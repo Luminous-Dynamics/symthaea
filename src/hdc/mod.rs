@@ -239,6 +239,7 @@ pub mod statistical_retrieval;
 pub mod sequence_encoder;
 pub mod resonator;
 pub mod morphogenetic;
+pub mod hebbian;
 
 // Re-export key types for convenience
 pub use statistical_retrieval::{
@@ -276,6 +277,24 @@ pub use morphogenetic::{
     FieldStats,
     corrupt_vector,
     random_vector,
+};
+
+pub use hebbian::{
+    HebbianEngine,
+    HebbianConfig,
+    HebbianStats,
+    Synapse,
+    ActivationRecord,
+    HebbianAssociativeMemory,
+    HebbianAssociativeStats,
+    DEFAULT_LEARNING_RATE,
+    DEFAULT_DECAY_RATE,
+    STDP_TAU_PLUS,
+    STDP_TAU_MINUS,
+    STDP_A_PLUS,
+    STDP_A_MINUS,
+    TARGET_ACTIVITY,
+    HOMEOSTATIC_TAU,
 };
 
 use anyhow::Result;
