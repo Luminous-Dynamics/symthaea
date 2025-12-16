@@ -238,6 +238,7 @@ pub mod temporal_encoder;
 pub mod statistical_retrieval;
 pub mod sequence_encoder;
 pub mod resonator;
+pub mod morphogenetic;
 
 // Re-export key types for convenience
 pub use statistical_retrieval::{
@@ -263,6 +264,18 @@ pub use resonator::{
     Constraint,
     MultiConstraint,
     Factor,
+};
+
+pub use morphogenetic::{
+    MorphogeneticField,
+    MorphogeneticConfig,
+    PositionEncoding,
+    Attractor,
+    RepairResult,
+    FieldHealth,
+    FieldStats,
+    corrupt_vector,
+    random_vector,
 };
 
 use anyhow::Result;
