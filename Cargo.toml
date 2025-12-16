@@ -1,0 +1,126 @@
+[package]
+name = "symthaea"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Symthaea: Holographic Liquid Brain lineage - Consciousness-first AI in Rust"
+license = "MIT"
+
+[dependencies]
+# HDC / Vector Symbolic Architectures
+# hypervector = "0.1"  # Using custom HDC implementation instead
+
+# Neural networks (for LTC implementation)
+# burn = { version = "0.14", features = ["ndarray"] }  # Simplified, no GPU for now
+ndarray = { version = "0.15", features = ["rayon"] }
+# ndarray-linalg = "0.16"  # Removed to avoid external BLAS dependency during tests
+
+# Graph structures (for autopoietic consciousness)
+petgraph = { version = "0.6", features = ["serde-1"] }
+
+# Phase 11: Semantic Ear (Deferred to Week 11+)
+# rust-bert = "0.21"  # For BERT-based models (EmbeddingGemma)
+# tokenizers = "0.15"  # Tokenization
+# safetensors = "0.4"  # Safe tensor loading
+
+# Phase 11: Database Trinity (Deferred to Week 11+)
+# lancedb = { version = "0.4", features = ["remote"] }  # Vector database
+# duckdb = { version = "0.10", features = ["bundled"] }  # Analytical queries
+# cozo = "0.7"  # Datalog reasoning
+
+# Phase 11: Swarm Intelligence (Deferred to Week 9+)
+# libp2p = { version = "0.53", features = ["kad", "gossipsub", "tcp", "noise", "yamux"] }
+
+# Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
+uuid = { version = "1.6", features = ["serde", "v4"] }  # Week 3: Enabled for Goal IDs
+# sha2 = "0.10"
+# reqwest = { version = "0.11", features = ["json"] }
+# urlencoding = "2.1"
+
+# Core async utilities
+async-trait = "0.1"
+
+# Phase 12: Resonator Networks (FFT for morphogenetic field)
+rustfft = "6.1"
+num-complex = "0.4"
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+rayon = "1.8"
+
+# Serialization (for consciousness persistence)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "1.3"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Week 0: Defer Prometheus metrics (needs OpenSSL via hyper)
+# metrics = "0.22"
+# metrics-exporter-prometheus = "0.13"
+
+# Utilities
+anyhow = "1.0"
+thiserror = "1.0"
+once_cell = "1.19"
+dashmap = "5.5"
+rand = "0.8"
+blake3 = "1.5"
+chrono = "0.4"
+regex = "1.10"  # For Thalamus pattern matching
+
+# Week 0: Memory Arena for HDC
+bumpalo = "3.14"
+
+# Week 2: Cerebellum - Procedural Memory
+qp-trie = "0.8"      # Efficient prefix trie for skill lookup
+strsim = "0.11"      # Fuzzy string matching for typo tolerance
+
+# Week 12: Perception & Tool Creation
+image = "0.24"       # Image loading and processing
+imageproc = "0.23"   # Computer vision algorithms
+tree-sitter = "0.20" # Incremental parsing for code understanding
+syn = { version = "2.0", features = ["full", "visit"] }  # Rust syntax parsing (self-analysis)
+ignore = "0.4"       # .gitignore-aware file walking
+
+# Week 12 Phase 2a: Voice Output (Larynx) - Kokoro TTS (optional)
+ort = { version = "2.0.0-rc.10", features = ["half"], optional = true }  # ONNX Runtime for Kokoro-82M model
+rodio = { version = "0.19", default-features = false, optional = true }  # Audio playback (no backends by default)
+hound = { version = "3.5", optional = true }        # WAV file I/O
+hf-hub = { version = "0.3", optional = true }       # HuggingFace Hub for model download
+
+# NixOS integration
+nix = "0.27"
+
+[features]
+default = []
+audio = ["rodio", "hound", "hf-hub", "ort"]
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.4"
+tempfile = "3.8"  # For perception tests
+
+# Examples
+[[example]]
+name = "social_coherence_demo"
+path = "demos/social_coherence_demo.rs"
+
+# Benchmarks (TODO: implement)
+# [[bench]]
+# name = "hdc_benchmark"
+# harness = false
+#
+# [[bench]]
+# name = "ltc_benchmark"
+# harness = false
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+[profile.bench]
+inherits = "release"

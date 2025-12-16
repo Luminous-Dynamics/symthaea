@@ -1,0 +1,16 @@
+# Rust build artifacts
+/target/
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+
+# Nix
+result
+result-*
+
+# Temporary files
+*.swp
+*.swo
+*~
