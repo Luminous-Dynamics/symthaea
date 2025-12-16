@@ -237,6 +237,7 @@ impl From<usize> for LtcNeuronCount {
 pub mod temporal_encoder;
 pub mod statistical_retrieval;
 pub mod sequence_encoder;
+pub mod resonator;
 
 // Re-export key types for convenience
 pub use statistical_retrieval::{
@@ -253,6 +254,15 @@ pub use sequence_encoder::{
     unpermute,
     bundle,
     bind,
+};
+
+pub use resonator::{
+    ResonatorNetwork,
+    ResonatorConfig,
+    ResonatorSolution,
+    Constraint,
+    MultiConstraint,
+    Factor,
 };
 
 use anyhow::Result;
