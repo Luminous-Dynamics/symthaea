@@ -19,11 +19,13 @@ use rust_bert::pipelines::sentence_embeddings::{
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use crate::hdc::HDC_DIMENSION;
+
 /// Dimension of EmbeddingGemma output (768D dense)
 const DENSE_DIM: usize = 768;
 
-/// Dimension of HDC hypervectors (10,000D sparse/bipolar)
-const HDC_DIM: usize = 10_000;
+/// Dimension of HDC hypervectors (16,384D sparse/bipolar - from central constant)
+const HDC_DIM: usize = HDC_DIMENSION;
 
 /// Number of hash functions for LSH
 const NUM_HASHES: usize = 128;

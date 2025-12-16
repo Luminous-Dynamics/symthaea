@@ -20,6 +20,8 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot};
 use tracing::{debug, error, info, instrument};
 
+use crate::hdc::HDC_DIMENSION;
+
 /// Shared ownership of dense vectors (zero-copy)
 pub type SharedVector = Arc<Vec<f64>>;
 
@@ -47,8 +49,7 @@ pub type SharedHdcVector = Arc<Vec<i8>>;
 /// // Use in OrganMessage::Query
 /// ```
 pub fn encode_text_to_hdc(text: &str) -> SharedHdcVector {
-    const HDC_DIM: usize = 10_000;
-    let mut vec = vec![0i8; HDC_DIM];
+    let mut vec = vec![0i8; HDC_DIMENSION];
 
     // ============================================================================
     // Week 15 Day 1: Hierarchical HDC Encoding 2.0
@@ -194,8 +195,8 @@ fn hash_string(s: &str) -> u64 {
 /// // Use in OrganMessage::Input
 /// ```
 pub fn encode_bid_to_hdc(bid: &SharedVector) -> SharedHdcVector {
-    const HDC_DIM: usize = 10_000;
-    let mut vec = vec![0i8; HDC_DIM];
+    use crate::hdc::HDC_DIMENSION;
+    let mut vec = vec![0i8; HDC_DIMENSION];
 
     // Random projection from dense to HDC space
     // Each dimension of bid influences multiple HDC dimensions
@@ -206,7 +207,7 @@ pub fn encode_bid_to_hdc(bid: &SharedVector) -> SharedHdcVector {
         // Map to multiple HDC dimensions based on magnitude
         let num_dims = ((magnitude * 20.0) as usize).min(20);
         for j in 0..num_dims {
-            let idx = (i * 97 + j * 73) % HDC_DIM;
+            let idx = (i * 97 + j * 73) % HDC_DIMENSION;
             vec[idx] = sign;
         }
     }
@@ -614,8 +615,9 @@ mod tests {
 
     #[test]
     fn test_encode_text_to_hdc_creates_correct_dimensions() {
+        use crate::hdc::HDC_DIMENSION;
         let hdc = encode_text_to_hdc("test query");
-        assert_eq!(hdc.len(), 10_000, "HDC vector must be 10K dimensions");
+        assert_eq!(hdc.len(), HDC_DIMENSION, "HDC vector must match HDC_DIMENSION");
     }
 
     #[test]
@@ -646,9 +648,10 @@ mod tests {
 
     #[test]
     fn test_encode_bid_to_hdc_creates_correct_dimensions() {
+        use crate::hdc::HDC_DIMENSION;
         let bid = Arc::new(vec![0.5, -0.3, 0.8, 0.2]);
         let hdc = encode_bid_to_hdc(&bid);
-        assert_eq!(hdc.len(), 10_000, "HDC vector must be 10K dimensions");
+        assert_eq!(hdc.len(), HDC_DIMENSION, "HDC vector must match HDC_DIMENSION");
     }
 
     #[test]
@@ -892,11 +895,12 @@ mod tests {
 
     #[test]
     fn test_encode_bid_handles_large_vectors() {
+        use crate::hdc::HDC_DIMENSION;
         // Test with 512-dim bid (typical EmbeddingGemma size)
         let bid = Arc::new(vec![0.1; 512]);
         let hdc = encode_bid_to_hdc(&bid);
 
-        assert_eq!(hdc.len(), 10_000);
+        assert_eq!(hdc.len(), HDC_DIMENSION, "HDC vector must match HDC_DIMENSION");
         // Should have non-zero values
         let non_zero = hdc.iter().filter(|&&v| v != 0).count();
         assert!(non_zero > 0, "HDC should have non-zero values");

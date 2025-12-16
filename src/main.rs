@@ -18,11 +18,13 @@ async fn main() -> Result<()> {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // Initialize complete system (Phase 10 + Phase 11)
-    let mut sophia = SophiaHLB::new(10_000, 1_000).await?;
+    // Uses central HDC_DIMENSION (16,384) and LTC_NEURONS (1,024) from hdc module
+    use symthaea::hdc::{HDC_DIMENSION, LTC_NEURONS};
+    let mut sophia = SophiaHLB::new(HDC_DIMENSION, LTC_NEURONS).await?;
 
     println!("✅ Symthaea initialized with:");
-    println!("   • HDC Semantic Space (10,000D)");
-    println!("   • Liquid Time-Constant Network (1,000 neurons)");
+    println!("   • HDC Semantic Space ({}D)", HDC_DIMENSION);
+    println!("   • LTC Network ({} neurons)", LTC_NEURONS);
     println!("   • Autopoietic Consciousness Graph");
     println!("   • Phase 11: Semantic Ear (EmbeddingGemma + LSH)");
     println!("   • Phase 11: Safety Guardrails (Forbidden Subspace)");

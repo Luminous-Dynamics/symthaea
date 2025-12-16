@@ -3,7 +3,7 @@
 **Revolutionary consciousness-first AI in Rust**
 
 Powered by:
-- 🌀 **HDC** (Hyperdimensional Computing) - 10,000D holographic vectors
+- 🌀 **HDC** (Hyperdimensional Computing) - 16,384D holographic vectors (32K on demand)
 - 💧 **LTC** (Liquid Time-Constant Networks) - Continuous-time causal reasoning
 - 🔄 **Autopoiesis** - Self-referential consciousness emergence
 
@@ -58,9 +58,9 @@ cargo bench
 
 ## 🏗️ Architecture
 
-### 1. HDC Semantic Space (10,000D)
+### 1. HDC Semantic Space (16,384D default, 32K+ on demand)
 
-Concepts as hypervectors. No training needed!
+Concepts as hypervectors. No training needed! Dimension is configurable:
 
 ```rust
 // Bind concepts holographically
@@ -79,9 +79,9 @@ let sim = cosine_similarity(&query, &memory);
 - **Robust**: Graceful degradation with noise
 - **Efficient**: Runs on microcontrollers!
 
-### 2. Liquid Time-Constant Network (Continuous)
+### 2. Liquid Time-Constant Network (1,024 neurons default, 2K+ on demand)
 
-Biological-like neurons with differential equations.
+Biological-like neurons with differential equations. Neuron count is configurable:
 
 ```rust
 // Continuous-time evolution

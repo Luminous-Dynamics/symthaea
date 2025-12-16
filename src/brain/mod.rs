@@ -7,6 +7,7 @@
 //! Week 3 Days 1-2: Prefrontal Cortex (Global Workspace)
 //! Week 16 Day 1: Sleep Cycle Manager (Memory Consolidation)
 //! Week 16 Day 2: Memory Consolidation Core (HDC-based compression)
+//! Week 18: Active Inference Engine (Free Energy Principle)
 
 pub mod actor_model;
 pub mod thalamus;
@@ -17,6 +18,7 @@ pub mod meta_cognition;
 pub mod daemon;
 pub mod sleep;
 pub mod consolidation;
+pub mod active_inference;
 
 pub use actor_model::{
     Actor,
@@ -75,4 +77,13 @@ pub use consolidation::{
     MemoryConsolidator,
     SemanticMemoryTrace,
     ConsolidationConfig,
+};
+pub use active_inference::{
+    ActiveInferenceEngine,
+    GenerativeModel,
+    PredictionError,
+    PredictionDomain,
+    ActionType,
+    ActiveInferenceStats,
+    ActiveInferenceSummary,
 };

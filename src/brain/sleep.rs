@@ -383,6 +383,11 @@ impl SleepCycleManager {
             }
         }
 
+        // Enforce max output size
+        if novel_patterns.len() > 5 {
+            novel_patterns.truncate(5);
+        }
+
         novel_patterns
     }
 

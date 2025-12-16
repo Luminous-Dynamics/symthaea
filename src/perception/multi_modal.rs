@@ -22,8 +22,9 @@
 use anyhow::Result;
 use std::time::Instant;
 
-// Hyperdimensional Computing constants
-const HDC_DIM: usize = 10_000;
+// Use central HDC dimension constant
+use crate::hdc::HDC_DIMENSION;
+const HDC_DIM: usize = HDC_DIMENSION;
 
 /// Placeholder HDC vector type - 10,000D holographic vector
 /// TODO: Replace with proper HDC implementation from hdc module

@@ -37,8 +37,9 @@ use std::collections::VecDeque;
 use tracing::{info, warn, instrument};
 
 /// Dimensionality of the K-Vector (consciousness shape)
-/// Matches the HDC dimensionality from Phase 10
-const K_VECTOR_DIM: usize = 10_000;
+/// Uses central HDC dimension constant
+use crate::hdc::HDC_DIMENSION;
+const K_VECTOR_DIM: usize = HDC_DIMENSION;
 
 /// Semantic centroid dimension (mean embedding)
 const SEMANTIC_DIM: usize = 512;

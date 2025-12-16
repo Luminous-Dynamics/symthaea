@@ -21,8 +21,11 @@ Integration Points:
 use std::time::Duration;
 use anyhow::Result;
 
+use super::HDC_DIMENSION;
+
 /// Default HDC dimension (matches semantic space)
-pub const DEFAULT_DIMENSION: usize = 10_000;
+/// Re-exported from central constant for backward compatibility
+pub const DEFAULT_DIMENSION: usize = HDC_DIMENSION;
 
 /// Default time scale for one full rotation (24 hours)
 pub const DEFAULT_TIME_SCALE_SECS: u64 = 24 * 60 * 60;
@@ -390,7 +393,11 @@ mod tests {
 
     #[test]
     fn test_temporal_encoding_performance() {
-        // Encoding should be fast (<3ms per operation, allow CI variance)
+        // Encoding should be fast - threshold accounts for:
+        // - 16,384D vectors (1.64x vs original 10K)
+        // - Debug mode overhead (~2-3x)
+        // - CI variance
+        // Target: <10ms in debug, <3ms in release
         use std::time::Instant;
 
         let encoder = TemporalEncoder::new();
@@ -404,8 +411,10 @@ mod tests {
         let elapsed = start.elapsed();
         let avg_time = elapsed.as_micros() / 100;
 
-        assert!(avg_time < 3000, "Average encoding time {}μs should be <3ms", avg_time);
-        println!("✅ Temporal encoding: {}μs average (target: <3000μs)", avg_time);
+        // Relaxed threshold for debug mode with 16K dimensions
+        let threshold = if cfg!(debug_assertions) { 10_000 } else { 3_000 };
+        assert!(avg_time < threshold, "Average encoding time {}μs should be <{}μs", avg_time, threshold);
+        println!("✅ Temporal encoding: {}μs average (target: <{}μs)", avg_time, threshold);
     }
 
     #[test]

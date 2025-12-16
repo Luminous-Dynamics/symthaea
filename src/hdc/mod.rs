@@ -1,7 +1,7 @@
 /*!
 Hyperdimensional Computing (HDC) Semantic Space
 
-10,000D holographic vectors for consciousness
+16,384D holographic vectors for consciousness (2^14 - SIMD-optimized)
 Memory IS computation - no separate storage needed!
 
 Module Structure:
@@ -10,6 +10,229 @@ Module Structure:
 - statistical_retrieval.rs: Week 17 Critical Fix #1 (z-score + margin + unbind)
 - sequence_encoder.rs: Week 17 Critical Fix #2 (permutation-based order preservation)
 */
+
+// =============================================================================
+// CENTRAL HDC CONFIGURATION - Single Source of Truth
+// =============================================================================
+
+/// Default HDC dimension: 16,384 (2^14)
+///
+/// **16,384 dimensions** chosen for:
+/// - **SIMD optimization**: Power of 2 aligns perfectly with vector registers
+/// - **Memory alignment**: Natural 64-byte cache line boundaries
+/// - **Orthogonality**: Higher dimensions = better near-orthogonality of random vectors
+/// - **Capacity**: More bits = more distinct concepts before saturation
+/// - **Balance**: Good accuracy vs memory tradeoff for most use cases
+///
+/// # Usage
+/// ```rust
+/// use symthaea::hdc::HDC_DIMENSION;
+/// let vector = vec![0i8; HDC_DIMENSION];
+/// ```
+pub const HDC_DIMENSION: usize = 16_384;
+
+/// Extended HDC dimension: 32,768 (2^15)
+///
+/// **32K dimensions** for:
+/// - **Higher capacity**: 2x more distinct concepts before saturation
+/// - **Complex semantic spaces**: Rich multi-modal embeddings
+/// - **Deep temporal encoding**: Fine-grained chrono-semantic resolution
+///
+/// # Memory Cost
+/// - 16K: ~16KB per bipolar vector
+/// - 32K: ~32KB per bipolar vector (2x memory)
+pub const HDC_DIMENSION_32K: usize = 32_768;
+
+/// Maximum HDC dimension: 65,536 (2^16)
+///
+/// **64K dimensions** for extreme precision requirements
+pub const HDC_DIMENSION_64K: usize = 65_536;
+
+/// HDC dimensionality configuration for runtime selection
+///
+/// Supports both predefined tiers and custom arbitrary dimensions.
+/// All dimensions should be powers of 2 for optimal SIMD performance.
+///
+/// # Predefined Tiers
+/// - **Standard (16K)**: Good balance of accuracy and memory
+/// - **Extended (32K)**: Higher semantic capacity
+/// - **Ultra (64K)**: Maximum precision
+/// - **Custom**: Any dimension (should be power of 2)
+///
+/// # Usage
+/// ```rust
+/// use symthaea::hdc::HdcDimensionality;
+///
+/// // Use predefined tier
+/// let standard = HdcDimensionality::Standard;
+/// assert_eq!(standard.dimension(), 16_384);
+///
+/// // Use custom dimension (128K for extreme cases)
+/// let ultra_custom = HdcDimensionality::Custom(131_072);
+/// assert_eq!(ultra_custom.dimension(), 131_072);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum HdcDimensionality {
+    /// Standard 16,384 dimensions (2^14) - good balance of accuracy and memory
+    Standard,
+    /// Extended 32,768 dimensions (2^15) - higher semantic capacity
+    Extended,
+    /// Ultra 65,536 dimensions (2^16) - maximum precision
+    Ultra,
+    /// Custom dimensions - any power of 2 (32K+ recommended)
+    Custom(usize),
+}
+
+impl HdcDimensionality {
+    /// Get the numeric dimension value
+    pub const fn dimension(&self) -> usize {
+        match self {
+            Self::Standard => HDC_DIMENSION,
+            Self::Extended => HDC_DIMENSION_32K,
+            Self::Ultra => HDC_DIMENSION_64K,
+            Self::Custom(dim) => *dim,
+        }
+    }
+
+    /// Create from dimension value
+    ///
+    /// Automatically maps to predefined tiers if exact match,
+    /// otherwise creates Custom variant.
+    pub const fn from_dimension(dim: usize) -> Self {
+        match dim {
+            16_384 => Self::Standard,
+            32_768 => Self::Extended,
+            65_536 => Self::Ultra,
+            _ => Self::Custom(dim),
+        }
+    }
+
+    /// Check if dimension is a power of 2 (recommended for SIMD)
+    pub const fn is_power_of_two(&self) -> bool {
+        let dim = self.dimension();
+        dim > 0 && (dim & (dim - 1)) == 0
+    }
+
+    /// Check if dimension is a predefined tier
+    pub const fn is_predefined(&self) -> bool {
+        matches!(self, Self::Standard | Self::Extended | Self::Ultra)
+    }
+
+    /// Get memory usage per bipolar vector in bytes
+    pub const fn memory_per_vector(&self) -> usize {
+        self.dimension() // Each i8 element is 1 byte
+    }
+
+    /// Get memory usage per f32 vector in bytes
+    pub const fn memory_per_f32_vector(&self) -> usize {
+        self.dimension() * 4 // Each f32 element is 4 bytes
+    }
+}
+
+impl Default for HdcDimensionality {
+    fn default() -> Self {
+        Self::Standard
+    }
+}
+
+impl From<usize> for HdcDimensionality {
+    fn from(dim: usize) -> Self {
+        Self::from_dimension(dim)
+    }
+}
+
+// =============================================================================
+// CENTRAL LTC CONFIGURATION - Liquid Time-Constant Network
+// =============================================================================
+
+/// Default LTC neuron count: 1,024 (2^10)
+///
+/// **1,024 neurons** chosen for:
+/// - **SIMD optimization**: Power of 2 aligns with vector registers
+/// - **Memory alignment**: Natural cache line boundaries
+/// - **Balance**: Good temporal dynamics vs compute cost
+/// - **Biological plausibility**: ~10^3 scale for cortical columns
+///
+/// # Usage
+/// ```rust
+/// use symthaea::hdc::LTC_NEURONS;
+/// let neurons = vec![0.0f32; LTC_NEURONS];
+/// ```
+pub const LTC_NEURONS: usize = 1_024;
+
+/// Extended LTC neuron count: 2,048 (2^11)
+///
+/// **2K neurons** for:
+/// - **Higher temporal capacity**: More nuanced time dynamics
+/// - **Complex causal reasoning**: Finer-grained cause-effect modeling
+pub const LTC_NEURONS_2K: usize = 2_048;
+
+/// Maximum LTC neuron count: 4,096 (2^12)
+///
+/// **4K neurons** for extreme temporal precision
+pub const LTC_NEURONS_4K: usize = 4_096;
+
+/// LTC neuron count configuration for runtime selection
+///
+/// Supports both predefined tiers and custom arbitrary counts.
+/// All counts should be powers of 2 for optimal SIMD performance.
+///
+/// # Predefined Tiers
+/// - **Standard (1K)**: Good balance of dynamics and compute
+/// - **Extended (2K)**: Higher temporal capacity
+/// - **Ultra (4K)**: Maximum precision
+/// - **Custom**: Any count (should be power of 2)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LtcNeuronCount {
+    /// Standard 1,024 neurons (2^10) - good balance
+    Standard,
+    /// Extended 2,048 neurons (2^11) - higher capacity
+    Extended,
+    /// Ultra 4,096 neurons (2^12) - maximum precision
+    Ultra,
+    /// Custom neuron count - any power of 2 (1K+ recommended)
+    Custom(usize),
+}
+
+impl LtcNeuronCount {
+    /// Get the numeric neuron count
+    pub const fn count(&self) -> usize {
+        match self {
+            Self::Standard => LTC_NEURONS,
+            Self::Extended => LTC_NEURONS_2K,
+            Self::Ultra => LTC_NEURONS_4K,
+            Self::Custom(n) => *n,
+        }
+    }
+
+    /// Create from neuron count
+    pub const fn from_count(n: usize) -> Self {
+        match n {
+            1_024 => Self::Standard,
+            2_048 => Self::Extended,
+            4_096 => Self::Ultra,
+            _ => Self::Custom(n),
+        }
+    }
+
+    /// Check if count is a power of 2 (recommended for SIMD)
+    pub const fn is_power_of_two(&self) -> bool {
+        let n = self.count();
+        n > 0 && (n & (n - 1)) == 0
+    }
+}
+
+impl Default for LtcNeuronCount {
+    fn default() -> Self {
+        Self::Standard
+    }
+}
+
+impl From<usize> for LtcNeuronCount {
+    fn from(n: usize) -> Self {
+        Self::from_count(n)
+    }
+}
 
 pub mod temporal_encoder;
 pub mod statistical_retrieval;
@@ -38,10 +261,10 @@ use anyhow::Result;
 use std::collections::HashMap;
 use bumpalo::Bump;
 
-/// Semantic space using 10,000D hypervectors
+/// Semantic space using high-dimensional hypervectors
 #[derive(Debug)]
 pub struct SemanticSpace {
-    /// Dimensionality (typically 10,000)
+    /// Dimensionality (default: HDC_DIMENSION = 16,384)
     dimension: usize,
 
     /// Concept library
@@ -211,7 +434,7 @@ impl SemanticSpace {
 
     pub fn deserialize(data: &[u8]) -> Result<Self> {
         let concepts: HashMap<String, Vec<f32>> = bincode::deserialize(data)?;
-        let dimension = concepts.values().next().map(|v| v.len()).unwrap_or(10_000);
+        let dimension = concepts.values().next().map(|v| v.len()).unwrap_or(HDC_DIMENSION);
 
         Ok(Self {
             dimension,

@@ -2,7 +2,7 @@
 Sophia: Holographic Liquid Brain
 
 Revolutionary consciousness-first AI combining:
-- HDC (Hyperdimensional Computing) - 10,000D holographic vectors
+- HDC (Hyperdimensional Computing) - 16,384D holographic vectors (32K+ on demand)
 - LTC (Liquid Time-Constant Networks) - Continuous-time causal reasoning
 - Autopoiesis - Self-referential consciousness emergence
 - Phase 11 Bio-Digital Bridge - Semantic grounding, safety, memory, swarm
