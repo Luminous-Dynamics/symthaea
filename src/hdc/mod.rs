@@ -240,6 +240,7 @@ pub mod sequence_encoder;
 pub mod resonator;
 pub mod morphogenetic;
 pub mod hebbian;
+pub mod sdm;
 
 // Re-export key types for convenience
 pub use statistical_retrieval::{
@@ -295,6 +296,24 @@ pub use hebbian::{
     STDP_A_MINUS,
     TARGET_ACTIVITY,
     HOMEOSTATIC_TAU,
+};
+
+pub use sdm::{
+    SparseDistributedMemory,
+    SDMConfig,
+    HardLocation,
+    WriteResult,
+    ReadResult,
+    IterativeReadResult,
+    SDMStats,
+    EpisodicSDM,
+    hamming_similarity,
+    random_bipolar_vector,
+    add_noise,
+    DEFAULT_NUM_HARD_LOCATIONS,
+    DEFAULT_ACTIVATION_RADIUS,
+    COUNTER_MAX,
+    COUNTER_MIN,
 };
 
 use anyhow::Result;
