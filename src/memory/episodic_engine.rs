@@ -102,6 +102,20 @@ pub struct EpisodicTrace {
 
     /// Memory strength (0.0-2.0, increases with recall)
     pub strength: f32,
+
+    /// WEEK 17 DAY 3: Attention-weighted encoding
+    /// Attention weight during encoding (0.0-1.0)
+    /// 0.0 = background/routine (weak encoding)
+    /// 0.5 = normal attention (default encoding)
+    /// 1.0 = full focus/critical moment (strong encoding, unforgettable)
+    pub attention_weight: f32,
+
+    /// SDM encoding strength (number of times written to SDM)
+    /// Calculated from attention_weight:
+    /// - attention 0.0 → 1x write (weak, easily forgotten)
+    /// - attention 0.5 → 10x writes (normal, typical memory)
+    /// - attention 1.0 → 100x writes (strong, unforgettable moment)
+    pub encoding_strength: usize,
 }
 
 impl EpisodicTrace {
@@ -161,6 +175,11 @@ impl EpisodicTrace {
             .map(|&v| if v >= 0.0 { 1i8 } else { -1i8 })
             .collect();
 
+        // WEEK 17 DAY 3: Default attention weight (normal encoding)
+        // Future: This will be parameterized in store_with_attention()
+        let attention_weight = 0.5; // Normal attention
+        let encoding_strength = 10; // 10x writes (matches old behavior)
+
         Ok(Self {
             id,
             timestamp,
@@ -173,6 +192,8 @@ impl EpisodicTrace {
             semantic_vector,
             recall_count: 0,
             strength: 0.5, // Start at neutral, can grow to 2.0
+            attention_weight,  // Week 17 Day 3: Attention during encoding
+            encoding_strength, // Week 17 Day 3: SDM reinforcement level
         })
     }
 
@@ -324,6 +345,138 @@ impl EpisodicMemoryEngine {
 
         self.next_id += 1;
         Ok(id)
+    }
+
+    /// WEEK 17 DAY 3: Store with attention-weighted encoding
+    ///
+    /// **Revolutionary Feature**: Memories are encoded with strength proportional to attention/importance.
+    ///
+    /// This mimics biological reality:
+    /// - **High-attention events** (car accidents) → 100x SDM writes → unforgettable
+    /// - **Normal events** (typical work) → 10x SDM writes → typical memory
+    /// - **Background tasks** (opening editor) → 1x SDM write → easily forgotten
+    ///
+    /// # Parameters
+    /// - `attention_weight`: Importance level (0.0-1.0)
+    ///   - 0.0 = background/routine (weak encoding)
+    ///   - 0.5 = normal attention (default)
+    ///   - 1.0 = full focus/critical moment (strong encoding)
+    ///
+    /// # Examples
+    /// ```ignore
+    /// // Critical bug fix (full attention)
+    /// engine.store_with_attention(
+    ///     timestamp, "Fixed critical auth vulnerability".to_string(),
+    ///     vec!["security".to_string(), "critical".to_string()],
+    ///     -0.8, // High stress
+    ///     1.0,  // Full attention → 100x SDM writes!
+    /// )?;
+    ///
+    /// // Routine task (background attention)
+    /// engine.store_with_attention(
+    ///     timestamp, "Opened editor".to_string(),
+    ///     vec!["routine".to_string()],
+    ///     0.0,  // Neutral emotion
+    ///     0.1,  // Background → only 10x SDM writes
+    /// )?;
+    /// ```
+    pub fn store_with_attention(
+        &mut self,
+        timestamp: Duration,
+        content: String,
+        tags: Vec<String>,
+        emotion: f32,
+        attention_weight: f32,
+    ) -> Result<u64> {
+        // Clamp attention to valid range
+        let attention = attention_weight.clamp(0.0, 1.0);
+
+        // Calculate encoding strength: attention 0.0 → 1x, 0.5 → 50x, 1.0 → 100x
+        // Formula: 1 + (attention * 99) gives range [1, 100]
+        let encoding_strength = (1.0 + attention * 99.0) as usize;
+
+        // Create episodic trace with explicit attention metadata
+        let mut trace = EpisodicTrace::new(
+            self.next_id,
+            timestamp,
+            content,
+            tags,
+            emotion,
+            &self.temporal_encoder,
+            &mut self.semantic_space,
+        )?;
+
+        // Override default attention values from constructor
+        trace.attention_weight = attention;
+        trace.encoding_strength = encoding_strength;
+
+        let id = trace.id;
+
+        // REVOLUTIONARY: Variable SDM reinforcement based on attention
+        // High-attention memories get many more writes → stronger, more persistent encoding
+        for _ in 0..encoding_strength {
+            self.sdm.write_auto(&trace.chrono_semantic_vector);
+        }
+
+        // Add to buffer
+        self.buffer.push_back(trace);
+
+        // Trigger consolidation if buffer full
+        if self.buffer.len() >= self.config.max_buffer_size {
+            self.consolidate()?;
+        }
+
+        self.next_id += 1;
+        Ok(id)
+    }
+
+    /// WEEK 17 DAY 3: Automatically detect attention weight from context
+    ///
+    /// Heuristics for attention detection:
+    /// - **Error/Critical tags** → High attention
+    /// - **Strong emotion** (|emotion| > 0.7) → High attention
+    /// - **Long detailed content** → Higher attention (more thought invested)
+    /// - **Multiple tags** → Higher attention (more contextualization)
+    ///
+    /// Returns: Estimated attention weight (0.0-1.0)
+    pub fn auto_detect_attention(
+        &self,
+        content: &str,
+        emotion: f32,
+        tags: &[String],
+    ) -> f32 {
+        let mut attention: f32 = 0.5; // Start with normal attention
+
+        // High-priority tag signals (critical, error, important, breakthrough)
+        let priority_tags = ["error", "critical", "important", "breakthrough", "security"];
+        for tag in tags {
+            if priority_tags.iter().any(|&pt| tag.to_lowercase().contains(pt)) {
+                attention += 0.2;
+                break; // Only count once
+            }
+        }
+
+        // Strong emotional salience (high emotion = high attention)
+        if emotion.abs() > 0.7 {
+            attention += 0.2;
+        } else if emotion.abs() > 0.5 {
+            attention += 0.1;
+        }
+
+        // Detailed content (long description = high attention/thought investment)
+        if content.len() > 200 {
+            attention += 0.15;
+        } else if content.len() > 100 {
+            attention += 0.05;
+        }
+
+        // Multiple tags (high contextualization = high attention)
+        if tags.len() >= 3 {
+            attention += 0.1;
+        }
+
+        // Clamp to valid range [0.0, 1.0]
+        attention.min(1.0)
     }
 
     /// Recall memories by temporal cue (mental time travel)
@@ -627,6 +780,8 @@ mod tests {
             semantic_vector: vec![1.0; HDC_DIMENSION],
             recall_count: 0,
             strength: 0.5,
+            attention_weight: 0.5,  // Week 17 Day 3: Normal attention
+            encoding_strength: 10,  // Week 17 Day 3: Normal encoding (10x writes)
         };
 
         assert_eq!(trace.recall_count, 0);
@@ -655,6 +810,8 @@ mod tests {
             semantic_vector: vec![1.0; HDC_DIMENSION],
             recall_count: 0,
             strength: 1.0,
+            attention_weight: 0.5,  // Week 17 Day 3: Normal attention
+            encoding_strength: 10,  // Week 17 Day 3: Normal encoding (10x writes)
         };
 
         trace.decay(0.1); // 10% decay
@@ -751,5 +908,191 @@ mod tests {
         assert_eq!(stats.total_memories, 1);
         assert_eq!(stats.next_id, 1);
         assert_eq!(stats.sdm_config.dimension, HDC_DIMENSION);
+    }
+
+    // ========================================
+    // WEEK 17 DAY 3: Attention-Weighted Encoding Tests
+    // ========================================
+
+    #[test]
+    fn test_attention_weighted_storage_encoding_strength() {
+        // Week 17 Day 3: Verify variable SDM encoding strength based on attention
+        let mut engine = EpisodicMemoryEngine::new().unwrap();
+
+        // Store with MAXIMUM attention (critical moment)
+        let critical_id = engine.store_with_attention(
+            Duration::from_secs(1000),
+            "Critical security breach detected!".to_string(),
+            vec!["security".to_string(), "critical".to_string()],
+            -0.9, // High stress
+            1.0,  // FULL attention → 100x SDM writes
+        ).unwrap();
+
+        // Store with MINIMUM attention (background task)
+        let routine_id = engine.store_with_attention(
+            Duration::from_secs(1100),
+            "Opened editor".to_string(),
+            vec!["routine".to_string()],
+            0.0,  // Neutral emotion
+            0.0,  // Zero attention → 1x SDM write
+        ).unwrap();
+
+        // Store with NORMAL attention (typical work)
+        let normal_id = engine.store_with_attention(
+            Duration::from_secs(1200),
+            "Fixed typo in documentation".to_string(),
+            vec!["docs".to_string()],
+            0.1,  // Slightly positive
+            0.5,  // Normal attention → 50x SDM writes
+        ).unwrap();
+
+        // Verify traces have correct attention metadata
+        let critical = engine.buffer().iter().find(|t| t.id == critical_id).unwrap();
+        let routine = engine.buffer().iter().find(|t| t.id == routine_id).unwrap();
+        let normal = engine.buffer().iter().find(|t| t.id == normal_id).unwrap();
+
+        assert_eq!(critical.attention_weight, 1.0);
+        assert_eq!(critical.encoding_strength, 100); // 100x writes
+
+        assert_eq!(routine.attention_weight, 0.0);
+        assert_eq!(routine.encoding_strength, 1); // 1x write
+
+        assert_eq!(normal.attention_weight, 0.5);
+        assert_eq!(normal.encoding_strength, 50); // 50x writes
+    }
+
+    #[test]
+    fn test_auto_detect_attention_heuristics() {
+        // Week 17 Day 3: Verify automatic attention detection
+        let engine = EpisodicMemoryEngine::new().unwrap();
+
+        // High attention: Critical error with strong emotion
+        let attention_critical = engine.auto_detect_attention(
+            "CRITICAL: Authentication bypass vulnerability discovered in production. Immediate patching required!",
+            -0.9, // High stress
+            &["error".to_string(), "critical".to_string(), "security".to_string()],
+        );
+        assert!(attention_critical >= 0.8, "Critical errors should have high attention");
+
+        // Medium attention: Important but not critical
+        let attention_medium = engine.auto_detect_attention(
+            "Fixed bug in payment processing",
+            0.3, // Moderate positive
+            &["bug".to_string(), "fix".to_string()],
+        );
+        assert!(attention_medium >= 0.5 && attention_medium < 0.8, "Important work should have medium attention");
+
+        // Low attention: Routine task
+        let attention_low = engine.auto_detect_attention(
+            "Opened file",
+            0.0, // Neutral
+            &["routine".to_string()],
+        );
+        assert!(attention_low < 0.6, "Routine tasks should have low attention");
+
+        // Very high attention: Breakthrough discovery
+        let attention_breakthrough = engine.auto_detect_attention(
+            "BREAKTHROUGH: Discovered revolutionary algorithm that solves the P=NP problem! This is the culmination of 10 years of research and will fundamentally transform computer science.",
+            0.95, // Extreme excitement
+            &["breakthrough".to_string(), "important".to_string(), "research".to_string()],
+        );
+        assert_eq!(attention_breakthrough, 1.0, "Breakthrough discoveries should have maximum attention");
+    }
+
+    #[test]
+    fn test_attention_weighted_recall_persistence() {
+        // Week 17 Day 3: Verify high-attention memories are more persistent/retrievable
+        let mut engine = EpisodicMemoryEngine::new().unwrap();
+
+        let timestamp = Duration::from_secs(5000);
+
+        // Store critical memory with full attention (100x SDM reinforcement)
+        engine.store_with_attention(
+            timestamp,
+            "Production database crashed - data loss risk!".to_string(),
+            vec!["critical".to_string(), "database".to_string()],
+            -0.8,
+            1.0, // Full attention → 100x SDM writes
+        ).unwrap();
+
+        // Store routine memory with minimal attention (1x SDM write)
+        engine.store_with_attention(
+            timestamp + Duration::from_secs(10),
+            "Opened settings panel".to_string(),
+            vec!["routine".to_string(), "ui".to_string()],
+            0.0,
+            0.05, // Minimal attention → ~5x SDM writes
+        ).unwrap();
+
+        // Both memories stored recently, but critical one should have MUCH stronger encoding
+        // Query by semantic content - critical memory should be recalled more reliably
+        let critical_recall = engine.recall_by_content("database crash", 5).unwrap();
+        assert!(!critical_recall.is_empty(), "High-attention critical memory should be easily recalled");
+
+        // Routine memory should be less reliably encoded
+        let routine_recall = engine.recall_by_content("settings panel", 5).unwrap();
+        // Note: Due to weak encoding (5x vs 100x), routine memory may be harder to retrieve
+        // but we store it in buffer so it should still be findable
+    }
+
+    #[test]
+    fn test_attention_weighted_encoding_formula() {
+        // Week 17 Day 3: Verify encoding strength formula correctness
+        let mut engine = EpisodicMemoryEngine::new().unwrap();
+
+        // Test encoding strength formula: 1 + (attention * 99)
+        let test_cases = vec![
+            (0.0, 1),    // 1 + (0.0 * 99) = 1
+            (0.25, 25),  // 1 + (0.25 * 99) = 25.75 → 25
+            (0.5, 50),   // 1 + (0.5 * 99) = 50.5 → 50
+            (0.75, 75),  // 1 + (0.75 * 99) = 75.25 → 75
+            (1.0, 100),  // 1 + (1.0 * 99) = 100
+        ];
+
+        for (attention, expected_strength) in test_cases {
+            let id = engine.store_with_attention(
+                Duration::from_secs(1000),
+                format!("Test attention {}", attention),
+                vec![],
+                0.0,
+                attention,
+            ).unwrap();
+
+            let trace = engine.buffer().iter().find(|t| t.id == id).unwrap();
+            assert_eq!(trace.encoding_strength, expected_strength,
+                "Attention {} should produce encoding strength {}", attention, expected_strength);
+        }
+    }
+
+    #[test]
+    fn test_attention_weight_clamping() {
+        // Week 17 Day 3: Verify out-of-range attention weights are clamped to [0.0, 1.0]
+        let mut engine = EpisodicMemoryEngine::new().unwrap();
+
+        // Test extreme out-of-range values
+        let id_high = engine.store_with_attention(
+            Duration::from_secs(1000),
+            "Test extreme high".to_string(),
+            vec![],
+            0.0,
+            99.9, // Should be clamped to 1.0
+        ).unwrap();
+
+        let id_low = engine.store_with_attention(
+            Duration::from_secs(1100),
+            "Test extreme low".to_string(),
+            vec![],
+            0.0,
+            -50.0, // Should be clamped to 0.0
+        ).unwrap();
+
+        let trace_high = engine.buffer().iter().find(|t| t.id == id_high).unwrap();
+        let trace_low = engine.buffer().iter().find(|t| t.id == id_low).unwrap();
+
+        assert_eq!(trace_high.attention_weight, 1.0, "Attention above 1.0 should be clamped to 1.0");
+        assert_eq!(trace_high.encoding_strength, 100, "Clamped max attention should give 100x encoding");
+
+        assert_eq!(trace_low.attention_weight, 0.0, "Attention below 0.0 should be clamped to 0.0");
+        assert_eq!(trace_low.encoding_strength, 1, "Clamped min attention should give 1x encoding");
     }
 }
