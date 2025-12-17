@@ -118,6 +118,73 @@ pub struct EpisodicTrace {
     pub encoding_strength: usize,
 }
 
+// ============================================================================
+// CAUSAL CHAIN - Week 17 Day 4 Revolutionary Enhancement
+// ============================================================================
+
+/// A causal chain linking episodic memories through cause-effect relationships
+///
+/// This is the REVOLUTIONARY enhancement that transforms episodic memory from
+/// isolated facts ("I did X at time T") into causal narratives ("I did X, which
+/// caused Y, which led to Z").
+///
+/// **Paradigm Shift**: Enables "why" questions, not just "what/when" queries.
+///
+/// # Example
+/// Query: "Why did the deployment fail?"
+/// Answer: Causal chain reconstruction:
+/// 1. "Updated dependencies" (9:00 AM)
+///    ↓ (causal link: 0.85)
+/// 2. "Tests started failing" (9:15 AM)
+///    ↓ (causal link: 0.92)
+/// 3. "Deployment blocked by CI" (9:30 AM)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CausalChain {
+    /// Memories in chronological order (earliest first, latest last)
+    pub chain: Vec<EpisodicTrace>,
+
+    /// Causal strength between adjacent memories (0.0-1.0)
+    /// causal_links[i] = strength of causal link from chain[i] → chain[i+1]
+    /// Length is chain.len() - 1
+    pub causal_links: Vec<f32>,
+
+    /// Overall chain coherence (average of causal links)
+    /// Higher coherence = stronger causal narrative
+    pub coherence: f32,
+}
+
+impl CausalChain {
+    /// Create new causal chain from memories and causal link strengths
+    pub fn new(chain: Vec<EpisodicTrace>, causal_links: Vec<f32>) -> Self {
+        let coherence = if causal_links.is_empty() {
+            0.0
+        } else {
+            causal_links.iter().sum::<f32>() / causal_links.len() as f32
+        };
+
+        Self {
+            chain,
+            causal_links,
+            coherence,
+        }
+    }
+
+    /// Get the root cause (earliest memory in chain)
+    pub fn root_cause(&self) -> Option<&EpisodicTrace> {
+        self.chain.first()
+    }
+
+    /// Get the final effect (latest memory in chain)
+    pub fn final_effect(&self) -> Option<&EpisodicTrace> {
+        self.chain.last()
+    }
+
+    /// Get the length of the causal chain
+    pub fn length(&self) -> usize {
+        self.chain.len()
+    }
+}
+
 impl EpisodicTrace {
     /// Create new episodic trace with chrono-semantic binding
     ///
@@ -640,6 +707,209 @@ impl EpisodicMemoryEngine {
         Ok(())
     }
 
+    // ========================================================================
+    // WEEK 17 DAY 4: Causal Chain Reconstruction - REVOLUTIONARY METHODS
+    // ========================================================================
+
+    /// **REVOLUTIONARY**: Reconstruct causal chains from fragmentary memories
+    ///
+    /// This method walks BACKWARD in time from an effect to find the causal chain
+    /// of events that led to it. This transforms episodic memory from isolated facts
+    /// into causal narratives, enabling "why" questions instead of just "what/when".
+    ///
+    /// # Algorithm
+    /// 1. Start with the EFFECT (final memory in chain)
+    /// 2. Walk backward in time, finding memories that happened BEFORE
+    /// 3. For each candidate, calculate causal strength:
+    ///    - Semantic similarity (related concepts)
+    ///    - Temporal proximity (close in time)
+    ///    - Emotional coherence (similar emotional tone)
+    /// 4. Select highest-causal-strength predecessor
+    /// 5. Repeat until chain complete or no strong causes found
+    ///
+    /// # Parameters
+    /// - `effect_memory_id`: The ID of the final effect to explain
+    /// - `max_chain_length`: Maximum causal steps to reconstruct (prevents infinite loops)
+    ///
+    /// # Returns
+    /// `CausalChain` with memories in chronological order and causal link strengths
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Query: "Why did the deployment fail?"
+    /// let deployment_fail_id = 42;
+    /// let chain = engine.reconstruct_causal_chain(deployment_fail_id, 5)?;
+    ///
+    /// // Result:
+    /// // 1. "Updated dependencies" (9:00 AM) → 0.85 causal link
+    /// // 2. "Tests started failing" (9:15 AM) → 0.92 causal link
+    /// // 3. "Deployment blocked by CI" (9:30 AM)
+    /// ```
+    pub fn reconstruct_causal_chain(
+        &self,
+        effect_memory_id: u64,
+        max_chain_length: usize,
+    ) -> Result<CausalChain> {
+        // Find the effect memory
+        let effect = self.buffer.iter()
+            .find(|t| t.id == effect_memory_id)
+            .ok_or_else(|| anyhow::anyhow!("Effect memory not found: {}", effect_memory_id))?;
+
+        let mut chain = vec![effect.clone()];
+        let mut causal_links = Vec::new();
+        let mut current_time = effect.timestamp;
+
+        // Walk backward in time, building causal chain
+        for _ in 0..max_chain_length {
+            // Find memories that happened BEFORE current event
+            let candidates: Vec<&EpisodicTrace> = self.buffer.iter()
+                .filter(|t| t.timestamp < current_time)
+                .collect();
+
+            if candidates.is_empty() {
+                break; // No earlier memories
+            }
+
+            // Find the best cause among candidates
+            let (best_cause, causal_strength) = self.find_best_cause(
+                chain.last().unwrap(),
+                &candidates,
+            )?;
+
+            // Break if causal link is too weak (< 0.3 = not actually causally related)
+            if causal_strength < 0.3 {
+                break;
+            }
+
+            // Add to chain (insert at beginning for chronological order)
+            chain.insert(0, best_cause.clone());
+            causal_links.insert(0, causal_strength);
+            current_time = best_cause.timestamp;
+        }
+
+        Ok(CausalChain::new(chain, causal_links))
+    }
+
+    /// Find the memory most likely to be the CAUSE of the effect
+    ///
+    /// Causal strength = semantic similarity × temporal proximity × emotional coherence
+    ///
+    /// This multi-factor approach ensures we find memories that are:
+    /// - Conceptually related (semantic)
+    /// - Close in time (temporal)
+    /// - Emotionally coherent (emotional)
+    fn find_best_cause(
+        &self,
+        effect: &EpisodicTrace,
+        candidates: &[&EpisodicTrace],
+    ) -> Result<(EpisodicTrace, f32)> {
+        let mut best_cause: Option<EpisodicTrace> = None;
+        let mut best_strength = 0.0f32;
+
+        for candidate in candidates {
+            // Calculate three components of causal strength
+            let semantic_sim = self.semantic_similarity(&candidate.semantic_vector, &effect.semantic_vector)?;
+            let temporal_prox = self.temporal_proximity(candidate.timestamp, effect.timestamp)?;
+            let emotional_coh = self.emotional_coherence(candidate.emotion, effect.emotion);
+
+            // Causal strength is the PRODUCT of all three factors
+            // All three must be reasonably high for strong causality
+            let causal_strength = semantic_sim * temporal_prox * emotional_coh;
+
+            if causal_strength > best_strength {
+                best_strength = causal_strength;
+                best_cause = Some((*candidate).clone());
+            }
+        }
+
+        best_cause
+            .ok_or_else(|| anyhow::anyhow!("No causal predecessor found"))
+            .map(|cause| (cause, best_strength))
+    }
+
+    /// Calculate semantic similarity between two vectors (0.0-1.0)
+    ///
+    /// Uses cosine similarity: how aligned are the concept vectors?
+    fn semantic_similarity(&self, vec1: &[f32], vec2: &[f32]) -> Result<f32> {
+        if vec1.len() != vec2.len() {
+            return Err(anyhow::anyhow!("Vector dimension mismatch"));
+        }
+
+        // Cosine similarity = dot product / (||a|| * ||b||)
+        let dot_product: f32 = vec1.iter().zip(vec2.iter()).map(|(a, b)| a * b).sum();
+        let norm1: f32 = vec1.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm2: f32 = vec2.iter().map(|x| x * x).sum::<f32>().sqrt();
+
+        if norm1 == 0.0 || norm2 == 0.0 {
+            return Ok(0.0);
+        }
+
+        // Convert from [-1, 1] to [0, 1]
+        let cosine_sim = dot_product / (norm1 * norm2);
+        Ok((cosine_sim + 1.0) / 2.0)
+    }
+
+    /// Calculate temporal proximity (0.0-1.0)
+    ///
+    /// How close are two events in time?
+    /// - Same time = 1.0
+    /// - 1 hour apart = ~0.5
+    /// - Many hours apart = ~0.0
+    fn temporal_proximity(&self, time1: Duration, time2: Duration) -> Result<f32> {
+        let diff_secs = if time1 > time2 {
+            (time1 - time2).as_secs_f32()
+        } else {
+            (time2 - time1).as_secs_f32()
+        };
+
+        // Exponential decay: e^(-t / tau)
+        // tau = 1 hour = 3600 seconds
+        // Same time → 1.0, 1 hour → 0.37, 2 hours → 0.13
+        let tau = 3600.0; // 1 hour time constant
+        Ok((-diff_secs / tau).exp())
+    }
+
+    /// Calculate emotional coherence (0.0-1.0)
+    ///
+    /// Do two events have similar emotional tone?
+    /// - Same emotion = 1.0
+    /// - Opposite emotions = 0.0
+    /// - Neutral to anything = 0.5
+    fn emotional_coherence(&self, emotion1: f32, emotion2: f32) -> f32 {
+        // Emotions range from -1.0 to 1.0
+        // Distance between emotions: |e1 - e2| ranges from 0 (identical) to 2 (opposite)
+        let emotion_distance = (emotion1 - emotion2).abs();
+
+        // Convert distance to similarity: 0 distance → 1.0, max distance (2.0) → 0.0
+        1.0 - (emotion_distance / 2.0)
+    }
+
+    /// Get a memory by ID
+    pub fn get_memory(&self, id: u64) -> Option<&EpisodicTrace> {
+        self.buffer.iter().find(|t| t.id == id)
+    }
+
+    /// Get all memories in a time range
+    ///
+    /// Useful for causal chain reconstruction: "What happened between 9 AM and 10 AM?"
+    pub fn recall_by_time_range(
+        &self,
+        start: Duration,
+        end: Duration,
+        top_k: usize,
+    ) -> Result<Vec<EpisodicTrace>> {
+        let mut results: Vec<EpisodicTrace> = self.buffer.iter()
+            .filter(|t| t.timestamp >= start && t.timestamp <= end)
+            .cloned()
+            .collect();
+
+        // Sort by timestamp (chronological order)
+        results.sort_by_key(|t| t.timestamp);
+
+        // Return top k
+        Ok(results.into_iter().take(top_k).collect())
+    }
+
     /// Get engine statistics
     pub fn stats(&self) -> EngineStats {
         EngineStats {
@@ -1094,5 +1364,186 @@ mod tests {
 
         assert_eq!(trace_low.attention_weight, 0.0, "Attention below 0.0 should be clamped to 0.0");
         assert_eq!(trace_low.encoding_strength, 1, "Clamped min attention should give 1x encoding");
+    }
+
+    // ========================================
+    // WEEK 17 DAY 4: Causal Chain Reconstruction Tests
+    // ========================================
+
+    #[test]
+    fn test_causal_chain_reconstruction_simple() {
+        // Week 17 Day 4: Verify basic causal chain reconstruction
+        let mut engine = EpisodicMemoryEngine::new().unwrap();
+
+        // Store a simple causal chain:
+        // 1. "Started working on feature" (9:00 AM)
+        // 2. "Encountered bug in tests" (9:30 AM)
+        // 3. "Fixed bug and tests passing" (10:00 AM)
+
+        let time_9am = Duration::from_secs(9 * 3600);
+        let time_930 = Duration::from_secs(9 * 3600 + 30 * 60);
+        let time_10am = Duration::from_secs(10 * 3600);
+
+        let id1 = engine.store(
+            time_9am,
+            "Started working on new authentication feature".to_string(),
+            vec!["feature".to_string(), "auth".to_string()],
+            0.5,
+        ).unwrap();
+
+        let id2 = engine.store(
+            time_930,
+            "Encountered failing test in authentication module".to_string(),
+            vec!["test".to_string(), "auth".to_string(), "bug".to_string()],
+            -0.5,
+        ).unwrap();
+
+        let id3 = engine.store(
+            time_10am,
+            "Fixed authentication bug and all tests passing".to_string(),
+            vec!["fix".to_string(), "auth".to_string(), "success".to_string()],
+            0.8,
+        ).unwrap();
+
+        // Reconstruct causal chain from the final effect (id3)
+        let chain = engine.reconstruct_causal_chain(id3, 5).unwrap();
+
+        // Should reconstruct full chain: id1 → id2 → id3
+        assert_eq!(chain.length(), 3, "Should reconstruct complete 3-step chain");
+        assert_eq!(chain.chain[0].id, id1, "First should be 'started working'");
+        assert_eq!(chain.chain[1].id, id2, "Second should be 'encountered bug'");
+        assert_eq!(chain.chain[2].id, id3, "Third should be 'fixed bug'");
+
+        // Verify causal links exist
+        assert_eq!(chain.causal_links.len(), 2, "Should have 2 causal links");
+        assert!(chain.causal_links[0] > 0.3, "Link 1→2 should be strong (semantic similarity: auth)");
+        assert!(chain.causal_links[1] > 0.3, "Link 2→3 should be strong (semantic similarity: auth)");
+
+        // Verify coherence
+        assert!(chain.coherence > 0.3, "Overall coherence should be reasonable");
+    }
+
+    #[test]
+    fn test_causal_chain_semantic_similarity() {
+        // Week 17 Day 4: Verify semantic similarity calculation
+        let engine = EpisodicMemoryEngine::new().unwrap();
+
+        // Create two vectors
+        let vec1: Vec<f32> = vec![1.0, 0.0, 1.0, 0.0]; // Simplified for testing
+        let vec2: Vec<f32> = vec![1.0, 0.0, 1.0, 0.0]; // Identical
+        let vec3: Vec<f32> = vec![-1.0, 0.0, -1.0, 0.0]; // Opposite
+        let vec4: Vec<f32> = vec![0.0, 1.0, 0.0, 1.0]; // Orthogonal
+
+        // Identical vectors → similarity ~1.0
+        let sim_identical = engine.semantic_similarity(&vec1, &vec2).unwrap();
+        assert!(sim_identical > 0.95, "Identical vectors should have similarity ~1.0");
+
+        // Opposite vectors → similarity ~0.0
+        let sim_opposite = engine.semantic_similarity(&vec1, &vec3).unwrap();
+        assert!(sim_opposite < 0.1, "Opposite vectors should have similarity ~0.0");
+
+        // Orthogonal vectors → similarity ~0.5
+        let sim_orthogonal = engine.semantic_similarity(&vec1, &vec4).unwrap();
+        assert!(sim_orthogonal > 0.4 && sim_orthogonal < 0.6, "Orthogonal vectors should have similarity ~0.5");
+    }
+
+    #[test]
+    fn test_causal_chain_temporal_proximity() {
+        // Week 17 Day 4: Verify temporal proximity calculation
+        let engine = EpisodicMemoryEngine::new().unwrap();
+
+        let time_9am = Duration::from_secs(9 * 3600);
+        let time_930 = Duration::from_secs(9 * 3600 + 30 * 60); // 30 min later
+        let time_10am = Duration::from_secs(10 * 3600); // 1 hour later
+        let time_2pm = Duration::from_secs(14 * 3600); // 5 hours later
+
+        // Same time → proximity ~1.0
+        let prox_same = engine.temporal_proximity(time_9am, time_9am).unwrap();
+        assert!((prox_same - 1.0).abs() < 0.01, "Same time should have proximity 1.0");
+
+        // 30 minutes apart → proximity ~0.61
+        let prox_30min = engine.temporal_proximity(time_9am, time_930).unwrap();
+        assert!(prox_30min > 0.55 && prox_30min < 0.65, "30min apart should have proximity ~0.61");
+
+        // 1 hour apart → proximity ~0.37
+        let prox_1hr = engine.temporal_proximity(time_9am, time_10am).unwrap();
+        assert!(prox_1hr > 0.30 && prox_1hr < 0.45, "1 hour apart should have proximity ~0.37");
+
+        // 5 hours apart → proximity ~0.007 (very weak)
+        let prox_5hr = engine.temporal_proximity(time_9am, time_2pm).unwrap();
+        assert!(prox_5hr < 0.05, "5 hours apart should have very low proximity");
+    }
+
+    #[test]
+    fn test_causal_chain_emotional_coherence() {
+        // Week 17 Day 4: Verify emotional coherence calculation
+        let engine = EpisodicMemoryEngine::new().unwrap();
+
+        // Same emotion → coherence 1.0
+        let coh_same = engine.emotional_coherence(0.8, 0.8);
+        assert!((coh_same - 1.0).abs() < 0.01, "Same emotions should have coherence 1.0");
+
+        // Opposite emotions (-1.0 to 1.0) → coherence 0.0
+        let coh_opposite = engine.emotional_coherence(-1.0, 1.0);
+        assert!((coh_opposite - 0.0).abs() < 0.01, "Opposite emotions should have coherence 0.0");
+
+        // Neutral to anything → coherence 0.5-1.0 depending on target
+        let coh_neutral_pos = engine.emotional_coherence(0.0, 0.5);
+        assert!(coh_neutral_pos > 0.7 && coh_neutral_pos < 0.8, "Neutral to positive should have coherence ~0.75");
+
+        let coh_neutral_neg = engine.emotional_coherence(0.0, -0.5);
+        assert!(coh_neutral_neg > 0.7 && coh_neutral_neg < 0.8, "Neutral to negative should have coherence ~0.75");
+
+        // Similar emotions → high coherence
+        let coh_similar = engine.emotional_coherence(0.7, 0.8);
+        assert!(coh_similar > 0.9, "Similar emotions should have high coherence");
+    }
+
+    #[test]
+    fn test_causal_chain_breaks_at_weak_link() {
+        // Week 17 Day 4: Verify chain stops when causal link is too weak
+        let mut engine = EpisodicMemoryEngine::new().unwrap();
+
+        // Store memories with NO causal relationship:
+        // 1. "Morning coffee" (9:00 AM) - neutral, routine
+        // 2. "Code review feedback" (9:30 AM) - work-related, different topic
+        // 3. "Fixed critical bug" (10:00 AM) - urgent, unrelated to coffee or review
+
+        let time_9am = Duration::from_secs(9 * 3600);
+        let time_930 = Duration::from_secs(9 * 3600 + 30 * 60);
+        let time_10am = Duration::from_secs(10 * 3600);
+
+        engine.store(
+            time_9am,
+            "Enjoyed morning coffee and chatted with colleagues".to_string(),
+            vec!["social".to_string(), "routine".to_string()],
+            0.5,
+        ).unwrap();
+
+        engine.store(
+            time_930,
+            "Received code review feedback on API refactor".to_string(),
+            vec!["review".to_string(), "api".to_string()],
+            0.2,
+        ).unwrap();
+
+        let id3 = engine.store(
+            time_10am,
+            "Fixed critical authentication vulnerability in production".to_string(),
+            vec!["critical".to_string(), "security".to_string(), "auth".to_string()],
+            -0.8,
+        ).unwrap();
+
+        // Reconstruct from id3 - should NOT link to unrelated earlier memories
+        let chain = engine.reconstruct_causal_chain(id3, 5).unwrap();
+
+        // Chain should be SHORT (only id3) or at most 2 if one weak link found
+        // Because "morning coffee" and "code review" are NOT causally related to "auth vulnerability"
+        assert!(chain.length() <= 2, "Should not create spurious causal chain from unrelated memories");
+
+        // If chain length is 1, it's just the effect itself (no causes found)
+        if chain.length() == 1 {
+            assert_eq!(chain.chain[0].id, id3, "Should be just the effect");
+        }
     }
 }
