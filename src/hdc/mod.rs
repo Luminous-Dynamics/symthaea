@@ -316,6 +316,8 @@ pub use sdm::{
     COUNTER_MIN,
 };
 
+pub use temporal_encoder::TemporalEncoder;
+
 use anyhow::Result;
 // Note: hypervector crate not used yet - using custom implementation
 // use hypervector::{HyperVector as HV, HVType};
