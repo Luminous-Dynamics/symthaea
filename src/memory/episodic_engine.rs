@@ -69,9 +69,27 @@ pub struct EpisodicTrace {
     /// Emotional valence (-1.0 to 1.0)
     pub emotion: f32,
 
-    /// The chrono-semantic encoding: Temporal ⊗ Semantic ⊗ Emotion
+    /// REVOLUTIONARY MULTI-MODAL ARCHITECTURE:
+    /// ========================================
+    /// Instead of mixing emotion into semantic representation (scalar contamination),
+    /// we store them as PARALLEL binding spaces (like amygdala || hippocampus).
+    ///
+    /// Old (broken): M = (T ⊗ S) + emotion_scalar  → emotion contaminates semantic similarity
+    /// New (biological): M_semantic = T ⊗ S,  M_emotional = E_binding  → parallel processing
+    ///
+    /// This allows three query modes:
+    /// 1. Pure semantic: Query M_semantic (ignores emotion) → finds "code review" regardless of feeling
+    /// 2. Pure emotional: Query M_emotional (ignores content) → finds all happy/sad memories
+    /// 3. Full query: Combine both via binding → "sad code reviews from yesterday"
+
+    /// The chrono-semantic encoding: Temporal ⊗ Semantic (NO emotion mixing!)
     /// This is stored in SDM for content-addressable recall
     pub chrono_semantic_vector: Vec<i8>, // Bipolar for SDM
+
+    /// The emotional binding vector: Separate emotional tag (NEW!)
+    /// Allows emotion-modulated recall WITHOUT contaminating semantic similarity
+    /// This mirrors biological reality: amygdala (emotion) || hippocampus (memory) = parallel processing
+    pub emotional_binding_vector: Vec<i8>, // Bipolar emotion signature
 
     /// Original temporal vector (f32) for unbinding operations
     pub temporal_vector: Vec<f32>,
@@ -115,18 +133,31 @@ impl EpisodicTrace {
         }
         let semantic_vector = semantic_space.encode(&full_content)?;
 
-        // 3. Bind temporal + semantic (chrono-semantic fusion)
+        // 3. Bind temporal + semantic (chrono-semantic fusion WITHOUT emotion)
         let bound = temporal_encoder.bind(&temporal_vector, &semantic_vector)?;
 
-        // 4. Add emotional modulation (scalar tint)
+        // 4. REVOLUTIONARY: Create SEPARATE emotional binding vector
+        //    Old (broken): M = (T ⊗ S) + emotion_scalar  → contaminates semantic similarity
+        //    New (biological): M_semantic = T ⊗ S,  M_emotional = E_binding
         let emotion_clamped = emotion.clamp(-1.0, 1.0);
-        let mut modulated = bound.clone();
-        for v in modulated.iter_mut() {
-            *v += emotion_clamped * 0.1; // 10% emotional influence
-        }
 
-        // 5. Convert to bipolar for SDM storage
-        let chrono_semantic_vector: Vec<i8> = modulated.iter()
+        // Create emotional signature vector (separate from semantics!)
+        // This allows pure semantic queries to ignore emotional valence
+        let emotional_vector: Vec<f32> = (0..bound.len())
+            .map(|i| {
+                // Create unique pattern for each emotion level
+                // Positive emotions → positive bias, negative → negative bias
+                let phase = (i as f32 * 0.1) + (emotion_clamped * std::f32::consts::PI);
+                phase.sin() * emotion_clamped.abs() // Magnitude proportional to emotion strength
+            })
+            .collect();
+
+        // 5. Convert BOTH to bipolar for SDM storage
+        let chrono_semantic_vector: Vec<i8> = bound.iter()
+            .map(|&v| if v >= 0.0 { 1i8 } else { -1i8 })
+            .collect();
+
+        let emotional_binding_vector: Vec<i8> = emotional_vector.iter()
             .map(|&v| if v >= 0.0 { 1i8 } else { -1i8 })
             .collect();
 
@@ -137,6 +168,7 @@ impl EpisodicTrace {
             tags,
             emotion: emotion_clamped,
             chrono_semantic_vector,
+            emotional_binding_vector, // NEW: Separate emotional tag!
             temporal_vector,
             semantic_vector,
             recall_count: 0,
@@ -590,6 +622,7 @@ mod tests {
             tags: vec![],
             emotion: 0.0,
             chrono_semantic_vector: vec![1i8; HDC_DIMENSION],
+            emotional_binding_vector: vec![1i8; HDC_DIMENSION], // Neutral emotion pattern
             temporal_vector: vec![1.0; HDC_DIMENSION],
             semantic_vector: vec![1.0; HDC_DIMENSION],
             recall_count: 0,
@@ -617,6 +650,7 @@ mod tests {
             tags: vec![],
             emotion: 0.0,
             chrono_semantic_vector: vec![1i8; HDC_DIMENSION],
+            emotional_binding_vector: vec![1i8; HDC_DIMENSION], // Neutral emotion pattern
             temporal_vector: vec![1.0; HDC_DIMENSION],
             semantic_vector: vec![1.0; HDC_DIMENSION],
             recall_count: 0,
