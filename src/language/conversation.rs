@@ -420,12 +420,8 @@ impl Conversation {
 
         // 3.10. SEAMLESS NIXOS UNDERSTANDING (Track 6 I6.4)
         // Automatically detect and understand NixOS-related queries
-        let is_nix = self.is_nix_related(user_input);
-        eprintln!("[NixOS-Detect] is_nix_related('{}') = {}", user_input, is_nix);
-        let nix_context = if is_nix {
+        let nix_context = if self.is_nix_related(user_input) {
             let understanding = self.nix_adapter.understand(user_input);
-            eprintln!("[NixOS-Detect] Got understanding: intent={:?}, confidence={:.2}",
-                understanding.intent, understanding.confidence);
             self.last_nix_understanding = Some(understanding.clone());
             Some(understanding)
         } else {
@@ -1742,19 +1738,21 @@ impl Conversation {
         let effective_confidence = understanding.confidence as f64 * (1.0 - phi_weight * 0.3)
             + consciousness_confidence * (phi_weight * 0.3);
 
-        // Log consciousness metrics for transparency (BEFORE early returns for debugging)
-        eprintln!("[NixOS-Consciousness] Φ={:.3}, FE={:.3}, spotlight={}, state={:?}, eff_conf={:.2}, intent={:?}",
-            phi, free_energy, gained_spotlight, consciousness_state, effective_confidence, understanding.intent);
+        // Consciousness-gated enhancement with fallback for early sessions
+        // In early stages (low Φ), we trust statistical confidence more
+        // As consciousness builds, we weight Φ more heavily
+        let use_enhancement = if phi > 0.3 || gained_spotlight {
+            // High consciousness - fully trust consciousness metrics
+            effective_confidence >= 0.4
+        } else if understanding.confidence > 0.15 {
+            // Low consciousness but some statistical confidence - proceed
+            true
+        } else {
+            // Very low confidence - skip enhancement
+            false
+        };
 
-        // Only enhance if consciousness confirms understanding
-        // Must either gain spotlight OR have high Φ
-        if !gained_spotlight && phi < 0.3 {
-            eprintln!("[NixOS] Skipping: spotlight={}, phi={:.3} (need spotlight OR phi>=0.3)", gained_spotlight, phi);
-            return base_response.to_string();
-        }
-
-        if effective_confidence < 0.4 {
-            eprintln!("[NixOS] Skipping: effective_confidence={:.2} < 0.4", effective_confidence);
+        if !use_enhancement {
             return base_response.to_string();
         }
 
@@ -1762,7 +1760,10 @@ impl Conversation {
 
         match understanding.intent {
             NixOSIntent::Install => {
-                if let Some(package) = understanding.parameters.get("package") {
+                // Note: Parameter key may be "Package" or "package" depending on the adapter
+                let package = understanding.parameters.get("package")
+                    .or_else(|| understanding.parameters.get("Package"));
+                if let Some(package) = package {
                     response.push_str(&format!(
                         "I understand you want to install {}. ", package
                     ));

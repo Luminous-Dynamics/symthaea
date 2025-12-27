@@ -842,7 +842,7 @@ impl ConsciousnessTopology {
     /// * `grid_size` - Size of the square grid (total nodes = grid_size²)
     /// * `dim` - Hypervector dimension
     /// * `seed` - Random seed for reproducibility
-    pub fn torus(grid_size: usize, dim: usize, seed: u64) -> Self {
+    pub fn torus_square(grid_size: usize, dim: usize, seed: u64) -> Self {
         assert!(grid_size >= 2, "Torus needs at least 2×2 grid");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
@@ -895,7 +895,7 @@ impl ConsciousnessTopology {
     /// * `grid_size` - Size of the square grid (total nodes = grid_size²)
     /// * `dim` - Hypervector dimension
     /// * `seed` - Random seed for reproducibility
-    pub fn klein_bottle(grid_size: usize, dim: usize, seed: u64) -> Self {
+    pub fn klein_bottle_square(grid_size: usize, dim: usize, seed: u64) -> Self {
         assert!(grid_size >= 2, "Klein bottle needs at least 2×2 grid");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
