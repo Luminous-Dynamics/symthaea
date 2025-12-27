@@ -18,7 +18,7 @@ Unlike traditional memory (exact addressing), SDM uses:
 
 ## Architecture
 
-```
+```text
 Query Pattern (16,384D)
         |
         v

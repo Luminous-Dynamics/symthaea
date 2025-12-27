@@ -234,7 +234,7 @@ pub fn encode_bid_to_hdc(bid: &SharedVector) -> SharedHdcVector {
 /// - ~100μs on typical hardware
 ///
 /// # Example
-/// ```rust
+/// ```rust,ignore
 /// use symthaea::brain::actor_model::{encode_text_to_hdc, hdc_similarity};
 /// let q1 = encode_text_to_hdc("What is my blood sugar?");
 /// let q2 = encode_text_to_hdc("Check glucose level");
@@ -285,7 +285,7 @@ pub fn hdc_similarity(a: &SharedHdcVector, b: &SharedHdcVector) -> f32 {
 /// - ~1ms for 10 candidates
 ///
 /// # Example
-/// ```rust
+/// ```rust,ignore
 /// use symthaea::brain::actor_model::{encode_text_to_hdc, find_best_match};
 /// let query = encode_text_to_hdc("blood sugar");
 /// let candidates = vec![

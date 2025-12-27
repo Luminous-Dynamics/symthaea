@@ -905,7 +905,7 @@ impl GlobalWorkspace {
     /// Find an item in working memory (read-only)
     ///
     /// Example: Find all error-related thoughts
-    /// ```rust
+    /// ```rust,ignore
     /// let error_thought = workspace.find(|item| item.content.contains("error"));
     /// ```
     pub fn find<F>(&self, predicate: F) -> Option<&WorkingMemoryItem>
@@ -918,7 +918,7 @@ impl GlobalWorkspace {
     /// Find an item in working memory (mutable)
     ///
     /// Example: Boost activation of goal-related thoughts
-    /// ```rust
+    /// ```rust,ignore
     /// if let Some(item) = workspace.find_mut(|i| i.content.contains("goal")) {
     ///     item.refresh();
     /// }

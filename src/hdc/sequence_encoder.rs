@@ -10,7 +10,7 @@ Solution: Use permutation to mark position BEFORE binding:
 - This preserves order: "cat sat mat" ≠ "mat sat cat"
 
 Key Algorithm:
-```
+```text
 fn encode_sequence(tokens: &[T]) -> HV {
     let components: Vec<HV> = tokens.iter()
         .enumerate()

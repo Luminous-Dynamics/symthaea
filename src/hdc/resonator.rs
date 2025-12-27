@@ -26,7 +26,7 @@ Solution: X = A⁻¹ ⊛ C (HDC unbind)
 But what if we have multiple constraints? What if we don't know which
 factors to unbind? Resonator networks find the solution through iteration:
 
-```
+```text
 X(t+1) = normalize(cleanup(A⁻¹ ⊛ C + prior(X(t))))
 ```
 

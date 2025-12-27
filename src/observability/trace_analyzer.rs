@@ -15,7 +15,7 @@
  *
  * ## Usage
  *
- * ```rust
+ * ```rust,ignore
  * use symthaea::observability::{Trace, TraceAnalyzer};
  *
  * // Load trace

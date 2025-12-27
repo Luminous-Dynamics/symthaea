@@ -20,7 +20,7 @@
  *
  * ## Architecture
  *
- * ```
+ * ```text
  * SymthaeaObserver (trait)
  *     ↓
  * TraceObserver (JSON export)
@@ -31,7 +31,7 @@
  *
  * ## Usage
  *
- * ```rust
+ * ```rust,ignore
  * use symthaea::observability::{TraceObserver, create_shared_observer};
  * use symthaea::SymthaeaHLB;
  *

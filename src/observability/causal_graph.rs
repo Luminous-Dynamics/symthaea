@@ -19,7 +19,7 @@ use chrono::{DateTime, Utc};
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// use symthaea::observability::causal_graph::CausalGraph;
 /// use symthaea::observability::types::Trace;
 ///

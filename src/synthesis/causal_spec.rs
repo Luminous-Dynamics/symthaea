@@ -20,7 +20,7 @@ pub enum CausalSpec {
     /// Create a direct causal link: cause → effect
     ///
     /// Example: Make age cause approval decision with strength 0.7
-    /// ```
+    /// ```ignore
     /// CausalSpec::MakeCause {
     ///     cause: "age".to_string(),
     ///     effect: "approved".to_string(),
@@ -36,7 +36,7 @@ pub enum CausalSpec {
     /// Remove a causal link (eliminate unwanted causation)
     ///
     /// Example: Remove bias from decision-making
-    /// ```
+    /// ```ignore
     /// CausalSpec::RemoveCause {
     ///     cause: "race".to_string(),
     ///     effect: "decision".to_string(),
@@ -50,7 +50,7 @@ pub enum CausalSpec {
     /// Create an indirect causal path: from → through... → to
     ///
     /// Example: Create path: input → hidden1 → hidden2 → output
-    /// ```
+    /// ```ignore
     /// CausalSpec::CreatePath {
     ///     from: "input".to_string(),
     ///     through: vec!["hidden1".to_string(), "hidden2".to_string()],
@@ -66,7 +66,7 @@ pub enum CausalSpec {
     /// Strengthen existing causal link
     ///
     /// Example: Make feature more influential
-    /// ```
+    /// ```ignore
     /// CausalSpec::Strengthen {
     ///     cause: "important_feature".to_string(),
     ///     effect: "decision".to_string(),
@@ -82,7 +82,7 @@ pub enum CausalSpec {
     /// Weaken existing causal link
     ///
     /// Example: Reduce influence of noisy feature
-    /// ```
+    /// ```ignore
     /// CausalSpec::Weaken {
     ///     cause: "noisy_feature".to_string(),
     ///     effect: "decision".to_string(),
@@ -98,7 +98,7 @@ pub enum CausalSpec {
     /// Mediate: Make all causation flow through mediator
     ///
     /// Example: All features → mediator → output
-    /// ```
+    /// ```ignore
     /// CausalSpec::Mediate {
     ///     causes: vec!["feat1".to_string(), "feat2".to_string()],
     ///     mediator: "attention".to_string(),
@@ -114,7 +114,7 @@ pub enum CausalSpec {
     /// Conjunction: Multiple specifications must all be satisfied
     ///
     /// Example: Create link AND remove bias
-    /// ```
+    /// ```ignore
     /// CausalSpec::And(vec![
     ///     Box::new(CausalSpec::MakeCause { ... }),
     ///     Box::new(CausalSpec::RemoveCause { ... }),
@@ -125,7 +125,7 @@ pub enum CausalSpec {
     /// Disjunction: At least one specification must be satisfied
     ///
     /// Example: Either strengthen OR create new path
-    /// ```
+    /// ```ignore
     /// CausalSpec::Or(vec![
     ///     Box::new(CausalSpec::Strengthen { ... }),
     ///     Box::new(CausalSpec::CreatePath { ... }),

@@ -29,23 +29,23 @@ Gratitude isn't payment - it's a synchronization signal that helps systems re-al
 ## Mechanics
 
 ### Depletion (solo work):
-```
+```text
 coherence -= task_complexity * 0.05 * (1.0 - relational_resonance)
 ```
 
 ### Amplification (connected work):
-```
+```text
 coherence += task_complexity * 0.02 * relational_resonance
 ```
 
 ### Gratitude (synchronization):
-```
+```text
 coherence += 0.1 * (1.0 - coherence)  // More effective when scattered
 relational_resonance += 0.15
 ```
 
 ### Passive centering (rest):
-```
+```text
 coherence += (1.0 - coherence) * 0.001 * seconds
 ```
 */

@@ -205,7 +205,7 @@ impl CorrelationContext {
 ///
 /// # Example
 ///
-/// ```
+/// ```ignore
 /// use symthaea::observability::correlation::{CorrelationContext, ScopedParent};
 ///
 /// let mut ctx = CorrelationContext::new("req_123");

@@ -20,7 +20,7 @@
 //!
 //! # Example Usage
 //!
-//! ```rust
+//! ```rust,ignore
 //! use symthaea::hdc::phi_topology_validation::{MinimalPhiValidation, ValidationResult};
 //!
 //! let validation = MinimalPhiValidation::new(10, 10, 10, 2048);

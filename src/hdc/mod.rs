@@ -242,6 +242,14 @@ pub mod morphogenetic;
 pub mod hebbian;
 pub mod sdm;
 
+// Consciousness topology and Φ measurement modules
+pub mod real_hv;                           // Real-valued hypervectors for consciousness topologies
+pub mod consciousness_topology;            // Consciousness topology structures
+pub mod consciousness_topology_generators; // 8 topology generators (Random, Star, Ring, Line, Tree, Dense, Modular, Lattice)
+pub mod tiered_phi;                        // Multi-tier Φ (integrated information) approximation
+pub mod phi_topology_validation;           // RealHV-TieredPhi integration for topology validation
+pub mod binary_hv;                         // Binary hypervector operations (HV16)
+
 // Re-export key types for convenience
 pub use statistical_retrieval::{
     StatisticalRetriever,
