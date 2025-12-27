@@ -1,0 +1,17 @@
+# Five-Component Consciousness Analysis Toolkit
+# Python 3.11+ required
+
+# Core dependencies
+numpy>=1.24.0
+scipy>=1.11.0
+
+# Optional: EDF file reading
+mne>=1.6.0
+
+# Optional: Visualization
+matplotlib>=3.8.0
+
+# Optional: Development
+pytest>=7.4.0
+black>=23.0.0
+ruff>=0.1.0

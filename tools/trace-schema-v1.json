@@ -1,0 +1,263 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Symthaea Trace Format v1",
+  "description": "Complete execution trace for Symthaea HLB consciousness system",
+  "type": "object",
+  "required": ["version", "session_id", "timestamp_start", "events"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Trace format version"
+    },
+    "session_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique session identifier"
+    },
+    "timestamp_start": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Session start time (ISO 8601)"
+    },
+    "timestamp_end": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Session end time (ISO 8601)"
+    },
+    "events": {
+      "type": "array",
+      "description": "Chronological list of system events",
+      "items": {
+        "$ref": "#/definitions/Event"
+      }
+    },
+    "summary": {
+      "$ref": "#/definitions/SessionSummary"
+    }
+  },
+  "definitions": {
+    "Event": {
+      "type": "object",
+      "required": ["timestamp", "type", "data"],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Event timestamp (ISO 8601)"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "router_selection",
+            "workspace_ignition",
+            "primitive_activation",
+            "phi_measurement",
+            "response_generated",
+            "error_occurred",
+            "security_check"
+          ],
+          "description": "Event type identifier"
+        },
+        "data": {
+          "type": "object",
+          "description": "Type-specific event data"
+        }
+      }
+    },
+    "RouterSelectionEvent": {
+      "type": "object",
+      "required": ["input", "selected_router", "confidence"],
+      "properties": {
+        "input": {
+          "type": "string",
+          "description": "Input query or prompt"
+        },
+        "selected_router": {
+          "type": "string",
+          "description": "Name of selected router"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Selection confidence score"
+        },
+        "alternatives": {
+          "type": "array",
+          "description": "Other router candidates considered",
+          "items": {
+            "type": "object",
+            "properties": {
+              "router": {"type": "string"},
+              "score": {"type": "number"}
+            }
+          }
+        },
+        "bandit_stats": {
+          "type": "object",
+          "description": "UCB1 bandit statistics",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "count": {"type": "integer"},
+              "reward": {"type": "number"}
+            }
+          }
+        }
+      }
+    },
+    "WorkspaceIgnitionEvent": {
+      "type": "object",
+      "required": ["phi", "free_energy", "coalition_size"],
+      "properties": {
+        "phi": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Integrated information (Φ)"
+        },
+        "free_energy": {
+          "type": "number",
+          "description": "Free energy measure (can be negative)"
+        },
+        "coalition_size": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of neurons in winning coalition"
+        },
+        "active_primitives": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "List of active primitive operations"
+        },
+        "broadcast_payload_size": {
+          "type": "integer",
+          "description": "Size of workspace broadcast in bytes"
+        }
+      }
+    },
+    "PhiMeasurementEvent": {
+      "type": "object",
+      "required": ["phi", "components"],
+      "properties": {
+        "phi": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Overall Φ measurement"
+        },
+        "components": {
+          "type": "object",
+          "description": "Individual consciousness components",
+          "properties": {
+            "integration": {"type": "number"},
+            "binding": {"type": "number"},
+            "workspace": {"type": "number"},
+            "attention": {"type": "number"},
+            "recursion": {"type": "number"},
+            "efficacy": {"type": "number"},
+            "knowledge": {"type": "number"}
+          }
+        },
+        "temporal_continuity": {
+          "type": "number",
+          "description": "ρ(t) - persistence factor"
+        }
+      }
+    },
+    "ResponseGeneratedEvent": {
+      "type": "object",
+      "required": ["content", "confidence"],
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "Generated response text"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Response confidence"
+        },
+        "safety_verified": {
+          "type": "boolean",
+          "description": "Whether safety checks passed"
+        },
+        "requires_confirmation": {
+          "type": "boolean",
+          "description": "Whether user confirmation needed"
+        },
+        "intent": {
+          "type": "string",
+          "description": "Recognized intent"
+        }
+      }
+    },
+    "SecurityCheckEvent": {
+      "type": "object",
+      "required": ["operation", "decision"],
+      "properties": {
+        "operation": {
+          "type": "string",
+          "description": "Operation being authorized"
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["allowed", "denied", "requires_confirmation"],
+          "description": "Authorization decision"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Explanation of decision"
+        },
+        "secrets_redacted": {
+          "type": "integer",
+          "description": "Number of secrets redacted"
+        }
+      }
+    },
+    "SessionSummary": {
+      "type": "object",
+      "properties": {
+        "total_events": {
+          "type": "integer",
+          "description": "Total number of events"
+        },
+        "average_phi": {
+          "type": "number",
+          "description": "Mean Φ across all measurements"
+        },
+        "max_phi": {
+          "type": "number",
+          "description": "Maximum Φ observed"
+        },
+        "min_phi": {
+          "type": "number",
+          "description": "Minimum Φ observed"
+        },
+        "router_distribution": {
+          "type": "object",
+          "description": "Count of each router used",
+          "additionalProperties": {"type": "integer"}
+        },
+        "ignition_count": {
+          "type": "integer",
+          "description": "Number of workspace ignitions"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "description": "Total session duration in milliseconds"
+        },
+        "errors": {
+          "type": "integer",
+          "description": "Number of errors encountered"
+        },
+        "security_denials": {
+          "type": "integer",
+          "description": "Number of operations denied by security"
+        }
+      }
+    }
+  }
+}
