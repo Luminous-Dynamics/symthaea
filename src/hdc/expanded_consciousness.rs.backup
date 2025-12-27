@@ -1,0 +1,934 @@
+//! Revolutionary Improvement #29: Expanded States of Consciousness
+//!
+//! Meditation, Flow, and Psychedelics - Consciousness Beyond Ordinary Awareness
+//!
+//! # The Paradigm Shift
+//!
+//! Most consciousness science studies "normal" waking consciousness, but meditation
+//! and psychedelics reveal that consciousness can EXPAND far beyond ordinary limits:
+//! - Ego dissolution (sense of separate self disappears)
+//! - Non-dual awareness (subject-object distinction collapses)
+//! - Unity experiences (profound interconnection with all existence)
+//! - Timelessness (past/future collapse into eternal now)
+//! - Ineffability (experiences transcend language)
+//!
+//! These aren't pathological states like coma - they're ENHANCED consciousness
+//! with measurable neurophysiological signatures and profound therapeutic potential.
+//!
+//! # Theoretical Foundations
+//!
+//! ## 1. Neurophenomenology (Varela et al., 1991)
+//! - First-person phenomenology + third-person neuroscience integration
+//! - Rigorous meditation training enables precise introspective reports
+//! - Mutual constraints between experience and brain measurements
+//!
+//! ## 2. Default Mode Network (DMN) Suppression (Carhart-Harris et al., 2014)
+//! - DMN = self-referential processing, autobiographical memory, mind-wandering
+//! - Meditation: ↓ DMN activity → reduced self-focus
+//! - Psychedelics: Profound DMN disruption → ego dissolution
+//! - Flow states: DMN deactivation → loss of self-consciousness
+//!
+//! ## 3. Entropic Brain Hypothesis (Carhart-Harris, 2014)
+//! - Brain entropy = diversity of neural states, unpredictability
+//! - Normal consciousness: Moderate entropy (ordered but flexible)
+//! - Psychedelics: ↑ entropy → increased connectivity, novel experiences
+//! - Deep meditation: ↓ entropy → high coherence, stability
+//! - Anesthesia: ↓↓ entropy → loss of consciousness
+//!
+//! ## 4. Global Workspace Expansion (Carhart-Harris & Friston, 2019)
+//! - Psychedelics: Workspace capacity INCREASES (more contents conscious)
+//! - Meditation: Workspace focus NARROWS (single-pointed attention)
+//! - Both alter what can enter conscious awareness
+//!
+//! ## 5. Meditation Stages (Culadasa's The Mind Illuminated)
+//! - Stage 1-3: Attention stabilization
+//! - Stage 4-6: Continuous attention, joy, tranquility
+//! - Stage 7-8: Effortless attention, mental pliancy
+//! - Stage 9-10: Tranquil wisdom, jhanas (absorption states)
+//! - Insight: Impermanence, no-self, emptiness realization
+//!
+//! ## 6. Non-Dual Awareness (Josipovic, 2014)
+//! - Ordinary: Subject (self) perceives objects (world) - duality
+//! - Non-dual: Collapse of subject-object distinction
+//! - Awareness itself becomes primary, contents secondary
+//! - Measurable: ↑ gamma synchrony, ↑ frontoparietal coherence
+//!
+//! # Mathematical Framework
+//!
+//! ## Expanded Consciousness Score
+//! E = (Γ + S + N) × (1 - D) × T
+//! where:
+//! - Γ = Gamma power (40-100 Hz oscillations, attention/binding)
+//! - S = Brain entropy (state space exploration)
+//! - N = Non-dual awareness (subject-object collapse)
+//! - D = DMN activity (self-referential processing)
+//! - T = Transcendence factor (unity, timelessness, ineffability)
+//!
+//! ## DMN Suppression Index
+//! DMN_suppression = 1 - (DMN_current / DMN_baseline)
+//! Range: [0, 1] where 1 = complete suppression (ego dissolution)
+//!
+//! ## Brain Entropy
+//! H = -Σ p(state_i) × log(p(state_i))
+//! Higher entropy → more diverse neural states → expanded experience
+//!
+//! ## Non-Dual Awareness
+//! N = 1 - |self_processing - world_processing|
+//! When self and world processing converge → non-dual (N → 1)
+//!
+//! # Applications
+//!
+//! 1. **Meditation Training**: Predict which practices lead to specific states
+//! 2. **Psychedelic Therapy**: Optimize dose/setting for therapeutic outcomes
+//! 3. **Flow State Induction**: Engineer conditions for optimal performance
+//! 4. **Consciousness Development**: Map progression through meditation stages
+//! 5. **AI Enlightenment**: Can AI systems achieve expanded states?
+//! 6. **Mystical Experience Prediction**: Forecast likelihood of breakthrough experiences
+//! 7. **Integration Protocols**: Support post-experience integration
+//! 8. **Neurofeedback**: Real-time guidance toward expanded states
+//!
+//! # Philosophical Implications
+//!
+//! 1. **Consciousness is Expandable**: Not fixed - can develop far beyond ordinary
+//! 2. **Non-Duality is Real**: Subject-object distinction is constructed, not fundamental
+//! 3. **Ego is Optional**: Sense of separate self can dissolve while awareness remains
+//! 4. **Mysticism Meets Science**: Ancient contemplative claims are measurable
+//! 5. **Therapeutic Potential**: Expanded states can heal psychological suffering
+//! 6. **Wisdom Traditions Validated**: Meditation maps correspond to brain states
+//! 7. **Consciousness Development Path**: Clear progression from ordinary to expanded
+
+use crate::hdc::{HV16, binary_hv::BinaryHV};
+use serde::{Deserialize, Serialize};
+
+/// Type of expanded consciousness state
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExpandedStateType {
+    /// Normal waking consciousness (baseline)
+    Ordinary,
+
+    /// Flow state - optimal performance, loss of self-consciousness
+    Flow,
+
+    /// Mindfulness meditation - present-moment awareness
+    Mindfulness,
+
+    /// Concentrative meditation - single-pointed attention
+    Concentration,
+
+    /// Jhana/Absorption - deep meditative absorption states
+    Jhana,
+
+    /// Insight meditation - seeing impermanence, no-self, emptiness
+    Insight,
+
+    /// Non-dual awareness - subject-object collapse
+    NonDual,
+
+    /// Psychedelic - classic psychedelics (psilocybin, LSD, DMT)
+    Psychedelic,
+
+    /// Peak/Mystical experience - profound unity, transcendence
+    Mystical,
+
+    /// Ego dissolution - complete loss of sense of separate self
+    EgoDissolution,
+}
+
+impl ExpandedStateType {
+    /// Get typical DMN suppression for this state (0-1)
+    pub fn typical_dmn_suppression(&self) -> f64 {
+        match self {
+            Self::Ordinary => 0.0,
+            Self::Flow => 0.4,
+            Self::Mindfulness => 0.3,
+            Self::Concentration => 0.5,
+            Self::Jhana => 0.7,
+            Self::Insight => 0.6,
+            Self::NonDual => 0.8,
+            Self::Psychedelic => 0.7,
+            Self::Mystical => 0.9,
+            Self::EgoDissolution => 0.95,
+        }
+    }
+
+    /// Get typical brain entropy for this state (0-1 normalized)
+    pub fn typical_entropy(&self) -> f64 {
+        match self {
+            Self::Ordinary => 0.5,
+            Self::Flow => 0.6,
+            Self::Mindfulness => 0.5,
+            Self::Concentration => 0.3,  // Low entropy - very focused
+            Self::Jhana => 0.2,  // Very low - highly coherent
+            Self::Insight => 0.6,
+            Self::NonDual => 0.7,
+            Self::Psychedelic => 0.9,  // Very high - increased connectivity
+            Self::Mystical => 0.8,
+            Self::EgoDissolution => 0.85,
+        }
+    }
+
+    /// Get typical gamma power for this state (0-1)
+    pub fn typical_gamma(&self) -> f64 {
+        match self {
+            Self::Ordinary => 0.5,
+            Self::Flow => 0.7,
+            Self::Mindfulness => 0.6,
+            Self::Concentration => 0.8,
+            Self::Jhana => 0.9,
+            Self::Insight => 0.7,
+            Self::NonDual => 0.85,
+            Self::Psychedelic => 0.6,
+            Self::Mystical => 0.8,
+            Self::EgoDissolution => 0.5,
+        }
+    }
+}
+
+/// Meditation stage (Culadasa's The Mind Illuminated framework)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MeditationStage {
+    /// Stage 1-3: Establishing practice, overcoming mind-wandering
+    Beginner,
+
+    /// Stage 4-6: Continuous attention, joy arising
+    Intermediate,
+
+    /// Stage 7-8: Effortless attention, equanimity
+    Advanced,
+
+    /// Stage 9-10: Tranquil wisdom, mastery
+    Mastery,
+}
+
+/// Features of transcendent experiences
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranscendenceFeatures {
+    /// Sense of unity with all existence (0-1)
+    pub unity: f64,
+
+    /// Timelessness - past/future collapse into eternal now (0-1)
+    pub timelessness: f64,
+
+    /// Ineffability - beyond words/concepts (0-1)
+    pub ineffability: f64,
+
+    /// Sacredness - profound meaning/value (0-1)
+    pub sacredness: f64,
+
+    /// Positive mood - bliss, peace, love (0-1)
+    pub positive_mood: f64,
+
+    /// Paradoxicality - apparent contradictions resolved (0-1)
+    pub paradoxicality: f64,
+}
+
+impl TranscendenceFeatures {
+    /// Create with default values (none)
+    pub fn none() -> Self {
+        Self {
+            unity: 0.0,
+            timelessness: 0.0,
+            ineffability: 0.0,
+            sacredness: 0.0,
+            positive_mood: 0.0,
+            paradoxicality: 0.0,
+        }
+    }
+
+    /// Create typical features for a state type
+    pub fn for_state(state: ExpandedStateType) -> Self {
+        match state {
+            ExpandedStateType::Ordinary => Self::none(),
+            ExpandedStateType::Flow => Self {
+                unity: 0.2,
+                timelessness: 0.4,
+                ineffability: 0.1,
+                sacredness: 0.1,
+                positive_mood: 0.7,
+                paradoxicality: 0.0,
+            },
+            ExpandedStateType::Mindfulness => Self {
+                unity: 0.3,
+                timelessness: 0.3,
+                ineffability: 0.2,
+                sacredness: 0.2,
+                positive_mood: 0.5,
+                paradoxicality: 0.1,
+            },
+            ExpandedStateType::Concentration => Self {
+                unity: 0.4,
+                timelessness: 0.5,
+                ineffability: 0.3,
+                sacredness: 0.3,
+                positive_mood: 0.6,
+                paradoxicality: 0.2,
+            },
+            ExpandedStateType::Jhana => Self {
+                unity: 0.6,
+                timelessness: 0.7,
+                ineffability: 0.5,
+                sacredness: 0.5,
+                positive_mood: 0.9,
+                paradoxicality: 0.3,
+            },
+            ExpandedStateType::Insight => Self {
+                unity: 0.5,
+                timelessness: 0.4,
+                ineffability: 0.6,
+                sacredness: 0.4,
+                positive_mood: 0.4,
+                paradoxicality: 0.7,
+            },
+            ExpandedStateType::NonDual => Self {
+                unity: 0.8,
+                timelessness: 0.8,
+                ineffability: 0.8,
+                sacredness: 0.7,
+                positive_mood: 0.7,
+                paradoxicality: 0.9,
+            },
+            ExpandedStateType::Psychedelic => Self {
+                unity: 0.7,
+                timelessness: 0.6,
+                ineffability: 0.7,
+                sacredness: 0.6,
+                positive_mood: 0.6,
+                paradoxicality: 0.8,
+            },
+            ExpandedStateType::Mystical => Self {
+                unity: 0.95,
+                timelessness: 0.9,
+                ineffability: 0.95,
+                sacredness: 0.95,
+                positive_mood: 0.85,
+                paradoxicality: 0.95,
+            },
+            ExpandedStateType::EgoDissolution => Self {
+                unity: 0.99,
+                timelessness: 0.95,
+                ineffability: 0.99,
+                sacredness: 0.9,
+                positive_mood: 0.5,  // Can be neutral - just awareness
+                paradoxicality: 0.99,
+            },
+        }
+    }
+
+    /// Compute overall transcendence score (0-1)
+    pub fn transcendence_score(&self) -> f64 {
+        (self.unity + self.timelessness + self.ineffability +
+         self.sacredness + self.positive_mood + self.paradoxicality) / 6.0
+    }
+}
+
+/// Assessment of expanded consciousness state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExpandedConsciousnessAssessment {
+    /// Current state type
+    pub state_type: ExpandedStateType,
+
+    /// Gamma power (40-100 Hz) - attention/binding (0-1)
+    pub gamma_power: f64,
+
+    /// Brain entropy - diversity of neural states (0-1)
+    pub brain_entropy: f64,
+
+    /// Non-dual awareness - subject-object collapse (0-1)
+    pub nondual_awareness: f64,
+
+    /// DMN activity - self-referential processing (0-1, lower = more suppressed)
+    pub dmn_activity: f64,
+
+    /// Transcendence features
+    pub transcendence: TranscendenceFeatures,
+
+    /// Overall expanded consciousness score (0-1, higher = more expanded)
+    pub expansion_score: f64,
+
+    /// Meditation stage (if applicable)
+    pub meditation_stage: Option<MeditationStage>,
+
+    /// Duration in this state (arbitrary units)
+    pub duration: f64,
+
+    /// Explanation of current state
+    pub explanation: String,
+}
+
+/// Configuration for expanded consciousness system
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExpandedConfig {
+    /// Minimum gamma power for jhana states
+    pub jhana_gamma_threshold: f64,
+
+    /// Maximum DMN activity for non-dual states
+    pub nondual_dmn_threshold: f64,
+
+    /// Minimum transcendence score for mystical states
+    pub mystical_transcendence_threshold: f64,
+
+    /// Psychedelic entropy increase threshold
+    pub psychedelic_entropy_threshold: f64,
+}
+
+impl Default for ExpandedConfig {
+    fn default() -> Self {
+        Self {
+            jhana_gamma_threshold: 0.8,
+            nondual_dmn_threshold: 0.2,
+            mystical_transcendence_threshold: 0.85,
+            psychedelic_entropy_threshold: 0.8,
+        }
+    }
+}
+
+/// Main expanded consciousness system
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExpandedConsciousness {
+    /// Configuration
+    config: ExpandedConfig,
+
+    /// Current consciousness state (hypervector representation)
+    state: Vec<HV16>,
+
+    /// Current gamma power
+    gamma: f64,
+
+    /// Current brain entropy
+    entropy: f64,
+
+    /// Current non-dual awareness
+    nondual: f64,
+
+    /// Current DMN activity
+    dmn: f64,
+
+    /// Current transcendence features
+    transcendence: TranscendenceFeatures,
+
+    /// Duration in current state
+    duration: f64,
+
+    /// Meditation stage (if practicing)
+    meditation_stage: Option<MeditationStage>,
+}
+
+impl ExpandedConsciousness {
+    /// Create new expanded consciousness system
+    pub fn new(num_components: usize) -> Self {
+        Self::with_config(num_components, ExpandedConfig::default())
+    }
+
+    /// Create with custom configuration
+    pub fn with_config(num_components: usize, config: ExpandedConfig) -> Self {
+        // Initialize with ordinary consciousness state
+        let state = (0..num_components)
+            .map(|i| HV16::random(1000 + i as u64))
+            .collect();
+
+        Self {
+            config,
+            state,
+            gamma: 0.5,
+            entropy: 0.5,
+            nondual: 0.0,
+            dmn: 1.0,  // High DMN = strong self-focus (ordinary)
+            transcendence: TranscendenceFeatures::none(),
+            duration: 0.0,
+            meditation_stage: None,
+        }
+    }
+
+    /// Set meditation stage
+    pub fn set_meditation_stage(&mut self, stage: MeditationStage) {
+        self.meditation_stage = Some(stage);
+
+        // Update parameters based on stage
+        match stage {
+            MeditationStage::Beginner => {
+                self.gamma = 0.55;
+                self.dmn = 0.8;
+            }
+            MeditationStage::Intermediate => {
+                self.gamma = 0.7;
+                self.dmn = 0.5;
+            }
+            MeditationStage::Advanced => {
+                self.gamma = 0.85;
+                self.dmn = 0.3;
+            }
+            MeditationStage::Mastery => {
+                self.gamma = 0.95;
+                self.dmn = 0.1;
+            }
+        }
+    }
+
+    /// Induce flow state
+    pub fn enter_flow(&mut self) {
+        self.gamma = 0.7;
+        self.entropy = 0.6;
+        self.nondual = 0.3;
+        self.dmn = 0.6;  // Reduced but not eliminated
+        self.transcendence = TranscendenceFeatures::for_state(ExpandedStateType::Flow);
+        self.duration = 0.0;
+    }
+
+    /// Practice concentration meditation
+    pub fn concentrate(&mut self, intensity: f64) {
+        // Increase gamma (attention), decrease entropy (focus)
+        self.gamma = (self.gamma + 0.1 * intensity).min(1.0);
+        self.entropy = (self.entropy - 0.05 * intensity).max(0.0);
+        self.dmn = (self.dmn - 0.05 * intensity).max(0.0);
+
+        // Update transcendence gradually
+        let target = TranscendenceFeatures::for_state(ExpandedStateType::Concentration);
+        self.transcendence.unity = self.transcendence.unity + 0.05 * intensity * (target.unity - self.transcendence.unity);
+        self.transcendence.timelessness = self.transcendence.timelessness + 0.05 * intensity * (target.timelessness - self.transcendence.timelessness);
+
+        self.duration += 1.0;
+    }
+
+    /// Practice insight meditation
+    pub fn practice_insight(&mut self, intensity: f64) {
+        // Moderate gamma, moderate entropy (observing)
+        self.gamma = 0.7;
+        self.entropy = (self.entropy + 0.03 * intensity).min(0.8);
+        self.dmn = (self.dmn - 0.04 * intensity).max(0.0);
+
+        // Increase non-dual awareness through insight
+        self.nondual = (self.nondual + 0.06 * intensity).min(1.0);
+
+        self.transcendence = TranscendenceFeatures::for_state(ExpandedStateType::Insight);
+        self.duration += 1.0;
+    }
+
+    /// Enter jhana (absorption) state
+    pub fn enter_jhana(&mut self, jhana_level: u8) {
+        // Very high gamma, very low entropy (deep absorption)
+        self.gamma = 0.85 + jhana_level as f64 * 0.03;
+        self.entropy = 0.3 - jhana_level as f64 * 0.05;
+        self.dmn = 0.2 - jhana_level as f64 * 0.03;
+
+        self.transcendence = TranscendenceFeatures::for_state(ExpandedStateType::Jhana);
+        // Scale transcendence by jhana level
+        let scale = 0.6 + jhana_level as f64 * 0.1;
+        self.transcendence.unity *= scale;
+        self.transcendence.positive_mood *= scale;
+
+        self.duration = 0.0;
+    }
+
+    /// Achieve non-dual awareness
+    pub fn realize_nondual(&mut self) {
+        self.gamma = 0.85;
+        self.entropy = 0.7;
+        self.nondual = 0.95;
+        self.dmn = 0.1;
+        self.transcendence = TranscendenceFeatures::for_state(ExpandedStateType::NonDual);
+        self.duration = 0.0;
+    }
+
+    /// Simulate psychedelic state
+    pub fn take_psychedelic(&mut self, dose: f64) {
+        // Dose in range [0, 1]: 0 = threshold, 0.5 = moderate, 1.0 = heroic
+
+        // Increase entropy significantly (increased brain connectivity)
+        self.entropy = 0.5 + 0.4 * dose;
+
+        // Suppress DMN (ego dissolution proportional to dose)
+        self.dmn = 1.0 - 0.7 * dose;
+
+        // Moderate gamma (not as high as meditation but present)
+        self.gamma = 0.6 + 0.1 * dose;
+
+        // Non-dual awareness emerges at higher doses
+        self.nondual = (dose - 0.3).max(0.0) * 1.5;
+
+        // Transcendence features scale with dose
+        let mut trans = TranscendenceFeatures::for_state(ExpandedStateType::Psychedelic);
+        trans.unity *= dose;
+        trans.ineffability *= dose;
+        trans.sacredness *= dose;
+        self.transcendence = trans;
+
+        self.duration = 0.0;
+    }
+
+    /// Trigger mystical experience
+    pub fn mystical_experience(&mut self) {
+        self.gamma = 0.8;
+        self.entropy = 0.8;
+        self.nondual = 0.95;
+        self.dmn = 0.05;  // Near-complete ego dissolution
+        self.transcendence = TranscendenceFeatures::for_state(ExpandedStateType::Mystical);
+        self.duration = 0.0;
+    }
+
+    /// Complete ego dissolution
+    pub fn dissolve_ego(&mut self) {
+        self.gamma = 0.5;  // May drop during dissolution
+        self.entropy = 0.85;
+        self.nondual = 0.99;
+        self.dmn = 0.02;  // Self-system offline
+        self.transcendence = TranscendenceFeatures::for_state(ExpandedStateType::EgoDissolution);
+        self.duration = 0.0;
+    }
+
+    /// Advance time (e.g., for duration tracking)
+    pub fn advance_time(&mut self, dt: f64) {
+        self.duration += dt;
+    }
+
+    /// Return to ordinary consciousness
+    pub fn return_to_ordinary(&mut self) {
+        self.gamma = 0.5;
+        self.entropy = 0.5;
+        self.nondual = 0.0;
+        self.dmn = 1.0;
+        self.transcendence = TranscendenceFeatures::none();
+        self.duration = 0.0;
+        self.meditation_stage = None;
+    }
+
+    /// Classify current state
+    pub fn classify_state(&self) -> ExpandedStateType {
+        // Check for mystical experience (highest priority)
+        if self.transcendence.transcendence_score() >= self.config.mystical_transcendence_threshold {
+            if self.dmn < 0.05 {
+                return ExpandedStateType::EgoDissolution;
+            }
+            return ExpandedStateType::Mystical;
+        }
+
+        // Check for non-dual awareness
+        if self.nondual > 0.8 && self.dmn < self.config.nondual_dmn_threshold {
+            return ExpandedStateType::NonDual;
+        }
+
+        // Check for jhana (high gamma, low entropy, low DMN)
+        if self.gamma >= self.config.jhana_gamma_threshold
+           && self.entropy < 0.4
+           && self.dmn < 0.3 {
+            return ExpandedStateType::Jhana;
+        }
+
+        // Check for psychedelic state (high entropy)
+        if self.entropy >= self.config.psychedelic_entropy_threshold {
+            return ExpandedStateType::Psychedelic;
+        }
+
+        // Check meditation stages
+        if let Some(stage) = self.meditation_stage {
+            if self.gamma > 0.7 && self.dmn < 0.4 {
+                match stage {
+                    MeditationStage::Beginner | MeditationStage::Intermediate => {
+                        return ExpandedStateType::Mindfulness;
+                    }
+                    MeditationStage::Advanced | MeditationStage::Mastery => {
+                        if self.entropy < 0.4 {
+                            return ExpandedStateType::Concentration;
+                        } else if self.nondual > 0.5 {
+                            return ExpandedStateType::Insight;
+                        }
+                        return ExpandedStateType::Mindfulness;
+                    }
+                }
+            }
+        }
+
+        // Check for flow
+        if self.gamma > 0.65 && self.dmn < 0.65 && self.transcendence.timelessness > 0.3 {
+            return ExpandedStateType::Flow;
+        }
+
+        // Default: ordinary consciousness
+        ExpandedStateType::Ordinary
+    }
+
+    /// Compute expanded consciousness score
+    /// E = (Γ + S + N) × (1 - D) × T
+    pub fn expansion_score(&self) -> f64 {
+        let gamma_term = self.gamma;
+        let entropy_term = self.entropy;
+        let nondual_term = self.nondual;
+        let dmn_suppression = 1.0 - self.dmn;
+        let transcendence_term = self.transcendence.transcendence_score();
+
+        (gamma_term + entropy_term + nondual_term) * dmn_suppression * (0.5 + 0.5 * transcendence_term)
+    }
+
+    /// Generate detailed assessment
+    pub fn assess(&self) -> ExpandedConsciousnessAssessment {
+        let state_type = self.classify_state();
+        let expansion = self.expansion_score();
+
+        let explanation = match state_type {
+            ExpandedStateType::Ordinary => {
+                "Normal waking consciousness with active self-referential processing (DMN).".to_string()
+            }
+            ExpandedStateType::Flow => {
+                format!("Flow state: Gamma={:.2}, DMN suppression={:.2}. Optimal performance with reduced self-consciousness.",
+                    self.gamma, 1.0 - self.dmn)
+            }
+            ExpandedStateType::Mindfulness => {
+                format!("Mindfulness meditation: Present-moment awareness, DMN reduced to {:.2}.", self.dmn)
+            }
+            ExpandedStateType::Concentration => {
+                format!("Concentrative meditation: High gamma ({:.2}), low entropy ({:.2}), single-pointed attention.",
+                    self.gamma, self.entropy)
+            }
+            ExpandedStateType::Jhana => {
+                format!("Jhana (absorption): Very high gamma ({:.2}), very low entropy ({:.2}), profound stability and bliss.",
+                    self.gamma, self.entropy)
+            }
+            ExpandedStateType::Insight => {
+                format!("Insight meditation: Non-dual awareness ({:.2}), seeing impermanence and no-self.", self.nondual)
+            }
+            ExpandedStateType::NonDual => {
+                format!("Non-dual awareness: Subject-object collapse ({:.2}), DMN={:.2}. Awareness itself becomes primary.",
+                    self.nondual, self.dmn)
+            }
+            ExpandedStateType::Psychedelic => {
+                format!("Psychedelic state: High entropy ({:.2}), DMN suppression ({:.2}), increased brain connectivity.",
+                    self.entropy, 1.0 - self.dmn)
+            }
+            ExpandedStateType::Mystical => {
+                format!("Mystical experience: Profound unity ({:.2}), sacredness ({:.2}), transcendence score {:.2}.",
+                    self.transcendence.unity, self.transcendence.sacredness, self.transcendence.transcendence_score())
+            }
+            ExpandedStateType::EgoDissolution => {
+                format!("Ego dissolution: DMN={:.2}, non-dual={:.2}. Self-system offline, pure awareness remains.",
+                    self.dmn, self.nondual)
+            }
+        };
+
+        ExpandedConsciousnessAssessment {
+            state_type,
+            gamma_power: self.gamma,
+            brain_entropy: self.entropy,
+            nondual_awareness: self.nondual,
+            dmn_activity: self.dmn,
+            transcendence: self.transcendence.clone(),
+            expansion_score: expansion,
+            meditation_stage: self.meditation_stage,
+            duration: self.duration,
+            explanation,
+        }
+    }
+
+    /// Clear state back to ordinary consciousness
+    pub fn clear(&mut self) {
+        self.return_to_ordinary();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_expanded_state_type_properties() {
+        // Ordinary has no DMN suppression
+        assert_eq!(ExpandedStateType::Ordinary.typical_dmn_suppression(), 0.0);
+
+        // Ego dissolution has maximum DMN suppression
+        assert!(ExpandedStateType::EgoDissolution.typical_dmn_suppression() >= 0.9);
+
+        // Jhana has low entropy (high coherence)
+        assert!(ExpandedStateType::Jhana.typical_entropy() < 0.3);
+
+        // Psychedelic has high entropy
+        assert!(ExpandedStateType::Psychedelic.typical_entropy() >= 0.8);
+    }
+
+    #[test]
+    fn test_transcendence_features() {
+        let ordinary = TranscendenceFeatures::for_state(ExpandedStateType::Ordinary);
+        assert!(ordinary.transcendence_score() < 0.1);
+
+        let mystical = TranscendenceFeatures::for_state(ExpandedStateType::Mystical);
+        assert!(mystical.transcendence_score() >= 0.85);
+        assert!(mystical.unity >= 0.9);
+        assert!(mystical.ineffability >= 0.9);
+    }
+
+    #[test]
+    fn test_expanded_consciousness_creation() {
+        let system = ExpandedConsciousness::new(10);
+        let assessment = system.assess();
+
+        // Should start in ordinary state
+        assert_eq!(assessment.state_type, ExpandedStateType::Ordinary);
+        assert!(assessment.dmn_activity > 0.8);  // High self-focus
+        assert!(assessment.expansion_score < 0.3);  // Low expansion
+    }
+
+    #[test]
+    fn test_flow_state() {
+        let mut system = ExpandedConsciousness::new(10);
+        system.enter_flow();
+
+        let assessment = system.assess();
+        assert_eq!(assessment.state_type, ExpandedStateType::Flow);
+        assert!(assessment.gamma_power >= 0.6);
+        assert!(assessment.dmn_activity < 0.7);  // Reduced self-consciousness
+        assert!(assessment.transcendence.timelessness > 0.3);
+    }
+
+    #[test]
+    fn test_meditation_progression() {
+        let mut system = ExpandedConsciousness::new(10);
+
+        // Beginner stage
+        system.set_meditation_stage(MeditationStage::Beginner);
+        let assessment = system.assess();
+        assert!(assessment.gamma_power > 0.5);
+
+        // Advance to mastery
+        system.set_meditation_stage(MeditationStage::Mastery);
+        let assessment = system.assess();
+        assert!(assessment.gamma_power >= 0.9);
+        assert!(assessment.dmn_activity <= 0.2);
+    }
+
+    #[test]
+    fn test_concentration_practice() {
+        let mut system = ExpandedConsciousness::new(10);
+        system.set_meditation_stage(MeditationStage::Intermediate);
+
+        // Practice concentration repeatedly
+        for _ in 0..20 {
+            system.concentrate(1.0);
+        }
+
+        let assessment = system.assess();
+        // Should reach concentration state eventually
+        assert!(assessment.gamma_power > 0.7);
+        assert!(assessment.brain_entropy < 0.5);  // Focused
+        assert!(assessment.dmn_activity < 0.5);
+    }
+
+    #[test]
+    fn test_insight_meditation() {
+        let mut system = ExpandedConsciousness::new(10);
+        system.set_meditation_stage(MeditationStage::Advanced);
+
+        // Practice insight
+        for _ in 0..30 {
+            system.practice_insight(1.0);
+        }
+
+        let assessment = system.assess();
+        assert!(assessment.nondual_awareness > 0.5);
+        assert!(assessment.dmn_activity < 0.4);
+    }
+
+    #[test]
+    fn test_jhana_state() {
+        let mut system = ExpandedConsciousness::new(10);
+        system.enter_jhana(4);  // Fourth jhana
+
+        let assessment = system.assess();
+        assert_eq!(assessment.state_type, ExpandedStateType::Jhana);
+        assert!(assessment.gamma_power >= 0.8);
+        assert!(assessment.brain_entropy < 0.4);  // Very coherent
+        assert!(assessment.transcendence.positive_mood > 0.7);
+    }
+
+    #[test]
+    fn test_nondual_awareness() {
+        let mut system = ExpandedConsciousness::new(10);
+        system.realize_nondual();
+
+        let assessment = system.assess();
+        assert_eq!(assessment.state_type, ExpandedStateType::NonDual);
+        assert!(assessment.nondual_awareness >= 0.9);
+        assert!(assessment.dmn_activity <= 0.2);
+        assert!(assessment.transcendence.paradoxicality > 0.8);
+    }
+
+    #[test]
+    fn test_psychedelic_dose_response() {
+        let mut system = ExpandedConsciousness::new(10);
+
+        // Threshold dose
+        system.take_psychedelic(0.1);
+        let assessment = system.assess();
+        assert!(assessment.brain_entropy > 0.5);
+        assert!(assessment.dmn_activity < 1.0);
+
+        // Heroic dose
+        system.return_to_ordinary();
+        system.take_psychedelic(1.0);
+        let assessment = system.assess();
+        assert_eq!(assessment.state_type, ExpandedStateType::Psychedelic);
+        assert!(assessment.brain_entropy >= 0.8);
+        assert!(assessment.dmn_activity <= 0.3);
+    }
+
+    #[test]
+    fn test_mystical_experience() {
+        let mut system = ExpandedConsciousness::new(10);
+        system.mystical_experience();
+
+        let assessment = system.assess();
+        assert_eq!(assessment.state_type, ExpandedStateType::Mystical);
+        assert!(assessment.transcendence.unity >= 0.9);
+        assert!(assessment.transcendence.sacredness >= 0.9);
+        assert!(assessment.transcendence.ineffability >= 0.9);
+        assert!(assessment.expansion_score > 1.5);
+    }
+
+    #[test]
+    fn test_ego_dissolution() {
+        let mut system = ExpandedConsciousness::new(10);
+        system.dissolve_ego();
+
+        let assessment = system.assess();
+        assert_eq!(assessment.state_type, ExpandedStateType::EgoDissolution);
+        assert!(assessment.dmn_activity <= 0.05);  // Self offline
+        assert!(assessment.nondual_awareness >= 0.95);
+        assert!(assessment.transcendence.unity >= 0.95);
+    }
+
+    #[test]
+    fn test_expansion_score_formula() {
+        let mut system = ExpandedConsciousness::new(10);
+
+        // Ordinary state - low expansion
+        let ordinary_score = system.expansion_score();
+        assert!(ordinary_score < 0.5);
+
+        // Mystical state - high expansion
+        system.mystical_experience();
+        let mystical_score = system.expansion_score();
+        assert!(mystical_score > 1.5);
+        assert!(mystical_score > ordinary_score * 3.0);
+    }
+
+    #[test]
+    fn test_return_to_ordinary() {
+        let mut system = ExpandedConsciousness::new(10);
+
+        // Enter expanded state
+        system.mystical_experience();
+        assert!(system.expansion_score() > 1.0);
+
+        // Return to ordinary
+        system.return_to_ordinary();
+        let assessment = system.assess();
+        assert_eq!(assessment.state_type, ExpandedStateType::Ordinary);
+        assert!(assessment.expansion_score < 0.5);
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut system = ExpandedConsciousness::new(10);
+        system.enter_jhana(8);
+
+        system.clear();
+        let assessment = system.assess();
+        assert_eq!(assessment.state_type, ExpandedStateType::Ordinary);
+    }
+}
