@@ -920,7 +920,7 @@ impl Default for DeepParser {
 mod tests {
     use super::*;
     use super::super::parser::SentenceType;
-    use crate::HV16;
+    use crate::hdc::binary_hv::HV16;
 
     fn make_basic_parse() -> ParsedSentence {
         ParsedSentence {
