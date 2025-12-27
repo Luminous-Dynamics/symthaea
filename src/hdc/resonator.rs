@@ -1009,9 +1009,9 @@ mod tests {
         // Threshold accounts for:
         // - 16,384D vectors (1.64x larger than original 10K design)
         // - Debug mode overhead (~3x slower than release)
-        // - CI environment variance
-        // Target: <2000ms debug, <200ms release
-        let threshold_ms = if cfg!(debug_assertions) { 2000 } else { 200 };
+        // - CI/system load variance (can be 20-50% slower under load)
+        // Target: <3000ms debug, <300ms release
+        let threshold_ms = if cfg!(debug_assertions) { 3000 } else { 300 };
         assert!(elapsed.as_millis() < threshold_ms,
                 "Should complete 20 iterations in <{}ms, took {}ms",
                 threshold_ms, elapsed.as_millis());

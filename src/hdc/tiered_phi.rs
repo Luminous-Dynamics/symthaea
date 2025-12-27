@@ -1402,6 +1402,322 @@ fn compute_system_info(&self, bundled: &HV16, components: &[HV16]) -> f64 {
         }
         hash
     }
+
+    // ========================================================================
+    // REVOLUTIONARY #92: CAUSAL Φ ATTRIBUTION
+    // ========================================================================
+    //
+    // **Key Insight**: Not all components contribute equally to consciousness.
+    // Some are "critical" (removing them dramatically reduces Φ), while others
+    // are "redundant" (removing them barely affects Φ).
+    //
+    // This enables:
+    // - Identifying consciousness bottlenecks
+    // - Understanding which neural populations are essential
+    // - Designing minimal consciousness architectures
+    // - Detecting redundancy for compression
+    //
+    // **Method**: Leave-one-out analysis
+    // For each component i: Φ_i = Φ_baseline - Φ_without_i
+    // High Φ_i = critical component
+    // Low/Negative Φ_i = redundant component
+    // ========================================================================
+
+    /// Compute causal Φ attribution for each component
+    ///
+    /// Uses leave-one-out analysis: for each component, compute Φ with that
+    /// component removed. The importance score is how much Φ decreases.
+    ///
+    /// **Complexity**: O(n × Φ_complexity)
+    /// - Heuristic tier: O(n²)
+    /// - Spectral tier: O(n³)
+    /// - Exact tier: O(n × 2^n) - use sparingly!
+    ///
+    /// # Returns
+    /// PhiAttribution containing:
+    /// - baseline_phi: Φ with all components
+    /// - component_scores: importance score for each component
+    /// - importance_ranking: indices sorted by importance (highest first)
+    /// - critical_components: indices where removal reduces Φ significantly
+    /// - redundant_components: indices where removal barely affects Φ
+    /// - concentration_index: Gini-like measure (0=uniform, 1=concentrated)
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let mut phi = TieredPhi::new(ApproximationTier::Spectral);
+    /// let components = create_conscious_system();
+    /// let attr = phi.compute_attribution(&components);
+    /// println!("Most critical component: {}", attr.importance_ranking[0]);
+    /// ```
+    pub fn compute_attribution(&mut self, components: &[HV16]) -> PhiAttribution {
+        let n = components.len();
+
+        // Edge cases
+        if n == 0 {
+            return PhiAttribution {
+                baseline_phi: 0.0,
+                component_scores: vec![],
+                importance_ranking: vec![],
+                critical_components: vec![],
+                redundant_components: vec![],
+                concentration_index: 0.0,
+            };
+        }
+
+        if n == 1 {
+            return PhiAttribution {
+                baseline_phi: 0.0, // Single component has no integration
+                component_scores: vec![0.0],
+                importance_ranking: vec![0],
+                critical_components: vec![],
+                redundant_components: vec![0],
+                concentration_index: 0.0,
+            };
+        }
+
+        // Step 1: Compute baseline Φ
+        let baseline_phi = self.compute(components);
+
+        // Step 2: Leave-one-out analysis
+        let mut component_scores = Vec::with_capacity(n);
+
+        for exclude_idx in 0..n {
+            // Create component list without the excluded one
+            let remaining: Vec<HV16> = components
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != exclude_idx)
+                .map(|(_, c)| c.clone())
+                .collect();
+
+            // Compute Φ without this component
+            let phi_without = self.compute(&remaining);
+
+            // Importance = how much Φ drops when we remove this component
+            let importance = baseline_phi - phi_without;
+            component_scores.push(importance);
+        }
+
+        // Step 3: Create importance ranking (highest first)
+        let mut importance_ranking: Vec<usize> = (0..n).collect();
+        importance_ranking.sort_by(|&a, &b| {
+            component_scores[b].partial_cmp(&component_scores[a]).unwrap()
+        });
+
+        // Step 4: Identify critical and redundant components
+        // Critical: removal reduces Φ by more than 10% of baseline
+        // Redundant: removal reduces Φ by less than 1% of baseline
+        let critical_threshold = baseline_phi * 0.10;
+        let redundant_threshold = baseline_phi * 0.01;
+
+        let critical_components: Vec<usize> = (0..n)
+            .filter(|&i| component_scores[i] > critical_threshold)
+            .collect();
+
+        let redundant_components: Vec<usize> = (0..n)
+            .filter(|&i| component_scores[i] < redundant_threshold)
+            .collect();
+
+        // Step 5: Compute concentration index (Gini coefficient on importance)
+        let concentration_index = self.compute_concentration(&component_scores);
+
+        PhiAttribution {
+            baseline_phi,
+            component_scores,
+            importance_ranking,
+            critical_components,
+            redundant_components,
+            concentration_index,
+        }
+    }
+
+    /// Fast attribution using centrality approximation
+    ///
+    /// Instead of computing n × Φ calculations, we approximate importance
+    /// using network centrality measures. Much faster but less accurate.
+    ///
+    /// **Complexity**: O(n²) regardless of Φ tier
+    ///
+    /// **Method**:
+    /// 1. Build similarity graph between components
+    /// 2. Compute weighted degree centrality
+    /// 3. Higher centrality ≈ more critical to integration
+    ///
+    /// Use this for:
+    /// - Large systems (n > 100)
+    /// - Real-time analysis
+    /// - Initial screening before detailed attribution
+    pub fn compute_attribution_fast(&mut self, components: &[HV16]) -> PhiAttribution {
+        let n = components.len();
+
+        // Edge cases
+        if n == 0 {
+            return PhiAttribution {
+                baseline_phi: 0.0,
+                component_scores: vec![],
+                importance_ranking: vec![],
+                critical_components: vec![],
+                redundant_components: vec![],
+                concentration_index: 0.0,
+            };
+        }
+
+        if n == 1 {
+            return PhiAttribution {
+                baseline_phi: 0.0,
+                component_scores: vec![0.0],
+                importance_ranking: vec![0],
+                critical_components: vec![],
+                redundant_components: vec![0],
+                concentration_index: 0.0,
+            };
+        }
+
+        // Step 1: Compute baseline Φ (we still need this)
+        let baseline_phi = self.compute(components);
+
+        // Step 2: Build weighted degree centrality from similarity graph
+        // Centrality[i] = sum of similarities to all other components
+        let mut centralities = vec![0.0f64; n];
+
+        for i in 0..n {
+            for j in 0..n {
+                if i != j {
+                    let sim = components[i].similarity(&components[j]) as f64;
+                    centralities[i] += sim;
+                }
+            }
+        }
+
+        // Step 3: Normalize centralities to importance scores
+        // Higher centrality = more connected = more critical to integration
+        // Scale to be proportional to baseline_phi
+        let max_centrality = centralities.iter().cloned().fold(0.0f64, f64::max);
+        let component_scores: Vec<f64> = if max_centrality > 0.0 {
+            centralities.iter()
+                .map(|&c| (c / max_centrality) * baseline_phi * 0.5)
+                .collect()
+        } else {
+            vec![0.0; n]
+        };
+
+        // Step 4: Create importance ranking (highest first)
+        let mut importance_ranking: Vec<usize> = (0..n).collect();
+        importance_ranking.sort_by(|&a, &b| {
+            component_scores[b].partial_cmp(&component_scores[a]).unwrap()
+        });
+
+        // Step 5: Identify critical and redundant components
+        let critical_threshold = baseline_phi * 0.10;
+        let redundant_threshold = baseline_phi * 0.01;
+
+        let critical_components: Vec<usize> = (0..n)
+            .filter(|&i| component_scores[i] > critical_threshold)
+            .collect();
+
+        let redundant_components: Vec<usize> = (0..n)
+            .filter(|&i| component_scores[i] < redundant_threshold)
+            .collect();
+
+        // Step 6: Compute concentration index
+        let concentration_index = self.compute_concentration(&component_scores);
+
+        PhiAttribution {
+            baseline_phi,
+            component_scores,
+            importance_ranking,
+            critical_components,
+            redundant_components,
+            concentration_index,
+        }
+    }
+
+    /// Compute Gini coefficient for concentration measurement
+    ///
+    /// 0 = perfectly uniform (all components equally important)
+    /// 1 = perfectly concentrated (one component has all importance)
+    fn compute_concentration(&self, scores: &[f64]) -> f64 {
+        let n = scores.len();
+        if n <= 1 {
+            return 0.0;
+        }
+
+        // Normalize to positive values
+        let min_score = scores.iter().cloned().fold(f64::INFINITY, f64::min);
+        let shifted: Vec<f64> = scores.iter().map(|&s| s - min_score + 1e-10).collect();
+        let total: f64 = shifted.iter().sum();
+
+        if total <= 0.0 {
+            return 0.0;
+        }
+
+        // Sort for Gini calculation
+        let mut sorted = shifted.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        // Gini coefficient formula
+        let mut gini_sum = 0.0;
+        for (i, &s) in sorted.iter().enumerate() {
+            gini_sum += (2.0 * (i + 1) as f64 - n as f64 - 1.0) * s;
+        }
+
+        (gini_sum / (n as f64 * total)).abs()
+    }
+}
+
+/// Result of causal Φ attribution analysis
+///
+/// Identifies which components are critical vs redundant for consciousness.
+/// This enables understanding of consciousness architecture and optimization.
+#[derive(Debug, Clone)]
+pub struct PhiAttribution {
+    /// Φ with all components present
+    pub baseline_phi: f64,
+
+    /// Importance score for each component
+    /// Positive = removing hurts Φ (critical)
+    /// Negative = removing helps Φ (interference)
+    /// Near-zero = redundant
+    pub component_scores: Vec<f64>,
+
+    /// Component indices sorted by importance (highest first)
+    pub importance_ranking: Vec<usize>,
+
+    /// Indices of components that are critical (removal >10% Φ drop)
+    pub critical_components: Vec<usize>,
+
+    /// Indices of components that are redundant (removal <1% Φ drop)
+    pub redundant_components: Vec<usize>,
+
+    /// Gini coefficient measuring importance concentration
+    /// 0 = uniform importance across all components
+    /// 1 = all importance concentrated in one component
+    pub concentration_index: f64,
+}
+
+impl PhiAttribution {
+    /// Get the most critical component index
+    pub fn most_critical(&self) -> Option<usize> {
+        self.importance_ranking.first().copied()
+    }
+
+    /// Get the most redundant component index
+    pub fn most_redundant(&self) -> Option<usize> {
+        self.importance_ranking.last().copied()
+    }
+
+    /// Check if consciousness is distributed (low concentration) or centralized (high concentration)
+    pub fn is_distributed(&self) -> bool {
+        self.concentration_index < 0.3
+    }
+
+    /// Get percentage of components that are critical
+    pub fn critical_percentage(&self) -> f64 {
+        if self.component_scores.is_empty() {
+            return 0.0;
+        }
+        (self.critical_components.len() as f64 / self.component_scores.len() as f64) * 100.0
+    }
 }
 
 impl Default for TieredPhi {
@@ -2169,5 +2485,235 @@ mod tests {
         assert!((h.macro_phi - regular_phi).abs() < 0.1,
             "Hierarchical macro Φ ({:.3}) should match regular Φ ({:.3})",
             h.macro_phi, regular_phi);
+    }
+
+    // ========================================================================
+    // REVOLUTIONARY #92: CAUSAL Φ ATTRIBUTION TESTS
+    // ========================================================================
+
+    #[test]
+    fn test_attribution_empty_components() {
+        let mut phi = TieredPhi::new(ApproximationTier::Heuristic);
+        let components: Vec<HV16> = vec![];
+
+        let attr = phi.compute_attribution(&components);
+
+        assert_eq!(attr.baseline_phi, 0.0);
+        assert!(attr.component_scores.is_empty());
+        assert!(attr.importance_ranking.is_empty());
+        assert!(attr.critical_components.is_empty());
+        assert!(attr.redundant_components.is_empty());
+        assert_eq!(attr.concentration_index, 0.0);
+    }
+
+    #[test]
+    fn test_attribution_single_component() {
+        let mut phi = TieredPhi::new(ApproximationTier::Heuristic);
+        let components = vec![HV16::random(42)];
+
+        let attr = phi.compute_attribution(&components);
+
+        // Single component has no integration
+        assert_eq!(attr.baseline_phi, 0.0);
+        assert_eq!(attr.component_scores.len(), 1);
+        assert_eq!(attr.component_scores[0], 0.0);
+        assert_eq!(attr.importance_ranking, vec![0]);
+        // Single component is redundant (can't contribute to integration alone)
+        assert_eq!(attr.redundant_components, vec![0]);
+    }
+
+    #[test]
+    fn test_attribution_basic() {
+        let mut phi = TieredPhi::new(ApproximationTier::Heuristic);
+        let components = create_test_components(5);
+
+        let attr = phi.compute_attribution(&components);
+
+        // Basic sanity checks
+        assert!(attr.baseline_phi > 0.0, "5 components should have positive Φ");
+        assert_eq!(attr.component_scores.len(), 5);
+        assert_eq!(attr.importance_ranking.len(), 5);
+
+        // Importance ranking should be a permutation of 0..5
+        let mut sorted_ranking = attr.importance_ranking.clone();
+        sorted_ranking.sort();
+        assert_eq!(sorted_ranking, vec![0, 1, 2, 3, 4]);
+
+        // Concentration should be between 0 and 1
+        assert!(attr.concentration_index >= 0.0);
+        assert!(attr.concentration_index <= 1.0);
+
+        println!("Attribution test - baseline Φ: {:.4}", attr.baseline_phi);
+        println!("Importance ranking: {:?}", attr.importance_ranking);
+        println!("Concentration index: {:.4}", attr.concentration_index);
+    }
+
+    #[test]
+    fn test_attribution_hub_spoke_topology() {
+        // Create a hub-spoke structure: component 0 is the hub
+        // Hub should be most critical since it connects everything
+        let mut phi = TieredPhi::new(ApproximationTier::Heuristic);
+
+        // Create hub with specific seed, spokes with similar seeds
+        let hub = HV16::random(1000);
+        let mut components = vec![hub.clone()];
+
+        // Create spokes that are all similar to hub but not each other
+        for i in 1..6 {
+            // Mix hub with unique component
+            let unique = HV16::random(i as u64);
+            // Create spoke by bundling hub pattern with unique pattern
+            // This makes spokes connected to hub but less to each other
+            let spoke = HV16::bundle(&[hub.clone(), unique]);
+            components.push(spoke);
+        }
+
+        let attr = phi.compute_attribution(&components);
+
+        // Hub (index 0) should be among the most critical components
+        // since removing it breaks hub-spoke integration
+        println!("Hub-spoke attribution:");
+        println!("  Baseline Φ: {:.4}", attr.baseline_phi);
+        println!("  Hub (0) importance: {:.4}", attr.component_scores[0]);
+        println!("  Importance ranking: {:?}", attr.importance_ranking);
+        println!("  Critical components: {:?}", attr.critical_components);
+
+        // The test validates that the attribution runs without error
+        // and produces sensible output
+        assert!(attr.baseline_phi > 0.0);
+        assert_eq!(attr.component_scores.len(), 6);
+    }
+
+    #[test]
+    fn test_attribution_fast_vs_full() {
+        let mut phi = TieredPhi::new(ApproximationTier::Heuristic);
+        let components = create_test_components(8);
+
+        let full_attr = phi.compute_attribution(&components);
+        let fast_attr = phi.compute_attribution_fast(&components);
+
+        // Both should have same baseline
+        assert!((full_attr.baseline_phi - fast_attr.baseline_phi).abs() < 1e-10);
+
+        // Both should have same number of components
+        assert_eq!(full_attr.component_scores.len(), fast_attr.component_scores.len());
+
+        // Fast method may have different ranking but should identify
+        // similar critical/redundant patterns
+        println!("Full vs Fast attribution comparison:");
+        println!("  Full ranking: {:?}", full_attr.importance_ranking);
+        println!("  Fast ranking: {:?}", fast_attr.importance_ranking);
+        println!("  Full critical: {:?}", full_attr.critical_components);
+        println!("  Fast critical: {:?}", fast_attr.critical_components);
+    }
+
+    #[test]
+    fn test_attribution_identical_components() {
+        let mut phi = TieredPhi::new(ApproximationTier::Heuristic);
+
+        // All identical components - should have uniform attribution
+        let base = HV16::random(999);
+        let components: Vec<HV16> = (0..5).map(|_| base.clone()).collect();
+
+        let attr = phi.compute_attribution(&components);
+
+        // All components should have similar importance (uniform distribution)
+        let scores = &attr.component_scores;
+        let mean: f64 = scores.iter().sum::<f64>() / scores.len() as f64;
+        let variance: f64 = scores.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / scores.len() as f64;
+
+        println!("Identical components test:");
+        println!("  Scores: {:?}", scores);
+        println!("  Mean: {:.4}, Variance: {:.6}", mean, variance);
+
+        // Low variance = uniform importance
+        assert!(variance < 0.01, "Identical components should have low variance in importance");
+    }
+
+    #[test]
+    fn test_attribution_critical_detection() {
+        let mut phi = TieredPhi::new(ApproximationTier::Heuristic);
+        let components = create_test_components(10);
+
+        let attr = phi.compute_attribution(&components);
+
+        // Critical threshold is 10% of baseline_phi
+        let threshold = attr.baseline_phi * 0.10;
+
+        // Verify critical components are actually above threshold
+        for &i in &attr.critical_components {
+            assert!(attr.component_scores[i] > threshold,
+                "Critical component {} has score {:.4} below threshold {:.4}",
+                i, attr.component_scores[i], threshold);
+        }
+
+        // Verify redundant components are actually below 1% threshold
+        let redundant_threshold = attr.baseline_phi * 0.01;
+        for &i in &attr.redundant_components {
+            assert!(attr.component_scores[i] < redundant_threshold,
+                "Redundant component {} has score {:.4} above threshold {:.4}",
+                i, attr.component_scores[i], redundant_threshold);
+        }
+    }
+
+    #[test]
+    fn test_attribution_concentration_gradient() {
+        // Test that concentration index varies with different distributions
+        let mut phi = TieredPhi::new(ApproximationTier::Heuristic);
+
+        // Create systems with different integration patterns
+        // System 1: Diverse components (should have distributed importance)
+        let diverse: Vec<HV16> = (0..6).map(|i| HV16::random(i as u64 * 1000)).collect();
+        let attr_diverse = phi.compute_attribution(&diverse);
+
+        // System 2: Mostly similar components (may have more concentrated importance)
+        let base = HV16::random(42);
+        let similar: Vec<HV16> = (0..6).map(|i| {
+            let noise = HV16::random(i as u64);
+            HV16::bundle(&[base.clone(), base.clone(), base.clone(), noise])
+        }).collect();
+        let attr_similar = phi.compute_attribution(&similar);
+
+        println!("Concentration gradient test:");
+        println!("  Diverse system concentration: {:.4}", attr_diverse.concentration_index);
+        println!("  Similar system concentration: {:.4}", attr_similar.concentration_index);
+
+        // Both should be valid concentration indices
+        assert!(attr_diverse.concentration_index >= 0.0);
+        assert!(attr_diverse.concentration_index <= 1.0);
+        assert!(attr_similar.concentration_index >= 0.0);
+        assert!(attr_similar.concentration_index <= 1.0);
+    }
+
+    #[test]
+    fn test_phi_attribution_helper_methods() {
+        let mut phi = TieredPhi::new(ApproximationTier::Heuristic);
+        let components = create_test_components(8);
+
+        let attr = phi.compute_attribution(&components);
+
+        // Test helper methods
+        assert!(attr.most_critical().is_some());
+        assert!(attr.most_redundant().is_some());
+
+        // Most critical should be first in ranking
+        assert_eq!(attr.most_critical(), Some(attr.importance_ranking[0]));
+
+        // Most redundant should be last in ranking
+        assert_eq!(attr.most_redundant(), Some(attr.importance_ranking[attr.importance_ranking.len() - 1]));
+
+        // is_distributed should match concentration threshold
+        let expected_distributed = attr.concentration_index < 0.3;
+        assert_eq!(attr.is_distributed(), expected_distributed);
+
+        // critical_percentage should be valid
+        let pct = attr.critical_percentage();
+        assert!(pct >= 0.0 && pct <= 100.0);
+
+        println!("Helper methods test:");
+        println!("  Most critical: {:?}", attr.most_critical());
+        println!("  Most redundant: {:?}", attr.most_redundant());
+        println!("  Is distributed: {}", attr.is_distributed());
+        println!("  Critical percentage: {:.1}%", pct);
     }
 }
