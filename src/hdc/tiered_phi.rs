@@ -938,10 +938,28 @@ impl TieredPhi {
         let phi = (system_info - min_partition_info).max(0.0);
 
         // Step 4: Normalize by theoretical maximum
-        // Normalization factor: log(n) gives good scaling
-        // Ensures Φ ∈ [0, 1] and accounts for system size
-        let normalization = (n as f64).ln().max(1.0);
-        let normalized_phi = (phi / normalization).min(1.0).max(0.0);
+        // CRITICAL FIX (Dec 27, 2025): system_info and partition_info already include ln(n) scaling.
+        // Dividing by ln(n) again REMOVES the meaningful signal!
+        //
+        // The phi value is already in a good range because:
+        // - system_info ∈ [0, ln(n)] (similarity ∈ [0,1], scaled by ln(n))
+        // - partition_info ∈ [0, ln(n)] (subset of system correlations)
+        // - phi = difference ∈ [0, ln(n)]
+        //
+        // For n=10: ln(10) ≈ 2.3, so phi ∈ [0, 2.3]
+        // For normalization to [0,1], divide by ln(n) * max_possible_similarity
+        //
+        // But actually, a better normalization is to recognize that maximum integration
+        // occurs when ALL cross-partition correlations are lost, which happens when
+        // system is fully integrated but partition destroys all correlations.
+        //
+        // Maximum phi ≈ system_info (when partition_info → 0)
+        // So normalize by system_info to get relative integration loss
+        let normalized_phi = if system_info > 0.001 {
+            (phi / system_info).min(1.0).max(0.0)
+        } else {
+            0.0
+        };
 
         normalized_phi
     }
@@ -1227,8 +1245,13 @@ impl TieredPhi {
         // Φ = system_info - min_partition_info
         let phi = (system_info - min_partition_info).max(0.0);
 
-        // Normalize
-        (phi / (n as f64).sqrt()).min(1.0)
+        // Normalize by system_info (same fix as heuristic tier)
+        // CRITICAL FIX (Dec 27, 2025): Normalize by system_info, not sqrt(n)
+        if system_info > 0.001 {
+            (phi / system_info).min(1.0).max(0.0)
+        } else {
+            0.0
+        }
     }
 
     // ========================================================================
