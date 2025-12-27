@@ -38,7 +38,7 @@ use crate::web_research::{
     KnowledgeIntegrator, IntegrationResult,
     EpistemicLearner, MetaLearningStats,
 };
-use crate::consciousness::IntegratedInformation;
+use crate::hdc::integrated_information::IntegratedInformation;
 use crate::databases::UnifiedMind;
 
 use anyhow::Result;

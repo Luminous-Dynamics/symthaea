@@ -34,8 +34,9 @@ pub mod vocabulary;
 pub mod parser;
 pub mod generator;
 pub mod conversation;
-pub mod conscious_conversation;  // ✨ NEW: Epistemic consciousness integration
-pub mod consciousness_observatory;  // 🔬 NEW: Scientific study of consciousness
+// Track 6: Enabled with web_research (reqwest, scraper, html2text)
+pub mod conscious_conversation;  // ✨ Epistemic consciousness integration
+pub mod consciousness_observatory;  // 🔬 Scientific study of consciousness
 pub mod multilingual;
 pub mod word_learner;
 pub mod dynamic_generation;
@@ -61,14 +62,16 @@ pub mod nix_security;  // 🔐 NEW: Security kernel with secret detection and re
 pub mod nix_knowledge_provider;  // 📚 NEW: Global + Local NixOS knowledge with semantic search
 pub mod consciousness_language_integration;  // 🧬 REVOLUTIONARY: Unified Consciousness-Language Core
 pub mod consciousness_guided_executor;  // 🚀 REVOLUTIONARY: Consciousness-Guided Action Execution
+// Track 6: Enabled with web_research (reqwest)
 pub mod epistemics_language_bridge;  // 🔬 REVOLUTIONARY: Epistemics-Language Bridge for Knowledge Grounding
 pub mod llm_organ;  // 🧠 LLM Language Organ: Consciousness-controlled external LLM access
 
 pub use vocabulary::{Vocabulary, WordEntry, SemanticGrounding};
 pub use parser::{SemanticParser, ParsedSentence, SemanticRole};
 pub use generator::{ResponseGenerator, GenerationConfig};
-pub use conscious_conversation::{ConsciousConversation, ConsciousConfig, ConsciousStats};  // ✨ Export new types
-pub use consciousness_observatory::{  // 🔬 Export observatory types
+// Track 6: Enabled with web_research
+pub use conscious_conversation::{ConsciousConversation, ConsciousConfig, ConsciousStats};
+pub use consciousness_observatory::{
     ConsciousnessObservatory, ConsciousnessExperiment, PhiChangeExpectation,
     ExperimentResult, PhiMeasurement, PhiMeasurementStream, EpistemicStateSnapshot,
 };
@@ -217,6 +220,7 @@ pub use consciousness_guided_executor::{
     GuidedExecutionResult, GuidedExecutionMetrics, ExecutionOutcomeInfo,
     ClarificationRequest, ExpectedResponse, PendingAction,
 };
+// Track 6: Enabled with web_research / reqwest
 // 🔬 REVOLUTIONARY: Epistemics-Language Bridge for Knowledge Grounding
 pub use epistemics_language_bridge::{
     EpistemicsLanguageBridge, EpistemicsBridgeConfig, EpistemicsBridgeStats,

@@ -274,7 +274,7 @@ mod tests {
         let mut config = VerificationConfig::default();
         config.num_counterfactuals = 100; // Fewer tests for synthetic data
 
-        let verifier = CounterfactualVerifier::new(config);
+        let mut verifier = CounterfactualVerifier::new(config);
         let result = verifier.verify(&program);
 
         assert!(result.success);

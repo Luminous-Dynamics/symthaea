@@ -53,8 +53,8 @@ pub struct RealHV {
 }
 
 impl RealHV {
-    /// Default dimension for hypervectors
-    pub const DEFAULT_DIM: usize = 2048;
+    /// Default dimension for hypervectors (aligned with HDC_DIMENSION = 16,384)
+    pub const DEFAULT_DIM: usize = super::HDC_DIMENSION;  // 16,384 (2^14)
 
     /// Create a zero vector (all dimensions = 0)
     pub fn zero(dim: usize) -> Self {
@@ -317,9 +317,9 @@ mod tests {
         let a = RealHV::random(dim, 42);
 
         // Create vectors with different amounts of noise
-        let noise_0_1 = RealHV::random(dim, 100).scale(0.1);  // 10% noise
-        let noise_0_3 = RealHV::random(dim, 101).scale(0.3);  // 30% noise
-        let noise_0_5 = RealHV::random(dim, 102).scale(0.5);  // 50% noise
+        let noise_0_1 = RealHV::random(dim, 100).scale(0.1_f32);  // 10% noise
+        let noise_0_3 = RealHV::random(dim, 101).scale(0.3_f32);  // 30% noise
+        let noise_0_5 = RealHV::random(dim, 102).scale(0.5_f32);  // 50% noise
         let noise_1_0 = RealHV::random(dim, 103);             // 100% noise (full random)
 
         // Bind with (1 + noise): a * (1 + ε) ≈ a for small ε

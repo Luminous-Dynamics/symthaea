@@ -1,0 +1,50 @@
+{
+  "evolution_config": {
+    "converged": true,
+    "generations": 4,
+    "population_size": 20,
+    "tier": "Physical"
+  },
+  "improvement": 46,
+  "name": "Consciousness Dimension Synergies",
+  "pareto_frontier_size": 20,
+  "synergy_profiles": [
+    {
+      "base_composite": 0.2313334208756903,
+      "emergent_properties": [],
+      "enhanced_composite": 0.20305566498350178,
+      "improvement_pct": -12.223809160451534,
+      "num_emergent_properties": 0,
+      "num_synergies": 8,
+      "primitive": "Highest Φ"
+    },
+    {
+      "base_composite": 0.2313334208756903,
+      "emergent_properties": [],
+      "enhanced_composite": 0.20305566498350178,
+      "improvement_pct": -12.223809160451534,
+      "num_emergent_properties": 0,
+      "num_synergies": 8,
+      "primitive": "Highest Entropy"
+    },
+    {
+      "base_composite": 0.2313334208756903,
+      "emergent_properties": [],
+      "enhanced_composite": 0.20305566498350178,
+      "improvement_pct": -12.223809160451534,
+      "num_emergent_properties": 0,
+      "num_synergies": 8,
+      "primitive": "Highest Complexity"
+    },
+    {
+      "base_composite": 0.2313334208756903,
+      "emergent_properties": [],
+      "enhanced_composite": 0.20305566498350178,
+      "improvement_pct": -12.223809160451534,
+      "num_emergent_properties": 0,
+      "num_synergies": 8,
+      "primitive": "Highest Composite"
+    }
+  ],
+  "total_emergent_properties": 0
+}

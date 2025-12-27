@@ -1,0 +1,164 @@
+{
+  "baseline": {
+    "mean_phi": 1.3031498151403642,
+    "results": [
+      1.3028626301373951,
+      1.312555123987609,
+      1.309084971868397,
+      1.295084702973643,
+      1.2961616467347779
+    ]
+  },
+  "improvement": 48,
+  "learning": {
+    "episode_results": [
+      0.6054338504264478,
+      0.6416670249677414,
+      0.5605133295453331,
+      0.6243401964552602,
+      0.6070612321099406,
+      0.602753457065401,
+      0.6199366930763975,
+      0.5987567991074115,
+      0.5610159033005293,
+      0.641164451212545,
+      0.5617099337243718,
+      0.635420751153159,
+      0.5882027502482898,
+      0.6139776042647845,
+      0.5880112935796435,
+      0.5887771202542283,
+      0.5999055391192887,
+      0.6247949060432948,
+      0.6291744773385768,
+      0.61105789006793
+    ],
+    "final_mean_phi": 0.61105789006793,
+    "improvement_pct": -53.10916036141923,
+    "learning_gain_pct": 0.48352167578846794,
+    "num_episodes": 20
+  },
+  "name": "Adaptive Primitive Selection via RL",
+  "stats_history": [
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.2970075,
+      "q_table_size": 35,
+      "replay_buffer_size": 50
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.28965619404284526,
+      "q_table_size": 66,
+      "replay_buffer_size": 100
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.2824868420743127,
+      "q_table_size": 88,
+      "replay_buffer_size": 150
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.2754949405063094,
+      "q_table_size": 105,
+      "replay_buffer_size": 200
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.2686760972201634,
+      "q_table_size": 119,
+      "replay_buffer_size": 250
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.26202602880761594,
+      "q_table_size": 130,
+      "replay_buffer_size": 300
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.25554055788010394,
+      "q_table_size": 147,
+      "replay_buffer_size": 350
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.24921561044463966,
+      "q_table_size": 166,
+      "replay_buffer_size": 400
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.24304721334464174,
+      "q_table_size": 183,
+      "replay_buffer_size": 450
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.2370314917641082,
+      "q_table_size": 199,
+      "replay_buffer_size": 500
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.2311646667935645,
+      "q_table_size": 215,
+      "replay_buffer_size": 550
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.2254430530562575,
+      "q_table_size": 226,
+      "replay_buffer_size": 600
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.21986305639310383,
+      "q_table_size": 236,
+      "replay_buffer_size": 650
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.21442117160493898,
+      "q_table_size": 248,
+      "replay_buffer_size": 700
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.20911398025064834,
+      "q_table_size": 266,
+      "replay_buffer_size": 750
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.2039381484997972,
+      "q_table_size": 279,
+      "replay_buffer_size": 800
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.19889042503841098,
+      "q_table_size": 289,
+      "replay_buffer_size": 850
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.19396763902659003,
+      "q_table_size": 303,
+      "replay_buffer_size": 900
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.18916669810667588,
+      "q_table_size": 313,
+      "replay_buffer_size": 950
+    },
+    {
+      "avg_q_value": 0.0,
+      "epsilon": 0.18448458646071778,
+      "q_table_size": 322,
+      "replay_buffer_size": 1000
+    }
+  ]
+}

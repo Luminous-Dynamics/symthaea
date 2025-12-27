@@ -1,0 +1,39 @@
+{
+  "improvement": 51,
+  "name": "Causal Self-Explanation",
+  "sample_explanations": [
+    {
+      "confidence": 0.375,
+      "explanation": "I chose ONE with transformation Abstract because it increases Φ by 0.126720 (confidence: 38%). Mechanism: Abstraction projects to higher-level concepts, potentially increasing Φ by revealing higher-order patterns. This is supported by 3 previous observations.",
+      "has_counterfactual": false,
+      "phi_effect": 0.12672038256020401,
+      "primitive": "ONE",
+      "step": 0,
+      "transformation": "Abstract"
+    },
+    {
+      "confidence": 0.4444444444444444,
+      "explanation": "I chose UNION with transformation Abstract because it increases Φ by 0.130191 (confidence: 44%). Mechanism: Abstraction projects to higher-level concepts, potentially increasing Φ by revealing higher-order patterns. This is supported by 4 previous observations.",
+      "has_counterfactual": false,
+      "phi_effect": 0.1301905346794164,
+      "primitive": "UNION",
+      "step": 1,
+      "transformation": "Abstract"
+    },
+    {
+      "confidence": 0.4444444444444444,
+      "explanation": "I chose EQUALS with transformation Abstract because it increases Φ by 0.127977 (confidence: 44%). Mechanism: Abstraction projects to higher-level concepts, potentially increasing Φ by revealing higher-order patterns. This is supported by 4 previous observations.",
+      "has_counterfactual": false,
+      "phi_effect": 0.1279768169481947,
+      "primitive": "EQUALS",
+      "step": 2,
+      "transformation": "Abstract"
+    }
+  ],
+  "summary": {
+    "average_confidence": 0.39023199023199023,
+    "explanations_generated": 11,
+    "high_confidence_relations": 0,
+    "total_causal_relations": 15
+  }
+}

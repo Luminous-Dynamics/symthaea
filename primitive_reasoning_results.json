@@ -1,0 +1,102 @@
+{
+  "demonstration": {
+    "chain_length": 10,
+    "efficiency": 0.1321649315748304,
+    "mean_phi_per_step": 0.1321649315748304,
+    "phi_variance": 0.0006667780851088959,
+    "question_seed": 42,
+    "total_phi": 1.3216493157483038
+  },
+  "executions": [
+    {
+      "input_bits": 1029,
+      "output_bits": 1013,
+      "phi_contribution": 0.1301905346794164,
+      "primitive": "AND",
+      "transformation": "Abstract"
+    },
+    {
+      "input_bits": 1013,
+      "output_bits": 1015,
+      "phi_contribution": 0.13234442220168618,
+      "primitive": "NOT",
+      "transformation": "Abstract"
+    },
+    {
+      "input_bits": 1015,
+      "output_bits": 1023,
+      "phi_contribution": 0.13234442220168618,
+      "primitive": "NOT",
+      "transformation": "Abstract"
+    },
+    {
+      "input_bits": 1023,
+      "output_bits": 999,
+      "phi_contribution": 0.13234442220168618,
+      "primitive": "NOT",
+      "transformation": "Abstract"
+    },
+    {
+      "input_bits": 999,
+      "output_bits": 991,
+      "phi_contribution": 0.13234442220168618,
+      "primitive": "NOT",
+      "transformation": "Abstract"
+    },
+    {
+      "input_bits": 991,
+      "output_bits": 1001,
+      "phi_contribution": 0.13234442220168618,
+      "primitive": "NOT",
+      "transformation": "Abstract"
+    },
+    {
+      "input_bits": 1001,
+      "output_bits": 1015,
+      "phi_contribution": 0.13234442220168618,
+      "primitive": "NOT",
+      "transformation": "Abstract"
+    },
+    {
+      "input_bits": 1015,
+      "output_bits": 1041,
+      "phi_contribution": 0.13234442220168618,
+      "primitive": "NOT",
+      "transformation": "Abstract"
+    },
+    {
+      "input_bits": 1041,
+      "output_bits": 1013,
+      "phi_contribution": 0.13234442220168618,
+      "primitive": "NOT",
+      "transformation": "Abstract"
+    },
+    {
+      "input_bits": 1013,
+      "output_bits": 1002,
+      "phi_contribution": 0.1327034034553978,
+      "primitive": "FALSE",
+      "transformation": "Abstract"
+    }
+  ],
+  "improvement": 47,
+  "multiple_chains_analysis": {
+    "coefficient_of_variation": 0.0,
+    "mean_phi": 1.3216493157483038,
+    "num_chains": 5,
+    "std_dev": 0.0
+  },
+  "name": "Primitive-Powered Reasoning",
+  "phi_gradient": [
+    0.1301905346794164,
+    0.13234442220168618,
+    0.13234442220168618,
+    0.13234442220168618,
+    0.13234442220168618,
+    0.13234442220168618,
+    0.13234442220168618,
+    0.13234442220168618,
+    0.13234442220168618,
+    0.1327034034553978
+  ]
+}

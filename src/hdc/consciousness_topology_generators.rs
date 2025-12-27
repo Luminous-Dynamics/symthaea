@@ -38,6 +38,16 @@ pub enum TopologyType {
     DenseNetwork,
     Modular,
     Lattice,
+    Sphere,          // 2-manifold: S²
+    Torus,           // 2-manifold: T²
+    KleinBottle,     // Non-orientable 2-manifold
+    SmallWorld,
+    MobiusStrip,
+    Hyperbolic,
+    ScaleFree,
+    Fractal,         // Tier 3: Self-similar structure
+    Hypercube,       // Tier 3: 3D/4D/5D dimensional scaling
+    Quantum,         // Tier 3: Superposition of topologies
 }
 
 impl ConsciousnessTopology {
@@ -88,9 +98,15 @@ impl ConsciousnessTopology {
         assert!(n_nodes >= 2, "Star needs at least 2 nodes (hub + 1 spoke)");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        // Create unique basis vectors for each node
+        // Create unique basis vectors for each node with seed-based variation
+        // This ensures different seeds produce different Star topologies
         let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+            .map(|i| {
+                let base = RealHV::basis(i, dim);
+                // Add 5% random noise based on seed to create variation
+                let noise = RealHV::random(dim, seed + (i as u64 * 1000)).scale(0.05_f32);
+                base.add(&noise)
+            })
             .collect();
 
         // Node 0 is the hub, nodes 1..n are spokes
@@ -106,13 +122,19 @@ impl ConsciousnessTopology {
             .map(|spoke_id| hub_id.bind(spoke_id))
             .collect();
 
-        let hub_repr = RealHV::bundle(&hub_connections);
+        // Add seed-based variation to hub to ensure different samples
+        let hub_base = RealHV::bundle(&hub_connections);
+        let hub_noise = RealHV::random(dim, seed + 999999).scale(0.05_f32);
+        let hub_repr = hub_base.add(&hub_noise);
         node_representations.push(hub_repr);
 
-        // Each spoke representation = single connection to hub
-        // spoke ⊗ hub
-        for spoke_id in spoke_ids.iter() {
-            let spoke_repr = spoke_id.bind(hub_id);
+        // Each spoke representation = single connection to hub with seed variation
+        // spoke ⊗ hub + small noise
+        for (i, spoke_id) in spoke_ids.iter().enumerate() {
+            let spoke_base = spoke_id.bind(hub_id);
+            // Add 5% noise to each spoke (different for each spoke)
+            let spoke_noise = RealHV::random(dim, seed + ((i + 1) as u64 * 100000)).scale(0.05_f32);
+            let spoke_repr = spoke_base.add(&spoke_noise);
             node_representations.push(spoke_repr);
         }
 
@@ -392,6 +414,203 @@ impl ConsciousnessTopology {
         }
     }
 
+    /// Generate a sphere (icosahedron) topology - 2-MANIFOLD S²
+    ///
+    /// 12 vertices arranged on a sphere in icosahedron configuration.
+    /// Each vertex connects to exactly 5 neighbors (perfect symmetry).
+    /// This is a closed, orientable 2-dimensional manifold.
+    ///
+    /// # Arguments
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed for reproducibility
+    pub fn sphere_icosahedron(dim: usize, seed: u64) -> Self {
+        let n_nodes = 12; // Icosahedron has 12 vertices
+
+        // Create basis vectors with seed variation
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let base = RealHV::basis(i, dim);
+                let noise = RealHV::random(dim, seed + (i as u64 * 1000)).scale(0.05);
+                base.add(&noise)
+            })
+            .collect();
+
+        // Icosahedron edge structure (30 edges, each vertex has degree 5)
+        // Vertices arranged: 1 top, 5 upper pentagon, 5 lower pentagon, 1 bottom
+        let edges = vec![
+            // Top vertex (0) to upper pentagon (1-5)
+            (0, 1), (0, 2), (0, 3), (0, 4), (0, 5),
+            // Upper pentagon connections
+            (1, 2), (2, 3), (3, 4), (4, 5), (5, 1),
+            // Upper to lower connections
+            (1, 6), (2, 6), (2, 7), (3, 7), (3, 8),
+            (4, 8), (4, 9), (5, 9), (5, 10), (1, 10),
+            // Lower pentagon connections
+            (6, 7), (7, 8), (8, 9), (9, 10), (10, 6),
+            // Lower pentagon (6-10) to bottom vertex (11)
+            (6, 11), (7, 11), (8, 11), (9, 11), (10, 11),
+        ];
+
+        let mut node_representations = Vec::with_capacity(n_nodes);
+
+        // Build node representations from edge structure
+        for i in 0..n_nodes {
+            let mut connections = Vec::new();
+
+            // Find all neighbors of node i
+            for (a, b) in &edges {
+                if *a == i {
+                    connections.push(node_identities[i].bind(&node_identities[*b]));
+                } else if *b == i {
+                    connections.push(node_identities[i].bind(&node_identities[*a]));
+                }
+            }
+
+            let repr = if connections.is_empty() {
+                node_identities[i].clone()
+            } else {
+                RealHV::bundle(&connections)
+            };
+
+            node_representations.push(repr);
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Sphere,
+        }
+    }
+
+    /// Generate a torus topology - 2-MANIFOLD T²
+    ///
+    /// n×m grid with periodic boundary conditions (wraparound).
+    /// Left edge connects to right edge, top connects to bottom.
+    /// Forms a donut-shaped 2-dimensional manifold (T² = S¹ × S¹).
+    ///
+    /// # Arguments
+    /// * `n` - Number of rows
+    /// * `m` - Number of columns
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed for reproducibility
+    pub fn torus(n: usize, m: usize, dim: usize, seed: u64) -> Self {
+        assert!(n >= 2, "Torus needs at least 2 rows");
+        assert!(m >= 2, "Torus needs at least 2 columns");
+
+        let n_nodes = n * m;
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let base = RealHV::basis(i, dim);
+                let noise = RealHV::random(dim, seed + (i as u64 * 1000)).scale(0.05);
+                base.add(&noise)
+            })
+            .collect();
+
+        let mut node_representations = Vec::with_capacity(n_nodes);
+
+        for i in 0..n {
+            for j in 0..m {
+                let idx = i * m + j;
+                let mut connections = Vec::new();
+
+                // Connect to 4 neighbors with wraparound (periodic boundaries)
+                let up = ((i + n - 1) % n) * m + j;
+                let down = ((i + 1) % n) * m + j;
+                let left = i * m + ((j + m - 1) % m);
+                let right = i * m + ((j + 1) % m);
+
+                connections.push(node_identities[idx].bind(&node_identities[up]));
+                connections.push(node_identities[idx].bind(&node_identities[down]));
+                connections.push(node_identities[idx].bind(&node_identities[left]));
+                connections.push(node_identities[idx].bind(&node_identities[right]));
+
+                let repr = RealHV::bundle(&connections);
+                node_representations.push(repr);
+            }
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Torus,
+        }
+    }
+
+    /// Generate a Klein bottle topology - NON-ORIENTABLE 2-MANIFOLD
+    ///
+    /// Like torus but with a twist: horizontal wraparound reverses vertical position.
+    /// Creates a non-orientable 2-dimensional manifold (cannot be embedded in 3D).
+    ///
+    /// # Arguments
+    /// * `n` - Number of rows
+    /// * `m` - Number of columns
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed for reproducibility
+    pub fn klein_bottle(n: usize, m: usize, dim: usize, seed: u64) -> Self {
+        assert!(n >= 2, "Klein bottle needs at least 2 rows");
+        assert!(m >= 2, "Klein bottle needs at least 2 columns");
+
+        let n_nodes = n * m;
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let base = RealHV::basis(i, dim);
+                let noise = RealHV::random(dim, seed + (i as u64 * 1000)).scale(0.05);
+                base.add(&noise)
+            })
+            .collect();
+
+        let mut node_representations = Vec::with_capacity(n_nodes);
+
+        for i in 0..n {
+            for j in 0..m {
+                let idx = i * m + j;
+                let mut connections = Vec::new();
+
+                // Vertical connections (normal wraparound)
+                let up = ((i + n - 1) % n) * m + j;
+                let down = ((i + 1) % n) * m + j;
+
+                // Horizontal connections with TWIST (Klein bottle property)
+                // When wrapping horizontally, reverse the vertical position
+                let left = if j == 0 {
+                    // Wrap to right edge with vertical flip
+                    ((n - 1 - i) * m) + (m - 1)
+                } else {
+                    i * m + (j - 1)
+                };
+
+                let right = if j == m - 1 {
+                    // Wrap to left edge with vertical flip
+                    (n - 1 - i) * m
+                } else {
+                    i * m + (j + 1)
+                };
+
+                connections.push(node_identities[idx].bind(&node_identities[up]));
+                connections.push(node_identities[idx].bind(&node_identities[down]));
+                connections.push(node_identities[idx].bind(&node_identities[left]));
+                connections.push(node_identities[idx].bind(&node_identities[right]));
+
+                let repr = RealHV::bundle(&connections);
+                node_representations.push(repr);
+            }
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::KleinBottle,
+        }
+    }
+
     /// Generate a lattice (grid) topology
     ///
     /// Regular 2D grid structure where each node connects to its
@@ -461,6 +680,694 @@ impl ConsciousnessTopology {
             node_representations,
             node_identities,
             topology_type: TopologyType::Lattice,
+        }
+    }
+
+    /// Generate a small-world network (Watts-Strogatz model)
+    ///
+    /// Starts with a k-regular ring lattice, then randomly rewires edges
+    /// with probability p. This creates the "small-world" property:
+    /// high clustering (like regular lattice) + short path length (like random).
+    ///
+    /// This topology is highly biologically relevant - matches brain connectivity!
+    ///
+    /// # Arguments
+    /// * `n_nodes` - Number of nodes (must be >= k + 1)
+    /// * `dim` - Hypervector dimension
+    /// * `k` - Number of nearest neighbors in initial ring (must be even)
+    /// * `p` - Rewiring probability [0.0, 1.0] (typical: 0.1)
+    /// * `seed` - Random seed for reproducibility
+    pub fn small_world(n_nodes: usize, dim: usize, k: usize, p: f64, seed: u64) -> Self {
+        assert!(n_nodes >= k + 1, "Need n_nodes >= k+1 for small-world");
+        assert!(k % 2 == 0, "k must be even for symmetric ring lattice");
+        assert!(k >= 2, "Need at least k=2 neighbors");
+        assert!((0.0..=1.0).contains(&p), "Rewiring probability p must be in [0, 1]");
+        assert!(dim >= 256, "Dimension should be >= 256 for good separation");
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        // Build initial k-regular ring lattice edges
+        let mut edges: Vec<(usize, usize)> = Vec::new();
+        for i in 0..n_nodes {
+            for j in 1..=(k / 2) {
+                let neighbor = (i + j) % n_nodes;
+                // Only store each edge once (i < neighbor)
+                if i < neighbor {
+                    edges.push((i, neighbor));
+                }
+            }
+        }
+
+        // Rewire edges with probability p
+        use rand::{Rng, SeedableRng};
+        use rand::rngs::StdRng;
+        let mut rng = StdRng::seed_from_u64(seed);
+
+        let mut final_edges = Vec::new();
+        for (i, j) in edges {
+            if rng.gen::<f64>() < p {
+                // Rewire: keep i, replace j with random node
+                let mut new_target = rng.gen_range(0..n_nodes);
+
+                // Avoid self-loops and duplicate edges
+                while new_target == i || final_edges.contains(&(i.min(new_target), i.max(new_target))) {
+                    new_target = rng.gen_range(0..n_nodes);
+                }
+
+                final_edges.push((i.min(new_target), i.max(new_target)));
+            } else {
+                // Keep original edge
+                final_edges.push((i, j));
+            }
+        }
+
+        // Build adjacency list
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+        for (i, j) in &final_edges {
+            adjacency[*i].push(*j);
+            adjacency[*j].push(*i);
+        }
+
+        // Generate node representations from adjacency
+        let mut node_representations = Vec::with_capacity(n_nodes);
+        for i in 0..n_nodes {
+            let connections: Vec<RealHV> = adjacency[i]
+                .iter()
+                .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                .collect();
+
+            let repr = if connections.is_empty() {
+                node_identities[i].clone()
+            } else {
+                RealHV::bundle(&connections)
+            };
+
+            node_representations.push(repr);
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::SmallWorld,
+        }
+    }
+
+    /// Generate a Möbius strip topology
+    ///
+    /// Like a ring, but with a topological twist: half the connections
+    /// are inverted (negated). This creates a non-orientable surface
+    /// with no inside/outside distinction.
+    ///
+    /// Tests the hypothesis: Does non-orientability affect integrated information?
+    ///
+    /// # Arguments
+    /// * `n_nodes` - Number of nodes (must be even for the twist)
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed for reproducibility
+    pub fn mobius_strip(n_nodes: usize, dim: usize, seed: u64) -> Self {
+        assert!(n_nodes >= 4, "Möbius strip needs at least 4 nodes");
+        assert!(n_nodes % 2 == 0, "Möbius strip needs even number of nodes for twist");
+        assert!(dim >= 256, "Dimension should be >= 256 for good separation");
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut node_representations = Vec::with_capacity(n_nodes);
+
+        // First half: normal ring connections
+        // Second half: one connection inverted (the Möbius twist!)
+        for i in 0..n_nodes {
+            let prev = (i + n_nodes - 1) % n_nodes;
+            let next = (i + 1) % n_nodes;
+
+            if i < n_nodes / 2 {
+                // First half: normal binding (like regular ring)
+                let conn1 = node_identities[i].bind(&node_identities[prev]);
+                let conn2 = node_identities[i].bind(&node_identities[next]);
+                let repr = RealHV::bundle(&[conn1, conn2]);
+                node_representations.push(repr);
+            } else {
+                // Second half: invert the "next" connection (the twist!)
+                let conn1 = node_identities[i].bind(&node_identities[prev]);
+                let conn2_inverted = node_identities[i].bind(&node_identities[next].scale(-1.0));
+                let repr = RealHV::bundle(&[conn1, conn2_inverted]);
+                node_representations.push(repr);
+            }
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::MobiusStrip,
+        }
+    }
+
+    /// Generate a torus (2D ring with wraparound) topology
+    ///
+    /// A 2D grid where edges wrap around: top connects to bottom,
+    /// left connects to right. Each node has exactly 4 neighbors
+    /// (up, down, left, right). This is the natural 2D extension
+    /// of the Ring topology.
+    ///
+    /// No boundary effects, uniform connectivity, scales to 3D/4D.
+    ///
+    /// # Arguments
+    /// * `grid_size` - Size of the square grid (total nodes = grid_size²)
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed for reproducibility
+    pub fn torus(grid_size: usize, dim: usize, seed: u64) -> Self {
+        assert!(grid_size >= 2, "Torus needs at least 2×2 grid");
+        assert!(dim >= 256, "Dimension should be >= 256 for good separation");
+
+        let n_nodes = grid_size * grid_size;
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut node_representations = Vec::with_capacity(n_nodes);
+
+        for i in 0..n_nodes {
+            let row = i / grid_size;
+            let col = i % grid_size;
+
+            // Wraparound connections (modulo arithmetic)
+            let up = ((row + grid_size - 1) % grid_size) * grid_size + col;
+            let down = ((row + 1) % grid_size) * grid_size + col;
+            let left = row * grid_size + ((col + grid_size - 1) % grid_size);
+            let right = row * grid_size + ((col + 1) % grid_size);
+
+            // Each node connects to its 4 neighbors
+            let conn_up = node_identities[i].bind(&node_identities[up]);
+            let conn_down = node_identities[i].bind(&node_identities[down]);
+            let conn_left = node_identities[i].bind(&node_identities[left]);
+            let conn_right = node_identities[i].bind(&node_identities[right]);
+
+            let repr = RealHV::bundle(&[conn_up, conn_down, conn_left, conn_right]);
+            node_representations.push(repr);
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Torus,
+        }
+    }
+
+    /// Generate a Klein bottle topology
+    ///
+    /// Like a torus, but with one dimension "flipped" - a non-orientable
+    /// 2D surface. The right edge connects to the left edge with row inversion.
+    /// This creates a surface with no inside/outside distinction.
+    ///
+    /// Tests: Does 2D non-orientability have the same catastrophic effect as Möbius?
+    ///
+    /// # Arguments
+    /// * `grid_size` - Size of the square grid (total nodes = grid_size²)
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed for reproducibility
+    pub fn klein_bottle(grid_size: usize, dim: usize, seed: u64) -> Self {
+        assert!(grid_size >= 2, "Klein bottle needs at least 2×2 grid");
+        assert!(dim >= 256, "Dimension should be >= 256 for good separation");
+
+        let n_nodes = grid_size * grid_size;
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut node_representations = Vec::with_capacity(n_nodes);
+
+        for i in 0..n_nodes {
+            let row = i / grid_size;
+            let col = i % grid_size;
+
+            // Normal wraparound for vertical (top↔bottom)
+            let up = ((row + grid_size - 1) % grid_size) * grid_size + col;
+            let down = ((row + 1) % grid_size) * grid_size + col;
+
+            // Klein bottle twist: horizontal wraparound with row flip
+            // Left edge connects to right edge, but with inverted row
+            let left = if col == 0 {
+                // Wraparound to right edge, but FLIP the row (Klein bottle twist!)
+                let flipped_row = grid_size - 1 - row;
+                flipped_row * grid_size + (grid_size - 1)
+            } else {
+                row * grid_size + (col - 1)
+            };
+
+            let right = if col == grid_size - 1 {
+                // Wraparound to left edge, with row flip
+                let flipped_row = grid_size - 1 - row;
+                flipped_row * grid_size + 0
+            } else {
+                row * grid_size + (col + 1)
+            };
+
+            // Bind connections
+            let conn_up = node_identities[i].bind(&node_identities[up]);
+            let conn_down = node_identities[i].bind(&node_identities[down]);
+            let conn_left = node_identities[i].bind(&node_identities[left]);
+            let conn_right = node_identities[i].bind(&node_identities[right]);
+
+            let repr = RealHV::bundle(&[conn_up, conn_down, conn_left, conn_right]);
+            node_representations.push(repr);
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::KleinBottle,
+        }
+    }
+
+    /// Generate a hyperbolic topology (negative curvature)
+    ///
+    /// Creates a tree-like structure where each level has exponentially
+    /// more nodes than the previous (modeling hyperbolic geometry).
+    /// Each node connects to its parent + children + neighbors at same depth.
+    ///
+    /// Unlike a simple tree, nodes at the same depth are also connected,
+    /// creating the characteristic "expanding space" of hyperbolic geometry.
+    ///
+    /// # Arguments
+    /// * `n_nodes` - Number of nodes (will build tree to this depth)
+    /// * `dim` - Hypervector dimension
+    /// * `branching` - Branching factor (typical: 2-3)
+    /// * `seed` - Random seed for reproducibility
+    pub fn hyperbolic(n_nodes: usize, dim: usize, branching: usize, seed: u64) -> Self {
+        assert!(n_nodes >= 2, "Hyperbolic needs at least 2 nodes");
+        assert!(branching >= 2, "Branching factor must be >= 2");
+        assert!(dim >= 256, "Dimension should be >= 256 for good separation");
+
+        // Build a tree structure with lateral connections at each level
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        // Build adjacency list
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+
+        // Add tree edges (parent-child)
+        for i in 1..n_nodes {
+            let parent = (i - 1) / branching;
+            adjacency[i].push(parent);
+            adjacency[parent].push(i);
+        }
+
+        // Add lateral connections within each depth level
+        // Group nodes by depth
+        let mut depth_groups: Vec<Vec<usize>> = Vec::new();
+        let mut current_depth = 0;
+        let mut depth_start = 0;
+
+        while depth_start < n_nodes {
+            let depth_size = branching.pow(current_depth as u32).min(n_nodes - depth_start);
+            let depth_end = (depth_start + depth_size).min(n_nodes);
+
+            let nodes_at_depth: Vec<usize> = (depth_start..depth_end).collect();
+
+            // Connect neighbors at same depth (creates hyperbolic expansion)
+            for (idx, &node) in nodes_at_depth.iter().enumerate() {
+                if idx > 0 {
+                    let left_neighbor = nodes_at_depth[idx - 1];
+                    if !adjacency[node].contains(&left_neighbor) {
+                        adjacency[node].push(left_neighbor);
+                        adjacency[left_neighbor].push(node);
+                    }
+                }
+            }
+
+            depth_groups.push(nodes_at_depth);
+            depth_start = depth_end;
+            current_depth += 1;
+        }
+
+        // Generate representations from adjacency
+        let mut node_representations = Vec::with_capacity(n_nodes);
+        for i in 0..n_nodes {
+            if adjacency[i].is_empty() {
+                node_representations.push(node_identities[i].clone());
+            } else {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                node_representations.push(RealHV::bundle(&connections));
+            }
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Hyperbolic,
+        }
+    }
+
+    /// Generate a scale-free network (Barabási-Albert model)
+    ///
+    /// Uses preferential attachment: new nodes preferentially connect to
+    /// nodes that already have many connections ("rich get richer").
+    /// This creates a power-law degree distribution P(k) ~ k^-γ.
+    ///
+    /// Matches many real-world networks: Internet, social networks, brain!
+    ///
+    /// # Arguments
+    /// * `n_nodes` - Total number of nodes
+    /// * `dim` - Hypervector dimension
+    /// * `m` - Number of edges to attach per new node (typical: 2-5)
+    /// * `seed` - Random seed for reproducibility
+    pub fn scale_free(n_nodes: usize, dim: usize, m: usize, seed: u64) -> Self {
+        assert!(n_nodes >= m + 1, "Need n_nodes > m for scale-free network");
+        assert!(m >= 1, "m must be >= 1");
+        assert!(dim >= 256, "Dimension should be >= 256 for good separation");
+
+        use rand::{Rng, SeedableRng};
+        use rand::rngs::StdRng;
+        let mut rng = StdRng::seed_from_u64(seed);
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        // Build adjacency list
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+
+        // Start with a small complete graph (m+1 nodes all connected)
+        for i in 0..=m {
+            for j in (i+1)..=m.min(n_nodes-1) {
+                adjacency[i].push(j);
+                adjacency[j].push(i);
+            }
+        }
+
+        // Add remaining nodes one by one with preferential attachment
+        for new_node in (m+1)..n_nodes {
+            // Calculate total degree (for normalization)
+            let total_degree: usize = adjacency.iter()
+                .take(new_node)
+                .map(|neighbors| neighbors.len())
+                .sum();
+
+            if total_degree == 0 {
+                // Fallback: connect to first m nodes
+                for target in 0..m {
+                    adjacency[new_node].push(target);
+                    adjacency[target].push(new_node);
+                }
+                continue;
+            }
+
+            // Select m targets using preferential attachment
+            let mut targets = Vec::new();
+            while targets.len() < m.min(new_node) {
+                // Randomly select a node with probability proportional to its degree
+                let rand_val = rng.gen_range(0..total_degree);
+                let mut cumulative = 0;
+                let mut selected = 0;
+
+                for node in 0..new_node {
+                    cumulative += adjacency[node].len();
+                    if cumulative > rand_val {
+                        selected = node;
+                        break;
+                    }
+                }
+
+                // Avoid duplicates
+                if !targets.contains(&selected) && !adjacency[new_node].contains(&selected) {
+                    targets.push(selected);
+                }
+            }
+
+            // Add edges
+            for target in targets {
+                adjacency[new_node].push(target);
+                adjacency[target].push(new_node);
+            }
+        }
+
+        // Generate representations from adjacency
+        let mut node_representations = Vec::with_capacity(n_nodes);
+        for i in 0..n_nodes {
+            if adjacency[i].is_empty() {
+                node_representations.push(node_identities[i].clone());
+            } else {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                node_representations.push(RealHV::bundle(&connections));
+            }
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::ScaleFree,
+        }
+    }
+
+    /// Generate a fractal network topology (self-similar structure)
+    ///
+    /// Creates a Sierpiński-inspired network with self-similarity at multiple scales.
+    /// The structure has:
+    /// - Hierarchical organization (like fractal geometry)
+    /// - Cross-scale connections (self-similarity)
+    /// - Local clusters at each scale
+    ///
+    /// Implementation uses a recursive subdivision pattern:
+    /// - Level 0: Core triangle (3 nodes)
+    /// - Level 1: 3 sub-triangles (9 nodes total)
+    /// - Level 2: 9 sub-triangles (27 nodes total)
+    ///
+    /// # Arguments
+    /// * `n_nodes` - Number of nodes (will use up to next power of 3)
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed for reproducibility
+    pub fn fractal(n_nodes: usize, dim: usize, seed: u64) -> Self {
+        // Create node identities with slight variation
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let base = RealHV::basis(i, dim);
+                let noise = RealHV::random(dim, seed + i as u64 * 1000).scale(0.05);
+                base.add(&noise)
+            })
+            .collect();
+
+        // Fractal structure: Sierpiński-inspired hierarchical triangles
+        // Level 0: Core triangle (nodes 0, 1, 2)
+        // Level 1: Sub-triangles at each vertex
+        // Level 2+: Recursive subdivision
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+
+        // Build fractal structure level by level
+        let levels = ((n_nodes as f64).log(3.0).floor() as usize).max(1);
+
+        // Level 0: Core triangle
+        if n_nodes >= 3 {
+            adjacency[0].extend_from_slice(&[1, 2]);
+            adjacency[1].extend_from_slice(&[0, 2]);
+            adjacency[2].extend_from_slice(&[0, 1]);
+        }
+
+        // Hierarchical subdivision
+        let mut nodes_per_level = vec![3]; // Start with core triangle
+        for level in 1..levels {
+            let prev_count: usize = nodes_per_level.iter().sum();
+            let new_count = prev_count * 3;
+            if new_count > n_nodes { break; }
+
+            // Add connections at this level
+            for i in prev_count..new_count.min(n_nodes) {
+                // Connect to parent level (self-similarity)
+                let parent = (i - prev_count) % prev_count;
+                adjacency[i].push(parent);
+                adjacency[parent].push(i);
+
+                // Connect within same level (local clustering)
+                let group_size = 3;
+                let group = (i - prev_count) / group_size;
+                let pos_in_group = (i - prev_count) % group_size;
+
+                for j in 0..group_size {
+                    if j != pos_in_group {
+                        let sibling = prev_count + group * group_size + j;
+                        if sibling < n_nodes {
+                            adjacency[i].push(sibling);
+                            adjacency[sibling].push(i);
+                        }
+                    }
+                }
+            }
+
+            nodes_per_level.push(new_count - prev_count);
+        }
+
+        // Generate representations from adjacency
+        let mut node_representations = Vec::with_capacity(n_nodes);
+        for i in 0..n_nodes {
+            if adjacency[i].is_empty() {
+                node_representations.push(node_identities[i].clone());
+            } else {
+                // Deduplicate adjacency list
+                let mut unique_neighbors = adjacency[i].clone();
+                unique_neighbors.sort_unstable();
+                unique_neighbors.dedup();
+
+                let connections: Vec<RealHV> = unique_neighbors
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                node_representations.push(RealHV::bundle(&connections));
+            }
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Fractal,
+        }
+    }
+
+    /// Generate a hypercube topology (3D/4D/5D dimensional scaling test)
+    ///
+    /// Creates an n-dimensional hypercube where each vertex connects to
+    /// neighbors in all dimensions. This tests dimensional scaling beyond 2D:
+    /// - 3D cube: 8 vertices, each with 3 neighbors
+    /// - 4D tesseract: 16 vertices, each with 4 neighbors
+    /// - 5D penteract: 32 vertices, each with 5 neighbors
+    ///
+    /// Prediction: Should achieve similar Φ to Ring/Torus if dimensional
+    /// invariance hypothesis holds at higher dimensions.
+    ///
+    /// # Arguments
+    /// * `dimensions` - Number of spatial dimensions (3, 4, or 5)
+    /// * `hv_dim` - Hypervector dimension
+    /// * `seed` - Random seed for reproducibility
+    pub fn hypercube(dimensions: usize, hv_dim: usize, seed: u64) -> Self {
+        let n_nodes = 2_usize.pow(dimensions as u32);
+
+        // Create node identities
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let base = RealHV::basis(i, hv_dim);
+                let noise = RealHV::random(hv_dim, seed + i as u64 * 1000).scale(0.05);
+                base.add(&noise)
+            })
+            .collect();
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+
+        // In a hypercube, two vertices are connected if their binary
+        // representations differ in exactly one bit
+        for i in 0..n_nodes {
+            for j in (i+1)..n_nodes {
+                // Count differing bits (Hamming distance)
+                let xor = i ^ j;
+                let hamming_dist = xor.count_ones();
+
+                // Connected if exactly 1 bit differs
+                if hamming_dist == 1 {
+                    adjacency[i].push(j);
+                    adjacency[j].push(i);
+                }
+            }
+        }
+
+        // Generate representations from adjacency
+        let mut node_representations = Vec::with_capacity(n_nodes);
+        for i in 0..n_nodes {
+            let connections: Vec<RealHV> = adjacency[i]
+                .iter()
+                .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                .collect();
+            node_representations.push(RealHV::bundle(&connections));
+        }
+
+        Self {
+            n_nodes,
+            dim: hv_dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Hypercube,
+        }
+    }
+
+    /// Generate a quantum network topology (superposition of topologies)
+    ///
+    /// Creates a quantum-inspired network where each node exists in a
+    /// superposition of multiple topology states. This is a novel research
+    /// frontier combining:
+    /// - Quantum superposition principle
+    /// - Network topology theory
+    /// - Consciousness measurement
+    ///
+    /// Implementation: Each node's representation is a weighted blend of
+    /// its representation in Ring, Star, and Random topologies.
+    ///
+    /// Hypothesis: Superposition may allow simultaneous benefits of multiple
+    /// topologies, potentially achieving higher Φ than any single topology.
+    ///
+    /// # Arguments
+    /// * `n_nodes` - Number of nodes
+    /// * `dim` - Hypervector dimension
+    /// * `weights` - Weights for (Ring, Star, Random) components
+    /// * `seed` - Random seed for reproducibility
+    pub fn quantum(n_nodes: usize, dim: usize, weights: (f32, f32, f32), seed: u64) -> Self {
+        // Normalize weights
+        let sum = weights.0 + weights.1 + weights.2;
+        let w = (weights.0 / sum, weights.1 / sum, weights.2 / sum);
+
+        // Generate three different topologies with same seed
+        let ring = Self::ring(n_nodes, dim, seed);
+        let star = Self::star(n_nodes, dim, seed);
+        let random = Self::random(n_nodes, dim, seed);
+
+        // Create node identities (use ring's as base)
+        let node_identities = ring.node_identities.clone();
+
+        // Quantum superposition: blend representations from all three topologies
+        let mut node_representations = Vec::with_capacity(n_nodes);
+
+        for i in 0..n_nodes {
+            // Scale each topology's representation by its weight
+            let ring_component = ring.node_representations[i].scale(w.0);
+            let star_component = star.node_representations[i].scale(w.1);
+            let random_component = random.node_representations[i].scale(w.2);
+
+            // Superposed state = weighted sum
+            let superposed = ring_component
+                .add(&star_component)
+                .add(&random_component);
+
+            node_representations.push(superposed);
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Quantum,
         }
     }
 
@@ -549,7 +1456,7 @@ mod tests {
 
     #[test]
     fn test_random_topology_generation() {
-        let topo = ConsciousnessTopology::random(4, 2048, 42);
+        let topo = ConsciousnessTopology::random(4, crate::hdc::HDC_DIMENSION, 42);
 
         assert_eq!(topo.n_nodes, 4);
         assert_eq!(topo.node_representations.len(), 4);
@@ -570,7 +1477,7 @@ mod tests {
 
     #[test]
     fn test_star_topology_generation() {
-        let topo = ConsciousnessTopology::star(4, 2048, 42);
+        let topo = ConsciousnessTopology::star(4, crate::hdc::HDC_DIMENSION, 42);
 
         assert_eq!(topo.n_nodes, 4);
         assert_eq!(topo.topology_type, TopologyType::Star);
@@ -610,8 +1517,8 @@ mod tests {
 
     #[test]
     fn test_star_vs_random_heterogeneity() {
-        let random = ConsciousnessTopology::random(4, 2048, 42);
-        let star = ConsciousnessTopology::star(4, 2048, 42);
+        let random = ConsciousnessTopology::random(4, crate::hdc::HDC_DIMENSION, 42);
+        let star = ConsciousnessTopology::star(4, crate::hdc::HDC_DIMENSION, 42);
 
         let random_stats = random.similarity_stats();
         let star_stats = star.similarity_stats();
@@ -634,7 +1541,7 @@ mod tests {
 
     #[test]
     fn test_ring_topology() {
-        let topo = ConsciousnessTopology::ring(4, 2048, 42);
+        let topo = ConsciousnessTopology::ring(4, crate::hdc::HDC_DIMENSION, 42);
 
         assert_eq!(topo.n_nodes, 4);
         assert_eq!(topo.topology_type, TopologyType::Ring);
@@ -651,7 +1558,7 @@ mod tests {
 
     #[test]
     fn test_line_topology() {
-        let topo = ConsciousnessTopology::line(4, 2048, 42);
+        let topo = ConsciousnessTopology::line(4, crate::hdc::HDC_DIMENSION, 42);
 
         assert_eq!(topo.n_nodes, 4);
         assert_eq!(topo.topology_type, TopologyType::Line);
@@ -680,7 +1587,7 @@ mod tests {
 
     #[test]
     fn test_binary_tree_topology() {
-        let topo = ConsciousnessTopology::binary_tree(7, 2048, 42);  // Perfect binary tree
+        let topo = ConsciousnessTopology::binary_tree(7, crate::hdc::HDC_DIMENSION, 42);  // Perfect binary tree
 
         assert_eq!(topo.n_nodes, 7);
         assert_eq!(topo.topology_type, TopologyType::BinaryTree);
@@ -697,7 +1604,7 @@ mod tests {
 
     #[test]
     fn test_dense_network_topology() {
-        let topo = ConsciousnessTopology::dense_network(4, 2048, None, 42);
+        let topo = ConsciousnessTopology::dense_network(4, crate::hdc::HDC_DIMENSION, None, 42);
 
         assert_eq!(topo.n_nodes, 4);
         assert_eq!(topo.topology_type, TopologyType::DenseNetwork);
@@ -715,7 +1622,7 @@ mod tests {
 
     #[test]
     fn test_modular_topology() {
-        let topo = ConsciousnessTopology::modular(8, 2048, 2, 42);  // 2 modules of 4 nodes each
+        let topo = ConsciousnessTopology::modular(8, crate::hdc::HDC_DIMENSION, 2, 42);  // 2 modules of 4 nodes each
 
         assert_eq!(topo.n_nodes, 8);
         assert_eq!(topo.topology_type, TopologyType::Modular);
@@ -740,7 +1647,7 @@ mod tests {
 
     #[test]
     fn test_lattice_topology() {
-        let topo = ConsciousnessTopology::lattice(4, 2048, 42);  // Will create 2x2 grid
+        let topo = ConsciousnessTopology::lattice(4, crate::hdc::HDC_DIMENSION, 42);  // Will create 2x2 grid
 
         assert_eq!(topo.n_nodes, 4);  // 2x2 = 4
         assert_eq!(topo.topology_type, TopologyType::Lattice);
@@ -767,14 +1674,14 @@ mod tests {
         println!("\n🔬 COMPREHENSIVE TEST: Heterogeneity Across All 8 Topologies");
         println!("{}", "=".repeat(70));
 
-        let random = ConsciousnessTopology::random(4, 2048, 42);
-        let star = ConsciousnessTopology::star(4, 2048, 42);
-        let ring = ConsciousnessTopology::ring(4, 2048, 42);
-        let line = ConsciousnessTopology::line(4, 2048, 42);
-        let tree = ConsciousnessTopology::binary_tree(7, 2048, 42);
-        let dense = ConsciousnessTopology::dense_network(4, 2048, None, 42);
-        let modular = ConsciousnessTopology::modular(8, 2048, 2, 42);
-        let lattice = ConsciousnessTopology::lattice(4, 2048, 42);
+        let random = ConsciousnessTopology::random(4, crate::hdc::HDC_DIMENSION, 42);
+        let star = ConsciousnessTopology::star(4, crate::hdc::HDC_DIMENSION, 42);
+        let ring = ConsciousnessTopology::ring(4, crate::hdc::HDC_DIMENSION, 42);
+        let line = ConsciousnessTopology::line(4, crate::hdc::HDC_DIMENSION, 42);
+        let tree = ConsciousnessTopology::binary_tree(7, crate::hdc::HDC_DIMENSION, 42);
+        let dense = ConsciousnessTopology::dense_network(4, crate::hdc::HDC_DIMENSION, None, 42);
+        let modular = ConsciousnessTopology::modular(8, crate::hdc::HDC_DIMENSION, 2, 42);
+        let lattice = ConsciousnessTopology::lattice(4, crate::hdc::HDC_DIMENSION, 42);
 
         let stats_vec = vec![
             ("Random", random.similarity_stats()),

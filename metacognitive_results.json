@@ -1,0 +1,15 @@
+{
+  "baseline": {
+    "healthy_steps": 4,
+    "mean_phi": 0.12918538716902386
+  },
+  "correction_history": [],
+  "improvement": 50,
+  "monitoring": {
+    "anomalies_detected": 2,
+    "corrections_attempted": 0,
+    "corrections_successful": 0,
+    "success_rate": 0.0
+  },
+  "name": "Metacognitive Monitoring and Self-Correction"
+}

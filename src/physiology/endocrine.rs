@@ -37,6 +37,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use crate::physiology::emotional_reasoning::{EmotionalReasoner, EmotionalState};
 
 /// Hormone state - the "chemical milieu" of the brain
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -211,23 +212,40 @@ pub struct EndocrineSystem {
 
     /// Focus streak counter (consecutive focus cycles)
     focus_streak: u32,
+
+    /// Emotional reasoning system (maps hormones → emotions)
+    emotional_reasoner: EmotionalReasoner,
+
+    /// Current emotional state (computed from hormones)
+    current_emotion: EmotionalState,
 }
 
 impl EndocrineSystem {
     /// Create new endocrine system with neutral state
     pub fn new(config: EndocrineConfig) -> Self {
+        let state = HormoneState::neutral();
+        let emotional_reasoner = EmotionalReasoner::new();
+        let current_emotion = emotional_reasoner.derive_emotional_state(&state);
+
         Self {
-            state: HormoneState::neutral(),
+            state,
             config,
             history: VecDeque::with_capacity(100),
             cycle_count: 0,
             focus_streak: 0,
+            emotional_reasoner,
+            current_emotion,
         }
     }
 
     /// Get current hormone state (read-only)
     pub fn state(&self) -> &HormoneState {
         &self.state
+    }
+
+    /// Get current emotional state (derived from hormones)
+    pub fn emotional_state(&self) -> &EmotionalState {
+        &self.current_emotion
     }
 
     /// Get configuration
@@ -312,6 +330,9 @@ impl EndocrineSystem {
                 self.decay_hormones_fast();
             }
         }
+
+        // Update emotional state after hormone change
+        self.update_emotional_state();
     }
 
     /// Natural decay of hormones (call every cycle)
@@ -347,6 +368,9 @@ impl EndocrineSystem {
             self.history.pop_front();
         }
         self.history.push_back(self.state.clone());
+
+        // Update emotional state after decay
+        self.update_emotional_state();
     }
 
     /// Decay towards baseline
@@ -364,6 +388,11 @@ impl EndocrineSystem {
         self.state.cortisol = Self::decay_towards(self.state.cortisol, 0.3, fast_rate);
         self.state.dopamine = Self::decay_towards(self.state.dopamine, 0.5, fast_rate);
         self.state.acetylcholine = Self::decay_towards(self.state.acetylcholine, 0.4, fast_rate);
+    }
+
+    /// Update emotional state from current hormones (using primitives)
+    fn update_emotional_state(&mut self) {
+        self.current_emotion = self.emotional_reasoner.derive_emotional_state(&self.state);
     }
 
     /// Get hormone trend (increasing/decreasing/stable)
@@ -417,6 +446,14 @@ impl EndocrineSystem {
 
     /// Get statistics
     pub fn stats(&self) -> EndocrineStats {
+        // Get emotional state data
+        let emotion = self.current_emotion.dominant_emotion.clone();
+        let emotion_intensity = self.current_emotion.intensity;
+        let secondary_emotions: Vec<String> = self.current_emotion.secondary_emotions
+            .iter()
+            .map(|(e, _)| format!("{:?}", e))
+            .collect();
+
         EndocrineStats {
             current_mood: self.state.mood().to_string(),
             cortisol: self.state.cortisol,
@@ -426,6 +463,9 @@ impl EndocrineSystem {
             valence: self.state.valence(),
             focus_streak: self.focus_streak,
             cycle_count: self.cycle_count,
+            emotion: format!("{:?}", emotion),
+            emotion_intensity,
+            secondary_emotions,
         }
     }
 }
@@ -457,6 +497,11 @@ pub struct EndocrineStats {
     pub valence: f32,
     pub focus_streak: u32,
     pub cycle_count: u64,
+
+    // Emotional reasoning (using primitives)
+    pub emotion: String,         // Dominant emotion name
+    pub emotion_intensity: f32,  // Intensity of dominant emotion
+    pub secondary_emotions: Vec<String>, // Secondary emotions present
 }
 
 #[cfg(test)]

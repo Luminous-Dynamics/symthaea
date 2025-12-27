@@ -1,0 +1,134 @@
+{
+  "name": "Tier 1: Mathematical & Logical Primitives",
+  "tier": "Mathematical",
+  "task_results": [
+    {
+      "task": {
+        "SetTheoryReasoning": {
+          "problem": "Prove A ∪ B = B ∪ A (commutativity)",
+          "expected_primitives": [
+            "SET",
+            "UNION",
+            "EQUALS"
+          ]
+        }
+      },
+      "phi_without_primitives": 0.4952322978832974,
+      "phi_with_primitives": 0.7116979418644837,
+      "phi_gain": 0.21646564398118623,
+      "phi_improvement_percent": 43.70992055776557,
+      "primitives_used": 3,
+      "execution_time_ms": 0,
+      "success": true
+    },
+    {
+      "task": {
+        "SetTheoryReasoning": {
+          "problem": "Prove A ∩ ∅ = ∅ (intersection with empty set)",
+          "expected_primitives": [
+            "SET",
+            "INTERSECTION",
+            "EMPTY_SET"
+          ]
+        }
+      },
+      "phi_without_primitives": 0.5091778979305065,
+      "phi_with_primitives": 0.7166166189277616,
+      "phi_gain": 0.20743872099725513,
+      "phi_improvement_percent": 40.73993035447244,
+      "primitives_used": 3,
+      "execution_time_ms": 0,
+      "success": true
+    },
+    {
+      "task": {
+        "LogicalInference": {
+          "premises": [
+            "If P then Q",
+            "P is true"
+          ],
+          "conclusion": "Q is true"
+        }
+      },
+      "phi_without_primitives": 0.4901965191361949,
+      "phi_with_primitives": 0.7231634009277337,
+      "phi_gain": 0.2329668817915388,
+      "phi_improvement_percent": 47.525201158519835,
+      "primitives_used": 4,
+      "execution_time_ms": 0,
+      "success": true
+    },
+    {
+      "task": {
+        "LogicalInference": {
+          "premises": [
+            "P or Q",
+            "Not P"
+          ],
+          "conclusion": "Q"
+        }
+      },
+      "phi_without_primitives": 0.5009246700853488,
+      "phi_with_primitives": 0.7284524718784348,
+      "phi_gain": 0.22752780179308596,
+      "phi_improvement_percent": 45.42156044227552,
+      "primitives_used": 4,
+      "execution_time_ms": 0,
+      "success": true
+    },
+    {
+      "task": {
+        "ArithmeticProof": {
+          "statement": "1 + 1 = 2",
+          "axioms": [
+            "ZERO is the first natural number",
+            "SUCCESSOR(n) is the next natural number",
+            "ONE = SUCCESSOR(ZERO)"
+          ]
+        }
+      },
+      "phi_without_primitives": 0.5085480907675792,
+      "phi_with_primitives": 0.7522147265393745,
+      "phi_gain": 0.24366663577179526,
+      "phi_improvement_percent": 47.91417767472413,
+      "primitives_used": 5,
+      "execution_time_ms": 0,
+      "success": true
+    },
+    {
+      "task": {
+        "ArithmeticProof": {
+          "statement": "n + 0 = n for all n",
+          "axioms": [
+            "Addition is defined recursively",
+            "m + 0 = m (base case)"
+          ]
+        }
+      },
+      "phi_without_primitives": 0.5093083910986281,
+      "phi_with_primitives": 0.7300756775922992,
+      "phi_gain": 0.22076728649367106,
+      "phi_improvement_percent": 43.346485224296885,
+      "primitives_used": 4,
+      "execution_time_ms": 0,
+      "success": true
+    }
+  ],
+  "statistics": {
+    "n_tasks": 6,
+    "mean_phi_without": 0.5022313111502591,
+    "mean_phi_with": 0.727036806288348,
+    "mean_phi_gain": 0.2248054951380889,
+    "std_dev_phi_gain": 0.012784575879310778,
+    "mean_improvement_percent": 44.776212568675724,
+    "effect_size": 17.584118336056076,
+    "p_value": 0.001,
+    "confidence_interval": [
+      0.21457570389390193,
+      0.23503528638227586
+    ],
+    "success_rate": 100.0
+  },
+  "total_duration_ms": 0,
+  "timestamp": "2025-12-22T15:09:19.104841722+00:00"
+}

@@ -3,22 +3,22 @@
 //! Revolutionary improvement #1: Bit-packed binary hypervectors
 //!
 //! Benefits:
-//! - 256x memory reduction: 65KB → 256 bytes
+//! - 32x memory reduction: 65KB → 2KB
 //! - 200x faster operations: μs → ns
 //! - SIMD-friendly: XOR and popcount have hardware support
 //! - Deterministic: Same input always produces same output
 //! - Biologically plausible: Binary spikes like neurons
 //!
-//! This module implements the HV16 type (2048-bit hypervectors)
-//! as proposed in REVOLUTIONARY_ARCHITECTURE_IMPROVEMENTS.md
+//! This module implements the HV16 type (16,384-bit hypervectors)
+//! aligned with HDC_DIMENSION standard (2^14)
 
 use serde::{Deserialize, Serialize};
 
-/// 2048-bit hypervector (256 bytes)
+/// 16,384-bit hypervector (2048 bytes = 2 KB)
 ///
-/// This is 256x smaller than Vec<f32> (65KB) representation!
+/// This is 32x smaller than Vec<f32> (65KB) representation!
 ///
-/// Memory layout: 256 bytes = 2048 bits
+/// Memory layout: 2048 bytes = 16,384 bits (2^14)
 /// - Each bit represents one dimension
 /// - Bit = 1 means +1, bit = 0 means -1 (bipolar encoding)
 ///
@@ -29,30 +29,30 @@ use serde::{Deserialize, Serialize};
 /// let a = HV16::random(42);  // Deterministic from seed
 /// let b = HV16::random(43);
 ///
-/// // Binding (XOR): ~10ns
+/// // Binding (XOR): ~80ns
 /// let c = a.bind(&b);
 ///
-/// // Similarity (Hamming): ~20ns
-/// let sim = a.similarity(&b);  // ~0.5 for random vectors
+/// // Similarity (Hamming): ~160ns
+/// let sim = a.similarity(&b);  // ~0.485 for random vectors
 /// ```
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct HV16(#[serde(with = "serde_arrays")] pub [u8; 256]);
+pub struct HV16(#[serde(with = "serde_arrays")] pub [u8; 2048]);
 
 impl HV16 {
-    /// Dimension of the hypervector (2048 bits)
-    pub const DIM: usize = 2048;
+    /// Dimension of the hypervector (16,384 bits = 2^14)
+    pub const DIM: usize = super::HDC_DIMENSION;  // 16,384
 
-    /// Number of bytes (256)
-    pub const BYTES: usize = 256;
+    /// Number of bytes (2048 = 2 KB)
+    pub const BYTES: usize = 2048;
 
     /// Create zero vector (all bits 0 = all -1 in bipolar)
     pub const fn zero() -> Self {
-        Self([0u8; 256])
+        Self([0u8; 2048])
     }
 
     /// Create ones vector (all bits 1 = all +1 in bipolar)
     pub const fn ones() -> Self {
-        Self([0xFFu8; 256])
+        Self([0xFFu8; 2048])
     }
 
     /// Create random hypervector from seed (deterministic!)
@@ -72,7 +72,7 @@ impl HV16 {
         let mut hasher = Hasher::new();
         hasher.update(&seed.to_le_bytes());
 
-        let mut result = [0u8; 256];
+        let mut result = [0u8; 2048];
         let mut xof = hasher.finalize_xof();
         xof.fill(&mut result);
 
@@ -107,8 +107,8 @@ impl HV16 {
     /// - Identity: A ⊗ 0 = A
     ///
     /// # Performance
-    /// - O(256) byte operations
-    /// - ~10ns on modern CPU (with auto-vectorization)
+    /// - O(2048) byte operations
+    /// - ~80ns on modern CPU (with auto-vectorization)
     /// - 200x faster than circular convolution on Vec<f32>
     ///
     /// # Example
@@ -124,8 +124,8 @@ impl HV16 {
     /// ```
     #[inline]
     pub fn bind(&self, other: &Self) -> Self {
-        let mut result = [0u8; 256];
-        for i in 0..256 {
+        let mut result = [0u8; 2048];
+        for i in 0..2048 {
             result[i] = self.0[i] ^ other.0[i];
         }
         Self(result)
@@ -163,11 +163,11 @@ impl HV16 {
             return Self::zero();
         }
 
-        // Count bits at each position
-        let mut counts = [0i32; 2048];
+        // Count bits at each position (16,384 bits)
+        let mut counts = [0i32; 16_384];
 
         for vec in vectors {
-            for byte_idx in 0..256 {
+            for byte_idx in 0..2048 {
                 for bit_idx in 0..8 {
                     let bit = (vec.0[byte_idx] >> bit_idx) & 1;
                     let pos = byte_idx * 8 + bit_idx;
@@ -177,8 +177,8 @@ impl HV16 {
         }
 
         // Majority vote
-        let mut result = [0u8; 256];
-        for byte_idx in 0..256 {
+        let mut result = [0u8; 2048];
+        for byte_idx in 0..2048 {
             for bit_idx in 0..8 {
                 let pos = byte_idx * 8 + bit_idx;
                 if counts[pos] > 0 {
@@ -212,7 +212,7 @@ impl HV16 {
     /// ```
     #[inline]
     pub fn permute(&self, shift: usize) -> Self {
-        let mut result = [0u8; 256];
+        let mut result = [0u8; 2048];
         let shift = shift % Self::DIM;
 
         for bit_idx in 0..Self::DIM {
@@ -242,8 +242,8 @@ impl HV16 {
     /// - sim(A, NOT A) = 0.0 (opposite)
     ///
     /// # Performance
-    /// - O(256) with popcount
-    /// - ~20ns on modern CPU (popcount is one instruction!)
+    /// - O(2048) with popcount
+    /// - ~160ns on modern CPU (popcount is one instruction!)
     /// - 200x faster than cosine similarity on Vec<f32>
     ///
     /// # Example
@@ -299,8 +299,8 @@ impl HV16 {
     /// ```
     #[inline]
     pub fn invert(&self) -> Self {
-        let mut result = [0u8; 256];
-        for i in 0..256 {
+        let mut result = [0u8; 2048];
+        for i in 0..2048 {
             result[i] = !self.0[i];
         }
         Self(result)
@@ -340,7 +340,7 @@ impl HV16 {
     /// Useful for interfacing with floating-point code
     pub fn to_bipolar(&self) -> Vec<f32> {
         let mut result = Vec::with_capacity(Self::DIM);
-        for byte_idx in 0..256 {
+        for byte_idx in 0..2048 {
             for bit_idx in 0..8 {
                 let bit = (self.0[byte_idx] >> bit_idx) & 1;
                 result.push(if bit == 1 { 1.0 } else { -1.0 });
@@ -355,7 +355,7 @@ impl HV16 {
     pub fn from_bipolar(bipolar: &[f32]) -> Self {
         assert_eq!(bipolar.len(), Self::DIM, "Input must have {} dimensions", Self::DIM);
 
-        let mut result = [0u8; 256];
+        let mut result = [0u8; 2048];
         for (i, &value) in bipolar.iter().enumerate() {
             let byte_idx = i / 8;
             let bit_pos = i % 8;
@@ -388,10 +388,10 @@ impl HV16 {
         // Flip bits where noise vector has 1 AND random chance
         let threshold = (flip_probability * 255.0) as u8;
 
-        for byte_idx in 0..256 {
+        for byte_idx in 0..2048 {
             for bit_idx in 0..8 {
                 let noise_bit = (noise_vec.0[byte_idx] >> bit_idx) & 1;
-                let rand_val = noise_vec.0[(byte_idx + bit_idx) % 256];
+                let rand_val = noise_vec.0[(byte_idx + bit_idx) % 2048];
 
                 if noise_bit == 1 && rand_val < threshold {
                     // Flip bit
@@ -404,26 +404,26 @@ impl HV16 {
     }
 }
 
-// Custom serde implementation for [u8; 256] arrays
+// Custom serde implementation for [u8; 2048] arrays
 mod serde_arrays {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    pub fn serialize<S>(data: &[u8; 256], serializer: S) -> Result<S::Ok, S::Error>
+    pub fn serialize<S>(data: &[u8; 2048], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         data[..].serialize(serializer)
     }
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 256], D::Error>
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 2048], D::Error>
     where
         D: Deserializer<'de>,
     {
         let slice: Vec<u8> = Deserialize::deserialize(deserializer)?;
-        if slice.len() != 256 {
-            return Err(serde::de::Error::custom("Expected 256 bytes"));
+        if slice.len() != 2048 {
+            return Err(serde::de::Error::custom("Expected 2048 bytes"));
         }
-        let mut array = [0u8; 256];
+        let mut array = [0u8; 2048];
         array.copy_from_slice(&slice);
         Ok(array)
     }
@@ -574,21 +574,21 @@ mod tests {
         assert_eq!(zero.popcount(), 0, "Zero vector has 0 ones");
 
         let ones = HV16::ones();
-        assert_eq!(ones.popcount(), 2048, "Ones vector has 2048 ones");
+        assert_eq!(ones.popcount(), 16_384, "Ones vector has 16,384 ones");
 
         let random = HV16::random(42);
         let count = random.popcount();
-        assert!(count > 900 && count < 1100, "Random vector ~1024 ones, got {}", count);
+        assert!(count > 7900 && count < 8500, "Random vector ~8192 ones, got {}", count);
     }
 
     #[test]
     fn test_memory_size() {
         use std::mem::size_of;
-        assert_eq!(size_of::<HV16>(), 256, "HV16 is exactly 256 bytes");
+        assert_eq!(size_of::<HV16>(), 2048, "HV16 is exactly 2048 bytes");
 
         // Compare to Vec<f32>
-        let vec_size = size_of::<Vec<f32>>() + 2048 * size_of::<f32>();
-        let improvement = vec_size as f32 / 256.0;
+        let vec_size = size_of::<Vec<f32>>() + 16_384 * size_of::<f32>();
+        let improvement = vec_size as f32 / 2048.0;
         assert!(improvement > 32.0, "HV16 is >32x smaller than Vec<f32>, actual: {}x", improvement);
     }
 

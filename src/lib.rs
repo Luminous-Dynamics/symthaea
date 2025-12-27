@@ -32,8 +32,17 @@ pub mod perception;
 // Enhancement #4: Observability & Causal Analysis (Phase 3+)
 pub mod observability;
 
-// Enhancement #7: Causal Program Synthesis (Phase 2)
-pub mod synthesis;
+// Enhancement #7 & #8: Causal Program Synthesis + Consciousness-Guided Synthesis
+// pub mod synthesis;  // PyPhi integration code complete but blocked by pre-existing synthesis module errors
+                       // Week 4: Code in src/synthesis/phi_exact.rs + examples/pyphi_validation.rs ready
+                       // TODO: Fix synthesis module compilation errors to enable PyPhi validation
+
+// Track 6: Component Integration
+pub mod action;                             // Action IR and execution
+pub mod databases;
+pub mod language;
+pub mod web_research;                         // Track 6: Enabled with reqwest, scraper, html2text
+pub mod awakening;
 
 // Phase 11: Bio-Digital Bridge modules (Week 0: Deferred to later phases)
 // pub mod semantic_ear;  // Needs rust-bert, tokenizers
@@ -120,6 +129,12 @@ pub use perception::{
 };
 
 // pub use swarm::{SwarmIntelligence, SwarmConfig, SwarmStats};  // Needs libp2p
+
+// Track 6: Language & Conversation exports
+pub use language::{
+    Conversation, ConversationConfig, ConversationTurn, ConversationState,
+};
+pub use awakening::{SymthaeaAwakening, AwakenedState, Introspection as AwakeningIntrospection};
 
 use anyhow::Result;
 // Week 0: Deferred swarm components

@@ -166,7 +166,7 @@ impl QdrantSensory {
     /// Convert f32 vector back to HV16
     #[allow(dead_code)]
     fn vec_to_hv(vec: &[f32]) -> HV16 {
-        let mut bytes = [0u8; 256];
+        let mut bytes = [0u8; 2048];
         for (byte_idx, byte) in bytes.iter_mut().enumerate() {
             for bit in 0..8 {
                 let vec_idx = byte_idx * 8 + bit;

@@ -34,8 +34,12 @@ petgraph = { version = "0.6", features = ["serde-1"] }
 # Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
 uuid = { version = "1.6", features = ["serde", "v4"] }  # Week 3: Enabled for Goal IDs
 # sha2 = "0.10"
-# reqwest = { version = "0.11", features = ["json"] }
 # urlencoding = "2.1"
+
+# Web Research & Epistemic Verification (Track 6)
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+scraper = "0.18"
+html2text = "0.6"
 
 # Core async utilities
 async-trait = "0.1"
@@ -90,12 +94,16 @@ rodio = { version = "0.19", default-features = false, optional = true }  # Audio
 hound = { version = "3.5", optional = true }        # WAV file I/O
 hf-hub = { version = "0.3", optional = true }       # HuggingFace Hub for model download
 
+# Enhancement #8 Week 4: PyPhi Integration (IIT 3.0 exact Φ calculation)
+pyo3 = { version = "0.22", features = ["auto-initialize"], optional = true }  # Rust-Python bridge for PyPhi
+
 # NixOS integration
 nix = "0.27"
 
 [features]
 default = []
 audio = ["rodio", "hound", "hf-hub", "ort"]
+pyphi = ["pyo3"]  # Enhancement #8 Week 4: Enable PyPhi integration for exact IIT Φ validation
 
 [dev-dependencies]
 criterion = "0.5"

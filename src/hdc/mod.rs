@@ -248,7 +248,26 @@ pub mod consciousness_topology;            // Consciousness topology structures
 pub mod consciousness_topology_generators; // 8 topology generators (Random, Star, Ring, Line, Tree, Dense, Modular, Lattice)
 pub mod tiered_phi;                        // Multi-tier Φ (integrated information) approximation
 pub mod phi_topology_validation;           // RealHV-TieredPhi integration for topology validation
+pub mod phi_real;                          // RealHV Φ calculator (no binarization) using cosine similarity
+pub mod phi_resonant;                      // Resonator-based Φ calculator (O(n log N) dynamics)
 pub mod binary_hv;                         // Binary hypervector operations (HV16)
+pub mod primitive_system;                  // Ontological primitives system with 7 semantic domains
+
+// Track 6: Consciousness integration for awakening module
+pub mod substrate_independence;            // Substrate type definitions
+pub mod consciousness_evaluator;           // Consciousness evaluation
+pub mod consciousness_integration;         // Complete consciousness pipeline
+pub mod consciousness_dashboard;           // Real-time consciousness monitoring
+
+// Track 6: Language module dependencies
+pub mod universal_semantics;               // Universal semantic primes (Wierzbicka)
+pub mod consciousness_self_assessment;     // Self-assessment for conversation
+pub mod consciousness_creativity;          // Creativity for conversation
+pub mod deterministic_seeds;               // Deterministic seeds for NixOS knowledge
+pub mod integrated_information;            // Φ (integrated information) measurement
+
+// Re-export HV16 at module level for convenience (used by language/nix_* modules)
+pub use binary_hv::HV16;
 
 // Re-export key types for convenience
 pub use statistical_retrieval::{

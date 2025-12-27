@@ -2716,4 +2716,247 @@ mod tests {
         println!("  Is distributed: {}", attr.is_distributed());
         println!("  Critical percentage: {:.1}%", pct);
     }
+
+    // ============================================================================
+    // Revolutionary #93: Φ Temporal Dynamics Tests
+    // ============================================================================
+
+    #[test]
+    fn test_dynamics_empty_history() {
+        let dynamics = PhiDynamics::new();
+
+        assert_eq!(dynamics.sample_count(), 0);
+        assert!(dynamics.get_history().is_empty());
+        assert!(dynamics.get_recent(10).is_empty());
+    }
+
+    #[test]
+    fn test_dynamics_single_sample() {
+        let mut dynamics = PhiDynamics::new();
+
+        let snapshot = dynamics.record(0.5);
+
+        assert_eq!(dynamics.sample_count(), 1);
+        assert_eq!(snapshot.current_phi, 0.5);
+        assert!((snapshot.mean_phi - 0.5).abs() < 1e-10);
+        assert!((snapshot.volatility - 0.0).abs() < 1e-10); // Single sample has 0 volatility
+        assert!(snapshot.transition.is_none()); // No transition on first sample
+    }
+
+    #[test]
+    fn test_dynamics_stable_sequence() {
+        let mut dynamics = PhiDynamics::new();
+
+        // Record stable values around 0.5
+        let mut last_snapshot = None;
+        for i in 0..20 {
+            let phi = 0.5 + (i as f64 * 0.001); // Very small variation
+            last_snapshot = Some(dynamics.record(phi));
+        }
+
+        let snapshot = last_snapshot.expect("Should have snapshot");
+
+        // Should be stable or slightly increasing
+        assert!(snapshot.trend.direction == TrendDirection::Stable ||
+                snapshot.trend.direction == TrendDirection::Increasing);
+
+        println!("Stable sequence trend: {:?}, strength: {:.4}",
+                 snapshot.trend.direction, snapshot.trend.strength);
+    }
+
+    #[test]
+    fn test_dynamics_increasing_trend() {
+        let mut dynamics = PhiDynamics::new();
+
+        // Record clearly increasing values
+        let mut last_snapshot = None;
+        for i in 0..50 {
+            let phi = 0.3 + (i as f64 * 0.01); // 0.3 → 0.79
+            last_snapshot = Some(dynamics.record(phi));
+        }
+
+        let snapshot = last_snapshot.expect("Should have snapshot");
+
+        assert_eq!(snapshot.trend.direction, TrendDirection::Increasing);
+        assert!(snapshot.trend.strength > 0.0);
+
+        println!("Increasing trend: strength = {:.4}, predicted_next = {:.4}",
+                 snapshot.trend.strength, snapshot.trend.predicted_next);
+    }
+
+    #[test]
+    fn test_dynamics_decreasing_trend() {
+        let mut dynamics = PhiDynamics::new();
+
+        // Record clearly decreasing values
+        let mut last_snapshot = None;
+        for i in 0..50 {
+            let phi = 0.8 - (i as f64 * 0.01); // 0.8 → 0.31
+            last_snapshot = Some(dynamics.record(phi));
+        }
+
+        let snapshot = last_snapshot.expect("Should have snapshot");
+
+        assert_eq!(snapshot.trend.direction, TrendDirection::Decreasing);
+
+        println!("Decreasing trend: strength = {:.4}, predicted_next = {:.4}",
+                 snapshot.trend.strength, snapshot.trend.predicted_next);
+    }
+
+    #[test]
+    fn test_dynamics_phase_transition_detection() {
+        let mut dynamics = PhiDynamics::new();
+
+        // Build up stable baseline
+        for _ in 0..20 {
+            dynamics.record(0.5);
+        }
+
+        // Now introduce a sudden change
+        let snapshot = dynamics.record(0.8); // Big jump!
+
+        assert!(snapshot.transition.is_some(), "Should detect phase transition");
+
+        let transition = snapshot.transition.unwrap();
+        assert_eq!(transition.direction, TransitionDirection::Rising);
+        assert!(transition.magnitude_sigma > 2.0); // Should be significant
+
+        println!("Detected transition: {:?}, magnitude: {:.2}σ, type: {:?}",
+                 transition.direction, transition.magnitude_sigma, transition.transition_type);
+    }
+
+    #[test]
+    fn test_dynamics_falling_transition() {
+        let mut dynamics = PhiDynamics::new();
+
+        // Build up stable high baseline
+        for _ in 0..20 {
+            dynamics.record(0.8);
+        }
+
+        // Sudden drop
+        let snapshot = dynamics.record(0.3);
+
+        assert!(snapshot.transition.is_some(), "Should detect falling transition");
+
+        let transition = snapshot.transition.unwrap();
+        assert_eq!(transition.direction, TransitionDirection::Falling);
+
+        println!("Falling transition detected: magnitude = {:.2}σ",
+                 transition.magnitude_sigma);
+    }
+
+    #[test]
+    fn test_dynamics_oscillating_pattern() {
+        let mut dynamics = PhiDynamics::new();
+
+        // Create oscillating pattern
+        let mut last_snapshot = None;
+        for i in 0..100 {
+            let phi = 0.5 + 0.2 * (i as f64 * 0.3).sin();
+            last_snapshot = Some(dynamics.record(phi));
+        }
+
+        let snapshot = last_snapshot.expect("Should have snapshot");
+
+        // Should detect oscillation or low strength trend
+        assert!(snapshot.trend.strength < 0.5 || snapshot.trend.direction == TrendDirection::Oscillating);
+
+        println!("Oscillating pattern: direction = {:?}, strength = {:.4}",
+                 snapshot.trend.direction, snapshot.trend.strength);
+    }
+
+    #[test]
+    fn test_dynamics_circular_buffer() {
+        let config = PhiDynamicsConfig {
+            history_size: 10, // Small buffer
+            ..Default::default()
+        };
+        let mut dynamics = PhiDynamics::with_config(config);
+
+        // Add more than buffer size
+        for i in 0..25 {
+            dynamics.record(i as f64 * 0.1);
+        }
+
+        // Should only have last 10
+        assert_eq!(dynamics.sample_count(), 10);
+
+        let history = dynamics.get_history();
+        assert_eq!(history.len(), 10);
+
+        // Values should be the most recent ones
+        let values: Vec<f64> = history.iter().map(|(_, v)| *v).collect();
+        for (i, v) in values.iter().enumerate() {
+            let expected = (15 + i) as f64 * 0.1; // Last 10 values: 1.5, 1.6, ..., 2.4
+            assert!((*v - expected).abs() < 1e-10,
+                    "Expected {:.1}, got {:.1}", expected, *v);
+        }
+    }
+
+    #[test]
+    fn test_dynamics_reset() {
+        let mut dynamics = PhiDynamics::new();
+
+        // Add some samples
+        for i in 0..20 {
+            dynamics.record(i as f64 * 0.05);
+        }
+        assert_eq!(dynamics.sample_count(), 20);
+
+        // Reset
+        dynamics.reset();
+
+        assert_eq!(dynamics.sample_count(), 0);
+        assert!(dynamics.get_history().is_empty());
+    }
+
+    #[test]
+    fn test_dynamics_statistics_accuracy() {
+        let mut dynamics = PhiDynamics::new();
+
+        // Add known values
+        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        for v in &values {
+            dynamics.record(*v);
+        }
+
+        let snapshot = dynamics.record(6.0);
+
+        // After adding 6.0, we have [1, 2, 3, 4, 5, 6]
+        // Mean should be 3.5
+        let expected_mean = 3.5;
+        assert!((snapshot.mean_phi - expected_mean).abs() < 1e-10,
+                "Expected mean {}, got {}", expected_mean, snapshot.mean_phi);
+
+        // Variance = E[X²] - E[X]² = (1+4+9+16+25+36)/6 - 12.25 = 91/6 - 12.25 ≈ 2.9167
+        // Std = sqrt(2.9167) ≈ 1.7078
+        let expected_volatility = (2.9166666667_f64).sqrt();
+        assert!((snapshot.volatility - expected_volatility).abs() < 0.01,
+                "Expected volatility {:.4}, got {:.4}", expected_volatility, snapshot.volatility);
+    }
+
+    #[test]
+    fn test_dynamics_with_real_phi() {
+        let mut dynamics = PhiDynamics::new();
+        let mut phi = TieredPhi::new(ApproximationTier::Heuristic);
+
+        // Create varying topologies and track their Φ over time
+        for seed in 0..30 {
+            let components = create_test_components(8 + (seed % 4)); // 8-11 components
+            let result = phi.compute(&components);
+
+            let snapshot = dynamics.record(result.phi);
+
+            if let Some(transition) = snapshot.transition {
+                println!("Transition at step {}: {:?} ({:.2}σ)",
+                         seed, transition.direction, transition.magnitude_sigma);
+            }
+        }
+
+        println!("Final sample count: {}", dynamics.sample_count());
+
+        // Verify we can compute dynamics on real Φ values
+        assert!(dynamics.sample_count() >= 20);
+    }
 }

@@ -446,3 +446,333 @@ impl HierarchicalLTC {
 ---
 
 *This document is living and will be updated as we progress.*
+
+---
+
+## Track 6: Component Integration (CRITICAL - Added 2025-12-27)
+
+### Executive Summary
+
+After comprehensive review (2025-12-27), Symthaea is **far more mature than initially apparent**. The core capabilities exist - the gaps are primarily about **wiring and integration** rather than missing components.
+
+| Component | Implementation | Integration |
+|-----------|---------------|-------------|
+| Motor Cortex (action execution) | ✅ Complete | ❌ Not wired to conversation |
+| Conversation Engine | ✅ Complete | ❌ No CLI/REPL entry point |
+| Observability | ✅ Complete | ❌ Not exposed to user |
+| Action Planning | ✅ Complete | ❌ Not wired to motor cortex |
+| Prefrontal Cortex (GWT) | ✅ Complete | 🔄 Partial integration |
+| Voice (Larynx/Kokoro) | ✅ Complete | ❌ Feature-gated, not wired |
+| NixOS Understanding | ✅ Complete | ❌ Not integrated with conversation |
+
+### 6.1 Create Interactive REPL Binary (CRITICAL)
+
+**What exists:**
+- `src/language/conversation.rs` - Full conversation engine (1900+ lines)
+- Has memory, reasoning, learning, emotional processing
+- Supports /commands: /help, /status, /introspect, /memory, etc.
+
+**What's missing:**
+- Interactive loop that lets users chat with Symthaea
+
+**Implementation:**
+```rust
+// Create: src/bin/symthaea-repl.rs
+// - Read user input from stdin
+// - Call conversation.respond()
+// - Display response with optional Φ metrics
+// - Support all /commands from conversation.rs
+```
+
+| ID | Task | Priority | Status | Expected Impact |
+|----|------|----------|--------|-----------------|
+| I6.1.1 | Create symthaea-repl binary | CRITICAL | 🟢 DONE | Usable interface |
+| I6.1.2 | Add Φ display to responses | HIGH | 🟢 DONE | Consciousness visibility |
+| I6.1.3 | Add /dashboard command | MEDIUM | 🟢 DONE | Metrics aggregation |
+
+**Implementation Note (2025-12-27):**
+- Created `src/bin/symthaea-repl.rs` with consciousness-first REPL
+- Uses `SymthaeaAwakening` for consciousness pipeline
+- Real-time Φ in prompt: `●[Φ:0.73|C:85%] symthaea>`
+- Commands: /status, /introspect, /dashboard, /stress, /clear, /help, /quit
+- Full language integration (I6.2) requires fixing hdc module exports first
+
+---
+
+### 6.2 Wire Motor Cortex to Conversation (CRITICAL)
+
+**What exists:**
+- `src/brain/motor_cortex.rs` - Complete execution sandbox
+  - ActionStep, PlannedAction types
+  - LocalShellSandbox with safety checks
+  - Dry-run, Ghost-run, Real-run modes
+  - Rollback capabilities
+  - Risk estimation
+
+- `src/language/conversation.rs` - Has intent detection via DeepParser
+
+**What's missing:**
+- When user says "install firefox", conversation should:
+  1. Detect intent as Action/Command
+  2. Build ActionStep from parsed command
+  3. Run through motor cortex (dry-run first, then real if approved)
+  4. Report results back to user
+
+**Integration Pattern:**
+```
+User: "install nginx on the server"
+  ↓
+DeepParser → Intent::Command, Entity: "nginx"
+  ↓
+Build ActionStep("nix-shell -p nginx", risk=0.3)
+  ↓
+MotorCortex.dry_run() → success
+  ↓
+Ask user: "Execute: nix-shell -p nginx? [y/n]"
+  ↓
+MotorCortex.execute() → result
+  ↓
+Response: "✅ nginx installed successfully"
+```
+
+| ID | Task | Priority | Status | Expected Impact |
+|----|------|----------|--------|-----------------|
+| I6.2.1 | Add motor_cortex to Conversation | CRITICAL | ✅ DONE | Action execution |
+| I6.2.2 | Intent→ActionStep conversion | CRITICAL | ✅ DONE | Command parsing |
+| I6.2.3 | Confirmation flow for dangerous ops | HIGH | ✅ DONE | Safety |
+
+**Implementation (2025-12-27 Session 3):**
+- Added MotorCortexActor to Conversation struct
+- Added /run, /execute, /motor commands
+- Implemented prepare_action() with dry-run validation
+- Implemented confirm_pending_action() and cancel_pending_action()
+- Risk estimation blocks high-risk commands on /execute
+- Full confirmation flow for /run commands
+
+---
+
+### 6.3 Connect Action Planning to Motor Cortex
+
+**What exists:**
+- `src/observability/action_planning.rs` - Goal-directed intervention search
+- `src/brain/motor_cortex.rs` - Action execution
+
+**What's missing:**
+- ActionPlanner creates plans but doesn't execute them
+
+**Implementation:**
+```rust
+// Create src/orchestration.rs or extend motor_cortex.rs:
+// 1. ActionPlanner.plan() → ActionPlan
+// 2. Convert ActionPlan.interventions → Vec<ActionStep>
+// 3. Feed to MotorCortexActor.execute_action()
+```
+
+| ID | Task | Priority | Status | Expected Impact |
+|----|------|----------|--------|-----------------|
+| I6.3.1 | ActionPlan → ActionStep conversion | HIGH | 🔴 TODO | Plan execution |
+| I6.3.2 | Goal persistence in conversation | MEDIUM | 🔴 TODO | Multi-turn goals |
+
+---
+
+### 6.4 Integrate NixOS Understanding
+
+**What exists:**
+- `src/nix_understanding.rs` - NixOS domain knowledge
+- `src/language/nix_*.rs` - NixOS frames, constructions, primitives
+
+**What's missing:**
+- Conversation doesn't leverage NixOS knowledge
+
+| ID | Task | Priority | Status | Expected Impact |
+|----|------|----------|--------|-----------------|
+| I6.4.1 | Query nix_understanding from conversation | MEDIUM | 🔴 TODO | NixOS expertise |
+| I6.4.2 | NixOS-specific intent detection | MEDIUM | 🔴 TODO | Better parsing |
+
+---
+
+### 6.5 Connect Prefrontal Goals to Conversation
+
+**What exists:**
+- `src/brain/prefrontal.rs` - Full GWT with goals, attention bidding
+- Attention competition and coalition formation
+
+**What's missing:**
+- User-expressed goals aren't added to prefrontal goal system
+
+| ID | Task | Priority | Status | Expected Impact |
+|----|------|----------|--------|-----------------|
+| I6.5.1 | Extract goals from user intent | MEDIUM | 🔴 TODO | Goal tracking |
+| I6.5.2 | Submit bids to prefrontal from conversation | MEDIUM | 🔴 TODO | Attention focus |
+
+---
+
+### 6.6 Causal Explanation in Responses
+
+**What exists:**
+- `src/observability/causal_explanation.rs` - Natural language explanations
+- ExplanationGenerator with multiple levels
+
+**What's missing:**
+- Responses don't explain WHY Symthaea chose this answer
+
+| ID | Task | Priority | Status | Expected Impact |
+|----|------|----------|--------|-----------------|
+| I6.6.1 | Add /why command | MEDIUM | 🔴 TODO | Explainability |
+| I6.6.2 | Auto-explain on low confidence | LOW | 🔴 TODO | Trust building |
+
+---
+
+### 6.7 Voice Integration
+
+**What exists (feature-gated):**
+- `src/physiology/larynx.rs` - Kokoro TTS with prosody modulation
+- `src/voice/` - Input/output/conversation modules
+
+| ID | Task | Priority | Status | Expected Impact |
+|----|------|----------|--------|-----------------|
+| I6.7.1 | Wire voice to conversation | LOW | 🔴 TODO | Speech interface |
+| I6.7.2 | Prosody modulation by LTC flow | LOW | 🔴 TODO | Natural voice |
+
+---
+
+### Implementation Priority Matrix (Track 6)
+
+| Priority | Task | Effort | Impact |
+|----------|------|--------|--------|
+| 🔴 Critical | I6.1.1 Create REPL binary | Small | High |
+| ✅ Complete | I6.2.1-3 Wire motor cortex | Medium | High |
+| 🟠 High | I6.1.2 Real-time Φ display | Small | Medium |
+| 🟠 High | I6.3.1 Connect action planning | Medium | High |
+| 🟡 Medium | I6.4.1-2 Integrate NixOS | Small | Medium |
+| 🟡 Medium | I6.5.1-2 Connect prefrontal | Medium | Medium |
+| 🟡 Medium | I6.6.1 Add /why command | Small | Medium |
+| 🟢 Lower | I6.7.1-2 Voice integration | Large | Medium |
+
+---
+
+### Quick Wins (Can Do Today)
+
+1. **Create REPL binary** - Wire stdin/stdout to conversation.respond()
+2. **Add Φ to responses** - Modify response to include `[Φ={:.2}]`
+3. **Add /dashboard command** - Aggregate existing stats
+4. **Enable dynamic generation** - Set SYMTHAEA_DYNAMIC_GENERATION=1
+
+---
+
+### Architecture Goal
+
+```
+Current:
+┌─────────────┐   ┌──────────────┐   ┌─────────────┐
+│ Conversation│   │ Motor Cortex │   │ Observability│
+│   Engine    │   │  (execution) │   │  (analysis)  │
+└─────────────┘   └──────────────┘   └─────────────┘
+       ▲                 ▲                   ▲
+       │                 │                   │
+       └─────── No connections ──────────────┘
+
+Goal:
+┌─────────────────────────────────────────────────────┐
+│                   SYMTHAEA REPL                      │
+├─────────────────────────────────────────────────────┤
+│  ┌─────────────┐   ┌──────────────┐   ┌───────────┐│
+│  │ Conversation│←→ │ Motor Cortex │←→ │Observ-    ││
+│  │   Engine    │   │  (execution) │   │ability    ││
+│  └──────┬──────┘   └──────────────┘   └───────────┘│
+│         │                                          │
+│         ↓                                          │
+│  ┌──────────────────────────────────────────────┐ │
+│  │            Prefrontal Cortex (GWT)            │ │
+│  │  Goals ← User intent   Attention ← Salience   │ │
+│  └──────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+### Changelog (Track 6)
+
+#### 2025-12-27 (Session 3) - MOTOR CORTEX + HTTP + NIXOS INTEGRATION
+- **COMPLETED**: I6.4 NixOS Understanding Integration
+  - Added NixOSLanguageAdapter to Conversation struct
+  - Added NixKnowledgeProvider for package/option lookup
+  - Added NixErrorDiagnoser for error interpretation
+  - New commands: `/nix <query>`, `/nixsearch <name>`, `/nixerror <error>`
+  - **Capabilities**:
+    - Understand NixOS queries (install, search, configure, etc.)
+    - Extract parameters (package names, options, etc.)
+    - Generate NixOS commands from natural language
+    - Search packages by name
+    - Diagnose NixOS errors with suggested fixes
+  - **Methods Added** (to `src/language/conversation.rs`):
+    - `nix_status_text()` - Display NixOS adapter stats
+    - `understand_nix_query()` - Process NixOS queries
+    - `search_nix_packages()` - Search package database
+    - `diagnose_nix_error()` - Error diagnosis
+    - `is_nix_related()` - Detect NixOS-related input
+  - Updated help text with NixOS commands
+
+- **COMPLETED**: HTTP Dependencies for Web Research
+  - Added to Cargo.toml:
+    - `reqwest = "0.11"` with rustls-tls
+    - `scraper = "0.18"`
+    - `html2text = "0.6"`
+  - Enabled in lib.rs: `pub mod web_research;`
+  - Enabled language modules:
+    - `conscious_conversation` - Epistemic consciousness integration
+    - `consciousness_observatory` - Scientific study of consciousness
+    - `epistemics_language_bridge` - Knowledge grounding
+    - `llm_organ` - External LLM access (Claude API)
+  - Build succeeded with 180 warnings (no errors)
+
+- **COMPLETED**: I6.2.1, I6.2.2, I6.2.3 - Wired Motor Cortex to Conversation Engine
+  - Added MotorCortexActor to Conversation struct
+  - Added LocalShellSandbox with 60s timeout (no destructive commands)
+  - New commands: `/run <cmd>`, `/execute <cmd>`, `/motor`
+  - **Safety Features**:
+    - Risk estimation based on command patterns
+    - Dry-run validation before confirmation
+    - High-risk commands blocked on /execute (require /run confirmation)
+    - Full confirmation flow: "yes/y/confirm" or "no/n/cancel"
+  - **Methods Added** (to `src/language/conversation.rs`):
+    - `motor_status_text()` - Display motor cortex stats
+    - `prepare_action()` - Dry-run + store pending action
+    - `execute_action_directly()` - Direct execution (low-risk only)
+    - `confirm_pending_action()` - Execute pending with confirmation
+    - `cancel_pending_action()` - Cancel pending action
+  - Updated help text with motor cortex commands
+
+#### 2025-12-27 (Session 2) - MAJOR PROGRESS
+- **COMPLETED**: I6.1.1, I6.1.2, I6.1.3 - Created symthaea-repl binary with full language integration
+  - New file: `src/bin/symthaea-repl.rs` (~265 lines)
+  - Added to Cargo.toml as `[[bin]]`
+  - **HDC Exports Added** (to `src/hdc/mod.rs`):
+    - `substrate_independence`, `consciousness_evaluator`
+    - `consciousness_integration`, `consciousness_dashboard`
+    - `universal_semantics`, `consciousness_self_assessment`
+    - `consciousness_creativity`, `deterministic_seeds`
+    - `integrated_information`
+    - Re-export: `pub use binary_hv::HV16;`
+  - **Lib.rs Exports Added**:
+    - `pub mod action;`
+    - `pub mod databases;`
+    - `pub mod language;`
+    - `pub mod awakening;`
+  - **Fixed Imports**:
+    - `substrate_independence.rs`: `super::binary_hv::HV16`
+    - `conscious_conversation.rs`: `crate::hdc::integrated_information::IntegratedInformation`
+    - `consciousness_observatory.rs`: `crate::hdc::integrated_information::IntegratedInformation`
+  - **Fixed Missing Derive**:
+    - `emotional_reasoning.rs`: Added `#[derive(Debug)]` to EmotionalReasoner
+  - **Deferred Modules** (need reqwest/scraper/html2text):
+    - `web_research`, `conscious_conversation`, `consciousness_observatory`
+    - `epistemics_language_bridge`, `llm_organ`
+- Binary runs: `cargo run --bin symthaea-repl`
+- **NOW INCLUDES**: Full Conversation engine with semantic parsing, reasoning, memory, knowledge graph
+
+#### 2025-12-27 (Session 1)
+- Added Track 6: Component Integration after comprehensive review
+- Identified that core components are COMPLETE but not WIRED
+- Defined 7 integration tasks with priorities
+- Created architecture diagram showing current vs goal state

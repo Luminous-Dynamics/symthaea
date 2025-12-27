@@ -1,0 +1,155 @@
+{
+  "best_composites": [
+    {
+      "avg_phi": 0.13715477100142198,
+      "fitness": 0.5665756786168925,
+      "generalization": 0.9999943103872719,
+      "novelty": 0.99,
+      "sequence": "[Ground, Resonate, Bundle, Abstract]"
+    },
+    {
+      "avg_phi": 0.13715477100142198,
+      "fitness": 0.5665756786168925,
+      "generalization": 0.9999943103872719,
+      "novelty": 0.99,
+      "sequence": "[Ground, Resonate, Bundle, Abstract]"
+    },
+    {
+      "avg_phi": 0.12430324211854574,
+      "fitness": 0.5601494004302521,
+      "generalization": 0.9999925979032641,
+      "novelty": 0.99,
+      "sequence": "[Resonate, Ground, Resonate]"
+    },
+    {
+      "avg_phi": 0.12430324211854574,
+      "fitness": 0.5601494004302521,
+      "generalization": 0.9999925979032641,
+      "novelty": 0.99,
+      "sequence": "[Resonate, Resonate, Ground]"
+    },
+    {
+      "avg_phi": 0.12430324211854574,
+      "fitness": 0.5601494004302521,
+      "generalization": 0.9999925979032641,
+      "novelty": 0.99,
+      "sequence": "[Ground, Resonate]"
+    }
+  ],
+  "evolution": {
+    "final_best_fitness": 0.5665756786168925,
+    "generations": 15,
+    "improvement_pct": 1.1472436070991763,
+    "initial_best_fitness": 0.5601494004302521,
+    "population_size": 30
+  },
+  "improvement": 49,
+  "name": "Meta-Learning Novel Primitives",
+  "stats_history": [
+    {
+      "avg_fitness": 0.37981576648037674,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.7,
+      "generation": 1,
+      "hall_of_fame_size": 1
+    },
+    {
+      "avg_fitness": 0.30798075437699207,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.6666666666666666,
+      "generation": 2,
+      "hall_of_fame_size": 2
+    },
+    {
+      "avg_fitness": 0.28394996214884405,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.9333333333333333,
+      "generation": 3,
+      "hall_of_fame_size": 3
+    },
+    {
+      "avg_fitness": 0.3319039428478009,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.7333333333333333,
+      "generation": 4,
+      "hall_of_fame_size": 4
+    },
+    {
+      "avg_fitness": 0.31981217024526704,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.7666666666666667,
+      "generation": 5,
+      "hall_of_fame_size": 5
+    },
+    {
+      "avg_fitness": 0.3318882153850698,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.5666666666666667,
+      "generation": 6,
+      "hall_of_fame_size": 6
+    },
+    {
+      "avg_fitness": 0.31997212408492204,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.7,
+      "generation": 7,
+      "hall_of_fame_size": 7
+    },
+    {
+      "avg_fitness": 0.3677784742500728,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.6333333333333333,
+      "generation": 8,
+      "hall_of_fame_size": 8
+    },
+    {
+      "avg_fitness": 0.3198789910281706,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.8333333333333334,
+      "generation": 9,
+      "hall_of_fame_size": 9
+    },
+    {
+      "avg_fitness": 0.35582976069509636,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.7,
+      "generation": 10,
+      "hall_of_fame_size": 10
+    },
+    {
+      "avg_fitness": 0.35561397771423303,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.7,
+      "generation": 11,
+      "hall_of_fame_size": 11
+    },
+    {
+      "avg_fitness": 0.35564163606164634,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.7,
+      "generation": 12,
+      "hall_of_fame_size": 12
+    },
+    {
+      "avg_fitness": 0.28388201034315996,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.6333333333333333,
+      "generation": 13,
+      "hall_of_fame_size": 13
+    },
+    {
+      "avg_fitness": 0.34403430119595246,
+      "best_fitness": 0.5601494004302521,
+      "diversity": 0.5333333333333333,
+      "generation": 14,
+      "hall_of_fame_size": 14
+    },
+    {
+      "avg_fitness": 0.30838097895017663,
+      "best_fitness": 0.5665756786168925,
+      "diversity": 0.6,
+      "generation": 15,
+      "hall_of_fame_size": 15
+    }
+  ]
+}

@@ -35,6 +35,7 @@ use crate::hdc::real_hv::RealHV;
 use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
 use crate::hdc::binary_hv::HV16;
 use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
+use crate::hdc::phi_real::RealPhiCalculator;  // ✨ NEW: Direct RealHV Φ calculation
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
@@ -58,16 +59,135 @@ pub fn real_hv_to_hv16(real_hv: &RealHV) -> HV16 {
     let mean = sum / n as f32;
 
     // Create binary representation
-    // HV16 is 2048 bits = 256 bytes
-    let mut bytes = [0u8; 256];
+    // HV16 is 16,384 bits = 2048 bytes
+    let mut bytes = [0u8; 2048];
 
     for (i, &val) in values.iter().enumerate() {
-        if i >= 2048 {
-            break; // HV16 is exactly 2048 bits
+        if i >= 16_384 {
+            break; // HV16 is exactly 16,384 bits
         }
 
         // Set bit to 1 if value > mean
         if val > mean {
+            let byte_idx = i / 8;
+            let bit_idx = i % 8;
+            bytes[byte_idx] |= 1 << bit_idx;
+        }
+    }
+
+    HV16(bytes)
+}
+
+/// Convert RealHV to HV16 using **median threshold** (more robust to outliers)
+///
+/// Median is more robust than mean when dealing with extreme values.
+/// This should better preserve heterogeneity for high-variance vectors.
+pub fn real_hv_to_hv16_median(real_hv: &RealHV) -> HV16 {
+    let values = &real_hv.values;
+    let n = values.len();
+
+    // Compute median for threshold
+    let mut sorted_values: Vec<f32> = values.iter().copied().collect();
+    sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let median = if n % 2 == 0 {
+        (sorted_values[n / 2 - 1] + sorted_values[n / 2]) / 2.0
+    } else {
+        sorted_values[n / 2]
+    };
+
+    // Create binary representation using median threshold
+    let mut bytes = [0u8; 2048];
+
+    for (i, &val) in values.iter().enumerate() {
+        if i >= 16_384 {
+            break;
+        }
+
+        if val > median {
+            let byte_idx = i / 8;
+            let bit_idx = i % 8;
+            bytes[byte_idx] |= 1 << bit_idx;
+        }
+    }
+
+    HV16(bytes)
+}
+
+/// Convert RealHV to HV16 using **probabilistic binarization**
+///
+/// Each value is converted to a probability using sigmoid, then randomly
+/// binarized. This preserves more information from the original distribution.
+///
+/// # Arguments
+/// * `real_hv` - Input real-valued hypervector
+/// * `seed` - Random seed for reproducibility
+pub fn real_hv_to_hv16_probabilistic(real_hv: &RealHV, seed: u64) -> HV16 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let values = &real_hv.values;
+    let mut bytes = [0u8; 2048];
+
+    // Normalize values to roughly [-3, 3] range for sigmoid
+    let sum: f32 = values.iter().sum();
+    let mean = sum / values.len() as f32;
+    let variance: f32 = values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / values.len() as f32;
+    let std_dev = variance.sqrt().max(0.001); // Avoid division by zero
+
+    for (i, &val) in values.iter().enumerate() {
+        if i >= 16_384 {
+            break;
+        }
+
+        // Normalize and apply sigmoid: p = 1 / (1 + exp(-x))
+        let normalized = (val - mean) / std_dev;
+        let prob = 1.0 / (1.0 + (-normalized).exp());
+
+        // Generate deterministic pseudo-random value from seed + index
+        let mut hasher = DefaultHasher::new();
+        (seed, i).hash(&mut hasher);
+        let hash_val = hasher.finish();
+        let random_val = (hash_val % 10000) as f32 / 10000.0; // [0, 1)
+
+        // Set bit based on probability
+        if random_val < prob {
+            let byte_idx = i / 8;
+            let bit_idx = i % 8;
+            bytes[byte_idx] |= 1 << bit_idx;
+        }
+    }
+
+    HV16(bytes)
+}
+
+/// Convert RealHV to HV16 using **quantile-based threshold** (percentile)
+///
+/// Uses a specific percentile as the threshold. 50th percentile = median.
+/// Can use other percentiles like 25th or 75th for skewed distributions.
+///
+/// # Arguments
+/// * `real_hv` - Input real-valued hypervector
+/// * `percentile` - Threshold percentile (0.0 - 100.0), typically 50.0
+pub fn real_hv_to_hv16_quantile(real_hv: &RealHV, percentile: f32) -> HV16 {
+    let values = &real_hv.values;
+    let n = values.len();
+
+    // Compute percentile threshold
+    let mut sorted_values: Vec<f32> = values.iter().copied().collect();
+    sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    let index = ((percentile / 100.0) * (n - 1) as f32) as usize;
+    let threshold = sorted_values[index.min(n - 1)];
+
+    // Create binary representation using quantile threshold
+    let mut bytes = [0u8; 2048];
+
+    for (i, &val) in values.iter().enumerate() {
+        if i >= 16_384 {
+            break;
+        }
+
+        if val > threshold {
             let byte_idx = i / 8;
             let bit_idx = i % 8;
             bytes[byte_idx] |= 1 << bit_idx;
@@ -229,17 +349,17 @@ impl MinimalPhiValidation {
 
     /// Create a quick validation (10 samples each, fast)
     pub fn quick() -> Self {
-        Self::new(10, 10, 8, 2048)
+        Self::new(10, 10, 8, super::HDC_DIMENSION)
     }
 
     /// Create a standard validation (20 samples each, balanced)
     pub fn standard() -> Self {
-        Self::new(20, 20, 10, 2048)
+        Self::new(20, 20, 10, super::HDC_DIMENSION)
     }
 
     /// Create a publication-ready validation (50 samples each, thorough)
     pub fn publication() -> Self {
-        Self::new(50, 50, 10, 2048)
+        Self::new(50, 50, 10, super::HDC_DIMENSION)
     }
 
     /// Set random seed for reproducibility
@@ -305,6 +425,125 @@ impl MinimalPhiValidation {
         }
     }
 
+    /// Run the validation using **RealPhiCalculator** (no binarization)
+    ///
+    /// ✨ NEW: This uses the RealPhi calculator directly on continuous data,
+    /// avoiding the lossy RealHV→HV16 conversion that can destroy structure.
+    ///
+    /// # Returns
+    ///
+    /// `ValidationResult` containing all Φ values computed using cosine similarity
+    pub fn run_with_real_phi(&mut self) -> ValidationResult {
+        let start_time = Instant::now();
+
+        println!("\n🔬 REAL Φ VALIDATION: Random vs Star Topologies (No Binarization)");
+        println!("============================================================");
+        println!("Method: RealPhiCalculator (cosine similarity, no conversion)");
+        println!("Samples: {} random, {} star", self.n_random_samples, self.n_star_samples);
+        println!("Nodes per topology: {}", self.n_nodes);
+        println!("Dimensionality: {}", self.dim);
+        println!("Seed: {}", self.seed);
+        println!();
+
+        // Step 1: Generate Random topologies and compute Φ using RealPhi
+        println!("📊 Step 1: Generating {} Random topologies...", self.n_random_samples);
+        let phi_random_values = self.compute_real_phi_for_topology_type("random");
+        println!("   Mean Φ (Random): {:.4}", mean(&phi_random_values));
+        println!();
+
+        // Step 2: Generate Star topologies and compute Φ using RealPhi
+        println!("⭐ Step 2: Generating {} Star topologies...", self.n_star_samples);
+        let phi_star_values = self.compute_real_phi_for_topology_type("star");
+        println!("   Mean Φ (Star): {:.4}", mean(&phi_star_values));
+        println!();
+
+        // Step 3: Statistical analysis
+        println!("📈 Step 3: Statistical Analysis");
+        let stats = self.compute_statistics(&phi_random_values, &phi_star_values);
+
+        let total_time_ms = start_time.elapsed().as_millis() as u64;
+        let total_calculations = (self.n_random_samples + self.n_star_samples) as f64;
+        let avg_time_per_phi_ms = total_time_ms as f64 / total_calculations;
+
+        ValidationResult {
+            n_random: self.n_random_samples,
+            n_star: self.n_star_samples,
+            mean_phi_random: stats.0,
+            std_phi_random: stats.1,
+            mean_phi_star: stats.2,
+            std_phi_star: stats.3,
+            t_statistic: stats.4,
+            degrees_of_freedom: stats.5,
+            p_value: stats.6,
+            effect_size: stats.7,
+            total_time_ms,
+            avg_time_per_phi_ms,
+            phi_random_values,
+            phi_star_values,
+        }
+    }
+
+    /// Compute Φ using RealPhiCalculator for multiple instances of a topology type
+    ///
+    /// ✨ This computes Φ directly on RealHV without converting to HV16
+    fn compute_real_phi_for_topology_type(&mut self, topology_type: &str) -> Vec<f64> {
+        let n_samples = match topology_type {
+            "random" => self.n_random_samples,
+            "star" => self.n_star_samples,
+            _ => panic!("Unknown topology type: {}", topology_type),
+        };
+
+        let mut phi_values = Vec::with_capacity(n_samples);
+        let real_phi_calc = RealPhiCalculator::new();
+
+        for i in 0..n_samples {
+            // Generate topology with unique seed
+            let seed = self.seed + (i as u64 * 1000);
+
+            let topology = match topology_type {
+                "random" => ConsciousnessTopology::random(self.n_nodes, self.dim, seed),
+                "star" => ConsciousnessTopology::star(self.n_nodes, self.dim, seed),
+                _ => unreachable!(),
+            };
+
+            // Get RealHV components directly (no conversion!)
+            let components = &topology.node_representations;
+
+            // DEBUG: Print cosine similarities for first sample
+            if i == 0 {
+                println!("   🔍 DEBUG: Cosine similarities for first {} topology:", topology_type);
+                for node_i in 0..components.len().min(5) {
+                    for node_j in (node_i + 1)..components.len().min(5) {
+                        let sim = components[node_i].similarity(&components[node_j]);
+                        println!("      Node {} ↔ Node {}: {:.4}",
+                                 node_i, node_j, sim);
+                    }
+                }
+                println!();
+            }
+
+            // Compute Φ using RealPhiCalculator (no binarization!)
+            let phi = real_phi_calc.compute(&components);
+
+            // DEBUG: Print Φ value for each sample
+            if i < 5 {  // First 5 samples only
+                println!("      Sample {}: Φ = {:.6}", i, phi);
+            }
+
+            phi_values.push(phi);
+
+            // Progress indicator every 10 samples
+            if (i + 1) % 10 == 0 || i == n_samples - 1 {
+                print!("   Progress: {}/{} samples completed\r", i + 1, n_samples);
+                use std::io::{self, Write};
+                io::stdout().flush().unwrap();
+            }
+        }
+
+        println!(); // New line after progress
+        phi_values
+    }
+
     /// Compute Φ for multiple instances of a topology type
     fn compute_phi_for_topology_type(&mut self, topology_type: &str) -> Vec<f64> {
         let n_samples = match topology_type {
@@ -328,8 +567,26 @@ impl MinimalPhiValidation {
             // Convert to HV16 components
             let components = topology_to_hv16_components(&topology);
 
+            // DEBUG: Print Hamming distances for first sample
+            if i == 0 {
+                println!("   🔍 DEBUG: Hamming distances for first {} topology:", topology_type);
+                for node_i in 0..components.len() {
+                    for node_j in (node_i + 1)..components.len() {
+                        let dist = components[node_i].hamming_distance(&components[node_j]);
+                        println!("      Node {} ↔ Node {}: {} / 2048 = {:.4}",
+                                 node_i, node_j, dist, dist as f64 / 2048.0);
+                    }
+                }
+                println!();
+            }
+
             // Compute Φ
             let phi = self.phi_calculator.compute(&components);
+
+            // DEBUG: Print Φ value for each sample
+            if i < 5 {  // First 5 samples only
+                println!("      Sample {}: Φ = {:.6}", i, phi);
+            }
 
             phi_values.push(phi);
 
@@ -381,8 +638,8 @@ impl MinimalPhiValidation {
             // Use standard normal approximation
             2.0 * (1.0 - normal_cdf(t_statistic.abs()))
         } else {
-            // Conservative: use df=30 as lower bound
-            2.0 * (1.0 * normal_cdf(t_statistic.abs()))
+            // For smaller samples, still use normal approximation (conservative)
+            2.0 * (1.0 - normal_cdf(t_statistic.abs()))
         };
 
         // Cohen's d effect size
@@ -424,10 +681,13 @@ fn normal_cdf(z: f64) -> f64 {
     // Approximation using error function
     // CDF(z) = 0.5 * (1 + erf(z / sqrt(2)))
 
-    // Simple erf approximation (good enough for our purposes)
-    let t = 1.0 / (1.0 + 0.3275911 * z.abs());
+    // Scale by 1/sqrt(2) as per the standard normal CDF formula
+    let x = z / std::f64::consts::SQRT_2;
+
+    // Simple erf approximation (Abramowitz-Stegun, good to ~5 decimal places)
+    let t = 1.0 / (1.0 + 0.3275911 * x.abs());
     let erf = 1.0 - (((((1.061405429 * t + -1.453152027) * t) + 1.421413741) * t +
-                     -0.284496736) * t + 0.254829592) * t * (-z * z).exp();
+                     -0.284496736) * t + 0.254829592) * t * (-x * x).exp();
 
     if z >= 0.0 {
         0.5 * (1.0 + erf)

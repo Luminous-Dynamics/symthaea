@@ -30,7 +30,7 @@
 //! ```
 
 use super::conscious_conversation::{ConsciousConversation, ConsciousStats};
-use crate::consciousness::IntegratedInformation;
+use crate::hdc::integrated_information::IntegratedInformation;
 use anyhow::{Result, Context};
 use serde::{Serialize, Deserialize};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};

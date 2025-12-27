@@ -21,6 +21,19 @@ use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
 // Database integration for persistent memory + LTC
 use crate::databases::{UnifiedMind, MemoryRecord, MemoryType, SearchResult, LTCSnapshot};
 
+// Motor Cortex integration for action execution (Track 6: I6.2)
+use crate::brain::{
+    MotorCortexActor, ActionStep, PlannedAction, SimulationMode,
+    LocalShellSandbox, ExecutionResult,
+};
+
+// NixOS Language Adapter for NixOS understanding (Track 6: I6.4)
+use super::nixos_language_adapter::{
+    NixOSLanguageAdapter, NixOSUnderstanding, NixOSIntent,
+};
+use super::nix_knowledge_provider::NixKnowledgeProvider;
+use super::nix_error_diagnosis::NixErrorDiagnoser;
+
 use super::parser::{SemanticParser, ParsedSentence};
 use super::generator::{ResponseGenerator, GenerationConfig, ConsciousnessContext, GeneratedResponse};
 use super::dynamic_generation::{
@@ -149,6 +162,22 @@ pub struct Conversation {
     last_learning_result: Option<LearningResult>,
     /// Current response strategy selected before generation
     current_strategy: ResponseStrategy,
+    // Track 6 I6.2: Motor Cortex Integration
+    /// Motor cortex for action execution
+    motor_cortex: MotorCortexActor,
+    /// Pending action awaiting user confirmation
+    pending_action: Option<PlannedAction>,
+    /// Last execution result for /motor command
+    last_execution: Option<ExecutionResult>,
+    // Track 6 I6.4: NixOS Understanding Integration
+    /// NixOS language adapter for understanding NixOS queries
+    nix_adapter: NixOSLanguageAdapter,
+    /// NixOS knowledge provider for package/option lookup
+    nix_knowledge: NixKnowledgeProvider,
+    /// NixOS error diagnoser for error interpretation
+    nix_diagnoser: NixErrorDiagnoser,
+    /// Last NixOS understanding result for /nix command
+    last_nix_understanding: Option<NixOSUnderstanding>,
 }
 
 /// Conversation configuration
@@ -203,6 +232,10 @@ impl Conversation {
         let session_state = SessionState::load_or_new(&session_path);
         eprintln!("[Conversation] Session state loaded from {:?}", session_path);
 
+        // Track 6 I6.2: Initialize motor cortex with safe sandbox (no destructive commands)
+        let sandbox = Box::new(LocalShellSandbox::new().with_timeout(60));
+        let motor_cortex = MotorCortexActor::new(sandbox);
+
         Self {
             parser: SemanticParser::new(),
             generator: ResponseGenerator::with_config(gen_config),
@@ -243,6 +276,15 @@ impl Conversation {
             // REVOLUTIONARY: Closed learning loop
             last_learning_result: None,
             current_strategy: ResponseStrategy::Supportive,
+            // Track 6 I6.2: Motor cortex integration
+            motor_cortex,
+            pending_action: None,
+            last_execution: None,
+            // Track 6 I6.4: NixOS understanding
+            nix_adapter: NixOSLanguageAdapter::new(),
+            nix_knowledge: NixKnowledgeProvider::new(),
+            nix_diagnoser: NixErrorDiagnoser::new(),
+            last_nix_understanding: None,
         }
     }
 
@@ -266,6 +308,10 @@ impl Conversation {
         let session_path = SessionState::default_path();
         let session_state = SessionState::load_or_new(&session_path);
         eprintln!("[Conversation] Session state loaded from {:?}", session_path);
+
+        // Track 6 I6.2: Initialize motor cortex with safe sandbox
+        let sandbox = Box::new(LocalShellSandbox::new().with_timeout(60));
+        let motor_cortex = MotorCortexActor::new(sandbox);
 
         Self {
             parser: SemanticParser::new(),
@@ -307,6 +353,15 @@ impl Conversation {
             // REVOLUTIONARY: Closed learning loop
             last_learning_result: None,
             current_strategy: ResponseStrategy::Supportive,
+            // Track 6 I6.2: Motor cortex integration
+            motor_cortex,
+            pending_action: None,
+            last_execution: None,
+            // Track 6 I6.4: NixOS understanding
+            nix_adapter: NixOSLanguageAdapter::new(),
+            nix_knowledge: NixKnowledgeProvider::new(),
+            nix_diagnoser: NixErrorDiagnoser::new(),
+            last_nix_understanding: None,
         }
     }
 
@@ -363,7 +418,21 @@ impl Conversation {
         let strategy = self.select_strategy_with_learning(user_input, &consciousness);
         self.current_strategy = strategy;
 
-        // 4. Check for special commands
+        // 3.10. SEAMLESS NIXOS UNDERSTANDING (Track 6 I6.4)
+        // Automatically detect and understand NixOS-related queries
+        let is_nix = self.is_nix_related(user_input);
+        eprintln!("[NixOS-Detect] is_nix_related('{}') = {}", user_input, is_nix);
+        let nix_context = if is_nix {
+            let understanding = self.nix_adapter.understand(user_input);
+            eprintln!("[NixOS-Detect] Got understanding: intent={:?}, confidence={:.2}",
+                understanding.intent, understanding.confidence);
+            self.last_nix_understanding = Some(understanding.clone());
+            Some(understanding)
+        } else {
+            None
+        };
+
+        // 4. Check for special commands (debug interface only)
         if let Some(response) = self.handle_special_commands(user_input, &consciousness).await {
             return response;
         }
@@ -556,6 +625,12 @@ impl Conversation {
         // B2.5: REVOLUTIONARY - Strategy-Guided Adaptation
         // The selected strategy modifies the response to match learned preferences
         final_text = self.apply_strategy_adaptation(&final_text, strategy, &topic_str);
+
+        // B2.6: SEAMLESS NIXOS INTEGRATION (Track 6 I6.4)
+        // If NixOS context was detected, enhance response with expert knowledge
+        if let Some(ref nix_understanding) = nix_context {
+            final_text = self.enhance_with_nix_understanding(&final_text, nix_understanding);
+        }
 
         // B3: Learn from the interaction (using previous turn's response if available)
         let previous_response = self.history.last().map(|t| t.response.as_str());
@@ -1114,8 +1189,808 @@ impl Conversation {
             return Some(self.strategy_text());
         }
 
+        // Track 6 I6.2: Motor cortex commands
+        if input_lower == "/motor" {
+            return Some(self.motor_status_text());
+        }
+
+        if input_lower.starts_with("/run ") {
+            let command = &input[5..].trim();
+            return Some(self.prepare_action(command).await);
+        }
+
+        if input_lower.starts_with("/execute ") {
+            let command = &input[9..].trim();
+            return Some(self.execute_action_directly(command).await);
+        }
+
+        // Track 6 I6.4: NixOS commands
+        if input_lower == "/nix" {
+            return Some(self.nix_status_text());
+        }
+
+        if input_lower.starts_with("/nix ") {
+            let query = &input[5..].trim();
+            return Some(self.understand_nix_query(query));
+        }
+
+        if input_lower.starts_with("/nixsearch ") {
+            let query = &input[11..].trim();
+            return Some(self.search_nix_packages(query));
+        }
+
+        if input_lower.starts_with("/nixerror ") {
+            let error = &input[10..].trim();
+            return Some(self.diagnose_nix_error(error));
+        }
+
+        // Handle pending action confirmation
+        if self.pending_action.is_some() {
+            if ["yes", "y", "confirm", "execute", "do it"].contains(&input_lower.as_str()) {
+                return Some(self.confirm_pending_action().await);
+            }
+            if ["no", "n", "cancel", "abort", "nevermind"].contains(&input_lower.as_str()) {
+                return Some(self.cancel_pending_action());
+            }
+        }
+
         None
     }
+
+    // ========================================================================
+    // Track 6 I6.2: Motor Cortex Integration Methods
+    // ========================================================================
+
+    /// Generate motor cortex status text
+    fn motor_status_text(&self) -> String {
+        let stats = self.motor_cortex.stats();
+        let mut text = "Symthaea Motor Cortex Status\n\n".to_string();
+
+        text.push_str("═══════════════════════════════════════\n");
+        text.push_str("ACTION EXECUTION ENGINE: ACTIVE ✓\n");
+        text.push_str("═══════════════════════════════════════\n\n");
+
+        text.push_str(&format!(
+            "Execution Statistics:\n\
+             • Total actions executed: {}\n\
+             • Successful: {} ({:.1}%)\n\
+             • Failed: {}\n\
+             • Total steps: {}\n\
+             • Avg duration: {}ms\n\n",
+            stats.total_actions,
+            stats.successful_actions,
+            if stats.total_actions > 0 {
+                (stats.successful_actions as f64 / stats.total_actions as f64) * 100.0
+            } else { 0.0 },
+            stats.failed_actions,
+            stats.total_steps,
+            stats.avg_duration_ms
+        ));
+
+        text.push_str(&format!(
+            "Current State:\n\
+             • Queued actions: {}\n\
+             • Rollback points: {}\n",
+            stats.queued_actions,
+            stats.rollback_count
+        ));
+
+        if let Some(ref pending) = self.pending_action {
+            text.push_str(&format!(
+                "\n⚠️  PENDING ACTION:\n\
+                 • Name: {}\n\
+                 • Steps: {}\n\
+                 • Max risk: {:.2}\n\
+                 Reply 'yes' to execute or 'no' to cancel.\n",
+                pending.name,
+                pending.steps.len(),
+                pending.max_risk()
+            ));
+        }
+
+        if let Some(ref last) = self.last_execution {
+            text.push_str(&format!(
+                "\nLast Execution:\n\
+                 • Action: {}\n\
+                 • Success: {}\n\
+                 • Duration: {}ms\n\
+                 • Rolled back: {}\n",
+                last.action_name,
+                if last.overall_success { "✓" } else { "✗" },
+                last.total_duration_ms,
+                if last.rolled_back { "yes" } else { "no" }
+            ));
+        }
+
+        text.push_str("\n\nCommands:\n\
+             • /run <cmd> - Prepare action with safety check\n\
+             • /execute <cmd> - Execute immediately (use with caution)\n\
+             • /motor - Show this status\n");
+
+        text
+    }
+
+    /// Prepare an action for execution with safety checks
+    async fn prepare_action(&mut self, command: &str) -> String {
+        // Parse command into action step
+        let mut step = ActionStep::new(
+            format!("Execute: {}", command),
+            command.to_string()
+        );
+        step.estimate_risk();
+
+        // Build planned action
+        let mut action = PlannedAction::new(
+            format!("User command: {}", truncate(command, 30)),
+            format!("Execute shell command: {}", command)
+        ).add_step(step.clone());
+        action.simulation_mode = SimulationMode::DryRun;
+
+        // Run dry-run to validate
+        let result = self.motor_cortex.execute_action(action.clone()).await;
+
+        match result {
+            Ok(dry_result) => {
+                if dry_result.overall_success {
+                    // Dry-run passed - store for confirmation
+                    action.simulation_mode = SimulationMode::RealRun;
+                    let risk = step.estimated_risk;
+                    self.pending_action = Some(action);
+
+                    let risk_level = if risk > 0.7 { "⚠️  HIGH" }
+                        else if risk > 0.4 { "⚡ MEDIUM" }
+                        else { "✓ LOW" };
+
+                    format!(
+                        "Dry-run passed ✓\n\n\
+                         Command: {}\n\
+                         Risk level: {} ({:.0}%)\n\n\
+                         Ready to execute. Reply 'yes' to confirm or 'no' to cancel.",
+                        command,
+                        risk_level,
+                        risk * 100.0
+                    )
+                } else {
+                    // Dry-run failed
+                    let error = dry_result.step_results.first()
+                        .map(|r| r.stderr.as_str())
+                        .unwrap_or("Unknown error");
+                    format!(
+                        "Dry-run failed ✗\n\n\
+                         Command: {}\n\
+                         Error: {}\n\n\
+                         The command cannot be executed safely.",
+                        command,
+                        error
+                    )
+                }
+            }
+            Err(e) => {
+                format!(
+                    "Action preparation failed: {}\n\n\
+                     The command could not be validated.",
+                    e
+                )
+            }
+        }
+    }
+
+    /// Execute an action directly without confirmation (use with caution)
+    async fn execute_action_directly(&mut self, command: &str) -> String {
+        // Parse command into action step
+        let mut step = ActionStep::new(
+            format!("Execute: {}", command),
+            command.to_string()
+        );
+        step.estimate_risk();
+
+        // Check risk level - refuse high-risk commands
+        if step.estimated_risk > 0.7 {
+            return format!(
+                "⚠️  HIGH RISK COMMAND BLOCKED\n\n\
+                 Command: {}\n\
+                 Risk: {:.0}%\n\n\
+                 This command is too risky for direct execution.\n\
+                 Use /run {} to execute with confirmation.",
+                command,
+                step.estimated_risk * 100.0,
+                command
+            );
+        }
+
+        // Build and execute action
+        let mut action = PlannedAction::new(
+            format!("Direct: {}", truncate(command, 30)),
+            format!("Execute shell command: {}", command)
+        ).add_step(step);
+        action.simulation_mode = SimulationMode::RealRun;
+
+        match self.motor_cortex.execute_action(action).await {
+            Ok(result) => {
+                self.last_execution = Some(result.clone());
+
+                if result.overall_success {
+                    let output = result.step_results.first()
+                        .map(|r| if r.stdout.is_empty() { "(no output)" } else { &r.stdout })
+                        .unwrap_or("(no output)");
+
+                    format!(
+                        "✓ Command executed successfully\n\n\
+                         Duration: {}ms\n\
+                         Output:\n{}",
+                        result.total_duration_ms,
+                        truncate(output, 500)
+                    )
+                } else {
+                    let error = result.step_results.first()
+                        .map(|r| r.stderr.as_str())
+                        .unwrap_or("Unknown error");
+
+                    format!(
+                        "✗ Command failed\n\n\
+                         Error: {}\n\
+                         Rolled back: {}",
+                        error,
+                        if result.rolled_back { "yes" } else { "no" }
+                    )
+                }
+            }
+            Err(e) => {
+                format!("Execution error: {}", e)
+            }
+        }
+    }
+
+    /// Confirm and execute the pending action
+    async fn confirm_pending_action(&mut self) -> String {
+        let action = match self.pending_action.take() {
+            Some(a) => a,
+            None => return "No pending action to confirm.".to_string(),
+        };
+
+        match self.motor_cortex.execute_action(action).await {
+            Ok(result) => {
+                self.last_execution = Some(result.clone());
+
+                if result.overall_success {
+                    let output = result.step_results.first()
+                        .map(|r| if r.stdout.is_empty() { "(no output)" } else { &r.stdout })
+                        .unwrap_or("(no output)");
+
+                    format!(
+                        "✓ Action executed successfully!\n\n\
+                         Duration: {}ms\n\
+                         Output:\n{}",
+                        result.total_duration_ms,
+                        truncate(output, 500)
+                    )
+                } else {
+                    let error = result.step_results.first()
+                        .map(|r| r.stderr.as_str())
+                        .unwrap_or("Unknown error");
+
+                    format!(
+                        "✗ Action failed\n\n\
+                         Error: {}\n\
+                         Rolled back: {}",
+                        error,
+                        if result.rolled_back { "yes" } else { "no" }
+                    )
+                }
+            }
+            Err(e) => {
+                format!("Execution error: {}", e)
+            }
+        }
+    }
+
+    /// Cancel the pending action
+    fn cancel_pending_action(&mut self) -> String {
+        if self.pending_action.take().is_some() {
+            "Action cancelled. No changes were made.".to_string()
+        } else {
+            "No pending action to cancel.".to_string()
+        }
+    }
+
+    // ========================================================================
+    // End Motor Cortex Methods
+    // ========================================================================
+
+    // ========================================================================
+    // Track 6 I6.4: NixOS Understanding Integration Methods
+    // ========================================================================
+
+    /// Generate NixOS status text
+    fn nix_status_text(&self) -> String {
+        let stats = self.nix_adapter.stats();
+        let mut text = "Symthaea NixOS Understanding\n\n".to_string();
+
+        text.push_str("═══════════════════════════════════════\n");
+        text.push_str("NIXOS LANGUAGE ADAPTER: ACTIVE ✓\n");
+        text.push_str("═══════════════════════════════════════\n\n");
+
+        text.push_str(&format!(
+            "Processing Statistics:\n\
+             • Inputs processed: {}\n\
+             • Successful interpretations: {}\n\
+             • Unknown intents: {}\n\
+             • Average confidence: {:.1}%\n\n",
+            stats.inputs_processed,
+            stats.successful_interpretations,
+            stats.unknown_intents,
+            stats.avg_confidence * 100.0
+        ));
+
+        text.push_str(&format!(
+            "Knowledge Base:\n\
+             • Packages indexed: {}\n\
+             • Options indexed: {}\n\n",
+            self.nix_knowledge.package_count(),
+            self.nix_knowledge.option_count()
+        ));
+
+        if let Some(ref last) = self.last_nix_understanding {
+            text.push_str(&format!(
+                "Last Understanding:\n\
+                 • Intent: {:?}\n\
+                 • Confidence: {:.1}%\n\
+                 • Description: {}\n",
+                last.intent,
+                last.confidence * 100.0,
+                last.description
+            ));
+        }
+
+        text.push_str("\n\nNixOS Commands:\n\
+             • /nix <query> - Understand a NixOS query\n\
+             • /nixsearch <name> - Search for packages\n\
+             • /nixerror <error> - Diagnose a NixOS error\n");
+
+        text
+    }
+
+    /// Understand a NixOS query using the language adapter
+    fn understand_nix_query(&mut self, query: &str) -> String {
+        let understanding = self.nix_adapter.understand(query);
+        self.last_nix_understanding = Some(understanding.clone());
+
+        let mut text = format!("NixOS Understanding: {}\n\n", query);
+
+        text.push_str(&format!(
+            "Intent: {:?} (confidence: {:.1}%)\n\n",
+            understanding.intent,
+            understanding.confidence * 100.0
+        ));
+
+        text.push_str(&format!("Description: {}\n\n", understanding.description));
+
+        if !understanding.parameters.is_empty() {
+            text.push_str("Extracted Parameters:\n");
+            for (key, value) in &understanding.parameters {
+                text.push_str(&format!("  • {}: {}\n", key, value));
+            }
+            text.push('\n');
+        }
+
+        if let Some(ref explanation) = understanding.explanation {
+            text.push_str(&format!("Explanation: {}\n\n", explanation));
+        }
+
+        // Show generated action
+        match &understanding.action {
+            super::nixos_language_adapter::ActionIR::RunCommand { program, args, .. } => {
+                text.push_str(&format!(
+                    "Generated Command:\n  {} {}\n\n",
+                    program,
+                    args.join(" ")
+                ));
+                text.push_str("Use /run to execute with confirmation.\n");
+            }
+            super::nixos_language_adapter::ActionIR::NoOp => {
+                text.push_str("No action generated (informational query).\n");
+            }
+        }
+
+        if !understanding.alternatives.is_empty() {
+            text.push_str("\nAlternative Interpretations:\n");
+            for (alt_intent, alt_conf) in &understanding.alternatives {
+                text.push_str(&format!("  • {:?}: {:.1}%\n", alt_intent, alt_conf * 100.0));
+            }
+        }
+
+        text
+    }
+
+    /// Search for NixOS packages
+    fn search_nix_packages(&self, query: &str) -> String {
+        let results = self.nix_knowledge.search_by_name(query);
+
+        if results.is_empty() {
+            return format!(
+                "No packages found matching '{}'\n\n\
+                 Try:\n\
+                 • Different search terms\n\
+                 • /nixsearch with partial name\n",
+                query
+            );
+        }
+
+        let mut text = format!("Package Search: '{}'\n\n", query);
+        text.push_str(&format!("Found {} packages:\n\n", results.len()));
+
+        for (i, pkg) in results.iter().take(10).enumerate() {
+            text.push_str(&format!(
+                "{}. {} ({})\n   {}\n   Install: nix-env -iA nixpkgs.{}\n\n",
+                i + 1,
+                pkg.name,
+                pkg.version,
+                truncate(&pkg.description, 60),
+                pkg.attr_path
+            ));
+        }
+
+        if results.len() > 10 {
+            text.push_str(&format!("... and {} more results\n", results.len() - 10));
+        }
+
+        text
+    }
+
+    /// Diagnose a NixOS error
+    fn diagnose_nix_error(&self, error: &str) -> String {
+        let diagnosis = self.nix_diagnoser.diagnose(error);
+
+        let mut text = "NixOS Error Diagnosis\n\n".to_string();
+
+        text.push_str(&format!(
+            "Category: {:?}\n\
+             Type: {:?}\n\
+             Confidence: {:.1}%\n\n",
+            diagnosis.category,
+            diagnosis.error_type,
+            diagnosis.confidence * 100.0
+        ));
+
+        text.push_str(&format!("Symptom:\n{}\n\n", diagnosis.symptom));
+
+        if let Some(ref location) = diagnosis.location {
+            text.push_str(&format!("Location: {}\n\n", location));
+        }
+
+        if !diagnosis.likely_causes.is_empty() {
+            text.push_str("Likely Causes:\n");
+            for cause in &diagnosis.likely_causes {
+                text.push_str(&format!("  • {}\n", cause));
+            }
+            text.push('\n');
+        }
+
+        if !diagnosis.fixes.is_empty() {
+            text.push_str("Suggested Fixes:\n");
+            for (i, fix) in diagnosis.fixes.iter().enumerate() {
+                let primary_marker = if fix.primary { " [RECOMMENDED]" } else { "" };
+                text.push_str(&format!(
+                    "{}. {} (Risk: {:?}){}\n",
+                    i + 1,
+                    fix.description,
+                    fix.risk,
+                    primary_marker
+                ));
+                if !fix.commands.is_empty() {
+                    text.push_str("   Commands:\n");
+                    for cmd in &fix.commands {
+                        text.push_str(&format!("     $ {}\n", cmd));
+                    }
+                }
+                if let Some(ref verify) = fix.verify_command {
+                    text.push_str(&format!("   Verify: {}\n", verify));
+                }
+                text.push('\n');
+            }
+        }
+
+        text
+    }
+
+    /// Detect if input is NixOS-related
+    fn is_nix_related(&self, input: &str) -> bool {
+        let input_lower = input.to_lowercase();
+        let nix_keywords = [
+            "nix", "nixos", "nixpkgs", "flake", "derivation", "package",
+            "configuration.nix", "home-manager", "nix-env", "nix-shell",
+            "nix-build", "nixos-rebuild", "nix profile", "nix develop",
+            "install", "uninstall", "upgrade", "rollback", "generation",
+        ];
+
+        // Also check for error patterns
+        let error_patterns = [
+            "error:", "attribute", "missing", "collision", "build failed",
+            "derivation", "hash mismatch", "unfree",
+        ];
+
+        nix_keywords.iter().any(|kw| input_lower.contains(kw)) ||
+        error_patterns.iter().any(|p| input_lower.contains(p))
+    }
+
+    /// Enhance response with NixOS understanding - natural, conversational AI
+    ///
+    /// REVOLUTIONARY: Uses consciousness metrics (Φ, free energy, attention) rather than
+    /// simple confidence thresholds. The HDC+LTC infrastructure already computes these -
+    /// we now leverage them for response quality modulation.
+    fn enhance_with_nix_understanding(&mut self, base_response: &str, understanding: &NixOSUnderstanding) -> String {
+        // Extract consciousness metrics from the bridge result
+        let phi = understanding.conscious_result.current_phi;
+        let free_energy = understanding.conscious_result.current_free_energy;
+        let gained_spotlight = understanding.conscious_result.gained_spotlight;
+        let consciousness_state = understanding.conscious_result.consciousness_state;
+
+        // Use consciousness state to determine response quality
+        // Higher Φ = more integrated understanding = more confident response
+        // Lower free energy = better prediction = more accurate interpretation
+        let consciousness_confidence = match consciousness_state {
+            super::consciousness_bridge::ConsciousnessState::HighlyCoherent => 0.95,
+            super::consciousness_bridge::ConsciousnessState::Coherent => 0.85,
+            super::consciousness_bridge::ConsciousnessState::Normal => 0.70,
+            super::consciousness_bridge::ConsciousnessState::Overloaded => 0.50,
+            super::consciousness_bridge::ConsciousnessState::Confused => 0.30,
+        };
+
+        // Blend statistical confidence with consciousness-based confidence
+        // Φ modulates how much we trust our interpretation
+        let phi_weight = (phi * 2.0).min(1.0).max(0.0);
+        let effective_confidence = understanding.confidence as f64 * (1.0 - phi_weight * 0.3)
+            + consciousness_confidence * (phi_weight * 0.3);
+
+        // Log consciousness metrics for transparency (BEFORE early returns for debugging)
+        eprintln!("[NixOS-Consciousness] Φ={:.3}, FE={:.3}, spotlight={}, state={:?}, eff_conf={:.2}, intent={:?}",
+            phi, free_energy, gained_spotlight, consciousness_state, effective_confidence, understanding.intent);
+
+        // Only enhance if consciousness confirms understanding
+        // Must either gain spotlight OR have high Φ
+        if !gained_spotlight && phi < 0.3 {
+            eprintln!("[NixOS] Skipping: spotlight={}, phi={:.3} (need spotlight OR phi>=0.3)", gained_spotlight, phi);
+            return base_response.to_string();
+        }
+
+        if effective_confidence < 0.4 {
+            eprintln!("[NixOS] Skipping: effective_confidence={:.2} < 0.4", effective_confidence);
+            return base_response.to_string();
+        }
+
+        let mut response = String::new();
+
+        match understanding.intent {
+            NixOSIntent::Install => {
+                if let Some(package) = understanding.parameters.get("package") {
+                    response.push_str(&format!(
+                        "I understand you want to install {}. ", package
+                    ));
+
+                    // Check if we have knowledge about this package
+                    let pkg_results = self.nix_knowledge.search_by_name(package);
+                    if !pkg_results.is_empty() {
+                        let pkg = &pkg_results[0];
+                        response.push_str(&format!(
+                            "{} is available in nixpkgs (version {}). ",
+                            pkg.name, pkg.version
+                        ));
+                    }
+
+                    // Offer the action
+                    match &understanding.action {
+                        super::nixos_language_adapter::ActionIR::RunCommand { program, args, .. } => {
+                            let cmd = format!("{} {}", program, args.join(" "));
+                            response.push_str(&format!(
+                                "\n\nI can run `{}` for you. Would you like me to proceed?",
+                                cmd
+                            ));
+                            // Store as pending action for confirmation
+                            let mut step = ActionStep::new(
+                                format!("Install {}", package),
+                                cmd.clone()
+                            );
+                            step.estimate_risk();
+                            let mut action = PlannedAction::new(
+                                format!("Install {}", package),
+                                format!("Install package via nix")
+                            ).add_step(step);
+                            action.simulation_mode = SimulationMode::RealRun;
+                            self.pending_action = Some(action);
+                        }
+                        _ => {
+                            response.push_str("\n\nFor a declarative approach, add it to your configuration.nix.");
+                        }
+                    }
+                } else {
+                    response.push_str(base_response);
+                }
+            }
+
+            NixOSIntent::Search => {
+                if let Some(query) = understanding.parameters.get("query")
+                    .or(understanding.parameters.get("package"))
+                {
+                    let results = self.nix_knowledge.search_by_name(query);
+                    if results.is_empty() {
+                        response.push_str(&format!(
+                            "I searched for '{}' but didn't find exact matches in my local index. \
+                             You can search the full nixpkgs with `nix search nixpkgs {}`.",
+                            query, query
+                        ));
+                    } else {
+                        response.push_str(&format!(
+                            "I found {} packages matching '{}':\n\n",
+                            results.len().min(5), query
+                        ));
+                        for pkg in results.iter().take(5) {
+                            response.push_str(&format!(
+                                "  {} ({}) - {}\n",
+                                pkg.name,
+                                pkg.version,
+                                truncate(&pkg.description, 50)
+                            ));
+                        }
+                        if results.len() > 5 {
+                            response.push_str(&format!("\n...and {} more.", results.len() - 5));
+                        }
+                    }
+                } else {
+                    response.push_str(base_response);
+                }
+            }
+
+            NixOSIntent::Configure => {
+                response.push_str("I can help you configure your NixOS system. ");
+                if let Some(option) = understanding.parameters.get("option") {
+                    response.push_str(&format!(
+                        "For the '{}' option, you'll want to edit your configuration.nix. ",
+                        option
+                    ));
+                }
+                response.push_str("What specifically would you like to configure?");
+            }
+
+            NixOSIntent::Rollback => {
+                response.push_str(
+                    "I can help you rollback to a previous generation. \
+                     Would you like me to list available generations first, \
+                     or rollback to the immediately previous one?"
+                );
+                // Prepare rollback action
+                let mut step = ActionStep::new(
+                    "Rollback to previous generation".to_string(),
+                    "sudo nixos-rebuild switch --rollback".to_string()
+                );
+                step.estimated_risk = 0.5; // Medium risk
+                let mut action = PlannedAction::new(
+                    "System Rollback".to_string(),
+                    "Rollback to previous NixOS generation".to_string()
+                ).add_step(step);
+                action.simulation_mode = SimulationMode::RealRun;
+                self.pending_action = Some(action);
+            }
+
+            NixOSIntent::Build | NixOSIntent::Switch => {
+                response.push_str(
+                    "I can rebuild your NixOS configuration. This will apply any changes you've made. \
+                     Would you like me to run `sudo nixos-rebuild switch`?"
+                );
+                let mut step = ActionStep::new(
+                    "Rebuild NixOS".to_string(),
+                    "sudo nixos-rebuild switch".to_string()
+                );
+                step.estimated_risk = 0.4;
+                let mut action = PlannedAction::new(
+                    "NixOS Rebuild".to_string(),
+                    "Rebuild and switch to new configuration".to_string()
+                ).add_step(step);
+                action.simulation_mode = SimulationMode::RealRun;
+                self.pending_action = Some(action);
+            }
+
+            NixOSIntent::GarbageCollect => {
+                response.push_str(
+                    "I can clean up old generations and free disk space. \
+                     Would you like me to run garbage collection? \
+                     This will remove old, unused packages."
+                );
+                let mut step = ActionStep::new(
+                    "Garbage collect".to_string(),
+                    "nix-collect-garbage -d".to_string()
+                );
+                step.estimated_risk = 0.3;
+                let mut action = PlannedAction::new(
+                    "Garbage Collection".to_string(),
+                    "Remove old generations and unused packages".to_string()
+                ).add_step(step);
+                action.simulation_mode = SimulationMode::RealRun;
+                self.pending_action = Some(action);
+            }
+
+            NixOSIntent::Unknown => {
+                // For unknown intents, check if it looks like an error
+                if understanding.parameters.contains_key("error") ||
+                   understanding.description.contains("error") {
+                    // Try to diagnose
+                    let diagnosis = self.nix_diagnoser.diagnose(&understanding.description);
+                    if diagnosis.confidence > 0.5 {
+                        response.push_str(&format!(
+                            "This looks like a {} error. {}",
+                            format!("{:?}", diagnosis.error_type).to_lowercase(),
+                            diagnosis.symptom
+                        ));
+                        if !diagnosis.likely_causes.is_empty() {
+                            response.push_str(&format!(
+                                "\n\nMost likely cause: {}",
+                                diagnosis.likely_causes[0]
+                            ));
+                        }
+                        if !diagnosis.fixes.is_empty() && diagnosis.fixes[0].primary {
+                            response.push_str(&format!(
+                                "\n\nI recommend: {}",
+                                diagnosis.fixes[0].description
+                            ));
+                        }
+                    } else {
+                        response.push_str(base_response);
+                    }
+                } else {
+                    response.push_str(base_response);
+                }
+            }
+
+            _ => {
+                // For other intents, provide contextual help
+                if !understanding.description.is_empty() {
+                    response.push_str(&understanding.description);
+                } else {
+                    response.push_str(base_response);
+                }
+            }
+        }
+
+        // If we set up a pending action, remind about confirmation
+        if self.pending_action.is_some() && !response.contains("Would you like") {
+            response.push_str("\n\nSay 'yes' to proceed or 'no' to cancel.");
+        }
+
+        // Φ-based response quality modulation
+        // Higher Φ = more confident, more specific responses
+        // Lower Φ = more tentative, ask for clarification
+        if !response.is_empty() && phi < 0.3 {
+            // Low consciousness integration - be tentative
+            response = format!(
+                "I think I understand, but let me check: {}",
+                response
+            );
+        } else if phi > 0.7 && consciousness_state == super::consciousness_bridge::ConsciousnessState::HighlyCoherent {
+            // High consciousness - add confidence indicator
+            response.push_str(&format!(
+                "\n\n[Consciousness: Φ={:.2}, integrated understanding confirmed]",
+                phi
+            ));
+        }
+
+        // Free energy informs uncertainty
+        // High free energy = high prediction error = uncertain
+        if free_energy > 0.8 && !response.contains("I think") {
+            response = format!(
+                "I'm not entirely certain, but: {}",
+                response
+            );
+        }
+
+        if response.is_empty() {
+            base_response.to_string()
+        } else {
+            response
+        }
+    }
+
+    // ========================================================================
+    // End NixOS Understanding Methods
+    // ========================================================================
 
     /// Generate strategy/learning status text
     fn strategy_text(&self) -> String {
@@ -1445,6 +2320,14 @@ impl Conversation {
          • /kg <entity> - Show entity relationships\n\n\
          Adaptive Learning (REVOLUTIONARY):\n\
          • /strategy - Show learning loop status\n\n\
+         Motor Cortex (Action Execution):\n\
+         • /run <cmd> - Prepare command with safety check\n\
+         • /execute <cmd> - Execute low-risk command directly\n\
+         • /motor - Show motor cortex status\n\n\
+         NixOS Understanding:\n\
+         • /nix <query> - Understand a NixOS query\n\
+         • /nixsearch <name> - Search for packages\n\
+         • /nixerror <error> - Diagnose a NixOS error\n\n\
          Questions I respond well to:\n\
          • Are you conscious?\n\
          • What are you thinking?\n\

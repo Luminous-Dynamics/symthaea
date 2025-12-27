@@ -66,6 +66,7 @@
 //!    - Natural, expressive speech synthesis
 
 pub mod endocrine;
+pub mod emotional_reasoning;
 pub mod hearth;
 pub mod chronos;
 pub mod proprioception;
@@ -82,6 +83,11 @@ pub use endocrine::{
     HormoneState,
     HormoneTrend,
     Trend,
+};
+pub use emotional_reasoning::{
+    EmotionalReasoner,
+    EmotionalState,
+    Emotion,
 };
 pub use hearth::{
     ActionCost,

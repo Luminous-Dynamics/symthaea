@@ -1,0 +1,934 @@
+warning: unused import: `PrimitiveValidationExperiment`
+  --> src/consciousness/primitive_evolution.rs:74:65
+   |
+74 | use crate::consciousness::primitive_validation::{ReasoningTask, PrimitiveValidationExperiment};
+   |                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `DomainManifold` and `Primitive`
+  --> src/consciousness/primitive_evolution.rs:75:68
+   |
+75 | use crate::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier, Primitive, DomainManifold};
+   |                                                                    ^^^^^^^^^  ^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/consciousness/primitive_evolution.rs:79:5
+   |
+79 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `EvolutionResult`
+  --> src/consciousness/multi_objective_evolution.rs:29:66
+   |
+29 |         CandidatePrimitive, EvolutionConfig, PrimitiveEvolution, EvolutionResult
+   |                                                                  ^^^^^^^^^^^^^^^
+
+warning: unused import: `Context`
+  --> src/consciousness/primitive_reasoning.rs:46:22
+   |
+46 | use anyhow::{Result, Context};
+   |                      ^^^^^^^
+
+warning: unused imports: `PrimitiveExecution` and `ReasoningChain`
+  --> src/consciousness/meta_primitives.rs:44:5
+   |
+44 |     ReasoningChain, TransformationType, PrimitiveExecution,
+   |     ^^^^^^^^^^^^^^                      ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> src/brain/prefrontal.rs:63:5
+   |
+63 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `AttentionBid`
+  --> src/brain/sleep.rs:17:32
+   |
+17 | use crate::brain::prefrontal::{AttentionBid, Coalition, WorkingMemoryItem};
+   |                                ^^^^^^^^^^^^
+
+warning: unused import: `RetrievalEvent`
+  --> src/memory/optimized_episodic.rs:34:45
+   |
+34 | use super::episodic_engine::{EpisodicTrace, RetrievalEvent, CoActivationPattern};
+   |                                             ^^^^^^^^^^^^^^
+
+warning: unused import: `anyhow::Result`
+  --> src/safety/thymus.rs:29:5
+   |
+29 | use anyhow::Result;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `RetrievalVerdict`
+  --> src/safety/thymus.rs:33:20
+   |
+33 |     EmpiricalTier, RetrievalVerdict, StatisticalRetriever, StatisticalRetrievalConfig,
+   |                    ^^^^^^^^^^^^^^^^
+
+warning: unused import: `AlteredStateIndex`
+  --> src/awakening.rs:54:20
+   |
+54 |     SubstrateType, AlteredStateIndex, IntegrationAssessment,
+   |                    ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::hdc::substrate_independence::SubstrateType as SubstrateTypeV2`
+  --> src/awakening.rs:59:5
+   |
+59 | use crate::hdc::substrate_independence::SubstrateType as SubstrateTypeV2;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::consciousness::ConsciousnessGraph`
+  --> src/awakening.rs:60:5
+   |
+60 | use crate::consciousness::ConsciousnessGraph;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Duration`
+  --> src/awakening.rs:62:26
+   |
+62 | use std::time::{Instant, Duration};
+   |                          ^^^^^^^^
+
+warning: unused import: `WordEntry`
+  --> src/language/parser.rs:17:37
+   |
+17 | use super::vocabulary::{Vocabulary, WordEntry};
+   |                                     ^^^^^^^^^
+
+warning: unused import: `SemanticRole`
+  --> src/language/generator.rs:18:51
+   |
+18 | use super::parser::{ParsedSentence, SentenceType, SemanticRole};
+   |                                                   ^^^^^^^^^^^^
+
+warning: unused imports: `Concept` and `CreativeMode`
+  --> src/language/conversation.rs:17:48
+   |
+17 |     ConsciousnessCreativity, CreativityConfig, Concept, CreativeMode,
+   |                                                ^^^^^^^  ^^^^^^^^^^^^
+
+warning: unused import: `SentenceType`
+  --> src/language/conversation.rs:24:53
+   |
+24 | use super::parser::{SemanticParser, ParsedSentence, SentenceType};
+   |                                                     ^^^^^^^^^^^^
+
+warning: unused import: `ConsciousnessGate`
+  --> src/language/conversation.rs:30:5
+   |
+30 |     ConsciousnessGate, FullGenerationContext,
+   |     ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `SpeechAct`
+  --> src/language/conversation.rs:35:57
+   |
+35 | use super::deep_parser::{DeepParser, DeepParse, Intent, SpeechAct};
+   |                                                         ^^^^^^^^^
+
+warning: unused import: `NodeType`
+  --> src/language/conversation.rs:37:46
+   |
+37 | use super::knowledge_graph::{KnowledgeGraph, NodeType};
+   |                                              ^^^^^^^^
+
+warning: unused import: `Duration`
+  --> src/language/conversation.rs:46:17
+   |
+46 | use std::time::{Duration, Instant};
+   |                 ^^^^^^^^
+
+warning: unused imports: `GroundTruth`, `VerificationOutcome`, and `VerifiedKnowledge`
+  --> src/language/conscious_conversation.rs:38:45
+   |
+38 |     KnowledgeIntegrator, IntegrationResult, VerifiedKnowledge,
+   |                                             ^^^^^^^^^^^^^^^^^
+39 |     EpistemicLearner, VerificationOutcome, GroundTruth, MetaLearningStats,
+   |                       ^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^
+
+warning: unused imports: `Vocabulary` and `WordEntry`
+  --> src/language/multilingual.rs:36:25
+   |
+36 | use super::vocabulary::{Vocabulary, WordEntry, SemanticGrounding};
+   |                         ^^^^^^^^^^  ^^^^^^^^^
+
+warning: unused import: `crate::language::vocabulary::Vocabulary`
+  --> src/language/dynamic_generation.rs:10:5
+   |
+10 | use crate::language::vocabulary::Vocabulary;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/language/dynamic_generation.rs:12:5
+   |
+12 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `HashSet`
+  --> src/language/reasoning.rs:12:33
+   |
+12 | use std::collections::{HashMap, HashSet, VecDeque};
+   |                                 ^^^^^^^
+
+warning: unused imports: `SystemTime` and `UNIX_EPOCH`
+  --> src/language/reasoning.rs:13:17
+   |
+13 | use std::time::{SystemTime, UNIX_EPOCH};
+   |                 ^^^^^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `crate::hdc::binary_hv::HV16`
+  --> src/language/deep_parser.rs:13:5
+   |
+13 | use crate::hdc::binary_hv::HV16;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::hdc::binary_hv::HV16`
+ --> src/language/creative.rs:8:5
+  |
+8 | use crate::hdc::binary_hv::HV16;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `EdgeType` and `NodeId`
+ --> src/language/creative.rs:9:46
+  |
+9 | use super::knowledge_graph::{KnowledgeGraph, EdgeType, NodeId};
+  |                                              ^^^^^^^^  ^^^^^^
+
+warning: unused import: `VoiceError`
+  --> src/voice/conversation.rs:12:13
+   |
+12 | use super::{VoiceError, VoiceResult, LTCPacing};
+   |             ^^^^^^^^^^
+
+warning: unused imports: `DatabaseError` and `MemoryType`
+  --> src/databases/qdrant_client.rs:26:36
+   |
+26 | use super::{ConsciousnessDatabase, DatabaseError, DbResult, MemoryRecord, MemoryType, SearchResult};
+   |                                    ^^^^^^^^^^^^^                          ^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/databases/qdrant_client.rs:29:5
+   |
+29 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> src/databases/qdrant_client.rs:30:5
+   |
+30 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `MemoryType`
+  --> src/databases/cozo_client.rs:26:60
+   |
+26 | use super::{ConsciousnessDatabase, DbResult, MemoryRecord, MemoryType, SearchResult};
+   |                                                            ^^^^^^^^^^
+
+warning: unused import: `MemoryType`
+  --> src/databases/duck_client.rs:25:60
+   |
+25 | use super::{ConsciousnessDatabase, DbResult, MemoryRecord, MemoryType, SearchResult};
+   |                                                            ^^^^^^^^^^
+
+warning: unused imports: `Arc` and `Mutex`
+  --> src/databases/duck_client.rs:29:17
+   |
+29 | use std::sync::{Arc, Mutex, RwLock};
+   |                 ^^^  ^^^^^
+
+warning: unused imports: `ConsciousnessEvent`, `DatabaseError`, `DuckEpistemic`, and `QdrantSensory`
+  --> src/databases/unified_mind.rs:23:38
+   |
+23 |     ConsciousnessDatabase, DbResult, DatabaseError, MemoryRecord, MemoryType, SearchResult,
+   |                                      ^^^^^^^^^^^^^
+24 |     mock::MockDatabase,
+25 |     qdrant_client::{QdrantSensory, QdrantConfig},
+   |                     ^^^^^^^^^^^^^
+26 |     duck_client::{DuckEpistemic, DuckConfig, ConsciousnessEvent},
+   |                   ^^^^^^^^^^^^^              ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::hdc::binary_hv::HV16`
+ --> src/web_research/researcher.rs:5:5
+  |
+5 | use crate::hdc::binary_hv::HV16;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Context`
+ --> src/web_research/extractor.rs:8:22
+  |
+8 | use anyhow::{Result, Context};
+  |                      ^^^^^^^
+
+warning: unused import: `NodeType`
+  --> src/web_research/verifier.rs:13:56
+   |
+13 | use crate::language::knowledge_graph::{KnowledgeGraph, NodeType};
+   |                                                        ^^^^^^^^
+
+warning: unused import: `ReasoningResult`
+  --> src/web_research/verifier.rs:14:51
+   |
+14 | use crate::language::reasoning::{ReasoningEngine, ReasoningResult};
+   |                                                   ^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/web_research/verifier.rs:17:5
+   |
+17 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Context`
+  --> src/web_research/integrator.rs:17:22
+   |
+17 | use anyhow::{Result, Context};
+   |                      ^^^^^^^
+
+warning: unused import: `crate::hdc::binary_hv::HV16`
+  --> src/web_research/meta_learning.rs:52:5
+   |
+52 | use crate::hdc::binary_hv::HV16;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Source`
+  --> src/web_research/meta_learning.rs:54:20
+   |
+54 | use super::types::{Source, VerificationLevel};
+   |                    ^^^^^^
+
+warning: unused import: `Evidence`
+  --> src/web_research/meta_learning.rs:55:40
+   |
+55 | use super::verifier::{EpistemicStatus, Evidence};
+   |                                        ^^^^^^^^
+
+warning: unused variable: `qdrant_config`
+   --> src/databases/unified_mind.rs:570:67
+    |
+570 |         let sensory: Arc<dyn ConsciousnessDatabase> = if let Some(qdrant_config) = config.qdrant {
+    |                                                                   ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_qdrant_config`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `duck_config`
+   --> src/databases/unified_mind.rs:596:69
+    |
+596 |         let epistemic: Arc<dyn ConsciousnessDatabase> = if let Some(duck_config) = config.duckdb {
+    |                                                                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_duck_config`
+
+warning: variable does not need to be mutable
+   --> src/databases/unified_mind.rs:567:13
+    |
+567 |         let mut status = MindStatus::all_mock();
+    |             ----^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: use of deprecated method `consciousness::ConsciousnessGraph::current_consciousness`: Use current_phi() - consciousness IS Φ
+   --> src/lib.rs:582:44
+    |
+582 |             confidence: self.consciousness.current_consciousness(),
+    |                                            ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: unused variable: `dynamic_state`
+   --> src/lib.rs:486:21
+    |
+486 |                 let dynamic_state = self.liquid.read_state()?;
+    |                     ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_dynamic_state`
+
+warning: use of deprecated method `consciousness::ConsciousnessGraph::current_consciousness`: Use current_phi() - consciousness IS Φ
+   --> src/lib.rs:591:53
+    |
+591 |             consciousness_level: self.consciousness.current_consciousness() as f32,
+    |                                                     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: variable does not need to be mutable
+   --> src/hdc/universal_semantics.rs:638:13
+    |
+638 |         let mut vectors: Vec<HV16> = components.iter()
+    |             ----^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/hdc/consciousness_flow_fields.rs:499:13
+    |
+499 |         let mut perturbed = state.to_vec();
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `df`
+   --> src/consciousness/primitive_validation.rs:273:23
+    |
+273 |     fn t_to_p(t: f64, df: usize) -> f64 {
+    |                       ^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+273 |     fn t_to_p(t: f64, _df: usize) -> f64 {
+    |                       +
+help: you might have meant to pattern match on the similarly named constant `HDC_DIM`
+    |
+273 -     fn t_to_p(t: f64, df: usize) -> f64 {
+273 +     fn t_to_p(t: f64, perception::multi_modal::HDC_DIM: usize) -> f64 {
+    |
+
+warning: unused variable: `synergies`
+   --> src/consciousness/dimension_synergies.rs:256:9
+    |
+256 |         synergies: &[DimensionSynergy],
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_synergies`
+
+warning: unused variable: `step`
+   --> src/consciousness/primitive_reasoning.rs:344:13
+    |
+344 |         for step in 0..max_steps {
+    |             ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+344 |         for _step in 0..max_steps {
+    |             +
+help: you might have meant to pattern match on the similarly named constant `HDC_DIM`
+    |
+344 -         for step in 0..max_steps {
+344 +         for perception::multi_modal::HDC_DIM in 0..max_steps {
+    |
+
+warning: unused variable: `start`
+  --> src/consciousness/adaptive_reasoning.rs:99:17
+   |
+99 |             let start = i * 2048;
+   |                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_start`
+
+warning: unused variable: `end`
+   --> src/consciousness/adaptive_reasoning.rs:100:17
+    |
+100 |             let end = (i + 1) * 2048;
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_end`
+
+warning: unused variable: `step`
+   --> src/consciousness/adaptive_reasoning.rs:393:13
+    |
+393 |         for step in 0..max_steps {
+    |             ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+393 |         for _step in 0..max_steps {
+    |             +
+help: you might have meant to pattern match on the similarly named constant `HDC_DIM`
+    |
+393 -         for step in 0..max_steps {
+393 +         for perception::multi_modal::HDC_DIM in 0..max_steps {
+    |
+
+warning: unused variable: `chain`
+   --> src/consciousness/metacognitive_monitoring.rs:388:9
+    |
+388 |         chain: &ReasoningChain,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_chain`
+
+warning: unused variable: `item1`
+   --> src/brain/sleep.rs:420:21
+    |
+420 |                 let item1 = &self.working_memory_buffer[idx1];
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_item1`
+
+warning: unused variable: `item2`
+   --> src/brain/sleep.rs:421:21
+    |
+421 |                 let item2 = &self.working_memory_buffer[idx2];
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_item2`
+
+warning: unused variable: `image`
+   --> src/perception/semantic_vision.rs:204:33
+    |
+204 |     pub fn caption_image(&self, image: &DynamicImage) -> Result<ImageCaption> {
+    |                                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `image`
+   --> src/perception/semantic_vision.rs:218:35
+    |
+218 |     pub fn answer_question(&self, image: &DynamicImage, question: &str) -> Result<VqaResponse> {
+    |                                   ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `image`
+   --> src/perception/ocr.rs:121:29
+    |
+121 |     pub fn recognize(&self, image: &DynamicImage) -> Result<OcrResult> {
+    |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `image`
+   --> src/perception/ocr.rs:185:29
+    |
+185 |     pub fn recognize(&self, image: &DynamicImage) -> Result<OcrResult> {
+    |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `integration`
+   --> src/language/conscious_conversation.rs:330:43
+    |
+330 |     fn record_learning_outcome(&mut self, integration: &IntegrationResult) -> Result<()> {
+    |                                           ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_integration`
+
+warning: unused variable: `context_valence`
+   --> src/language/multilingual.rs:533:17
+    |
+533 |         let mut context_valence = 0.0f32;
+    |                 ^^^^^^^^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+533 |         let mut _context_valence = 0.0f32;
+    |                 +
+help: you might have meant to pattern match on the similarly named constant `CONSOLIDATION_THRESHOLD`
+    |
+533 -         let mut context_valence = 0.0f32;
+533 +         let mut sleep_cycles::CONSOLIDATION_THRESHOLD = 0.0f32;
+    |
+
+warning: variable `context_count` is assigned to, but never used
+   --> src/language/multilingual.rs:534:17
+    |
+534 |         let mut context_count = 0;
+    |                 ^^^^^^^^^^^^^
+    |
+    = note: consider using `_context_count` instead
+
+warning: variable does not need to be mutable
+   --> src/language/multilingual.rs:533:13
+    |
+533 |         let mut context_valence = 0.0f32;
+    |             ----^^^^^^^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `depth`
+   --> src/language/reasoning.rs:510:35
+    |
+510 |     fn inference_cycle(&mut self, depth: usize) -> usize {
+    |                                   ^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+510 |     fn inference_cycle(&mut self, _depth: usize) -> usize {
+    |                                   +
+help: you might have meant to pattern match on the similarly named constant `HDC_DIM`
+    |
+510 -     fn inference_cycle(&mut self, depth: usize) -> usize {
+510 +     fn inference_cycle(&mut self, perception::multi_modal::HDC_DIM: usize) -> usize {
+    |
+
+warning: unused variable: `query`
+   --> src/language/reasoning.rs:770:31
+    |
+770 |     fn generate_answer(&self, query: &str) -> (bool, Option<String>) {
+    |                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_query`
+
+warning: unused variable: `tag`
+   --> src/language/deep_parser.rs:844:25
+    |
+844 |         for (i, (token, tag)) in tokens.iter().zip(pos_tags.iter()).enumerate() {
+    |                         ^^^ help: if this is intentional, prefix it with an underscore: `_tag`
+
+warning: unused variable: `parsed`
+   --> src/web_research/researcher.rs:190:13
+    |
+190 |         let parsed = self.parser.parse(query);
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_parsed`
+
+warning: unused variable: `element`
+   --> src/web_research/extractor.rs:182:29
+    |
+182 |                 if let Some(element) = document.select(&selector).next() {
+    |                             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_element`
+
+warning: unused variable: `text`
+   --> src/web_research/extractor.rs:241:62
+    |
+241 |     fn determine_content_type(&self, url: &str, title: &str, text: &str) -> ContentType {
+    |                                                              ^^^^ help: if this is intentional, prefix it with an underscore: `_text`
+
+warning: unused variable: `claim`
+   --> src/web_research/verifier.rs:268:34
+    |
+268 |     fn does_support_claim(&self, claim: &str, excerpt: &str) -> bool {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_claim`
+
+warning: unused variable: `level`
+   --> src/web_research/verifier.rs:356:9
+    |
+356 |         level: VerificationLevel,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_level`
+
+warning: unused variable: `confidence`
+   --> src/web_research/verifier.rs:386:55
+    |
+386 |     fn generate_hedge(&self, status: EpistemicStatus, confidence: f64) -> String {
+    |                                                       ^^^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+386 |     fn generate_hedge(&self, status: EpistemicStatus, _confidence: f64) -> String {
+    |                                                       +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+386 -     fn generate_hedge(&self, status: EpistemicStatus, confidence: f64) -> String {
+386 +     fn generate_hedge(&self, status: EpistemicStatus, soul::weaver::COHERENCE_THRESHOLD: f64) -> String {
+    |
+
+warning: unused variable: `domain`
+   --> src/web_research/meta_learning.rs:309:13
+    |
+309 |         let domain = Self::extract_domain(&source_url);
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_domain`
+
+warning: fields `primitive_system` and `phi_calculator` are never read
+   --> src/consciousness/primitive_validation.rs:431:5
+    |
+420 | pub struct PrimitiveValidationExperiment {
+    |            ----------------------------- fields in this struct
+...
+431 |     primitive_system: PrimitiveSystem,
+    |     ^^^^^^^^^^^^^^^^
+...
+434 |     phi_calculator: IntegratedInformation,
+    |     ^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `phi_calculator` and `primitive_system` are never read
+   --> src/consciousness/primitive_evolution.rs:298:5
+    |
+290 | pub struct PrimitiveEvolution {
+    |            ------------------ fields in this struct
+...
+298 |     phi_calculator: IntegratedInformation,
+    |     ^^^^^^^^^^^^^^
+...
+301 |     primitive_system: PrimitiveSystem,
+    |     ^^^^^^^^^^^^^^^^
+
+warning: field `tier` is never read
+  --> src/consciousness/multi_objective_evolution.rs:86:5
+   |
+85 | pub struct MultiObjectiveEvolution {
+   |            ----------------------- field in this struct
+86 |     tier: PrimitiveTier,
+   |     ^^^^
+
+warning: field `confidence_threshold` is never read
+   --> src/consciousness/metacognitive_monitoring.rs:374:5
+    |
+372 | struct SelfCorrectionEngine {
+    |        -------------------- field in this struct
+373 |     /// Confidence threshold for proposing corrections
+374 |     confidence_threshold: f64,
+    |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: field `max_size` is never read
+  --> src/perception/visual.rs:34:5
+   |
+29 | pub struct VisualCortex {
+   |            ------------ field in this struct
+...
+34 |     max_size: (u32, u32),
+   |     ^^^^^^^^
+
+warning: field `model_path` is never read
+  --> src/perception/semantic_vision.rs:96:5
+   |
+94 | pub struct SigLipModel {
+   |            ----------- field in this struct
+95 |     /// Model path (will be downloaded from HuggingFace if needed)
+96 |     model_path: Option<PathBuf>,
+   |     ^^^^^^^^^^
+
+warning: field `model_path` is never read
+   --> src/perception/semantic_vision.rs:174:5
+    |
+172 | pub struct MoondreamModel {
+    |            -------------- field in this struct
+173 |     /// Model path
+174 |     model_path: Option<PathBuf>,
+    |     ^^^^^^^^^^
+
+warning: field `creativity` is never read
+   --> src/language/conversation.rs:107:5
+    |
+ 95 | pub struct Conversation {
+    |            ------------ field in this struct
+...
+107 |     creativity: ConsciousnessCreativity,
+    |     ^^^^^^^^^^
+
+warning: fields `phi_calculator` and `runtime` are never read
+  --> src/language/conscious_conversation.rs:71:5
+   |
+57 | pub struct ConsciousConversation {
+   |            --------------------- fields in this struct
+...
+71 |     phi_calculator: IntegratedInformation,
+   |     ^^^^^^^^^^^^^^
+...
+74 |     runtime: Runtime,
+   |     ^^^^^^^
+
+warning: field `phi_calculator` is never read
+   --> src/language/consciousness_observatory.rs:336:5
+    |
+322 | pub struct ConsciousnessObservatory {
+    |            ------------------------ field in this struct
+...
+336 |     phi_calculator: IntegratedInformation,
+    |     ^^^^^^^^^^^^^^
+
+warning: field `failed_lookups` is never read
+   --> src/language/word_learner.rs:119:5
+    |
+111 | pub struct WordLearner {
+    |            ----------- field in this struct
+...
+119 |     failed_lookups: RwLock<HashMap<String, u64>>,
+    |     ^^^^^^^^^^^^^^
+
+warning: method `transition_weight` is never used
+   --> src/language/dynamic_generation.rs:376:8
+    |
+331 | impl SentenceForm {
+    | ----------------- method in this implementation
+...
+376 |     fn transition_weight(&self, previous: &SentenceForm) -> f32 {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: fields `phi` and `valence` are never read
+    --> src/language/dynamic_generation.rs:1040:5
+     |
+1038 | pub struct IntentFormation<'a> {
+     |            --------------- fields in this struct
+1039 |     parsed_input: &'a ParsedSentence,
+1040 |     phi: f32,
+     |     ^^^
+1041 |     valence: f32,
+     |     ^^^^^^^
+
+warning: field `goals` is never read
+   --> src/language/reasoning.rs:203:5
+    |
+195 | pub struct ReasoningEngine {
+    |            --------------- field in this struct
+...
+203 |     goals: VecDeque<Goal>,
+    |     ^^^^^
+
+warning: fields `verb_class`, `subject_role`, and `object_role` are never read
+   --> src/language/deep_parser.rs:246:5
+    |
+245 | struct RolePattern {
+    |        ----------- fields in this struct
+246 |     verb_class: VerbClass,
+    |     ^^^^^^^^^^
+247 |     subject_role: SemanticRole,
+    |     ^^^^^^^^^^^^
+248 |     object_role: Option<SemanticRole>,
+    |     ^^^^^^^^^^^
+
+warning: field `pattern` is never read
+  --> src/language/creative.rs:44:5
+   |
+42 | struct MetaphorTemplate {
+   |        ---------------- field in this struct
+43 |     source_domain: String,
+44 |     pattern: String,  // e.g., "{target} is like {source}"
+   |     ^^^^^^^
+   |
+   = note: `MetaphorTemplate` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `gamma` is never read
+   --> src/language/live_learner.rs:252:5
+    |
+250 | pub struct RewardProcessor {
+    |            --------------- field in this struct
+251 |     /// Discount factor for temporal difference
+252 |     gamma: f32,
+    |     ^^^^^
+    |
+    = note: `RewardProcessor` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `config` is never read
+  --> src/voice/conversation.rs:78:5
+   |
+77 | pub struct VoiceConversation {
+   |            ----------------- field in this struct
+78 |     config: VoiceConfig,
+   |     ^^^^^^
+
+warning: field `config` is never read
+   --> src/voice/conversation.rs:293:5
+    |
+292 | pub struct MockVoiceConversation {
+    |            --------------------- field in this struct
+293 |     config: VoiceConfig,
+    |     ^^^^^^
+
+warning: field `config` is never read
+  --> src/databases/qdrant_client.rs:70:5
+   |
+69 | pub struct QdrantSensory {
+   |            ------------- field in this struct
+70 |     config: QdrantConfig,
+   |     ^^^^^^
+
+warning: associated function `hv_to_vec` is never used
+   --> src/databases/qdrant_client.rs:157:8
+    |
+ 82 | impl QdrantSensory {
+    | ------------------ associated function in this implementation
+...
+157 |     fn hv_to_vec(hv: &HV16) -> Vec<f32> {
+    |        ^^^^^^^^^
+
+warning: field `config` is never read
+  --> src/databases/cozo_client.rs:81:5
+   |
+80 | pub struct CozoPrefrontal {
+   |            -------------- field in this struct
+81 |     config: CozoConfig,
+   |     ^^^^^^
+
+warning: field `config` is never read
+  --> src/databases/lance_client.rs:79:5
+   |
+78 | pub struct LanceLongTerm {
+   |            ------------- field in this struct
+79 |     config: LanceConfig,
+   |     ^^^^^^
+
+warning: fields `knowledge_graph`, `reasoning`, `min_sources_high_confidence`, and `agreement_threshold` are never read
+   --> src/web_research/verifier.rs:116:5
+    |
+114 | pub struct EpistemicVerifier {
+    |            ----------------- fields in this struct
+115 |     /// Knowledge graph for checking existing knowledge
+116 |     knowledge_graph: KnowledgeGraph,
+    |     ^^^^^^^^^^^^^^^
+...
+119 |     reasoning: ReasoningEngine,
+    |     ^^^^^^^^^
+...
+122 |     min_sources_high_confidence: usize,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+128 |     agreement_threshold: f64,
+    |     ^^^^^^^^^^^^^^^^^^^
+
+warning: fields `vocabulary` and `active_learning` are never read
+   --> src/web_research/meta_learning.rs:212:5
+    |
+210 | pub struct EpistemicLearner {
+    |            ---------------- fields in this struct
+211 |     /// Vocabulary for domain classification
+212 |     vocabulary: Vocabulary,
+    |     ^^^^^^^^^^
+...
+233 |     active_learning: bool,
+    |     ^^^^^^^^^^^^^^^
+
+warning: `symthaea` (lib) generated 109 warnings (run `cargo fix --lib -p symthaea` to apply 59 suggestions)
+   Compiling symthaea v0.1.0 (/srv/luminous-dynamics/11-meta-consciousness/luminous-nix/symthaea-hlb)
+    Finished `release` profile [optimized] target(s) in 11.54s
+     Running `target/release/examples/run_detailed_profiling`
+╔════════════════════════════════════════════════════════════╗
+║     SESSION 7A: DETAILED PROFILING INFRASTRUCTURE         ║
+╚════════════════════════════════════════════════════════════╝
+
+Running 4 comprehensive profiling benchmarks...
+
+
+=== DETAILED CONSCIOUSNESS CYCLE PROFILING ===
+
+Average times per cycle (1000 iterations):
+
+  1. Encoding:        3018 ns  (  8.1%)
+  2. Bind (10x):       123 ns  (  0.3%)
+  3. Bundle:          5442 ns  ( 14.7%)
+  4. Similarity:     28316 ns  ( 76.4%)
+  5. Permute:           17 ns  (  0.0%)
+
+  TOTAL:             37057 ns  (100.0%)
+
+🎯 PRIMARY BOTTLENECK: Similarity search (28316 ns, 76.4%)
+
+=== END DETAILED PROFILING ===
+
+
+=== BATCH SIZE CHARACTERISTICS ===
+
+Testing different batch sizes to find GPU threshold:
+
+Batch Size | Bundle Time | Similarity Time | Notes
+-----------|-------------|-----------------|------
+        10 |           5 µs |               0 µs | ❌ Too small
+        50 |           9 µs |               0 µs | ❌ Too small
+       100 |          18 µs |               0 µs | ❌ Too small
+       500 |         115 µs |               0 µs | ⚠️  Borderline
+      1000 |         288 µs |               0 µs | ✅ GPU candidate
+      5000 |        2400 µs |               1 µs | ✅ GPU candidate
+     10000 |        4664 µs |               0 µs | ✅ GPU candidate
+
+📊 GPU Threshold Analysis:
+  - Batches <500:  Too small for GPU (transfer overhead dominates)
+  - Batches 500-1000: Borderline (may benefit on high-end GPUs)
+  - Batches >1000: Good GPU candidates (amortize transfer cost)
+
+=== END BATCH ANALYSIS ===
+
+
+=== OPERATION FREQUENCY ANALYSIS ===
+
+Operation frequency (10000 operations):
+
+Operation  | Count | Avg Time | Total Time | % of Total
+-----------|-------|----------|------------|------------
+Bind       |  4000 |     581 ns |      2324 µs |   2.1%
+Bundle     |  2000 |    8721 ns |     17442 µs |  15.7%
+Similarity |  3000 |   30398 ns |     91196 µs |  82.0%
+Permute    |  1000 |     308 ns |       308 µs |   0.3%
+
+📊 Key Insights:
+  - Primary time sink: Similarity (82.0% of total)
+  - Most frequent: Bind operations (40.0%)
+
+=== END FREQUENCY ANALYSIS ===
+
+
+=== GPU SUITABILITY ANALYSIS ===
+
+Based on profiling data, analyzing GPU viability:
+
+Scenario                | CPU Time | GPU Est. | Speedup | Worth it?
+------------------------|----------|----------|---------|----------
+Small batches (n=10)     |       5 µs |    10.4 µs |   0.48x | ❌ No
+Medium batches (n=100)   |      18 µs |    13.7 µs |   1.31x | ⚠️  Maybe
+Large batches (n=1000)   |     263 µs |    47.0 µs |   5.60x | ✅ Yes
+Very large (n=10000)     |    4792 µs |   380.0 µs |  12.61x | ✅ Yes
+
+📊 Conclusion:
+  - GPU beneficial for batches >1000
+  - Break-even around 500-1000 vectors
+  - Small batches (<100) stay on CPU
+  - Adaptive routing strategy recommended
+
+=== END GPU SUITABILITY ===
+
+╔════════════════════════════════════════════════════════════╗
+║           PROFILING COMPLETE - ANALYZE RESULTS            ║
+╚════════════════════════════════════════════════════════════╝
+
+✅ Session 7A profiling infrastructure execution complete!
+📊 Review output above to create SESSION_7B_PROFILING_RESULTS.md
+🎯 Use data to make decision: GPU vs algorithm fusion vs other

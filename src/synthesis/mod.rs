@@ -16,6 +16,8 @@ pub mod causal_spec;
 pub mod synthesizer;
 pub mod verifier;
 pub mod adaptive;
+pub mod consciousness_synthesis;  // Enhancement #8: Consciousness-guided synthesis
+pub mod phi_exact;  // Enhancement #8 Week 4: Exact IIT Φ via PyPhi
 
 pub use causal_spec::{
     CausalSpec, CausalPath, CausalStrength, SpecVerifier,
@@ -31,6 +33,10 @@ pub use verifier::{
 };
 pub use adaptive::{
     AdaptiveProgram, AdaptationStrategy, ProgramMonitor,
+};
+pub use consciousness_synthesis::{
+    ConsciousnessSynthesisConfig, TopologyType, ConsciousSynthesizedProgram,
+    MultiObjectiveScores, ConsciousnessQuality,
 };
 
 /// Synthesis error types
@@ -50,6 +56,33 @@ pub enum SynthesisError {
 
     /// Integration error with Enhancement #4
     CausalEngineError(String),
+
+    /// Consciousness synthesis error (Enhancement #8)
+    ConsciousnessSynthesisError(String),
+
+    /// Φ computation timeout
+    PhiComputationTimeout { candidate_id: usize, time_ms: u64 },
+
+    /// No candidates meet consciousness constraints
+    InsufficientConsciousness { min_phi: f64, best_phi: f64 },
+
+    /// PyPhi import error (Week 4: IIT validation)
+    PyPhiImportError { message: String },
+
+    /// PyPhi computation error (Week 4: IIT validation)
+    PyPhiComputationError { message: String },
+
+    /// Topology too large for exact IIT (Week 4: IIT validation)
+    PhiExactTooLarge { size: usize, recommended_max: usize },
+
+    /// PyPhi feature not enabled (Week 4: IIT validation)
+    PyPhiNotEnabled { message: String },
+
+    /// Internal error (shouldn't happen)
+    InternalError(String),
+
+    /// Unsatisfiable specification (alias for backward compatibility)
+    UnsatisfiableSpecification(String),
 }
 
 impl std::fmt::Display for SynthesisError {
@@ -60,6 +93,21 @@ impl std::fmt::Display for SynthesisError {
             Self::VerificationFailed(msg) => write!(f, "Verification failed: {}", msg),
             Self::NotMinimal(msg) => write!(f, "Program not minimal: {}", msg),
             Self::CausalEngineError(msg) => write!(f, "Causal engine error: {}", msg),
+            Self::ConsciousnessSynthesisError(msg) => write!(f, "Consciousness synthesis error: {}", msg),
+            Self::PhiComputationTimeout { candidate_id, time_ms } => {
+                write!(f, "Φ computation timeout for candidate {}: {}ms", candidate_id, time_ms)
+            }
+            Self::InsufficientConsciousness { min_phi, best_phi } => {
+                write!(f, "No candidates meet Φ threshold: best={:.3} < min={:.3}", best_phi, min_phi)
+            }
+            Self::PyPhiImportError { message } => write!(f, "PyPhi import error: {}", message),
+            Self::PyPhiComputationError { message } => write!(f, "PyPhi computation error: {}", message),
+            Self::PhiExactTooLarge { size, recommended_max } => {
+                write!(f, "Topology too large for exact IIT: n={} (recommended max: n={})", size, recommended_max)
+            }
+            Self::PyPhiNotEnabled { message } => write!(f, "PyPhi not enabled: {}", message),
+            Self::InternalError(msg) => write!(f, "Internal error: {}", msg),
+            Self::UnsatisfiableSpecification(msg) => write!(f, "Unsatisfiable specification: {}", msg),
         }
     }
 }

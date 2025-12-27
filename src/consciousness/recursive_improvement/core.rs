@@ -13450,7 +13450,7 @@ impl QuantumCoherenceRouter {
             // Combine amplitudes
             let a1 = &self.state.amplitudes[idx1];
             let a2 = &self.state.amplitudes[idx2];
-            let combined = a1.add(a2).scale(0.5);
+            let combined = a1.add(a2).scale(0.5_f32);
 
             // Apply interference to both
             self.state.amplitudes[idx1] = combined;

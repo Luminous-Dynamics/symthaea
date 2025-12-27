@@ -28,9 +28,9 @@
 //! };
 //!
 //! let components = vec![
-//!     RealHV::random(2048, 1),
-//!     RealHV::random(2048, 2),
-//!     RealHV::random(2048, 3),
+//!     RealHV::random(RealHV::DEFAULT_DIM, 1),  // 16,384 dimensions
+//!     RealHV::random(RealHV::DEFAULT_DIM, 2),
+//!     RealHV::random(RealHV::DEFAULT_DIM, 3),
 //! ];
 //!
 //! let calculator = RealPhiCalculator::new();
