@@ -1276,7 +1276,7 @@ impl TieredPhi {
     /// - The bundle captures the integrated state
     ///
     /// We approximate I(components) using average pairwise similarity
-fn compute_system_info(&self, bundled: &HV16, components: &[HV16]) -> f64 {
+    fn compute_system_info(&self, bundled: &HV16, components: &[HV16]) -> f64 {
         let n = components.len();
         if n < 2 {
             return 0.0;
@@ -1786,6 +1786,424 @@ pub fn set_global_tier(tier: ApproximationTier) {
 /// Get statistics from the global Φ calculator
 pub fn global_phi_stats() -> TieredPhiStats {
     GLOBAL_PHI.lock().unwrap().stats.clone()
+}
+
+// ============================================================================
+// Revolutionary Improvement #93: Φ Temporal Dynamics & Phase Transitions
+// ============================================================================
+//
+// Track consciousness evolution over time, detect phase transitions,
+// and analyze trends. This enables:
+// - Monitoring consciousness state changes
+// - Detecting awake/asleep, focused/distracted transitions
+// - Predicting future Φ values
+// - Stability analysis
+
+/// Configuration for Φ dynamics tracking
+#[derive(Debug, Clone)]
+pub struct PhiDynamicsConfig {
+    /// Size of the circular buffer for history
+    pub history_size: usize,
+
+    /// Threshold (in std devs) for detecting phase transitions
+    pub transition_threshold_sigma: f64,
+
+    /// Minimum samples before detecting transitions
+    pub min_samples_for_transition: usize,
+
+    /// Smoothing factor for EMA (0 = no smoothing, 1 = instant)
+    pub smoothing_alpha: f64,
+}
+
+impl Default for PhiDynamicsConfig {
+    fn default() -> Self {
+        Self {
+            history_size: 1000,
+            transition_threshold_sigma: 2.0,
+            min_samples_for_transition: 10,
+            smoothing_alpha: 0.3,
+        }
+    }
+}
+
+/// Tracks Φ evolution over time for dynamics and phase transition analysis
+#[derive(Debug, Clone)]
+pub struct PhiDynamics {
+    config: PhiDynamicsConfig,
+    history: Vec<(u64, f64)>, // (timestamp, phi) circular buffer
+    head: usize,
+    count: usize,
+    running_sum: f64,
+    running_sum_sq: f64,
+    last_transition: Option<PhaseTransition>,
+    tick_counter: u64,
+}
+
+/// Result of recording a new Φ measurement
+#[derive(Debug, Clone)]
+pub struct PhiDynamicsSnapshot {
+    /// Current Φ value
+    pub current_phi: f64,
+
+    /// Rate of change (dΦ/dt per sample)
+    pub rate_of_change: f64,
+
+    /// Smoothed rate of change (EMA)
+    pub smoothed_rate: f64,
+
+    /// Standard deviation of recent Φ values
+    pub volatility: f64,
+
+    /// Mean Φ over history window
+    pub mean_phi: f64,
+
+    /// Trend direction and strength
+    pub trend: PhiTrend,
+
+    /// Stability score (0 = chaotic, 1 = stable)
+    pub stability: f64,
+
+    /// Any detected phase transition
+    pub transition: Option<PhaseTransition>,
+}
+
+/// Trend analysis for Φ evolution
+#[derive(Debug, Clone)]
+pub struct PhiTrend {
+    /// Trend direction
+    pub direction: TrendDirection,
+
+    /// Strength of trend (0 = no trend, 1 = strong monotonic)
+    pub strength: f64,
+
+    /// Predicted Φ at next sample (linear extrapolation)
+    pub predicted_next: f64,
+}
+
+/// Direction of Φ trend
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrendDirection {
+    Increasing,
+    Decreasing,
+    Stable,
+    Oscillating,
+}
+
+/// A detected phase transition in consciousness
+#[derive(Debug, Clone)]
+pub struct PhaseTransition {
+    /// When the transition occurred
+    pub timestamp_ns: u64,
+
+    /// Φ value before transition
+    pub phi_before: f64,
+
+    /// Φ value after transition
+    pub phi_after: f64,
+
+    /// Magnitude in standard deviations
+    pub magnitude_sigma: f64,
+
+    /// Direction of change
+    pub direction: TransitionDirection,
+
+    /// Type/speed of transition
+    pub transition_type: TransitionType,
+}
+
+/// Direction of a phase transition
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransitionDirection {
+    Rising,
+    Falling,
+}
+
+/// Speed/type of phase transition
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransitionType {
+    /// Sudden jump (1-2 samples)
+    Sudden,
+    /// Rapid change (3-5 samples)
+    Rapid,
+    /// Gradual shift (5+ samples)
+    Gradual,
+}
+
+impl PhiDynamics {
+    /// Create new Φ dynamics tracker with default config
+    pub fn new() -> Self {
+        Self::with_config(PhiDynamicsConfig::default())
+    }
+
+    /// Create with custom configuration
+    pub fn with_config(config: PhiDynamicsConfig) -> Self {
+        Self {
+            history: vec![(0, 0.0); config.history_size],
+            head: 0,
+            count: 0,
+            running_sum: 0.0,
+            running_sum_sq: 0.0,
+            last_transition: None,
+            tick_counter: 0,
+            config,
+        }
+    }
+
+    /// Record a new Φ measurement with auto-generated timestamp
+    pub fn record(&mut self, phi: f64) -> PhiDynamicsSnapshot {
+        let ts = self.tick_counter;
+        self.tick_counter += 1;
+        self.record_with_timestamp(phi, ts)
+    }
+
+    /// Record a new Φ measurement with explicit timestamp
+    pub fn record_with_timestamp(&mut self, phi: f64, timestamp_ns: u64) -> PhiDynamicsSnapshot {
+        // Get previous value for rate calculation
+        let prev_phi = if self.count > 0 {
+            let prev_idx = if self.head == 0 { self.config.history_size - 1 } else { self.head - 1 };
+            self.history[prev_idx].1
+        } else {
+            phi
+        };
+
+        // Update running statistics (remove old value if buffer full)
+        if self.count >= self.config.history_size {
+            let old_val = self.history[self.head].1;
+            self.running_sum -= old_val;
+            self.running_sum_sq -= old_val * old_val;
+        }
+
+        // Add new value
+        self.history[self.head] = (timestamp_ns, phi);
+        self.running_sum += phi;
+        self.running_sum_sq += phi * phi;
+
+        // Advance head
+        self.head = (self.head + 1) % self.config.history_size;
+        if self.count < self.config.history_size {
+            self.count += 1;
+        }
+
+        // Calculate snapshot
+        self.compute_snapshot(phi, prev_phi, timestamp_ns)
+    }
+
+    /// Compute dynamics snapshot based on current state
+    fn compute_snapshot(&mut self, current_phi: f64, prev_phi: f64, timestamp: u64) -> PhiDynamicsSnapshot {
+        let n = self.count as f64;
+
+        // Mean and variance
+        let mean_phi = if n > 0.0 { self.running_sum / n } else { 0.0 };
+        let variance = if n > 1.0 {
+            (self.running_sum_sq / n) - (mean_phi * mean_phi)
+        } else {
+            0.0
+        };
+        let volatility = variance.max(0.0).sqrt();
+
+        // Rate of change
+        let rate_of_change = current_phi - prev_phi;
+
+        // Smoothed rate (EMA)
+        let smoothed_rate = if let Some(ref trans) = self.last_transition {
+            self.config.smoothing_alpha * rate_of_change +
+                (1.0 - self.config.smoothing_alpha) * (trans.phi_after - trans.phi_before)
+        } else {
+            rate_of_change
+        };
+
+        // Stability (inverse of coefficient of variation)
+        let stability = if mean_phi.abs() > 1e-10 && volatility > 0.0 {
+            let cv = volatility / mean_phi.abs();
+            1.0 / (1.0 + cv)
+        } else {
+            1.0
+        };
+
+        // Trend analysis
+        let trend = self.compute_trend(current_phi);
+
+        // Phase transition detection
+        let transition = self.detect_transition(current_phi, mean_phi, volatility, timestamp);
+        if transition.is_some() {
+            self.last_transition = transition.clone();
+        }
+
+        PhiDynamicsSnapshot {
+            current_phi,
+            rate_of_change,
+            smoothed_rate,
+            volatility,
+            mean_phi,
+            trend,
+            stability,
+            transition,
+        }
+    }
+
+    /// Compute trend from recent history
+    fn compute_trend(&self, current_phi: f64) -> PhiTrend {
+        if self.count < 3 {
+            return PhiTrend {
+                direction: TrendDirection::Stable,
+                strength: 0.0,
+                predicted_next: current_phi,
+            };
+        }
+
+        // Get recent values for trend analysis
+        let recent = self.get_recent(self.count.min(20));
+        if recent.len() < 3 {
+            return PhiTrend {
+                direction: TrendDirection::Stable,
+                strength: 0.0,
+                predicted_next: current_phi,
+            };
+        }
+
+        // Simple linear regression for trend
+        let n = recent.len() as f64;
+        let sum_x: f64 = (0..recent.len()).map(|i| i as f64).sum();
+        let sum_y: f64 = recent.iter().sum();
+        let sum_xy: f64 = recent.iter().enumerate().map(|(i, y)| i as f64 * y).sum();
+        let sum_xx: f64 = (0..recent.len()).map(|i| (i as f64) * (i as f64)).sum();
+
+        let slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
+        let mean_y = sum_y / n;
+
+        // R² for trend strength
+        let ss_tot: f64 = recent.iter().map(|y| (y - mean_y).powi(2)).sum();
+        let ss_res: f64 = recent.iter().enumerate()
+            .map(|(i, y)| {
+                let predicted = mean_y + slope * (i as f64 - (n - 1.0) / 2.0);
+                (y - predicted).powi(2)
+            })
+            .sum();
+        let r_squared = if ss_tot > 0.0 { 1.0 - (ss_res / ss_tot) } else { 0.0 };
+
+        // Determine direction
+        let direction = if r_squared < 0.1 {
+            // Check for oscillation
+            let sign_changes: usize = recent.windows(2)
+                .filter(|w| (w[1] - w[0]) * (if w.len() > 2 { w[2] - w[1] } else { 0.0 }) < 0.0)
+                .count();
+            if sign_changes > recent.len() / 3 {
+                TrendDirection::Oscillating
+            } else {
+                TrendDirection::Stable
+            }
+        } else if slope > 0.0 {
+            TrendDirection::Increasing
+        } else {
+            TrendDirection::Decreasing
+        };
+
+        // Predict next value
+        let predicted_next = current_phi + slope;
+
+        PhiTrend {
+            direction,
+            strength: r_squared.max(0.0).min(1.0),
+            predicted_next,
+        }
+    }
+
+    /// Detect phase transitions using z-score
+    fn detect_transition(&self, current: f64, mean: f64, std: f64, timestamp: u64) -> Option<PhaseTransition> {
+        if self.count < self.config.min_samples_for_transition || std < 1e-10 {
+            return None;
+        }
+
+        let z_score = (current - mean).abs() / std;
+
+        if z_score >= self.config.transition_threshold_sigma {
+            let direction = if current > mean {
+                TransitionDirection::Rising
+            } else {
+                TransitionDirection::Falling
+            };
+
+            let transition_type = if z_score >= 4.0 {
+                TransitionType::Sudden
+            } else if z_score >= 3.0 {
+                TransitionType::Rapid
+            } else {
+                TransitionType::Gradual
+            };
+
+            Some(PhaseTransition {
+                timestamp_ns: timestamp,
+                phi_before: mean,
+                phi_after: current,
+                magnitude_sigma: z_score,
+                direction,
+                transition_type,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Get complete history (oldest to newest)
+    pub fn get_history(&self) -> Vec<(u64, f64)> {
+        if self.count == 0 {
+            return vec![];
+        }
+
+        let mut result = Vec::with_capacity(self.count);
+        let start = if self.count >= self.config.history_size {
+            self.head
+        } else {
+            0
+        };
+
+        for i in 0..self.count {
+            let idx = (start + i) % self.config.history_size;
+            result.push(self.history[idx]);
+        }
+
+        result
+    }
+
+    /// Get recent Φ values (oldest to newest)
+    pub fn get_recent(&self, n: usize) -> Vec<f64> {
+        let take = n.min(self.count);
+        if take == 0 {
+            return vec![];
+        }
+
+        let mut result = Vec::with_capacity(take);
+        for i in 0..take {
+            // Safe calculation that avoids underflow:
+            // We want: (head - 1 - i) mod history_size
+            // Reorder to: (head + history_size - 1 - i) mod history_size
+            let idx = (self.head + self.config.history_size - 1 - i) % self.config.history_size;
+            result.push(self.history[idx].1);
+        }
+        result.reverse();
+        result
+    }
+
+    /// Reset all history
+    pub fn reset(&mut self) {
+        self.head = 0;
+        self.count = 0;
+        self.running_sum = 0.0;
+        self.running_sum_sq = 0.0;
+        self.last_transition = None;
+        self.tick_counter = 0;
+    }
+
+    /// Get current sample count
+    pub fn sample_count(&self) -> usize {
+        self.count
+    }
+}
+
+impl Default for PhiDynamics {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ============================================================================
@@ -2939,14 +3357,14 @@ mod tests {
     #[test]
     fn test_dynamics_with_real_phi() {
         let mut dynamics = PhiDynamics::new();
-        let mut phi = TieredPhi::new(ApproximationTier::Heuristic);
+        let mut phi_calc = TieredPhi::new(ApproximationTier::Heuristic);
 
         // Create varying topologies and track their Φ over time
         for seed in 0..30 {
             let components = create_test_components(8 + (seed % 4)); // 8-11 components
-            let result = phi.compute(&components);
+            let phi_value = phi_calc.compute(&components);
 
-            let snapshot = dynamics.record(result.phi);
+            let snapshot = dynamics.record(phi_value);
 
             if let Some(transition) = snapshot.transition {
                 println!("Transition at step {}: {:?} ({:.2}σ)",
