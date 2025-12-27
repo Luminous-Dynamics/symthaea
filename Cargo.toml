@@ -67,7 +67,7 @@ once_cell = "1.19"
 dashmap = "5.5"
 rand = "0.8"
 blake3 = "1.5"
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 regex = "1.10"  # For Thalamus pattern matching
 
 # Week 0: Memory Arena for HDC
@@ -102,12 +102,21 @@ criterion = "0.5"
 proptest = "1.4"
 tempfile = "3.8"  # For perception tests
 
+# Binaries
+[[bin]]
+name = "symthaea-repl"
+path = "src/bin/symthaea-repl.rs"
+
 # Examples
 [[example]]
 name = "social_coherence_demo"
 path = "demos/social_coherence_demo.rs"
 
-# Benchmarks (TODO: implement)
+# Benchmarks
+[[bench]]
+name = "enhancement_7_phase2_benchmarks"
+harness = false
+
 # [[bench]]
 # name = "hdc_benchmark"
 # harness = false
