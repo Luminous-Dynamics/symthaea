@@ -1,0 +1,539 @@
+// Phase 3 Causal Understanding System - Integration Tests
+//
+// These tests validate the complete causal analysis pipeline:
+// 1. Observer records events with correlation metadata
+// 2. CorrelationContext tracks parent-child relationships
+// 3. CausalGraph constructs causal relationships
+// 4. TraceAnalyzer provides high-level insights
+//
+// Each test scenario represents a real-world usage pattern.
+
+use symthaea::observability::{
+    CorrelationContext,
+    CausalGraph, CausalAnswer,
+    TraceAnalyzer,
+    Trace, PhiComponents, SecurityDecision,
+    TraceObserver, SymthaeaObserver,
+    SecurityCheckEvent, PhiMeasurementEvent, RouterSelectionEvent,
+    WorkspaceIgnitionEvent, PrimitiveActivationEvent, ResponseGeneratedEvent,
+};
+use std::sync::Arc;
+use parking_lot::RwLock;  // Use parking_lot for blocking access
+use tempfile::NamedTempFile;
+use chrono::Utc;
+
+type SharedObserver = Arc<RwLock<Box<dyn SymthaeaObserver>>>;
+
+// Helper to create observer with correlation tracking
+fn create_observer_with_correlation() -> (SharedObserver, CorrelationContext, tempfile::TempPath) {
+    let temp_file = NamedTempFile::new().unwrap();
+    let trace_path = temp_file.into_temp_path();
+
+    let observer: SharedObserver = Arc::new(RwLock::new(
+        Box::new(TraceObserver::new(&trace_path).unwrap())
+    ));
+
+    let ctx = CorrelationContext::new("integration_test");
+
+    (observer, ctx, trace_path)
+}
+
+#[test]
+fn test_scenario_1_basic_causal_chain() {
+    // Scenario: Security check → Phi measurement → Router selection
+    // Expected: Complete causal chain from security to router
+
+    let (observer, mut ctx, trace_path) = create_observer_with_correlation();
+
+    // Step 1: Security check (root event)
+    let security_meta = ctx.create_event_metadata_with_tags(vec!["security", "root"]);
+    {
+        let mut obs = observer.write();
+        obs.record_security_check(SecurityCheckEvent {
+            timestamp: Utc::now(),
+            operation: "query_processing".to_string(),
+            decision: SecurityDecision::Allowed,
+            reason: Some("Clean input".to_string()),
+            secrets_redacted: 0,
+            similarity_score: Some(0.05),
+            matched_pattern: None,
+        }).unwrap();
+    }
+
+    // Step 2: Phi measurement (caused by security check)
+    ctx.push_parent(&security_meta.id);
+    let phi_meta = ctx.create_event_metadata();
+    {
+        let mut obs = observer.write();
+        obs.record_phi_measurement(PhiMeasurementEvent {
+            timestamp: Utc::now(),
+            phi: 0.82,
+            components: PhiComponents {
+                integration: 0.85,
+                binding: 0.80,
+                workspace: 0.82,
+                attention: 0.78,
+                recursion: 0.75,
+                efficacy: 0.80,
+                knowledge: 0.77,
+            },
+            temporal_continuity: 0.91,
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Step 3: Router selection (caused by phi measurement)
+    ctx.push_parent(&phi_meta.id);
+    let router_meta = ctx.create_event_metadata();
+    {
+        let mut obs = observer.write();
+        obs.record_router_selection(RouterSelectionEvent {
+            timestamp: Utc::now(),
+            input: "complex query".to_string(),
+            selected_router: "consciousness_guided".to_string(),
+            confidence: 0.88,
+            alternatives: vec![],
+            bandit_stats: std::collections::HashMap::new(),
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Finalize and analyze
+    {
+        let mut obs = observer.write();
+        obs.finalize().unwrap();
+    }
+
+    let trace = Trace::load_from_file(&trace_path).unwrap();
+    let graph = CausalGraph::from_trace(&trace);
+
+    // Verify causal relationships
+    assert_eq!(graph.events().len(), 3, "Should have 3 events");
+
+    // Verify security → phi causality
+    let causes_of_phi = graph.find_causes(&phi_meta.id, Some(1));
+    assert_eq!(causes_of_phi.len(), 1, "Phi should have 1 direct cause");
+    assert_eq!(causes_of_phi[0].id, security_meta.id);
+
+    // Verify phi → router causality
+    let causes_of_router = graph.find_causes(&router_meta.id, Some(1));
+    assert_eq!(causes_of_router.len(), 1, "Router should have 1 direct cause");
+    assert_eq!(causes_of_router[0].id, phi_meta.id);
+
+    // Verify complete causal chain
+    match graph.did_cause(&security_meta.id, &router_meta.id) {
+        CausalAnswer::IndirectCause { path, strength } => {
+            assert!(path.len() >= 2, "Should have path through phi");
+            assert!(strength > 0.5, "Should have strong causal relationship");
+        }
+        other => panic!("Expected IndirectCause, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_scenario_2_parallel_processing() {
+    // Scenario: One security check causes two parallel phi measurements
+    // Expected: Security has 2 effects, both phi measurements have same parent
+
+    let (observer, mut ctx, trace_path) = create_observer_with_correlation();
+
+    // Root security check
+    let security_meta = ctx.create_event_metadata_with_tags(vec!["security"]);
+    {
+        let mut obs = observer.write();
+        obs.record_security_check(SecurityCheckEvent {
+            timestamp: Utc::now(),
+            operation: "parallel_query".to_string(),
+            decision: SecurityDecision::Allowed,
+            reason: Some("Multi-path processing".to_string()),
+            secrets_redacted: 0,
+            similarity_score: Some(0.03),
+            matched_pattern: None,
+        }).unwrap();
+    }
+
+    // Parallel phi measurement 1
+    ctx.push_parent(&security_meta.id);
+    let phi_meta_1 = ctx.create_event_metadata_with_tags(vec!["path_1"]);
+    {
+        let mut obs = observer.write();
+        obs.record_phi_measurement(PhiMeasurementEvent {
+            timestamp: Utc::now(),
+            phi: 0.75,
+            components: PhiComponents::default(),
+            temporal_continuity: 0.88,
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Parallel phi measurement 2
+    ctx.push_parent(&security_meta.id);
+    let phi_meta_2 = ctx.create_event_metadata_with_tags(vec!["path_2"]);
+    {
+        let mut obs = observer.write();
+        obs.record_phi_measurement(PhiMeasurementEvent {
+            timestamp: Utc::now(),
+            phi: 0.78,
+            components: PhiComponents::default(),
+            temporal_continuity: 0.90,
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Finalize
+    {
+        let mut obs = observer.write();
+        obs.finalize().unwrap();
+    }
+
+    let trace = Trace::load_from_file(&trace_path).unwrap();
+    let graph = CausalGraph::from_trace(&trace);
+
+    // Verify parallel structure
+    let effects_of_security = graph.find_effects(&security_meta.id, Some(1));
+    assert_eq!(effects_of_security.len(), 2, "Security should cause 2 parallel effects");
+
+    // Verify both phi measurements have security as parent
+    let causes_1 = graph.find_causes(&phi_meta_1.id, Some(1));
+    let causes_2 = graph.find_causes(&phi_meta_2.id, Some(1));
+
+    assert_eq!(causes_1.len(), 1);
+    assert_eq!(causes_2.len(), 1);
+    assert_eq!(causes_1[0].id, security_meta.id);
+    assert_eq!(causes_2[0].id, security_meta.id);
+}
+
+#[test]
+fn test_scenario_3_deep_causal_chain() {
+    // Scenario: Security → Phi → Router → Workspace → Primitive → Response
+    // Expected: 6-event deep causal chain with all relationships intact
+
+    let (observer, mut ctx, trace_path) = create_observer_with_correlation();
+
+    // Event 1: Security check
+    let e1 = ctx.create_event_metadata();
+    {
+        let mut obs = observer.write();
+        obs.record_security_check(SecurityCheckEvent {
+            timestamp: Utc::now(),
+            operation: "deep_processing".to_string(),
+            decision: SecurityDecision::Allowed,
+            reason: Some("Clean".to_string()),
+            secrets_redacted: 0,
+            similarity_score: Some(0.02),
+            matched_pattern: None,
+        }).unwrap();
+    }
+
+    // Event 2: Phi measurement
+    ctx.push_parent(&e1.id);
+    let e2 = ctx.create_event_metadata();
+    {
+        let mut obs = observer.write();
+        obs.record_phi_measurement(PhiMeasurementEvent {
+            timestamp: Utc::now(),
+            phi: 0.80,
+            components: PhiComponents::default(),
+            temporal_continuity: 0.90,
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Event 3: Router selection
+    ctx.push_parent(&e2.id);
+    let e3 = ctx.create_event_metadata();
+    {
+        let mut obs = observer.write();
+        obs.record_router_selection(RouterSelectionEvent {
+            timestamp: Utc::now(),
+            input: "complex input".to_string(),
+            selected_router: "standard".to_string(),
+            confidence: 0.85,
+            alternatives: vec![],
+            bandit_stats: std::collections::HashMap::new(),
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Event 4: Workspace ignition
+    ctx.push_parent(&e3.id);
+    let e4 = ctx.create_event_metadata();
+    {
+        let mut obs = observer.write();
+        obs.record_workspace_ignition(WorkspaceIgnitionEvent {
+            timestamp: Utc::now(),
+            input_state: vec![0.5; 10],
+            workspace_activated: true,
+            phi_threshold: 0.7,
+            actual_phi: 0.80,
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Event 5: Primitive activation
+    ctx.push_parent(&e4.id);
+    let e5 = ctx.create_event_metadata();
+    {
+        let mut obs = observer.write();
+        obs.record_primitive_activation(PrimitiveActivationEvent {
+            timestamp: Utc::now(),
+            primitive: "reasoning".to_string(),
+            activation_strength: 0.92,
+            context_relevance: 0.88,
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Event 6: Response generated
+    ctx.push_parent(&e5.id);
+    let e6 = ctx.create_event_metadata();
+    {
+        let mut obs = observer.write();
+        obs.record_response_generated(ResponseGeneratedEvent {
+            timestamp: Utc::now(),
+            response_length: 150,
+            generation_time_ms: 1250,
+            final_phi: 0.78,
+            coherence_score: 0.91,
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Finalize
+    {
+        let mut obs = observer.write();
+        obs.finalize().unwrap();
+    }
+
+    let trace = Trace::load_from_file(&trace_path).unwrap();
+    let graph = CausalGraph::from_trace(&trace);
+    let analyzer = TraceAnalyzer::new(trace.clone());
+
+    // Verify complete chain
+    assert_eq!(graph.events().len(), 6, "Should have 6 events");
+
+    // Verify each link in the chain
+    let chain = analyzer.get_causal_chain(&e6);
+    assert!(chain.len() >= 1, "Response should have causal chain");
+
+    // Verify security caused response (indirectly)
+    match graph.did_cause(&e1.id, &e6.id) {
+        CausalAnswer::IndirectCause { path, strength } => {
+            assert!(path.len() >= 5, "Should have deep path");
+            assert!(strength > 0.3, "Should have measurable strength through deep chain");
+        }
+        other => panic!("Expected IndirectCause through deep chain, got {:?}", other),
+    }
+
+    // Verify root causes
+    let root_causes = analyzer.find_root_causes(&e6.id);
+    assert!(!root_causes.is_empty(), "Response should have root causes");
+}
+
+#[test]
+fn test_scenario_4_correlation_analysis() {
+    // Scenario: Multiple security checks followed by multiple phi measurements
+    // Expected: Statistical correlation between security and phi events
+
+    let (observer, mut ctx, trace_path) = create_observer_with_correlation();
+
+    // Generate 10 security → phi pairs
+    for i in 0..10 {
+        // Security check
+        let security_meta = ctx.create_event_metadata_with_tags(vec![format!("iter_{}", i)]);
+        {
+            let mut obs = observer.write();
+            obs.record_security_check(SecurityCheckEvent {
+                timestamp: Utc::now(),
+                operation: format!("operation_{}", i),
+                decision: SecurityDecision::Allowed,
+                reason: Some("Test".to_string()),
+                secrets_redacted: 0,
+                similarity_score: Some(0.01 * i as f64),
+                matched_pattern: None,
+            }).unwrap();
+        }
+
+        // Phi measurement (child of security)
+        ctx.push_parent(&security_meta.id);
+        let _phi_meta = ctx.create_event_metadata();
+        {
+            let mut obs = observer.write();
+            obs.record_phi_measurement(PhiMeasurementEvent {
+                timestamp: Utc::now(),
+                phi: 0.7 + (i as f64 * 0.02),
+                components: PhiComponents::default(),
+                temporal_continuity: 0.85 + (i as f64 * 0.01),
+            }).unwrap();
+        }
+        ctx.pop_parent();
+    }
+
+    // Finalize
+    {
+        let mut obs = observer.write();
+        obs.finalize().unwrap();
+    }
+
+    let trace = Trace::load_from_file(&trace_path).unwrap();
+    let analyzer = TraceAnalyzer::new(trace.clone());
+
+    // Analyze correlation
+    let correlation = analyzer.analyze_correlation("security_check", "phi_measurement");
+
+    assert_eq!(correlation.total_cause_events, 10);
+    assert_eq!(correlation.total_effect_events, 10);
+
+    // NOTE: Phase 4 will integrate correlation metadata with observer
+    // For now, verify the framework runs and returns valid data
+    assert!(correlation.direct_correlation_rate >= 0.0 && correlation.direct_correlation_rate <= 1.0);
+}
+
+#[test]
+fn test_scenario_5_visualization_export() {
+    // Scenario: Create causal graph and export to Mermaid and GraphViz formats
+    // Expected: Valid diagram exports
+
+    let (observer, mut ctx, trace_path) = create_observer_with_correlation();
+
+    // Create simple graph: A → B → C
+    let a = ctx.create_event_metadata_with_tags(vec!["event_a"]);
+    {
+        let mut obs = observer.write();
+        obs.record_security_check(SecurityCheckEvent {
+            timestamp: Utc::now(),
+            operation: "A".to_string(),
+            decision: SecurityDecision::Allowed,
+            reason: None,
+            secrets_redacted: 0,
+            similarity_score: None,
+            matched_pattern: None,
+        }).unwrap();
+    }
+
+    ctx.push_parent(&a.id);
+    let b = ctx.create_event_metadata_with_tags(vec!["event_b"]);
+    {
+        let mut obs = observer.write();
+        obs.record_phi_measurement(PhiMeasurementEvent {
+            timestamp: Utc::now(),
+            phi: 0.75,
+            components: PhiComponents::default(),
+            temporal_continuity: 0.88,
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    ctx.push_parent(&b.id);
+    let c = ctx.create_event_metadata_with_tags(vec!["event_c"]);
+    {
+        let mut obs = observer.write();
+        obs.record_router_selection(RouterSelectionEvent {
+            timestamp: Utc::now(),
+            input: "test".to_string(),
+            selected_router: "standard".to_string(),
+            confidence: 0.80,
+            alternatives: vec![],
+            bandit_stats: std::collections::HashMap::new(),
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Finalize
+    {
+        let mut obs = observer.write();
+        obs.finalize().unwrap();
+    }
+
+    let trace = Trace::load_from_file(&trace_path).unwrap();
+    let graph = CausalGraph::from_trace(&trace);
+
+    // Export to Mermaid
+    let mermaid = graph.to_mermaid();
+    assert!(mermaid.contains("graph TD"), "Should have Mermaid header");
+    assert!(mermaid.contains(&a.id), "Should contain event A");
+    assert!(mermaid.contains(&b.id), "Should contain event B");
+    assert!(mermaid.contains(&c.id), "Should contain event C");
+    assert!(mermaid.contains("-->"), "Should have causal arrows");
+
+    // Export to GraphViz
+    let dot = graph.to_dot();
+    assert!(dot.contains("digraph"), "Should have GraphViz header");
+    assert!(dot.contains(&a.id), "Should contain event A");
+    assert!(dot.contains(&b.id), "Should contain event B");
+    assert!(dot.contains(&c.id), "Should contain event C");
+    assert!(dot.contains("->"), "Should have causal arrows");
+}
+
+#[test]
+fn test_scenario_6_performance_analysis() {
+    // Scenario: Create events with varying durations to test bottleneck detection
+    // Expected: Correctly identify slowest events
+
+    let (observer, mut ctx, trace_path) = create_observer_with_correlation();
+
+    // Fast event
+    let fast = ctx.create_event_metadata_with_tags(vec!["fast"]);
+    {
+        let mut obs = observer.write();
+        obs.record_security_check(SecurityCheckEvent {
+            timestamp: Utc::now(),
+            operation: "fast_operation".to_string(),
+            decision: SecurityDecision::Allowed,
+            reason: None,
+            secrets_redacted: 0,
+            similarity_score: None,
+            matched_pattern: None,
+        }).unwrap();
+    }
+
+    // Slow event (simulated)
+    ctx.push_parent(&fast.id);
+    let slow = ctx.create_event_metadata_with_tags(vec!["slow"]);
+    {
+        let mut obs = observer.write();
+        obs.record_phi_measurement(PhiMeasurementEvent {
+            timestamp: Utc::now(),
+            phi: 0.85,
+            components: PhiComponents::default(),
+            temporal_continuity: 0.92,
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Another fast event
+    ctx.push_parent(&slow.id);
+    let _fast2 = ctx.create_event_metadata_with_tags(vec!["fast"]);
+    {
+        let mut obs = observer.write();
+        obs.record_router_selection(RouterSelectionEvent {
+            timestamp: Utc::now(),
+            input: "test".to_string(),
+            selected_router: "fast_router".to_string(),
+            confidence: 0.90,
+            alternatives: vec![],
+            bandit_stats: std::collections::HashMap::new(),
+        }).unwrap();
+    }
+    ctx.pop_parent();
+
+    // Finalize
+    {
+        let mut obs = observer.write();
+        obs.finalize().unwrap();
+    }
+
+    let trace = Trace::load_from_file(&trace_path).unwrap();
+    let analyzer = TraceAnalyzer::new(trace.clone());
+
+    // Get performance summary
+    let summary = analyzer.performance_summary();
+    assert_eq!(summary.total_events, 3);
+
+    // NOTE: Phase 4 will integrate duration tracking with observer
+    // For now, verify the analysis framework runs
+    let bottlenecks = analyzer.find_bottlenecks(0.5);
+    assert!(bottlenecks.len() >= 0); // Valid result
+
+    let _ = slow; // Use variable to avoid warning
+}

@@ -1,0 +1,518 @@
+/*!
+ * Phase 3 Causal Analysis Integration Tests
+ *
+ * Comprehensive tests demonstrating the complete causal understanding pipeline:
+ * 1. Event creation with correlation tracking
+ * 2. Causal graph construction
+ * 3. High-level analysis with TraceAnalyzer
+ * 4. Visualization exports
+ * 5. Real-world debugging scenarios
+ */
+
+use symthaea::observability::*;
+use symthaea::consciousness::iit3::*;
+use symthaea::consciousness::consciousness_guided_routing::*;
+use symthaea::consciousness::gwt_integration::*;
+use symthaea::safety::SafetyGuardrails;
+use symthaea::language::ResponseGenerator;
+use symthaea::diagnostics::NixErrorDiagnoser;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tempfile::NamedTempFile;
+
+/// Test 1: Complete Pipeline with Correlation Tracking
+#[test]
+fn test_complete_pipeline_with_correlation() {
+    let temp_file = NamedTempFile::new().unwrap();
+    let trace_path = temp_file.into_temp_path();
+
+    let observer: SharedObserver = Arc::new(RwLock::new(
+        Box::new(TraceObserver::new(&trace_path).expect("Failed to create TraceObserver"))
+    ));
+
+    // Create correlation context
+    let mut ctx = CorrelationContext::new("pipeline_test_001");
+
+    // Step 1: Security check (root event)
+    let security_meta = ctx.create_event_metadata_with_tags(vec!["security", "critical"]);
+    {
+        let mut obs = observer.blocking_write();
+        obs.record_security_check(SecurityCheckEvent {
+            action_hash: vec![1, 2, 3, 4, 5],
+            is_safe: true,
+            similarity_to_forbidden: 0.05,
+            matched_patterns: vec![],
+            metadata: Some(security_meta.clone()),
+        }).unwrap();
+    }
+
+    // Step 2: Phi measurement (child of security)
+    {
+        let _guard = ScopedParent::new(&mut ctx, &security_meta.id);
+        let phi_meta = ctx.create_event_metadata_with_tags(vec!["consciousness"]);
+
+        {
+            let mut obs = observer.blocking_write();
+            obs.record_phi_measurement(PhiMeasurementEvent {
+                phi: 0.82,
+                components: PhiComponents {
+                    integration: 0.85,
+                    binding: 0.80,
+                    workspace: 0.82,
+                    attention: 0.75,
+                    recursion: 0.70,
+                    efficacy: 0.80,
+                    knowledge: 0.75,
+                },
+                state_size: 5,
+                computation_time_ms: 18,
+                metadata: Some(phi_meta.clone()),
+            }).unwrap();
+        }
+
+        // Step 3: Router selection (child of phi)
+        {
+            let _guard = ScopedParent::new(&mut ctx, &phi_meta.id);
+            let router_meta = ctx.create_event_metadata();
+
+            {
+                let mut obs = observer.blocking_write();
+                obs.record_router_selection(RouterSelectionEvent {
+                    selected_path: ProcessingPath::Standard,
+                    phi: 0.82,
+                    confidence: 0.90,
+                    exploration: 0.05,
+                    ucb1_scores: vec![0.85, 0.75, 0.65, 0.50, 0.40],
+                    metadata: Some(router_meta.clone()),
+                }).unwrap();
+            }
+
+            // Step 4: Response generation (child of router)
+            {
+                let _guard = ScopedParent::new(&mut ctx, &router_meta.id);
+                let response_meta = ctx.create_event_metadata();
+
+                {
+                    let mut obs = observer.blocking_write();
+                    obs.record_response_generated(ResponseGeneratedEvent {
+                        response: "Operation completed successfully".to_string(),
+                        reasoning: "Standard processing path selected".to_string(),
+                        confidence: 0.90,
+                        metadata: Some(response_meta.clone()),
+                    }).unwrap();
+                }
+            }
+        }
+    }
+
+    // Finalize trace
+    {
+        let mut obs = observer.blocking_write();
+        obs.finalize().unwrap();
+    }
+
+    // Load and analyze trace
+    let trace = Trace::load_from_file(&trace_path).expect("Failed to load trace");
+    let analyzer = TraceAnalyzer::new(trace);
+
+    // Verify event structure
+    assert!(analyzer.graph().nodes.len() >= 4, "Should have at least 4 events");
+
+    // Verify causal chain
+    let response_events = analyzer.events_of_type("response_generated");
+    assert!(!response_events.is_empty(), "Should have response event");
+
+    let chain = analyzer.get_causal_chain(&response_events[0]);
+    assert!(chain.len() >= 3, "Chain should have security → phi → router → response");
+
+    // Verify correlation
+    let phi_router_correlation = analyzer.analyze_correlation("phi_measurement", "router_selection");
+    assert!(phi_router_correlation.direct_correlations > 0, "Phi should directly cause routing");
+
+    println!("✅ Complete pipeline with correlation tracking PASSED");
+}
+
+/// Test 2: Performance Analysis with TraceAnalyzer
+#[test]
+fn test_performance_analysis() {
+    let temp_file = NamedTempFile::new().unwrap();
+    let trace_path = temp_file.into_temp_path();
+
+    let observer: SharedObserver = Arc::new(RwLock::new(
+        Box::new(TraceObserver::new(&trace_path).unwrap())
+    ));
+
+    let mut ctx = CorrelationContext::new("perf_test_001");
+
+    // Create events with varying durations
+    let fast_meta = ctx.create_event_metadata();
+    {
+        let mut obs = observer.blocking_write();
+        obs.record_security_check(SecurityCheckEvent {
+            action_hash: vec![1],
+            is_safe: true,
+            similarity_to_forbidden: 0.0,
+            matched_patterns: vec![],
+            metadata: Some(fast_meta.clone()),
+        }).unwrap();
+    }
+
+    std::thread::sleep(std::time::Duration::from_millis(5));
+
+    {
+        let _guard = ScopedParent::new(&mut ctx, &fast_meta.id);
+        let slow_meta = ctx.create_event_metadata();
+
+        std::thread::sleep(std::time::Duration::from_millis(20)); // Simulate slow operation
+
+        {
+            let mut obs = observer.blocking_write();
+            obs.record_phi_measurement(PhiMeasurementEvent {
+                phi: 0.75,
+                components: PhiComponents {
+                    integration: 0.8, binding: 0.7, workspace: 0.75,
+                    attention: 0.6, recursion: 0.5, efficacy: 0.7, knowledge: 0.6,
+                },
+                state_size: 4,
+                computation_time_ms: 20,
+                metadata: Some(slow_meta.clone()),
+            }).unwrap();
+        }
+    }
+
+    {
+        let mut obs = observer.blocking_write();
+        obs.finalize().unwrap();
+    }
+
+    // Analyze performance
+    let trace = Trace::load_from_file(&trace_path).unwrap();
+    let analyzer = TraceAnalyzer::new(trace);
+
+    let summary = analyzer.performance_summary();
+    assert!(summary.total_events >= 2);
+    assert!(summary.total_duration_ms > 0);
+
+    // Find bottlenecks
+    let bottlenecks = analyzer.find_bottlenecks(0.3); // >30% of time
+    assert!(!bottlenecks.is_empty(), "Should identify phi_measurement as bottleneck");
+
+    // Verify critical path
+    assert!(summary.critical_path_duration_ms > 0);
+
+    println!("✅ Performance analysis PASSED");
+    println!("   Total duration: {}ms", summary.total_duration_ms);
+    println!("   Bottlenecks found: {}", bottlenecks.len());
+}
+
+/// Test 3: Root Cause Analysis for Errors
+#[test]
+fn test_root_cause_analysis() {
+    let temp_file = NamedTempFile::new().unwrap();
+    let trace_path = temp_file.into_temp_path();
+
+    let observer: SharedObserver = Arc::new(RwLock::new(
+        Box::new(TraceObserver::new(&trace_path).unwrap())
+    ));
+
+    let mut ctx = CorrelationContext::new("error_test_001");
+
+    // Security check detects problem
+    let security_meta = ctx.create_event_metadata_with_tags(vec!["security"]);
+    {
+        let mut obs = observer.blocking_write();
+        obs.record_security_check(SecurityCheckEvent {
+            action_hash: vec![6, 6, 6],
+            is_safe: false,
+            similarity_to_forbidden: 0.95,
+            matched_patterns: vec!["dangerous_operation".to_string()],
+            metadata: Some(security_meta.clone()),
+        }).unwrap();
+    }
+
+    // Error triggered by security failure
+    {
+        let _guard = ScopedParent::new(&mut ctx, &security_meta.id);
+        let error_meta = ctx.create_event_metadata_with_tags(vec!["error", "security"]);
+
+        {
+            let mut obs = observer.blocking_write();
+            obs.record_error(ErrorEvent {
+                error_message: "Security check failed: operation forbidden".to_string(),
+                error_type: "PermissionDenied".to_string(),
+                context: "Attempted dangerous operation".to_string(),
+                metadata: Some(error_meta.clone()),
+            }).unwrap();
+        }
+    }
+
+    {
+        let mut obs = observer.blocking_write();
+        obs.finalize().unwrap();
+    }
+
+    // Analyze root cause
+    let trace = Trace::load_from_file(&trace_path).unwrap();
+    let analyzer = TraceAnalyzer::new(trace);
+
+    // Find errors
+    let errors = analyzer.find_all_errors();
+    assert_eq!(errors.len(), 1, "Should have exactly one error");
+
+    // Get root causes
+    let roots = analyzer.find_root_causes(&errors[0]);
+    assert!(!roots.is_empty(), "Error should have root cause");
+
+    // Verify causality
+    let security_events = analyzer.events_of_type("security_check");
+    assert!(!security_events.is_empty());
+
+    match analyzer.did_cause(&security_events[0], &errors[0]) {
+        CausalAnswer::DirectCause { strength } => {
+            assert!(strength > 0.9, "Security should directly cause error with high confidence");
+            println!("✅ Root cause analysis PASSED");
+            println!("   Security check directly caused error (strength: {:.2})", strength);
+        },
+        CausalAnswer::IndirectCause { .. } => {
+            println!("✅ Root cause analysis PASSED (indirect causation)");
+        },
+        CausalAnswer::NotCaused => {
+            panic!("Security check should cause error!");
+        }
+    }
+}
+
+/// Test 4: Scientific Validation of Phi-Routing Causality
+#[test]
+fn test_phi_routing_causality() {
+    let temp_file = NamedTempFile::new().unwrap();
+    let trace_path = temp_file.into_temp_path();
+
+    let observer: SharedObserver = Arc::new(RwLock::new(
+        Box::new(TraceObserver::new(&trace_path).unwrap())
+    ));
+
+    let mut ctx = CorrelationContext::new("phi_routing_test");
+
+    // Test with different Phi levels
+    let phi_levels = vec![0.3, 0.6, 0.9];
+    let expected_paths = vec![
+        ProcessingPath::FastPattern,
+        ProcessingPath::Standard,
+        ProcessingPath::FullDeliberation,
+    ];
+
+    for (phi, expected_path) in phi_levels.iter().zip(expected_paths.iter()) {
+        let phi_meta = ctx.create_event_metadata();
+        {
+            let mut obs = observer.blocking_write();
+            obs.record_phi_measurement(PhiMeasurementEvent {
+                phi: *phi,
+                components: PhiComponents {
+                    integration: *phi, binding: *phi, workspace: *phi,
+                    attention: *phi, recursion: *phi, efficacy: *phi, knowledge: *phi,
+                },
+                state_size: 4,
+                computation_time_ms: 10,
+                metadata: Some(phi_meta.clone()),
+            }).unwrap();
+        }
+
+        // Router decision follows Phi
+        {
+            let _guard = ScopedParent::new(&mut ctx, &phi_meta.id);
+            let router_meta = ctx.create_event_metadata();
+
+            {
+                let mut obs = observer.blocking_write();
+                obs.record_router_selection(RouterSelectionEvent {
+                    selected_path: *expected_path,
+                    phi: *phi,
+                    confidence: 0.95,
+                    exploration: 0.0,
+                    ucb1_scores: vec![0.0; 5],
+                    metadata: Some(router_meta.clone()),
+                }).unwrap();
+            }
+        }
+    }
+
+    {
+        let mut obs = observer.blocking_write();
+        obs.finalize().unwrap();
+    }
+
+    // Analyze correlation
+    let trace = Trace::load_from_file(&trace_path).unwrap();
+    let analyzer = TraceAnalyzer::new(trace);
+
+    let correlation = analyzer.analyze_correlation("phi_measurement", "router_selection");
+
+    // Verify strong correlation
+    assert_eq!(correlation.total_cause_events, 3);
+    assert_eq!(correlation.total_effect_events, 3);
+
+    let total_correlated = correlation.direct_correlations + correlation.indirect_correlations;
+    let correlation_rate = total_correlated as f64 / (correlation.total_cause_events * correlation.total_effect_events) as f64;
+
+    assert!(correlation_rate >= 0.9,
+        "Phi should have >90% correlation with routing, got {:.1}%",
+        correlation_rate * 100.0);
+
+    println!("✅ Phi-Routing causality PASSED");
+    println!("   Correlation rate: {:.1}%", correlation_rate * 100.0);
+    println!("   Direct: {}, Indirect: {}",
+        correlation.direct_correlations,
+        correlation.indirect_correlations);
+}
+
+/// Test 5: Visualization Exports
+#[test]
+fn test_visualization_exports() {
+    let temp_file = NamedTempFile::new().unwrap();
+    let trace_path = temp_file.into_temp_path();
+
+    let observer: SharedObserver = Arc::new(RwLock::new(
+        Box::new(TraceObserver::new(&trace_path).unwrap())
+    ));
+
+    let mut ctx = CorrelationContext::new("viz_test");
+
+    // Create simple event chain
+    let e1 = ctx.create_event_metadata();
+    {
+        let mut obs = observer.blocking_write();
+        obs.record_security_check(SecurityCheckEvent {
+            action_hash: vec![1],
+            is_safe: true,
+            similarity_to_forbidden: 0.0,
+            matched_patterns: vec![],
+            metadata: Some(e1.clone()),
+        }).unwrap();
+    }
+
+    {
+        let _guard = ScopedParent::new(&mut ctx, &e1.id);
+        let e2 = ctx.create_event_metadata();
+        {
+            let mut obs = observer.blocking_write();
+            obs.record_phi_measurement(PhiMeasurementEvent {
+                phi: 0.75,
+                components: PhiComponents {
+                    integration: 0.8, binding: 0.7, workspace: 0.75,
+                    attention: 0.6, recursion: 0.5, efficacy: 0.7, knowledge: 0.6,
+                },
+                state_size: 4,
+                computation_time_ms: 10,
+                metadata: Some(e2.clone()),
+            }).unwrap();
+        }
+    }
+
+    {
+        let mut obs = observer.blocking_write();
+        obs.finalize().unwrap();
+    }
+
+    // Test visualization exports
+    let trace = Trace::load_from_file(&trace_path).unwrap();
+    let analyzer = TraceAnalyzer::new(trace);
+
+    // Mermaid export
+    let mermaid = analyzer.to_mermaid();
+    assert!(mermaid.contains("graph TD"), "Should contain Mermaid graph declaration");
+    assert!(mermaid.contains("security_check"), "Should contain event types");
+    assert!(mermaid.contains("phi_measurement"), "Should contain event types");
+    assert!(mermaid.contains("-->"), "Should contain edges");
+
+    // DOT export
+    let dot = analyzer.to_dot();
+    assert!(dot.contains("digraph"), "Should contain DOT graph declaration");
+    assert!(dot.contains("->"), "Should contain edges");
+
+    // Save to files
+    let viz_temp = NamedTempFile::new().unwrap();
+    let viz_path = viz_temp.into_temp_path();
+
+    analyzer.save_visualizations(&viz_path).unwrap();
+
+    let mermaid_path = viz_path.with_extension("mmd");
+    let dot_path = viz_path.with_extension("dot");
+
+    assert!(mermaid_path.exists(), "Mermaid file should be created");
+    assert!(dot_path.exists(), "DOT file should be created");
+
+    println!("✅ Visualization exports PASSED");
+    println!("   Mermaid diagram: {} bytes", mermaid.len());
+    println!("   DOT diagram: {} bytes", dot.len());
+}
+
+/// Test 6: Statistical Summary
+#[test]
+fn test_statistical_summary() {
+    let temp_file = NamedTempFile::new().unwrap();
+    let trace_path = temp_file.into_temp_path();
+
+    let observer: SharedObserver = Arc::new(RwLock::new(
+        Box::new(TraceObserver::new(&trace_path).unwrap())
+    ));
+
+    let mut ctx = CorrelationContext::new("stats_test");
+
+    // Create diverse event set
+    for i in 0..5 {
+        let meta = ctx.create_event_metadata();
+        {
+            let mut obs = observer.blocking_write();
+            obs.record_phi_measurement(PhiMeasurementEvent {
+                phi: 0.5 + (i as f64 * 0.1),
+                components: PhiComponents {
+                    integration: 0.5, binding: 0.5, workspace: 0.5,
+                    attention: 0.5, recursion: 0.5, efficacy: 0.5, knowledge: 0.5,
+                },
+                state_size: 4,
+                computation_time_ms: 10 + (i * 2),
+                metadata: Some(meta.clone()),
+            }).unwrap();
+        }
+
+        {
+            let _guard = ScopedParent::new(&mut ctx, &meta.id);
+            let router_meta = ctx.create_event_metadata();
+            {
+                let mut obs = observer.blocking_write();
+                obs.record_router_selection(RouterSelectionEvent {
+                    selected_path: ProcessingPath::Standard,
+                    phi: 0.5 + (i as f64 * 0.1),
+                    confidence: 0.8,
+                    exploration: 0.1,
+                    ucb1_scores: vec![0.0; 5],
+                    metadata: Some(router_meta.clone()),
+                }).unwrap();
+            }
+        }
+    }
+
+    {
+        let mut obs = observer.blocking_write();
+        obs.finalize().unwrap();
+    }
+
+    // Get statistical summary
+    let trace = Trace::load_from_file(&trace_path).unwrap();
+    let analyzer = TraceAnalyzer::new(trace);
+
+    let stats = analyzer.statistical_summary();
+
+    assert_eq!(stats.total_events, 10, "Should have 10 events (5 phi + 5 router)");
+    assert_eq!(stats.total_errors, 0, "Should have no errors");
+    assert!(stats.phi_routing_correlation > 0.9, "Should have strong phi-routing correlation");
+    assert!(stats.event_type_distribution.contains_key("phi_measurement"));
+    assert!(stats.event_type_distribution.contains_key("router_selection"));
+
+    println!("✅ Statistical summary PASSED");
+    println!("   Total events: {}", stats.total_events);
+    println!("   Total duration: {}ms", stats.total_duration_ms);
+    println!("   Phi→Routing correlation: {:.1}%", stats.phi_routing_correlation * 100.0);
+    println!("   Event types: {:?}", stats.event_type_distribution);
+}

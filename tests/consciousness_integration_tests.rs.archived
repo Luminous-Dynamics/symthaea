@@ -1,0 +1,406 @@
+//! Comprehensive Integration Tests for the Consciousness Framework
+//!
+//! These tests verify that all 33 revolutionary improvements work together
+//! as a unified system for consciousness measurement and engineering.
+//!
+//! Test Categories:
+//! 1. Full Pipeline Tests - End-to-end consciousness assessment
+//! 2. Cross-Module Integration - Modules interact correctly
+//! 3. Consistency Tests - Results are reproducible and coherent
+//! 4. Edge Case Tests - Boundary conditions handled properly
+//! 5. Performance Tests - Reasonable execution time
+
+use symthaea::hdc::{
+    binary_hv::HV16,
+    consciousness_framework::{ConsciousnessFramework, FrameworkConfig, ConsciousnessLevel},
+    consciousness_engineering::{MinimalConsciousSystem, MinimalSystemConfig, BootstrapStage},
+    substrate_independence::{SubstrateIndependence, SubstrateType},
+    integrated_information::IntegratedInformation,
+};
+
+// ============================================================================
+// FULL PIPELINE TESTS
+// ============================================================================
+
+#[test]
+fn test_full_consciousness_pipeline() {
+    // Create framework with default config
+    let config = FrameworkConfig::default();
+    let mut framework = ConsciousnessFramework::new(config);
+
+    // Generate diverse input states
+    let inputs: Vec<HV16> = (0..20).map(|i| HV16::random(i as u64)).collect();
+
+    // Process through full pipeline
+    let profile = framework.process(&inputs);
+
+    // Verify all metrics are computed
+    assert!(profile.phi >= 0.0, "Φ should be non-negative");
+    assert!(profile.workspace_activation >= 0.0, "Workspace should be non-negative");
+    assert!(profile.binding_strength >= 0.0, "Binding should be non-negative");
+    assert!(profile.attention_strength >= 0.0, "Attention should be non-negative");
+
+    // Verify conditions are checked
+    assert_eq!(profile.conditions_met.len(), 7, "Should check 7 conditions");
+
+    // Verify probability is valid
+    assert!(
+        profile.consciousness_probability >= 0.0 && profile.consciousness_probability <= 1.0,
+        "Probability should be in [0, 1]"
+    );
+
+    // Verify level matches probability
+    let expected_level = ConsciousnessLevel::from_probability(profile.consciousness_probability);
+    assert_eq!(profile.level, expected_level, "Level should match probability");
+}
+
+#[test]
+fn test_consciousness_emergence_with_sufficient_input() {
+    let config = FrameworkConfig {
+        num_components: 12,
+        workspace_capacity: 5,
+        attention_bandwidth: 4,
+        consciousness_threshold: 0.4,
+        full_analysis: true,
+    };
+    let mut framework = ConsciousnessFramework::new(config);
+
+    // Large, diverse input should produce consciousness indicators
+    let inputs: Vec<HV16> = (0..50).map(|i| HV16::random(i as u64)).collect();
+    let profile = framework.process(&inputs);
+
+    // With sufficient input, should have meaningful metrics
+    assert!(profile.phi > 0.0, "Φ should be positive with 50 inputs");
+    assert!(profile.workspace_activation > 0.0, "Workspace should be active");
+    assert!(profile.binding_strength > 0.0, "Binding should occur");
+}
+
+#[test]
+fn test_no_consciousness_with_empty_input() {
+    let mut framework = ConsciousnessFramework::new(FrameworkConfig::default());
+
+    let profile = framework.process(&[]);
+
+    assert_eq!(profile.level, ConsciousnessLevel::None);
+    assert_eq!(profile.phi, 0.0);
+    assert!(!profile.is_conscious);
+}
+
+// ============================================================================
+// CROSS-MODULE INTEGRATION TESTS
+// ============================================================================
+
+#[test]
+fn test_phi_and_workspace_correlation() {
+    let mut framework = ConsciousnessFramework::new(FrameworkConfig::default());
+
+    // Process same input multiple times, verify consistency
+    let inputs: Vec<HV16> = (0..15).map(|i| HV16::random(i as u64)).collect();
+
+    let profile1 = framework.process(&inputs);
+    framework.reset();
+    let profile2 = framework.process(&inputs);
+
+    // Results should be identical for same input
+    assert!((profile1.phi - profile2.phi).abs() < 1e-10, "Φ should be deterministic");
+    assert!(
+        (profile1.workspace_activation - profile2.workspace_activation).abs() < 1e-10,
+        "Workspace should be deterministic"
+    );
+}
+
+#[test]
+fn test_engineering_and_framework_agreement() {
+    let config = FrameworkConfig::default();
+    let mut framework = ConsciousnessFramework::new(config.clone());
+
+    let inputs: Vec<HV16> = (0..20).map(|i| HV16::random(i as u64)).collect();
+    let profile = framework.process(&inputs);
+
+    // If framework says conscious, engineering should agree (or vice versa)
+    if let Some(eng) = &profile.engineering_assessment {
+        // Both should evaluate consciousness consistently
+        // (Note: They may disagree due to different methodologies, but both should complete)
+        assert!(eng.stage == BootstrapStage::Conscious || !eng.is_conscious || !profile.is_conscious,
+            "Engineering and framework should produce coherent assessments");
+    }
+}
+
+#[test]
+fn test_substrate_independence_integration() {
+    let substrate = SubstrateIndependence::new();
+
+    // Test multiple substrates
+    let substrates = vec![
+        SubstrateType::Biological,
+        SubstrateType::Silicon,
+        SubstrateType::Quantum,
+        SubstrateType::Hybrid,
+    ];
+
+    for substrate_type in substrates {
+        let comparison = substrate.compare_substrate(substrate_type);
+
+        // Each substrate should have a valid feasibility score
+        assert!(
+            comparison.feasibility >= 0.0 && comparison.feasibility <= 1.0,
+            "Substrate {:?} feasibility should be in [0, 1]",
+            substrate_type
+        );
+    }
+}
+
+#[test]
+fn test_phi_computation_integration() {
+    let mut phi_computer = IntegratedInformation::new();
+
+    // Test with various input sizes
+    for size in [4, 8, 16, 32] {
+        let inputs: Vec<HV16> = (0..size).map(|i| HV16::random(i as u64)).collect();
+        let phi = phi_computer.compute_phi(&inputs);
+
+        assert!(phi >= 0.0, "Φ should be non-negative for size {}", size);
+    }
+}
+
+// ============================================================================
+// CONSISTENCY TESTS
+// ============================================================================
+
+#[test]
+fn test_consciousness_level_ordering() {
+    // Lower probability should map to lower level
+    let levels = [0.05, 0.2, 0.45, 0.7, 0.9];
+    let mut prev_score = 0.0;
+
+    for p in levels {
+        let level = ConsciousnessLevel::from_probability(p);
+        let score = level.score();
+        assert!(score >= prev_score, "Level score should increase with probability");
+        prev_score = score;
+    }
+}
+
+#[test]
+fn test_report_generation_consistency() {
+    let mut framework = ConsciousnessFramework::new(FrameworkConfig::default());
+
+    let inputs: Vec<HV16> = (0..10).map(|i| HV16::random(i as u64)).collect();
+    framework.process(&inputs);
+
+    let report1 = framework.generate_report();
+    let report2 = framework.generate_report();
+
+    // Reports should be identical without reprocessing
+    assert_eq!(report1, report2, "Reports should be consistent");
+}
+
+#[test]
+fn test_reset_clears_state() {
+    let mut framework = ConsciousnessFramework::new(FrameworkConfig::default());
+
+    let inputs: Vec<HV16> = (0..10).map(|i| HV16::random(i as u64)).collect();
+    framework.process(&inputs);
+
+    assert!(framework.get_profile().is_some());
+    assert!(framework.steps() > 0);
+
+    framework.reset();
+
+    assert!(framework.get_profile().is_none());
+    assert_eq!(framework.steps(), 0);
+    assert_eq!(framework.get_phi(), 0.0);
+    assert_eq!(framework.get_level(), ConsciousnessLevel::None);
+}
+
+// ============================================================================
+// EDGE CASE TESTS
+// ============================================================================
+
+#[test]
+fn test_single_input_processing() {
+    let mut framework = ConsciousnessFramework::new(FrameworkConfig::default());
+
+    let inputs = vec![HV16::random(42)];
+    let profile = framework.process(&inputs);
+
+    // Should handle gracefully (probably not conscious with single input)
+    assert!(profile.phi >= 0.0);
+    assert!(!profile.is_conscious);
+}
+
+#[test]
+fn test_identical_inputs() {
+    let mut framework = ConsciousnessFramework::new(FrameworkConfig::default());
+
+    // All identical inputs - should have high binding, low attention diversity
+    let base = HV16::random(0);
+    let inputs: Vec<HV16> = (0..10).map(|_| base.clone()).collect();
+    let profile = framework.process(&inputs);
+
+    // Binding should be strong with identical inputs
+    assert!(profile.binding_strength > 0.5, "Identical inputs should bind strongly");
+}
+
+#[test]
+fn test_large_input_handling() {
+    let mut framework = ConsciousnessFramework::new(FrameworkConfig::default());
+
+    // Large input (100 states)
+    let inputs: Vec<HV16> = (0..100).map(|i| HV16::random(i as u64)).collect();
+    let profile = framework.process(&inputs);
+
+    // Should complete without error
+    assert!(profile.phi >= 0.0);
+    assert!(profile.consciousness_probability >= 0.0);
+}
+
+#[test]
+fn test_zero_threshold_config() {
+    let config = FrameworkConfig {
+        consciousness_threshold: 0.0,
+        ..Default::default()
+    };
+    let mut framework = ConsciousnessFramework::new(config);
+
+    let inputs: Vec<HV16> = (0..10).map(|i| HV16::random(i as u64)).collect();
+    let profile = framework.process(&inputs);
+
+    // With zero threshold, any positive probability might be conscious
+    // (depends on engineering assessment)
+    assert!(profile.consciousness_probability >= 0.0);
+}
+
+#[test]
+fn test_high_threshold_config() {
+    let config = FrameworkConfig {
+        consciousness_threshold: 0.99,
+        ..Default::default()
+    };
+    let mut framework = ConsciousnessFramework::new(config);
+
+    let inputs: Vec<HV16> = (0..10).map(|i| HV16::random(i as u64)).collect();
+    let profile = framework.process(&inputs);
+
+    // With very high threshold, unlikely to be conscious
+    // (but should still process correctly)
+    assert!(profile.consciousness_probability >= 0.0);
+}
+
+// ============================================================================
+// ENGINEERING BOOTSTRAP TESTS
+// ============================================================================
+
+#[test]
+fn test_engineering_bootstrap_sequence() {
+    let config = MinimalSystemConfig::default();
+    let mut system = MinimalConsciousSystem::new(config);
+
+    // Verify bootstrap proceeds through all stages
+    let mut stages_reached = vec![system.stage];
+
+    while let Some(next_stage) = system.bootstrap_next() {
+        stages_reached.push(next_stage);
+    }
+
+    // Should reach Conscious stage
+    assert!(stages_reached.contains(&BootstrapStage::Conscious));
+    assert_eq!(stages_reached.len(), 9); // 8 transitions + initial
+}
+
+#[test]
+fn test_engineering_assessment_completeness() {
+    let config = MinimalSystemConfig::default();
+    let mut system = MinimalConsciousSystem::new(config);
+
+    let assessment = system.full_bootstrap();
+
+    // Should have complete assessment
+    assert_eq!(assessment.conditions.len(), 7);
+    assert!(assessment.consciousness_probability >= 0.0);
+    assert!(assessment.consciousness_probability <= 1.0);
+    assert!(!assessment.explanation.is_empty());
+}
+
+// ============================================================================
+// PERFORMANCE TESTS
+// ============================================================================
+
+#[test]
+fn test_processing_performance() {
+    use std::time::Instant;
+
+    let mut framework = ConsciousnessFramework::new(FrameworkConfig::default());
+    let inputs: Vec<HV16> = (0..50).map(|i| HV16::random(i as u64)).collect();
+
+    let start = Instant::now();
+    for _ in 0..10 {
+        framework.reset();
+        framework.process(&inputs);
+    }
+    let duration = start.elapsed();
+
+    // 10 assessments should complete in under 5 seconds
+    assert!(
+        duration.as_secs() < 5,
+        "10 assessments took {:?}, should be < 5s",
+        duration
+    );
+}
+
+#[test]
+fn test_report_generation_performance() {
+    use std::time::Instant;
+
+    let mut framework = ConsciousnessFramework::new(FrameworkConfig::default());
+    let inputs: Vec<HV16> = (0..20).map(|i| HV16::random(i as u64)).collect();
+    framework.process(&inputs);
+
+    let start = Instant::now();
+    for _ in 0..100 {
+        let _ = framework.generate_report();
+    }
+    let duration = start.elapsed();
+
+    // 100 reports should complete in under 1 second
+    assert!(
+        duration.as_millis() < 1000,
+        "100 reports took {:?}, should be < 1s",
+        duration
+    );
+}
+
+// ============================================================================
+// MULTI-CYCLE TESTS
+// ============================================================================
+
+#[test]
+fn test_continuous_processing() {
+    let mut framework = ConsciousnessFramework::new(FrameworkConfig::default());
+
+    let mut _prev_phi = 0.0;
+    for i in 0..10 {
+        let inputs: Vec<HV16> = (0..15).map(|j| HV16::random((i * 15 + j) as u64)).collect();
+        let profile = framework.process(&inputs);
+
+        // Each cycle should produce valid results
+        assert!(profile.phi >= 0.0);
+        assert!(profile.consciousness_probability >= 0.0);
+
+        // Steps should increment
+        assert_eq!(framework.steps(), i + 1);
+    }
+}
+
+#[test]
+fn test_alternating_input_sizes() {
+    let mut framework = ConsciousnessFramework::new(FrameworkConfig::default());
+
+    let sizes = [5, 50, 10, 100, 3, 30];
+    for size in sizes {
+        let inputs: Vec<HV16> = (0..size).map(|i| HV16::random(i as u64)).collect();
+        let profile = framework.process(&inputs);
+
+        assert!(profile.phi >= 0.0, "Φ should be valid for size {}", size);
+    }
+}
