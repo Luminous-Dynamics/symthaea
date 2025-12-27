@@ -21,7 +21,7 @@ use symthaea::hdc::{
 
 fn main() {
     println!("🌐 Manifold Consciousness Topology Validation");
-    println!("=" .repeat(70));
+    println!("{}", "=".repeat(70));
     println!();
 
     let n_nodes = 8;
@@ -90,9 +90,9 @@ fn main() {
     }
 
     // Summary comparison
-    println!("=" .repeat(70));
+    println!("{}", "=".repeat(70));
     println!("MANIFOLD Φ RANKING");
-    println!("=" .repeat(70));
+    println!("{}", "=".repeat(70));
     println!();
 
     // Sort by mean Φ (descending)
@@ -119,9 +119,9 @@ fn main() {
     }
 
     println!();
-    println!("=" .repeat(70));
+    println!("{}", "=".repeat(70));
     println!("STATISTICAL COMPARISONS");
-    println!("=" .repeat(70));
+    println!("{}", "=".repeat(70));
     println!();
 
     // Compare each manifold to Ring (baseline)
@@ -166,9 +166,9 @@ fn main() {
         println!();
     }
 
-    println!("=" .repeat(70));
+    println!("{}", "=".repeat(70));
     println!("HYPOTHESIS VALIDATION");
-    println!("=" .repeat(70));
+    println!("{}", "=".repeat(70));
     println!();
 
     println!("Hypothesis: Closed, symmetric manifolds maximize integrated information");

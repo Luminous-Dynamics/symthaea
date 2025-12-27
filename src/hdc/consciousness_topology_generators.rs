@@ -45,7 +45,12 @@ pub enum TopologyType {
     MobiusStrip,
     Hyperbolic,
     ScaleFree,
-    Fractal,         // Tier 3: Self-similar structure
+    Fractal,         // Tier 3: Generic fractal (deprecated - use specific types)
+    SierpinskiGasket,  // Tier 3: Fractal triangle (d≈1.585)
+    FractalTree,     // Tier 3: Self-similar hierarchical branching
+    KochSnowflake,   // Tier 3: Fractal curve (d≈1.262)
+    MengerSponge,    // Tier 3: 3D fractal (d≈2.727)
+    CantorSet,       // Tier 3: Disconnected fractal (d≈0.631)
     Hypercube,       // Tier 3: 3D/4D/5D dimensional scaling
     Quantum,         // Tier 3: Superposition of topologies
 }
@@ -1309,6 +1314,247 @@ impl ConsciousnessTopology {
             node_representations,
             node_identities,
             topology_type: TopologyType::Hypercube,
+        }
+    }
+
+    /// Generate a Sierpinski Gasket topology (fractal triangle, d≈1.585)
+    ///
+    /// Creates a hierarchical triangular fractal network with self-similar
+    /// structure at multiple scales. The fractal dimension is approximately
+    /// 1.585 (log(3)/log(2)), placing it between 1D (Ring) and 2D (Torus).
+    ///
+    /// Structure:
+    /// - Depth 0: 3 vertices (single triangle)
+    /// - Depth 1: 6 vertices (4 sub-triangles, center removed)
+    /// - Depth 2: 12 vertices (16 sub-triangles, centers removed)
+    /// - Depth 3: 42 vertices (self-similar pattern continues)
+    ///
+    /// Each node connects to:
+    /// - Its neighbors within the same triangle
+    /// - The parent/child node in the hierarchical structure
+    ///
+    /// Hypothesis: Fractal dimension d≈1.585 should produce Φ between
+    /// Ring (1D, Φ≈0.4954) and Torus (2D, Φ≈0.4954), if Φ is a continuous
+    /// function of dimension. However, self-similarity across scales may
+    /// provide additional integration benefits.
+    ///
+    /// # Arguments
+    /// * `depth` - Iteration depth (0-5 recommended, produces 3·3^depth vertices)
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed for reproducibility
+    pub fn sierpinski_gasket(depth: usize, dim: usize, seed: u64) -> Self {
+        assert!(depth <= 6, "Depth > 6 creates too many nodes (>2000)");
+        assert!(dim >= 256, "Dimension should be >= 256 for good separation");
+
+        // Calculate number of nodes
+        // Sierpinski gasket: 3 * (3^depth - 1) / 2 + 3 vertices
+        let n_nodes = if depth == 0 {
+            3
+        } else {
+            3 * (3_usize.pow(depth as u32) - 1) / 2 + 3
+        };
+
+        // Create node identities with variation
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let base = RealHV::basis(i, dim);
+                let noise = RealHV::random(dim, seed + i as u64 * 1000).scale(0.05);
+                base.add(&noise)
+            })
+            .collect();
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+
+        // Build hierarchical structure
+        // Level 0: Core triangle (nodes 0, 1, 2)
+        if n_nodes >= 3 {
+            adjacency[0].extend_from_slice(&[1, 2]);
+            adjacency[1].extend_from_slice(&[0, 2]);
+            adjacency[2].extend_from_slice(&[0, 1]);
+        }
+
+        if depth > 0 {
+            // Recursive subdivision
+            let mut current_node = 3;
+
+            for d in 1..=depth {
+                let triangles_at_level = 3_usize.pow(d as u32);
+                let nodes_per_triangle = 3;
+
+                for tri in 0..triangles_at_level {
+                    if current_node + nodes_per_triangle > n_nodes {
+                        break;
+                    }
+
+                    // Create sub-triangle
+                    let a = current_node;
+                    let b = current_node + 1;
+                    let c = current_node + 2;
+
+                    // Connect triangle vertices to each other
+                    adjacency[a].extend_from_slice(&[b, c]);
+                    adjacency[b].extend_from_slice(&[a, c]);
+                    adjacency[c].extend_from_slice(&[a, b]);
+
+                    // Connect to parent triangle (hierarchical connection)
+                    let parent = tri / 3;
+                    if parent < current_node {
+                        adjacency[a].push(parent);
+                        adjacency[parent].push(a);
+                    }
+
+                    // Connect to sibling triangles (self-similarity)
+                    let sibling_offset = tri % 3;
+                    if sibling_offset > 0 && current_node >= nodes_per_triangle {
+                        let sibling = current_node - nodes_per_triangle;
+                        adjacency[a].push(sibling);
+                        adjacency[sibling].push(a);
+                    }
+
+                    current_node += nodes_per_triangle;
+                }
+            }
+        }
+
+        // Generate representations from adjacency
+        let mut node_representations = Vec::with_capacity(n_nodes);
+        for i in 0..n_nodes {
+            if adjacency[i].is_empty() {
+                node_representations.push(node_identities[i].clone());
+            } else {
+                // Remove duplicates
+                let mut unique_neighbors = adjacency[i].clone();
+                unique_neighbors.sort_unstable();
+                unique_neighbors.dedup();
+
+                let connections: Vec<RealHV> = unique_neighbors
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                node_representations.push(RealHV::bundle(&connections));
+            }
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::SierpinskiGasket,
+        }
+    }
+
+    /// Generate a Fractal Tree topology (self-similar hierarchical branching)
+    ///
+    /// Creates a self-similar tree structure where each branch subdivides
+    /// into multiple sub-branches at all scales. Unlike a regular binary tree,
+    /// the fractal tree maintains the same branching pattern at every level.
+    ///
+    /// Structure:
+    /// - Root node (1 node)
+    /// - Level 1: `branching` children
+    /// - Level 2: `branching²` children
+    /// - Level d: `branching^d` children
+    ///
+    /// Total nodes = (branching^(depth+1) - 1) / (branching - 1)
+    ///
+    /// Hypothesis: Self-similar branching may achieve higher Φ than regular
+    /// binary tree due to uniform structure at all scales. If branching=2,
+    /// should closely match binary tree baseline (Φ≈0.4668). Higher branching
+    /// factors may reduce integration due to increased hub centrality.
+    ///
+    /// Biological relevance: Neural dendritic trees, vascular networks, and
+    /// bronchial trees all exhibit fractal branching patterns.
+    ///
+    /// # Arguments
+    /// * `depth` - Tree depth (0-4 recommended for branching=2)
+    /// * `branching` - Number of children per node (2-4 typical)
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed for reproducibility
+    pub fn fractal_tree(depth: usize, branching: usize, dim: usize, seed: u64) -> Self {
+        assert!(branching >= 2, "Branching factor must be >= 2");
+        assert!(depth <= 8, "Depth too large, would create too many nodes");
+        assert!(dim >= 256, "Dimension should be >= 256 for good separation");
+
+        // Calculate number of nodes
+        // Geometric series: sum_{i=0}^{depth} branching^i = (branching^(depth+1) - 1) / (branching - 1)
+        let n_nodes = (branching.pow((depth + 1) as u32) - 1) / (branching - 1);
+
+        assert!(
+            n_nodes <= 10000,
+            "Too many nodes ({}). Reduce depth or branching factor.",
+            n_nodes
+        );
+
+        // Create node identities with variation
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let base = RealHV::basis(i, dim);
+                let noise = RealHV::random(dim, seed + i as u64 * 1000).scale(0.05);
+                base.add(&noise)
+            })
+            .collect();
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+
+        // Build tree structure
+        // Node 0 is the root
+        // Nodes 1..branching are level 1
+        // Nodes branching..(branching + branching²) are level 2, etc.
+
+        for node in 0..n_nodes {
+            // Calculate children for this node
+            let first_child = node * branching + 1;
+
+            for child_offset in 0..branching {
+                let child = first_child + child_offset;
+
+                if child < n_nodes {
+                    // Parent → child connection
+                    adjacency[node].push(child);
+                    adjacency[child].push(node);
+
+                    // Optional: Connect siblings at each level for local clustering
+                    // This makes it more brain-like (dendritic trees have crosslinks)
+                    for sibling_offset in 0..branching {
+                        if sibling_offset != child_offset {
+                            let sibling = first_child + sibling_offset;
+                            if sibling < n_nodes {
+                                adjacency[child].push(sibling);
+                                adjacency[sibling].push(child);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Generate representations from adjacency
+        let mut node_representations = Vec::with_capacity(n_nodes);
+        for i in 0..n_nodes {
+            if adjacency[i].is_empty() {
+                // Leaf node with no connections
+                node_representations.push(node_identities[i].clone());
+            } else {
+                // Remove duplicates
+                let mut unique_neighbors = adjacency[i].clone();
+                unique_neighbors.sort_unstable();
+                unique_neighbors.dedup();
+
+                let connections: Vec<RealHV> = unique_neighbors
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                node_representations.push(RealHV::bundle(&connections));
+            }
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::FractalTree,
         }
     }
 

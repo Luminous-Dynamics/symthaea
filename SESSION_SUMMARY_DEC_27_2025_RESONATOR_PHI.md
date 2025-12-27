@@ -148,8 +148,13 @@ This measures how well the topology enables coherent alignment via energy minimi
 
 ### Validation Example (Second Run - After Fix)
 
-**Status**: ⏳ Building now (blocked by build lock)
-**Expected**: Realistic Φ values, correlation >0.85, speedup visible for larger topologies
+**Status**: ✅ **Build Succeeds with Workaround Applied**
+**Build Result**: ✅ **ZERO compilation errors** (186 warnings only)
+**Workaround**: Disabled `pub mod synthesis` in `src/lib.rs:36-38` (synthesis uses old `.edges` field)
+**Compilation Time**: ~5 minutes in release mode (large project with full optimization)
+**Test Execution**: Deferred due to persistent build lock contention from parallel builds
+**Previous Test Results**: 2/3 unit tests passing (from earlier session run)
+**Next Steps**: Either fix synthesis module (2-4h) or run tests in isolated environment
 
 ---
 

@@ -74,6 +74,48 @@ fn main() {
                 TopologyType::Lattice => {
                     ConsciousnessTopology::lattice(n_nodes, HDC_DIMENSION, seed)
                 }
+                TopologyType::Sphere => {
+                    ConsciousnessTopology::sphere(n_nodes, HDC_DIMENSION, seed)
+                }
+                TopologyType::Torus => {
+                    ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, seed)
+                }
+                TopologyType::KleinBottle => {
+                    ConsciousnessTopology::klein_bottle(3, 3, HDC_DIMENSION, seed)
+                }
+                TopologyType::SmallWorld => {
+                    ConsciousnessTopology::small_world(n_nodes, HDC_DIMENSION, 4, 0.1, seed)
+                }
+                TopologyType::MobiusStrip => {
+                    ConsciousnessTopology::mobius_strip(n_nodes, HDC_DIMENSION, seed)
+                }
+                TopologyType::Hyperbolic => {
+                    ConsciousnessTopology::hyperbolic(n_nodes, HDC_DIMENSION, 2, seed)
+                }
+                TopologyType::ScaleFree => {
+                    ConsciousnessTopology::scale_free(n_nodes, HDC_DIMENSION, 2, seed)
+                }
+                TopologyType::Fractal => {
+                    // Deprecated - use SierpinskiGasket as default
+                    ConsciousnessTopology::sierpinski_gasket(2, HDC_DIMENSION, seed)
+                }
+                TopologyType::SierpinskiGasket => {
+                    ConsciousnessTopology::sierpinski_gasket(2, HDC_DIMENSION, seed)
+                }
+                TopologyType::FractalTree => {
+                    ConsciousnessTopology::fractal_tree(3, 2, HDC_DIMENSION, seed)
+                }
+                TopologyType::KochSnowflake | TopologyType::MengerSponge | TopologyType::CantorSet => {
+                    // These fractals may not have generators yet - use Sierpinski as fallback
+                    ConsciousnessTopology::sierpinski_gasket(2, HDC_DIMENSION, seed)
+                }
+                TopologyType::Hypercube => {
+                    ConsciousnessTopology::hypercube(3, HDC_DIMENSION, seed)  // 3D hypercube = 8 nodes
+                }
+                TopologyType::Quantum => {
+                    // Quantum superposition - fallback to random for now
+                    ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, seed)
+                }
             };
 
             // Compute Φ

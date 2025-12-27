@@ -155,7 +155,7 @@ fn main() {
     println!("1️⃣1️⃣ Testing Torus topology (3×3 grid = 9 nodes)...");
     let (real_phi, real_std, binary_phi, binary_std) = test_topology_samples(
         n_samples,
-        |seed| ConsciousnessTopology::torus(3, HDC_DIMENSION, seed)  // 3×3 = 9 nodes
+        |seed| ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, seed)  // 3×3 = 9 nodes
     );
     results.push(("Torus (3×3)".to_string(), real_phi, real_std, binary_phi, binary_std));
     println!("    RealHV Φ: {:.4} ± {:.4}", real_phi, real_std);

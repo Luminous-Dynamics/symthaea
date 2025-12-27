@@ -12,7 +12,7 @@
 //
 // For large systems (n > 8), use RealPhiCalculator (HDC approximation) instead.
 
-use crate::hdc::consciousness_topology::ConsciousnessTopology;
+use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
 use crate::synthesis::SynthesisError;
 
 /// Bridge to PyPhi for exact IIT 3.0 Φ calculation
@@ -163,11 +163,18 @@ impl PyPhiValidator {
 
         let n = topology.node_representations.len();
 
-        // Build connectivity matrix from edges
+        // Build connectivity matrix from node similarities
+        // Nodes with high similarity (> 0.5) are considered connected
         let mut cm_data: Vec<Vec<u8>> = vec![vec![0; n]; n];
-        for &(i, j) in &topology.edges {
-            cm_data[i][j] = 1;
-            cm_data[j][i] = 1; // Undirected graph
+        for i in 0..n {
+            for j in (i+1)..n {
+                let similarity = topology.node_representations[i]
+                    .similarity(&topology.node_representations[j]);
+                if similarity > 0.5 {
+                    cm_data[i][j] = 1;
+                    cm_data[j][i] = 1; // Undirected graph
+                }
+            }
         }
 
         // Convert to Python list

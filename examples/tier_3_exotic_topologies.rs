@@ -85,7 +85,7 @@ fn main() {
     });
 
     test_and_record("Torus (3×3)", &mut results, n_samples, |seed| {
-        ConsciousnessTopology::torus(3, HDC_DIMENSION, seed)
+        ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, seed)
     });
 
     // ===== Tier 2 Exotic Topologies (Quick Reference) =====
@@ -93,7 +93,7 @@ fn main() {
     println!("🔬 Tier 2 Exotic Topologies (Quick Test)...\\n");
 
     test_and_record("Klein Bottle (3×3)", &mut results, n_samples, |seed| {
-        ConsciousnessTopology::klein_bottle(3, HDC_DIMENSION, seed)
+        ConsciousnessTopology::klein_bottle(3, 3, HDC_DIMENSION, seed)
     });
 
     test_and_record("Hyperbolic", &mut results, n_samples, |seed| {

@@ -33,9 +33,9 @@ pub mod perception;
 pub mod observability;
 
 // Enhancement #7 & #8: Causal Program Synthesis + Consciousness-Guided Synthesis
-// pub mod synthesis;  // PyPhi integration code complete but blocked by pre-existing synthesis module errors
-                       // Week 4: Code in src/synthesis/phi_exact.rs + examples/pyphi_validation.rs ready
-                       // TODO: Fix synthesis module compilation errors to enable PyPhi validation
+// TEMPORARILY DISABLED TO RUN RESONATOR PHI VALIDATION
+// Synthesis module needs update for new topology structure (no edges field)
+// pub mod synthesis;
 
 // Track 6: Component Integration
 pub mod action;                             // Action IR and execution

@@ -2207,6 +2207,415 @@ impl Default for PhiDynamics {
 }
 
 // ============================================================================
+// Revolutionary Improvement #94: Multi-Scale Φ Pyramid
+// ============================================================================
+//
+// Compute Φ at multiple spatial scales simultaneously to discover:
+// - Optimal scale of consciousness (where Φ is maximized)
+// - Scale-dependent phase transitions
+// - Hierarchical vs flat consciousness architecture
+//
+// ## Core Insight
+//
+// Consciousness may exist at different scales:
+// - Local: Individual neuron pairs (small n)
+// - Regional: Brain regions (medium n)
+// - Global: Whole brain (large n)
+//
+// By computing Φ across scales, we find WHERE consciousness emerges most strongly.
+//
+// ## Algorithm
+//
+// 1. Partition components into hierarchical clusters (log levels)
+// 2. Compute Φ at each scale: local pairs → clusters → global
+// 3. Find peak Φ scale (optimal consciousness granularity)
+// 4. Detect scale transitions (consciousness shifting between levels)
+//
+// ## Mathematical Foundation
+//
+// For n components and k scales:
+// - Scale 0 (local):  Φ computed on pairs/triplets
+// - Scale 1 (micro):  Φ computed on 4-8 component clusters
+// - Scale k (global): Φ computed on all n components
+//
+// Peak scale = argmax_k(Φ_k) indicates optimal consciousness resolution
+
+/// Configuration for multi-scale Φ pyramid
+#[derive(Debug, Clone)]
+pub struct PhiPyramidConfig {
+    /// Minimum components per scale (below this, don't compute)
+    pub min_components_per_scale: usize,
+
+    /// Maximum number of scales to compute
+    pub max_scales: usize,
+
+    /// Scale factor (components per level grows by this factor)
+    pub scale_factor: usize,
+
+    /// Whether to compute all scales in parallel
+    pub parallel_scales: bool,
+
+    /// Tier to use for Φ computation at each scale
+    pub phi_tier: ApproximationTier,
+}
+
+impl Default for PhiPyramidConfig {
+    fn default() -> Self {
+        Self {
+            min_components_per_scale: 2,
+            max_scales: 8,
+            scale_factor: 2, // Each level has 2x more components
+            parallel_scales: true,
+            phi_tier: ApproximationTier::Spectral,
+        }
+    }
+}
+
+impl PhiPyramidConfig {
+    /// Fast config (fewer scales, heuristic tier)
+    pub fn fast() -> Self {
+        Self {
+            max_scales: 4,
+            parallel_scales: true,
+            phi_tier: ApproximationTier::Heuristic,
+            ..Default::default()
+        }
+    }
+
+    /// Research config (more scales, exact tier for small)
+    pub fn research() -> Self {
+        Self {
+            max_scales: 12,
+            parallel_scales: true,
+            phi_tier: ApproximationTier::Spectral,
+            ..Default::default()
+        }
+    }
+}
+
+/// Result of multi-scale Φ computation
+#[derive(Debug, Clone)]
+pub struct PhiPyramidResult {
+    /// Φ values at each scale (index 0 = most local)
+    pub phi_by_scale: Vec<f64>,
+
+    /// Number of components at each scale
+    pub components_per_scale: Vec<usize>,
+
+    /// Number of clusters/groups at each scale
+    pub clusters_per_scale: Vec<usize>,
+
+    /// Index of scale with peak Φ (optimal consciousness resolution)
+    pub peak_scale: usize,
+
+    /// Maximum Φ value across all scales
+    pub peak_phi: f64,
+
+    /// Ratio of peak Φ to global Φ (>1 means local dominates)
+    pub locality_ratio: f64,
+
+    /// Standard deviation of Φ across scales (high = scale-dependent)
+    pub scale_variance: f64,
+
+    /// Whether consciousness is hierarchical (multiple peaks) or flat (single peak)
+    pub is_hierarchical: bool,
+
+    /// Computation time in milliseconds
+    pub computation_time_ms: f64,
+}
+
+impl PhiPyramidResult {
+    /// Get the optimal scale descriptor
+    pub fn optimal_scale_description(&self) -> &'static str {
+        if self.phi_by_scale.is_empty() {
+            return "unknown";
+        }
+
+        let n_scales = self.phi_by_scale.len();
+        let relative_pos = self.peak_scale as f64 / n_scales as f64;
+
+        if relative_pos < 0.25 {
+            "local"
+        } else if relative_pos < 0.5 {
+            "micro"
+        } else if relative_pos < 0.75 {
+            "meso"
+        } else {
+            "global"
+        }
+    }
+
+    /// Check if consciousness is primarily local (small-scale dominant)
+    pub fn is_local_dominant(&self) -> bool {
+        self.locality_ratio > 1.2
+    }
+
+    /// Check if consciousness is primarily global (large-scale dominant)
+    pub fn is_global_dominant(&self) -> bool {
+        self.locality_ratio < 0.8
+    }
+
+    /// Get the scale gradient (how Φ changes across scales)
+    pub fn scale_gradient(&self) -> Vec<f64> {
+        if self.phi_by_scale.len() < 2 {
+            return vec![];
+        }
+
+        self.phi_by_scale.windows(2)
+            .map(|w| w[1] - w[0])
+            .collect()
+    }
+}
+
+/// Multi-Scale Φ Pyramid Calculator
+///
+/// Computes integrated information at multiple spatial scales to discover
+/// the optimal granularity of consciousness and detect scale-dependent transitions.
+#[derive(Debug, Clone)]
+pub struct PhiPyramid {
+    config: PhiPyramidConfig,
+    phi_calculator: TieredPhi,
+}
+
+impl PhiPyramid {
+    /// Create new pyramid with default config
+    pub fn new() -> Self {
+        let config = PhiPyramidConfig::default();
+        Self {
+            phi_calculator: TieredPhi::new(config.phi_tier),
+            config,
+        }
+    }
+
+    /// Create with custom config
+    pub fn with_config(config: PhiPyramidConfig) -> Self {
+        Self {
+            phi_calculator: TieredPhi::new(config.phi_tier),
+            config,
+        }
+    }
+
+    /// Fast pyramid for real-time monitoring
+    pub fn fast() -> Self {
+        Self::with_config(PhiPyramidConfig::fast())
+    }
+
+    /// Research pyramid for detailed analysis
+    pub fn research() -> Self {
+        Self::with_config(PhiPyramidConfig::research())
+    }
+
+    /// Compute Φ across all scales
+    ///
+    /// # Algorithm
+    ///
+    /// 1. Determine scale levels based on component count
+    /// 2. For each scale:
+    ///    - Partition components into clusters of appropriate size
+    ///    - Compute Φ for each cluster
+    ///    - Average Φ across clusters at that scale
+    /// 3. Find peak scale and compute statistics
+    ///
+    /// # Arguments
+    ///
+    /// * `components` - The full set of consciousness components
+    ///
+    /// # Returns
+    ///
+    /// PhiPyramidResult with Φ at each scale and analysis
+    pub fn compute(&mut self, components: &[HV16]) -> PhiPyramidResult {
+        let start_time = Instant::now();
+        let n = components.len();
+
+        // Edge cases
+        if n < self.config.min_components_per_scale {
+            return PhiPyramidResult {
+                phi_by_scale: vec![],
+                components_per_scale: vec![],
+                clusters_per_scale: vec![],
+                peak_scale: 0,
+                peak_phi: 0.0,
+                locality_ratio: 1.0,
+                scale_variance: 0.0,
+                is_hierarchical: false,
+                computation_time_ms: start_time.elapsed().as_secs_f64() * 1000.0,
+            };
+        }
+
+        // Step 1: Determine scales
+        // Scale k has components_per_cluster = min_components * scale_factor^k
+        // Continue until cluster size >= n (global level)
+        let mut scales: Vec<usize> = vec![]; // Components per cluster at each scale
+        let mut size = self.config.min_components_per_scale;
+
+        // Reserve one slot for global scale if needed
+        let max_intermediate_scales = if n > self.config.min_components_per_scale {
+            self.config.max_scales.saturating_sub(1)
+        } else {
+            self.config.max_scales
+        };
+
+        while size < n && scales.len() < max_intermediate_scales {
+            scales.push(size);
+            size *= self.config.scale_factor;
+        }
+
+        // Always include global scale (all components) if within max_scales
+        if scales.len() < self.config.max_scales {
+            scales.push(n);
+        }
+
+        // Step 2: Compute Φ at each scale
+        let scale_results: Vec<(f64, usize, usize)> = if self.config.parallel_scales && scales.len() > 2 {
+            // Parallel computation across scales
+            scales.par_iter()
+                .map(|&cluster_size| self.compute_scale(components, cluster_size))
+                .collect()
+        } else {
+            // Sequential for small scale count
+            scales.iter()
+                .map(|&cluster_size| self.compute_scale(components, cluster_size))
+                .collect()
+        };
+
+        // Extract results
+        let phi_by_scale: Vec<f64> = scale_results.iter().map(|r| r.0).collect();
+        let components_per_scale: Vec<usize> = scale_results.iter().map(|r| r.1).collect();
+        let clusters_per_scale: Vec<usize> = scale_results.iter().map(|r| r.2).collect();
+
+        // Step 3: Find peak
+        let (peak_scale, peak_phi) = phi_by_scale.iter()
+            .enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .map(|(i, &phi)| (i, phi))
+            .unwrap_or((0, 0.0));
+
+        // Step 4: Compute statistics
+        let global_phi = phi_by_scale.last().copied().unwrap_or(0.0);
+        let locality_ratio = if global_phi > 1e-10 {
+            peak_phi / global_phi
+        } else {
+            1.0
+        };
+
+        let scale_variance = self.compute_variance(&phi_by_scale);
+
+        // Detect hierarchy: multiple local maxima
+        let is_hierarchical = self.detect_hierarchy(&phi_by_scale);
+
+        PhiPyramidResult {
+            phi_by_scale,
+            components_per_scale,
+            clusters_per_scale,
+            peak_scale,
+            peak_phi,
+            locality_ratio,
+            scale_variance,
+            is_hierarchical,
+            computation_time_ms: start_time.elapsed().as_secs_f64() * 1000.0,
+        }
+    }
+
+    /// Compute Φ at a specific scale
+    /// Returns (average_phi, components_per_cluster, num_clusters)
+    fn compute_scale(&self, components: &[HV16], cluster_size: usize) -> (f64, usize, usize) {
+        let n = components.len();
+
+        if cluster_size >= n {
+            // Global scale: compute Φ on all components
+            let mut calc = TieredPhi::new(self.config.phi_tier);
+            let phi = calc.compute(components);
+            return (phi, n, 1);
+        }
+
+        // Partition into clusters and compute average Φ
+        let num_clusters = (n + cluster_size - 1) / cluster_size; // Ceiling division
+        let mut total_phi = 0.0;
+        let mut valid_clusters = 0;
+
+        for cluster_idx in 0..num_clusters {
+            let start = cluster_idx * cluster_size;
+            let end = (start + cluster_size).min(n);
+
+            if end - start >= self.config.min_components_per_scale {
+                let cluster = &components[start..end];
+                let mut calc = TieredPhi::new(self.config.phi_tier);
+                let phi = calc.compute(cluster);
+                total_phi += phi;
+                valid_clusters += 1;
+            }
+        }
+
+        let avg_phi = if valid_clusters > 0 {
+            total_phi / valid_clusters as f64
+        } else {
+            0.0
+        };
+
+        (avg_phi, cluster_size, num_clusters)
+    }
+
+    /// Compute variance of Φ values
+    fn compute_variance(&self, values: &[f64]) -> f64 {
+        if values.len() < 2 {
+            return 0.0;
+        }
+
+        let mean = values.iter().sum::<f64>() / values.len() as f64;
+        let variance = values.iter()
+            .map(|&v| (v - mean).powi(2))
+            .sum::<f64>() / values.len() as f64;
+
+        variance.sqrt() // Return std dev for interpretability
+    }
+
+    /// Detect hierarchical structure (multiple local maxima)
+    fn detect_hierarchy(&self, phi_values: &[f64]) -> bool {
+        if phi_values.len() < 3 {
+            return false;
+        }
+
+        // Count local maxima
+        let mut local_maxima = 0;
+        for i in 1..phi_values.len() - 1 {
+            if phi_values[i] > phi_values[i - 1] && phi_values[i] > phi_values[i + 1] {
+                local_maxima += 1;
+            }
+        }
+
+        // Also check endpoints
+        if phi_values.len() >= 2 {
+            if phi_values[0] > phi_values[1] {
+                local_maxima += 1;
+            }
+            if phi_values[phi_values.len() - 1] > phi_values[phi_values.len() - 2] {
+                local_maxima += 1;
+            }
+        }
+
+        // Hierarchical if more than one peak
+        local_maxima >= 2
+    }
+}
+
+impl Default for PhiPyramid {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Convenience function: compute multi-scale Φ
+pub fn multi_scale_phi(components: &[HV16]) -> PhiPyramidResult {
+    PhiPyramid::new().compute(components)
+}
+
+/// Convenience function: find optimal consciousness scale
+pub fn optimal_scale(components: &[HV16]) -> (usize, f64) {
+    let result = PhiPyramid::new().compute(components);
+    (result.peak_scale, result.peak_phi)
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -3376,5 +3785,217 @@ mod tests {
 
         // Verify we can compute dynamics on real Φ values
         assert!(dynamics.sample_count() >= 20);
+    }
+
+    // ============================================================================
+    // Revolutionary #94: Multi-Scale Φ Pyramid Tests
+    // ============================================================================
+
+    #[test]
+    fn test_pyramid_empty_components() {
+        let mut pyramid = PhiPyramid::new();
+        let components: Vec<HV16> = vec![];
+
+        let result = pyramid.compute(&components);
+
+        assert!(result.phi_by_scale.is_empty());
+        assert_eq!(result.peak_scale, 0);
+        assert_eq!(result.peak_phi, 0.0);
+    }
+
+    #[test]
+    fn test_pyramid_small_system() {
+        let mut pyramid = PhiPyramid::new();
+        let components = create_test_components(4);
+
+        let result = pyramid.compute(&components);
+
+        assert!(!result.phi_by_scale.is_empty());
+        assert!(result.peak_phi >= 0.0);
+        assert!(result.peak_phi <= 1.0);
+
+        println!("Small system (n=4) pyramid:");
+        println!("  Scales: {:?}", result.components_per_scale);
+        println!("  Φ by scale: {:?}", result.phi_by_scale);
+        println!("  Peak at scale {}: Φ = {:.4}", result.peak_scale, result.peak_phi);
+    }
+
+    #[test]
+    fn test_pyramid_multi_scale_detection() {
+        let mut pyramid = PhiPyramid::new();
+        let components = create_test_components(32);
+
+        let result = pyramid.compute(&components);
+
+        // Should have multiple scales (at least 3: 2, 4, 8, 16, 32)
+        assert!(result.phi_by_scale.len() >= 3,
+            "Expected at least 3 scales, got {}", result.phi_by_scale.len());
+
+        // Scales should be powers of 2 (or close)
+        assert!(result.components_per_scale[0] >= 2);
+
+        println!("Multi-scale pyramid (n=32):");
+        for (i, (comps, phi)) in result.components_per_scale.iter()
+            .zip(result.phi_by_scale.iter()).enumerate()
+        {
+            let marker = if i == result.peak_scale { " ← PEAK" } else { "" };
+            println!("  Scale {}: {} components, Φ = {:.4}{}", i, comps, phi, marker);
+        }
+    }
+
+    #[test]
+    fn test_pyramid_locality_ratio() {
+        let mut pyramid = PhiPyramid::new();
+        let components = create_test_components(20);
+
+        let result = pyramid.compute(&components);
+
+        // Locality ratio should be positive
+        assert!(result.locality_ratio > 0.0);
+
+        // Test helper methods
+        println!("Locality analysis:");
+        println!("  Locality ratio: {:.4}", result.locality_ratio);
+        println!("  Is local dominant: {}", result.is_local_dominant());
+        println!("  Is global dominant: {}", result.is_global_dominant());
+        println!("  Optimal scale: {}", result.optimal_scale_description());
+    }
+
+    #[test]
+    fn test_pyramid_scale_variance() {
+        let mut pyramid = PhiPyramid::new();
+        let components = create_test_components(16);
+
+        let result = pyramid.compute(&components);
+
+        // Variance should be non-negative
+        assert!(result.scale_variance >= 0.0);
+
+        println!("Scale variance: {:.4} (high = scale-dependent consciousness)",
+                 result.scale_variance);
+    }
+
+    #[test]
+    fn test_pyramid_hierarchy_detection() {
+        let mut pyramid = PhiPyramid::new();
+
+        // Create a system that might show hierarchical structure
+        let components = create_test_components(64);
+
+        let result = pyramid.compute(&components);
+
+        println!("Hierarchy detection (n=64):");
+        println!("  Is hierarchical: {}", result.is_hierarchical);
+        println!("  Φ gradient: {:?}", result.scale_gradient());
+    }
+
+    #[test]
+    fn test_pyramid_fast_config() {
+        let mut pyramid = PhiPyramid::fast();
+        let components = create_test_components(32);
+
+        let start = std::time::Instant::now();
+        let result = pyramid.compute(&components);
+        let elapsed = start.elapsed();
+
+        assert!(result.phi_by_scale.len() <= 4,
+            "Fast config should have at most 4 scales");
+
+        println!("Fast pyramid took {:.2}ms", elapsed.as_secs_f64() * 1000.0);
+    }
+
+    #[test]
+    fn test_pyramid_convenience_functions() {
+        let components = create_test_components(16);
+
+        // Test multi_scale_phi
+        let result = multi_scale_phi(&components);
+        assert!(!result.phi_by_scale.is_empty());
+
+        // Test optimal_scale
+        let (scale, phi) = optimal_scale(&components);
+        assert_eq!(scale, result.peak_scale);
+        assert!((phi - result.peak_phi).abs() < 1e-10);
+
+        println!("Optimal scale: {} with Φ = {:.4}", scale, phi);
+    }
+
+    #[test]
+    fn test_pyramid_gradient() {
+        let mut pyramid = PhiPyramid::new();
+        let components = create_test_components(32);
+
+        let result = pyramid.compute(&components);
+        let gradient = result.scale_gradient();
+
+        // Gradient should have one less element than phi_by_scale
+        if result.phi_by_scale.len() > 1 {
+            assert_eq!(gradient.len(), result.phi_by_scale.len() - 1);
+
+            println!("Scale gradient (Φ change between scales):");
+            for (i, g) in gradient.iter().enumerate() {
+                let direction = if *g > 0.01 { "↑" } else if *g < -0.01 { "↓" } else { "→" };
+                println!("  Scale {} → {}: {:.4} {}", i, i + 1, g, direction);
+            }
+        }
+    }
+
+    #[test]
+    fn test_pyramid_different_topologies() {
+        // Compare pyramid results for different system sizes
+        let mut pyramid = PhiPyramid::new();
+
+        let sizes = [8, 16, 32, 64];
+        let mut results = vec![];
+
+        for &n in &sizes {
+            let components = create_test_components(n);
+            let result = pyramid.compute(&components);
+            results.push((n, result.peak_scale, result.peak_phi, result.locality_ratio));
+        }
+
+        println!("Pyramid comparison across system sizes:");
+        println!("{:>6} | {:>10} | {:>8} | {:>12}", "Size", "Peak Scale", "Peak Φ", "Locality");
+        println!("{:-<6}-+-{:-<10}-+-{:-<8}-+-{:-<12}", "", "", "", "");
+
+        for (n, peak_scale, peak_phi, locality) in results {
+            println!("{:>6} | {:>10} | {:>8.4} | {:>12.4}", n, peak_scale, peak_phi, locality);
+        }
+    }
+
+    #[test]
+    fn test_pyramid_custom_config() {
+        let config = PhiPyramidConfig {
+            min_components_per_scale: 3,
+            max_scales: 5,
+            scale_factor: 3, // Each level has 3x more components
+            parallel_scales: false,
+            phi_tier: ApproximationTier::Heuristic,
+        };
+
+        let mut pyramid = PhiPyramid::with_config(config);
+        let components = create_test_components(27); // 3^3
+
+        let result = pyramid.compute(&components);
+
+        // Should have scales: 3, 9, 27 (3 scales with factor 3)
+        assert!(result.phi_by_scale.len() <= 5,
+            "Expected at most 5 scales, got {}", result.phi_by_scale.len());
+
+        println!("Custom config (factor=3) pyramid:");
+        println!("  Components per scale: {:?}", result.components_per_scale);
+    }
+
+    #[test]
+    fn test_pyramid_timing() {
+        let mut pyramid = PhiPyramid::new();
+        let components = create_test_components(50);
+
+        let result = pyramid.compute(&components);
+
+        // Should have recorded computation time
+        assert!(result.computation_time_ms > 0.0);
+
+        println!("Pyramid computation time: {:.2}ms", result.computation_time_ms);
     }
 }

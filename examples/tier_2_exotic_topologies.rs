@@ -85,7 +85,7 @@ fn main() {
     });
 
     test_and_record("Torus (3×3)", &mut results, n_samples, |seed| {
-        ConsciousnessTopology::torus(3, HDC_DIMENSION, seed)
+        ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, seed)
     });
 
     // ===== NEW: Tier 2 Exotic Topologies =====
@@ -98,7 +98,7 @@ fn main() {
     println!("1️⃣2️⃣ Testing Klein Bottle topology (3×3 grid = 9 nodes)...");
     let (real_phi, real_std, binary_phi, binary_std) = test_topology_samples(
         n_samples,
-        |seed| ConsciousnessTopology::klein_bottle(3, HDC_DIMENSION, seed)
+        |seed| ConsciousnessTopology::klein_bottle(3, 3, HDC_DIMENSION, seed)
     );
     results.push(("Klein Bottle (3×3)".to_string(), real_phi, real_std, binary_phi, binary_std));
     println!("    RealHV Φ: {:.4} ± {:.4}", real_phi, real_std);
