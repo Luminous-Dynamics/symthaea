@@ -2616,6 +2616,491 @@ pub fn optimal_scale(components: &[HV16]) -> (usize, f64) {
 }
 
 // ============================================================================
+// Revolutionary Improvement #95: Φ Entropy & Complexity Analysis
+// ============================================================================
+//
+// Measure the complexity, predictability, and information richness of
+// consciousness states using entropy-based metrics.
+//
+// ## Core Insight
+//
+// Consciousness isn't just about integration (Φ) - it's also about complexity.
+// A highly integrated but simple system may have high Φ but low complexity.
+// True consciousness likely requires BOTH integration AND complexity.
+//
+// ## Metrics Implemented
+//
+// 1. **Shannon Entropy**: Information content of Φ distribution
+// 2. **Sample Entropy**: Regularity/predictability of Φ time series
+// 3. **Lempel-Ziv Complexity**: Algorithmic complexity approximation
+// 4. **Multi-Scale Entropy**: Complexity at different time scales
+// 5. **Integrated Complexity**: Φ × Complexity product (novel metric!)
+//
+// ## Scientific Foundation
+//
+// - Tononi (2004): Consciousness requires integrated information
+// - Casali (2013): PCI (Perturbational Complexity Index) for consciousness
+// - Costa (2005): Multi-Scale Entropy for physiological time series
+// - This work: Novel Φ-Complexity integration for consciousness measurement
+
+/// Configuration for entropy and complexity analysis
+#[derive(Debug, Clone)]
+pub struct PhiEntropyConfig {
+    /// Number of bins for histogram-based entropy
+    pub num_bins: usize,
+
+    /// Embedding dimension for sample entropy
+    pub embed_dim: usize,
+
+    /// Tolerance radius for sample entropy (fraction of std)
+    pub tolerance_fraction: f64,
+
+    /// Maximum scale for multi-scale entropy
+    pub max_scale: usize,
+
+    /// Minimum samples required for reliable entropy estimation
+    pub min_samples: usize,
+}
+
+impl Default for PhiEntropyConfig {
+    fn default() -> Self {
+        Self {
+            num_bins: 10,
+            embed_dim: 2,
+            tolerance_fraction: 0.2,
+            max_scale: 10,
+            min_samples: 50,
+        }
+    }
+}
+
+impl PhiEntropyConfig {
+    /// Fast config for real-time analysis
+    pub fn fast() -> Self {
+        Self {
+            num_bins: 5,
+            embed_dim: 2,
+            max_scale: 3,
+            min_samples: 20,
+            ..Default::default()
+        }
+    }
+
+    /// Research config for detailed analysis
+    pub fn research() -> Self {
+        Self {
+            num_bins: 20,
+            embed_dim: 3,
+            max_scale: 20,
+            min_samples: 100,
+            ..Default::default()
+        }
+    }
+}
+
+/// Result of entropy and complexity analysis
+#[derive(Debug, Clone)]
+pub struct PhiEntropyResult {
+    /// Shannon entropy of Φ distribution (bits)
+    pub shannon_entropy: f64,
+
+    /// Normalized Shannon entropy (0 = deterministic, 1 = uniform)
+    pub normalized_entropy: f64,
+
+    /// Sample entropy (regularity measure)
+    /// Low = regular/predictable, High = complex/unpredictable
+    pub sample_entropy: f64,
+
+    /// Lempel-Ziv complexity (algorithmic complexity approximation)
+    pub lz_complexity: f64,
+
+    /// Normalized LZ complexity (0 = simple, 1 = random)
+    pub normalized_lz: f64,
+
+    /// Multi-scale entropy values (if computed)
+    pub multi_scale_entropy: Vec<f64>,
+
+    /// Complexity index (geometric mean of entropy measures)
+    pub complexity_index: f64,
+
+    /// Integrated complexity: Φ_mean × Complexity_index
+    /// This is a novel metric combining integration and complexity
+    pub integrated_complexity: f64,
+
+    /// Predictability score (1 - normalized_entropy)
+    pub predictability: f64,
+
+    /// Number of samples analyzed
+    pub sample_count: usize,
+}
+
+impl PhiEntropyResult {
+    /// Check if consciousness is complex (high entropy + high Φ)
+    pub fn is_complex(&self) -> bool {
+        self.complexity_index > 0.5 && self.integrated_complexity > 0.3
+    }
+
+    /// Check if consciousness is simple/predictable
+    pub fn is_predictable(&self) -> bool {
+        self.predictability > 0.7
+    }
+
+    /// Check if consciousness is chaotic (high entropy, low Φ)
+    pub fn is_chaotic(&self) -> bool {
+        self.normalized_entropy > 0.8 && self.integrated_complexity < 0.2
+    }
+
+    /// Consciousness quality descriptor
+    pub fn quality_description(&self) -> &'static str {
+        if self.integrated_complexity > 0.6 {
+            "rich" // High integration + high complexity
+        } else if self.integrated_complexity > 0.4 {
+            "moderate"
+        } else if self.normalized_entropy > 0.7 {
+            "chaotic" // High complexity but low integration
+        } else if self.predictability > 0.7 {
+            "simple" // Low complexity, predictable
+        } else {
+            "transitional"
+        }
+    }
+}
+
+/// Φ Entropy and Complexity Analyzer
+///
+/// Computes entropy-based complexity measures for consciousness analysis.
+/// Combines with Φ to produce novel "integrated complexity" metric.
+#[derive(Debug, Clone)]
+pub struct PhiEntropyAnalyzer {
+    config: PhiEntropyConfig,
+}
+
+impl PhiEntropyAnalyzer {
+    /// Create analyzer with default config
+    pub fn new() -> Self {
+        Self {
+            config: PhiEntropyConfig::default(),
+        }
+    }
+
+    /// Create with custom config
+    pub fn with_config(config: PhiEntropyConfig) -> Self {
+        Self { config }
+    }
+
+    /// Fast analyzer for real-time monitoring
+    pub fn fast() -> Self {
+        Self::with_config(PhiEntropyConfig::fast())
+    }
+
+    /// Research analyzer for detailed analysis
+    pub fn research() -> Self {
+        Self::with_config(PhiEntropyConfig::research())
+    }
+
+    /// Compute entropy and complexity metrics for Φ time series
+    ///
+    /// # Arguments
+    ///
+    /// * `phi_values` - Time series of Φ measurements
+    /// * `mean_phi` - Optional mean Φ for integrated complexity
+    ///
+    /// # Returns
+    ///
+    /// PhiEntropyResult with all complexity metrics
+    pub fn analyze(&self, phi_values: &[f64], mean_phi: Option<f64>) -> PhiEntropyResult {
+        let n = phi_values.len();
+
+        // Edge case: insufficient samples
+        if n < self.config.min_samples {
+            return PhiEntropyResult {
+                shannon_entropy: 0.0,
+                normalized_entropy: 0.0,
+                sample_entropy: 0.0,
+                lz_complexity: 0.0,
+                normalized_lz: 0.0,
+                multi_scale_entropy: vec![],
+                complexity_index: 0.0,
+                integrated_complexity: 0.0,
+                predictability: 1.0,
+                sample_count: n,
+            };
+        }
+
+        // 1. Shannon Entropy (histogram-based)
+        let (shannon, normalized_shannon) = self.compute_shannon_entropy(phi_values);
+
+        // 2. Sample Entropy (regularity measure)
+        let sample_ent = self.compute_sample_entropy(phi_values);
+
+        // 3. Lempel-Ziv Complexity
+        let (lz, normalized_lz) = self.compute_lz_complexity(phi_values);
+
+        // 4. Multi-Scale Entropy (optional, more expensive)
+        let mse = if n >= self.config.min_samples * 2 {
+            self.compute_multi_scale_entropy(phi_values)
+        } else {
+            vec![]
+        };
+
+        // 5. Complexity Index (geometric mean of entropy measures)
+        let complexity_index = (normalized_shannon * sample_ent.max(0.01) * normalized_lz)
+            .powf(1.0 / 3.0)
+            .min(1.0)
+            .max(0.0);
+
+        // 6. Integrated Complexity (novel metric)
+        let phi_mean = mean_phi.unwrap_or_else(|| {
+            phi_values.iter().sum::<f64>() / n as f64
+        });
+        let integrated_complexity = phi_mean * complexity_index;
+
+        // 7. Predictability
+        let predictability = 1.0 - normalized_shannon;
+
+        PhiEntropyResult {
+            shannon_entropy: shannon,
+            normalized_entropy: normalized_shannon,
+            sample_entropy: sample_ent,
+            lz_complexity: lz,
+            normalized_lz,
+            multi_scale_entropy: mse,
+            complexity_index,
+            integrated_complexity,
+            predictability,
+            sample_count: n,
+        }
+    }
+
+    /// Compute Shannon entropy using histogram
+    fn compute_shannon_entropy(&self, values: &[f64]) -> (f64, f64) {
+        let n = values.len();
+        if n == 0 {
+            return (0.0, 0.0);
+        }
+
+        // Find min/max for binning
+        let min_val = values.iter().cloned().fold(f64::INFINITY, f64::min);
+        let max_val = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+
+        // Handle constant values
+        if (max_val - min_val).abs() < 1e-10 {
+            return (0.0, 0.0); // Zero entropy for constant signal
+        }
+
+        // Build histogram
+        let bin_width = (max_val - min_val) / self.config.num_bins as f64;
+        let mut counts = vec![0usize; self.config.num_bins];
+
+        for &v in values {
+            let bin = ((v - min_val) / bin_width).floor() as usize;
+            let bin = bin.min(self.config.num_bins - 1);
+            counts[bin] += 1;
+        }
+
+        // Compute Shannon entropy: H = -Σ p_i × log2(p_i)
+        let n_f64 = n as f64;
+        let entropy: f64 = counts.iter()
+            .filter(|&&c| c > 0)
+            .map(|&c| {
+                let p = c as f64 / n_f64;
+                -p * p.log2()
+            })
+            .sum();
+
+        // Normalized entropy (0 = deterministic, 1 = uniform)
+        let max_entropy = (self.config.num_bins as f64).log2();
+        let normalized = if max_entropy > 0.0 {
+            entropy / max_entropy
+        } else {
+            0.0
+        };
+
+        (entropy, normalized.min(1.0).max(0.0))
+    }
+
+    /// Compute Sample Entropy (SampEn)
+    ///
+    /// Measures regularity/predictability of time series.
+    /// Low SampEn = regular, predictable; High SampEn = complex, unpredictable
+    fn compute_sample_entropy(&self, values: &[f64]) -> f64 {
+        let n = values.len();
+        let m = self.config.embed_dim;
+
+        if n <= m + 1 {
+            return 0.0;
+        }
+
+        // Compute standard deviation for tolerance
+        let mean = values.iter().sum::<f64>() / n as f64;
+        let variance = values.iter().map(|&v| (v - mean).powi(2)).sum::<f64>() / n as f64;
+        let std = variance.sqrt();
+
+        if std < 1e-10 {
+            return 0.0; // Constant signal
+        }
+
+        let r = self.config.tolerance_fraction * std;
+
+        // Count template matches for dimension m and m+1
+        let count_m = self.count_template_matches(values, m, r);
+        let count_m1 = self.count_template_matches(values, m + 1, r);
+
+        // Sample entropy = -ln(count_m+1 / count_m)
+        if count_m == 0 || count_m1 == 0 {
+            return 0.0;
+        }
+
+        let ratio = count_m1 as f64 / count_m as f64;
+        if ratio > 0.0 {
+            -ratio.ln()
+        } else {
+            0.0
+        }
+    }
+
+    /// Count template matches for sample entropy
+    fn count_template_matches(&self, values: &[f64], m: usize, r: f64) -> usize {
+        let n = values.len();
+        if n <= m {
+            return 0;
+        }
+
+        let mut count = 0;
+        let templates = n - m;
+
+        for i in 0..templates {
+            for j in (i + 1)..templates {
+                // Check if templates match within tolerance
+                let mut matches = true;
+                for k in 0..m {
+                    if (values[i + k] - values[j + k]).abs() > r {
+                        matches = false;
+                        break;
+                    }
+                }
+                if matches {
+                    count += 1;
+                }
+            }
+        }
+
+        count
+    }
+
+    /// Compute Lempel-Ziv complexity (simplified version)
+    ///
+    /// Approximates Kolmogorov complexity by counting distinct patterns.
+    fn compute_lz_complexity(&self, values: &[f64]) -> (f64, f64) {
+        let n = values.len();
+        if n < 2 {
+            return (0.0, 0.0);
+        }
+
+        // Convert to binary string based on median
+        let median = self.compute_median(values);
+        let binary: Vec<u8> = values.iter()
+            .map(|&v| if v >= median { 1 } else { 0 })
+            .collect();
+
+        // Count distinct patterns (simplified LZ76)
+        let mut patterns = std::collections::HashSet::new();
+        let mut i = 0;
+        let mut len = 1;
+
+        while i + len <= n {
+            let pattern = &binary[i..i + len];
+            if patterns.contains(pattern) {
+                len += 1;
+            } else {
+                patterns.insert(pattern.to_vec());
+                i += len;
+                len = 1;
+            }
+        }
+
+        let complexity = patterns.len() as f64;
+
+        // Normalized by theoretical maximum (log2(n) patterns for random sequence)
+        let max_complexity = (n as f64).log2() * 2.0;
+        let normalized = if max_complexity > 0.0 {
+            complexity / max_complexity
+        } else {
+            0.0
+        };
+
+        (complexity, normalized.min(1.0).max(0.0))
+    }
+
+    /// Compute multi-scale entropy
+    fn compute_multi_scale_entropy(&self, values: &[f64]) -> Vec<f64> {
+        let mut mse = Vec::with_capacity(self.config.max_scale);
+
+        for scale in 1..=self.config.max_scale {
+            let coarse = self.coarse_grain(values, scale);
+            if coarse.len() >= self.config.min_samples {
+                let se = self.compute_sample_entropy(&coarse);
+                mse.push(se);
+            } else {
+                break; // Not enough data for higher scales
+            }
+        }
+
+        mse
+    }
+
+    /// Coarse-grain time series by averaging windows
+    fn coarse_grain(&self, values: &[f64], scale: usize) -> Vec<f64> {
+        if scale == 1 {
+            return values.to_vec();
+        }
+
+        let n = values.len();
+        let new_len = n / scale;
+        let mut coarse = Vec::with_capacity(new_len);
+
+        for i in 0..new_len {
+            let start = i * scale;
+            let end = start + scale;
+            let avg = values[start..end].iter().sum::<f64>() / scale as f64;
+            coarse.push(avg);
+        }
+
+        coarse
+    }
+
+    /// Compute median value
+    fn compute_median(&self, values: &[f64]) -> f64 {
+        let mut sorted = values.to_vec();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        let n = sorted.len();
+        if n % 2 == 0 {
+            (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
+        } else {
+            sorted[n / 2]
+        }
+    }
+}
+
+impl Default for PhiEntropyAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Convenience function: analyze Φ complexity
+pub fn analyze_phi_complexity(phi_values: &[f64]) -> PhiEntropyResult {
+    PhiEntropyAnalyzer::new().analyze(phi_values, None)
+}
+
+/// Convenience function: compute integrated complexity (Φ × Complexity)
+pub fn integrated_complexity(phi_values: &[f64], mean_phi: f64) -> f64 {
+    let result = PhiEntropyAnalyzer::new().analyze(phi_values, Some(mean_phi));
+    result.integrated_complexity
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -3997,5 +4482,347 @@ mod tests {
         assert!(result.computation_time_ms > 0.0);
 
         println!("Pyramid computation time: {:.2}ms", result.computation_time_ms);
+    }
+
+    // ============================================================================
+    // REVOLUTIONARY #95: Φ ENTROPY & COMPLEXITY TESTS
+    // ============================================================================
+
+    #[test]
+    fn test_entropy_insufficient_samples() {
+        let analyzer = PhiEntropyAnalyzer::new();
+
+        // Default min_samples is 50, so 10 samples should be insufficient
+        let values: Vec<f64> = (0..10).map(|i| i as f64 * 0.1).collect();
+        let result = analyzer.analyze(&values, None);
+
+        // Should return default values for insufficient samples
+        assert_eq!(result.shannon_entropy, 0.0);
+        assert_eq!(result.sample_count, 10);
+        assert_eq!(result.predictability, 1.0);
+
+        println!("Insufficient samples handled correctly: {} samples", result.sample_count);
+    }
+
+    #[test]
+    fn test_entropy_constant_signal() {
+        let config = PhiEntropyConfig {
+            min_samples: 10, // Lower threshold for testing
+            ..Default::default()
+        };
+        let analyzer = PhiEntropyAnalyzer::with_config(config);
+
+        // Constant signal - all same value
+        let values: Vec<f64> = vec![0.5; 100];
+        let result = analyzer.analyze(&values, None);
+
+        // Constant signal should have zero entropy
+        assert_eq!(result.shannon_entropy, 0.0, "Constant signal should have zero entropy");
+        assert_eq!(result.normalized_entropy, 0.0);
+        assert!(result.predictability > 0.99, "Constant signal should be highly predictable");
+
+        println!("Constant signal: entropy = {:.4}, predictability = {:.4}",
+                 result.shannon_entropy, result.predictability);
+    }
+
+    #[test]
+    fn test_entropy_uniform_random() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let config = PhiEntropyConfig {
+            min_samples: 10,
+            num_bins: 10,
+            ..Default::default()
+        };
+        let analyzer = PhiEntropyAnalyzer::with_config(config);
+
+        // Generate pseudo-random values spread across range
+        let values: Vec<f64> = (0..1000)
+            .map(|i| {
+                let mut hasher = DefaultHasher::new();
+                i.hash(&mut hasher);
+                (hasher.finish() % 1000) as f64 / 1000.0
+            })
+            .collect();
+
+        let result = analyzer.analyze(&values, None);
+
+        // Random signal should have high normalized entropy
+        assert!(result.normalized_entropy > 0.5,
+                "Random signal should have high entropy: {}", result.normalized_entropy);
+        assert!(result.predictability < 0.5,
+                "Random signal should have low predictability: {}", result.predictability);
+
+        println!("Random signal: normalized entropy = {:.4}, predictability = {:.4}",
+                 result.normalized_entropy, result.predictability);
+    }
+
+    #[test]
+    fn test_entropy_shannon_calculation() {
+        let config = PhiEntropyConfig {
+            min_samples: 10,
+            num_bins: 4, // 4 bins for easy verification
+            ..Default::default()
+        };
+        let analyzer = PhiEntropyAnalyzer::with_config(config);
+
+        // Create perfectly uniform distribution across 4 bins
+        // Values: 25 in each bin [0-0.25), [0.25-0.5), [0.5-0.75), [0.75-1.0)
+        let mut values = Vec::new();
+        for i in 0..100 {
+            values.push(i as f64 / 100.0); // 0.0 to 0.99 uniformly
+        }
+
+        let result = analyzer.analyze(&values, None);
+
+        // Shannon entropy for uniform 4-bin distribution = log2(4) = 2.0 bits
+        // Normalized = 2.0 / log2(4) = 1.0
+        // In practice, due to binning edge effects, it may be slightly less
+        assert!(result.shannon_entropy > 1.5,
+                "Uniform distribution should have entropy > 1.5: {}", result.shannon_entropy);
+        assert!(result.normalized_entropy > 0.8,
+                "Uniform distribution should have normalized entropy > 0.8: {}", result.normalized_entropy);
+
+        println!("Shannon entropy: {:.4} bits, normalized: {:.4}",
+                 result.shannon_entropy, result.normalized_entropy);
+    }
+
+    #[test]
+    fn test_entropy_sample_entropy() {
+        let config = PhiEntropyConfig {
+            min_samples: 10,
+            embed_dim: 2,
+            tolerance_fraction: 0.2,
+            ..Default::default()
+        };
+        let analyzer = PhiEntropyAnalyzer::with_config(config);
+
+        // Periodic signal (low sample entropy)
+        let periodic: Vec<f64> = (0..100)
+            .map(|i| (i as f64 * 0.1).sin())
+            .collect();
+
+        // Random-ish signal (higher sample entropy)
+        let chaotic: Vec<f64> = (0..100)
+            .map(|i| {
+                let x = i as f64 * 0.31415926;
+                (x.sin() * 1000.0) % 1.0 // Pseudo-random
+            })
+            .collect();
+
+        let periodic_result = analyzer.analyze(&periodic, None);
+        let chaotic_result = analyzer.analyze(&chaotic, None);
+
+        // Sample entropy should generally be lower for periodic signals
+        // (though this depends on the specific signals and parameters)
+        println!("Periodic sample entropy: {:.4}", periodic_result.sample_entropy);
+        println!("Chaotic sample entropy: {:.4}", chaotic_result.sample_entropy);
+
+        // Both should produce valid (non-negative) sample entropy
+        assert!(periodic_result.sample_entropy >= 0.0);
+        assert!(chaotic_result.sample_entropy >= 0.0);
+    }
+
+    #[test]
+    fn test_entropy_lz_complexity() {
+        let config = PhiEntropyConfig {
+            min_samples: 10,
+            ..Default::default()
+        };
+        let analyzer = PhiEntropyAnalyzer::with_config(config);
+
+        // Repetitive signal (low complexity)
+        let repetitive: Vec<f64> = (0..100)
+            .map(|i| if i % 2 == 0 { 0.0 } else { 1.0 })
+            .collect();
+
+        // More varied signal (higher complexity)
+        let varied: Vec<f64> = (0..100)
+            .map(|i| (i as f64 * 0.137) % 1.0) // Irrational-ish sequence
+            .collect();
+
+        let repetitive_result = analyzer.analyze(&repetitive, None);
+        let varied_result = analyzer.analyze(&varied, None);
+
+        println!("Repetitive LZ: {:.4} (normalized: {:.4})",
+                 repetitive_result.lz_complexity, repetitive_result.normalized_lz);
+        println!("Varied LZ: {:.4} (normalized: {:.4})",
+                 varied_result.lz_complexity, varied_result.normalized_lz);
+
+        // Both should produce valid complexity values
+        assert!(repetitive_result.lz_complexity >= 0.0);
+        assert!(varied_result.lz_complexity >= 0.0);
+        assert!(repetitive_result.normalized_lz <= 1.0);
+        assert!(varied_result.normalized_lz <= 1.0);
+    }
+
+    #[test]
+    fn test_entropy_multi_scale() {
+        let config = PhiEntropyConfig {
+            min_samples: 10,
+            max_scale: 5,
+            ..Default::default()
+        };
+        let analyzer = PhiEntropyAnalyzer::with_config(config);
+
+        // Generate enough samples for multi-scale analysis
+        let values: Vec<f64> = (0..500)
+            .map(|i| (i as f64 * 0.1).sin() + (i as f64 * 0.03).sin() * 0.5)
+            .collect();
+
+        let result = analyzer.analyze(&values, None);
+
+        // Should have multi-scale entropy values
+        assert!(!result.multi_scale_entropy.is_empty(),
+                "Should have multi-scale entropy for {} samples", result.sample_count);
+
+        println!("Multi-scale entropy ({} scales):", result.multi_scale_entropy.len());
+        for (scale, se) in result.multi_scale_entropy.iter().enumerate() {
+            println!("  Scale {}: {:.4}", scale + 1, se);
+        }
+    }
+
+    #[test]
+    fn test_entropy_integrated_complexity() {
+        let config = PhiEntropyConfig {
+            min_samples: 10,
+            ..Default::default()
+        };
+        let analyzer = PhiEntropyAnalyzer::with_config(config);
+
+        // Create varied signal
+        let values: Vec<f64> = (0..100)
+            .map(|i| (i as f64 * 0.17) % 1.0)
+            .collect();
+
+        // Test with different mean Φ values
+        let result_low_phi = analyzer.analyze(&values, Some(0.1));
+        let result_high_phi = analyzer.analyze(&values, Some(0.9));
+
+        // Same complexity, different Φ should yield different integrated complexity
+        assert!(result_high_phi.integrated_complexity > result_low_phi.integrated_complexity,
+                "Higher Φ should yield higher integrated complexity");
+
+        // Verify integrated complexity formula: Φ × complexity_index
+        let expected_low = 0.1 * result_low_phi.complexity_index;
+        let expected_high = 0.9 * result_high_phi.complexity_index;
+
+        assert!((result_low_phi.integrated_complexity - expected_low).abs() < 0.01,
+                "Integrated complexity should match Φ × complexity_index");
+        assert!((result_high_phi.integrated_complexity - expected_high).abs() < 0.01);
+
+        println!("Low Φ (0.1): integrated_complexity = {:.4}", result_low_phi.integrated_complexity);
+        println!("High Φ (0.9): integrated_complexity = {:.4}", result_high_phi.integrated_complexity);
+    }
+
+    #[test]
+    fn test_entropy_quality_descriptors() {
+        // Test quality description categories
+        let rich = PhiEntropyResult {
+            shannon_entropy: 2.0,
+            normalized_entropy: 0.5,
+            sample_entropy: 1.0,
+            lz_complexity: 5.0,
+            normalized_lz: 0.5,
+            multi_scale_entropy: vec![],
+            complexity_index: 0.8,
+            integrated_complexity: 0.7, // High
+            predictability: 0.5,
+            sample_count: 100,
+        };
+        assert_eq!(rich.quality_description(), "rich");
+        assert!(rich.is_complex());
+
+        let chaotic = PhiEntropyResult {
+            shannon_entropy: 2.0,
+            normalized_entropy: 0.85, // High
+            sample_entropy: 1.0,
+            lz_complexity: 5.0,
+            normalized_lz: 0.5,
+            multi_scale_entropy: vec![],
+            complexity_index: 0.3,
+            integrated_complexity: 0.15, // Low
+            predictability: 0.15,
+            sample_count: 100,
+        };
+        assert_eq!(chaotic.quality_description(), "chaotic");
+        assert!(chaotic.is_chaotic());
+
+        let simple = PhiEntropyResult {
+            shannon_entropy: 0.5,
+            normalized_entropy: 0.2,
+            sample_entropy: 0.1,
+            lz_complexity: 2.0,
+            normalized_lz: 0.2,
+            multi_scale_entropy: vec![],
+            complexity_index: 0.2,
+            integrated_complexity: 0.1,
+            predictability: 0.8, // High
+            sample_count: 100,
+        };
+        assert_eq!(simple.quality_description(), "simple");
+        assert!(simple.is_predictable());
+
+        println!("Quality descriptors: rich, chaotic, simple - all working");
+    }
+
+    #[test]
+    fn test_entropy_convenience_functions() {
+        // Test analyze_phi_complexity
+        let values: Vec<f64> = (0..100)
+            .map(|i| (i as f64 * 0.1) % 1.0)
+            .collect();
+
+        let result = analyze_phi_complexity(&values);
+        assert!(result.sample_count == 100);
+
+        // Test integrated_complexity function
+        let ic = integrated_complexity(&values, 0.5);
+        assert!(ic >= 0.0 && ic <= 1.0, "Integrated complexity should be in [0, 1]");
+
+        println!("Convenience functions: analyze_phi_complexity and integrated_complexity working");
+    }
+
+    #[test]
+    fn test_entropy_config_presets() {
+        // Test fast config
+        let fast = PhiEntropyAnalyzer::fast();
+        let values: Vec<f64> = (0..50).map(|i| i as f64 / 50.0).collect();
+        let result = fast.analyze(&values, None);
+        assert!(result.sample_count > 0);
+
+        // Test research config
+        let research = PhiEntropyAnalyzer::research();
+        let values_large: Vec<f64> = (0..200).map(|i| i as f64 / 200.0).collect();
+        let result_research = research.analyze(&values_large, None);
+        assert!(result_research.sample_count > 0);
+
+        println!("Config presets (fast, research) working");
+    }
+
+    #[test]
+    fn test_entropy_complexity_index() {
+        let config = PhiEntropyConfig {
+            min_samples: 10,
+            ..Default::default()
+        };
+        let analyzer = PhiEntropyAnalyzer::with_config(config);
+
+        // Create signal with moderate complexity
+        let values: Vec<f64> = (0..100)
+            .map(|i| (i as f64 * 0.23 + (i as f64 * 0.07).sin()) % 1.0)
+            .collect();
+
+        let result = analyzer.analyze(&values, Some(0.5));
+
+        // Complexity index should be geometric mean of entropy measures
+        // Bounded between 0 and 1
+        assert!(result.complexity_index >= 0.0 && result.complexity_index <= 1.0,
+                "Complexity index should be in [0, 1]: {}", result.complexity_index);
+
+        println!("Complexity index: {:.4}", result.complexity_index);
+        println!("Components: norm_entropy={:.4}, sample_ent={:.4}, norm_lz={:.4}",
+                 result.normalized_entropy, result.sample_entropy, result.normalized_lz);
     }
 }

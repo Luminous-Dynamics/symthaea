@@ -75,7 +75,8 @@ fn main() {
                     ConsciousnessTopology::lattice(n_nodes, HDC_DIMENSION, seed)
                 }
                 TopologyType::Sphere => {
-                    ConsciousnessTopology::sphere(n_nodes, HDC_DIMENSION, seed)
+                    // Sphere generator not implemented yet - use dense network as approximation
+                    ConsciousnessTopology::dense_network(n_nodes, HDC_DIMENSION, None, seed)
                 }
                 TopologyType::Torus => {
                     ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, seed)
