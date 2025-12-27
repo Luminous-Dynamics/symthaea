@@ -29,6 +29,12 @@ pub mod physiology;
 // Week 12: Perception & Tool Creation
 pub mod perception;
 
+// Enhancement #4: Observability & Causal Analysis (Phase 3+)
+pub mod observability;
+
+// Enhancement #7: Causal Program Synthesis (Phase 2)
+pub mod synthesis;
+
 // Phase 11: Bio-Digital Bridge modules (Week 0: Deferred to later phases)
 // pub mod semantic_ear;  // Needs rust-bert, tokenizers
 pub mod safety;

@@ -484,25 +484,27 @@ impl CausalProgramSynthesizer {
             // Create goal: maximize target variable
             let goal = Goal {
                 target: to.clone(),
+                desired_value: 1.0,
+                tolerance: 0.1,
                 direction: GoalDirection::Maximize,
-                target_value: 1.0,
             };
 
+            // For planning, we need candidate nodes
+            // In a real implementation, this would come from the causal graph
+            let candidates = vec![from.clone(), to.clone()];
+
             // Plan action sequence
-            if let Ok(plan) = planner.plan_action(goal) {
-                // Extract intervention sequence from plan
-                let path: Vec<VarName> = plan.steps
-                    .iter()
-                    .map(|step| step.variable.clone())
-                    .collect();
+            let plan = planner.plan(&goal, &candidates);
 
-                let confidence = plan.expected_utility;
+            // Extract intervention sequence from plan
+            let path: Vec<VarName> = plan.interventions
+                .iter()
+                .map(|intervention| intervention.node.clone())
+                .collect();
 
-                (path, confidence)
-            } else {
-                // Fallback: Direct path
-                (vec![from.clone()], 0.7)
-            }
+            let confidence = plan.confidence;
+
+            (path, confidence)
         } else {
             // Phase 1 fallback: Direct path
             (vec![from.clone()], 0.9)

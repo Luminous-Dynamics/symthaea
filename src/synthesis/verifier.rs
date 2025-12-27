@@ -120,7 +120,7 @@ impl CounterfactualVerifier {
     }
 
     /// Verify a synthesized program
-    pub fn verify(&self, program: &SynthesizedProgram) -> VerificationResult {
+    pub fn verify(&mut self, program: &SynthesizedProgram) -> VerificationResult {
         let mut passed = 0;
         let mut failed = 0;
         let mut errors = Vec::new();
@@ -217,6 +217,8 @@ impl CounterfactualVerifier {
     /// Converts test case into a CounterfactualQuery that asks:
     /// "What would happen to the effect if we intervened on the cause?"
     fn generate_counterfactual_query(&self, test: &TestCase) -> CounterfactualQuery {
+        use crate::observability::Evidence;
+
         // Extract cause and effect from specification
         let (cause, effect) = match &test.specification {
             CausalSpec::MakeCause { cause, effect, .. } => (cause.clone(), effect.clone()),
@@ -234,21 +236,21 @@ impl CounterfactualVerifier {
         // Get intervention value from test inputs
         let intervention_value = test.inputs.get(&cause).copied().unwrap_or(0.5);
 
-        // Create intervention
-        let mut intervention = HashMap::new();
-        intervention.insert(cause.clone(), intervention_value);
+        // Create counterfactual intervention
+        let mut counterfactual_intervention = HashMap::new();
+        counterfactual_intervention.insert(cause.clone(), intervention_value);
 
-        // Create evidence from other variables
-        let evidence: HashMap<String, f64> = test.inputs
+        // Create actual evidence from other variables
+        let actual_evidence: Vec<Evidence> = test.inputs
             .iter()
             .filter(|(k, _)| *k != &cause)
-            .map(|(k, v)| (k.clone(), *v))
+            .map(|(k, v)| Evidence::new(k, *v))
             .collect();
 
         CounterfactualQuery {
-            intervention,
-            evidence,
-            query_variable: effect,
+            actual_evidence,
+            counterfactual_intervention,
+            target: effect,
         }
     }
 
@@ -259,20 +261,20 @@ impl CounterfactualVerifier {
     ///
     /// Returns: (actual_strength, error)
     fn test_with_counterfactual(
-        &self,
+        &mut self,
         program: &SynthesizedProgram,
         test: &TestCase,
     ) -> (f64, f64) {
-        if let Some(ref engine) = self.counterfactual_engine {
-            // Phase 2: Use real counterfactual engine
-            // Generate counterfactual query from test case
-            let query = self.generate_counterfactual_query(test);
+        // Generate query before borrowing engine to avoid borrow conflict
+        let query = self.generate_counterfactual_query(test);
 
+        if let Some(ref mut engine) = self.counterfactual_engine {
+            // Phase 2: Use real counterfactual engine
             // Ask engine for the true counterfactual answer
-            let result = engine.query(&query);
+            let result = engine.compute_counterfactual(&query);
 
             // The actual strength is the counterfactual value
-            let actual_strength = result.value;
+            let actual_strength = result.counterfactual_value;
 
             // Compare with program's expected strength
             let error = (actual_strength - test.expected_strength).abs();
@@ -288,7 +290,7 @@ impl CounterfactualVerifier {
     }
 
     /// Run a single test case
-    fn run_test(&self, program: &SynthesizedProgram, test: &TestCase) -> TestResult {
+    fn run_test(&mut self, program: &SynthesizedProgram, test: &TestCase) -> TestResult {
         // Phase 2: Use counterfactual testing when available
         let (actual_strength, error) = self.test_with_counterfactual(program, test);
 
@@ -410,7 +412,7 @@ mod tests {
 
     #[test]
     fn test_verify_simple_program() {
-        let verifier = CounterfactualVerifier::default();
+        let mut verifier = CounterfactualVerifier::default();
 
         // Create a simple program
         let program = SynthesizedProgram {
@@ -439,7 +441,7 @@ mod tests {
     fn test_complexity_check() {
         let mut config = VerificationConfig::default();
         config.max_complexity = 5;
-        let verifier = CounterfactualVerifier::new(config);
+        let mut verifier = CounterfactualVerifier::new(config);
 
         // Create program exceeding complexity
         let program = SynthesizedProgram {
