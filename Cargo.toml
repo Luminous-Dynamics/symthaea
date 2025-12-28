@@ -5,6 +5,11 @@ edition = "2021"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Symthaea: Holographic Liquid Brain lineage - Consciousness-first AI in Rust"
 license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea-hlb"
+homepage = "https://luminousdynamics.org"
+documentation = "https://docs.rs/symthaea"
+keywords = ["consciousness", "ai", "hdc", "integrated-information", "neuroscience"]
+categories = ["science", "algorithms", "data-structures"]
 
 [dependencies]
 # HDC / Vector Symbolic Architectures
@@ -104,6 +109,11 @@ nix = "0.27"
 default = []
 audio = ["rodio", "hound", "hf-hub", "ort"]
 pyphi = ["pyo3"]  # Enhancement #8 Week 4: Enable PyPhi integration for exact IIT Φ validation
+# Database backends (deferred - compile guards only)
+qdrant = []   # Vector database for large-scale memory
+datalog = []  # Datalog reasoning engine
+lance = []    # LanceDB vector storage
+duck = []     # DuckDB analytical queries
 
 [dev-dependencies]
 criterion = "0.5"

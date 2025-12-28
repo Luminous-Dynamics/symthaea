@@ -1,0 +1,1805 @@
+warning: unused import: `anyhow::Result`
+  --> src/hdc/statistical_retrieval.rs:26:5
+   |
+26 | use anyhow::Result;
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `HDC_DIMENSION` and `HdcContext`
+  --> src/hdc/resonator.rs:49:13
+   |
+49 | use super::{HDC_DIMENSION, HdcContext};
+   |             ^^^^^^^^^^^^^  ^^^^^^^^^^
+
+warning: unused import: `super::HDC_DIMENSION`
+  --> src/hdc/morphogenetic.rs:41:5
+   |
+41 | use super::HDC_DIMENSION;
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `anyhow::Result`
+  --> src/hdc/hebbian.rs:31:5
+   |
+31 | use anyhow::Result;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/hdc/sdm.rs:52:5
+   |
+52 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashSet`
+   --> src/hdc/consciousness_topology.rs:167:5
+    |
+167 | use std::collections::HashSet;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/hdc/consciousness_topology_generators.rs:10:5
+   |
+10 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `super::binary_hv::HV16`
+  --> src/hdc/substrate_independence.rs:53:5
+   |
+53 | use super::binary_hv::HV16;
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::hdc::binary_hv::HV16`
+  --> src/hdc/consciousness_evaluator.rs:15:5
+   |
+15 | use crate::hdc::binary_hv::HV16;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `SubstrateRequirements`
+  --> src/hdc/consciousness_evaluator.rs:16:57
+   |
+16 | use crate::hdc::substrate_independence::{SubstrateType, SubstrateRequirements};
+   |                                                         ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Duration`
+  --> src/hdc/consciousness_dashboard.rs:30:17
+   |
+30 | use std::time::{Duration, Instant};
+   |                 ^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/hdc/deterministic_seeds.rs:42:5
+   |
+42 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> src/hdc/integrated_information.rs:81:5
+   |
+81 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> src/brain/prefrontal.rs:63:5
+   |
+63 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `AttentionBid`
+  --> src/brain/sleep.rs:17:32
+   |
+17 | use crate::brain::prefrontal::{AttentionBid, Coalition, WorkingMemoryItem};
+   |                                ^^^^^^^^^^^^
+
+warning: unused imports: `ObserverStats` and `types::*`
+ --> src/observability/null_observer.rs:7:31
+  |
+7 | use super::{SymthaeaObserver, types::*, ObserverStats};
+  |                               ^^^^^^^^  ^^^^^^^^^^^^^
+
+warning: unused import: `anyhow::Result`
+ --> src/observability/null_observer.rs:8:5
+  |
+8 | use anyhow::Result;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `CausalNode`
+  --> src/observability/trace_analyzer.rs:46:33
+   |
+46 | use super::{Trace, CausalGraph, CausalNode, CausalAnswer};
+   |                                 ^^^^^^^^^^
+
+warning: unused import: `super::types::PhiComponents`
+  --> src/observability/trace_analyzer.rs:50:5
+   |
+50 | use super::types::PhiComponents;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `chrono::Utc`
+  --> src/observability/streaming_causal.rs:28:5
+   |
+28 | use chrono::Utc;
+   |     ^^^^^^^^^^^
+
+warning: unused import: `causal_graph::CausalGraph`
+  --> src/observability/pattern_library.rs:19:5
+   |
+19 |     causal_graph::CausalGraph,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `CausalEdge`, `correlation::EventMetadata`, and `types::Event`
+  --> src/observability/probabilistic_inference.rs:20:33
+   |
+20 |     causal_graph::{CausalGraph, CausalEdge, EdgeType},
+   |                                 ^^^^^^^^^^
+21 |     types::Event,
+   |     ^^^^^^^^^^^^
+22 |     correlation::EventMetadata,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `CausalEdge`, `CausalGraph`, `CausalNode`, `EdgeType`, and `ProbabilisticEdge`
+  --> src/observability/causal_intervention.rs:29:20
+   |
+29 |     causal_graph::{CausalGraph, CausalEdge, CausalNode, EdgeType},
+   |                    ^^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^
+30 |     probabilistic_inference::{
+31 |         ProbabilisticCausalGraph, ProbabilisticEdge, ProbabilisticPrediction,
+   |                                   ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `HashSet`
+  --> src/observability/causal_intervention.rs:35:33
+   |
+35 | use std::collections::{HashMap, HashSet};
+   |                                 ^^^^^^^
+
+warning: unused imports: `CausalEdge`, `CausalGraph`, `EdgeType`, `InterventionResult`, `InterventionType`, `ProbabilisticPrediction`, and `UncertaintySource`
+  --> src/observability/counterfactual_reasoning.rs:30:20
+   |
+30 |     causal_graph::{CausalGraph, CausalEdge, EdgeType},
+   |                    ^^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^
+31 |     probabilistic_inference::{
+32 |         ProbabilisticCausalGraph, ProbabilisticEdge, ProbabilisticPrediction,
+   |                                                      ^^^^^^^^^^^^^^^^^^^^^^^
+33 |         UncertaintySource,
+   |         ^^^^^^^^^^^^^^^^^
+...
+36 |         CausalInterventionEngine, InterventionSpec, InterventionType, InterventionResult,
+   |                                                     ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `InterventionSpec` and `causal_graph::EdgeType`
+  --> src/observability/action_planning.rs:29:5
+   |
+29 |     causal_graph::EdgeType,
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+...
+32 |         CausalInterventionEngine, InterventionSpec, InterventionType, InterventionResult,
+   |                                   ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `HashSet` and `VecDeque`
+  --> src/observability/action_planning.rs:35:33
+   |
+35 | use std::collections::{HashMap, HashSet, VecDeque};
+   |                                 ^^^^^^^  ^^^^^^^^
+
+warning: unused imports: `CausalGraph`, `EdgeType`, `Goal`, `InterventionSpec`, and `ProbabilisticCausalGraph`
+  --> src/observability/causal_explanation.rs:26:20
+   |
+26 |     causal_graph::{CausalGraph, EdgeType},
+   |                    ^^^^^^^^^^^  ^^^^^^^^
+27 |     probabilistic_inference::{ProbabilisticCausalGraph, ProbabilisticPrediction},
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^
+28 |     causal_intervention::{InterventionResult, InterventionSpec},
+   |                                               ^^^^^^^^^^^^^^^^
+29 |     counterfactual_reasoning::CounterfactualResult,
+30 |     action_planning::{ActionPlan, Goal},
+   |                                   ^^^^
+
+warning: unused imports: `ActionPlanner`, `CausalInterventionEngine`, `CounterfactualResult`, `GoalDirection`, `Goal`, and `InterventionSpec`
+  --> src/observability/byzantine_defense.rs:22:27
+   |
+22 |     causal_intervention::{CausalInterventionEngine, InterventionSpec},
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^
+23 |     counterfactual_reasoning::{CounterfactualEngine, CounterfactualQuery, CounterfactualResult},
+   |                                                                           ^^^^^^^^^^^^^^^^^^^^
+24 |     action_planning::{ActionPlanner, Goal, GoalDirection},
+   |                       ^^^^^^^^^^^^^  ^^^^  ^^^^^^^^^^^^^
+
+warning: unused imports: `AttackSimulation` and `probabilistic_inference::ProbabilisticCausalGraph`
+  --> src/observability/predictive_byzantine_defense.rs:29:9
+   |
+29 |         AttackSimulation, Countermeasure,
+   |         ^^^^^^^^^^^^^^^^
+...
+37 |     probabilistic_inference::ProbabilisticCausalGraph,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `CausalInsight`, `CounterfactualQuery`, `CounterfactualResult`, `InterventionSpec`, and `ProbabilisticEdge`
+  --> src/observability/ml_explainability.rs:47:31
+   |
+47 |     ProbabilisticCausalGraph, ProbabilisticEdge,
+   |                               ^^^^^^^^^^^^^^^^^
+48 |     CausalInterventionEngine, InterventionSpec,
+   |                               ^^^^^^^^^^^^^^^^
+49 |     CounterfactualEngine, CounterfactualQuery, CounterfactualResult,
+   |                           ^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^
+50 |     ExplanationGenerator,
+51 |     StreamingCausalAnalyzer, StreamingConfig, CausalInsight,
+   |                                               ^^^^^^^^^^^^^
+
+warning: unused import: `VecDeque`
+  --> src/observability/ml_explainability.rs:55:33
+   |
+55 | use std::collections::{HashMap, VecDeque};
+   |                                 ^^^^^^^^
+
+warning: unexpected `cfg` condition value: `qdrant`
+  --> src/databases/qdrant_client.rs:30:7
+   |
+30 | #[cfg(feature = "qdrant")]
+   |       ^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+   = help: consider adding `qdrant` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+   = note: `#[warn(unexpected_cfgs)]` on by default
+
+warning: unused import: `MemoryType`
+  --> src/databases/qdrant_client.rs:26:60
+   |
+26 | use super::{ConsciousnessDatabase, DbResult, MemoryRecord, MemoryType, SearchResult};
+   |                                                            ^^^^^^^^^^
+
+warning: unexpected `cfg` condition value: `qdrant`
+  --> src/databases/qdrant_client.rs:70:11
+   |
+70 |     #[cfg(feature = "qdrant")]
+   |           ^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+   = help: consider adding `qdrant` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `qdrant`
+  --> src/databases/qdrant_client.rs:93:11
+   |
+93 |     #[cfg(feature = "qdrant")]
+   |           ^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+   = help: consider adding `qdrant` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `qdrant`
+   --> src/databases/qdrant_client.rs:125:11
+    |
+125 |     #[cfg(feature = "qdrant")]
+    |           ^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `qdrant` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `qdrant`
+  --> src/databases/qdrant_client.rs:85:19
+   |
+85 |             #[cfg(feature = "qdrant")]
+   |                   ^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+   = help: consider adding `qdrant` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `qdrant`
+   --> src/databases/qdrant_client.rs:210:15
+    |
+210 |         #[cfg(feature = "qdrant")]
+    |               ^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `qdrant` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `qdrant`
+   --> src/databases/qdrant_client.rs:255:15
+    |
+255 |         #[cfg(feature = "qdrant")]
+    |               ^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `qdrant` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `qdrant`
+   --> src/databases/qdrant_client.rs:355:15
+    |
+355 |         #[cfg(feature = "qdrant")]
+    |               ^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `qdrant` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `qdrant`
+   --> src/databases/qdrant_client.rs:379:15
+    |
+379 |         #[cfg(feature = "qdrant")]
+    |               ^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `qdrant` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `qdrant`
+   --> src/databases/qdrant_client.rs:393:15
+    |
+393 |         #[cfg(feature = "qdrant")]
+    |               ^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `qdrant` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `datalog`
+  --> src/databases/cozo_client.rs:83:11
+   |
+83 |     #[cfg(feature = "datalog")]
+   |           ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+   = help: consider adding `datalog` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `datalog`
+   --> src/databases/cozo_client.rs:114:11
+    |
+114 |     #[cfg(feature = "datalog")]
+    |           ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `datalog` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `datalog`
+   --> src/databases/cozo_client.rs:232:11
+    |
+232 |     #[cfg(feature = "datalog")]
+    |           ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `datalog` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `datalog`
+   --> src/databases/cozo_client.rs:104:19
+    |
+104 |             #[cfg(feature = "datalog")]
+    |                   ^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `datalog` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `lance`
+  --> src/databases/lance_client.rs:81:11
+   |
+81 |     #[cfg(feature = "lance")]
+   |           ^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+   = help: consider adding `lance` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `lance`
+   --> src/databases/lance_client.rs:108:11
+    |
+108 |     #[cfg(feature = "lance")]
+    |           ^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `lance` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `lance`
+  --> src/databases/lance_client.rs:99:19
+   |
+99 |             #[cfg(feature = "lance")]
+   |                   ^^^^^^^^^^^^^^^^^
+   |
+   = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+   = help: consider adding `lance` as a feature in `Cargo.toml`
+   = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `duck`
+   --> src/databases/duck_client.rs:142:11
+    |
+142 |     #[cfg(feature = "duck")]
+    |           ^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `duck` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `duck`
+   --> src/databases/duck_client.rs:173:11
+    |
+173 |     #[cfg(feature = "duck")]
+    |           ^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `duck` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `duck`
+   --> src/databases/duck_client.rs:163:19
+    |
+163 |             #[cfg(feature = "duck")]
+    |                   ^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `duck` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `qdrant`
+   --> src/databases/unified_mind.rs:571:19
+    |
+571 |             #[cfg(feature = "qdrant")]
+    |                   ^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `qdrant` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `qdrant`
+   --> src/databases/unified_mind.rs:586:23
+    |
+586 |             #[cfg(not(feature = "qdrant"))]
+    |                       ^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `qdrant` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `duck`
+   --> src/databases/unified_mind.rs:597:19
+    |
+597 |             #[cfg(feature = "duck")]
+    |                   ^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `duck` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unexpected `cfg` condition value: `duck`
+   --> src/databases/unified_mind.rs:612:23
+    |
+612 |             #[cfg(not(feature = "duck"))]
+    |                       ^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `audio`, `default`, `hf-hub`, `hound`, `ort`, `pyo3`, `pyphi`, and `rodio`
+    = help: consider adding `duck` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+
+warning: unused import: `std::sync::Arc`
+  --> src/language/generator.rs:22:5
+   |
+22 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `ApproximationTier`
+  --> src/language/conversation.rs:19:41
+   |
+19 | use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
+   |                                         ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `FrameElement`
+  --> src/language/constructions.rs:29:36
+   |
+29 | use super::frames::{SemanticFrame, FrameElement, FrameLibrary};
+   |                                    ^^^^^^^^^^^^
+
+warning: unused import: `FrameInstance`
+  --> src/language/conscious_understanding.rs:53:51
+   |
+53 | use super::frames::{FrameLibrary, FrameActivator, FrameInstance};
+   |                                                   ^^^^^^^^^^^^^
+
+warning: unused import: `ConstructionParse`
+  --> src/language/conscious_understanding.rs:54:49
+   |
+54 | use super::constructions::{ConstructionGrammar, ConstructionParse};
+   |                                                 ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `SentenceUnderstanding as PredictiveSentenceResult`
+  --> src/language/conscious_understanding.rs:57:5
+   |
+57 |     SentenceUnderstanding as PredictiveSentenceResult,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ConsciousnessMetrics` and `PredictionResult`
+  --> src/language/consciousness_bridge.rs:60:5
+   |
+60 |     PredictionResult, ConsciousnessMetrics, PipelineConfig,
+   |     ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `PredictionSource`, `PredictiveUnderstanding`, and `SentenceUnderstanding`
+  --> src/language/consciousness_bridge.rs:64:5
+   |
+64 |     PredictiveUnderstanding, LinguisticLevel, LinguisticError,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+65 |     PredictionSource, SentenceUnderstanding,
+   |     ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `HashMap`
+  --> src/language/consciousness_bridge.rs:68:24
+   |
+68 | use std::collections::{HashMap, VecDeque};
+   |                        ^^^^^^^
+
+warning: unused imports: `BridgeStats` and `LanguageAttentionBid`
+  --> src/language/active_inference_adapter.rs:57:54
+   |
+57 |     ConsciousnessBridge, BridgeConfig, BridgeResult, BridgeStats,
+   |                                                      ^^^^^^^^^^^
+58 |     LinguisticPredictionError, InferenceDomain, ConsciousnessState,
+59 |     LanguageAttentionBid,
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ActionType`, `ActiveInferenceStats`, and `GenerativeModel`
+  --> src/language/active_inference_adapter.rs:63:63
+   |
+63 |     ActiveInferenceEngine, PredictionDomain, PredictionError, ActionType,
+   |                                                               ^^^^^^^^^^
+64 |     ActiveInferenceSummary, GenerativeModel, ActiveInferenceStats,
+   |                             ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `HashMap`
+  --> src/language/active_inference_adapter.rs:67:24
+   |
+67 | use std::collections::{HashMap, VecDeque};
+   |                        ^^^^^^^
+
+warning: unused import: `NixPrimitiveTier`
+  --> src/language/nix_frames.rs:24:64
+   |
+24 | use super::nix_primitives::{NixPrimitive, NixPrimitiveEncoder, NixPrimitiveTier};
+   |                                                                ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `NixFrameFiller` and `NixFrameInstance`
+  --> src/language/nix_constructions.rs:18:53
+   |
+18 | use super::nix_frames::{NixFrameType, NixFrameRole, NixFrameInstance, NixFrameFiller};
+   |                                                     ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+
+warning: unused import: `NixPrimitiveTier`
+  --> src/language/nix_constructions.rs:19:43
+   |
+19 | use super::nix_primitives::{NixPrimitive, NixPrimitiveTier};
+   |                                           ^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::hdc::HV16`
+  --> src/language/nix_constructions.rs:20:5
+   |
+20 | use crate::hdc::HV16;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> src/language/nix_error_diagnosis.rs:17:5
+   |
+17 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/language/nix_security.rs:35:5
+   |
+35 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `BTreeMap`
+  --> src/language/nix_knowledge_provider.rs:51:33
+   |
+51 | use std::collections::{HashMap, BTreeMap, HashSet};
+   |                                 ^^^^^^^^
+
+warning: unused import: `ConsciousnessStateLevel`
+  --> src/language/consciousness_guided_executor.rs:64:5
+   |
+64 |     ConsciousnessStateLevel,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `anyhow::Result`
+  --> src/safety/thymus.rs:29:5
+   |
+29 | use anyhow::Result;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `RetrievalVerdict`
+  --> src/safety/thymus.rs:33:20
+   |
+33 |     EmpiricalTier, RetrievalVerdict, StatisticalRetriever, StatisticalRetrievalConfig,
+   |                    ^^^^^^^^^^^^^^^^
+
+warning: unused variable: `qdrant_config`
+   --> src/databases/unified_mind.rs:570:67
+    |
+570 |         let sensory: Arc<dyn ConsciousnessDatabase> = if let Some(qdrant_config) = config.qdrant {
+    |                                                                   ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_qdrant_config`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `duck_config`
+   --> src/databases/unified_mind.rs:596:69
+    |
+596 |         let epistemic: Arc<dyn ConsciousnessDatabase> = if let Some(duck_config) = config.duckdb {
+    |                                                                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_duck_config`
+
+warning: unused import: `Write`
+  --> src/observability/trace_observer.rs:10:26
+   |
+10 | use std::io::{BufWriter, Write};
+   |                          ^^^^^
+
+warning: unused import: `SymthaeaObserver`
+  --> src/language/consciousness_guided_executor.rs:68:21
+   |
+68 |     SharedObserver, SymthaeaObserver,
+   |                     ^^^^^^^^^^^^^^^^
+
+warning: value assigned to `previous` is never read
+   --> src/hdc/resonator.rs:315:17
+    |
+315 |         let mut previous = estimate.clone();
+    |                 ^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `iteration`
+   --> src/hdc/resonator.rs:419:13
+    |
+419 |         for iteration in 0..max_iterations {
+    |             ^^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+419 |         for _iteration in 0..max_iterations {
+    |             +
+help: you might have meant to pattern match on the similarly named constant `HDC_DIM`
+    |
+419 -         for iteration in 0..max_iterations {
+419 +         for perception::multi_modal::HDC_DIM in 0..max_iterations {
+    |
+
+warning: variable `total_weight` is assigned to, but never used
+   --> src/hdc/sdm.rs:332:17
+    |
+332 |         let mut total_weight = 0.0f64;
+    |                 ^^^^^^^^^^^^
+    |
+    = note: consider using `_total_weight` instead
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+332 -         let mut total_weight = 0.0f64;
+332 +         let mut soul::weaver::COHERENCE_THRESHOLD = 0.0f64;
+    |
+
+warning: unused variable: `confidence`
+   --> src/hdc/sdm.rs:463:44
+    |
+463 |             ReadResult::Success { pattern, confidence, .. } => {
+    |                                            ^^^^^^^^^^-
+    |                                            |
+    |                                            help: try removing the field
+
+warning: unused variable: `seed`
+   --> src/hdc/consciousness_topology_generators.rs:187:45
+    |
+187 |     pub fn ring(n_nodes: usize, dim: usize, seed: u64) -> Self {
+    |                                             ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+187 |     pub fn ring(n_nodes: usize, dim: usize, _seed: u64) -> Self {
+    |                                             +
+help: you might have meant to pattern match on the similarly named constant `FNV_PRIME`
+    |
+187 -     pub fn ring(n_nodes: usize, dim: usize, seed: u64) -> Self {
+187 +     pub fn ring(n_nodes: usize, dim: usize, brain::actor_model::hash_string::FNV_PRIME: u64) -> Self {
+    |
+
+warning: unused variable: `seed`
+   --> src/hdc/consciousness_topology_generators.rs:233:45
+    |
+233 |     pub fn line(n_nodes: usize, dim: usize, seed: u64) -> Self {
+    |                                             ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+233 |     pub fn line(n_nodes: usize, dim: usize, _seed: u64) -> Self {
+    |                                             +
+help: you might have meant to pattern match on the similarly named constant `FNV_PRIME`
+    |
+233 -     pub fn line(n_nodes: usize, dim: usize, seed: u64) -> Self {
+233 +     pub fn line(n_nodes: usize, dim: usize, brain::actor_model::hash_string::FNV_PRIME: u64) -> Self {
+    |
+
+warning: unused variable: `seed`
+   --> src/hdc/consciousness_topology_generators.rs:291:52
+    |
+291 |     pub fn binary_tree(n_nodes: usize, dim: usize, seed: u64) -> Self {
+    |                                                    ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+291 |     pub fn binary_tree(n_nodes: usize, dim: usize, _seed: u64) -> Self {
+    |                                                    +
+help: you might have meant to pattern match on the similarly named constant `FNV_PRIME`
+    |
+291 -     pub fn binary_tree(n_nodes: usize, dim: usize, seed: u64) -> Self {
+291 +     pub fn binary_tree(n_nodes: usize, dim: usize, brain::actor_model::hash_string::FNV_PRIME: u64) -> Self {
+    |
+
+warning: unused variable: `seed`
+   --> src/hdc/consciousness_topology_generators.rs:366:72
+    |
+366 |     pub fn dense_network(n_nodes: usize, dim: usize, k: Option<usize>, seed: u64) -> Self {
+    |                                                                        ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+366 |     pub fn dense_network(n_nodes: usize, dim: usize, k: Option<usize>, _seed: u64) -> Self {
+    |                                                                        +
+help: you might have meant to pattern match on the similarly named constant `FNV_PRIME`
+    |
+366 -     pub fn dense_network(n_nodes: usize, dim: usize, k: Option<usize>, seed: u64) -> Self {
+366 +     pub fn dense_network(n_nodes: usize, dim: usize, k: Option<usize>, brain::actor_model::hash_string::FNV_PRIME: u64) -> Self {
+    |
+
+warning: unused variable: `seed`
+   --> src/hdc/consciousness_topology_generators.rs:430:66
+    |
+430 |     pub fn modular(n_nodes: usize, dim: usize, n_modules: usize, seed: u64) -> Self {
+    |                                                                  ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+430 |     pub fn modular(n_nodes: usize, dim: usize, n_modules: usize, _seed: u64) -> Self {
+    |                                                                  +
+help: you might have meant to pattern match on the similarly named constant `FNV_PRIME`
+    |
+430 -     pub fn modular(n_nodes: usize, dim: usize, n_modules: usize, seed: u64) -> Self {
+430 +     pub fn modular(n_nodes: usize, dim: usize, n_modules: usize, brain::actor_model::hash_string::FNV_PRIME: u64) -> Self {
+    |
+
+warning: unused variable: `seed`
+   --> src/hdc/consciousness_topology_generators.rs:726:48
+    |
+726 |     pub fn lattice(n_nodes: usize, dim: usize, seed: u64) -> Self {
+    |                                                ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+726 |     pub fn lattice(n_nodes: usize, dim: usize, _seed: u64) -> Self {
+    |                                                +
+help: you might have meant to pattern match on the similarly named constant `FNV_PRIME`
+    |
+726 -     pub fn lattice(n_nodes: usize, dim: usize, seed: u64) -> Self {
+726 +     pub fn lattice(n_nodes: usize, dim: usize, brain::actor_model::hash_string::FNV_PRIME: u64) -> Self {
+    |
+
+warning: unused variable: `seed`
+   --> src/hdc/consciousness_topology_generators.rs:917:53
+    |
+917 |     pub fn mobius_strip(n_nodes: usize, dim: usize, seed: u64) -> Self {
+    |                                                     ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+917 |     pub fn mobius_strip(n_nodes: usize, dim: usize, _seed: u64) -> Self {
+    |                                                     +
+help: you might have meant to pattern match on the similarly named constant `FNV_PRIME`
+    |
+917 -     pub fn mobius_strip(n_nodes: usize, dim: usize, seed: u64) -> Self {
+917 +     pub fn mobius_strip(n_nodes: usize, dim: usize, brain::actor_model::hash_string::FNV_PRIME: u64) -> Self {
+    |
+
+warning: unused variable: `seed`
+   --> src/hdc/consciousness_topology_generators.rs:975:55
+    |
+975 |     pub fn torus_square(grid_size: usize, dim: usize, seed: u64) -> Self {
+    |                                                       ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+975 |     pub fn torus_square(grid_size: usize, dim: usize, _seed: u64) -> Self {
+    |                                                       +
+help: you might have meant to pattern match on the similarly named constant `FNV_PRIME`
+    |
+975 -     pub fn torus_square(grid_size: usize, dim: usize, seed: u64) -> Self {
+975 +     pub fn torus_square(grid_size: usize, dim: usize, brain::actor_model::hash_string::FNV_PRIME: u64) -> Self {
+    |
+
+warning: unused variable: `seed`
+    --> src/hdc/consciousness_topology_generators.rs:1032:62
+     |
+1032 |     pub fn klein_bottle_square(grid_size: usize, dim: usize, seed: u64) -> Self {
+     |                                                              ^^^^
+     |
+help: if this is intentional, prefix it with an underscore
+     |
+1032 |     pub fn klein_bottle_square(grid_size: usize, dim: usize, _seed: u64) -> Self {
+     |                                                              +
+help: you might have meant to pattern match on the similarly named constant `FNV_PRIME`
+     |
+1032 -     pub fn klein_bottle_square(grid_size: usize, dim: usize, seed: u64) -> Self {
+1032 +     pub fn klein_bottle_square(grid_size: usize, dim: usize, brain::actor_model::hash_string::FNV_PRIME: u64) -> Self {
+     |
+
+warning: unused variable: `seed`
+    --> src/hdc/consciousness_topology_generators.rs:1107:69
+     |
+1107 |     pub fn hyperbolic(n_nodes: usize, dim: usize, branching: usize, seed: u64) -> Self {
+     |                                                                     ^^^^
+     |
+help: if this is intentional, prefix it with an underscore
+     |
+1107 |     pub fn hyperbolic(n_nodes: usize, dim: usize, branching: usize, _seed: u64) -> Self {
+     |                                                                     +
+help: you might have meant to pattern match on the similarly named constant `FNV_PRIME`
+     |
+1107 -     pub fn hyperbolic(n_nodes: usize, dim: usize, branching: usize, seed: u64) -> Self {
+1107 +     pub fn hyperbolic(n_nodes: usize, dim: usize, branching: usize, brain::actor_model::hash_string::FNV_PRIME: u64) -> Self {
+     |
+
+warning: unused variable: `level`
+    --> src/hdc/consciousness_topology_generators.rs:1338:13
+     |
+1338 |         for level in 1..levels {
+     |             ^^^^^
+     |
+help: if this is intentional, prefix it with an underscore
+     |
+1338 |         for _level in 1..levels {
+     |             +
+help: you might have meant to pattern match on the similarly named constant `HDC_DIM`
+     |
+1338 -         for level in 1..levels {
+1338 +         for perception::multi_modal::HDC_DIM in 1..levels {
+     |
+
+warning: unused variable: `bundled`
+    --> src/hdc/tiered_phi.rs:1280:35
+     |
+1280 |     fn compute_system_info(&self, bundled: &HV16, components: &[HV16]) -> f64 {
+     |                                   ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_bundled`
+
+warning: value assigned to `knockout_delta` is never read
+    --> src/hdc/tiered_phi.rs:4650:21
+     |
+4650 |             let mut knockout_delta = 0.0;
+     |                     ^^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `amplify_delta` is never read
+    --> src/hdc/tiered_phi.rs:4651:21
+     |
+4651 |             let mut amplify_delta = 0.0;
+     |                     ^^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: value assigned to `dampen_delta` is never read
+    --> src/hdc/tiered_phi.rs:4652:21
+     |
+4652 |             let mut dampen_delta = 0.0;
+     |                     ^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: unused variable: `node_representations`
+    --> src/hdc/tiered_phi.rs:5886:9
+     |
+5886 |         node_representations: &[RealHV],
+     |         ^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_node_representations`
+
+warning: variable `trace` is assigned to, but never used
+   --> src/hdc/phi_real.rs:201:17
+    |
+201 |         let mut trace = 0.0;
+    |                 ^^^^^
+    |
+    = note: consider using `_trace` instead
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+201 -         let mut trace = 0.0;
+201 +         let mut soul::weaver::COHERENCE_THRESHOLD = 0.0;
+    |
+
+warning: variable does not need to be mutable
+   --> src/hdc/phi_real.rs:192:13
+    |
+192 |         let mut a = matrix.to_vec();
+    |             ----^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `n`
+   --> src/hdc/phi_resonant.rs:273:13
+    |
+273 |         let n = current_state.len();
+    |             ^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+273 |         let _n = current_state.len();
+    |             +
+help: you might have meant to pattern match on the similarly named constant `HDC_DIM`
+    |
+273 -         let n = current_state.len();
+273 +         let perception::multi_modal::HDC_DIM = current_state.len();
+    |
+
+warning: unused variable: `has_binding`
+   --> src/hdc/consciousness_dashboard.rs:151:13
+    |
+151 |         let has_binding = state.bound_objects.iter().any(|b| b.is_conscious());
+    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_has_binding`
+
+warning: unused variable: `start_time`
+   --> src/hdc/integrated_information.rs:331:13
+    |
+331 |         let start_time = std::time::Instant::now();
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_start_time`
+
+warning: unused variable: `item1`
+   --> src/brain/sleep.rs:420:21
+    |
+420 |                 let item1 = &self.working_memory_buffer[idx1];
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_item1`
+
+warning: unused variable: `item2`
+   --> src/brain/sleep.rs:421:21
+    |
+421 |                 let item2 = &self.working_memory_buffer[idx2];
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_item2`
+
+warning: unused variable: `v_weight`
+   --> src/physiology/emotional_reasoning.rs:278:25
+    |
+278 |                     let v_weight = valence.abs();
+    |                         ^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+278 |                     let _v_weight = valence.abs();
+    |                         +
+help: you might have meant to pattern match on the similarly named constant `CONSOLIDATION_THRESHOLD`
+    |
+278 -                     let v_weight = valence.abs();
+278 +                     let sleep_cycles::CONSOLIDATION_THRESHOLD = valence.abs();
+    |
+
+warning: unused variable: `image`
+   --> src/perception/semantic_vision.rs:204:33
+    |
+204 |     pub fn caption_image(&self, image: &DynamicImage) -> Result<ImageCaption> {
+    |                                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `image`
+   --> src/perception/semantic_vision.rs:218:35
+    |
+218 |     pub fn answer_question(&self, image: &DynamicImage, question: &str) -> Result<VqaResponse> {
+    |                                   ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `image`
+   --> src/perception/ocr.rs:121:29
+    |
+121 |     pub fn recognize(&self, image: &DynamicImage) -> Result<OcrResult> {
+    |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `image`
+   --> src/perception/ocr.rs:185:29
+    |
+185 |     pub fn recognize(&self, image: &DynamicImage) -> Result<OcrResult> {
+    |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `event`
+   --> src/observability/telemetry_observer.rs:184:47
+    |
+184 |     fn record_primitive_activation(&mut self, event: PrimitiveActivationEvent) -> Result<()> {
+    |                                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+
+warning: unused variable: `event`
+   --> src/observability/telemetry_observer.rs:189:45
+    |
+189 |     fn record_response_generated(&mut self, event: ResponseGeneratedEvent) -> Result<()> {
+    |                                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+
+warning: unused variable: `event`
+   --> src/observability/telemetry_observer.rs:206:32
+    |
+206 |     fn record_error(&mut self, event: ErrorEvent) -> Result<()> {
+    |                                ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+
+warning: variable does not need to be mutable
+   --> src/observability/correlation.rs:163:13
+    |
+163 |         let mut metadata = if let Some(parent) = self.current_parent() {
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `trace`
+   --> src/observability/causal_graph.rs:261:40
+    |
+261 |     fn infer_temporal_edges(&mut self, trace: &Trace) {
+    |                                        ^^^^^ help: if this is intentional, prefix it with an underscore: `_trace`
+
+warning: unused variable: `value`
+   --> src/observability/causal_intervention.rs:285:17
+    |
+285 |             let value = match intervention {
+    |                 ^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+285 |             let _value = match intervention {
+    |                 +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+285 -             let value = match intervention {
+285 +             let soul::weaver::COHERENCE_THRESHOLD = match intervention {
+    |
+
+warning: unused variable: `incoming_edges`
+   --> src/observability/counterfactual_reasoning.rs:239:17
+    |
+239 |             let incoming_edges: Vec<&ProbabilisticEdge> = self.graph.edges()
+    |                 ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_incoming_edges`
+
+warning: unused variable: `hidden_state`
+   --> src/observability/counterfactual_reasoning.rs:275:9
+    |
+275 |         hidden_state: &HiddenState,
+    |         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_hidden_state`
+
+warning: unused variable: `step`
+   --> src/observability/action_planning.rs:323:9
+    |
+323 |         step: usize,
+    |         ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+323 |         _step: usize,
+    |         +
+help: you might have meant to pattern match on the similarly named constant `HDC_DIM`
+    |
+323 -         step: usize,
+323 +         perception::multi_modal::HDC_DIM: usize,
+    |
+
+warning: unused variable: `target`
+   --> src/observability/action_planning.rs:354:38
+    |
+354 |     fn estimate_current_value(&self, target: &str) -> f64 {
+    |                                      ^^^^^^ help: if this is intentional, prefix it with an underscore: `_target`
+
+warning: unused variable: `attack_type`
+   --> src/observability/predictive_byzantine_defense.rs:387:45
+    |
+387 |     pub fn report_false_negative(&mut self, attack_type: AttackType) {
+    |                                             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_attack_type`
+
+warning: unused variable: `event_id`
+   --> src/observability/predictive_byzantine_defense.rs:455:36
+    |
+455 |     fn extract_causal_chain(&self, event_id: &str) -> Vec<String> {
+    |                                    ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_event_id`
+
+warning: unused variable: `pattern_id`
+   --> src/observability/predictive_byzantine_defense.rs:466:9
+    |
+466 |         pattern_id: &str,
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pattern_id`
+
+warning: unused variable: `frequency`
+   --> src/observability/predictive_byzantine_defense.rs:467:9
+    |
+467 |         frequency: f64,
+    |         ^^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+467 |         _frequency: f64,
+    |         +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+467 -         frequency: f64,
+467 +         soul::weaver::COHERENCE_THRESHOLD: f64,
+    |
+
+warning: unused variable: `example_chains`
+   --> src/observability/predictive_byzantine_defense.rs:468:9
+    |
+468 |         example_chains: &[Vec<String>],
+    |         ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_example_chains`
+
+warning: unused variable: `description`
+   --> src/observability/predictive_byzantine_defense.rs:478:9
+    |
+478 |         description: &str,
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_description`
+
+warning: unused variable: `involved_events`
+   --> src/observability/predictive_byzantine_defense.rs:479:9
+    |
+479 |         involved_events: &[String],
+    |         ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_involved_events`
+
+warning: unused variable: `streaming_config`
+   --> src/observability/ml_explainability.rs:181:13
+    |
+181 |         let streaming_config = StreamingConfig {
+    |             ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_streaming_config`
+
+warning: unused variable: `input_val`
+   --> src/observability/ml_explainability.rs:246:27
+    |
+246 |         for (input_name, &input_val) in &observation.inputs {
+    |                           ^^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+246 |         for (input_name, &_input_val) in &observation.inputs {
+    |                           +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+246 -         for (input_name, &input_val) in &observation.inputs {
+246 +         for (input_name, &soul::weaver::COHERENCE_THRESHOLD) in &observation.inputs {
+    |
+
+warning: unused variable: `activation_val`
+   --> src/observability/ml_explainability.rs:262:32
+    |
+262 |         for (activation_name, &activation_val) in &observation.activations {
+    |                                ^^^^^^^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+262 |         for (activation_name, &_activation_val) in &observation.activations {
+    |                                +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+262 -         for (activation_name, &activation_val) in &observation.activations {
+262 +         for (activation_name, &soul::weaver::COHERENCE_THRESHOLD) in &observation.activations {
+    |
+
+warning: unused variable: `obs`
+   --> src/observability/ml_explainability.rs:809:13
+    |
+809 |         let obs = match self.observations.iter().find(|o| o.id == obs_id) {
+    |             ^^^ help: if this is intentional, prefix it with an underscore: `_obs`
+
+warning: unused variable: `integration`
+   --> src/language/conscious_conversation.rs:338:43
+    |
+338 |     fn record_learning_outcome(&mut self, integration: &IntegrationResult) -> Result<()> {
+    |                                           ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_integration`
+
+warning: variable `context_count` is assigned to, but never used
+   --> src/language/multilingual.rs:534:17
+    |
+534 |         let mut context_count = 0;
+    |                 ^^^^^^^^^^^^^
+    |
+    = note: consider using `_context_count` instead
+
+warning: unused variable: `query`
+   --> src/language/reasoning.rs:769:31
+    |
+769 |     fn generate_answer(&self, query: &str) -> (bool, Option<String>) {
+    |                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_query`
+
+warning: unused variable: `tag`
+   --> src/language/deep_parser.rs:843:25
+    |
+843 |         for (i, (token, tag)) in tokens.iter().zip(pos_tags.iter()).enumerate() {
+    |                         ^^^ help: if this is intentional, prefix it with an underscore: `_tag`
+
+warning: variable does not need to be mutable
+  --> src/language/frames.rs:91:13
+   |
+91 |         let mut semantics = UniversalSemantics::new();
+   |             ----^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/language/constructions.rs:185:13
+    |
+185 |         let mut semantics = UniversalSemantics::new();
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `prediction`
+   --> src/language/predictive_understanding.rs:544:21
+    |
+544 |                 let prediction = &self.predictions[level];
+    |                     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_prediction`
+
+warning: unused variable: `weight`
+   --> src/language/predictive_understanding.rs:545:21
+    |
+545 |                 let weight = (error.precision * learning_rate).min(1.0);
+    |                     ^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+545 |                 let _weight = (error.precision * learning_rate).min(1.0);
+    |                     +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+545 -                 let weight = (error.precision * learning_rate).min(1.0);
+545 +                 let soul::weaver::COHERENCE_THRESHOLD = (error.precision * learning_rate).min(1.0);
+    |
+
+warning: unused variable: `level`
+   --> src/language/predictive_understanding.rs:564:14
+    |
+564 |         for (level, error) in &self.errors {
+    |              ^^^^^ help: if this is intentional, prefix it with an underscore: `_level`
+
+warning: unused variable: `word`
+   --> src/language/predictive_understanding.rs:602:36
+    |
+602 |     fn learn_from_error(&mut self, word: &str) {
+    |                                    ^^^^ help: if this is intentional, prefix it with an underscore: `_word`
+
+warning: unused variable: `start_time`
+   --> src/language/conscious_understanding.rs:344:13
+    |
+344 |         let start_time = std::time::Instant::now();
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_start_time`
+
+warning: unused variable: `result`
+   --> src/language/nixos_language_adapter.rs:993:9
+    |
+993 |         result: &BridgeResult,
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+
+warning: unused variable: `validate_after`
+   --> src/language/consciousness_guided_executor.rs:385:65
+    |
+385 |             ExecutionStrategy::Confident { execute_immediately, validate_after, explain_to_user } => {
+    |                                                                 ^^^^^^^^^^^^^^ help: try ignoring the field: `validate_after: _`
+
+warning: unused variable: `clarification_needed`
+   --> src/language/consciousness_guided_executor.rs:479:44
+    |
+479 |             ExecutionStrategy::Skeptical { clarification_needed, require_explicit_confirmation, suggested_questions } => {
+    |                                            ^^^^^^^^^^^^^^^^^^^^ help: try ignoring the field: `clarification_needed: _`
+
+warning: unused variable: `require_explicit_confirmation`
+   --> src/language/consciousness_guided_executor.rs:479:66
+    |
+479 |             ExecutionStrategy::Skeptical { clarification_needed, require_explicit_confirmation, suggested_questions } => {
+    |                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try ignoring the field: `require_explicit_confirmation: _`
+
+warning: unused variable: `context_emb`
+   --> src/language/llm_organ.rs:634:46
+    |
+634 |         let context_similarity = if let Some(context_emb) = &request.context_embedding {
+    |                                              ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context_emb`
+
+warning: unused variable: `parsed`
+   --> src/web_research/researcher.rs:189:13
+    |
+189 |         let parsed = self.parser.parse(query);
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_parsed`
+
+warning: unused variable: `element`
+   --> src/web_research/extractor.rs:182:29
+    |
+182 |                 if let Some(element) = document.select(&selector).next() {
+    |                             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_element`
+
+warning: unused variable: `text`
+   --> src/web_research/extractor.rs:241:62
+    |
+241 |     fn determine_content_type(&self, url: &str, title: &str, text: &str) -> ContentType {
+    |                                                              ^^^^ help: if this is intentional, prefix it with an underscore: `_text`
+
+warning: unused variable: `claim`
+   --> src/web_research/verifier.rs:267:34
+    |
+267 |     fn does_support_claim(&self, claim: &str, excerpt: &str) -> bool {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_claim`
+
+warning: unused variable: `level`
+   --> src/web_research/verifier.rs:355:9
+    |
+355 |         level: VerificationLevel,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_level`
+
+warning: unused variable: `domain`
+   --> src/web_research/meta_learning.rs:308:13
+    |
+308 |         let domain = Self::extract_domain(&source_url);
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_domain`
+
+warning: field `states` is never read
+   --> src/hdc/resonator.rs:105:5
+    |
+ 94 | pub struct ResonatorNetwork {
+    |            ---------------- field in this struct
+...
+105 |     states: Vec<ResonatorState>,
+    |     ^^^^^^
+    |
+    = note: `ResonatorNetwork` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `created_at` is never read
+   --> src/hdc/sdm.rs:270:5
+    |
+259 | pub struct SparseDistributedMemory {
+    |            ----------------------- field in this struct
+...
+270 |     created_at: Instant,
+    |     ^^^^^^^^^^
+    |
+    = note: `SparseDistributedMemory` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `temporal_dim` is never read
+   --> src/hdc/sdm.rs:566:5
+    |
+558 | pub struct EpisodicSDM {
+    |            ----------- field in this struct
+...
+566 |     temporal_dim: usize,
+    |     ^^^^^^^^^^^^
+    |
+    = note: `EpisodicSDM` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `phi_calculator` is never read
+    --> src/hdc/tiered_phi.rs:2378:5
+     |
+2376 | pub struct PhiPyramid {
+     |            ---------- field in this struct
+2377 |     config: PhiPyramidConfig,
+2378 |     phi_calculator: TieredPhi,
+     |     ^^^^^^^^^^^^^^
+     |
+     = note: `PhiPyramid` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `min_connectivity` and `max_connectivity` are never read
+  --> src/hdc/phi_real.rs:49:5
+   |
+47 | pub struct RealPhiCalculator {
+   |            ----------------- fields in this struct
+48 |     /// Minimum algebraic connectivity (for normalization)
+49 |     min_connectivity: f64,
+   |     ^^^^^^^^^^^^^^^^
+50 |     /// Maximum algebraic connectivity (for normalization)
+51 |     max_connectivity: f64,
+   |     ^^^^^^^^^^^^^^^^
+
+warning: fields `partition` and `phi_partition` are never read
+   --> src/hdc/integrated_information.rs:166:5
+    |
+165 | struct PartitionResult {
+    |        --------------- fields in this struct
+166 |     partition: Partition,
+    |     ^^^^^^^^^
+167 |     phi_partition: f64,
+    |     ^^^^^^^^^^^^^
+    |
+    = note: `PartitionResult` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: field `max_size` is never read
+  --> src/perception/visual.rs:34:5
+   |
+29 | pub struct VisualCortex {
+   |            ------------ field in this struct
+...
+34 |     max_size: (u32, u32),
+   |     ^^^^^^^^
+
+warning: field `model_path` is never read
+  --> src/perception/semantic_vision.rs:96:5
+   |
+94 | pub struct SigLipModel {
+   |            ----------- field in this struct
+95 |     /// Model path (will be downloaded from HuggingFace if needed)
+96 |     model_path: Option<PathBuf>,
+   |     ^^^^^^^^^^
+
+warning: field `model_path` is never read
+   --> src/perception/semantic_vision.rs:174:5
+    |
+172 | pub struct MoondreamModel {
+    |            -------------- field in this struct
+173 |     /// Model path
+174 |     model_path: Option<PathBuf>,
+    |     ^^^^^^^^^^
+
+warning: field `intervention_engine` is never read
+   --> src/observability/counterfactual_reasoning.rs:147:5
+    |
+142 | pub struct CounterfactualEngine {
+    |            -------------------- field in this struct
+...
+147 |     intervention_engine: CausalInterventionEngine,
+    |     ^^^^^^^^^^^^^^^^^^^
+
+warning: methods `matches_attack_pattern` and `extract_causal_chain` are never used
+   --> src/observability/predictive_byzantine_defense.rs:432:8
+    |
+205 | impl PredictiveDefender {
+    | ----------------------- methods in this implementation
+...
+432 |     fn matches_attack_pattern(&self, pattern: &AttackPattern) -> bool {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+455 |     fn extract_causal_chain(&self, event_id: &str) -> Vec<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: field `config` is never read
+   --> src/observability/ml_explainability.rs:407:5
+    |
+393 | pub struct CausalModelLearner {
+    |            ------------------ field in this struct
+...
+407 |     config: MLObserverConfig,
+    |     ^^^^^^
+
+warning: fields `model` and `explanation_gen` are never read
+   --> src/observability/ml_explainability.rs:672:5
+    |
+670 | pub struct InteractiveExplainer {
+    |            -------------------- fields in this struct
+671 |     /// Learned causal model
+672 |     model: CausalModelLearner,
+    |     ^^^^^
+...
+678 |     explanation_gen: ExplanationGenerator,
+    |     ^^^^^^^^^^^^^^^
+
+warning: field `config` is never read
+  --> src/databases/qdrant_client.rs:68:5
+   |
+67 | pub struct QdrantSensory {
+   |            ------------- field in this struct
+68 |     config: QdrantConfig,
+   |     ^^^^^^
+
+warning: associated function `hv_to_vec` is never used
+   --> src/databases/qdrant_client.rs:155:8
+    |
+ 80 | impl QdrantSensory {
+    | ------------------ associated function in this implementation
+...
+155 |     fn hv_to_vec(hv: &HV16) -> Vec<f32> {
+    |        ^^^^^^^^^
+
+warning: field `config` is never read
+  --> src/databases/cozo_client.rs:81:5
+   |
+80 | pub struct CozoPrefrontal {
+   |            -------------- field in this struct
+81 |     config: CozoConfig,
+   |     ^^^^^^
+
+warning: field `config` is never read
+  --> src/databases/lance_client.rs:79:5
+   |
+78 | pub struct LanceLongTerm {
+   |            ------------- field in this struct
+79 |     config: LanceConfig,
+   |     ^^^^^^
+
+warning: field `creativity` is never read
+   --> src/language/conversation.rs:119:5
+    |
+107 | pub struct Conversation {
+    |            ------------ field in this struct
+...
+119 |     creativity: ConsciousnessCreativity,
+    |     ^^^^^^^^^^
+
+warning: fields `phi_calculator` and `runtime` are never read
+  --> src/language/conscious_conversation.rs:71:5
+   |
+57 | pub struct ConsciousConversation {
+   |            --------------------- fields in this struct
+...
+71 |     phi_calculator: IntegratedInformation,
+   |     ^^^^^^^^^^^^^^
+...
+74 |     runtime: Option<Runtime>,
+   |     ^^^^^^^
+
+warning: field `phi_calculator` is never read
+   --> src/language/consciousness_observatory.rs:336:5
+    |
+322 | pub struct ConsciousnessObservatory {
+    |            ------------------------ field in this struct
+...
+336 |     phi_calculator: IntegratedInformation,
+    |     ^^^^^^^^^^^^^^
+
+warning: field `failed_lookups` is never read
+   --> src/language/word_learner.rs:119:5
+    |
+111 | pub struct WordLearner {
+    |            ----------- field in this struct
+...
+119 |     failed_lookups: RwLock<HashMap<String, u64>>,
+    |     ^^^^^^^^^^^^^^
+
+warning: method `transition_weight` is never used
+   --> src/language/dynamic_generation.rs:374:8
+    |
+329 | impl SentenceForm {
+    | ----------------- method in this implementation
+...
+374 |     fn transition_weight(&self, previous: &SentenceForm) -> f32 {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: fields `phi` and `valence` are never read
+    --> src/language/dynamic_generation.rs:1038:5
+     |
+1036 | pub struct IntentFormation<'a> {
+     |            --------------- fields in this struct
+1037 |     parsed_input: &'a ParsedSentence,
+1038 |     phi: f32,
+     |     ^^^
+1039 |     valence: f32,
+     |     ^^^^^^^
+
+warning: field `goals` is never read
+   --> src/language/reasoning.rs:202:5
+    |
+194 | pub struct ReasoningEngine {
+    |            --------------- field in this struct
+...
+202 |     goals: VecDeque<Goal>,
+    |     ^^^^^
+
+warning: fields `verb_class`, `subject_role`, and `object_role` are never read
+   --> src/language/deep_parser.rs:245:5
+    |
+244 | struct RolePattern {
+    |        ----------- fields in this struct
+245 |     verb_class: VerbClass,
+    |     ^^^^^^^^^^
+246 |     subject_role: SemanticRole,
+    |     ^^^^^^^^^^^^
+247 |     object_role: Option<SemanticRole>,
+    |     ^^^^^^^^^^^
+
+warning: field `pattern` is never read
+  --> src/language/creative.rs:43:5
+   |
+41 | struct MetaphorTemplate {
+   |        ---------------- field in this struct
+42 |     source_domain: String,
+43 |     pattern: String,  // e.g., "{target} is like {source}"
+   |     ^^^^^^^
+   |
+   = note: `MetaphorTemplate` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `gamma` is never read
+   --> src/language/live_learner.rs:252:5
+    |
+250 | pub struct RewardProcessor {
+    |            --------------- field in this struct
+251 |     /// Discount factor for temporal difference
+252 |     gamma: f32,
+    |     ^^^^^
+    |
+    = note: `RewardProcessor` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `grammar` is never read
+   --> src/language/predictive_understanding.rs:272:5
+    |
+264 | pub struct PredictiveUnderstanding {
+    |            ----------------------- field in this struct
+...
+272 |     grammar: ConstructionGrammar,
+    |     ^^^^^^^
+    |
+    = note: `PredictiveUnderstanding` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: function `inference_domain_from_level` is never used
+   --> src/language/active_inference_adapter.rs:198:4
+    |
+198 | fn inference_domain_from_level(level: LinguisticLevel) -> InferenceDomain {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `encodings` is never read
+   --> src/language/nix_error_diagnosis.rs:613:5
+    |
+609 | pub struct NixErrorDiagnoser {
+    |            ----------------- field in this struct
+...
+613 |     encodings: HashMap<NixErrorType, HV16>,
+    |     ^^^^^^^^^
+
+warning: fields `knowledge_graph`, `reasoning`, `min_sources_high_confidence`, and `agreement_threshold` are never read
+   --> src/web_research/verifier.rs:115:5
+    |
+113 | pub struct EpistemicVerifier {
+    |            ----------------- fields in this struct
+114 |     /// Knowledge graph for checking existing knowledge
+115 |     knowledge_graph: KnowledgeGraph,
+    |     ^^^^^^^^^^^^^^^
+...
+118 |     reasoning: ReasoningEngine,
+    |     ^^^^^^^^^
+...
+121 |     min_sources_high_confidence: usize,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+127 |     agreement_threshold: f64,
+    |     ^^^^^^^^^^^^^^^^^^^
+
+warning: fields `vocabulary` and `active_learning` are never read
+   --> src/web_research/meta_learning.rs:211:5
+    |
+209 | pub struct EpistemicLearner {
+    |            ---------------- fields in this struct
+210 |     /// Vocabulary for domain classification
+211 |     vocabulary: Vocabulary,
+    |     ^^^^^^^^^^
+...
+232 |     active_learning: bool,
+    |     ^^^^^^^^^^^^^^^
+
+warning: field `observer` is never read
+   --> src/awakening.rs:155:5
+    |
+129 | pub struct SymthaeaAwakening {
+    |            ----------------- field in this struct
+...
+155 |     observer: SharedObserver,
+    |     ^^^^^^^^
+
+warning: variable `vTMv` should have a snake case name
+    --> src/hdc/tiered_phi.rs:3533:13
+     |
+3533 |         let vTMv: f64 = v.iter().zip(mv.iter()).map(|(a, b)| a * b).sum();
+     |             ^^^^ help: convert the identifier to snake case: `v_tmv`
+     |
+     = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+warning: variable `vTv` should have a snake case name
+    --> src/hdc/tiered_phi.rs:3534:13
+     |
+3534 |         let vTv: f64 = v.iter().map(|x| x * x).sum();
+     |             ^^^ help: convert the identifier to snake case: `v_tv`
+
+warning: `symthaea` (lib) generated 193 warnings (run `cargo fix --lib -p symthaea` to apply 82 suggestions)
+    Finished `release` profile [optimized] target(s) in 0.85s
+     Running `target/release/examples/tier_3_exotic_topologies`
+
+🌀 Tier 3 Exotic Topologies Φ Validation
+================================================================================
+
+📐 Configuration:
+   Dimension: 16384
+   Samples per topology: 10
+   Methods: RealHV Φ (continuous) + Binary Φ (probabilistic binarization)
+
+📊 Testing All 17 Topologies (8 Original + 3 Tier 1 + 3 Tier 2 + 3 Tier 3)...\n
+📚 Original 8 Topologies (Quick Test)...\n
+
+================================================================================
+🌟 Tier 1 Exotic Topologies (Quick Test)...\n
+
+================================================================================
+🔬 Tier 2 Exotic Topologies (Quick Test)...\n
+
+================================================================================
+🚀 TIER 3 EXOTIC TOPOLOGIES (NEW!)
+================================================================================
+
+1️⃣5️⃣ Testing Fractal Network topology (8 nodes, Sierpiński-inspired)...
+    RealHV Φ: 0.4345 ± 0.0001
+    Binary Φ: 0.8478 ± 0.0023
+    🔺 SELF-SIMILAR structure - hierarchical cross-scale connections!\n
+1️⃣6️⃣ Testing Hypercube 3D topology (8 nodes = cube)...
+    RealHV Φ: 0.4960 ± 0.0002
+    Binary Φ: 0.8882 ± 0.0031
+    📦 3D CUBE - each vertex has 3 neighbors!\n
+1️⃣7️⃣ Testing Hypercube 4D topology (16 nodes = tesseract)...
+    RealHV Φ: 0.4976 ± 0.0001
+    Binary Φ: 0.8268 ± 0.0022
+    🎲 4D TESSERACT - each vertex has 4 neighbors!\n
+1️⃣8️⃣ Testing Quantum Network topology (equal Ring+Star+Random)...
+    RealHV Φ: 0.4432 ± 0.0009
+    Binary Φ: 0.8589 ± 0.0017
+    ⚛️  QUANTUM SUPERPOSITION - blend of Ring, Star, Random!\n
+1️⃣9️⃣ Testing Quantum Network topology (Ring-biased 3:1:1)...
+    RealHV Φ: 0.4650 ± 0.0007
+    Binary Φ: 0.8684 ± 0.0022
+    🌊 RING-BIASED quantum state - should approach Ring Φ!\n
+
+================================================================================
+📊 COMPREHENSIVE RESULTS - ALL 19 TOPOLOGIES
+================================================================================
+
+🏆 RANKED BY REAL-VALUED Φ (Continuous Method):
+--------------------------------------------------------------------------------
+Topology                      RealHV Φ      Std Dev     Binary Φ      Std Dev
+--------------------------------------------------------------------------------
+🥇🆕 Hypercube 4D                  0.4976       0.0001       0.8268       0.0022
+🥈🆕 Hypercube 3D                  0.4960       0.0002       0.8882       0.0031
+🥉   Ring                          0.4954       0.0000       0.8833       0.0017
+     Torus (3×3)                   0.4953       0.0001       0.8752       0.0017
+     Klein Bottle (3×3)            0.4940       0.0002       0.8762       0.0021
+     Dense Network                 0.4888       0.0000       0.9343       0.0017
+     Lattice                       0.4855       0.0000       0.8697       0.0017
+     Modular                       0.4812       0.0000       0.8853       0.0022
+     Small-World                   0.4786       0.0060       0.8831       0.0034
+     Line                          0.4768       0.0000       0.8738       0.0026
+     Scale-Free                    0.4753       0.0030       0.8851       0.0032
+     Hyperbolic                    0.4718       0.0000       0.8782       0.0027
+     Binary Tree                   0.4712       0.0000       0.8701       0.0022
+  🆕 Quantum (3:1:1 Ring)          0.4650       0.0007       0.8684       0.0022
+     Star                          0.4553       0.0004       0.8927       0.0021
+  🆕 Quantum (1:1:1)               0.4432       0.0009       0.8589       0.0017
+     Random                        0.4358       0.0005       0.8460       0.0017
+  🆕 Fractal                       0.4345       0.0001       0.8478       0.0023
+     Möbius Strip                  0.3729       0.0000       0.8353       0.0033
+
+================================================================================
+🏆 RANKED BY BINARY Φ (Probabilistic Binarization):
+--------------------------------------------------------------------------------
+Topology                      Binary Φ      Std Dev     RealHV Φ      Std Dev
+--------------------------------------------------------------------------------
+🥇   Dense Network                 0.9343       0.0017       0.4888       0.0000
+🥈   Star                          0.8927       0.0021       0.4553       0.0004
+🥉🆕 Hypercube 3D                  0.8882       0.0031       0.4960       0.0002
+     Modular                       0.8853       0.0022       0.4812       0.0000
+     Scale-Free                    0.8851       0.0032       0.4753       0.0030
+     Ring                          0.8833       0.0017       0.4954       0.0000
+     Small-World                   0.8831       0.0034       0.4786       0.0060
+     Hyperbolic                    0.8782       0.0027       0.4718       0.0000
+     Klein Bottle (3×3)            0.8762       0.0021       0.4940       0.0002
+     Torus (3×3)                   0.8752       0.0017       0.4953       0.0001
+     Line                          0.8738       0.0026       0.4768       0.0000
+     Binary Tree                   0.8701       0.0022       0.4712       0.0000
+     Lattice                       0.8697       0.0017       0.4855       0.0000
+  🆕 Quantum (3:1:1 Ring)          0.8684       0.0022       0.4650       0.0007
+  🆕 Quantum (1:1:1)               0.8589       0.0017       0.4432       0.0009
+  🆕 Fractal                       0.8478       0.0023       0.4345       0.0001
+     Random                        0.8460       0.0017       0.4358       0.0005
+     Möbius Strip                  0.8353       0.0033       0.3729       0.0000
+  🆕 Hypercube 4D                  0.8268       0.0022       0.4976       0.0001
+
+================================================================================
+✅ TIER 3 EXOTIC TOPOLOGIES VALIDATION COMPLETE!
+================================================================================
+
+📝 Key Hypotheses Tested:
+   ❓ Does Fractal (self-similar) achieve high Φ?
+   ❓ Do Hypercubes (3D/4D) preserve dimensional invariance?
+   ❓ Can Quantum superposition exceed single-topology Φ?
+
+🔬 Scientific Questions:
+   - Does self-similarity enhance or reduce integration?
+   - How does Φ scale from 2D (Torus) to 3D/4D (Hypercube)?
+   - Can topology superposition create emergent benefits?
+
+🎯 Comparison Points:
+   - Ring/Torus Φ = 0.4954 (highest so far, 1D/2D invariance)
+   - Klein Bottle Φ = 0.4941 (3rd place, 2D non-orientable success)
+   - Möbius Strip Φ = 0.3729 (14th place, 1D non-orientable failure)
+
+🚀 Complete exotic topology research (Tier 1 + 2 + 3) finished!
+   Ready for publication and analysis!
+

@@ -19,6 +19,19 @@
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" ];
         };
+
+        # Python environment with PyPhi for validation
+        pythonEnv = pkgs.python311.withPackages (ps: with ps; [
+          # PyPhi and dependencies for exact IIT 3.0 Φ calculation
+          numpy
+          scipy
+          networkx
+          # pyphi - Note: May need to install via pip if not in nixpkgs
+
+          # Additional scientific computing
+          matplotlib
+          pandas
+        ]);
       in
       {
         devShells.default = pkgs.mkShell {
@@ -27,6 +40,11 @@
             rustToolchain
             cargo
             rustc
+
+            # Python environment with scientific packages
+            pythonEnv
+            python311Packages.pip
+            python311Packages.virtualenv
 
             # Build dependencies for Rust crates
             pkg-config
@@ -52,9 +70,12 @@
             echo "🌟 Entering Symthaea HLB development environment"
             echo "📦 Rust version: $(rustc --version)"
             echo "🔧 Cargo version: $(cargo --version)"
+            echo "🐍 Python version: $(python --version)"
             echo ""
-            echo "Week 0: Actor Model + HDC Arena + Tracing"
-            echo "Ready to build revolutionary consciousness! 🧠"
+            echo "Week 4: PyPhi Validation + Topology Analysis"
+            echo "Ready to validate HDC-based Φ calculation! 🧬"
+            echo ""
+            echo "To install PyPhi: pip install --user pyphi"
 
             # Set OpenSSL paths for rust crates
             export OPENSSL_DIR="${pkgs.openssl.dev}"
@@ -67,6 +88,9 @@
 
             # Tell Rust linker where to find BLAS libraries
             export RUSTFLAGS="-C link-arg=-L${pkgs.openblas}/lib -C link-arg=-lopenblas"
+
+            # Add user site-packages to PYTHONPATH for PyPhi
+            export PYTHONPATH="$HOME/.local/lib/python3.11/site-packages:$PYTHONPATH"
           '';
 
           # Prevent cargo from using vendored OpenSSL

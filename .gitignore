@@ -14,3 +14,19 @@ result-*
 *.swp
 *.swo
 *~
+
+# Editor files
+**/*.swp
+**/*.swo
+**/*~
+.vscode/
+.idea/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
