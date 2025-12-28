@@ -51,6 +51,7 @@
               networkx
               joblib
               more-itertools
+              ordered-set
               psutil
               pyyaml
               toolz

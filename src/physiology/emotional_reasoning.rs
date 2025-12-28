@@ -275,7 +275,7 @@ impl EmotionalReasoner {
             // Modulate by valence (if available)
             if let Some(v_prim) = valence_prim {
                 if valence.abs() > 0.1 {
-                    let v_weight = valence.abs();
+                    let _v_weight = valence.abs();
                     encoding = if valence > 0.0 {
                         encoding.bind(&v_prim.encoding)
                     } else {

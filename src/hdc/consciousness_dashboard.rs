@@ -148,7 +148,7 @@ impl ConsciousnessDashboard {
 
         // Extract metrics from consciousness state
         let has_workspace = !state.conscious_contents.is_empty();
-        let has_binding = state.bound_objects.iter().any(|b| b.is_conscious());
+        let _has_binding = state.bound_objects.iter().any(|b| b.is_conscious());
         let has_hot = !state.meta_awareness.is_empty();
         let integration = state.phi;
         let prediction = 1.0 - state.free_energy.min(1.0);

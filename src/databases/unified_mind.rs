@@ -567,7 +567,8 @@ impl UnifiedMind {
         let status = MindStatus::all_mock();
 
         // === Sensory Cortex (Qdrant) ===
-        let sensory: Arc<dyn ConsciousnessDatabase> = if let Some(_qdrant_config) = config.qdrant {
+        #[allow(unused_variables)]
+        let sensory: Arc<dyn ConsciousnessDatabase> = if let Some(qdrant_config) = config.qdrant {
             #[cfg(feature = "qdrant")]
             {
                 let mut qdrant = QdrantSensory::new(qdrant_config);
@@ -593,7 +594,8 @@ impl UnifiedMind {
         };
 
         // === Epistemic Auditor (DuckDB) ===
-        let epistemic: Arc<dyn ConsciousnessDatabase> = if let Some(_duck_config) = config.duckdb {
+        #[allow(unused_variables)]
+        let epistemic: Arc<dyn ConsciousnessDatabase> = if let Some(duck_config) = config.duckdb {
             #[cfg(feature = "duck")]
             {
                 let mut duck = DuckEpistemic::new(duck_config);

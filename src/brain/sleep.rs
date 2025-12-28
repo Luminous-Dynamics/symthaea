@@ -417,8 +417,8 @@ impl SleepCycleManager {
             let idx2 = (i * 2 + 1) % self.working_memory_buffer.len();
 
             if idx1 != idx2 {
-                let item1 = &self.working_memory_buffer[idx1];
-                let item2 = &self.working_memory_buffer[idx2];
+                let _item1 = &self.working_memory_buffer[idx1];
+                let _item2 = &self.working_memory_buffer[idx2];
 
                 // Associate distant concepts
                 associations.push((

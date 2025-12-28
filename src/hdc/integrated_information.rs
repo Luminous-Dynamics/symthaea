@@ -327,7 +327,7 @@ impl IntegratedInformation {
     /// assert!(phi_value >= 0.0);
     /// ```
     pub fn compute_phi(&mut self, components: &[HV16]) -> f64 {
-        let start_time = std::time::Instant::now();
+        let _start_time = std::time::Instant::now();
 
         if components.len() < 2 {
             // Single component has no integration
