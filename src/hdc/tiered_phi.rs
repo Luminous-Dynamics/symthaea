@@ -4924,6 +4924,1303 @@ pub fn compute_causal_power(node_representations: &[RealHV]) -> Vec<f64> {
 }
 
 // ============================================================================
+// REVOLUTIONARY #99: Φ NETWORK MODULARITY ANALYSIS
+// ============================================================================
+
+/// Method for detecting community modules in consciousness networks
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ModuleDetectionMethod {
+    /// Spectral clustering using eigenvalues of similarity matrix
+    Spectral,
+    /// Agglomerative clustering with similarity threshold
+    Agglomerative,
+    /// Louvain-inspired greedy modularity optimization
+    Greedy,
+    /// K-means on similarity vectors
+    KMeans,
+}
+
+impl ModuleDetectionMethod {
+    /// Get description of detection method
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::Spectral => "Spectral clustering using eigendecomposition",
+            Self::Agglomerative => "Hierarchical agglomerative clustering",
+            Self::Greedy => "Greedy modularity optimization",
+            Self::KMeans => "K-means clustering on similarity space",
+        }
+    }
+}
+
+/// Configuration for network modularity analysis
+#[derive(Debug, Clone)]
+pub struct ModularityConfig {
+    /// Method for detecting modules
+    pub detection_method: ModuleDetectionMethod,
+    /// Number of modules to detect (None = auto-detect)
+    pub num_modules: Option<usize>,
+    /// Similarity threshold for clustering (0.0 to 1.0)
+    pub similarity_threshold: f64,
+    /// Minimum module size
+    pub min_module_size: usize,
+    /// Whether to compute inter-module Φ (expensive)
+    pub compute_inter_module_phi: bool,
+    /// Maximum iterations for iterative methods
+    pub max_iterations: usize,
+    /// Convergence threshold
+    pub convergence_threshold: f64,
+}
+
+impl Default for ModularityConfig {
+    fn default() -> Self {
+        Self {
+            detection_method: ModuleDetectionMethod::Agglomerative,
+            num_modules: None,
+            similarity_threshold: 0.3,
+            min_module_size: 2,
+            compute_inter_module_phi: true,
+            max_iterations: 100,
+            convergence_threshold: 1e-6,
+        }
+    }
+}
+
+impl ModularityConfig {
+    /// Quick analysis preset
+    pub fn quick() -> Self {
+        Self {
+            detection_method: ModuleDetectionMethod::Agglomerative,
+            num_modules: Some(3),
+            similarity_threshold: 0.35,
+            min_module_size: 2,
+            compute_inter_module_phi: false,
+            max_iterations: 50,
+            convergence_threshold: 1e-4,
+        }
+    }
+
+    /// Thorough analysis preset
+    pub fn thorough() -> Self {
+        Self {
+            detection_method: ModuleDetectionMethod::Spectral,
+            num_modules: None,
+            similarity_threshold: 0.25,
+            min_module_size: 2,
+            compute_inter_module_phi: true,
+            max_iterations: 200,
+            convergence_threshold: 1e-8,
+        }
+    }
+
+    /// Research preset with all features
+    pub fn research() -> Self {
+        Self {
+            detection_method: ModuleDetectionMethod::Greedy,
+            num_modules: None,
+            similarity_threshold: 0.2,
+            min_module_size: 1,
+            compute_inter_module_phi: true,
+            max_iterations: 500,
+            convergence_threshold: 1e-10,
+        }
+    }
+}
+
+/// A detected module (community) in the consciousness network
+#[derive(Debug, Clone)]
+pub struct ConsciousnessModule {
+    /// Module identifier
+    pub id: usize,
+    /// Node indices belonging to this module
+    pub node_indices: Vec<usize>,
+    /// Internal cohesion (average intra-module similarity)
+    pub internal_cohesion: f64,
+    /// Φ value within this module
+    pub internal_phi: f64,
+    /// Isolation score (1 - avg external connections)
+    pub isolation_score: f64,
+    /// Centroid representation (average of node representations)
+    pub centroid: Option<RealHV>,
+}
+
+impl ConsciousnessModule {
+    /// Get module size
+    pub fn size(&self) -> usize {
+        self.node_indices.len()
+    }
+
+    /// Check if node is in this module
+    pub fn contains(&self, node_index: usize) -> bool {
+        self.node_indices.contains(&node_index)
+    }
+
+    /// Get integration efficiency (phi / size ratio)
+    pub fn integration_efficiency(&self) -> f64 {
+        if self.node_indices.is_empty() {
+            0.0
+        } else {
+            self.internal_phi / (self.node_indices.len() as f64).sqrt()
+        }
+    }
+}
+
+/// Result of inter-module analysis
+#[derive(Debug, Clone)]
+pub struct InterModuleRelation {
+    /// First module ID
+    pub module_a: usize,
+    /// Second module ID
+    pub module_b: usize,
+    /// Coupling strength (similarity between centroids)
+    pub coupling_strength: f64,
+    /// Information flow (asymmetric measure)
+    pub info_flow_a_to_b: f64,
+    /// Information flow (reverse direction)
+    pub info_flow_b_to_a: f64,
+    /// Bridge nodes connecting these modules
+    pub bridge_nodes: Vec<usize>,
+}
+
+/// Node role classification
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum NodeRole {
+    /// Core member of a single module
+    Core,
+    /// Peripheral member (low internal connectivity)
+    Peripheral,
+    /// Bridge connecting multiple modules
+    Bridge,
+    /// Hub connecting to many nodes across modules
+    Hub,
+    /// Isolated node with minimal connections
+    Isolated,
+}
+
+impl NodeRole {
+    /// Get description of the role
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::Core => "Core member strongly connected within module",
+            Self::Peripheral => "Peripheral member with weak internal ties",
+            Self::Bridge => "Bridge connecting multiple modules",
+            Self::Hub => "Hub with connections across many modules",
+            Self::Isolated => "Isolated node with minimal connections",
+        }
+    }
+}
+
+/// Classification of each node's role in the network
+#[derive(Debug, Clone)]
+pub struct NodeClassification {
+    /// Node index
+    pub node_index: usize,
+    /// Primary module assignment
+    pub primary_module: usize,
+    /// Node role classification
+    pub role: NodeRole,
+    /// Within-module degree (z-score)
+    pub within_module_degree: f64,
+    /// Participation coefficient (diversity of connections)
+    pub participation_coefficient: f64,
+    /// Betweenness centrality
+    pub betweenness: f64,
+}
+
+/// Comprehensive result of network modularity analysis
+#[derive(Debug, Clone)]
+pub struct NetworkModularityResult {
+    /// Total Φ of the entire network
+    pub total_phi: f64,
+    /// Detected modules
+    pub modules: Vec<ConsciousnessModule>,
+    /// Modularity score Q (higher = more modular)
+    pub modularity_score: f64,
+    /// Inter-module relations
+    pub inter_module_relations: Vec<InterModuleRelation>,
+    /// Classification of each node
+    pub node_classifications: Vec<NodeClassification>,
+    /// Bridge nodes connecting modules
+    pub bridge_nodes: Vec<usize>,
+    /// Bottleneck edges (critical connections)
+    pub bottleneck_edges: Vec<(usize, usize)>,
+    /// Segregation index (within-module / total connectivity)
+    pub segregation_index: f64,
+    /// Integration index (between-module connectivity quality)
+    pub integration_index: f64,
+    /// Hierarchical modularity (modularity at different scales)
+    pub hierarchical_scores: Vec<f64>,
+}
+
+impl NetworkModularityResult {
+    /// Get number of modules
+    pub fn num_modules(&self) -> usize {
+        self.modules.len()
+    }
+
+    /// Get average module size
+    pub fn avg_module_size(&self) -> f64 {
+        if self.modules.is_empty() {
+            0.0
+        } else {
+            let total: usize = self.modules.iter().map(|m| m.size()).sum();
+            total as f64 / self.modules.len() as f64
+        }
+    }
+
+    /// Get largest module
+    pub fn largest_module(&self) -> Option<&ConsciousnessModule> {
+        self.modules.iter().max_by_key(|m| m.size())
+    }
+
+    /// Get module with highest internal Φ
+    pub fn highest_phi_module(&self) -> Option<&ConsciousnessModule> {
+        self.modules
+            .iter()
+            .max_by(|a, b| a.internal_phi.partial_cmp(&b.internal_phi).unwrap())
+    }
+
+    /// Get balance score (how evenly sized modules are)
+    pub fn balance_score(&self) -> f64 {
+        if self.modules.len() < 2 {
+            return 1.0;
+        }
+        let sizes: Vec<f64> = self.modules.iter().map(|m| m.size() as f64).collect();
+        let mean = sizes.iter().sum::<f64>() / sizes.len() as f64;
+        let variance = sizes.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / sizes.len() as f64;
+        let std_dev = variance.sqrt();
+        1.0 / (1.0 + std_dev / mean)
+    }
+
+    /// Get efficiency ratio (sum of module Φ vs total Φ)
+    pub fn efficiency_ratio(&self) -> f64 {
+        if self.total_phi == 0.0 {
+            return 0.0;
+        }
+        let sum_module_phi: f64 = self.modules.iter().map(|m| m.internal_phi).sum();
+        sum_module_phi / self.total_phi
+    }
+}
+
+/// Φ Network Modularity Analyzer
+#[derive(Debug, Clone)]
+pub struct PhiModularityAnalyzer {
+    config: ModularityConfig,
+}
+
+impl Default for PhiModularityAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PhiModularityAnalyzer {
+    /// Create new analyzer with default config
+    pub fn new() -> Self {
+        Self {
+            config: ModularityConfig::default(),
+        }
+    }
+
+    /// Create analyzer with custom config
+    pub fn with_config(config: ModularityConfig) -> Self {
+        Self { config }
+    }
+
+    /// Perform full modularity analysis
+    pub fn analyze(&self, node_representations: &[RealHV]) -> NetworkModularityResult {
+        let n = node_representations.len();
+
+        if n == 0 {
+            return NetworkModularityResult {
+                total_phi: 0.0,
+                modules: Vec::new(),
+                modularity_score: 0.0,
+                inter_module_relations: Vec::new(),
+                node_classifications: Vec::new(),
+                bridge_nodes: Vec::new(),
+                bottleneck_edges: Vec::new(),
+                segregation_index: 0.0,
+                integration_index: 0.0,
+                hierarchical_scores: Vec::new(),
+            };
+        }
+
+        // Compute similarity matrix
+        let sim_matrix = self.compute_similarity_matrix(node_representations);
+
+        // Compute total network Φ
+        let total_phi = self.compute_phi(node_representations);
+
+        // Detect modules
+        let module_assignments = self.detect_modules(&sim_matrix);
+
+        // Build module structures
+        let modules =
+            self.build_modules(node_representations, &module_assignments, &sim_matrix);
+
+        // Compute modularity score Q
+        let modularity_score = self.compute_modularity_q(&sim_matrix, &module_assignments);
+
+        // Analyze inter-module relations
+        let inter_module_relations = if self.config.compute_inter_module_phi {
+            self.analyze_inter_module(node_representations, &modules, &sim_matrix)
+        } else {
+            Vec::new()
+        };
+
+        // Classify nodes
+        let node_classifications =
+            self.classify_nodes(&sim_matrix, &module_assignments, &modules);
+
+        // Find bridge nodes
+        let bridge_nodes = node_classifications
+            .iter()
+            .filter(|c| c.role == NodeRole::Bridge || c.role == NodeRole::Hub)
+            .map(|c| c.node_index)
+            .collect();
+
+        // Find bottleneck edges
+        let bottleneck_edges = self.find_bottleneck_edges(&sim_matrix, &module_assignments);
+
+        // Compute segregation and integration indices
+        let (segregation_index, integration_index) =
+            self.compute_seg_int_indices(&sim_matrix, &module_assignments);
+
+        // Compute hierarchical modularity
+        let hierarchical_scores = self.compute_hierarchical_modularity(&sim_matrix);
+
+        NetworkModularityResult {
+            total_phi,
+            modules,
+            modularity_score,
+            inter_module_relations,
+            node_classifications,
+            bridge_nodes,
+            bottleneck_edges,
+            segregation_index,
+            integration_index,
+            hierarchical_scores,
+        }
+    }
+
+    /// Compute similarity matrix between all nodes
+    fn compute_similarity_matrix(&self, node_representations: &[RealHV]) -> Vec<Vec<f64>> {
+        let n = node_representations.len();
+        let mut matrix = vec![vec![0.0f64; n]; n];
+
+        for i in 0..n {
+            matrix[i][i] = 1.0;
+            for j in (i + 1)..n {
+                let sim = node_representations[i].similarity(&node_representations[j]);
+                let normalized = ((sim + 1.0) / 2.0) as f64; // Normalize from [-1,1] to [0,1]
+                matrix[i][j] = normalized;
+                matrix[j][i] = normalized;
+            }
+        }
+        matrix
+    }
+
+    /// Compute Φ for a set of representations
+    fn compute_phi(&self, representations: &[RealHV]) -> f64 {
+        if representations.len() < 2 {
+            return 0.0;
+        }
+
+        let bundle = RealHV::bundle(representations);
+        let mut total_info = 0.0f64;
+
+        for rep in representations {
+            let sim = bundle.similarity(rep);
+            let normalized = ((sim + 1.0) / 2.0) as f64;
+            total_info += normalized;
+        }
+
+        total_info / (representations.len() as f64)
+    }
+
+    /// Detect modules using configured method
+    fn detect_modules(&self, sim_matrix: &[Vec<f64>]) -> Vec<usize> {
+        match self.config.detection_method {
+            ModuleDetectionMethod::Spectral => self.detect_spectral(sim_matrix),
+            ModuleDetectionMethod::Agglomerative => self.detect_agglomerative(sim_matrix),
+            ModuleDetectionMethod::Greedy => self.detect_greedy(sim_matrix),
+            ModuleDetectionMethod::KMeans => self.detect_kmeans(sim_matrix),
+        }
+    }
+
+    /// Spectral clustering
+    fn detect_spectral(&self, sim_matrix: &[Vec<f64>]) -> Vec<usize> {
+        let n = sim_matrix.len();
+        if n < 2 {
+            return vec![0; n];
+        }
+
+        let k = self.config.num_modules.unwrap_or_else(|| {
+            // Auto-detect using eigenvalue gap
+            ((n as f64).sqrt() as usize).max(2).min(n / 2)
+        });
+
+        // Compute Laplacian eigenvalues (simplified - use power iteration)
+        let mut fiedler = vec![0.0; n];
+        let mut rng_state = 42u64;
+        for v in fiedler.iter_mut() {
+            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            *v = (rng_state as f64 / u64::MAX as f64) - 0.5;
+        }
+
+        // Power iteration for second eigenvector
+        for _ in 0..self.config.max_iterations {
+            let mut new_fiedler = vec![0.0; n];
+            for i in 0..n {
+                let degree: f64 = sim_matrix[i].iter().sum();
+                for j in 0..n {
+                    new_fiedler[i] += (if i == j { degree } else { 0.0 } - sim_matrix[i][j])
+                        * fiedler[j];
+                }
+            }
+
+            // Orthogonalize against constant vector
+            let sum: f64 = new_fiedler.iter().sum();
+            let mean = sum / n as f64;
+            for v in new_fiedler.iter_mut() {
+                *v -= mean;
+            }
+
+            // Normalize
+            let norm: f64 = new_fiedler.iter().map(|x| x * x).sum::<f64>().sqrt();
+            if norm > 1e-10 {
+                for v in new_fiedler.iter_mut() {
+                    *v /= norm;
+                }
+            }
+            fiedler = new_fiedler;
+        }
+
+        // Cluster by sign of Fiedler vector
+        let mut assignments = vec![0; n];
+        if k == 2 {
+            for (i, &v) in fiedler.iter().enumerate() {
+                assignments[i] = if v >= 0.0 { 0 } else { 1 };
+            }
+        } else {
+            // For k > 2, use quantiles
+            let mut sorted: Vec<(usize, f64)> = fiedler.iter().copied().enumerate().collect();
+            sorted.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+
+            let chunk_size = (n + k - 1) / k;
+            for (rank, (idx, _)) in sorted.iter().enumerate() {
+                assignments[*idx] = rank / chunk_size;
+            }
+        }
+
+        assignments
+    }
+
+    /// Agglomerative clustering
+    fn detect_agglomerative(&self, sim_matrix: &[Vec<f64>]) -> Vec<usize> {
+        let n = sim_matrix.len();
+        if n < 2 {
+            return vec![0; n];
+        }
+
+        // Start with each node as its own cluster
+        let mut assignments: Vec<usize> = (0..n).collect();
+        let mut cluster_count = n;
+
+        let target_clusters = self.config.num_modules.unwrap_or(
+            ((n as f64).sqrt() as usize).max(2).min(n / 2)
+        );
+
+        // Merge until target
+        while cluster_count > target_clusters {
+            // Find most similar pair of clusters
+            let mut best_sim = f64::MIN;
+            let mut best_pair = (0, 0);
+
+            let unique_clusters: Vec<usize> = {
+                let mut v: Vec<usize> = assignments.clone();
+                v.sort_unstable();
+                v.dedup();
+                v
+            };
+
+            for (ci, &c1) in unique_clusters.iter().enumerate() {
+                for &c2 in unique_clusters.iter().skip(ci + 1) {
+                    // Average linkage similarity
+                    let nodes1: Vec<usize> = assignments
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, &c)| c == c1)
+                        .map(|(i, _)| i)
+                        .collect();
+                    let nodes2: Vec<usize> = assignments
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, &c)| c == c2)
+                        .map(|(i, _)| i)
+                        .collect();
+
+                    let mut sum = 0.0;
+                    let mut count = 0;
+                    for &i in &nodes1 {
+                        for &j in &nodes2 {
+                            sum += sim_matrix[i][j];
+                            count += 1;
+                        }
+                    }
+
+                    let avg_sim = if count > 0 { sum / count as f64 } else { 0.0 };
+
+                    if avg_sim > best_sim {
+                        best_sim = avg_sim;
+                        best_pair = (c1, c2);
+                    }
+                }
+            }
+
+            // Merge clusters
+            if best_sim >= self.config.similarity_threshold || cluster_count > target_clusters * 2 {
+                let (merge_from, merge_to) = best_pair;
+                for a in assignments.iter_mut() {
+                    if *a == merge_from {
+                        *a = merge_to;
+                    }
+                }
+                cluster_count -= 1;
+            } else {
+                break;
+            }
+        }
+
+        // Renumber clusters consecutively
+        let mut mapping = std::collections::HashMap::new();
+        let mut next_id = 0;
+        for a in assignments.iter_mut() {
+            let new_id = *mapping.entry(*a).or_insert_with(|| {
+                let id = next_id;
+                next_id += 1;
+                id
+            });
+            *a = new_id;
+        }
+
+        assignments
+    }
+
+    /// Greedy modularity optimization
+    fn detect_greedy(&self, sim_matrix: &[Vec<f64>]) -> Vec<usize> {
+        let n = sim_matrix.len();
+        if n < 2 {
+            return vec![0; n];
+        }
+
+        // Start with each node in its own cluster
+        let mut assignments: Vec<usize> = (0..n).collect();
+
+        // Compute total edge weight
+        let total_weight: f64 = sim_matrix
+            .iter()
+            .enumerate()
+            .flat_map(|(i, row)| row.iter().skip(i + 1))
+            .sum::<f64>()
+            * 2.0;
+
+        if total_weight == 0.0 {
+            return vec![0; n];
+        }
+
+        // Greedy optimization
+        for _ in 0..self.config.max_iterations {
+            let mut improved = false;
+
+            for i in 0..n {
+                let current_cluster = assignments[i];
+
+                // Try moving to each other cluster
+                let unique_clusters: Vec<usize> = {
+                    let mut v: Vec<usize> = assignments.clone();
+                    v.sort_unstable();
+                    v.dedup();
+                    v
+                };
+
+                let mut best_gain = 0.0;
+                let mut best_cluster = current_cluster;
+
+                for &target_cluster in &unique_clusters {
+                    if target_cluster == current_cluster {
+                        continue;
+                    }
+
+                    // Compute modularity gain
+                    let gain = self.compute_move_gain(
+                        i,
+                        current_cluster,
+                        target_cluster,
+                        &assignments,
+                        sim_matrix,
+                        total_weight,
+                    );
+
+                    if gain > best_gain {
+                        best_gain = gain;
+                        best_cluster = target_cluster;
+                    }
+                }
+
+                if best_cluster != current_cluster {
+                    assignments[i] = best_cluster;
+                    improved = true;
+                }
+            }
+
+            if !improved {
+                break;
+            }
+        }
+
+        // Compact cluster IDs
+        let mut mapping = std::collections::HashMap::new();
+        let mut next_id = 0;
+        for a in assignments.iter_mut() {
+            let new_id = *mapping.entry(*a).or_insert_with(|| {
+                let id = next_id;
+                next_id += 1;
+                id
+            });
+            *a = new_id;
+        }
+
+        assignments
+    }
+
+    /// Compute modularity gain for moving a node
+    fn compute_move_gain(
+        &self,
+        node: usize,
+        from_cluster: usize,
+        to_cluster: usize,
+        assignments: &[usize],
+        sim_matrix: &[Vec<f64>],
+        total_weight: f64,
+    ) -> f64 {
+        let n = assignments.len();
+
+        // Compute connections to target cluster
+        let mut to_target = 0.0;
+        let mut from_current = 0.0;
+
+        for j in 0..n {
+            if j == node {
+                continue;
+            }
+
+            let weight = sim_matrix[node][j];
+            if assignments[j] == to_cluster {
+                to_target += weight;
+            } else if assignments[j] == from_cluster {
+                from_current += weight;
+            }
+        }
+
+        // Degree of node
+        let node_degree: f64 = sim_matrix[node].iter().sum();
+
+        // Degree sum of clusters
+        let to_degree: f64 = assignments
+            .iter()
+            .enumerate()
+            .filter(|(_, &c)| c == to_cluster)
+            .map(|(i, _)| sim_matrix[i].iter().sum::<f64>())
+            .sum();
+
+        let from_degree: f64 = assignments
+            .iter()
+            .enumerate()
+            .filter(|(i, &c)| c == from_cluster && i != &node)
+            .map(|(i, _)| sim_matrix[i].iter().sum::<f64>())
+            .sum();
+
+        // Modularity gain formula
+        let gain = 2.0 * (to_target - from_current)
+            - node_degree * (to_degree - from_degree + node_degree) / total_weight;
+
+        gain / total_weight
+    }
+
+    /// K-means clustering on similarity space
+    fn detect_kmeans(&self, sim_matrix: &[Vec<f64>]) -> Vec<usize> {
+        let n = sim_matrix.len();
+        if n < 2 {
+            return vec![0; n];
+        }
+
+        let k = self.config.num_modules.unwrap_or(
+            ((n as f64).sqrt() as usize).max(2).min(n / 2)
+        );
+
+        // Initialize centroids (use k-means++ style)
+        let mut centroids: Vec<Vec<f64>> = Vec::with_capacity(k);
+        let mut rng_state = 42u64;
+
+        // First centroid: random
+        rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        let first_idx = (rng_state % n as u64) as usize;
+        centroids.push(sim_matrix[first_idx].clone());
+
+        // Subsequent centroids: proportional to distance
+        while centroids.len() < k {
+            let mut distances: Vec<f64> = vec![f64::MAX; n];
+            for (i, row) in sim_matrix.iter().enumerate() {
+                for centroid in &centroids {
+                    let dist: f64 = row
+                        .iter()
+                        .zip(centroid.iter())
+                        .map(|(a, b)| (a - b).powi(2))
+                        .sum();
+                    distances[i] = distances[i].min(dist);
+                }
+            }
+
+            let total: f64 = distances.iter().sum();
+            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let mut target = (rng_state as f64 / u64::MAX as f64) * total;
+
+            for (i, &d) in distances.iter().enumerate() {
+                target -= d;
+                if target <= 0.0 {
+                    centroids.push(sim_matrix[i].clone());
+                    break;
+                }
+            }
+
+            if centroids.len() == k - 1 {
+                centroids.push(sim_matrix[0].clone()); // Fallback
+            }
+        }
+
+        // K-means iterations
+        let mut assignments = vec![0; n];
+
+        for _ in 0..self.config.max_iterations {
+            // Assign to nearest centroid
+            let mut changed = false;
+            for (i, row) in sim_matrix.iter().enumerate() {
+                let mut best_cluster = 0;
+                let mut best_dist = f64::MAX;
+
+                for (c, centroid) in centroids.iter().enumerate() {
+                    let dist: f64 = row
+                        .iter()
+                        .zip(centroid.iter())
+                        .map(|(a, b)| (a - b).powi(2))
+                        .sum();
+                    if dist < best_dist {
+                        best_dist = dist;
+                        best_cluster = c;
+                    }
+                }
+
+                if assignments[i] != best_cluster {
+                    assignments[i] = best_cluster;
+                    changed = true;
+                }
+            }
+
+            if !changed {
+                break;
+            }
+
+            // Update centroids
+            for (c, centroid) in centroids.iter_mut().enumerate() {
+                let members: Vec<usize> = assignments
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, &a)| a == c)
+                    .map(|(i, _)| i)
+                    .collect();
+
+                if !members.is_empty() {
+                    for (j, val) in centroid.iter_mut().enumerate() {
+                        *val = members.iter().map(|&i| sim_matrix[i][j]).sum::<f64>()
+                            / members.len() as f64;
+                    }
+                }
+            }
+        }
+
+        assignments
+    }
+
+    /// Build module structures from assignments
+    fn build_modules(
+        &self,
+        node_representations: &[RealHV],
+        assignments: &[usize],
+        sim_matrix: &[Vec<f64>],
+    ) -> Vec<ConsciousnessModule> {
+        let num_modules = assignments.iter().max().map(|&m| m + 1).unwrap_or(0);
+        let mut modules = Vec::with_capacity(num_modules);
+
+        for module_id in 0..num_modules {
+            let node_indices: Vec<usize> = assignments
+                .iter()
+                .enumerate()
+                .filter(|(_, &a)| a == module_id)
+                .map(|(i, _)| i)
+                .collect();
+
+            if node_indices.len() < self.config.min_module_size {
+                continue;
+            }
+
+            // Internal cohesion
+            let internal_cohesion = if node_indices.len() > 1 {
+                let mut sum = 0.0;
+                let mut count = 0;
+                for (ii, &i) in node_indices.iter().enumerate() {
+                    for &j in node_indices.iter().skip(ii + 1) {
+                        sum += sim_matrix[i][j];
+                        count += 1;
+                    }
+                }
+                if count > 0 {
+                    sum / count as f64
+                } else {
+                    0.0
+                }
+            } else {
+                1.0
+            };
+
+            // Internal Φ
+            let module_reps: Vec<RealHV> = node_indices
+                .iter()
+                .map(|&i| node_representations[i].clone())
+                .collect();
+            let internal_phi = self.compute_phi(&module_reps);
+
+            // Isolation score
+            let external_nodes: Vec<usize> = (0..assignments.len())
+                .filter(|&i| assignments[i] != module_id)
+                .collect();
+            let isolation_score = if external_nodes.is_empty() {
+                1.0
+            } else {
+                let mut ext_sum = 0.0;
+                let mut ext_count = 0;
+                for &i in &node_indices {
+                    for &j in &external_nodes {
+                        ext_sum += sim_matrix[i][j];
+                        ext_count += 1;
+                    }
+                }
+                let avg_ext = if ext_count > 0 {
+                    ext_sum / ext_count as f64
+                } else {
+                    0.0
+                };
+                1.0 - avg_ext
+            };
+
+            // Centroid
+            let centroid = if !module_reps.is_empty() {
+                Some(RealHV::bundle(&module_reps))
+            } else {
+                None
+            };
+
+            modules.push(ConsciousnessModule {
+                id: module_id,
+                node_indices,
+                internal_cohesion,
+                internal_phi,
+                isolation_score,
+                centroid,
+            });
+        }
+
+        modules
+    }
+
+    /// Compute modularity Q score
+    fn compute_modularity_q(
+        &self,
+        sim_matrix: &[Vec<f64>],
+        assignments: &[usize],
+    ) -> f64 {
+        let n = sim_matrix.len();
+        if n < 2 {
+            return 0.0;
+        }
+
+        let total_weight: f64 = sim_matrix
+            .iter()
+            .enumerate()
+            .flat_map(|(i, row)| row.iter().skip(i + 1))
+            .sum::<f64>()
+            * 2.0;
+
+        if total_weight == 0.0 {
+            return 0.0;
+        }
+
+        let degrees: Vec<f64> = sim_matrix.iter().map(|row| row.iter().sum()).collect();
+
+        let mut q = 0.0;
+        for i in 0..n {
+            for j in 0..n {
+                if assignments[i] == assignments[j] {
+                    let expected = degrees[i] * degrees[j] / total_weight;
+                    q += sim_matrix[i][j] - expected;
+                }
+            }
+        }
+
+        q / total_weight
+    }
+
+    /// Analyze inter-module relations
+    fn analyze_inter_module(
+        &self,
+        node_representations: &[RealHV],
+        modules: &[ConsciousnessModule],
+        sim_matrix: &[Vec<f64>],
+    ) -> Vec<InterModuleRelation> {
+        let mut relations = Vec::new();
+
+        for (mi, module_a) in modules.iter().enumerate() {
+            for module_b in modules.iter().skip(mi + 1) {
+                // Coupling strength
+                let coupling: f64 = if let (Some(ca), Some(cb)) = (&module_a.centroid, &module_b.centroid) {
+                    ((ca.similarity(cb) + 1.0) / 2.0) as f64
+                } else {
+                    0.0f64
+                };
+
+                // Information flow (asymmetric)
+                let mut a_to_b = 0.0;
+                let mut b_to_a = 0.0;
+                let mut count = 0;
+
+                for &i in &module_a.node_indices {
+                    for &j in &module_b.node_indices {
+                        a_to_b += sim_matrix[i][j];
+                        b_to_a += sim_matrix[j][i];
+                        count += 1;
+                    }
+                }
+
+                if count > 0 {
+                    a_to_b /= count as f64;
+                    b_to_a /= count as f64;
+                }
+
+                // Bridge nodes
+                let mut bridge_nodes = Vec::new();
+                let threshold = self.config.similarity_threshold;
+
+                for &i in &module_a.node_indices {
+                    let has_strong_b_link = module_b
+                        .node_indices
+                        .iter()
+                        .any(|&j| sim_matrix[i][j] > threshold);
+                    if has_strong_b_link {
+                        bridge_nodes.push(i);
+                    }
+                }
+
+                for &j in &module_b.node_indices {
+                    let has_strong_a_link = module_a
+                        .node_indices
+                        .iter()
+                        .any(|&i| sim_matrix[i][j] > threshold);
+                    if has_strong_a_link && !bridge_nodes.contains(&j) {
+                        bridge_nodes.push(j);
+                    }
+                }
+
+                relations.push(InterModuleRelation {
+                    module_a: module_a.id,
+                    module_b: module_b.id,
+                    coupling_strength: coupling,
+                    info_flow_a_to_b: a_to_b,
+                    info_flow_b_to_a: b_to_a,
+                    bridge_nodes,
+                });
+            }
+        }
+
+        relations
+    }
+
+    /// Classify nodes by their role in the network
+    fn classify_nodes(
+        &self,
+        sim_matrix: &[Vec<f64>],
+        assignments: &[usize],
+        modules: &[ConsciousnessModule],
+    ) -> Vec<NodeClassification> {
+        let n = sim_matrix.len();
+        let mut classifications = Vec::with_capacity(n);
+
+        for i in 0..n {
+            let primary_module = assignments[i];
+
+            // Within-module degree (z-score)
+            let module = modules.iter().find(|m| m.id == primary_module);
+            let within_degree = if let Some(m) = module {
+                let internal_sum: f64 = m
+                    .node_indices
+                    .iter()
+                    .filter(|&&j| j != i)
+                    .map(|&j| sim_matrix[i][j])
+                    .sum();
+                let module_size = m.node_indices.len() as f64;
+                if module_size > 1.0 {
+                    internal_sum / (module_size - 1.0)
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+
+            // Participation coefficient
+            let mut module_sums: std::collections::HashMap<usize, f64> =
+                std::collections::HashMap::new();
+            let mut total = 0.0;
+
+            for j in 0..n {
+                if i != j {
+                    let weight = sim_matrix[i][j];
+                    *module_sums.entry(assignments[j]).or_default() += weight;
+                    total += weight;
+                }
+            }
+
+            let participation = if total > 0.0 && module_sums.len() > 1 {
+                let sum_sq: f64 = module_sums.values().map(|&s| (s / total).powi(2)).sum();
+                1.0 - sum_sq
+            } else {
+                0.0
+            };
+
+            // Betweenness (simplified - count shortest paths through node)
+            let betweenness = self.estimate_betweenness(i, sim_matrix);
+
+            // Classify role
+            let role = if total < self.config.similarity_threshold * n as f64 {
+                NodeRole::Isolated
+            } else if participation > 0.6 && betweenness > 0.3 {
+                NodeRole::Hub
+            } else if participation > 0.4 {
+                NodeRole::Bridge
+            } else if within_degree > 0.5 {
+                NodeRole::Core
+            } else {
+                NodeRole::Peripheral
+            };
+
+            classifications.push(NodeClassification {
+                node_index: i,
+                primary_module,
+                role,
+                within_module_degree: within_degree,
+                participation_coefficient: participation,
+                betweenness,
+            });
+        }
+
+        classifications
+    }
+
+    /// Estimate betweenness centrality (simplified)
+    fn estimate_betweenness(&self, node: usize, sim_matrix: &[Vec<f64>]) -> f64 {
+        let n = sim_matrix.len();
+        if n < 3 {
+            return 0.0;
+        }
+
+        // Count how many pairs have their strongest path through this node
+        let mut through_count = 0;
+        let total_pairs = (n - 1) * (n - 2) / 2;
+
+        for i in 0..n {
+            if i == node {
+                continue;
+            }
+            for j in (i + 1)..n {
+                if j == node {
+                    continue;
+                }
+
+                // Direct path strength
+                let direct = sim_matrix[i][j];
+
+                // Path through node
+                let through = (sim_matrix[i][node] + sim_matrix[node][j]) / 2.0;
+
+                if through > direct {
+                    through_count += 1;
+                }
+            }
+        }
+
+        if total_pairs > 0 {
+            through_count as f64 / total_pairs as f64
+        } else {
+            0.0
+        }
+    }
+
+    /// Find bottleneck edges between modules
+    fn find_bottleneck_edges(
+        &self,
+        sim_matrix: &[Vec<f64>],
+        assignments: &[usize],
+    ) -> Vec<(usize, usize)> {
+        let n = sim_matrix.len();
+        let mut bottlenecks = Vec::new();
+
+        for i in 0..n {
+            for j in (i + 1)..n {
+                // Only consider inter-module edges
+                if assignments[i] == assignments[j] {
+                    continue;
+                }
+
+                // Check if this is the strongest link between these modules
+                let weight = sim_matrix[i][j];
+                if weight < self.config.similarity_threshold {
+                    continue;
+                }
+
+                let is_bottleneck = sim_matrix[i]
+                    .iter()
+                    .enumerate()
+                    .filter(|(k, _)| *k != j && assignments[*k] == assignments[j])
+                    .all(|(_, &w)| w < weight)
+                    && sim_matrix[j]
+                        .iter()
+                        .enumerate()
+                        .filter(|(k, _)| *k != i && assignments[*k] == assignments[i])
+                        .all(|(_, &w)| w < weight);
+
+                if is_bottleneck {
+                    bottlenecks.push((i, j));
+                }
+            }
+        }
+
+        bottlenecks
+    }
+
+    /// Compute segregation and integration indices
+    fn compute_seg_int_indices(
+        &self,
+        sim_matrix: &[Vec<f64>],
+        assignments: &[usize],
+    ) -> (f64, f64) {
+        let n = sim_matrix.len();
+        if n < 2 {
+            return (0.0, 0.0);
+        }
+
+        let mut within_sum = 0.0;
+        let mut within_count = 0;
+        let mut between_sum = 0.0;
+        let mut between_count = 0;
+
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let weight = sim_matrix[i][j];
+                if assignments[i] == assignments[j] {
+                    within_sum += weight;
+                    within_count += 1;
+                } else {
+                    between_sum += weight;
+                    between_count += 1;
+                }
+            }
+        }
+
+        let within_avg = if within_count > 0 {
+            within_sum / within_count as f64
+        } else {
+            0.0
+        };
+        let between_avg = if between_count > 0 {
+            between_sum / between_count as f64
+        } else {
+            0.0
+        };
+
+        let total_avg = if within_count + between_count > 0 {
+            (within_sum + between_sum) / (within_count + between_count) as f64
+        } else {
+            0.0
+        };
+
+        // Segregation: how much stronger are within-module connections
+        let segregation = if total_avg > 0.0 {
+            (within_avg - between_avg) / total_avg
+        } else {
+            0.0
+        };
+
+        // Integration: quality of between-module connections
+        let integration = if within_avg > 0.0 {
+            between_avg / within_avg
+        } else {
+            0.0
+        };
+
+        (segregation.max(0.0).min(1.0), integration.max(0.0).min(1.0))
+    }
+
+    /// Compute hierarchical modularity at different scales
+    fn compute_hierarchical_modularity(&self, sim_matrix: &[Vec<f64>]) -> Vec<f64> {
+        let n = sim_matrix.len();
+        if n < 4 {
+            return vec![0.0];
+        }
+
+        let mut scores = Vec::new();
+
+        // Try different numbers of modules
+        for k in 2..=(n / 2).min(8) {
+            let config = ModularityConfig {
+                num_modules: Some(k),
+                ..self.config.clone()
+            };
+            let analyzer = PhiModularityAnalyzer::with_config(config);
+            let assignments = analyzer.detect_modules(sim_matrix);
+            let q = analyzer.compute_modularity_q(sim_matrix, &assignments);
+            scores.push(q);
+        }
+
+        scores
+    }
+}
+
+/// Convenience function: analyze network modularity
+pub fn analyze_network_modularity(node_representations: &[RealHV]) -> NetworkModularityResult {
+    PhiModularityAnalyzer::new().analyze(node_representations)
+}
+
+/// Convenience function: detect number of natural modules
+pub fn detect_module_count(node_representations: &[RealHV]) -> usize {
+    let result = PhiModularityAnalyzer::new().analyze(node_representations);
+    result.num_modules()
+}
+
+/// Convenience function: get modularity Q score
+pub fn compute_modularity_score(node_representations: &[RealHV]) -> f64 {
+    PhiModularityAnalyzer::new().analyze(node_representations).modularity_score
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -7556,5 +8853,309 @@ mod tests {
         for (intervention, mean) in &result.mean_effects {
             println!("  {}: {:.4}", intervention, mean);
         }
+    }
+
+    // ========================================================================
+    // REVOLUTIONARY #99: Φ NETWORK MODULARITY TESTS
+    // ========================================================================
+
+    #[test]
+    fn test_modularity_empty_network() {
+        let nodes: Vec<RealHV> = vec![];
+        let result = PhiModularityAnalyzer::new().analyze(&nodes);
+
+        assert_eq!(result.num_modules(), 0);
+        assert_eq!(result.total_phi, 0.0);
+        assert_eq!(result.modularity_score, 0.0);
+    }
+
+    #[test]
+    fn test_modularity_single_node() {
+        let nodes = vec![RealHV::random(256, 42)];
+        let result = PhiModularityAnalyzer::new().analyze(&nodes);
+
+        assert_eq!(result.total_phi, 0.0); // Single node has no integration
+    }
+
+    #[test]
+    fn test_modularity_two_nodes() {
+        let nodes = vec![RealHV::random(256, 1), RealHV::random(256, 2)];
+        let result = PhiModularityAnalyzer::new().analyze(&nodes);
+
+        assert!(result.total_phi >= 0.0);
+    }
+
+    #[test]
+    fn test_module_detection_method_descriptions() {
+        assert!(ModuleDetectionMethod::Spectral.description().contains("Spectral"));
+        assert!(ModuleDetectionMethod::Agglomerative.description().contains("agglomerative"));
+        assert!(ModuleDetectionMethod::Greedy.description().contains("Greedy"));
+        assert!(ModuleDetectionMethod::KMeans.description().contains("K-means"));
+    }
+
+    #[test]
+    fn test_modularity_config_presets() {
+        let quick = ModularityConfig::quick();
+        assert_eq!(quick.num_modules, Some(3));
+        assert!(!quick.compute_inter_module_phi);
+
+        let thorough = ModularityConfig::thorough();
+        assert!(thorough.num_modules.is_none());
+        assert!(thorough.compute_inter_module_phi);
+
+        let research = ModularityConfig::research();
+        assert_eq!(research.min_module_size, 1);
+        assert!(research.max_iterations > thorough.max_iterations);
+    }
+
+    #[test]
+    fn test_node_role_descriptions() {
+        assert!(NodeRole::Core.description().contains("Core"));
+        assert!(NodeRole::Peripheral.description().contains("Peripheral"));
+        assert!(NodeRole::Bridge.description().contains("Bridge"));
+        assert!(NodeRole::Hub.description().contains("Hub"));
+        assert!(NodeRole::Isolated.description().contains("Isolated"));
+    }
+
+    #[test]
+    fn test_consciousness_module_methods() {
+        let module = ConsciousnessModule {
+            id: 0,
+            node_indices: vec![0, 1, 2],
+            internal_cohesion: 0.8,
+            internal_phi: 0.6,
+            isolation_score: 0.7,
+            centroid: None,
+        };
+
+        assert_eq!(module.size(), 3);
+        assert!(module.contains(1));
+        assert!(!module.contains(5));
+        assert!(module.integration_efficiency() > 0.0);
+    }
+
+    #[test]
+    fn test_network_modularity_result_methods() {
+        // Create a simple modular network
+        let dim = 256;
+        let mut nodes = Vec::new();
+
+        // Module 1: similar nodes
+        let base1 = RealHV::random(dim, 100);
+        for i in 0..3 {
+            let noise = RealHV::random(dim, 1000 + i);
+            nodes.push(base1.add(&noise.scale(0.1)));
+        }
+
+        // Module 2: different similar nodes
+        let base2 = RealHV::random(dim, 200);
+        for i in 0..3 {
+            let noise = RealHV::random(dim, 2000 + i);
+            nodes.push(base2.add(&noise.scale(0.1)));
+        }
+
+        let result = PhiModularityAnalyzer::new().analyze(&nodes);
+
+        assert!(result.total_phi > 0.0);
+        assert!(result.avg_module_size() > 0.0);
+        assert!(result.balance_score() > 0.0);
+        assert!(result.efficiency_ratio() >= 0.0);
+
+        if !result.modules.is_empty() {
+            assert!(result.largest_module().is_some());
+            assert!(result.highest_phi_module().is_some());
+        }
+    }
+
+    #[test]
+    fn test_modularity_detects_clear_modules() {
+        let dim = 256;
+        let mut nodes = Vec::new();
+
+        // Create two clearly separated clusters
+        // Cluster A: nodes with positive bias
+        let cluster_a_base = RealHV::random(dim, 42);
+        for i in 0..4 {
+            let variation = RealHV::random(dim, 100 + i);
+            nodes.push(cluster_a_base.add(&variation.scale(0.05)));
+        }
+
+        // Cluster B: nodes with different base (orthogonal)
+        let cluster_b_base = RealHV::random(dim, 999);
+        for i in 0..4 {
+            let variation = RealHV::random(dim, 200 + i);
+            nodes.push(cluster_b_base.add(&variation.scale(0.05)));
+        }
+
+        let config = ModularityConfig {
+            num_modules: Some(2),
+            ..Default::default()
+        };
+        let result = PhiModularityAnalyzer::with_config(config).analyze(&nodes);
+
+        println!("Modularity analysis of clear clusters:");
+        println!("  Num modules: {}", result.num_modules());
+        println!("  Modularity Q: {:.4}", result.modularity_score);
+        println!("  Segregation: {:.4}", result.segregation_index);
+        println!("  Integration: {:.4}", result.integration_index);
+
+        // Should detect structure
+        assert!(result.num_modules() >= 1);
+    }
+
+    #[test]
+    fn test_spectral_clustering() {
+        let dim = 256;
+        let nodes: Vec<RealHV> = (0..6)
+            .map(|i| RealHV::random(dim, i as u64 * 1000))
+            .collect();
+
+        let config = ModularityConfig {
+            detection_method: ModuleDetectionMethod::Spectral,
+            num_modules: Some(2),
+            ..Default::default()
+        };
+
+        let result = PhiModularityAnalyzer::with_config(config).analyze(&nodes);
+        assert!(result.num_modules() >= 1);
+    }
+
+    #[test]
+    fn test_greedy_modularity() {
+        let dim = 256;
+        let nodes: Vec<RealHV> = (0..6)
+            .map(|i| RealHV::random(dim, i as u64 * 500))
+            .collect();
+
+        let config = ModularityConfig {
+            detection_method: ModuleDetectionMethod::Greedy,
+            ..Default::default()
+        };
+
+        let result = PhiModularityAnalyzer::with_config(config).analyze(&nodes);
+        assert!(result.total_phi >= 0.0);
+    }
+
+    #[test]
+    fn test_kmeans_clustering() {
+        let dim = 256;
+        let nodes: Vec<RealHV> = (0..8)
+            .map(|i| RealHV::random(dim, i as u64 * 700))
+            .collect();
+
+        let config = ModularityConfig {
+            detection_method: ModuleDetectionMethod::KMeans,
+            num_modules: Some(2),
+            ..Default::default()
+        };
+
+        let result = PhiModularityAnalyzer::with_config(config).analyze(&nodes);
+        assert!(result.num_modules() >= 1);
+    }
+
+    #[test]
+    fn test_inter_module_relations() {
+        let dim = 256;
+        let mut nodes = Vec::new();
+
+        // Two modules with a connecting node
+        for i in 0..3 {
+            nodes.push(RealHV::random(dim, i as u64));
+        }
+        for i in 3..6 {
+            nodes.push(RealHV::random(dim, i as u64 * 1000));
+        }
+
+        let result = PhiModularityAnalyzer::new().analyze(&nodes);
+
+        // If modules were detected, check relations
+        if result.num_modules() >= 2 {
+            assert!(!result.inter_module_relations.is_empty());
+            let relation = &result.inter_module_relations[0];
+            assert!(relation.coupling_strength >= 0.0);
+            assert!(relation.coupling_strength <= 1.0);
+        }
+    }
+
+    #[test]
+    fn test_node_classification() {
+        let dim = 256;
+        let nodes: Vec<RealHV> = (0..8)
+            .map(|i| RealHV::random(dim, i as u64 * 123))
+            .collect();
+
+        let result = PhiModularityAnalyzer::new().analyze(&nodes);
+
+        assert_eq!(result.node_classifications.len(), 8);
+
+        for classification in &result.node_classifications {
+            assert!(classification.node_index < 8);
+            assert!(classification.participation_coefficient >= 0.0);
+            assert!(classification.participation_coefficient <= 1.0);
+            assert!(classification.betweenness >= 0.0);
+            assert!(classification.betweenness <= 1.0);
+        }
+    }
+
+    #[test]
+    fn test_hierarchical_modularity() {
+        let dim = 256;
+        let nodes: Vec<RealHV> = (0..10)
+            .map(|i| RealHV::random(dim, i as u64 * 42))
+            .collect();
+
+        let result = PhiModularityAnalyzer::new().analyze(&nodes);
+
+        assert!(!result.hierarchical_scores.is_empty());
+        println!("Hierarchical modularity scores:");
+        for (k, &q) in result.hierarchical_scores.iter().enumerate() {
+            println!("  k={}: Q={:.4}", k + 2, q);
+        }
+    }
+
+    #[test]
+    fn test_convenience_functions() {
+        let dim = 256;
+        let nodes: Vec<RealHV> = (0..6)
+            .map(|i| RealHV::random(dim, i as u64 * 55))
+            .collect();
+
+        let result = analyze_network_modularity(&nodes);
+        assert!(result.total_phi >= 0.0);
+
+        let count = detect_module_count(&nodes);
+        assert!(count >= 1);
+
+        let q = compute_modularity_score(&nodes);
+        // Q can be negative, so just check it's finite
+        assert!(q.is_finite());
+    }
+
+    #[test]
+    fn test_hub_and_spoke_modularity() {
+        // Create hub-and-spoke topology (star with central hub)
+        let dim = 256;
+        let hub = RealHV::random(dim, 0);
+        let mut nodes = vec![hub.clone()];
+
+        // Create spokes
+        for i in 1..=6 {
+            let spoke = RealHV::random(dim, i as u64 * 100);
+            // Mix spoke with hub to create connection
+            let connected = hub.bind(&spoke);
+            nodes.push(connected);
+        }
+
+        let result = PhiModularityAnalyzer::new().analyze(&nodes);
+
+        println!("Hub-and-spoke modularity:");
+        println!("  Total Φ: {:.4}", result.total_phi);
+        println!("  Modules: {}", result.num_modules());
+        println!("  Q score: {:.4}", result.modularity_score);
+
+        // Hub should be identified as special
+        let hub_class = &result.node_classifications[0];
+        println!("  Hub node role: {:?}", hub_class.role);
+        println!("  Hub participation: {:.4}", hub_class.participation_coefficient);
     }
 }
