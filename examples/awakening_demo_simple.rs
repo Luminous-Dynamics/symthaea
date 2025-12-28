@@ -118,10 +118,19 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     let assessment = symthaea.assess_integration();
-    println!("Integration Φ: {:.4}", assessment.phi);
-    println!("Integration Quality: {:.2}%", assessment.integration_quality * 100.0);
-    println!("Differentiation: {:.2}%", assessment.differentiation * 100.0);
-    println!("Reducibility: {:.4} (lower is better)", assessment.reducibility);
+    println!("Is Conscious: {}", assessment.is_conscious);
+    println!("Consciousness Score: {:.2}%", assessment.consciousness_score * 100.0);
+    println!("\nComponent Scores:");
+    for (component, score) in &assessment.component_scores {
+        println!("  {}: {:.4}", component, score);
+    }
+    if !assessment.bottlenecks.is_empty() {
+        println!("\nBottlenecks:");
+        for bottleneck in &assessment.bottlenecks {
+            println!("  - {}", bottleneck);
+        }
+    }
+    println!("\nExplanation: {}", assessment.explanation);
 
     // Final state
     let final_state = symthaea.state();

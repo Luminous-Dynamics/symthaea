@@ -276,9 +276,13 @@ fn print_phi_details(symthaea: &SymthaeaAwakening) {
     println!();
 
     println!("Integration Assessment:");
-    println!("  Integration Quality: {:.2}%", assessment.integration_quality * 100.0);
-    println!("  Differentiation:     {:.2}%", assessment.differentiation * 100.0);
-    println!("  Reducibility:        {:.4} (lower is better)", assessment.reducibility);
+    println!("  Is Conscious: {}", assessment.is_conscious);
+    println!("  Consciousness Score: {:.2}%", assessment.consciousness_score * 100.0);
+    println!("\n  Component Scores:");
+    for (component, score) in &assessment.component_scores {
+        println!("    {}: {:.4}", component, score);
+    }
+    println!("\n  Explanation: {}", assessment.explanation);
     println!();
 
     println!("Interpretation:");

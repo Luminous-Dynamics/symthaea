@@ -311,7 +311,7 @@ impl ResonatorNetwork {
             .collect();
         normalize(&mut estimate);
 
-        let mut previous = estimate.clone();
+        let mut _previous = estimate.clone();
         let mut velocity = vec![0.0f32; self.dimension];
 
         for iteration in 0..max_iterations {
@@ -415,7 +415,7 @@ impl ResonatorNetwork {
             .map(|&name| (name.to_string(), vec![0.0f32; self.dimension]))
             .collect();
 
-        for iteration in 0..max_iterations {
+        for _iteration in 0..max_iterations {
             // Compute updates for each unknown
             let mut updates: HashMap<String, Vec<f32>> = unknowns
                 .iter()

@@ -1277,7 +1277,7 @@ impl TieredPhi {
     /// - The bundle captures the integrated state
     ///
     /// We approximate I(components) using average pairwise similarity
-    fn compute_system_info(&self, bundled: &HV16, components: &[HV16]) -> f64 {
+    fn compute_system_info(&self, _bundled: &HV16, components: &[HV16]) -> f64 {
         let n = components.len();
         if n < 2 {
             return 0.0;
@@ -4647,9 +4647,9 @@ impl PhiCausalAnalyzer {
 
         for node_idx in 0..n {
             let mut node_interventions = Vec::new();
-            let mut knockout_delta = 0.0;
-            let mut amplify_delta = 0.0;
-            let mut dampen_delta = 0.0;
+            let mut _knockout_delta = 0.0;
+            let mut _amplify_delta = 0.0;
+            let mut _dampen_delta = 0.0;
 
             // Knockout
             let knockout_result = self.test_intervention(
@@ -5883,7 +5883,7 @@ impl PhiModularityAnalyzer {
     /// Analyze inter-module relations
     fn analyze_inter_module(
         &self,
-        node_representations: &[RealHV],
+        _node_representations: &[RealHV],
         modules: &[ConsciousnessModule],
         sim_matrix: &[Vec<f64>],
     ) -> Vec<InterModuleRelation> {
