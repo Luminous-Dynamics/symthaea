@@ -380,7 +380,9 @@ mod tests {
 
     #[test]
     fn test_safe_commands() {
-        let mut amygdala = AmygdalaActor::new();
+        use std::time::Duration;
+        // Use longer timeout for debug mode (regex is slower in debug builds)
+        let mut amygdala = AmygdalaActor::with_config(0.1, Duration::from_millis(100));
 
         // These should NOT trigger
         assert!(amygdala.check_visceral_safety("ls -la").is_none());

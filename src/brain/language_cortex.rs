@@ -622,6 +622,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "performance test - run with cargo test --release"]
     fn benchmark_language_cortex_bridge() {
         use std::time::Instant;
 

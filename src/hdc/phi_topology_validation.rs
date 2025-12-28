@@ -723,7 +723,7 @@ mod tests {
 
     #[test]
     fn test_topology_to_hv16_components() {
-        use super::HDC_DIMENSION;
+        use crate::hdc::HDC_DIMENSION;
 
         // Create a small star topology with standard HDC dimension
         let topology = ConsciousnessTopology::star(5, HDC_DIMENSION, 42);

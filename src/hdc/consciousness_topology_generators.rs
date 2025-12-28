@@ -26,6 +26,10 @@ pub struct ConsciousnessTopology {
 
     /// Topology type
     pub topology_type: TopologyType,
+
+    /// Edge list (node pairs)
+    /// Added back for synthesis module compatibility
+    pub edges: Vec<(usize, usize)>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -80,12 +84,25 @@ impl ConsciousnessTopology {
             .map(|i| RealHV::random(dim, seed + (i as u64 * 1000)))
             .collect();
 
+        // Random edges: connect ~50% of possible edges randomly
+        let mut edges = Vec::new();
+        for i in 0..n_nodes {
+            for j in (i + 1)..n_nodes {
+                // Use deterministic random based on seed
+                let edge_seed = seed.wrapping_add((i * n_nodes + j) as u64);
+                if (edge_seed % 100) < 50 {  // ~50% probability
+                    edges.push((i, j));
+                }
+            }
+        }
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Random,
+            edges,
         }
     }
 

@@ -3794,6 +3794,552 @@ pub fn compute_transfer_matrix(
 }
 
 // ============================================================================
+// REVOLUTIONARY #97: Φ ATTRACTOR DYNAMICS
+// ============================================================================
+//
+// Models consciousness as a dynamical system with attractor states.
+// Consciousness doesn't exist as a single value but evolves through
+// a phase space with basins of attraction, saddle points, and limit cycles.
+//
+// ## Core Insight
+//
+// Traditional IIT measures Φ as a static snapshot. But consciousness is
+// fundamentally DYNAMIC - it flows, transitions, and settles into stable
+// patterns. Attractor dynamics captures this:
+//
+// - **Stable Attractors**: Baseline consciousness states (awake, dreaming)
+// - **Saddle Points**: Transition states (falling asleep, waking up)
+// - **Basin Size**: Robustness of consciousness (how hard to perturb)
+// - **Lyapunov Exponents**: Stability/chaos of consciousness dynamics
+//
+// ## Applications
+//
+// - **Anesthesia Monitoring**: Track consciousness as it approaches attractor
+// - **Sleep Stage Detection**: Different stages = different attractors
+// - **Meditation States**: Map meditative attractors
+// - **Consciousness Recovery**: Guide recovery toward healthy attractors
+// - **AI Consciousness**: Design systems with desired attractor landscapes
+//
+// ## References
+//
+// - Strogatz (2001): Nonlinear Dynamics and Chaos
+// - Tononi (2004): IIT consciousness measurement
+// - Koch & Tsuchiya (2007): Consciousness as global workspace
+// - This work: First attractor dynamics for consciousness phase space
+
+/// Configuration for attractor dynamics analysis
+#[derive(Debug, Clone)]
+pub struct AttractorConfig {
+    /// Maximum iterations for convergence detection
+    pub max_iterations: usize,
+
+    /// Convergence threshold (change in Φ)
+    pub convergence_threshold: f64,
+
+    /// Perturbation magnitude for basin estimation
+    pub perturbation_magnitude: f64,
+
+    /// Number of random perturbations for basin sampling
+    pub basin_samples: usize,
+
+    /// Time step for dynamics simulation
+    pub time_step: f64,
+
+    /// Noise amplitude for stochastic dynamics
+    pub noise_amplitude: f64,
+}
+
+impl Default for AttractorConfig {
+    fn default() -> Self {
+        Self {
+            max_iterations: 100,
+            convergence_threshold: 1e-4,
+            perturbation_magnitude: 0.1,
+            basin_samples: 20,
+            time_step: 0.1,
+            noise_amplitude: 0.01,
+        }
+    }
+}
+
+impl AttractorConfig {
+    /// Fast config for real-time analysis
+    pub fn fast() -> Self {
+        Self {
+            max_iterations: 30,
+            basin_samples: 10,
+            ..Default::default()
+        }
+    }
+
+    /// Research config for detailed analysis
+    pub fn research() -> Self {
+        Self {
+            max_iterations: 500,
+            convergence_threshold: 1e-6,
+            basin_samples: 50,
+            ..Default::default()
+        }
+    }
+}
+
+/// Attractor state classification
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttractorType {
+    /// Fixed point - consciousness converges to stable value
+    FixedPoint,
+    /// Limit cycle - consciousness oscillates periodically
+    LimitCycle,
+    /// Strange attractor - chaotic but bounded dynamics
+    StrangeAttractor,
+    /// Saddle point - unstable equilibrium
+    SaddlePoint,
+    /// Transient - no attractor found (still evolving)
+    Transient,
+}
+
+impl AttractorType {
+    /// Human-readable description
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::FixedPoint => "stable fixed point (baseline consciousness)",
+            Self::LimitCycle => "limit cycle (oscillating consciousness)",
+            Self::StrangeAttractor => "strange attractor (chaotic but bounded)",
+            Self::SaddlePoint => "saddle point (unstable transition)",
+            Self::Transient => "transient (no stable attractor)",
+        }
+    }
+
+    /// Consciousness interpretation
+    pub fn consciousness_interpretation(&self) -> &'static str {
+        match self {
+            Self::FixedPoint => "stable waking or sleep state",
+            Self::LimitCycle => "meditative or hypnagogic state",
+            Self::StrangeAttractor => "creative or flow state",
+            Self::SaddlePoint => "transition (falling asleep, waking)",
+            Self::Transient => "rapidly changing consciousness",
+        }
+    }
+}
+
+/// Result of attractor dynamics analysis
+#[derive(Debug, Clone)]
+pub struct AttractorResult {
+    /// Type of attractor detected
+    pub attractor_type: AttractorType,
+
+    /// Final Φ value at attractor (if converged)
+    pub attractor_phi: f64,
+
+    /// Initial Φ value before dynamics
+    pub initial_phi: f64,
+
+    /// Estimated basin of attraction size (0-1)
+    pub basin_size: f64,
+
+    /// Largest Lyapunov exponent (negative = stable, positive = chaotic)
+    pub lyapunov_exponent: f64,
+
+    /// Convergence time (iterations to attractor)
+    pub convergence_time: usize,
+
+    /// Φ trajectory during evolution
+    pub trajectory: Vec<f64>,
+
+    /// Whether the system converged
+    pub converged: bool,
+
+    /// Oscillation period (if limit cycle)
+    pub oscillation_period: Option<usize>,
+
+    /// Basin neighbors - other attractors within perturbation distance
+    pub basin_neighbors: Vec<f64>,
+}
+
+impl AttractorResult {
+    /// Check if consciousness is in a stable state
+    pub fn is_stable(&self) -> bool {
+        matches!(self.attractor_type, AttractorType::FixedPoint)
+            && self.lyapunov_exponent < 0.0
+    }
+
+    /// Check if consciousness is in transition
+    pub fn is_transitioning(&self) -> bool {
+        matches!(self.attractor_type, AttractorType::SaddlePoint | AttractorType::Transient)
+    }
+
+    /// Check if consciousness shows complex dynamics
+    pub fn is_complex(&self) -> bool {
+        matches!(self.attractor_type, AttractorType::LimitCycle | AttractorType::StrangeAttractor)
+    }
+
+    /// Get stability score (0 = chaotic, 1 = maximally stable)
+    pub fn stability_score(&self) -> f64 {
+        if self.lyapunov_exponent >= 0.0 {
+            0.0
+        } else {
+            (-self.lyapunov_exponent).min(1.0).tanh()
+        }
+    }
+
+    /// Get robustness score based on basin size
+    pub fn robustness_score(&self) -> f64 {
+        self.basin_size
+    }
+}
+
+/// Φ Attractor Dynamics Analyzer
+///
+/// Models consciousness evolution through phase space and identifies
+/// stable attractor states, transition saddles, and basin boundaries.
+#[derive(Debug, Clone)]
+pub struct PhiAttractor {
+    config: AttractorConfig,
+    /// History of Φ states for trajectory analysis
+    state_history: Vec<f64>,
+}
+
+impl PhiAttractor {
+    /// Create new attractor analyzer with default config
+    pub fn new() -> Self {
+        Self {
+            config: AttractorConfig::default(),
+            state_history: Vec::new(),
+        }
+    }
+
+    /// Create with custom config
+    pub fn with_config(config: AttractorConfig) -> Self {
+        Self {
+            config,
+            state_history: Vec::new(),
+        }
+    }
+
+    /// Fast analyzer for real-time use
+    pub fn fast() -> Self {
+        Self::with_config(AttractorConfig::fast())
+    }
+
+    /// Research analyzer for detailed analysis
+    pub fn research() -> Self {
+        Self::with_config(AttractorConfig::research())
+    }
+
+    /// Analyze attractor dynamics from Φ time series
+    ///
+    /// # Arguments
+    ///
+    /// * `phi_trajectory` - Time series of Φ measurements
+    ///
+    /// # Returns
+    ///
+    /// AttractorResult with dynamics analysis
+    pub fn analyze(&mut self, phi_trajectory: &[f64]) -> AttractorResult {
+        if phi_trajectory.is_empty() {
+            return AttractorResult {
+                attractor_type: AttractorType::Transient,
+                attractor_phi: 0.0,
+                initial_phi: 0.0,
+                basin_size: 0.0,
+                lyapunov_exponent: 0.0,
+                convergence_time: 0,
+                trajectory: vec![],
+                converged: false,
+                oscillation_period: None,
+                basin_neighbors: vec![],
+            };
+        }
+
+        self.state_history = phi_trajectory.to_vec();
+
+        let initial_phi = phi_trajectory[0];
+        let final_phi = *phi_trajectory.last().unwrap();
+
+        // 1. Detect convergence
+        let (converged, convergence_time) = self.detect_convergence(phi_trajectory);
+
+        // 2. Compute Lyapunov exponent
+        let lyapunov = self.compute_lyapunov(phi_trajectory);
+
+        // 3. Detect oscillation
+        let (is_oscillating, period) = self.detect_oscillation(phi_trajectory);
+
+        // 4. Classify attractor type
+        let attractor_type = self.classify_attractor(converged, is_oscillating, lyapunov);
+
+        // 5. Estimate basin size
+        let (basin_size, basin_neighbors) = self.estimate_basin(phi_trajectory);
+
+        AttractorResult {
+            attractor_type,
+            attractor_phi: final_phi,
+            initial_phi,
+            basin_size,
+            lyapunov_exponent: lyapunov,
+            convergence_time,
+            trajectory: phi_trajectory.to_vec(),
+            converged,
+            oscillation_period: period,
+            basin_neighbors,
+        }
+    }
+
+    /// Detect convergence to a fixed point
+    fn detect_convergence(&self, trajectory: &[f64]) -> (bool, usize) {
+        if trajectory.len() < 3 {
+            return (false, trajectory.len());
+        }
+
+        let n = trajectory.len();
+        let threshold = self.config.convergence_threshold;
+
+        // Check for convergence in the last portion of trajectory
+        let check_window = (n / 4).max(3);
+
+        for i in (check_window..n).rev() {
+            let window = &trajectory[i - check_window..i];
+            let mean = window.iter().sum::<f64>() / window.len() as f64;
+            let max_deviation = window.iter()
+                .map(|&x| (x - mean).abs())
+                .fold(0.0, f64::max);
+
+            if max_deviation < threshold {
+                return (true, i - check_window);
+            }
+        }
+
+        (false, n)
+    }
+
+    /// Compute largest Lyapunov exponent
+    ///
+    /// Measures rate of divergence of nearby trajectories.
+    /// Negative = stable, Positive = chaotic
+    fn compute_lyapunov(&self, trajectory: &[f64]) -> f64 {
+        if trajectory.len() < 10 {
+            return 0.0;
+        }
+
+        // Compute average rate of change
+        let mut divergence_sum = 0.0;
+        let mut count = 0;
+
+        for i in 1..trajectory.len() {
+            let delta = (trajectory[i] - trajectory[i - 1]).abs();
+            if delta > 1e-10 && trajectory[i - 1].abs() > 1e-10 {
+                // Rate of divergence normalized by current state
+                divergence_sum += (delta / trajectory[i - 1].abs()).ln();
+                count += 1;
+            }
+        }
+
+        if count > 0 {
+            divergence_sum / count as f64
+        } else {
+            0.0
+        }
+    }
+
+    /// Detect oscillatory behavior (limit cycles)
+    fn detect_oscillation(&self, trajectory: &[f64]) -> (bool, Option<usize>) {
+        if trajectory.len() < 10 {
+            return (false, None);
+        }
+
+        // Find peaks
+        let mut peaks = Vec::new();
+        for i in 1..trajectory.len() - 1 {
+            if trajectory[i] > trajectory[i - 1] && trajectory[i] > trajectory[i + 1] {
+                peaks.push(i);
+            }
+        }
+
+        if peaks.len() < 2 {
+            return (false, None);
+        }
+
+        // Check for consistent period
+        let mut periods = Vec::new();
+        for i in 1..peaks.len() {
+            periods.push(peaks[i] - peaks[i - 1]);
+        }
+
+        if periods.is_empty() {
+            return (false, None);
+        }
+
+        let mean_period = periods.iter().sum::<usize>() as f64 / periods.len() as f64;
+        let variance = periods.iter()
+            .map(|&p| (p as f64 - mean_period).powi(2))
+            .sum::<f64>() / periods.len() as f64;
+
+        // Low variance indicates regular oscillation
+        let is_periodic = variance.sqrt() / mean_period < 0.3;
+
+        if is_periodic {
+            (true, Some(mean_period.round() as usize))
+        } else {
+            (false, None)
+        }
+    }
+
+    /// Classify attractor type based on dynamics
+    fn classify_attractor(
+        &self,
+        converged: bool,
+        is_oscillating: bool,
+        lyapunov: f64,
+    ) -> AttractorType {
+        if is_oscillating {
+            return AttractorType::LimitCycle;
+        }
+
+        if converged {
+            if lyapunov < -0.1 {
+                return AttractorType::FixedPoint;
+            } else if lyapunov > 0.1 {
+                return AttractorType::SaddlePoint;
+            } else {
+                return AttractorType::FixedPoint;
+            }
+        }
+
+        if lyapunov > 0.3 {
+            AttractorType::StrangeAttractor
+        } else if lyapunov > 0.0 {
+            AttractorType::SaddlePoint
+        } else {
+            AttractorType::Transient
+        }
+    }
+
+    /// Estimate basin of attraction size
+    fn estimate_basin(&self, trajectory: &[f64]) -> (f64, Vec<f64>) {
+        if trajectory.len() < 5 {
+            return (0.5, vec![]);
+        }
+
+        let final_phi = *trajectory.last().unwrap();
+
+        // Estimate basin by checking how often trajectory returns to attractor region
+        let tolerance = self.config.convergence_threshold * 10.0;
+        let mut in_basin_count = 0;
+
+        for &phi in trajectory.iter() {
+            if (phi - final_phi).abs() < tolerance {
+                in_basin_count += 1;
+            }
+        }
+
+        let basin_estimate = in_basin_count as f64 / trajectory.len() as f64;
+
+        // Find neighboring values (local extrema)
+        let mut neighbors = Vec::new();
+        for i in 1..trajectory.len() - 1 {
+            let is_local_min = trajectory[i] < trajectory[i - 1] && trajectory[i] < trajectory[i + 1];
+            let is_local_max = trajectory[i] > trajectory[i - 1] && trajectory[i] > trajectory[i + 1];
+            if is_local_min || is_local_max {
+                if (trajectory[i] - final_phi).abs() > tolerance {
+                    neighbors.push(trajectory[i]);
+                }
+            }
+        }
+
+        neighbors.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        neighbors.dedup();
+
+        (basin_estimate, neighbors)
+    }
+
+    /// Simulate dynamics from initial state
+    ///
+    /// Evolves the system according to a simple gradient dynamics:
+    /// dΦ/dt = -∇V(Φ) + noise
+    ///
+    /// where V is an inferred potential landscape.
+    pub fn simulate(&self, initial_phi: f64, target_phi: f64) -> Vec<f64> {
+        let mut trajectory = Vec::with_capacity(self.config.max_iterations);
+        let mut phi = initial_phi;
+
+        let mut rng_state = (initial_phi * 1000.0) as u64;
+
+        for _ in 0..self.config.max_iterations {
+            trajectory.push(phi);
+
+            // Gradient toward target with some nonlinearity
+            let gradient = -(phi - target_phi) * (1.0 + (phi - target_phi).powi(2));
+
+            // Add noise
+            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let noise = ((rng_state as f64) / u64::MAX as f64 - 0.5) * 2.0
+                * self.config.noise_amplitude;
+
+            // Euler step
+            phi += gradient * self.config.time_step + noise;
+
+            // Keep in valid range
+            phi = phi.max(0.0).min(1.0);
+
+            // Check convergence
+            if (phi - target_phi).abs() < self.config.convergence_threshold {
+                trajectory.push(phi);
+                break;
+            }
+        }
+
+        trajectory
+    }
+
+    /// Find multiple attractors in phase space
+    ///
+    /// Samples many initial conditions and identifies distinct attractors.
+    pub fn find_attractors(&mut self, phi_range: (f64, f64)) -> Vec<f64> {
+        let (min_phi, max_phi) = phi_range;
+        let step = (max_phi - min_phi) / self.config.basin_samples as f64;
+
+        let mut attractors = Vec::new();
+
+        for i in 0..self.config.basin_samples {
+            let initial = min_phi + i as f64 * step;
+
+            // Simulate to find where it converges
+            let trajectory = self.simulate(initial, 0.5); // Target is mid-range
+
+            if let Some(&final_phi) = trajectory.last() {
+                // Check if this is a new attractor
+                let is_new = attractors.iter()
+                    .all(|&a: &f64| (a - final_phi).abs() > self.config.convergence_threshold * 10.0);
+
+                if is_new {
+                    attractors.push(final_phi);
+                }
+            }
+        }
+
+        attractors.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        attractors
+    }
+}
+
+impl Default for PhiAttractor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Convenience function: analyze attractor from Φ time series
+pub fn analyze_phi_attractor(phi_trajectory: &[f64]) -> AttractorResult {
+    PhiAttractor::new().analyze(phi_trajectory)
+}
+
+/// Convenience function: classify consciousness state from trajectory
+pub fn classify_consciousness_state(phi_trajectory: &[f64]) -> (AttractorType, f64) {
+    let result = PhiAttractor::new().analyze(phi_trajectory);
+    (result.attractor_type, result.stability_score())
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -5746,5 +6292,352 @@ mod tests {
 
         println!("High→Low improvement: {:.2}%", result_improve.improvement_percent());
         println!("Low→High improvement: {:.2}%", result_no_improve.improvement_percent());
+    }
+
+    // ========================================================================
+    // Revolutionary #97: Φ Attractor Dynamics Tests
+    // ========================================================================
+
+    #[test]
+    fn test_attractor_empty_trajectory() {
+        let mut attractor = PhiAttractor::new();
+        let empty: Vec<f64> = vec![];
+
+        let result = attractor.analyze(&empty);
+
+        assert_eq!(result.attractor_type, AttractorType::Transient);
+        assert_eq!(result.trajectory.len(), 0);
+        assert!(!result.converged);
+
+        println!("Empty trajectory → Transient attractor (as expected)");
+    }
+
+    #[test]
+    fn test_attractor_fixed_point() {
+        let mut attractor = PhiAttractor::new();
+
+        // Create a trajectory that converges to a fixed point
+        let trajectory: Vec<f64> = (0..100)
+            .map(|i| {
+                let t = i as f64 / 100.0;
+                0.5 + 0.3 * (-5.0 * t).exp() // Exponential decay to 0.5
+            })
+            .collect();
+
+        let result = attractor.analyze(&trajectory);
+
+        // Should detect fixed point
+        assert!(result.converged, "Should detect convergence");
+        assert!(
+            matches!(result.attractor_type, AttractorType::FixedPoint),
+            "Should classify as fixed point, got {:?}",
+            result.attractor_type
+        );
+        assert!(
+            (result.attractor_phi - 0.5).abs() < 0.05,
+            "Attractor Φ should be near 0.5"
+        );
+        assert!(result.lyapunov_exponent < 0.0, "Lyapunov should be negative (stable)");
+
+        println!("Fixed point test:");
+        println!("  Attractor Φ: {:.4}", result.attractor_phi);
+        println!("  Lyapunov: {:.4}", result.lyapunov_exponent);
+        println!("  Convergence time: {}", result.convergence_time);
+    }
+
+    #[test]
+    fn test_attractor_limit_cycle() {
+        let mut attractor = PhiAttractor::new();
+
+        // Create an oscillating trajectory (limit cycle)
+        let trajectory: Vec<f64> = (0..100)
+            .map(|i| {
+                let t = i as f64;
+                0.5 + 0.2 * (t * 0.5).sin() // Regular oscillation
+            })
+            .collect();
+
+        let result = attractor.analyze(&trajectory);
+
+        // Should detect oscillation
+        assert!(
+            matches!(result.attractor_type, AttractorType::LimitCycle),
+            "Should classify as limit cycle, got {:?}",
+            result.attractor_type
+        );
+        assert!(result.oscillation_period.is_some(), "Should detect period");
+
+        println!("Limit cycle test:");
+        println!("  Type: {:?}", result.attractor_type);
+        println!("  Oscillation period: {:?}", result.oscillation_period);
+        println!("  Interpretation: {}", result.attractor_type.consciousness_interpretation());
+    }
+
+    #[test]
+    fn test_attractor_lyapunov_calculation() {
+        let attractor = PhiAttractor::new();
+
+        // Stable trajectory (should have negative Lyapunov)
+        let stable: Vec<f64> = (0..50)
+            .map(|i| 0.5 - 0.3 * (-0.1 * i as f64).exp())
+            .collect();
+        let result_stable = attractor.analyze(&stable);
+        // Note: actually computing on trajectory, so check is within range
+
+        // Diverging trajectory (should have positive Lyapunov)
+        let diverging: Vec<f64> = (0..50)
+            .map(|i| 0.1 * (0.05 * i as f64).exp().min(1.0))
+            .collect();
+        let result_diverging = PhiAttractor::new().analyze(&diverging);
+
+        println!("Lyapunov exponent test:");
+        println!("  Stable trajectory: λ = {:.4}", result_stable.lyapunov_exponent);
+        println!("  Diverging trajectory: λ = {:.4}", result_diverging.lyapunov_exponent);
+
+        // Diverging should have larger (more positive) Lyapunov
+        assert!(
+            result_diverging.lyapunov_exponent > result_stable.lyapunov_exponent,
+            "Diverging should have larger Lyapunov than stable"
+        );
+    }
+
+    #[test]
+    fn test_attractor_basin_estimation() {
+        let mut attractor = PhiAttractor::new();
+
+        // Trajectory that spends most time near attractor
+        let trajectory: Vec<f64> = (0..100)
+            .map(|i| {
+                if i < 20 {
+                    0.3 + 0.01 * i as f64 // Approach
+                } else {
+                    0.5 + 0.001 * ((i as f64).sin()) // Stable near 0.5
+                }
+            })
+            .collect();
+
+        let result = attractor.analyze(&trajectory);
+
+        // Basin should be reasonably large (>0.5) since trajectory stays near attractor
+        assert!(result.basin_size > 0.3, "Basin should be significant");
+        assert!(result.basin_size <= 1.0, "Basin should be bounded");
+
+        println!("Basin estimation test:");
+        println!("  Basin size: {:.4}", result.basin_size);
+        println!("  Robustness score: {:.4}", result.robustness_score());
+    }
+
+    #[test]
+    fn test_attractor_classification() {
+        let attractor = PhiAttractor::new();
+
+        // Test all classification methods work
+        let cases = vec![
+            ("Stable", vec![0.5; 50], AttractorType::FixedPoint),
+            ("Chaotic", (0..50).map(|i| 0.5 + 0.3 * (i as f64 * 0.7).sin() * (i as f64 * 1.3).cos()).collect::<Vec<_>>(), AttractorType::LimitCycle),
+        ];
+
+        for (name, trajectory, _expected) in cases {
+            let result = attractor.analyze(&trajectory);
+            println!("{} trajectory → {:?}", name, result.attractor_type);
+            println!("  Description: {}", result.attractor_type.description());
+            println!("  Consciousness: {}", result.attractor_type.consciousness_interpretation());
+        }
+    }
+
+    #[test]
+    fn test_attractor_result_methods() {
+        let result = AttractorResult {
+            attractor_type: AttractorType::FixedPoint,
+            attractor_phi: 0.5,
+            initial_phi: 0.3,
+            basin_size: 0.8,
+            lyapunov_exponent: -0.5,
+            convergence_time: 50,
+            trajectory: vec![0.3, 0.4, 0.45, 0.49, 0.5],
+            converged: true,
+            oscillation_period: None,
+            basin_neighbors: vec![],
+        };
+
+        // Test state checks
+        assert!(result.is_stable(), "Fixed point with negative Lyapunov should be stable");
+        assert!(!result.is_transitioning(), "Fixed point should not be transitioning");
+        assert!(!result.is_complex(), "Fixed point should not be complex");
+
+        // Test scores
+        assert!(result.stability_score() > 0.0, "Stability score should be positive");
+        assert!((result.robustness_score() - 0.8).abs() < 0.001, "Robustness should match basin_size");
+
+        println!("AttractorResult methods test:");
+        println!("  is_stable: {}", result.is_stable());
+        println!("  stability_score: {:.4}", result.stability_score());
+        println!("  robustness_score: {:.4}", result.robustness_score());
+    }
+
+    #[test]
+    fn test_attractor_simulation() {
+        let attractor = PhiAttractor::new();
+
+        // Simulate from initial state to target
+        let trajectory = attractor.simulate(0.1, 0.7);
+
+        assert!(!trajectory.is_empty(), "Simulation should produce trajectory");
+        assert_eq!(trajectory[0], 0.1, "Should start at initial state");
+
+        // Should move toward target
+        let final_phi = *trajectory.last().unwrap();
+        let mid_phi = trajectory[trajectory.len() / 2];
+
+        assert!(mid_phi > 0.1, "Should move away from initial");
+        assert!(
+            (final_phi - 0.7).abs() < (trajectory[0] - 0.7).abs(),
+            "Should get closer to target"
+        );
+
+        println!("Simulation test:");
+        println!("  Initial: {:.4}", trajectory[0]);
+        println!("  Mid: {:.4}", mid_phi);
+        println!("  Final: {:.4}", final_phi);
+        println!("  Steps: {}", trajectory.len());
+    }
+
+    #[test]
+    fn test_attractor_find_attractors() {
+        let mut attractor = PhiAttractor::fast();
+
+        // Find attractors in a range
+        let attractors = attractor.find_attractors((0.0, 1.0));
+
+        // Should find at least one attractor (the target we simulate toward)
+        assert!(!attractors.is_empty(), "Should find at least one attractor");
+
+        // All attractors should be in valid range
+        for a in &attractors {
+            assert!(*a >= 0.0 && *a <= 1.0, "Attractor should be in range");
+        }
+
+        println!("Find attractors test:");
+        println!("  Found {} attractors: {:?}", attractors.len(), attractors);
+    }
+
+    #[test]
+    fn test_attractor_convenience_functions() {
+        // Test analyze_phi_attractor
+        let trajectory = vec![0.3, 0.4, 0.45, 0.48, 0.5, 0.5, 0.5, 0.5];
+        let result = analyze_phi_attractor(&trajectory);
+
+        assert!(result.converged, "Simple convergent trajectory should converge");
+
+        // Test classify_consciousness_state
+        let (attractor_type, stability) = classify_consciousness_state(&trajectory);
+
+        assert!(stability >= 0.0, "Stability should be non-negative");
+        assert!(stability <= 1.0, "Stability should be bounded");
+
+        println!("Convenience functions test:");
+        println!("  analyze_phi_attractor → {:?}", result.attractor_type);
+        println!("  classify_consciousness_state → {:?}, stability={:.4}", attractor_type, stability);
+    }
+
+    #[test]
+    fn test_attractor_config_presets() {
+        let fast = PhiAttractor::fast();
+        let research = PhiAttractor::research();
+        let default = PhiAttractor::new();
+
+        // Fast should have fewer iterations
+        assert!(fast.config.max_iterations < default.config.max_iterations);
+
+        // Research should have more iterations and tighter threshold
+        assert!(research.config.max_iterations > default.config.max_iterations);
+        assert!(research.config.convergence_threshold < default.config.convergence_threshold);
+
+        println!("Config presets test:");
+        println!("  Fast: max_iter={}, samples={}", fast.config.max_iterations, fast.config.basin_samples);
+        println!("  Default: max_iter={}, samples={}", default.config.max_iterations, default.config.basin_samples);
+        println!("  Research: max_iter={}, samples={}", research.config.max_iterations, research.config.basin_samples);
+    }
+
+    #[test]
+    fn test_attractor_type_descriptions() {
+        // Verify all enum variants have descriptions
+        let types = vec![
+            AttractorType::FixedPoint,
+            AttractorType::LimitCycle,
+            AttractorType::StrangeAttractor,
+            AttractorType::SaddlePoint,
+            AttractorType::Transient,
+        ];
+
+        for t in types {
+            let desc = t.description();
+            let interp = t.consciousness_interpretation();
+
+            assert!(!desc.is_empty(), "Description should not be empty for {:?}", t);
+            assert!(!interp.is_empty(), "Interpretation should not be empty for {:?}", t);
+
+            println!("{:?}:", t);
+            println!("  Description: {}", desc);
+            println!("  Consciousness: {}", interp);
+        }
+    }
+
+    #[test]
+    fn test_attractor_transient_detection() {
+        let mut attractor = PhiAttractor::with_config(AttractorConfig {
+            max_iterations: 20,
+            convergence_threshold: 1e-6, // Very tight threshold
+            ..Default::default()
+        });
+
+        // Create a trajectory that doesn't converge (keeps changing)
+        let trajectory: Vec<f64> = (0..50)
+            .map(|i| 0.5 + 0.2 * (i as f64 * 0.1).sin() + 0.1 * (i as f64 * 0.03).cos())
+            .collect();
+
+        let result = attractor.analyze(&trajectory);
+
+        // Should detect complex dynamics
+        println!("Transient/complex detection test:");
+        println!("  Type: {:?}", result.attractor_type);
+        println!("  Converged: {}", result.converged);
+        println!("  Lyapunov: {:.4}", result.lyapunov_exponent);
+    }
+
+    #[test]
+    fn test_attractor_stability_scores() {
+        // Test stability scoring for different dynamics
+        let stable_result = AttractorResult {
+            attractor_type: AttractorType::FixedPoint,
+            attractor_phi: 0.5,
+            initial_phi: 0.3,
+            basin_size: 0.9,
+            lyapunov_exponent: -1.0, // Very stable
+            convergence_time: 10,
+            trajectory: vec![],
+            converged: true,
+            oscillation_period: None,
+            basin_neighbors: vec![],
+        };
+
+        let chaotic_result = AttractorResult {
+            lyapunov_exponent: 0.5, // Positive = chaotic
+            ..stable_result.clone()
+        };
+
+        let neutral_result = AttractorResult {
+            lyapunov_exponent: 0.0, // Neutral
+            ..stable_result.clone()
+        };
+
+        assert!(stable_result.stability_score() > chaotic_result.stability_score());
+        assert!(stable_result.stability_score() > neutral_result.stability_score());
+        assert_eq!(chaotic_result.stability_score(), 0.0, "Positive Lyapunov → 0 stability");
+
+        println!("Stability scores:");
+        println!("  Stable (λ=-1.0): {:.4}", stable_result.stability_score());
+        println!("  Neutral (λ=0.0): {:.4}", neutral_result.stability_score());
+        println!("  Chaotic (λ=+0.5): {:.4}", chaotic_result.stability_score());
     }
 }

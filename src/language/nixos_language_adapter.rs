@@ -1509,6 +1509,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "performance test - run with cargo test --release"]
     fn benchmark_nixos_adapter() {
         use std::time::Instant;
 

@@ -20,6 +20,8 @@
 | **pyphi_validation.rs Example** | ✅ Complete | Restored from .archive-broken/ |
 | **Analysis Framework** | ✅ Complete | analyze_pyphi_results.py (419 lines) ready |
 | **Results Template** | ✅ Complete | ENHANCEMENT_8_WEEK_4_VALIDATION_RESULTS_TEMPLATE.md |
+| **Synthesis Module Export** | ✅ Complete | Uncommented pub mod synthesis in src/lib.rs |
+| **RealHV Import Fix** | ✅ Complete | Added use crate::hdc::real_hv::RealHV to tiered_phi.rs |
 
 ### 🟡 In Progress
 
