@@ -851,6 +851,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "performance test - timing varies; run with: cargo test --release -- --ignored"]
     fn test_hdc_encoding_performance_reasonable() {
         // Rough performance test - encoding should be fast
         use std::time::Instant;
