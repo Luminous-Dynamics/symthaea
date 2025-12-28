@@ -23,8 +23,6 @@ Integration Points:
 - Used by Prefrontal for coalition formation confidence
 */
 
-use anyhow::Result;
-
 /// Epistemic tier for empirical verification (from Epistemic Charter v2.0)
 /// Maps directly to E-axis of the Epistemic Cube
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

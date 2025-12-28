@@ -46,7 +46,6 @@ The system resonates to a fixed point that satisfies all constraints!
 - Plate (1995) "Holographic Reduced Representations"
 */
 
-use super::{HDC_DIMENSION, HdcContext};
 use anyhow::Result;
 use std::collections::HashMap;
 

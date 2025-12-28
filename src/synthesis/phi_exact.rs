@@ -15,6 +15,9 @@
 use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
 use crate::synthesis::SynthesisError;
 
+#[cfg(feature = "pyphi")]
+use pyo3::{Bound, PyAny, Python};
+
 /// Bridge to PyPhi for exact IIT 3.0 Φ calculation
 ///
 /// # Prerequisites
@@ -93,7 +96,7 @@ impl PyPhiValidator {
         topology: &ConsciousnessTopology,
     ) -> Result<f64, SynthesisError> {
         use pyo3::prelude::*;
-        use pyo3::types::{PyList, PyTuple};
+        use pyo3::types::{PyList, PyTuple, PyAnyMethods, PyListMethods};
 
         let n = topology.node_representations.len();
 
@@ -107,7 +110,7 @@ impl PyPhiValidator {
 
         Python::with_gil(|py| {
             // Import PyPhi
-            let pyphi = py.import("pyphi")
+            let pyphi = py.import_bound("pyphi")
                 .map_err(|e| SynthesisError::PyPhiImportError {
                     message: format!("Failed to import pyphi: {}. Install with: pip install pyphi", e),
                 })?;
@@ -122,7 +125,7 @@ impl PyPhiValidator {
                 })?;
 
             // Create initial state (all zeros)
-            let state = PyTuple::new(py, vec![0; n]);
+            let state = PyTuple::new_bound(py, vec![0; n]);
 
             // Compute SIA (System Irreducibility Analysis)
             let compute = pyphi.getattr("compute")
@@ -154,12 +157,12 @@ impl PyPhiValidator {
     /// Returns: (TPM, CM) where:
     /// - TPM (Transition Probability Matrix): [2^n][n][2] - probability distributions
     /// - CM (Connectivity Matrix): [n][n] - binary adjacency matrix
-    fn topology_to_pyphi_format(
+    fn topology_to_pyphi_format<'py>(
         &self,
         topology: &ConsciousnessTopology,
-        py: Python,
-    ) -> Result<(Py<PyAny>, Py<PyAny>), SynthesisError> {
-        use pyo3::types::PyList;
+        py: Python<'py>,
+    ) -> Result<(Bound<'py, PyAny>, Bound<'py, PyAny>), SynthesisError> {
+        use pyo3::types::{PyList, PyListMethods};
 
         let n = topology.node_representations.len();
 
@@ -178,20 +181,24 @@ impl PyPhiValidator {
         }
 
         // Convert to Python list
-        let cm = PyList::empty(py);
+        let cm = PyList::empty_bound(py);
         for row in &cm_data {
-            let py_row = PyList::empty(py);
+            let py_row = PyList::empty_bound(py);
             for &val in row {
-                py_row.append(val)?;
+                py_row.append(val).map_err(|e| SynthesisError::PyPhiComputationError {
+                    message: format!("Failed to append to Python list: {}", e),
+                })?;
             }
-            cm.append(py_row)?;
+            cm.append(py_row).map_err(|e| SynthesisError::PyPhiComputationError {
+                message: format!("Failed to append row to connectivity matrix: {}", e),
+            })?;
         }
 
         // Build TPM (Transition Probability Matrix)
         // Simplified approach: Use connectivity to determine state transitions
         let tpm = self.build_transition_probability_matrix(&cm_data, py)?;
 
-        Ok((tpm.into(), cm.into()))
+        Ok((tpm.into_any(), cm.into_any()))
     }
 
     /// Build transition probability matrix for PyPhi
@@ -202,20 +209,20 @@ impl PyPhiValidator {
     /// - Third index: [P(OFF), P(ON)] in next state
     ///
     /// Simplified model: Each node is influenced by its neighbors
-    fn build_transition_probability_matrix(
+    fn build_transition_probability_matrix<'py>(
         &self,
         cm: &[Vec<u8>],
-        py: Python,
-    ) -> Result<Py<PyAny>, SynthesisError> {
-        use pyo3::types::PyList;
+        py: Python<'py>,
+    ) -> Result<Bound<'py, PyAny>, SynthesisError> {
+        use pyo3::types::{PyList, PyListMethods};
 
         let n = cm.len();
         let num_states = 1 << n; // 2^n possible states
 
-        let tpm = PyList::empty(py);
+        let tpm = PyList::empty_bound(py);
 
         for state in 0..num_states {
-            let state_tpm = PyList::empty(py);
+            let state_tpm = PyList::empty_bound(py);
 
             for node in 0..n {
                 // Compute probability node is ON in next state
@@ -241,17 +248,25 @@ impl PyPhiValidator {
                 p_on = p_on.clamp(0.0, 1.0);
 
                 // Create [P(OFF), P(ON)] pair
-                let node_dist = PyList::empty(py);
-                node_dist.append(1.0 - p_on)?;
-                node_dist.append(p_on)?;
+                let node_dist = PyList::empty_bound(py);
+                node_dist.append(1.0 - p_on).map_err(|e| SynthesisError::PyPhiComputationError {
+                    message: format!("Failed to append P(OFF) to node distribution: {}", e),
+                })?;
+                node_dist.append(p_on).map_err(|e| SynthesisError::PyPhiComputationError {
+                    message: format!("Failed to append P(ON) to node distribution: {}", e),
+                })?;
 
-                state_tpm.append(node_dist)?;
+                state_tpm.append(node_dist).map_err(|e| SynthesisError::PyPhiComputationError {
+                    message: format!("Failed to append node distribution to state TPM: {}", e),
+                })?;
             }
 
-            tpm.append(state_tpm)?;
+            tpm.append(state_tpm).map_err(|e| SynthesisError::PyPhiComputationError {
+                message: format!("Failed to append state TPM to full TPM: {}", e),
+            })?;
         }
 
-        Ok(tpm.into())
+        Ok(tpm.into_any())
     }
 }
 

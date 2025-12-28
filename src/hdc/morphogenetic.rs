@@ -38,8 +38,6 @@ context, just like a cell regenerates from its tissue environment.
 use anyhow::Result;
 use std::collections::HashMap;
 
-use super::HDC_DIMENSION;
-
 /// Default number of neighbors for position encoding
 pub const DEFAULT_NEIGHBORHOOD_SIZE: usize = 8;
 

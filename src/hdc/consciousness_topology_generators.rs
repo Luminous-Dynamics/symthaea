@@ -7,7 +7,6 @@
 /// representation encodes its connections to other nodes via RealHV operations.
 
 use super::real_hv::RealHV;
-use std::collections::HashMap;
 
 /// A consciousness topology represented with RealHV
 #[derive(Clone, Debug)]

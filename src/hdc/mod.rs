@@ -252,6 +252,7 @@ pub mod phi_real;                          // RealHV Φ calculator (no binarizat
 pub mod phi_resonant;                      // Resonator-based Φ calculator (O(n log N) dynamics)
 pub mod binary_hv;                         // Binary hypervector operations (HV16)
 pub mod primitive_system;                  // Ontological primitives system with 7 semantic domains
+pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
 
 // Track 6: Consciousness integration for awakening module
 pub mod substrate_independence;            // Substrate type definitions
