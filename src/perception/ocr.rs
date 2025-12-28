@@ -118,7 +118,7 @@ impl RustOcrEngine {
     }
 
     /// Recognize text from an image
-    pub fn recognize(&self, image: &DynamicImage) -> Result<OcrResult> {
+    pub fn recognize(&self, _image: &DynamicImage) -> Result<OcrResult> {
         if !self.initialized {
             anyhow::bail!("OCR engine not initialized. Call initialize() first.");
         }
@@ -182,7 +182,7 @@ impl TesseractEngine {
     }
 
     /// Recognize text using Tesseract
-    pub fn recognize(&self, image: &DynamicImage) -> Result<OcrResult> {
+    pub fn recognize(&self, _image: &DynamicImage) -> Result<OcrResult> {
         if !self.available {
             anyhow::bail!("Tesseract not available on system");
         }

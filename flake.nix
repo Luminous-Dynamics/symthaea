@@ -122,6 +122,9 @@
 
             # Tell Rust linker where to find BLAS libraries
             export RUSTFLAGS="-C link-arg=-L${pkgs.openblas}/lib -C link-arg=-lopenblas"
+
+            # Add user site-packages to PYTHONPATH for PyPhi dependencies (graphillion, tblib)
+            export PYTHONPATH="$HOME/.local/lib/python3.11/site-packages:$PYTHONPATH"
           '';
 
           # Prevent cargo from using vendored OpenSSL

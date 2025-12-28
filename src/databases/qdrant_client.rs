@@ -23,7 +23,7 @@
 //! - **#25 Binding**: Pattern matching for feature binding
 //! - **#23 Workspace**: Quick retrieval for global workspace access
 
-use super::{ConsciousnessDatabase, DbResult, MemoryRecord, MemoryType, SearchResult};
+use super::{ConsciousnessDatabase, DbResult, MemoryRecord, SearchResult};
 use crate::hdc::binary_hv::HV16;
 use async_trait::async_trait;
 

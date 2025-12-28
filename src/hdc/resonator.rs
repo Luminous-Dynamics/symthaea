@@ -311,7 +311,7 @@ impl ResonatorNetwork {
             .collect();
         normalize(&mut estimate);
 
-        let mut _previous = estimate.clone();
+        let mut previous = estimate.clone();
         let mut velocity = vec![0.0f32; self.dimension];
 
         for iteration in 0..max_iterations {

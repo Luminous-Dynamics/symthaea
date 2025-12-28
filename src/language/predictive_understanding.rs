@@ -541,8 +541,8 @@ impl PredictiveUnderstanding {
                 // New belief = old belief + learning_rate * precision * error_direction
                 // In HDC: bundle current belief with error-corrected prediction
 
-                let prediction = &self.predictions[level];
-                let weight = (error.precision * learning_rate).min(1.0);
+                let _prediction = &self.predictions[level];
+                let _weight = (error.precision * learning_rate).min(1.0);
 
                 // Weighted bundle towards observation
                 // More error = move belief more towards observation
@@ -561,7 +561,7 @@ impl PredictiveUnderstanding {
     pub fn compute_free_energy(&self) -> f64 {
         let mut total_fe = 0.0;
 
-        for (level, error) in &self.errors {
+        for (_level, error) in &self.errors {
             // F = precision * prediction_error² + complexity_penalty
             // Simplified: F = weighted_error + log(precision)
             total_fe += error.weighted_error;

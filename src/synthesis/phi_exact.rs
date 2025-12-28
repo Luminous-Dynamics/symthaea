@@ -109,14 +109,42 @@ impl PyPhiValidator {
         }
 
         Python::with_gil(|py| {
-            // Import PyPhi
+            // Import PyPhi and NumPy
             let pyphi = py.import_bound("pyphi")
                 .map_err(|e| SynthesisError::PyPhiImportError {
                     message: format!("Failed to import pyphi: {}. Install with: pip install pyphi", e),
                 })?;
 
+            // Configure PyPhi for IIT 3.0 (CRITICAL!)
+            let config = pyphi.getattr("config")
+                .map_err(|e| SynthesisError::PyPhiImportError {
+                    message: format!("Failed to access pyphi.config: {}", e),
+                })?;
+
+            // Set partition scheme to DIRECTED_BI for IIT 3.0
+            config.setattr("SYSTEM_CUTS", "DIRECTED_BI")
+                .map_err(|e| SynthesisError::PyPhiComputationError {
+                    message: format!("Failed to configure PyPhi SYSTEM_CUTS: {}", e),
+                })?;
+
+            let np = py.import_bound("numpy")
+                .map_err(|e| SynthesisError::PyPhiImportError {
+                    message: format!("Failed to import numpy: {}. Install with: pip install numpy", e),
+                })?;
+
             // Convert topology to PyPhi format (TPM + CM)
-            let (tpm, cm) = self.topology_to_pyphi_format(topology, py)?;
+            let (tpm_list, cm_list) = self.topology_to_pyphi_format(topology, py)?;
+
+            // Convert Python lists to NumPy arrays (PyPhi requirement)
+            let tpm = np.call_method1("array", (tpm_list,))
+                .map_err(|e| SynthesisError::PyPhiComputationError {
+                    message: format!("Failed to convert TPM to NumPy array: {}", e),
+                })?;
+
+            let cm = np.call_method1("array", (cm_list,))
+                .map_err(|e| SynthesisError::PyPhiComputationError {
+                    message: format!("Failed to convert CM to NumPy array: {}", e),
+                })?;
 
             // Create PyPhi network
             let network = pyphi.call_method1("Network", (tpm, cm))
@@ -203,12 +231,13 @@ impl PyPhiValidator {
 
     /// Build transition probability matrix for PyPhi
     ///
-    /// TPM format: [2^n][n][2] where:
+    /// TPM format: [2^n][n] where:
     /// - First index: Current state (binary encoding)
     /// - Second index: Node
-    /// - Third index: [P(OFF), P(ON)] in next state
+    /// - Value: 0 or 1 (deterministic next state for that node)
     ///
-    /// Simplified model: Each node is influenced by its neighbors
+    /// PyPhi requires DETERMINISTIC TPMs, not probabilistic.
+    /// Simplified model: Each node follows majority rule of its neighbors
     fn build_transition_probability_matrix<'py>(
         &self,
         cm: &[Vec<u8>],
@@ -225,39 +254,33 @@ impl PyPhiValidator {
             let state_tpm = PyList::empty_bound(py);
 
             for node in 0..n {
-                // Compute probability node is ON in next state
-                let mut p_on = 0.3; // Base probability (slightly favor OFF)
-
                 // Count active neighbors
                 let mut active_neighbors = 0;
+                let mut total_neighbors = 0;
+
                 for neighbor in 0..n {
                     if cm[node][neighbor] == 1 {
+                        total_neighbors += 1;
                         if (state >> neighbor) & 1 == 1 {
                             active_neighbors += 1;
                         }
                     }
                 }
 
-                // Increase probability based on active neighbors
-                let degree = cm[node].iter().sum::<u8>() as f64;
-                if degree > 0.0 {
-                    p_on += (active_neighbors as f64 / degree) * 0.5;
-                }
+                // Deterministic rule: Node is ON if majority of neighbors are ON
+                // If no neighbors, stay OFF
+                let next_state = if total_neighbors > 0 {
+                    if active_neighbors * 2 > total_neighbors {
+                        1  // Majority ON → turn ON
+                    } else {
+                        0  // Majority OFF or tie → turn OFF
+                    }
+                } else {
+                    0  // No neighbors → stay OFF
+                };
 
-                // Clamp to [0, 1]
-                p_on = p_on.clamp(0.0, 1.0);
-
-                // Create [P(OFF), P(ON)] pair
-                let node_dist = PyList::empty_bound(py);
-                node_dist.append(1.0 - p_on).map_err(|e| SynthesisError::PyPhiComputationError {
-                    message: format!("Failed to append P(OFF) to node distribution: {}", e),
-                })?;
-                node_dist.append(p_on).map_err(|e| SynthesisError::PyPhiComputationError {
-                    message: format!("Failed to append P(ON) to node distribution: {}", e),
-                })?;
-
-                state_tpm.append(node_dist).map_err(|e| SynthesisError::PyPhiComputationError {
-                    message: format!("Failed to append node distribution to state TPM: {}", e),
+                state_tpm.append(next_state).map_err(|e| SynthesisError::PyPhiComputationError {
+                    message: format!("Failed to append next state to state TPM: {}", e),
                 })?;
             }
 

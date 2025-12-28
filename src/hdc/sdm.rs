@@ -342,7 +342,7 @@ impl SparseDistributedMemory {
                     1.0
                 };
 
-                total_weight += weight;
+                _total_weight += weight;
 
                 for (i, &counter) in loc.counters.iter().enumerate() {
                     total_counters[i] += (counter as f64 * weight) as i64;

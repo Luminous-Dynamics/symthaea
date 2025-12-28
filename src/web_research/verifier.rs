@@ -352,7 +352,7 @@ impl EpistemicVerifier {
         evidence: &[Evidence],
         contradictions: &[Contradiction],
         confidence: f64,
-        level: VerificationLevel,
+        _level: VerificationLevel,
     ) -> EpistemicStatus {
         // No evidence = unverifiable
         if evidence.is_empty() {

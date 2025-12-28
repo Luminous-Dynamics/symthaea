@@ -4647,9 +4647,9 @@ impl PhiCausalAnalyzer {
 
         for node_idx in 0..n {
             let mut node_interventions = Vec::new();
-            let mut _knockout_delta = 0.0;
-            let mut _amplify_delta = 0.0;
-            let mut _dampen_delta = 0.0;
+            let mut knockout_delta = 0.0;
+            let mut amplify_delta = 0.0;
+            let mut dampen_delta = 0.0;
 
             // Knockout
             let knockout_result = self.test_intervention(

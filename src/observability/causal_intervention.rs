@@ -25,14 +25,11 @@
 // - Safety analysis for system changes
 // - Optimal intervention selection
 
-use super::{
-    causal_graph::{CausalGraph, CausalEdge, CausalNode, EdgeType},
-    probabilistic_inference::{
-        ProbabilisticCausalGraph, ProbabilisticEdge, ProbabilisticPrediction,
+use super::probabilistic_inference::{
+        ProbabilisticCausalGraph, ProbabilisticPrediction,
         UncertaintySource,
-    },
-};
-use std::collections::{HashMap, HashSet};
+    };
+use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
 /// Type of intervention on a causal node
@@ -282,7 +279,7 @@ impl CausalInterventionEngine {
             modified.remove_incoming_edges(node);
 
             // Set intervention value
-            let value = match intervention {
+            let _value = match intervention {
                 InterventionType::SetValue(v) => *v,
                 InterventionType::Enable => 1.0,
                 InterventionType::Disable => 0.0,

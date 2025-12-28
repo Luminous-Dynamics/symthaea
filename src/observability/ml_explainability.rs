@@ -44,15 +44,15 @@
 // Fixed: Use re-exported types from observability module to avoid import conflicts
 use crate::observability::{
     CausalGraph, CausalEdge, EdgeType,
-    ProbabilisticCausalGraph, ProbabilisticEdge,
-    CausalInterventionEngine, InterventionSpec,
-    CounterfactualEngine, CounterfactualQuery, CounterfactualResult,
+    ProbabilisticCausalGraph,
+    CausalInterventionEngine,
+    CounterfactualEngine,
     ExplanationGenerator,
-    StreamingCausalAnalyzer, StreamingConfig, CausalInsight,
+    StreamingCausalAnalyzer, StreamingConfig,
     Event, EventMetadata,
 };
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::time::Instant;
 use serde::{Deserialize, Serialize};
 
@@ -243,7 +243,7 @@ impl MLModelObserver {
 
         // Build initial causal graph edges
         // Input → Activation edges
-        for (input_name, &input_val) in &observation.inputs {
+        for (input_name, &_input_val) in &observation.inputs {
             for (activation_name, &activation_val) in &observation.activations {
                 // Check if there's correlation
                 if self.compute_correlation(input_name, activation_name) > self.config.correlation_threshold {
@@ -259,7 +259,7 @@ impl MLModelObserver {
         }
 
         // Activation → Output edges
-        for (activation_name, &activation_val) in &observation.activations {
+        for (activation_name, &_activation_val) in &observation.activations {
             for (output_name, &output_val) in &observation.outputs {
                 if self.compute_correlation(activation_name, output_name) > self.config.correlation_threshold {
                     self.prob_graph.observe_edge(

@@ -25,7 +25,6 @@ use super::{
 use std::collections::{VecDeque, HashMap};
 use std::time::Duration;
 use serde::{Serialize, Deserialize};
-use chrono::Utc;
 
 /// Configuration for streaming causal analyzer
 #[derive(Debug, Clone, Serialize, Deserialize)]

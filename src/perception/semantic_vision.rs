@@ -201,7 +201,7 @@ impl MoondreamModel {
     }
 
     /// Generate a caption for an image
-    pub fn caption_image(&self, image: &DynamicImage) -> Result<ImageCaption> {
+    pub fn caption_image(&self, _image: &DynamicImage) -> Result<ImageCaption> {
         if !self.initialized {
             anyhow::bail!("Moondream model not initialized. Call initialize() first.");
         }
@@ -215,7 +215,7 @@ impl MoondreamModel {
     }
 
     /// Answer a question about an image
-    pub fn answer_question(&self, image: &DynamicImage, question: &str) -> Result<VqaResponse> {
+    pub fn answer_question(&self, _image: &DynamicImage, question: &str) -> Result<VqaResponse> {
         if !self.initialized {
             anyhow::bail!("Moondream model not initialized. Call initialize() first.");
         }

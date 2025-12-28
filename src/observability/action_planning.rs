@@ -26,13 +26,12 @@
 // - Constraint satisfaction
 
 use super::{
-    causal_graph::EdgeType,
     probabilistic_inference::ProbabilisticCausalGraph,
     causal_intervention::{
-        CausalInterventionEngine, InterventionSpec, InterventionType, InterventionResult,
+        CausalInterventionEngine, InterventionType, InterventionResult,
     },
 };
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
 /// Goal specification for planning
@@ -320,7 +319,7 @@ impl ActionPlanner {
         goal: &Goal,
         candidates: &[String],
         current_value: f64,
-        step: usize,
+        _depth: usize,
     ) -> Option<(String, InterventionResult, f64)> {
         let mut best: Option<(String, InterventionResult, f64, f64)> = None;
 

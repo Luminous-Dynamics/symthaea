@@ -181,12 +181,12 @@ impl SymthaeaObserver for TelemetryObserver {
         Ok(())
     }
 
-    fn record_primitive_activation(&mut self, event: PrimitiveActivationEvent) -> Result<()> {
+    fn record_primitive_activation(&mut self, _event: PrimitiveActivationEvent) -> Result<()> {
         self.stats.increment_event("primitive_activation");
         Ok(())
     }
 
-    fn record_response_generated(&mut self, event: ResponseGeneratedEvent) -> Result<()> {
+    fn record_response_generated(&mut self, _event: ResponseGeneratedEvent) -> Result<()> {
         self.stats.increment_event("response_generated");
         Ok(())
     }
@@ -203,7 +203,7 @@ impl SymthaeaObserver for TelemetryObserver {
         Ok(())
     }
 
-    fn record_error(&mut self, event: ErrorEvent) -> Result<()> {
+    fn record_error(&mut self, _event: ErrorEvent) -> Result<()> {
         self.stats.increment_event("error");
         Ok(())
     }
