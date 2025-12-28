@@ -4,7 +4,9 @@
  * Use this when you don't want observability overhead.
  */
 
+#[allow(unused_imports)]
 use super::{SymthaeaObserver, types::*, ObserverStats};
+#[allow(unused_imports)]
 use anyhow::Result;
 
 /// Observer that does nothing (zero overhead)

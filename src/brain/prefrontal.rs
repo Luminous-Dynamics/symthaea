@@ -57,10 +57,15 @@
 //! The system doesn't "decide" what to focus on - the modules compete,
 //! and consciousness is what happens when one wins.
 
+#[allow(unused_imports)]
 use serde::{Deserialize, Serialize};
+#[allow(unused_imports)]
 use std::collections::{HashMap, VecDeque};
+#[allow(unused_imports)]
 use std::time::{SystemTime, UNIX_EPOCH};
+#[allow(unused_imports)]
 use std::sync::Arc;
+#[allow(unused_imports)]
 use uuid::Uuid;
 
 use crate::memory::EmotionalValence;

@@ -12,8 +12,11 @@
 //! Revolutionary feature: First AI with authentic sleep cycles for memory consolidation
 
 use std::time::Instant;
+#[allow(unused_imports)]
 use std::collections::VecDeque;
+#[allow(unused_imports)]
 use std::sync::Arc;
+#[allow(unused_imports)]
 use crate::brain::prefrontal::{AttentionBid, Coalition, WorkingMemoryItem};
 
 /// Sleep states mirroring biological sleep architecture
