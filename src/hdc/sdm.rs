@@ -1007,6 +1007,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "performance test - run with cargo test --release"]
     fn test_sdm_performance() {
         // Performance test - validates SDM can handle batch operations
         // Debug mode is significantly slower due to bounds checking and no optimizations
