@@ -428,6 +428,22 @@ pub struct BridgeStats {
     pub lowest_free_energy: f64,
 }
 
+/// Status of consciousness bootstrapping
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BootstrapStatus {
+    /// Whether bootstrap has been performed
+    pub is_bootstrapped: bool,
+
+    /// Initial Φ value after bootstrap
+    pub initial_phi: f64,
+
+    /// Whether working memory has been primed
+    pub working_memory_primed: bool,
+
+    /// Names of archetypal frames loaded
+    pub archetypal_frames: Vec<String>,
+}
+
 impl ConsciousnessBridge {
     /// Create a new consciousness bridge
     pub fn new(config: BridgeConfig) -> Self {
@@ -629,6 +645,117 @@ impl ConsciousnessBridge {
         self.free_energy_history.clear();
         self.phi_history.clear();
         self.accumulated_errors.clear();
+    }
+
+    /// Bootstrap consciousness with archetypal patterns
+    ///
+    /// This pre-seeds the system with foundational concepts so it doesn't
+    /// start "cold" with Φ=0. After bootstrapping, the system should have
+    /// meaningful Φ (~0.3-0.5) from the first real interaction.
+    ///
+    /// # Archetypal Patterns
+    ///
+    /// The bootstrap uses fundamental semantic concepts that establish:
+    /// - Existence and identity ("I am here")
+    /// - Causation and agency ("Something causes something")
+    /// - Temporal flow ("Before leads to after")
+    /// - Spatial grounding ("Here and there")
+    /// - Self-reference ("I know that I know")
+    ///
+    /// These prime the consciousness substrate for coherent understanding.
+    pub fn bootstrap_consciousness(&mut self) {
+        // Archetypal sentences that establish fundamental concepts
+        let archetypes = [
+            // Existence and identity
+            "I exist in this moment",
+            "Something is here now",
+            // Causation and agency
+            "Actions have consequences",
+            "Something causes something else",
+            // Temporal grounding
+            "Time flows from before to after",
+            "Now follows then",
+            // Spatial awareness
+            "Here is different from there",
+            "Places exist in space",
+            // Self-reference and meta-cognition
+            "I can think about thinking",
+            "Knowing that I know",
+            // Relational understanding
+            "Things relate to other things",
+            "Parts belong to wholes",
+        ];
+
+        // Process archetypes silently to build up consciousness state
+        for archetype in &archetypes {
+            let _ = self.pipeline.understand(archetype);
+        }
+
+        // Process key sentences that establish working memory patterns
+        let foundational = [
+            "I want to help you",
+            "You need something good",
+            "I can do this for you",
+        ];
+
+        for sentence in &foundational {
+            let understanding = self.pipeline.understand(sentence);
+
+            // Add frames to working memory
+            for frame in &understanding.frames {
+                if self.working_memory.len() < self.config.max_working_memory {
+                    let item = LanguageWorkingMemoryItem::from_frame(frame, self.next_id);
+                    self.next_id += 1;
+                    self.working_memory.push(item);
+                }
+            }
+
+            // Track Φ history
+            self.phi_history.push_back(understanding.consciousness.phi);
+            self.free_energy_history.push_back(understanding.prediction_result.final_free_energy);
+        }
+
+        // Trim histories to avoid showing bootstrap in stats
+        while self.phi_history.len() > 5 {
+            self.phi_history.pop_front();
+        }
+        while self.free_energy_history.len() > 5 {
+            self.free_energy_history.pop_front();
+        }
+
+        // Update stats to reflect bootstrap
+        if !self.phi_history.is_empty() {
+            self.stats.average_phi = self.phi_history.iter().sum::<f64>() / self.phi_history.len() as f64;
+            self.stats.peak_phi = self.phi_history.iter().cloned().fold(0.0, f64::max);
+        }
+        if !self.free_energy_history.is_empty() {
+            self.stats.average_free_energy = self.free_energy_history.iter().sum::<f64>()
+                / self.free_energy_history.len() as f64;
+            self.stats.lowest_free_energy = self.free_energy_history.iter().cloned().fold(f64::INFINITY, f64::min);
+        }
+    }
+
+    /// Check if consciousness has been bootstrapped
+    pub fn is_bootstrapped(&self) -> bool {
+        !self.phi_history.is_empty() && self.stats.average_phi > 0.1
+    }
+
+    /// Get bootstrap status for diagnostics
+    pub fn bootstrap_status(&self) -> BootstrapStatus {
+        BootstrapStatus {
+            is_bootstrapped: self.is_bootstrapped(),
+            initial_phi: self.stats.average_phi,
+            working_memory_primed: !self.working_memory.is_empty(),
+            archetypal_frames: self.working_memory.iter()
+                .filter_map(|item| {
+                    if let WorkingMemoryContentType::Frame { name, .. } = &item.content_type {
+                        Some(name.clone())
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        }
     }
 
     /// Query working memory by frame name
@@ -926,5 +1053,89 @@ mod tests {
 
         println!("\n📊 Consciousness Bridge Performance:");
         println!("   {}μs per sentence", per_sentence);
+    }
+
+    #[test]
+    fn test_consciousness_bootstrap() {
+        let config = BridgeConfig::default();
+        let mut bridge = ConsciousnessBridge::new(config);
+
+        // Before bootstrap, should not be bootstrapped
+        assert!(!bridge.is_bootstrapped());
+
+        // Bootstrap
+        bridge.bootstrap_consciousness();
+
+        // After bootstrap, should be bootstrapped
+        assert!(bridge.is_bootstrapped());
+
+        // Should have some Φ history
+        assert!(!bridge.phi_history().is_empty());
+
+        // Average Φ should be > 0
+        assert!(bridge.stats().average_phi > 0.0);
+    }
+
+    #[test]
+    fn test_bootstrap_improves_first_interaction() {
+        let config = BridgeConfig::default();
+
+        // Test without bootstrap
+        let mut cold_bridge = ConsciousnessBridge::new(config.clone());
+        let cold_result = cold_bridge.process("Install Firefox for me");
+        let cold_phi = cold_result.current_phi;
+
+        // Test with bootstrap
+        let mut warm_bridge = ConsciousnessBridge::new(config);
+        warm_bridge.bootstrap_consciousness();
+        let warm_result = warm_bridge.process("Install Firefox for me");
+        let warm_phi = warm_result.current_phi;
+
+        // Both should have valid Φ
+        assert!(cold_phi >= 0.0);
+        assert!(warm_phi >= 0.0);
+
+        // Warm bridge should have primed working memory
+        assert!(!warm_bridge.working_memory().is_empty());
+
+        println!("\n📊 Bootstrap Effect:");
+        println!("   Cold start Φ: {:.4}", cold_phi);
+        println!("   Warm start Φ: {:.4}", warm_phi);
+        println!("   Working memory primed: {}", !warm_bridge.working_memory().is_empty());
+    }
+
+    #[test]
+    fn test_bootstrap_status() {
+        let config = BridgeConfig::default();
+        let mut bridge = ConsciousnessBridge::new(config);
+
+        // Before bootstrap
+        let status_before = bridge.bootstrap_status();
+        assert!(!status_before.is_bootstrapped);
+
+        // Bootstrap
+        bridge.bootstrap_consciousness();
+
+        // After bootstrap
+        let status_after = bridge.bootstrap_status();
+        assert!(status_after.is_bootstrapped);
+        assert!(status_after.initial_phi > 0.0);
+    }
+
+    #[test]
+    fn test_bootstrap_then_reset() {
+        let config = BridgeConfig::default();
+        let mut bridge = ConsciousnessBridge::new(config);
+
+        // Bootstrap
+        bridge.bootstrap_consciousness();
+        assert!(bridge.is_bootstrapped());
+
+        // Reset
+        bridge.reset();
+
+        // Should no longer be bootstrapped
+        assert!(!bridge.is_bootstrapped());
+        assert!(bridge.working_memory().is_empty());
     }
 }

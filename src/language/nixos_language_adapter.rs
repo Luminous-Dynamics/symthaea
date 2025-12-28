@@ -907,8 +907,15 @@ impl NixOSLanguageAdapter {
 
     /// Create a new adapter with custom configuration
     pub fn with_config(config: NixOSAdapterConfig) -> Self {
+        // Create and bootstrap the consciousness bridge
+        let mut bridge = ConsciousnessBridge::new(config.bridge_config.clone());
+
+        // Bootstrap consciousness so we don't start cold
+        // This pre-seeds with archetypal patterns for meaningful Φ from first interaction
+        bridge.bootstrap_consciousness();
+
         Self {
-            bridge: ConsciousnessBridge::new(config.bridge_config.clone()),
+            bridge,
             frame_library: NixOSFrameLibrary::new(),
             stats: NixOSAdapterStats::default(),
             config,
