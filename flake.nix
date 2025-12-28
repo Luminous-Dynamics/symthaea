@@ -44,7 +44,7 @@
             # Build system (PyPhi uses hatchling with hatch-vcs for version)
             build-system = with ps; [ hatchling hatch-vcs ];
 
-            # PyPhi dependencies
+            # PyPhi dependencies (from pip list when installed)
             dependencies = with ps; [
               numpy
               scipy
@@ -56,6 +56,8 @@
               pyyaml
               toolz
               tqdm
+              # graphillion - may not be in nixpkgs, will try
+              # tblib - may not be in nixpkgs, will try
             ];
 
             # Skip tests and checks during build (they require special setup)
