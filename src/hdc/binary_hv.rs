@@ -540,10 +540,12 @@ mod tests {
 
         let c = HV16::random(43);
         let dist = a.hamming_distance(&c);
-        assert!(dist > 900 && dist < 1100, "Random vectors ~1024 distance, got {}", dist);
+        // 16,384 bits: random vectors should have ~8192 distance (half)
+        assert!(dist > 7500 && dist < 8900, "Random vectors ~8192 distance, got {}", dist);
 
         let inv = a.invert();
-        assert_eq!(a.hamming_distance(&inv), 2048, "Inverted vector distance = 2048");
+        // 16,384 bits total
+        assert_eq!(a.hamming_distance(&inv), 16_384, "Inverted vector distance = 16,384");
     }
 
     #[test]
@@ -593,6 +595,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "performance test - run with cargo test --release"]
     fn test_benchmark_bind() {
         use std::time::Instant;
 
@@ -621,6 +624,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "performance test - run with cargo test --release"]
     fn test_benchmark_similarity() {
         use std::time::Instant;
 

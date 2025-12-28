@@ -723,8 +723,10 @@ mod tests {
 
     #[test]
     fn test_topology_to_hv16_components() {
-        // Create a small star topology
-        let topology = ConsciousnessTopology::star(5, 2048, 42);
+        use super::HDC_DIMENSION;
+
+        // Create a small star topology with standard HDC dimension
+        let topology = ConsciousnessTopology::star(5, HDC_DIMENSION, 42);
 
         // Convert to HV16 components
         let components = topology_to_hv16_components(&topology);
@@ -732,10 +734,10 @@ mod tests {
         // Should have 5 components (one per node)
         assert_eq!(components.len(), 5);
 
-        // Each should be valid HV16
+        // Each should be valid HV16 (16,384 bits = 2048 bytes)
         for comp in &components {
             let bytes = &comp.0;
-            assert_eq!(bytes.len(), 256, "HV16 should be 256 bytes");
+            assert_eq!(bytes.len(), 2048, "HV16 should be 2048 bytes (16,384 bits)");
         }
     }
 

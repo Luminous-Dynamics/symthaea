@@ -985,6 +985,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "performance test - run with cargo test --release"]
     fn test_performance_large_dimension() {
         use std::time::Instant;
 

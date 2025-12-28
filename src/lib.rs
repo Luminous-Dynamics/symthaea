@@ -33,9 +33,7 @@ pub mod perception;
 pub mod observability;
 
 // Enhancement #7 & #8: Causal Program Synthesis + Consciousness-Guided Synthesis
-// TEMPORARILY DISABLED TO RUN RESONATOR PHI VALIDATION
-// Synthesis module needs update for new topology structure (no edges field)
-// pub mod synthesis;
+pub mod synthesis;
 
 // Track 6: Component Integration
 pub mod action;                             // Action IR and execution

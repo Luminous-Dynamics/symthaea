@@ -885,6 +885,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "performance test - run with cargo test --release"]
     fn test_performance_small_system() {
         use std::time::Instant;
 
