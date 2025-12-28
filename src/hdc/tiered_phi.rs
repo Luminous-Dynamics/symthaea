@@ -6317,10 +6317,11 @@ mod tests {
         let mut attractor = PhiAttractor::new();
 
         // Create a trajectory that converges to a fixed point
+        // Use faster decay (-15.0) to converge within the default threshold (0.001)
         let trajectory: Vec<f64> = (0..100)
             .map(|i| {
                 let t = i as f64 / 100.0;
-                0.5 + 0.3 * (-5.0 * t).exp() // Exponential decay to 0.5
+                0.5 + 0.3 * (-15.0 * t).exp() // Fast exponential decay to 0.5
             })
             .collect();
 
