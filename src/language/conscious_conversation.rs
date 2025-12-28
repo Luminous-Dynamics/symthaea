@@ -335,7 +335,7 @@ impl ConsciousConversation {
     }
 
     /// Record learning outcome for meta-learning
-    fn record_learning_outcome(&mut self, integration: &IntegrationResult) -> Result<()> {
+    fn record_learning_outcome(&mut self, _integration: &IntegrationResult) -> Result<()> {
         // For now, we don't have ground truth, so we assume research was successful
         // In production, this would be collected via user feedback
 

@@ -258,7 +258,7 @@ impl CausalGraph {
     }
 
     /// Infer temporal edges from event timing
-    fn infer_temporal_edges(&mut self, trace: &Trace) {
+    fn infer_temporal_edges(&mut self, _trace: &Trace) {
         // Group events by correlation ID
         let mut correlation_groups: HashMap<String, Vec<String>> = HashMap::new();
 

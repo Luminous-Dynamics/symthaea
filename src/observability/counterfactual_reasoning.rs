@@ -234,7 +234,7 @@ impl CounterfactualEngine {
         // For each piece of evidence, infer contributing factors
         for ev in evidence {
             // Find edges leading to this variable
-            let incoming_edges: Vec<&ProbabilisticEdge> = self.graph.edges()
+            let _incoming_edges: Vec<&ProbabilisticEdge> = self.graph.edges()
                 .values()
                 .filter(|edge| edge.to == ev.variable)
                 .collect();
@@ -270,7 +270,7 @@ impl CounterfactualEngine {
     fn apply_counterfactual_action(
         &self,
         intervention: &HashMap<String, f64>,
-        hidden_state: &HiddenState,
+        _hidden_state: &HiddenState,
     ) -> ProbabilisticCausalGraph {
         // Clone graph
         let mut modified = self.graph.clone();

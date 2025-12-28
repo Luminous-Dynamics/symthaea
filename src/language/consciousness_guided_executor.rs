@@ -381,7 +381,7 @@ impl ConsciousnessGuidedExecutor {
 
         // Step 3: Handle based on execution strategy
         let result = match &understanding.execution_strategy {
-            ExecutionStrategy::Confident { execute_immediately, validate_after, explain_to_user } => {
+            ExecutionStrategy::Confident { execute_immediately, validate_after: _, explain_to_user } => {
                 metrics.strategy = "Confident".to_string();
                 self.stats.confident_executions += 1;
 
@@ -475,7 +475,7 @@ impl ConsciousnessGuidedExecutor {
                 }
             }
 
-            ExecutionStrategy::Skeptical { clarification_needed, require_explicit_confirmation, suggested_questions } => {
+            ExecutionStrategy::Skeptical { clarification_needed: _, require_explicit_confirmation: _, suggested_questions } => {
                 metrics.strategy = "Skeptical".to_string();
                 self.stats.skeptical_count += 1;
 

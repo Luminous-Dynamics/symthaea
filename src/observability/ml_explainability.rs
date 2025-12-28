@@ -178,7 +178,7 @@ impl MLModelObserver {
     /// Create new ML model observer
     pub fn new(config: MLObserverConfig) -> Self {
         // Configure streaming analyzer for ML observation
-        let streaming_config = StreamingConfig {
+        let _streaming_config = StreamingConfig {
             window_size: 1000,
             time_window: None,
             min_edge_strength: 0.3,
@@ -806,7 +806,7 @@ impl InteractiveExplainer {
         new_value: f64,
     ) -> ExplanationResult {
         // Find observation
-        let obs = match self.observations.iter().find(|o| o.id == obs_id) {
+        let _obs = match self.observations.iter().find(|o| o.id == obs_id) {
             Some(o) => o,
             None => {
                 return ExplanationResult {

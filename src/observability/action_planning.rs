@@ -350,7 +350,7 @@ impl ActionPlanner {
     }
 
     /// Estimate current value of target (without interventions)
-    fn estimate_current_value(&self, target: &str) -> f64 {
+    fn estimate_current_value(&self, _target: &str) -> f64 {
         // For now, use a heuristic: 0.5 as default
         // In full implementation, this would query current system state
         0.5

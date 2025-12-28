@@ -381,7 +381,7 @@ impl PredictiveDefender {
     }
 
     /// Report a false negative (attack not predicted)
-    pub fn report_false_negative(&mut self, attack_type: AttackType) {
+    pub fn report_false_negative(&mut self, _attack_type: AttackType) {
         self.stats.false_negatives += 1;
     }
 
@@ -449,7 +449,7 @@ impl PredictiveDefender {
     }
 
     /// Extract causal chain leading to current event
-    fn extract_causal_chain(&self, event_id: &str) -> Vec<String> {
+    fn extract_causal_chain(&self, _event_id: &str) -> Vec<String> {
         // Use analyzer's graph to extract causal path
         // Simplified - returns recent event types
         self.recent_events.iter()
@@ -472,8 +472,8 @@ impl PredictiveDefender {
     /// Analyze alert for potential attack indicators
     fn analyze_alert_for_attack(
         &self,
-        description: &str,
-        involved_events: &[String],
+        _description: &str,
+        _involved_events: &[String],
     ) -> Option<AttackWarning> {
         // Analyze alert description and events for attack signatures
         // This would use NLP and pattern matching in real implementation
