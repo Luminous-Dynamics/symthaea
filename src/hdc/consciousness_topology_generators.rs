@@ -1715,6 +1715,133 @@ impl ConsciousnessTopology {
         }
     }
 
+    /// Generate a Koch Snowflake topology (fractal curve, d ≈ 1.262)
+    ///
+    /// The Koch Snowflake is a famous fractal curve where each line segment
+    /// is replaced by 4 segments forming a triangular "bump". This creates
+    /// a self-similar structure with fractal dimension log(4)/log(3) ≈ 1.262.
+    ///
+    /// Structure:
+    /// - Depth 0: Triangle with 3 nodes (boundary path)
+    /// - Depth 1: 12 segments, 12 nodes
+    /// - Depth 2: 48 segments, 48 nodes
+    /// - Depth n: 3 * 4^n segments
+    ///
+    /// Nodes are connected along the curve (path-like connectivity), but
+    /// the self-similar structure creates hierarchical relationships at
+    /// multiple scales.
+    ///
+    /// Hypothesis: The infinite perimeter in finite area creates unique
+    /// integration properties - local connectivity but fractal self-similarity.
+    ///
+    /// # Arguments
+    /// * `depth` - Recursion depth (0-5 recommended, 5 gives 3072 nodes)
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed for reproducibility
+    #[allow(dead_code)]
+    pub fn koch_snowflake(depth: usize, dim: usize, seed: u64) -> Self {
+        assert!(depth <= 5, "Depth > 5 creates too many nodes (>3000)");
+        assert!(dim >= 256, "Dimension should be >= 256 for good separation");
+
+        // Calculate number of nodes (one per segment vertex)
+        // Koch curve: 3 * 4^depth edges, same number of nodes for closed curve
+        let n_nodes = 3 * 4_usize.pow(depth as u32);
+
+        // Create node identities with seed-based variation
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let base = RealHV::basis(i % dim, dim);
+                let noise = RealHV::random(dim, seed + i as u64 * 1000).scale(0.05);
+                base.add(&noise)
+            })
+            .collect();
+
+        // Build adjacency list
+        // Koch snowflake is a closed curve - connect consecutive nodes
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+
+        // Connect along the curve (circular path)
+        for i in 0..n_nodes {
+            let next = (i + 1) % n_nodes;
+            let prev = (i + n_nodes - 1) % n_nodes;
+            adjacency[i].push(next);
+            adjacency[i].push(prev);
+        }
+
+        // Add hierarchical connections based on fractal self-similarity
+        // At each level, nodes that were peaks in the previous iteration
+        // maintain special relationships
+        if depth > 0 {
+            // Connect nodes that correspond to the same position at different scales
+            // This captures the self-similar structure of the Koch curve
+
+            // For each scale level
+            for level in 1..=depth {
+                let segment_size = 4_usize.pow(level as u32);
+                let num_segments = n_nodes / segment_size;
+
+                // Connect midpoints of each segment (the "peak" nodes)
+                for seg in 0..num_segments {
+                    let segment_start = seg * segment_size;
+                    let peak_node = segment_start + segment_size / 2;
+
+                    // Connect peak to segment endpoints (hierarchical structure)
+                    if peak_node < n_nodes {
+                        let start_node = segment_start;
+                        let end_node = (segment_start + segment_size) % n_nodes;
+
+                        if !adjacency[peak_node].contains(&start_node) {
+                            adjacency[peak_node].push(start_node);
+                            adjacency[start_node].push(peak_node);
+                        }
+                        if !adjacency[peak_node].contains(&end_node) {
+                            adjacency[peak_node].push(end_node);
+                            adjacency[end_node].push(peak_node);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Generate representations from adjacency
+        let mut node_representations = Vec::with_capacity(n_nodes);
+        for i in 0..n_nodes {
+            if adjacency[i].is_empty() {
+                node_representations.push(node_identities[i].clone());
+            } else {
+                // Remove duplicates
+                let mut unique_neighbors = adjacency[i].clone();
+                unique_neighbors.sort_unstable();
+                unique_neighbors.dedup();
+
+                let connections: Vec<RealHV> = unique_neighbors
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                node_representations.push(RealHV::bundle(&connections));
+            }
+        }
+
+        // Build edge list for compatibility
+        let mut edges = Vec::new();
+        for i in 0..n_nodes {
+            for &neighbor in &adjacency[i] {
+                if i < neighbor {
+                    edges.push((i, neighbor));
+                }
+            }
+        }
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::KochSnowflake,
+            edges,
+        }
+    }
+
     /// Generate a quantum network topology (superposition of topologies)
     ///
     /// Creates a quantum-inspired network where each node exists in a
