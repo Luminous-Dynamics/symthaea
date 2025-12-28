@@ -1,0 +1,46 @@
+{
+  "title": "Network Topology and Integrated Information: Research Dataset",
+  "description": "Complete research dataset supporting the manuscript 'Network Topology and Integrated Information: A Comprehensive Characterization'. Contains 260 integrated information (\u03a6) measurements across 19 network topologies and dimensional sweep (1D-7D hypercubes). First demonstration of asymptotic \u03a6 limit and comprehensive topology-consciousness characterization using hyperdimensional computing.",
+  "creators": [
+    {
+      "name": "Stoltz, Tristan",
+      "affiliation": "Luminous Dynamics",
+      "orcid": ""
+    },
+    {
+      "name": "Claude Code",
+      "affiliation": "Anthropic PBC"
+    }
+  ],
+  "keywords": [
+    "integrated information theory",
+    "consciousness",
+    "network topology",
+    "hyperdimensional computing",
+    "neuroscience",
+    "artificial intelligence",
+    "dimensional optimization",
+    "graph theory"
+  ],
+  "license": "CC-BY-4.0",
+  "upload_type": "dataset",
+  "access_right": "open",
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/luminous-dynamics/symthaea-hlb",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Anthropic PBC",
+      "type": "HostingInstitution"
+    }
+  ],
+  "references": [
+    "Manuscript submitted to Nature Neuroscience (2025)"
+  ],
+  "version": "1.0.0",
+  "publication_date": "2025-12-29"
+}

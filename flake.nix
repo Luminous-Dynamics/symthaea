@@ -22,15 +22,46 @@
 
         # Python environment with PyPhi for validation
         pythonEnv = pkgs.python311.withPackages (ps: with ps; [
-          # PyPhi and dependencies for exact IIT 3.0 Φ calculation
+          # Core scientific computing dependencies
           numpy
           scipy
           networkx
-          # pyphi - Note: May need to install via pip if not in nixpkgs
-
-          # Additional scientific computing
           matplotlib
           pandas
+
+          # PyPhi built from source with Python 3.11 fixes
+          (ps.buildPythonPackage {
+            pname = "pyphi";
+            version = "1.2.1.dev1470";
+            pyproject = true;
+            src = pkgs.fetchFromGitHub {
+              owner = "wmayner";
+              repo = "pyphi";
+              rev = "b78d0e342d37175cbd55cf35a6d52ae035b4c50f";
+              hash = "sha256-qh5U0ToJ3fZ87m4gDD+YZmgSwPd215Hbw75KkCC1MGk=";
+            };
+
+            # Build system
+            build-system = with ps; [ setuptools ];
+
+            # PyPhi dependencies
+            dependencies = with ps; [
+              numpy
+              scipy
+              networkx
+              joblib
+              more-itertools
+              psutil
+              pyyaml
+              toolz
+              tqdm
+            ];
+
+            # Skip tests and checks during build (they require special setup)
+            doCheck = false;
+            dontCheckRuntimeDeps = true;
+            pythonImportsCheck = [];  # Skip import check due to optional deps
+          })
         ]);
       in
       {
@@ -75,7 +106,7 @@
             echo "Week 4: PyPhi Validation + Topology Analysis"
             echo "Ready to validate HDC-based Φ calculation! 🧬"
             echo ""
-            echo "To install PyPhi: pip install --user pyphi"
+            echo "✅ PyPhi built from source (Python 3.11 compatible)"
 
             # Set OpenSSL paths for rust crates
             export OPENSSL_DIR="${pkgs.openssl.dev}"
@@ -88,9 +119,6 @@
 
             # Tell Rust linker where to find BLAS libraries
             export RUSTFLAGS="-C link-arg=-L${pkgs.openblas}/lib -C link-arg=-lopenblas"
-
-            # Add user site-packages to PYTHONPATH for PyPhi
-            export PYTHONPATH="$HOME/.local/lib/python3.11/site-packages:$PYTHONPATH"
           '';
 
           # Prevent cargo from using vendored OpenSSL

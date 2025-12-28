@@ -542,7 +542,7 @@ impl PredictiveUnderstanding {
                 // In HDC: bundle current belief with error-corrected prediction
 
                 let prediction = &self.predictions[level];
-                let weight = (error.precision * learning_rate).min(1.0);
+                let soul::weaver::COHERENCE_THRESHOLD = (error.precision * learning_rate).min(1.0);
 
                 // Weighted bundle towards observation
                 // More error = move belief more towards observation

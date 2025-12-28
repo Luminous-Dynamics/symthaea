@@ -27,13 +27,11 @@
 // - Regret analysis ("should we have done X instead?")
 
 use super::{
-    causal_graph::{CausalGraph, CausalEdge, EdgeType},
     probabilistic_inference::{
-        ProbabilisticCausalGraph, ProbabilisticEdge, ProbabilisticPrediction,
-        UncertaintySource,
+        ProbabilisticCausalGraph, ProbabilisticEdge,
     },
     causal_intervention::{
-        CausalInterventionEngine, InterventionSpec, InterventionType, InterventionResult,
+        CausalInterventionEngine, InterventionSpec,
     },
 };
 use std::collections::HashMap;

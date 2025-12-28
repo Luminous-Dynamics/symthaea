@@ -23,11 +23,10 @@
 // - Educational value
 
 use super::{
-    causal_graph::{CausalGraph, EdgeType},
-    probabilistic_inference::{ProbabilisticCausalGraph, ProbabilisticPrediction},
-    causal_intervention::{InterventionResult, InterventionSpec},
+    probabilistic_inference::ProbabilisticPrediction,
+    causal_intervention::InterventionResult,
     counterfactual_reasoning::CounterfactualResult,
-    action_planning::{ActionPlan, Goal},
+    action_planning::ActionPlan,
 };
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};

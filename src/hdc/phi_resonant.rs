@@ -270,7 +270,7 @@ impl ResonantPhiCalculator {
     /// Each resonator i updates as:
     /// new_i = damping × old_i + (1-damping) × Σⱼ similarity(i,j) × old_j
     fn resonance_step(&self, current_state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> Vec<RealHV> {
-        let n = current_state.len();
+        let perception::multi_modal::HDC_DIM = current_state.len();
         let damping = self.config.damping;
 
         current_state

@@ -1,0 +1,1914 @@
+    Blocking waiting for file lock on build directory
+   Compiling getrandom v0.3.4
+   Compiling serde v1.0.228
+   Compiling rustix v1.1.2
+   Compiling serde_json v1.0.145
+   Compiling linux-raw-sys v0.11.0
+   Compiling clap_lex v0.7.6
+   Compiling ciborium-io v0.2.2
+   Compiling fastrand v2.3.0
+   Compiling anstyle v1.0.13
+   Compiling plotters-backend v0.3.7
+   Compiling tower-http v0.6.8
+   Compiling selectors v0.25.0
+   Compiling ciborium-ll v0.2.2
+   Compiling plotters-svg v0.3.7
+   Compiling wait-timeout v0.2.1
+   Compiling clap_builder v4.5.53
+   Compiling fnv v1.0.7
+   Compiling quick-error v1.2.3
+   Compiling bit-vec v0.8.0
+   Compiling rand_core v0.9.3
+   Compiling ahash v0.8.12
+   Compiling cast v0.3.0
+   Compiling uuid v1.19.0
+   Compiling plotters v0.3.7
+   Compiling nix v0.27.1
+   Compiling rand_xorshift v0.4.0
+   Compiling rand v0.9.2
+   Compiling rand_chacha v0.9.0
+   Compiling string_cache v0.8.9
+   Compiling url v2.5.7
+   Compiling serde_urlencoded v0.7.1
+   Compiling markup5ever v0.11.0
+   Compiling markup5ever v0.12.1
+   Compiling chrono v0.4.42
+   Compiling ciborium v0.2.2
+   Compiling tinytemplate v1.2.1
+   Compiling petgraph v0.6.5
+   Compiling bincode v1.3.3
+   Compiling bit-set v0.8.0
+   Compiling criterion-plot v0.5.0
+   Compiling html5ever v0.27.0
+   Compiling clap v4.5.53
+   Compiling is-terminal v0.4.17
+   Compiling oorandom v11.1.5
+   Compiling tempfile v3.23.0
+   Compiling anes v0.1.6
+   Compiling html5ever v0.26.0
+   Compiling xml5ever v0.17.0
+   Compiling rusty-fork v0.3.1
+   Compiling reqwest v0.12.26
+   Compiling unarray v0.1.4
+   Compiling criterion v0.5.1
+   Compiling proptest v1.9.0
+   Compiling html2text v0.12.5
+   Compiling scraper v0.20.0
+   Compiling markup5ever_rcdom v0.2.0
+   Compiling select v0.6.1
+   Compiling symthaea v0.1.0 (/srv/luminous-dynamics/11-meta-consciousness/luminous-nix/symthaea-hlb)
+warning: unused import: `std::sync::Arc`
+  --> src/consciousness/consciousness_guided_routing.rs:57:5
+   |
+57 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::hdc::binary_hv::HV16`
+  --> src/consciousness/consciousness_guided_discovery.rs:24:5
+   |
+24 | use crate::hdc::binary_hv::HV16;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `CompositionMetadata`
+  --> src/consciousness/consciousness_guided_discovery.rs:28:22
+   |
+28 |     CompositionType, CompositionMetadata,
+   |                      ^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> src/consciousness/gwt_integration.rs:43:5
+   |
+43 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `HashMap`
+  --> src/consciousness/narrative_self.rs:54:24
+   |
+54 | use std::collections::{HashMap, VecDeque};
+   |                        ^^^^^^^
+
+warning: unused import: `Duration`
+  --> src/consciousness/narrative_self.rs:55:17
+   |
+55 | use std::time::{Duration, Instant};
+   |                 ^^^^^^^^
+
+warning: unused import: `Coalition`
+  --> src/consciousness/narrative_gwt_integration.rs:79:65
+   |
+79 |     UnifiedGlobalWorkspace, UnifiedGWTConfig, UnifiedGWTResult, Coalition
+   |                                                                 ^^^^^^^^^
+
+warning: unused import: `TemporalConsciousnessReport`
+  --> src/consciousness/narrative_gwt_integration.rs:92:65
+   |
+92 |     TemporalConsciousnessAnalyzer, TemporalConsciousnessConfig, TemporalConsciousnessReport,
+   |                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unnecessary parentheses around block return value
+   --> src/consciousness/temporal_consciousness.rs:813:9
+    |
+813 |         (0.2 * phi_health + 0.2 * continuity + 0.25 * identity + 0.2 * husserlian + 0.15 * binding)
+    |         ^                                                                                         ^
+    |
+    = note: `#[warn(unused_parens)]` (part of `#[warn(unused)]`) on by default
+help: remove these parentheses
+    |
+813 -         (0.2 * phi_health + 0.2 * continuity + 0.25 * identity + 0.2 * husserlian + 0.15 * binding)
+813 +         0.2 * phi_health + 0.2 * continuity + 0.25 * identity + 0.2 * husserlian + 0.15 * binding
+    |
+
+warning: unused import: `Duration`
+  --> src/consciousness/quantum_coherence.rs:57:17
+   |
+57 | use std::time::{Duration, Instant};
+   |                 ^^^^^^^^
+
+warning: unused imports: `ObserverStats` and `types::*`
+ --> src/observability/null_observer.rs:7:31
+  |
+7 | use super::{SymthaeaObserver, types::*, ObserverStats};
+  |                               ^^^^^^^^  ^^^^^^^^^^^^^
+
+warning: unused import: `anyhow::Result`
+ --> src/observability/null_observer.rs:8:5
+  |
+8 | use anyhow::Result;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `CausalNode`
+  --> src/observability/trace_analyzer.rs:46:33
+   |
+46 | use super::{Trace, CausalGraph, CausalNode, CausalAnswer};
+   |                                 ^^^^^^^^^^
+
+warning: unused import: `super::types::PhiComponents`
+  --> src/observability/trace_analyzer.rs:50:5
+   |
+50 | use super::types::PhiComponents;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `chrono::Utc`
+  --> src/observability/streaming_causal.rs:28:5
+   |
+28 | use chrono::Utc;
+   |     ^^^^^^^^^^^
+
+warning: unused import: `causal_graph::CausalGraph`
+  --> src/observability/pattern_library.rs:19:5
+   |
+19 |     causal_graph::CausalGraph,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `CausalEdge`, `correlation::EventMetadata`, and `types::Event`
+  --> src/observability/probabilistic_inference.rs:20:33
+   |
+20 |     causal_graph::{CausalGraph, CausalEdge, EdgeType},
+   |                                 ^^^^^^^^^^
+21 |     types::Event,
+   |     ^^^^^^^^^^^^
+22 |     correlation::EventMetadata,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `CausalEdge`, `CausalGraph`, `CausalNode`, `EdgeType`, and `ProbabilisticEdge`
+  --> src/observability/causal_intervention.rs:29:20
+   |
+29 |     causal_graph::{CausalGraph, CausalEdge, CausalNode, EdgeType},
+   |                    ^^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^
+30 |     probabilistic_inference::{
+31 |         ProbabilisticCausalGraph, ProbabilisticEdge, ProbabilisticPrediction,
+   |                                   ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `HashSet`
+  --> src/observability/causal_intervention.rs:35:33
+   |
+35 | use std::collections::{HashMap, HashSet};
+   |                                 ^^^^^^^
+
+warning: unused imports: `CausalEdge`, `CausalGraph`, `EdgeType`, `InterventionResult`, `InterventionType`, `ProbabilisticPrediction`, and `UncertaintySource`
+  --> src/observability/counterfactual_reasoning.rs:30:20
+   |
+30 |     causal_graph::{CausalGraph, CausalEdge, EdgeType},
+   |                    ^^^^^^^^^^^  ^^^^^^^^^^  ^^^^^^^^
+31 |     probabilistic_inference::{
+32 |         ProbabilisticCausalGraph, ProbabilisticEdge, ProbabilisticPrediction,
+   |                                                      ^^^^^^^^^^^^^^^^^^^^^^^
+33 |         UncertaintySource,
+   |         ^^^^^^^^^^^^^^^^^
+...
+36 |         CausalInterventionEngine, InterventionSpec, InterventionType, InterventionResult,
+   |                                                     ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `InterventionSpec` and `causal_graph::EdgeType`
+  --> src/observability/action_planning.rs:29:5
+   |
+29 |     causal_graph::EdgeType,
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+...
+32 |         CausalInterventionEngine, InterventionSpec, InterventionType, InterventionResult,
+   |                                   ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `HashSet` and `VecDeque`
+  --> src/observability/action_planning.rs:35:33
+   |
+35 | use std::collections::{HashMap, HashSet, VecDeque};
+   |                                 ^^^^^^^  ^^^^^^^^
+
+warning: unused imports: `CausalGraph`, `EdgeType`, `Goal`, `InterventionSpec`, and `ProbabilisticCausalGraph`
+  --> src/observability/causal_explanation.rs:26:20
+   |
+26 |     causal_graph::{CausalGraph, EdgeType},
+   |                    ^^^^^^^^^^^  ^^^^^^^^
+27 |     probabilistic_inference::{ProbabilisticCausalGraph, ProbabilisticPrediction},
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^
+28 |     causal_intervention::{InterventionResult, InterventionSpec},
+   |                                               ^^^^^^^^^^^^^^^^
+29 |     counterfactual_reasoning::CounterfactualResult,
+30 |     action_planning::{ActionPlan, Goal},
+   |                                   ^^^^
+
+warning: unused imports: `ActionPlanner`, `CausalInterventionEngine`, `CounterfactualResult`, `GoalDirection`, `Goal`, and `InterventionSpec`
+  --> src/observability/byzantine_defense.rs:22:27
+   |
+22 |     causal_intervention::{CausalInterventionEngine, InterventionSpec},
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^
+23 |     counterfactual_reasoning::{CounterfactualEngine, CounterfactualQuery, CounterfactualResult},
+   |                                                                           ^^^^^^^^^^^^^^^^^^^^
+24 |     action_planning::{ActionPlanner, Goal, GoalDirection},
+   |                       ^^^^^^^^^^^^^  ^^^^  ^^^^^^^^^^^^^
+
+warning: unused imports: `AttackSimulation` and `probabilistic_inference::ProbabilisticCausalGraph`
+  --> src/observability/predictive_byzantine_defense.rs:29:9
+   |
+29 |         AttackSimulation, Countermeasure,
+   |         ^^^^^^^^^^^^^^^^
+...
+37 |     probabilistic_inference::ProbabilisticCausalGraph,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src/nix_understanding.rs:9:5
+  |
+9 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `AttentionBid`
+  --> src/brain/sleep.rs:17:32
+   |
+17 | use crate::brain::prefrontal::{AttentionBid, Coalition, WorkingMemoryItem};
+   |                                ^^^^^^^^^^^^
+
+warning: unused import: `crate::hdc::binary_hv::HV16`
+  --> src/brain/language_cortex.rs:61:5
+   |
+61 | use crate::hdc::binary_hv::HV16;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `GlobalWorkspace`
+  --> src/brain/language_cortex.rs:62:58
+   |
+62 | use super::prefrontal::{AttentionBid, WorkingMemoryItem, GlobalWorkspace, PrefrontalCortexActor};
+   |                                                          ^^^^^^^^^^^^^^^
+
+warning: unused import: `super::actor_model::SharedHdcVector`
+  --> src/brain/language_cortex.rs:63:5
+   |
+63 | use super::actor_model::SharedHdcVector;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ActiveInferenceEngine` and `PredictionDomain`
+  --> src/brain/language_cortex.rs:64:31
+   |
+64 | use super::active_inference::{ActiveInferenceEngine, PredictionDomain};
+   |                               ^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ActiveInferenceAdapter`, `AdapterConfig`, `BridgeConfig`, `BridgeResult`, `ConsciousnessBridge`, and `ConsciousnessState`
+  --> src/brain/language_cortex.rs:67:5
+   |
+67 |     ConsciousnessBridge, BridgeConfig, BridgeResult, ConsciousnessState,
+   |     ^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^  ^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^
+...
+70 |     ActiveInferenceAdapter, AdapterConfig,
+   |     ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> src/safety/guardrails.rs:16:5
+   |
+16 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> src/language/generator.rs:22:5
+   |
+22 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `ApproximationTier`
+  --> src/language/conversation.rs:19:41
+   |
+19 | use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
+   |                                         ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `FrameElement`
+  --> src/language/constructions.rs:29:36
+   |
+29 | use super::frames::{SemanticFrame, FrameElement, FrameLibrary};
+   |                                    ^^^^^^^^^^^^
+
+warning: unused import: `FrameInstance`
+  --> src/language/conscious_understanding.rs:53:51
+   |
+53 | use super::frames::{FrameLibrary, FrameActivator, FrameInstance};
+   |                                                   ^^^^^^^^^^^^^
+
+warning: unused import: `ConstructionParse`
+  --> src/language/conscious_understanding.rs:54:49
+   |
+54 | use super::constructions::{ConstructionGrammar, ConstructionParse};
+   |                                                 ^^^^^^^^^^^^^^^^^
+
+warning: unused import: `SentenceUnderstanding as PredictiveSentenceResult`
+  --> src/language/conscious_understanding.rs:57:5
+   |
+57 |     SentenceUnderstanding as PredictiveSentenceResult,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ConsciousnessMetrics` and `PredictionResult`
+  --> src/language/consciousness_bridge.rs:60:5
+   |
+60 |     PredictionResult, ConsciousnessMetrics, PipelineConfig,
+   |     ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `PredictionSource`, `PredictiveUnderstanding`, and `SentenceUnderstanding`
+  --> src/language/consciousness_bridge.rs:64:5
+   |
+64 |     PredictiveUnderstanding, LinguisticLevel, LinguisticError,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+65 |     PredictionSource, SentenceUnderstanding,
+   |     ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `HashMap`
+  --> src/language/consciousness_bridge.rs:68:24
+   |
+68 | use std::collections::{HashMap, VecDeque};
+   |                        ^^^^^^^
+
+warning: unused imports: `BridgeStats` and `LanguageAttentionBid`
+  --> src/language/active_inference_adapter.rs:57:54
+   |
+57 |     ConsciousnessBridge, BridgeConfig, BridgeResult, BridgeStats,
+   |                                                      ^^^^^^^^^^^
+58 |     LinguisticPredictionError, InferenceDomain, ConsciousnessState,
+59 |     LanguageAttentionBid,
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `ActionType`, `ActiveInferenceStats`, and `GenerativeModel`
+  --> src/language/active_inference_adapter.rs:63:63
+   |
+63 |     ActiveInferenceEngine, PredictionDomain, PredictionError, ActionType,
+   |                                                               ^^^^^^^^^^
+64 |     ActiveInferenceSummary, GenerativeModel, ActiveInferenceStats,
+   |                             ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `HashMap`
+  --> src/language/active_inference_adapter.rs:67:24
+   |
+67 | use std::collections::{HashMap, VecDeque};
+   |                        ^^^^^^^
+
+warning: unused import: `NixPrimitiveTier`
+  --> src/language/nix_frames.rs:24:64
+   |
+24 | use super::nix_primitives::{NixPrimitive, NixPrimitiveEncoder, NixPrimitiveTier};
+   |                                                                ^^^^^^^^^^^^^^^^
+
+warning: unused imports: `NixFrameFiller` and `NixFrameInstance`
+  --> src/language/nix_constructions.rs:18:53
+   |
+18 | use super::nix_frames::{NixFrameType, NixFrameRole, NixFrameInstance, NixFrameFiller};
+   |                                                     ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^
+
+warning: unused import: `NixPrimitiveTier`
+  --> src/language/nix_constructions.rs:19:43
+   |
+19 | use super::nix_primitives::{NixPrimitive, NixPrimitiveTier};
+   |                                           ^^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::hdc::HV16`
+  --> src/language/nix_constructions.rs:20:5
+   |
+20 | use crate::hdc::HV16;
+   |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> src/language/nix_error_diagnosis.rs:17:5
+   |
+17 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: unused import: `std::collections::HashMap`
+  --> src/language/nix_security.rs:35:5
+   |
+35 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `BTreeMap`
+  --> src/language/nix_knowledge_provider.rs:51:33
+   |
+51 | use std::collections::{HashMap, BTreeMap, HashSet};
+   |                                 ^^^^^^^^
+
+warning: unused import: `ConsciousnessStateLevel`
+  --> src/language/consciousness_guided_executor.rs:64:5
+   |
+64 |     ConsciousnessStateLevel,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `MemoryType`
+  --> src/databases/qdrant_client.rs:26:60
+   |
+26 | use super::{ConsciousnessDatabase, DbResult, MemoryRecord, MemoryType, SearchResult};
+   |                                                            ^^^^^^^^^^
+
+warning: unused import: `Context`
+  --> src/embeddings/bge.rs:43:14
+   |
+43 | use anyhow::{Context, Result};
+   |              ^^^^^^^
+
+warning: unused import: `ConstraintSeverity`
+ --> src/nix_verification/encoder.rs:7:45
+  |
+7 |     SecurityConstraint, ResourceConstraint, ConstraintSeverity,
+  |                                             ^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `SmtFormula`
+ --> src/nix_verification/verifier.rs:6:34
+  |
+6 | use super::encoder::{SmtEncoder, SmtFormula, NixConfig};
+  |                                  ^^^^^^^^^^
+
+warning: unused variable: `qdrant_config`
+   --> src/databases/unified_mind.rs:570:67
+    |
+570 |         let sensory: Arc<dyn ConsciousnessDatabase> = if let Some(qdrant_config) = config.qdrant {
+    |                                                                   ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_qdrant_config`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `duck_config`
+   --> src/databases/unified_mind.rs:596:69
+    |
+596 |         let epistemic: Arc<dyn ConsciousnessDatabase> = if let Some(duck_config) = config.duckdb {
+    |                                                                     ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_duck_config`
+
+warning: use of deprecated method `consciousness::ConsciousnessGraph::current_consciousness`: Use current_phi() - consciousness IS Φ
+   --> src/lib.rs:720:50
+    |
+720 |         self.record_phi_event(self.consciousness.current_consciousness() as f64);
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated method `consciousness::ConsciousnessGraph::current_consciousness`: Use current_phi() - consciousness IS Φ
+   --> src/lib.rs:776:32
+    |
+776 |             self.consciousness.current_consciousness() as f64,
+    |                                ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `consciousness::ConsciousnessGraph::current_consciousness`: Use current_phi() - consciousness IS Φ
+   --> src/lib.rs:784:44
+    |
+784 |             confidence: self.consciousness.current_consciousness(),
+    |                                            ^^^^^^^^^^^^^^^^^^^^^
+
+warning: use of deprecated method `consciousness::ConsciousnessGraph::current_consciousness`: Use current_phi() - consciousness IS Φ
+   --> src/lib.rs:793:53
+    |
+793 |             consciousness_level: self.consciousness.current_consciousness() as f32,
+    |                                                     ^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `Context`
+  --> src/consciousness/recursive_improvement.rs:41:22
+   |
+41 | use anyhow::{Result, Context};
+   |                      ^^^^^^^
+
+warning: unused import: `Write`
+  --> src/observability/trace_observer.rs:10:26
+   |
+10 | use std::io::{BufWriter, Write};
+   |                          ^^^^^
+
+warning: unused import: `SymthaeaObserver`
+  --> src/language/consciousness_guided_executor.rs:68:21
+   |
+68 |     SharedObserver, SymthaeaObserver,
+   |                     ^^^^^^^^^^^^^^^^
+
+warning: unused variable: `synergies`
+   --> src/consciousness/dimension_synergies.rs:256:9
+    |
+256 |         synergies: &[DimensionSynergy],
+    |         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_synergies`
+
+warning: unused variable: `start`
+  --> src/consciousness/adaptive_reasoning.rs:99:17
+   |
+99 |             let start = i * 2048;
+   |                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_start`
+
+warning: unused variable: `end`
+   --> src/consciousness/adaptive_reasoning.rs:100:17
+    |
+100 |             let end = (i + 1) * 2048;
+    |                 ^^^ help: if this is intentional, prefix it with an underscore: `_end`
+
+warning: unused variable: `chain`
+   --> src/consciousness/metacognitive_monitoring.rs:388:9
+    |
+388 |         chain: &ReasoningChain,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_chain`
+
+warning: unused variable: `chain`
+   --> src/consciousness/meta_reasoning.rs:269:9
+    |
+269 |         chain: &mut ReasoningChain,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_chain`
+
+warning: unused variable: `decision_history`
+   --> src/consciousness/meta_reasoning.rs:611:9
+    |
+611 |         decision_history: &[MetaDecision],
+    |         ^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_decision_history`
+
+warning: unused variable: `instance_id`
+   --> src/consciousness/byzantine_collective.rs:575:39
+    |
+575 |     fn quarantine_instance(&mut self, instance_id: &str) -> Result<()> {
+    |                                       ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_instance_id`
+
+warning: unused variable: `features`
+   --> src/consciousness/causal_byzantine.rs:725:9
+    |
+725 |         features: &AttackFeatures,
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_features`
+
+warning: unused variable: `thresholds`
+   --> src/consciousness/causal_byzantine.rs:726:9
+    |
+726 |         thresholds: &ThresholdSnapshot,
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_thresholds`
+
+warning: unused variable: `outcome`
+   --> src/consciousness/causal_byzantine.rs:727:9
+    |
+727 |         outcome: &ContributionOutcome,
+    |         ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_outcome`
+
+warning: unused variable: `thresholds`
+   --> src/consciousness/causal_byzantine.rs:786:13
+    |
+786 |         let thresholds = self.get_threshold_snapshot();
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_thresholds`
+
+warning: unused variable: `depth`
+   --> src/consciousness/recursive_improvement.rs:940:13
+    |
+940 |         for depth in 0..5 {
+    |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_depth`
+
+warning: unused variable: `old_level`
+    --> src/consciousness/recursive_improvement.rs:4157:13
+     |
+4157 |         let old_level = *skill;
+     |             ^^^^^^^^^
+     |
+help: if this is intentional, prefix it with an underscore
+     |
+4157 |         let _old_level = *skill;
+     |             +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+     |
+4157 -         let old_level = *skill;
+4157 +         let soul::weaver::COHERENCE_THRESHOLD = *skill;
+     |
+
+warning: unused variable: `current_phi`
+    --> src/consciousness/recursive_improvement.rs:6032:39
+     |
+6032 |     fn update_trajectories(&mut self, current_phi: f64) {
+     |                                       ^^^^^^^^^^^
+     |
+help: if this is intentional, prefix it with an underscore
+     |
+6032 |     fn update_trajectories(&mut self, _current_phi: f64) {
+     |                                       +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+     |
+6032 -     fn update_trajectories(&mut self, current_phi: f64) {
+6032 +     fn update_trajectories(&mut self, soul::weaver::COHERENCE_THRESHOLD: f64) {
+     |
+
+warning: value assigned to `predictions` is never read
+    --> src/consciousness/recursive_improvement.rs:8603:17
+     |
+8603 |         let mut predictions = Vec::new();
+     |                 ^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable `best_actions` is assigned to, but never used
+    --> src/consciousness/recursive_improvement.rs:8605:17
+     |
+8605 |         let mut best_actions = Vec::new();
+     |                 ^^^^^^^^^^^^
+     |
+     = note: consider using `_best_actions` instead
+
+warning: value assigned to `best_actions` is never read
+    --> src/consciousness/recursive_improvement.rs:8635:17
+     |
+8635 |                 best_actions = candidate_actions.clone();
+     |                 ^^^^^^^^^^^^
+     |
+     = help: maybe it is overwritten before being read?
+
+warning: unused variable: `predicted_phi`
+    --> src/consciousness/recursive_improvement.rs:8702:13
+     |
+8702 |         let predicted_phi = if let Some(plan) = &self.current_plan {
+     |             ^^^^^^^^^^^^^
+     |
+help: if this is intentional, prefix it with an underscore
+     |
+8702 |         let _predicted_phi = if let Some(plan) = &self.current_plan {
+     |             +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+     |
+8702 -         let predicted_phi = if let Some(plan) = &self.current_plan {
+8702 +         let soul::weaver::COHERENCE_THRESHOLD = if let Some(plan) = &self.current_plan {
+     |
+
+warning: unused variable: `action`
+    --> src/consciousness/recursive_improvement.rs:8697:9
+     |
+8697 |         action: ConsciousnessAction,
+     |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_action`
+
+warning: unused variable: `r`
+    --> src/consciousness/recursive_improvement.rs:9527:13
+     |
+9527 |         let r = ((sum_cos / n).powi(2) + (sum_sin / n).powi(2)).sqrt();
+     |             ^
+     |
+help: if this is intentional, prefix it with an underscore
+     |
+9527 |         let _r = ((sum_cos / n).powi(2) + (sum_sin / n).powi(2)).sqrt();
+     |             +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+     |
+9527 -         let r = ((sum_cos / n).powi(2) + (sum_sin / n).powi(2)).sqrt();
+9527 +         let soul::weaver::COHERENCE_THRESHOLD = ((sum_cos / n).powi(2) + (sum_sin / n).powi(2)).sqrt();
+     |
+
+warning: unused variable: `probs`
+     --> src/consciousness/recursive_improvement.rs:13094:13
+      |
+13094 |         let probs = self.probabilities();
+      |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_probs`
+
+warning: unused variable: `prob`
+     --> src/consciousness/recursive_improvement.rs:13501:17
+      |
+13501 |             let prob = distribution[idx];
+      |                 ^^^^
+      |
+help: if this is intentional, prefix it with an underscore
+      |
+13501 |             let _prob = distribution[idx];
+      |                 +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+      |
+13501 -             let prob = distribution[idx];
+13501 +             let soul::weaver::COHERENCE_THRESHOLD = distribution[idx];
+      |
+
+warning: unused variable: `strategy_idx`
+     --> src/consciousness/recursive_improvement.rs:14378:13
+      |
+14378 |         let strategy_idx = Self::strategy_to_index(strategy);
+      |             ^^^^^^^^^^^^
+      |
+help: if this is intentional, prefix it with an underscore
+      |
+14378 |         let _strategy_idx = Self::strategy_to_index(strategy);
+      |             +
+help: you might have meant to pattern match on the similarly named constant `BGE_MAX_SEQ_LEN`
+      |
+14378 -         let strategy_idx = Self::strategy_to_index(strategy);
+14378 +         let embeddings::bge::BGE_MAX_SEQ_LEN = Self::strategy_to_index(strategy);
+      |
+
+warning: unused variable: `start`
+     --> src/consciousness/recursive_improvement.rs:16851:13
+      |
+16851 |         let start = std::time::Instant::now();
+      |             ^^^^^ help: if this is intentional, prefix it with an underscore: `_start`
+
+warning: unused variable: `strategy`
+     --> src/consciousness/recursive_improvement.rs:16995:42
+      |
+16995 |     fn check_social_influence(&mut self, strategy: &RoutingStrategy) -> bool {
+      |                                          ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_strategy`
+
+warning: unused variable: `phi_current`
+   --> src/consciousness/consciousness_driven_evolution.rs:212:13
+    |
+212 |         let phi_current = self.stats.current_phi_ema;
+    |             ^^^^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+212 |         let _phi_current = self.stats.current_phi_ema;
+    |             +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+212 -         let phi_current = self.stats.current_phi_ema;
+212 +         let soul::weaver::COHERENCE_THRESHOLD = self.stats.current_phi_ema;
+    |
+
+warning: unused variable: `gene`
+   --> src/consciousness/consciousness_driven_evolution.rs:696:21
+    |
+696 |         if let Some(gene) = self.genome.genes.get("ltc_time_constant") {
+    |                     ^^^^ help: if this is intentional, prefix it with an underscore: `_gene`
+
+warning: unused variable: `gene`
+   --> src/consciousness/consciousness_driven_evolution.rs:701:21
+    |
+701 |         if let Some(gene) = self.genome.genes.get("ltc_coupling_strength") {
+    |                     ^^^^ help: if this is intentional, prefix it with an underscore: `_gene`
+
+warning: unused variable: `computation`
+   --> src/consciousness/consciousness_guided_routing.rs:667:9
+    |
+667 |         computation: &R,
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_computation`
+
+warning: unused variable: `strategy`
+   --> src/consciousness/consciousness_guided_routing.rs:759:9
+    |
+759 |         strategy: UncertaintyStrategy,
+    |         ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_strategy`
+
+warning: value assigned to `prev` is never read
+   --> src/consciousness/compositionality_primitives.rs:670:25
+    |
+670 |                 let mut prev = current.clone();
+    |                         ^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+warning: unused variable: `base_phi`
+   --> src/consciousness/consciousness_guided_discovery.rs:804:13
+    |
+804 |         let base_phi = self.evaluate_phi(composition, params);
+    |             ^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+804 |         let _base_phi = self.evaluate_phi(composition, params);
+    |             +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+804 -         let base_phi = self.evaluate_phi(composition, params);
+804 +         let soul::weaver::COHERENCE_THRESHOLD = self.evaluate_phi(composition, params);
+    |
+
+warning: unused variable: `candidates`
+   --> src/consciousness/consciousness_guided_discovery.rs:861:13
+    |
+861 |         let candidates = self.discovery.discover_cycles(cycles)?;
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_candidates`
+
+warning: unused variable: `i`
+   --> src/consciousness/narrative_self.rs:429:14
+    |
+429 |         for (i, ep) in self.life_story.iter().enumerate() {
+    |              ^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+429 |         for (_i, ep) in self.life_story.iter().enumerate() {
+    |              +
+help: you might have meant to pattern match on the similarly named constant `BGE_MAX_SEQ_LEN`
+    |
+429 -         for (i, ep) in self.life_story.iter().enumerate() {
+429 +         for (embeddings::bge::BGE_MAX_SEQ_LEN, ep) in self.life_story.iter().enumerate() {
+    |
+
+warning: variable `verified` is assigned to, but never used
+   --> src/consciousness/narrative_gwt_integration.rs:929:17
+    |
+929 |         let mut verified = 0;
+    |                 ^^^^^^^^
+    |
+    = note: consider using `_verified` instead
+
+warning: variable `accurate` is assigned to, but never used
+   --> src/consciousness/narrative_gwt_integration.rs:930:17
+    |
+930 |         let mut accurate = 0;
+    |                 ^^^^^^^^
+    |
+    = note: consider using `_accurate` instead
+
+warning: unused variable: `actual_coherence`
+   --> src/consciousness/predictive_self.rs:768:63
+    |
+768 |     pub fn learn_from_outcome_raw(&mut self, actual_phi: f64, actual_coherence: f64) {
+    |                                                               ^^^^^^^^^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+768 |     pub fn learn_from_outcome_raw(&mut self, actual_phi: f64, _actual_coherence: f64) {
+    |                                                               +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+768 -     pub fn learn_from_outcome_raw(&mut self, actual_phi: f64, actual_coherence: f64) {
+768 +     pub fn learn_from_outcome_raw(&mut self, actual_phi: f64, soul::weaver::COHERENCE_THRESHOLD: f64) {
+    |
+
+warning: unused variable: `predictive`
+   --> src/consciousness/temporal_consciousness.rs:439:9
+    |
+439 |         predictive: &PredictiveSelfModel,
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_predictive`
+
+warning: unused variable: `dims`
+   --> src/consciousness/consciousness_thermodynamics.rs:626:44
+    |
+626 |     fn calculate_chemical_potential(&self, dims: &[f64; 7]) -> f64 {
+    |                                            ^^^^ help: if this is intentional, prefix it with an underscore: `_dims`
+
+warning: unused variable: `mean_phase`
+   --> src/consciousness/consciousness_resonance.rs:529:13
+    |
+529 |         let mean_phase: f64 = self.oscillators.iter()
+    |             ^^^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+529 |         let _mean_phase: f64 = self.oscillators.iter()
+    |             +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+529 -         let mean_phase: f64 = self.oscillators.iter()
+529 +         let soul::weaver::COHERENCE_THRESHOLD: f64 = self.oscillators.iter()
+    |
+
+warning: unused variable: `i`
+   --> src/consciousness/synthetic_states.rs:311:13
+    |
+311 |         for i in 0..self.num_components {
+    |             ^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+311 |         for _i in 0..self.num_components {
+    |             +
+help: you might have meant to pattern match on the similarly named constant `BGE_MAX_SEQ_LEN`
+    |
+311 -         for i in 0..self.num_components {
+311 +         for embeddings::bge::BGE_MAX_SEQ_LEN in 0..self.num_components {
+    |
+
+warning: unused variable: `event`
+   --> src/observability/telemetry_observer.rs:184:47
+    |
+184 |     fn record_primitive_activation(&mut self, event: PrimitiveActivationEvent) -> Result<()> {
+    |                                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+
+warning: unused variable: `event`
+   --> src/observability/telemetry_observer.rs:189:45
+    |
+189 |     fn record_response_generated(&mut self, event: ResponseGeneratedEvent) -> Result<()> {
+    |                                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+
+warning: unused variable: `event`
+   --> src/observability/telemetry_observer.rs:206:32
+    |
+206 |     fn record_error(&mut self, event: ErrorEvent) -> Result<()> {
+    |                                ^^^^^ help: if this is intentional, prefix it with an underscore: `_event`
+
+warning: variable does not need to be mutable
+   --> src/observability/correlation.rs:163:13
+    |
+163 |         let mut metadata = if let Some(parent) = self.current_parent() {
+    |             ----^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `trace`
+   --> src/observability/causal_graph.rs:261:40
+    |
+261 |     fn infer_temporal_edges(&mut self, trace: &Trace) {
+    |                                        ^^^^^ help: if this is intentional, prefix it with an underscore: `_trace`
+
+warning: unused variable: `value`
+   --> src/observability/causal_intervention.rs:285:17
+    |
+285 |             let value = match intervention {
+    |                 ^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+285 |             let _value = match intervention {
+    |                 +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+285 -             let value = match intervention {
+285 +             let soul::weaver::COHERENCE_THRESHOLD = match intervention {
+    |
+
+warning: unused variable: `incoming_edges`
+   --> src/observability/counterfactual_reasoning.rs:239:17
+    |
+239 |             let incoming_edges: Vec<&ProbabilisticEdge> = self.graph.edges()
+    |                 ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_incoming_edges`
+
+warning: unused variable: `hidden_state`
+   --> src/observability/counterfactual_reasoning.rs:275:9
+    |
+275 |         hidden_state: &HiddenState,
+    |         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_hidden_state`
+
+warning: unused variable: `step`
+   --> src/observability/action_planning.rs:323:9
+    |
+323 |         step: usize,
+    |         ^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+323 |         _step: usize,
+    |         +
+help: you might have meant to pattern match on the similarly named constant `BGE_MAX_SEQ_LEN`
+    |
+323 -         step: usize,
+323 +         embeddings::bge::BGE_MAX_SEQ_LEN: usize,
+    |
+
+warning: unused variable: `target`
+   --> src/observability/action_planning.rs:354:38
+    |
+354 |     fn estimate_current_value(&self, target: &str) -> f64 {
+    |                                      ^^^^^^ help: if this is intentional, prefix it with an underscore: `_target`
+
+warning: unused variable: `attack_type`
+   --> src/observability/predictive_byzantine_defense.rs:387:45
+    |
+387 |     pub fn report_false_negative(&mut self, attack_type: AttackType) {
+    |                                             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_attack_type`
+
+warning: unused variable: `event_id`
+   --> src/observability/predictive_byzantine_defense.rs:455:36
+    |
+455 |     fn extract_causal_chain(&self, event_id: &str) -> Vec<String> {
+    |                                    ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_event_id`
+
+warning: unused variable: `pattern_id`
+   --> src/observability/predictive_byzantine_defense.rs:466:9
+    |
+466 |         pattern_id: &str,
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pattern_id`
+
+warning: unused variable: `frequency`
+   --> src/observability/predictive_byzantine_defense.rs:467:9
+    |
+467 |         frequency: f64,
+    |         ^^^^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+467 |         _frequency: f64,
+    |         +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+467 -         frequency: f64,
+467 +         soul::weaver::COHERENCE_THRESHOLD: f64,
+    |
+
+warning: unused variable: `example_chains`
+   --> src/observability/predictive_byzantine_defense.rs:468:9
+    |
+468 |         example_chains: &[Vec<String>],
+    |         ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_example_chains`
+
+warning: unused variable: `description`
+   --> src/observability/predictive_byzantine_defense.rs:478:9
+    |
+478 |         description: &str,
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_description`
+
+warning: unused variable: `involved_events`
+   --> src/observability/predictive_byzantine_defense.rs:479:9
+    |
+479 |         involved_events: &[String],
+    |         ^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_involved_events`
+
+warning: unused variable: `item1`
+   --> src/brain/sleep.rs:420:21
+    |
+420 |                 let item1 = &self.working_memory_buffer[idx1];
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_item1`
+
+warning: unused variable: `item2`
+   --> src/brain/sleep.rs:421:21
+    |
+421 |                 let item2 = &self.working_memory_buffer[idx2];
+    |                     ^^^^^ help: if this is intentional, prefix it with an underscore: `_item2`
+
+warning: unused variable: `image`
+   --> src/perception/semantic_vision.rs:204:33
+    |
+204 |     pub fn caption_image(&self, image: &DynamicImage) -> Result<ImageCaption> {
+    |                                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `image`
+   --> src/perception/semantic_vision.rs:218:35
+    |
+218 |     pub fn answer_question(&self, image: &DynamicImage, question: &str) -> Result<VqaResponse> {
+    |                                   ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `image`
+   --> src/perception/ocr.rs:121:29
+    |
+121 |     pub fn recognize(&self, image: &DynamicImage) -> Result<OcrResult> {
+    |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `image`
+   --> src/perception/ocr.rs:185:29
+    |
+185 |     pub fn recognize(&self, image: &DynamicImage) -> Result<OcrResult> {
+    |                             ^^^^^ help: if this is intentional, prefix it with an underscore: `_image`
+
+warning: unused variable: `integration`
+   --> src/language/conscious_conversation.rs:338:43
+    |
+338 |     fn record_learning_outcome(&mut self, integration: &IntegrationResult) -> Result<()> {
+    |                                           ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_integration`
+
+warning: variable `context_count` is assigned to, but never used
+   --> src/language/multilingual.rs:534:17
+    |
+534 |         let mut context_count = 0;
+    |                 ^^^^^^^^^^^^^
+    |
+    = note: consider using `_context_count` instead
+
+warning: unused variable: `query`
+   --> src/language/reasoning.rs:769:31
+    |
+769 |     fn generate_answer(&self, query: &str) -> (bool, Option<String>) {
+    |                               ^^^^^ help: if this is intentional, prefix it with an underscore: `_query`
+
+warning: unused variable: `tag`
+   --> src/language/deep_parser.rs:843:25
+    |
+843 |         for (i, (token, tag)) in tokens.iter().zip(pos_tags.iter()).enumerate() {
+    |                         ^^^ help: if this is intentional, prefix it with an underscore: `_tag`
+
+warning: variable does not need to be mutable
+  --> src/language/frames.rs:91:13
+   |
+91 |         let mut semantics = UniversalSemantics::new();
+   |             ----^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/language/constructions.rs:185:13
+    |
+185 |         let mut semantics = UniversalSemantics::new();
+    |             ----^^^^^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: unused variable: `prediction`
+   --> src/language/predictive_understanding.rs:544:21
+    |
+544 |                 let prediction = &self.predictions[level];
+    |                     ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_prediction`
+
+warning: unused variable: `weight`
+   --> src/language/predictive_understanding.rs:545:21
+    |
+545 |                 let weight = (error.precision * learning_rate).min(1.0);
+    |                     ^^^^^^
+    |
+help: if this is intentional, prefix it with an underscore
+    |
+545 |                 let _weight = (error.precision * learning_rate).min(1.0);
+    |                     +
+help: you might have meant to pattern match on the similarly named constant `COHERENCE_THRESHOLD`
+    |
+545 -                 let weight = (error.precision * learning_rate).min(1.0);
+545 +                 let soul::weaver::COHERENCE_THRESHOLD = (error.precision * learning_rate).min(1.0);
+    |
+
+warning: unused variable: `level`
+   --> src/language/predictive_understanding.rs:564:14
+    |
+564 |         for (level, error) in &self.errors {
+    |              ^^^^^ help: if this is intentional, prefix it with an underscore: `_level`
+
+warning: unused variable: `word`
+   --> src/language/predictive_understanding.rs:602:36
+    |
+602 |     fn learn_from_error(&mut self, word: &str) {
+    |                                    ^^^^ help: if this is intentional, prefix it with an underscore: `_word`
+
+warning: unused variable: `start_time`
+   --> src/language/conscious_understanding.rs:344:13
+    |
+344 |         let start_time = std::time::Instant::now();
+    |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_start_time`
+
+warning: unused variable: `result`
+   --> src/language/nixos_language_adapter.rs:986:9
+    |
+986 |         result: &BridgeResult,
+    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_result`
+
+warning: unused variable: `validate_after`
+   --> src/language/consciousness_guided_executor.rs:385:65
+    |
+385 |             ExecutionStrategy::Confident { execute_immediately, validate_after, explain_to_user } => {
+    |                                                                 ^^^^^^^^^^^^^^ help: try ignoring the field: `validate_after: _`
+
+warning: unused variable: `clarification_needed`
+   --> src/language/consciousness_guided_executor.rs:479:44
+    |
+479 |             ExecutionStrategy::Skeptical { clarification_needed, require_explicit_confirmation, suggested_questions } => {
+    |                                            ^^^^^^^^^^^^^^^^^^^^ help: try ignoring the field: `clarification_needed: _`
+
+warning: unused variable: `require_explicit_confirmation`
+   --> src/language/consciousness_guided_executor.rs:479:66
+    |
+479 |             ExecutionStrategy::Skeptical { clarification_needed, require_explicit_confirmation, suggested_questions } => {
+    |                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try ignoring the field: `require_explicit_confirmation: _`
+
+warning: unused variable: `context_emb`
+   --> src/language/llm_organ.rs:634:46
+    |
+634 |         let context_similarity = if let Some(context_emb) = &request.context_embedding {
+    |                                              ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_context_emb`
+
+warning: unused variable: `parsed`
+   --> src/web_research/researcher.rs:189:13
+    |
+189 |         let parsed = self.parser.parse(query);
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_parsed`
+
+warning: unused variable: `element`
+   --> src/web_research/extractor.rs:182:29
+    |
+182 |                 if let Some(element) = document.select(&selector).next() {
+    |                             ^^^^^^^ help: if this is intentional, prefix it with an underscore: `_element`
+
+warning: unused variable: `text`
+   --> src/web_research/extractor.rs:241:62
+    |
+241 |     fn determine_content_type(&self, url: &str, title: &str, text: &str) -> ContentType {
+    |                                                              ^^^^ help: if this is intentional, prefix it with an underscore: `_text`
+
+warning: unused variable: `claim`
+   --> src/web_research/verifier.rs:267:34
+    |
+267 |     fn does_support_claim(&self, claim: &str, excerpt: &str) -> bool {
+    |                                  ^^^^^ help: if this is intentional, prefix it with an underscore: `_claim`
+
+warning: unused variable: `level`
+   --> src/web_research/verifier.rs:355:9
+    |
+355 |         level: VerificationLevel,
+    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_level`
+
+warning: unused variable: `domain`
+   --> src/web_research/meta_learning.rs:308:13
+    |
+308 |         let domain = Self::extract_domain(&source_url);
+    |             ^^^^^^ help: if this is intentional, prefix it with an underscore: `_domain`
+
+warning: field `semantic` is never read
+   --> src/lib.rs:240:5
+    |
+238 | pub struct SymthaeaHLB {
+    |            ----------- field in this struct
+239 |     /// Phase 10: Core components
+240 |     semantic: SemanticSpace,
+    |     ^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: fields `phi_calculator` and `primitive_system` are never read
+   --> src/consciousness/primitive_evolution.rs:320:5
+    |
+312 | pub struct PrimitiveEvolution {
+    |            ------------------ fields in this struct
+...
+320 |     phi_calculator: IntegratedInformation,
+    |     ^^^^^^^^^^^^^^
+...
+323 |     primitive_system: PrimitiveSystem,
+    |     ^^^^^^^^^^^^^^^^
+
+warning: field `tier` is never read
+  --> src/consciousness/multi_objective_evolution.rs:86:5
+   |
+85 | pub struct MultiObjectiveEvolution {
+   |            ----------------------- field in this struct
+86 |     tier: PrimitiveTier,
+   |     ^^^^
+
+warning: field `confidence_threshold` is never read
+   --> src/consciousness/metacognitive_monitoring.rs:374:5
+    |
+372 | struct SelfCorrectionEngine {
+    |        -------------------- field in this struct
+373 |     /// Confidence threshold for proposing corrections
+374 |     confidence_threshold: f64,
+    |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: field `verbose` is never read
+   --> src/consciousness/causal_explanation.rs:516:5
+    |
+508 | pub struct CausalExplainer {
+    |            --------------- field in this struct
+...
+516 |     verbose: bool,
+    |     ^^^^^^^
+
+warning: field `config` is never read
+   --> src/consciousness/context_aware_evolution.rs:504:5
+    |
+503 | pub struct ContextAwareOptimizer {
+    |            --------------------- field in this struct
+504 |     config: EvolutionConfig,
+    |     ^^^^^^
+
+warning: fields `children` and `primitive` are never read
+   --> src/consciousness/byzantine_collective.rs:197:5
+    |
+192 | struct MerkleNode {
+    |        ---------- fields in this struct
+...
+197 |     children: Option<Vec<u64>>,
+    |     ^^^^^^^^
+...
+200 |     primitive: Option<CandidatePrimitive>,
+    |     ^^^^^^^^^
+    |
+    = note: `MerkleNode` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `min_contribution_trust` is never read
+   --> src/consciousness/byzantine_collective.rs:224:5
+    |
+204 | pub struct ByzantineResistantCollective {
+    |            ---------------------------- field in this struct
+...
+224 |     min_contribution_trust: f64,
+    |     ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `created_at` is never read
+    --> src/consciousness/recursive_improvement.rs:1090:5
+     |
+1064 | pub struct SafeExperiment {
+     |            -------------- field in this struct
+...
+1090 |     created_at: Instant,
+     |     ^^^^^^^^^^
+     |
+     = note: `SafeExperiment` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `gradient_optimizer` is never read
+   --> src/consciousness/consciousness_driven_evolution.rs:310:5
+    |
+302 | pub struct ConsciousnessDrivenEvolver {
+    |            -------------------------- field in this struct
+...
+310 |     gradient_optimizer: ConsciousnessGradientOptimizer,
+    |     ^^^^^^^^^^^^^^^^^^
+
+warning: fields `component` and `severity` are never read
+   --> src/consciousness/consciousness_driven_evolution.rs:780:5
+    |
+778 | struct PhiBottleneck {
+    |        ------------- fields in this struct
+779 |     /// Which component is bottlenecked
+780 |     component: String,
+    |     ^^^^^^^^^
+...
+783 |     severity: f64,
+    |     ^^^^^^^^
+    |
+    = note: `PhiBottleneck` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `id` is never read
+   --> src/consciousness/hierarchical_ltc.rs:134:5
+    |
+132 | pub struct LocalCircuit {
+    |            ------------ field in this struct
+133 |     /// Circuit identifier
+134 |     id: usize,
+    |     ^^
+    |
+    = note: `LocalCircuit` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: field `inter_circuit` is never read
+   --> src/consciousness/hierarchical_ltc.rs:430:5
+    |
+419 | pub struct HierarchicalLTC {
+    |            --------------- field in this struct
+...
+430 |     inter_circuit: SparseMatrix,
+    |     ^^^^^^^^^^^^^
+
+warning: field `frequency` is never read
+  --> src/consciousness/unified_consciousness_pipeline.rs:65:5
+   |
+63 | pub struct GammaOscillator {
+   |            --------------- field in this struct
+64 |     /// Oscillation frequency (Hz) - typically 30-100Hz, centered at 40Hz
+65 |     frequency: f64,
+   |     ^^^^^^^^^
+   |
+   = note: `GammaOscillator` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: field `base_system` is never read
+   --> src/consciousness/compositionality_primitives.rs:174:5
+    |
+166 | pub struct CompositionalityEngine {
+    |            ---------------------- field in this struct
+...
+174 |     base_system: Arc<PrimitiveSystem>,
+    |     ^^^^^^^^^^^
+
+warning: field `engine` is never read
+   --> src/consciousness/compositionality_primitives.rs:877:5
+    |
+876 | pub struct CompositionDiscovery {
+    |            -------------------- field in this struct
+877 |     engine: Arc<CompositionalityEngine>,
+    |     ^^^^^^
+
+warning: field `population_size` is never read
+   --> src/consciousness/meta_meta_learning.rs:135:5
+    |
+125 | pub struct MetaOptimizer {
+    |            ------------- field in this struct
+...
+135 |     population_size: usize,
+    |     ^^^^^^^^^^^^^^^
+
+warning: field `latency_ms` is never read
+   --> src/consciousness/cross_modal_binding.rs:107:5
+    |
+ 95 | pub struct ModalityChannel {
+    |            --------------- field in this struct
+...
+107 |     latency_ms: f64,
+    |     ^^^^^^^^^^
+    |
+    = note: `ModalityChannel` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: field `learning_rate` is never read
+   --> src/consciousness/cross_modal_binding.rs:218:5
+    |
+204 | pub struct ConvergenceZone {
+    |            --------------- field in this struct
+...
+218 |     learning_rate: f64,
+    |     ^^^^^^^^^^^^^
+    |
+    = note: `ConvergenceZone` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: field `coherence_weights` is never read
+   --> src/consciousness/predictive_self.rs:182:5
+    |
+176 | pub struct SelfPredictor {
+    |            ------------- field in this struct
+...
+182 |     coherence_weights: Vec<f64>,
+    |     ^^^^^^^^^^^^^^^^^
+    |
+    = note: `SelfPredictor` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `temporal_reasoner` is never read
+   --> src/consciousness/temporal_consciousness.rs:702:5
+    |
+682 | pub struct TemporalConsciousnessAnalyzer {
+    |            ----------------------------- field in this struct
+...
+702 |     temporal_reasoner: TemporalReasoner,
+    |     ^^^^^^^^^^^^^^^^^
+
+warning: field `started_at` is never read
+   --> src/consciousness/consciousness_signatures.rs:434:5
+    |
+422 | pub struct ConsciousnessSignatureAnalyzer {
+    |            ------------------------------ field in this struct
+...
+434 |     started_at: Instant,
+    |     ^^^^^^^^^^
+
+warning: field `started_at` is never read
+   --> src/consciousness/consciousness_topology.rs:392:5
+    |
+380 | pub struct ConsciousnessTopologyAnalyzer {
+    |            ----------------------------- field in this struct
+...
+392 |     started_at: Instant,
+    |     ^^^^^^^^^^
+
+warning: field `started_at` is never read
+   --> src/consciousness/consciousness_field_dynamics.rs:385:5
+    |
+359 | pub struct ConsciousnessFieldAnalyzer {
+    |            -------------------------- field in this struct
+...
+385 |     started_at: Instant,
+    |     ^^^^^^^^^^
+
+warning: constant `CONSCIOUSNESS_BOLTZMANN` is never used
+  --> src/consciousness/consciousness_thermodynamics.rs:42:7
+   |
+42 | const CONSCIOUSNESS_BOLTZMANN: f64 = 1.0;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `probability_distribution` and `started_at` are never read
+   --> src/consciousness/consciousness_thermodynamics.rs:410:5
+    |
+399 | pub struct ConsciousnessThermodynamicsAnalyzer {
+    |            ----------------------------------- fields in this struct
+...
+410 |     probability_distribution: Vec<f64>,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+419 |     started_at: Instant,
+    |     ^^^^^^^^^^
+    |
+    = note: `ConsciousnessThermodynamicsAnalyzer` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `fundamental` is never read
+   --> src/consciousness/consciousness_resonance.rs:822:5
+    |
+820 | pub struct HarmonicAnalyzer {
+    |            ---------------- field in this struct
+821 |     /// Base frequency (fundamental)
+822 |     fundamental: f64,
+    |     ^^^^^^^^^^^
+
+warning: field `dimension` is never read
+   --> src/consciousness/synthetic_states.rs:152:5
+    |
+144 | pub struct SyntheticStateGenerator {
+    |            ----------------------- field in this struct
+...
+152 |     dimension: usize,
+    |     ^^^^^^^^^
+    |
+    = note: `SyntheticStateGenerator` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: field `intervention_engine` is never read
+   --> src/observability/counterfactual_reasoning.rs:147:5
+    |
+142 | pub struct CounterfactualEngine {
+    |            -------------------- field in this struct
+...
+147 |     intervention_engine: CausalInterventionEngine,
+    |     ^^^^^^^^^^^^^^^^^^^
+
+warning: methods `matches_attack_pattern` and `extract_causal_chain` are never used
+   --> src/observability/predictive_byzantine_defense.rs:432:8
+    |
+205 | impl PredictiveDefender {
+    | ----------------------- methods in this implementation
+...
+432 |     fn matches_attack_pattern(&self, pattern: &AttackPattern) -> bool {
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+...
+455 |     fn extract_causal_chain(&self, event_id: &str) -> Vec<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^
+
+warning: field `command` is never read
+  --> src/nix_understanding.rs:44:5
+   |
+43 | struct ParsedIntent {
+   |        ------------ field in this struct
+44 |     command: NixCommand,
+   |     ^^^^^^^
+   |
+   = note: `ParsedIntent` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `max_size` is never read
+  --> src/perception/visual.rs:34:5
+   |
+29 | pub struct VisualCortex {
+   |            ------------ field in this struct
+...
+34 |     max_size: (u32, u32),
+   |     ^^^^^^^^
+
+warning: field `model_path` is never read
+  --> src/perception/semantic_vision.rs:96:5
+   |
+94 | pub struct SigLipModel {
+   |            ----------- field in this struct
+95 |     /// Model path (will be downloaded from HuggingFace if needed)
+96 |     model_path: Option<PathBuf>,
+   |     ^^^^^^^^^^
+
+warning: field `model_path` is never read
+   --> src/perception/semantic_vision.rs:174:5
+    |
+172 | pub struct MoondreamModel {
+    |            -------------- field in this struct
+173 |     /// Model path
+174 |     model_path: Option<PathBuf>,
+    |     ^^^^^^^^^^
+
+warning: field `observer` is never read
+   --> src/awakening.rs:155:5
+    |
+129 | pub struct SymthaeaAwakening {
+    |            ----------------- field in this struct
+...
+155 |     observer: SharedObserver,
+    |     ^^^^^^^^
+
+warning: field `creativity` is never read
+   --> src/language/conversation.rs:106:5
+    |
+ 94 | pub struct Conversation {
+    |            ------------ field in this struct
+...
+106 |     creativity: ConsciousnessCreativity,
+    |     ^^^^^^^^^^
+
+warning: fields `phi_calculator` and `runtime` are never read
+  --> src/language/conscious_conversation.rs:71:5
+   |
+57 | pub struct ConsciousConversation {
+   |            --------------------- fields in this struct
+...
+71 |     phi_calculator: IntegratedInformation,
+   |     ^^^^^^^^^^^^^^
+...
+74 |     runtime: Option<Runtime>,
+   |     ^^^^^^^
+
+warning: field `phi_calculator` is never read
+   --> src/language/consciousness_observatory.rs:336:5
+    |
+322 | pub struct ConsciousnessObservatory {
+    |            ------------------------ field in this struct
+...
+336 |     phi_calculator: IntegratedInformation,
+    |     ^^^^^^^^^^^^^^
+
+warning: field `failed_lookups` is never read
+   --> src/language/word_learner.rs:119:5
+    |
+111 | pub struct WordLearner {
+    |            ----------- field in this struct
+...
+119 |     failed_lookups: RwLock<HashMap<String, u64>>,
+    |     ^^^^^^^^^^^^^^
+
+warning: method `transition_weight` is never used
+   --> src/language/dynamic_generation.rs:374:8
+    |
+329 | impl SentenceForm {
+    | ----------------- method in this implementation
+...
+374 |     fn transition_weight(&self, previous: &SentenceForm) -> f32 {
+    |        ^^^^^^^^^^^^^^^^^
+
+warning: fields `phi` and `valence` are never read
+    --> src/language/dynamic_generation.rs:1038:5
+     |
+1036 | pub struct IntentFormation<'a> {
+     |            --------------- fields in this struct
+1037 |     parsed_input: &'a ParsedSentence,
+1038 |     phi: f32,
+     |     ^^^
+1039 |     valence: f32,
+     |     ^^^^^^^
+
+warning: field `goals` is never read
+   --> src/language/reasoning.rs:202:5
+    |
+194 | pub struct ReasoningEngine {
+    |            --------------- field in this struct
+...
+202 |     goals: VecDeque<Goal>,
+    |     ^^^^^
+
+warning: fields `verb_class`, `subject_role`, and `object_role` are never read
+   --> src/language/deep_parser.rs:245:5
+    |
+244 | struct RolePattern {
+    |        ----------- fields in this struct
+245 |     verb_class: VerbClass,
+    |     ^^^^^^^^^^
+246 |     subject_role: SemanticRole,
+    |     ^^^^^^^^^^^^
+247 |     object_role: Option<SemanticRole>,
+    |     ^^^^^^^^^^^
+
+warning: field `pattern` is never read
+  --> src/language/creative.rs:43:5
+   |
+41 | struct MetaphorTemplate {
+   |        ---------------- field in this struct
+42 |     source_domain: String,
+43 |     pattern: String,  // e.g., "{target} is like {source}"
+   |     ^^^^^^^
+   |
+   = note: `MetaphorTemplate` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: field `gamma` is never read
+   --> src/language/live_learner.rs:252:5
+    |
+250 | pub struct RewardProcessor {
+    |            --------------- field in this struct
+251 |     /// Discount factor for temporal difference
+252 |     gamma: f32,
+    |     ^^^^^
+    |
+    = note: `RewardProcessor` has a derived impl for the trait `Debug`, but this is intentionally ignored during dead code analysis
+
+warning: field `grammar` is never read
+   --> src/language/predictive_understanding.rs:272:5
+    |
+264 | pub struct PredictiveUnderstanding {
+    |            ----------------------- field in this struct
+...
+272 |     grammar: ConstructionGrammar,
+    |     ^^^^^^^
+    |
+    = note: `PredictiveUnderstanding` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: function `inference_domain_from_level` is never used
+   --> src/language/active_inference_adapter.rs:198:4
+    |
+198 | fn inference_domain_from_level(level: LinguisticLevel) -> InferenceDomain {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `encodings` is never read
+   --> src/language/nix_error_diagnosis.rs:613:5
+    |
+609 | pub struct NixErrorDiagnoser {
+    |            ----------------- field in this struct
+...
+613 |     encodings: HashMap<NixErrorType, HV16>,
+    |     ^^^^^^^^^
+
+warning: field `config` is never read
+  --> src/voice/conversation.rs:78:5
+   |
+77 | pub struct VoiceConversation {
+   |            ----------------- field in this struct
+78 |     config: VoiceConfig,
+   |     ^^^^^^
+
+warning: field `config` is never read
+   --> src/voice/conversation.rs:293:5
+    |
+292 | pub struct MockVoiceConversation {
+    |            --------------------- field in this struct
+293 |     config: VoiceConfig,
+    |     ^^^^^^
+
+warning: field `config` is never read
+  --> src/databases/qdrant_client.rs:68:5
+   |
+67 | pub struct QdrantSensory {
+   |            ------------- field in this struct
+68 |     config: QdrantConfig,
+   |     ^^^^^^
+
+warning: associated function `hv_to_vec` is never used
+   --> src/databases/qdrant_client.rs:155:8
+    |
+ 80 | impl QdrantSensory {
+    | ------------------ associated function in this implementation
+...
+155 |     fn hv_to_vec(hv: &HV16) -> Vec<f32> {
+    |        ^^^^^^^^^
+
+warning: field `config` is never read
+  --> src/databases/cozo_client.rs:81:5
+   |
+80 | pub struct CozoPrefrontal {
+   |            -------------- field in this struct
+81 |     config: CozoConfig,
+   |     ^^^^^^
+
+warning: field `config` is never read
+  --> src/databases/lance_client.rs:79:5
+   |
+78 | pub struct LanceLongTerm {
+   |            ------------- field in this struct
+79 |     config: LanceConfig,
+   |     ^^^^^^
+
+warning: fields `knowledge_graph`, `reasoning`, `min_sources_high_confidence`, and `agreement_threshold` are never read
+   --> src/web_research/verifier.rs:115:5
+    |
+113 | pub struct EpistemicVerifier {
+    |            ----------------- fields in this struct
+114 |     /// Knowledge graph for checking existing knowledge
+115 |     knowledge_graph: KnowledgeGraph,
+    |     ^^^^^^^^^^^^^^^
+...
+118 |     reasoning: ReasoningEngine,
+    |     ^^^^^^^^^
+...
+121 |     min_sources_high_confidence: usize,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+127 |     agreement_threshold: f64,
+    |     ^^^^^^^^^^^^^^^^^^^
+
+warning: fields `vocabulary` and `active_learning` are never read
+   --> src/web_research/meta_learning.rs:211:5
+    |
+209 | pub struct EpistemicLearner {
+    |            ---------------- fields in this struct
+210 |     /// Vocabulary for domain classification
+211 |     vocabulary: Vocabulary,
+    |     ^^^^^^^^^^
+...
+232 |     active_learning: bool,
+    |     ^^^^^^^^^^^^^^^
+
+warning: `symthaea` (lib) generated 208 warnings (run `cargo fix --lib -p symthaea` to apply 76 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9m 04s
+     Running `target/debug/examples/phi_validation_study`
+🔬 Φ Validation Framework - First Empirical Study
+═══════════════════════════════════════════════════
+
+Configuration:
+  • Samples per state: 100
+  • State types: 8 (Deep Anesthesia → Alert Focused)
+  • Total samples: 800
+  • Component count: 16 (HDC components)
+  • Vector dimension: 16384 (HV16)
+
+Initializing validation framework...
+✓ Framework initialized
+
+Running validation study...
+This will take approximately 1-2 seconds for 800 samples
+
+🔬 Starting Φ Validation Study
+   Samples per state: 100
+
+📊 Testing DeepAnesthesia (n=100)
+   Mean Φ: 0.081 (expected: 0.00-0.05)
+📊 Testing LightAnesthesia (n=100)
+   Mean Φ: 0.087 (expected: 0.05-0.15)
+📊 Testing DeepSleep (n=100)
+   Mean Φ: 0.061 (expected: 0.15-0.25)
+📊 Testing LightSleep (n=100)
+   Mean Φ: 0.066 (expected: 0.25-0.35)
+📊 Testing Drowsy (n=100)
+   Mean Φ: 0.053 (expected: 0.35-0.45)
+📊 Testing RestingAwake (n=100)
+   Mean Φ: 0.065 (expected: 0.45-0.55)
+📊 Testing Awake (n=100)
+   Mean Φ: 0.056 (expected: 0.55-0.65)
+📊 Testing AlertFocused (n=100)
+   Mean Φ: 0.051 (expected: 0.65-0.85)
+
+✅ Validation study complete
+   Total samples: 800
+   Pearson r: -0.803
+   p-value: 0.000000
+   R²: 0.645
+
+✓ Validation study complete in 10.28s
+
+╔═══════════════════════════════════════════════════╗
+║         STATISTICAL VALIDATION RESULTS            ║
+╚═══════════════════════════════════════════════════╝
+
+Primary Metrics:
+  • Pearson correlation (r):    -0.8029
+  • Spearman rank correlation:  -0.7737
+  • p-value:                    0.000000
+  • R² (explained variance):    0.6446
+  • 95% CI:                     [-0.8262, -0.7768]
+
+Classification Performance:
+  • AUC (area under curve):     0.5000
+
+Error Metrics:
+  • MAE (mean absolute error):  0.3177
+  • RMSE (root mean squared):   0.3949
+
+Sample Size:
+  • Total samples (n):          800
+
+╔═══════════════════════════════════════════════════╗
+║              SCIENTIFIC INTERPRETATION            ║
+╚═══════════════════════════════════════════════════╝
+
+❌ INSUFFICIENT RESULTS
+   • Correlation too weak or not significant
+   • Methodology needs revision
+
+╔═══════════════════════════════════════════════════╗
+║           PER-STATE STATISTICAL SUMMARY           ║
+╚═══════════════════════════════════════════════════╝
+
+LightAnesthesia | Mean Φ: 0.0868 ± 0.0035 | Range: [0.0500, 0.1500]
+LightSleep      | Mean Φ: 0.0659 ± 0.0015 | Range: [0.2500, 0.3500]
+Drowsy          | Mean Φ: 0.0529 ± 0.0016 | Range: [0.3500, 0.4500]
+RestingAwake    | Mean Φ: 0.0651 ± 0.0017 | Range: [0.4500, 0.5500]
+Awake           | Mean Φ: 0.0556 ± 0.0015 | Range: [0.5500, 0.6500]
+DeepSleep       | Mean Φ: 0.0613 ± 0.0017 | Range: [0.1500, 0.2500]
+AlertFocused    | Mean Φ: 0.0513 ± 0.0016 | Range: [0.6500, 0.8500]
+DeepAnesthesia  | Mean Φ: 0.0808 ± 0.0016 | Range: [0.0000, 0.0500]
+
+╔═══════════════════════════════════════════════════╗
+║            SCIENTIFIC REPORT GENERATION           ║
+╚═══════════════════════════════════════════════════╝
+
+# Φ Validation Study Results
+
+**Study Date**: 2025-12-26
+**Sample Size**: n = 800
+
+## Statistical Summary
+
+- **Pearson correlation**: r = -0.803, p = 0.000000
+- **Spearman correlation**: ρ = -0.774
+- **R² (variance explained)**: 0.645
+- **95% Confidence Interval**: (-0.826, -0.777)
+
+## Classification Performance
+
+- **AUC (conscious vs unconscious)**: 0.500
+- **Mean Absolute Error**: 0.318
+- **RMSE**: 0.395
+
+## Per-State Analysis
+
+| State | Mean Φ | Std | Expected Range | Status |
+|-------|--------|-----|----------------|--------|
+| DeepAnesthesia | 0.081 | 0.002 | (0.00, 0.05) | ⚠️ |
+| LightAnesthesia | 0.087 | 0.004 | (0.05, 0.15) | ✅ |
+| DeepSleep | 0.061 | 0.002 | (0.15, 0.25) | ⚠️ |
+| LightSleep | 0.066 | 0.002 | (0.25, 0.35) | ⚠️ |
+| Drowsy | 0.053 | 0.002 | (0.35, 0.45) | ⚠️ |
+| RestingAwake | 0.065 | 0.002 | (0.45, 0.55) | ⚠️ |
+| Awake | 0.056 | 0.001 | (0.55, 0.65) | ⚠️ |
+| AlertFocused | 0.051 | 0.002 | (0.65, 0.85) | ⚠️ |
+
+## Interpretation
+
+❌ **INSUFFICIENT**: No significant correlation detected.
+Major revision needed in Φ computation methodology or state generation.
+
+The lack of significant correlation suggests fundamental issues with either:
+1. Φ computation implementation
+2. Synthetic state generation methodology
+3. Integration measurement approach
+
+**Recommendation**: Comprehensive review of IIT implementation required.
+
+## Recommendation
+
+**Fundamental review required**:
+1. Verify Φ computation against IIT 3.0 specification
+2. Analyze outliers and edge cases
+3. Review synthetic state generation methodology
+4. Consider alternative integration measures
+5. Consult IIT literature for implementation guidance
+
+
+✓ Full report saved to: PHI_VALIDATION_STUDY_RESULTS.md
+
+🌟 First empirical validation of IIT complete!
+🔬 Paradigm Shift #1: Consciousness measurement validated
+

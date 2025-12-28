@@ -26,8 +26,12 @@ use std::time::Instant;
 use crate::hdc::HDC_DIMENSION;
 const HDC_DIM: usize = HDC_DIMENSION;
 
-/// Placeholder HDC vector type - 10,000D holographic vector
-/// TODO: Replace with proper HDC implementation from hdc module
+/// Multi-modal HDC vector type - Uses HDC_DIMENSION (16,384D) holographic vector
+///
+/// Note: This is a simplified boolean-based HDC implementation optimized for
+/// multi-modal perception. For consciousness measurement, use `hdc::RealHV`.
+/// For binary operations, use `hdc::HV16`. This type focuses on fast bundling
+/// and projection for sensory fusion tasks.
 #[derive(Debug, Clone)]
 pub struct HdcVector {
     bits: Vec<bool>,

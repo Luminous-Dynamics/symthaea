@@ -243,8 +243,13 @@ impl SleepCycleManager {
 
     /// Phase 4: Pattern Extraction (placeholder)
     fn extract_patterns(&self, report: &mut SleepReport) {
-        // TODO: Use resonator networks to find recurring patterns
-        // For now, just count pattern candidates
+        // Future: Use ResonatorNetwork from hdc::phi_resonant to find recurring patterns
+        // Integration path:
+        // 1. Convert memory entries to RealHV embeddings
+        // 2. Create ResonatorNetwork with memory embeddings as codebook
+        // 3. Run resonator convergence to find attractor patterns
+        // 4. Extract patterns from converged resonator states
+        // For now, use heuristic pattern detection based on access count
 
         let pattern_candidates = self
             .short_term

@@ -60,7 +60,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::memory::EmotionalValence;

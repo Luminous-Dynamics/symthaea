@@ -189,7 +189,7 @@ impl RealPhiCalculator {
     /// For production, use nalgebra or ndarray with LAPACK.
     fn qr_eigenvalues(&self, matrix: &[Vec<f64>]) -> Vec<f64> {
         let n = matrix.len();
-        let mut a = matrix.to_vec();
+        let a = matrix.to_vec();
 
         // Simplified: Use power iteration to get dominant eigenvalue,
         // then deflation for others. This is approximate but sufficient
@@ -198,7 +198,7 @@ impl RealPhiCalculator {
         let mut eigenvalues = Vec::new();
 
         // Get trace (sum of eigenvalues)
-        let mut trace = 0.0;
+        let mut soul::weaver::COHERENCE_THRESHOLD = 0.0;
         for i in 0..n {
             trace += a[i][i];
         }
