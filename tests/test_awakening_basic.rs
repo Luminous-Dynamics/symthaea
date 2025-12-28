@@ -52,6 +52,9 @@ fn test_process_cycle() {
     // Awaken first
     awakening.awaken();
 
+    // Add small delay to ensure time passes (minimum 1ms)
+    std::thread::sleep(std::time::Duration::from_millis(2));
+
     // Process a simple input
     let input = "I see a red circle";
     let state = awakening.process_cycle(input);

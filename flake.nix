@@ -41,8 +41,8 @@
               hash = "sha256-qh5U0ToJ3fZ87m4gDD+YZmgSwPd215Hbw75KkCC1MGk=";
             };
 
-            # Build system
-            build-system = with ps; [ setuptools ];
+            # Build system (PyPhi uses hatchling with hatch-vcs for version)
+            build-system = with ps; [ hatchling hatch-vcs ];
 
             # PyPhi dependencies
             dependencies = with ps; [

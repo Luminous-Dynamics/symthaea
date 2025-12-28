@@ -16,7 +16,11 @@
 // - Enhancement #1 (Streaming): Incremental probability updates
 // - Enhancement #2 (Patterns): Probabilistic pattern matching
 
-use super::causal_graph::{CausalGraph, EdgeType};
+use super::{
+    causal_graph::{CausalGraph, CausalEdge, EdgeType},
+    types::Event,
+    correlation::EventMetadata,
+};
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use rand::Rng;

@@ -14,7 +14,7 @@
 use std::time::Instant;
 use std::collections::VecDeque;
 use std::sync::Arc;
-use crate::brain::prefrontal::{Coalition, WorkingMemoryItem};
+use crate::brain::prefrontal::{AttentionBid, Coalition, WorkingMemoryItem};
 
 /// Sleep states mirroring biological sleep architecture
 #[derive(Debug, Clone, PartialEq)]

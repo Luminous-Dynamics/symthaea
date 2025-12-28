@@ -25,13 +25,16 @@
 use super::{
     // Enhancement #5 Phase 1: Attack Modeling
     byzantine_defense::{
-        AttackModel, AttackType, SystemState, AttackPattern, Countermeasure,
+        AttackModel, AttackType, SystemState, AttackPattern,
+        AttackSimulation, Countermeasure,
     },
     // Enhancement #1: Streaming Analysis
     streaming_causal::{
         StreamingCausalAnalyzer, StreamingConfig, CausalInsight,
         AlertSeverity,
     },
+    // Enhancement #3: Probabilistic Inference
+    probabilistic_inference::ProbabilisticCausalGraph,
     // Core types
     types::Event,
     correlation::EventMetadata,
@@ -461,7 +464,7 @@ impl PredictiveDefender {
     fn check_pattern_for_attack(
         &self,
         pattern_id: &str,
-        soul::weaver::COHERENCE_THRESHOLD: f64,
+        frequency: f64,
         example_chains: &[Vec<String>],
     ) -> Option<AttackWarning> {
         // Match pattern ID to known attack patterns

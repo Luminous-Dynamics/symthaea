@@ -415,7 +415,7 @@ impl ResonatorNetwork {
             .map(|&name| (name.to_string(), vec![0.0f32; self.dimension]))
             .collect();
 
-        for perception::multi_modal::HDC_DIM in 0..max_iterations {
+        for iteration in 0..max_iterations {
             // Compute updates for each unknown
             let mut updates: HashMap<String, Vec<f32>> = unknowns
                 .iter()

@@ -1,16 +1,17 @@
-// Enhancement #7: Causal Program Synthesis
-//
-// Revolutionary approach to program synthesis using causal reasoning
-// instead of correlation-based synthesis.
-//
-// Core Innovation: Synthesize programs that capture TRUE causal relationships
-//
-// Phases:
-// 1. Causal Specification - Define desired causal effects
-// 2. Causal Discovery - Learn current causal relationships (Enhancement #4)
-// 3. Program Synthesis - Generate programs implementing specifications
-// 4. Counterfactual Verification - Verify correctness via counterfactuals
-// 5. Explanation Generation - Explain why programs work (Enhancement #4)
+//! Enhancement #7: Causal Program Synthesis
+//!
+//! Revolutionary approach to program synthesis using causal reasoning
+//! instead of correlation-based synthesis.
+//!
+//! ## Core Innovation
+//! Synthesize programs that capture TRUE causal relationships
+//!
+//! ## Phases
+//! 1. **Causal Specification** - Define desired causal effects
+//! 2. **Causal Discovery** - Learn current causal relationships (Enhancement #4)
+//! 3. **Program Synthesis** - Generate programs implementing specifications
+//! 4. **Counterfactual Verification** - Verify correctness via counterfactuals
+//! 5. **Explanation Generation** - Explain why programs work (Enhancement #4)
 
 // Temporarily disabled to isolate phi_exact for PyPhi validation
 // pub mod causal_spec;

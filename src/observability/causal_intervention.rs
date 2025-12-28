@@ -25,11 +25,14 @@
 // - Safety analysis for system changes
 // - Optimal intervention selection
 
-use super::probabilistic_inference::{
-        ProbabilisticCausalGraph, ProbabilisticPrediction,
+use super::{
+    causal_graph::{CausalGraph, CausalEdge, CausalNode, EdgeType},
+    probabilistic_inference::{
+        ProbabilisticCausalGraph, ProbabilisticEdge, ProbabilisticPrediction,
         UncertaintySource,
-    };
-use std::collections::HashMap;
+    },
+};
+use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
 
 /// Type of intervention on a causal node
@@ -279,7 +282,7 @@ impl CausalInterventionEngine {
             modified.remove_incoming_edges(node);
 
             // Set intervention value
-            let soul::weaver::COHERENCE_THRESHOLD = match intervention {
+            let value = match intervention {
                 InterventionType::SetValue(v) => *v,
                 InterventionType::Enable => 1.0,
                 InterventionType::Disable => 0.0,

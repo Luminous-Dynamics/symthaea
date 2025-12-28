@@ -19,7 +19,9 @@
 
 use super::{
     causal_graph::CausalGraph,
-    counterfactual_reasoning::{CounterfactualEngine, CounterfactualQuery},
+    causal_intervention::{CausalInterventionEngine, InterventionSpec},
+    counterfactual_reasoning::{CounterfactualEngine, CounterfactualQuery, CounterfactualResult},
+    action_planning::{ActionPlanner, Goal, GoalDirection},
     probabilistic_inference::ProbabilisticCausalGraph,
 };
 use std::collections::HashMap;

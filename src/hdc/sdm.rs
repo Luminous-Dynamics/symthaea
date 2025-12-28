@@ -328,7 +328,7 @@ impl SparseDistributedMemory {
 
         let mut total_counters = vec![0i64; self.config.dimension];
         let mut activated_count = 0;
-        let mut soul::weaver::COHERENCE_THRESHOLD = 0.0f64;
+        let mut total_weight = 0.0f64;
 
         for loc in &self.hard_locations {
             let sim = loc.similarity(address);
@@ -459,7 +459,7 @@ impl SparseDistributedMemory {
     /// Find most similar stored pattern to query
     pub fn nearest_neighbor(&mut self, query: &[i8]) -> Option<(Vec<i8>, f32)> {
         match self.read(query) {
-            ReadResult::Success { pattern,  .. } => {
+            ReadResult::Success { pattern, confidence, .. } => {
                 let similarity = hamming_similarity(&pattern, query);
                 Some((pattern, similarity))
             }
