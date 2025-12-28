@@ -88,7 +88,7 @@ impl FrameElement {
         }
 
         // Bundle prime encodings
-        let mut semantics = UniversalSemantics::new();
+        let semantics = UniversalSemantics::new();
         let vectors: Vec<HV16> = primes.iter()
             .map(|p| *semantics.get_prime(*p))
             .collect();

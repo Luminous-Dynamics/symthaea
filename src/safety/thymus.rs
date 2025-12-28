@@ -26,11 +26,10 @@ Tri-state semantics:
 Performance Target: ~50ms (slower than Amygdala, but semantic understanding)
 */
 
-use anyhow::Result;
 use std::time::{Duration, Instant};
 
 use crate::hdc::statistical_retrieval::{
-    EmpiricalTier, RetrievalVerdict, StatisticalRetriever, StatisticalRetrievalConfig,
+    EmpiricalTier, StatisticalRetriever, StatisticalRetrievalConfig,
 };
 
 /// Tri-state verification result (the critical semantic fix)

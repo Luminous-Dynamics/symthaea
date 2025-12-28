@@ -164,7 +164,6 @@
 
 use super::binary_hv::HV16;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 
 /// Topological feature type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

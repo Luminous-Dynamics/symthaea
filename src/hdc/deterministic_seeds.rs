@@ -39,7 +39,6 @@
 //!
 //! This is inspired by Gödel numbering from mathematical logic.
 
-use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::LazyLock;
 

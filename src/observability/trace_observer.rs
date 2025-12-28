@@ -7,7 +7,7 @@
 use super::{SymthaeaObserver, types::*, ObserverStats};
 use anyhow::{Context, Result};
 use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 

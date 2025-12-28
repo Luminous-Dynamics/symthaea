@@ -915,6 +915,7 @@ pub fn random_vector(dim: usize) -> Vec<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hdc::HDC_DIMENSION;
 
     fn create_test_field() -> MorphogeneticField {
         let mut field = MorphogeneticField::new(1000).unwrap();

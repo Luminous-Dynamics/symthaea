@@ -14,7 +14,6 @@
 use std::collections::HashMap;
 use crate::hdc::HV16;
 use crate::observability::{SharedObserver, types::*};
-use std::sync::Arc;
 
 // =============================================================================
 // ERROR CATEGORIES

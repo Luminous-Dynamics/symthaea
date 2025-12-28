@@ -15,9 +15,8 @@
 //! 7. **OverrideChain** - "X overrides Y with priority Z from W"
 //! 8. **ModuleComposition** - "Module X imports Y, providing Z"
 
-use super::nix_frames::{NixFrameType, NixFrameRole, NixFrameInstance, NixFrameFiller};
-use super::nix_primitives::{NixPrimitive, NixPrimitiveTier};
-use crate::hdc::HV16;
+use super::nix_frames::{NixFrameType, NixFrameRole};
+use super::nix_primitives::NixPrimitive;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

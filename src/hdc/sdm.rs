@@ -49,7 +49,6 @@ Traditional SDM uses binary vectors. Our implementation uses:
 - Kanerva, P. (2009). "Hyperdimensional Computing: An Introduction"
 */
 
-use std::collections::HashMap;
 use std::time::Instant;
 
 use super::HDC_DIMENSION;

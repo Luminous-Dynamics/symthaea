@@ -27,7 +27,7 @@ use crate::hdc::consciousness_evaluator::{
 use crate::hdc::consciousness_integration::ConsciousnessState;
 use crate::hdc::substrate_independence::SubstrateType;
 use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 /// Alert level for consciousness changes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

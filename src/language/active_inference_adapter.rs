@@ -54,17 +54,16 @@
 //! asking clarifying questions, requesting confirmations, etc.
 
 use super::consciousness_bridge::{
-    ConsciousnessBridge, BridgeConfig, BridgeResult, BridgeStats,
+    ConsciousnessBridge, BridgeConfig, BridgeResult,
     LinguisticPredictionError, InferenceDomain, ConsciousnessState,
-    LanguageAttentionBid,
 };
 use super::predictive_understanding::LinguisticLevel;
 use crate::brain::active_inference::{
-    ActiveInferenceEngine, PredictionDomain, PredictionError, ActionType,
-    ActiveInferenceSummary, GenerativeModel, ActiveInferenceStats,
+    ActiveInferenceEngine, PredictionDomain, PredictionError,
+    ActiveInferenceSummary,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 // =============================================================================
 // DOMAIN MAPPING

@@ -16,7 +16,7 @@ use crate::hdc::consciousness_self_assessment::{
 use crate::hdc::consciousness_creativity::{
     ConsciousnessCreativity, CreativityConfig,
 };
-use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
+use crate::hdc::tiered_phi::TieredPhi;
 
 // Database integration for persistent memory + LTC
 use crate::databases::{UnifiedMind, MemoryRecord, MemoryType, SearchResult, LTCSnapshot};

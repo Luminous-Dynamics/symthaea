@@ -21,7 +21,7 @@
 //! - Example instantiations
 //! - Inference rules for reasoning
 
-use super::nix_primitives::{NixPrimitive, NixPrimitiveEncoder, NixPrimitiveTier};
+use super::nix_primitives::{NixPrimitive, NixPrimitiveEncoder};
 use crate::hdc::HV16;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

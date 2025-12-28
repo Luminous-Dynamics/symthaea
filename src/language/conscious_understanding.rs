@@ -50,11 +50,10 @@
 
 use crate::hdc::binary_hv::HV16;
 use crate::hdc::universal_semantics::SemanticPrime;
-use super::frames::{FrameLibrary, FrameActivator, FrameInstance};
-use super::constructions::{ConstructionGrammar, ConstructionParse};
+use super::frames::{FrameLibrary, FrameActivator};
+use super::constructions::ConstructionGrammar;
 use super::predictive_understanding::{
     PredictiveUnderstanding, PredictiveConfig,
-    SentenceUnderstanding as PredictiveSentenceResult,
 };
 use super::vocabulary::Vocabulary;
 use serde::{Deserialize, Serialize};

@@ -15,10 +15,7 @@
 // - Learning from historical incidents
 // - Sharing knowledge across Symthaea instances
 
-use super::{
-    causal_graph::CausalGraph,
-    types::Event,
-};
+use super::types::Event;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 

@@ -19,7 +19,6 @@ use super::parser::{ParsedSentence, SentenceType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::observability::{SharedObserver, types::*};
-use std::sync::Arc;
 
 /// Configuration for response generation
 #[derive(Debug, Clone, Serialize, Deserialize)]

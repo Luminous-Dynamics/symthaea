@@ -3530,9 +3530,9 @@ impl PhiTransfer {
                 mv[i] += sim_matrix[i][j] * v[j];
             }
         }
-        let vTMv: f64 = v.iter().zip(mv.iter()).map(|(a, b)| a * b).sum();
-        let vTv: f64 = v.iter().map(|x| x * x).sum();
-        let dominant_eig = vTMv / vTv;
+        let v_t_m_v: f64 = v.iter().zip(mv.iter()).map(|(a, b)| a * b).sum();
+        let v_t_v: f64 = v.iter().map(|x| x * x).sum();
+        let dominant_eig = v_t_m_v / v_t_v;
         features.push(dominant_eig / n as f64); // Normalized
 
         // Spectral gap approximation (using trace)

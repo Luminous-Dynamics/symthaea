@@ -160,7 +160,7 @@ impl CorrelationContext {
     ///
     /// Automatically sets parent_id to current parent (if any)
     pub fn create_event_metadata(&mut self) -> EventMetadata {
-        let mut metadata = if let Some(parent) = self.current_parent() {
+        let metadata = if let Some(parent) = self.current_parent() {
             EventMetadata::with_parent(&self.correlation_id, parent)
         } else {
             EventMetadata::new(&self.correlation_id)

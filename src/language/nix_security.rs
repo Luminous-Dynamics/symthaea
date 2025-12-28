@@ -32,7 +32,6 @@
 //! assert!(result.contains_secrets);
 //! ```
 
-use std::collections::HashMap;
 use std::time::Instant;
 use regex::Regex;
 use serde::{Serialize, Deserialize};

@@ -78,7 +78,6 @@
 use super::binary_hv::HV16;
 use serde::{Deserialize, Serialize};
 use crate::observability::{SharedObserver, types::*};
-use std::sync::Arc;
 
 /// Integrated Information calculator for HDC systems
 ///

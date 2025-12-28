@@ -28,7 +28,6 @@ Mathematical Foundation:
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use anyhow::Result;
 
 use super::HDC_DIMENSION;
 

@@ -369,10 +369,10 @@ impl CElegansConnectome {
         let mut out_degree = vec![0usize; n];
         let mut gap_degree = vec![0usize; n];
 
-        for neuron in &self.neurons {
-            out_degree[neuron.index] = neuron.chemical_out.len();
-            in_degree[neuron.index] = neuron.chemical_in.len();
-            gap_degree[neuron.index] = neuron.gap_junctions.len();
+        for (i, neuron) in self.neurons.iter().enumerate() {
+            out_degree[i] = neuron.chemical_out.len();
+            in_degree[i] = neuron.chemical_in.len();
+            gap_degree[i] = neuron.gap_junctions.len();
         }
 
         let avg_in = in_degree.iter().sum::<usize>() as f64 / n as f64;
@@ -405,6 +405,14 @@ impl CElegansConnectome {
     pub fn to_consciousness_topology(&self, dim: usize) -> ConsciousnessTopology {
         let n = self.neurons.len();
 
+        // Build mapping from original index to actual position
+        let index_map: HashMap<usize, usize> = self
+            .neurons
+            .iter()
+            .enumerate()
+            .map(|(pos, neuron)| (neuron.index, pos))
+            .collect();
+
         // Create node identities (orthogonal basis vectors with small noise)
         let node_identities: Vec<RealHV> = (0..n)
             .map(|i| {
@@ -424,71 +432,80 @@ impl CElegansConnectome {
         let node_representations: Vec<RealHV> = self
             .neurons
             .iter()
-            .map(|neuron| {
-                // Collect all connected neurons with weights
+            .enumerate()
+            .map(|(actual_idx, neuron)| {
+                // Collect all connected neurons with weights (mapped to actual positions)
                 let mut connections: Vec<(usize, f64)> = Vec::new();
 
                 // Add chemical outputs
                 for (target, weight) in &neuron.chemical_out {
-                    connections.push((*target, *weight));
+                    if let Some(&mapped_target) = index_map.get(target) {
+                        connections.push((mapped_target, *weight));
+                    }
                 }
 
                 // Add chemical inputs (with lower weight - information flows out)
                 for (source, weight) in &neuron.chemical_in {
-                    connections.push((*source, weight * 0.5));
+                    if let Some(&mapped_source) = index_map.get(source) {
+                        connections.push((mapped_source, weight * 0.5));
+                    }
                 }
 
                 // Add gap junctions (bidirectional, full weight)
                 for (partner, weight) in &neuron.gap_junctions {
-                    connections.push((*partner, *weight));
+                    if let Some(&mapped_partner) = index_map.get(partner) {
+                        connections.push((mapped_partner, *weight));
+                    }
                 }
 
                 if connections.is_empty() {
                     // Isolated neuron - just use identity
-                    node_identities[neuron.index].clone()
+                    node_identities[actual_idx].clone()
                 } else {
                     // Weighted combination of connected neuron identities
                     let total_weight: f64 = connections.iter().map(|(_, w)| w).sum();
 
                     let mut result = RealHV::zero(dim);
                     for (target_idx, weight) in &connections {
-                        if *target_idx < n {
-                            let scaled = node_identities[*target_idx].scale((*weight / total_weight) as f32);
-                            result = result.add(&scaled);
-                        }
+                        let scaled = node_identities[*target_idx].scale((*weight / total_weight) as f32);
+                        result = result.add(&scaled);
                     }
 
                     // Bind with own identity to create unique representation
-                    node_identities[neuron.index].bind(&result)
+                    node_identities[actual_idx].bind(&result)
                 }
             })
             .collect();
 
-        // Build edge list
+        // Build edge list using actual positions
         let mut edges: Vec<(usize, usize)> = Vec::new();
         let mut seen: HashSet<(usize, usize)> = HashSet::new();
 
-        for neuron in &self.neurons {
+        for (actual_idx, neuron) in self.neurons.iter().enumerate() {
             for (target, _) in &neuron.chemical_out {
-                let edge = if neuron.index < *target {
-                    (neuron.index, *target)
-                } else {
-                    (*target, neuron.index)
-                };
-                if !seen.contains(&edge) {
-                    edges.push(edge);
-                    seen.insert(edge);
+                if let Some(&mapped_target) = index_map.get(target) {
+                    let edge = if actual_idx < mapped_target {
+                        (actual_idx, mapped_target)
+                    } else {
+                        (mapped_target, actual_idx)
+                    };
+                    if !seen.contains(&edge) {
+                        edges.push(edge);
+                        seen.insert(edge);
+                    }
                 }
             }
             for (partner, _) in &neuron.gap_junctions {
-                let edge = if neuron.index < *partner {
-                    (neuron.index, *partner)
-                } else {
-                    (*partner, neuron.index)
-                };
-                if !seen.contains(&edge) {
-                    edges.push(edge);
-                    seen.insert(edge);
+                if let Some(&mapped_partner) = index_map.get(partner) {
+                    let edge = if actual_idx < mapped_partner {
+                        (actual_idx, mapped_partner)
+                    } else {
+                        (mapped_partner, actual_idx)
+                    };
+                    if !seen.contains(&edge) {
+                        edges.push(edge);
+                        seen.insert(edge);
+                    }
                 }
             }
         }

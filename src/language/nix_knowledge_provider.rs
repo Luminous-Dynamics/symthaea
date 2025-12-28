@@ -48,7 +48,7 @@
 //! - "a web server that handles lots of connections" → finds nginx, caddy
 //! - "install the thing that edits PDFs" → finds pdftk, qpdf, okular
 
-use std::collections::{HashMap, BTreeMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 

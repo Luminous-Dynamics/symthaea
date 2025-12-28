@@ -718,6 +718,7 @@ fn normalize(v: &mut Vec<f32>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::hdc::HDC_DIMENSION;
 
     fn random_vector(dim: usize) -> Vec<f32> {
         (0..dim)

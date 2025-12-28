@@ -12,8 +12,7 @@
 // consciousness evaluation framework applicable to biological and artificial systems.
 
 use serde::{Deserialize, Serialize};
-use crate::hdc::binary_hv::HV16;
-use crate::hdc::substrate_independence::{SubstrateType, SubstrateRequirements};
+use crate::hdc::substrate_independence::SubstrateType;
 
 /// Evaluation dimension corresponding to each revolutionary improvement
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

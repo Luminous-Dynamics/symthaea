@@ -56,16 +56,14 @@
 
 use crate::hdc::binary_hv::HV16;
 use super::conscious_understanding::{
-    ConsciousUnderstanding, ActivatedFrame, ParsedConstruction,
-    PredictionResult, ConsciousnessMetrics, PipelineConfig,
+    ConsciousUnderstanding, ActivatedFrame, ParsedConstruction, PipelineConfig,
     ConsciousUnderstandingPipeline,
 };
 use super::predictive_understanding::{
-    PredictiveUnderstanding, LinguisticLevel, LinguisticError,
-    PredictionSource, SentenceUnderstanding,
+    LinguisticLevel, LinguisticError,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 // =============================================================================
 // ATTENTION BID GENERATION

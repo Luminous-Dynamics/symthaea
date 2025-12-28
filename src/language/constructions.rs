@@ -26,7 +26,7 @@
 
 use crate::hdc::binary_hv::HV16;
 use crate::hdc::universal_semantics::{SemanticPrime, UniversalSemantics};
-use super::frames::{SemanticFrame, FrameElement, FrameLibrary};
+use super::frames::{SemanticFrame, FrameLibrary};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -182,7 +182,7 @@ impl SemanticStructure {
         let primary_frame = primary_frame.into();
 
         // Create encoding from frame and primes
-        let mut semantics = UniversalSemantics::new();
+        let semantics = UniversalSemantics::new();
         let mut vectors = Vec::new();
 
         for (p1, p2) in &prime_structure {

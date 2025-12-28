@@ -61,11 +61,10 @@ use crate::action::{ActionIR as CoreActionIR, ActionOutcome, ExecutionError, Pol
 use crate::language::{
     ConsciousnessLanguageCore, ConsciousnessLanguageConfig,
     ConsciousUnderstandingResult, ExecutionStrategy, ClarifyingQuestion,
-    ConsciousnessStateLevel,
     nixos_language_adapter::ActionIR as NixActionIR,
 };
 use crate::observability::{
-    SharedObserver, SymthaeaObserver,
+    SharedObserver,
     PhiMeasurementEvent, PhiComponents,
     RouterSelectionEvent, RouterAlternative,
     ResponseGeneratedEvent,

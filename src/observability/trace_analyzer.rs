@@ -43,11 +43,10 @@
  * ```
  */
 
-use super::{Trace, CausalGraph, CausalNode, CausalAnswer};
+use super::{Trace, CausalGraph, CausalAnswer};
 use std::collections::HashMap;
 use anyhow::{Result, Context};
 // PhiComponents is in observability/types, imported via super::
-use super::types::PhiComponents;
 // ProcessingPath commented out - unused
 // use crate::consciousness::consciousness_guided_routing::ProcessingPath;
 

@@ -8,7 +8,7 @@
 //!
 //! Track 6: Component Integration (I6.1.1 + I6.2)
 
-use symthaea::awakening::{SymthaeaAwakening, AwakenedState, Introspection};
+use symthaea::awakening::{SymthaeaAwakening, Introspection};
 use symthaea::language::{Conversation, ConversationConfig};
 use std::io::{self, Write};
 

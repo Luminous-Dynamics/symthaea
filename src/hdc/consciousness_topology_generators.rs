@@ -183,7 +183,7 @@ impl ConsciousnessTopology {
     /// * `n_nodes` - Number of nodes (must be >= 3 for meaningful ring)
     /// * `dim` - Hypervector dimension
     /// * `seed` - Random seed for reproducibility
-    pub fn ring(n_nodes: usize, dim: usize, seed: u64) -> Self {
+    pub fn ring(n_nodes: usize, dim: usize, _seed: u64) -> Self {
         assert!(n_nodes >= 3, "Ring needs at least 3 nodes");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
@@ -229,7 +229,7 @@ impl ConsciousnessTopology {
     /// * `n_nodes` - Number of nodes (must be >= 2)
     /// * `dim` - Hypervector dimension
     /// * `seed` - Random seed for reproducibility
-    pub fn line(n_nodes: usize, dim: usize, seed: u64) -> Self {
+    pub fn line(n_nodes: usize, dim: usize, _seed: u64) -> Self {
         assert!(n_nodes >= 2, "Line needs at least 2 nodes");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
@@ -287,7 +287,7 @@ impl ConsciousnessTopology {
     /// * `n_nodes` - Number of nodes (works best with 2^k - 1 nodes for complete tree)
     /// * `dim` - Hypervector dimension
     /// * `seed` - Random seed for reproducibility
-    pub fn binary_tree(n_nodes: usize, dim: usize, seed: u64) -> Self {
+    pub fn binary_tree(n_nodes: usize, dim: usize, _seed: u64) -> Self {
         assert!(n_nodes >= 1, "Tree needs at least 1 node");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
@@ -362,7 +362,7 @@ impl ConsciousnessTopology {
     /// * `dim` - Hypervector dimension
     /// * `k` - Number of connections per node (default: n/2)
     /// * `seed` - Random seed for reproducibility
-    pub fn dense_network(n_nodes: usize, dim: usize, k: Option<usize>, seed: u64) -> Self {
+    pub fn dense_network(n_nodes: usize, dim: usize, k: Option<usize>, _seed: u64) -> Self {
         assert!(n_nodes >= 2, "Dense network needs at least 2 nodes");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
@@ -426,7 +426,7 @@ impl ConsciousnessTopology {
     /// * `dim` - Hypervector dimension
     /// * `n_modules` - Number of modules/communities
     /// * `seed` - Random seed for reproducibility
-    pub fn modular(n_nodes: usize, dim: usize, n_modules: usize, seed: u64) -> Self {
+    pub fn modular(n_nodes: usize, dim: usize, n_modules: usize, _seed: u64) -> Self {
         assert!(n_nodes >= n_modules, "Need at least one node per module");
         assert!(n_modules >= 2, "Need at least 2 modules for meaningful modularity");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
@@ -722,7 +722,7 @@ impl ConsciousnessTopology {
     /// * `n_nodes` - Number of nodes (will be rounded to nearest perfect square)
     /// * `dim` - Hypervector dimension
     /// * `seed` - Random seed for reproducibility
-    pub fn lattice(n_nodes: usize, dim: usize, seed: u64) -> Self {
+    pub fn lattice(n_nodes: usize, dim: usize, _seed: u64) -> Self {
         assert!(n_nodes >= 4, "Lattice needs at least 4 nodes (2x2 grid)");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
@@ -913,7 +913,7 @@ impl ConsciousnessTopology {
     /// * `n_nodes` - Number of nodes (must be even for the twist)
     /// * `dim` - Hypervector dimension
     /// * `seed` - Random seed for reproducibility
-    pub fn mobius_strip(n_nodes: usize, dim: usize, seed: u64) -> Self {
+    pub fn mobius_strip(n_nodes: usize, dim: usize, _seed: u64) -> Self {
         assert!(n_nodes >= 4, "Möbius strip needs at least 4 nodes");
         assert!(n_nodes % 2 == 0, "Möbius strip needs even number of nodes for twist");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
@@ -971,7 +971,7 @@ impl ConsciousnessTopology {
     /// * `grid_size` - Size of the square grid (total nodes = grid_size²)
     /// * `dim` - Hypervector dimension
     /// * `seed` - Random seed for reproducibility
-    pub fn torus_square(grid_size: usize, dim: usize, seed: u64) -> Self {
+    pub fn torus_square(grid_size: usize, dim: usize, _seed: u64) -> Self {
         assert!(grid_size >= 2, "Torus needs at least 2×2 grid");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
@@ -1028,7 +1028,7 @@ impl ConsciousnessTopology {
     /// * `grid_size` - Size of the square grid (total nodes = grid_size²)
     /// * `dim` - Hypervector dimension
     /// * `seed` - Random seed for reproducibility
-    pub fn klein_bottle_square(grid_size: usize, dim: usize, seed: u64) -> Self {
+    pub fn klein_bottle_square(grid_size: usize, dim: usize, _seed: u64) -> Self {
         assert!(grid_size >= 2, "Klein bottle needs at least 2×2 grid");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
@@ -1103,7 +1103,7 @@ impl ConsciousnessTopology {
     /// * `dim` - Hypervector dimension
     /// * `branching` - Branching factor (typical: 2-3)
     /// * `seed` - Random seed for reproducibility
-    pub fn hyperbolic(n_nodes: usize, dim: usize, branching: usize, seed: u64) -> Self {
+    pub fn hyperbolic(n_nodes: usize, dim: usize, branching: usize, _seed: u64) -> Self {
         assert!(n_nodes >= 2, "Hyperbolic needs at least 2 nodes");
         assert!(branching >= 2, "Branching factor must be >= 2");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
@@ -1334,7 +1334,7 @@ impl ConsciousnessTopology {
 
         // Hierarchical subdivision
         let mut nodes_per_level = vec![3]; // Start with core triangle
-        for level in 1..levels {
+        for _level in 1..levels {
             let prev_count: usize = nodes_per_level.iter().sum();
             let new_count = prev_count * 3;
             if new_count > n_nodes { break; }
