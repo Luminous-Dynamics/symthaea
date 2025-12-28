@@ -160,12 +160,18 @@ impl ConsciousnessTopology {
             node_representations.push(spoke_repr);
         }
 
+        // Star edges: hub (node 0) connected to all spokes (nodes 1..n)
+        let edges: Vec<(usize, usize)> = (1..n_nodes)
+            .map(|i| (0, i))
+            .collect();
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Star,
+            edges,
         }
     }
 
@@ -200,12 +206,18 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
+        // Ring edges: each node connects to next (wrapping)
+        let edges: Vec<(usize, usize)> = (0..n_nodes)
+            .map(|i| (i, (i + 1) % n_nodes))
+            .collect();
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Ring,
+            edges,
         }
     }
 
@@ -251,12 +263,18 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
+        // Line edges: sequential connections
+        let edges: Vec<(usize, usize)> = (0..n_nodes.saturating_sub(1))
+            .map(|i| (i, i + 1))
+            .collect();
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Line,
+            edges,
         }
     }
 
@@ -311,12 +329,26 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
+        // Binary tree edges: parent-child connections
+        let mut edges = Vec::new();
+        for i in 0..n_nodes {
+            let left_child = 2 * i + 1;
+            if left_child < n_nodes {
+                edges.push((i, left_child));
+            }
+            let right_child = 2 * i + 2;
+            if right_child < n_nodes {
+                edges.push((i, right_child));
+            }
+        }
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::BinaryTree,
+            edges,
         }
     }
 
@@ -363,12 +395,24 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
+        // Dense network edges: k-nearest neighbors for each node
+        let mut edges = Vec::new();
+        for i in 0..n_nodes {
+            for offset in 1..=k {
+                let neighbor = (i + offset) % n_nodes;
+                if neighbor > i {  // Only add each edge once
+                    edges.push((i, neighbor));
+                }
+            }
+        }
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::DenseNetwork,
+            edges,
         }
     }
 
@@ -427,12 +471,36 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
+        // Modular edges: intra-module + inter-module connections
+        let mut edges = Vec::new();
+        for i in 0..n_nodes {
+            let my_module = i / nodes_per_module;
+            let module_start = my_module * nodes_per_module;
+            let module_end = ((my_module + 1) * nodes_per_module).min(n_nodes);
+
+            // Intra-module edges
+            for j in module_start..module_end {
+                if j > i {
+                    edges.push((i, j));
+                }
+            }
+
+            // Inter-module edge to next module
+            if my_module < n_modules - 1 {
+                let next_module_start = (my_module + 1) * nodes_per_module;
+                if next_module_start < n_nodes && i == module_start {
+                    edges.push((i, next_module_start));
+                }
+            }
+        }
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Modular,
+            edges,
         }
     }
 
@@ -497,12 +565,16 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Sphere,
+            edges,
         }
     }
 
@@ -554,12 +626,16 @@ impl ConsciousnessTopology {
             }
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Torus,
+            edges,
         }
     }
 
@@ -624,12 +700,16 @@ impl ConsciousnessTopology {
             }
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::KleinBottle,
+            edges,
         }
     }
 
@@ -696,12 +776,32 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
+        // Lattice edges: grid connections (right and down to avoid duplicates)
+        let mut edges = Vec::new();
+        for i in 0..actual_n_nodes {
+            let row = i / grid_size;
+            let col = i % grid_size;
+
+            // Connect to right neighbor
+            if col < grid_size - 1 {
+                let right = row * grid_size + (col + 1);
+                edges.push((i, right));
+            }
+
+            // Connect to down neighbor
+            if row < grid_size - 1 {
+                let down = (row + 1) * grid_size + col;
+                edges.push((i, down));
+            }
+        }
+
         Self {
             n_nodes: actual_n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Lattice,
+            edges,
         }
     }
 
@@ -789,12 +889,16 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::SmallWorld,
+            edges,
         }
     }
 
@@ -842,12 +946,16 @@ impl ConsciousnessTopology {
             }
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::MobiusStrip,
+            edges,
         }
     }
 
@@ -896,12 +1004,16 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Torus,
+            edges,
         }
     }
 
@@ -965,12 +1077,16 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::KleinBottle,
+            edges,
         }
     }
 
@@ -1050,12 +1166,16 @@ impl ConsciousnessTopology {
             }
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Hyperbolic,
+            edges,
         }
     }
 
@@ -1156,12 +1276,16 @@ impl ConsciousnessTopology {
             }
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::ScaleFree,
+            edges,
         }
     }
 
@@ -1261,12 +1385,16 @@ impl ConsciousnessTopology {
             }
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Fractal,
+            edges,
         }
     }
 
@@ -1325,12 +1453,16 @@ impl ConsciousnessTopology {
             node_representations.push(RealHV::bundle(&connections));
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim: hv_dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Hypercube,
+            edges,
         }
     }
 
@@ -1452,12 +1584,16 @@ impl ConsciousnessTopology {
             }
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::SierpinskiGasket,
+            edges,
         }
     }
 
@@ -1566,12 +1702,16 @@ impl ConsciousnessTopology {
             }
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::FractalTree,
+            edges,
         }
     }
 
@@ -1625,12 +1765,16 @@ impl ConsciousnessTopology {
             node_representations.push(superposed);
         }
 
+        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+
+
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::Quantum,
+            edges,
         }
     }
 

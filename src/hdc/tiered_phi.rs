@@ -6375,7 +6375,7 @@ mod tests {
 
     #[test]
     fn test_attractor_lyapunov_calculation() {
-        let attractor = PhiAttractor::new();
+        let mut attractor = PhiAttractor::new();
 
         // Stable trajectory (should have negative Lyapunov)
         let stable: Vec<f64> = (0..50)
@@ -6429,7 +6429,7 @@ mod tests {
 
     #[test]
     fn test_attractor_classification() {
-        let attractor = PhiAttractor::new();
+        let mut attractor = PhiAttractor::new();
 
         // Test all classification methods work
         let cases = vec![
