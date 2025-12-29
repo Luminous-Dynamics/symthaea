@@ -411,7 +411,7 @@ impl CounterfactualEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::observability::probabilistic_inference::ProbabilisticConfig;
+    use crate::observability::{EdgeType, probabilistic_inference::ProbabilisticConfig};
 
     #[test]
     fn test_counterfactual_query_builder() {

@@ -472,6 +472,7 @@ impl StreamingCausalAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
     use serde_json::json;
 
     fn create_test_event(event_type: &str) -> (Event, EventMetadata) {

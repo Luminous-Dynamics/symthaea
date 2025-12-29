@@ -503,6 +503,7 @@ mod tests {
     use super::*;
     use crate::observability::{
         byzantine_defense::AttackPreconditions,
+        probabilistic_inference::ProbabilisticCausalGraph,
         types::Event,
     };
     use chrono::Utc;

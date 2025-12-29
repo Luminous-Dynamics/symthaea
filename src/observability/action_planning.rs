@@ -420,6 +420,7 @@ impl ActionPlanner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::observability::EdgeType;
 
     #[test]
     fn test_goal_creation() {

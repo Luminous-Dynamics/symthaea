@@ -371,7 +371,7 @@ impl CausalInterventionEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::observability::probabilistic_inference::ProbabilisticConfig;
+    use crate::observability::{EdgeType, probabilistic_inference::ProbabilisticConfig};
 
     #[test]
     fn test_intervention_spec_builder() {
