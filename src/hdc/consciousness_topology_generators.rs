@@ -56,6 +56,17 @@ pub enum TopologyType {
     CantorSet,       // Tier 3: Disconnected fractal (d≈0.631)
     Hypercube,       // Tier 3: 3D/4D/5D dimensional scaling
     Quantum,         // Tier 3: Superposition of topologies
+    // Tier 4: Extended topologies (Revolutionary #102)
+    CorticalColumn,  // 6-layer hierarchical (like mammalian cortex)
+    Feedforward,     // Layered neural network structure
+    Recurrent,       // Feedback loops (like RNNs)
+    Bipartite,       // Two-layer structure (like retina → V1)
+    CorePeriphery,   // Dense core, sparse periphery
+    BowTie,          // IN → CORE → OUT structure
+    Attention,       // Query-Key-Value structure
+    Residual,        // Skip connections (like ResNets)
+    PetersenGraph,   // Famous 10-node highly symmetric graph
+    CompleteBipartite, // K_{n,n} - All-to-all between groups
 }
 
 impl ConsciousnessTopology {
@@ -564,9 +575,6 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
-
-
         Self {
             n_nodes,
             dim,
@@ -603,6 +611,7 @@ impl ConsciousnessTopology {
             .collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
+        let mut edges = Vec::new();
 
         for i in 0..n {
             for j in 0..m {
@@ -620,12 +629,18 @@ impl ConsciousnessTopology {
                 connections.push(node_identities[idx].bind(&node_identities[left]));
                 connections.push(node_identities[idx].bind(&node_identities[right]));
 
+                // Add all edges as (min, max) pairs to handle wraparound
+                edges.push((idx.min(down), idx.max(down)));
+                edges.push((idx.min(right), idx.max(right)));
+
                 let repr = RealHV::bundle(&connections);
                 node_representations.push(repr);
             }
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+        // Deduplicate edges
+        edges.sort_unstable();
+        edges.dedup();
 
 
         Self {
@@ -663,6 +678,7 @@ impl ConsciousnessTopology {
             .collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
+        let mut edges = Vec::new();
 
         for i in 0..n {
             for j in 0..m {
@@ -694,13 +710,18 @@ impl ConsciousnessTopology {
                 connections.push(node_identities[idx].bind(&node_identities[left]));
                 connections.push(node_identities[idx].bind(&node_identities[right]));
 
+                // Add all edges as (min, max) pairs to handle wraparound
+                edges.push((idx.min(down), idx.max(down)));
+                edges.push((idx.min(right), idx.max(right)));
+
                 let repr = RealHV::bundle(&connections);
                 node_representations.push(repr);
             }
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
-
+        // Deduplicate edges
+        edges.sort_unstable();
+        edges.dedup();
 
         Self {
             n_nodes,
@@ -830,16 +851,16 @@ impl ConsciousnessTopology {
             .collect();
 
         // Build initial k-regular ring lattice edges
+        // Use min/max to handle wraparound edges correctly, then deduplicate
         let mut edges: Vec<(usize, usize)> = Vec::new();
         for i in 0..n_nodes {
             for j in 1..=(k / 2) {
                 let neighbor = (i + j) % n_nodes;
-                // Only store each edge once (i < neighbor)
-                if i < neighbor {
-                    edges.push((i, neighbor));
-                }
+                edges.push((i.min(neighbor), i.max(neighbor)));
             }
         }
+        edges.sort_unstable();
+        edges.dedup();
 
         // Rewire edges with probability p
         use rand::{Rng, SeedableRng};
@@ -888,16 +909,13 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
-
-
         Self {
             n_nodes,
             dim,
             node_representations,
             node_identities,
             topology_type: TopologyType::SmallWorld,
-            edges,
+            edges: final_edges,
         }
     }
 
@@ -924,6 +942,16 @@ impl ConsciousnessTopology {
 
         let mut node_representations = Vec::with_capacity(n_nodes);
 
+        // Build edge list (ring topology) - use min/max for wraparound edge
+        let mut edges: Vec<(usize, usize)> = (0..n_nodes)
+            .map(|i| {
+                let next = (i + 1) % n_nodes;
+                (i.min(next), i.max(next))
+            })
+            .collect();
+        edges.sort_unstable();
+        edges.dedup();
+
         // First half: normal ring connections
         // Second half: one connection inverted (the Möbius twist!)
         for i in 0..n_nodes {
@@ -944,8 +972,6 @@ impl ConsciousnessTopology {
                 node_representations.push(repr);
             }
         }
-
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
 
 
         Self {
@@ -982,6 +1008,7 @@ impl ConsciousnessTopology {
             .collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
+        let mut edges = Vec::new();
 
         for i in 0..n_nodes {
             let row = i / grid_size;
@@ -993,6 +1020,10 @@ impl ConsciousnessTopology {
             let left = row * grid_size + ((col + grid_size - 1) % grid_size);
             let right = row * grid_size + ((col + 1) % grid_size);
 
+            // Add all edges as (min, max) pairs to handle wraparound
+            edges.push((i.min(down), i.max(down)));
+            edges.push((i.min(right), i.max(right)));
+
             // Each node connects to its 4 neighbors
             let conn_up = node_identities[i].bind(&node_identities[up]);
             let conn_down = node_identities[i].bind(&node_identities[down]);
@@ -1003,8 +1034,9 @@ impl ConsciousnessTopology {
             node_representations.push(repr);
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
-
+        // Deduplicate edges
+        edges.sort_unstable();
+        edges.dedup();
 
         Self {
             n_nodes,
@@ -1039,6 +1071,7 @@ impl ConsciousnessTopology {
             .collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
+        let mut edges = Vec::new();
 
         for i in 0..n_nodes {
             let row = i / grid_size;
@@ -1066,6 +1099,10 @@ impl ConsciousnessTopology {
                 row * grid_size + (col + 1)
             };
 
+            // Add edges (only add if i < neighbor to avoid duplicates)
+            if i < down { edges.push((i, down)); }
+            if i < right { edges.push((i, right)); }
+
             // Bind connections
             let conn_up = node_identities[i].bind(&node_identities[up]);
             let conn_down = node_identities[i].bind(&node_identities[down]);
@@ -1075,9 +1112,6 @@ impl ConsciousnessTopology {
             let repr = RealHV::bundle(&[conn_up, conn_down, conn_left, conn_right]);
             node_representations.push(repr);
         }
-
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
-
 
         Self {
             n_nodes,
@@ -1165,8 +1199,15 @@ impl ConsciousnessTopology {
             }
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
-
+        // Extract edges from adjacency (only i < j to avoid duplicates)
+        let mut edges = Vec::new();
+        for i in 0..n_nodes {
+            for &j in &adjacency[i] {
+                if i < j {
+                    edges.push((i, j));
+                }
+            }
+        }
 
         Self {
             n_nodes,
@@ -1275,7 +1316,15 @@ impl ConsciousnessTopology {
             }
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
+        // Extract edges from adjacency (only i < j to avoid duplicates)
+        let mut edges = Vec::new();
+        for i in 0..n_nodes {
+            for &j in &adjacency[i] {
+                if i < j {
+                    edges.push((i, j));
+                }
+            }
+        }
 
 
         Self {
@@ -1384,8 +1433,18 @@ impl ConsciousnessTopology {
             }
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
-
+        // Extract edges from adjacency (deduplicated, only i < j)
+        let mut edges = Vec::new();
+        for i in 0..n_nodes {
+            let mut unique_neighbors = adjacency[i].clone();
+            unique_neighbors.sort_unstable();
+            unique_neighbors.dedup();
+            for j in unique_neighbors {
+                if i < j {
+                    edges.push((i, j));
+                }
+            }
+        }
 
         Self {
             n_nodes,
@@ -1452,8 +1511,15 @@ impl ConsciousnessTopology {
             node_representations.push(RealHV::bundle(&connections));
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
-
+        // Extract edges from adjacency (only i < j to avoid duplicates)
+        let mut edges = Vec::new();
+        for i in 0..n_nodes {
+            for &j in &adjacency[i] {
+                if i < j {
+                    edges.push((i, j));
+                }
+            }
+        }
 
         Self {
             n_nodes,
@@ -1583,8 +1649,18 @@ impl ConsciousnessTopology {
             }
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
-
+        // Extract edges from adjacency (deduplicated, only i < j)
+        let mut edges = Vec::new();
+        for i in 0..n_nodes {
+            let mut unique_neighbors = adjacency[i].clone();
+            unique_neighbors.sort_unstable();
+            unique_neighbors.dedup();
+            for j in unique_neighbors {
+                if i < j {
+                    edges.push((i, j));
+                }
+            }
+        }
 
         Self {
             n_nodes,
@@ -1701,8 +1777,18 @@ impl ConsciousnessTopology {
             }
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
-
+        // Extract edges from adjacency (deduplicated, only i < j)
+        let mut edges = Vec::new();
+        for i in 0..n_nodes {
+            let mut unique_neighbors = adjacency[i].clone();
+            unique_neighbors.sort_unstable();
+            unique_neighbors.dedup();
+            for j in unique_neighbors {
+                if i < j {
+                    edges.push((i, j));
+                }
+            }
+        }
 
         Self {
             n_nodes,
@@ -1891,8 +1977,14 @@ impl ConsciousnessTopology {
             node_representations.push(superposed);
         }
 
-        let edges = Vec::new(); // Empty placeholder - edges encoded in representations
-
+        // Combine edges from all three topologies (deduplicated)
+        let mut edges: Vec<(usize, usize)> = ring.edges.iter()
+            .chain(star.edges.iter())
+            .chain(random.edges.iter())
+            .cloned()
+            .collect();
+        edges.sort_unstable();
+        edges.dedup();
 
         Self {
             n_nodes,
@@ -1969,6 +2061,666 @@ impl ConsciousnessTopology {
             min,
             max,
             heterogeneity,
+        }
+    }
+
+    // ==========================================================================
+    // TIER 4: Extended Topologies (Revolutionary #102)
+    // ==========================================================================
+
+    /// Cortical Column - 6-layer hierarchical structure like mammalian cortex
+    ///
+    /// Layers: L1 (sparse) → L2/3 (feedback) → L4 (input) → L5 (output) → L6 (thalamic)
+    /// This models the canonical microcircuit of the neocortex.
+    ///
+    /// # Arguments
+    /// * `neurons_per_layer` - Neurons in each of 6 layers
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed
+    pub fn cortical_column(neurons_per_layer: usize, dim: usize, _seed: u64) -> Self {
+        let n_layers = 6;
+        let n_nodes = neurons_per_layer * n_layers;
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut edges = Vec::new();
+
+        // Within-layer connections (dense local connectivity)
+        for layer in 0..n_layers {
+            let start = layer * neurons_per_layer;
+            for i in start..(start + neurons_per_layer) {
+                for j in (i + 1)..(start + neurons_per_layer) {
+                    edges.push((i, j));
+                }
+            }
+        }
+
+        // Between-layer connections (feedforward + feedback)
+        // L4 (input layer, index 3) receives from L6 and projects to L2/3
+        // L2/3 (index 1-2) projects to L5 and receives feedback from L5
+        // L5 (index 4) projects to L6 and thalamus
+        for i in 0..neurons_per_layer {
+            // L4 → L2/3 (feedforward)
+            let l4_neuron = 3 * neurons_per_layer + i;
+            let l23_neuron = 1 * neurons_per_layer + (i % neurons_per_layer);
+            edges.push((l4_neuron.min(l23_neuron), l4_neuron.max(l23_neuron)));
+
+            // L2/3 → L5 (feedforward)
+            let l5_neuron = 4 * neurons_per_layer + i;
+            edges.push((l23_neuron.min(l5_neuron), l23_neuron.max(l5_neuron)));
+
+            // L5 → L6 (feedforward)
+            let l6_neuron = 5 * neurons_per_layer + i;
+            edges.push((l5_neuron.min(l6_neuron), l5_neuron.max(l6_neuron)));
+
+            // L6 → L4 (feedback loop via thalamus)
+            edges.push((l6_neuron.min(l4_neuron), l6_neuron.max(l4_neuron)));
+
+            // L5 → L2/3 (feedback)
+            edges.push((l5_neuron.min(l23_neuron), l5_neuron.max(l23_neuron)));
+        }
+
+        edges.sort_unstable();
+        edges.dedup();
+
+        // Build adjacency and representations
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+        for (i, j) in &edges {
+            adjacency[*i].push(*j);
+            adjacency[*j].push(*i);
+        }
+
+        let node_representations: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                if connections.is_empty() {
+                    node_identities[i].clone()
+                } else {
+                    RealHV::bundle(&connections)
+                }
+            })
+            .collect();
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::CorticalColumn,
+            edges,
+        }
+    }
+
+    /// Feedforward network - layered structure like neural networks
+    ///
+    /// Each layer only connects to the next layer (no recurrence).
+    /// Models perception pipelines and deep learning architectures.
+    ///
+    /// # Arguments
+    /// * `layers` - Vec of layer sizes, e.g., [3, 4, 2] for 3→4→2
+    /// * `dim` - Hypervector dimension
+    /// * `seed` - Random seed
+    pub fn feedforward(layers: &[usize], dim: usize, _seed: u64) -> Self {
+        let n_nodes: usize = layers.iter().sum();
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut edges = Vec::new();
+        let mut offset = 0;
+
+        // Connect each layer to the next (all-to-all between adjacent layers)
+        for window in layers.windows(2) {
+            let layer_size = window[0];
+            let next_layer_size = window[1];
+
+            for i in 0..layer_size {
+                for j in 0..next_layer_size {
+                    let from = offset + i;
+                    let to = offset + layer_size + j;
+                    edges.push((from.min(to), from.max(to)));
+                }
+            }
+            offset += layer_size;
+        }
+
+        // Build adjacency and representations
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+        for (i, j) in &edges {
+            adjacency[*i].push(*j);
+            adjacency[*j].push(*i);
+        }
+
+        let node_representations: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                if connections.is_empty() {
+                    node_identities[i].clone()
+                } else {
+                    RealHV::bundle(&connections)
+                }
+            })
+            .collect();
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Feedforward,
+            edges,
+        }
+    }
+
+    /// Recurrent network - includes feedback loops
+    ///
+    /// Like feedforward but with additional recurrent connections within layers.
+    /// Models memory and temporal processing (like RNNs/LSTMs).
+    pub fn recurrent(layers: &[usize], dim: usize, _seed: u64) -> Self {
+        let n_nodes: usize = layers.iter().sum();
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut edges = Vec::new();
+        let mut offset = 0;
+
+        for (layer_idx, &layer_size) in layers.iter().enumerate() {
+            // Within-layer recurrent connections (each node connects to next in layer)
+            for i in 0..layer_size {
+                let next_i = (i + 1) % layer_size;
+                if layer_size > 1 {
+                    let from = offset + i;
+                    let to = offset + next_i;
+                    edges.push((from.min(to), from.max(to)));
+                }
+            }
+
+            // Feedforward to next layer (if not last layer)
+            if layer_idx < layers.len() - 1 {
+                let next_layer_size = layers[layer_idx + 1];
+                for i in 0..layer_size {
+                    for j in 0..next_layer_size {
+                        let from = offset + i;
+                        let to = offset + layer_size + j;
+                        edges.push((from.min(to), from.max(to)));
+                    }
+                }
+            }
+
+            offset += layer_size;
+        }
+
+        edges.sort_unstable();
+        edges.dedup();
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+        for (i, j) in &edges {
+            adjacency[*i].push(*j);
+            adjacency[*j].push(*i);
+        }
+
+        let node_representations: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                if connections.is_empty() {
+                    node_identities[i].clone()
+                } else {
+                    RealHV::bundle(&connections)
+                }
+            })
+            .collect();
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Recurrent,
+            edges,
+        }
+    }
+
+    /// Bipartite graph - two groups with connections only between groups
+    ///
+    /// Models sensory processing (inputs → outputs with no lateral connections).
+    /// Like retina → V1 or encoder → decoder.
+    pub fn bipartite(n_left: usize, n_right: usize, connection_prob: f64, dim: usize, seed: u64) -> Self {
+        let n_nodes = n_left + n_right;
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut edges = Vec::new();
+
+        // Connect left to right with given probability
+        for i in 0..n_left {
+            for j in 0..n_right {
+                let edge_seed = seed.wrapping_add((i * n_right + j) as u64);
+                if (edge_seed % 100) as f64 / 100.0 < connection_prob {
+                    edges.push((i, n_left + j));
+                }
+            }
+        }
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+        for (i, j) in &edges {
+            adjacency[*i].push(*j);
+            adjacency[*j].push(*i);
+        }
+
+        let node_representations: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                if connections.is_empty() {
+                    node_identities[i].clone()
+                } else {
+                    RealHV::bundle(&connections)
+                }
+            })
+            .collect();
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Bipartite,
+            edges,
+        }
+    }
+
+    /// Core-Periphery structure - dense core with sparse peripheral connections
+    ///
+    /// Models real-world networks where a small core is highly interconnected
+    /// while peripheral nodes connect mainly to the core.
+    pub fn core_periphery(core_size: usize, periphery_size: usize, dim: usize, _seed: u64) -> Self {
+        let n_nodes = core_size + periphery_size;
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut edges = Vec::new();
+
+        // Dense core connections (complete graph)
+        for i in 0..core_size {
+            for j in (i + 1)..core_size {
+                edges.push((i, j));
+            }
+        }
+
+        // Peripheral nodes connect to 1-2 core nodes each
+        for p in 0..periphery_size {
+            let peripheral_node = core_size + p;
+            // Connect to core node (p mod core_size)
+            let core_node = p % core_size;
+            edges.push((core_node, peripheral_node));
+            // Connect to one more core node for connectivity
+            if core_size > 1 {
+                let second_core = (p + 1) % core_size;
+                edges.push((second_core, peripheral_node));
+            }
+        }
+
+        edges.sort_unstable();
+        edges.dedup();
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+        for (i, j) in &edges {
+            adjacency[*i].push(*j);
+            adjacency[*j].push(*i);
+        }
+
+        let node_representations: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                if connections.is_empty() {
+                    node_identities[i].clone()
+                } else {
+                    RealHV::bundle(&connections)
+                }
+            })
+            .collect();
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::CorePeriphery,
+            edges,
+        }
+    }
+
+    /// Bow-Tie structure - IN → CORE → OUT
+    ///
+    /// Classic web/biological network structure: input nodes feed into a strongly
+    /// connected core, which feeds into output nodes. Models metabolic networks,
+    /// gene regulatory networks, and the web.
+    pub fn bow_tie(n_in: usize, n_core: usize, n_out: usize, dim: usize, _seed: u64) -> Self {
+        let n_nodes = n_in + n_core + n_out;
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut edges = Vec::new();
+
+        // IN nodes connect to CORE
+        for i in 0..n_in {
+            for c in 0..n_core {
+                edges.push((i, n_in + c));
+            }
+        }
+
+        // CORE is strongly connected (complete graph)
+        for i in 0..n_core {
+            for j in (i + 1)..n_core {
+                edges.push((n_in + i, n_in + j));
+            }
+        }
+
+        // CORE connects to OUT
+        for c in 0..n_core {
+            for o in 0..n_out {
+                edges.push((n_in + c, n_in + n_core + o));
+            }
+        }
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+        for (i, j) in &edges {
+            adjacency[*i].push(*j);
+            adjacency[*j].push(*i);
+        }
+
+        let node_representations: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                if connections.is_empty() {
+                    node_identities[i].clone()
+                } else {
+                    RealHV::bundle(&connections)
+                }
+            })
+            .collect();
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::BowTie,
+            edges,
+        }
+    }
+
+    /// Attention network - Query-Key-Value structure
+    ///
+    /// Models transformer attention: queries attend to keys, which gate values.
+    /// Three-layer structure with all-to-all attention weights.
+    pub fn attention(n_queries: usize, n_keys: usize, n_values: usize, dim: usize, _seed: u64) -> Self {
+        let n_nodes = n_queries + n_keys + n_values;
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut edges = Vec::new();
+
+        // Queries attend to all Keys
+        for q in 0..n_queries {
+            for k in 0..n_keys {
+                edges.push((q, n_queries + k));
+            }
+        }
+
+        // Keys gate Values (1-to-1 for simplicity, assuming n_keys == n_values)
+        for k in 0..n_keys.min(n_values) {
+            edges.push((n_queries + k, n_queries + n_keys + k));
+        }
+
+        // Queries also directly connect to Values (residual-like)
+        for q in 0..n_queries {
+            for v in 0..n_values {
+                edges.push((q.min(n_queries + n_keys + v), q.max(n_queries + n_keys + v)));
+            }
+        }
+
+        edges.sort_unstable();
+        edges.dedup();
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+        for (i, j) in &edges {
+            adjacency[*i].push(*j);
+            adjacency[*j].push(*i);
+        }
+
+        let node_representations: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                if connections.is_empty() {
+                    node_identities[i].clone()
+                } else {
+                    RealHV::bundle(&connections)
+                }
+            })
+            .collect();
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Attention,
+            edges,
+        }
+    }
+
+    /// Residual network - skip connections like ResNets
+    ///
+    /// Layered structure where each layer has skip connections to layers 2 ahead.
+    /// Models deep learning architectures with gradient highways.
+    pub fn residual(layers: &[usize], dim: usize, _seed: u64) -> Self {
+        let n_nodes: usize = layers.iter().sum();
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut edges = Vec::new();
+        let mut offsets: Vec<usize> = vec![0];
+        let mut sum = 0;
+        for &size in layers {
+            sum += size;
+            offsets.push(sum);
+        }
+
+        // Regular feedforward connections
+        for (layer_idx, window) in layers.windows(2).enumerate() {
+            let layer_size = window[0];
+            let next_layer_size = window[1];
+
+            for i in 0..layer_size {
+                for j in 0..next_layer_size {
+                    let from = offsets[layer_idx] + i;
+                    let to = offsets[layer_idx + 1] + j;
+                    edges.push((from.min(to), from.max(to)));
+                }
+            }
+        }
+
+        // Skip connections (layer i to layer i+2)
+        for layer_idx in 0..(layers.len().saturating_sub(2)) {
+            let layer_size = layers[layer_idx];
+            let skip_layer_size = layers[layer_idx + 2];
+
+            for i in 0..layer_size.min(skip_layer_size) {
+                let from = offsets[layer_idx] + i;
+                let to = offsets[layer_idx + 2] + i;
+                edges.push((from.min(to), from.max(to)));
+            }
+        }
+
+        edges.sort_unstable();
+        edges.dedup();
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+        for (i, j) in &edges {
+            adjacency[*i].push(*j);
+            adjacency[*j].push(*i);
+        }
+
+        let node_representations: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                if connections.is_empty() {
+                    node_identities[i].clone()
+                } else {
+                    RealHV::bundle(&connections)
+                }
+            })
+            .collect();
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::Residual,
+            edges,
+        }
+    }
+
+    /// Petersen Graph - famous 10-node highly symmetric graph
+    ///
+    /// One of the most famous graphs in graph theory. Has remarkable properties:
+    /// - 10 vertices, 15 edges
+    /// - 3-regular (each vertex has exactly 3 neighbors)
+    /// - Highly symmetric (120 automorphisms)
+    /// - Non-planar, vertex-transitive
+    pub fn petersen_graph(dim: usize, _seed: u64) -> Self {
+        let n_nodes = 10;
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        // Petersen graph edges (fixed structure)
+        // Outer pentagon: 0-1-2-3-4-0
+        // Inner pentagram: 5-7-9-6-8-5
+        // Spokes: 0-5, 1-6, 2-7, 3-8, 4-9
+        let edges = vec![
+            // Outer pentagon
+            (0, 1), (1, 2), (2, 3), (3, 4), (4, 0),
+            // Inner pentagram
+            (5, 7), (7, 9), (9, 6), (6, 8), (8, 5),
+            // Spokes
+            (0, 5), (1, 6), (2, 7), (3, 8), (4, 9),
+        ];
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+        for (i, j) in &edges {
+            adjacency[*i].push(*j);
+            adjacency[*j].push(*i);
+        }
+
+        let node_representations: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                RealHV::bundle(&connections)
+            })
+            .collect();
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::PetersenGraph,
+            edges,
+        }
+    }
+
+    /// Complete Bipartite Graph K_{n,m} - all-to-all between two groups
+    ///
+    /// Every node in group A connects to every node in group B.
+    /// Models perfect encoder-decoder relationships.
+    pub fn complete_bipartite(n: usize, m: usize, dim: usize, _seed: u64) -> Self {
+        let n_nodes = n + m;
+
+        let node_identities: Vec<RealHV> = (0..n_nodes)
+            .map(|i| RealHV::basis(i, dim))
+            .collect();
+
+        let mut edges = Vec::new();
+
+        // All nodes in first group connect to all nodes in second group
+        for i in 0..n {
+            for j in 0..m {
+                edges.push((i, n + j));
+            }
+        }
+
+        let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
+        for (i, j) in &edges {
+            adjacency[*i].push(*j);
+            adjacency[*j].push(*i);
+        }
+
+        let node_representations: Vec<RealHV> = (0..n_nodes)
+            .map(|i| {
+                let connections: Vec<RealHV> = adjacency[i]
+                    .iter()
+                    .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
+                    .collect();
+                if connections.is_empty() {
+                    node_identities[i].clone()
+                } else {
+                    RealHV::bundle(&connections)
+                }
+            })
+            .collect();
+
+        Self {
+            n_nodes,
+            dim,
+            node_representations,
+            node_identities,
+            topology_type: TopologyType::CompleteBipartite,
+            edges,
         }
     }
 }
@@ -2238,5 +2990,148 @@ mod tests {
 
         println!("\n✅ All 8 topologies generated successfully!");
         println!("   Heterogeneity values show clear variation across topologies");
+    }
+
+    // ========================================================================
+    // EXOTIC TOPOLOGY TESTS (Tier 1, 2, 3)
+    // ========================================================================
+
+    #[test]
+    fn test_torus_topology() {
+        let topo = ConsciousnessTopology::torus(3, 3, crate::hdc::HDC_DIMENSION, 42);
+
+        // 3x3 torus = 9 nodes
+        assert_eq!(topo.node_identities.len(), 9, "3x3 torus should have 9 nodes");
+        assert_eq!(topo.node_representations.len(), 9, "Should have 9 representations");
+
+        // Each node connects to 4 neighbors (up, down, left, right with wraparound)
+        assert_eq!(topo.edges.len(), 18, "3x3 torus should have 18 edges (9 nodes × 4 neighbors / 2)");
+
+        let stats = topo.similarity_stats();
+        assert!(stats.mean > 0.0, "Mean similarity should be positive");
+    }
+
+    #[test]
+    fn test_klein_bottle_topology() {
+        let topo = ConsciousnessTopology::klein_bottle(3, 3, crate::hdc::HDC_DIMENSION, 42);
+
+        assert_eq!(topo.node_identities.len(), 9, "3x3 Klein bottle should have 9 nodes");
+        assert_eq!(topo.node_representations.len(), 9, "Should have 9 representations");
+
+        // Klein bottle has similar edge count to torus
+        assert!(topo.edges.len() >= 12, "Klein bottle should have at least 12 edges");
+    }
+
+    #[test]
+    fn test_small_world_topology() {
+        // Small-world with rewiring probability 0.1
+        let topo = ConsciousnessTopology::small_world(8, crate::hdc::HDC_DIMENSION, 2, 0.1, 42);
+
+        assert_eq!(topo.node_identities.len(), 8, "Should have 8 nodes");
+        assert_eq!(topo.node_representations.len(), 8, "Should have 8 representations");
+
+        // With k=2, each node connects to 2 neighbors initially, plus some rewiring
+        assert!(topo.edges.len() >= 8, "Should have at least 8 edges");
+    }
+
+    #[test]
+    fn test_mobius_strip_topology() {
+        let topo = ConsciousnessTopology::mobius_strip(8, crate::hdc::HDC_DIMENSION, 42);
+
+        assert_eq!(topo.node_identities.len(), 8, "Should have 8 nodes");
+        assert_eq!(topo.node_representations.len(), 8, "Should have 8 representations");
+
+        // Mobius strip: each node connects to neighbors (like ring but with twist)
+        assert!(topo.edges.len() >= 8, "Should have at least 8 edges");
+    }
+
+    #[test]
+    fn test_hyperbolic_topology() {
+        let topo = ConsciousnessTopology::hyperbolic(8, crate::hdc::HDC_DIMENSION, 3, 42);
+
+        assert_eq!(topo.node_identities.len(), 8, "Should have 8 nodes");
+        assert_eq!(topo.node_representations.len(), 8, "Should have 8 representations");
+
+        // Hyperbolic tree with branching factor 3
+        assert!(topo.edges.len() >= 7, "Tree with 8 nodes should have at least 7 edges");
+    }
+
+    #[test]
+    fn test_scale_free_topology() {
+        let topo = ConsciousnessTopology::scale_free(10, crate::hdc::HDC_DIMENSION, 2, 42);
+
+        assert_eq!(topo.node_identities.len(), 10, "Should have 10 nodes");
+        assert_eq!(topo.node_representations.len(), 10, "Should have 10 representations");
+
+        // Scale-free networks have power-law degree distribution
+        assert!(topo.edges.len() >= 9, "Should have at least 9 edges");
+    }
+
+    #[test]
+    fn test_hypercube_3d_topology() {
+        let topo = ConsciousnessTopology::hypercube(3, crate::hdc::HDC_DIMENSION, 42);
+
+        // 3D hypercube = 2^3 = 8 nodes
+        assert_eq!(topo.node_identities.len(), 8, "3D hypercube should have 8 nodes");
+        assert_eq!(topo.node_representations.len(), 8, "Should have 8 representations");
+
+        // Each node in 3D hypercube has exactly 3 neighbors
+        // Total edges = 8 * 3 / 2 = 12
+        assert_eq!(topo.edges.len(), 12, "3D hypercube should have 12 edges");
+    }
+
+    #[test]
+    fn test_hypercube_4d_topology() {
+        let topo = ConsciousnessTopology::hypercube(4, crate::hdc::HDC_DIMENSION, 42);
+
+        // 4D hypercube = 2^4 = 16 nodes
+        assert_eq!(topo.node_identities.len(), 16, "4D hypercube should have 16 nodes");
+        assert_eq!(topo.node_representations.len(), 16, "Should have 16 representations");
+
+        // Each node in 4D hypercube has exactly 4 neighbors
+        // Total edges = 16 * 4 / 2 = 32
+        assert_eq!(topo.edges.len(), 32, "4D hypercube should have 32 edges");
+    }
+
+    #[test]
+    fn test_all_exotic_topologies_generation() {
+        println!("\n🔬 COMPREHENSIVE TEST: All Exotic Topologies");
+        println!("{}", "=".repeat(70));
+
+        // Tier 1
+        let torus = ConsciousnessTopology::torus(3, 3, crate::hdc::HDC_DIMENSION, 42);
+        let small_world = ConsciousnessTopology::small_world(8, crate::hdc::HDC_DIMENSION, 2, 0.1, 42);
+        let mobius = ConsciousnessTopology::mobius_strip(8, crate::hdc::HDC_DIMENSION, 42);
+
+        // Tier 2
+        let klein = ConsciousnessTopology::klein_bottle(3, 3, crate::hdc::HDC_DIMENSION, 42);
+        let hyperbolic = ConsciousnessTopology::hyperbolic(8, crate::hdc::HDC_DIMENSION, 3, 42);
+        let scale_free = ConsciousnessTopology::scale_free(10, crate::hdc::HDC_DIMENSION, 2, 42);
+
+        // Tier 3
+        let hypercube_3d = ConsciousnessTopology::hypercube(3, crate::hdc::HDC_DIMENSION, 42);
+        let hypercube_4d = ConsciousnessTopology::hypercube(4, crate::hdc::HDC_DIMENSION, 42);
+
+        let stats_vec = vec![
+            ("Torus", torus.similarity_stats()),
+            ("Small-World", small_world.similarity_stats()),
+            ("Möbius", mobius.similarity_stats()),
+            ("Klein Bottle", klein.similarity_stats()),
+            ("Hyperbolic", hyperbolic.similarity_stats()),
+            ("Scale-Free", scale_free.similarity_stats()),
+            ("Hypercube 3D", hypercube_3d.similarity_stats()),
+            ("Hypercube 4D", hypercube_4d.similarity_stats()),
+        ];
+
+        println!("\nExotic Topology Statistics:");
+        println!("{:<15} {:>10} {:>10} {:>10}", "Topology", "Mean", "StdDev", "Heterogen");
+        println!("{}", "-".repeat(50));
+
+        for (name, stats) in &stats_vec {
+            println!("{:<15} {:>10.4} {:>10.4} {:>10.4}",
+                     name, stats.mean, stats.std_dev, stats.heterogeneity);
+        }
+
+        println!("\n✅ All 8 exotic topologies generated successfully!");
     }
 }
