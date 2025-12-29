@@ -253,9 +253,10 @@ mod phi_tier_tests;                        // Unit tests for Φ tier implementat
 pub mod phi_topology_validation;           // RealHV-TieredPhi integration for topology validation
 pub mod phi_real;                          // RealHV Φ calculator (no binarization) using cosine similarity
 pub mod phi_resonant;                      // Resonator-based Φ calculator (O(n log N) dynamics)
+pub mod phi_orchestrator;                  // Adaptive Φ calculator orchestrator (Phase 5E)
 pub mod binary_hv;                         // Binary hypervector operations (HV16)
 pub mod primitive_system;                  // Ontological primitives system with 7 semantic domains
-// pub mod arithmetic_engine;                 // Revolutionary: True mathematical cognition via HDC (TEMP DISABLED - needs phi field fix)
+pub mod arithmetic_engine;                   // Revolutionary: True mathematical cognition via HDC
 pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
 
 // Track 6: Consciousness integration for awakening module
