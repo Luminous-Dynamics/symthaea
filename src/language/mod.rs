@@ -65,6 +65,7 @@ pub mod consciousness_guided_executor;  // 🚀 REVOLUTIONARY: Consciousness-Gui
 // Track 6: Enabled with web_research (reqwest)
 pub mod epistemics_language_bridge;  // 🔬 REVOLUTIONARY: Epistemics-Language Bridge for Knowledge Grounding
 pub mod llm_organ;  // 🧠 LLM Language Organ: Consciousness-controlled external LLM access
+// pub mod math_language_adapter;  // 🧮 REVOLUTIONARY: Natural Language Math via HDC Arithmetic Engine (TEMP DISABLED - needs phi field fix)
 
 pub use vocabulary::{Vocabulary, WordEntry, SemanticGrounding};
 pub use parser::{SemanticParser, ParsedSentence, SemanticRole};

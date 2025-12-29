@@ -241,17 +241,21 @@ pub mod resonator;
 pub mod morphogenetic;
 pub mod hebbian;
 pub mod sdm;
+pub mod text_encoder;  // Revolutionary Enhancement: Text → HDC encoding
 
 // Consciousness topology and Φ measurement modules
 pub mod real_hv;                           // Real-valued hypervectors for consciousness topologies
 pub mod consciousness_topology;            // Consciousness topology structures
 pub mod consciousness_topology_generators; // 8 topology generators (Random, Star, Ring, Line, Tree, Dense, Modular, Lattice)
 pub mod tiered_phi;                        // Multi-tier Φ (integrated information) approximation
+#[cfg(test)]
+mod phi_tier_tests;                        // Unit tests for Φ tier implementations
 pub mod phi_topology_validation;           // RealHV-TieredPhi integration for topology validation
 pub mod phi_real;                          // RealHV Φ calculator (no binarization) using cosine similarity
 pub mod phi_resonant;                      // Resonator-based Φ calculator (O(n log N) dynamics)
 pub mod binary_hv;                         // Binary hypervector operations (HV16)
 pub mod primitive_system;                  // Ontological primitives system with 7 semantic domains
+// pub mod arithmetic_engine;                 // Revolutionary: True mathematical cognition via HDC (TEMP DISABLED - needs phi field fix)
 pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
 
 // Track 6: Consciousness integration for awakening module
@@ -269,6 +273,7 @@ pub mod integrated_information;            // Φ (integrated information) measur
 
 // Re-export HV16 at module level for convenience (used by language/nix_* modules)
 pub use binary_hv::HV16;
+pub use real_hv::RealHV;
 
 // Re-export key types for convenience
 pub use statistical_retrieval::{
@@ -345,6 +350,7 @@ pub use sdm::{
 };
 
 pub use temporal_encoder::TemporalEncoder;
+pub use text_encoder::{TextEncoder, TextEncoderConfig, TextEncoderStats};
 
 use anyhow::Result;
 // Note: hypervector crate not used yet - using custom implementation
