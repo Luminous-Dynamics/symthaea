@@ -117,6 +117,13 @@ fn main() {
                     // Quantum superposition - fallback to random for now
                     ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, seed)
                 }
+                // Tier 4 topologies - use dense_network as fallback until generators are implemented
+                TopologyType::CorticalColumn | TopologyType::Feedforward | TopologyType::Recurrent |
+                TopologyType::Bipartite | TopologyType::CorePeriphery | TopologyType::BowTie |
+                TopologyType::Attention | TopologyType::Residual | TopologyType::PetersenGraph |
+                TopologyType::CompleteBipartite => {
+                    ConsciousnessTopology::dense_network(n_nodes, HDC_DIMENSION, None, seed)
+                }
             };
 
             // Compute Φ

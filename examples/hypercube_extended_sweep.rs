@@ -53,23 +53,23 @@ fn main() {
     // Create Φ calculator instance
     let phi_calc = RealPhiCalculator::new();
 
-    // Test dimensions 8D through 20D
-    // Note: Testing every dimension would be slow for high D
-    // So we'll test: 8, 9, 10, 12, 15, 20
+    // Test dimensions 8D through 14D (practical limit for O(n²) algorithm)
+    // Note: n nodes = 2^dim, so:
+    // - 8D = 256 nodes (64K similarity matrix)
+    // - 10D = 1024 nodes (1M similarity matrix)
+    // - 12D = 4096 nodes (16M similarity matrix) - slow
+    // - 14D = 16384 nodes (256M similarity matrix) - very slow
     let dimensions_to_test = vec![
         (8, "8D Hypercube", "256 vertices, 8 neighbors"),
         (9, "9D Hypercube", "512 vertices, 9 neighbors"),
         (10, "10D Hypercube", "1024 vertices, 10 neighbors"),
+        (11, "11D Hypercube", "2048 vertices, 11 neighbors"),
         (12, "12D Hypercube", "4096 vertices, 12 neighbors"),
-        (15, "15D Hypercube", "32768 vertices, 15 neighbors"),
-        (20, "20D Hypercube", "1048576 vertices, 20 neighbors"),
     ];
 
     let mut results: Vec<(usize, Vec<f64>)> = Vec::new();
 
     for (dim, name, description) in &dimensions_to_test {
-        let n_nodes = 2_usize.pow(*dim as u32);
-
         println!("Testing {} ({}) - {}", name, dim, description);
         print!("  Generating 10 samples");
         std::io::Write::flush(&mut std::io::stdout()).unwrap();
@@ -110,7 +110,7 @@ fn main() {
     let phi_7d = 0.4991;
 
     for (i, (dim, phi_values)) in results.iter().enumerate() {
-        let name = dimensions_to_test[i].1;
+        let _name = dimensions_to_test[i].1;
         let n_nodes = 2_usize.pow(*dim as u32);
         let mean = phi_values.iter().sum::<f64>() / phi_values.len() as f64;
         let variance = phi_values.iter()
@@ -209,9 +209,9 @@ fn main() {
 
     if gains.len() >= 2 {
         for i in 1..gains.len() {
-            let reduction = (gains[i] / gains[i-1] - 1.0) * 100.0;
+            let ratio = gains[i] / gains[i-1];
             println!("  Gain {}→{}: {:.1}% of previous gain",
-                     i-1, i, (gains[i] / gains[i-1]) * 100.0);
+                     i-1, i, ratio * 100.0);
         }
     }
 

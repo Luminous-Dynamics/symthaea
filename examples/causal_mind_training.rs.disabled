@@ -1,0 +1,451 @@
+// ==================================================================================
+// CausalMind Training Pipeline
+// ==================================================================================
+//
+// Revolutionary training for Symthaea's unified causal reasoning system.
+//
+// **Training Strategy**:
+// 1. Synthetic causal pairs (controlled ground truth)
+// 2. Tübingen benchmark data (real-world evaluation)
+// 3. Language-derived causal knowledge (text → structure)
+// 4. Phi-guided representation learning (consciousness signal)
+//
+// **The Key Insight**:
+// Instead of hand-tuning weights for RECI/IGCI/ANM, we LEARN the optimal
+// combination from data. This allows Symthaea to discover causal patterns
+// that humans haven't formalized.
+//
+// Usage: cargo run --example causal_mind_training
+//
+// ==================================================================================
+
+use symthaea::hdc::{CausalMind, CausalDirection, LearnedCausalDiscovery};
+
+// ==================================================================================
+// SYNTHETIC DATA GENERATION
+// ==================================================================================
+
+/// Generate synthetic causal pairs with known ground truth
+///
+/// **Causal Mechanisms**:
+/// - Linear: Y = aX + ε
+/// - Nonlinear: Y = sin(X) + ε, Y = X² + ε, Y = exp(X) + ε
+/// - Polynomial: Y = aX + bX² + cX³ + ε
+/// - Interaction: Y = X₁ · X₂ + ε
+struct SyntheticCausalGenerator {
+    seed: u64,
+}
+
+impl SyntheticCausalGenerator {
+    fn new(seed: u64) -> Self {
+        Self { seed }
+    }
+
+    /// Generate a linear causal pair: Y = aX + noise
+    fn generate_linear(&mut self, n: usize, slope: f64, noise_level: f64) -> (Vec<f64>, Vec<f64>) {
+        let x = self.uniform_samples(n, -3.0, 3.0);
+        let y: Vec<f64> = x.iter().enumerate().map(|(i, &xi)| {
+            slope * xi + self.noise(i as u64, noise_level)
+        }).collect();
+        (x, y)
+    }
+
+    /// Generate a nonlinear causal pair: Y = f(X) + noise
+    fn generate_nonlinear(&mut self, n: usize, mechanism: NonlinearMechanism, noise_level: f64) -> (Vec<f64>, Vec<f64>) {
+        let x = self.uniform_samples(n, -2.0, 2.0);
+        let y: Vec<f64> = x.iter().enumerate().map(|(i, &xi)| {
+            let base = match mechanism {
+                NonlinearMechanism::Sine => (xi * std::f64::consts::PI).sin(),
+                NonlinearMechanism::Quadratic => xi * xi,
+                NonlinearMechanism::Cubic => xi * xi * xi,
+                NonlinearMechanism::Exponential => (xi * 0.5).exp(),
+                NonlinearMechanism::Sigmoid => 1.0 / (1.0 + (-xi).exp()),
+                NonlinearMechanism::Tanh => xi.tanh(),
+            };
+            base + self.noise(i as u64, noise_level)
+        }).collect();
+        (x, y)
+    }
+
+    /// Generate a polynomial causal pair: Y = aX + bX² + cX³ + noise
+    fn generate_polynomial(&mut self, n: usize, coeffs: (f64, f64, f64), noise_level: f64) -> (Vec<f64>, Vec<f64>) {
+        let x = self.uniform_samples(n, -2.0, 2.0);
+        let y: Vec<f64> = x.iter().enumerate().map(|(i, &xi)| {
+            let (a, b, c) = coeffs;
+            a * xi + b * xi * xi + c * xi * xi * xi + self.noise(i as u64, noise_level)
+        }).collect();
+        (x, y)
+    }
+
+    /// Generate confounded pair (X ← Z → Y, appears correlated but no direct causation)
+    fn generate_confounded(&mut self, n: usize, noise_level: f64) -> (Vec<f64>, Vec<f64>) {
+        // Hidden confounder Z
+        let z = self.uniform_samples(n, -2.0, 2.0);
+
+        // X caused by Z
+        let x: Vec<f64> = z.iter().enumerate().map(|(i, &zi)| {
+            zi * 1.5 + self.noise(i as u64, noise_level)
+        }).collect();
+
+        // Y also caused by Z (not by X!)
+        let y: Vec<f64> = z.iter().enumerate().map(|(i, &zi)| {
+            zi * 0.8 + self.noise(i as u64 + 1000, noise_level)
+        }).collect();
+
+        (x, y)
+    }
+
+    fn uniform_samples(&mut self, n: usize, min: f64, max: f64) -> Vec<f64> {
+        (0..n).map(|i| {
+            let hash = self.hash(i as u64);
+            let normalized = (hash as f64) / (u64::MAX as f64);
+            min + normalized * (max - min)
+        }).collect()
+    }
+
+    fn noise(&self, i: u64, level: f64) -> f64 {
+        let hash = self.hash(i + 999);
+        let normalized = (hash as f64) / (u64::MAX as f64) * 2.0 - 1.0;
+        normalized * level
+    }
+
+    fn hash(&mut self, i: u64) -> u64 {
+        // Simple hash for reproducibility
+        let mut h = self.seed.wrapping_add(i);
+        h = h.wrapping_mul(6364136223846793005);
+        h = h.wrapping_add(1442695040888963407);
+        h ^= h >> 33;
+        h = h.wrapping_mul(0xff51afd7ed558ccd);
+        h ^= h >> 33;
+        self.seed = h;
+        h
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum NonlinearMechanism {
+    Sine,
+    Quadratic,
+    Cubic,
+    Exponential,
+    Sigmoid,
+    Tanh,
+}
+
+// ==================================================================================
+// TRAINING CURRICULUM
+// ==================================================================================
+
+/// Training curriculum: structured learning from easy to hard
+struct TrainingCurriculum {
+    current_epoch: usize,
+    total_epochs: usize,
+}
+
+impl TrainingCurriculum {
+    fn new(total_epochs: usize) -> Self {
+        Self {
+            current_epoch: 0,
+            total_epochs,
+        }
+    }
+
+    /// Get difficulty parameters for current epoch (curriculum learning)
+    fn difficulty(&self) -> CurriculumDifficulty {
+        let progress = self.current_epoch as f64 / self.total_epochs.max(1) as f64;
+
+        CurriculumDifficulty {
+            // Start with high SNR, gradually add noise
+            noise_level: 0.1 + progress * 0.4,
+            // Start with linear, gradually add nonlinear
+            nonlinear_fraction: 0.1 + progress * 0.5,
+            // Start with large samples, reduce for harder cases
+            sample_size: (200.0 - progress * 150.0) as usize,
+            // Add confounders later in training
+            confounder_fraction: if progress > 0.3 { (progress - 0.3) * 0.3 } else { 0.0 },
+        }
+    }
+
+    fn advance(&mut self) {
+        self.current_epoch += 1;
+    }
+}
+
+struct CurriculumDifficulty {
+    noise_level: f64,
+    nonlinear_fraction: f64,
+    sample_size: usize,
+    confounder_fraction: f64,
+}
+
+// ==================================================================================
+// TRAINING LOOP
+// ==================================================================================
+
+fn main() {
+    println!("╔══════════════════════════════════════════════════════════════╗");
+    println!("║       CausalMind Training Pipeline                           ║");
+    println!("║                                                              ║");
+    println!("║   Revolutionary: Learning to discover causality              ║");
+    println!("║   Unlike LLMs: Native causal representation                  ║");
+    println!("╚══════════════════════════════════════════════════════════════╝\n");
+
+    // Initialize CausalMind
+    let mut mind = CausalMind::new();
+
+    // ==========================================
+    // PHASE 1: Synthetic Training
+    // ==========================================
+    println!("╔══════════════════════════════════════════════════════════════╗");
+    println!("║              PHASE 1: Synthetic Training                     ║");
+    println!("╚══════════════════════════════════════════════════════════════╝\n");
+
+    let mut curriculum = TrainingCurriculum::new(20);
+    let mut generator = SyntheticCausalGenerator::new(42);
+
+    let mut epoch_accuracies = Vec::new();
+
+    for epoch in 0..20 {
+        let difficulty = curriculum.difficulty();
+        let mut epoch_correct = 0;
+        let mut epoch_total = 0;
+
+        // Generate training batch
+        let batch_size = 50;
+
+        for i in 0..batch_size {
+            let use_nonlinear = (i as f64 / batch_size as f64) < difficulty.nonlinear_fraction;
+            let use_confounder = (i as f64 / batch_size as f64) > (1.0 - difficulty.confounder_fraction);
+
+            let (x, y, direction) = if use_confounder {
+                // Confounded pair - no direct causation
+                let (x, y) = generator.generate_confounded(difficulty.sample_size, difficulty.noise_level);
+                // For confounders, we use Forward as placeholder (real system would detect confounding)
+                (x, y, CausalDirection::Forward)
+            } else if use_nonlinear {
+                // Nonlinear mechanism
+                let mechanisms = [
+                    NonlinearMechanism::Sine,
+                    NonlinearMechanism::Quadratic,
+                    NonlinearMechanism::Cubic,
+                    NonlinearMechanism::Exponential,
+                    NonlinearMechanism::Sigmoid,
+                    NonlinearMechanism::Tanh,
+                ];
+                let mechanism = mechanisms[i % mechanisms.len()];
+                let (x, y) = generator.generate_nonlinear(difficulty.sample_size, mechanism, difficulty.noise_level);
+                (x, y, CausalDirection::Forward)
+            } else {
+                // Linear mechanism
+                let slope = 0.5 + (i as f64 * 0.1);
+                let (x, y) = generator.generate_linear(difficulty.sample_size, slope, difficulty.noise_level);
+                (x, y, CausalDirection::Forward)
+            };
+
+            // Test before training
+            let result = mind.discover_causality(&x, &y);
+            if result.direction == direction {
+                epoch_correct += 1;
+            }
+            epoch_total += 1;
+
+            // Train
+            mind.train_discovery(&x, &y, direction);
+
+            // Also train on reversed pair (backward direction)
+            mind.train_discovery(&y, &x, CausalDirection::Backward);
+        }
+
+        let accuracy = epoch_correct as f64 / epoch_total as f64;
+        epoch_accuracies.push(accuracy);
+
+        println!("  Epoch {:2}: Accuracy {:.1}% | Noise {:.2} | Nonlinear {:.0}% | Samples {}",
+            epoch + 1,
+            accuracy * 100.0,
+            difficulty.noise_level,
+            difficulty.nonlinear_fraction * 100.0,
+            difficulty.sample_size
+        );
+
+        curriculum.advance();
+    }
+
+    // ==========================================
+    // PHASE 2: Language-Derived Training
+    // ==========================================
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║              PHASE 2: Language-Derived Training              ║");
+    println!("╚══════════════════════════════════════════════════════════════╝\n");
+
+    // Extract causal knowledge from text
+    let causal_texts = [
+        "Smoking causes lung cancer",
+        "Exercise leads to better health",
+        "Education produces higher income",
+        "Stress triggers anxiety",
+        "Rain causes wet ground",
+        "Fire produces smoke",
+        "Gravity causes objects to fall",
+        "Infection leads to fever",
+        "Deforestation triggers climate change",
+        "Poverty produces crime",
+    ];
+
+    for text in &causal_texts {
+        mind.learn_from_text(text);
+        println!("  Learned: \"{}\"", text);
+    }
+
+    println!("\n  Concepts learned: {}", mind.concept_count());
+    println!("  Causal links: {}", mind.link_count());
+    println!("  Current Φ: {:.4}", mind.phi());
+
+    // ==========================================
+    // PHASE 3: Evaluation
+    // ==========================================
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║              PHASE 3: Evaluation                             ║");
+    println!("╚══════════════════════════════════════════════════════════════╝\n");
+
+    // Test on held-out synthetic data
+    let mut test_generator = SyntheticCausalGenerator::new(9999);
+    let mut test_correct = 0;
+    let test_total = 100;
+
+    println!("  Testing on 100 held-out synthetic pairs...\n");
+
+    let mut results_by_type: std::collections::HashMap<&str, (usize, usize)> = std::collections::HashMap::new();
+
+    for i in 0..test_total {
+        let (x, y, mechanism_name) = if i < 25 {
+            let (x, y) = test_generator.generate_linear(100, 1.0, 0.2);
+            (x, y, "linear")
+        } else if i < 50 {
+            let (x, y) = test_generator.generate_nonlinear(100, NonlinearMechanism::Quadratic, 0.2);
+            (x, y, "quadratic")
+        } else if i < 75 {
+            let (x, y) = test_generator.generate_nonlinear(100, NonlinearMechanism::Sine, 0.2);
+            (x, y, "sine")
+        } else {
+            let (x, y) = test_generator.generate_nonlinear(100, NonlinearMechanism::Exponential, 0.2);
+            (x, y, "exponential")
+        };
+
+        let result = mind.discover_causality(&x, &y);
+        let correct = result.direction == CausalDirection::Forward;
+
+        if correct {
+            test_correct += 1;
+        }
+
+        let entry = results_by_type.entry(mechanism_name).or_insert((0, 0));
+        entry.1 += 1;
+        if correct {
+            entry.0 += 1;
+        }
+    }
+
+    println!("  Results by mechanism type:");
+    for (mechanism, (correct, total)) in &results_by_type {
+        println!("    {:12}: {:.1}% ({}/{})",
+            mechanism,
+            *correct as f64 / *total as f64 * 100.0,
+            correct, total
+        );
+    }
+
+    let test_accuracy = test_correct as f64 / test_total as f64;
+    println!("\n  Overall Test Accuracy: {:.1}% ({}/{})",
+        test_accuracy * 100.0, test_correct, test_total);
+
+    // ==========================================
+    // PHASE 4: Model Analysis
+    // ==========================================
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║              PHASE 4: Learned Weights Analysis               ║");
+    println!("╚══════════════════════════════════════════════════════════════╝\n");
+
+    let discovery = mind.causal_discovery();
+    let weights = discovery.weights();
+
+    println!("  Feature weights after training:");
+    println!("    RECI weight:         {:+.4}", weights.reci_weight);
+    println!("    IGCI weight:         {:+.4}", weights.igci_weight);
+    println!("    ANM weight:          {:+.4}", weights.anm_weight);
+    println!("    Higher-order weight: {:+.4}", weights.higher_order_weight);
+    println!("    Bias:                {:+.4}", weights.bias);
+
+    println!("\n  Training stats:");
+    println!("    Examples seen: {}", discovery.training_examples);
+    println!("    Running accuracy: {:.1}%", discovery.accuracy() * 100.0);
+
+    // ==========================================
+    // PHASE 5: Causal Queries
+    // ==========================================
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║              PHASE 5: Causal Query Demonstration             ║");
+    println!("╚══════════════════════════════════════════════════════════════╝\n");
+
+    println!("  Query: \"Why did lung cancer happen?\"");
+    let explanations = mind.query_why("cancer");
+    if explanations.is_empty() {
+        println!("    → No direct causes found (need more training data)");
+    } else {
+        for exp in &explanations {
+            println!("    → {}", exp.explanation);
+        }
+    }
+
+    println!("\n  Query: \"What if we intervene on smoking?\"");
+    let predictions = mind.query_intervention("Smoking", 0.5);
+    if predictions.is_empty() {
+        println!("    → No strong effects predicted");
+    } else {
+        for pred in &predictions {
+            println!("    → {}", pred.prediction);
+        }
+    }
+
+    // ==========================================
+    // SUMMARY
+    // ==========================================
+    println!("\n╔══════════════════════════════════════════════════════════════╗");
+    println!("║                       TRAINING SUMMARY                       ║");
+    println!("╚══════════════════════════════════════════════════════════════╝\n");
+
+    let avg_epoch_acc = epoch_accuracies.iter().sum::<f64>() / epoch_accuracies.len() as f64;
+    let final_epoch_acc = epoch_accuracies.last().unwrap_or(&0.0);
+
+    println!("  Synthetic Training:");
+    println!("    Average accuracy: {:.1}%", avg_epoch_acc * 100.0);
+    println!("    Final accuracy:   {:.1}%", final_epoch_acc * 100.0);
+
+    println!("\n  Test Performance:");
+    println!("    Held-out accuracy: {:.1}%", test_accuracy * 100.0);
+
+    println!("\n  Knowledge Base:");
+    println!("    Concepts: {}", mind.concept_count());
+    println!("    Links: {}", mind.link_count());
+    println!("    Φ (integrated information): {:.6}", mind.phi());
+
+    // Assessment
+    let assessment = if test_accuracy >= 0.7 {
+        "EXCELLENT - Strong causal discovery capability"
+    } else if test_accuracy >= 0.6 {
+        "GOOD - Above random, room for improvement"
+    } else if test_accuracy > 0.5 {
+        "FAIR - Better than random, needs more training"
+    } else {
+        "NEEDS WORK - At or below random chance"
+    };
+
+    println!("\n  Assessment: {}", assessment);
+
+    println!("\n  Next Steps:");
+    println!("    1. Train on Tübingen dataset for real-world evaluation");
+    println!("    2. Integrate Φ-guided learning signal");
+    println!("    3. Add more sophisticated feature extraction");
+    println!("    4. Implement active learning for hard cases");
+
+    println!("\n  Done!");
+}
