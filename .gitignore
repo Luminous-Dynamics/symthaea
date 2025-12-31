@@ -30,3 +30,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+
+# Binary model files
+models/
+consciousness.bin
