@@ -199,7 +199,7 @@ impl DifferentiablePhiCalculator {
             };
         }
 
-        let dim = topology.node_representations[0].dim();
+        let _dim = topology.node_representations[0].dim();
 
         // Step 1: Compute similarity matrix with differentiable operations
         let (similarity_matrix, sim_gradients) = self.compute_similarity_matrix(&topology.node_representations);
@@ -333,7 +333,7 @@ impl DifferentiablePhiCalculator {
 
     /// Sample from Gumbel(0, 1) distribution
     fn sample_gumbel(&self) -> f64 {
-        use std::f64::consts::E;
+        
         // Use deterministic pseudo-random for reproducibility
         let u: f64 = 0.5; // Could be seeded random
         -(-u.ln()).ln()
@@ -406,7 +406,7 @@ impl DifferentiablePhiCalculator {
         similarity: &[Vec<f64>],
         sim_gradients: &[Vec<Vec<f64>>],
         partition_weights: &[Vec<f64>],
-        phi: f64,
+        _phi: f64,
     ) -> PhiGradient {
         let n = nodes.len();
         if n == 0 {
@@ -418,7 +418,7 @@ impl DifferentiablePhiCalculator {
 
         // Gradient of Φ w.r.t. each node representation
         // Using numerical approximation for simplicity (analytical is complex)
-        let epsilon = 1e-5;
+        let _epsilon = 1e-5;
 
         for i in 0..n {
             for d in 0..dim.min(100) { // Limit dimensions for efficiency
