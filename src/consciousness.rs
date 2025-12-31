@@ -5,6 +5,9 @@ Self-referential structure where consciousness emerges
 Uses arena-based indices (not pointers) for Rust safety + serializability
 */
 
+// Submodules
+// pub mod recursive_improvement;  // Temporarily disabled - has borrow checker issues to fix
+
 use petgraph::graph::{Graph, NodeIndex};
 use petgraph::visit::EdgeRef;  // For edge.source() and edge.target()
 use serde::{Deserialize, Serialize};

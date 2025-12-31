@@ -14,6 +14,14 @@ pub mod ltc;
 pub mod consciousness;
 pub mod nix_understanding;
 
+// Learnable LTC (gradient-based neural adaptation)
+pub mod learnable_ltc;
+// pub mod sparse_ltc;  // Efficient sparse LTC implementation (deferred)
+pub mod learning;    // Learning integration engine
+
+// Continuous Mind - deferred until router dependencies are fixed
+// pub mod continuous_mind;
+
 // Week 0: Actor Model & Physiological Systems
 pub mod brain;
 
@@ -46,10 +54,16 @@ pub mod awakening;
 // pub mod semantic_ear;  // Needs rust-bert, tokenizers
 pub mod safety;
 pub mod sleep_cycles;
-// pub mod swarm;  // Needs libp2p
+pub mod swarm;  // libp2p enabled - P2P collective learning
 
-// Phase 11+: Mycelix Protocol integration (Deferred to Week 9+)
-// pub mod sophia_swarm;  // Needs libp2p
+// Benchmarks (Tübingen causal discovery, etc.)
+pub mod benchmarks;
+
+// Week 12 Phase 2a: Voice Interface (STT + TTS)
+pub mod voice;
+
+// Phase 11+: Mycelix Protocol integration (Deferred - needs sha2, uuid, urlencoding dependencies)
+// pub mod sophia_swarm;  // Needs additional dependencies
 
 // Phase 11+: Resonant Speech (Deferred to Week 11+)
 // pub mod resonant_speech;  // Needs tokenizers
@@ -72,6 +86,11 @@ pub use hdc::{SemanticSpace, HdcContext};  // Week 0: Added HdcContext
 pub use ltc::LiquidNetwork;
 pub use consciousness::ConsciousnessGraph;
 pub use nix_understanding::NixUnderstanding;
+
+// Learning integration re-exports
+pub use learnable_ltc::{LearnableLTC, LearnableLTCConfig, LTCTrainingStats};
+pub use learning::{LearningEngine, LearningConfig, LearningStats, Experience};
+// pub use continuous_mind::{ContinuousMind, MindConfig, MindState, MindResponse};  // Deferred
 
 // Week 0: Deferred Phase 11+ exports
 // pub use semantic_ear::SemanticEar;  // Needs rust-bert
@@ -120,13 +139,21 @@ pub use physiology::{
 #[cfg(feature = "audio")]
 pub use physiology::{LarynxActor, LarynxConfig, LarynxStats, ProsodyParams};  // Week 12 Phase 2a: Voice output with prosody
 
+// Week 12 Phase 2a: Voice Interface exports
+pub use voice::{VoiceError, VoiceResult, LTCPacing, VoiceConfig, VoiceEvent};
+pub use voice::models::{ModelManager, KokoroModel, WhisperModel};
+#[cfg(feature = "voice-tts")]
+pub use voice::{VoiceOutput, VoiceOutputConfig, SynthesisResult};
+#[cfg(feature = "voice-stt")]
+pub use voice::{VoiceInput, VoiceInputConfig, TranscriptionResult};
+
 // Week 12: Perception & Tool Creation exports
 pub use perception::{
     VisualCortex, VisualFeatures,
     CodePerceptionCortex, ProjectStructure, RustCodeSemantics, CodeQualityAnalysis,
 };
 
-// pub use swarm::{SwarmIntelligence, SwarmConfig, SwarmStats};  // Needs libp2p
+pub use swarm::{SwarmIntelligence, SwarmConfig, PeerStats};  // libp2p enabled
 
 // Track 6: Language & Conversation exports
 pub use language::{
