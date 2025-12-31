@@ -240,8 +240,10 @@ pub mod sequence_encoder;
 pub mod resonator;
 pub mod morphogenetic;
 pub mod hebbian;
+pub mod hdc_ltc_neuron;  // HDC-LTC neuron integration with Hebbian learning
 pub mod sdm;
 pub mod text_encoder;  // Revolutionary Enhancement: Text → HDC encoding
+pub mod unified_hv;     // Unified hypervector types (ContinuousHV)
 
 // Consciousness topology and Φ measurement modules
 pub mod real_hv;                           // Real-valued hypervectors for consciousness topologies
@@ -271,6 +273,12 @@ pub mod consciousness_self_assessment;     // Self-assessment for conversation
 pub mod consciousness_creativity;          // Creativity for conversation
 pub mod deterministic_seeds;               // Deterministic seeds for NixOS knowledge
 pub mod integrated_information;            // Φ (integrated information) measurement
+pub mod causal_encoder;                    // Causal relation encoding
+
+// Novel Algorithm Modules (Dec 2025)
+pub mod differentiable_phi;                // Soft-partitioned differentiable Φ for gradient optimization
+pub mod cross_modal_binding;               // Cross-modal binding for multi-sensory integration
+pub mod metacognitive_monitor;             // Real-time consciousness monitoring with self-reflection
 
 // Re-export HV16 at module level for convenience (used by language/nix_* modules)
 pub use binary_hv::HV16;
