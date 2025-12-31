@@ -19,7 +19,9 @@ pub mod learnable_ltc;
 // pub mod sparse_ltc;  // Efficient sparse LTC implementation (deferred)
 pub mod learning;    // Learning integration engine
 
-// Continuous Mind - deferred until router dependencies are fixed
+// Continuous Mind - deferred until OscillatoryRouter is fully implemented
+// Requires ~90 fields in OscillatorySummary for complete integration
+// DaemonActor::run_continuous is implemented and ready (see brain/daemon.rs)
 // pub mod continuous_mind;
 
 // Week 0: Actor Model & Physiological Systems

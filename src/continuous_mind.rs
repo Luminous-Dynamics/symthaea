@@ -71,16 +71,465 @@ use crate::language::active_inference_adapter::{
 
 // Cognitive Router Integration - Phase 5F
 // MetaRouter uses UCB1 multi-armed bandit to select optimal routing paradigm
-use crate::consciousness::recursive_improvement::routers::{
-    MetaRouter, MetaRouterConfig, LatentConsciousnessState,
-};
+// TODO: Re-enable when recursive_improvement routers are fixed
+// use crate::consciousness::recursive_improvement::routers::{
+//     MetaRouter, MetaRouterConfig, LatentConsciousnessState,
+// };
 
 // Phase 6A: OscillatoryRouter Integration
 // Phase-locked routing using 40Hz gamma-band synchronization for optimal execution windows
-// Note: oscillatory module is private, but types are re-exported at parent level
-use crate::consciousness::recursive_improvement::routers::{
-    OscillatoryRouter, OscillatoryRouterConfig, OscillatoryPhase,
-};
+// TODO: Re-enable when recursive_improvement routers are fixed
+// use crate::consciousness::recursive_improvement::routers::{
+//     OscillatoryRouter, OscillatoryRouterConfig, OscillatoryPhase,
+// };
+
+// ============================================================================
+// TEMPORARY STUBS - Replace with real implementations when routers are fixed
+// ============================================================================
+
+/// Temporary stub for MetaRouter config
+#[derive(Debug, Clone, Default)]
+pub struct MetaRouterConfig;
+
+/// Temporary stub for latent consciousness state
+#[derive(Debug, Clone, Default)]
+pub struct LatentConsciousnessState {
+    pub phi: f64,
+    pub integration_quality: f64,
+    pub coherence: f64,
+    pub attention: f64,
+}
+
+impl LatentConsciousnessState {
+    /// Create from observable metrics
+    pub fn from_observables(phi: f64, integration: f64, coherence: f64, attention: f64) -> Self {
+        Self {
+            phi,
+            integration_quality: integration,
+            coherence,
+            attention,
+        }
+    }
+}
+
+/// Routing decision returned by MetaRouter
+#[derive(Debug, Clone)]
+pub struct RoutingDecision {
+    pub paradigm: &'static str,
+    pub confidence: f64,
+}
+
+/// Temporary stub for MetaRouter (UCB1 multi-armed bandit)
+#[derive(Debug)]
+pub struct MetaRouter {
+    _config: MetaRouterConfig,
+}
+
+impl MetaRouter {
+    pub fn new(_config: MetaRouterConfig) -> Self {
+        Self { _config }
+    }
+
+    pub fn select_paradigm(&mut self, _state: &LatentConsciousnessState) -> &'static str {
+        "default"  // Stub: always use default paradigm
+    }
+
+    pub fn report_outcome(&mut self, _paradigm: &str, _reward: f64, _state: &LatentConsciousnessState) {
+        // Stub: no-op learning
+    }
+
+    /// Route to select optimal paradigm for current consciousness state
+    pub fn route(&mut self, state: &LatentConsciousnessState) -> RoutingDecision {
+        let paradigm = if state.phi > 0.7 {
+            "FullDeliberation"
+        } else if state.phi > 0.4 {
+            "FastPatterns"
+        } else {
+            "Ensemble"
+        };
+        RoutingDecision {
+            paradigm,
+            confidence: state.phi,
+        }
+    }
+}
+
+/// Temporary stub for OscillatoryRouter config
+#[derive(Debug, Clone)]
+pub struct OscillatoryRouterConfig {
+    pub gamma_frequency_hz: f64,
+    pub base_frequency: f64,
+    pub frequency_adaptation: f64,
+    pub min_amplitude: f64,
+    pub amplitude_decay: f64,
+    pub phase_coupling_strength: f64,
+    pub prediction_cycles: usize,
+    pub phase_locked_scheduling: bool,
+    pub phase_weight: f64,
+    pub magnitude_weight: f64,
+}
+
+impl Default for OscillatoryRouterConfig {
+    fn default() -> Self {
+        Self {
+            gamma_frequency_hz: 40.0,
+            base_frequency: 40.0,
+            frequency_adaptation: 0.1,
+            min_amplitude: 0.1,
+            amplitude_decay: 0.05,
+            phase_coupling_strength: 0.3,
+            prediction_cycles: 4,
+            phase_locked_scheduling: true,
+            phase_weight: 0.4,
+            magnitude_weight: 0.6,
+        }
+    }
+}
+
+/// Summary of oscillatory state for monitoring
+#[derive(Debug, Clone)]
+pub struct OscillatorySummary {
+    pub current_phase: OscillatoryPhase,
+    pub coherence: f64,
+    pub effective_phi: f64,
+    pub ready_operations: usize,
+    pub current_phi: f64,
+    pub is_sleeping: bool,
+    pub delta_power: f64,
+    pub frequency: f64,
+    pub phase_lock_accuracy: f64,
+    pub pending_operations: usize,
+    pub cycles_completed: u64,
+    pub dominant_band: &'static str,
+    // Extended neural oscillation metrics
+    pub gamma_power: f64,
+    pub theta_power: f64,
+    pub alpha_power: f64,
+    pub theta_gamma_coupling: f64,
+    pub arousal: f64,
+    pub attention: f64,
+    pub in_memory_window: bool,
+    pub system_resonance: f64,
+
+    // Resonance state (Phase 4)
+    pub resonance_integration_boost: f64,
+    pub resonating_pairs: usize,
+    pub cluster_count: usize,
+    pub primary_cluster_size: usize,
+    pub primary_cluster_plv: f64,
+
+    // Attention spotlight (Phase 6)
+    pub attention_position: f64,
+    pub attention_intensity: f64,
+    pub attention_width: f64,
+    pub attention_capacity: f64,
+    pub secondary_foci_count: usize,
+    pub in_attention_blink: bool,
+    pub attention_sampling_effectiveness: f64,
+    pub in_attention_uptake: bool,
+
+    // Sleep state (Phase 7)
+    pub sleep_stage: &'static str,
+    pub time_in_sleep_stage: f64,
+    pub sleep_pressure: f64,
+    pub sleep_cycles_completed: u64,
+    pub ultradian_cycle_position: f64,
+    pub consolidation_efficiency: f64,
+    pub in_memory_transfer_window: bool,
+    pub sleep_consciousness_level: f64,
+    pub spindle_count: u64,
+    pub ripple_count: u64,
+    pub dream_intensity: f64,
+    pub spindle_power: f64,
+
+    // Neuromodulatory state (Phase 8)
+    pub dopamine_level: f64,
+    pub serotonin_level: f64,
+    pub norepinephrine_level: f64,
+    pub acetylcholine_level: f64,
+    pub dopamine_sensitivity: f64,
+    pub serotonin_sensitivity: f64,
+    pub mood_valence: f64,
+    pub motivation_drive: f64,
+    pub learning_rate_mod: f64,
+    pub stress_level: f64,
+
+    // Predictive processing (Phase 9)
+    pub free_energy: f64,
+    pub complexity: f64,
+    pub accuracy: f64,
+    pub precision_gain: f64,
+    pub weighted_prediction_error: f64,
+    pub expected_free_energy: f64,
+    pub epistemic_value: f64,
+    pub pragmatic_value: f64,
+    pub exploration_drive: f64,
+    pub surprise: f64,
+    pub sensory_precision: f64,
+    pub perceptual_precision: f64,
+    pub conceptual_precision: f64,
+    pub metacognitive_precision: f64,
+    pub sensory_prediction: f64,
+    pub perceptual_prediction: f64,
+    pub conceptual_prediction: f64,
+    pub metacognitive_prediction: f64,
+
+    // Global workspace (Phase 10)
+    pub is_ignited: bool,
+    pub broadcasting_processor: String,
+    pub broadcast_strength: f64,
+    pub broadcast_duration: f64,
+    pub ignition_threshold: f64,
+    pub time_since_ignition: f64,
+    pub workspace_integration: f64,
+    pub coalition_count: usize,
+    pub perception_activation: f64,
+    pub memory_activation: f64,
+    pub executive_activation: f64,
+    pub emotion_activation: f64,
+    pub motor_activation: f64,
+    pub language_activation: f64,
+    pub metacognition_activation: f64,
+    pub ignition_count: u64,
+    pub total_broadcast_time: f64,
+}
+
+/// Temporary stub for oscillatory phase
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum OscillatoryPhase {
+    Peak,
+    Rising,
+    Falling,
+    Trough,
+}
+
+/// Temporary stub for OscillatoryRouter (40Hz gamma synchronization)
+#[derive(Debug)]
+pub struct OscillatoryRouter {
+    _config: OscillatoryRouterConfig,
+    phase: OscillatoryPhase,
+    coherence: f64,
+    effective_phi: f64,
+    arousal: f64,
+    attention: f64,
+    pending_ops: Vec<(u64, String)>,
+    cycles_completed: u64,
+    is_sleeping: bool,
+}
+
+impl OscillatoryRouter {
+    pub fn new(config: OscillatoryRouterConfig) -> Self {
+        Self {
+            _config: config,
+            phase: OscillatoryPhase::Peak,
+            coherence: 1.0,
+            effective_phi: 0.5,
+            arousal: 0.5,
+            attention: 0.5,
+            pending_ops: Vec::new(),
+            cycles_completed: 0,
+            is_sleeping: false,
+        }
+    }
+
+    pub fn current_phase(&self) -> OscillatoryPhase {
+        self.phase
+    }
+
+    pub fn update(&mut self, _delta_time: f64) {
+        // Stub: cycle through phases
+        self.phase = match self.phase {
+            OscillatoryPhase::Peak => OscillatoryPhase::Falling,
+            OscillatoryPhase::Falling => OscillatoryPhase::Trough,
+            OscillatoryPhase::Trough => OscillatoryPhase::Rising,
+            OscillatoryPhase::Rising => OscillatoryPhase::Peak,
+        };
+    }
+
+    pub fn is_optimal_window(&self) -> bool {
+        self.phase == OscillatoryPhase::Peak
+    }
+
+    pub fn phase_coherence(&self) -> f64 {
+        match self.phase {
+            OscillatoryPhase::Peak => 1.0,
+            OscillatoryPhase::Rising | OscillatoryPhase::Falling => 0.7,
+            OscillatoryPhase::Trough => 0.3,
+        }
+    }
+
+    /// Advance oscillatory state by delta time (in seconds)
+    pub fn cycle(&mut self, dt: f64) {
+        // Advance phase based on frequency (40Hz = 25ms per cycle)
+        let cycles = dt * self._config.base_frequency;
+        let phase_advance = (cycles * 4.0).fract(); // 4 phases per cycle
+
+        // Simple phase advancement
+        if phase_advance > 0.75 {
+            self.phase = OscillatoryPhase::Trough;
+        } else if phase_advance > 0.5 {
+            self.phase = OscillatoryPhase::Falling;
+        } else if phase_advance > 0.25 {
+            self.phase = OscillatoryPhase::Peak;
+        } else {
+            self.phase = OscillatoryPhase::Rising;
+        }
+
+        self.cycles_completed += 1;
+    }
+
+    /// Observe current Φ to modulate oscillatory coherence
+    pub fn observe_state(&mut self, phi: f64, _dt: f64) {
+        // Higher Φ = better synchronization
+        self.effective_phi = phi;
+        self.coherence = (self.coherence * 0.9 + phi * 0.1).clamp(0.1, 1.0);
+    }
+
+    /// Set arousal level (affects oscillation amplitude)
+    pub fn set_arousal(&mut self, arousal: f64) {
+        self.arousal = arousal.clamp(0.0, 1.0);
+    }
+
+    /// Set attention level (affects phase-locking)
+    pub fn set_attention(&mut self, attention: f64) {
+        self.attention = attention.clamp(0.0, 1.0);
+    }
+
+    /// Modulate based on hormones (cortisol disrupts, dopamine enhances)
+    pub fn modulate_hormones(&mut self, cortisol: f32, dopamine: f32) {
+        // Cortisol disrupts synchronization
+        let cortisol_effect = 1.0 - (cortisol as f64 * 0.3);
+        // Dopamine enhances synchronization
+        let dopamine_effect = 1.0 + (dopamine as f64 * 0.2);
+
+        self.coherence = (self.coherence * cortisol_effect * dopamine_effect).clamp(0.1, 1.0);
+    }
+
+    /// Execute operations ready for phase-locked execution
+    pub fn execute_ready(&mut self) -> Vec<(u64, String)> {
+        // Only execute at Peak phase
+        if self.phase == OscillatoryPhase::Peak && !self.pending_ops.is_empty() {
+            std::mem::take(&mut self.pending_ops)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get summary of oscillatory state
+    pub fn summary(&self) -> OscillatorySummary {
+        OscillatorySummary {
+            // Core oscillatory state
+            current_phase: self.phase,
+            coherence: self.coherence,
+            effective_phi: self.effective_phi,
+            ready_operations: self.pending_ops.len(),
+            current_phi: self.effective_phi,
+            is_sleeping: self.is_sleeping,
+            delta_power: if self.is_sleeping { 0.8 } else { 0.2 },
+            frequency: self._config.base_frequency,
+            phase_lock_accuracy: self.coherence * self.attention,
+            pending_operations: self.pending_ops.len(),
+            cycles_completed: self.cycles_completed,
+            dominant_band: if self._config.base_frequency > 30.0 { "gamma" } else { "alpha" },
+
+            // Extended neural oscillation metrics
+            gamma_power: if self._config.base_frequency > 30.0 { 0.8 } else { 0.3 },
+            theta_power: 0.4,
+            alpha_power: if self.is_sleeping { 0.2 } else { 0.5 },
+            theta_gamma_coupling: self.coherence * 0.7,
+            arousal: self.arousal,
+            attention: self.attention,
+            in_memory_window: self.phase == OscillatoryPhase::Peak,
+            system_resonance: self.coherence * self.effective_phi,
+
+            // Resonance state (Phase 4)
+            resonance_integration_boost: self.coherence * 0.3,
+            resonating_pairs: 0,
+            cluster_count: 1,
+            primary_cluster_size: 1,
+            primary_cluster_plv: self.coherence,
+
+            // Attention spotlight (Phase 6)
+            attention_position: 0.5,
+            attention_intensity: self.attention,
+            attention_width: 0.3,
+            attention_capacity: 4.0,
+            secondary_foci_count: 0,
+            in_attention_blink: false,
+            attention_sampling_effectiveness: self.attention * 0.9,
+            in_attention_uptake: false,
+
+            // Sleep state (Phase 7)
+            sleep_stage: if self.is_sleeping { "N2" } else { "Wake" },
+            time_in_sleep_stage: 0.0,
+            sleep_pressure: if self.is_sleeping { 0.3 } else { 0.7 },
+            sleep_cycles_completed: 0,
+            ultradian_cycle_position: 0.0,
+            consolidation_efficiency: 0.5,
+            in_memory_transfer_window: self.is_sleeping && self.phase == OscillatoryPhase::Trough,
+            sleep_consciousness_level: if self.is_sleeping { 0.2 } else { 1.0 },
+            spindle_count: 0,
+            ripple_count: 0,
+            dream_intensity: 0.0,
+            spindle_power: if self.is_sleeping { 0.5 } else { 0.0 },
+
+            // Neuromodulatory state (Phase 8)
+            dopamine_level: 0.5,
+            serotonin_level: 0.5,
+            norepinephrine_level: self.arousal * 0.8,
+            acetylcholine_level: self.attention * 0.7,
+            dopamine_sensitivity: 1.0,
+            serotonin_sensitivity: 1.0,
+            mood_valence: 0.0,
+            motivation_drive: 0.5,
+            learning_rate_mod: 1.0,
+            stress_level: 0.3,
+
+            // Predictive processing (Phase 9)
+            free_energy: 0.5,
+            complexity: 0.5,
+            accuracy: 0.8,
+            precision_gain: 0.1,
+            weighted_prediction_error: 0.2,
+            expected_free_energy: 0.4,
+            epistemic_value: 0.3,
+            pragmatic_value: 0.5,
+            exploration_drive: 0.3,
+            surprise: 0.2,
+            sensory_precision: 0.8,
+            perceptual_precision: 0.7,
+            conceptual_precision: 0.6,
+            metacognitive_precision: 0.5,
+            sensory_prediction: 0.5,
+            perceptual_prediction: 0.5,
+            conceptual_prediction: 0.5,
+            metacognitive_prediction: 0.5,
+
+            // Global workspace (Phase 10)
+            is_ignited: self.phase == OscillatoryPhase::Peak && self.coherence > 0.7,
+            broadcasting_processor: String::new(),
+            broadcast_strength: self.coherence,
+            broadcast_duration: 0.0,
+            ignition_threshold: 0.7,
+            time_since_ignition: 0.0,
+            workspace_integration: self.effective_phi,
+            coalition_count: 0,
+            perception_activation: 0.5,
+            memory_activation: 0.5,
+            executive_activation: 0.5,
+            emotion_activation: 0.5,
+            motor_activation: 0.3,
+            language_activation: 0.5,
+            metacognition_activation: 0.4,
+            ignition_count: 0,
+            total_broadcast_time: 0.0,
+        }
+    }
+}
+
+// ============================================================================
+// END TEMPORARY STUBS
+// ============================================================================
 
 // LEARNING INTEGRATION: Gradient-based neural adaptation
 // Bridges LearnableLTC (BPTT+Adam) with ContinuousMind cognitive loop
@@ -812,9 +1261,12 @@ impl ContinuousMind {
         // - Falling (decreasing): Output generation and consolidation
         // - Trough (min amplitude): Reset, maintenance, and cleanup
         let oscillatory_router = OscillatoryRouter::new(OscillatoryRouterConfig {
+            gamma_frequency_hz: 40.0,       // 40Hz gamma-band (consciousness signature)
             base_frequency: 40.0,           // 40Hz gamma-band (consciousness signature)
             frequency_adaptation: 0.1,      // Adaptation rate
             min_amplitude: 0.3,             // Minimum amplitude for phase-locking
+            amplitude_decay: 0.05,          // Amplitude decay rate
+            phase_coupling_strength: 0.3,   // Phase coupling strength
             prediction_cycles: 4,           // Predict 4 cycles ahead
             phase_locked_scheduling: true,  // Enable phase-locked scheduling
             phase_weight: 0.4,              // 40% influence from phase state
@@ -1170,9 +1622,9 @@ impl ContinuousMind {
                             let lang = latest_language.lock().unwrap();
                             if let Some(ref result) = *lang {
                                 // Use unified free energy as linguistic error signal
-                                let lang_fe = result.unified_free_energy.language_fe;
+                                let lang_fe = result.unified_free_energy.language_fe as f32;
                                 // Use coherence as positive reward signal
-                                let coherence = result.precision_weights.coherence;
+                                let coherence = result.precision_weights.coherence as f32;
                                 (lang_fe, coherence - 0.5)  // Coherence above 0.5 is positive
                             } else {
                                 (0.0, 0.0)

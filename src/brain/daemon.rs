@@ -60,7 +60,11 @@
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::Sender;
+use std::thread::{self, JoinHandle};
 
 use crate::memory::{HippocampusActor, EmotionalValence};
 use crate::hdc::SemanticSpace;
@@ -422,6 +426,93 @@ impl DaemonActor {
     /// Get recent insights
     pub fn get_recent_insights(&self) -> &[Insight] {
         &self.recent_insights
+    }
+
+    /// Run the daemon continuously in a background thread
+    ///
+    /// This is the main entry point for the Default Mode Network.
+    /// The daemon runs in its own thread, periodically generating insights
+    /// when the system is idle and hormone levels are appropriate.
+    ///
+    /// # Arguments
+    /// * `daemon` - Arc-wrapped self for thread-safe access
+    /// * `hippocampus` - Memory system to draw random memories from
+    /// * `goals` - Active goals for resonance checking
+    /// * `hormones` - Endocrine state (modulates creativity)
+    /// * `insight_tx` - Channel to send generated insights
+    /// * `shutdown` - Atomic flag to signal thread termination
+    ///
+    /// # Returns
+    /// JoinHandle for the spawned daemon thread
+    pub fn run_continuous(
+        daemon: Arc<Mutex<Self>>,
+        hippocampus: Arc<Mutex<HippocampusActor>>,
+        goals: Arc<Mutex<Vec<Goal>>>,
+        hormones: Arc<Mutex<HormoneState>>,
+        insight_tx: Sender<Insight>,
+        shutdown: Arc<AtomicBool>,
+    ) -> JoinHandle<()> {
+        thread::spawn(move || {
+            // Daemon runs at ~10 Hz when active (100ms sleep)
+            let sleep_duration = Duration::from_millis(100);
+
+            loop {
+                // Check shutdown signal
+                if shutdown.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                // Try to daydream (may not produce insight every cycle)
+                let insight = {
+                    // Lock all shared state briefly
+                    let mut daemon_guard = match daemon.lock() {
+                        Ok(g) => g,
+                        Err(_) => {
+                            thread::sleep(sleep_duration);
+                            continue;
+                        }
+                    };
+
+                    let hippocampus_guard = match hippocampus.lock() {
+                        Ok(g) => g,
+                        Err(_) => {
+                            thread::sleep(sleep_duration);
+                            continue;
+                        }
+                    };
+
+                    let goals_guard = match goals.lock() {
+                        Ok(g) => g,
+                        Err(_) => {
+                            thread::sleep(sleep_duration);
+                            continue;
+                        }
+                    };
+
+                    let hormones_guard = match hormones.lock() {
+                        Ok(g) => g,
+                        Err(_) => {
+                            thread::sleep(sleep_duration);
+                            continue;
+                        }
+                    };
+
+                    // Attempt to generate an insight
+                    daemon_guard.daydream(&hippocampus_guard, &goals_guard, &hormones_guard)
+                };
+
+                // If we got an insight, send it
+                if let Some(insight) = insight {
+                    if insight_tx.send(insight).is_err() {
+                        // Receiver dropped, time to shut down
+                        break;
+                    }
+                }
+
+                // Sleep between cycles
+                thread::sleep(sleep_duration);
+            }
+        })
     }
 }
 
