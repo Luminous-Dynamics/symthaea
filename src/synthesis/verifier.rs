@@ -7,7 +7,6 @@
 
 use super::synthesizer::{SynthesizedProgram, ProgramTemplate};
 use super::causal_spec::{CausalSpec, CausalStrength};
-use super::{SynthesisError, SynthesisResult};
 use crate::observability::{CounterfactualEngine, CounterfactualQuery};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -382,7 +381,7 @@ impl MinimalityChecker {
 
     /// Generate simpler variants of a program
     pub fn generate_simpler_variants(&self, program: &SynthesizedProgram) -> Vec<ProgramTemplate> {
-        let mut variants = Vec::new();
+        let variants = Vec::new();
 
         // Try removing operations
         // Try simplifying conditions

@@ -1,6 +1,8 @@
 //! Voice Interface Module - Natural Voice Conversation with LTC Pacing
 //!
 //! This module provides speech-to-text (STT) and text-to-speech (TTS) capabilities
+
+#![allow(dead_code, unused_variables)]
 //! integrated with Symthaea's LTC temporal dynamics for natural conversation flow.
 //!
 //! ## Components
@@ -13,9 +15,12 @@
 //!
 //! Enable voice features in Cargo.toml:
 //! ```toml
-//! symthaea = { features = ["voice"] }      # Full voice (STT + TTS)
-//! symthaea = { features = ["voice-stt"] }  # STT only (whisper)
-//! symthaea = { features = ["voice-tts"] }  # TTS only (Kokoro)
+//! symthaea = { features = ["voice-tts"] }       # TTS only (Kokoro, CPU)
+//! symthaea = { features = ["voice-tts-cuda"] }  # TTS with GPU acceleration
+//! symthaea = { features = ["voice-tts-async"] } # TTS with async support
+//! symthaea = { features = ["audio"] }           # TTS with audio playback
+//! symthaea = { features = ["audio-cuda"] }      # TTS + playback + GPU
+//! symthaea = { features = ["voice-stt"] }       # STT only (whisper)
 //! ```
 //!
 //! ## LTC Integration
@@ -44,13 +49,14 @@ pub mod output;
 
 pub mod conversation;
 pub mod models;
+pub mod tokenizer;
 
 // Re-exports
 #[cfg(feature = "voice-stt")]
 pub use input::{VoiceInput, VoiceInputConfig, TranscriptionResult};
 
 #[cfg(feature = "voice-tts")]
-pub use output::{VoiceOutput, VoiceOutputConfig, SynthesisResult};
+pub use output::{VoiceOutput, VoiceOutputConfig, SynthesisResult, ExecutionProvider, split_sentences, add_pauses};
 
 pub use conversation::{VoiceConversation, VoiceConfig, VoiceEvent};
 pub use models::{ModelManager, ModelPaths, WhisperModel, KokoroModel};

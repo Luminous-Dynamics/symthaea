@@ -1186,7 +1186,7 @@ mod tests {
         }
 
         // Should have tracked some ignitions
-        assert!(integration.stats.ignitions_processed >= 0);
+        // Ignition processing tracked (usize always >= 0)
     }
 
     #[test]
@@ -1329,8 +1329,7 @@ mod tests {
 
         // New predictive fields should be present
         assert!(result.prediction_accuracy >= 0.0);
-        assert!(result.counterfactuals_available >= 0);
-        assert!(result.pending_intentions >= 0);
+        // Counterfactuals and intentions tracked (usize always >= 0)
     }
 
     #[test]
@@ -1413,8 +1412,7 @@ mod tests {
         let stats = &integration.stats;
         assert!(stats.predictions_made > 0 || integration.predictive_self.is_some());
         // Predictive vetoes and counterfactuals may be 0 if no vetoes were issued
-        assert!(stats.predictive_vetoes >= 0);
-        assert!(stats.counterfactuals_explored >= 0);
+        // (usize fields always >= 0)
     }
 
     #[test]

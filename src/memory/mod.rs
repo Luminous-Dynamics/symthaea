@@ -1,6 +1,8 @@
 //! Memory Module - Episodic & Procedural Memory Systems
 //!
 //! Week 2 Days 1-4: Hippocampus (Episodic) & Cerebellum (Procedural)
+
+#![allow(dead_code, unused_variables)]
 //! Week 17 Day 2: Episodic Memory Engine (Revolutionary Integration)
 //!
 //! Revolutionary Insight:
@@ -17,6 +19,7 @@
 
 pub mod hippocampus;
 pub mod episodic_engine;
+pub mod temporal_holographic;  // Temporal holographic memory with encode/recall
 
 pub use hippocampus::{HippocampusActor, MemoryTrace, RecallQuery, EmotionalValence};
 pub use episodic_engine::{

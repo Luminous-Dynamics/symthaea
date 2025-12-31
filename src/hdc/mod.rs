@@ -3,7 +3,11 @@ Hyperdimensional Computing (HDC) Semantic Space
 
 16,384D holographic vectors for consciousness (2^14 - SIMD-optimized)
 Memory IS computation - no separate storage needed!
+*/
 
+#![allow(dead_code, unused_variables, unused_assignments)]
+
+/*!
 Module Structure:
 - mod.rs: Core SemanticSpace and HdcContext (arena-based operations)
 - temporal_encoder.rs: Week 17 circular time encoding
@@ -280,6 +284,20 @@ pub mod differentiable_phi;                // Soft-partitioned differentiable Φ
 pub mod cross_modal_binding;               // Cross-modal binding for multi-sensory integration
 pub mod metacognitive_monitor;             // Real-time consciousness monitoring with self-reflection
 
+// Unified Consciousness Architecture (Dec 2025)
+pub mod fractal_consciousness;             // Fractal consciousness patterns
+pub mod phi_gradient_learning;             // Φ-gradient learning for optimization
+pub mod process_topology;                  // Process topology structures
+pub mod unified_consciousness_engine;      // Core consciousness engine with Φ-guided processing
+pub mod attention_dynamics;                // Dynamic attention allocation with salience, goals, and priors
+pub mod temporal_binding;                  // Temporal stream binding for continuous experience
+pub mod emergent_self_model;               // Self-awareness and metacognitive optimization
+pub mod adaptive_topology;                 // Adaptive cognitive mode topology
+pub mod topology_synergy;                  // Topology-consciousness synergy
+pub mod integrated_conscious_agent;        // Complete conscious agent with Symthaea integration
+pub mod consciousness_visualizer;          // Consciousness visualization tools
+pub mod deep_integration;                   // Deep integration bridge for Φ-guided processing
+
 // Re-export HV16 at module level for convenience (used by language/nix_* modules)
 pub use binary_hv::HV16;
 pub use real_hv::RealHV;
@@ -360,6 +378,48 @@ pub use sdm::{
 
 pub use temporal_encoder::TemporalEncoder;
 pub use text_encoder::{TextEncoder, TextEncoderConfig, TextEncoderStats};
+
+// Re-export Unified Consciousness Architecture types
+pub use integrated_conscious_agent::{
+    IntegratedConsciousAgent, AgentConfig, IntegratedUpdate,
+    WorkingMemory, EmotionalState, QualiaTexture, PhenomenalContent,
+    HormoneEventSuggestion, CoherenceGating, QualiaModulation,
+    MemoryExport, MemoryImport, IdentityCoherence, IdentityStatus, ProsodyHints,
+    // Runtime orchestration
+    ConsciousAgentRuntime, SyncConsciousAgentRuntime, RuntimeConfig,
+    RuntimeMessage, RuntimeResponse, RuntimeSnapshot, HormoneEventType,
+    EmotionalStateSummary,
+};
+
+// Re-export adaptive topology types
+pub use adaptive_topology::{AdaptiveTopology, CognitiveMode};
+
+// Re-export unified consciousness engine types
+pub use unified_consciousness_engine::{
+    UnifiedConsciousnessEngine, EngineConfig, ConsciousnessDimensions,
+};
+
+// Re-export consciousness visualization
+pub use consciousness_visualizer::ConsciousnessVisualizer;
+
+// Re-export deep integration bridge
+pub use deep_integration::DeepIntegrationBridge;
+
+// Re-export phi-gradient learning types
+pub use phi_gradient_learning::{PhiGradientTopology, PhiLearningConfig};
+
+// Re-export fractal consciousness types
+pub use fractal_consciousness::{FractalConsciousness, FractalConfig};
+
+// Re-export consciousness topology types
+pub use consciousness_topology_generators::{ConsciousnessTopology, TopologyType};
+
+// Re-export phi calculators
+pub use phi_real::RealPhiCalculator;
+pub use tiered_phi::{TieredPhi, ApproximationTier};
+
+// Re-export process topology types
+pub use process_topology::ProcessTopologyOrganizer;
 
 use anyhow::Result;
 // Note: hypervector crate not used yet - using custom implementation

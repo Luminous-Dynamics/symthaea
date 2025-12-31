@@ -1,6 +1,8 @@
 //! Multi-Database Consciousness Architecture
 //!
 //! Implements the "Mental Roles" architecture from Revolutionary Improvement #30:
+
+#![allow(dead_code, unused_variables)]
 //!
 //! | Database | Mental Role | Purpose |
 //! |----------|-------------|---------|

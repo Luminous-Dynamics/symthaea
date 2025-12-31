@@ -33,8 +33,8 @@ petgraph = { version = "0.6", features = ["serde-1"] }
 # duckdb = { version = "0.10", features = ["bundled"] }  # Analytical queries
 # cozo = "0.7"  # Datalog reasoning
 
-# Phase 11: Swarm Intelligence (Deferred to Week 9+)
-# libp2p = { version = "0.53", features = ["kad", "gossipsub", "tcp", "noise", "yamux"] }
+# Phase 11: Swarm Intelligence (Enabled!)
+libp2p = { version = "0.53", features = ["kad", "gossipsub", "tcp", "noise", "yamux", "tokio", "macros"] }
 
 # Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
 uuid = { version = "1.6", features = ["serde", "v4"] }  # Week 3: Enabled for Goal IDs
@@ -48,6 +48,9 @@ html2text = "0.6"
 
 # Core async utilities
 async-trait = "0.1"
+
+# Filesystem utilities
+dirs = "5.0"
 
 # Phase 12: Resonator Networks (FFT for morphogenetic field)
 rustfft = "6.1"
@@ -78,6 +81,7 @@ rand = "0.8"
 blake3 = "1.5"
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1.10"  # For Thalamus pattern matching
+csv = "1.3"     # CSV parsing for benchmark data
 
 # Week 0: Memory Arena for HDC
 bumpalo = "3.14"
@@ -94,7 +98,8 @@ syn = { version = "2.0", features = ["full", "visit"] }  # Rust syntax parsing (
 ignore = "0.4"       # .gitignore-aware file walking
 
 # Week 12 Phase 2a: Voice Output (Larynx) - Kokoro TTS (optional)
-ort = { version = "2.0.0-rc.10", features = ["half"], optional = true }  # ONNX Runtime for Kokoro-82M model
+ort = { version = "2.0.0-rc.10", features = ["half"], optional = true }  # ONNX Runtime base
+futures = { version = "0.3", optional = true }  # Async TTS streaming
 rodio = { version = "0.19", default-features = false, optional = true }  # Audio playback (no backends by default)
 hound = { version = "3.5", optional = true }        # WAV file I/O
 hf-hub = { version = "0.3", optional = true }       # HuggingFace Hub for model download
@@ -105,9 +110,19 @@ pyo3 = { version = "0.22", features = ["auto-initialize"], optional = true }  # 
 # NixOS integration
 nix = "0.27"
 
+# CLI argument parsing (optional - for service binary)
+clap = { version = "4.4", features = ["derive"], optional = true }
+
 [features]
 default = []
-audio = ["rodio", "hound", "hf-hub", "ort"]
+service = ["clap"]  # Enable symthaea-service binary
+# Voice features
+voice-tts = ["ort", "hound", "hf-hub"]  # TTS with Kokoro (ONNX) - CPU
+voice-tts-cuda = ["voice-tts", "ort/cuda"]  # TTS with CUDA acceleration (requires CUDA toolkit)
+voice-tts-async = ["voice-tts", "futures"]  # Async/streaming TTS
+voice-stt = ["hound"]  # STT with Whisper (future)
+audio = ["voice-tts", "rodio"]  # Full audio including playback
+audio-cuda = ["voice-tts-cuda", "rodio"]  # Full audio with GPU acceleration
 pyphi = ["pyo3"]  # Enhancement #8 Week 4: Enable PyPhi integration for exact IIT Φ validation
 # Database backends (deferred - compile guards only)
 qdrant = []   # Vector database for large-scale memory
@@ -125,6 +140,11 @@ tempfile = "3.8"  # For perception tests
 name = "symthaea-repl"
 path = "src/bin/symthaea-repl.rs"
 
+[[bin]]
+name = "symthaea-service"
+path = "src/bin/symthaea-service.rs"
+required-features = ["service"]
+
 # Examples
 [[example]]
 name = "social_coherence_demo"
@@ -133,6 +153,10 @@ path = "demos/social_coherence_demo.rs"
 # Benchmarks
 [[bench]]
 name = "enhancement_7_phase2_benchmarks"
+harness = false
+
+[[bench]]
+name = "phi_benchmark"
 harness = false
 
 # [[bench]]

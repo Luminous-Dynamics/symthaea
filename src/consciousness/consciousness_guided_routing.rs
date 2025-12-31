@@ -283,6 +283,10 @@ pub struct ConsciousnessRouter {
     total_decisions: usize,
 
     /// Observer for tracing routing decisions (not cloned)
+    ///
+    /// TODO(future): Connect to observability layer for routing decision tracing.
+    /// This would enable real-time analysis of consciousness-guided routing
+    /// decisions, helpful for debugging and system optimization.
     #[allow(dead_code)]
     observer: Option<SharedObserver>,
 }

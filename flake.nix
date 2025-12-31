@@ -13,6 +13,8 @@
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
           inherit system overlays;
+          # Allow unfree for CUDA/cuDNN
+          config.allowUnfree = true;
         };
 
         # Rust toolchain with all components
@@ -114,7 +116,7 @@
             # Set OpenSSL paths for rust crates
             export OPENSSL_DIR="${pkgs.openssl.dev}"
             export OPENSSL_LIB_DIR="${pkgs.openssl.out}/lib"
-            export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig:$PKG_CONFIG_PATH"
+            export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig:${pkgs.alsa-lib.dev}/lib/pkgconfig:$PKG_CONFIG_PATH"
 
             # Set BLAS/LAPACK library paths for ndarray-linalg
             export LD_LIBRARY_PATH="${pkgs.openblas}/lib:${pkgs.gfortran.cc.lib}/lib:$LD_LIBRARY_PATH"

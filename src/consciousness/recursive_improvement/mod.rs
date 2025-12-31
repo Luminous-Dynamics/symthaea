@@ -42,6 +42,9 @@ mod core;
 // Shared types (extracted for cleaner dependencies)
 pub mod types;
 
+// Routers module
+pub mod routers;
+
 // Re-export everything from core for backward compatibility
 pub use core::*;
 

@@ -66,6 +66,70 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 // =============================================================================
+// PRECISION WEIGHTS FOR ACTIVE INFERENCE FEEDBACK
+// =============================================================================
+
+/// Precision weights fed back from Active Inference Engine
+///
+/// These weights modulate attention allocation based on the brain's
+/// learned precision (confidence) in different prediction domains.
+/// Higher precision = more attention allocated to that domain.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PrecisionWeights {
+    /// Weight for user state (lexical understanding)
+    pub user_state: f32,
+    /// Weight for task success (syntactic coherence)
+    pub task_success: f32,
+    /// Weight for coherence (semantic integration)
+    pub coherence: f32,
+    /// Weight for social (discourse patterns)
+    pub social: f32,
+    /// Weight for performance (processing efficiency)
+    pub performance: f32,
+}
+
+impl Default for PrecisionWeights {
+    fn default() -> Self {
+        Self {
+            user_state: 1.0,
+            task_success: 1.0,
+            coherence: 1.0,
+            social: 1.0,
+            performance: 1.0,
+        }
+    }
+}
+
+impl PrecisionWeights {
+    /// Compute the normalized salience multiplier for attention allocation
+    ///
+    /// This combines all precision weights into a single multiplier
+    /// that modulates the overall salience of language attention bids.
+    pub fn salience_multiplier(&self) -> f32 {
+        // Average precision with extra weight on coherence and task_success
+        // as they're most relevant for language understanding quality
+        let weighted_sum = self.user_state * 0.2
+            + self.task_success * 0.25
+            + self.coherence * 0.30
+            + self.social * 0.15
+            + self.performance * 0.10;
+
+        // Clamp to reasonable range
+        weighted_sum.clamp(0.5, 2.0)
+    }
+
+    /// Get the coherence precision for Φ-weighted calculations
+    pub fn coherence_weight(&self) -> f32 {
+        self.coherence.clamp(0.1, 2.0)
+    }
+
+    /// Get the task success precision for confidence calculations
+    pub fn task_weight(&self) -> f32 {
+        self.task_success.clamp(0.1, 2.0)
+    }
+}
+
+// =============================================================================
 // ATTENTION BID GENERATION
 // =============================================================================
 
@@ -396,6 +460,10 @@ pub struct ConsciousnessBridge {
 
     /// Processing statistics
     stats: BridgeStats,
+
+    /// Precision weights from Active Inference feedback
+    /// These modulate attention allocation based on learned domain precision
+    precision_weights: PrecisionWeights,
 }
 
 /// Statistics for the consciousness bridge
@@ -459,6 +527,7 @@ impl ConsciousnessBridge {
             phi_history: VecDeque::with_capacity(100),
             next_id: 0,
             stats: BridgeStats::default(),
+            precision_weights: PrecisionWeights::default(),
         }
     }
 
@@ -477,7 +546,16 @@ impl ConsciousnessBridge {
         let understanding = self.pipeline.understand(input);
 
         // Step 2: Generate attention bid
-        let bid = LanguageAttentionBid::from_understanding(understanding.clone());
+        let mut bid = LanguageAttentionBid::from_understanding(understanding.clone());
+
+        // Step 2b: Apply precision weights from Active Inference feedback
+        // This modulates attention allocation based on learned domain precision
+        let precision_multiplier = self.precision_weights.salience_multiplier();
+        bid.salience = (bid.salience * precision_multiplier).clamp(0.0, 1.0);
+
+        // Also modulate confidence based on task success precision
+        let task_multiplier = self.precision_weights.task_weight();
+        bid.confidence = (bid.confidence * task_multiplier.sqrt()).clamp(0.0, 1.0);
 
         // Step 3: Update spotlight
         let gained_spotlight = self.update_spotlight(&bid);
@@ -633,6 +711,23 @@ impl ConsciousnessBridge {
     /// Get recent free energy history
     pub fn free_energy_history(&self) -> &VecDeque<f64> {
         &self.free_energy_history
+    }
+
+    /// Update precision weights from Active Inference feedback
+    ///
+    /// This is the critical feedback loop: Active Inference learns which
+    /// prediction domains are reliable, and feeds that back to modulate
+    /// language attention allocation.
+    ///
+    /// # Arguments
+    /// * `weights` - New precision weights from the Active Inference adapter
+    pub fn update_precision_weights(&mut self, weights: PrecisionWeights) {
+        self.precision_weights = weights;
+    }
+
+    /// Get current precision weights
+    pub fn precision_weights(&self) -> &PrecisionWeights {
+        &self.precision_weights
     }
 
     /// Reset the bridge state

@@ -23,6 +23,7 @@
 //! - **#25 Binding**: Pattern matching for feature binding
 //! - **#23 Workspace**: Quick retrieval for global workspace access
 
+#[allow(unused_imports)]  // MemoryType used in tests
 use super::{ConsciousnessDatabase, DbResult, MemoryRecord, MemoryType, SearchResult};
 use crate::hdc::binary_hv::HV16;
 use async_trait::async_trait;

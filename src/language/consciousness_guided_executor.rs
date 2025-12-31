@@ -812,7 +812,7 @@ mod tests {
         // Should produce a valid result
         assert!(result.metrics.consciousness_phi >= 0.0);
         // Time may be 0 for very fast executions
-        assert!(result.metrics.total_time_ms >= 0);
+        // Time is captured correctly (u64 is always non-negative)
     }
 
     #[test]

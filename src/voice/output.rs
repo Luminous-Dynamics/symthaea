@@ -3,8 +3,9 @@
 //! Provides natural speech synthesis using Kokoro-82M via ONNX runtime.
 //! Supports LTC-aware speech pacing for natural conversation flow.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::io::Read;
 
 use super::{VoiceError, VoiceResult, LTCPacing};
 use super::models::{ModelManager, KokoroModel};
@@ -20,8 +21,8 @@ pub struct VoiceOutputConfig {
     pub base_rate: f32,
     /// Enable LTC-aware pacing
     pub ltc_pacing: bool,
-    /// Voice ID (0-9 for different voices)
-    pub voice_id: u8,
+    /// Voice file name (e.g., "af_bella" - looks for af_bella.bin in voices dir)
+    pub voice_name: String,
 }
 
 impl Default for VoiceOutputConfig {
@@ -31,7 +32,7 @@ impl Default for VoiceOutputConfig {
             sample_rate: 24000,
             base_rate: 1.0,
             ltc_pacing: true,
-            voice_id: 0,
+            voice_name: "af_bella".to_string(),  // Default voice
         }
     }
 }
@@ -74,79 +75,262 @@ impl SynthesisResult {
 }
 
 /// Voice output handler for speech synthesis
+#[cfg(feature = "voice-tts")]
 pub struct VoiceOutput {
     config: VoiceOutputConfig,
-    #[cfg(feature = "voice-tts")]
-    session: ort::Session,
+    session: ort::session::Session,
+    /// Cached style vector (256 dimensions)
+    style_vector: Vec<f32>,
 }
 
+#[cfg(not(feature = "voice-tts"))]
+pub struct VoiceOutput {
+    config: VoiceOutputConfig,
+}
+
+/// Execution provider used for inference
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutionProvider {
+    /// CUDA GPU acceleration
+    Cuda,
+    /// TensorRT (NVIDIA optimized)
+    TensorRT,
+    /// CPU with multi-threading
+    Cpu,
+}
+
+impl std::fmt::Display for ExecutionProvider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExecutionProvider::Cuda => write!(f, "CUDA"),
+            ExecutionProvider::TensorRT => write!(f, "TensorRT"),
+            ExecutionProvider::Cpu => write!(f, "CPU"),
+        }
+    }
+}
+
+#[cfg(feature = "voice-tts")]
 impl VoiceOutput {
     /// Create a new voice output handler
-    #[cfg(feature = "voice-tts")]
     pub fn new(config: VoiceOutputConfig) -> VoiceResult<Self> {
         let manager = ModelManager::new()?;
         let model_path = manager.kokoro_path(config.model)?;
-        Self::from_model_path(&model_path, config)
+
+        // Voice files are in the voices subdirectory next to the model
+        let voices_dir = model_path.parent()
+            .ok_or_else(|| VoiceError::ModelLoad("Invalid model path".into()))?
+            .join("voices");
+        let voice_path = voices_dir.join(format!("{}.bin", config.voice_name));
+
+        Self::from_paths(&model_path, &voice_path, config)
     }
 
-    /// Create from a specific model path
-    #[cfg(feature = "voice-tts")]
-    pub fn from_model_path(path: &Path, config: VoiceOutputConfig) -> VoiceResult<Self> {
-        use ort::GraphOptimizationLevel;
+    /// Create from specific model and voice file paths
+    pub fn from_paths(model_path: &Path, voice_path: &Path, config: VoiceOutputConfig) -> VoiceResult<Self> {
+        Self::from_paths_with_provider(model_path, voice_path, config, None)
+    }
 
-        let session = ort::Session::builder()
+    /// Create with explicit execution provider selection
+    /// If provider is None, auto-detects best available (CUDA > TensorRT > CPU)
+    pub fn from_paths_with_provider(
+        model_path: &Path,
+        voice_path: &Path,
+        config: VoiceOutputConfig,
+        preferred_provider: Option<ExecutionProvider>,
+    ) -> VoiceResult<Self> {
+        use ort::session::builder::GraphOptimizationLevel;
+
+        // Try to use GPU if available, fall back to CPU
+        let (session, provider) = Self::create_session_with_best_provider(
+            model_path,
+            preferred_provider
+        )?;
+
+        tracing::info!("Loaded Kokoro TTS model using {} execution provider", provider);
+
+        // Load style vector from voice file (256 floats = 1024 bytes)
+        let style_vector = Self::load_style_vector(voice_path)?;
+
+        Ok(Self { config, session, style_vector })
+    }
+
+    /// Create session with best available execution provider
+    fn create_session_with_best_provider(
+        model_path: &Path,
+        preferred: Option<ExecutionProvider>,
+    ) -> VoiceResult<(ort::session::Session, ExecutionProvider)> {
+        use ort::session::builder::GraphOptimizationLevel;
+
+        // Determine provider order based on preference
+        let providers = match preferred {
+            Some(p) => vec![p],
+            None => {
+                // Auto-detect: try CUDA first, then TensorRT, then CPU
+                #[cfg(feature = "voice-tts-cuda")]
+                {
+                    vec![ExecutionProvider::Cuda, ExecutionProvider::TensorRT, ExecutionProvider::Cpu]
+                }
+                #[cfg(not(feature = "voice-tts-cuda"))]
+                {
+                    vec![ExecutionProvider::Cpu]
+                }
+            }
+        };
+
+        for provider in &providers {
+            match Self::try_create_session(model_path, *provider) {
+                Ok(session) => return Ok((session, *provider)),
+                Err(e) => {
+                    tracing::warn!("Failed to create session with {}: {}", provider, e);
+                    continue;
+                }
+            }
+        }
+
+        // All providers failed, give detailed error
+        Err(VoiceError::ModelLoad(
+            "Failed to create ONNX session with any execution provider".into()
+        ))
+    }
+
+    /// Try to create a session with a specific execution provider
+    fn try_create_session(
+        model_path: &Path,
+        provider: ExecutionProvider,
+    ) -> VoiceResult<ort::session::Session> {
+        use ort::session::builder::GraphOptimizationLevel;
+
+        let mut builder = ort::session::Session::builder()
             .map_err(|e| VoiceError::ModelLoad(format!("ONNX builder error: {}", e)))?
             .with_optimization_level(GraphOptimizationLevel::Level3)
-            .map_err(|e| VoiceError::ModelLoad(format!("Optimization error: {}", e)))?
-            .with_intra_threads(4)
-            .map_err(|e| VoiceError::ModelLoad(format!("Thread config error: {}", e)))?
-            .commit_from_file(path)
-            .map_err(|e| VoiceError::ModelLoad(format!("Failed to load model: {}", e)))?;
+            .map_err(|e| VoiceError::ModelLoad(format!("Optimization error: {}", e)))?;
 
-        Ok(Self { config, session })
+        // Configure based on provider
+        match provider {
+            ExecutionProvider::Cuda => {
+                #[cfg(feature = "voice-tts-cuda")]
+                {
+                    // CUDA execution provider - use GPU device 0
+                    builder = builder
+                        .with_execution_providers([ort::execution_providers::CUDAExecutionProvider::default().build()])
+                        .map_err(|e| VoiceError::ModelLoad(format!("CUDA provider error: {}", e)))?;
+                    tracing::info!("Initializing CUDA execution provider for GPU acceleration");
+                }
+                #[cfg(not(feature = "voice-tts-cuda"))]
+                {
+                    return Err(VoiceError::ModelLoad("CUDA feature not enabled".into()));
+                }
+            }
+            ExecutionProvider::TensorRT => {
+                #[cfg(feature = "voice-tts-cuda")]
+                {
+                    // TensorRT for NVIDIA-optimized inference
+                    builder = builder
+                        .with_execution_providers([ort::execution_providers::TensorRTExecutionProvider::default().build()])
+                        .map_err(|e| VoiceError::ModelLoad(format!("TensorRT provider error: {}", e)))?;
+                    tracing::info!("Initializing TensorRT execution provider for optimized GPU inference");
+                }
+                #[cfg(not(feature = "voice-tts-cuda"))]
+                {
+                    return Err(VoiceError::ModelLoad("TensorRT requires CUDA feature".into()));
+                }
+            }
+            ExecutionProvider::Cpu => {
+                // CPU with multi-threading
+                builder = builder
+                    .with_intra_threads(12)
+                    .map_err(|e| VoiceError::ModelLoad(format!("Thread config error: {}", e)))?;
+                tracing::info!("Using CPU execution provider with 12 threads");
+            }
+        }
+
+        builder
+            .commit_from_file(model_path)
+            .map_err(|e| VoiceError::ModelLoad(format!("Failed to load model: {}", e)))
+    }
+
+    /// Create from a specific model path (uses default voice)
+    pub fn from_model_path(path: &Path, config: VoiceOutputConfig) -> VoiceResult<Self> {
+        let voices_dir = path.parent()
+            .ok_or_else(|| VoiceError::ModelLoad("Invalid model path".into()))?
+            .join("voices");
+        let voice_path = voices_dir.join(format!("{}.bin", config.voice_name));
+        Self::from_paths(path, &voice_path, config)
+    }
+
+    /// Load style vector from a voice binary file
+    /// Voice files contain 256-dimensional f32 style vectors
+    fn load_style_vector(voice_path: &Path) -> VoiceResult<Vec<f32>> {
+        let mut file = std::fs::File::open(voice_path)
+            .map_err(|e| VoiceError::ModelLoad(format!("Failed to open voice file {:?}: {}", voice_path, e)))?;
+
+        // Read first 256 floats (1024 bytes) for the style vector
+        let mut buffer = vec![0u8; 256 * 4];
+        file.read_exact(&mut buffer)
+            .map_err(|e| VoiceError::ModelLoad(format!("Failed to read voice file: {}", e)))?;
+
+        // Convert bytes to f32 (little-endian)
+        let style_vector: Vec<f32> = buffer
+            .chunks_exact(4)
+            .map(|chunk| f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect();
+
+        tracing::info!("Loaded style vector with {} dimensions from {:?}", style_vector.len(), voice_path);
+
+        Ok(style_vector)
     }
 
     /// Synthesize speech from text
-    #[cfg(feature = "voice-tts")]
-    pub fn synthesize(&self, text: &str) -> VoiceResult<SynthesisResult> {
+    pub fn synthesize(&mut self, text: &str) -> VoiceResult<SynthesisResult> {
         self.synthesize_with_pacing(text, LTCPacing::default())
     }
 
     /// Synthesize speech with LTC-aware pacing
-    #[cfg(feature = "voice-tts")]
-    pub fn synthesize_with_pacing(&self, text: &str, pacing: LTCPacing) -> VoiceResult<SynthesisResult> {
-        use ort::inputs;
-        use ndarray::Array1;
+    pub fn synthesize_with_pacing(&mut self, text: &str, pacing: LTCPacing) -> VoiceResult<SynthesisResult> {
+        use ort::value::Value;
 
-        // Prepare text tokens (simplified - Kokoro uses phoneme input)
+        // Prepare text tokens using Misaki tokenizer via socket
         let tokens = self.text_to_tokens(text);
         let token_len = tokens.len();
 
-        // Create input tensors
-        let tokens_array = Array1::from_vec(tokens);
-        let voice_id = Array1::from_vec(vec![self.config.voice_id as i64]);
-
-        // Calculate effective speech rate
+        // Speed adjustment based on LTC pacing
         let rate = self.config.base_rate * pacing.speech_rate;
-        let speed = Array1::from_vec(vec![rate]);
+        let speed = vec![rate];
+
+        // Style vector is already loaded (256 dimensions)
+        let style = self.style_vector.clone();
+        let style_len = style.len();
+
+        // Convert to ort Values using (shape, data) tuple format
+        // Kokoro expects: input_ids (1, seq_len), style (1, 256), speed (1,)
+        let input_ids_value = Value::from_array(([1usize, token_len], tokens))
+            .map_err(|e| VoiceError::Synthesis(format!("input_ids tensor error: {}", e)))?;
+        let style_value = Value::from_array(([1usize, style_len], style))
+            .map_err(|e| VoiceError::Synthesis(format!("style tensor error: {}", e)))?;
+        let speed_value = Value::from_array(([1usize], speed))
+            .map_err(|e| VoiceError::Synthesis(format!("speed tensor error: {}", e)))?;
+
+        // Build inputs using ort 2.0 API with correct Kokoro input names
+        let inputs = ort::inputs![
+            "input_ids" => input_ids_value,
+            "style" => style_value,
+            "speed" => speed_value,
+        ];
 
         // Run inference
-        let outputs = self.session.run(inputs![
-            "tokens" => tokens_array.view(),
-            "voice" => voice_id.view(),
-            "speed" => speed.view(),
-        ].map_err(|e| VoiceError::Synthesis(format!("Input error: {}", e)))?)
+        let outputs = self.session.run(inputs)
             .map_err(|e| VoiceError::Synthesis(format!("Inference error: {}", e)))?;
 
-        // Extract audio
-        let audio_tensor = outputs.get("audio")
+        // Extract audio - ort 2.0: iterate outputs to get (name, value_ref) tuples
+        let (_, audio_ref) = outputs.iter().next()
             .ok_or_else(|| VoiceError::Synthesis("No audio output".into()))?;
 
-        let audio_array = audio_tensor
+        // Extract tensor - try_extract_tensor returns (&Shape, &[T]) tuple
+        let (_, audio_data) = audio_ref
             .try_extract_tensor::<f32>()
             .map_err(|e| VoiceError::Synthesis(format!("Extract error: {}", e)))?;
 
-        let samples: Vec<f32> = audio_array.view().iter().copied().collect();
+        let samples: Vec<f32> = audio_data.to_vec();
         let duration_ms = (samples.len() as f64 / self.config.sample_rate as f64 * 1000.0) as u64;
 
         Ok(SynthesisResult {
@@ -156,36 +340,23 @@ impl VoiceOutput {
         })
     }
 
-    /// Convert text to token IDs (simplified phoneme mapping)
-    #[cfg(feature = "voice-tts")]
+    /// Convert text to token IDs using Misaki (official Kokoro G2P)
     fn text_to_tokens(&self, text: &str) -> Vec<i64> {
-        // Kokoro uses a specific vocabulary - this is a simplified version
-        // In production, you'd use the actual tokenizer from the model
-        let mut tokens = vec![0i64];  // Start token
-
-        for ch in text.chars() {
-            let token = match ch.to_ascii_lowercase() {
-                'a'..='z' => (ch as i64 - 'a' as i64) + 1,
-                ' ' => 27,
-                '.' => 28,
-                ',' => 29,
-                '?' => 30,
-                '!' => 31,
-                '\'' => 32,
-                _ => 27,  // Unknown -> space
-            };
-            tokens.push(token);
+        // Use Misaki tokenizer for proper phoneme conversion
+        match super::tokenizer::tokenize(text) {
+            Ok(tokens) => tokens,
+            Err(e) => {
+                tracing::error!("Tokenization failed: {}, using fallback", e);
+                // Minimal fallback - just return BOS/EOS
+                vec![0i64, 0]
+            }
         }
-
-        tokens.push(0);  // End token
-        tokens
     }
 
     /// Play audio through default output device
-    #[cfg(all(feature = "voice-tts", feature = "rodio"))]
+    #[cfg(feature = "audio")]
     pub fn play(&self, result: &SynthesisResult) -> VoiceResult<()> {
-        use rodio::{OutputStream, Sink, Source};
-        use std::time::Duration;
+        use rodio::{OutputStream, Sink};
 
         let (_stream, stream_handle) = OutputStream::try_default()
             .map_err(|e| VoiceError::AudioDevice(format!("Output device error: {}", e)))?;
@@ -207,7 +378,7 @@ impl VoiceOutput {
     }
 
     /// Play audio with LTC-aware pauses
-    #[cfg(all(feature = "voice-tts", feature = "rodio"))]
+    #[cfg(feature = "audio")]
     pub fn play_with_pacing(&self, result: &SynthesisResult, pacing: LTCPacing) -> VoiceResult<()> {
         // Play the audio
         self.play(result)?;
@@ -217,17 +388,77 @@ impl VoiceOutput {
 
         Ok(())
     }
+
+    /// Synthesize and play in streaming mode - lower latency by playing while generating
+    /// Splits text into sentences and plays each as it's synthesized
+    #[cfg(feature = "audio")]
+    pub fn stream_speak(&mut self, text: &str, pacing: LTCPacing) -> VoiceResult<()> {
+        use rodio::{OutputStream, Sink};
+
+        let (_stream, stream_handle) = OutputStream::try_default()
+            .map_err(|e| VoiceError::AudioDevice(format!("Output device error: {}", e)))?;
+
+        let sink = Sink::try_new(&stream_handle)
+            .map_err(|e| VoiceError::AudioDevice(format!("Sink error: {}", e)))?;
+
+        // Split into sentences for streaming
+        let sentences = split_sentences(text);
+
+        for sentence in sentences {
+            if sentence.trim().is_empty() {
+                continue;
+            }
+
+            // Synthesize this sentence
+            let result = self.synthesize_with_pacing(sentence, pacing.clone())?;
+
+            // Create audio source and append to sink (plays asynchronously)
+            let source = SamplesSource {
+                samples: result.samples,
+                sample_rate: result.sample_rate,
+                position: 0,
+            };
+
+            sink.append(source);
+        }
+
+        // Wait for all audio to finish
+        sink.sleep_until_end();
+
+        // Add final pause
+        std::thread::sleep(std::time::Duration::from_millis(pacing.pause_ms as u64));
+
+        Ok(())
+    }
+
+    /// Synthesize multiple texts in parallel using a thread pool
+    /// Returns results in the same order as inputs
+    pub fn synthesize_batch(&mut self, texts: &[&str], pacing: LTCPacing) -> VoiceResult<Vec<SynthesisResult>> {
+        // For now, synthesize sequentially but could be parallelized with model cloning
+        texts.iter()
+            .map(|text| self.synthesize_with_pacing(text, pacing.clone()))
+            .collect()
+    }
+
+    /// Get synthesis latency estimate in milliseconds for given text length
+    pub fn estimate_latency_ms(&self, text_chars: usize) -> u64 {
+        // Empirical: ~10ms tokenization + ~50ms per 100 chars on CPU
+        // GPU is ~5x faster
+        let base_ms = 10u64;
+        let per_100_chars = 50u64;
+        base_ms + (text_chars as u64 * per_100_chars / 100)
+    }
 }
 
 /// Audio source adapter for rodio
-#[cfg(all(feature = "voice-tts", feature = "rodio"))]
+#[cfg(feature = "audio")]
 struct SamplesSource {
     samples: Vec<f32>,
     sample_rate: u32,
     position: usize,
 }
 
-#[cfg(all(feature = "voice-tts", feature = "rodio"))]
+#[cfg(feature = "audio")]
 impl Iterator for SamplesSource {
     type Item = f32;
 
@@ -242,7 +473,7 @@ impl Iterator for SamplesSource {
     }
 }
 
-#[cfg(all(feature = "voice-tts", feature = "rodio"))]
+#[cfg(feature = "audio")]
 impl rodio::Source for SamplesSource {
     fn current_frame_len(&self) -> Option<usize> {
         Some(self.samples.len() - self.position)

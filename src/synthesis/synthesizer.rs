@@ -8,8 +8,8 @@
 use super::causal_spec::{CausalSpec, CausalStrength, VarName};
 use super::{SynthesisError, SynthesisResult};
 use crate::observability::{
-    CausalInterventionEngine, InterventionSpec, InterventionType,
-    ActionPlanner, Goal, GoalDirection,
+    CausalInterventionEngine,
+    ActionPlanner,
     ExplanationGenerator,
 };
 use std::collections::HashMap;
@@ -171,6 +171,16 @@ impl CausalProgramSynthesizer {
     /// Create synthesizer with default configuration
     pub fn default() -> Self {
         Self::new(SynthesisConfig::default())
+    }
+
+    /// Get reference to configuration
+    pub fn config(&self) -> &SynthesisConfig {
+        &self.config
+    }
+
+    /// Get mutable reference to configuration
+    pub fn config_mut(&mut self) -> &mut SynthesisConfig {
+        &mut self.config
     }
 
     /// Set intervention engine (Enhancement #4)

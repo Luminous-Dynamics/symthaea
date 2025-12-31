@@ -894,7 +894,7 @@ mod tests {
         binder.bind();
 
         // Should have done some binding
-        assert!(binder.stats.binding_events >= 0);
+        // Binding stats tracked (usize always >= 0)
     }
 
     #[test]

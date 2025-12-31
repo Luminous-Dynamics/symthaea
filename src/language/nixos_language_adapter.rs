@@ -1512,7 +1512,8 @@ mod tests {
 
         // Should have alternatives if configured
         // (May or may not have alternatives depending on understanding)
-        assert!(result.alternatives.len() >= 0);
+        // Alternatives may or may not exist depending on understanding
+        let _ = result.alternatives; // Just verify result is valid
     }
 
     #[test]

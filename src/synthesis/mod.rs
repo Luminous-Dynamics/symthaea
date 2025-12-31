@@ -2,6 +2,8 @@
 //!
 //! Revolutionary approach to program synthesis using causal reasoning
 //! instead of correlation-based synthesis.
+
+#![allow(dead_code, unused_variables)]
 //!
 //! ## Core Innovation
 //! Synthesize programs that capture TRUE causal relationships
@@ -13,34 +15,35 @@
 //! 4. **Counterfactual Verification** - Verify correctness via counterfactuals
 //! 5. **Explanation Generation** - Explain why programs work (Enhancement #4)
 
-// Temporarily disabled to isolate phi_exact for PyPhi validation
-// pub mod causal_spec;
-// pub mod synthesizer;
-// pub mod verifier;
-// pub mod adaptive;
-// pub mod consciousness_synthesis;  // Enhancement #8: Consciousness-guided synthesis
+// Causal Program Synthesis modules (Enhancement #7)
+pub mod causal_spec;
+pub mod synthesizer;
+pub mod verifier;
+pub mod adaptive;
 
-pub mod phi_exact;  // Enhancement #8 Week 4: Exact IIT Φ via PyPhi
+// Consciousness-Guided Synthesis (Enhancement #8)
+pub mod consciousness_synthesis;
 
-// pub use causal_spec::{
-//     CausalSpec, CausalPath, CausalStrength, SpecVerifier,
-// };
-// pub use synthesizer::{
-//     CausalProgramSynthesizer, SynthesisConfig, SynthesizedProgram,
-//     ProgramTemplate,
-// };
-// // SynthesisResult is already defined in this module (line 68)
-// pub use verifier::{
-//     CounterfactualVerifier, VerificationResult, VerificationConfig,
-//     MinimalityChecker,
-// };
-// pub use adaptive::{
-//     AdaptiveProgram, AdaptationStrategy, ProgramMonitor,
-// };
-// pub use consciousness_synthesis::{
-//     ConsciousnessSynthesisConfig, TopologyType, ConsciousSynthesizedProgram,
-//     MultiObjectiveScores, ConsciousnessQuality,
-// };
+// Exact IIT Φ via PyPhi (Enhancement #8 Week 4)
+pub mod phi_exact;
+
+// Re-exports
+pub use causal_spec::{CausalSpec, CausalStrength, VarName};
+pub use synthesizer::{
+    CausalProgramSynthesizer, SynthesisConfig, SynthesizedProgram,
+    ProgramTemplate, ActivationFunction, TreeNode,
+};
+pub use verifier::{
+    CounterfactualVerifier, VerificationResult, VerificationConfig,
+    MinimalityChecker,
+};
+pub use adaptive::{
+    AdaptiveProgram, AdaptationStrategy, ProgramMonitor,
+};
+pub use consciousness_synthesis::{
+    ConsciousnessSynthesisConfig, TopologyType, ConsciousSynthesizedProgram,
+    MultiObjectiveScores, ConsciousnessQuality, ConsciousSynthesizerExt,
+};
 
 /// Synthesis error types
 #[derive(Debug, Clone)]

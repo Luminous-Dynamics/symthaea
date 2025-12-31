@@ -18812,8 +18812,7 @@ mod meta_router_tests {
         let state = LatentConsciousnessState::from_observables(0.6, 0.5, 0.7, 0.5);
         let decision = router.route(&state);
 
-        // Decision time may be 0 for very fast decisions
-        assert!(decision.decision_time_us >= 0);
+        // Decision time may be 0 for very fast decisions (u128 always >= 0)
         // Early decisions explore (but this is probabilistic, not guaranteed)
     }
 
@@ -19776,7 +19775,7 @@ mod gwt_tests {
 
         // Competition should have caused some suppression
         // (weak entries inhibited by stronger ones)
-        assert!(router.stats.competition_suppressions >= 0); // May be 0 if no competition occurred
+        // Suppression stats tracked (usize always >= 0, may be 0 if no competition occurred)
     }
 
     #[test]

@@ -19,10 +19,12 @@ Performance Target: <10ms (pre-cognitive = faster than thought)
 use crate::brain::actor_model::{
     Actor, ActorPriority, OrganMessage,
 };
+use crate::physiology::endocrine::HormoneEvent;
 use anyhow::Result;
 use async_trait::async_trait;
 use regex::{Regex, RegexSet};
 use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
 use tracing::{error, info, warn, instrument};
 
 /// Threat classification levels
@@ -67,6 +69,10 @@ pub struct AmygdalaActor {
 
     /// Maximum time for safety check (fail-safe to DENY if exceeded)
     timeout: Duration,
+
+    /// Channel to send hormone events to EndocrineSystem
+    /// When threat detected, sends HormoneEvent::Threat to spike cortisol
+    hormone_tx: Option<mpsc::UnboundedSender<HormoneEvent>>,
 }
 
 impl AmygdalaActor {
@@ -134,6 +140,28 @@ impl AmygdalaActor {
             threat_level: 0.0,
             decay_rate,
             timeout,
+            hormone_tx: None,
+        }
+    }
+
+    /// Connect to EndocrineSystem for cortisol feedback
+    ///
+    /// When a threat is detected, the Amygdala will send a HormoneEvent::Threat
+    /// to the EndocrineSystem, causing a cortisol spike that affects the entire
+    /// cognitive system (increased vigilance, reduced exploration, etc.)
+    pub fn with_hormone_channel(mut self, tx: mpsc::UnboundedSender<HormoneEvent>) -> Self {
+        self.hormone_tx = Some(tx);
+        self
+    }
+
+    /// Send cortisol spike to EndocrineSystem
+    fn trigger_cortisol_spike(&self, intensity: f32) {
+        if let Some(ref tx) = self.hormone_tx {
+            if let Err(e) = tx.send(HormoneEvent::Threat { intensity }) {
+                warn!("Failed to send cortisol spike to EndocrineSystem: {}", e);
+            } else {
+                info!("🧬 Amygdala → Endocrine: Cortisol spike (intensity: {:.2})", intensity);
+            }
         }
     }
 
@@ -309,8 +337,10 @@ impl Actor for AmygdalaActor {
                     // STOP EVERYTHING. Send the block.
                     let _ = reply.send(danger_reason);
 
-                    // TODO Phase 2: Broadcast "Cortisol Spike" to Endocrine Core
-                    // This would modulate other organs (increase Thalamus threshold, etc.)
+                    // Phase 2: Broadcast "Cortisol Spike" to Endocrine Core
+                    // This modulates other organs (increases vigilance, reduces exploration)
+                    // Intensity based on current threat level (0.8 = high threat response)
+                    self.trigger_cortisol_spike(self.threat_level.max(0.8));
                 } else {
                     // Safe. Acknowledge so Thalamus/Orchestrator can proceed
                     let _ = reply.send(String::from("✓ Safe"));

@@ -24,8 +24,149 @@
 //!
 //! This enables encoding of continuous relationships like graph topology
 //! where edge weights and connectivity patterns matter.
+//!
+//! # SIMD Optimization
+//!
+//! Hot paths use chunked operations optimized for auto-vectorization:
+//! - Dot product via 8-wide accumulation
+//! - Norm computation with parallel reduction
+//! - Element-wise ops with cache-friendly access patterns
 
 use serde::{Deserialize, Serialize};
+
+// ============================================================================
+// SIMD-Friendly Inner Functions
+// ============================================================================
+// These functions use explicit chunking and inline hints to help LLVM
+// generate efficient SIMD code (SSE4/AVX2/AVX-512 depending on target).
+
+/// SIMD-optimized dot product using 8-wide accumulation
+#[inline(always)]
+fn simd_dot_product(a: &[f32], b: &[f32]) -> f32 {
+    debug_assert_eq!(a.len(), b.len());
+
+    // Process in chunks of 8 for optimal SIMD utilization
+    const CHUNK_SIZE: usize = 8;
+
+    let chunks_a = a.chunks_exact(CHUNK_SIZE);
+    let chunks_b = b.chunks_exact(CHUNK_SIZE);
+    let remainder_a = chunks_a.remainder();
+    let remainder_b = chunks_b.remainder();
+
+    // Accumulate in 8-wide lanes (will vectorize to 2x f32x4 or 1x f32x8)
+    let mut acc = [0.0f32; CHUNK_SIZE];
+
+    for (chunk_a, chunk_b) in chunks_a.zip(chunks_b) {
+        // This loop body should vectorize
+        for i in 0..CHUNK_SIZE {
+            acc[i] += chunk_a[i] * chunk_b[i];
+        }
+    }
+
+    // Reduce accumulator
+    let mut sum: f32 = acc.iter().sum();
+
+    // Handle remainder
+    for (x, y) in remainder_a.iter().zip(remainder_b.iter()) {
+        sum += x * y;
+    }
+
+    sum
+}
+
+/// SIMD-optimized squared norm
+#[inline(always)]
+fn simd_norm_squared(v: &[f32]) -> f32 {
+    const CHUNK_SIZE: usize = 8;
+
+    let chunks = v.chunks_exact(CHUNK_SIZE);
+    let remainder = chunks.remainder();
+
+    let mut acc = [0.0f32; CHUNK_SIZE];
+
+    for chunk in chunks {
+        for i in 0..CHUNK_SIZE {
+            acc[i] += chunk[i] * chunk[i];
+        }
+    }
+
+    let mut sum: f32 = acc.iter().sum();
+
+    for x in remainder {
+        sum += x * x;
+    }
+
+    sum
+}
+
+/// SIMD-optimized element-wise multiply (for bind)
+#[inline(always)]
+fn simd_elementwise_mul(a: &[f32], b: &[f32], out: &mut [f32]) {
+    debug_assert_eq!(a.len(), b.len());
+    debug_assert_eq!(a.len(), out.len());
+
+    const CHUNK_SIZE: usize = 8;
+
+    let n = a.len();
+    let chunks = n / CHUNK_SIZE;
+
+    for c in 0..chunks {
+        let base = c * CHUNK_SIZE;
+        for i in 0..CHUNK_SIZE {
+            out[base + i] = a[base + i] * b[base + i];
+        }
+    }
+
+    // Remainder
+    for i in (chunks * CHUNK_SIZE)..n {
+        out[i] = a[i] * b[i];
+    }
+}
+
+/// SIMD-optimized element-wise add
+#[inline(always)]
+fn simd_elementwise_add(a: &[f32], b: &[f32], out: &mut [f32]) {
+    debug_assert_eq!(a.len(), b.len());
+    debug_assert_eq!(a.len(), out.len());
+
+    const CHUNK_SIZE: usize = 8;
+
+    let n = a.len();
+    let chunks = n / CHUNK_SIZE;
+
+    for c in 0..chunks {
+        let base = c * CHUNK_SIZE;
+        for i in 0..CHUNK_SIZE {
+            out[base + i] = a[base + i] + b[base + i];
+        }
+    }
+
+    for i in (chunks * CHUNK_SIZE)..n {
+        out[i] = a[i] + b[i];
+    }
+}
+
+/// SIMD-optimized scalar multiply
+#[inline(always)]
+fn simd_scale(v: &[f32], scalar: f32, out: &mut [f32]) {
+    debug_assert_eq!(v.len(), out.len());
+
+    const CHUNK_SIZE: usize = 8;
+
+    let n = v.len();
+    let chunks = n / CHUNK_SIZE;
+
+    for c in 0..chunks {
+        let base = c * CHUNK_SIZE;
+        for i in 0..CHUNK_SIZE {
+            out[base + i] = v[base + i] * scalar;
+        }
+    }
+
+    for i in (chunks * CHUNK_SIZE)..n {
+        out[i] = v[i] * scalar;
+    }
+}
 
 /// Real-valued hypervector (2048 dimensions)
 ///
@@ -68,6 +209,24 @@ impl RealHV {
         Self {
             values: vec![1.0; dim],
         }
+    }
+
+    /// Create a hypervector from existing values
+    ///
+    /// # Example
+    /// ```
+    /// # use symthaea::hdc::real_hv::RealHV;
+    /// let values = vec![0.5, -0.3, 0.8, 0.1];
+    /// let hv = RealHV::from_values(values);
+    /// assert_eq!(hv.dim(), 4);
+    /// ```
+    pub fn from_values(values: Vec<f32>) -> Self {
+        Self { values }
+    }
+
+    /// Alias for from_values - creates a RealHV from a Vec<f32>
+    pub fn from_vec(values: Vec<f32>) -> Self {
+        Self::from_values(values)
     }
 
     /// Create a random hypervector with values in [-1, 1]
@@ -138,12 +297,8 @@ impl RealHV {
         assert_eq!(self.values.len(), other.values.len(),
                    "Cannot bind vectors of different dimensions");
 
-        let values: Vec<f32> = self.values
-            .iter()
-            .zip(&other.values)
-            .map(|(a, b)| a * b)
-            .collect();
-
+        let mut values = vec![0.0f32; self.values.len()];
+        simd_elementwise_mul(&self.values, &other.values, &mut values);
         Self { values }
     }
 
@@ -167,12 +322,8 @@ impl RealHV {
         assert_eq!(self.values.len(), other.values.len(),
                    "Cannot add vectors of different dimensions");
 
-        let values: Vec<f32> = self.values
-            .iter()
-            .zip(&other.values)
-            .map(|(a, b)| a + b)
-            .collect();
-
+        let mut values = vec![0.0f32; self.values.len()];
+        simd_elementwise_add(&self.values, &other.values, &mut values);
         Self { values }
     }
 
@@ -244,14 +395,10 @@ impl RealHV {
         assert_eq!(self.values.len(), other.values.len(),
                    "Cannot compute similarity of vectors with different dimensions");
 
-        let dot: f32 = self.values
-            .iter()
-            .zip(&other.values)
-            .map(|(a, b)| a * b)
-            .sum();
-
-        let norm_self: f32 = self.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-        let norm_other: f32 = other.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+        // Use SIMD-optimized operations
+        let dot = simd_dot_product(&self.values, &other.values);
+        let norm_self = simd_norm_squared(&self.values).sqrt();
+        let norm_other = simd_norm_squared(&other.values).sqrt();
 
         if norm_self == 0.0 || norm_other == 0.0 {
             return 0.0;
@@ -279,15 +426,16 @@ impl RealHV {
         Self { values }
     }
 
-    /// Scalar multiplication
+    /// Scalar multiplication (SIMD-optimized)
     pub fn scale(&self, scalar: f32) -> Self {
-        let values: Vec<f32> = self.values.iter().map(|&x| x * scalar).collect();
+        let mut values = vec![0.0f32; self.values.len()];
+        simd_scale(&self.values, scalar, &mut values);
         Self { values }
     }
 
-    /// Normalize to unit length (L2 norm = 1)
+    /// Normalize to unit length (L2 norm = 1) (SIMD-optimized)
     pub fn normalize(&self) -> Self {
-        let norm: f32 = self.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm = simd_norm_squared(&self.values).sqrt();
         if norm == 0.0 {
             return self.clone();
         }

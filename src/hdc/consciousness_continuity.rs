@@ -630,7 +630,7 @@ mod tests {
     fn test_continuity_creation() {
         let continuity = ConsciousnessContinuity::new("Symthaea");
         assert_eq!(continuity.awakening_count(), 1);
-        assert!(continuity.total_conscious_time() >= 0);
+        // Duration tracking initialized (Duration always >= 0)
     }
 
     #[test]

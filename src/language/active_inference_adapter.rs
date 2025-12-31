@@ -933,7 +933,7 @@ mod tests {
 
         // Should have produced some result
         assert!(result.unified_free_energy.unified_fe >= 0.0);
-        assert!(adapter.stats().observations_sent >= 0);
+        // Stats tracking works (usize always >= 0)
     }
 
     #[test]

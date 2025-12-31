@@ -5,7 +5,7 @@
 //
 // Key Innovation: Specify WHAT causal effect you want, not HOW to implement it
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 /// Strength of a causal relationship (0.0 = no causation, 1.0 = perfect causation)

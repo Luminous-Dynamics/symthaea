@@ -442,7 +442,8 @@ mod tests {
         // NOTE: Phase 4 will integrate duration tracking with observer
         // For now, verify the method runs without panic
         // (bottlenecks may be empty if events don't have duration metadata yet)
-        assert!(bottlenecks.len() >= 0); // Just verify it returns a valid vec
+        // Bottlenecks may be empty if events don't have duration metadata yet
+        let _ = bottlenecks; // Verify method completes without panic
     }
 
     #[test]
@@ -492,7 +493,8 @@ mod tests {
         // NOTE: Phase 4 will integrate correlation metadata with observer
         // For now, verify the method runs without panic
         // Chain may be shorter until full integration is complete
-        assert!(chain.len() >= 0); // Just verify it returns a valid vec
+        // Chain may be shorter until full correlation integration is complete
+        let _ = chain; // Verify method completes without panic
     }
 
     #[test]

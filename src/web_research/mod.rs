@@ -1,6 +1,8 @@
 //! # Web Research & Epistemic Verification
 //!
 //! **Revolutionary Capability**: An AI that researches autonomously and verifies epistemically.
+
+#![allow(dead_code, unused_variables)]
 //!
 //! ## What Makes This Revolutionary
 //!

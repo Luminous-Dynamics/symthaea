@@ -1,6 +1,8 @@
 //! Week 12: Perception & Tool Creation - Giving Sophia Senses
 //!
 //! This module provides sensory capabilities for Sophia:
+
+#![allow(dead_code, unused_variables)]
 //! - Visual perception (images) - Basic feature extraction
 //! - Semantic vision - Deep semantic understanding with SigLIP & Moondream
 //! - OCR - Text extraction from images (rten + ocrs, Tesseract fallback)

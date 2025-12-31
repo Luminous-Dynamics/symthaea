@@ -58,7 +58,7 @@
 //! ```
 
 use crate::hdc::HDC_DIMENSION;
-use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
+use crate::hdc::consciousness_topology_generators::{ConsciousnessTopology, TopologyType as HdcTopologyType};
 use crate::hdc::real_hv::RealHV;
 use crate::synthesis::{CausalSpec, ProgramTemplate, SynthesisError, SynthesizedProgram, SynthesisResult};
 use serde::{Deserialize, Serialize};
@@ -213,6 +213,51 @@ impl TopologyType {
             TopologyType::Line => (0.1, 0.3),
         }
     }
+
+    /// Convert to HDC topology type for ConsciousnessTopology construction
+    pub fn to_hdc_type(&self) -> HdcTopologyType {
+        match self {
+            TopologyType::Dense => HdcTopologyType::DenseNetwork,
+            TopologyType::Modular => HdcTopologyType::Modular,
+            TopologyType::Star => HdcTopologyType::Star,
+            TopologyType::Ring => HdcTopologyType::Ring,
+            TopologyType::Random => HdcTopologyType::Random,
+            TopologyType::BinaryTree => HdcTopologyType::BinaryTree,
+            TopologyType::Lattice => HdcTopologyType::Lattice,
+            TopologyType::Line => HdcTopologyType::Line,
+        }
+    }
+
+    /// Convert from HDC topology type
+    pub fn from_hdc_type(hdc_type: &HdcTopologyType) -> Self {
+        match hdc_type {
+            HdcTopologyType::DenseNetwork => TopologyType::Dense,
+            HdcTopologyType::Modular => TopologyType::Modular,
+            HdcTopologyType::Star => TopologyType::Star,
+            HdcTopologyType::Ring => TopologyType::Ring,
+            HdcTopologyType::Random => TopologyType::Random,
+            HdcTopologyType::BinaryTree => TopologyType::BinaryTree,
+            HdcTopologyType::Lattice => TopologyType::Lattice,
+            HdcTopologyType::Line => TopologyType::Line,
+            // Map exotic topologies to closest match
+            HdcTopologyType::Torus | HdcTopologyType::KleinBottle | HdcTopologyType::MobiusStrip => TopologyType::Ring,
+            HdcTopologyType::SmallWorld => TopologyType::Modular,
+            HdcTopologyType::Hyperbolic | HdcTopologyType::ScaleFree => TopologyType::Star,
+            HdcTopologyType::Sphere => TopologyType::Dense,
+            HdcTopologyType::Fractal | HdcTopologyType::SierpinskiGasket |
+            HdcTopologyType::FractalTree | HdcTopologyType::KochSnowflake |
+            HdcTopologyType::MengerSponge | HdcTopologyType::CantorSet => TopologyType::BinaryTree,
+            HdcTopologyType::Hypercube => TopologyType::Lattice,
+            HdcTopologyType::Quantum => TopologyType::Random,
+            // Tier 4: Neural-inspired
+            HdcTopologyType::CorticalColumn | HdcTopologyType::Feedforward |
+            HdcTopologyType::Recurrent | HdcTopologyType::Residual => TopologyType::Modular,
+            HdcTopologyType::Bipartite | HdcTopologyType::CompleteBipartite => TopologyType::Star,
+            HdcTopologyType::CorePeriphery | HdcTopologyType::BowTie => TopologyType::Star,
+            HdcTopologyType::Attention => TopologyType::Modular,
+            HdcTopologyType::PetersenGraph => TopologyType::Ring,
+        }
+    }
 }
 
 /// Result of consciousness-aware synthesis
@@ -307,7 +352,7 @@ impl ConsciousSynthesizedProgram {
 
     /// Get consciousness quality assessment
     pub fn consciousness_quality(&self) -> ConsciousnessQuality {
-        match self.phi {
+        match self.phi_hdc {
             phi if phi >= 0.7 => ConsciousnessQuality::Excellent,
             phi if phi >= 0.5 => ConsciousnessQuality::Good,
             phi if phi >= 0.3 => ConsciousnessQuality::Fair,
@@ -375,6 +420,66 @@ pub trait ConsciousSynthesizerExt {
 
 use crate::synthesis::CausalProgramSynthesizer;
 
+/// Helper function to classify topology from edge structure
+/// Used before full ConsciousnessTopology construction
+fn classify_topology_from_edges(n: usize, edges: &[(usize, usize)]) -> TopologyType {
+    let m = edges.len();
+
+    if n == 0 {
+        return TopologyType::Line;  // Degenerate case
+    }
+
+    // Dense: Complete graph (all-to-all)
+    let max_edges = n * (n - 1) / 2;
+    if m == max_edges && max_edges > 0 {
+        return TopologyType::Dense;
+    }
+
+    // Tree structures: n-1 edges
+    if m == n - 1 && n > 1 {
+        let degrees: Vec<usize> = (0..n)
+            .map(|i| edges.iter().filter(|(a, b)| *a == i || *b == i).count())
+            .collect();
+        let max_degree = degrees.iter().max().copied().unwrap_or(0);
+        let min_degree = degrees.iter().min().copied().unwrap_or(0);
+
+        if max_degree == n - 1 && min_degree == 1 {
+            return TopologyType::Star;
+        }
+        if max_degree <= 2 {
+            return TopologyType::Line;
+        }
+        return TopologyType::BinaryTree;
+    }
+
+    // Ring: n edges forming a cycle
+    if m == n && n > 2 {
+        let degrees: Vec<usize> = (0..n)
+            .map(|i| edges.iter().filter(|(a, b)| *a == i || *b == i).count())
+            .collect();
+        if degrees.iter().all(|&d| d == 2) {
+            return TopologyType::Ring;
+        }
+    }
+
+    // Lattice check
+    if n >= 4 {
+        let degrees: Vec<usize> = (0..n)
+            .map(|i| edges.iter().filter(|(a, b)| *a == i || *b == i).count())
+            .collect();
+        let avg_degree = degrees.iter().sum::<usize>() as f64 / n as f64;
+        let degree_variance = degrees.iter()
+            .map(|&d| { let diff = d as f64 - avg_degree; diff * diff })
+            .sum::<f64>() / n as f64;
+        if degree_variance < 1.0 && avg_degree >= 2.0 && avg_degree <= 4.0 {
+            return TopologyType::Lattice;
+        }
+    }
+
+    // Default: Random
+    TopologyType::Random
+}
+
 impl ConsciousSynthesizerExt for CausalProgramSynthesizer {
     fn program_to_topology(
         &self,
@@ -410,13 +515,13 @@ impl ConsciousSynthesizerExt for CausalProgramSynthesizer {
             .enumerate()
             .map(|(i, identity)| {
                 // Find neighbors for this node
-                let neighbors: Vec<&RealHV> = edges
+                let neighbors: Vec<RealHV> = edges
                     .iter()
                     .filter_map(|(a, b)| {
                         if *a == i {
-                            Some(&node_identities[*b])
+                            Some(node_identities[*b].clone())
                         } else if *b == i {
-                            Some(&node_identities[*a])
+                            Some(node_identities[*a].clone())
                         } else {
                             None
                         }
@@ -433,112 +538,31 @@ impl ConsciousSynthesizerExt for CausalProgramSynthesizer {
             })
             .collect();
 
+        // Classify topology based on structure before full construction
+        let topology_type = classify_topology_from_edges(n_variables, &edges);
+
         Ok(ConsciousnessTopology {
+            n_nodes: n_variables,
+            dim,
             node_identities,
             node_representations,
+            topology_type: topology_type.to_hdc_type(),
             edges,
         })
     }
 
     fn classify_topology(&self, topology: &ConsciousnessTopology) -> TopologyType {
         let n = topology.node_identities.len();
-        let m = topology.edges.len();
 
-        if n == 0 {
-            return TopologyType::Line;  // Degenerate case
-        }
+        // Use helper for basic classification
+        let basic_type = classify_topology_from_edges(n, &topology.edges);
 
-        // Check for special patterns
-
-        // Dense: Complete graph (all-to-all)
-        let max_edges = n * (n - 1) / 2;
-        if m == max_edges && max_edges > 0 {
-            return TopologyType::Dense;
-        }
-
-        // Tree structures: n-1 edges
-        if m == n - 1 && n > 1 {
-            // Could be tree, line, or star
-            let degrees: Vec<usize> = (0..n)
-                .map(|i| {
-                    topology
-                        .edges
-                        .iter()
-                        .filter(|(a, b)| *a == i || *b == i)
-                        .count()
-                })
-                .collect();
-
-            let max_degree = degrees.iter().max().copied().unwrap_or(0);
-            let min_degree = degrees.iter().min().copied().unwrap_or(0);
-
-            // Star: One hub with degree n-1, rest have degree 1
-            if max_degree == n - 1 && min_degree == 1 {
-                return TopologyType::Star;
-            }
-
-            // Line: All nodes have degree <= 2
-            if max_degree <= 2 {
-                return TopologyType::Line;
-            }
-
-            // Otherwise: Binary tree (hierarchical)
-            return TopologyType::BinaryTree;
-        }
-
-        // Ring: n edges forming a cycle
-        if m == n && n > 2 {
-            // Check if it's actually a cycle
-            let degrees: Vec<usize> = (0..n)
-                .map(|i| {
-                    topology
-                        .edges
-                        .iter()
-                        .filter(|(a, b)| *a == i || *b == i)
-                        .count()
-                })
-                .collect();
-
-            if degrees.iter().all(|&d| d == 2) {
-                return TopologyType::Ring;
-            }
-        }
-
-        // Lattice: Regular grid structure (4 edges per node in 2D)
-        if n >= 4 {
-            let degrees: Vec<usize> = (0..n)
-                .map(|i| {
-                    topology
-                        .edges
-                        .iter()
-                        .filter(|(a, b)| *a == i || *b == i)
-                        .count()
-                })
-                .collect();
-
-            let avg_degree = degrees.iter().sum::<usize>() as f64 / n as f64;
-            let degree_variance = degrees
-                .iter()
-                .map(|&d| {
-                    let diff = d as f64 - avg_degree;
-                    diff * diff
-                })
-                .sum::<f64>()
-                / n as f64;
-
-            // Low variance + moderate degree suggests lattice
-            if degree_variance < 1.0 && avg_degree >= 2.0 && avg_degree <= 4.0 {
-                return TopologyType::Lattice;
-            }
-        }
-
-        // Modular: Check for community structure
-        if self.has_modular_structure(topology) {
+        // Additional check for modular structure (requires topology analysis)
+        if basic_type == TopologyType::Random && self.has_modular_structure(topology) {
             return TopologyType::Modular;
         }
 
-        // Default: Random
-        TopologyType::Random
+        basic_type
     }
 
     fn measure_heterogeneity(&self, topology: &ConsciousnessTopology) -> f64 {
@@ -562,7 +586,7 @@ impl ConsciousSynthesizerExt for CausalProgramSynthesizer {
 
         // Heterogeneity = 1 - mean(similarity)
         // High heterogeneity means nodes are dissimilar (more differentiated)
-        let mean_similarity: f64 = similarities.iter().sum::<f64>() / similarities.len() as f64;
+        let mean_similarity: f64 = similarities.iter().map(|&x| x as f64).sum::<f64>() / similarities.len() as f64;
         (1.0 - mean_similarity).max(0.0).min(1.0)
     }
 
@@ -589,7 +613,7 @@ impl ConsciousSynthesizerExt for CausalProgramSynthesizer {
         }
 
         let mean_integration: f64 =
-            connected_similarities.iter().sum::<f64>() / connected_similarities.len() as f64;
+            connected_similarities.iter().map(|&x| x as f64).sum::<f64>() / connected_similarities.len() as f64;
         mean_integration.max(0.0).min(1.0)
     }
 
@@ -683,7 +707,7 @@ impl CausalProgramSynthesizer {
         config: &ConsciousnessSynthesisConfig,
     ) -> SynthesisResult<ConsciousSynthesizedProgram> {
         use crate::hdc::phi_real::RealPhiCalculator;
-        use std::time::{Duration, Instant};
+        use std::time::Instant;
 
         // Step 1: Generate candidate programs
         let candidates = self.generate_candidates(spec, config)?;
@@ -798,7 +822,7 @@ impl CausalProgramSynthesizer {
                     .unwrap_or(0.0);
 
                 Err(SynthesisError::InsufficientConsciousness {
-                    min_phi_hdc: config.min_phi,
+                    min_phi: config.min_phi_hdc,
                     best_phi,
                 })
             }
@@ -821,10 +845,10 @@ impl CausalProgramSynthesizer {
         }
 
         // Generate variations with different complexity levels
-        let original_max_complexity = self.config.max_complexity;
+        let original_max_complexity = self.config().max_complexity;
 
         for complexity_factor in &[0.5, 1.0, 1.5, 2.0] {
-            self.config.max_complexity = (original_max_complexity as f64 * complexity_factor) as usize;
+            self.config_mut().max_complexity = (original_max_complexity as f64 * complexity_factor) as usize;
 
             if let Ok(candidate) = self.synthesize(spec) {
                 // Only add if not duplicate
@@ -838,7 +862,7 @@ impl CausalProgramSynthesizer {
         }
 
         // Restore original config
-        self.config.max_complexity = original_max_complexity;
+        self.config_mut().max_complexity = original_max_complexity;
 
         // Filter by preferred topology if specified
         if let Some(preferred) = config.preferred_topology {
@@ -869,7 +893,7 @@ impl CausalProgramSynthesizer {
         let phi_score = phi_hdc;
 
         // Complexity penalty (lower complexity is better)
-        let max_complexity = self.config.max_complexity as f64;
+        let max_complexity = self.config().max_complexity as f64;
         let complexity_score = 1.0 - (program.complexity as f64 / max_complexity).min(1.0);
 
         // Combined score: weighted average
@@ -1040,7 +1064,7 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = ConsciousnessSynthesisConfig::default();
-        assert_eq!(config.min_phi, 0.3);
+        assert_eq!(config.min_phi_hdc, 0.3);
         assert_eq!(config.phi_weight, 0.3);
         assert!(config.preferred_topology.is_none());
         assert_eq!(config.max_phi_computation_time, 5000);
@@ -1185,8 +1209,8 @@ mod tests {
 
         let synthesizer = create_test_synthesizer();
 
-        // Create dense topology
-        let topology = CTGen::dense(5, HDC_DIMENSION, 42);
+        // Create dense topology (dense_network with k=None for full connectivity)
+        let topology = CTGen::dense_network(5, HDC_DIMENSION, None, 42);
 
         let classified = synthesizer.classify_topology(&topology);
         assert_eq!(
@@ -1324,8 +1348,8 @@ mod tests {
 
         let synthesizer = create_test_synthesizer();
 
-        // Modular topology should detect modularity
-        let modular = CTGen::modular(12, HDC_DIMENSION, 42);
+        // Modular topology should detect modularity (12 nodes, 3 modules, seed 42)
+        let modular = CTGen::modular(12, HDC_DIMENSION, 3, 42);
         let is_modular = synthesizer.has_modular_structure(&modular);
 
         println!("Modular topology detected as modular: {}", is_modular);
@@ -1459,10 +1483,10 @@ mod tests {
 
         // Verify Φ meets threshold
         assert!(
-            conscious_program.phi >= config.min_phi,
+            conscious_program.phi_hdc >= config.min_phi_hdc,
             "Φ={:.3} should be >= {:.3}",
             conscious_program.phi_hdc,
-            config.min_phi
+            config.min_phi_hdc
         );
 
         // Verify scores are valid
@@ -1509,7 +1533,7 @@ mod tests {
         let conscious = synthesizer.synthesize_conscious(&spec, &config).unwrap();
 
         // Conscious synthesis should have Φ measured
-        assert!(conscious.phi > 0.0, "Conscious synthesis should have Φ > 0");
+        assert!(conscious.phi_hdc > 0.0, "Conscious synthesis should have Φ > 0");
 
         // Both should achieve similar causal strength
         assert!(
@@ -1639,8 +1663,8 @@ mod tests {
 
         // High Φ weight should prioritize higher Φ scores
         // (though not guaranteed due to threshold filtering)
-        assert!(prog_high_phi.phi >= config_high_phi.min_phi);
-        assert!(prog_low_phi.phi >= config_low_phi.min_phi);
+        assert!(prog_high_phi.phi_hdc >= config_high_phi.min_phi_hdc);
+        assert!(prog_low_phi.phi_hdc >= config_low_phi.min_phi_hdc);
 
         // Combined scores should reflect weighting
         println!(
@@ -1685,7 +1709,7 @@ mod tests {
             // Preference may influence but not guarantee topology
             // (depends on what synthesis generates)
             println!("Generated topology: {:?}", program.topology_type);
-            println!("Φ: {:.3}", program.phi);
+            println!("Φ: {:.3}", program.phi_hdc);
 
             // At minimum, topology should be classified
             assert!(matches!(

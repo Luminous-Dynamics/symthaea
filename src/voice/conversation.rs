@@ -23,8 +23,8 @@ pub struct VoiceConfig {
     pub language: Option<String>,
     /// Enable LTC-aware pacing
     pub ltc_pacing: bool,
-    /// Voice ID (0-9)
-    pub voice_id: u8,
+    /// Voice name (e.g., "af_bella")
+    pub voice_name: String,
     /// Wake word (optional)
     pub wake_word: Option<String>,
     /// Silence threshold for VAD
@@ -40,7 +40,7 @@ impl Default for VoiceConfig {
             kokoro_model: KokoroModel::V019,
             language: Some("en".to_string()),
             ltc_pacing: true,
-            voice_id: 0,
+            voice_name: "af_bella".to_string(),
             wake_word: None,
             silence_threshold: 0.02,
             debug: false,
@@ -121,7 +121,7 @@ impl VoiceConversation {
             let output_config = VoiceOutputConfig {
                 model: self.config.kokoro_model,
                 ltc_pacing: self.config.ltc_pacing,
-                voice_id: self.config.voice_id,
+                voice_name: self.config.voice_name.clone(),
                 ..Default::default()
             };
             self.output = Some(VoiceOutput::new(output_config)?);
@@ -150,19 +150,29 @@ impl VoiceConversation {
         self.is_running.store(false, Ordering::SeqCst);
     }
 
-    /// Speak text using TTS with LTC pacing
-    #[cfg(feature = "voice-tts")]
-    pub fn speak(&self, text: &str) -> VoiceResult<()> {
-        if let Some(ref output) = self.output {
+    /// Speak text using TTS with LTC pacing and audio playback
+    #[cfg(all(feature = "voice-tts", feature = "audio"))]
+    pub fn speak(&mut self, text: &str) -> VoiceResult<()> {
+        if let Some(ref mut output) = self.output {
             let result = output.synthesize_with_pacing(text, self.current_ltc.clone())?;
             output.play_with_pacing(&result, self.current_ltc.clone())?;
         }
         Ok(())
     }
 
+    /// Speak text using TTS (synthesis only, no playback)
+    #[cfg(all(feature = "voice-tts", not(feature = "audio")))]
+    pub fn speak(&mut self, text: &str) -> VoiceResult<()> {
+        if let Some(ref mut output) = self.output {
+            // Synthesize but don't play (no audio feature)
+            let _result = output.synthesize_with_pacing(text, self.current_ltc.clone())?;
+        }
+        Ok(())
+    }
+
     /// Speak text sentence by sentence for natural flow
     #[cfg(feature = "voice-tts")]
-    pub fn speak_natural(&self, text: &str) -> VoiceResult<()> {
+    pub fn speak_natural(&mut self, text: &str) -> VoiceResult<()> {
         use super::output::split_sentences;
 
         let sentences = split_sentences(text);

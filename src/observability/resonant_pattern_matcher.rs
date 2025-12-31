@@ -23,7 +23,8 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
-use super::pattern_library::{CausalMotif, MotifSeverity, MotifMatch};
+#[allow(unused_imports)]  // MotifSeverity used in tests
+use super::pattern_library::{CausalMotif, MotifMatch, MotifSeverity};
 use super::types::Event;
 
 // ═══════════════════════════════════════════════════════════════════════════

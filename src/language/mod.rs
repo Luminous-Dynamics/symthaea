@@ -1,6 +1,8 @@
 //! Language Module - Consciousness-First Natural Language
 //!
 //! This module implements LLM-FREE language understanding and generation
+
+#![allow(dead_code, unused_variables)]
 //! through semantic primitives and hyperdimensional computing.
 //!
 //! ## Why Better Than LLMs
@@ -162,6 +164,8 @@ pub use consciousness_bridge::{
     ConsciousnessBridge, BridgeConfig, BridgeResult, BridgeStats,
     LanguageAttentionBid, LanguageWorkingMemoryItem,
     WorkingMemoryContentType, ConsciousnessState,
+    // Active Inference Feedback Loop
+    PrecisionWeights,
     // Active Inference Integration
     LinguisticPredictionError, InferenceDomain,
 };

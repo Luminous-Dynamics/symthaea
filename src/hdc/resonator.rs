@@ -101,6 +101,12 @@ pub struct ResonatorNetwork {
     symbol_names: HashMap<String, usize>,
 
     /// Current resonator states (one per unknown)
+    ///
+    /// TODO(future): Expose resonator state inspection API.
+    /// This would allow debugging and visualization of the resonator's
+    /// internal dynamics - useful for understanding convergence behavior,
+    /// detecting oscillations, and optimizing parameters.
+    #[allow(dead_code)] // Reserved for future state inspection
     states: Vec<ResonatorState>,
 
     /// Convergence parameters

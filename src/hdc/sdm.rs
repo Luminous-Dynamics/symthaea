@@ -266,6 +266,11 @@ pub struct SparseDistributedMemory {
     stats: SDMStats,
 
     /// Creation timestamp
+    ///
+    /// TODO(future): Implement age-based eviction for SDM entries.
+    /// When memory pressure is high, older entries should be evicted first.
+    /// Use this timestamp to calculate entry age and prioritize eviction.
+    #[allow(dead_code)] // Reserved for age-based eviction
     created_at: Instant,
 }
 
@@ -562,6 +567,12 @@ pub struct EpisodicSDM {
     episode_count: usize,
 
     /// Temporal context binding dimension
+    ///
+    /// TODO(future): Implement temporal queries using this dimension.
+    /// Should enable queries like "what was active at time T?" or
+    /// "find memories near temporal context X". Bind episode vectors
+    /// with temporal position vectors for time-aware retrieval.
+    #[allow(dead_code)] // Reserved for temporal queries
     temporal_dim: usize,
 }
 

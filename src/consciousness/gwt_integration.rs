@@ -80,6 +80,10 @@ pub struct UnifiedGlobalWorkspace {
     phi_estimates: HashMap<String, f64>,
 
     /// Observer for tracing workspace ignition events
+    ///
+    /// TODO(future): Connect observer to emit tracing events on workspace ignition.
+    /// This enables real-time monitoring of consciousness dynamics via the
+    /// observability infrastructure - useful for debugging and visualization.
     #[allow(dead_code)]
     observer: Option<SharedObserver>,
 }

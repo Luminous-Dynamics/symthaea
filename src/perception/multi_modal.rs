@@ -26,6 +26,96 @@ use std::time::Instant;
 use crate::hdc::HDC_DIMENSION;
 const HDC_DIM: usize = HDC_DIMENSION;
 
+/// Johnson-Lindenstrauss Random Projection Matrix
+///
+/// Implements distance-preserving projection from input space to HDC space.
+/// Uses sparse Rademacher distribution (±1 with probability 1/2, 0 with probability 1-2s)
+/// for computational efficiency.
+///
+/// Key property: For any two points u, v:
+/// |‖Pu - Pv‖ - ‖u - v‖| < ε‖u - v‖ with high probability
+struct JLProjector {
+    /// Projection matrix stored as sparse entries: (row, col, sign)
+    /// Using sparse representation since most entries are 0
+    sparse_entries: Vec<(usize, usize, i8)>,
+
+    /// Input dimension
+    input_dim: usize,
+
+    /// Output dimension
+    output_dim: usize,
+
+    /// Scaling factor (sqrt(3/s) for sparse JL)
+    scale: f32,
+}
+
+impl JLProjector {
+    /// Create a new JL projector with sparse Rademacher distribution
+    ///
+    /// Uses sparsity s = 1/3 (standard choice) which means:
+    /// - P(entry = +1/sqrt(s)) = s/2
+    /// - P(entry = -1/sqrt(s)) = s/2
+    /// - P(entry = 0) = 1 - s
+    fn new(input_dim: usize, output_dim: usize, seed: u64) -> Self {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut entries = Vec::new();
+        let sparsity = 3; // 1/3 probability of non-zero
+
+        // Generate sparse random projection matrix
+        for row in 0..output_dim {
+            for col in 0..input_dim {
+                // Deterministic pseudo-random based on position and seed
+                let mut hasher = DefaultHasher::new();
+                (row, col, seed).hash(&mut hasher);
+                let hash = hasher.finish();
+
+                // Sparse: only ~1/3 of entries are non-zero
+                if hash % sparsity as u64 == 0 {
+                    // Sign: ±1 with equal probability
+                    let sign = if (hash / sparsity as u64) % 2 == 0 { 1i8 } else { -1i8 };
+                    entries.push((row, col, sign));
+                }
+            }
+        }
+
+        // Scale factor for sparse JL: sqrt(3) since sparsity = 1/3
+        let scale = (sparsity as f32).sqrt();
+
+        Self {
+            sparse_entries: entries,
+            input_dim,
+            output_dim,
+            scale,
+        }
+    }
+
+    /// Project a vector from input space to output space
+    fn project(&self, input: &[f32]) -> Vec<f32> {
+        assert_eq!(input.len(), self.input_dim);
+
+        let mut output = vec![0.0f32; self.output_dim];
+
+        // Sparse matrix-vector multiplication
+        for &(row, col, sign) in &self.sparse_entries {
+            output[row] += (sign as f32) * input[col];
+        }
+
+        // Apply scaling
+        for val in &mut output {
+            *val *= self.scale / (self.input_dim as f32).sqrt();
+        }
+
+        output
+    }
+
+    /// Project to binary HDC (threshold at 0)
+    fn project_to_binary(&self, input: &[f32]) -> Vec<bool> {
+        self.project(input).into_iter().map(|v| v > 0.0).collect()
+    }
+}
+
 /// Multi-modal HDC vector type - Uses HDC_DIMENSION (16,384D) holographic vector
 ///
 /// Note: This is a simplified boolean-based HDC implementation optimized for
@@ -140,6 +230,12 @@ pub struct MultiModalIntegrator {
 
     /// Whether to use adaptive weighting based on confidence
     adaptive_weighting: bool,
+
+    /// JL projector for image embeddings (768D SigLIP → HDC_DIM)
+    image_projector: JLProjector,
+
+    /// JL projector for text/OCR (256D character n-grams → HDC_DIM)
+    text_projector: JLProjector,
 }
 
 /// Weights for combining different modalities
@@ -164,9 +260,17 @@ impl Default for ModalityWeights {
 
 impl Default for MultiModalIntegrator {
     fn default() -> Self {
+        // Use fixed seeds for deterministic projections across runs
+        const IMAGE_PROJECTOR_SEED: u64 = 0xCAFE_BABE_1234_5678;
+        const TEXT_PROJECTOR_SEED: u64 = 0xDEAD_BEEF_8765_4321;
+
         Self {
             modality_weights: ModalityWeights::default(),
             adaptive_weighting: true,
+            // 768D SigLIP embedding → 16,384D HDC
+            image_projector: JLProjector::new(768, HDC_DIM, IMAGE_PROJECTOR_SEED),
+            // 256D n-gram features → 16,384D HDC
+            text_projector: JLProjector::new(256, HDC_DIM, TEXT_PROJECTOR_SEED),
         }
     }
 }
@@ -179,9 +283,12 @@ impl MultiModalIntegrator {
 
     /// Create with custom modality weights
     pub fn with_weights(weights: ModalityWeights) -> Self {
+        let default = Self::default();
         Self {
             modality_weights: weights,
             adaptive_weighting: true,
+            image_projector: default.image_projector,
+            text_projector: default.text_projector,
         }
     }
 
@@ -222,46 +329,62 @@ impl MultiModalIntegrator {
         Ok(hdc)
     }
 
-    /// Project image embedding into HDC space
+    /// Project image embedding into HDC space using Johnson-Lindenstrauss projection
+    ///
+    /// Uses sparse random projection to map 768D SigLIP embedding to HDC_DIM (16,384D).
+    /// The JL lemma guarantees that pairwise distances are approximately preserved:
+    /// |‖P(u) - P(v)‖ - ‖u - v‖| < ε‖u - v‖ with high probability.
     pub fn project_image_embedding(&self, embedding: &ImageEmbedding) -> Result<HdcVector> {
-        // Map 768D SigLIP embedding to 10,000D HDC space
-        // Strategy: Use random projection with consistent seed for determinism
+        // Ensure input dimension matches (768D SigLIP)
+        if embedding.vector.len() != 768 {
+            anyhow::bail!(
+                "Image embedding dimension mismatch: expected 768, got {}",
+                embedding.vector.len()
+            );
+        }
 
-        let mut hdc = HdcVector::zero();
+        // Apply JL projection to get binary HDC vector
+        let projected_bits = self.image_projector.project_to_binary(&embedding.vector);
 
-        // TODO: Implement Johnson-Lindenstrauss random projection
-        // For now, use a simple mapping
-        for (i, &value) in embedding.vector.iter().enumerate() {
-            if value > 0.0 {
-                // Map positive values to corresponding HDC dimensions
-                let base_idx = (i * 13) % HDC_DIM; // Prime number for better distribution
-                hdc.set_bit(base_idx);
+        Ok(HdcVector {
+            bits: projected_bits,
+        })
+    }
+
+    /// Project OCR text into HDC space using n-gram feature encoding
+    ///
+    /// Encodes text using character tri-grams projected through JL projection.
+    /// This creates a distributed representation that captures character patterns.
+    pub fn project_ocr(&self, ocr: &OcrResult) -> Result<HdcVector> {
+        // Build n-gram feature vector (256 dimensions for character tri-grams)
+        let mut ngram_features = vec![0.0f32; 256];
+
+        // Extract character tri-grams
+        let text = ocr.text.to_lowercase();
+        let chars: Vec<char> = text.chars().collect();
+
+        for window in chars.windows(3) {
+            // Hash tri-gram to feature index
+            let hash = window.iter()
+                .fold(0u64, |acc, &c| acc.wrapping_mul(31).wrapping_add(c as u64));
+            let idx = (hash % 256) as usize;
+            ngram_features[idx] += 1.0;
+        }
+
+        // Normalize features
+        let sum: f32 = ngram_features.iter().sum();
+        if sum > 0.0 {
+            for f in &mut ngram_features {
+                *f /= sum;
             }
         }
 
-        Ok(hdc)
-    }
+        // Apply JL projection
+        let projected_bits = self.text_projector.project_to_binary(&ngram_features);
 
-    /// Project OCR text into HDC space
-    pub fn project_ocr(&self, ocr: &OcrResult) -> Result<HdcVector> {
-        // Text encoding strategy:
-        // - Use n-gram encoding (character and word level)
-        // - Position-aware encoding for spatial layout
-        // - Confidence-weighted contributions
-
-        let mut hdc = HdcVector::zero();
-
-        // TODO: Implement proper text encoding
-        // For now, simple character-based encoding
-        for (i, ch) in ocr.text.chars().take(100).enumerate() {
-            let char_idx = (ch as usize) % 256;
-            let pos_idx = 768 + (i % 100); // Position encoding
-
-            hdc.set_bit(char_idx);
-            hdc.set_bit(pos_idx);
-        }
-
-        Ok(hdc)
+        Ok(HdcVector {
+            bits: projected_bits,
+        })
     }
 
     /// Project code semantics into HDC space

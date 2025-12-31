@@ -41,8 +41,95 @@ state(t+1) = normalize(∑ⱼ similarity(i,j) × state_j(t))
 */
 
 use super::real_hv::RealHV;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
+
+// =============================================================================
+// SIMD-Optimized Helper Functions for Resonance Dynamics
+// =============================================================================
+
+/// SIMD-optimized weighted accumulation with 8-wide chunks
+///
+/// Computes: output += weight * vector in a vectorization-friendly way
+#[inline(always)]
+fn simd_weighted_accumulate(output: &mut [f32], vector: &[f32], weight: f32) {
+    const CHUNK_SIZE: usize = 8;
+    let n = output.len().min(vector.len());
+    let chunks = n / CHUNK_SIZE;
+
+    // Process 8-wide chunks for auto-vectorization
+    for c in 0..chunks {
+        let base = c * CHUNK_SIZE;
+        for i in 0..CHUNK_SIZE {
+            output[base + i] += weight * vector[base + i];
+        }
+    }
+
+    // Handle remainder
+    for i in (chunks * CHUNK_SIZE)..n {
+        output[i] += weight * vector[i];
+    }
+}
+
+/// SIMD-optimized damped blend: result = damping * a + (1-damping) * b
+#[inline(always)]
+fn simd_damped_blend(result: &mut [f32], a: &[f32], b: &[f32], damping: f32) {
+    const CHUNK_SIZE: usize = 8;
+    let one_minus_damping = 1.0 - damping;
+    let n = result.len().min(a.len()).min(b.len());
+    let chunks = n / CHUNK_SIZE;
+
+    // Process 8-wide chunks for auto-vectorization
+    for c in 0..chunks {
+        let base = c * CHUNK_SIZE;
+        for i in 0..CHUNK_SIZE {
+            result[base + i] = damping * a[base + i] + one_minus_damping * b[base + i];
+        }
+    }
+
+    // Handle remainder
+    for i in (chunks * CHUNK_SIZE)..n {
+        result[i] = damping * a[i] + one_minus_damping * b[i];
+    }
+}
+
+/// SIMD-optimized normalization in place
+#[inline(always)]
+fn simd_normalize_inplace(values: &mut [f32]) {
+    const CHUNK_SIZE: usize = 8;
+
+    // Compute norm squared with SIMD
+    let mut acc = [0.0f32; CHUNK_SIZE];
+    for chunk in values.chunks_exact(CHUNK_SIZE) {
+        for i in 0..CHUNK_SIZE {
+            acc[i] += chunk[i] * chunk[i];
+        }
+    }
+
+    let mut sum: f32 = acc.iter().sum();
+    for &x in values.chunks_exact(CHUNK_SIZE).remainder() {
+        sum += x * x;
+    }
+
+    let norm = sum.sqrt();
+    if norm == 0.0 {
+        return;
+    }
+
+    let inv_norm = 1.0 / norm;
+
+    // Scale with SIMD
+    for chunk in values.chunks_exact_mut(CHUNK_SIZE) {
+        for i in 0..CHUNK_SIZE {
+            chunk[i] *= inv_norm;
+        }
+    }
+
+    for x in values.chunks_exact_mut(CHUNK_SIZE).into_remainder() {
+        *x *= inv_norm;
+    }
+}
 
 /// Result of resonant Φ calculation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,6 +173,12 @@ pub struct ResonantConfig {
 
     /// Normalization method
     pub normalize: bool,
+
+    /// Enable parallel computation (uses rayon)
+    pub parallel: bool,
+
+    /// Minimum nodes before enabling parallelism (overhead threshold)
+    pub parallel_threshold: usize,
 }
 
 impl Default for ResonantConfig {
@@ -96,6 +189,8 @@ impl Default for ResonantConfig {
             damping: 0.3,
             self_coupling: 0.1,
             normalize: true,
+            parallel: true,
+            parallel_threshold: 8, // Use parallelism for n >= 8 nodes
         }
     }
 }
@@ -107,6 +202,8 @@ impl ResonantConfig {
             max_iterations: 100,
             convergence_threshold: 1e-4,
             damping: 0.5,
+            parallel: true,
+            parallel_threshold: 6,
             ..Default::default()
         }
     }
@@ -116,6 +213,16 @@ impl ResonantConfig {
             max_iterations: 5000,
             convergence_threshold: 1e-8,
             damping: 0.2,
+            parallel: true,
+            parallel_threshold: 4,
+            ..Default::default()
+        }
+    }
+
+    /// Sequential-only (for benchmarking or small topologies)
+    pub fn sequential() -> Self {
+        Self {
+            parallel: false,
             ..Default::default()
         }
     }
@@ -126,6 +233,7 @@ impl ResonantConfig {
 /// Models consciousness emergence through iterative resonance dynamics rather than
 /// static eigenvalue computation. Much faster (O(n log N) vs O(n³)) and captures
 /// the dynamic nature of consciousness.
+#[derive(Clone)]
 pub struct ResonantPhiCalculator {
     config: ResonantConfig,
 }
@@ -243,20 +351,30 @@ impl ResonantPhiCalculator {
     }
 
     /// Build pairwise similarity matrix (coupling strengths)
+    ///
+    /// Uses parallel computation for large topologies (n >= parallel_threshold)
     fn build_similarity_matrix(&self, components: &[RealHV]) -> Vec<Vec<f64>> {
+        let n = components.len();
+        let use_parallel = self.config.parallel && n >= self.config.parallel_threshold;
+
+        if use_parallel {
+            self.build_similarity_matrix_parallel(components)
+        } else {
+            self.build_similarity_matrix_sequential(components)
+        }
+    }
+
+    /// Sequential similarity matrix construction
+    fn build_similarity_matrix_sequential(&self, components: &[RealHV]) -> Vec<Vec<f64>> {
         let n = components.len();
         let mut matrix = vec![vec![0.0; n]; n];
 
         for i in 0..n {
             for j in 0..n {
                 if i == j {
-                    // Self-coupling (prevents complete erasure)
                     matrix[i][j] = self.config.self_coupling;
                 } else {
-                    // Cosine similarity as coupling strength
                     let sim = components[i].similarity(&components[j]);
-
-                    // Normalize to [0, 1]
                     matrix[i][j] = ((sim as f64 + 1.0) / 2.0).max(0.0).min(1.0);
                 }
             }
@@ -265,46 +383,121 @@ impl ResonantPhiCalculator {
         matrix
     }
 
+    /// Parallel similarity matrix construction using rayon
+    ///
+    /// Parallelizes row computation - each row is computed independently
+    fn build_similarity_matrix_parallel(&self, components: &[RealHV]) -> Vec<Vec<f64>> {
+        let n = components.len();
+        let self_coupling = self.config.self_coupling;
+
+        (0..n)
+            .into_par_iter()
+            .map(|i| {
+                let mut row = vec![0.0; n];
+                for j in 0..n {
+                    if i == j {
+                        row[j] = self_coupling;
+                    } else {
+                        let sim = components[i].similarity(&components[j]);
+                        row[j] = ((sim as f64 + 1.0) / 2.0).max(0.0).min(1.0);
+                    }
+                }
+                row
+            })
+            .collect()
+    }
+
     /// Single resonance step: update all resonators based on current state
     ///
     /// Each resonator i updates as:
     /// new_i = damping × old_i + (1-damping) × Σⱼ similarity(i,j) × old_j
     fn resonance_step(&self, current_state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> Vec<RealHV> {
-        let _n = current_state.len();
+        let n = current_state.len();
+        let use_parallel = self.config.parallel && n >= self.config.parallel_threshold;
+
+        if use_parallel {
+            self.resonance_step_parallel(current_state, similarity_matrix)
+        } else {
+            self.resonance_step_sequential(current_state, similarity_matrix)
+        }
+    }
+
+    /// Sequential resonance step
+    fn resonance_step_sequential(&self, current_state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> Vec<RealHV> {
         let damping = self.config.damping;
+        let normalize = self.config.normalize;
 
         current_state
             .iter()
             .enumerate()
             .map(|(i, current_hv)| {
-                // Weighted sum of all other resonators
-                let mut coupled_sum = RealHV::zero(current_hv.dim());
-                let mut total_weight = 0.0;
-
-                for (j, other_hv) in current_state.iter().enumerate() {
-                    let weight = similarity_matrix[i][j];
-                    coupled_sum = coupled_sum.add(&other_hv.scale(weight as f32));
-                    total_weight += weight;
-                }
-
-                // Normalize by total weight
-                if total_weight > 0.0 {
-                    coupled_sum = coupled_sum.scale((1.0 / total_weight) as f32);
-                }
-
-                // Damped update: blend current state with coupled influence
-                let updated = current_hv
-                    .scale(damping as f32)
-                    .add(&coupled_sum.scale((1.0 - damping) as f32));
-
-                // Optional normalization
-                if self.config.normalize {
-                    updated.normalize()
-                } else {
-                    updated
-                }
+                self.update_single_resonator(i, current_hv, current_state, similarity_matrix, damping, normalize)
             })
             .collect()
+    }
+
+    /// Parallel resonance step using rayon
+    ///
+    /// Each node update is independent and can be computed in parallel
+    fn resonance_step_parallel(&self, current_state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> Vec<RealHV> {
+        let damping = self.config.damping;
+        let normalize = self.config.normalize;
+
+        (0..current_state.len())
+            .into_par_iter()
+            .map(|i| {
+                self.update_single_resonator(i, &current_state[i], current_state, similarity_matrix, damping, normalize)
+            })
+            .collect()
+    }
+
+    /// Update a single resonator based on coupling with all others
+    ///
+    /// SIMD-optimized version that avoids temporary allocations by working
+    /// directly on f32 arrays with 8-wide vectorization
+    #[inline]
+    fn update_single_resonator(
+        &self,
+        i: usize,
+        current_hv: &RealHV,
+        current_state: &[RealHV],
+        similarity_matrix: &[Vec<f64>],
+        damping: f64,
+        normalize: bool,
+    ) -> RealHV {
+        let dim = current_hv.dim();
+
+        // Pre-allocate output buffer (avoid repeated allocations)
+        let mut coupled_sum = vec![0.0f32; dim];
+        let mut total_weight = 0.0f64;
+
+        // SIMD-optimized weighted accumulation
+        for (j, other_hv) in current_state.iter().enumerate() {
+            let weight = similarity_matrix[i][j];
+            if weight > 0.0 {
+                simd_weighted_accumulate(&mut coupled_sum, &other_hv.values, weight as f32);
+                total_weight += weight;
+            }
+        }
+
+        // Normalize by total weight (in-place)
+        if total_weight > 1e-10 {
+            let inv_weight = (1.0 / total_weight) as f32;
+            for x in &mut coupled_sum {
+                *x *= inv_weight;
+            }
+        }
+
+        // SIMD-optimized damped blend: result = damping * current + (1-damping) * coupled
+        let mut result = vec![0.0f32; dim];
+        simd_damped_blend(&mut result, &current_hv.values, &coupled_sum, damping as f32);
+
+        // Optional normalization (SIMD-optimized)
+        if normalize {
+            simd_normalize_inplace(&mut result);
+        }
+
+        RealHV::from_values(result)
     }
 
     /// Compute system energy (measures stability)
@@ -313,19 +506,50 @@ impl ResonantPhiCalculator {
     /// Energy = -Σᵢⱼ similarity(i,j) × similarity(state_i, state_j)
     fn compute_energy(&self, state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> f64 {
         let n = state.len();
+        let use_parallel = self.config.parallel && n >= self.config.parallel_threshold;
+
+        if use_parallel {
+            self.compute_energy_parallel(state, similarity_matrix)
+        } else {
+            self.compute_energy_sequential(state, similarity_matrix)
+        }
+    }
+
+    /// Sequential energy computation
+    fn compute_energy_sequential(&self, state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> f64 {
+        let n = state.len();
         let mut energy = 0.0;
 
         for i in 0..n {
-            for j in (i+1)..n {
+            for j in (i + 1)..n {
                 let coupling = similarity_matrix[i][j];
                 let alignment = state[i].similarity(&state[j]) as f64;
-
-                // Energy decreases when aligned resonators are strongly coupled
                 energy -= coupling * alignment;
             }
         }
 
         energy
+    }
+
+    /// Parallel energy computation using rayon
+    ///
+    /// Parallelizes over rows, each row computes its contribution to energy
+    fn compute_energy_parallel(&self, state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> f64 {
+        let n = state.len();
+
+        // Compute partial sums in parallel (one per row)
+        (0..n)
+            .into_par_iter()
+            .map(|i| {
+                let mut row_energy = 0.0;
+                for j in (i + 1)..n {
+                    let coupling = similarity_matrix[i][j];
+                    let alignment = state[i].similarity(&state[j]) as f64;
+                    row_energy -= coupling * alignment;
+                }
+                row_energy
+            })
+            .sum()
     }
 
     /// Measure integration of stable state
@@ -344,12 +568,7 @@ impl ResonantPhiCalculator {
 
         // Compute maximum possible energy (worst case: all states opposite)
         // Max energy = -Σᵢⱼ similarity(i,j) × (-1) = Σᵢⱼ similarity(i,j)
-        let mut max_energy = 0.0;
-        for i in 0..n {
-            for j in (i+1)..n {
-                max_energy += similarity_matrix[i][j];
-            }
-        }
+        let max_energy = self.compute_total_similarity(similarity_matrix);
 
         // Compute minimum possible energy (best case: all states perfectly aligned)
         // Min energy = -Σᵢⱼ similarity(i,j) × (+1) = -Σᵢⱼ similarity(i,j)
@@ -363,6 +582,33 @@ impl ResonantPhiCalculator {
             normalized.max(0.0).min(1.0)
         } else {
             0.0
+        }
+    }
+
+    /// Compute total similarity (sum of upper triangle of similarity matrix)
+    fn compute_total_similarity(&self, similarity_matrix: &[Vec<f64>]) -> f64 {
+        let n = similarity_matrix.len();
+        let use_parallel = self.config.parallel && n >= self.config.parallel_threshold;
+
+        if use_parallel {
+            (0..n)
+                .into_par_iter()
+                .map(|i| {
+                    let mut row_sum = 0.0;
+                    for j in (i + 1)..n {
+                        row_sum += similarity_matrix[i][j];
+                    }
+                    row_sum
+                })
+                .sum()
+        } else {
+            let mut total = 0.0;
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    total += similarity_matrix[i][j];
+                }
+            }
+            total
         }
     }
 }

@@ -152,6 +152,7 @@ pub struct SymthaeaAwakening {
     qualia_generator: QualiaGenerator,
 
     /// Observability for tracing consciousness decisions
+    #[allow(dead_code)]
     observer: SharedObserver,
 }
 

@@ -2,6 +2,11 @@
  * Observability & Telemetry for Symthaea HLB
  *
  * This module provides visibility into Symthaea's internal dynamics:
+ */
+
+#![allow(dead_code, unused_variables)]
+
+/*!
  * - Router selection decisions (with UCB1 bandit stats)
  * - GWT workspace ignitions (coalition formation)
  * - Φ (Integrated Information) measurements over time
@@ -67,6 +72,9 @@ pub mod causal_explanation;  // Revolutionary Enhancement #4 Phase 4: Causal exp
 pub mod byzantine_defense;   // Revolutionary Enhancement #5 Phase 1: Meta-Learning Byzantine Defense (FIXED API)
 pub mod predictive_byzantine_defense;  // Revolutionary Enhancement #5 Phase 2: Real-time Predictive Defense
 pub mod ml_explainability;   // Revolutionary Enhancement #6: Universal Causal Explainability for ML Models (FIXED: Import structure + all API errors)
+pub mod resonant_pattern_matcher;  // HDC+LTC+Resonator integrated pattern matching
+pub mod resonant_causal;           // HDC+LTC+Resonator integrated causal analysis
+pub mod resonant_byzantine;        // HDC+LTC+Resonator integrated Byzantine defense
 
 pub use types::*;
 pub use trace_observer::TraceObserver;
@@ -117,6 +125,18 @@ pub use ml_explainability::{
     CausalModelLearner, LearningStats,
     InteractiveExplainer, ExplainQuery, ExplanationResult,
     CounterfactualExplanation, ExplainerStats,
+};
+pub use resonant_pattern_matcher::{
+    ResonantPatternMatcher, ResonantMatcherConfig,
+    LtcPatternState, ResonantMatchResult, ResonantMatcherStats,
+};
+pub use resonant_causal::{
+    ResonantCausalAnalyzer, ResonantCausalConfig,
+    LtcCausalState, CausalQueryResult, ResonantCausalStats,
+};
+pub use resonant_byzantine::{
+    ResonantByzantineDefender, ResonantDefenseConfig,
+    LtcThreatState, ThreatAlert, ResonantDefenseStats,
 };
 
 use anyhow::Result;

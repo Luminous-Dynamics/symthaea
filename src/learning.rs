@@ -39,8 +39,6 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
-
 use crate::learnable_ltc::{LearnableLTC, LearnableLTCConfig, LTCTrainingStats};
 use crate::hdc::real_hv::RealHV;
 use crate::hdc::HDC_DIMENSION;
