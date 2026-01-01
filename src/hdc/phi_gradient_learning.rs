@@ -560,6 +560,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "computationally expensive - run with cargo test --release --ignored"]
     fn test_extract_topology() {
         let config = PhiLearningConfig::default();
         let mut topology = PhiGradientTopology::new(12, HDC_DIMENSION, 4, 42, config);
