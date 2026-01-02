@@ -351,6 +351,13 @@ impl UnifiedConsciousnessEngine {
             CognitiveMode::Exploratory => 0.4,
             CognitiveMode::GlobalAwareness => 0.3,
             CognitiveMode::PhiGuided => 0.5,
+            // New modes
+            CognitiveMode::Vigilant => 0.85,        // High efficacy for quick response
+            CognitiveMode::Flow => 0.75,            // High efficacy in flow state
+            CognitiveMode::Meditative => 0.55,      // Moderate, introspective
+            CognitiveMode::Social => 0.45,          // Moderate, distributed attention
+            CognitiveMode::Dreaming => 0.25,        // Low efficacy during consolidation
+            CognitiveMode::Playful => 0.35,         // Lower efficacy, exploratory
         };
 
         // Epistemic from state stability

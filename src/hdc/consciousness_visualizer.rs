@@ -100,6 +100,13 @@ impl ConsciousnessVisualizer {
             CognitiveMode::Exploratory => ("✦", "Exploratory - Creative Divergence"),
             CognitiveMode::GlobalAwareness => ("❂", "Global Awareness - Expanded Mind"),
             CognitiveMode::PhiGuided => ("Φ", "Φ-Guided - Adaptive Learning"),
+            // New modes
+            CognitiveMode::Dreaming => ("☽", "Dreaming - Memory Consolidation"),
+            CognitiveMode::Meditative => ("☯", "Meditative - Inner Coherence"),
+            CognitiveMode::Flow => ("⚡", "Flow - Peak Performance"),
+            CognitiveMode::Social => ("♡", "Social - Empathic Resonance"),
+            CognitiveMode::Vigilant => ("⚠", "Vigilant - Threat Detection"),
+            CognitiveMode::Playful => ("✿", "Playful - Creative Exploration"),
         };
 
         format!("┌─ COGNITIVE MODE ───────────────────────────────────────┐\n\

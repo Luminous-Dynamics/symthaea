@@ -83,6 +83,13 @@ impl ResonanceMode {
             CognitiveMode::Exploratory => ResonanceMode::Relaxed,
             CognitiveMode::GlobalAwareness => ResonanceMode::Peak,
             CognitiveMode::PhiGuided => ResonanceMode::Conscious,
+            // New modes
+            CognitiveMode::Dreaming => ResonanceMode::Dreaming,
+            CognitiveMode::Meditative => ResonanceMode::Relaxed,
+            CognitiveMode::Flow => ResonanceMode::Peak,
+            CognitiveMode::Social => ResonanceMode::Conscious,
+            CognitiveMode::Vigilant => ResonanceMode::Focused,
+            CognitiveMode::Playful => ResonanceMode::Relaxed,
         }
     }
 
