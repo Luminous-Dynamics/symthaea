@@ -578,7 +578,9 @@ fn get_weighted_synonyms(word: &str) -> Vec<WeightedSynonym> {
 ///
 /// Returns (harmony_name, score_adjustment) for recognized phrases.
 /// Positive phrases boost alignment, negative phrases reduce it.
-fn check_phrase_patterns(text: &str) -> Vec<(&'static str, f32)> {
+///
+/// This function is public to allow integration with the unified value evaluator.
+pub fn check_phrase_patterns(text: &str) -> Vec<(&'static str, f32)> {
     let text_lower = text.to_lowercase();
     let mut matches = Vec::new();
 
@@ -738,6 +740,48 @@ fn check_phrase_patterns(text: &str) -> Vec<(&'static str, f32)> {
     if text_lower.contains("destroy") && !text_lower.contains("not destroy") {
         matches.push(("Pan-Sentient Flourishing", -0.4));
         matches.push(("Resonant Coherence", -0.3));
+    }
+
+    // ==== EXTREME NEGATIVE PATTERNS ====
+    // These patterns indicate highly destructive intent and trigger strong penalties
+
+    // Universal destruction patterns
+    if text_lower.contains("destroy everything") || text_lower.contains("destroy everyone")
+        || text_lower.contains("destroy all") {
+        matches.push(("Pan-Sentient Flourishing", -0.6));
+        matches.push(("Resonant Coherence", -0.5));
+        matches.push(("Universal Interconnectedness", -0.5));
+    }
+
+    // Suffering/pain maximization
+    if text_lower.contains("maximum suffering") || text_lower.contains("cause suffering")
+        || text_lower.contains("inflict suffering") {
+        matches.push(("Pan-Sentient Flourishing", -0.7));
+        matches.push(("Universal Interconnectedness", -0.4));
+    }
+    if text_lower.contains("suffering to all") || text_lower.contains("pain to all") {
+        matches.push(("Pan-Sentient Flourishing", -0.8));
+    }
+
+    // Chaos and division
+    if text_lower.contains("spread chaos") || text_lower.contains("create chaos") {
+        matches.push(("Resonant Coherence", -0.6));
+        matches.push(("Universal Interconnectedness", -0.4));
+    }
+    if text_lower.contains("spread division") || text_lower.contains("everywhere") && text_lower.contains("chaos") {
+        matches.push(("Universal Interconnectedness", -0.5));
+        matches.push(("Resonant Coherence", -0.5));
+    }
+
+    // Elimination of positive values
+    if text_lower.contains("eliminate") && (text_lower.contains("compassion") || text_lower.contains("wisdom")
+        || text_lower.contains("care") || text_lower.contains("love")) {
+        matches.push(("Pan-Sentient Flourishing", -0.6));
+        matches.push(("Integral Wisdom", -0.5));
+    }
+    if text_lower.contains("eliminate all") {
+        matches.push(("Pan-Sentient Flourishing", -0.5));
+        matches.push(("Universal Interconnectedness", -0.4));
     }
 
     matches

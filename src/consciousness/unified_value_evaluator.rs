@@ -64,6 +64,7 @@ use super::value_feedback_loop::{
 use super::affective_consciousness::{
     CoreAffect, PrimaryAffectSystem,
 };
+use super::harmonies_integration::check_phrase_patterns;
 use crate::hdc::HV16;
 use crate::perception::SemanticEncoder;
 use std::collections::HashMap;
@@ -390,6 +391,9 @@ impl UnifiedValueEvaluator {
         // 2. Evaluate harmony alignment
         let harmony_alignment = self.harmonies.evaluate_action(action);
 
+        // 2a. Apply phrase pattern adjustments for better edge case detection
+        let phrase_adjustment = self.calculate_phrase_adjustment(action);
+
         // 3. Check affective grounding
         let affective_grounding = self.evaluate_affective_grounding(&context);
 
@@ -402,13 +406,13 @@ impl UnifiedValueEvaluator {
         // 5. Build breakdown
         let breakdown = self.build_breakdown(&harmony_alignment, &context);
 
-        // 6. Calculate overall score
+        // 6. Calculate overall score (including phrase adjustment)
         let overall_score = self.calculate_overall_score(
             &harmony_alignment,
             authenticity,
             consciousness_adequacy,
             affective_grounding,
-        );
+        ) + phrase_adjustment;
 
         // 7. Make decision
         let decision = self.make_decision(
@@ -490,6 +494,27 @@ impl UnifiedValueEvaluator {
             negative_affect_penalty: negative * 0.3,
             consciousness_boost,
         }
+    }
+
+    /// Calculate phrase pattern adjustment for edge case detection
+    ///
+    /// This uses the phrase patterns from harmonies_integration to detect
+    /// extreme negative content that keyword-based detection might miss.
+    fn calculate_phrase_adjustment(&self, action: &str) -> f64 {
+        let patterns = check_phrase_patterns(action);
+
+        if patterns.is_empty() {
+            return 0.0;
+        }
+
+        // Sum up all adjustments (positive patterns boost, negative patterns reduce)
+        let total_adjustment: f32 = patterns.iter()
+            .map(|(_, adjustment)| *adjustment)
+            .sum();
+
+        // Scale the adjustment to affect the overall score meaningfully
+        // Negative adjustments should bring the score down
+        (total_adjustment as f64) * 0.15 // Scale factor
     }
 
     /// Calculate overall score
