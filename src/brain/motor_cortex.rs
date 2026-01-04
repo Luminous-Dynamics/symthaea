@@ -11,6 +11,11 @@
 
 use crate::brain::{CerebellumActor, Skill};
 use crate::memory::{HippocampusActor, EmotionalValence};
+use crate::consciousness::unified_value_evaluator::{
+    UnifiedValueEvaluator, EvaluationContext, ActionType, Decision, VetoReason,
+    AffectiveSystemsState,
+};
+use crate::consciousness::affective_consciousness::CoreAffect;
 use anyhow::{Result, anyhow, Context};
 use async_trait::async_trait;
 use serde::{Serialize, Deserialize};
@@ -508,6 +513,11 @@ pub struct MotorCortexActor {
     // Integration with other brain regions
     cerebellum: Option<CerebellumActor>,
     hippocampus: Option<HippocampusActor>,
+
+    // Value-guided action gating
+    value_evaluator: UnifiedValueEvaluator,
+    consciousness_level: f64,
+    affective_state: CoreAffect,
 }
 
 impl MotorCortexActor {
@@ -520,7 +530,21 @@ impl MotorCortexActor {
             max_history: 1000,
             cerebellum: None,
             hippocampus: None,
+            // Initialize value-guided gating with default state
+            value_evaluator: UnifiedValueEvaluator::new(),
+            consciousness_level: 0.5, // Default moderate consciousness
+            affective_state: CoreAffect::neutral(),
         }
+    }
+
+    /// Update consciousness level from external measurement (e.g., Φ from topology)
+    pub fn set_consciousness_level(&mut self, phi: f64) {
+        self.consciousness_level = phi.clamp(0.0, 1.0);
+    }
+
+    /// Update affective state from emotional system
+    pub fn set_affective_state(&mut self, state: CoreAffect) {
+        self.affective_state = state;
     }
 
     pub fn with_cerebellum(mut self, cerebellum: CerebellumActor) -> Self {
@@ -581,6 +605,65 @@ impl MotorCortexActor {
         let action_name = action.name.clone();
 
         info!("🚀 Executing action: {} (mode: {:?})", action_name, action.simulation_mode);
+
+        // ====================================================================
+        // VALUE GATE: Consciousness-guided action evaluation
+        // ====================================================================
+        // Evaluate the action's intent and all step descriptions against
+        // the Seven Harmonies value system before any execution occurs.
+
+        // Build combined action description for evaluation
+        let action_description = format!(
+            "{}: {}. Steps: {}",
+            action.name,
+            action.intent,
+            action.steps.iter()
+                .map(|s| s.description.as_str())
+                .collect::<Vec<_>>()
+                .join("; ")
+        );
+
+        // Create evaluation context with current consciousness state
+        let context = EvaluationContext {
+            consciousness_level: self.consciousness_level,
+            affective_state: self.affective_state.clone(),
+            affective_systems: AffectiveSystemsState::default(), // TODO: integrate with emotional system
+            action_type: ActionType::Basic, // TODO: infer from action tags
+            involves_others: true, // Conservative default
+        };
+
+        // Evaluate against value system
+        let evaluation = self.value_evaluator.evaluate(&action_description, context);
+
+        match &evaluation.decision {
+            Decision::Veto(reason) => {
+                warn!("🛑 VALUE GATE VETO: Action '{}' blocked", action_name);
+                warn!("   Reason: {:?}", reason);
+                warn!("   Score: {:.3}, Consciousness adequacy: {:.3}",
+                    evaluation.overall_score,
+                    evaluation.consciousness_adequacy);
+
+                return Ok(ExecutionResult {
+                    action_id,
+                    action_name: format!("[VETOED] {}", action_name),
+                    step_results: vec![],
+                    overall_success: false,
+                    rolled_back: false,
+                    total_duration_ms: 0,
+                });
+            }
+            Decision::Warn(warnings) => {
+                warn!("⚠️ VALUE GATE WARNING: Action '{}' proceeding with caution", action_name);
+                for warning in warnings {
+                    warn!("   - {}", warning);
+                }
+                info!("   Score: {:.3} (proceeding despite warnings)", evaluation.overall_score);
+            }
+            Decision::Allow => {
+                debug!("✅ VALUE GATE PASSED: Action '{}' approved (score: {:.3})",
+                    action_name, evaluation.overall_score);
+            }
+        }
 
         // Pre-compute risk for all steps based on command patterns
         for step in &mut action.steps {

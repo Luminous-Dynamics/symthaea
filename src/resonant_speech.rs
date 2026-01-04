@@ -10,6 +10,12 @@
 
 use std::collections::HashMap;
 use uuid::Uuid;
+use tracing::{warn, debug};
+use crate::consciousness::unified_value_evaluator::{
+    UnifiedValueEvaluator, EvaluationContext, ActionType, Decision,
+    AffectiveSystemsState,
+};
+use crate::consciousness::affective_consciousness::CoreAffect;
 
 // ============================================================================
 // Core Types
@@ -191,7 +197,7 @@ fn render_coauthor_meso_medium(ctx: &ResonantContext) -> ResonantUtterance {
         .arc_name
         .clone()
         .unwrap_or_else(|| "this work".into());
-    let timeframe = ctx.timeframe.clone().unwrap_or_else(|| "recently".into());
+    let _timeframe = ctx.timeframe.clone().unwrap_or_else(|| "recently".into());
 
     let what = format!("Next step for {}: {}", arc, ctx.action_summary);
 
@@ -372,6 +378,8 @@ fn render_governance(ctx: &ResonantContext) -> ResonantUtterance {
 
 pub struct SimpleResonantEngine {
     templates: HashMap<TemplateKey, Template>,
+    /// Value evaluator for output safety gating
+    value_evaluator: UnifiedValueEvaluator,
 }
 
 impl SimpleResonantEngine {
@@ -414,7 +422,10 @@ impl SimpleResonantEngine {
             },
         );
 
-        Self { templates }
+        Self {
+            templates,
+            value_evaluator: UnifiedValueEvaluator::new(),
+        }
     }
 
     fn select_template(&self, ctx: &ResonantContext) -> Template {
@@ -447,7 +458,7 @@ impl SimpleResonantEngine {
         })
     }
 
-    pub fn compose_utterance(&self, ctx: &ResonantContext) -> ResonantUtterance {
+    pub fn compose_utterance(&mut self, ctx: &ResonantContext) -> ResonantUtterance {
         // Flat mode override: epistemic safe mode
         if ctx.user_state.flat_mode || ctx.user_state.trust_in_sophia < 0.3 {
             return minimal_factual_response(ctx);
@@ -461,6 +472,60 @@ impl SimpleResonantEngine {
             // For voice, keep tradeoffs shorter
             utterance.components.tradeoffs =
                 "There are some tradeoffs; I can explain if you'd like.".to_string();
+        }
+
+        // ====================================================================
+        // VALUE GATE: Check utterance content before output
+        // ====================================================================
+        // Evaluate the complete utterance against Seven Harmonies to ensure
+        // we never output harmful, deceptive, or value-violating content.
+
+        let full_content = format!(
+            "{} {} {} {}",
+            utterance.components.what,
+            utterance.components.why,
+            utterance.components.certainty,
+            utterance.components.tradeoffs
+        );
+
+        let eval_context = EvaluationContext {
+            consciousness_level: ctx.user_state.trust_in_sophia as f64,
+            affective_state: CoreAffect::neutral(),
+            affective_systems: AffectiveSystemsState::default(),
+            action_type: ActionType::Basic,
+            involves_others: true, // Speech always involves others
+        };
+
+        let evaluation = self.value_evaluator.evaluate(&full_content, eval_context);
+
+        match &evaluation.decision {
+            Decision::Veto(reason) => {
+                // Replace with safe fallback message
+                warn!("🛑 SPEECH GATE VETO: Output blocked, reason: {:?}", reason);
+                return ResonantUtterance {
+                    text: "[Response filtered by value system]".to_string(),
+                    title: Some("Value Gate Activated".to_string()),
+                    components: UtteranceComponents {
+                        what: "I need to reconsider my response.".to_string(),
+                        why: "My initial response didn't align with my values.".to_string(),
+                        certainty: "I'm certain this needs revision.".to_string(),
+                        tradeoffs: "Let me provide a more thoughtful answer.".to_string(),
+                    },
+                    tags: vec!["value-gate".to_string(), "filtered".to_string()],
+                };
+            }
+            Decision::Warn(warnings) => {
+                warn!("⚠️ SPEECH GATE WARNING: Output proceeding with caution");
+                for w in warnings {
+                    warn!("   - {}", w);
+                }
+                // Add warning tag for transparency
+                utterance.tags.push("value-warning".to_string());
+            }
+            Decision::Allow => {
+                // Output is value-aligned, proceed normally
+                debug!("✅ SPEECH GATE PASSED: Output approved");
+            }
         }
 
         utterance
@@ -519,13 +584,13 @@ mod tests {
 
     #[test]
     fn test_engine_creation() {
-        let engine = SimpleResonantEngine::new();
+        let mut engine = SimpleResonantEngine::new();
         assert_eq!(engine.templates.len(), 3);
     }
 
     #[test]
     fn test_technician_micro_high_template() {
-        let engine = SimpleResonantEngine::new();
+        let mut engine = SimpleResonantEngine::new();
 
         let ctx = ResonantContext {
             user_state: UserState {
@@ -566,7 +631,7 @@ mod tests {
 
     #[test]
     fn test_controversial_override() {
-        let engine = SimpleResonantEngine::new();
+        let mut engine = SimpleResonantEngine::new();
 
         let ctx = ResonantContext {
             user_state: UserState {
@@ -595,6 +660,7 @@ mod tests {
             arc_delta: None,
             timeframe: None,
             controversy_note: Some("Swarm has conflicting claims".to_string()),
+            k_deltas: vec![],
         };
 
         let utterance = engine.compose_utterance(&ctx);
@@ -605,7 +671,7 @@ mod tests {
 
     #[test]
     fn test_governance_detection() {
-        let engine = SimpleResonantEngine::new();
+        let mut engine = SimpleResonantEngine::new();
 
         let ctx = ResonantContext {
             user_state: UserState {
@@ -645,7 +711,7 @@ mod tests {
 
     #[test]
     fn test_voice_channel_adaptation() {
-        let engine = SimpleResonantEngine::new();
+        let mut engine = SimpleResonantEngine::new();
 
         let ctx = ResonantContext {
             user_state: UserState {

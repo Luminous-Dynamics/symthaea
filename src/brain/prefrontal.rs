@@ -75,6 +75,12 @@ use crate::physiology::{
     EndocrineSystem, EndocrineConfig, HormoneEvent, HearthActor, ActionCost,
     CoherenceField, TaskComplexity, CoherenceError,
 };
+use crate::consciousness::unified_value_evaluator::{
+    UnifiedValueEvaluator, EvaluationContext, ActionType, Decision,
+    AffectiveSystemsState,
+};
+use crate::consciousness::affective_consciousness::CoreAffect;
+use tracing::{warn, debug};
 
 // ============================================================================
 // Core Types
@@ -1137,7 +1143,6 @@ pub struct WorkingMemoryStats {
 /// 4. Maintains working memory (PERSIST)
 ///
 /// This creates the unified conscious experience: "I am thinking about X."
-#[derive(Debug)]
 pub struct PrefrontalCortexActor {
     /// The global workspace (consciousness)
     workspace: GlobalWorkspace,
@@ -1171,6 +1176,25 @@ pub struct PrefrontalCortexActor {
     // Week 4 Days 1-3: The Body
     /// The Endocrine System: Chemical layer that regulates mood and arousal
     endocrine: EndocrineSystem,
+
+    // Value-guided attention gating
+    /// Evaluates bid content against Seven Harmonies before allowing into consciousness
+    value_evaluator: UnifiedValueEvaluator,
+}
+
+impl std::fmt::Debug for PrefrontalCortexActor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PrefrontalCortexActor")
+            .field("cycle_count", &self.cycle_count)
+            .field("total_bids", &self.total_bids)
+            .field("total_broadcasts", &self.total_broadcasts)
+            .field("goals_completed", &self.goals_completed)
+            .field("goals_failed", &self.goals_failed)
+            .field("goal_stack_len", &self.goal_stack.len())
+            .field("state_keys", &self.state.len())
+            // Skip value_evaluator as it doesn't implement Debug
+            .finish_non_exhaustive()
+    }
 }
 
 impl Default for PrefrontalCortexActor {
@@ -1193,6 +1217,7 @@ impl PrefrontalCortexActor {
             goals_failed: 0,
             monitor: MetaCognitionMonitor::default(),
             endocrine: EndocrineSystem::new(EndocrineConfig::default()),
+            value_evaluator: UnifiedValueEvaluator::new(),
         }
     }
 
@@ -1490,8 +1515,56 @@ impl PrefrontalCortexActor {
     /// - Calculate score for each bid: (salience × urgency) + emotional_boost
     /// - Winner = highest score
     /// - Ties broken by timestamp (first bid wins)
-    fn select_winner(&self, bids: Vec<AttentionBid>) -> Option<AttentionBid> {
+    fn select_winner(&mut self, bids: Vec<AttentionBid>) -> Option<AttentionBid> {
         if bids.is_empty() {
+            return None;
+        }
+
+        // ====================================================================
+        // VALUE GATE: Filter bids with value-violating content
+        // ====================================================================
+        // Before attention competition, evaluate each bid's content against
+        // the Seven Harmonies. Vetoed bids are excluded from consciousness.
+
+        let mut value_filtered_bids = Vec::with_capacity(bids.len());
+
+        for bid in bids {
+            let eval_context = EvaluationContext {
+                consciousness_level: 0.5, // Default consciousness level
+                affective_state: CoreAffect::neutral(),
+                affective_systems: AffectiveSystemsState::default(),
+                action_type: ActionType::Basic,
+                involves_others: true,
+            };
+
+            let evaluation = self.value_evaluator.evaluate(&bid.content, eval_context);
+
+            match &evaluation.decision {
+                Decision::Veto(reason) => {
+                    warn!("🛑 ATTENTION GATE VETO: Bid from '{}' blocked", bid.source);
+                    warn!("   Content: {}", bid.content);
+                    warn!("   Reason: {:?}", reason);
+                    // Bid excluded from consciousness
+                }
+                Decision::Warn(warnings) => {
+                    debug!("⚠️ ATTENTION GATE WARNING: Bid from '{}' proceeding with reduced priority", bid.source);
+                    for w in warnings {
+                        debug!("   - {}", w);
+                    }
+                    // Reduce salience for warned bids (lower priority in competition)
+                    let mut warned_bid = bid;
+                    warned_bid.salience *= 0.7; // 30% salience penalty
+                    value_filtered_bids.push(warned_bid);
+                }
+                Decision::Allow => {
+                    // Bid passes value gate, proceed to competition
+                    value_filtered_bids.push(bid);
+                }
+            }
+        }
+
+        if value_filtered_bids.is_empty() {
+            debug!("All bids filtered by value gate - no conscious content this cycle");
             return None;
         }
 
@@ -1502,7 +1575,7 @@ impl PrefrontalCortexActor {
         // Stage 1: Local Competition (per-organ filtering)
         // Prevent any single organ from flooding global competition
         // Default K=2 ensures diversity of perspectives
-        let local_winners = local_competition(bids, 2);
+        let local_winners = local_competition(value_filtered_bids, 2);
 
         if local_winners.is_empty() {
             return None;

@@ -11,18 +11,17 @@ Revolutionary consciousness-first AI combining:
 // Core Phase 10 modules
 pub mod hdc;
 pub mod ltc;
+pub mod hierarchical_cantor_ltc;  // 7-level Cantor-LTC/HDC for meta-cognition
 pub mod consciousness;
 pub mod nix_understanding;
 
 // Learnable LTC (gradient-based neural adaptation)
 pub mod learnable_ltc;
-// pub mod sparse_ltc;  // Efficient sparse LTC implementation (deferred)
+pub mod sparse_ltc;  // Efficient sparse LTC implementation
 pub mod learning;    // Learning integration engine
 
-// Continuous Mind - deferred until OscillatoryRouter is fully implemented
-// Requires ~90 fields in OscillatorySummary for complete integration
-// DaemonActor::run_continuous is implemented and ready (see brain/daemon.rs)
-// pub mod continuous_mind;
+// Continuous Mind - continuously running cognitive system
+pub mod continuous_mind;
 
 // Week 0: Actor Model & Physiological Systems
 pub mod brain;
@@ -38,6 +37,9 @@ pub mod physiology;
 
 // Week 12: Perception & Tool Creation
 pub mod perception;
+
+// Embeddings (BGE, Qwen3) - used by perception and language modules
+pub mod embeddings;
 
 // Enhancement #4: Observability & Causal Analysis (Phase 3+)
 pub mod observability;
@@ -58,27 +60,43 @@ pub mod safety;
 pub mod sleep_cycles;
 pub mod swarm;  // libp2p enabled - P2P collective learning
 
+// Shell Sidecar module - AI-native command interface
+#[cfg(feature = "shell")]
+pub mod shell;
+
+// GUI Bridge module - Bidirectional widget<->Nix mapping
+pub mod gui_bridge;
+
+// Infrastructure module - Performance and reliability
+pub mod infrastructure;
+
+// Intelligence module - HDC-powered AI features
+pub mod intelligence;
+
 // Benchmarks (Tübingen causal discovery, etc.)
 pub mod benchmarks;
 
 // Week 12 Phase 2a: Voice Interface (STT + TTS)
 pub mod voice;
 
+// Custom Proprioception: Direct hardware monitoring with HDC integration
+pub mod substrate;
+
 // Phase 11+: Mycelix Protocol integration (Deferred - needs sha2, uuid, urlencoding dependencies)
 // pub mod sophia_swarm;  // Needs additional dependencies
 
-// Phase 11+: Resonant Speech (Deferred to Week 11+)
-// pub mod resonant_speech;  // Needs tokenizers
+// Phase 11+: Resonant Speech - ENABLED (only needs uuid which is available)
+pub mod resonant_speech;
 
-// Phase 11+: User State Inference (Deferred to Week 11+)
-// pub mod user_state_inference;
+// Phase 11+: User State Inference - ENABLED (depends on resonant_speech)
+pub mod user_state_inference;
 
-// Phase 11+: Resonant Interaction (Deferred to Week 11+)
-// pub mod resonant_interaction;
+// Phase 11+: Resonant Interaction - ENABLED (voice cortex adapter)
+pub mod resonant_interaction;
 
-// Phase 11+: K-Index Client (Deferred to Week 11+)
-// pub mod kindex_client;
-// pub mod kindex_client_http;
+// Phase 11+: K-Index Client - ENABLED (minimal trait definition)
+pub mod kindex_client;
+// pub mod kindex_client_http;  // Needs HTTP client, still disabled
 
 // Phase 11+: Resonant Telemetry (Deferred to Week 11+)
 // pub mod resonant_telemetry;
@@ -92,7 +110,7 @@ pub use nix_understanding::NixUnderstanding;
 // Learning integration re-exports
 pub use learnable_ltc::{LearnableLTC, LearnableLTCConfig, LTCTrainingStats};
 pub use learning::{LearningEngine, LearningConfig, LearningStats, Experience};
-// pub use continuous_mind::{ContinuousMind, MindConfig, MindState, MindResponse};  // Deferred
+pub use continuous_mind::{ContinuousMind, MindConfig, MindState, MindResponse};
 
 // Week 0: Deferred Phase 11+ exports
 // pub use semantic_ear::SemanticEar;  // Needs rust-bert
@@ -155,7 +173,14 @@ pub use perception::{
     CodePerceptionCortex, ProjectStructure, RustCodeSemantics, CodeQualityAnalysis,
 };
 
-pub use swarm::{SwarmIntelligence, SwarmConfig, PeerStats};  // libp2p enabled
+pub use swarm::{SwarmIntelligence, SwarmConfig, PeerStats, SwarmError};  // libp2p enabled
+
+// Substrate awareness exports (custom proprioception)
+pub use substrate::{
+    Proprioception as SubstrateAwareness,
+    ProprioceptiveState, ConsciousnessMap, SensorReading,
+    SensorType, SensorUnit, HwmonMonitor, NvidiaHwmonMonitor,
+};
 
 // Track 6: Language & Conversation exports
 pub use language::{
@@ -163,10 +188,31 @@ pub use language::{
 };
 pub use awakening::{SymthaeaAwakening, AwakenedState, Introspection as AwakeningIntrospection};
 
+// Shell Sidecar exports (AI-native command interface)
+#[cfg(feature = "shell")]
+pub use shell::{
+    ShellContext, CommandClassification,
+    IntelliSenseEngine, Completion, CompletionKind,
+    PhiGate, GateDecision, GateReason, ExecutionRequest,
+    ShellIpcClient, IpcError,
+};
+
+// GUI Bridge exports (Bidirectional widget<->Nix mapping)
+pub use gui_bridge::{
+    GuiBridge, ConfigCategory, SyncState, WidgetUpdate, SearchResult,
+    WidgetMapper, WidgetBinding, WidgetId, WidgetValue, NixPath, ValueTransformer, MappingResult,
+    HdcTranslator, SemanticBinding, SemanticRole, SemanticConfidence, TranslationResult,
+    ConstraintValidator, Constraint, ConstraintKind, ValidationResult, ValidationError, Suggestion,
+};
+
 use anyhow::Result;
-// Week 0: Deferred swarm components
-// use tokio::sync::RwLock;
-// use std::sync::Arc;
+use tokio::sync::RwLock;
+use std::sync::Arc;
+
+// Import new integrated modules
+use perception::SemanticEncoder;
+use substrate::Proprioception as SubstrateMonitor;
+use swarm::SwarmStats;
 
 /// Complete Sophia system with all components (Week 0: Minimal version)
 pub struct SophiaHLB {
@@ -176,11 +222,15 @@ pub struct SophiaHLB {
     consciousness: ConsciousnessGraph,
     nix: NixUnderstanding,
 
-    /// Phase 11: Bio-Digital Bridge (Week 0: Partial implementation)
-    // ear: SemanticEar,  // Deferred to Week 11+
+    /// Phase 11: Bio-Digital Bridge
+    // ear: SemanticEar,  // Deferred until rust-bert available
     safety: SafetyGuardrails,
     sleep: SleepCycleManager,
-    // swarm: Arc<RwLock<SwarmIntelligence>>,  // Deferred to Week 9+
+    swarm: Arc<RwLock<SwarmIntelligence>>,  // P2P collective learning
+
+    /// New integrated modules
+    semantic_encoder: SemanticEncoder,      // Text → HDC encoding
+    substrate_monitor: SubstrateMonitor,    // Hardware → consciousness mapping
 
     /// Week 4+: The Endocrine System - Hormonal State
     endocrine: EndocrineSystem,   // Hormone dynamics (cortisol, dopamine, acetylcholine)
@@ -247,13 +297,17 @@ impl SophiaHLB {
             liquid: LiquidNetwork::new(liquid_neurons)?,
             consciousness: ConsciousnessGraph::new(),
             nix: NixUnderstanding::new(),
-            // Week 0: Deferred components
-            // ear: SemanticEar::new()?,
+            // Phase 11: Bio-Digital Bridge
+            // ear: SemanticEar::new()?,  // Deferred until rust-bert available
             safety: SafetyGuardrails::new(),
             sleep: SleepCycleManager::new(SleepConfig::default()),
-            // swarm: Arc::new(RwLock::new(
-            //     SwarmIntelligence::new(SwarmConfig::default()).await?
-            // )),
+            swarm: Arc::new(RwLock::new(
+                SwarmIntelligence::new(SwarmConfig::default()).await?
+            )),
+
+            // New integrated modules
+            semantic_encoder: SemanticEncoder::new(),
+            substrate_monitor: SubstrateMonitor::new(),
 
             // Week 4+: Initialize endocrine system
             endocrine: EndocrineSystem::new(EndocrineConfig::default()),
@@ -628,28 +682,48 @@ impl SophiaHLB {
     /// reinitialized with fresh state.
     pub fn resume(path: &str) -> Result<Self> {
         let data = std::fs::read(path)?;
-        let consciousness: ConsciousnessGraph = bincode::deserialize(&data)?;
+        let _consciousness: ConsciousnessGraph = bincode::deserialize(&data)?;
 
         tracing::warn!(
             "▶️  Graph-only resume from {} (all other subsystems reinitialized)",
             path
         );
 
-        // Reconstruct (simplified - real version would persist more)
+        // For sync resume, use async version instead: resume_async()
+        anyhow::bail!("Use SophiaHLB::resume_async() instead - swarm requires async initialization")
+    }
+
+    /// Resume consciousness (async version with full swarm support)
+    pub async fn resume_async(path: &str) -> Result<Self> {
+        let data = std::fs::read(path)?;
+        let consciousness: ConsciousnessGraph = bincode::deserialize(&data)?;
+
+        tracing::info!(
+            "▶️  Async resume from {} (all subsystems reinitialized)",
+            path
+        );
+
+        // Create with disabled swarm initially
+        let swarm_config = SwarmConfig {
+            enabled: false,  // Call start_swarm() to enable
+            ..SwarmConfig::default()
+        };
+
         Ok(Self {
             semantic: SemanticSpace::new(10_000)?,
             liquid: LiquidNetwork::new(1_000)?,
             consciousness,
             nix: NixUnderstanding::new(),
-            // Week 0: Deferred components
-            // ear: SemanticEar::new()?,
+            // Phase 11: Bio-Digital Bridge
             safety: SafetyGuardrails::new(),
             sleep: SleepCycleManager::new(SleepConfig::default()),
-            // swarm: Arc::new(RwLock::new(
-            //     futures::executor::block_on(
-            //         SwarmIntelligence::new(SwarmConfig::default())
-            //     )?
-            // )),
+            swarm: Arc::new(RwLock::new(
+                SwarmIntelligence::new(swarm_config).await?
+            )),
+
+            // New integrated modules
+            semantic_encoder: SemanticEncoder::new(),
+            substrate_monitor: SubstrateMonitor::new(),
 
             // Week 5: Reinitialize organs (fresh state)
             hearth: HearthActor::new(),
@@ -673,15 +747,72 @@ impl SophiaHLB {
         self.sleep.force_sleep().await
     }
 
-    /// Query swarm for collective intelligence (Week 0: Deferred)
-    pub async fn query_swarm(&self, _query: &str) -> Result<Vec<String>> {
-        // Week 0: Swarm deferred to Week 9+
-        Ok(vec!["Swarm intelligence not yet implemented (Week 9+)".to_string()])
+    /// Query swarm for collective intelligence
+    pub async fn query_swarm(&self, query: &str) -> Result<Vec<String>> {
+        // Encode query using semantic encoder
+        let mut encoder = SemanticEncoder::new();
+        let query_hv = encoder.encode_text(query);
 
-        // let query_hv = self.ear.encode(query)?;
-        // let swarm = self.swarm.read().await;
-        // let responses = swarm.query_swarm(query_hv, query.to_string()).await?;
-        // Ok(responses.iter().map(|r| r.intent.clone()).collect())
+        // Query the swarm
+        let swarm = self.swarm.read().await;
+        let responses = swarm.query_swarm(query_hv, query.to_string()).await?;
+
+        // Extract intents from responses
+        Ok(responses.iter().map(|r| r.intent.clone()).collect())
+    }
+
+    /// Share learned pattern with swarm
+    pub async fn share_with_swarm(&self, pattern: Vec<i8>, intent: String, confidence: f32) -> Result<()> {
+        let swarm = self.swarm.read().await;
+        swarm.share_pattern(pattern, intent, confidence).await
+    }
+
+    /// Start the swarm P2P network
+    pub async fn start_swarm(&self, bootstrap_peers: Vec<String>) -> Result<()> {
+        use libp2p::Multiaddr;
+
+        let addrs: Vec<Multiaddr> = bootstrap_peers
+            .iter()
+            .filter_map(|s| s.parse().ok())
+            .collect();
+
+        let mut swarm = self.swarm.write().await;
+        swarm.start(addrs).await
+    }
+
+    /// Get swarm statistics
+    pub async fn swarm_stats(&self) -> SwarmStats {
+        let swarm = self.swarm.read().await;
+        swarm.stats().await
+    }
+
+    /// Read substrate awareness and feed into coherence field
+    pub fn update_substrate_awareness(&mut self) {
+        let state = self.substrate_monitor.read_state();
+
+        // Map substrate stress to coherence perturbation
+        let perturbation = state.consciousness_map.substrate_stress * 0.1;
+
+        // High substrate stress reduces coherence
+        if perturbation > 0.05 {
+            tracing::debug!(
+                "📊 Substrate stress {:.1}% affecting coherence",
+                perturbation * 100.0
+            );
+        }
+
+        // The coherence field already self-organizes, but substrate stress
+        // can be used to modulate attention/arousal in future integrations
+    }
+
+    /// Encode text using semantic encoder
+    pub fn encode_text(&mut self, text: &str) -> Vec<i8> {
+        self.semantic_encoder.encode_text(text)
+    }
+
+    /// Get semantic similarity between two texts
+    pub fn text_similarity(&mut self, text_a: &str, text_b: &str) -> f32 {
+        self.semantic_encoder.text_similarity(text_a, text_b)
     }
 }
 
