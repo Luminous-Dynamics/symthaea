@@ -468,6 +468,9 @@ pub mod mycelix_bridge;
 /// Value Feedback Loop - Meta-cognitive learning from value decisions
 pub mod value_feedback_loop;
 
+/// Semantic Value Embedder - Real semantic embeddings for value alignment
+pub mod semantic_value_embedder;
+
 /// Value System Calibration Tests
 #[cfg(test)]
 mod value_system_tests;

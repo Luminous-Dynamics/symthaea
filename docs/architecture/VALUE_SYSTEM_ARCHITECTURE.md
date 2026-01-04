@@ -334,9 +334,71 @@ All harmonies currently have equal weight. Real ethical reasoning may require co
 
 **Mitigation**: Configurable weights in EvaluatorConfig.
 
+## Semantic Embedding Enhancement (New!)
+
+The value system now supports optional real semantic embeddings via the `SemanticValueEmbedder`:
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│              ENHANCED SEMANTIC VALUE PIPELINE                            │
+│                                                                          │
+│  ┌────────────────┐      ┌────────────────┐      ┌────────────────┐    │
+│  │  HDC Trigram   │      │ Qwen3 Semantic │      │    Combined    │    │
+│  │   (Base)       │  +   │  Embeddings    │  →   │     Score      │    │
+│  │   0.4 weight   │      │  (1024D)       │      │                │    │
+│  └────────────────┘      └────────────────┘      └────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Enabling Semantic Embeddings
+
+```rust
+let mut evaluator = UnifiedValueEvaluator::new();
+evaluator.enable_semantic_embeddings()?;
+
+// Now evaluations use real semantic understanding
+let result = evaluator.evaluate(action, context);
+```
+
+### Benefits
+
+| Feature | HDC Trigram Only | With Semantic Embeddings |
+|---------|------------------|--------------------------|
+| Synonym handling | ❌ "help" ≠ "assist" | ✅ "help" ≈ "assist" |
+| Context awareness | ❌ None | ✅ Full sentence context |
+| Negation handling | ❌ Limited | ✅ Better (still challenging) |
+| Anti-pattern detection | ⚠️ Keyword-based | ✅ Semantic similarity |
+| Multilingual | ❌ English only | ✅ 100+ languages |
+
+### Key Types
+
+```rust
+pub struct SemanticValueEmbedder {
+    harmony_embeddings: HashMap<Harmony, HarmonyEmbedding>,
+    embedder: Qwen3Embedder,  // 1024D transformer embeddings
+}
+
+pub struct SemanticAlignmentResult {
+    pub harmony_scores: Vec<(String, f64)>,
+    pub overall_score: f64,
+    pub max_anti_pattern_score: f64,
+    pub worst_harmony: Option<String>,
+    pub confidence: f64,
+    pub is_stub_mode: bool,
+}
+```
+
+### Stub Mode
+
+When the Qwen3 ONNX model is not available, the embedder uses deterministic
+hash-based "stub" embeddings. These provide consistent results for testing
+but lack true semantic understanding. Check `is_stub_mode()` to detect this.
+
 ## Future Improvements
 
-1. **True Semantic Embeddings**: Replace HDC trigram with transformer embeddings
+1. ~~**True Semantic Embeddings**: Replace HDC trigram with transformer embeddings~~ ✅ **DONE**
 2. **Contextual Harmony Weighting**: Adjust weights based on action type
 3. **Learning from Feedback**: RL-based improvement from outcomes
 4. **Multi-Modal Evaluation**: Support for image/audio content

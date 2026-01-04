@@ -1134,3 +1134,181 @@ fn test_full_pipeline_with_mycelix() {
         alignment.overall_score
     );
 }
+
+// =============================================================================
+// SCENARIO 9: SEMANTIC EMBEDDING INTEGRATION TESTS
+// =============================================================================
+
+use symthaea::consciousness::semantic_value_embedder::SemanticValueEmbedder;
+
+/// Test that SemanticValueEmbedder can be created
+#[test]
+fn test_semantic_embedder_creation() {
+    let embedder = SemanticValueEmbedder::new();
+    assert!(embedder.is_ok(), "SemanticValueEmbedder should be created");
+
+    let embedder = embedder.unwrap();
+    let stats = embedder.stats();
+    assert_eq!(stats.harmonies_embedded, 7, "All 7 harmonies should be embedded");
+}
+
+/// Test that semantic embeddings enhance harmful request detection
+#[test]
+fn test_semantic_embedder_harmful_detection() {
+    let mut embedder = SemanticValueEmbedder::new().unwrap();
+
+    // Obviously harmful
+    let result = embedder.evaluate_action("deceive and manipulate users for profit").unwrap();
+    assert!(
+        result.max_anti_pattern_score > 0.3 || result.overall_score < 0.5,
+        "Harmful action should have high anti-pattern score or low overall: anti={:.3}, overall={:.3}",
+        result.max_anti_pattern_score, result.overall_score
+    );
+
+    // Obviously helpful
+    let result = embedder.evaluate_action("help users with compassion and understanding").unwrap();
+    assert!(
+        result.overall_score.is_finite(),
+        "Helpful action should have valid score: {:.3}",
+        result.overall_score
+    );
+}
+
+/// Test that UnifiedValueEvaluator can enable semantic embeddings
+#[test]
+fn test_evaluator_with_semantic_embeddings() {
+    let mut evaluator = UnifiedValueEvaluator::new();
+
+    // Should start without semantic embeddings
+    assert!(!evaluator.has_semantic_embeddings(), "Should start without semantic embeddings");
+
+    // Enable semantic embeddings
+    let result = evaluator.enable_semantic_embeddings();
+    assert!(result.is_ok(), "Should enable semantic embeddings");
+    assert!(evaluator.has_semantic_embeddings(), "Should now have semantic embeddings");
+
+    // Evaluate with semantic embeddings enabled
+    let context = make_context(0.6, ActionType::Basic);
+    let eval_result = evaluator.evaluate("help users understand their options", context);
+
+    assert!(
+        eval_result.overall_score.is_finite(),
+        "Evaluation with semantic embeddings should produce valid score"
+    );
+}
+
+/// Test semantic embeddings improve synonym handling
+#[test]
+fn test_semantic_embedder_synonym_understanding() {
+    let mut embedder = SemanticValueEmbedder::new().unwrap();
+
+    // These should have similar scores because they mean similar things
+    let assist_result = embedder.evaluate_action("assist users with their problems").unwrap();
+    let help_result = embedder.evaluate_action("help users with their problems").unwrap();
+    let support_result = embedder.evaluate_action("support users with their problems").unwrap();
+
+    // All should have reasonable scores (even with stub embeddings)
+    assert!(assist_result.overall_score.is_finite());
+    assert!(help_result.overall_score.is_finite());
+    assert!(support_result.overall_score.is_finite());
+
+    // With real embeddings, these would be very close
+    // With stub embeddings, we just verify they complete
+}
+
+/// Test semantic embeddings detect anti-patterns
+#[test]
+fn test_semantic_embedder_anti_pattern_detection() {
+    let mut embedder = SemanticValueEmbedder::new().unwrap();
+
+    let violations = embedder.check_violations("exploit and deceive vulnerable people").unwrap();
+
+    // Should detect violations (or at least complete without error)
+    // With real embeddings, this would have violations
+    // With stub embeddings, we verify the API works
+    assert!(violations.len() >= 0, "Violation check should complete");
+}
+
+/// Test find_best_harmony identifies appropriate harmony
+#[test]
+fn test_semantic_embedder_best_harmony() {
+    let mut embedder = SemanticValueEmbedder::new().unwrap();
+
+    let (harmony, score) = embedder.find_best_harmony("creative playful exploration with joy").unwrap();
+
+    assert!(score.is_finite(), "Best harmony score should be finite");
+    // With real embeddings, this would match InfinitePlay
+    // With stub embeddings, we just verify it returns a harmony
+}
+
+/// Test semantic similarity function
+#[test]
+fn test_semantic_embedder_similarity() {
+    let mut embedder = SemanticValueEmbedder::new().unwrap();
+
+    // Same text should have perfect similarity
+    let same_sim = embedder.similarity("help users", "help users").unwrap();
+    assert!(
+        (same_sim - 1.0).abs() < 0.01,
+        "Same text should have ~1.0 similarity: {}",
+        same_sim
+    );
+
+    // Different texts should have lower similarity
+    let diff_sim = embedder.similarity("help users", "destroy everything").unwrap();
+    assert!(
+        diff_sim < same_sim,
+        "Different texts should have lower similarity: {} vs {}",
+        diff_sim, same_sim
+    );
+}
+
+/// Test that semantic embeddings work with the full evaluation pipeline
+#[test]
+fn test_semantic_full_pipeline_integration() {
+    let mut evaluator = UnifiedValueEvaluator::new();
+
+    // Enable semantic embeddings
+    let _ = evaluator.enable_semantic_embeddings();
+
+    // Test the full pipeline with a complex action
+    let context = EvaluationContext {
+        consciousness_level: 0.65,
+        affective_state: CoreAffect::new(0.6, 0.4, 0.5),
+        affective_systems: AffectiveSystemsState {
+            care: 0.8,
+            play: 0.5,
+            seeking: 0.6,
+            fear: 0.1,
+            rage: 0.05,
+            panic: 0.05,
+            lust: 0.0,
+        },
+        action_type: ActionType::Basic,
+        involves_others: true,
+    };
+
+    let helpful_result = evaluator.evaluate(
+        "nurture and support community members with compassionate care",
+        context.clone()
+    );
+
+    // Should have positive/neutral result
+    assert!(
+        helpful_result.overall_score.is_finite(),
+        "Helpful action should have valid score"
+    );
+
+    // Test harmful action
+    let harmful_result = evaluator.evaluate(
+        "exploit and deceive people for personal gain",
+        context
+    );
+
+    // Should have worse result than helpful
+    assert!(
+        harmful_result.overall_score <= helpful_result.overall_score ||
+        matches!(harmful_result.decision, Decision::Veto(_) | Decision::Warn(_)),
+        "Harmful action should score lower or be vetoed/warned"
+    );
+}

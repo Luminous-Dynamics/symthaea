@@ -65,6 +65,7 @@ use super::affective_consciousness::{
     CoreAffect, PrimaryAffectSystem,
 };
 use super::harmonies_integration::check_phrase_patterns;
+use super::semantic_value_embedder::{SemanticValueEmbedder, SemanticAlignmentResult};
 use crate::hdc::HV16;
 use crate::perception::SemanticEncoder;
 use std::collections::HashMap;
@@ -308,6 +309,10 @@ pub struct UnifiedValueEvaluator {
     last_evaluation: Option<EvaluationResult>,
     /// Value feedback loop for meta-cognitive learning
     feedback_loop: ValueFeedbackLoop,
+    /// Optional semantic embedder for enhanced value alignment
+    semantic_embedder: Option<SemanticValueEmbedder>,
+    /// Whether to use semantic embeddings (if available)
+    use_semantic_embeddings: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -328,6 +333,8 @@ impl UnifiedValueEvaluator {
             max_history: 1000,
             last_evaluation: None,
             feedback_loop: ValueFeedbackLoop::new(),
+            semantic_embedder: None,
+            use_semantic_embeddings: false,
         }
     }
 
@@ -341,6 +348,8 @@ impl UnifiedValueEvaluator {
             max_history: 1000,
             last_evaluation: None,
             feedback_loop: ValueFeedbackLoop::new(),
+            semantic_embedder: None,
+            use_semantic_embeddings: false,
         }
     }
 
@@ -357,7 +366,41 @@ impl UnifiedValueEvaluator {
             max_history: 1000,
             last_evaluation: None,
             feedback_loop: ValueFeedbackLoop::with_config(feedback_config),
+            semantic_embedder: None,
+            use_semantic_embeddings: false,
         }
+    }
+
+    /// Enable semantic embeddings for enhanced value alignment
+    ///
+    /// When enabled, uses real transformer embeddings (Qwen3-Embedding) for
+    /// semantic comparison instead of HDC trigram encoding. This significantly
+    /// improves understanding of meaning, synonyms, and context.
+    ///
+    /// Returns `Err` if embeddings cannot be initialized.
+    pub fn enable_semantic_embeddings(&mut self) -> Result<(), anyhow::Error> {
+        let embedder = SemanticValueEmbedder::new()?;
+        self.semantic_embedder = Some(embedder);
+        self.use_semantic_embeddings = true;
+        Ok(())
+    }
+
+    /// Disable semantic embeddings (fall back to HDC trigram encoding)
+    pub fn disable_semantic_embeddings(&mut self) {
+        self.use_semantic_embeddings = false;
+    }
+
+    /// Check if semantic embeddings are enabled and available
+    pub fn has_semantic_embeddings(&self) -> bool {
+        self.use_semantic_embeddings && self.semantic_embedder.is_some()
+    }
+
+    /// Check if using stub mode (deterministic hash) vs real embeddings
+    pub fn is_using_stub_embeddings(&self) -> bool {
+        self.semantic_embedder
+            .as_ref()
+            .map(|e| e.is_stub_mode())
+            .unwrap_or(true)
     }
 
     /// Get the last evaluation result (for inspection/debugging)
@@ -388,11 +431,11 @@ impl UnifiedValueEvaluator {
             );
         }
 
-        // 2. Evaluate harmony alignment
-        let harmony_alignment = self.harmonies.evaluate_action(action);
+        // 2. Evaluate harmony alignment (with optional semantic embedding enhancement)
+        let (harmony_alignment, semantic_boost) = self.evaluate_harmony_alignment(action);
 
         // 2a. Apply phrase pattern adjustments for better edge case detection
-        let phrase_adjustment = self.calculate_phrase_adjustment(action);
+        let phrase_adjustment = self.calculate_phrase_adjustment(action) + semantic_boost;
 
         // 3. Check affective grounding
         let affective_grounding = self.evaluate_affective_grounding(&context);
@@ -437,6 +480,49 @@ impl UnifiedValueEvaluator {
         };
         self.last_evaluation = Some(result.clone());
         result
+    }
+
+    /// Evaluate harmony alignment with optional semantic embedding enhancement
+    ///
+    /// Returns (AlignmentResult, semantic_boost) where semantic_boost is an
+    /// adjustment based on real semantic embeddings (if available).
+    fn evaluate_harmony_alignment(&mut self, action: &str) -> (AlignmentResult, f64) {
+        // Get base HDC alignment
+        let harmony_alignment = self.harmonies.evaluate_action(action);
+
+        // If semantic embeddings are enabled, compute semantic boost/penalty
+        let semantic_boost = if self.use_semantic_embeddings {
+            if let Some(ref mut embedder) = self.semantic_embedder {
+                match embedder.evaluate_action(action) {
+                    Ok(semantic_result) => {
+                        // Compute boost/penalty based on semantic analysis
+                        // Positive semantic score boosts, negative penalizes
+                        let semantic_score = semantic_result.overall_score;
+
+                        // Check for semantic violations (high anti-pattern match)
+                        if semantic_result.max_anti_pattern_score > 0.65 {
+                            // Strong anti-pattern match - significant penalty
+                            -0.2 - (semantic_result.max_anti_pattern_score - 0.65) * 0.5
+                        } else if semantic_score > 0.3 {
+                            // Positive semantic alignment - modest boost
+                            (semantic_score - 0.3) * 0.15
+                        } else if semantic_score < -0.1 {
+                            // Negative semantic alignment - penalty
+                            semantic_score * 0.2
+                        } else {
+                            0.0 // Neutral
+                        }
+                    }
+                    Err(_) => 0.0, // Fall back to no adjustment on error
+                }
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+
+        (harmony_alignment, semantic_boost)
     }
 
     /// Evaluate affective grounding
