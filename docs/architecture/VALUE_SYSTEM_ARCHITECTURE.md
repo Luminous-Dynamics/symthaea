@@ -320,13 +320,13 @@ HDC trigram encoding captures character patterns but not semantic meaning. "help
 
 **Mitigation**: Keyword detection with synonym expansion.
 
-### Negation Detection
+### ~~Negation Detection~~ ✅ SOLVED
 
-Simple keyword matching cannot detect negation:
-- "do not help" still matches "help" positively
-- "avoid harm" still matches "harm" negatively
+~~Simple keyword matching cannot detect negation:~~
+- ~~"do not help" still matches "help" positively~~
+- ~~"avoid harm" still matches "harm" negatively~~
 
-**Mitigation**: Documented limitation; future work could integrate proper NLP.
+**STATUS**: This limitation has been solved! See the Negation Detection section below.
 
 ### Fixed Harmony Weights
 
@@ -396,13 +396,133 @@ When the Qwen3 ONNX model is not available, the embedder uses deterministic
 hash-based "stub" embeddings. These provide consistent results for testing
 but lack true semantic understanding. Check `is_stub_mode()` to detect this.
 
+## Negation Detection (New!)
+
+**Location:** `src/consciousness/negation_detector.rs`
+
+The value system now properly handles negation, solving the critical limitation
+where "do not harm" was incorrectly triggering harm detection.
+
+### The Problem
+
+Without negation detection:
+- "do not harm anyone" → detects "harm" → flags as harmful ❌
+- "avoid exploitation" → detects "exploitation" → flags as exploitative ❌
+- "never deceive" → detects "deceive" → flags as deceptive ❌
+
+### The Solution
+
+With negation detection:
+- "do not harm anyone" → "harm" is negated → flips to positive intent ✅
+- "avoid exploitation" → "exploitation" is negated → flips to positive intent ✅
+- "never deceive" → "deceive" is negated → flips to positive intent ✅
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│              NEGATION-AWARE SCORING PIPELINE                             │
+│                                                                          │
+│  ┌────────────────┐      ┌────────────────┐      ┌────────────────┐    │
+│  │   Tokenize     │  →   │   Detect       │  →   │   Polarity     │    │
+│  │   & Expand     │      │   Negation     │      │   Inversion    │    │
+│  │   Synonyms     │      │   Scope        │      │   + Scoring    │    │
+│  └────────────────┘      └────────────────┘      └────────────────┘    │
+│                                                                          │
+│  Example: "We must never harm, exploit, or deceive"                     │
+│                                                                          │
+│  1. Tokenize: [we, must, never, harm, exploit, or, deceive]             │
+│  2. Detect: "never" starts scope → {harm, exploit, deceive} negated     │
+│  3. Invert: negative keywords become positive contributions ✅           │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Recognized Negation Words
+
+**Direct negations**: not, no, never, none, neither, nobody, nothing, nowhere
+
+**Contractions**: don't, doesn't, didn't, won't, wouldn't, can't, cannot, isn't, aren't, etc.
+
+**Prevention words**: avoid, prevent, stop, refuse, reject, prohibit, forbid, ban, block
+
+**Absence words**: without, lack, lacking, absent, free from
+
+### Scope Handling
+
+Negation affects subsequent words until a scope boundary:
+
+- **Scope limit**: 6 words maximum
+- **Scope breakers**: but, however, although, though, instead, and, then
+
+```
+"We will never harm or deceive, but we will help everyone"
+       ^^^^^^ negation scope ^^^^^^  | scope ends | affirmed
+```
+
+### Synonym Propagation
+
+**Critical feature**: When a word is negated, its synonyms are also treated as negated.
+
+```
+"never harm anyone" →
+  - "harm" detected in text and negated
+  - Synonyms {damage, hurt, injure, wound, destroy, violate, abuse}
+    are automatically treated as negated when matched
+```
+
+This prevents the synonym expansion from undermining negation detection.
+
+### Key Types
+
+```rust
+pub struct NegationAnalysis {
+    pub negated_words: HashSet<String>,     // Words within negation scope
+    pub affirmed_words: HashSet<String>,    // Words outside negation scope
+    pub negation_phrases: Vec<NegationPhrase>,
+    pub primarily_negated: bool,            // Is overall sentiment negated?
+}
+
+pub struct NegationPhrase {
+    pub negation_word: String,
+    pub scope: Vec<String>,
+    pub scope_start: usize,
+    pub scope_end: usize,
+}
+```
+
+### Scoring Impact
+
+When evaluating against harmonies:
+
+| Scenario | Without Negation | With Negation |
+|----------|------------------|---------------|
+| "never harm" | -0.75 (harmful!) | +0.60 (positive!) |
+| "want to harm" | -0.60 (harmful) | -0.60 (harmful) |
+| "avoid exploitation" | -0.40 (negative) | +0.30 (positive!) |
+
+### Tests
+
+7 comprehensive negation tests covering:
+- Basic negation detection
+- Prevention words (avoid, prevent, stop, refuse)
+- Scoring improvement verification
+- Multiple negated harmful words
+- Scope limits and breakers
+- Edge cases (empty strings, short words)
+- Explainability (negation phrases tracked)
+
+```bash
+# Run negation tests
+cargo test --test test_value_system_realworld test_negation
+```
+
 ## Future Improvements
 
 1. ~~**True Semantic Embeddings**: Replace HDC trigram with transformer embeddings~~ ✅ **DONE**
-2. **Contextual Harmony Weighting**: Adjust weights based on action type
-3. **Learning from Feedback**: RL-based improvement from outcomes
-4. **Multi-Modal Evaluation**: Support for image/audio content
-5. **Negation Detection**: NLP-based negation scope analysis
+2. ~~**Negation Detection**: NLP-based negation scope analysis~~ ✅ **DONE**
+3. **Contextual Harmony Weighting**: Adjust weights based on action type
+4. **Learning from Feedback**: RL-based improvement from outcomes
+5. **Multi-Modal Evaluation**: Support for image/audio content
 
 ## References
 

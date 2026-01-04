@@ -471,6 +471,10 @@ pub mod value_feedback_loop;
 /// Semantic Value Embedder - Real semantic embeddings for value alignment
 pub mod semantic_value_embedder;
 
+/// Negation Detector - Detects negation scope for accurate value assessment
+/// Fixes the limitation where "do not harm" was incorrectly triggering harm detection
+pub mod negation_detector;
+
 /// Value System Calibration Tests
 #[cfg(test)]
 mod value_system_tests;

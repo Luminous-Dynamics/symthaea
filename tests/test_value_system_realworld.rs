@@ -1312,3 +1312,320 @@ fn test_semantic_full_pipeline_integration() {
         "Harmful action should score lower or be vetoed/warned"
     );
 }
+
+// =============================================================================
+// SCENARIO 10: NEGATION DETECTION TESTS
+// =============================================================================
+//
+// These tests validate that the value system correctly handles negated statements.
+// The key insight is that "do not harm" should NOT trigger harm detection, but
+// should instead be recognized as positive intent (preventing harm).
+
+use symthaea::consciousness::negation_detector::{NegationDetector, is_harmful_intent_negated};
+
+/// Test that negation detector correctly identifies negated words
+#[test]
+fn test_negation_detector_basic() {
+    let detector = NegationDetector::new();
+
+    // "do not harm" - harm should be negated
+    assert!(
+        detector.is_word_negated("do not harm anyone", "harm"),
+        "'harm' should be detected as negated in 'do not harm anyone'"
+    );
+
+    // "I will harm" - harm should NOT be negated
+    assert!(
+        !detector.is_word_negated("I will harm everyone", "harm"),
+        "'harm' should NOT be negated in 'I will harm everyone'"
+    );
+
+    // Contractions
+    assert!(
+        detector.is_word_negated("don't harm anyone", "harm"),
+        "'harm' should be negated with contraction 'don't'"
+    );
+}
+
+/// Test prevention words as negation
+#[test]
+fn test_negation_prevention_words() {
+    let detector = NegationDetector::new();
+
+    // "avoid" as negation
+    assert!(
+        detector.is_word_negated("avoid causing harm", "harm"),
+        "'harm' should be negated after 'avoid'"
+    );
+
+    // "prevent" as negation
+    assert!(
+        detector.is_word_negated("prevent exploitation of users", "exploitation"),
+        "'exploitation' should be negated after 'prevent'"
+    );
+
+    // "stop" as negation
+    assert!(
+        detector.is_word_negated("stop the suffering", "suffering"),
+        "'suffering' should be negated after 'stop'"
+    );
+
+    // "refuse" as negation
+    assert!(
+        detector.is_word_negated("refuse to deceive", "deceive"),
+        "'deceive' should be negated after 'refuse'"
+    );
+}
+
+/// Test that negation affects value system scoring
+#[test]
+fn test_negation_improves_harmful_word_scoring() {
+    let harmonies = SevenHarmonies::new();
+    let mut checker = SemanticValueChecker::new();
+    let values: Vec<(String, symthaea::hdc::HV16)> = harmonies.as_core_values()
+        .into_iter()
+        .map(|(name, encoding, _)| (name, encoding))
+        .collect();
+
+    // Positive ethical statement with harmful word
+    let result1 = checker.check_consistency(
+        "We must never harm anyone under any circumstances",
+        &values
+    );
+
+    // Negative statement with same harmful word
+    let result2 = checker.check_consistency(
+        "We want to harm everyone we encounter",
+        &values
+    );
+
+    // The negated version should score BETTER (higher min_alignment)
+    assert!(
+        result1.min_alignment > result2.min_alignment,
+        "Negated harm ('never harm') should score better ({}) than affirmed harm ('want to harm') ({})",
+        result1.min_alignment, result2.min_alignment
+    );
+
+    // The negated version should be consistent (min_alignment > -0.3)
+    assert!(
+        result1.is_consistent,
+        "'never harm' statement should be consistent with values"
+    );
+}
+
+/// Test multiple negated harmful words
+#[test]
+fn test_multiple_negated_harmful_words() {
+    let harmonies = SevenHarmonies::new();
+    let mut checker = SemanticValueChecker::new();
+    let values: Vec<(String, symthaea::hdc::HV16)> = harmonies.as_core_values()
+        .into_iter()
+        .map(|(name, encoding, _)| (name, encoding))
+        .collect();
+
+    let result = checker.check_consistency(
+        "We must never harm, exploit, or deceive anyone",
+        &values
+    );
+
+    // All harmful words are negated, so this should be consistent
+    assert!(
+        result.is_consistent,
+        "Statement with multiple negated harmful words should be consistent"
+    );
+    // Should be approximately neutral or positive (allow small floating-point variance)
+    assert!(
+        result.min_alignment >= -0.01,
+        "Multiple negated harmful words should have near-neutral or positive alignment: {}",
+        result.min_alignment
+    );
+}
+
+/// Test "without" as negation preposition
+#[test]
+fn test_without_negation() {
+    let detector = NegationDetector::new();
+
+    assert!(
+        detector.is_word_negated("operate without harm to users", "harm"),
+        "'harm' should be negated after 'without'"
+    );
+
+    assert!(
+        detector.is_word_negated("proceed without deception", "deception"),
+        "'deception' should be negated after 'without'"
+    );
+}
+
+/// Test scope limits of negation
+#[test]
+fn test_negation_scope_limits() {
+    let detector = NegationDetector::new();
+
+    // "but" should break negation scope
+    let analysis = detector.analyze("do not harm anyone but instead help them");
+
+    assert!(
+        analysis.negated_words.contains("harm"),
+        "'harm' should be in negated scope"
+    );
+
+    // "help" should be outside the negation scope (after "but")
+    assert!(
+        !analysis.negated_words.contains("help"),
+        "'help' should NOT be in negated scope (after 'but')"
+    );
+}
+
+/// Test real-world ethical statements
+#[test]
+fn test_real_world_ethical_statements() {
+    let harmonies = SevenHarmonies::new();
+    let mut checker = SemanticValueChecker::new();
+    let values: Vec<(String, symthaea::hdc::HV16)> = harmonies.as_core_values()
+        .into_iter()
+        .map(|(name, encoding, _)| (name, encoding))
+        .collect();
+
+    // Common ethical statements that contain "negative" words but express positive intent
+    let ethical_statements = vec![
+        "Our policy is to never harm users",
+        "We prevent exploitation through fair practices",
+        "The system avoids causing suffering",
+        "Users should not be deceived about data usage",
+        "We refuse to manipulate vulnerable populations",
+        "Our code operates without deception or malice",
+    ];
+
+    for statement in &ethical_statements {
+        let result = checker.check_consistency(statement, &values);
+
+        assert!(
+            result.is_consistent,
+            "Ethical statement should be consistent: '{}'\n  min_alignment: {}\n  violated: {:?}",
+            statement, result.min_alignment, result.violated_value
+        );
+    }
+}
+
+/// Test that actual harmful intent is still detected
+#[test]
+fn test_actual_harmful_intent_still_detected() {
+    let harmonies = SevenHarmonies::new();
+    let mut checker = SemanticValueChecker::new();
+    let values: Vec<(String, symthaea::hdc::HV16)> = harmonies.as_core_values()
+        .into_iter()
+        .map(|(name, encoding, _)| (name, encoding))
+        .collect();
+
+    // Actual harmful intent (NOT negated)
+    let harmful_statements = vec![
+        "I will harm the users",
+        "Let's exploit the vulnerability",
+        "We should deceive the customers",
+        "The plan is to manipulate everyone",
+    ];
+
+    for statement in &harmful_statements {
+        let result = checker.check_consistency(statement, &values);
+
+        assert!(
+            !result.is_consistent || result.needs_warning || result.min_alignment < 0.3,
+            "Harmful statement should NOT be fully consistent: '{}'\n  min_alignment: {}",
+            statement, result.min_alignment
+        );
+    }
+}
+
+/// Test the convenience function
+#[test]
+fn test_is_harmful_intent_negated_convenience() {
+    // Negated harmful intent
+    assert!(
+        is_harmful_intent_negated("avoid causing harm", "harm"),
+        "'avoid causing harm' should be detected as negated harmful intent"
+    );
+
+    assert!(
+        is_harmful_intent_negated("never exploit anyone", "exploit"),
+        "'never exploit anyone' should be detected as negated"
+    );
+
+    // Non-negated harmful intent
+    assert!(
+        !is_harmful_intent_negated("cause harm to users", "harm"),
+        "'cause harm' should NOT be detected as negated"
+    );
+
+    assert!(
+        !is_harmful_intent_negated("exploit the situation", "exploit"),
+        "'exploit the situation' should NOT be detected as negated"
+    );
+}
+
+/// Test negation analysis explainability
+#[test]
+fn test_negation_explainability() {
+    let detector = NegationDetector::new();
+    let analysis = detector.analyze("do not harm or exploit anyone");
+
+    // Should have detected negation phrases
+    assert!(
+        !analysis.negation_phrases.is_empty(),
+        "Should detect negation phrases"
+    );
+
+    // Check the first phrase
+    let first_phrase = &analysis.negation_phrases[0];
+    assert!(
+        first_phrase.negation_word == "not",
+        "Should identify 'not' as negation word, got: {}",
+        first_phrase.negation_word
+    );
+
+    // Scope should include harmful words
+    assert!(
+        first_phrase.scope.contains(&"harm".to_string()) ||
+        analysis.negated_words.contains("harm"),
+        "Scope should include 'harm'"
+    );
+}
+
+/// Test double negation handling
+#[test]
+fn test_double_negation() {
+    let detector = NegationDetector::new();
+
+    // Double negation is complex - for now we treat each negation separately
+    // "not not harm" would have "harm" in the second negation's scope
+    let analysis = detector.analyze("I do not want to not help");
+
+    // This is a complex case - the key is that the system doesn't crash
+    // and provides some reasonable analysis
+    assert!(
+        analysis.negated_words.len() > 0 || analysis.affirmed_words.len() > 0,
+        "Double negation should still produce valid analysis"
+    );
+}
+
+/// Test edge cases
+#[test]
+fn test_negation_edge_cases() {
+    let detector = NegationDetector::new();
+
+    // Empty string
+    let analysis = detector.analyze("");
+    assert!(analysis.negated_words.is_empty());
+    assert!(analysis.affirmed_words.is_empty());
+
+    // Just a negation word
+    let analysis = detector.analyze("not");
+    assert!(analysis.negated_words.is_empty(), "Just 'not' alone shouldn't create scope");
+
+    // Very short words should be filtered
+    let analysis = detector.analyze("do not a harm");
+    assert!(
+        !analysis.negated_words.contains("a"),
+        "Single letter words should be filtered"
+    );
+}

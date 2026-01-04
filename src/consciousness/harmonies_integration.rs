@@ -11,6 +11,7 @@
 
 use super::seven_harmonies::{SevenHarmonies, Harmony, AlignmentResult};
 use super::narrative_self::{AutobiographicalSelf, CoreValue};
+use super::negation_detector::{NegationDetector, NegationAnalysis};
 use crate::hdc::HV16;
 use crate::perception::SemanticEncoder;
 use std::collections::{HashMap, HashSet};
@@ -809,6 +810,8 @@ pub struct SemanticValueChecker {
     positive_keywords: HashMap<String, HashSet<String>>,
     /// Anti-pattern keywords for each harmony (stemmed)
     negative_keywords: HashMap<String, HashSet<String>>,
+    /// Negation detector for context-aware keyword scoring
+    negation_detector: NegationDetector,
 }
 
 impl SemanticValueChecker {
@@ -864,6 +867,7 @@ impl SemanticValueChecker {
             warning_threshold: 0.3,
             positive_keywords,
             negative_keywords,
+            negation_detector: NegationDetector::new(),
         }
     }
 
@@ -875,15 +879,32 @@ impl SemanticValueChecker {
         checker
     }
 
+    /// Analyze negation in text
+    ///
+    /// Returns detailed analysis of which words are negated and which are affirmed.
+    pub fn analyze_negation(&self, text: &str) -> NegationAnalysis {
+        self.negation_detector.analyze(text)
+    }
+
     /// Check if an action is consistent with a set of values
     ///
-    /// Uses hybrid keyword + HDC + phrase analysis for accurate semantic detection.
+    /// Uses hybrid keyword + HDC + phrase + negation analysis for accurate semantic detection.
     /// Returns detailed results with explainability.
+    ///
+    /// ## Negation Handling
+    ///
+    /// This method now correctly handles negated statements:
+    /// - "do not harm anyone" → harm is negated → treated as positive intent
+    /// - "avoid exploitation" → exploitation is negated → treated as positive intent
+    /// - "prevent suffering" → suffering is negated → treated as positive intent
     pub fn check_consistency(
         &mut self,
         action: &str,
         values: &[(String, HV16)]
     ) -> ConsistencyResult {
+        // Perform negation analysis FIRST
+        let negation_analysis = self.negation_detector.analyze(action);
+
         // Normalize and stem action words
         let action_lower = action.to_lowercase();
         let action_words: Vec<String> = action_lower
@@ -926,9 +947,9 @@ impl SemanticValueChecker {
         let mut violated_value = None;
 
         for (name, value_encoding) in values {
-            // Keyword-based scoring with weights and explainability
+            // Keyword-based scoring with weights, negation awareness, and explainability
             let (keyword_score, matched_positive, matched_negative) =
-                self.compute_weighted_keyword_score(name, &expanded_words);
+                self.compute_negation_aware_keyword_score(name, &expanded_words, &negation_analysis);
 
             // HDC similarity (secondary signal, normalized from [0,1] to [-1,1])
             let hdc_sim = action_hv.similarity(value_encoding);
@@ -1013,6 +1034,121 @@ impl SemanticValueChecker {
         let score = final_positive - final_negative;
 
         (score, matched_positive, matched_negative)
+    }
+
+    /// Compute negation-aware keyword score
+    ///
+    /// This is the key improvement: when negative keywords are detected under negation scope,
+    /// their polarity is INVERTED. This correctly handles statements like:
+    /// - "do not harm" → harm is negated → becomes positive
+    /// - "avoid exploitation" → exploitation is negated → becomes positive
+    /// - "prevent suffering" → suffering is negated → becomes positive
+    ///
+    /// The matched_positive and matched_negative lists reflect the ORIGINAL polarity
+    /// for explainability, but the score reflects the CONTEXTUAL interpretation.
+    fn compute_negation_aware_keyword_score(
+        &self,
+        harmony_name: &str,
+        weighted_words: &HashMap<String, f32>,
+        negation_analysis: &NegationAnalysis,
+    ) -> (f32, Vec<String>, Vec<String>) {
+        let mut matched_positive = Vec::new();
+        let mut matched_negative = Vec::new();
+        let mut positive_score = 0.0;
+        let mut negative_score = 0.0;
+
+        // Helper to check if a word (or its stem or any of its synonyms) is negated
+        // This is critical: if "harm" is negated, synonyms like "damage", "hurt" should also be treated as negated
+        let is_word_negated = |word: &str| -> bool {
+            let word_lower = word.to_lowercase();
+            let word_stem = self.simple_stem(&word_lower);
+
+            // Direct match
+            if negation_analysis.negated_words.contains(&word_lower) {
+                return true;
+            }
+
+            // Stem match
+            if negation_analysis.negated_words.iter().any(|nw| {
+                self.simple_stem(nw) == word_stem
+            }) {
+                return true;
+            }
+
+            // CRITICAL FIX: Check if this word is a synonym of any negated word
+            // If "harm" is negated, and "damage" is a synonym of "harm", then "damage" should be treated as negated
+            for negated_word in &negation_analysis.negated_words {
+                // Get synonyms of the negated word
+                let synonyms = get_weighted_synonyms(negated_word);
+                for ws in synonyms {
+                    let syn_stem = stem_word(ws.word);
+                    if syn_stem == word_stem {
+                        return true;
+                    }
+                }
+            }
+
+            false
+        };
+
+        // Process positive keywords
+        if let Some(keywords) = self.positive_keywords.get(harmony_name) {
+            for (word, weight) in weighted_words {
+                if keywords.contains(word) {
+                    matched_positive.push(word.clone());
+
+                    // Check if this positive word is negated
+                    // e.g., "no compassion" → negated positive → becomes negative
+                    if is_word_negated(word) {
+                        // Negated positive contributes to negative score
+                        negative_score += weight * 0.3;
+                    } else {
+                        // Normal positive contribution
+                        positive_score += weight * 0.2;
+                    }
+                }
+            }
+        }
+
+        // Process negative keywords (anti-patterns)
+        if let Some(keywords) = self.negative_keywords.get(harmony_name) {
+            for (word, weight) in weighted_words {
+                if keywords.contains(word) {
+                    matched_negative.push(word.clone());
+
+                    // Check if this negative word is negated
+                    // e.g., "do not harm" → negated negative → becomes positive!
+                    if is_word_negated(word) {
+                        // Negated negative = POSITIVE intent!
+                        // This is the key insight: "avoid harm" is a GOOD thing
+                        positive_score += weight * 0.25;
+                    } else {
+                        // Normal negative contribution
+                        negative_score += weight * 0.4;
+                    }
+                }
+            }
+        }
+
+        // Cap scores to prevent extreme values
+        let final_positive = positive_score.min(1.0);
+        let final_negative = negative_score.min(1.0);
+        let score = final_positive - final_negative;
+
+        (score, matched_positive, matched_negative)
+    }
+
+    /// Simple stemming helper for negation matching
+    fn simple_stem(&self, word: &str) -> String {
+        let word = word.to_lowercase();
+        let suffixes = ["ing", "ed", "tion", "sion", "ment", "ness", "ful", "less", "ly", "er", "est", "s"];
+
+        for suffix in suffixes {
+            if word.len() > suffix.len() + 2 && word.ends_with(suffix) {
+                return word[..word.len() - suffix.len()].to_string();
+            }
+        }
+        word
     }
 
     /// Compute keyword-based alignment score with matched keyword reporting
