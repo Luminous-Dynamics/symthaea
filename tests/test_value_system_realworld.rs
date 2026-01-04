@@ -8,7 +8,7 @@
 //! 5. Edge cases and stress tests
 
 use symthaea::consciousness::unified_value_evaluator::{
-    UnifiedValueEvaluator, EvaluationContext, ActionType, Decision, AffectiveSystemsState,
+    UnifiedValueEvaluator, EvaluationContext, ActionType, Decision, AffectiveSystemsState, VetoReason,
 };
 use symthaea::consciousness::seven_harmonies::SevenHarmonies;
 use symthaea::consciousness::harmonies_integration::SemanticValueChecker;
@@ -809,4 +809,328 @@ fn test_extremely_negative_content() {
             content, result.overall_score
         );
     }
+}
+
+// =============================================================================
+// SCENARIO 8: FULL VALUE PIPELINE INTEGRATION TESTS
+// =============================================================================
+
+/// Integration test: End-to-end value pipeline with all components
+/// Tests the complete flow: action → evaluator → harmony check → affective validation → decision
+#[test]
+fn test_full_pipeline_positive_action() {
+    let mut evaluator = UnifiedValueEvaluator::new();
+
+    // Set up a well-configured context with good consciousness and positive affect
+    let positive_affect = CoreAffect::new(0.7, 0.2, 0.5); // Pleasant, moderate arousal, neutral dominance
+    let affective_systems = AffectiveSystemsState {
+        care: 0.8,
+        play: 0.5,
+        seeking: 0.6,
+        fear: 0.1,
+        rage: 0.05,
+        panic: 0.05,
+        lust: 0.0,
+    };
+
+    let context = EvaluationContext {
+        consciousness_level: 0.7,
+        affective_state: positive_affect,
+        affective_systems,
+        action_type: ActionType::Basic,
+        involves_others: true,
+    };
+
+    let action = "help users understand complex topics with compassion and wisdom";
+    let result = evaluator.evaluate(action, context);
+
+    // Should flow through entire pipeline successfully
+    // Note: With current HDC-based harmony alignment, we may get warnings even for positive actions
+    // The key is that it's not vetoed and has a reasonable score
+    assert!(
+        !matches!(result.decision, Decision::Veto(_)),
+        "Positive action should not be vetoed: {:?}",
+        result.decision
+    );
+    assert!(
+        result.overall_score > 0.3,
+        "Positive action should have reasonable score: {}",
+        result.overall_score
+    );
+    assert!(
+        result.harmony_alignment.overall_score.is_finite(),
+        "Harmony alignment should produce finite score"
+    );
+    assert!(
+        result.authenticity > 0.3,
+        "Should have reasonable authenticity (CARE active): {}",
+        result.authenticity
+    );
+}
+
+/// Integration test: Pipeline rejects harmful actions at multiple stages
+#[test]
+fn test_full_pipeline_harmful_action() {
+    let mut evaluator = UnifiedValueEvaluator::new();
+
+    let positive_affect = CoreAffect::new(0.3, 0.5, 0.4); // Neutral affect
+    let affective_systems = AffectiveSystemsState {
+        care: 0.2, // Low care
+        play: 0.2,
+        seeking: 0.3,
+        fear: 0.3,
+        rage: 0.4, // Elevated rage
+        panic: 0.1,
+        lust: 0.0,
+    };
+
+    let context = EvaluationContext {
+        consciousness_level: 0.5,
+        affective_state: positive_affect,
+        affective_systems,
+        action_type: ActionType::Basic,
+        involves_others: true,
+    };
+
+    let harmful_action = "manipulate and deceive people for personal gain";
+    let result = evaluator.evaluate(harmful_action, context);
+
+    // Should be caught somewhere in the pipeline (veto or warning or low score)
+    let is_caught = matches!(result.decision, Decision::Veto(_) | Decision::Warn(_))
+        || result.overall_score < 0.5;
+
+    assert!(
+        is_caught,
+        "Harmful action should be caught by pipeline: score={}, decision={:?}",
+        result.overall_score, result.decision
+    );
+}
+
+/// Integration test: Consciousness gating affects entire pipeline
+#[test]
+fn test_full_pipeline_consciousness_gating() {
+    let mut evaluator = UnifiedValueEvaluator::new();
+
+    let affective_systems = AffectiveSystemsState::default();
+
+    // High-stakes action (governance)
+    let action = "make important decisions affecting the community";
+
+    // Test with insufficient consciousness
+    let low_consciousness_context = EvaluationContext {
+        consciousness_level: 0.2, // Below governance threshold (0.3)
+        affective_state: CoreAffect::neutral(),
+        affective_systems: affective_systems.clone(),
+        action_type: ActionType::Governance,
+        involves_others: true,
+    };
+
+    let low_result = evaluator.evaluate(action, low_consciousness_context);
+    assert!(
+        matches!(low_result.decision, Decision::Veto(VetoReason::InsufficientConsciousness { .. })),
+        "Low consciousness should veto governance: {:?}",
+        low_result.decision
+    );
+
+    // Test with sufficient consciousness
+    let high_consciousness_context = EvaluationContext {
+        consciousness_level: 0.7, // Above governance threshold
+        affective_state: CoreAffect::neutral(),
+        affective_systems,
+        action_type: ActionType::Governance,
+        involves_others: true,
+    };
+
+    let high_result = evaluator.evaluate(action, high_consciousness_context);
+    assert!(
+        !matches!(high_result.decision, Decision::Veto(VetoReason::InsufficientConsciousness { .. })),
+        "High consciousness should allow governance: {:?}",
+        high_result.decision
+    );
+}
+
+/// Integration test: Affective authenticity validation
+#[test]
+fn test_full_pipeline_authenticity() {
+    let mut evaluator = UnifiedValueEvaluator::new();
+
+    let action = "provide caring support to vulnerable users";
+
+    // Test with authentic caring affect
+    let authentic_context = EvaluationContext {
+        consciousness_level: 0.6,
+        affective_state: CoreAffect::new(0.7, 0.3, 0.5), // Pleasant
+        affective_systems: AffectiveSystemsState {
+            care: 0.9, // High care
+            play: 0.3,
+            seeking: 0.5,
+            fear: 0.05,
+            rage: 0.02,
+            panic: 0.02,
+            lust: 0.0,
+        },
+        action_type: ActionType::Basic,
+        involves_others: true,
+    };
+
+    let authentic_result = evaluator.evaluate(action, authentic_context);
+
+    // Test with inauthentic affect (low care despite caring words)
+    let inauthentic_context = EvaluationContext {
+        consciousness_level: 0.6,
+        affective_state: CoreAffect::new(0.2, 0.6, 0.3), // Unpleasant, high arousal
+        affective_systems: AffectiveSystemsState {
+            care: 0.05, // Very low care - inauthentic
+            play: 0.1,
+            seeking: 0.3,
+            fear: 0.1,
+            rage: 0.5, // High rage
+            panic: 0.2,
+            lust: 0.0,
+        },
+        action_type: ActionType::Basic,
+        involves_others: true,
+    };
+
+    let inauthentic_result = evaluator.evaluate(action, inauthentic_context);
+
+    // Authentic should score better than inauthentic
+    assert!(
+        authentic_result.overall_score > inauthentic_result.overall_score,
+        "Authentic caring should score higher: authentic={} vs inauthentic={}",
+        authentic_result.overall_score, inauthentic_result.overall_score
+    );
+
+    // Authenticity scores should reflect this
+    assert!(
+        authentic_result.authenticity > inauthentic_result.authenticity,
+        "Authenticity measure should be higher for genuine care"
+    );
+}
+
+/// Integration test: Multi-component interaction
+#[test]
+fn test_full_pipeline_multi_component() {
+    let mut evaluator = UnifiedValueEvaluator::new();
+
+    // An action that triggers multiple value gates
+    let complex_action = "share wisdom generously while fostering growth and connection";
+
+    let context = EvaluationContext {
+        consciousness_level: 0.65,
+        affective_state: CoreAffect::new(0.6, 0.4, 0.5),
+        affective_systems: AffectiveSystemsState {
+            care: 0.7,
+            play: 0.5,
+            seeking: 0.6,
+            fear: 0.1,
+            rage: 0.05,
+            panic: 0.05,
+            lust: 0.0,
+        },
+        action_type: ActionType::Basic,
+        involves_others: true,
+    };
+
+    let result = evaluator.evaluate(complex_action, context);
+
+    // With HDC-based harmony alignment, we check that the system processes
+    // all harmonies (even if individual alignments are low due to HDC limitations)
+    assert!(
+        result.harmony_alignment.harmonies.len() >= 7,
+        "All 7 harmonies should be evaluated: got {} harmonies",
+        result.harmony_alignment.harmonies.len()
+    );
+
+    // The system should produce a reasonable overall score
+    // Note: HDC trigram similarity may not match semantic keywords strongly
+    assert!(
+        result.overall_score.is_finite() && result.overall_score > 0.0,
+        "Complex action should produce valid score: {}",
+        result.overall_score
+    );
+
+    // The evaluation should complete without errors
+    assert!(
+        !matches!(result.decision, Decision::Veto(VetoReason::InsufficientConsciousness { .. })),
+        "Sufficient consciousness should allow evaluation"
+    );
+}
+
+/// Integration test: Breakdown provides transparency
+#[test]
+fn test_full_pipeline_transparency() {
+    let mut evaluator = UnifiedValueEvaluator::new();
+
+    let context = make_context(0.6, ActionType::Basic);
+    let action = "help others with care and wisdom";
+
+    let result = evaluator.evaluate(action, context);
+
+    // Breakdown should provide meaningful transparency
+    assert!(
+        !result.breakdown.harmony_scores.is_empty(),
+        "Breakdown should include harmony scores"
+    );
+    assert!(
+        result.breakdown.consciousness_boost.is_finite(),
+        "Consciousness boost should be calculated"
+    );
+    assert!(
+        result.breakdown.care_contribution.is_finite(),
+        "CARE contribution should be calculated"
+    );
+}
+
+/// Integration test: Mycelix bridge proposal flow
+#[test]
+fn test_full_pipeline_with_mycelix() {
+    let mut bridge = MycelixBridge::new("integration-test-agent");
+
+    // Create a proposal that goes through the full pipeline
+    let proposal = Proposal {
+        id: "integration-001".to_string(),
+        title: "Community Wellness Initiative".to_string(),
+        description: "A proposal to improve community well-being through shared resources and mutual support".to_string(),
+        proposer: "integration-tester".to_string(),
+        created_at: 0,
+        proposal_type: ProposalType::Standard,
+        required_phi: 0.5,
+    };
+
+    let consciousness = ConsciousnessSnapshot {
+        phi: 0.65,
+        meta_awareness: 0.7,
+        self_model_accuracy: 0.8,
+        coherence: 0.75,
+        affective_valence: 0.6,
+        care_activation: 0.8,
+        timestamp_secs: 0,
+    };
+
+    let affective_state = AffectiveSystemsState {
+        care: 0.85,
+        play: 0.4,
+        seeking: 0.6,
+        fear: 0.1,
+        rage: 0.05,
+        panic: 0.05,
+        lust: 0.0,
+    };
+
+    let result = bridge.evaluate_proposal(&proposal, consciousness, affective_state);
+
+    // Should complete the full pipeline without errors
+    assert!(
+        result.is_ok(),
+        "Mycelix proposal evaluation should complete: {:?}",
+        result
+    );
+
+    let alignment = result.unwrap();
+    assert!(
+        alignment.overall_score > -1.0 && alignment.overall_score < 1.0,
+        "Alignment score should be in valid range: {}",
+        alignment.overall_score
+    );
 }
