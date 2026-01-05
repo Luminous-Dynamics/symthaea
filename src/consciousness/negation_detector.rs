@@ -315,7 +315,13 @@ impl NegationDetector {
 
     /// Expand common contractions for better analysis
     fn expand_contractions(&self, text: &str) -> String {
-        text.replace("don't", "do not")
+        // First normalize curly apostrophes to straight ones
+        let normalized = text
+            .replace('\u{2019}', "'")  // Right single quotation mark (')
+            .replace('\u{2018}', "'"); // Left single quotation mark (')
+
+        // Then expand contractions
+        normalized.replace("don't", "do not")
             .replace("doesn't", "does not")
             .replace("didn't", "did not")
             .replace("won't", "will not")

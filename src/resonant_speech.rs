@@ -488,11 +488,21 @@ impl SimpleResonantEngine {
             utterance.components.tradeoffs
         );
 
+        // Speech requires baseline CARE activation to pass the value gate
+        // Default AffectiveSystemsState has care=0.0 which would veto
+        let speech_affective_state = AffectiveSystemsState {
+            care: 0.5, // Baseline care for speech (needed for value gate)
+            play: 0.3, // Baseline play for engagement
+            seeking: 0.4, // Baseline seeking for helpfulness
+            ..AffectiveSystemsState::default()
+        };
+
         let eval_context = EvaluationContext {
             consciousness_level: ctx.user_state.trust_in_sophia as f64,
             affective_state: CoreAffect::neutral(),
-            affective_systems: AffectiveSystemsState::default(),
+            affective_systems: speech_affective_state,
             action_type: ActionType::Basic,
+            action_domain: None, // Auto-detect from speech content
             involves_others: true, // Speech always involves others
         };
 

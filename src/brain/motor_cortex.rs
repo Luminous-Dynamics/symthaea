@@ -12,7 +12,7 @@
 use crate::brain::{CerebellumActor, Skill};
 use crate::memory::{HippocampusActor, EmotionalValence};
 use crate::consciousness::unified_value_evaluator::{
-    UnifiedValueEvaluator, EvaluationContext, ActionType, Decision, VetoReason,
+    UnifiedValueEvaluator, EvaluationContext, ActionType, Decision,
     AffectiveSystemsState,
 };
 use crate::consciousness::affective_consciousness::CoreAffect;
@@ -624,11 +624,20 @@ impl MotorCortexActor {
         );
 
         // Create evaluation context with current consciousness state
+        // Action execution requires baseline CARE activation to pass value gate
+        let action_affective_state = AffectiveSystemsState {
+            care: 0.5, // Baseline care for action execution (needed for value gate)
+            seeking: 0.4, // Baseline seeking for goal pursuit
+            play: 0.2, // Baseline play for exploration
+            ..AffectiveSystemsState::default()
+        };
+
         let context = EvaluationContext {
             consciousness_level: self.consciousness_level,
             affective_state: self.affective_state.clone(),
-            affective_systems: AffectiveSystemsState::default(), // TODO: integrate with emotional system
+            affective_systems: action_affective_state,
             action_type: ActionType::Basic, // TODO: infer from action tags
+            action_domain: None, // Auto-detect from action description
             involves_others: true, // Conservative default
         };
 

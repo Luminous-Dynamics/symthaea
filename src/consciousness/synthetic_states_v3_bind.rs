@@ -57,7 +57,7 @@ impl StateType {
             Self::Drowsy => 4.0 / 7.0,           // 0.57
             Self::RestingAwake => 5.0 / 7.0,     // 0.71
             Self::Awake => 6.0 / 7.0,            // 0.86
-            Self::AlertFocused => 7.0 / 7.0,     // 1.00
+            Self::AlertFocused => 1.0,           // 1.00
         }
     }
 
@@ -199,7 +199,7 @@ impl SyntheticStateGenerator {
     /// - Plus long-range shortcuts for integration
     fn generate_ring_with_shortcuts(&mut self) -> Vec<HV16> {
         let n = self.num_components;
-        let mut node_patterns: Vec<HV16> = (0..n)
+        let node_patterns: Vec<HV16> = (0..n)
             .map(|_| HV16::random(self.next_seed()))
             .collect();
 
@@ -234,7 +234,7 @@ impl SyntheticStateGenerator {
     /// - Breaks on any partition that cuts the ring
     fn generate_ring_topology(&mut self) -> Vec<HV16> {
         let n = self.num_components;
-        let mut node_patterns: Vec<HV16> = (0..n)
+        let node_patterns: Vec<HV16> = (0..n)
             .map(|_| HV16::random(self.next_seed()))
             .collect();
 
@@ -260,7 +260,7 @@ impl SyntheticStateGenerator {
     /// - Weak inter-cluster integration
     fn generate_modular_structure(&mut self) -> Vec<HV16> {
         let num_modules = (self.num_components / 2).max(2);
-        let mut module_hubs: Vec<HV16> = (0..num_modules)
+        let module_hubs: Vec<HV16> = (0..num_modules)
             .map(|_| HV16::random(self.next_seed()))
             .collect();
 

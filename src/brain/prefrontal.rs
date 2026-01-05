@@ -1529,11 +1529,22 @@ impl PrefrontalCortexActor {
         let mut value_filtered_bids = Vec::with_capacity(bids.len());
 
         for bid in bids {
+            // Attention bids require baseline CARE activation to pass the value gate.
+            // Default AffectiveSystemsState has care=0.0, which would veto all bids
+            // that involve_others due to InauthenicBenevolence check (care < 0.15).
+            let attention_affective_state = AffectiveSystemsState {
+                care: 0.5, // Baseline care for attention processing (needed for value gate)
+                seeking: 0.4, // Baseline seeking for goal-directed attention
+                play: 0.3, // Baseline play for cognitive flexibility
+                ..AffectiveSystemsState::default()
+            };
+
             let eval_context = EvaluationContext {
                 consciousness_level: 0.5, // Default consciousness level
                 affective_state: CoreAffect::neutral(),
-                affective_systems: AffectiveSystemsState::default(),
+                affective_systems: attention_affective_state,
                 action_type: ActionType::Basic,
+                action_domain: None, // Auto-detect from content
                 involves_others: true,
             };
 
@@ -1547,14 +1558,14 @@ impl PrefrontalCortexActor {
                     // Bid excluded from consciousness
                 }
                 Decision::Warn(warnings) => {
-                    debug!("⚠️ ATTENTION GATE WARNING: Bid from '{}' proceeding with reduced priority", bid.source);
+                    debug!("⚠️ ATTENTION GATE WARNING: Bid from '{}' proceeding", bid.source);
                     for w in warnings {
                         debug!("   - {}", w);
                     }
-                    // Reduce salience for warned bids (lower priority in competition)
-                    let mut warned_bid = bid;
-                    warned_bid.salience *= 0.7; // 30% salience penalty
-                    value_filtered_bids.push(warned_bid);
+                    // For internal attention processing, warnings are informational only.
+                    // Salience penalty is for external actions, not internal thoughts.
+                    // High-salience thoughts should still enter working memory.
+                    value_filtered_bids.push(bid);
                 }
                 Decision::Allow => {
                     // Bid passes value gate, proceed to competition

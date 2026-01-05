@@ -158,7 +158,7 @@ impl TemporalBenchmarkSuite {
                     (1.2, 0.932),   // sin(1.2)
                     (2.0, 0.909),   // sin(2.0)
                     (2.3, 0.746),   // sin(2.3)
-                    (3.14, 0.0016), // sin(π)
+                    (std::f64::consts::PI, 0.0016), // sin(π)
                 ],
                 horizon: 2,
             },
