@@ -76,6 +76,10 @@ pub mod intelligence;
 // Benchmarks (Tübingen causal discovery, etc.)
 pub mod benchmarks;
 
+// REST API for benchmark platform (optional - requires axum feature)
+#[cfg(feature = "api")]
+pub mod api;
+
 // Week 12 Phase 2a: Voice Interface (STT + TTS)
 pub mod voice;
 
@@ -97,6 +101,9 @@ pub mod resonant_interaction;
 // Phase 11+: K-Index Client - ENABLED (minimal trait definition)
 pub mod kindex_client;
 // pub mod kindex_client_http;  // Needs HTTP client, still disabled
+
+// Phi Engine - Unified Φ calculation framework with automatic method selection
+pub mod phi_engine;
 
 // Phase 11+: Resonant Telemetry (Deferred to Week 11+)
 // pub mod resonant_telemetry;
