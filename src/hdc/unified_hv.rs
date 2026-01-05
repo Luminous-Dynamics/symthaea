@@ -76,6 +76,11 @@ impl ContinuousHV {
     /// Default dimension (uses HDC_DIMENSION constant)
     pub const DEFAULT_DIM: usize = HDC_DIMENSION;
 
+    /// Create from existing values
+    pub fn from_vec(values: Vec<f32>) -> Self {
+        Self { values }
+    }
+
     /// Create a zero vector
     pub fn zero(dim: usize) -> Self {
         Self {

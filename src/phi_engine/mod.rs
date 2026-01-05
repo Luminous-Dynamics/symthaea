@@ -55,10 +55,12 @@
 
 mod calculator;
 mod result;
+mod cache;
 
 // Re-export main types
 pub use calculator::{PhiCalculator, Complexity};
 pub use result::{PhiResult, PhiUncertainty};
+pub use cache::{CachedPhiEngine, CacheStats};
 
 // Re-export specific implementations (from existing hdc module)
 pub use crate::hdc::phi_real::RealPhiCalculator as ContinuousPhiCalculator;
