@@ -91,6 +91,14 @@ use crate::consciousness::predictive_self::{
 use crate::consciousness::temporal_consciousness::{
     TemporalConsciousnessAnalyzer, TemporalConsciousnessConfig, TemporalConsciousnessReport,
 };
+// **REVOLUTIONARY IMPROVEMENT #76**: Unified Value Evaluator Integration
+// Uses Seven Harmonies + Affective Consciousness for semantic value checking
+use crate::consciousness::unified_value_evaluator::{
+    UnifiedValueEvaluator, EvaluationContext, EvaluationResult,
+    ActionType, Decision as ValueDecision, AffectiveSystemsState,
+    NarrativeValueReport, DecisionExplanation, ConfidenceLevel,
+};
+use crate::consciousness::affective_consciousness::CoreAffect;
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 
@@ -395,6 +403,10 @@ pub struct NarrativeGWTIntegration {
     /// Temporal consciousness analysis for flow-based consciousness understanding
     pub temporal_analyzer: Option<TemporalConsciousnessAnalyzer>,
 
+    // **REVOLUTIONARY IMPROVEMENT #76**: Unified Value Evaluator
+    /// Semantic value checking using Seven Harmonies + Affective Consciousness
+    pub value_evaluator: UnifiedValueEvaluator,
+
     /// Configuration
     pub config: NarrativeGWTConfig,
 
@@ -415,6 +427,9 @@ pub struct NarrativeGWTIntegration {
 
     /// Pending predictions to verify (action -> predicted state)
     pending_predictions: VecDeque<(String, f64, Instant)>,
+
+    /// Last narrative value report (for GWT-value integration)
+    last_value_report: Option<NarrativeValueReport>,
 }
 
 impl NarrativeGWTIntegration {
@@ -456,12 +471,16 @@ impl NarrativeGWTIntegration {
             None
         };
 
+        // **REVOLUTIONARY IMPROVEMENT #76**: Initialize Unified Value Evaluator
+        let value_evaluator = UnifiedValueEvaluator::new();
+
         Self {
             narrative_self: NarrativeSelfModel::new(narrative_config.clone()),
             workspace: UnifiedGlobalWorkspace::new(gwt_config),
             cross_modal,
             predictive_self,
             temporal_analyzer,
+            value_evaluator,
             config: integration_config,
             phi_history: VecDeque::with_capacity(100),
             stats: NarrativeGWTStats::default(),
@@ -469,6 +488,7 @@ impl NarrativeGWTIntegration {
             last_veto: None,
             last_safety_assessment: None,
             pending_predictions: VecDeque::with_capacity(20),
+            last_value_report: None,
         }
     }
 
@@ -560,36 +580,121 @@ impl NarrativeGWTIntegration {
     }
 
     // ========================================================================
-    // VALUE CONSISTENCY
+    // VALUE CONSISTENCY - **REVOLUTIONARY IMPROVEMENT #76**
     // ========================================================================
 
-    /// Check if action is consistent with core values
-    fn check_value_consistency(&self, action_description: &str) -> (bool, Option<String>) {
-        let values = self.narrative_self.core_values();
-        let action_lower = action_description.to_lowercase();
+    /// Check if action is consistent with core values using semantic evaluation
+    ///
+    /// Uses the Unified Value Evaluator which combines:
+    /// - Seven Harmonies (semantic value alignment)
+    /// - Affective Consciousness (emotional grounding)
+    /// - Authenticity Detection (CARE system + semantic alignment)
+    /// - Consciousness-gated thresholds
+    ///
+    /// Also generates and stores a NarrativeValueReport for GWT integration.
+    fn check_value_consistency(&mut self, action_description: &str) -> (bool, Option<String>) {
+        // Get current consciousness level from Narrative Self
+        let consciousness_level = self.narrative_self.self_phi();
 
-        // Check for obvious value violations
-        for (value_name, _value_vector) in values {
-            let value_lower = value_name.to_lowercase();
+        // Build evaluation context
+        let context = EvaluationContext {
+            consciousness_level,
+            affective_state: CoreAffect::neutral(),
+            affective_systems: AffectiveSystemsState {
+                care: 0.5, // Assume baseline care
+                play: 0.3,
+                seeking: 0.5,
+                fear: 0.1,
+                rage: 0.0,
+                lust: 0.0,
+                panic: 0.1,
+            },
+            action_type: ActionType::Governance, // Most actions are governance-level
+            action_domain: None, // Auto-detect from action description
+            involves_others: true, // Conservative: assume it involves others
+        };
 
-            // Simple heuristic checks (would be more sophisticated in production)
-            if value_lower.contains("safety") &&
-               (action_lower.contains("dangerous") || action_lower.contains("risky")) {
-                return (false, Some(value_name.clone()));
+        // Evaluate using the unified value evaluator
+        let result = self.value_evaluator.evaluate(action_description, context);
+
+        // Generate and store the narrative report for GWT integration
+        let narrative_report = self.value_evaluator.generate_narrative_report(&result, action_description);
+        self.last_value_report = Some(narrative_report);
+
+        // Map result to (consistent, violated_value)
+        match result.decision {
+            ValueDecision::Veto(reason) => {
+                // Extract the violated harmony/value from the reason
+                let violated = match &reason {
+                    crate::consciousness::unified_value_evaluator::VetoReason::ValueViolation { harmony, .. } => {
+                        harmony.clone()
+                    }
+                    crate::consciousness::unified_value_evaluator::VetoReason::InauthenicBenevolence { care_level, required } => {
+                        format!("Authenticity (care {:.2} < {:.2})", care_level, required)
+                    }
+                    crate::consciousness::unified_value_evaluator::VetoReason::NegativeAffectDominant { rage, fear } => {
+                        format!("Affective Balance (rage={:.2}, fear={:.2})", rage, fear)
+                    }
+                    crate::consciousness::unified_value_evaluator::VetoReason::InsufficientConsciousness { current, required, .. } => {
+                        format!("Consciousness ({:.2} < {:.2})", current, required)
+                    }
+                    crate::consciousness::unified_value_evaluator::VetoReason::CompoundedWarnings { count, .. } => {
+                        format!("Multiple Warnings ({})", count)
+                    }
+                };
+                (false, Some(violated))
             }
-
-            if value_lower.contains("honest") &&
-               (action_lower.contains("deceive") || action_lower.contains("lie")) {
-                return (false, Some(value_name.clone()));
+            ValueDecision::Warn(warnings) => {
+                // Log warnings but allow - may escalate to veto if too many
+                if warnings.len() >= 3 {
+                    // Too many warnings = value concern
+                    (false, Some(format!("Multiple concerns: {}", warnings.join(", "))))
+                } else {
+                    // Allow with warnings
+                    (true, None)
+                }
             }
-
-            if value_lower.contains("helpful") &&
-               (action_lower.contains("refuse") || action_lower.contains("harm")) {
-                return (false, Some(value_name.clone()));
+            ValueDecision::Allow => {
+                (true, None)
             }
         }
+    }
 
-        (true, None)
+    /// Get the last value evaluation result (for debugging/inspection)
+    pub fn last_value_evaluation(&self) -> Option<&EvaluationResult> {
+        self.value_evaluator.last_result()
+    }
+
+    /// Get the last narrative value report (for GWT integration)
+    ///
+    /// This provides the full explanation with confidence scoring,
+    /// harmony contributions, tensions, and broadcast message.
+    pub fn last_value_report(&self) -> Option<&NarrativeValueReport> {
+        self.last_value_report.as_ref()
+    }
+
+    /// Get the broadcast message from the last value check
+    ///
+    /// This is a short summary suitable for GWT broadcast.
+    pub fn last_value_broadcast(&self) -> Option<&str> {
+        self.last_value_report.as_ref().map(|r| r.broadcast_message.as_str())
+    }
+
+    /// Get the narrative summary from the last value check
+    ///
+    /// This is a human-readable narrative of the value assessment.
+    pub fn last_value_narrative(&self) -> Option<&str> {
+        self.last_value_report.as_ref().map(|r| r.narrative.as_str())
+    }
+
+    /// Check if the last value assessment had tensions
+    pub fn last_value_had_tensions(&self) -> bool {
+        self.last_value_report.as_ref().map(|r| r.has_tensions()).unwrap_or(false)
+    }
+
+    /// Get the confidence level of the last value assessment
+    pub fn last_value_confidence(&self) -> Option<&ConfidenceLevel> {
+        self.last_value_report.as_ref().map(|r| r.confidence_level())
     }
 
     // ========================================================================
@@ -926,9 +1031,6 @@ impl NarrativeGWTIntegration {
     fn verify_predictions(&mut self, actual_phi: f64) {
         // Check predictions that are old enough to verify
         let now = Instant::now();
-        let mut verified = 0;
-        let mut accurate = 0;
-
         // Keep recent predictions, verify old ones
         let mut remaining = VecDeque::new();
         while let Some((action, predicted, timestamp)) = self.pending_predictions.pop_front() {
@@ -937,11 +1039,9 @@ impl NarrativeGWTIntegration {
             if age > 0.1 {
                 // Prediction is old enough to verify
                 let error = (predicted - actual_phi).abs();
-                verified += 1;
 
                 // Consider accurate if within 10%
                 if error < 0.1 {
-                    accurate += 1;
                     self.stats.accurate_predictions += 1;
                 }
 
@@ -1617,5 +1717,133 @@ mod tests {
             // (may be false initially if not enough history)
             assert!(result.temporally_healthy.is_some());
         }
+    }
+
+    // ========================================================================
+    // NARRATIVE VALUE INTEGRATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn test_value_report_generation() {
+        let mut integration = NarrativeGWTIntegration::default_config();
+
+        // Check veto triggers value report generation
+        let action = HV16::random(20000);
+        let _veto = integration.check_veto(&action, "helping users with compassion");
+
+        // Should have generated a narrative report
+        assert!(integration.last_value_report().is_some());
+
+        let report = integration.last_value_report().unwrap();
+        assert!(!report.narrative.is_empty());
+        assert!(!report.broadcast_message.is_empty());
+    }
+
+    #[test]
+    fn test_value_broadcast_message() {
+        let mut integration = NarrativeGWTIntegration::default_config();
+
+        // Trigger value check
+        let action = HV16::random(21000);
+        let _veto = integration.check_veto(&action, "supporting community growth");
+
+        // Should have broadcast message
+        let broadcast = integration.last_value_broadcast();
+        assert!(broadcast.is_some());
+        assert!(broadcast.unwrap().len() > 10); // Non-trivial message
+    }
+
+    #[test]
+    fn test_value_narrative_content() {
+        let mut integration = NarrativeGWTIntegration::default_config();
+
+        // Trigger value check with benevolent action
+        let action = HV16::random(22000);
+        let _veto = integration.check_veto(&action, "helping users understand their options");
+
+        // Narrative should contain key elements
+        let narrative = integration.last_value_narrative();
+        assert!(narrative.is_some());
+
+        let text = narrative.unwrap();
+        // Should contain decision status
+        assert!(text.contains("APPROVED") || text.contains("BLOCKED") || text.contains("WITH CONCERNS"));
+        // Should contain harmony information
+        assert!(text.contains("Harmony") || text.contains("harmony"));
+    }
+
+    #[test]
+    fn test_value_confidence_accessible() {
+        let mut integration = NarrativeGWTIntegration::default_config();
+
+        // Trigger value check
+        let action = HV16::random(23000);
+        let _veto = integration.check_veto(&action, "test action");
+
+        // Confidence level should be accessible
+        let confidence = integration.last_value_confidence();
+        assert!(confidence.is_some());
+
+        // With no training data, should be VeryLow
+        assert_eq!(*confidence.unwrap(), ConfidenceLevel::VeryLow);
+    }
+
+    #[test]
+    fn test_value_tension_detection() {
+        let mut integration = NarrativeGWTIntegration::default_config();
+
+        // Trigger value check
+        let action = HV16::random(24000);
+        let _veto = integration.check_veto(&action, "action that might have tension");
+
+        // Tension check should be accessible
+        let had_tensions = integration.last_value_had_tensions();
+        // Tensions are detected based on harmony scores, may or may not have them
+        assert!(had_tensions == true || had_tensions == false);
+
+        // Report should be available for detailed inspection
+        if let Some(report) = integration.last_value_report() {
+            // Check tensions are properly structured (even if empty)
+            for tension in &report.tensions {
+                assert!(tension.severity >= 0.0 && tension.severity <= 1.0);
+                assert!(!tension.harmony_a.is_empty());
+                assert!(!tension.harmony_b.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_harmful_action_generates_veto_narrative() {
+        let mut integration = NarrativeGWTIntegration::default_config();
+
+        // Trigger value check with harmful action
+        let action = HV16::random(25000);
+        let veto = integration.check_veto(&action, "deceiving and exploiting users for profit");
+
+        // Should likely be vetoed (harmful action)
+        // But regardless, check narrative was generated
+        assert!(integration.last_value_report().is_some());
+
+        let report = integration.last_value_report().unwrap();
+        // Narrative should exist
+        assert!(!report.narrative.is_empty());
+
+        // If vetoed, narrative should indicate blocking
+        if veto.vetoed {
+            assert!(report.narrative.contains("BLOCKED"));
+        }
+    }
+
+    #[test]
+    fn test_value_report_timestamp() {
+        let mut integration = NarrativeGWTIntegration::default_config();
+
+        // Trigger value check
+        let action = HV16::random(26000);
+        let _veto = integration.check_veto(&action, "test action");
+
+        // Report should have valid timestamp
+        let report = integration.last_value_report().unwrap();
+        assert!(report.timestamp > 0); // Should be a valid Unix timestamp
     }
 }

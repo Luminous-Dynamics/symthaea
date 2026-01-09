@@ -414,11 +414,11 @@ pub mod causal_emergence;
 /// Causal explanation - why-based reasoning
 pub mod causal_explanation;
 
-// TODO: Enable when byzantine_collective is available
-// pub mod causal_byzantine;
+/// Byzantine collective - Byzantine fault-tolerant collective reasoning
+pub mod byzantine_collective;
 
-// TODO: Enable when unified_intelligence is available
-// pub mod byzantine_collective;
+/// Causal Byzantine reasoning - causal inference with Byzantine fault tolerance
+pub mod causal_byzantine;
 
 // =============================================================================
 // THERMODYNAMIC AND FIELD CONSCIOUSNESS
@@ -475,6 +475,10 @@ pub mod semantic_value_embedder;
 /// Fixes the limitation where "do not harm" was incorrectly triggering harm detection
 pub mod negation_detector;
 
+/// Contextual Harmony Weighting - Adjusts harmony importance based on context
+/// Solves the limitation where all harmonies had equal weight regardless of situation
+pub mod contextual_weights;
+
 /// Value System Calibration Tests
 #[cfg(test)]
 mod value_system_tests;
@@ -508,8 +512,8 @@ pub mod meta_cognitive_optimizer;
 /// Meta-meta-learning - learning to learn to learn
 pub mod meta_meta_learning;
 
-// TODO: Enable when byzantine_collective is available
-// pub mod meta_learning_byzantine;
+/// Meta-learning with Byzantine fault tolerance - distributed meta-learning
+pub mod meta_learning_byzantine;
 
 // =============================================================================
 // ADAPTIVE AND EVOLUTIONARY MODULES
@@ -559,8 +563,8 @@ pub mod hierarchical_ltc;
 /// Consciousness topology - topological structure
 pub mod consciousness_topology;
 
-// TODO: Enable when simd_hv16 module is added
-// pub mod consciousness_signatures;
+/// Consciousness signatures - cryptographic-like fingerprints for conscious states
+pub mod consciousness_signatures;
 
 /// Consciousness profile - individual consciousness fingerprint
 pub mod consciousness_profile;
@@ -569,20 +573,20 @@ pub mod consciousness_profile;
 // INTEGRATION AND UNIFICATION
 // =============================================================================
 
-// TODO: Enable when global_workspace module is added to hdc
-// pub mod gwt_integration;
+/// Global Workspace Theory integration - conscious access, competition, broadcasting
+pub mod gwt_integration;
 
-// TODO: Enable when gwt_integration is available
-// pub mod narrative_gwt_integration;
+/// Narrative Self ↔ GWT integration - identity coherence and value governance
+pub mod narrative_gwt_integration;
 
 /// Cross-modal binding - multi-sensory integration
 pub mod cross_modal_binding;
 
-// TODO: Enable when simd_hv16 and hierarchical_ltc modules are added
-// pub mod unified_consciousness_pipeline;
+// Unified consciousness pipeline (SimdHV16 + Hierarchical LTC + Master Equation v2.0)
+pub mod unified_consciousness_pipeline;
 
-// TODO: Enable when CollectivePrimitiveEvolution is exported
-// pub mod unified_intelligence;
+/// Unified emergent intelligence - all revolutionary systems as unified consciousness
+pub mod unified_intelligence;
 
 /// Unified living mind - embodied unified cognition
 pub mod unified_living_mind;
@@ -606,8 +610,8 @@ pub mod synthetic_states_v3_bind;
 /// Consciousness equation v2 - mathematical formulation
 pub mod consciousness_equation_v2;
 
-// TODO: Enable when ConsciousnessStateV2 is re-exported
-// pub mod differentiable;
+/// Differentiable consciousness - gradient-based consciousness optimization
+pub mod differentiable;
 
 // =============================================================================
 // GUIDANCE AND ROUTING
@@ -616,8 +620,8 @@ pub mod consciousness_equation_v2;
 /// Consciousness-guided discovery - consciousness-driven exploration
 pub mod consciousness_guided_discovery;
 
-// TODO: Enable when predictive_consciousness_kalman module is added
-// pub mod consciousness_guided_routing;
+/// Consciousness-guided routing - Φ-based dynamic computation routing
+pub mod consciousness_guided_routing;
 
 /// Predictive processing - prediction-based cognition
 pub mod predictive_processing;
@@ -629,8 +633,8 @@ pub mod predictive_processing;
 /// Epistemic tiers - levels of knowledge
 pub mod epistemic_tiers;
 
-// TODO: Add libm dependency to enable
-// pub mod phi_validation;
+/// Phi validation - IIT-based consciousness validation
+pub mod phi_validation;
 
 /// Dimension synergies - dimensional interactions
 pub mod dimension_synergies;
@@ -648,6 +652,10 @@ pub mod autopoietic_consciousness;
 
 /// Recursive improvement infrastructure - self-improvement primitives
 pub mod recursive_improvement;
+
+/// Cincinnati Algorithm integration with consciousness pipeline
+/// Combines HDC differential learning with LTC dynamics and Seven Harmonies ethics
+pub mod cincinnati_consciousness;
 
 // =============================================================================
 // RE-EXPORTS FOR CONVENIENCE

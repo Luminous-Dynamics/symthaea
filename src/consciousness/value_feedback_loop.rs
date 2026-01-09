@@ -137,7 +137,7 @@ pub struct LearningRecord {
 // ============================================================================
 
 /// Configuration for the feedback loop
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedbackLoopConfig {
     /// Learning rate (how much to adjust per feedback)
     pub learning_rate: f64,
@@ -609,6 +609,145 @@ fn now_secs() -> u64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(0)
+}
+
+// ============================================================================
+// PERSISTENCE
+// ============================================================================
+
+/// Persistent state that can be saved and loaded
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeedbackLoopState {
+    /// Configuration
+    pub config: FeedbackLoopConfig,
+    /// Harmony importance adjustments
+    pub harmony_adjustments: HashMap<String, f64>,
+    /// Per-harmony statistics
+    pub harmony_stats: HashMap<String, PersistentHarmonyStats>,
+    /// Total outcomes ever processed
+    pub total_outcomes: u64,
+    /// Recent outcome history (limited to last N)
+    pub recent_outcomes: Vec<ValueOutcome>,
+    /// Version for future compatibility
+    pub version: u32,
+    /// When the state was saved
+    pub saved_at: u64,
+}
+
+/// Serializable version of HarmonyStats
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PersistentHarmonyStats {
+    pub positive_outcomes: u64,
+    pub negative_outcomes: u64,
+    pub quality_sum: f64,
+    pub quality_count: u64,
+    pub false_positives: u64,
+    pub false_negatives: u64,
+}
+
+impl From<&HarmonyStats> for PersistentHarmonyStats {
+    fn from(stats: &HarmonyStats) -> Self {
+        Self {
+            positive_outcomes: stats.positive_outcomes,
+            negative_outcomes: stats.negative_outcomes,
+            quality_sum: stats.quality_sum,
+            quality_count: stats.quality_count,
+            false_positives: stats.false_positives,
+            false_negatives: stats.false_negatives,
+        }
+    }
+}
+
+impl From<PersistentHarmonyStats> for HarmonyStats {
+    fn from(stats: PersistentHarmonyStats) -> Self {
+        Self {
+            positive_outcomes: stats.positive_outcomes,
+            negative_outcomes: stats.negative_outcomes,
+            quality_sum: stats.quality_sum,
+            quality_count: stats.quality_count,
+            false_positives: stats.false_positives,
+            false_negatives: stats.false_negatives,
+        }
+    }
+}
+
+impl ValueFeedbackLoop {
+    /// Get the current state for persistence
+    pub fn get_state(&self) -> FeedbackLoopState {
+        let persistent_stats: HashMap<String, PersistentHarmonyStats> = self
+            .harmony_stats
+            .iter()
+            .map(|(k, v)| (k.clone(), PersistentHarmonyStats::from(v)))
+            .collect();
+
+        // Keep only recent outcomes (up to history_size)
+        let recent_outcomes: Vec<ValueOutcome> = self
+            .outcome_history
+            .iter()
+            .cloned()
+            .collect();
+
+        FeedbackLoopState {
+            config: self.config.clone(),
+            harmony_adjustments: self.harmony_adjustments.clone(),
+            harmony_stats: persistent_stats,
+            total_outcomes: self.total_outcomes,
+            recent_outcomes,
+            version: 1,
+            saved_at: now_secs(),
+        }
+    }
+
+    /// Restore state from persistence
+    pub fn restore_state(&mut self, state: FeedbackLoopState) {
+        self.config = state.config;
+        self.harmony_adjustments = state.harmony_adjustments;
+        self.harmony_stats = state
+            .harmony_stats
+            .into_iter()
+            .map(|(k, v)| (k, HarmonyStats::from(v)))
+            .collect();
+        self.total_outcomes = state.total_outcomes;
+
+        // Restore outcome history
+        self.outcome_history.clear();
+        for outcome in state.recent_outcomes {
+            self.outcome_history.push_back(outcome);
+        }
+    }
+
+    /// Create from persisted state
+    pub fn from_state(state: FeedbackLoopState) -> Self {
+        let mut feedback_loop = Self::with_config(state.config.clone());
+        feedback_loop.restore_state(state);
+        feedback_loop
+    }
+
+    /// Save state to a file (JSON format)
+    pub fn save_to_file(&self, path: &std::path::Path) -> Result<(), std::io::Error> {
+        let state = self.get_state();
+        let json = serde_json::to_string_pretty(&state)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        std::fs::write(path, json)
+    }
+
+    /// Load state from a file (JSON format)
+    pub fn load_from_file(path: &std::path::Path) -> Result<Self, std::io::Error> {
+        let json = std::fs::read_to_string(path)?;
+        let state: FeedbackLoopState = serde_json::from_str(&json)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        Ok(Self::from_state(state))
+    }
+
+    /// Check if there is learned data worth persisting
+    pub fn has_learned_data(&self) -> bool {
+        self.total_outcomes > 0 || !self.harmony_adjustments.is_empty()
+    }
+
+    /// Get the number of data points used for learning
+    pub fn learning_data_count(&self) -> u64 {
+        self.total_outcomes
+    }
 }
 
 // ============================================================================

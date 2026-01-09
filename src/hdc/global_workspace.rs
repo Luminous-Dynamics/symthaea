@@ -35,7 +35,7 @@
 // First HDC implementation of Global Workspace Theory with competitive dynamics,
 // broadcasting mechanism, and integration with Free Energy Principle.
 
-use crate::hdc::{HV16, HDC_DIMENSION};
+use crate::hdc::HV16;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 

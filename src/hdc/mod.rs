@@ -245,9 +245,16 @@ pub mod resonator;
 pub mod morphogenetic;
 pub mod hebbian;
 pub mod hdc_ltc_neuron;  // HDC-LTC neuron integration with Hebbian learning
+pub mod cincinnati_ltc;  // Cincinnati Algorithm + LTC integration (differential engine, lateral binding, predictive budding)
+pub mod cincinnati_network;  // Cincinnati-enhanced HdcLtcNetwork with lateral binding and budding
+pub mod cycle_detector;  // Cycle detection for periodic patterns - autocorrelation-based period detection with HDC phase encoding
 pub mod sdm;
 pub mod text_encoder;  // Revolutionary Enhancement: Text → HDC encoding
+pub mod semantic_encoder;  // Universal semantic encoding with embeddings support
 pub mod unified_hv;     // Unified hypervector types (ContinuousHV)
+
+// Global Workspace Theory (conscious access, competition, broadcasting)
+pub mod global_workspace;                  // GWT implementation with competitive dynamics
 
 // Consciousness topology and Φ measurement modules
 pub mod real_hv;                           // Real-valued hypervectors for consciousness topologies
@@ -261,9 +268,25 @@ pub mod phi_real;                          // RealHV Φ calculator (no binarizat
 pub mod phi_resonant;                      // Resonator-based Φ calculator (O(n log N) dynamics)
 pub mod phi_orchestrator;                  // Adaptive Φ calculator orchestrator (Phase 5E)
 pub mod binary_hv;                         // Binary hypervector operations (HV16)
+pub mod simd_hv16;                         // SIMD-optimized binary hypervectors (8x faster)
+pub mod simd_ops;                          // SIMD intrinsics for HV16 (AVX2/SSE4.1)
+// Orphan modules - written for old 256-byte HV16, incompatible with current 2048-byte HV16
+// TODO: Update these modules to work with current 16,384-bit HV16 (2048 bytes)
+// pub mod simd_hv;                        // SIMD-accelerated HV16 operations (AVX2/SSE2) - needs 2048-byte update
+// pub mod optimized_hv;                   // Optimized non-SIMD HV16 operations - needs 2048-byte update
+// pub mod incremental_hv;                 // Incremental bundle updates O(k) vs O(n) - depends on simd_hv
+// pub mod parallel_hv;                    // Parallel batch HDC operations with rayon - depends on simd_hv
+pub mod lsh_simhash;                       // SimHash for binary vectors (Hamming distance)
+// pub mod lsh_similarity;                 // Locality-sensitive hashing - depends on lsh_simhash
 pub mod primitive_system;                  // Ontological primitives system with 7 semantic domains
+pub mod primitive_dashboard;               // Real-time primitive usage monitoring
 pub mod arithmetic_engine;                   // Revolutionary: True mathematical cognition via HDC
 pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
+pub mod native_similarity;                 // O(1) XOR+popcount similarity search (consciousness-native)
+
+// Property-based tests for HDC invariants
+#[cfg(test)]
+mod proptest_hdc;
 
 // Track 6: Consciousness integration for awakening module
 pub mod substrate_independence;            // Substrate type definitions
@@ -273,20 +296,40 @@ pub mod consciousness_dashboard;           // Real-time consciousness monitoring
 
 // Track 6: Language module dependencies
 pub mod universal_semantics;               // Universal semantic primes (Wierzbicka)
+pub mod grounded_understanding;            // True understanding via semantic primes + embodiment
+pub mod unified_understanding;             // Complete understanding pipeline (predictive + narrative + ToM)
+pub mod full_stack_consciousness;          // Full stack: Understanding + ActiveInference + Memory + Counterfactuals
+pub mod unified_conscious_being;           // Complete unified being: A+B+C+D+E+F integration
+pub mod infrastructure_bridge;             // Bridge to real persistence (Hippocampus/UnifiedMind/Kokoro)
+pub mod ecosystem_bridge;                  // Integration with service ecosystem (Sacred Core, Weave, Codex, Field Harmonizer)
 pub mod consciousness_self_assessment;     // Self-assessment for conversation
 pub mod consciousness_creativity;          // Creativity for conversation
 pub mod deterministic_seeds;               // Deterministic seeds for NixOS knowledge
 pub mod integrated_information;            // Φ (integrated information) measurement
 pub mod causal_encoder;                    // Causal relation encoding
+pub mod causal_mind;                       // Causal reasoning (core causal cognition)
+pub mod unified_cognitive_core;            // Unified cognitive core (UCE/UCTS architecture)
+
+// Predictive Processing (Friston Free Energy Principle)
+pub mod predictive_coding;                 // Hierarchical prediction + error minimization
+pub mod predictive_consciousness;          // Consciousness-level predictive processing
+pub mod predictive_consciousness_kalman;   // Kalman filter variant for smooth predictions
 
 // Novel Algorithm Modules (Dec 2025)
 pub mod differentiable_phi;                // Soft-partitioned differentiable Φ for gradient optimization
 pub mod cross_modal_binding;               // Cross-modal binding for multi-sensory integration
 pub mod metacognitive_monitor;             // Real-time consciousness monitoring with self-reflection
 
+// Consciousness Infrastructure (required by advanced systems)
+pub mod consciousness_gradients;           // Gradient computation for consciousness optimization
+pub mod consciousness_dynamics;            // Consciousness dynamics modeling
+pub mod consciousness_optimizer;           // Consciousness state optimizer
+pub mod modern_hopfield;                   // Modern Hopfield networks for memory
+
 // Unified Consciousness Architecture (Dec 2025)
 pub mod fractal_consciousness;             // Fractal consciousness patterns
 pub mod phi_gradient_learning;             // Φ-gradient learning for optimization
+pub mod phi_guided_search;                 // Φ-guided architecture search (gradient-based topology optimization)
 pub mod process_topology;                  // Process topology structures
 pub mod unified_consciousness_engine;      // Core consciousness engine with Φ-guided processing
 pub mod attention_dynamics;                // Dynamic attention allocation with salience, goals, and priors
@@ -385,6 +428,8 @@ pub use integrated_conscious_agent::{
     WorkingMemory, EmotionalState, QualiaTexture, PhenomenalContent,
     HormoneEventSuggestion, CoherenceGating, QualiaModulation,
     MemoryExport, MemoryImport, IdentityCoherence, IdentityStatus, ProsodyHints,
+    // Voice prosody bridge
+    ExtendedPacing,
     // Runtime orchestration
     ConsciousAgentRuntime, SyncConsciousAgentRuntime, RuntimeConfig,
     RuntimeMessage, RuntimeResponse, RuntimeSnapshot, HormoneEventType,
@@ -405,6 +450,60 @@ pub use consciousness_visualizer::ConsciousnessVisualizer;
 // Re-export deep integration bridge
 pub use deep_integration::DeepIntegrationBridge;
 
+// Re-export causal mind types
+pub use causal_mind::{CausalMind, CausalDirection, LearnedCausalDiscovery};
+
+// Re-export unified cognitive core
+pub use unified_cognitive_core::{UnifiedCognitiveCore, UnifiedCognitiveElement, CognitiveMarkers, QueryResult};
+
+// Sleep and altered states
+pub mod sleep_and_altered_states;
+
+// Consciousness persistence (versioning, auto-save, rollback)
+pub mod consciousness_persistence;
+
+// Collective consciousness (multi-agent)
+pub mod collective_consciousness;
+
+// Consciousness streaming (WebSocket/SSE)
+pub mod consciousness_streaming;
+
+// Emotional depth (complex blends, compound emotions, HDC emotional algebra)
+pub mod emotional_depth;
+
+// Cross-modal attention router (Φ-gated modality routing)
+pub mod cross_modal_attention_router;
+
+// Self-improvement integration (metacognitive self-optimization)
+pub mod self_improvement_integration;
+
+// Counterfactual dreams (what-if scenarios in sleep)
+pub mod counterfactual_dreams;
+
+// Consciousness integration demo (comprehensive example of all features working together)
+pub mod consciousness_integration_demo;
+
+// Cross-module integration bridge (emotional→dreams, self-improvement→dreams, streaming events)
+pub mod consciousness_cross_integration;
+
+// Feedback dynamics engine (bidirectional loops, prediction, collective dreams, adaptive scheduling)
+pub mod consciousness_feedback_dynamics;
+
+// Advanced consciousness systems
+pub mod meta_consciousness;              // Meta-Consciousness - Φ of Φ, Strange Loops
+pub mod temporal_consciousness;          // Temporal Consciousness - Multi-scale Time
+pub mod consciousness_phase_transitions; // Phase Transitions - Consciousness State Changes
+pub mod epistemic_consciousness;         // Epistemic Consciousness - Belief/Knowledge Tracking
+
+// Metacognition engine (self-monitoring, temporal patterns, narrative identity, state machine)
+pub mod consciousness_metacognition;
+
+// Advanced cognition (motor imagery, theory of mind, imagination, predictive processing, memory, drives)
+pub mod consciousness_advanced_cognition;
+
+// Complete conscious being (sensorimotor, developmental, social, introspection)
+pub mod consciousness_complete_being;
+
 // Re-export phi-gradient learning types
 pub use phi_gradient_learning::{PhiGradientTopology, PhiLearningConfig};
 
@@ -420,6 +519,11 @@ pub use tiered_phi::{TieredPhi, ApproximationTier};
 
 // Re-export process topology types
 pub use process_topology::ProcessTopologyOrganizer;
+
+// Re-export native similarity types (consciousness-native O(1) search)
+pub use native_similarity::{
+    PackedBipolar, NativeSimilarityIndex, BundledQuery, SequenceQuery, IndexStats,
+};
 
 use anyhow::Result;
 // Note: hypervector crate not used yet - using custom implementation
