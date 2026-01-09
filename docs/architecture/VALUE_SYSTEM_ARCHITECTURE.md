@@ -516,13 +516,264 @@ When evaluating against harmonies:
 cargo test --test test_value_system_realworld test_negation
 ```
 
+## Contextual Harmony Weighting (New!)
+
+**Location:** `src/consciousness/contextual_weights.rs`
+
+The value system now supports contextual weighting, solving the limitation where all harmonies
+had equal weight regardless of situation.
+
+### The Problem
+
+Without contextual weighting:
+- Voting on governance: same weight for Infinite Play as Integral Wisdom
+- Financial action: same weight for creativity as fairness
+- Emergency action: same slow deliberation as routine action
+
+### The Solution
+
+With contextual weighting:
+- Voting: Higher weight on truth (Integral Wisdom), fairness (Sacred Reciprocity)
+- Financial: Higher weight on fairness, do-no-harm (Pan-Sentient Flourishing)
+- Creative: Higher weight on play (Infinite Play), coherence (Resonant Coherence)
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│              CONTEXTUAL WEIGHTING PIPELINE                               │
+│                                                                          │
+│  ┌────────────────┐      ┌────────────────┐      ┌────────────────┐    │
+│  │   Action       │  →   │   Context      │  →   │   Weighted     │    │
+│  │   Context      │      │   Analysis     │      │   Harmonies    │    │
+│  │   (type,domain)│      │   + Profile    │      │   Evaluation   │    │
+│  └────────────────┘      └────────────────┘      └────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Action Domains
+
+```rust
+pub enum ActionDomain {
+    General,      // Default balanced weights
+    Financial,    // Emphasizes fairness, do-no-harm
+    Creative,     // Emphasizes play, coherence
+    Social,       // Emphasizes interconnectedness, care
+    Technical,    // Emphasizes coherence, wisdom
+    Educational,  // Emphasizes wisdom, evolution
+    Healthcare,   // Emphasizes flourishing, wisdom
+    Environmental,// Emphasizes interconnectedness, evolution
+}
+```
+
+### Action Type Weights
+
+| Action Type | Elevated Harmonies | Reduced Harmonies |
+|-------------|-------------------|-------------------|
+| **Basic** | All equal (1.0) | None |
+| **Governance** | Wisdom (1.4), Reciprocity (1.3) | Play (0.8) |
+| **Voting** | Wisdom (1.5), Interconnectedness (1.4) | Play (0.7) |
+| **Constitutional** | Wisdom (1.6), Flourishing (1.5) | None reduced |
+
+### Domain Weights
+
+| Domain | Elevated Harmonies | Reduced Harmonies |
+|--------|-------------------|-------------------|
+| **Financial** | Reciprocity (1.4), Flourishing (1.3) | Play (0.7) |
+| **Creative** | Play (1.5), Coherence (1.3) | Reciprocity (0.8) |
+| **Healthcare** | Flourishing (1.6), Wisdom (1.4) | Play (0.7) |
+| **Environmental** | Interconnectedness (1.5), Evolution (1.4) | None reduced |
+
+### Combined Weights
+
+Weights are combined using **geometric mean** for balanced influence:
+
+```rust
+combined_weight = sqrt(action_type_weight * domain_weight)
+```
+
+This ensures neither factor dominates the final weight.
+
+### Auto-Detection
+
+The system automatically detects action domain from text using keyword matching:
+
+```rust
+let classifier = DomainClassifier::new();
+let domain = classifier.classify("transfer money to bank account");
+// Returns: ActionDomain::Financial
+```
+
+### Usage
+
+```rust
+let mut evaluator = UnifiedValueEvaluator::new();
+
+// Contextual weights are enabled by default
+let context = EvaluationContext {
+    consciousness_level: 0.5,
+    action_type: ActionType::Voting,
+    action_domain: None,  // Auto-detect from action
+    ..Default::default()
+};
+
+let result = evaluator.evaluate("proposal to change funding", context);
+// Voting context applies higher weight to Integral Wisdom (truth)
+```
+
+### Customization
+
+Register custom profiles for specific needs:
+
+```rust
+let profile = HarmonyWeightProfile::new("CustomProfile", "Description")
+    .with_weight(Harmony::IntegralWisdom, 2.0)
+    .with_weight(Harmony::InfinitePlay, 0.5);
+
+evaluator.register_action_profile(ActionType::Basic, profile);
+```
+
+### Tests
+
+```bash
+# Run contextual weights tests
+cargo test --lib contextual_weights
+```
+
+## GWT Integration & Narrative Value Reports (New!)
+
+**Location:** `src/consciousness/narrative_gwt_integration.rs`
+
+The value system now integrates with Global Workspace Theory (GWT) to generate
+human-readable narrative reports and broadcast decisions through the consciousness system.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│              VALUE → NARRATIVE → GWT INTEGRATION                         │
+│                                                                          │
+│  ┌────────────────┐      ┌────────────────┐      ┌────────────────┐    │
+│  │ Value Evaluation│  →  │   Narrative    │  →  │      GWT       │    │
+│  │  (align, veto) │      │   Generation   │      │   Broadcast    │    │
+│  │                │      │  explanation   │      │   conscious    │    │
+│  └────────────────┘      └────────────────┘      └────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### NarrativeValueReport
+
+The `NarrativeValueReport` struct provides comprehensive decision explanations:
+
+```rust
+pub struct NarrativeValueReport {
+    pub action_description: String,           // What action was evaluated
+    pub decision_summary: String,             // Allow/Warn/Veto with reason
+    pub harmony_narrative: String,            // Detailed harmony analysis
+    pub confidence: ConfidenceLevel,          // High/Medium/Low/Emerging
+    pub broadcast_message: String,            // GWT-ready message
+    pub cross_harmony_tensions: Vec<String>,  // Detected tensions
+    pub timestamp: u64,                       // When evaluated
+}
+```
+
+### Confidence Levels
+
+| Level | Alignment Range | Description |
+|-------|-----------------|-------------|
+| **High** | ≥ 0.7 | Clear positive alignment |
+| **Medium** | 0.4 - 0.7 | Moderate alignment |
+| **Low** | 0.2 - 0.4 | Weak alignment, warnings |
+| **Emerging** | < 0.2 | Very low, likely veto |
+
+### Cross-Harmony Tension Detection
+
+The system detects when different harmonies conflict:
+
+```rust
+// Example: Action that helps some but restricts others
+// Could score high on Flourishing but low on Play
+if high_on_one && low_on_opposing {
+    tensions.push("Flourishing vs Play: helping may restrict freedom");
+}
+```
+
+**Opposing Harmony Pairs:**
+- Flourishing ↔ Play (care vs freedom)
+- Reciprocity ↔ Interconnectedness (boundaries vs unity)
+- Wisdom ↔ Play (truth vs creativity)
+
+### GWT Broadcasting
+
+When decisions have sufficient importance, they are broadcast to the Global Workspace:
+
+```rust
+let report = integration.generate_value_report(action, context)?;
+
+// Broadcast to GWT for conscious processing
+if report.confidence >= ConfidenceLevel::Medium {
+    workspace.submit(report.broadcast_message, BroadcastPriority::Normal);
+}
+```
+
+### Veto Narratives
+
+When actions are vetoed, the system generates explanatory narratives:
+
+```rust
+VetoReason::ValueViolation { harmony, alignment } => {
+    format!("Action vetoed: {} alignment ({:.2}) below threshold",
+            harmony, alignment)
+}
+
+VetoReason::InauthenicBenevolence { care_level, required } => {
+    format!("Action vetoed: CARE system activation ({:.2}) below required ({:.2}). \
+             Authentic care must accompany benevolent actions.",
+             care_level, required)
+}
+```
+
+### Test Coverage
+
+7 new tests covering value narrative generation:
+
+| Test | Description |
+|------|-------------|
+| `test_value_report_generation` | Basic report creation |
+| `test_value_broadcast_message` | GWT message formatting |
+| `test_value_narrative_content` | Harmony narrative details |
+| `test_value_confidence_accessible` | Confidence level mapping |
+| `test_value_tension_detection` | Cross-harmony tensions |
+| `test_harmful_action_generates_veto_narrative` | Veto explanations |
+| `test_value_report_timestamp` | Temporal tracking |
+
+### Usage
+
+```rust
+use symthaea::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
+
+let mut integration = NarrativeGWTIntegration::default_config();
+
+let report = integration.generate_value_report(
+    "help the community with resources",
+    context,
+)?;
+
+println!("{}", report.decision_summary);
+// "Action allowed: Strong alignment with Pan-Sentient Flourishing"
+
+println!("{}", report.broadcast_message);
+// "VALUE DECISION: Allow. Confidence: High. Primary harmony: Flourishing"
+```
+
 ## Future Improvements
 
 1. ~~**True Semantic Embeddings**: Replace HDC trigram with transformer embeddings~~ ✅ **DONE**
 2. ~~**Negation Detection**: NLP-based negation scope analysis~~ ✅ **DONE**
-3. **Contextual Harmony Weighting**: Adjust weights based on action type
-4. **Learning from Feedback**: RL-based improvement from outcomes
-5. **Multi-Modal Evaluation**: Support for image/audio content
+3. ~~**Contextual Harmony Weighting**: Adjust weights based on action type~~ ✅ **DONE**
+4. ~~**GWT Integration**: Narrative reports for conscious decision broadcasting~~ ✅ **DONE**
+5. **Learning from Feedback**: RL-based improvement from outcomes
+6. **Multi-Modal Evaluation**: Support for image/audio content
 
 ## References
 
