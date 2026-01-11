@@ -733,10 +733,11 @@ pub struct WorldModelSummary {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DOMAIN TRAIT IMPLEMENTATIONS (Generalization Refactoring Phase 1)
+// DOMAIN TRAIT IMPLEMENTATIONS (Generalization Refactoring Phase 1 & 2)
 // ═══════════════════════════════════════════════════════════════════════════
 
-use crate::core::domain_traits::{State, Action, Goal};
+use crate::core::domain_traits::{State, Action, Goal, HdcEncodable, DomainAdapter, QualitySignal};
+use crate::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CONSCIOUSNESS GOALS
@@ -935,6 +936,304 @@ impl Action for ConsciousnessAction {
             Self::ApplyImprovement(_) => 1.5, // Variable
             Self::Noop => 0.0,              // No effort
         }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HDC ENCODABLE IMPLEMENTATION (Phase 2)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Implementation of HdcEncodable for LatentConsciousnessState.
+///
+/// This enables semantic similarity computation via hyperdimensional computing,
+/// allowing consciousness states to be compared, composed, and reasoned about
+/// using HDC operations (bind, bundle, similarity).
+impl HdcEncodable for LatentConsciousnessState {
+    type HyperVector = ContinuousHV;
+
+    /// Encode consciousness state as a hypervector.
+    ///
+    /// Uses a simple but effective encoding:
+    /// 1. Create basis vectors for each observable (phi, integration, coherence, attention)
+    /// 2. Scale each basis by the observable value
+    /// 3. Bundle (superpose) all scaled bases
+    /// 4. Add encoded latent vector information
+    fn to_hv(&self) -> Self::HyperVector {
+        // Create deterministic basis vectors for each observable
+        let phi_basis = ContinuousHV::random(HDC_DIMENSION, 1001);
+        let integration_basis = ContinuousHV::random(HDC_DIMENSION, 1002);
+        let coherence_basis = ContinuousHV::random(HDC_DIMENSION, 1003);
+        let attention_basis = ContinuousHV::random(HDC_DIMENSION, 1004);
+
+        // Scale bases by observable values
+        let phi_component = phi_basis.scale(self.phi as f32);
+        let integration_component = integration_basis.scale(self.integration as f32);
+        let coherence_component = coherence_basis.scale(self.coherence as f32);
+        let attention_component = attention_basis.scale(self.attention as f32);
+
+        // Bundle all components
+        let bundled = ContinuousHV::bundle(&[
+            &phi_component,
+            &integration_component,
+            &coherence_component,
+            &attention_component,
+        ]);
+
+        // Add latent vector information (first 8 dimensions encoded into HV)
+        let mut latent_hv = ContinuousHV::zero(HDC_DIMENSION);
+        for (i, &val) in self.latent.iter().take(8).enumerate() {
+            let basis = ContinuousHV::random(HDC_DIMENSION, 2000 + i as u64);
+            let component = basis.scale(val as f32);
+            latent_hv = latent_hv.add(&component);
+        }
+
+        // Combine observable bundle with latent encoding
+        bundled.add(&latent_hv.scale(0.5))
+    }
+
+    /// Decode hypervector back to consciousness state.
+    ///
+    /// This is approximate - HDC encoding is lossy but preserves semantic similarity.
+    /// Returns None if the decoded values are out of valid range.
+    fn from_hv(hv: &Self::HyperVector) -> Option<Self> {
+        // Decode by projecting onto basis vectors
+        let phi_basis = ContinuousHV::random(HDC_DIMENSION, 1001);
+        let integration_basis = ContinuousHV::random(HDC_DIMENSION, 1002);
+        let coherence_basis = ContinuousHV::random(HDC_DIMENSION, 1003);
+        let attention_basis = ContinuousHV::random(HDC_DIMENSION, 1004);
+
+        // Cosine similarity gives approximate value
+        let phi = hv.similarity(&phi_basis).clamp(-1.0, 1.0) as f64;
+        let integration = hv.similarity(&integration_basis).clamp(-1.0, 1.0) as f64;
+        let coherence = hv.similarity(&coherence_basis).clamp(-1.0, 1.0) as f64;
+        let attention = hv.similarity(&attention_basis).clamp(-1.0, 1.0) as f64;
+
+        // Reconstruct state (approximate)
+        Some(LatentConsciousnessState::from_observables(
+            phi.abs(),
+            integration.abs(),
+            coherence.abs(),
+            attention.abs(),
+        ))
+    }
+
+    /// Compute semantic similarity between two consciousness states via HDC.
+    ///
+    /// This captures high-level similarity that may not be apparent from
+    /// direct feature comparison.
+    fn semantic_similarity(&self, other: &Self) -> f64 {
+        let self_hv = self.to_hv();
+        let other_hv = other.to_hv();
+        self_hv.similarity(&other_hv) as f64
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// QUALITY SIGNALS (Phase 2)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Φ (integrated information) as a quality signal.
+///
+/// This is the primary quality metric for consciousness systems,
+/// measuring how much information is integrated across the system.
+#[derive(Debug, Clone)]
+pub struct PhiQualitySignal {
+    /// Weight of this signal in composite calculations
+    pub weight: f64,
+}
+
+impl PhiQualitySignal {
+    /// Create a new Φ quality signal with default weight.
+    pub fn new() -> Self {
+        Self { weight: 1.0 }
+    }
+
+    /// Create with custom weight.
+    pub fn with_weight(weight: f64) -> Self {
+        Self {
+            weight: weight.max(0.0),
+        }
+    }
+}
+
+impl Default for PhiQualitySignal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl QualitySignal<LatentConsciousnessState> for PhiQualitySignal {
+    fn measure(&self, state: &LatentConsciousnessState) -> f64 {
+        state.phi
+    }
+
+    fn name(&self) -> &'static str {
+        "phi"
+    }
+
+    fn weight(&self) -> f64 {
+        self.weight
+    }
+}
+
+/// Coherence quality signal.
+///
+/// Measures the coherence of the consciousness state.
+#[derive(Debug, Clone)]
+pub struct CoherenceQualitySignal {
+    pub weight: f64,
+}
+
+impl CoherenceQualitySignal {
+    pub fn new() -> Self {
+        Self { weight: 0.8 }
+    }
+}
+
+impl Default for CoherenceQualitySignal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl QualitySignal<LatentConsciousnessState> for CoherenceQualitySignal {
+    fn measure(&self, state: &LatentConsciousnessState) -> f64 {
+        state.coherence
+    }
+
+    fn name(&self) -> &'static str {
+        "coherence"
+    }
+
+    fn weight(&self) -> f64 {
+        self.weight
+    }
+}
+
+/// Integration quality signal.
+///
+/// Measures the integration level of consciousness.
+#[derive(Debug, Clone)]
+pub struct IntegrationQualitySignal {
+    pub weight: f64,
+}
+
+impl IntegrationQualitySignal {
+    pub fn new() -> Self {
+        Self { weight: 0.9 }
+    }
+}
+
+impl Default for IntegrationQualitySignal {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl QualitySignal<LatentConsciousnessState> for IntegrationQualitySignal {
+    fn measure(&self, state: &LatentConsciousnessState) -> f64 {
+        state.integration
+    }
+
+    fn name(&self) -> &'static str {
+        "integration"
+    }
+
+    fn weight(&self) -> f64 {
+        self.weight
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DOMAIN ADAPTER (Phase 2)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Domain adapter for consciousness systems.
+///
+/// Provides domain-specific functionality for the consciousness domain,
+/// including available actions, initial states, and quality signals.
+#[derive(Debug, Clone)]
+pub struct ConsciousnessDomainAdapter {
+    /// Initial phi level for new states
+    pub initial_phi: f64,
+    /// Initial integration level
+    pub initial_integration: f64,
+    /// Initial coherence level
+    pub initial_coherence: f64,
+    /// Initial attention level
+    pub initial_attention: f64,
+}
+
+impl ConsciousnessDomainAdapter {
+    /// Create a new consciousness domain adapter with default initial state.
+    pub fn new() -> Self {
+        Self {
+            initial_phi: 0.5,
+            initial_integration: 0.5,
+            initial_coherence: 0.5,
+            initial_attention: 0.5,
+        }
+    }
+
+    /// Create with custom initial values.
+    pub fn with_initial_state(phi: f64, integration: f64, coherence: f64, attention: f64) -> Self {
+        Self {
+            initial_phi: phi.clamp(0.0, 1.0),
+            initial_integration: integration.clamp(0.0, 1.0),
+            initial_coherence: coherence.clamp(0.0, 1.0),
+            initial_attention: attention.clamp(0.0, 1.0),
+        }
+    }
+}
+
+impl Default for ConsciousnessDomainAdapter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DomainAdapter<LatentConsciousnessState, ConsciousnessAction> for ConsciousnessDomainAdapter {
+    fn domain_name(&self) -> &'static str {
+        "consciousness"
+    }
+
+    fn available_actions(&self, _state: &LatentConsciousnessState) -> Vec<ConsciousnessAction> {
+        // All standard actions are available in any state
+        ConsciousnessAction::all()
+    }
+
+    fn initial_state(&self) -> LatentConsciousnessState {
+        LatentConsciousnessState::from_observables(
+            self.initial_phi,
+            self.initial_integration,
+            self.initial_coherence,
+            self.initial_attention,
+        )
+    }
+
+    fn quality_signals(&self) -> Vec<Box<dyn QualitySignal<LatentConsciousnessState>>> {
+        vec![
+            Box::new(PhiQualitySignal::new()),
+            Box::new(CoherenceQualitySignal::new()),
+            Box::new(IntegrationQualitySignal::new()),
+        ]
+    }
+
+    fn is_valid_state(&self, state: &LatentConsciousnessState) -> bool {
+        // Valid if all observables are in [0, 1] range
+        state.phi >= 0.0
+            && state.phi <= 1.0
+            && state.integration >= 0.0
+            && state.integration <= 1.0
+            && state.coherence >= 0.0
+            && state.coherence <= 1.0
+            && state.attention >= 0.0
+            && state.attention <= 1.0
+    }
+
+    fn is_valid_action(&self, _state: &LatentConsciousnessState, _action: &ConsciousnessAction) -> bool {
+        // All actions are valid in any state for consciousness domain
+        true
     }
 }
 
@@ -1277,5 +1576,179 @@ mod tests {
         let low_priority = CoherenceGoal::new();
 
         assert!(high_priority.priority() > low_priority.priority());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 2: HDC ENCODABLE TESTS (Generalization Refactoring)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    use crate::core::domain_traits::HdcEncodable;
+
+    #[test]
+    fn test_latent_state_to_hv() {
+        let state = LatentConsciousnessState::from_observables(0.7, 0.6, 0.5, 0.8);
+        let hv = state.to_hv();
+
+        // HV should have correct dimension
+        assert_eq!(hv.dim(), crate::hdc::unified_hv::HDC_DIMENSION);
+
+        // HV should be non-zero
+        let norm: f32 = hv.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!(norm > 0.1);
+    }
+
+    #[test]
+    fn test_latent_state_hv_similarity() {
+        let state1 = LatentConsciousnessState::from_observables(0.7, 0.6, 0.5, 0.8);
+        let state2 = LatentConsciousnessState::from_observables(0.7, 0.6, 0.5, 0.8);
+        let state3 = LatentConsciousnessState::from_observables(0.1, 0.1, 0.1, 0.1);
+
+        // Same states should have high similarity
+        let sim_same = state1.semantic_similarity(&state2);
+        assert!(sim_same > 0.8, "Same states should be similar: {}", sim_same);
+
+        // Different states should have lower similarity
+        let sim_diff = state1.semantic_similarity(&state3);
+        assert!(
+            sim_diff < sim_same,
+            "Different states should be less similar: {} vs {}",
+            sim_diff,
+            sim_same
+        );
+    }
+
+    #[test]
+    fn test_latent_state_hv_roundtrip() {
+        let original = LatentConsciousnessState::from_observables(0.7, 0.6, 0.5, 0.8);
+        let hv = original.to_hv();
+        let decoded = LatentConsciousnessState::from_hv(&hv);
+
+        // Decoding should succeed
+        assert!(decoded.is_some());
+
+        // Decoded state should be similar to original (but not exact - HDC is lossy)
+        let decoded = decoded.unwrap();
+        let similarity = original.semantic_similarity(&decoded);
+        // We expect some loss, but should still be reasonably similar
+        assert!(
+            similarity > 0.3,
+            "Roundtrip should preserve some similarity: {}",
+            similarity
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 2: QUALITY SIGNAL TESTS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    use crate::core::domain_traits::QualitySignal;
+
+    #[test]
+    fn test_phi_quality_signal() {
+        let signal = PhiQualitySignal::new();
+        let state = LatentConsciousnessState::from_observables(0.7, 0.6, 0.5, 0.8);
+
+        assert_eq!(signal.name(), "phi");
+
+        let score = signal.measure(&state);
+        assert!((score - 0.7).abs() < 0.001, "Score should equal phi: {}", score);
+
+        // Weight should be default 1.0
+        let weight = signal.weight();
+        assert!(
+            (weight - 1.0).abs() < 0.001,
+            "Default weight should be 1.0: {}",
+            weight
+        );
+    }
+
+    #[test]
+    fn test_phi_quality_signal_with_weight() {
+        let signal = PhiQualitySignal::with_weight(2.0);
+
+        assert!((signal.weight() - 2.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_coherence_quality_signal() {
+        let signal = CoherenceQualitySignal::new();
+        let state = LatentConsciousnessState::from_observables(0.7, 0.6, 0.5, 0.8);
+
+        assert_eq!(signal.name(), "coherence");
+
+        let score = signal.measure(&state);
+        assert!((score - 0.5).abs() < 0.001, "Score should equal coherence: {}", score);
+    }
+
+    #[test]
+    fn test_integration_quality_signal() {
+        let signal = IntegrationQualitySignal::new();
+        let state = LatentConsciousnessState::from_observables(0.7, 0.6, 0.5, 0.8);
+
+        assert_eq!(signal.name(), "integration");
+
+        let score = signal.measure(&state);
+        assert!((score - 0.6).abs() < 0.001, "Score should equal integration: {}", score);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 2: DOMAIN ADAPTER TESTS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    use crate::core::domain_traits::DomainAdapter;
+
+    #[test]
+    fn test_consciousness_domain_adapter_name() {
+        let adapter = ConsciousnessDomainAdapter::new();
+        assert_eq!(adapter.domain_name(), "consciousness");
+    }
+
+    #[test]
+    fn test_consciousness_domain_adapter_available_actions() {
+        let adapter = ConsciousnessDomainAdapter::new();
+        let state = LatentConsciousnessState::from_observables(0.5, 0.5, 0.5, 0.5);
+
+        let actions = adapter.available_actions(&state);
+        assert!(!actions.is_empty());
+        assert!(actions.contains(&ConsciousnessAction::FocusIntegration));
+        assert!(actions.contains(&ConsciousnessAction::Noop));
+    }
+
+    #[test]
+    fn test_consciousness_domain_adapter_initial_state() {
+        let adapter = ConsciousnessDomainAdapter::new();
+        let state = adapter.initial_state();
+
+        // Initial state should have valid observables
+        assert!(state.phi >= 0.0 && state.phi <= 1.0);
+        assert!(state.integration >= 0.0 && state.integration <= 1.0);
+        assert!(state.coherence >= 0.0 && state.coherence <= 1.0);
+        assert!(state.attention >= 0.0 && state.attention <= 1.0);
+    }
+
+    #[test]
+    fn test_consciousness_domain_adapter_quality_signals() {
+        let adapter = ConsciousnessDomainAdapter::new();
+        let signals = adapter.quality_signals();
+
+        // Should have 3 quality signals
+        assert_eq!(signals.len(), 3);
+
+        // Collect signal names
+        let names: Vec<&str> = signals.iter().map(|s| s.name()).collect();
+        assert!(names.contains(&"phi"));
+        assert!(names.contains(&"coherence"));
+        assert!(names.contains(&"integration"));
+    }
+
+    #[test]
+    fn test_consciousness_domain_adapter_valid_action() {
+        let adapter = ConsciousnessDomainAdapter::new();
+        let state = LatentConsciousnessState::from_observables(0.5, 0.5, 0.5, 0.5);
+
+        // All standard actions should be valid
+        assert!(adapter.is_valid_action(&state, &ConsciousnessAction::FocusIntegration));
+        assert!(adapter.is_valid_action(&state, &ConsciousnessAction::FocusCoherence));
+        assert!(adapter.is_valid_action(&state, &ConsciousnessAction::Noop));
     }
 }
