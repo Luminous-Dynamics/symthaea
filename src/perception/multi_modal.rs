@@ -124,7 +124,8 @@ impl JLProjector {
 /// and projection for sensory fusion tasks.
 #[derive(Debug, Clone)]
 pub struct HdcVector {
-    bits: Vec<bool>,
+    /// Binary representation (public for consciousness bridge)
+    pub bits: Vec<bool>,
 }
 
 impl HdcVector {
@@ -209,6 +210,9 @@ pub enum ModalityType {
 
     /// Text extraction via OCR
     Ocr,
+
+    /// Semantic text input (direct text, not from OCR)
+    Semantic,
 }
 
 impl ModalityType {
@@ -219,9 +223,16 @@ impl ModalityType {
             ModalityType::Voice => "Voice",
             ModalityType::Code => "Code",
             ModalityType::Ocr => "OCR",
+            ModalityType::Semantic => "Semantic",
         }
     }
 }
+
+/// Embedding dimension for Qwen3 (1024D)
+pub const QWEN3_DIM: usize = 1024;
+
+/// Embedding dimension for SigLIP (768D)
+pub const SIGLIP_DIM: usize = 768;
 
 /// Multi-modal integration system - the sensory fusion layer
 pub struct MultiModalIntegrator {
@@ -234,8 +245,11 @@ pub struct MultiModalIntegrator {
     /// JL projector for image embeddings (768D SigLIP → HDC_DIM)
     image_projector: JLProjector,
 
-    /// JL projector for text/OCR (256D character n-grams → HDC_DIM)
-    text_projector: JLProjector,
+    /// JL projector for text embeddings (1024D Qwen3 → HDC_DIM)
+    text_embedding_projector: JLProjector,
+
+    /// JL projector for text/OCR n-grams (256D character n-grams → HDC_DIM)
+    text_ngram_projector: JLProjector,
 }
 
 /// Weights for combining different modalities
@@ -245,6 +259,7 @@ pub struct ModalityWeights {
     pub voice: f32,
     pub code: f32,
     pub ocr: f32,
+    pub semantic: f32,
 }
 
 impl Default for ModalityWeights {
@@ -254,6 +269,7 @@ impl Default for ModalityWeights {
             voice: 1.0,
             code: 1.0,
             ocr: 1.0,
+            semantic: 1.0,
         }
     }
 }
@@ -262,15 +278,18 @@ impl Default for MultiModalIntegrator {
     fn default() -> Self {
         // Use fixed seeds for deterministic projections across runs
         const IMAGE_PROJECTOR_SEED: u64 = 0xCAFE_BABE_1234_5678;
-        const TEXT_PROJECTOR_SEED: u64 = 0xDEAD_BEEF_8765_4321;
+        const TEXT_EMBEDDING_PROJECTOR_SEED: u64 = 0xDEAD_BEEF_8765_4321;
+        const TEXT_NGRAM_PROJECTOR_SEED: u64 = 0x5974_1AEA_CAFE_BABE;
 
         Self {
             modality_weights: ModalityWeights::default(),
             adaptive_weighting: true,
             // 768D SigLIP embedding → 16,384D HDC
-            image_projector: JLProjector::new(768, HDC_DIM, IMAGE_PROJECTOR_SEED),
+            image_projector: JLProjector::new(SIGLIP_DIM, HDC_DIM, IMAGE_PROJECTOR_SEED),
+            // 1024D Qwen3 embedding → 16,384D HDC
+            text_embedding_projector: JLProjector::new(QWEN3_DIM, HDC_DIM, TEXT_EMBEDDING_PROJECTOR_SEED),
             // 256D n-gram features → 16,384D HDC
-            text_projector: JLProjector::new(256, HDC_DIM, TEXT_PROJECTOR_SEED),
+            text_ngram_projector: JLProjector::new(256, HDC_DIM, TEXT_NGRAM_PROJECTOR_SEED),
         }
     }
 }
@@ -288,8 +307,28 @@ impl MultiModalIntegrator {
             modality_weights: weights,
             adaptive_weighting: true,
             image_projector: default.image_projector,
-            text_projector: default.text_projector,
+            text_embedding_projector: default.text_embedding_projector,
+            text_ngram_projector: default.text_ngram_projector,
         }
+    }
+
+    /// Project a text embedding (from Qwen3 or similar) into HDC space
+    ///
+    /// Uses JL projection to map 1024D Qwen3 embedding to HDC_DIM (16,384D).
+    pub fn project_text_embedding(&self, embedding: &[f32]) -> Result<HdcVector> {
+        if embedding.len() != QWEN3_DIM {
+            anyhow::bail!(
+                "Text embedding dimension mismatch: expected {}, got {}",
+                QWEN3_DIM,
+                embedding.len()
+            );
+        }
+
+        let projected_bits = self.text_embedding_projector.project_to_binary(embedding);
+
+        Ok(HdcVector {
+            bits: projected_bits,
+        })
     }
 
     /// Enable or disable adaptive weighting based on confidence
@@ -351,6 +390,42 @@ impl MultiModalIntegrator {
         })
     }
 
+    /// Project raw text into HDC space using n-gram feature encoding
+    ///
+    /// Encodes text using character tri-grams projected through JL projection.
+    /// This creates a distributed representation that captures character patterns.
+    pub fn project_text(&self, text: &str) -> Result<HdcVector> {
+        // Build n-gram feature vector (256 dimensions for character tri-grams)
+        let mut ngram_features = vec![0.0f32; 256];
+
+        // Extract character tri-grams
+        let text_lower = text.to_lowercase();
+        let chars: Vec<char> = text_lower.chars().collect();
+
+        for window in chars.windows(3) {
+            // Hash tri-gram to feature index
+            let hash = window.iter()
+                .fold(0u64, |acc, &c| acc.wrapping_mul(31).wrapping_add(c as u64));
+            let idx = (hash % 256) as usize;
+            ngram_features[idx] += 1.0;
+        }
+
+        // Normalize features
+        let sum: f32 = ngram_features.iter().sum();
+        if sum > 0.0 {
+            for f in &mut ngram_features {
+                *f /= sum;
+            }
+        }
+
+        // Apply JL projection
+        let projected_bits = self.text_ngram_projector.project_to_binary(&ngram_features);
+
+        Ok(HdcVector {
+            bits: projected_bits,
+        })
+    }
+
     /// Project OCR text into HDC space using n-gram feature encoding
     ///
     /// Encodes text using character tri-grams projected through JL projection.
@@ -380,7 +455,7 @@ impl MultiModalIntegrator {
         }
 
         // Apply JL projection
-        let projected_bits = self.text_projector.project_to_binary(&ngram_features);
+        let projected_bits = self.text_ngram_projector.project_to_binary(&ngram_features);
 
         Ok(HdcVector {
             bits: projected_bits,
@@ -467,6 +542,7 @@ impl MultiModalIntegrator {
             ModalityType::Voice => self.modality_weights.voice,
             ModalityType::Code => self.modality_weights.code,
             ModalityType::Ocr => self.modality_weights.ocr,
+            ModalityType::Semantic => self.modality_weights.semantic,
         }
     }
 
@@ -564,6 +640,7 @@ mod tests {
             voice: 1.0,
             code: 1.5,
             ocr: 0.8,
+            semantic: 1.0,
         };
 
         let integrator = MultiModalIntegrator::with_weights(weights.clone());
