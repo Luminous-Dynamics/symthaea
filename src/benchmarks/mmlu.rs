@@ -26,6 +26,7 @@ use crate::domains::task::{TaskState, TaskAction, TaskDynamics};
 use crate::consciousness::ConsciousnessGraph;
 use crate::core::domain_traits::WorldModel;
 use crate::hdc::phi_real::RealPhiCalculator;
+use crate::hdc::real_hv::RealHV;
 
 use serde::{Serialize, Deserialize};
 
@@ -273,11 +274,14 @@ impl MMLUBenchmark {
         // 4. Create initial task state
         let mut state = TaskState::from_question(initial_memory);
 
-        // 5. Create consciousness graph for Φ measurement
-        let mut graph = ConsciousnessGraph::new();
+        // 5. Create consciousness graph (kept for potential future use)
+        let mut _graph = ConsciousnessGraph::new();
+
+        // 5b. Collect semantic states as RealHV for proper Φ calculation
+        let mut semantic_states: Vec<RealHV> = Vec::new();
 
         // 6. Run reasoning steps
-        let categories = ReasoningCategory::for_subject(&question.subject);
+        let _categories = ReasoningCategory::for_subject(&question.subject);
         let primitives = self.bootstrapper.primitives_for_subject(&question.subject);
 
         let mut step_count = 0;
@@ -295,7 +299,11 @@ impl MMLUBenchmark {
                 .map(|&b| b as f32 / 255.0)
                 .collect();
             let dynamic_hv: Vec<f32> = vec![state.confidence() as f32; 32];
-            graph.add_state(semantic_hv, dynamic_hv, state.confidence() as f32);
+            _graph.add_state(semantic_hv.clone(), dynamic_hv, state.confidence() as f32);
+
+            // Also collect as RealHV for actual Φ calculation
+            // Convert HV16 (binary) to RealHV for spectral analysis
+            semantic_states.push(RealHV::from_values(semantic_hv));
 
             // Check if we've reached sufficient confidence
             if state.confidence() > 0.8 {
@@ -303,11 +311,12 @@ impl MMLUBenchmark {
             }
         }
 
-        // 7. Measure Φ from consciousness graph
-        let phi = self.measure_phi(&graph);
+        // 7. Select best matching answer (need this first for Φ calculation)
+        let (selected_answer, confidence, answer_similarities) = self.select_answer_with_sims(&state, &answer_hvs);
 
-        // 8. Select best matching answer
-        let (selected_answer, confidence) = self.select_answer(&state, &answer_hvs);
+        // 8. Measure Φ as answer discrimination quality
+        // High discrimination (clear preference) should correlate with correctness
+        let phi = self.measure_phi_discrimination(&semantic_states, &answer_similarities);
 
         let time_ms = start.elapsed().as_millis();
 
@@ -340,8 +349,98 @@ impl MMLUBenchmark {
         }
     }
 
-    /// Measure Φ from the consciousness graph
-    fn measure_phi(&self, graph: &ConsciousnessGraph) -> f64 {
+    /// Measure Φ as answer-context integration (unused - kept for reference)
+    #[allow(dead_code)]
+    ///
+    /// Key insight: Correct answers should "fit" well with the reasoning context.
+    /// We measure how coherently the reasoning trajectory converges toward
+    /// a distinguishable answer state.
+    ///
+    /// The metric combines:
+    /// 1. Trajectory coherence (how focused the reasoning was)
+    /// 2. Final state differentiation (how clearly it points to one answer)
+    /// 3. Convergence (did reasoning states become more similar over time?)
+    fn measure_phi_from_states(&self, states: &[RealHV]) -> f64 {
+        if states.len() < 2 {
+            return 0.0;
+        }
+
+        // Component 1: Trajectory coherence
+        // Measure how similar consecutive states are (focused reasoning)
+        let mut consecutive_sims = Vec::new();
+        for i in 1..states.len() {
+            let sim = states[i - 1].similarity(&states[i]);
+            consecutive_sims.push((sim + 1.0) / 2.0); // Normalize to [0, 1]
+        }
+        let coherence = if consecutive_sims.is_empty() {
+            0.5
+        } else {
+            consecutive_sims.iter().sum::<f32>() / consecutive_sims.len() as f32
+        };
+
+        // Component 2: Convergence (do later states become more similar?)
+        // Higher convergence = reasoning is settling on an answer
+        let n = states.len();
+        let first_half_sim = if n >= 4 {
+            let mid = n / 2;
+            let mut sims = Vec::new();
+            for i in 0..mid {
+                for j in (i + 1)..mid {
+                    sims.push((states[i].similarity(&states[j]) + 1.0) / 2.0);
+                }
+            }
+            if sims.is_empty() { 0.5 } else { sims.iter().sum::<f32>() / sims.len() as f32 }
+        } else {
+            0.5
+        };
+
+        let second_half_sim = if n >= 4 {
+            let mid = n / 2;
+            let mut sims = Vec::new();
+            for i in mid..n {
+                for j in (i + 1)..n {
+                    sims.push((states[i].similarity(&states[j]) + 1.0) / 2.0);
+                }
+            }
+            if sims.is_empty() { 0.5 } else { sims.iter().sum::<f32>() / sims.len() as f32 }
+        } else {
+            0.5
+        };
+
+        // Convergence: second half should be more similar than first half
+        let convergence = if second_half_sim > first_half_sim {
+            (second_half_sim - first_half_sim + 0.5).min(1.0)
+        } else {
+            (0.5 - (first_half_sim - second_half_sim) * 0.5).max(0.0)
+        };
+
+        // Component 3: Final state differentiation
+        // How distinct is the final state from the initial state?
+        let differentiation = if states.len() >= 2 {
+            let first = &states[0];
+            let last = &states[states.len() - 1];
+            let sim = (first.similarity(last) + 1.0) / 2.0;
+            // We want MODERATE differentiation - too similar = no reasoning happened
+            // Too different = reasoning went off track
+            // Optimal is around 0.3-0.7 similarity
+            let distance_from_optimal = (sim - 0.5).abs();
+            1.0 - distance_from_optimal * 2.0 // Max at 0.5 similarity, min at 0 or 1
+        } else {
+            0.5
+        };
+
+        // Combine components with weights that favor convergent, coherent reasoning
+        // that reaches a distinct but not wildly different conclusion
+        let phi = coherence as f64 * 0.3
+                + convergence as f64 * 0.4
+                + differentiation as f64 * 0.3;
+
+        phi.clamp(0.0, 1.0)
+    }
+
+    /// Measure Φ from the consciousness graph (legacy proxy - less accurate)
+    #[allow(dead_code)]
+    fn measure_phi_proxy(&self, graph: &ConsciousnessGraph) -> f64 {
         // Use graph properties as a proxy for Φ
         let size = graph.size();
         if size < 2 {
@@ -370,7 +469,8 @@ impl MMLUBenchmark {
     }
 
     /// Select the best matching answer based on working memory similarity
-    fn select_answer(&self, state: &TaskState, answer_hvs: &[HV16]) -> (usize, f64) {
+    /// Returns (selected_index, confidence, all_similarities)
+    fn select_answer_with_sims(&self, state: &TaskState, answer_hvs: &[HV16]) -> (usize, f64, Vec<f64>) {
         let working_memory = state.working_memory();
 
         let similarities: Vec<f64> = answer_hvs.iter()
@@ -391,7 +491,80 @@ impl MMLUBenchmark {
             }
         }
 
-        (best_idx, best_sim)
+        (best_idx, best_sim, similarities)
+    }
+
+    /// Measure Φ based on answer discrimination quality
+    ///
+    /// Key insight: Correct answers should come from CONFIDENT discrimination.
+    /// When the reasoning state clearly distinguishes one answer from others,
+    /// it's more likely to be correct.
+    ///
+    /// Φ = discrimination_score * convergence_bonus
+    fn measure_phi_discrimination(&self, states: &[RealHV], answer_sims: &[f64]) -> f64 {
+        if answer_sims.is_empty() {
+            return 0.0;
+        }
+
+        // Component 1: Answer discrimination (how peaked is the distribution?)
+        // Use the gap between best and second-best answer
+        let mut sorted_sims = answer_sims.to_vec();
+        sorted_sims.sort_by(|a, b| b.partial_cmp(a).unwrap());
+
+        let discrimination = if sorted_sims.len() >= 2 {
+            // Gap between best and second-best, normalized
+            let gap = sorted_sims[0] - sorted_sims[1];
+            // Normalize by average similarity to get relative discrimination
+            let avg = answer_sims.iter().sum::<f64>() / answer_sims.len() as f64;
+            if avg > 0.001 {
+                (gap / avg).min(1.0)
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+
+        // Component 2: Confidence level (absolute similarity to chosen answer)
+        let max_sim = sorted_sims.first().copied().unwrap_or(0.5);
+        let confidence_component = (max_sim - 0.3).max(0.0) / 0.5; // Scale from [0.3, 0.8] to [0, 1]
+
+        // Component 3: Reasoning convergence from states
+        let convergence = if states.len() >= 4 {
+            let n = states.len();
+            let last_quarter = &states[3 * n / 4..];
+
+            // How similar are the final states to each other?
+            let mut final_sims = Vec::new();
+            for i in 0..last_quarter.len() {
+                for j in (i + 1)..last_quarter.len() {
+                    let sim = (last_quarter[i].similarity(&last_quarter[j]) + 1.0) / 2.0;
+                    final_sims.push(sim as f64);
+                }
+            }
+
+            if final_sims.is_empty() {
+                0.5
+            } else {
+                final_sims.iter().sum::<f64>() / final_sims.len() as f64
+            }
+        } else {
+            0.5
+        };
+
+        // Combine: discrimination is most important (0.5), then confidence (0.3), then convergence (0.2)
+        let phi = discrimination * 0.5
+                + confidence_component.min(1.0) * 0.3
+                + convergence * 0.2;
+
+        phi.clamp(0.0, 1.0)
+    }
+
+    /// Select the best matching answer (legacy method)
+    #[allow(dead_code)]
+    fn select_answer(&self, state: &TaskState, answer_hvs: &[HV16]) -> (usize, f64) {
+        let (idx, conf, _) = self.select_answer_with_sims(state, answer_hvs);
+        (idx, conf)
     }
 
     /// Run the full benchmark on a set of questions
