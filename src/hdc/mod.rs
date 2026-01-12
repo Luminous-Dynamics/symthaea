@@ -248,6 +248,11 @@ pub mod hdc_ltc_neuron;  // HDC-LTC neuron integration with Hebbian learning
 pub mod cincinnati_ltc;  // Cincinnati Algorithm + LTC integration (differential engine, lateral binding, predictive budding)
 pub mod cincinnati_network;  // Cincinnati-enhanced HdcLtcNetwork with lateral binding and budding
 pub mod cycle_detector;  // Cycle detection for periodic patterns - autocorrelation-based period detection with HDC phase encoding
+pub mod gwt_cincinnati_integration;  // Cincinnati-LTC + Global Workspace Theory integration - temporal patterns enter consciousness
+pub mod cincinnati_enhanced;  // Enhanced Cincinnati-LTC: multi-scale, amplitude encoding, attention modulation
+pub mod cincinnati_advanced;  // Advanced Cincinnati-LTC: chaos detection, adaptive weights, memory horizon
+pub mod reservoir;            // Reservoir Computing (Echo State Network) for chaotic signal prediction
+pub mod predictor;            // Unified predictor trait for Symthaea integration (links prediction to Φ)
 pub mod sdm;
 pub mod text_encoder;  // Revolutionary Enhancement: Text → HDC encoding
 pub mod semantic_encoder;  // Universal semantic encoding with embeddings support
@@ -270,17 +275,20 @@ pub mod phi_orchestrator;                  // Adaptive Φ calculator orchestrato
 pub mod binary_hv;                         // Binary hypervector operations (HV16)
 pub mod simd_hv16;                         // SIMD-optimized binary hypervectors (8x faster)
 pub mod simd_ops;                          // SIMD intrinsics for HV16 (AVX2/SSE4.1)
-// Orphan modules - written for old 256-byte HV16, incompatible with current 2048-byte HV16
-// TODO: Update these modules to work with current 16,384-bit HV16 (2048 bytes)
-// pub mod simd_hv;                        // SIMD-accelerated HV16 operations (AVX2/SSE2) - needs 2048-byte update
-// pub mod optimized_hv;                   // Optimized non-SIMD HV16 operations - needs 2048-byte update
-// pub mod incremental_hv;                 // Incremental bundle updates O(k) vs O(n) - depends on simd_hv
-// pub mod parallel_hv;                    // Parallel batch HDC operations with rayon - depends on simd_hv
+pub mod hdc_trait;                         // Unified HyperdimensionalVector trait interface
+// Legacy modules (incompatible with 16,384-bit HV16 - use simd_hv16 instead):
+// - simd_hv: Was written for 2048-bit vectors
+// - optimized_hv: Was written for 2048-bit vectors
+// Future modules:
+// - incremental_hv: TODO: Could add incremental bundling to simd_hv16
+// - parallel_hv: TODO: Could add rayon parallelism to batch operations
 pub mod lsh_simhash;                       // SimHash for binary vectors (Hamming distance)
-// pub mod lsh_similarity;                 // Locality-sensitive hashing - depends on lsh_simhash
+pub mod lsh_similarity;                    // Adaptive LSH-backed similarity search (Session 7C)
 pub mod primitive_system;                  // Ontological primitives system with 7 semantic domains
+pub mod bootstrapping;                     // Cognitive bootstrapping - primitives to reasoning tasks
 pub mod primitive_dashboard;               // Real-time primitive usage monitoring
 pub mod arithmetic_engine;                   // Revolutionary: True mathematical cognition via HDC
+pub mod arithmetic;                          // Modular arithmetic (re-exports arithmetic_engine)
 pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
 pub mod native_similarity;                 // O(1) XOR+popcount similarity search (consciousness-native)
 
@@ -292,6 +300,7 @@ mod proptest_hdc;
 pub mod substrate_independence;            // Substrate type definitions
 pub mod consciousness_evaluator;           // Consciousness evaluation
 pub mod consciousness_integration;         // Complete consciousness pipeline
+pub mod consciousness;                     // Modular consciousness (re-exports consciousness_integration)
 pub mod consciousness_dashboard;           // Real-time consciousness monitoring
 
 // Track 6: Language module dependencies
@@ -422,6 +431,12 @@ pub use sdm::{
 pub use temporal_encoder::TemporalEncoder;
 pub use text_encoder::{TextEncoder, TextEncoderConfig, TextEncoderStats};
 
+// Re-export Primitive System types (9-tier ontological primitives)
+pub use primitive_system::{PrimitiveSystem, Primitive, PrimitiveTier};
+
+// Re-export Primitive Dashboard types (real-time monitoring)
+pub use primitive_dashboard::{PrimitiveDashboard, PrimitiveStats, VoicePrimitiveTracker};
+
 // Re-export Unified Consciousness Architecture types
 pub use integrated_conscious_agent::{
     IntegratedConsciousAgent, AgentConfig, IntegratedUpdate,
@@ -503,6 +518,20 @@ pub mod consciousness_advanced_cognition;
 
 // Complete conscious being (sensorimotor, developmental, social, introspection)
 pub mod consciousness_complete_being;
+
+// Relational consciousness - I-Thou philosophy, intersubjectivity, relationship dynamics
+// Revolutionary Improvement #18: Consciousness exists BETWEEN beings, not just IN them
+pub mod relational_consciousness;
+
+// Re-export relational consciousness types for sympoietic partnership
+pub use relational_consciousness::{
+    RelationMode,
+    RelationshipStage,
+    RelationalInteraction,
+    RelationalAssessment,
+    RelationalConfig,
+    RelationalConsciousness,
+};
 
 // Re-export phi-gradient learning types
 pub use phi_gradient_learning::{PhiGradientTopology, PhiLearningConfig};
