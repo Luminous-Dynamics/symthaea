@@ -88,6 +88,16 @@ pub use domain_traits::{
     ActorObservation,
 };
 
+// GridWorld domain adapter (Generalization Refactoring validation)
+// A simple 2D grid world to validate domain-agnostic infrastructure
+pub mod gridworld;
+pub use gridworld::{
+    GridState,
+    GridAction,
+    GridGoal,
+    GridWorldAdapter,
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSCIOUSNESS DOMAIN TYPES (Generalization Refactoring Phase 1)
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -931,6 +931,33 @@ impl State for LatentConsciousnessState {
         }
         sum.sqrt()
     }
+
+    /// Check if two consciousness states are equivalent using a hybrid approach.
+    ///
+    /// Uses BOTH distance-based tolerance AND HDC semantic similarity:
+    /// - If distance < tolerance, states are equivalent (strict match)
+    /// - Otherwise, if HDC similarity >= HDC_EQUIVALENCE_THRESHOLD (0.95),
+    ///   states are semantically equivalent (captures "same meaning")
+    ///
+    /// This hybrid approach ensures backward compatibility with distance-based
+    /// tests while enabling semantic equivalence for states that "mean the same"
+    /// even when their exact values differ.
+    fn is_equivalent(&self, other: &Self, tolerance: f64) -> bool {
+        // First check distance-based equivalence (respects tolerance parameter)
+        if self.distance(other) < tolerance {
+            return true;
+        }
+
+        // Then check HDC semantic similarity for looser "same meaning" equivalence
+        // Only if tolerance is loose enough to allow semantic matching
+        if tolerance >= 0.1 {
+            use crate::core::domain_traits::HdcEncodable;
+            self.semantic_similarity(other) >= HDC_EQUIVALENCE_THRESHOLD
+        } else {
+            // For very tight tolerances (< 0.1), rely on distance only
+            false
+        }
+    }
 }
 
 /// Implementation of domain-agnostic Action trait for ConsciousnessAction.
@@ -1667,6 +1694,170 @@ where
             .collect();
 
         self.dynamics.prediction_error(&recent)
+    }
+
+    /// Simulate a trajectory given starting state and action sequence.
+    pub fn simulate_trajectory(&self, start: &S, actions: &[A]) -> Vec<S> {
+        let mut trajectory = Vec::with_capacity(actions.len() + 1);
+        trajectory.push(start.clone());
+
+        let mut current = start.clone();
+        for action in actions {
+            current = self.dynamics.predict(&current, action.clone());
+            trajectory.push(current.clone());
+        }
+
+        trajectory
+    }
+
+    /// Predict cumulative discounted reward for a trajectory.
+    pub fn predict_cumulative_reward(&self, states: &[S], actions: &[A], gamma: f64) -> f64 {
+        let mut total = 0.0f64;
+
+        for (i, (state, action)) in states.iter().zip(actions.iter()).enumerate() {
+            let r = self.reward.predict(state, action.clone());
+            total += gamma.powi(i as i32) * r;
+        }
+
+        total
+    }
+
+    /// Get the imagined transitions buffer.
+    pub fn imagined(&self) -> &VecDeque<Transition<S, A>> {
+        &self.imagined_buffer
+    }
+
+    /// Get mutable access to dynamics model.
+    pub fn dynamics_mut(&mut self) -> &mut D {
+        &mut self.dynamics
+    }
+
+    /// Get mutable access to reward estimator.
+    pub fn reward_mut(&mut self) -> &mut R {
+        &mut self.reward
+    }
+}
+
+/// Extended GenericWorldModel with imagination/dreaming capabilities.
+///
+/// Requires an ActionProvider to enumerate available actions for dreaming.
+pub trait ActionProvider<A: Action> {
+    /// Get all available actions.
+    fn all_actions() -> Vec<A>;
+}
+
+impl<S, A, D, R> GenericWorldModel<S, A, D, R>
+where
+    S: State + Clone,
+    A: Action + Clone + ActionProvider<A>,
+    D: DynamicsPredictor<S, A>,
+    R: RewardEstimator<S, A>,
+{
+    /// Dream: generate imagined experiences through simulation.
+    ///
+    /// This enables model-based reinforcement learning by creating
+    /// synthetic training data from the learned dynamics model.
+    pub fn dream(&mut self, starting_states: &[S], exploration_rate: f64) {
+        if self.stats.transitions_observed < self.config.min_training_samples {
+            return; // Not enough real experience to dream reliably
+        }
+
+        let actions = A::all_actions();
+        if actions.is_empty() {
+            return;
+        }
+
+        for start in starting_states.iter().take(self.config.dream_trajectories) {
+            let mut current = start.clone();
+
+            for _ in 0..self.config.imagination_horizon {
+                // Sample action (epsilon-greedy)
+                let action = if rand::random::<f64>() < exploration_rate {
+                    // Random exploration
+                    actions[rand::random::<usize>() % actions.len()].clone()
+                } else {
+                    // Greedy: pick action with highest predicted reward
+                    self.select_best_action(&current, &actions)
+                };
+
+                let next = self.dynamics.predict(&current, action.clone());
+                let reward = self.reward.predict(&current, action.clone());
+
+                let transition = Transition::imagined(
+                    current.clone(),
+                    action,
+                    next.clone(),
+                    reward,
+                );
+
+                // Store imagined transition
+                if self.imagined_buffer.len() >= self.config.max_imagined_buffer {
+                    self.imagined_buffer.pop_front();
+                }
+                self.imagined_buffer.push_back(transition);
+                self.stats.transitions_imagined += 1;
+
+                current = next;
+            }
+        }
+
+        self.stats.dreams_completed += 1;
+    }
+
+    /// Select the best action according to predicted reward.
+    fn select_best_action(&self, state: &S, actions: &[A]) -> A {
+        let mut best_action = actions[0].clone();
+        let mut best_reward = f64::NEG_INFINITY;
+
+        for action in actions {
+            let next_state = self.dynamics.predict(state, action.clone());
+            let reward = self.reward.predict(&next_state, action.clone());
+
+            if reward > best_reward {
+                best_reward = reward;
+                best_action = action.clone();
+            }
+        }
+
+        best_action
+    }
+
+    /// Plan: find best action sequence using random shooting.
+    pub fn plan(&self, start: &S, horizon: usize, num_samples: usize, gamma: f64) -> Vec<A> {
+        let actions = A::all_actions();
+        if actions.is_empty() {
+            return Vec::new();
+        }
+
+        let mut best_sequence = Vec::new();
+        let mut best_reward = f64::NEG_INFINITY;
+
+        for _ in 0..num_samples {
+            let sequence: Vec<A> = (0..horizon)
+                .map(|_| actions[rand::random::<usize>() % actions.len()].clone())
+                .collect();
+
+            let trajectory = self.simulate_trajectory(start, &sequence);
+            let reward = self.predict_cumulative_reward(
+                &trajectory[..trajectory.len() - 1],
+                &sequence,
+                gamma,
+            );
+
+            if reward > best_reward {
+                best_reward = reward;
+                best_sequence = sequence;
+            }
+        }
+
+        best_sequence
+    }
+}
+
+/// Implement ActionProvider for ConsciousnessAction.
+impl ActionProvider<ConsciousnessAction> for ConsciousnessAction {
+    fn all_actions() -> Vec<ConsciousnessAction> {
+        ConsciousnessAction::all()
     }
 }
 
