@@ -8,6 +8,28 @@ Revolutionary consciousness-first AI combining:
 - Phase 11 Bio-Digital Bridge - Semantic grounding, safety, memory, swarm
 */
 
+/// Core, stable API surface for external users.
+///
+/// Prefer `symthaea::core` when you want a small, well-defined entry point
+/// for Φ measurement, hypervector operations, and the unified consciousness
+/// pipeline, without pulling in the entire experimental surface area.
+pub mod core;
+
+/// Domain adapters for the generalized agent architecture.
+///
+/// Each domain (Task, GridWorld, Consciousness) implements State/Action/Goal
+/// traits to enable the same planning infrastructure across different problems.
+pub mod domains;
+
+/// Prelude module for convenient imports
+///
+/// Use `use symthaea::prelude::*;` for common types:
+/// - `HV16` - Hyperdimensional vector
+/// - `HormoneState` - Endocrine state
+/// - `CoherenceField` - Consciousness integration
+/// - `SevenHarmonies` - Value alignment
+pub mod prelude;
+
 // Core Phase 10 modules
 pub mod hdc;
 pub mod ltc;
@@ -100,13 +122,16 @@ pub mod resonant_interaction;
 
 // Phase 11+: K-Index Client - ENABLED (minimal trait definition)
 pub mod kindex_client;
-// pub mod kindex_client_http;  // Needs HTTP client, still disabled
+pub mod kindex_client_http;  // HTTP-based K-Index client (reqwest blocking)
 
 // Phi Engine - Unified Φ calculation framework with automatic method selection
 pub mod phi_engine;
 
-// Phase 11+: Resonant Telemetry (Deferred to Week 11+)
-// pub mod resonant_telemetry;
+// Integration Pipeline - End-to-end conscious AI orchestration
+pub mod integration;
+
+// Phase 11+: Resonant Telemetry - Voice Cortex observability
+pub mod resonant_telemetry;
 
 // Re-exports for convenience
 pub use hdc::{SemanticSpace, HdcContext};  // Week 0: Added HdcContext
@@ -195,6 +220,12 @@ pub use language::{
 };
 pub use awakening::{SymthaeaAwakening, AwakenedState, Introspection as AwakeningIntrospection};
 
+// Integration Pipeline exports
+pub use integration::{
+    ConsciousPipeline, PipelineConfig, PipelineResult, PipelineStats,
+    DetectedIntent, ExecutionOutcome,
+};
+
 // Shell Sidecar exports (AI-native command interface)
 #[cfg(feature = "shell")]
 pub use shell::{
@@ -222,7 +253,7 @@ use substrate::Proprioception as SubstrateMonitor;
 use swarm::SwarmStats;
 
 /// Complete Sophia system with all components (Week 0: Minimal version)
-pub struct SophiaHLB {
+pub struct Symthaea {
     /// Phase 10: Core components
     semantic: SemanticSpace,
     liquid: LiquidNetwork,
@@ -258,7 +289,7 @@ pub struct SophiaHLB {
 
 /// Response from Sophia
 #[derive(Debug, Clone)]
-pub struct SophiaResponse {
+pub struct SymthaeaResponse {
     /// Response content (NixOS command or explanation)
     pub content: String,
 
@@ -294,7 +325,7 @@ pub struct Introspection {
     pub safety_stats: SafetyStats,
 }
 
-impl SophiaHLB {
+impl Symthaea {
     /// Create new Sophia system
     pub async fn new(semantic_dim: usize, liquid_neurons: usize) -> Result<Self> {
         tracing::info!("🌟 Initializing Sophia Holographic Liquid Brain (Week 0)");
@@ -334,7 +365,7 @@ impl SophiaHLB {
     }
 
     /// Process query (natural language → NixOS operation)
-    pub async fn process(&mut self, query: &str) -> Result<SophiaResponse> {
+    pub async fn process(&mut self, query: &str) -> Result<SymthaeaResponse> {
         self.operations_count += 1;
 
         tracing::info!("🧠 Processing query: {}", query);
@@ -441,7 +472,7 @@ impl SophiaHLB {
                 prediction.centering_needed
             );
 
-            return Ok(SophiaResponse {
+            return Ok(SymthaeaResponse {
                 content: format!(
                     "I can help with that, but I'll need to gather myself first. \
                      Give me about {:.0} seconds to center, then I'll be ready. \
@@ -485,7 +516,7 @@ impl SophiaHLB {
                 );
 
                 // Return intelligent scatter message with cause and recovery
-                return Ok(SophiaResponse {
+                return Ok(SymthaeaResponse {
                     content: format!(
                         "{}\n\n{}",
                         analysis.recommended_action,
@@ -510,7 +541,7 @@ impl SophiaHLB {
             if winner.source == "CoherenceField" {
                 // Sophia needs to center! (Not "too tired", but needs integration)
                 tracing::warn!("🌫️  Coherence centering request");
-                return Ok(SophiaResponse {
+                return Ok(SymthaeaResponse {
                     content: winner.content.clone(),
                     confidence: 0.0,
                     steps_to_emergence: 0,
@@ -526,7 +557,7 @@ impl SophiaHLB {
 
         // Week 0: Safety check (simplified without semantic encoding)
         // if let Err(e) = self.safety.check_safety(&query_hv) {
-        //     return Ok(SophiaResponse {
+        //     return Ok(SymthaeaResponse {
         //         content: format!("Safety check failed: {}", e),
         //         confidence: 0.0,
         //         steps_to_emergence: 0,
@@ -647,7 +678,7 @@ impl SophiaHLB {
             );
         }
 
-        Ok(SophiaResponse {
+        Ok(SymthaeaResponse {
             content: nix_response,
             confidence: self.consciousness.current_consciousness(),
             steps_to_emergence: steps,
@@ -697,7 +728,7 @@ impl SophiaHLB {
         );
 
         // For sync resume, use async version instead: resume_async()
-        anyhow::bail!("Use SophiaHLB::resume_async() instead - swarm requires async initialization")
+        anyhow::bail!("Use Symthaea::resume_async() instead - swarm requires async initialization")
     }
 
     /// Resume consciousness (async version with full swarm support)
@@ -829,13 +860,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_sophia_creation() {
-        let sophia = SophiaHLB::new(10_000, 1_000).await.unwrap();
+        let sophia = Symthaea::new(10_000, 1_000).await.unwrap();
         assert_eq!(sophia.operations_count, 0);
     }
 
     #[tokio::test]
     async fn test_sophia_process() {
-        let mut sophia = SophiaHLB::new(10_000, 1_000).await.unwrap();
+        let mut sophia = Symthaea::new(10_000, 1_000).await.unwrap();
 
         let response = sophia.process("install nginx").await.unwrap();
 
@@ -845,7 +876,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_introspection() {
-        let mut sophia = SophiaHLB::new(10_000, 1_000).await.unwrap();
+        let mut sophia = Symthaea::new(10_000, 1_000).await.unwrap();
 
         sophia.process("install firefox").await.unwrap();
 
