@@ -49,6 +49,10 @@ pub mod robustness_benchmarks;
 pub mod cladder_adapter;
 pub mod cladder_nlp_adapter;
 pub mod tuebingen_adapter;
+pub mod unified_causal_understanding;
+pub mod causal_tower;
+pub mod causal_cantor;
+pub mod mmlu;  // MMLU benchmark for Φ-accuracy correlation (Phase 2)
 
 // Re-export key types
 pub use causal_reasoning::{
@@ -145,6 +149,86 @@ pub use tuebingen_adapter::{
     discover_by_phi,
     discover_unified_primitives,
     discover_by_unified_primitives,
+};
+
+// Unified Causal Understanding - Deep Architecture (Jan 2026)
+pub use unified_causal_understanding::{
+    // Core components
+    CompressionCodebook,
+    CompressionCausalDiscovery,
+    InterventionalDynamics,
+    InterventionalCausalDiscovery,
+    DirectionalPhi,
+    DirectionalPhiDiscovery,
+    // Unified reasoning
+    UnifiedCausalReasoning,
+    CausalEvidence,
+    // Discovery functions
+    discover_by_compression,
+    discover_by_intervention,
+    discover_by_directional_phi,
+    discover_by_unified_reasoning,
+};
+
+// Causal Tower - Multi-level causal understanding (Jan 2026)
+pub use causal_tower::{
+    // Phase 1: Improved Primitives
+    ImprovedHdcCompression,
+    ImprovedLtcDynamics,
+    ImprovedPhiFlow,
+    // Phase 2: Classic Algorithms
+    IgciDiscovery,
+    LingamDiscovery,
+    ReciDiscovery,
+    CamDiscovery,
+    AnmDiscovery,
+    SlopeDiscovery,
+    // Phase 3: Meta-Learning
+    MetaFeatures,
+    MetaCausalLearner,
+    // Phase 4: Semantic Understanding
+    VariableType,
+    SemanticCausalReasoner,
+    // Phase 5: Uncertainty-Aware
+    UndeterminedReason,
+    CausalVerdict,
+    // Complete System
+    CausalTower,
+    discover_by_tower,
+    discover_by_tower_with_uncertainty,
+    // Improved SmartTower (Jan 2026)
+    SmartTower,
+    discover_by_smart_tower,
+    discover_by_oracle,
+    // Advanced methods (Jan 2026)
+    EnhancedReci,
+    UltimateEnsemble,
+    SemanticDiscovery,
+    NeuralCausalDiscovery,
+    FinalBoss,
+    discover_by_enhanced_reci,
+    discover_by_ultimate_ensemble,
+    discover_by_semantic,
+    discover_by_neural,
+    discover_by_final_boss,
+};
+
+// Causal Cantor - Multi-timescale hierarchical causal discovery (Jan 2026)
+pub use causal_cantor::{
+    CausalFeatureEncoder,
+    CausalCantorNetwork,
+    discover_by_cantor,
+    train_causal_cantor,
+    discover_by_cantor_cv,
+};
+
+// MMLU Benchmark - Φ-Accuracy correlation (Phase 2 validation)
+pub use mmlu::{
+    MMLUQuestion,
+    MMLUBenchmark,
+    ReasoningResult,
+    BenchmarkResults as MMLUResults,  // Renamed to avoid collision
+    sample_questions as mmlu_sample_questions,
 };
 
 /// Run the full benchmark suite with Symthaea's real causal solver
