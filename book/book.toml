@@ -1,0 +1,46 @@
+[book]
+title = "Symthaea: The Complete Guide"
+authors = ["Luminous Dynamics"]
+description = "Consciousness-first AI that grows with you - from first steps to deep partnership"
+language = "en"
+src = "src"
+
+[build]
+build-dir = "build"
+create-missing = true
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/Luminous-Dynamics/symthaea-hlb"
+site-url = "/symthaea-hlb/"
+no-section-label = false
+additional-css = ["custom.css"]
+
+[output.html.print]
+enable = true
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.search]
+enable = true
+limit-results = 30
+teaser-word-count = 30
+boost-title = 2
+boost-hierarchy = 1
+boost-paragraph = 1
+expand = true
+heading-split-level = 3
+
+[output.html.playground]
+editable = false
+copyable = true
+copy-js = true
+line-numbers = true
+runnable = false
+
+[preprocessor.links]
+
+[preprocessor.index]
