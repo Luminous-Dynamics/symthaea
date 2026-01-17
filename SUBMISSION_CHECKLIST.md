@@ -188,7 +188,7 @@ publication-quality science.
 
 **Steps**:
 1. Create account at https://zenodo.org
-2. Link to GitHub repository (luminous-dynamics/symthaea-hlb)
+2. Link to GitHub repository (Luminous-Dynamics/symthaea)
 3. Create new upload with metadata:
    - Title: "Network Topology and Integrated Information: Dataset and Code"
    - Authors: Tristan Stoltz, Claude Code
@@ -197,7 +197,7 @@ publication-quality science.
    - Access: Open Access (CC BY 4.0)
 4. Upload files:
    - Raw data (CSV format): `tier_3_validation_raw_data.csv`
-   - Code repository (zip): `symthaea-hlb-v0.1.0.zip`
+   - Code repository (zip): `symthaea-v0.1.0.zip`
    - Analysis scripts: `generate_figures.py`, analysis notebooks
    - README: `ZENODO_README.md` with usage instructions
 5. Generate DOI
@@ -211,8 +211,8 @@ python scripts/convert_results_to_csv.py \
   -o tier_3_validation_raw_data.csv
 
 # Package code
-git archive --format=zip --prefix=symthaea-hlb-v0.1.0/ \
-  -o symthaea-hlb-v0.1.0.zip HEAD
+git archive --format=zip --prefix=symthaea-v0.1.0/ \
+  -o symthaea-v0.1.0.zip HEAD
 ```
 
 **Deliverable**: Zenodo DOI (10.5281/zenodo.XXXXXXX)
@@ -244,7 +244,7 @@ in Zenodo at https://doi.org/10.5281/zenodo.XXXXXXX
 **Steps**:
 1. Tag current commit: `git tag -a v0.1.0 -m "Publication release"`
 2. Push tag: `git push origin v0.1.0`
-3. Create GitHub release at https://github.com/luminous-dynamics/symthaea-hlb/releases
+3. Create GitHub release at https://github.com/Luminous-Dynamics/symthaea/releases
 4. Upload compiled binaries (if applicable)
 5. Write release notes highlighting publication
 

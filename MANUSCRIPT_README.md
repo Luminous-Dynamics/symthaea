@@ -19,7 +19,7 @@
 
 **For Reproducing Results**:
 1. Ensure NixOS 25.11 or Nix package manager installed
-2. Clone repository: `git clone https://github.com/luminous-dynamics/symthaea-hlb`
+2. Clone repository: `git clone https://github.com/Luminous-Dynamics/symthaea`
 3. Enter environment: `nix develop`
 4. Run validation: `cargo run --release --example tier_3_validation`
 5. Generate figures: `python3 generate_figures.py`
@@ -139,8 +139,8 @@ mkdir -p ~/.config/nix
 echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
 
 # 3. Clone repository
-git clone https://github.com/luminous-dynamics/symthaea-hlb
-cd symthaea-hlb
+git clone https://github.com/Luminous-Dynamics/symthaea
+cd symthaea
 
 # 4. Enter development environment
 nix develop
@@ -337,9 +337,9 @@ This work demonstrates the **Sacred Trinity** human-AI collaboration framework:
 **Organization**: Luminous Dynamics
 **Location**: Richardson, TX, USA
 
-**GitHub**: https://github.com/luminous-dynamics/symthaea-hlb
-**Issues**: https://github.com/luminous-dynamics/symthaea-hlb/issues
-**Discussions**: https://github.com/luminous-dynamics/symthaea-hlb/discussions
+**GitHub**: https://github.com/Luminous-Dynamics/symthaea
+**Issues**: https://github.com/Luminous-Dynamics/symthaea/issues
+**Discussions**: https://github.com/Luminous-Dynamics/symthaea/discussions
 
 ---
 

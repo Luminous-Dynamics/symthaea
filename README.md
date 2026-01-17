@@ -29,8 +29,8 @@ Powered by:
 ## 🚀 Quick Start
 
 ```bash
-# Clone or navigate to symthaea-hlb directory
-cd symthaea-hlb
+# Clone or navigate to symthaea directory
+cd symthaea
 
 # Build (release mode for performance)
 cargo build --release
@@ -119,7 +119,7 @@ huggingface-cli download Xenova/siglip-so400m-patch14-224-onnx --local-dir model
 
 **Model locations:**
 ```
-symthaea-hlb/
+symthaea/
   models/
     qwen3-embedding-0.6b/
       model.onnx

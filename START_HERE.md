@@ -119,8 +119,8 @@
 python prepare_zenodo_dataset.py
 
 # Step 2: Review output
-ls zenodo-dataset/symthaea-hlb-v0.1.0/
-cat zenodo-dataset/symthaea-hlb-v0.1.0/README.md
+ls zenodo-dataset/symthaea-v0.1.0/
+cat zenodo-dataset/symthaea-v0.1.0/README.md
 
 # Step 3: Decide if you want to continue or pause
 ```

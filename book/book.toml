@@ -12,8 +12,8 @@ create-missing = true
 [output.html]
 default-theme = "light"
 preferred-dark-theme = "navy"
-git-repository-url = "https://github.com/Luminous-Dynamics/symthaea-hlb"
-site-url = "/symthaea-hlb/"
+git-repository-url = "https://github.com/Luminous-Dynamics/symthaea"
+site-url = "/symthaea/"
 no-section-label = false
 additional-css = ["custom.css"]
 

@@ -418,7 +418,7 @@ When ready to proceed with submission:
 **Location**: Richardson, TX, USA
 
 **Resources**:
-- GitHub: https://github.com/luminous-dynamics/symthaea-hlb
+- GitHub: https://github.com/Luminous-Dynamics/symthaea
 - Zenodo: (DOI pending upload)
 - ArXiv: (pending submission)
 - Journal: (pending submission)

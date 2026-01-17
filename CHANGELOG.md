@@ -249,5 +249,5 @@ This research builds on:
 
 ---
 
-[Unreleased]: https://github.com/Luminous-Dynamics/symthaea-hlb/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/Luminous-Dynamics/symthaea-hlb/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Luminous-Dynamics/symthaea/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Luminous-Dynamics/symthaea/releases/tag/v0.1.0
