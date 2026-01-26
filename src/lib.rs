@@ -21,19 +21,25 @@ pub mod core;
 /// traits to enable the same planning infrastructure across different problems.
 pub mod domains;
 
-/// Prelude module for convenient imports
-///
-/// Use `use symthaea::prelude::*;` for common types:
-/// - `HV16` - Hyperdimensional vector
-/// - `HormoneState` - Endocrine state
-/// - `CoherenceField` - Consciousness integration
-/// - `SevenHarmonies` - Value alignment
-pub mod prelude;
+// STUB: Prelude module temporarily disabled during Grammar Space development
+// TODO: Create src/prelude.rs with common re-exports
+// /// Prelude module for convenient imports
+// ///
+// /// Use `use symthaea::prelude::*;` for common types:
+// /// - `HV16` - Hyperdimensional vector
+// /// - `HormoneState` - Endocrine state
+// /// - `CoherenceField` - Consciousness integration
+// /// - `SevenHarmonies` - Value alignment
+// pub mod prelude;
 
 // Core Phase 10 modules
 pub mod hdc;
 pub mod ltc;
-pub mod hierarchical_cantor_ltc;  // 7-level Cantor-LTC/HDC for meta-cognition
+
+// Mind Module - Neuro-Symbolic Bridge (Epistemic Governance)
+pub mod mind;
+// STUB: hierarchical_cantor_ltc disabled - file doesn't exist
+// pub mod hierarchical_cantor_ltc;  // 7-level Cantor-LTC/HDC for meta-cognition
 pub mod consciousness;
 pub mod nix_understanding;
 
@@ -42,8 +48,8 @@ pub mod learnable_ltc;
 pub mod sparse_ltc;  // Efficient sparse LTC implementation
 pub mod learning;    // Learning integration engine
 
-// Continuous Mind - continuously running cognitive system
-pub mod continuous_mind;
+// STUB: Continuous Mind disabled - depends on prefrontal (Goal, Condition)
+// pub mod continuous_mind;
 
 // Week 0: Actor Model & Physiological Systems
 pub mod brain;
@@ -86,14 +92,10 @@ pub mod swarm;  // libp2p enabled - P2P collective learning
 #[cfg(feature = "shell")]
 pub mod shell;
 
-// GUI Bridge module - Bidirectional widget<->Nix mapping
-pub mod gui_bridge;
-
-// Infrastructure module - Performance and reliability
-pub mod infrastructure;
-
-// Intelligence module - HDC-powered AI features
-pub mod intelligence;
+// STUB: Advanced modules disabled - files don't exist
+// pub mod gui_bridge;        // Bidirectional widget<->Nix mapping
+// pub mod infrastructure;    // Performance and reliability
+// pub mod intelligence;      // HDC-powered AI features
 
 // Benchmarks (Tübingen causal discovery, etc.)
 pub mod benchmarks;
@@ -105,33 +107,30 @@ pub mod api;
 // Week 12 Phase 2a: Voice Interface (STT + TTS)
 pub mod voice;
 
-// Custom Proprioception: Direct hardware monitoring with HDC integration
-pub mod substrate;
+// STUB: substrate disabled - file doesn't exist
+// pub mod substrate;  // Direct hardware monitoring with HDC integration
 
 // Phase 11+: Mycelix Protocol integration (Deferred - needs sha2, uuid, urlencoding dependencies)
 // pub mod sophia_swarm;  // Needs additional dependencies
 
-// Phase 11+: Resonant Speech - ENABLED (only needs uuid which is available)
-pub mod resonant_speech;
-
-// Phase 11+: User State Inference - ENABLED (depends on resonant_speech)
-pub mod user_state_inference;
-
-// Phase 11+: Resonant Interaction - ENABLED (voice cortex adapter)
-pub mod resonant_interaction;
+// STUB: Phase 11+ modules disabled - depend on unified_value_evaluator
+// pub mod resonant_speech;
+// pub mod user_state_inference;
+// pub mod resonant_interaction;
 
 // Phase 11+: K-Index Client - ENABLED (minimal trait definition)
 pub mod kindex_client;
-pub mod kindex_client_http;  // HTTP-based K-Index client (reqwest blocking)
+// STUB: kindex_client_http disabled - needs reqwest blocking feature
+// pub mod kindex_client_http;
 
 // Phi Engine - Unified Φ calculation framework with automatic method selection
 pub mod phi_engine;
 
-// Integration Pipeline - End-to-end conscious AI orchestration
-pub mod integration;
+// STUB: integration disabled - file doesn't exist
+// pub mod integration;  // End-to-end conscious AI orchestration
 
-// Phase 11+: Resonant Telemetry - Voice Cortex observability
-pub mod resonant_telemetry;
+// STUB: Phase 11+ Resonant Telemetry disabled - depends on resonant_speech
+// pub mod resonant_telemetry;
 
 // Re-exports for convenience
 pub use hdc::{SemanticSpace, HdcContext};  // Week 0: Added HdcContext
@@ -139,10 +138,14 @@ pub use ltc::LiquidNetwork;
 pub use consciousness::ConsciousnessGraph;
 pub use nix_understanding::NixUnderstanding;
 
+// Mind module exports (Neuro-Symbolic Bridge)
+pub use mind::{Mind, EpistemicStatus, SemanticIntent as MindSemanticIntent, StructuredThought};
+
 // Learning integration re-exports
 pub use learnable_ltc::{LearnableLTC, LearnableLTCConfig, LTCTrainingStats};
 pub use learning::{LearningEngine, LearningConfig, LearningStats, Experience};
-pub use continuous_mind::{ContinuousMind, MindConfig, MindState, MindResponse};
+// STUB: continuous_mind disabled
+// pub use continuous_mind::{ContinuousMind, MindConfig, MindState, MindResponse};
 
 // Week 0: Deferred Phase 11+ exports
 // pub use semantic_ear::SemanticEar;  // Needs rust-bert
@@ -156,23 +159,26 @@ pub use soul::{WeaverActor, DailyState, CoherenceStatus, KVector};
 pub use memory::{HippocampusActor, MemoryTrace, RecallQuery, EmotionalValence};
 pub use brain::{
     CerebellumActor, Skill, ExecutionContext, WorkflowChain, CerebellumStats,
-    MotorCortexActor, ActionStep, PlannedAction, StepResult, ExecutionResult,
-    SimulationMode, ExecutionSandbox, LocalShellSandbox, MotorCortexStats,
+    // STUB: motor_cortex types disabled - module depends on unified_value_evaluator
+    // MotorCortexActor, ActionStep, PlannedAction, StepResult, ExecutionResult,
+    // SimulationMode, ExecutionSandbox, LocalShellSandbox, MotorCortexStats,
 };
 
-// Week 3: Prefrontal Cortex (Global Workspace) exports
+// STUB: Week 3: Prefrontal Cortex disabled - depends on unified_value_evaluator
+// pub use brain::{
+//     PrefrontalCortexActor, AttentionBid, GlobalWorkspace, WorkingMemoryItem, PrefrontalStats,
+//     WorkingMemoryStats, Goal, Condition, GoalStats,
+// };
 pub use brain::{
-    PrefrontalCortexActor, AttentionBid, GlobalWorkspace, WorkingMemoryItem, PrefrontalStats,
-    WorkingMemoryStats, Goal, Condition, GoalStats,
     MetaCognitionMonitor, CognitiveMetrics, RegulatoryAction, RegulatoryBid,
     MetaCognitionConfig, MonitorStats,
     ThalamusActor,  // Week 5: Sensory Relay
 };
 
-// Week 4: The Daemon (Default Mode Network) exports
-pub use brain::{
-    DaemonActor, DaemonConfig, Insight, DaemonStats,
-};
+// STUB: Week 4: Daemon disabled - depends on prefrontal
+// pub use brain::{
+//     DaemonActor, DaemonConfig, Insight, DaemonStats,
+// };
 
 // Week 4: Physiology exports
 pub use physiology::{
@@ -205,26 +211,19 @@ pub use perception::{
     CodePerceptionCortex, ProjectStructure, RustCodeSemantics, CodeQualityAnalysis,
 };
 
-pub use swarm::{SwarmIntelligence, SwarmConfig, PeerStats, SwarmError};  // libp2p enabled
+pub use swarm::{SwarmIntelligence, SwarmConfig, PeerStats};  // libp2p enabled (SwarmError removed - not defined)
 
-// Substrate awareness exports (custom proprioception)
-pub use substrate::{
-    Proprioception as SubstrateAwareness,
-    ProprioceptiveState, ConsciousnessMap, SensorReading,
-    SensorType, SensorUnit, HwmonMonitor, NvidiaHwmonMonitor,
-};
+// STUB: Substrate awareness exports disabled - module disabled
+// pub use substrate::{ ... };
 
-// Track 6: Language & Conversation exports
-pub use language::{
-    Conversation, ConversationConfig, ConversationTurn, ConversationState,
-};
+// STUB: Track 6: Language Conversation exports disabled - conversation module disabled
+// pub use language::{
+//     Conversation, ConversationConfig, ConversationTurn, ConversationState,
+// };
 pub use awakening::{SymthaeaAwakening, AwakenedState, Introspection as AwakeningIntrospection};
 
-// Integration Pipeline exports
-pub use integration::{
-    ConsciousPipeline, PipelineConfig, PipelineResult, PipelineStats,
-    DetectedIntent, ExecutionOutcome,
-};
+// STUB: Integration Pipeline exports disabled - module disabled
+// pub use integration::{ ... };
 
 // Shell Sidecar exports (AI-native command interface)
 #[cfg(feature = "shell")]
@@ -235,22 +234,66 @@ pub use shell::{
     ShellIpcClient, IpcError,
 };
 
-// GUI Bridge exports (Bidirectional widget<->Nix mapping)
-pub use gui_bridge::{
-    GuiBridge, ConfigCategory, SyncState, WidgetUpdate, SearchResult,
-    WidgetMapper, WidgetBinding, WidgetId, WidgetValue, NixPath, ValueTransformer, MappingResult,
-    HdcTranslator, SemanticBinding, SemanticRole, SemanticConfidence, TranslationResult,
-    ConstraintValidator, Constraint, ConstraintKind, ValidationResult, ValidationError, Suggestion,
-};
+// STUB: GUI Bridge exports disabled - module disabled
+// pub use gui_bridge::{ ... };
 
 use anyhow::Result;
 use tokio::sync::RwLock;
 use std::sync::Arc;
 
-// Import new integrated modules
-use perception::SemanticEncoder;
-use substrate::Proprioception as SubstrateMonitor;
+// STUB: Integrated module imports disabled - modules don't exist or have broken deps
+// use perception::SemanticEncoder;
+// use substrate::Proprioception as SubstrateMonitor;
 use swarm::SwarmStats;
+
+// STUB: Create placeholder types for disabled modules
+#[derive(Debug, Clone, Default)]
+pub struct SemanticEncoder;
+impl SemanticEncoder {
+    pub fn new() -> Self { Self }
+    pub async fn encode(&self, _text: &str) -> Vec<i8> { vec![0i8; 256] }
+    pub fn encode_text(&self, _text: &str) -> Vec<i8> { vec![0i8; 256] }
+    pub fn text_similarity(&self, _a: &str, _b: &str) -> f32 { 0.5 }
+}
+#[derive(Debug, Clone, Default)]
+pub struct SubstrateMonitor;
+impl SubstrateMonitor {
+    pub fn new() -> Self { Self }
+    pub fn current_state(&self) -> ProprioceptiveState { ProprioceptiveState::default() }
+    pub fn read_state(&self) -> ProprioceptiveState { ProprioceptiveState::default() }
+}
+#[derive(Debug, Clone, Default)]
+pub struct ConsciousnessMap {
+    pub substrate_stress: f32,
+}
+#[derive(Debug, Clone, Default)]
+pub struct ProprioceptiveState {
+    pub consciousness_map: ConsciousnessMap,
+}
+// SleepCycleManager is imported from sleep_cycles module
+#[derive(Debug, Clone, Default)]
+pub struct PrefrontalCortexActor;
+#[derive(Debug, Clone, Default)]
+pub struct AttentionBid {
+    pub urgency: f32,
+    pub relevance: f32,
+}
+impl AttentionBid {
+    pub fn new(_source: &str, _content: impl Into<String>) -> Self { Self { urgency: 0.5, relevance: 0.5 } }
+    pub fn with_urgency(mut self, u: f32) -> Self { self.urgency = u; self }
+    pub fn with_salience(self, _s: f32) -> Self { self }
+    pub fn with_emotion(self, _e: memory::hippocampus::EmotionalValence) -> Self { self }
+}
+#[derive(Debug, Clone)]
+pub struct WinningBid {
+    pub source: String,
+    pub content: String,
+}
+impl PrefrontalCortexActor {
+    pub fn new() -> Self { Self }
+    pub fn estimate_complexity<T>(&self, _bid: &T) -> TaskComplexity { TaskComplexity::default() }
+    pub fn cognitive_cycle_with_coherence(&mut self, _bids: Vec<AttentionBid>, _coherence: &mut CoherenceField) -> Option<WinningBid> { None }
+}
 
 /// Complete Sophia system with all components (Week 0: Minimal version)
 pub struct Symthaea {
@@ -283,6 +326,9 @@ pub struct Symthaea {
     /// Week 6+: Revolutionary Consciousness Model
     coherence: CoherenceField,    // Consciousness as integration (replaces ATP commodity model)
 
+    /// Neuro-Symbolic Bridge - Epistemic Governance Layer
+    pub mind: Mind,  // The Mind for hallucination prevention
+
     /// System state
     operations_count: usize,
 }
@@ -293,6 +339,9 @@ pub struct SymthaeaResponse {
     /// Response content (NixOS command or explanation)
     pub content: String,
 
+    /// Response text (alias for content, for API compatibility)
+    pub response_text: String,
+
     /// Confidence level (0.0 to 1.0)
     pub confidence: f32,
 
@@ -301,6 +350,9 @@ pub struct SymthaeaResponse {
 
     /// Safety check passed
     pub safe: bool,
+
+    /// Structured thought from the Mind (epistemic governance)
+    pub structured_thought: Option<StructuredThought>,
 }
 
 /// Introspection data
@@ -360,6 +412,42 @@ impl Symthaea {
             // Week 6+: Initialize revolutionary consciousness model
             coherence: CoherenceField::new(),
 
+            // Neuro-Symbolic Bridge - Mind for epistemic governance
+            mind: Mind::new_with_simulated_llm(semantic_dim, liquid_neurons).await?,
+
+            operations_count: 0,
+        })
+    }
+
+    /// Create Sophia with simulated LLM (for deterministic testing)
+    ///
+    /// This is the "Proof of Character" test harness - the Mind uses a
+    /// simulated LLM backend that respects epistemic constraints and
+    /// produces deterministic, hedging responses when knowledge is Unknown.
+    pub async fn new_with_simulated_llm(semantic_dim: usize, liquid_neurons: usize) -> Result<Self> {
+        tracing::info!("🧪 Initializing Sophia with Simulated LLM (Veracity Test Mode)");
+
+        Ok(Self {
+            semantic: SemanticSpace::new(semantic_dim)?,
+            liquid: LiquidNetwork::new(liquid_neurons)?,
+            consciousness: ConsciousnessGraph::new(),
+            nix: NixUnderstanding::new(),
+            safety: SafetyGuardrails::new(),
+            sleep: SleepCycleManager::new(SleepConfig::default()),
+            swarm: Arc::new(RwLock::new(
+                SwarmIntelligence::new(SwarmConfig::default()).await?
+            )),
+            semantic_encoder: SemanticEncoder::new(),
+            substrate_monitor: SubstrateMonitor::new(),
+            endocrine: EndocrineSystem::new(EndocrineConfig::default()),
+            hearth: HearthActor::new(),
+            thalamus: ThalamusActor::new(),
+            prefrontal: PrefrontalCortexActor::new(),
+            chronos: ChronosActor::new(),
+            proprioception: ProprioceptionActor::new(),
+            coherence: CoherenceField::new(),
+            // CRITICAL: Use simulated LLM for deterministic hallucination testing
+            mind: Mind::new_with_simulated_llm(semantic_dim, liquid_neurons).await?,
             operations_count: 0,
         })
     }
@@ -472,18 +560,21 @@ impl Symthaea {
                 prediction.centering_needed
             );
 
+            let content = format!(
+                "I can help with that, but I'll need to gather myself first. \
+                 Give me about {:.0} seconds to center, then I'll be ready. \
+                 (Current coherence: {:.0}%, need {:.0}%)",
+                prediction.centering_needed,
+                self.coherence.state().coherence * 100.0,
+                task_complexity.required_coherence(&self.coherence.config) * 100.0
+            );
             return Ok(SymthaeaResponse {
-                content: format!(
-                    "I can help with that, but I'll need to gather myself first. \
-                     Give me about {:.0} seconds to center, then I'll be ready. \
-                     (Current coherence: {:.0}%, need {:.0}%)",
-                    prediction.centering_needed,
-                    self.coherence.state().coherence * 100.0,
-                    task_complexity.required_coherence(&self.coherence.config) * 100.0
-                ),
+                content: content.clone(),
+                response_text: content,
                 confidence: prediction.confidence,
                 steps_to_emergence: 0,
                 safe: true,
+                structured_thought: None,
             });
         }
 
@@ -516,15 +607,18 @@ impl Symthaea {
                 );
 
                 // Return intelligent scatter message with cause and recovery
+                let content = format!(
+                    "{}\n\n{}",
+                    analysis.recommended_action,
+                    message
+                );
                 return Ok(SymthaeaResponse {
-                    content: format!(
-                        "{}\n\n{}",
-                        analysis.recommended_action,
-                        message
-                    ),
+                    content: content.clone(),
+                    response_text: content,
                     confidence: 0.0,
                     steps_to_emergence: 0,
                     safe: true,
+                    structured_thought: None,
                 });
             }
         }
@@ -543,9 +637,11 @@ impl Symthaea {
                 tracing::warn!("🌫️  Coherence centering request");
                 return Ok(SymthaeaResponse {
                     content: winner.content.clone(),
+                    response_text: winner.content.clone(),
                     confidence: 0.0,
                     steps_to_emergence: 0,
                     safe: true,
+                    structured_thought: None,
                 });
             }
             // Align task complexity with the actual winning bid
@@ -678,11 +774,31 @@ impl Symthaea {
             );
         }
 
+        // Generate structured thought from the Mind (epistemic governance layer)
+        let structured_thought = self.mind.think(query).await.ok();
+
+        // If the Mind indicates uncertainty, use its hedging response instead
+        // This is the "Negative Capability" in action - refuse to hallucinate
+        let (final_content, final_response_text) = if let Some(ref thought) = structured_thought {
+            if thought.is_uncertain() {
+                // Use the Mind's hedging response when uncertain
+                (thought.response_text.clone(), thought.response_text.clone())
+            } else {
+                // Use the normal NixOS response when known
+                (nix_response.clone(), nix_response)
+            }
+        } else {
+            // No structured thought - use default response
+            (nix_response.clone(), nix_response)
+        };
+
         Ok(SymthaeaResponse {
-            content: nix_response,
+            content: final_content,
+            response_text: final_response_text,
             confidence: self.consciousness.current_consciousness(),
             steps_to_emergence: steps,
             safe: true,
+            structured_thought,
         })
     }
 
@@ -775,6 +891,9 @@ impl Symthaea {
 
             // Week 4+: Reinitialize endocrine system (fresh state)
             endocrine: EndocrineSystem::new(EndocrineConfig::default()),
+
+            // Epistemic governance layer (Mind module)
+            mind: Mind::new_with_simulated_llm(10_000, 1_000).await?,
 
             operations_count: 0,
         })
