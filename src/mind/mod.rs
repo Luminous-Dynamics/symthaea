@@ -39,9 +39,11 @@
 
 pub mod structured_thought;
 pub mod simulated_llm;
+pub mod ollama_backend;
 
 pub use structured_thought::{EpistemicStatus, SemanticIntent, StructuredThought};
 pub use simulated_llm::SimulatedLLM;
+pub use ollama_backend::{OllamaBackend, check_ollama_availability};
 
 use crate::hdc::SemanticSpace;
 use crate::ltc::LiquidNetwork;
@@ -119,6 +121,57 @@ impl Mind {
             hdc_dim,
             ltc_neurons,
         })
+    }
+
+    /// Create a Mind with Ollama backend (real LLM)
+    ///
+    /// This is "The Taming of the Shrew" - using Rust control logic
+    /// to constrain a real neural network's tendency to hallucinate.
+    pub async fn new_with_ollama(
+        hdc_dim: usize,
+        ltc_neurons: usize,
+        model: &str,
+    ) -> Result<Self> {
+        let semantic_space = SemanticSpace::new(hdc_dim)?;
+        let liquid_network = LiquidNetwork::new(ltc_neurons)?;
+
+        let ollama = OllamaBackend::new(model);
+
+        // Verify Ollama is available
+        if !ollama.is_available().await {
+            return Err(anyhow::anyhow!(
+                "Ollama is not available at localhost:11434. \
+                 Please start Ollama or use new_with_simulated_llm() for testing."
+            ));
+        }
+
+        tracing::info!("🧠 Mind initialized with Ollama backend (model: {})", model);
+
+        Ok(Self {
+            semantic_space,
+            liquid_network,
+            epistemic_state: RwLock::new(EpistemicStatus::Unknown),
+            llm_backend: Arc::new(ollama),
+            hdc_dim,
+            ltc_neurons,
+        })
+    }
+
+    /// Create a Mind with automatic backend selection
+    ///
+    /// Prefers Ollama if available, falls back to simulation.
+    pub async fn new_auto(
+        hdc_dim: usize,
+        ltc_neurons: usize,
+        preferred_model: &str,
+    ) -> Result<Self> {
+        if check_ollama_availability().await {
+            tracing::info!("🌟 Ollama detected - using real LLM backend");
+            Self::new_with_ollama(hdc_dim, ltc_neurons, preferred_model).await
+        } else {
+            tracing::warn!("⚠️ Ollama not available - falling back to simulation");
+            Self::new_with_simulated_llm(hdc_dim, ltc_neurons).await
+        }
     }
 
     /// Force the epistemic state (for testing scenarios)
