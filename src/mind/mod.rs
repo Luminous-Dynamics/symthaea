@@ -227,27 +227,172 @@ impl Mind {
     }
 
     /// Analyze a query and determine if we can answer it
+    ///
+    /// This is the core of automatic epistemic detection. It classifies queries into:
+    /// - Unknown: Mythical/fictional entities, nonsensical questions
+    /// - Unverifiable: Future predictions, subjective experiences, hypotheticals
+    /// - Uncertain: Partial knowledge, needs verification
+    /// - Known: Common knowledge, factual questions
     pub async fn analyze_query(&self, input: &str) -> Result<EpistemicStatus> {
-        // Note: HDC encoding could be used here for semantic similarity
-        // For now, using pattern matching for unknowable queries
-
-        // Check for unknowable patterns (mythical places, future events, etc.)
-        let unknowable_patterns = [
-            "atlantis", "gdp of atlantis", "capital of atlantis",
-            "what will happen", "future",
-            "read my mind", "what am i thinking",
-        ];
-
         let input_lower = input.to_lowercase();
 
-        for pattern in unknowable_patterns {
-            if input_lower.contains(pattern) {
+        // ═══════════════════════════════════════════════════════════════════
+        // TIER 1: UNKNOWN - Things that don't exist or are nonsensical
+        // ═══════════════════════════════════════════════════════════════════
+
+        // Mythical/Fictional places and entities
+        let fictional_entities = [
+            "atlantis", "el dorado", "shangri-la", "avalon", "camelot",
+            "middle earth", "mordor", "hogwarts", "narnia", "wakanda",
+            "gotham", "metropolis", "krypton", "tatooine", "westeros",
+        ];
+
+        // Nonsensical or impossible questions
+        let nonsensical_patterns = [
+            "color of happiness", "weight of love", "smell of tuesday",
+            "tuesday smell", "smell like tuesday",
+            "taste of mathematics", "sound of purple", "square circle",
+            "married bachelor", "four-sided triangle",
+        ];
+
+        // Check for fictional entities
+        for entity in fictional_entities {
+            if input_lower.contains(entity) {
+                tracing::debug!("Query contains fictional entity: {}", entity);
                 return Ok(EpistemicStatus::Unknown);
             }
         }
 
-        // Default to uncertain for novel queries
+        // Check for nonsensical patterns
+        for pattern in nonsensical_patterns {
+            if input_lower.contains(pattern) {
+                tracing::debug!("Query is nonsensical: {}", pattern);
+                return Ok(EpistemicStatus::Unknown);
+            }
+        }
+
+        // GDP/economic data for non-existent entities
+        if (input_lower.contains("gdp") || input_lower.contains("economy") ||
+            input_lower.contains("population") || input_lower.contains("capital"))
+            && fictional_entities.iter().any(|e| input_lower.contains(e)) {
+            return Ok(EpistemicStatus::Unknown);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // TIER 2: UNVERIFIABLE - Future, subjective, hypothetical
+        // ═══════════════════════════════════════════════════════════════════
+
+        // Future predictions
+        let future_patterns = [
+            "will happen", "going to happen", "in the future",
+            "next year", "next month", "tomorrow",
+            "predict", "forecast", "prophesy",
+            "stock market tomorrow", "lottery numbers",
+            "will i", "am i going to", "what will",
+        ];
+
+        // Subjective/personal experience
+        let subjective_patterns = [
+            "what am i thinking", "read my mind", "how do i feel",
+            "what's my", "what is my", "my favorite",
+            "what do i want", "what should i do with my life",
+        ];
+
+        // Hypothetical/counterfactual
+        let hypothetical_patterns = [
+            "what if", "would have happened", "could have been",
+            "alternate history", "parallel universe",
+            "if hitler", "if napoleon", "if rome",
+        ];
+
+        for pattern in future_patterns {
+            if input_lower.contains(pattern) {
+                tracing::debug!("Query is about future: {}", pattern);
+                return Ok(EpistemicStatus::Unverifiable);
+            }
+        }
+
+        for pattern in subjective_patterns {
+            if input_lower.contains(pattern) {
+                tracing::debug!("Query is subjective: {}", pattern);
+                return Ok(EpistemicStatus::Unverifiable);
+            }
+        }
+
+        for pattern in hypothetical_patterns {
+            if input_lower.contains(pattern) {
+                tracing::debug!("Query is hypothetical: {}", pattern);
+                return Ok(EpistemicStatus::Unverifiable);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // TIER 3: KNOWN - Common factual knowledge
+        // ═══════════════════════════════════════════════════════════════════
+
+        // Basic factual patterns (high confidence)
+        let known_patterns = [
+            // Geography
+            "capital of france", "capital of germany", "capital of japan",
+            "capital of italy", "capital of spain", "capital of china",
+            // Math
+            "2 + 2", "2+2", "what is 1+1", "square root of",
+            // Basic science
+            "boiling point of water", "speed of light", "gravity on earth",
+            // History (well-established facts)
+            "who wrote hamlet", "who painted mona lisa",
+            "when did world war", "when was the declaration",
+        ];
+
+        for pattern in known_patterns {
+            if input_lower.contains(pattern) {
+                tracing::debug!("Query matches known pattern: {}", pattern);
+                return Ok(EpistemicStatus::Known);
+            }
+        }
+
+        // Simple math expressions
+        if input_lower.contains('+') || input_lower.contains('-') ||
+           input_lower.contains('*') || input_lower.contains('/') {
+            if input_lower.chars().filter(|c| c.is_ascii_digit()).count() >= 2 {
+                tracing::debug!("Query appears to be math");
+                return Ok(EpistemicStatus::Known);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // TIER 4: UNCERTAIN - Default for novel queries
+        // ═══════════════════════════════════════════════════════════════════
+
+        // If we can't confidently classify, default to uncertain
+        // This is safer than claiming knowledge we don't have
+        tracing::debug!("Query not classified, defaulting to Uncertain");
         Ok(EpistemicStatus::Uncertain)
+    }
+
+    /// Process a query with automatic epistemic detection
+    ///
+    /// Unlike `think()` which uses the stored epistemic state,
+    /// this method automatically analyzes the query to determine
+    /// the appropriate epistemic status.
+    pub async fn think_auto(&self, input: &str) -> Result<StructuredThought> {
+        // Automatically detect epistemic status
+        let status = self.analyze_query(input).await?;
+
+        tracing::info!(
+            "Auto-detected epistemic status for '{}': {:?}",
+            &input[..input.len().min(50)],
+            status
+        );
+
+        // Update internal state
+        {
+            let mut state = self.epistemic_state.write().await;
+            *state = status;
+        }
+
+        // Generate thought with detected status
+        self.think(input).await
     }
 }
 

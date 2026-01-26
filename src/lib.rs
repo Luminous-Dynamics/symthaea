@@ -775,7 +775,8 @@ impl Symthaea {
         }
 
         // Generate structured thought from the Mind (epistemic governance layer)
-        let structured_thought = self.mind.think(query).await.ok();
+        // Uses automatic epistemic detection - no manual state forcing needed
+        let structured_thought = self.mind.think_auto(query).await.ok();
 
         // If the Mind indicates uncertainty, use its hedging response instead
         // This is the "Negative Capability" in action - refuse to hallucinate
