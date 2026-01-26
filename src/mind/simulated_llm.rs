@@ -9,7 +9,7 @@
 //! When the EpistemicStatus is Unknown, the simulated LLM MUST produce
 //! hedging language. It should NEVER fabricate an answer.
 
-use super::{LLMBackend, EpistemicStatus};
+use super::{LLMBackend, EpistemicStatus, MemoryContext};
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -74,6 +74,38 @@ impl SimulatedLLM {
             input
         )
     }
+
+    /// Generate response with memory context
+    fn generate_with_memory_context(
+        &self,
+        input: &str,
+        epistemic_status: &EpistemicStatus,
+        memory_context: &MemoryContext,
+    ) -> String {
+        let base_response = match epistemic_status {
+            EpistemicStatus::Unknown => self.generate_hedging_response(input),
+            EpistemicStatus::Uncertain => self.generate_uncertain_response(input),
+            EpistemicStatus::Unverifiable => self.generate_unverifiable_response(input),
+            EpistemicStatus::Known => self.generate_known_response(input),
+        };
+
+        if !memory_context.has_memories() {
+            return base_response;
+        }
+
+        // Include memory context in the simulated response
+        format!(
+            "[SIMULATED RESPONSE WITH MEMORY]\n\
+            Retrieved {} memories (relevance: {:.2}):\n\
+            {}\n\
+            ---\n\
+            {}",
+            memory_context.count,
+            memory_context.relevance,
+            memory_context.memories.join("\n"),
+            base_response
+        )
+    }
 }
 
 impl Default for SimulatedLLM {
@@ -106,6 +138,21 @@ impl LLMBackend for SimulatedLLM {
     /// This is a simulated backend
     fn is_simulated(&self) -> bool {
         true
+    }
+
+    /// Simulated LLM supports memory context for testing
+    fn supports_memory_context(&self) -> bool {
+        true
+    }
+
+    /// Generate response with memory context
+    async fn generate_with_memory(
+        &self,
+        input: &str,
+        epistemic_status: &EpistemicStatus,
+        memory_context: &MemoryContext,
+    ) -> Result<String> {
+        Ok(self.generate_with_memory_context(input, epistemic_status, memory_context))
     }
 }
 

@@ -12,7 +12,7 @@
 //! When EpistemicStatus is Unknown, the system prompt DEMANDS refusal.
 //! The LLM must express uncertainty, not fabricate facts.
 
-use super::{EpistemicStatus, LLMBackend};
+use super::{EpistemicStatus, LLMBackend, MemoryContext};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use reqwest::Client;
@@ -166,6 +166,35 @@ and helpful response. Be concise and informative."#.to_string()
             }
         }
     }
+
+    /// Build system prompt with memory context
+    ///
+    /// This injects retrieved memories into the system prompt, providing
+    /// relevant context from past interactions.
+    fn build_system_prompt_with_memory(
+        &self,
+        epistemic_status: &EpistemicStatus,
+        memory_context: &MemoryContext,
+    ) -> String {
+        let base_prompt = self.build_system_prompt(epistemic_status);
+
+        if !memory_context.has_memories() {
+            return base_prompt;
+        }
+
+        // Inject memory context into the system prompt
+        let memory_section = memory_context.format_for_prompt();
+
+        format!(
+            "{}\n\n--- CONTEXTUAL MEMORY ---\n\
+            You have access to the following relevant information from previous interactions.\n\
+            Use this context to provide more accurate and personalized responses.\n\
+            {}\n\
+            Integrate this context naturally into your response when relevant.",
+            base_prompt,
+            memory_section
+        )
+    }
 }
 
 #[async_trait]
@@ -240,6 +269,79 @@ impl LLMBackend for OllamaBackend {
     /// This is a real LLM backend, not simulated
     fn is_simulated(&self) -> bool {
         false
+    }
+
+    /// Ollama supports memory context
+    fn supports_memory_context(&self) -> bool {
+        true
+    }
+
+    /// Generate a response with memory context
+    ///
+    /// This injects retrieved memories into the system prompt to provide
+    /// relevant context from past interactions.
+    async fn generate_with_memory(
+        &self,
+        input: &str,
+        epistemic_status: &EpistemicStatus,
+        memory_context: &MemoryContext,
+    ) -> Result<String> {
+        let system_prompt = self.build_system_prompt_with_memory(epistemic_status, memory_context);
+
+        // Adjust temperature based on epistemic status
+        let temp = match epistemic_status {
+            EpistemicStatus::Unknown => 0.1,
+            EpistemicStatus::Uncertain => 0.5,
+            EpistemicStatus::Unverifiable => 0.3,
+            EpistemicStatus::Known => self.temperature,
+        };
+
+        let request = OllamaRequest {
+            model: self.model.clone(),
+            prompt: input.to_string(),
+            system: system_prompt,
+            stream: false,
+            options: OllamaOptions {
+                temperature: temp,
+                num_predict: 256,
+            },
+        };
+
+        tracing::debug!(
+            "Ollama request with memory: model={}, status={:?}, memories={}, relevance={:.2}",
+            self.model,
+            epistemic_status,
+            memory_context.count,
+            memory_context.relevance
+        );
+
+        let response = self
+            .client
+            .post(format!("{}/api/generate", self.base_url))
+            .json(&request)
+            .timeout(self.timeout)
+            .send()
+            .await
+            .context("Failed to connect to Ollama")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(anyhow::anyhow!(
+                "Ollama API error: {} - {}",
+                status,
+                body
+            ));
+        }
+
+        let ollama_response: OllamaResponse = response
+            .json()
+            .await
+            .context("Failed to parse Ollama response")?;
+
+        tracing::debug!("Ollama response (with memory): {}", ollama_response.response);
+
+        Ok(ollama_response.response)
     }
 }
 

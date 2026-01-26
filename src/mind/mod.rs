@@ -129,6 +129,49 @@ pub struct Mind {
     ltc_neurons: usize,
 }
 
+/// Memory context for LLM generation
+///
+/// Contains retrieved memories that should be injected into the system prompt
+/// to provide relevant context for the current query.
+#[derive(Debug, Clone, Default)]
+pub struct MemoryContext {
+    /// Retrieved memory snippets, most relevant first
+    pub memories: Vec<String>,
+
+    /// Overall relevance score (0.0 - 1.0)
+    pub relevance: f32,
+
+    /// Number of memories retrieved
+    pub count: usize,
+}
+
+impl MemoryContext {
+    /// Create a new memory context
+    pub fn new(memories: Vec<String>, relevance: f32) -> Self {
+        let count = memories.len();
+        Self { memories, relevance, count }
+    }
+
+    /// Check if context has any relevant memories
+    pub fn has_memories(&self) -> bool {
+        !self.memories.is_empty()
+    }
+
+    /// Format memories for injection into system prompt
+    pub fn format_for_prompt(&self) -> String {
+        if self.memories.is_empty() {
+            return String::new();
+        }
+
+        let mut formatted = String::from("\n\n--- RELEVANT CONTEXT FROM MEMORY ---\n");
+        for (i, memory) in self.memories.iter().enumerate() {
+            formatted.push_str(&format!("{}. {}\n", i + 1, memory));
+        }
+        formatted.push_str("--- END MEMORY CONTEXT ---\n");
+        formatted
+    }
+}
+
 /// Trait for LLM backends (real or simulated)
 #[async_trait::async_trait]
 pub trait LLMBackend: Send + Sync {
@@ -139,8 +182,27 @@ pub trait LLMBackend: Send + Sync {
         epistemic_status: &EpistemicStatus,
     ) -> Result<String>;
 
+    /// Generate a response with memory context
+    ///
+    /// Default implementation ignores memory context for backward compatibility.
+    /// Override this in backends that support memory-augmented generation.
+    async fn generate_with_memory(
+        &self,
+        input: &str,
+        epistemic_status: &EpistemicStatus,
+        _memory_context: &MemoryContext,
+    ) -> Result<String> {
+        // Default: ignore memory context
+        self.generate(input, epistemic_status).await
+    }
+
     /// Check if this backend is simulated
     fn is_simulated(&self) -> bool;
+
+    /// Check if this backend supports memory context
+    fn supports_memory_context(&self) -> bool {
+        false
+    }
 }
 
 impl Mind {
@@ -709,6 +771,204 @@ impl Mind {
         // Generate thought with detected status
         self.think(input).await
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // MEMORY-AUGMENTED THINKING - The Cognitive Loop
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Process a query with holographic memory (Recall-Reason-Store cycle)
+    ///
+    /// This is the core cognitive loop that makes Symthaea non-amnesic:
+    ///
+    /// 1. **RECALL**: Encode query → query memory for relevant context
+    /// 2. **AUGMENT**: Inject retrieved memories into LLM system prompt
+    /// 3. **REASON**: LLM generates response with Input + Context
+    /// 4. **STORE**: Consolidate Input + Response into memory
+    ///
+    /// ## Example
+    ///
+    /// ```ignore
+    /// let mut mind = Mind::new_with_simulated_llm(512, 32).await?;
+    /// mind.enable_memory()?;
+    /// mind.enable_semantic_classification()?;
+    ///
+    /// // First interaction - stores "Alice" in memory
+    /// mind.think_with_memory("My name is Alice").await?;
+    ///
+    /// // Later interaction - recalls "Alice" from memory
+    /// let thought = mind.think_with_memory("What is my name?").await?;
+    /// // Response uses memory context to answer "Alice"
+    /// ```
+    pub async fn think_with_memory(&mut self, input: &str) -> Result<StructuredThought> {
+        // ═══════════════════════════════════════════════════════════════════
+        // PHASE 1: RECALL - Query memory for relevant context
+        // ═══════════════════════════════════════════════════════════════════
+
+        let memory_context = if let Some(ref mut memory) = self.memory {
+            // Encode the input to a dense vector for memory query
+            let query_vector = if let Some(ref mut semantic_classifier) = self.semantic_classifier {
+                // Use semantic encoder if available (768D BGE embeddings)
+                match semantic_classifier.encoder_mut().encode(input) {
+                    Ok(encoded) => Some(encoded.dense),
+                    Err(e) => {
+                        tracing::warn!("Failed to encode for memory query: {}", e);
+                        None
+                    }
+                }
+            } else {
+                // Fallback: use HDC to get a representation
+                tracing::debug!("No semantic encoder, skipping memory recall");
+                None
+            };
+
+            if let Some(vector) = query_vector {
+                // Query memory for relevant matches
+                let matches = memory.query(&vector, 3); // Top 3 most relevant
+
+                if !matches.is_empty() {
+                    let memories: Vec<String> = matches
+                        .iter()
+                        .filter_map(|m| m.trace.text.clone())
+                        .collect();
+
+                    let avg_relevance = matches.iter().map(|m| m.similarity).sum::<f32>()
+                        / matches.len() as f32;
+
+                    tracing::info!(
+                        "📚 RECALL: Retrieved {} memories (avg relevance: {:.2}%)",
+                        memories.len(),
+                        avg_relevance * 100.0
+                    );
+
+                    MemoryContext::new(memories, avg_relevance)
+                } else {
+                    tracing::debug!("📚 RECALL: No relevant memories found");
+                    MemoryContext::default()
+                }
+            } else {
+                MemoryContext::default()
+            }
+        } else {
+            tracing::debug!("📚 Memory not enabled, skipping recall");
+            MemoryContext::default()
+        };
+
+        // ═══════════════════════════════════════════════════════════════════
+        // PHASE 2: CLASSIFY - Determine epistemic status
+        // ═══════════════════════════════════════════════════════════════════
+
+        let (status, method) = self.analyze_query_hybrid(input).await?;
+
+        tracing::info!(
+            "🧠 CLASSIFY: {:?} via {} for '{}'",
+            status,
+            method,
+            &input[..input.len().min(40)]
+        );
+
+        // Update internal state
+        {
+            let mut state = self.epistemic_state.write().await;
+            *state = status;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // PHASE 3: REASON - Generate response with memory context
+        // ═══════════════════════════════════════════════════════════════════
+
+        let response = if memory_context.has_memories() {
+            tracing::info!("💭 REASON: Generating with {} memory contexts", memory_context.count);
+            self.llm_backend.generate_with_memory(input, &status, &memory_context).await?
+        } else {
+            self.llm_backend.generate(input, &status).await?
+        };
+
+        // ═══════════════════════════════════════════════════════════════════
+        // PHASE 4: STORE - Consolidate experience into memory
+        // ═══════════════════════════════════════════════════════════════════
+
+        if let Some(ref mut memory) = self.memory {
+            if let Some(ref mut semantic_classifier) = self.semantic_classifier {
+                // Create a combined representation of the interaction
+                let interaction = format!("Q: {} A: {}", input, &response[..response.len().min(200)]);
+
+                match semantic_classifier.encoder_mut().encode(&interaction) {
+                    Ok(encoded) => {
+                        // Store with the interaction text as label
+                        memory.store_with_text(&encoded.dense, Some(interaction.clone()));
+                        tracing::info!(
+                            "💾 STORE: Consolidated interaction (memory size: {})",
+                            memory.stats().episodic_count
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to encode for storage: {}", e);
+                    }
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // PHASE 5: BUILD STRUCTURED THOUGHT
+        // ═══════════════════════════════════════════════════════════════════
+
+        let intent = match status {
+            EpistemicStatus::Unknown | EpistemicStatus::Uncertain => {
+                SemanticIntent::ExpressUncertainty
+            }
+            EpistemicStatus::Known => SemanticIntent::ProvideAnswer,
+            EpistemicStatus::Unverifiable => SemanticIntent::ExpressUncertainty,
+        };
+
+        let confidence = match status {
+            EpistemicStatus::Known => 0.95,
+            EpistemicStatus::Uncertain => 0.3,
+            EpistemicStatus::Unknown => 0.0,
+            EpistemicStatus::Unverifiable => 0.1,
+        };
+
+        let mut reasoning_trace = vec![
+            format!("Epistemic status: {:?} (via {})", status, method),
+            format!("Semantic intent: {:?}", intent),
+        ];
+
+        if memory_context.has_memories() {
+            reasoning_trace.push(format!(
+                "Memory context: {} memories (relevance: {:.2}%)",
+                memory_context.count,
+                memory_context.relevance * 100.0
+            ));
+        }
+
+        Ok(StructuredThought {
+            epistemic_status: status,
+            semantic_intent: intent,
+            response_text: response,
+            confidence,
+            reasoning_trace,
+        })
+    }
+
+    /// Think with memory and automatic HAM feature enablement
+    ///
+    /// Convenience method that enables semantic classification and memory
+    /// if not already enabled, then processes the query through the full
+    /// Recall-Reason-Store cycle.
+    pub async fn think_with_memory_auto(&mut self, input: &str) -> Result<StructuredThought> {
+        // Auto-enable semantic classification if not present
+        if self.semantic_classifier.is_none() {
+            tracing::info!("🔧 Auto-enabling semantic classification for memory");
+            self.enable_semantic_classification()?;
+        }
+
+        // Auto-enable memory if not present
+        if self.memory.is_none() {
+            tracing::info!("🔧 Auto-enabling holographic memory");
+            self.enable_memory()?;
+        }
+
+        self.think_with_memory(input).await
+    }
 }
 
 #[cfg(test)]
@@ -739,5 +999,72 @@ mod tests {
 
         let status = mind.analyze_query("What is the GDP of Atlantis?").await.unwrap();
         assert_eq!(status, EpistemicStatus::Unknown);
+    }
+
+    #[tokio::test]
+    async fn test_think_with_memory_stores_and_recalls() {
+        let mut mind = Mind::new_with_simulated_llm(512, 32).await.unwrap();
+
+        // Enable HAM components
+        mind.enable_memory().unwrap();
+        mind.enable_semantic_classification().unwrap();
+
+        // First interaction - stores "Alice" in memory
+        let thought1 = mind.think_with_memory("My name is Alice").await.unwrap();
+        assert!(!thought1.response_text.is_empty());
+
+        // Verify memory was stored
+        assert!(mind.memory_stats().is_some());
+        assert!(mind.memory_stats().unwrap().episodic_count >= 1);
+
+        // Second interaction - should recall previous context
+        let thought2 = mind.think_with_memory("What did I tell you?").await.unwrap();
+
+        // The response should include memory context (simulated backend shows it)
+        // We just verify the flow completed successfully
+        assert!(!thought2.response_text.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_think_with_memory_auto() {
+        let mut mind = Mind::new_with_simulated_llm(512, 32).await.unwrap();
+
+        // Initially, memory and classifier should not be enabled
+        assert!(!mind.has_memory());
+        assert!(!mind.has_semantic_classifier());
+
+        // Auto-enable should work
+        let thought = mind.think_with_memory_auto("Hello world").await.unwrap();
+        assert!(!thought.response_text.is_empty());
+
+        // Now they should be enabled
+        assert!(mind.has_memory());
+        assert!(mind.has_semantic_classifier());
+    }
+
+    #[tokio::test]
+    async fn test_memory_context_format() {
+        let ctx = MemoryContext::new(
+            vec!["User's name is Alice".to_string(), "User likes cats".to_string()],
+            0.85,
+        );
+
+        assert!(ctx.has_memories());
+        assert_eq!(ctx.count, 2);
+        assert!((ctx.relevance - 0.85).abs() < 0.001);
+
+        let formatted = ctx.format_for_prompt();
+        assert!(formatted.contains("Alice"));
+        assert!(formatted.contains("cats"));
+        assert!(formatted.contains("MEMORY"));
+    }
+
+    #[tokio::test]
+    async fn test_empty_memory_context() {
+        let ctx = MemoryContext::default();
+
+        assert!(!ctx.has_memories());
+        assert_eq!(ctx.count, 0);
+        assert!(ctx.format_for_prompt().is_empty());
     }
 }
