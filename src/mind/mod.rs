@@ -42,12 +42,14 @@ pub mod simulated_llm;
 pub mod ollama_backend;
 pub mod hdc_epistemic;
 pub mod semantic_encoder;
+pub mod holographic_memory;
 
 pub use structured_thought::{EpistemicStatus, SemanticIntent, StructuredThought};
 pub use simulated_llm::SimulatedLLM;
 pub use ollama_backend::{OllamaBackend, check_ollama_availability};
 pub use hdc_epistemic::{HdcEpistemicClassifier, HdcEpistemicStats, SemanticEpistemicClassifier, SemanticEpistemicStats};
 pub use semantic_encoder::{SemanticEncoder, SemanticEncoderConfig, EncodedThought, DenseVector};
+pub use holographic_memory::{HolographicMemory, HolographicMemoryConfig, MemoryTrace, MemoryMatch, MemoryStats};
 
 use crate::hdc::SemanticSpace;
 use crate::ltc::LiquidNetwork;
@@ -65,12 +67,39 @@ use anyhow::Result;
 ///
 /// ## Classification Methods
 ///
-/// The Mind supports two classification methods:
+/// The Mind supports three classification methods (in priority order):
 ///
-/// 1. **Pattern Matching** (`analyze_query`): Fast, rule-based classification
-/// 2. **HDC Semantic** (`analyze_query_hdc`): Similarity-based, handles novel phrasings
+/// 1. **Semantic** (`analyze_query_semantic`): BGE embeddings, best for novel phrasings
+/// 2. **HDC** (`analyze_query_hdc`): N-gram HDC, good balance of speed and accuracy
+/// 3. **Pattern Matching** (`analyze_query`): Fast, rule-based classification
 ///
-/// Use `analyze_query_hybrid` for best results (HDC with pattern matching fallback).
+/// Use `analyze_query_hybrid` for best results (semantic → HDC → pattern fallback).
+///
+/// ## HAM Architecture Integration
+///
+/// The Mind now integrates the Holographic Associative Memory (HAM) architecture:
+///
+/// ```text
+/// ┌─────────────┐
+/// │   Query     │
+/// └──────┬──────┘
+///        ▼
+/// ┌─────────────────────┐
+/// │  SemanticEncoder    │  ← Sensation (BGE + HDC projection)
+/// └──────┬──────────────┘
+///        ▼
+/// ┌─────────────────────┐
+/// │ HolographicMemory   │  ← Memory (vector superposition)
+/// └──────┬──────────────┘
+///        ▼
+/// ┌─────────────────────┐
+/// │ EpistemicClassifier │  ← Perception (semantic/HDC/pattern)
+/// └──────┬──────────────┘
+///        ▼
+/// ┌─────────────────────┐
+/// │    LLM Backend      │  ← Cognition (constrained generation)
+/// └─────────────────────┘
+/// ```
 pub struct Mind {
     /// Hyperdimensional semantic space
     semantic_space: SemanticSpace,
@@ -84,8 +113,14 @@ pub struct Mind {
     /// LLM backend (real or simulated)
     llm_backend: Arc<dyn LLMBackend + Send + Sync>,
 
-    /// HDC-based epistemic classifier (optional, for semantic similarity)
+    /// HDC-based epistemic classifier (optional, for n-gram similarity)
     hdc_classifier: Option<HdcEpistemicClassifier>,
+
+    /// Semantic epistemic classifier (optional, for BGE-based similarity)
+    semantic_classifier: Option<SemanticEpistemicClassifier>,
+
+    /// Holographic memory (optional, for experience storage)
+    memory: Option<HolographicMemory>,
 
     /// HDC dimension
     hdc_dim: usize,
@@ -120,6 +155,8 @@ impl Mind {
             epistemic_state: RwLock::new(EpistemicStatus::Unknown),
             llm_backend: Arc::new(SimulatedLLM::new()),
             hdc_classifier: None,
+            semantic_classifier: None,
+            memory: None,
             hdc_dim,
             ltc_neurons,
         })
@@ -136,6 +173,8 @@ impl Mind {
             epistemic_state: RwLock::new(EpistemicStatus::Unknown),
             llm_backend: Arc::new(SimulatedLLM::new()),
             hdc_classifier: None,
+            semantic_classifier: None,
+            memory: None,
             hdc_dim,
             ltc_neurons,
         })
@@ -171,6 +210,8 @@ impl Mind {
             epistemic_state: RwLock::new(EpistemicStatus::Unknown),
             llm_backend: Arc::new(ollama),
             hdc_classifier: None,
+            semantic_classifier: None,
+            memory: None,
             hdc_dim,
             ltc_neurons,
         })
@@ -439,6 +480,131 @@ impl Mind {
         self.hdc_classifier.as_ref().map(|c| c.stats())
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // SEMANTIC (BGE) EPISTEMIC CLASSIFICATION - Best for novel phrasings
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Enable semantic (BGE-based) epistemic classification
+    ///
+    /// This creates a SemanticEpistemicClassifier that uses dense 768D BGE embeddings
+    /// for classification. This is the most accurate method for novel phrasings and
+    /// cross-lingual queries, but requires the BGE model to be loaded.
+    ///
+    /// Once enabled, `analyze_query_semantic` and `analyze_query_hybrid` will
+    /// prefer semantic classification when confident.
+    pub fn enable_semantic_classification(&mut self) -> Result<()> {
+        let encoder = SemanticEncoder::new()?;
+        let classifier = SemanticEpistemicClassifier::new(encoder)?;
+        self.semantic_classifier = Some(classifier);
+        tracing::info!("🧠 Semantic (BGE) epistemic classification enabled");
+        Ok(())
+    }
+
+    /// Enable semantic classification with custom encoder config
+    pub fn enable_semantic_classification_with_config(&mut self, config: SemanticEncoderConfig) -> Result<()> {
+        let encoder = SemanticEncoder::with_config(config)?;
+        let classifier = SemanticEpistemicClassifier::new(encoder)?;
+        self.semantic_classifier = Some(classifier);
+        tracing::info!("🧠 Semantic (BGE) epistemic classification enabled (custom config)");
+        Ok(())
+    }
+
+    /// Enable semantic classification with a custom encoder
+    pub fn enable_semantic_classification_with_encoder(&mut self, encoder: SemanticEncoder) -> Result<()> {
+        let classifier = SemanticEpistemicClassifier::new(encoder)?;
+        self.semantic_classifier = Some(classifier);
+        tracing::info!("🧠 Semantic (BGE) epistemic classification enabled (custom encoder)");
+        Ok(())
+    }
+
+    /// Check if semantic classification is enabled
+    pub fn has_semantic_classifier(&self) -> bool {
+        self.semantic_classifier.is_some()
+    }
+
+    /// Get semantic classifier statistics (if enabled)
+    pub fn semantic_classifier_stats(&self) -> Option<SemanticEpistemicStats> {
+        self.semantic_classifier.as_ref().map(|c| c.stats())
+    }
+
+    /// Analyze a query using semantic (BGE) similarity
+    ///
+    /// Requires `enable_semantic_classification()` to be called first.
+    /// Returns the detected status and confidence score.
+    ///
+    /// This method uses 768D BGE embeddings for highest accuracy,
+    /// especially for novel phrasings and cross-lingual queries.
+    pub fn analyze_query_semantic(&self, input: &str) -> Result<(EpistemicStatus, f32)> {
+        let classifier = self.semantic_classifier.as_ref()
+            .ok_or_else(|| anyhow::anyhow!(
+                "Semantic classifier not enabled. Call enable_semantic_classification() first."
+            ))?;
+
+        classifier.classify(input)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // HOLOGRAPHIC MEMORY - HAM Architecture Memory Layer
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Enable holographic memory for experience storage
+    ///
+    /// This creates a HolographicMemory that uses vector superposition for
+    /// one-shot learning. Each experience is added to the holographic field,
+    /// enabling associative recall and temporal context.
+    ///
+    /// Once enabled, queries can leverage memory context for more accurate
+    /// responses and epistemic classification.
+    ///
+    /// Uses the default dimension (768D to match BGE embeddings).
+    pub fn enable_memory(&mut self) -> Result<()> {
+        // Default to 768 dimensions (BGE embedding dimension)
+        let memory = HolographicMemory::new(768);
+        self.memory = Some(memory);
+        tracing::info!("🧠 Holographic memory enabled (768D)");
+        Ok(())
+    }
+
+    /// Enable holographic memory with custom configuration
+    pub fn enable_memory_with_config(&mut self, config: HolographicMemoryConfig) -> Result<()> {
+        let memory = HolographicMemory::with_config(config);
+        self.memory = Some(memory);
+        tracing::info!("🧠 Holographic memory enabled with custom config");
+        Ok(())
+    }
+
+    /// Enable holographic memory with a specific dimension
+    pub fn enable_memory_with_dimension(&mut self, dimension: usize) -> Result<()> {
+        let memory = HolographicMemory::new(dimension);
+        self.memory = Some(memory);
+        tracing::info!("🧠 Holographic memory enabled ({}D)", dimension);
+        Ok(())
+    }
+
+    /// Check if holographic memory is enabled
+    pub fn has_memory(&self) -> bool {
+        self.memory.is_some()
+    }
+
+    /// Get memory statistics (if enabled)
+    pub fn memory_stats(&self) -> Option<&MemoryStats> {
+        self.memory.as_ref().map(|m| m.stats())
+    }
+
+    /// Get a mutable reference to the memory (for direct manipulation)
+    pub fn memory_mut(&mut self) -> Option<&mut HolographicMemory> {
+        self.memory.as_mut()
+    }
+
+    /// Get a reference to the memory (for queries)
+    pub fn memory(&self) -> Option<&HolographicMemory> {
+        self.memory.as_ref()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // HDC EPISTEMIC CLASSIFICATION
+    // ═══════════════════════════════════════════════════════════════════════
+
     /// Analyze a query using HDC semantic similarity
     ///
     /// Requires `enable_hdc_classification()` to be called first.
@@ -455,15 +621,44 @@ impl Mind {
         classifier.classify(&mut self.semantic_space, input)
     }
 
-    /// Analyze a query using hybrid approach (HDC + pattern matching)
+    /// Analyze a query using hybrid approach (semantic → HDC → pattern)
     ///
-    /// This is the recommended method for epistemic detection:
-    /// 1. First tries HDC classification (if enabled and confident)
-    /// 2. Falls back to pattern matching if HDC is uncertain
+    /// This is the recommended method for epistemic detection, using a
+    /// three-tier fallback chain:
     ///
-    /// Returns the detected status and the method used ("hdc" or "pattern").
+    /// 1. **Semantic (BGE)**: Best for novel phrasings, 768D embeddings
+    /// 2. **HDC (n-gram)**: Good balance of speed and accuracy, 16K-bit hypervectors
+    /// 3. **Pattern matching**: Fast rule-based fallback
+    ///
+    /// Each tier is tried in order, with fallback if confidence is too low
+    /// or the classifier returns Uncertain.
+    ///
+    /// Returns the detected status and the method used ("semantic", "hdc", or "pattern").
     pub async fn analyze_query_hybrid(&mut self, input: &str) -> Result<(EpistemicStatus, &'static str)> {
-        // Try HDC classification first (if enabled)
+        // Tier 1: Try semantic (BGE) classification first (highest accuracy)
+        if let Some(classifier) = &self.semantic_classifier {
+            match classifier.classify(input) {
+                Ok((status, confidence)) => {
+                    // Use semantic result if confidence is high enough
+                    if confidence >= 0.5 && status != EpistemicStatus::Uncertain {
+                        tracing::debug!(
+                            "Semantic classification: {:?} (confidence: {:.2}%)",
+                            status, confidence * 100.0
+                        );
+                        return Ok((status, "semantic"));
+                    }
+                    tracing::debug!(
+                        "Semantic uncertain (confidence: {:.2}%), falling back to HDC",
+                        confidence * 100.0
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!("Semantic classification failed: {}, falling back to HDC", e);
+                }
+            }
+        }
+
+        // Tier 2: Try HDC classification (if enabled)
         if let Some(classifier) = &self.hdc_classifier {
             match classifier.classify(&mut self.semantic_space, input) {
                 Ok((status, confidence)) => {
@@ -486,7 +681,7 @@ impl Mind {
             }
         }
 
-        // Fall back to pattern matching
+        // Tier 3: Fall back to pattern matching
         let status = self.analyze_query(input).await?;
         Ok((status, "pattern"))
     }
