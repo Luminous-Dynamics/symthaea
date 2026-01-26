@@ -60,6 +60,452 @@
 use super::semantic_encoder::{DenseVector, EncodedThought};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
+use std::time::Duration;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CHRONO-SEMANTIC-EMOTIONAL BINDING SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Multi-dimensional memory encoding that separates:
+// - **Temporal** (WHEN): Cyclic time encoding with phase-based representation
+// - **Semantic** (WHAT): Content meaning via vector embedding
+// - **Emotional** (HOW): Affective state via phase-shifted sinusoids
+//
+// This enables three query modes:
+// 1. Pure Semantic - "What did I learn about X?" (ignores emotion/time)
+// 2. Pure Emotional - "What made me frustrated?" (ignores content/time)
+// 3. Chrono-Semantic - "What happened yesterday morning?" (time + content)
+// 4. Combined - Full context with weighted blend
+//
+// Architecture (from episodic_engine.rs):
+// ```
+// EpisodicMemory = Temporal(when) ⊗ Semantic(what) + Emotional(how)
+//                  \_____chrono_semantic____/        \___parallel___/
+// ```
+
+/// Temporal Encoder - Cyclic Time Representation
+///
+/// Encodes time using phase-based sinusoidal patterns that naturally capture
+/// cyclic rhythms (hour of day, day of week, month, season).
+///
+/// ## Key Properties
+/// - **Cyclic continuity**: 23:59 is close to 00:00
+/// - **Multi-scale**: Captures hourly, daily, weekly patterns
+/// - **Deterministic**: Same time → same encoding
+#[derive(Debug, Clone)]
+pub struct TemporalEncoder {
+    /// Dimension of temporal vectors
+    pub dimension: usize,
+    /// Number of frequency bands for multi-scale encoding
+    pub frequency_bands: usize,
+}
+
+impl Default for TemporalEncoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl TemporalEncoder {
+    /// Create a new temporal encoder with default parameters
+    pub fn new() -> Self {
+        Self {
+            dimension: 128, // Compact temporal representation
+            frequency_bands: 4, // Hour, Day, Week, Season
+        }
+    }
+
+    /// Create with custom dimension
+    pub fn with_dimension(dimension: usize) -> Self {
+        Self {
+            dimension,
+            frequency_bands: 4,
+        }
+    }
+
+    /// Encode a timestamp into a temporal vector
+    ///
+    /// Uses cyclic phase encoding for natural time representation:
+    /// - Hour phase: 2π * hour / 24
+    /// - Day phase: 2π * day_of_week / 7
+    /// - Month phase: 2π * month / 12
+    ///
+    /// # Arguments
+    /// * `timestamp` - Duration since midnight (or any reference point)
+    pub fn encode(&self, timestamp: Duration) -> Vec<f32> {
+        let secs = timestamp.as_secs_f64();
+        let hours = (secs / 3600.0) % 24.0;
+        let days = (secs / 86400.0) % 7.0;
+        let months = (secs / (86400.0 * 30.0)) % 12.0;
+        let years = secs / (86400.0 * 365.0);
+
+        let mut temporal = vec![0.0f32; self.dimension];
+        let phase_scales = [
+            (hours / 24.0, 1.0),        // Hour of day
+            (days / 7.0, 0.5),          // Day of week
+            (months / 12.0, 0.3),       // Month of year
+            (years.fract(), 0.2),       // Year cycle (seasonal)
+        ];
+
+        for (i, val) in temporal.iter_mut().enumerate() {
+            let base_phase = (i as f64 / self.dimension as f64) * std::f64::consts::TAU;
+
+            // Sum contributions from each time scale
+            let mut sum = 0.0f64;
+            for (phase, weight) in &phase_scales {
+                let combined_phase = base_phase + phase * std::f64::consts::TAU;
+                sum += weight * combined_phase.sin();
+            }
+
+            *val = (sum / phase_scales.len() as f64) as f32;
+        }
+
+        // Normalize to unit length
+        let norm: f32 = temporal.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for v in &mut temporal {
+                *v /= norm;
+            }
+        }
+
+        temporal
+    }
+
+    /// Compute similarity between two temporal encodings
+    pub fn similarity(&self, a: &[f32], b: &[f32]) -> f32 {
+        if a.len() != b.len() {
+            return 0.0;
+        }
+        let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+        let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm_a > 0.0 && norm_b > 0.0 {
+            dot / (norm_a * norm_b)
+        } else {
+            0.0
+        }
+    }
+}
+
+/// Emotional Encoder - Affective State Representation
+///
+/// Encodes emotional valence and arousal into phase-shifted sinusoidal patterns.
+/// This creates a continuous emotional space where similar emotions have similar encodings.
+///
+/// ## Emotion Model
+/// - **Valence**: Positive/Negative (-1.0 to 1.0)
+/// - **Arousal**: Calm/Excited (0.0 to 1.0)
+///
+/// ## Key Properties
+/// - **Orthogonality**: Different emotions have distinct signatures
+/// - **Continuity**: Similar emotions have similar encodings
+/// - **Intensity-scaled**: Stronger emotions have larger amplitudes
+#[derive(Debug, Clone)]
+pub struct EmotionalEncoder {
+    /// Dimension of emotional vectors
+    pub dimension: usize,
+}
+
+impl Default for EmotionalEncoder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EmotionalEncoder {
+    /// Create a new emotional encoder with default parameters
+    pub fn new() -> Self {
+        Self {
+            dimension: 64, // Compact emotional representation
+        }
+    }
+
+    /// Create with custom dimension
+    pub fn with_dimension(dimension: usize) -> Self {
+        Self { dimension }
+    }
+
+    /// Encode an emotional state into a vector
+    ///
+    /// # Arguments
+    /// * `valence` - Emotional valence (-1.0 = negative, 0.0 = neutral, 1.0 = positive)
+    /// * `arousal` - Emotional arousal (0.0 = calm, 1.0 = excited)
+    ///
+    /// # Returns
+    /// A vector encoding the emotional state
+    pub fn encode(&self, valence: f32, arousal: f32) -> Vec<f32> {
+        let valence_clamped = valence.clamp(-1.0, 1.0);
+        let arousal_clamped = arousal.clamp(0.0, 1.0);
+
+        let mut emotional = vec![0.0f32; self.dimension];
+
+        for (i, val) in emotional.iter_mut().enumerate() {
+            // Phase shifts based on valence (determines signature pattern)
+            let base_phase = (i as f32 * 0.1) + (valence_clamped * std::f32::consts::PI);
+
+            // Amplitude modulated by arousal (intensity)
+            let amplitude = 0.5 + 0.5 * arousal_clamped;
+
+            // Sinusoidal encoding with valence-dependent phase
+            *val = base_phase.sin() * amplitude * valence_clamped.abs().max(0.1);
+        }
+
+        // Normalize to unit length
+        let norm: f32 = emotional.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for v in &mut emotional {
+                *v /= norm;
+            }
+        }
+
+        emotional
+    }
+
+    /// Encode with just valence (assumes neutral arousal)
+    pub fn encode_valence(&self, valence: f32) -> Vec<f32> {
+        self.encode(valence, 0.5)
+    }
+
+    /// Compute similarity between two emotional encodings
+    pub fn similarity(&self, a: &[f32], b: &[f32]) -> f32 {
+        if a.len() != b.len() {
+            return 0.0;
+        }
+        let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+        let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+        let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm_a > 0.0 && norm_b > 0.0 {
+            dot / (norm_a * norm_b)
+        } else {
+            0.0
+        }
+    }
+}
+
+/// Composite Engram - Multi-dimensional Memory Encoding
+///
+/// Combines temporal, semantic, and emotional information into a unified
+/// memory representation that supports multiple query modes.
+///
+/// ## Architecture
+/// ```text
+/// CompositeEngram {
+///     chrono_semantic: Temporal ⊗ Semantic  // Bound together
+///     emotional:       Emotional             // Parallel space
+///     temporal:        Temporal              // Raw (for pure temporal query)
+///     semantic:        Semantic              // Raw (for pure semantic query)
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompositeEngram {
+    /// Chrono-Semantic binding: Temporal ⊗ Semantic
+    /// Used for "when + what" queries
+    pub chrono_semantic_vector: Vec<f32>,
+
+    /// Emotional binding vector (parallel, not bound to chrono-semantic)
+    /// Used for "how did I feel" queries
+    pub emotional_binding_vector: Vec<f32>,
+
+    /// Raw temporal vector (for pure temporal queries)
+    pub temporal_vector: Vec<f32>,
+
+    /// Raw semantic vector (for pure semantic queries)
+    pub semantic_vector: Vec<f32>,
+
+    /// Emotional valence (-1.0 to 1.0)
+    pub valence: f32,
+
+    /// Emotional arousal (0.0 to 1.0)
+    pub arousal: f32,
+
+    /// Attention/importance weight at encoding time
+    pub attention_weight: f32,
+
+    /// Encoding strength (number of reinforcement writes)
+    pub encoding_strength: usize,
+}
+
+impl CompositeEngram {
+    /// Create a new composite engram from components
+    ///
+    /// # Arguments
+    /// * `semantic` - The semantic content vector
+    /// * `timestamp` - When this memory was formed
+    /// * `valence` - Emotional valence (-1.0 to 1.0)
+    /// * `arousal` - Emotional arousal (0.0 to 1.0)
+    /// * `temporal_encoder` - Encoder for time
+    /// * `emotional_encoder` - Encoder for emotion
+    pub fn new(
+        semantic: Vec<f32>,
+        timestamp: Duration,
+        valence: f32,
+        arousal: f32,
+        temporal_encoder: &TemporalEncoder,
+        emotional_encoder: &EmotionalEncoder,
+    ) -> Self {
+        // Encode temporal
+        let temporal_vector = temporal_encoder.encode(timestamp);
+
+        // Encode emotional
+        let emotional_binding_vector = emotional_encoder.encode(valence, arousal);
+
+        // Bind chrono-semantic (element-wise multiply, then normalize)
+        let chrono_semantic_vector = Self::bind_vectors(&temporal_vector, &semantic);
+
+        Self {
+            chrono_semantic_vector,
+            emotional_binding_vector,
+            temporal_vector,
+            semantic_vector: semantic,
+            valence,
+            arousal,
+            attention_weight: 0.5,
+            encoding_strength: 10,
+        }
+    }
+
+    /// Create with attention weighting
+    pub fn with_attention(
+        semantic: Vec<f32>,
+        timestamp: Duration,
+        valence: f32,
+        arousal: f32,
+        attention: f32,
+        temporal_encoder: &TemporalEncoder,
+        emotional_encoder: &EmotionalEncoder,
+    ) -> Self {
+        let mut engram = Self::new(semantic, timestamp, valence, arousal, temporal_encoder, emotional_encoder);
+        engram.attention_weight = attention.clamp(0.0, 1.0);
+        engram.encoding_strength = (1.0 + attention * 99.0) as usize;
+        engram
+    }
+
+    /// Bind two vectors via element-wise multiplication (HDC bind operation)
+    pub fn bind_vectors(a: &[f32], b: &[f32]) -> Vec<f32> {
+        // If dimensions differ, extend the smaller one cyclically
+        let max_len = a.len().max(b.len());
+        let mut result = vec![0.0f32; max_len];
+
+        for i in 0..max_len {
+            let a_val = a.get(i % a.len()).copied().unwrap_or(0.0);
+            let b_val = b.get(i % b.len()).copied().unwrap_or(0.0);
+            result[i] = a_val * b_val;
+        }
+
+        // Normalize
+        let norm: f32 = result.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for v in &mut result {
+                *v /= norm;
+            }
+        }
+
+        result
+    }
+
+    /// Query similarity with weighted components
+    ///
+    /// # Arguments
+    /// * `query_semantic` - Semantic query vector
+    /// * `query_temporal` - Optional temporal query vector
+    /// * `query_emotional` - Optional emotional query vector
+    /// * `weight_semantic` - Weight for semantic similarity (0.0 - 1.0)
+    /// * `weight_temporal` - Weight for temporal similarity (0.0 - 1.0)
+    /// * `weight_emotional` - Weight for emotional similarity (0.0 - 1.0)
+    ///
+    /// # Returns
+    /// Weighted similarity score
+    pub fn query_similarity(
+        &self,
+        query_semantic: Option<&[f32]>,
+        query_temporal: Option<&[f32]>,
+        query_emotional: Option<&[f32]>,
+        weight_semantic: f32,
+        weight_temporal: f32,
+        weight_emotional: f32,
+    ) -> f32 {
+        let total_weight = weight_semantic + weight_temporal + weight_emotional;
+        if total_weight <= 0.0 {
+            return 0.0;
+        }
+
+        let mut score = 0.0f32;
+
+        // Semantic similarity
+        if let Some(q) = query_semantic {
+            let sim = Self::cosine_similarity(&self.semantic_vector, q);
+            score += sim * weight_semantic;
+        }
+
+        // Temporal similarity
+        if let Some(q) = query_temporal {
+            let sim = Self::cosine_similarity(&self.temporal_vector, q);
+            score += sim * weight_temporal;
+        }
+
+        // Emotional similarity
+        if let Some(q) = query_emotional {
+            let sim = Self::cosine_similarity(&self.emotional_binding_vector, q);
+            score += sim * weight_emotional;
+        }
+
+        score / total_weight
+    }
+
+    /// Pure semantic query (ignores time and emotion)
+    pub fn semantic_similarity(&self, query: &[f32]) -> f32 {
+        Self::cosine_similarity(&self.semantic_vector, query)
+    }
+
+    /// Pure temporal query (ignores content and emotion)
+    pub fn temporal_similarity(&self, query: &[f32]) -> f32 {
+        Self::cosine_similarity(&self.temporal_vector, query)
+    }
+
+    /// Pure emotional query (ignores content and time)
+    pub fn emotional_similarity(&self, query: &[f32]) -> f32 {
+        Self::cosine_similarity(&self.emotional_binding_vector, query)
+    }
+
+    /// Chrono-semantic query (what + when, ignores emotion)
+    pub fn chrono_semantic_similarity(&self, query: &[f32]) -> f32 {
+        Self::cosine_similarity(&self.chrono_semantic_vector, query)
+    }
+
+    /// Cosine similarity helper (handles dimension mismatch via cyclic extension)
+    pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+        if a.len() != b.len() {
+            // Handle dimension mismatch via cyclic extension
+            let max_len = a.len().max(b.len());
+            let mut dot = 0.0f32;
+            let mut norm_a = 0.0f32;
+            let mut norm_b = 0.0f32;
+
+            for i in 0..max_len {
+                let a_val = a.get(i % a.len()).copied().unwrap_or(0.0);
+                let b_val = b.get(i % b.len()).copied().unwrap_or(0.0);
+                dot += a_val * b_val;
+                norm_a += a_val * a_val;
+                norm_b += b_val * b_val;
+            }
+
+            if norm_a > 0.0 && norm_b > 0.0 {
+                dot / (norm_a.sqrt() * norm_b.sqrt())
+            } else {
+                0.0
+            }
+        } else {
+            let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+            let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+            let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm_a > 0.0 && norm_b > 0.0 {
+                dot / (norm_a * norm_b)
+            } else {
+                0.0
+            }
+        }
+    }
+}
 
 /// Configuration for HolographicMemory
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,6 +569,34 @@ pub struct HolographicMemoryConfig {
     /// Minimum access count for long-term eligibility
     #[serde(default = "default_min_access_for_long_term")]
     pub min_access_for_long_term: u32,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CHRONO-SEMANTIC-EMOTIONAL BINDING CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Whether to enable chrono-semantic-emotional binding
+    #[serde(default)]
+    pub enable_composite_encoding: bool,
+
+    /// Dimension for temporal vectors
+    #[serde(default = "default_temporal_dimension")]
+    pub temporal_dimension: usize,
+
+    /// Dimension for emotional vectors
+    #[serde(default = "default_emotional_dimension")]
+    pub emotional_dimension: usize,
+
+    /// Default weight for semantic component in queries
+    #[serde(default = "default_semantic_weight")]
+    pub default_semantic_weight: f32,
+
+    /// Default weight for temporal component in queries
+    #[serde(default = "default_temporal_weight")]
+    pub default_temporal_weight: f32,
+
+    /// Default weight for emotional component in queries
+    #[serde(default = "default_emotional_weight")]
+    pub default_emotional_weight: f32,
 }
 
 fn default_hippocampus_decay_rate() -> f32 { 0.05 }
@@ -131,6 +605,13 @@ fn default_max_strength() -> f32 { 2.0 }
 fn default_prune_threshold() -> f32 { 0.01 }
 fn default_long_term_threshold() -> f32 { 0.5 }
 fn default_min_access_for_long_term() -> u32 { 2 }
+
+// Chrono-semantic-emotional defaults
+fn default_temporal_dimension() -> usize { 128 }
+fn default_emotional_dimension() -> usize { 64 }
+fn default_semantic_weight() -> f32 { 0.6 }
+fn default_temporal_weight() -> f32 { 0.2 }
+fn default_emotional_weight() -> f32 { 0.2 }
 
 impl Default for HolographicMemoryConfig {
     fn default() -> Self {
@@ -151,6 +632,13 @@ impl Default for HolographicMemoryConfig {
             enable_sleep_consolidation: false,
             long_term_threshold: default_long_term_threshold(),
             min_access_for_long_term: default_min_access_for_long_term(),
+            // Chrono-semantic-emotional binding
+            enable_composite_encoding: false, // Off by default for backwards compatibility
+            temporal_dimension: default_temporal_dimension(),
+            emotional_dimension: default_emotional_dimension(),
+            default_semantic_weight: default_semantic_weight(),
+            default_temporal_weight: default_temporal_weight(),
+            default_emotional_weight: default_emotional_weight(),
         }
     }
 }
@@ -160,9 +648,21 @@ impl Default for HolographicMemoryConfig {
 /// Integrates Hippocampus-style decay/strengthen dynamics:
 /// - **Decay**: `strength *= 1.0 - decay_rate` (exponential forgetting)
 /// - **Strengthen**: `recall_count += 1; strength += 0.1` (use-dependent potentiation)
+///
+/// ## Chrono-Semantic-Emotional Binding (NEW)
+///
+/// When `composite` is present, the memory has multi-dimensional encoding:
+/// - **Temporal**: When this happened (cyclic time encoding)
+/// - **Semantic**: What this is about (content meaning)
+/// - **Emotional**: How it felt (affective state)
+///
+/// This enables queries like:
+/// - "What happened yesterday morning?" (chrono-semantic)
+/// - "What made me frustrated?" (emotional)
+/// - "Things related to X" (pure semantic)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryTrace {
-    /// The dense vector representation
+    /// The dense vector representation (primary semantic encoding)
     pub vector: Vec<f32>,
 
     /// Original text (if available)
@@ -191,6 +691,24 @@ pub struct MemoryTrace {
     /// Eligibility for long-term storage (set during sleep consolidation)
     #[serde(default)]
     pub long_term_eligible: bool,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CHRONO-SEMANTIC-EMOTIONAL BINDING (NEW)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Composite engram with multi-dimensional encoding
+    /// When present, enables temporal, semantic, and emotional queries
+    #[serde(default)]
+    pub composite: Option<CompositeEngram>,
+
+    /// Emotional valence (-1.0 to 1.0) for quick filtering
+    /// Extracted from composite for efficiency
+    #[serde(default)]
+    pub valence: Option<f32>,
+
+    /// Emotional arousal (0.0 to 1.0) for quick filtering
+    #[serde(default)]
+    pub arousal: Option<f32>,
 }
 
 impl MemoryTrace {
@@ -211,6 +729,9 @@ impl MemoryTrace {
             category: None,
             consolidated: false,
             long_term_eligible: false,
+            composite: None,
+            valence: None,
+            arousal: None,
         }
     }
 
@@ -219,6 +740,130 @@ impl MemoryTrace {
         let mut trace = Self::new(thought.dense.values.clone(), Some(thought.text.clone()));
         trace.importance = thought.confidence;
         trace
+    }
+
+    /// Create a new memory trace with composite chrono-semantic-emotional encoding
+    ///
+    /// # Arguments
+    /// * `vector` - The primary semantic vector
+    /// * `text` - Optional text description
+    /// * `timestamp` - When this memory was formed (duration since reference point)
+    /// * `valence` - Emotional valence (-1.0 to 1.0)
+    /// * `arousal` - Emotional arousal (0.0 to 1.0)
+    /// * `temporal_encoder` - Encoder for time
+    /// * `emotional_encoder` - Encoder for emotion
+    pub fn new_composite(
+        vector: Vec<f32>,
+        text: Option<String>,
+        timestamp: Duration,
+        valence: f32,
+        arousal: f32,
+        temporal_encoder: &TemporalEncoder,
+        emotional_encoder: &EmotionalEncoder,
+    ) -> Self {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        let composite = CompositeEngram::new(
+            vector.clone(),
+            timestamp,
+            valence,
+            arousal,
+            temporal_encoder,
+            emotional_encoder,
+        );
+
+        Self {
+            vector,
+            text,
+            importance: 1.0,
+            access_count: 0,
+            created_at: now,
+            last_accessed: now,
+            category: None,
+            consolidated: false,
+            long_term_eligible: false,
+            composite: Some(composite),
+            valence: Some(valence),
+            arousal: Some(arousal),
+        }
+    }
+
+    /// Create with composite encoding and attention weight
+    pub fn new_composite_with_attention(
+        vector: Vec<f32>,
+        text: Option<String>,
+        timestamp: Duration,
+        valence: f32,
+        arousal: f32,
+        attention: f32,
+        temporal_encoder: &TemporalEncoder,
+        emotional_encoder: &EmotionalEncoder,
+    ) -> Self {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+
+        let composite = CompositeEngram::with_attention(
+            vector.clone(),
+            timestamp,
+            valence,
+            arousal,
+            attention,
+            temporal_encoder,
+            emotional_encoder,
+        );
+
+        Self {
+            vector,
+            text,
+            importance: attention, // Use attention as initial importance
+            access_count: 0,
+            created_at: now,
+            last_accessed: now,
+            category: None,
+            consolidated: false,
+            long_term_eligible: false,
+            composite: Some(composite),
+            valence: Some(valence),
+            arousal: Some(arousal),
+        }
+    }
+
+    /// Add composite encoding to an existing trace
+    pub fn with_composite(
+        mut self,
+        timestamp: Duration,
+        valence: f32,
+        arousal: f32,
+        temporal_encoder: &TemporalEncoder,
+        emotional_encoder: &EmotionalEncoder,
+    ) -> Self {
+        let composite = CompositeEngram::new(
+            self.vector.clone(),
+            timestamp,
+            valence,
+            arousal,
+            temporal_encoder,
+            emotional_encoder,
+        );
+        self.composite = Some(composite);
+        self.valence = Some(valence);
+        self.arousal = Some(arousal);
+        self
+    }
+
+    /// Check if this trace has composite encoding
+    pub fn has_composite(&self) -> bool {
+        self.composite.is_some()
+    }
+
+    /// Get the composite engram (if present)
+    pub fn composite(&self) -> Option<&CompositeEngram> {
+        self.composite.as_ref()
     }
 
     /// Compute similarity to another vector
@@ -433,6 +1078,15 @@ pub struct MemoryMatch {
 /// - **Hippocampus Dynamics**: decay/strengthen for biological memory behavior
 /// - **Sleep Consolidation**: Integration with SleepCycleManager for REM-based consolidation
 /// - **Persistence Ready**: Export/import for UnifiedMind database storage
+/// - **Chrono-Semantic-Emotional Binding**: Multi-dimensional memory encoding (NEW)
+///
+/// ## Query Modes (with Composite Encoding)
+///
+/// 1. **Pure Semantic**: "What did I learn about X?" (ignores time/emotion)
+/// 2. **Pure Temporal**: "What happened at 9 AM?" (ignores content/emotion)
+/// 3. **Pure Emotional**: "What made me frustrated?" (ignores content/time)
+/// 4. **Chrono-Semantic**: "What happened yesterday morning?" (time + content)
+/// 5. **Combined**: Full context with weighted blend of all three
 pub struct HolographicMemory {
     /// Configuration
     config: HolographicMemoryConfig,
@@ -459,6 +1113,16 @@ pub struct HolographicMemory {
 
     /// Total decay cycles applied (for debugging/analysis)
     total_decay_cycles: u64,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CHRONO-SEMANTIC-EMOTIONAL BINDING (NEW)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Temporal encoder for time-based memory encoding
+    temporal_encoder: TemporalEncoder,
+
+    /// Emotional encoder for affective state encoding
+    emotional_encoder: EmotionalEncoder,
 }
 
 /// Statistics about memory usage
@@ -516,6 +1180,9 @@ impl HolographicMemory {
 
     /// Create with custom configuration
     pub fn with_config(config: HolographicMemoryConfig) -> Self {
+        let temporal_encoder = TemporalEncoder::with_dimension(config.temporal_dimension);
+        let emotional_encoder = EmotionalEncoder::with_dimension(config.emotional_dimension);
+
         Self {
             hologram: vec![0.0; config.dimension],
             config,
@@ -525,6 +1192,8 @@ impl HolographicMemory {
             pending_long_term: Vec::new(),
             memory_pressure: 0.0,
             total_decay_cycles: 0,
+            temporal_encoder,
+            emotional_encoder,
         }
     }
 
@@ -569,6 +1238,285 @@ impl HolographicMemory {
         }
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CHRONO-SEMANTIC-EMOTIONAL BINDING METHODS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Store with chrono-semantic-emotional encoding (full composite)
+    ///
+    /// # Arguments
+    /// * `vector` - The semantic content vector
+    /// * `text` - Optional text description
+    /// * `timestamp` - When this memory was formed
+    /// * `valence` - Emotional valence (-1.0 to 1.0)
+    /// * `arousal` - Emotional arousal (0.0 to 1.0)
+    ///
+    /// # Example
+    /// ```ignore
+    /// memory.store_composite(
+    ///     &semantic_vector,
+    ///     Some("Fixed critical bug".to_string()),
+    ///     Duration::from_secs(9 * 3600), // 9 AM
+    ///     -0.7,  // Frustration (negative valence)
+    ///     0.8,   // High arousal (stressful)
+    /// );
+    /// ```
+    pub fn store_composite(
+        &mut self,
+        vector: &DenseVector,
+        text: Option<String>,
+        timestamp: Duration,
+        valence: f32,
+        arousal: f32,
+    ) {
+        let trace = MemoryTrace::new_composite(
+            vector.values.clone(),
+            text,
+            timestamp,
+            valence,
+            arousal,
+            &self.temporal_encoder,
+            &self.emotional_encoder,
+        );
+        self.store_trace(trace);
+    }
+
+    /// Store with composite encoding and attention weight
+    ///
+    /// High-attention memories get stronger encoding (more SDM writes)
+    /// mimicking biological memory formation.
+    ///
+    /// # Arguments
+    /// * `attention` - Importance/focus level (0.0-1.0)
+    ///   - 0.0 = background/routine (weak encoding)
+    ///   - 0.5 = normal attention (default)
+    ///   - 1.0 = full focus/critical moment (strong encoding)
+    pub fn store_composite_with_attention(
+        &mut self,
+        vector: &DenseVector,
+        text: Option<String>,
+        timestamp: Duration,
+        valence: f32,
+        arousal: f32,
+        attention: f32,
+    ) {
+        let trace = MemoryTrace::new_composite_with_attention(
+            vector.values.clone(),
+            text,
+            timestamp,
+            valence,
+            arousal,
+            attention,
+            &self.temporal_encoder,
+            &self.emotional_encoder,
+        );
+        self.store_trace(trace);
+    }
+
+    /// Query by temporal cue (mental time travel)
+    ///
+    /// "What happened at 9 AM?" - Returns memories formed around that time.
+    ///
+    /// # Arguments
+    /// * `timestamp` - The time to query
+    /// * `top_k` - Maximum number of results
+    ///
+    /// # Returns
+    /// Memories ranked by temporal similarity
+    pub fn query_temporal(&mut self, timestamp: Duration, top_k: usize) -> Vec<MemoryMatch> {
+        let query_temporal = self.temporal_encoder.encode(timestamp);
+
+        let mut matches = Vec::new();
+
+        for trace in self.episodic.iter_mut() {
+            if let Some(ref composite) = trace.composite {
+                let sim = self.temporal_encoder.similarity(&query_temporal, &composite.temporal_vector);
+                if sim >= self.config.retrieval_threshold {
+                    trace.touch();
+                    matches.push(MemoryMatch {
+                        trace: trace.clone(),
+                        similarity: sim,
+                        source: "temporal".to_string(),
+                    });
+                }
+            }
+        }
+
+        matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        matches.truncate(top_k);
+        matches
+    }
+
+    /// Query by emotional state
+    ///
+    /// "What made me frustrated?" - Returns memories with similar emotional valence.
+    ///
+    /// # Arguments
+    /// * `valence` - Emotional valence to query (-1.0 to 1.0)
+    /// * `arousal` - Emotional arousal to query (0.0 to 1.0)
+    /// * `top_k` - Maximum number of results
+    pub fn query_emotional(&mut self, valence: f32, arousal: f32, top_k: usize) -> Vec<MemoryMatch> {
+        let query_emotional = self.emotional_encoder.encode(valence, arousal);
+
+        let mut matches = Vec::new();
+
+        for trace in self.episodic.iter_mut() {
+            if let Some(ref composite) = trace.composite {
+                let sim = self.emotional_encoder.similarity(&query_emotional, &composite.emotional_binding_vector);
+                if sim >= self.config.retrieval_threshold {
+                    trace.touch();
+                    matches.push(MemoryMatch {
+                        trace: trace.clone(),
+                        similarity: sim,
+                        source: "emotional".to_string(),
+                    });
+                }
+            }
+        }
+
+        matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        matches.truncate(top_k);
+        matches
+    }
+
+    /// Query by valence only (simpler emotional query)
+    ///
+    /// "What made me happy?" (valence > 0) or "What made me sad?" (valence < 0)
+    pub fn query_by_valence(&mut self, valence: f32, top_k: usize) -> Vec<MemoryMatch> {
+        self.query_emotional(valence, 0.5, top_k)
+    }
+
+    /// Query with chrono-semantic binding (what + when)
+    ///
+    /// "What did I learn about X yesterday morning?"
+    ///
+    /// # Arguments
+    /// * `semantic_query` - What you're looking for
+    /// * `timestamp` - When it happened
+    /// * `top_k` - Maximum results
+    pub fn query_chrono_semantic(
+        &mut self,
+        semantic_query: &DenseVector,
+        timestamp: Duration,
+        top_k: usize,
+    ) -> Vec<MemoryMatch> {
+        let temporal_vec = self.temporal_encoder.encode(timestamp);
+        let chrono_semantic_query = CompositeEngram::bind_vectors(&temporal_vec, &semantic_query.values);
+
+        let mut matches = Vec::new();
+
+        for trace in self.episodic.iter_mut() {
+            if let Some(ref composite) = trace.composite {
+                let sim = CompositeEngram::cosine_similarity(&chrono_semantic_query, &composite.chrono_semantic_vector);
+                if sim >= self.config.retrieval_threshold {
+                    trace.touch();
+                    matches.push(MemoryMatch {
+                        trace: trace.clone(),
+                        similarity: sim,
+                        source: "chrono_semantic".to_string(),
+                    });
+                }
+            }
+        }
+
+        matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        matches.truncate(top_k);
+        matches
+    }
+
+    /// Multi-dimensional query with weighted components
+    ///
+    /// This is the most powerful query mode, combining all three dimensions
+    /// with customizable weights.
+    ///
+    /// # Arguments
+    /// * `semantic_query` - Optional semantic content query
+    /// * `temporal_query` - Optional timestamp query
+    /// * `emotional_query` - Optional (valence, arousal) query
+    /// * `weights` - (semantic_weight, temporal_weight, emotional_weight)
+    /// * `top_k` - Maximum results
+    ///
+    /// # Example
+    /// ```ignore
+    /// // "What frustrated me yesterday morning?"
+    /// let matches = memory.query_multi_dimensional(
+    ///     None,  // Any content
+    ///     Some(Duration::from_secs(9 * 3600)),  // Morning
+    ///     Some((-0.7, 0.8)),  // Frustrated (negative valence, high arousal)
+    ///     (0.0, 0.3, 0.7),    // Heavy weight on emotion
+    ///     10,
+    /// );
+    /// ```
+    pub fn query_multi_dimensional(
+        &mut self,
+        semantic_query: Option<&DenseVector>,
+        temporal_query: Option<Duration>,
+        emotional_query: Option<(f32, f32)>,
+        weights: (f32, f32, f32),
+        top_k: usize,
+    ) -> Vec<MemoryMatch> {
+        let (w_semantic, w_temporal, w_emotional) = weights;
+
+        // Pre-encode query vectors
+        let query_temporal = temporal_query.map(|t| self.temporal_encoder.encode(t));
+        let query_emotional = emotional_query.map(|(v, a)| self.emotional_encoder.encode(v, a));
+
+        let mut matches = Vec::new();
+
+        for trace in self.episodic.iter_mut() {
+            // For traces with composite encoding
+            if let Some(ref composite) = trace.composite {
+                let sim = composite.query_similarity(
+                    semantic_query.map(|q| q.values.as_slice()),
+                    query_temporal.as_deref(),
+                    query_emotional.as_deref(),
+                    w_semantic,
+                    w_temporal,
+                    w_emotional,
+                );
+
+                if sim >= self.config.retrieval_threshold {
+                    trace.touch();
+                    matches.push(MemoryMatch {
+                        trace: trace.clone(),
+                        similarity: sim,
+                        source: "multi_dimensional".to_string(),
+                    });
+                }
+            } else if let Some(ref query) = semantic_query {
+                // Fall back to pure semantic for non-composite traces
+                let sim = trace.similarity(&query.values);
+                if sim >= self.config.retrieval_threshold {
+                    trace.touch();
+                    matches.push(MemoryMatch {
+                        trace: trace.clone(),
+                        similarity: sim,
+                        source: "semantic_fallback".to_string(),
+                    });
+                }
+            }
+        }
+
+        matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        matches.truncate(top_k);
+        matches
+    }
+
+    /// Get temporal encoder reference
+    pub fn temporal_encoder(&self) -> &TemporalEncoder {
+        &self.temporal_encoder
+    }
+
+    /// Get emotional encoder reference
+    pub fn emotional_encoder(&self) -> &EmotionalEncoder {
+        &self.emotional_encoder
+    }
+
+    /// Check if composite encoding is enabled
+    pub fn composite_enabled(&self) -> bool {
+        self.config.enable_composite_encoding
+    }
+
     /// Query memory by similarity
     ///
     /// Returns the top-k most similar memories from both episodic and semantic stores.
@@ -604,6 +1552,9 @@ impl HolographicMemory {
                     category: Some(category.name.clone()),
                     consolidated: true,       // Semantic categories are already consolidated
                     long_term_eligible: true, // Semantic = long-term by definition
+                    composite: None,          // Categories don't have composite encoding
+                    valence: None,
+                    arousal: None,
                 };
                 matches.push(MemoryMatch {
                     trace,
@@ -1134,6 +2085,31 @@ impl HolographicMemory {
     pub fn sleep_enabled(&self) -> bool {
         self.config.enable_sleep_consolidation
     }
+
+    /// Create with chrono-semantic-emotional binding enabled
+    pub fn new_with_composite(dimension: usize) -> Self {
+        Self::with_config(HolographicMemoryConfig {
+            dimension,
+            enable_composite_encoding: true,
+            ..Default::default()
+        })
+    }
+
+    /// Create with all biological features enabled (hippocampus + sleep + composite)
+    ///
+    /// This creates a fully biologically-inspired memory system:
+    /// - Hippocampus-style decay/strengthen
+    /// - Sleep consolidation for memory organization
+    /// - Chrono-semantic-emotional binding for rich encoding
+    pub fn new_full_biological(dimension: usize) -> Self {
+        Self::with_config(HolographicMemoryConfig {
+            dimension,
+            use_hippocampus_dynamics: true,
+            enable_sleep_consolidation: true,
+            enable_composite_encoding: true,
+            ..Default::default()
+        })
+    }
 }
 
 /// Serializable memory state for persistence/swarm
@@ -1483,5 +2459,343 @@ mod tests {
 
         memory.clear_pending_long_term();
         assert!(memory.pending_long_term().is_empty());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CHRONO-SEMANTIC-EMOTIONAL BINDING TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_temporal_encoder() {
+        let encoder = TemporalEncoder::new();
+
+        // Encode 9 AM
+        let morning = encoder.encode(Duration::from_secs(9 * 3600));
+        assert_eq!(morning.len(), 128);
+
+        // Encode 9 PM
+        let evening = encoder.encode(Duration::from_secs(21 * 3600));
+        assert_eq!(evening.len(), 128);
+
+        // Morning and evening should be somewhat different
+        let sim = encoder.similarity(&morning, &evening);
+        println!("Morning vs Evening similarity: {:.4}", sim);
+        assert!(sim < 0.9); // Not identical
+
+        // Same time should be identical
+        let morning2 = encoder.encode(Duration::from_secs(9 * 3600));
+        let sim_same = encoder.similarity(&morning, &morning2);
+        assert!((sim_same - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_emotional_encoder() {
+        let encoder = EmotionalEncoder::new();
+
+        // Encode frustration (negative valence, high arousal)
+        let frustrated = encoder.encode(-0.7, 0.8);
+        assert_eq!(frustrated.len(), 64);
+
+        // Encode joy (positive valence, high arousal)
+        let joyful = encoder.encode(0.8, 0.8);
+        assert_eq!(joyful.len(), 64);
+
+        // Encode calm (neutral valence, low arousal)
+        let calm = encoder.encode(0.0, 0.2);
+        assert_eq!(calm.len(), 64);
+
+        // Opposite emotions should have lower similarity
+        let sim_opposites = encoder.similarity(&frustrated, &joyful);
+        println!("Frustrated vs Joyful similarity: {:.4}", sim_opposites);
+        // Opposite valence emotions might have negative or low similarity
+
+        // Same emotion should be identical
+        let frustrated2 = encoder.encode(-0.7, 0.8);
+        let sim_same = encoder.similarity(&frustrated, &frustrated2);
+        assert!((sim_same - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_composite_engram() {
+        let temporal_encoder = TemporalEncoder::new();
+        let emotional_encoder = EmotionalEncoder::new();
+
+        let semantic = vec![0.1; 768];
+        let timestamp = Duration::from_secs(9 * 3600); // 9 AM
+        let valence = -0.5;
+        let arousal = 0.7;
+
+        let engram = CompositeEngram::new(
+            semantic.clone(),
+            timestamp,
+            valence,
+            arousal,
+            &temporal_encoder,
+            &emotional_encoder,
+        );
+
+        // Check components exist
+        assert!(!engram.chrono_semantic_vector.is_empty());
+        assert!(!engram.emotional_binding_vector.is_empty());
+        assert!(!engram.temporal_vector.is_empty());
+        assert!(!engram.semantic_vector.is_empty());
+        assert_eq!(engram.valence, valence);
+        assert_eq!(engram.arousal, arousal);
+    }
+
+    #[test]
+    fn test_composite_engram_query() {
+        let temporal_encoder = TemporalEncoder::new();
+        let emotional_encoder = EmotionalEncoder::new();
+
+        let semantic = vec![0.1; 768];
+        let engram = CompositeEngram::new(
+            semantic.clone(),
+            Duration::from_secs(9 * 3600),
+            -0.5,
+            0.7,
+            &temporal_encoder,
+            &emotional_encoder,
+        );
+
+        // Pure semantic query
+        let sim = engram.semantic_similarity(&semantic);
+        assert!((sim - 1.0).abs() < 0.001);
+
+        // Weighted query
+        let query_temporal = temporal_encoder.encode(Duration::from_secs(9 * 3600));
+        let query_emotional = emotional_encoder.encode(-0.5, 0.7);
+
+        let combined_sim = engram.query_similarity(
+            Some(&semantic),
+            Some(&query_temporal),
+            Some(&query_emotional),
+            0.5,  // semantic weight
+            0.25, // temporal weight
+            0.25, // emotional weight
+        );
+
+        // Should be high since we're querying with matching values
+        assert!(combined_sim > 0.8);
+    }
+
+    #[test]
+    fn test_memory_trace_composite() {
+        let temporal_encoder = TemporalEncoder::new();
+        let emotional_encoder = EmotionalEncoder::new();
+
+        let trace = MemoryTrace::new_composite(
+            vec![0.1; 768],
+            Some("Test composite".to_string()),
+            Duration::from_secs(9 * 3600),
+            -0.5,
+            0.7,
+            &temporal_encoder,
+            &emotional_encoder,
+        );
+
+        assert!(trace.has_composite());
+        assert_eq!(trace.valence, Some(-0.5));
+        assert_eq!(trace.arousal, Some(0.7));
+
+        let composite = trace.composite().unwrap();
+        assert!(!composite.chrono_semantic_vector.is_empty());
+    }
+
+    #[test]
+    fn test_store_composite() {
+        let mut memory = HolographicMemory::new_with_composite(768);
+
+        let v = make_vector(768, 1.0);
+        memory.store_composite(
+            &v,
+            Some("Morning frustration".to_string()),
+            Duration::from_secs(9 * 3600),
+            -0.7,
+            0.8,
+        );
+
+        assert_eq!(memory.stats.episodic_count, 1);
+
+        let trace = memory.episodic.front().unwrap();
+        assert!(trace.has_composite());
+        assert_eq!(trace.valence, Some(-0.7));
+    }
+
+    #[test]
+    fn test_query_temporal() {
+        let mut memory = HolographicMemory::new_with_composite(768);
+
+        // Store memories at different times
+        memory.store_composite(
+            &make_vector(768, 1.0),
+            Some("Morning event".to_string()),
+            Duration::from_secs(9 * 3600),  // 9 AM
+            0.5,
+            0.5,
+        );
+
+        memory.store_composite(
+            &make_vector(768, 2.0),
+            Some("Evening event".to_string()),
+            Duration::from_secs(21 * 3600), // 9 PM
+            0.5,
+            0.5,
+        );
+
+        // Query for morning time
+        let morning_matches = memory.query_temporal(Duration::from_secs(9 * 3600), 5);
+
+        assert!(!morning_matches.is_empty());
+        let best = &morning_matches[0];
+        println!("Best morning match: {} (sim: {:.4})",
+                 best.trace.text.as_deref().unwrap_or("?"), best.similarity);
+    }
+
+    #[test]
+    fn test_query_emotional() {
+        let mut memory = HolographicMemory::new_with_composite(768);
+
+        // Store memories with different emotions
+        memory.store_composite(
+            &make_vector(768, 1.0),
+            Some("Frustrating bug".to_string()),
+            Duration::from_secs(9 * 3600),
+            -0.7,  // Negative valence
+            0.8,   // High arousal
+        );
+
+        memory.store_composite(
+            &make_vector(768, 2.0),
+            Some("Great success".to_string()),
+            Duration::from_secs(10 * 3600),
+            0.8,   // Positive valence
+            0.9,   // High arousal
+        );
+
+        memory.store_composite(
+            &make_vector(768, 3.0),
+            Some("Calm routine".to_string()),
+            Duration::from_secs(11 * 3600),
+            0.0,   // Neutral valence
+            0.2,   // Low arousal
+        );
+
+        // Query for frustration
+        let frustrated_matches = memory.query_emotional(-0.7, 0.8, 5);
+
+        assert!(!frustrated_matches.is_empty());
+        let best = &frustrated_matches[0];
+        println!("Best frustration match: {} (sim: {:.4})",
+                 best.trace.text.as_deref().unwrap_or("?"), best.similarity);
+    }
+
+    #[test]
+    fn test_query_multi_dimensional() {
+        let mut memory = HolographicMemory::new_with_composite(768);
+
+        // Store memories
+        let v1 = make_vector(768, 1.0);
+        memory.store_composite(
+            &v1,
+            Some("Morning bug fix".to_string()),
+            Duration::from_secs(9 * 3600),
+            -0.5,
+            0.6,
+        );
+
+        memory.store_composite(
+            &make_vector(768, 2.0),
+            Some("Afternoon success".to_string()),
+            Duration::from_secs(14 * 3600),
+            0.8,
+            0.7,
+        );
+
+        // Multi-dimensional query: semantic + temporal + emotional
+        let matches = memory.query_multi_dimensional(
+            Some(&v1),                              // Similar semantic content
+            Some(Duration::from_secs(9 * 3600)),    // Morning time
+            Some((-0.5, 0.6)),                      // Negative emotion
+            (0.4, 0.3, 0.3),                        // Balanced weights
+            5,
+        );
+
+        assert!(!matches.is_empty());
+        let best = &matches[0];
+        println!("Best multi-dimensional match: {} (sim: {:.4})",
+                 best.trace.text.as_deref().unwrap_or("?"), best.similarity);
+
+        // The morning bug fix should be the best match
+        assert!(best.trace.text.as_deref().unwrap_or("").contains("Morning"));
+    }
+
+    #[test]
+    fn test_new_full_biological() {
+        let memory = HolographicMemory::new_full_biological(768);
+
+        assert!(memory.hippocampus_enabled());
+        assert!(memory.sleep_enabled());
+        assert!(memory.composite_enabled());
+    }
+
+    #[test]
+    fn test_store_composite_with_attention() {
+        let mut memory = HolographicMemory::new_with_composite(768);
+
+        let v = make_vector(768, 1.0);
+
+        // Store with high attention
+        memory.store_composite_with_attention(
+            &v,
+            Some("Critical security fix".to_string()),
+            Duration::from_secs(9 * 3600),
+            -0.8,  // High stress
+            0.9,   // High arousal
+            1.0,   // Full attention
+        );
+
+        let trace = memory.episodic.front().unwrap();
+        assert!(trace.has_composite());
+
+        let composite = trace.composite().unwrap();
+        assert_eq!(composite.attention_weight, 1.0);
+        assert_eq!(composite.encoding_strength, 100);
+    }
+
+    #[test]
+    fn test_query_chrono_semantic() {
+        let mut memory = HolographicMemory::new_with_composite(768);
+
+        let v1 = make_vector(768, 1.0);
+        memory.store_composite(
+            &v1,
+            Some("Morning coding session".to_string()),
+            Duration::from_secs(9 * 3600),
+            0.5,
+            0.6,
+        );
+
+        let v2 = make_vector(768, 1.0); // Same semantic content
+        memory.store_composite(
+            &v2,
+            Some("Evening coding session".to_string()),
+            Duration::from_secs(21 * 3600), // Different time
+            0.5,
+            0.6,
+        );
+
+        // Query: "What about coding in the morning?"
+        let matches = memory.query_chrono_semantic(
+            &v1,
+            Duration::from_secs(9 * 3600),
+            5,
+        );
+
+        assert!(!matches.is_empty());
+        // Should prefer morning coding session due to chrono-semantic binding
+        let best = &matches[0];
+        println!("Best chrono-semantic match: {} (sim: {:.4})",
+                 best.trace.text.as_deref().unwrap_or("?"), best.similarity);
     }
 }
