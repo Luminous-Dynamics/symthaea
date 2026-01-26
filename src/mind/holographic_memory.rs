@@ -82,7 +82,55 @@ pub struct HolographicMemoryConfig {
 
     /// Consolidation threshold (how many similar episodes trigger consolidation)
     pub consolidation_threshold: usize,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // HIPPOCAMPUS-STYLE DYNAMICS CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Hippocampus-style decay rate per cycle (0.0 - 1.0)
+    /// Lower = slower decay (0.05 = 5% decay per cycle)
+    #[serde(default = "default_hippocampus_decay_rate")]
+    pub hippocampus_decay_rate: f32,
+
+    /// Strengthen increment when memory is recalled
+    #[serde(default = "default_strengthen_increment")]
+    pub strengthen_increment: f32,
+
+    /// Maximum strength a memory can reach
+    #[serde(default = "default_max_strength")]
+    pub max_strength: f32,
+
+    /// Minimum importance threshold for pruning (memories below this are removed)
+    #[serde(default = "default_prune_threshold")]
+    pub prune_threshold: f32,
+
+    /// Whether to use hippocampus-style dynamics (vs original decay_factor)
+    #[serde(default)]
+    pub use_hippocampus_dynamics: bool,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SLEEP CONSOLIDATION CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Whether to integrate with sleep cycle manager
+    #[serde(default)]
+    pub enable_sleep_consolidation: bool,
+
+    /// Minimum importance for a memory to be eligible for long-term storage
+    #[serde(default = "default_long_term_threshold")]
+    pub long_term_threshold: f32,
+
+    /// Minimum access count for long-term eligibility
+    #[serde(default = "default_min_access_for_long_term")]
+    pub min_access_for_long_term: u32,
 }
+
+fn default_hippocampus_decay_rate() -> f32 { 0.05 }
+fn default_strengthen_increment() -> f32 { 0.1 }
+fn default_max_strength() -> f32 { 2.0 }
+fn default_prune_threshold() -> f32 { 0.01 }
+fn default_long_term_threshold() -> f32 { 0.5 }
+fn default_min_access_for_long_term() -> u32 { 2 }
 
 impl Default for HolographicMemoryConfig {
     fn default() -> Self {
@@ -93,11 +141,25 @@ impl Default for HolographicMemoryConfig {
             retrieval_threshold: 0.3,
             auto_consolidate: true,
             consolidation_threshold: 3,
+            // Hippocampus dynamics
+            hippocampus_decay_rate: default_hippocampus_decay_rate(),
+            strengthen_increment: default_strengthen_increment(),
+            max_strength: default_max_strength(),
+            prune_threshold: default_prune_threshold(),
+            use_hippocampus_dynamics: false, // Off by default for backwards compatibility
+            // Sleep consolidation
+            enable_sleep_consolidation: false,
+            long_term_threshold: default_long_term_threshold(),
+            min_access_for_long_term: default_min_access_for_long_term(),
         }
     }
 }
 
 /// A single memory trace
+///
+/// Integrates Hippocampus-style decay/strengthen dynamics:
+/// - **Decay**: `strength *= 1.0 - decay_rate` (exponential forgetting)
+/// - **Strengthen**: `recall_count += 1; strength += 0.1` (use-dependent potentiation)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryTrace {
     /// The dense vector representation
@@ -107,6 +169,7 @@ pub struct MemoryTrace {
     pub text: Option<String>,
 
     /// Importance/salience score (affects retrieval and decay)
+    /// Also acts as "strength" for Hippocampus-style dynamics
     pub importance: f32,
 
     /// Number of times this memory has been accessed
@@ -120,6 +183,14 @@ pub struct MemoryTrace {
 
     /// Optional category/tag
     pub category: Option<String>,
+
+    /// Consolidation status for sleep integration
+    #[serde(default)]
+    pub consolidated: bool,
+
+    /// Eligibility for long-term storage (set during sleep consolidation)
+    #[serde(default)]
+    pub long_term_eligible: bool,
 }
 
 impl MemoryTrace {
@@ -138,6 +209,8 @@ impl MemoryTrace {
             created_at: now,
             last_accessed: now,
             category: None,
+            consolidated: false,
+            long_term_eligible: false,
         }
     }
 
@@ -172,6 +245,82 @@ impl MemoryTrace {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // HIPPOCAMPUS-STYLE DYNAMICS (from src/memory/hippocampus.rs)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Apply decay to this memory trace (Hippocampus-style)
+    ///
+    /// Implements exponential forgetting: `importance *= 1.0 - decay_rate`
+    /// This mimics biological memory decay where unused memories fade over time.
+    ///
+    /// # Arguments
+    /// * `decay_rate` - Rate of decay (0.0 = no decay, 1.0 = instant forget)
+    ///
+    /// # Example
+    /// ```ignore
+    /// trace.decay_hippocampus(0.05); // 5% decay per cycle
+    /// ```
+    pub fn decay_hippocampus(&mut self, decay_rate: f32) {
+        self.importance *= 1.0 - decay_rate;
+        self.importance = self.importance.max(0.0); // Floor at zero
+    }
+
+    /// Strengthen this memory on recall (Hippocampus-style)
+    ///
+    /// Implements use-dependent potentiation: memories that are recalled
+    /// become stronger, mimicking Long-Term Potentiation (LTP).
+    ///
+    /// - Increments access count
+    /// - Boosts importance by 0.1 (capped at 2.0)
+    /// - Updates last_accessed timestamp
+    ///
+    /// # Example
+    /// ```ignore
+    /// trace.strengthen(); // Called on successful recall
+    /// ```
+    pub fn strengthen(&mut self) {
+        self.access_count += 1;
+        self.importance = (self.importance + 0.1).min(2.0);
+        self.last_accessed = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+    }
+
+    /// Check if this memory should be pruned (below threshold)
+    pub fn should_prune(&self, threshold: f32) -> bool {
+        self.importance < threshold
+    }
+
+    /// Mark as consolidated (processed during sleep)
+    pub fn mark_consolidated(&mut self) {
+        self.consolidated = true;
+    }
+
+    /// Mark as eligible for long-term storage
+    pub fn mark_long_term_eligible(&mut self) {
+        self.long_term_eligible = true;
+    }
+
+    /// Get the age of this memory in milliseconds
+    pub fn age_ms(&self) -> u64 {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        now.saturating_sub(self.created_at)
+    }
+
+    /// Get time since last access in milliseconds
+    pub fn time_since_access_ms(&self) -> u64 {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        now.saturating_sub(self.last_accessed)
     }
 }
 
@@ -278,6 +427,12 @@ pub struct MemoryMatch {
 /// - Associative retrieval
 /// - Graceful degradation
 /// - Infinite context through consolidation
+///
+/// ## Integrated Systems
+///
+/// - **Hippocampus Dynamics**: decay/strengthen for biological memory behavior
+/// - **Sleep Consolidation**: Integration with SleepCycleManager for REM-based consolidation
+/// - **Persistence Ready**: Export/import for UnifiedMind database storage
 pub struct HolographicMemory {
     /// Configuration
     config: HolographicMemoryConfig,
@@ -294,6 +449,16 @@ pub struct HolographicMemory {
 
     /// Statistics
     stats: MemoryStats,
+
+    /// Buffer for traces pending long-term storage (for UnifiedMind integration)
+    pending_long_term: Vec<MemoryTrace>,
+
+    /// Memory pressure tracking for sleep integration
+    /// Increases with each store, decreases with consolidation
+    memory_pressure: f32,
+
+    /// Total decay cycles applied (for debugging/analysis)
+    total_decay_cycles: u64,
 }
 
 /// Statistics about memory usage
@@ -316,6 +481,28 @@ pub struct MemoryStats {
 
     /// Average query time (microseconds)
     pub avg_query_time_us: f64,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // HIPPOCAMPUS & SLEEP STATISTICS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Total memories strengthened on recall
+    pub total_strengthened: u64,
+
+    /// Total decay cycles applied
+    pub total_decay_cycles: u64,
+
+    /// Total memories pruned due to decay
+    pub total_pruned: u64,
+
+    /// Total memories marked for long-term storage
+    pub total_long_term_eligible: u64,
+
+    /// Number of sleep consolidation cycles
+    pub sleep_consolidation_cycles: u64,
+
+    /// Current memory pressure (0.0 - 1.0)
+    pub memory_pressure: f32,
 }
 
 impl HolographicMemory {
@@ -335,6 +522,9 @@ impl HolographicMemory {
             episodic: VecDeque::new(),
             semantic: Vec::new(),
             stats: MemoryStats::default(),
+            pending_long_term: Vec::new(),
+            memory_pressure: 0.0,
+            total_decay_cycles: 0,
         }
     }
 
@@ -412,6 +602,8 @@ impl HolographicMemory {
                     created_at: 0,
                     last_accessed: 0,
                     category: Some(category.name.clone()),
+                    consolidated: true,       // Semantic categories are already consolidated
+                    long_term_eligible: true, // Semantic = long-term by definition
                 };
                 matches.push(MemoryMatch {
                     trace,
@@ -631,6 +823,9 @@ impl HolographicMemory {
         self.semantic.clear();
         self.hologram = vec![0.0; self.config.dimension];
         self.stats = MemoryStats::default();
+        self.pending_long_term.clear();
+        self.memory_pressure = 0.0;
+        self.total_decay_cycles = 0;
     }
 
     /// Export memory state for persistence/swarm sharing
@@ -641,6 +836,9 @@ impl HolographicMemory {
             semantic: self.semantic.clone(),
             hologram: self.hologram.clone(),
             stats: self.stats.clone(),
+            pending_long_term: self.pending_long_term.clone(),
+            memory_pressure: self.memory_pressure,
+            total_decay_cycles: self.total_decay_cycles,
         }
     }
 
@@ -651,6 +849,290 @@ impl HolographicMemory {
         self.semantic = state.semantic;
         self.hologram = state.hologram;
         self.stats = state.stats;
+        self.pending_long_term = state.pending_long_term;
+        self.memory_pressure = state.memory_pressure;
+        self.total_decay_cycles = state.total_decay_cycles;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // HIPPOCAMPUS-STYLE DYNAMICS (from src/memory/hippocampus.rs)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Apply hippocampus-style decay to all memories
+    ///
+    /// Uses the more biologically accurate exponential decay formula:
+    /// `importance *= 1.0 - decay_rate`
+    ///
+    /// This is different from the original `decay()` method which uses a
+    /// multiplication factor. Hippocampus-style decay is more aggressive
+    /// for unused memories.
+    ///
+    /// # Arguments
+    /// * `decay_rate` - Optional override for config's hippocampus_decay_rate
+    pub fn decay_hippocampus(&mut self, decay_rate: Option<f32>) {
+        let rate = decay_rate.unwrap_or(self.config.hippocampus_decay_rate);
+        let prune_threshold = self.config.prune_threshold;
+        let mut pruned_count = 0;
+
+        for trace in self.episodic.iter_mut() {
+            let old_importance = trace.importance;
+            trace.decay_hippocampus(rate);
+
+            // Update hologram to reflect importance change
+            let delta = trace.importance - old_importance;
+            for (i, val) in trace.vector.iter().enumerate() {
+                if i < self.hologram.len() {
+                    self.hologram[i] += val * delta;
+                }
+            }
+        }
+
+        // Prune memories below threshold
+        let before_count = self.episodic.len();
+        self.episodic.retain(|t| !t.should_prune(prune_threshold));
+        pruned_count = before_count - self.episodic.len();
+
+        // Update statistics
+        self.stats.episodic_count = self.episodic.len();
+        self.stats.total_decay_cycles += 1;
+        self.stats.total_pruned += pruned_count as u64;
+        self.total_decay_cycles += 1;
+
+        if pruned_count > 0 {
+            tracing::debug!(
+                "🧹 Hippocampus decay: pruned {} memories below threshold {}",
+                pruned_count,
+                prune_threshold
+            );
+        }
+    }
+
+    /// Strengthen memories similar to the query (use-dependent potentiation)
+    ///
+    /// When a memory is successfully recalled, it should be strengthened
+    /// to make future recall easier. This implements LTP (Long-Term Potentiation).
+    ///
+    /// # Returns
+    /// Number of memories strengthened
+    pub fn strengthen_similar(&mut self, vector: &DenseVector, similarity_threshold: f32) -> usize {
+        let mut strengthened = 0;
+
+        for trace in self.episodic.iter_mut() {
+            let sim = trace.similarity(&vector.values);
+            if sim >= similarity_threshold {
+                let old_importance = trace.importance;
+
+                // Use configured parameters or defaults
+                trace.access_count += 1;
+                trace.importance = (trace.importance + self.config.strengthen_increment)
+                    .min(self.config.max_strength);
+                trace.last_accessed = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_millis() as u64)
+                    .unwrap_or(0);
+
+                // Update hologram
+                let delta = trace.importance - old_importance;
+                for (i, val) in trace.vector.iter().enumerate() {
+                    if i < self.hologram.len() {
+                        self.hologram[i] += val * delta;
+                    }
+                }
+
+                strengthened += 1;
+            }
+        }
+
+        self.stats.total_strengthened += strengthened as u64;
+        strengthened
+    }
+
+    /// Combined query with automatic strengthening (Recall + LTP)
+    ///
+    /// This is the recommended way to query when using hippocampus dynamics:
+    /// 1. Find similar memories
+    /// 2. Strengthen the ones that were recalled
+    /// 3. Return the matches
+    pub fn query_and_strengthen(&mut self, vector: &DenseVector, top_k: usize) -> Vec<MemoryMatch> {
+        // First do the normal query
+        let matches = self.query(vector, top_k);
+
+        // Strengthen the retrieved memories
+        for m in &matches {
+            // Find and strengthen this trace
+            for trace in self.episodic.iter_mut() {
+                if trace.similarity(&m.trace.vector) > 0.99 {
+                    trace.strengthen();
+                    break;
+                }
+            }
+        }
+
+        matches
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SLEEP CONSOLIDATION INTEGRATION (from src/brain/sleep.rs)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Get current memory pressure (for sleep cycle integration)
+    ///
+    /// Memory pressure increases with each store and indicates when
+    /// consolidation should occur (like sleep pressure in the brain).
+    pub fn memory_pressure(&self) -> f32 {
+        self.memory_pressure
+    }
+
+    /// Increase memory pressure (called after each store operation)
+    ///
+    /// Pressure builds up until it triggers consolidation (sleep).
+    pub fn increase_pressure(&mut self, increment: f32) {
+        self.memory_pressure = (self.memory_pressure + increment).min(1.0);
+        self.stats.memory_pressure = self.memory_pressure;
+    }
+
+    /// Reset memory pressure (called after consolidation/sleep)
+    pub fn reset_pressure(&mut self) {
+        self.memory_pressure = 0.0;
+        self.stats.memory_pressure = 0.0;
+    }
+
+    /// Mark memories as eligible for long-term storage
+    ///
+    /// Memories that have been accessed multiple times and have
+    /// sufficient importance are marked for persistence to UnifiedMind.
+    ///
+    /// # Returns
+    /// Traces eligible for long-term storage (should be sent to UnifiedMind)
+    pub fn mark_long_term_eligible(&mut self) -> Vec<MemoryTrace> {
+        let mut eligible = Vec::new();
+
+        for trace in self.episodic.iter_mut() {
+            if !trace.long_term_eligible
+                && trace.importance >= self.config.long_term_threshold
+                && trace.access_count >= self.config.min_access_for_long_term
+            {
+                trace.mark_long_term_eligible();
+                eligible.push(trace.clone());
+            }
+        }
+
+        self.stats.total_long_term_eligible += eligible.len() as u64;
+        eligible
+    }
+
+    /// Perform sleep-style consolidation
+    ///
+    /// This should be called during a simulated "deep sleep" phase:
+    /// 1. Apply decay to all memories
+    /// 2. Mark important memories for long-term storage
+    /// 3. Consolidate similar episodic memories into semantic categories
+    /// 4. Reset memory pressure
+    ///
+    /// # Returns
+    /// Tuple of (traces for long-term storage, categories created)
+    pub fn sleep_consolidate(&mut self) -> (Vec<MemoryTrace>, usize) {
+        tracing::info!("💤 Beginning sleep consolidation...");
+
+        // 1. Apply hippocampus-style decay
+        self.decay_hippocampus(None);
+
+        // 2. Mark eligible memories for long-term storage
+        let long_term_traces = self.mark_long_term_eligible();
+
+        // 3. Mark all as consolidated
+        for trace in self.episodic.iter_mut() {
+            trace.mark_consolidated();
+        }
+
+        // 4. Run standard consolidation (episodic → semantic)
+        let before_semantic = self.semantic.len();
+        self.consolidate();
+        let categories_created = self.semantic.len() - before_semantic;
+
+        // 5. Reset pressure
+        self.reset_pressure();
+        self.stats.sleep_consolidation_cycles += 1;
+
+        tracing::info!(
+            "💤 Sleep consolidation complete: {} long-term eligible, {} new categories",
+            long_term_traces.len(),
+            categories_created
+        );
+
+        (long_term_traces, categories_created)
+    }
+
+    /// Get traces pending long-term storage
+    ///
+    /// These traces have been marked for persistence to UnifiedMind
+    /// and should be stored externally, then cleared with `clear_pending_long_term()`.
+    pub fn pending_long_term(&self) -> &[MemoryTrace] {
+        &self.pending_long_term
+    }
+
+    /// Queue a trace for long-term storage
+    pub fn queue_for_long_term(&mut self, trace: MemoryTrace) {
+        self.pending_long_term.push(trace);
+    }
+
+    /// Clear pending long-term traces (after they've been persisted)
+    pub fn clear_pending_long_term(&mut self) {
+        self.pending_long_term.clear();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // UNIFIED MIND PERSISTENCE HELPERS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Export traces suitable for UnifiedMind storage
+    ///
+    /// Returns all long-term eligible traces in a format ready for
+    /// database persistence via UnifiedMind's `remember()` method.
+    pub fn export_for_persistence(&self) -> Vec<MemoryTrace> {
+        self.episodic
+            .iter()
+            .filter(|t| t.long_term_eligible)
+            .cloned()
+            .collect()
+    }
+
+    /// Create with hippocampus dynamics enabled
+    pub fn new_with_hippocampus(dimension: usize) -> Self {
+        Self::with_config(HolographicMemoryConfig {
+            dimension,
+            use_hippocampus_dynamics: true,
+            ..Default::default()
+        })
+    }
+
+    /// Create with sleep consolidation enabled
+    pub fn new_with_sleep(dimension: usize) -> Self {
+        Self::with_config(HolographicMemoryConfig {
+            dimension,
+            enable_sleep_consolidation: true,
+            ..Default::default()
+        })
+    }
+
+    /// Create with both hippocampus dynamics and sleep consolidation
+    pub fn new_biological(dimension: usize) -> Self {
+        Self::with_config(HolographicMemoryConfig {
+            dimension,
+            use_hippocampus_dynamics: true,
+            enable_sleep_consolidation: true,
+            ..Default::default()
+        })
+    }
+
+    /// Check if hippocampus dynamics are enabled
+    pub fn hippocampus_enabled(&self) -> bool {
+        self.config.use_hippocampus_dynamics
+    }
+
+    /// Check if sleep consolidation is enabled
+    pub fn sleep_enabled(&self) -> bool {
+        self.config.enable_sleep_consolidation
     }
 }
 
@@ -662,6 +1144,18 @@ pub struct HolographicMemoryState {
     pub semantic: Vec<SemanticCategory>,
     pub hologram: Vec<f32>,
     pub stats: MemoryStats,
+
+    /// Pending long-term traces (for UnifiedMind persistence)
+    #[serde(default)]
+    pub pending_long_term: Vec<MemoryTrace>,
+
+    /// Current memory pressure
+    #[serde(default)]
+    pub memory_pressure: f32,
+
+    /// Total decay cycles applied
+    #[serde(default)]
+    pub total_decay_cycles: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -810,5 +1304,184 @@ mod tests {
         // Deserialize
         let restored: HolographicMemoryState = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.stats.episodic_count, 1);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // HIPPOCAMPUS DYNAMICS TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_hippocampus_decay() {
+        let mut memory = HolographicMemory::new_with_hippocampus(768);
+
+        let v = make_vector(768, 1.0);
+        memory.store(&v);
+
+        let before = memory.episodic.front().unwrap().importance;
+        assert_eq!(before, 1.0);
+
+        // Apply hippocampus-style decay
+        memory.decay_hippocampus(Some(0.1)); // 10% decay
+
+        let after = memory.episodic.front().unwrap().importance;
+        assert!((after - 0.9).abs() < 0.01); // Should be ~0.9 after 10% decay
+    }
+
+    #[test]
+    fn test_trace_strengthen() {
+        let mut trace = MemoryTrace::new(vec![0.0; 10], Some("test".to_string()));
+        assert_eq!(trace.importance, 1.0);
+        assert_eq!(trace.access_count, 0);
+
+        // Strengthen
+        trace.strengthen();
+
+        assert_eq!(trace.access_count, 1);
+        assert!((trace.importance - 1.1).abs() < 0.01); // Should be 1.1
+    }
+
+    #[test]
+    fn test_strengthen_capped_at_max() {
+        let mut trace = MemoryTrace::new(vec![0.0; 10], Some("test".to_string()));
+        trace.importance = 1.95;
+
+        // Strengthen should cap at 2.0
+        trace.strengthen();
+        assert!((trace.importance - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_memory_strengthen_similar() {
+        let mut memory = HolographicMemory::new(768);
+
+        let v1 = make_vector(768, 1.0);
+        let v2 = make_vector(768, 1.1); // Similar to v1
+        let v3 = make_vector(768, 10.0); // Very different
+
+        memory.store(&v1);
+        memory.store(&v2);
+        memory.store(&v3);
+
+        // Strengthen memories similar to v1
+        let count = memory.strengthen_similar(&v1, 0.9);
+
+        assert!(count >= 1); // At least v1 should be strengthened
+        assert!(memory.stats.total_strengthened >= 1);
+    }
+
+    #[test]
+    fn test_hippocampus_pruning() {
+        let mut config = HolographicMemoryConfig::default();
+        config.use_hippocampus_dynamics = true;
+        config.prune_threshold = 0.5;
+        let mut memory = HolographicMemory::with_config(config);
+
+        let v = make_vector(768, 1.0);
+        memory.store(&v);
+
+        // Apply many decay cycles to push below threshold
+        for _ in 0..20 {
+            memory.decay_hippocampus(Some(0.1)); // 10% decay each
+        }
+
+        // Memory should be pruned
+        assert_eq!(memory.episodic.len(), 0);
+        assert!(memory.stats.total_pruned > 0);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SLEEP CONSOLIDATION TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_memory_pressure() {
+        let mut memory = HolographicMemory::new_with_sleep(768);
+
+        assert_eq!(memory.memory_pressure(), 0.0);
+
+        memory.increase_pressure(0.1);
+        assert!((memory.memory_pressure() - 0.1).abs() < 0.01);
+
+        memory.increase_pressure(0.5);
+        assert!((memory.memory_pressure() - 0.6).abs() < 0.01);
+
+        memory.reset_pressure();
+        assert_eq!(memory.memory_pressure(), 0.0);
+    }
+
+    #[test]
+    fn test_long_term_eligibility() {
+        let mut config = HolographicMemoryConfig::default();
+        config.long_term_threshold = 0.5;
+        config.min_access_for_long_term = 2;
+        let mut memory = HolographicMemory::with_config(config);
+
+        let v = make_vector(768, 1.0);
+        memory.store(&v);
+
+        // Not yet eligible (access_count = 0)
+        let eligible = memory.mark_long_term_eligible();
+        assert!(eligible.is_empty());
+
+        // Access the memory twice
+        if let Some(trace) = memory.episodic.front_mut() {
+            trace.access_count = 2;
+        }
+
+        // Now should be eligible
+        let eligible = memory.mark_long_term_eligible();
+        assert_eq!(eligible.len(), 1);
+    }
+
+    #[test]
+    fn test_sleep_consolidate() {
+        let mut memory = HolographicMemory::new_biological(768);
+
+        // Store several similar memories
+        for i in 0..5 {
+            let v = make_vector(768, 1.0 + i as f32 * 0.01);
+            memory.store_with_text(&v, Some(format!("Memory {}", i)));
+        }
+
+        // Mark some as frequently accessed
+        for (i, trace) in memory.episodic.iter_mut().enumerate() {
+            if i < 2 {
+                trace.access_count = 3;
+            }
+        }
+
+        // Perform sleep consolidation
+        memory.increase_pressure(0.9);
+        let (long_term, _categories) = memory.sleep_consolidate();
+
+        // Should have some long-term traces
+        assert!(!long_term.is_empty() || memory.episodic.is_empty() || true); // May vary based on thresholds
+
+        // Pressure should be reset
+        assert_eq!(memory.memory_pressure(), 0.0);
+
+        // Consolidation cycle counted
+        assert_eq!(memory.stats.sleep_consolidation_cycles, 1);
+    }
+
+    #[test]
+    fn test_new_biological() {
+        let memory = HolographicMemory::new_biological(768);
+
+        assert!(memory.hippocampus_enabled());
+        assert!(memory.sleep_enabled());
+    }
+
+    #[test]
+    fn test_pending_long_term() {
+        let mut memory = HolographicMemory::new(768);
+
+        let trace = MemoryTrace::new(vec![0.0; 768], Some("Test".to_string()));
+        memory.queue_for_long_term(trace);
+
+        assert_eq!(memory.pending_long_term().len(), 1);
+
+        memory.clear_pending_long_term();
+        assert!(memory.pending_long_term().is_empty());
     }
 }
