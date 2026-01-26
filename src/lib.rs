@@ -382,6 +382,11 @@ impl Symthaea {
     pub async fn new(semantic_dim: usize, liquid_neurons: usize) -> Result<Self> {
         tracing::info!("🌟 Initializing Sophia Holographic Liquid Brain (Week 0)");
 
+        // Create Mind with HDC-enhanced epistemic classification
+        let mut mind = Mind::new_with_simulated_llm(semantic_dim, liquid_neurons).await?;
+        mind.enable_hdc_classification()?;
+        tracing::info!("🧠 HDC epistemic classifier enabled");
+
         Ok(Self {
             semantic: SemanticSpace::new(semantic_dim)?,
             liquid: LiquidNetwork::new(liquid_neurons)?,
@@ -412,8 +417,8 @@ impl Symthaea {
             // Week 6+: Initialize revolutionary consciousness model
             coherence: CoherenceField::new(),
 
-            // Neuro-Symbolic Bridge - Mind for epistemic governance
-            mind: Mind::new_with_simulated_llm(semantic_dim, liquid_neurons).await?,
+            // Neuro-Symbolic Bridge - Mind for epistemic governance (HDC-enabled)
+            mind,
 
             operations_count: 0,
         })
@@ -426,6 +431,11 @@ impl Symthaea {
     /// produces deterministic, hedging responses when knowledge is Unknown.
     pub async fn new_with_simulated_llm(semantic_dim: usize, liquid_neurons: usize) -> Result<Self> {
         tracing::info!("🧪 Initializing Sophia with Simulated LLM (Veracity Test Mode)");
+
+        // Create Mind with HDC-enhanced epistemic classification
+        let mut mind = Mind::new_with_simulated_llm(semantic_dim, liquid_neurons).await?;
+        mind.enable_hdc_classification()?;
+        tracing::info!("🧠 HDC epistemic classifier enabled (test mode)");
 
         Ok(Self {
             semantic: SemanticSpace::new(semantic_dim)?,
@@ -446,8 +456,8 @@ impl Symthaea {
             chronos: ChronosActor::new(),
             proprioception: ProprioceptionActor::new(),
             coherence: CoherenceField::new(),
-            // CRITICAL: Use simulated LLM for deterministic hallucination testing
-            mind: Mind::new_with_simulated_llm(semantic_dim, liquid_neurons).await?,
+            // CRITICAL: Use simulated LLM for deterministic hallucination testing (HDC-enabled)
+            mind,
             operations_count: 0,
         })
     }
@@ -775,8 +785,8 @@ impl Symthaea {
         }
 
         // Generate structured thought from the Mind (epistemic governance layer)
-        // Uses automatic epistemic detection - no manual state forcing needed
-        let structured_thought = self.mind.think_auto(query).await.ok();
+        // Uses HDC semantic similarity for epistemic detection, with pattern fallback
+        let structured_thought = self.mind.think_auto_hybrid(query).await.ok();
 
         // If the Mind indicates uncertainty, use its hedging response instead
         // This is the "Negative Capability" in action - refuse to hallucinate
@@ -864,6 +874,11 @@ impl Symthaea {
             ..SwarmConfig::default()
         };
 
+        // Create Mind with HDC-enhanced epistemic classification
+        let mut mind = Mind::new_with_simulated_llm(10_000, 1_000).await?;
+        mind.enable_hdc_classification()?;
+        tracing::info!("🧠 HDC epistemic classifier enabled (resume mode)");
+
         Ok(Self {
             semantic: SemanticSpace::new(10_000)?,
             liquid: LiquidNetwork::new(1_000)?,
@@ -893,8 +908,8 @@ impl Symthaea {
             // Week 4+: Reinitialize endocrine system (fresh state)
             endocrine: EndocrineSystem::new(EndocrineConfig::default()),
 
-            // Epistemic governance layer (Mind module)
-            mind: Mind::new_with_simulated_llm(10_000, 1_000).await?,
+            // Epistemic governance layer (Mind module with HDC-enabled)
+            mind,
 
             operations_count: 0,
         })
