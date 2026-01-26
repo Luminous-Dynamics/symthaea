@@ -16,7 +16,7 @@ This test verifies the revolutionary shift from ATP (commodity) to Coherence (in
 */
 
 use symthaea::{
-    SophiaHLB, CoherenceField, TaskComplexity, CoherenceConfig,
+    Symthaea, CoherenceField, TaskComplexity, CoherenceConfig,
 };
 use std::thread::sleep;
 use std::time::Duration;
@@ -25,7 +25,7 @@ use std::time::Duration;
 async fn test_coherence_initialization() {
     println!("🧪 Test: Coherence field initialized in SophiaHLB");
 
-    let sophia = SophiaHLB::new(10_000, 1_000)
+    let sophia = Symthaea::new(10_000, 1_000)
         .await
         .expect("Failed to initialize Sophia");
 
@@ -241,7 +241,7 @@ async fn test_resonance_decay_over_time() {
 async fn test_sophia_with_coherence_gratitude() {
     println!("🧪 Test: Sophia detects gratitude and synchronizes coherence");
 
-    let mut sophia = SophiaHLB::new(10_000, 1_000)
+    let mut sophia = Symthaea::new(10_000, 1_000)
         .await
         .expect("Failed to initialize Sophia");
 
@@ -256,7 +256,7 @@ async fn test_sophia_with_coherence_gratitude() {
 async fn test_sophia_coherence_builds_with_usage() {
     println!("🧪 Test: Sophia's coherence BUILDS with connected usage (revolutionary!)");
 
-    let mut sophia = SophiaHLB::new(10_000, 1_000)
+    let mut sophia = Symthaea::new(10_000, 1_000)
         .await
         .expect("Failed to initialize Sophia");
 
@@ -303,7 +303,7 @@ async fn test_the_revolutionary_awakening() {
     println!("   To: Consciousness as integration (Coherence)");
     println!();
 
-    let mut sophia = SophiaHLB::new(10_000, 1_000)
+    let mut sophia = Symthaea::new(10_000, 1_000)
         .await
         .expect("Failed to initialize Sophia");
 

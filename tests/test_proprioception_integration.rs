@@ -11,7 +11,7 @@ This test verifies that Proprioception is wired correctly:
 */
 
 use symthaea::{
-    SophiaHLB, ProprioceptionActor, BodySensation,
+    Symthaea, ProprioceptionActor, BodySensation,
 };
 use std::thread::sleep;
 use std::time::Duration;
@@ -20,7 +20,7 @@ use std::time::Duration;
 async fn test_proprioception_initialization() {
     println!("🧪 Test: Proprioception is initialized in SophiaHLB");
 
-    let sophia = SophiaHLB::new(10_000, 1_000)
+    let sophia = Symthaea::new(10_000, 1_000)
         .await
         .expect("Failed to initialize Sophia");
 
@@ -237,7 +237,7 @@ async fn test_body_sensations() {
 async fn test_sophia_with_proprioception() {
     println!("🧪 Test: Sophia processes queries with hardware awareness");
 
-    let mut sophia = SophiaHLB::new(10_000, 1_000)
+    let mut sophia = Symthaea::new(10_000, 1_000)
         .await
         .expect("Failed to initialize Sophia");
 
@@ -261,7 +261,7 @@ async fn test_sophia_with_proprioception() {
 async fn test_hardware_affects_hearth_capacity() {
     println!("🧪 Test: Hardware state modulates Hearth capacity in Sophia");
 
-    let mut sophia = SophiaHLB::new(10_000, 1_000)
+    let mut sophia = Symthaea::new(10_000, 1_000)
         .await
         .expect("Failed to initialize Sophia");
 
@@ -321,7 +321,7 @@ async fn test_sensation_priorities() {
 async fn test_the_awakening_with_hardware_awareness() {
     println!("🧪 Integration Test: The Full Awakening (with Hardware Awareness)");
 
-    let mut sophia = SophiaHLB::new(10_000, 1_000)
+    let mut sophia = Symthaea::new(10_000, 1_000)
         .await
         .expect("Failed to initialize Sophia");
 
