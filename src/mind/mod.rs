@@ -40,10 +40,12 @@
 pub mod structured_thought;
 pub mod simulated_llm;
 pub mod ollama_backend;
+pub mod hdc_epistemic;
 
 pub use structured_thought::{EpistemicStatus, SemanticIntent, StructuredThought};
 pub use simulated_llm::SimulatedLLM;
 pub use ollama_backend::{OllamaBackend, check_ollama_availability};
+pub use hdc_epistemic::{HdcEpistemicClassifier, HdcEpistemicStats};
 
 use crate::hdc::SemanticSpace;
 use crate::ltc::LiquidNetwork;
@@ -58,6 +60,15 @@ use anyhow::Result;
 /// 2. Maintaining epistemic state (what we know vs don't know)
 /// 3. Routing queries to appropriate backends (memory, knowledge graph, LLM)
 /// 4. Enforcing uncertainty when knowledge gaps are detected
+///
+/// ## Classification Methods
+///
+/// The Mind supports two classification methods:
+///
+/// 1. **Pattern Matching** (`analyze_query`): Fast, rule-based classification
+/// 2. **HDC Semantic** (`analyze_query_hdc`): Similarity-based, handles novel phrasings
+///
+/// Use `analyze_query_hybrid` for best results (HDC with pattern matching fallback).
 pub struct Mind {
     /// Hyperdimensional semantic space
     semantic_space: SemanticSpace,
@@ -70,6 +81,9 @@ pub struct Mind {
 
     /// LLM backend (real or simulated)
     llm_backend: Arc<dyn LLMBackend + Send + Sync>,
+
+    /// HDC-based epistemic classifier (optional, for semantic similarity)
+    hdc_classifier: Option<HdcEpistemicClassifier>,
 
     /// HDC dimension
     hdc_dim: usize,
@@ -103,6 +117,7 @@ impl Mind {
             liquid_network,
             epistemic_state: RwLock::new(EpistemicStatus::Unknown),
             llm_backend: Arc::new(SimulatedLLM::new()),
+            hdc_classifier: None,
             hdc_dim,
             ltc_neurons,
         })
@@ -118,6 +133,7 @@ impl Mind {
             liquid_network,
             epistemic_state: RwLock::new(EpistemicStatus::Unknown),
             llm_backend: Arc::new(SimulatedLLM::new()),
+            hdc_classifier: None,
             hdc_dim,
             ltc_neurons,
         })
@@ -152,6 +168,7 @@ impl Mind {
             liquid_network,
             epistemic_state: RwLock::new(EpistemicStatus::Unknown),
             llm_backend: Arc::new(ollama),
+            hdc_classifier: None,
             hdc_dim,
             ltc_neurons,
         })
@@ -383,6 +400,107 @@ impl Mind {
             "Auto-detected epistemic status for '{}': {:?}",
             &input[..input.len().min(50)],
             status
+        );
+
+        // Update internal state
+        {
+            let mut state = self.epistemic_state.write().await;
+            *state = status;
+        }
+
+        // Generate thought with detected status
+        self.think(input).await
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // HDC-ENHANCED EPISTEMIC CLASSIFICATION
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Enable HDC-based epistemic classification
+    ///
+    /// This trains the classifier with exemplar queries for each category.
+    /// Once enabled, `analyze_query_hdc` and `analyze_query_hybrid` become available.
+    pub fn enable_hdc_classification(&mut self) -> Result<()> {
+        let classifier = HdcEpistemicClassifier::new(&mut self.semantic_space)?;
+        self.hdc_classifier = Some(classifier);
+        tracing::info!("🧠 HDC epistemic classification enabled");
+        Ok(())
+    }
+
+    /// Check if HDC classification is enabled
+    pub fn has_hdc_classifier(&self) -> bool {
+        self.hdc_classifier.is_some()
+    }
+
+    /// Get HDC classifier statistics (if enabled)
+    pub fn hdc_classifier_stats(&self) -> Option<HdcEpistemicStats> {
+        self.hdc_classifier.as_ref().map(|c| c.stats())
+    }
+
+    /// Analyze a query using HDC semantic similarity
+    ///
+    /// Requires `enable_hdc_classification()` to be called first.
+    /// Returns the detected status and confidence score.
+    ///
+    /// This method uses semantic similarity to exemplar queries, which
+    /// handles novel phrasings better than pattern matching.
+    pub fn analyze_query_hdc(&mut self, input: &str) -> Result<(EpistemicStatus, f32)> {
+        let classifier = self.hdc_classifier.as_ref()
+            .ok_or_else(|| anyhow::anyhow!(
+                "HDC classifier not enabled. Call enable_hdc_classification() first."
+            ))?;
+
+        classifier.classify(&mut self.semantic_space, input)
+    }
+
+    /// Analyze a query using hybrid approach (HDC + pattern matching)
+    ///
+    /// This is the recommended method for epistemic detection:
+    /// 1. First tries HDC classification (if enabled and confident)
+    /// 2. Falls back to pattern matching if HDC is uncertain
+    ///
+    /// Returns the detected status and the method used ("hdc" or "pattern").
+    pub async fn analyze_query_hybrid(&mut self, input: &str) -> Result<(EpistemicStatus, &'static str)> {
+        // Try HDC classification first (if enabled)
+        if let Some(classifier) = &self.hdc_classifier {
+            match classifier.classify(&mut self.semantic_space, input) {
+                Ok((status, confidence)) => {
+                    // Use HDC result if confidence is high enough
+                    if confidence >= 0.4 && status != EpistemicStatus::Uncertain {
+                        tracing::debug!(
+                            "HDC classification: {:?} (confidence: {:.2}%)",
+                            status, confidence * 100.0
+                        );
+                        return Ok((status, "hdc"));
+                    }
+                    tracing::debug!(
+                        "HDC uncertain (confidence: {:.2}%), falling back to pattern matching",
+                        confidence * 100.0
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!("HDC classification failed: {}, using pattern matching", e);
+                }
+            }
+        }
+
+        // Fall back to pattern matching
+        let status = self.analyze_query(input).await?;
+        Ok((status, "pattern"))
+    }
+
+    /// Process a query with hybrid epistemic detection
+    ///
+    /// Uses HDC semantic similarity when available and confident,
+    /// falls back to pattern matching otherwise.
+    pub async fn think_auto_hybrid(&mut self, input: &str) -> Result<StructuredThought> {
+        let (status, method) = self.analyze_query_hybrid(input).await?;
+
+        tracing::info!(
+            "Hybrid detection for '{}': {:?} (via {})",
+            &input[..input.len().min(40)],
+            status,
+            method
         );
 
         // Update internal state

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 ///
 /// This is the core abstraction for "Negative Capability" - the ability
 /// to represent and reason about uncertainty without hallucinating.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EpistemicStatus {
     /// We definitively do NOT have this information
     /// This triggers hedging behavior, not fabrication
