@@ -41,11 +41,13 @@ pub mod structured_thought;
 pub mod simulated_llm;
 pub mod ollama_backend;
 pub mod hdc_epistemic;
+pub mod semantic_encoder;
 
 pub use structured_thought::{EpistemicStatus, SemanticIntent, StructuredThought};
 pub use simulated_llm::SimulatedLLM;
 pub use ollama_backend::{OllamaBackend, check_ollama_availability};
-pub use hdc_epistemic::{HdcEpistemicClassifier, HdcEpistemicStats};
+pub use hdc_epistemic::{HdcEpistemicClassifier, HdcEpistemicStats, SemanticEpistemicClassifier, SemanticEpistemicStats};
+pub use semantic_encoder::{SemanticEncoder, SemanticEncoderConfig, EncodedThought, DenseVector};
 
 use crate::hdc::SemanticSpace;
 use crate::ltc::LiquidNetwork;
