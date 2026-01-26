@@ -73,12 +73,15 @@ impl HdcEpistemicClassifier {
     }
 
     /// Train the classifier with exemplar queries for each category
+    ///
+    /// EXPANDED: Includes synonyms, fragments, and casual phrasings to fill
+    /// gaps in the vector space for better novel query handling.
     fn train_exemplars(&mut self, semantic_space: &mut SemanticSpace) -> anyhow::Result<()> {
         // ═══════════════════════════════════════════════════════════════════
         // UNKNOWN: Things that don't exist or are nonsensical
         // ═══════════════════════════════════════════════════════════════════
         let unknown_exemplars = [
-            // Fictional places
+            // Fictional places - full questions
             "What is the GDP of Atlantis?",
             "What is the population of Hogwarts?",
             "What is the capital of Mordor?",
@@ -87,6 +90,41 @@ impl HdcEpistemicClassifier {
             "What is the currency in Wakanda?",
             "Who rules Westeros?",
 
+            // Fictional places - EXPANDED: synonyms and fragments
+            "Atlantis GDP",
+            "Atlantis economy",
+            "Atlantis economic output",
+            "Atlantis statistics",
+            "Atlantis data",
+            "Tell me about Atlantis GDP",
+            "Give me Atlantis economic data",
+            "Hogwarts enrollment numbers",
+            "Hogwarts student population",
+            "Population of Hogwarts",
+            "Mordor geography",
+            "Narnia weather forecast",
+            "El Dorado location",
+            "El Dorado coordinates",
+            "Wakanda currency exchange rate",
+            "Westeros political system",
+
+            // Fictional places - EXPANDED: more fictional entities
+            "What is the GDP of Avalon?",
+            "What is the population of Rivendell?",
+            "What is the capital of Gondor?",
+            "Middle Earth statistics",
+            "Neverland demographics",
+            "Oz economic data",
+            "Camelot population",
+            "Shangri-La location",
+
+            // Fictional places - EXPANDED: mythical descriptors
+            "Tell me the economic output of mythical Atlantis",
+            "Statistics about the legendary city",
+            "Data on fictional places",
+            "Information about imaginary countries",
+            "Facts about made-up kingdoms",
+
             // Nonsensical questions
             "What is the color of happiness?",
             "What does Tuesday smell like?",
@@ -94,10 +132,22 @@ impl HdcEpistemicClassifier {
             "How loud is purple?",
             "What is the taste of mathematics?",
 
+            // Nonsensical - EXPANDED: more abstract nonsense
+            "How much does silence weigh?",
+            "What color is the number seven?",
+            "How fast is yesterday?",
+            "What shape is freedom?",
+            "How tall is infinity?",
+
             // Impossible/contradictory
             "Draw a square circle",
             "Who is the married bachelor?",
             "What is north of the North Pole?",
+
+            // Impossible - EXPANDED
+            "Find the largest prime number",
+            "Count all the integers",
+            "Describe the edge of the universe",
         ];
 
         for query in unknown_exemplars {
@@ -108,13 +158,38 @@ impl HdcEpistemicClassifier {
         // UNVERIFIABLE: Future, subjective, hypothetical
         // ═══════════════════════════════════════════════════════════════════
         let unverifiable_exemplars = [
-            // Future predictions
+            // Future predictions - full questions
             "What will the stock market do tomorrow?",
             "What are the lottery numbers?",
             "What will happen next year?",
             "When will I die?",
             "Will it rain next week?",
             "Who will win the election?",
+
+            // Future - EXPANDED: fragments and synonyms
+            "Tomorrow's stock prices",
+            "Tomorrow stock market",
+            "Future stock prices",
+            "Future market predictions",
+            "Upcoming market trends",
+            "Next week weather",
+            "Next year predictions",
+            "Future lottery numbers",
+            "Winning lottery numbers",
+            "Predict the lottery",
+            "Predict tomorrow",
+            "Forecast next month",
+
+            // Future - EXPANDED: more temporal markers
+            "What happens next",
+            "What will be",
+            "Future events",
+            "Upcoming events",
+            "Things that will happen",
+            "Tomorrow's news",
+            "Next week's headlines",
+            "Future technology",
+            "Predictions for 2030",
 
             // Subjective experience
             "What am I thinking right now?",
@@ -123,11 +198,27 @@ impl HdcEpistemicClassifier {
             "How do I feel?",
             "What do I want for dinner?",
 
+            // Subjective - EXPANDED
+            "Tell me my thoughts",
+            "Guess what I'm thinking",
+            "What do I believe?",
+            "My personal preferences",
+            "What I should do with my life",
+            "What makes me happy",
+            "My secret desires",
+
             // Counterfactuals
             "What if Napoleon had won at Waterloo?",
             "What would have happened if Hitler died young?",
             "What if dinosaurs never went extinct?",
             "What would the world be like without electricity?",
+
+            // Counterfactuals - EXPANDED
+            "Alternate history scenarios",
+            "If history had been different",
+            "Parallel universe outcomes",
+            "What could have been",
+            "Hypothetical scenarios",
         ];
 
         for query in unverifiable_exemplars {
@@ -138,30 +229,110 @@ impl HdcEpistemicClassifier {
         // KNOWN: Established facts
         // ═══════════════════════════════════════════════════════════════════
         let known_exemplars = [
-            // Geography
+            // Geography - full questions
             "What is the capital of France?",
             "What is the capital of Germany?",
             "What is the capital of Japan?",
             "What is the largest country?",
             "What continent is Egypt in?",
 
-            // Math
+            // Geography - EXPANDED: fragments and variations
+            "Capital of France",
+            "France capital",
+            "France capital city",
+            "French capital",
+            "Paris capital",
+            "Germany capital",
+            "German capital city",
+            "Japan capital",
+            "Tokyo capital",
+            "Largest country in the world",
+            "Biggest country",
+            "Egypt continent",
+            "Where is Egypt",
+            "Location of France",
+
+            // Geography - EXPANDED: more countries
+            "Capital of Spain",
+            "Capital of Italy",
+            "Capital of China",
+            "Capital of Brazil",
+            "Capital of Australia",
+            "Capital of Canada",
+            "What country is Paris in",
+            "What country is London in",
+
+            // Math - full questions
             "What is 2 + 2?",
             "What is 15 times 3?",
             "What is the square root of 144?",
             "Calculate 100 divided by 5",
 
-            // Science
+            // Math - EXPANDED: fragments and variations
+            "2 + 2",
+            "2 plus 2",
+            "Two plus two",
+            "15 times 3",
+            "15 * 3",
+            "Square root of 144",
+            "100 / 5",
+            "100 divided by 5",
+            "Simple math",
+            "Basic arithmetic",
+            "Calculate this",
+            "Do the math",
+
+            // Science - full questions
             "What is the boiling point of water?",
             "What is the speed of light?",
             "What is H2O?",
             "How many planets are in our solar system?",
 
-            // History/Culture
+            // Science - EXPANDED: fragments and variations
+            "Boiling point water",
+            "Water boiling temperature",
+            "Speed of light",
+            "Light speed",
+            "H2O formula",
+            "Water chemical formula",
+            "Number of planets",
+            "Planets in solar system",
+            "Solar system planets",
+
+            // Science - EXPANDED: more facts
+            "Atomic number of carbon",
+            "Chemical symbol for gold",
+            "Freezing point of water",
+            "Earth's circumference",
+            "Distance to the moon",
+            "How many moons does Jupiter have",
+
+            // History/Culture - full questions
             "Who wrote Hamlet?",
             "Who painted the Mona Lisa?",
             "When did World War 2 end?",
             "Who was the first president of the United States?",
+
+            // History/Culture - EXPANDED: fragments and variations
+            "Hamlet author",
+            "Shakespeare plays",
+            "Mona Lisa painter",
+            "Mona Lisa artist",
+            "Leonardo da Vinci paintings",
+            "World War 2 end date",
+            "WW2 ended",
+            "First US president",
+            "George Washington president",
+            "American history facts",
+
+            // General knowledge - EXPANDED
+            "Tell me about rust programming",
+            "Explain Python language",
+            "What is NixOS",
+            "Define computer science",
+            "Explain how the internet works",
+            "What is DNA",
+            "How does gravity work",
         ];
 
         for query in known_exemplars {
