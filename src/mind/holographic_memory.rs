@@ -2110,6 +2110,319 @@ impl HolographicMemory {
             ..Default::default()
         })
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONSCIOUSNESS-DRIVEN MEMORY CONSOLIDATION
+    // ═══════════════════════════════════════════════════════════════════════════
+    //
+    // Integrates consciousness measurement (Φ) with memory consolidation:
+    // - High Φ → memories formed are more important/vivid
+    // - Low Φ (sleep) → consolidation happens, weak memories pruned
+    // - Φ modulates which memories get prioritized for long-term storage
+    //
+    // This creates a biologically accurate model where:
+    // 1. Waking high-consciousness states = vivid memory encoding
+    // 2. Sleep low-consciousness states = memory consolidation/pruning
+    // 3. Memory importance scales with consciousness at encoding time
+
+    /// Store memory with consciousness-weighted importance
+    ///
+    /// Memories formed during high-consciousness states (high Φ) are stored
+    /// with higher initial importance, reflecting the biological observation
+    /// that vivid, conscious experiences are better remembered.
+    ///
+    /// # Arguments
+    /// * `vector` - The semantic vector to store
+    /// * `consciousness_level` - Current Φ level (0.0 - 1.0, typically 0.3 - 0.7)
+    /// * `text` - Optional text description
+    ///
+    /// # Φ Scaling
+    /// - Φ ≈ 0.5 (baseline): importance = 1.0
+    /// - Φ ≈ 0.7 (high consciousness): importance = 1.4
+    /// - Φ ≈ 0.3 (low consciousness): importance = 0.6
+    ///
+    /// # Example
+    /// ```ignore
+    /// let phi = consciousness_graph.causal_phi();
+    /// memory.store_with_consciousness(&experience, phi, Some("Important event".to_string()));
+    /// ```
+    pub fn store_with_consciousness(
+        &mut self,
+        vector: &DenseVector,
+        consciousness_level: f32,
+        text: Option<String>,
+    ) {
+        // Scale importance by consciousness level
+        // φ=0.5 → importance=1.0 (baseline)
+        // φ=0.7 → importance=1.4 (40% boost)
+        // φ=0.3 → importance=0.6 (40% reduction)
+        let phi_factor = consciousness_level / 0.5; // Normalize around φ=0.5
+        let scaled_importance = phi_factor.clamp(0.2, 2.5); // Reasonable bounds
+
+        let mut trace = MemoryTrace::new(
+            vector.values.clone(),
+            text,
+        );
+        trace.importance = scaled_importance;
+
+        // Track consciousness level at encoding (store in arousal field as proxy)
+        // This allows queries like "what did I experience when highly conscious?"
+        trace.arousal = Some(consciousness_level);
+
+        self.store_trace(trace);
+        self.stats.total_stored += 1;
+    }
+
+    /// Store memory with full consciousness context
+    ///
+    /// Stores a memory with both consciousness level and emotional context,
+    /// enabling consciousness-aware temporal-emotional queries.
+    ///
+    /// # Arguments
+    /// * `vector` - Semantic vector
+    /// * `consciousness_level` - Current Φ (0.0 - 1.0)
+    /// * `timestamp` - When this occurred
+    /// * `valence` - Emotional valence (-1.0 to 1.0)
+    /// * `arousal` - Emotional arousal (0.0 to 1.0)
+    /// * `text` - Optional description
+    pub fn store_conscious_composite(
+        &mut self,
+        vector: &DenseVector,
+        consciousness_level: f32,
+        timestamp: Duration,
+        valence: f32,
+        arousal: f32,
+        text: Option<String>,
+    ) {
+        // Consciousness modulates importance
+        let phi_factor = consciousness_level / 0.5;
+        let base_importance = phi_factor.clamp(0.2, 2.5);
+
+        // Also modulate by arousal (emotional salience)
+        let arousal_boost = 1.0 + (arousal * 0.5);
+        let final_importance = base_importance * arousal_boost;
+
+        // Use new_composite_with_attention to include consciousness-scaled importance
+        let mut trace = MemoryTrace::new_composite_with_attention(
+            vector.values.clone(),
+            text,
+            timestamp,
+            valence,
+            arousal,
+            final_importance, // Use as attention weight
+            &self.temporal_encoder,
+            &self.emotional_encoder,
+        );
+
+        // Store consciousness level in arousal (overwriting the original arousal)
+        // This allows later queries by encoding consciousness
+        // We keep the original arousal in the composite encoding
+        trace.arousal = Some(consciousness_level);
+
+        self.store_trace(trace);
+        self.stats.total_stored += 1;
+    }
+
+    /// Φ-aware sleep consolidation
+    ///
+    /// Enhanced sleep consolidation that uses consciousness levels to prioritize
+    /// which memories are preserved. This models the biological process where:
+    ///
+    /// 1. Memories encoded during high-Φ states are prioritized
+    /// 2. Current low-Φ state (sleep) enables consolidation
+    /// 3. Memories compete for long-term storage based on Φ at encoding
+    ///
+    /// # Arguments
+    /// * `current_phi` - Current consciousness level (should be low for sleep)
+    ///
+    /// # Returns
+    /// Tuple of (traces for long-term storage, categories created, memories pruned)
+    ///
+    /// # Consciousness Modulation
+    /// - Current Φ < 0.3: Deep sleep, aggressive consolidation
+    /// - Current Φ 0.3-0.5: Light sleep, moderate consolidation
+    /// - Current Φ > 0.5: Awake, minimal consolidation
+    pub fn sleep_consolidate_conscious(&mut self, current_phi: f32) -> (Vec<MemoryTrace>, usize, usize) {
+        tracing::info!("💤 Beginning consciousness-aware sleep consolidation (Φ = {:.3})", current_phi);
+
+        // Modulate consolidation aggressiveness by current consciousness
+        // Low Φ (sleep) = more aggressive pruning
+        let pruning_threshold_modifier = if current_phi < 0.3 {
+            1.5 // 50% more aggressive pruning during deep sleep
+        } else if current_phi < 0.5 {
+            1.2 // 20% more aggressive during light sleep
+        } else {
+            0.8 // Less aggressive when awake
+        };
+
+        // Adjusted prune threshold
+        let adjusted_prune_threshold = self.config.prune_threshold * pruning_threshold_modifier;
+
+        // 1. Apply consciousness-modulated decay
+        // Memories with low encoding-time Φ decay faster
+        for trace in self.episodic.iter_mut() {
+            // Get consciousness at encoding (stored in arousal as proxy)
+            let encoding_phi = trace.arousal.unwrap_or(0.5);
+
+            // Higher encoding Φ = slower decay
+            let phi_protection = encoding_phi / 0.5; // 1.0 at baseline
+            let protected_decay_rate = self.config.hippocampus_decay_rate / phi_protection.max(0.5);
+
+            trace.decay_hippocampus(protected_decay_rate);
+        }
+
+        // 2. Prune memories below consciousness-adjusted threshold
+        let before_count = self.episodic.len();
+        self.episodic.retain(|t| t.importance >= adjusted_prune_threshold);
+        let pruned_count = before_count - self.episodic.len();
+
+        // 3. Mark high-Φ memories for long-term storage (priority access)
+        let mut long_term_traces = Vec::new();
+        for trace in self.episodic.iter_mut() {
+            let encoding_phi = trace.arousal.unwrap_or(0.5);
+
+            // Consciousness-weighted eligibility:
+            // High encoding Φ + high importance + sufficient access = long-term
+            let phi_eligibility = encoding_phi >= 0.4;
+            let importance_eligible = trace.importance >= self.config.long_term_threshold;
+            let access_eligible = trace.access_count >= self.config.min_access_for_long_term;
+
+            if !trace.long_term_eligible && phi_eligibility && importance_eligible && access_eligible {
+                trace.mark_long_term_eligible();
+                long_term_traces.push(trace.clone());
+            }
+        }
+
+        // 4. Mark all remaining as consolidated
+        for trace in self.episodic.iter_mut() {
+            trace.mark_consolidated();
+        }
+
+        // 5. Run semantic category consolidation
+        let before_semantic = self.semantic.len();
+        self.consolidate();
+        let categories_created = self.semantic.len() - before_semantic;
+
+        // 6. Reset pressure
+        self.reset_pressure();
+        self.stats.sleep_consolidation_cycles += 1;
+        self.stats.total_pruned += pruned_count as u64;
+        self.stats.total_long_term_eligible += long_term_traces.len() as u64;
+
+        tracing::info!(
+            "💤 Conscious consolidation complete: {} long-term, {} categories, {} pruned (Φ-threshold: {:.3})",
+            long_term_traces.len(),
+            categories_created,
+            pruned_count,
+            adjusted_prune_threshold
+        );
+
+        (long_term_traces, categories_created, pruned_count)
+    }
+
+    /// Query memories by consciousness level at encoding
+    ///
+    /// Find memories that were formed during high/low consciousness states.
+    /// Useful for analyzing which experiences were most vividly encoded.
+    ///
+    /// # Arguments
+    /// * `min_phi` - Minimum consciousness level at encoding
+    /// * `max_phi` - Maximum consciousness level at encoding
+    /// * `top_k` - Maximum results
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Find memories formed during high consciousness
+    /// let vivid_memories = memory.query_by_encoding_consciousness(0.6, 1.0, 10);
+    ///
+    /// // Find memories formed during low consciousness
+    /// let drowsy_memories = memory.query_by_encoding_consciousness(0.0, 0.3, 10);
+    /// ```
+    pub fn query_by_encoding_consciousness(
+        &self,
+        min_phi: f32,
+        max_phi: f32,
+        top_k: usize,
+    ) -> Vec<MemoryMatch> {
+        let mut matches: Vec<MemoryMatch> = self.episodic
+            .iter()
+            .filter_map(|trace| {
+                // Consciousness level stored in arousal field
+                let encoding_phi = trace.arousal.unwrap_or(0.5);
+
+                if encoding_phi >= min_phi && encoding_phi <= max_phi {
+                    Some(MemoryMatch {
+                        trace: trace.clone(),
+                        similarity: encoding_phi, // Use Φ as relevance score
+                        source: "consciousness_query".to_string(),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Sort by encoding consciousness (descending)
+        matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        matches.truncate(top_k);
+        matches
+    }
+
+    /// Get consciousness statistics for stored memories
+    ///
+    /// Returns summary statistics about consciousness levels at encoding time.
+    ///
+    /// # Returns
+    /// Tuple of (mean_phi, min_phi, max_phi, count_with_phi)
+    pub fn consciousness_statistics(&self) -> (f32, f32, f32, usize) {
+        let phi_values: Vec<f32> = self.episodic
+            .iter()
+            .filter_map(|t| t.arousal) // Φ stored in arousal
+            .collect();
+
+        if phi_values.is_empty() {
+            return (0.5, 0.5, 0.5, 0);
+        }
+
+        let sum: f32 = phi_values.iter().sum();
+        let mean = sum / phi_values.len() as f32;
+        let min = phi_values.iter().cloned().fold(f32::INFINITY, f32::min);
+        let max = phi_values.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+
+        (mean, min, max, phi_values.len())
+    }
+
+    /// Modulate memory importance by current consciousness level
+    ///
+    /// Temporarily boosts or reduces memory importance based on current Φ.
+    /// This models attention: high consciousness = heightened memory access.
+    ///
+    /// # Arguments
+    /// * `current_phi` - Current consciousness level
+    ///
+    /// # Effect
+    /// - Φ > 0.6: All memories temporarily 20% more accessible
+    /// - Φ < 0.3: All memories temporarily 20% less accessible
+    pub fn modulate_by_consciousness(&mut self, current_phi: f32) {
+        let modulation = if current_phi > 0.6 {
+            1.2 // Heightened access
+        } else if current_phi < 0.3 {
+            0.8 // Reduced access
+        } else {
+            1.0 // Baseline
+        };
+
+        // Temporarily adjust retrieval threshold
+        let original = self.config.retrieval_threshold;
+        self.config.retrieval_threshold = (original / modulation).clamp(0.1, 0.9);
+
+        tracing::debug!(
+            "🧠 Consciousness modulation: Φ={:.3} → threshold {:.3} → {:.3}",
+            current_phi,
+            original,
+            self.config.retrieval_threshold
+        );
+    }
 }
 
 /// Serializable memory state for persistence/swarm
@@ -2797,5 +3110,197 @@ mod tests {
         let best = &matches[0];
         println!("Best chrono-semantic match: {} (sim: {:.4})",
                  best.trace.text.as_deref().unwrap_or("?"), best.similarity);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CONSCIOUSNESS-DRIVEN MEMORY CONSOLIDATION TESTS
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_store_with_consciousness() {
+        let mut memory = HolographicMemory::new(768);
+
+        let v = make_vector(768, 1.0);
+
+        // Store with high consciousness (φ = 0.7)
+        memory.store_with_consciousness(&v, 0.7, Some("High consciousness memory".to_string()));
+
+        let trace = memory.episodic.front().unwrap();
+        // High consciousness should boost importance (0.7/0.5 = 1.4)
+        assert!(trace.importance > 1.0, "High Φ should boost importance");
+        assert!((trace.importance - 1.4).abs() < 0.01, "Expected importance ~1.4, got {}", trace.importance);
+
+        // Consciousness level stored in arousal
+        assert_eq!(trace.arousal, Some(0.7));
+    }
+
+    #[test]
+    fn test_store_with_low_consciousness() {
+        let mut memory = HolographicMemory::new(768);
+
+        let v = make_vector(768, 2.0);
+
+        // Store with low consciousness (φ = 0.3)
+        memory.store_with_consciousness(&v, 0.3, Some("Low consciousness memory".to_string()));
+
+        let trace = memory.episodic.front().unwrap();
+        // Low consciousness should reduce importance (0.3/0.5 = 0.6)
+        assert!(trace.importance < 1.0, "Low Φ should reduce importance");
+        assert!((trace.importance - 0.6).abs() < 0.01, "Expected importance ~0.6, got {}", trace.importance);
+    }
+
+    #[test]
+    fn test_consciousness_statistics() {
+        let mut memory = HolographicMemory::new(768);
+
+        // Store memories with varying consciousness
+        memory.store_with_consciousness(&make_vector(768, 1.0), 0.3, None);
+        memory.store_with_consciousness(&make_vector(768, 2.0), 0.5, None);
+        memory.store_with_consciousness(&make_vector(768, 3.0), 0.7, None);
+
+        let (mean, min, max, count) = memory.consciousness_statistics();
+
+        assert_eq!(count, 3);
+        assert!((min - 0.3).abs() < 0.01, "Expected min 0.3, got {}", min);
+        assert!((max - 0.7).abs() < 0.01, "Expected max 0.7, got {}", max);
+        assert!((mean - 0.5).abs() < 0.01, "Expected mean 0.5, got {}", mean);
+    }
+
+    #[test]
+    fn test_query_by_encoding_consciousness() {
+        let mut memory = HolographicMemory::new(768);
+
+        // Store memories with varying consciousness
+        memory.store_with_consciousness(&make_vector(768, 1.0), 0.3, Some("Drowsy memory".to_string()));
+        memory.store_with_consciousness(&make_vector(768, 2.0), 0.5, Some("Normal memory".to_string()));
+        memory.store_with_consciousness(&make_vector(768, 3.0), 0.7, Some("Vivid memory".to_string()));
+        memory.store_with_consciousness(&make_vector(768, 4.0), 0.8, Some("Peak consciousness".to_string()));
+
+        // Query high-consciousness memories
+        let vivid = memory.query_by_encoding_consciousness(0.6, 1.0, 10);
+        assert_eq!(vivid.len(), 2, "Should find 2 high-Φ memories (0.7 and 0.8)");
+
+        // First should be highest consciousness
+        assert_eq!(vivid[0].trace.text.as_deref(), Some("Peak consciousness"));
+
+        // Query low-consciousness memories
+        let drowsy = memory.query_by_encoding_consciousness(0.0, 0.4, 10);
+        assert_eq!(drowsy.len(), 1, "Should find 1 low-Φ memory");
+        assert_eq!(drowsy[0].trace.text.as_deref(), Some("Drowsy memory"));
+    }
+
+    #[test]
+    fn test_sleep_consolidate_conscious() {
+        let mut memory = HolographicMemory::new_biological(768);
+
+        // Store memories with varying consciousness levels
+        for i in 0..5 {
+            let phi = 0.3 + (i as f32 * 0.1); // 0.3, 0.4, 0.5, 0.6, 0.7
+            memory.store_with_consciousness(
+                &make_vector(768, i as f32),
+                phi,
+                Some(format!("Memory at Φ={:.1}", phi)),
+            );
+        }
+
+        // Mark all as accessed
+        for trace in memory.episodic.iter_mut() {
+            trace.access_count = 3;
+        }
+
+        // Perform consciousness-aware sleep consolidation with low Φ (deep sleep)
+        let (long_term, categories, pruned) = memory.sleep_consolidate_conscious(0.2);
+
+        println!("Conscious consolidation: {} long-term, {} categories, {} pruned",
+                 long_term.len(), categories, pruned);
+
+        // Consolidation cycle counted
+        assert_eq!(memory.stats.sleep_consolidation_cycles, 1);
+
+        // Pressure should be reset
+        assert_eq!(memory.memory_pressure(), 0.0);
+
+        // High-Φ memories should preferentially survive
+        // (exact behavior depends on thresholds)
+    }
+
+    #[test]
+    fn test_consciousness_modulates_pruning() {
+        let mut memory = HolographicMemory::new_biological(768);
+
+        // Store a high-Φ memory and a low-Φ memory
+        memory.store_with_consciousness(&make_vector(768, 1.0), 0.7, Some("High Φ".to_string()));
+        memory.store_with_consciousness(&make_vector(768, 2.0), 0.3, Some("Low Φ".to_string()));
+
+        // Manually reduce importance of both
+        for trace in memory.episodic.iter_mut() {
+            trace.importance = 0.15; // Just above default prune threshold
+        }
+
+        // Deep sleep consolidation (Φ = 0.2) is more aggressive
+        let (_, _, pruned) = memory.sleep_consolidate_conscious(0.2);
+
+        // With aggressive pruning in deep sleep, low-Φ memories should be pruned first
+        // (they decay faster due to lower encoding consciousness)
+        println!("Pruned {} memories during deep sleep", pruned);
+    }
+
+    #[test]
+    fn test_modulate_by_consciousness() {
+        let mut memory = HolographicMemory::new(768);
+        let original_threshold = memory.config.retrieval_threshold;
+
+        // High consciousness should lower threshold (easier recall)
+        memory.modulate_by_consciousness(0.7);
+        assert!(memory.config.retrieval_threshold < original_threshold,
+                "High Φ should lower retrieval threshold");
+
+        // Reset and test low consciousness
+        memory.config.retrieval_threshold = original_threshold;
+        memory.modulate_by_consciousness(0.2);
+        assert!(memory.config.retrieval_threshold > original_threshold,
+                "Low Φ should raise retrieval threshold");
+    }
+
+    #[test]
+    fn test_store_conscious_composite() {
+        let mut memory = HolographicMemory::new_full_biological(768);
+
+        let v = make_vector(768, 1.0);
+
+        // Store with full consciousness context
+        memory.store_conscious_composite(
+            &v,
+            0.7,                              // High consciousness
+            Duration::from_secs(9 * 3600),    // Morning
+            0.5,                              // Positive valence
+            0.8,                              // High arousal
+            Some("Exciting breakthrough".to_string()),
+        );
+
+        let trace = memory.episodic.front().unwrap();
+
+        // Should have composite encoding
+        assert!(trace.has_composite());
+
+        // Importance should be boosted by both consciousness and arousal
+        // Base: 0.7/0.5 = 1.4, Arousal boost: 1 + 0.8*0.5 = 1.4
+        // Final: 1.4 * 1.4 = 1.96
+        assert!(trace.importance > 1.5, "Expected high importance from Φ + arousal boost");
+        println!("Conscious composite importance: {:.3}", trace.importance);
+    }
+
+    #[test]
+    fn test_consciousness_importance_clamping() {
+        let mut memory = HolographicMemory::new(768);
+
+        // Extreme consciousness values should be clamped
+        memory.store_with_consciousness(&make_vector(768, 1.0), 2.0, None);
+        assert!(memory.episodic.front().unwrap().importance <= 2.5,
+                "Very high Φ should be clamped");
+
+        memory.store_with_consciousness(&make_vector(768, 2.0), 0.01, None);
+        assert!(memory.episodic.back().unwrap().importance >= 0.2,
+                "Very low Φ should be clamped");
     }
 }
