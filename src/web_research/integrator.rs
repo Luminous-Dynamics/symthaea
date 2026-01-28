@@ -12,7 +12,7 @@ use crate::hdc::binary_hv::HV16;
 use crate::language::vocabulary::Vocabulary;
 use crate::language::knowledge_graph::{KnowledgeGraph, NodeType, EdgeType, KnowledgeSource};
 use super::researcher::ResearchResult;
-use super::verifier::{Verification, EpistemicStatus};
+use super::verifier::{Verification, ClaimConfidence};
 use super::types::Source;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -57,7 +57,7 @@ pub struct VerifiedClaim {
     pub encoding: HV16,
 
     /// Epistemic status
-    pub status: EpistemicStatus,
+    pub status: ClaimConfidence,
 
     /// Confidence level
     pub confidence: f64,
@@ -277,9 +277,9 @@ impl KnowledgeIntegrator {
             sources: verification.sources.clone(),
             requires_hedge: matches!(
                 verification.status,
-                EpistemicStatus::LowConfidence
-                | EpistemicStatus::Contested
-                | EpistemicStatus::Unverifiable
+                ClaimConfidence::LowConfidence
+                | ClaimConfidence::Contested
+                | ClaimConfidence::Unverifiable
             ),
             hedge_phrase: verification.hedge_phrase.clone(),
         }
@@ -455,7 +455,7 @@ mod tests {
             VerifiedClaim {
                 text: "Test claim".to_string(),
                 encoding: HV16::zero(),
-                status: EpistemicStatus::HighConfidence,
+                status: ClaimConfidence::HighConfidence,
                 confidence: 0.9,
                 sources: vec!["https://example.com".to_string()],
                 requires_hedge: false,

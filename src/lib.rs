@@ -329,6 +329,10 @@ pub struct Symthaea {
     /// Neuro-Symbolic Bridge - Epistemic Governance Layer
     pub mind: Mind,  // The Mind for hallucination prevention
 
+    /// Phase 3.6: External Knowledge Enrichment (web research)
+    #[cfg(feature = "web_research_module")]
+    web_researcher: Option<crate::web_research::WebResearcher>,
+
     /// System state
     operations_count: usize,
 }
@@ -420,6 +424,10 @@ impl Symthaea {
             // Neuro-Symbolic Bridge - Mind for epistemic governance (HDC-enabled)
             mind,
 
+            // Phase 3.6: External Knowledge Enrichment
+            #[cfg(feature = "web_research_module")]
+            web_researcher: crate::web_research::WebResearcher::new().ok(),
+
             operations_count: 0,
         })
     }
@@ -458,6 +466,10 @@ impl Symthaea {
             coherence: CoherenceField::new(),
             // CRITICAL: Use simulated LLM for deterministic hallucination testing (HDC-enabled)
             mind,
+
+            #[cfg(feature = "web_research_module")]
+            web_researcher: crate::web_research::WebResearcher::new().ok(),
+
             operations_count: 0,
         })
     }
@@ -786,7 +798,45 @@ impl Symthaea {
 
         // Generate structured thought from the Mind (epistemic governance layer)
         // Uses HDC semantic similarity for epistemic detection, with pattern fallback
-        let structured_thought = self.mind.think_auto_hybrid(query).await.ok();
+        let mut structured_thought = self.mind.think_auto_hybrid(query).await.ok();
+
+        // ====================================================================
+        // PHASE 3.6: EXTERNAL KNOWLEDGE ENRICHMENT
+        // ====================================================================
+        // When the Mind is uncertain, reach out to external sources for grounding.
+        #[cfg(feature = "web_research_module")]
+        if let Some(ref mut thought) = structured_thought {
+            let needs_enrichment = thought.domain_context.as_ref()
+                .map_or(true, |c| c.computed_answer.is_none());
+            let is_uncertain = matches!(
+                thought.epistemic_status,
+                EpistemicStatus::Unknown | EpistemicStatus::Uncertain
+            );
+
+            if needs_enrichment && is_uncertain {
+                if let Some(ref researcher) = self.web_researcher {
+                    if let Ok(result) = researcher.research(query).await {
+                        if let Some(best) = result.sources.first() {
+                            let cube = researcher.classifier().classify(&best.url);
+                            thought.domain_context = Some(
+                                crate::mind::structured_thought::DomainContext {
+                                    domain: "web_research".to_string(),
+                                    entities: vec![],
+                                    computed_answer: Some(result.summary.clone()),
+                                    cube: Some(cube),
+                                    phi: None,
+                                }
+                            );
+                            thought.epistemic_status = Self::cube_to_epistemic_status(&cube);
+                            tracing::info!(
+                                "🌐 Phase 3.6: Enriched with web research (credibility: {:.2})",
+                                cube.credibility_score()
+                            );
+                        }
+                    }
+                }
+            }
+        }
 
         // If the Mind indicates uncertainty, use its hedging response instead
         // This is the "Negative Capability" in action - refuse to hallucinate
@@ -911,8 +961,28 @@ impl Symthaea {
             // Epistemic governance layer (Mind module with HDC-enabled)
             mind,
 
+            #[cfg(feature = "web_research_module")]
+            web_researcher: crate::web_research::WebResearcher::new().ok(),
+
             operations_count: 0,
         })
+    }
+
+    /// Map an EpistemicCube to the pipeline's EpistemicStatus.
+    ///
+    /// High-credibility cubes → Known, mid → Uncertain, low → Unknown.
+    #[cfg(feature = "web_research_module")]
+    fn cube_to_epistemic_status(
+        cube: &crate::mind::structured_thought::EpistemicCube,
+    ) -> EpistemicStatus {
+        let score = cube.credibility_score();
+        if score >= 0.7 {
+            EpistemicStatus::Known
+        } else if score >= 0.4 {
+            EpistemicStatus::Uncertain
+        } else {
+            EpistemicStatus::Unknown
+        }
     }
 
     /// Force sleep cycle (manual)

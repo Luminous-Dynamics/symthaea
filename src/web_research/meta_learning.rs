@@ -51,7 +51,7 @@
 
 use crate::language::vocabulary::Vocabulary;
 use super::types::VerificationLevel;
-use super::verifier::EpistemicStatus;
+use super::verifier::ClaimConfidence;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -65,7 +65,7 @@ pub struct VerificationOutcome {
     pub claim: String,
 
     /// Initial verification status
-    pub initial_status: EpistemicStatus,
+    pub initial_status: ClaimConfidence,
 
     /// Initial confidence
     pub initial_confidence: f64,
@@ -671,7 +671,7 @@ mod tests {
 
         let outcome = VerificationOutcome {
             claim: "Test claim".to_string(),
-            initial_status: EpistemicStatus::HighConfidence,
+            initial_status: ClaimConfidence::HighConfidence,
             initial_confidence: 0.9,
             sources: vec!["https://wikipedia.org/test".to_string()],
             ground_truth: GroundTruth::Correct,

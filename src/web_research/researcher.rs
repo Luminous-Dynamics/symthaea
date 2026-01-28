@@ -6,12 +6,131 @@ use crate::language::parser::SemanticParser;
 use crate::language::vocabulary::Vocabulary;
 use super::types::{Source, SearchQuery, ResearchPlan, Claim, VerificationLevel};
 use super::extractor::{ContentExtractor, ExtractedContent};
-use super::verifier::{EpistemicVerifier, Verification};
+use super::verifier::{EpistemicVerifier, Verification, SourceClassifier};
 use anyhow::{Result, Context};
+use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::{info, warn, debug};
+
+// ============================================================================
+// Pluggable search backend
+// ============================================================================
+
+/// A single search hit returned by a backend.
+#[derive(Debug, Clone)]
+pub struct SearchHit {
+    pub title: String,
+    pub url: String,
+    pub snippet: String,
+}
+
+/// Async search backend trait — allows swapping search providers.
+#[async_trait]
+pub trait SearchBackend: Send + Sync {
+    async fn search(&self, query: &str, max_results: usize) -> Result<Vec<SearchHit>>;
+}
+
+/// DuckDuckGo Instant Answer API backend (free, no API key required).
+pub struct DuckDuckGoBackend {
+    client: Client,
+}
+
+impl DuckDuckGoBackend {
+    pub fn new(config: &ResearchConfig) -> Self {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(config.request_timeout_seconds))
+            .user_agent(&config.user_agent)
+            .build()
+            .unwrap_or_else(|_| Client::new());
+        Self { client }
+    }
+}
+
+#[async_trait]
+impl SearchBackend for DuckDuckGoBackend {
+    async fn search(&self, query: &str, max_results: usize) -> Result<Vec<SearchHit>> {
+        let url = format!(
+            "https://api.duckduckgo.com/?q={}&format=json&no_html=1",
+            urlencoding::encode(query)
+        );
+
+        let response: serde_json::Value = self.client
+            .get(&url)
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        let mut hits = Vec::new();
+
+        // AbstractText → first hit
+        if let Some(text) = response.get("AbstractText").and_then(|v| v.as_str()) {
+            if !text.is_empty() {
+                let title = response.get("Heading")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("DuckDuckGo Result")
+                    .to_string();
+                let url = response.get("AbstractURL")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("https://duckduckgo.com")
+                    .to_string();
+                hits.push(SearchHit { title, url, snippet: text.to_string() });
+            }
+        }
+
+        // RelatedTopics → additional hits
+        if let Some(topics) = response.get("RelatedTopics").and_then(|v| v.as_array()) {
+            for topic in topics.iter().take(max_results.saturating_sub(hits.len())) {
+                if let (Some(text), Some(first_url)) = (
+                    topic.get("Text").and_then(|v| v.as_str()),
+                    topic.get("FirstURL").and_then(|v| v.as_str()),
+                ) {
+                    hits.push(SearchHit {
+                        title: text.chars().take(80).collect(),
+                        url: first_url.to_string(),
+                        snippet: text.to_string(),
+                    });
+                }
+            }
+        }
+
+        hits.truncate(max_results);
+        Ok(hits)
+    }
+}
+
+/// Mock search backend for offline / CI testing.
+///
+/// Returns canned results so integration tests can exercise the full
+/// research pipeline without network access.
+pub struct MockSearchBackend {
+    hits: Vec<SearchHit>,
+}
+
+impl MockSearchBackend {
+    /// Create a mock that always returns the provided hits.
+    pub fn new(hits: Vec<SearchHit>) -> Self {
+        Self { hits }
+    }
+
+    /// Convenience: a single Wikipedia-style hit for any query.
+    pub fn wikipedia_stub() -> Self {
+        Self::new(vec![SearchHit {
+            title: "Mock Wikipedia Result".to_string(),
+            url: "https://en.wikipedia.org/wiki/Mock".to_string(),
+            snippet: "This is a mock search result for testing purposes.".to_string(),
+        }])
+    }
+}
+
+#[async_trait]
+impl SearchBackend for MockSearchBackend {
+    async fn search(&self, _query: &str, max_results: usize) -> Result<Vec<SearchHit>> {
+        Ok(self.hits.iter().take(max_results).cloned().collect())
+    }
+}
 
 /// Research configuration
 #[derive(Debug, Clone)]
@@ -80,6 +199,12 @@ pub struct WebResearcher {
     /// Epistemic verifier
     verifier: EpistemicVerifier,
 
+    /// Source classifier (domain → EpistemicCube)
+    classifier: SourceClassifier,
+
+    /// Pluggable search backend
+    backend: Box<dyn SearchBackend>,
+
     /// Semantic parser
     parser: SemanticParser,
 
@@ -92,20 +217,8 @@ pub struct WebResearcher {
 
 impl WebResearcher {
     pub fn new() -> Result<Self> {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(10))
-            .user_agent("Symthaea/0.1 (Conscious AI Research Assistant)")
-            .build()
-            .context("Failed to create HTTP client")?;
-
-        Ok(Self {
-            client,
-            extractor: ContentExtractor::new(),
-            verifier: EpistemicVerifier::new(),
-            parser: SemanticParser::new(),
-            vocabulary: Vocabulary::new(),
-            config: ResearchConfig::default(),
-        })
+        let config = ResearchConfig::default();
+        Self::with_config(config)
     }
 
     pub fn with_config(config: ResearchConfig) -> Result<Self> {
@@ -115,13 +228,83 @@ impl WebResearcher {
             .build()
             .context("Failed to create HTTP client")?;
 
+        let backend = Box::new(DuckDuckGoBackend::new(&config));
+
         Ok(Self {
             client,
             extractor: ContentExtractor::new(),
             verifier: EpistemicVerifier::new(),
+            classifier: SourceClassifier::new(),
+            backend,
             parser: SemanticParser::new(),
             vocabulary: Vocabulary::new(),
             config,
+        })
+    }
+
+    /// Replace the search backend (useful for testing with MockSearchBackend).
+    pub fn with_backend(mut self, backend: Box<dyn SearchBackend>) -> Self {
+        self.backend = backend;
+        self
+    }
+
+    /// Access the source classifier for external use (e.g., Phase 3.6).
+    pub fn classifier(&self) -> &SourceClassifier {
+        &self.classifier
+    }
+
+    /// High-level research: search + classify sources, return ResearchResult.
+    ///
+    /// This uses the pluggable SearchBackend and SourceClassifier without
+    /// the full epistemic verification pipeline.
+    pub async fn research(&self, query: &str) -> Result<ResearchResult> {
+        let start_time = std::time::Instant::now();
+        info!("🔍 Research (backend): {}", query);
+
+        // 1. Search via backend
+        let hits = self.backend.search(query, self.config.max_sources).await?;
+        debug!("Backend returned {} hits", hits.len());
+
+        // 2. Convert hits → Sources (classify each URL)
+        let mut sources = Vec::new();
+        for hit in &hits {
+            let cube = self.classifier.classify(&hit.url);
+            let credibility = self.classifier.credibility_score(&cube);
+
+            let content = ExtractedContent {
+                text: hit.snippet.clone(),
+                title: hit.title.clone(),
+                content_type: super::extractor::ContentType::Article,
+                published_date: None,
+                author: None,
+                paragraphs: vec![hit.snippet.clone()],
+                citations: Vec::new(),
+            };
+
+            sources.push(self.extractor.create_source(
+                hit.url.clone(),
+                content,
+                credibility,
+            ));
+        }
+
+        // 3. Build summary from best source
+        let summary = if let Some(best) = sources.first() {
+            best.content.chars().take(500).collect()
+        } else {
+            format!("No results found for '{}'", query)
+        };
+
+        let elapsed = start_time.elapsed();
+
+        Ok(ResearchResult {
+            query: query.to_string(),
+            sources,
+            verifications: Vec::new(),
+            confidence: 0.5,
+            summary,
+            new_concepts: Vec::new(),
+            time_taken_ms: elapsed.as_millis() as u64,
         })
     }
 

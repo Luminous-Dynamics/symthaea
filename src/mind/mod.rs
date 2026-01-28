@@ -44,7 +44,10 @@ pub mod hdc_epistemic;
 pub mod semantic_encoder;
 pub mod holographic_memory;
 
-pub use structured_thought::{EpistemicStatus, SemanticIntent, StructuredThought};
+pub use structured_thought::{
+    EpistemicStatus, SemanticIntent, StructuredThought,
+    EpistemicCube, ETier, NTier, MTier, DomainContext,
+};
 pub use simulated_llm::SimulatedLLM;
 pub use ollama_backend::{OllamaBackend, check_ollama_availability};
 pub use hdc_epistemic::{HdcEpistemicClassifier, HdcEpistemicStats, SemanticEpistemicClassifier, SemanticEpistemicStats};
@@ -345,6 +348,7 @@ impl Mind {
                 format!("Epistemic status: {:?}", status),
                 format!("Semantic intent: {:?}", intent),
             ],
+            domain_context: None,
         })
     }
 
@@ -946,6 +950,7 @@ impl Mind {
             response_text: response,
             confidence,
             reasoning_trace,
+            domain_context: None,
         })
     }
 

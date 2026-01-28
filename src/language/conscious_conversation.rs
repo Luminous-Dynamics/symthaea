@@ -236,7 +236,7 @@ impl ConsciousConversation {
 
             // Count claims that needed hedging (unverifiable or low confidence)
             self.stats.claims_hedged += research.verifications.iter()
-                .filter(|v| v.status != crate::web_research::EpistemicStatus::HighConfidence)
+                .filter(|v| v.status != crate::web_research::ClaimConfidence::HighConfidence)
                 .count();
 
             // Integrate into knowledge base

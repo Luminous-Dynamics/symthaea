@@ -140,6 +140,7 @@ zbus = { version = "4.0", optional = true }  # D-Bus for notifications
 
 # Systemd Integration (D1)
 libsystemd = { version = "0.7", optional = true }  # Systemd socket activation
+libm = "0.2.16"
 
 [features]
 default = []
@@ -170,6 +171,8 @@ duck = []     # DuckDB analytical queries
 notifications = ["zbus"]  # E1: D-Bus desktop notifications
 systemd = ["libsystemd"]  # D1: Systemd socket activation
 desktop = ["notifications", "systemd"]
+# Web research pipeline (Phase 3.6 external knowledge enrichment)
+web_research_module = []
 # Mycelix integration
 mycelix = ["mycelix-sdk", "sha3"]  # Full Mycelix SDK integration for governance
 
@@ -219,26 +222,6 @@ harness = false
 
 [[bench]]
 name = "consciousness_benchmarks"
-harness = false
-
-# Quick suite for CI (~5 min)
-[[bench]]
-name = "quick"
-harness = false
-
-# Standard suite (~30 min)
-[[bench]]
-name = "standard"
-harness = false
-
-# Full consciousness suite (~1 hr)
-[[bench]]
-name = "consciousness"
-harness = false
-
-# Ethics suite (~45 min)
-[[bench]]
-name = "ethics"
 harness = false
 
 # [[bench]]

@@ -44,11 +44,11 @@ pub mod integrator;
 pub mod meta_learning;
 pub mod types;
 
-pub use researcher::{WebResearcher, ResearchConfig, ResearchResult};
+pub use researcher::{WebResearcher, ResearchConfig, ResearchResult, SearchBackend, DuckDuckGoBackend, MockSearchBackend, SearchHit};
 pub use extractor::{ContentExtractor, ExtractedContent, ContentType};
 pub use verifier::{
-    EpistemicVerifier, Verification, EpistemicStatus,
-    Evidence, Contradiction,
+    EpistemicVerifier, Verification, ClaimConfidence,
+    Evidence, Contradiction, SourceClassifier,
 };
 pub use integrator::{
     KnowledgeIntegrator, VerifiedKnowledge, IntegrationResult,

@@ -6,6 +6,114 @@
 
 use serde::{Deserialize, Serialize};
 
+// ============================================================================
+// 3D Epistemic Model — maps source reliability into consciousness dimensions
+// ============================================================================
+
+/// Empirical tier — quality of evidence behind information.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ETier {
+    /// Anecdotal / opinion
+    E0,
+    /// Single non-peer-reviewed source
+    E1,
+    /// Multiple independent sources OR peer review
+    E2,
+    /// Peer-reviewed + reproduced
+    E3,
+}
+
+/// Normative tier — authority of the publishing institution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum NTier {
+    /// Unknown or anonymous
+    N0,
+    /// Named individual or small organisation
+    N1,
+    /// Established institution (university, major news)
+    N2,
+    /// Governmental / intergovernmental body
+    N3,
+}
+
+/// Meta-epistemic tier — self-awareness about limitations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MTier {
+    /// No disclosure of methodology
+    M0,
+    /// Methodology stated
+    M1,
+    /// Methodology + limitations stated
+    M2,
+    /// Full reproducibility / open data
+    M3,
+}
+
+/// A position in the 3D epistemic space (E × N × M).
+///
+/// Used to classify web sources and bridge into the consciousness pipeline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct EpistemicCube {
+    pub empirical: ETier,
+    pub normative: NTier,
+    pub meta: MTier,
+}
+
+impl EpistemicCube {
+    pub fn new(empirical: ETier, normative: NTier, meta: MTier) -> Self {
+        Self { empirical, normative, meta }
+    }
+
+    /// Weighted credibility score in 0.0–1.0.
+    pub fn credibility_score(&self) -> f64 {
+        let e = match self.empirical {
+            ETier::E0 => 0.0,
+            ETier::E1 => 0.33,
+            ETier::E2 => 0.66,
+            ETier::E3 => 1.0,
+        };
+        let n = match self.normative {
+            NTier::N0 => 0.0,
+            NTier::N1 => 0.33,
+            NTier::N2 => 0.66,
+            NTier::N3 => 1.0,
+        };
+        let m = match self.meta {
+            MTier::M0 => 0.0,
+            MTier::M1 => 0.33,
+            MTier::M2 => 0.66,
+            MTier::M3 => 1.0,
+        };
+        // Empirical evidence weighted highest
+        e * 0.5 + n * 0.3 + m * 0.2
+    }
+}
+
+impl Default for EpistemicCube {
+    fn default() -> Self {
+        Self::new(ETier::E1, NTier::N0, MTier::M0)
+    }
+}
+
+// ============================================================================
+// Domain Context — enrichment produced by domain plugins or web research
+// ============================================================================
+
+/// Context produced by a domain plugin or external knowledge source.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DomainContext {
+    /// Which domain produced this context (e.g. "nix", "web_research")
+    pub domain: String,
+    /// Named entities extracted
+    pub entities: Vec<String>,
+    /// A computed answer, if the domain could produce one
+    pub computed_answer: Option<String>,
+    /// Epistemic cube classification of the primary source
+    pub cube: Option<EpistemicCube>,
+    /// Φ measurement of the source integration (if available)
+    pub phi: Option<f64>,
+}
+
 /// Epistemic Status - What we know about what we know
 ///
 /// This is the core abstraction for "Negative Capability" - the ability
@@ -95,6 +203,10 @@ pub struct StructuredThought {
 
     /// Trace of reasoning steps (for debugging/transparency)
     pub reasoning_trace: Vec<String>,
+
+    /// Domain context from plugin or external enrichment (Phase 3.6)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub domain_context: Option<DomainContext>,
 }
 
 impl StructuredThought {
@@ -110,6 +222,7 @@ impl StructuredThought {
                 "No knowledge found".to_string(),
                 "Expressing uncertainty".to_string(),
             ],
+            domain_context: None,
         }
     }
 
@@ -125,6 +238,7 @@ impl StructuredThought {
                 "Knowledge retrieved".to_string(),
                 "Providing answer".to_string(),
             ],
+            domain_context: None,
         }
     }
 

@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 
 /// Epistemic status of a claim
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum EpistemicStatus {
+pub enum ClaimConfidence {
     /// Verified with high confidence (multiple agreeing sources)
     HighConfidence,
 
@@ -82,7 +82,7 @@ pub struct Verification {
     pub claim: Claim,
 
     /// Epistemic status
-    pub status: EpistemicStatus,
+    pub status: ClaimConfidence,
 
     /// Confidence level (0.0-1.0)
     pub confidence: f64,
@@ -353,15 +353,15 @@ impl EpistemicVerifier {
         contradictions: &[Contradiction],
         confidence: f64,
         _level: VerificationLevel,
-    ) -> EpistemicStatus {
+    ) -> ClaimConfidence {
         // No evidence = unverifiable
         if evidence.is_empty() {
-            return EpistemicStatus::Unverifiable;
+            return ClaimConfidence::Unverifiable;
         }
 
         // Contradictions = contested
         if !contradictions.is_empty() {
-            return EpistemicStatus::Contested;
+            return ClaimConfidence::Contested;
         }
 
         // Check if refuted
@@ -369,37 +369,37 @@ impl EpistemicVerifier {
         let supporting = evidence.iter().filter(|e| e.supports).count();
 
         if refuting > supporting {
-            return EpistemicStatus::False;
+            return ClaimConfidence::False;
         }
 
         // Determine confidence level
         match confidence {
-            c if c >= 0.8 => EpistemicStatus::HighConfidence,
-            c if c >= 0.6 => EpistemicStatus::ModerateConfidence,
-            c if c >= 0.4 => EpistemicStatus::LowConfidence,
-            _ => EpistemicStatus::Unverifiable,
+            c if c >= 0.8 => ClaimConfidence::HighConfidence,
+            c if c >= 0.6 => ClaimConfidence::ModerateConfidence,
+            c if c >= 0.4 => ClaimConfidence::LowConfidence,
+            _ => ClaimConfidence::Unverifiable,
         }
     }
 
     /// Generate hedging phrase based on epistemic status
-    fn generate_hedge(&self, status: EpistemicStatus, _confidence: f64) -> String {
+    fn generate_hedge(&self, status: ClaimConfidence, _confidence: f64) -> String {
         match status {
-            EpistemicStatus::HighConfidence => {
+            ClaimConfidence::HighConfidence => {
                 "According to multiple reliable sources,".to_string()
             }
-            EpistemicStatus::ModerateConfidence => {
+            ClaimConfidence::ModerateConfidence => {
                 "Evidence suggests that".to_string()
             }
-            EpistemicStatus::LowConfidence => {
+            ClaimConfidence::LowConfidence => {
                 "Some sources indicate that".to_string()
             }
-            EpistemicStatus::Contested => {
+            ClaimConfidence::Contested => {
                 "Sources disagree on this, but".to_string()
             }
-            EpistemicStatus::Unverifiable => {
+            ClaimConfidence::Unverifiable => {
                 "I cannot verify this claim, but I believe".to_string()
             }
-            EpistemicStatus::False => {
+            ClaimConfidence::False => {
                 "This claim appears to be incorrect based on".to_string()
             }
         }
@@ -440,6 +440,107 @@ impl Default for EpistemicVerifier {
     }
 }
 
+// ============================================================================
+// Source Classifier — maps domain URLs to the 3D epistemic model
+// ============================================================================
+
+use crate::mind::structured_thought::{EpistemicCube, ETier, NTier, MTier};
+use std::collections::HashMap;
+
+/// Classifies web source URLs into the 3D epistemic cube model.
+///
+/// This bridges external knowledge into the consciousness pipeline's
+/// epistemic framework, enabling principled credibility scoring.
+pub struct SourceClassifier {
+    domain_registry: HashMap<String, EpistemicCube>,
+}
+
+impl SourceClassifier {
+    pub fn new() -> Self {
+        let mut registry = HashMap::new();
+
+        // Academic sources: high empirical, moderate normative & meta
+        for domain in &["arxiv.org", "nature.com", "science.org", "pubmed.ncbi.nlm.nih.gov"] {
+            registry.insert(domain.to_string(), EpistemicCube::new(ETier::E3, NTier::N2, MTier::M2));
+        }
+
+        // Government sources: high across all dimensions
+        for domain in &["who.int", "cdc.gov", "nih.gov"] {
+            registry.insert(domain.to_string(), EpistemicCube::new(ETier::E3, NTier::N3, MTier::M3));
+        }
+
+        // Official documentation: high empirical, moderate authority
+        for domain in &["docs.rs", "doc.rust-lang.org", "docs.python.org"] {
+            registry.insert(domain.to_string(), EpistemicCube::new(ETier::E3, NTier::N2, MTier::M2));
+        }
+
+        // Major news: moderate empirical, named authority
+        for domain in &["reuters.com", "apnews.com", "bbc.com"] {
+            registry.insert(domain.to_string(), EpistemicCube::new(ETier::E2, NTier::N1, MTier::M1));
+        }
+
+        // Wikipedia: moderate empirical, community normative, methodology stated
+        registry.insert("wikipedia.org".to_string(), EpistemicCube::new(ETier::E2, NTier::N1, MTier::M2));
+        registry.insert("en.wikipedia.org".to_string(), EpistemicCube::new(ETier::E2, NTier::N1, MTier::M2));
+
+        Self { domain_registry: registry }
+    }
+
+    /// Classify a URL into an EpistemicCube position.
+    pub fn classify(&self, url: &str) -> EpistemicCube {
+        let domain = Self::extract_domain(url);
+
+        // Exact domain match
+        if let Some(cube) = self.domain_registry.get(&domain) {
+            return *cube;
+        }
+
+        // TLD-based patterns
+        let url_lower = url.to_lowercase();
+        if url_lower.contains(".edu") || url_lower.contains(".ac.uk") {
+            return EpistemicCube::new(ETier::E3, NTier::N2, MTier::M2);
+        }
+        if url_lower.contains(".gov") || url_lower.contains(".gov.uk") {
+            return EpistemicCube::new(ETier::E3, NTier::N3, MTier::M3);
+        }
+
+        // Blog / forum heuristics
+        if url_lower.contains("blog") || url_lower.contains("medium.com") {
+            return EpistemicCube::new(ETier::E1, NTier::N0, MTier::M1);
+        }
+        if url_lower.contains("reddit.com") || url_lower.contains("forum")
+            || url_lower.contains("stackoverflow.com")
+        {
+            return EpistemicCube::new(ETier::E1, NTier::N0, MTier::M1);
+        }
+
+        // Unknown default
+        EpistemicCube::new(ETier::E1, NTier::N0, MTier::M0)
+    }
+
+    /// Credibility score derived from cube position (0.0–1.0).
+    pub fn credibility_score(&self, cube: &EpistemicCube) -> f64 {
+        cube.credibility_score()
+    }
+
+    /// Extract the domain part from a URL.
+    fn extract_domain(url: &str) -> String {
+        url.split("//")
+            .nth(1)
+            .unwrap_or(url)
+            .split('/')
+            .next()
+            .unwrap_or("unknown")
+            .to_lowercase()
+    }
+}
+
+impl Default for SourceClassifier {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -448,10 +549,10 @@ mod tests {
     fn test_generate_hedge() {
         let verifier = EpistemicVerifier::new();
 
-        let high = verifier.generate_hedge(EpistemicStatus::HighConfidence, 0.9);
+        let high = verifier.generate_hedge(ClaimConfidence::HighConfidence, 0.9);
         assert!(high.contains("reliable sources"));
 
-        let unverifiable = verifier.generate_hedge(EpistemicStatus::Unverifiable, 0.3);
+        let unverifiable = verifier.generate_hedge(ClaimConfidence::Unverifiable, 0.3);
         assert!(unverifiable.contains("cannot verify"));
     }
 
@@ -462,5 +563,27 @@ mod tests {
         assert!(verifier.domain_credibility("https://stanford.edu/paper") >= 0.9);
         assert!(verifier.domain_credibility("https://arxiv.org/abs/123") >= 0.9);
         assert!(verifier.domain_credibility("https://blog.example.com") < 0.7);
+    }
+
+    #[test]
+    fn test_source_classifier_academic() {
+        let classifier = SourceClassifier::new();
+        let cube = classifier.classify("https://arxiv.org/abs/2301.00001");
+        assert_eq!(cube.empirical, ETier::E3);
+    }
+
+    #[test]
+    fn test_source_classifier_gov_tld() {
+        let classifier = SourceClassifier::new();
+        let cube = classifier.classify("https://data.census.gov/stats");
+        assert_eq!(cube.normative, NTier::N3);
+    }
+
+    #[test]
+    fn test_source_classifier_unknown() {
+        let classifier = SourceClassifier::new();
+        let cube = classifier.classify("https://random-site.xyz/page");
+        assert_eq!(cube.empirical, ETier::E1);
+        assert_eq!(cube.normative, NTier::N0);
     }
 }
