@@ -1,0 +1,5 @@
+# WASM build configuration for Holochain zomes
+# getrandom 0.3.x requires explicit backend configuration for WASM targets
+
+[target.wasm32-unknown-unknown]
+rustflags = ['--cfg', 'getrandom_backend="wasm_js"']

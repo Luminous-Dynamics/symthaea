@@ -345,10 +345,10 @@ impl FLRoundAgentImpact {
 mod tests {
     use super::*;
     use crate::agentic::{
-        AgentClass, AgentConstraints, AgentStatus, EpistemicStats,
+        AgentId, AgentClass, AgentConstraints, AgentStatus, EpistemicStats,
         UncertaintyCalibration,
     };
-    use crate::fl::matl_feedback::{MatlFeedbackConfig, FeedbackStats};
+    use crate::fl::matl_feedback::FeedbackStats;
 
     fn create_test_agent(id: &str) -> InstrumentalActor {
         InstrumentalActor {

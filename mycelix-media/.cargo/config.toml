@@ -1,0 +1,9 @@
+[build]
+target = "wasm32-unknown-unknown"
+
+[target.wasm32-unknown-unknown]
+rustflags = [
+    "-C", "opt-level=z",
+    # Enable getrandom wasm_js support via cfg (for getrandom 0.3+)
+    "--cfg", "getrandom_backend=\"wasm_js\"",
+]

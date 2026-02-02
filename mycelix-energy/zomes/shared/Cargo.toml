@@ -1,0 +1,17 @@
+[package]
+name = "mycelix_energy_shared"
+version = "0.1.0"
+edition = "2021"
+description = "Shared utilities for Mycelix Energy zomes - batch queries and common types"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "mycelix_energy_shared"
+
+[dependencies]
+hdk.workspace = true
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[lints.rust]
+unsafe_code = "forbid"

@@ -52,6 +52,7 @@ pub mod adaptive_thresholds;
 pub mod game_theory;
 pub mod verification;
 pub mod trust_portability;
+pub mod integration;
 
 #[cfg(feature = "parallel")]
 pub mod parallel;
@@ -442,6 +443,19 @@ pub use parallel::{
     KVectorBatch, TickAggregators, RandomBuffer,
     // Benchmarking
     BenchmarkResult, benchmark_simulation,
+};
+
+pub use integration::{
+    // Trust Pipeline
+    TrustPipelineConfig, IntegratedTrustPipeline, AttestationResult,
+    // Attack Response
+    AttackResponseConfig, IntegratedAttackResponse, AttackResponse, ResponseAction,
+    // Privacy Analytics
+    PrivacyAnalyticsConfig, IntegratedPrivacyAnalytics, PrivateAnalyticsResult,
+    // Epistemic Lifecycle
+    EpistemicLifecycleConfig, IntegratedEpistemicLifecycle, OutputProcessingResult,
+    // Errors
+    IntegrationError,
 };
 
 use serde::{Deserialize, Serialize};

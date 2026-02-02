@@ -18,7 +18,7 @@ mod tests {
         economics::{SlashingConfig, SlashingEngine, SlashResult, RewardEngine, RewardConfig, ViolationType, ViolationSeverity},
         temporal_trust::{TemporalTrustManager, TemporalTrustConfig, TrustDecayConfig, DecayCurve},
         adaptive_thresholds::{AdaptiveThresholdEngine, AdaptiveConfig, ThresholdType, ThresholdFeedback, FeedbackOutcome, FeedbackContext},
-        cascade_analysis::{CascadeEngine, CascadeConfig, TrustNetwork, NetworkAgent, NetworkEdge, EdgeType},
+        cascade_analysis::{CascadeEngine, CascadeConfig, NetworkAgent, NetworkEdge, EdgeType},
         game_theory::{validate_mechanism, MechanismParams},
         differential_privacy::{PrivateAggregator, DPConfig},
     };
@@ -350,28 +350,29 @@ mod tests {
 
         for i in 0..100 {
             let outcome = match rng.next_usize(4) {
-                0 => FeedbackOutcome::Success,
+                0 => FeedbackOutcome::TruePositive,
                 1 => FeedbackOutcome::FalseNegative,
                 2 => FeedbackOutcome::FalsePositive,
-                _ => FeedbackOutcome::Neutral,
+                _ => FeedbackOutcome::TrueNegative,
             };
 
             engine.process_feedback(ThresholdFeedback {
-                threshold_type: ThresholdType::Membership,
+                threshold_type: ThresholdType::TrustAcceptance,
+                threshold_value: engine.get_threshold(ThresholdType::TrustAcceptance),
                 outcome,
-                threshold_at_event: engine.get_threshold(ThresholdType::Membership),
                 context: FeedbackContext {
-                    participants: 10,
-                    average_trust: 0.5,
-                    attack_detected: false,
                     network_health: 0.9,
+                    active_agents: 10,
+                    threat_level: 0.1,
+                    ..Default::default()
                 },
                 timestamp: i as u64 * 1000,
             });
 
-            let threshold = engine.get_threshold(ThresholdType::Membership);
+            let threshold = engine.get_threshold(ThresholdType::TrustAcceptance);
+            // Use small epsilon for floating point comparison
             assert!(
-                threshold >= 0.3 && threshold <= 0.9,
+                threshold >= 0.3 - 0.001 && threshold <= 0.9 + 0.001,
                 "Threshold {} out of bounds [0.3, 0.9]",
                 threshold
             );
@@ -424,19 +425,18 @@ mod tests {
     #[test]
     fn prop_private_mean_converges() {
         let config = DPConfig {
-            min_samples: 10,
-            epoch_budget: 100.0,
+            epsilon: 100.0, // High epsilon for low noise in test
             ..Default::default()
         };
 
-        let mut agg = PrivateAggregator::new(config, 42);
+        let mut agg = PrivateAggregator::new(config);
 
         // Generate values with known mean 0.5
         let values: Vec<f64> = (0..1000).map(|i| (i as f64 % 100.0) / 100.0).collect();
         let true_mean: f64 = values.iter().sum::<f64>() / values.len() as f64;
 
         // Compute private mean with high epsilon (low noise)
-        let private_mean = agg.private_mean(&values, (0.0, 1.0), 10.0, "test").unwrap();
+        let private_mean = agg.private_mean(&values, 10.0).unwrap();
 
         // Should be within 0.1 of true mean with high probability
         assert!(
@@ -450,20 +450,19 @@ mod tests {
     #[test]
     fn prop_privacy_budget_consumed() {
         let config = DPConfig {
-            min_samples: 5,
-            epoch_budget: 2.0,
+            epsilon: 2.0,
             ..Default::default()
         };
 
-        let mut agg = PrivateAggregator::new(config, 42);
+        let mut agg = PrivateAggregator::new(config);
         let values: Vec<f64> = (0..100).map(|i| i as f64 / 100.0).collect();
 
         // First query should succeed
-        let r1 = agg.private_mean(&values, (0.0, 1.0), 1.5, "q1");
+        let r1 = agg.private_mean(&values, 1.5);
         assert!(r1.is_ok());
 
         // Second query should fail (budget exhausted)
-        let r2 = agg.private_mean(&values, (0.0, 1.0), 1.5, "q2");
+        let r2 = agg.private_mean(&values, 1.5);
         assert!(r2.is_err(), "Should fail due to budget exhaustion");
     }
 

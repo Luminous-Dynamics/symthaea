@@ -1,133 +1,63 @@
 {
-  description = "Kosmic Lab development environment";
+  description = "Luminous Dynamics Monorepo - Common Development Environment";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs = { self, nixpkgs, flake-utils }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
-        projectDir = ./.;
-        pythonEnv = pkgs.python311.withPackages (ps: with ps; [
-          numpy
-          scipy
-          pandas
-          networkx
-          tqdm
-          pyyaml
-          jsonschema
-          pytest
-          pip
-          black
-          matplotlib
-          seaborn
-        ]);
-        runTestsScript = pkgs.writeShellApplication {
-          name = "kosmic-run-tests";
-          runtimeInputs = [ pythonEnv pkgs.poetry ];
-          text = ''
-            cd ${projectDir}
-            poetry run pytest --maxfail=1 --disable-warnings -q
-          '';
-        };
-        runLintScript = pkgs.writeShellApplication {
-          name = "kosmic-run-lint";
-          runtimeInputs = [ pythonEnv pkgs.poetry ];
-          text = ''
-            cd ${projectDir}
-            poetry run black --check .
-          '';
-        };
-      in {
+        pkgs = nixpkgs.legacyPackages.${system};
+      in
+      {
         devShells.default = pkgs.mkShell {
-          packages = [
-            pythonEnv
-            pkgs.poetry
-            pkgs.git
-            pkgs.texlive.combined.scheme-medium  # sufficient for papers, smaller than scheme-full
+          name = "luminous-dynamics-dev";
+
+          buildInputs = with pkgs; [
+            # Common tools across all projects
+            nodejs_20
+            rustc
+            cargo
+
+            # Database (PostgreSQL already in your environment)
+            postgresql_15
+
+            # Common utilities
+            git
+            curl
+            jq
+
+            # Nix tooling
+            nixfmt
+            nil  # Nix LSP
           ];
+
           shellHook = ''
-            export PYTHONUNBUFFERED=1
-            export KOSMIC_LAB_ROOT=${toString projectDir}
-            echo "Kosmic Lab dev shell activated (with LaTeX)."
+            echo "🌟 Luminous-Dynamics Development Environment"
+            echo "📦 Node.js: $(node --version)"
+            echo "🦀 Rust: $(rustc --version)"
+            echo "❄️  Nix: $(nix --version)"
+            echo ""
+            echo "Commands:"
+            echo "  lum-start  - Start all services"
+            echo "  lum-status - Connect to overmind"
+            echo "  lum-stop   - Stop all services"
+            echo ""
+            echo "🌊 We flow with Nix!"
+
+            # Project-specific setup
+            export LUMINOUS_DEV=true
+            export LUMINOUS_ROOT="$PWD"
+            export NODE_ENV=development
+
+            # PostgreSQL setup
+            export PGDATA="$PWD/.postgres"
+            export PGHOST="localhost"
+            export PGUSER="$USER"
+            export PGDATABASE="luminous"
           '';
         };
-
-        apps = {
-          run-tests = {
-            type = "app";
-            program = "${runTestsScript}/bin/kosmic-run-tests";
-          };
-          run-lint = {
-            type = "app";
-            program = "${runLintScript}/bin/kosmic-run-lint";
-          };
-          run-archive-verify = {
-            type = "app";
-            program = "${pkgs.writeShellApplication {
-              name = "kosmic-archive-verify";
-              runtimeInputs = [ pythonEnv pkgs.poetry ];
-              text = ''
-                if [ -z "$1" ]; then
-                  echo "Usage: kosmic-archive-verify ARCHIVE.tar.gz"
-                  exit 1
-                fi
-                cd ${projectDir}
-                poetry run python scripts/archive_tool.py verify --archive "$1"
-              '';
-            }}/bin/kosmic-archive-verify";
-          };
-          run-archive-summary = {
-            type = "app";
-            program = "${pkgs.writeShellApplication {
-              name = "kosmic-archive-summary";
-              runtimeInputs = [ pythonEnv pkgs.poetry ];
-              text = ''
-                if [ -z "$1" ]; then
-                  echo "Usage: kosmic-archive-summary ARCHIVE.tar.gz"
-                  exit 1
-                fi
-                cd ${projectDir}
-                poetry run python scripts/archive_tool.py summary --archive "$1"
-              '';
-            }}/bin/kosmic-archive-summary";
-          };
-          default = apps.run-tests;
-        };
-
-        checks.pytest = pkgs.runCommand "kosmic-pytest" { buildInputs = [ pythonEnv pkgs.poetry ]; } ''
-          export HOME=$TMPDIR
-          cd ${projectDir}
-          poetry run pytest --maxfail=1 --disable-warnings -q
-          touch $out
-        '';
-
-        checks.archive = pkgs.runCommand "kosmic-archive-check" { buildInputs = [ pythonEnv pkgs.poetry ]; } ''
-          export HOME=$TMPDIR
-          cd ${projectDir}
-          mkdir -p tmp/checks
-          cat <<'JSON' > tmp/checks/min_checkpoint.json
-{"metadata":{"config":{"path":"synthetic","sha256":"dummy"}},"state":{}}
-JSON
-          poetry run python scripts/archive_tool.py create --checkpoint tmp/checks/min_checkpoint.json --config fre/configs/track_g_threshold.yaml --output tmp/checks/sample_bundle.tar.gz
-          poetry run python scripts/archive_tool.py verify --archive tmp/checks/sample_bundle.tar.gz
-          touch $out
-        '';
-
-        checks.lint = pkgs.runCommand "kosmic-lint" { buildInputs = [ pythonEnv pkgs.poetry ]; } ''
-          export HOME=$TMPDIR
-          cd ${projectDir}
-          poetry run black --check .
-          touch $out
-        '';
-
-        checks.registry = pkgs.runCommand "kosmic-registry" { buildInputs = [ pythonEnv pkgs.poetry ]; } ''
-          cd ${projectDir}
-          poetry run python scripts/validate_registry.py --path configs/config_registry.json
-          touch $out
-        '';
       });
 }
