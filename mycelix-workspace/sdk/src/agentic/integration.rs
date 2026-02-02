@@ -8,20 +8,18 @@
 //! 1. **Trust Pipeline** - K-Vector → Attestation → Consensus → Update
 //! 2. **Attack Response** - Detection → Thresholds → Quarantine → Slash
 //! 3. **Privacy Analytics** - DP Aggregation → Dashboard → Alerts
-//! 4. **Agent Lifecycle** - Create → Output → Classify → Measure Phi → Update Trust
+//! 4. **Agent Lifecycle** - Create → Output → Classify → Update Trust
 
 use crate::matl::KVector;
 use crate::agentic::{
     AgentId, InstrumentalActor, AgentClass, AgentConstraints, AgentStatus,
-    EpistemicStats, UncertaintyCalibration, ActionOutcome,
+    EpistemicStats, UncertaintyCalibration,
     // Trust pipeline
-    kvector_bridge::{compute_trust_score, calculate_kredit_from_trust, BehaviorAnalysis},
-    // Attack detection
-    attack_detection::{StreamingAnalyzer, AttackDetectionConfig},
+    kvector_bridge::calculate_kredit_from_trust,
     // Adaptive thresholds
     adaptive_thresholds::{AdaptiveThresholdEngine, AdaptiveConfig, ThresholdType, ThresholdFeedback, FeedbackOutcome, FeedbackContext},
     // Quarantine
-    adversarial::{QuarantineManager, QuarantineReason, GamingDetector, GamingDetectionConfig},
+    adversarial::{QuarantineManager, QuarantineReason, GamingDetector, GamingDetectionConfig, GamingResponse},
     // Economics
     economics::{SlashingEngine, SlashingConfig, RewardEngine, RewardConfig, ViolationType, ViolationSeverity, SlashResult},
     // Differential privacy
@@ -34,8 +32,6 @@ use crate::agentic::{
     verification::{VerificationEngine, SystemState, InvariantCheckResult},
     // Epistemic
     epistemic_classifier::{AgentOutput, AgentOutputBuilder, OutputContent, calculate_epistemic_weight},
-    // Phi measurement
-    phi_bridge::{measure_phi_simple, check_coherence_for_action, PhiMeasurementConfig},
 };
 use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel};
 use serde::{Deserialize, Serialize};
@@ -155,8 +151,8 @@ impl IntegratedTrustPipeline {
         let new_trust = to_agent_mut.k_vector.trust_score();
 
         // Recalculate KREDIT cap
-        let new_kredit_cap = calculate_kredit_from_trust(new_trust as f64);
-        to_agent_mut.kredit_cap = (new_kredit_cap * self.config.kredit_base as f64) as u64;
+        let kredit_multiplier = calculate_kredit_from_trust(new_trust);
+        to_agent_mut.kredit_cap = kredit_multiplier * self.config.kredit_base;
 
         Ok(AttestationResult {
             from_agent: from_agent.to_string(),
@@ -217,11 +213,17 @@ impl IntegratedTrustPipeline {
 /// Result of processing an attestation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationResult {
+    /// Agent that created the attestation.
     pub from_agent: String,
+    /// Agent that received the attestation.
     pub to_agent: String,
+    /// Effective attestation weight.
     pub weight: f64,
+    /// Trust score before the attestation.
     pub old_trust: f64,
+    /// Trust score after the attestation.
     pub new_trust: f64,
+    /// Updated KREDIT cap after trust change.
     pub new_kredit_cap: u64,
 }
 
@@ -232,8 +234,6 @@ pub struct AttestationResult {
 /// Configuration for integrated attack response
 #[derive(Debug, Clone)]
 pub struct AttackResponseConfig {
-    /// Detection config
-    pub detection: AttackDetectionConfig,
     /// Adaptive threshold config
     pub thresholds: AdaptiveConfig,
     /// Slashing config
@@ -245,7 +245,6 @@ pub struct AttackResponseConfig {
 impl Default for AttackResponseConfig {
     fn default() -> Self {
         Self {
-            detection: AttackDetectionConfig::default(),
             thresholds: AdaptiveConfig::default(),
             slashing: SlashingConfig::default(),
             gaming: GamingDetectionConfig::default(),
@@ -255,11 +254,6 @@ impl Default for AttackResponseConfig {
 
 /// Integrated attack response system
 pub struct IntegratedAttackResponse {
-    #[allow(dead_code)]
-    config: AttackResponseConfig,
-    /// Streaming attack analyzer
-    #[allow(dead_code)]
-    detector: StreamingAnalyzer,
     /// Adaptive thresholds
     thresholds: AdaptiveThresholdEngine,
     /// Quarantine manager
@@ -276,12 +270,10 @@ impl IntegratedAttackResponse {
     /// Create new attack response system
     pub fn new(config: AttackResponseConfig) -> Self {
         Self {
-            detector: StreamingAnalyzer::new(config.detection.clone()),
-            thresholds: AdaptiveThresholdEngine::new(config.thresholds.clone()),
+            thresholds: AdaptiveThresholdEngine::new(config.thresholds),
             quarantine: QuarantineManager::new(),
-            slashing: SlashingEngine::new(config.slashing.clone()),
-            gaming: GamingDetector::new(config.gaming.clone()),
-            config,
+            slashing: SlashingEngine::new(config.slashing),
+            gaming: GamingDetector::new(config.gaming),
             responses: vec![],
         }
     }
@@ -290,7 +282,6 @@ impl IntegratedAttackResponse {
     pub fn process_behavior(
         &mut self,
         agent: &mut InstrumentalActor,
-        _behavior: &BehaviorAnalysis,
     ) -> Option<AttackResponse> {
         let agent_id = agent.agent_id.as_str();
         let timestamp = std::time::SystemTime::now()
@@ -301,8 +292,12 @@ impl IntegratedAttackResponse {
         // Check for gaming behavior using analyze method
         let gaming_result = self.gaming.analyze(agent, timestamp);
 
-        if gaming_result.is_gaming {
-            // Quarantine immediately with evidence
+        // Check if gaming detected (suspicion score above threshold)
+        let is_gaming = gaming_result.suspicion_score > 0.5 ||
+            matches!(gaming_result.recommended_action, GamingResponse::Quarantine | GamingResponse::EscalateToSponsor);
+
+        if is_gaming {
+            // Quarantine with evidence
             self.quarantine.quarantine(
                 agent_id,
                 QuarantineReason::GamingDetected,
@@ -311,9 +306,9 @@ impl IntegratedAttackResponse {
             );
 
             // Slash based on severity
-            let severity = if gaming_result.confidence > 0.8 {
+            let severity = if gaming_result.suspicion_score > 0.8 {
                 ViolationSeverity::Critical
-            } else if gaming_result.confidence > 0.5 {
+            } else if gaming_result.suspicion_score > 0.5 {
                 ViolationSeverity::Major
             } else {
                 ViolationSeverity::Minor
@@ -340,7 +335,7 @@ impl IntegratedAttackResponse {
                 context: FeedbackContext {
                     network_health: 0.8,
                     active_agents: 100,
-                    threat_level: gaming_result.confidence,
+                    threat_level: gaming_result.suspicion_score,
                     ..Default::default()
                 },
                 timestamp,
@@ -355,7 +350,7 @@ impl IntegratedAttackResponse {
             let response = AttackResponse {
                 agent_id: agent_id.to_string(),
                 attack_type: "Gaming".to_string(),
-                confidence: gaming_result.confidence,
+                confidence: gaming_result.suspicion_score,
                 actions_taken: vec![
                     ResponseAction::Quarantined { duration_secs: 86400 },
                     ResponseAction::Slashed { amount: slashed_amount },
@@ -389,20 +384,41 @@ impl IntegratedAttackResponse {
 /// Response to a detected attack
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttackResponse {
+    /// ID of the offending agent.
     pub agent_id: String,
+    /// Type of attack detected.
     pub attack_type: String,
+    /// Detection confidence (0.0-1.0).
     pub confidence: f64,
+    /// Actions taken in response.
     pub actions_taken: Vec<ResponseAction>,
+    /// When the response was generated.
     pub timestamp: u64,
 }
 
 /// Actions taken in response to attack
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ResponseAction {
-    Quarantined { duration_secs: u64 },
-    Slashed { amount: u64 },
-    TrustReduced { amount: f64 },
-    AlertRaised { severity: String },
+    /// Agent was quarantined.
+    Quarantined {
+        /// Quarantine duration in seconds.
+        duration_secs: u64,
+    },
+    /// Agent was slashed.
+    Slashed {
+        /// Amount of KREDIT slashed.
+        amount: u64,
+    },
+    /// Agent trust was reduced.
+    TrustReduced {
+        /// Amount of trust reduction.
+        amount: f64,
+    },
+    /// An alert was raised.
+    AlertRaised {
+        /// Alert severity level.
+        severity: String,
+    },
 }
 
 // ============================================================================
@@ -433,24 +449,18 @@ impl Default for PrivacyAnalyticsConfig {
 
 /// Integrated privacy-preserving analytics system
 pub struct IntegratedPrivacyAnalytics {
-    #[allow(dead_code)]
-    config: PrivacyAnalyticsConfig,
     /// Private trust analytics
     analytics: PrivateTrustAnalytics,
     /// Dashboard
     dashboard: Dashboard,
-    /// Queries this epoch
-    queries_this_epoch: usize,
 }
 
 impl IntegratedPrivacyAnalytics {
     /// Create new privacy analytics system
     pub fn new(config: PrivacyAnalyticsConfig) -> Self {
         Self {
-            analytics: PrivateTrustAnalytics::new(config.dp.clone()),
-            dashboard: Dashboard::new(config.dashboard.clone()),
-            queries_this_epoch: 0,
-            config,
+            analytics: PrivateTrustAnalytics::new(config.dp),
+            dashboard: Dashboard::new(config.dashboard),
         }
     }
 
@@ -467,12 +477,10 @@ impl IntegratedPrivacyAnalytics {
             .as_secs();
 
         // Compute private trust distribution
-        let epsilon_per_query = 0.25; // Budget 4 queries
+        let epsilon_per_query = 0.25;
         let distribution = self.analytics
             .analyze_trust_distribution(trust_scores, epsilon_per_query)
             .map_err(|e| IntegrationError::PrivacyError(e.to_string()))?;
-
-        self.queries_this_epoch += 1;
 
         // Update dashboard with metrics
         let metrics_input = MetricsInput {
@@ -510,15 +518,17 @@ impl IntegratedPrivacyAnalytics {
     /// Reset privacy budget for new epoch
     pub fn reset_epoch(&mut self) {
         self.analytics.reset_budget();
-        self.queries_this_epoch = 0;
     }
 }
 
 /// Result of privacy-preserving analytics
 #[derive(Debug, Clone)]
 pub struct PrivateAnalyticsResult {
+    /// Differentially-private trust distribution.
     pub distribution: TrustDistribution,
+    /// Current dashboard metrics.
     pub live_metrics: LiveMetrics,
+    /// Remaining privacy budget (epsilon, delta).
     pub remaining_budget: (f64, f64),
 }
 
@@ -529,8 +539,6 @@ pub struct PrivateAnalyticsResult {
 /// Configuration for epistemic agent lifecycle
 #[derive(Debug, Clone)]
 pub struct EpistemicLifecycleConfig {
-    /// Phi threshold for high-stakes actions
-    pub phi_threshold: f64,
     /// Minimum epistemic weight for trust updates
     pub min_epistemic_weight: f32,
     /// KREDIT base
@@ -540,7 +548,6 @@ pub struct EpistemicLifecycleConfig {
 impl Default for EpistemicLifecycleConfig {
     fn default() -> Self {
         Self {
-            phi_threshold: 0.6,
             min_epistemic_weight: 0.1,
             kredit_base: 10000,
         }
@@ -550,12 +557,8 @@ impl Default for EpistemicLifecycleConfig {
 /// Integrated epistemic agent lifecycle manager
 pub struct IntegratedEpistemicLifecycle {
     config: EpistemicLifecycleConfig,
-    /// Phi measurement config
-    phi_config: PhiMeasurementConfig,
     /// Reward engine
     rewards: RewardEngine,
-    /// Output history for Phi measurement
-    output_vectors: Vec<Vec<f64>>,
 }
 
 impl IntegratedEpistemicLifecycle {
@@ -563,9 +566,7 @@ impl IntegratedEpistemicLifecycle {
     pub fn new(config: EpistemicLifecycleConfig) -> Self {
         Self {
             config,
-            phi_config: PhiMeasurementConfig::default(),
             rewards: RewardEngine::new(RewardConfig::default()),
-            output_vectors: vec![],
         }
     }
 
@@ -574,13 +575,14 @@ impl IntegratedEpistemicLifecycle {
         let agent_id = AgentId::generate();
         let k_vector = KVector::new_participant();
         let trust = k_vector.trust_score();
-        let kredit_cap = (calculate_kredit_from_trust(trust as f64) * self.config.kredit_base as f64) as u64;
+        let kredit_multiplier = calculate_kredit_from_trust(trust);
+        let kredit_cap = kredit_multiplier * self.config.kredit_base;
 
         InstrumentalActor {
             agent_id,
             sponsor_did: sponsor_did.to_string(),
             agent_class,
-            kredit_balance: (kredit_cap / 2) as i64, // Start with half cap
+            kredit_balance: (kredit_cap / 2) as i64,
             kredit_cap,
             constraints: AgentConstraints::default(),
             behavior_log: vec![],
@@ -601,14 +603,14 @@ impl IntegratedEpistemicLifecycle {
 
     /// Process an agent output through the full epistemic pipeline
     pub fn process_output(
-        &mut self,
+        &self,
         agent: &mut InstrumentalActor,
         content: OutputContent,
     ) -> Result<OutputProcessingResult, IntegrationError> {
-        let agent_id = agent.agent_id.as_str();
+        let agent_id = agent.agent_id.as_str().to_string();
 
         // Build and classify output
-        let output = AgentOutputBuilder::new(agent_id)
+        let output = AgentOutputBuilder::new(&agent_id)
             .content(content)
             .classification(
                 EmpiricalLevel::E1Testimonial,
@@ -618,7 +620,7 @@ impl IntegratedEpistemicLifecycle {
             )
             .confidence(0.8)
             .build()
-            .map_err(|e| IntegrationError::ClassificationError(e))?;
+            .map_err(|e: &str| IntegrationError::ClassificationError(e.to_string()))?;
 
         // Calculate epistemic weight
         let weight = calculate_epistemic_weight(&output.classification);
@@ -626,54 +628,23 @@ impl IntegratedEpistemicLifecycle {
         // Record output on agent
         agent.record_output(&output);
 
-        // Convert output to vector for Phi measurement
-        let output_vector = self.output_to_vector(&output);
-        self.output_vectors.push(output_vector);
-
-        // Measure Phi if we have enough outputs
-        let phi_result = if self.output_vectors.len() >= 3 {
-            let phi = measure_phi_simple(&self.output_vectors);
-            Some(phi)
-        } else {
-            None
-        };
-
-        // Check coherence for high-stakes actions
-        let coherence_ok = if let Some(phi) = phi_result {
-            let check = check_coherence_for_action(
-                phi,
-                &self.phi_config,
-                true, // high stakes
-            );
-            check.can_proceed
-        } else {
-            true // Allow if we don't have enough data yet
-        };
-
         // Update K-Vector based on epistemic weight
         if weight >= self.config.min_epistemic_weight {
-            // Increase k_r (reputation) based on output quality
             let delta = weight * 0.01;
             agent.k_vector.k_r = (agent.k_vector.k_r + delta).clamp(0.0, 1.0);
-
-            // Update k_phi if we have Phi measurement
-            if let Some(phi) = phi_result {
-                agent.k_vector.k_phi = phi as f32;
-            }
         }
 
         // Recalculate KREDIT cap
         let trust = agent.k_vector.trust_score();
-        agent.kredit_cap = (calculate_kredit_from_trust(trust as f64) * self.config.kredit_base as f64) as u64;
+        let kredit_multiplier = calculate_kredit_from_trust(trust);
+        agent.kredit_cap = kredit_multiplier * self.config.kredit_base;
 
         // Calculate reward
-        let reward = self.rewards.calculate_participation_reward(agent_id, trust as f64);
+        let reward = self.rewards.calculate_participation_reward(&agent_id, trust as f64);
 
         Ok(OutputProcessingResult {
             output_id: output.output_id,
             epistemic_weight: weight,
-            phi: phi_result,
-            coherence_ok,
             trust_delta: weight * 0.01,
             new_trust: trust as f64,
             new_kredit_cap: agent.kredit_cap,
@@ -681,20 +652,9 @@ impl IntegratedEpistemicLifecycle {
         })
     }
 
-    fn output_to_vector(&self, output: &AgentOutput) -> Vec<f64> {
-        // Convert epistemic classification to feature vector
-        vec![
-            output.classification.empirical as u8 as f64 / 4.0,
-            output.classification.normative as u8 as f64 / 3.0,
-            output.classification.materiality as u8 as f64 / 3.0,
-            output.classification.harmonic.map(|h| h as u8 as f64 / 4.0).unwrap_or(0.0),
-            output.classification_confidence as f64,
-        ]
-    }
-
     /// Verify an agent's output and update trust accordingly
     pub fn verify_output(
-        &mut self,
+        &self,
         agent: &mut InstrumentalActor,
         output_id: &str,
         correct: bool,
@@ -718,20 +678,25 @@ impl IntegratedEpistemicLifecycle {
 
         // Update KREDIT cap
         let trust = agent.k_vector.trust_score();
-        agent.kredit_cap = (calculate_kredit_from_trust(trust as f64) * self.config.kredit_base as f64) as u64;
+        let kredit_multiplier = calculate_kredit_from_trust(trust);
+        agent.kredit_cap = kredit_multiplier * self.config.kredit_base;
     }
 }
 
 /// Result of processing an agent output
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutputProcessingResult {
+    /// Unique output identifier.
     pub output_id: String,
+    /// Epistemic weight assigned to the output.
     pub epistemic_weight: f32,
-    pub phi: Option<f64>,
-    pub coherence_ok: bool,
+    /// Trust change from this output.
     pub trust_delta: f32,
+    /// Agent's trust score after processing.
     pub new_trust: f64,
+    /// Updated KREDIT cap.
     pub new_kredit_cap: u64,
+    /// KREDIT reward earned.
     pub reward: u64,
 }
 
@@ -757,9 +722,6 @@ pub enum IntegrationError {
 
     #[error("Classification error: {0}")]
     ClassificationError(String),
-
-    #[error("Verification error: {0}")]
-    VerificationError(String),
 }
 
 // ============================================================================
@@ -804,8 +766,8 @@ mod tests {
 
         let result = pipeline.process_attestation("agent-1", "agent-2", 0.8).unwrap();
 
-        assert!(result.new_trust >= result.old_trust, "Trust should increase after positive attestation");
-        assert!(result.new_kredit_cap > 0, "KREDIT cap should be positive");
+        assert!(result.new_trust >= result.old_trust);
+        assert!(result.new_kredit_cap > 0);
     }
 
     #[test]
@@ -813,13 +775,11 @@ mod tests {
         let config = TrustPipelineConfig::default();
         let mut pipeline = IntegratedTrustPipeline::new(config);
 
-        // Create chain of agents
         for i in 0..5 {
             let agent = create_test_agent(&format!("agent-{}", i));
             pipeline.register_agent(agent);
         }
 
-        // Create attestation chain
         for i in 0..4 {
             let _ = pipeline.process_attestation(
                 &format!("agent-{}", i),
@@ -828,9 +788,8 @@ mod tests {
             );
         }
 
-        // Apply shock and verify cascade
         let result = pipeline.simulate_cascade("agent-0", 0.5);
-        assert!(result.agents_affected > 0, "Cascade should affect agents");
+        assert!(result.agents_affected > 0);
     }
 
     #[test]
@@ -842,8 +801,6 @@ mod tests {
         pipeline.register_agent(agent);
 
         let results = pipeline.verify_invariants();
-
-        // All invariants should hold for valid agent
         for result in &results {
             assert!(result.holds, "Invariant {} should hold", result.invariant_id);
         }
@@ -856,17 +813,12 @@ mod tests {
 
         let trust_scores = vec![0.5, 0.6, 0.7, 0.4, 0.55, 0.65];
         let phi_values = vec![0.7, 0.65];
-        let threat_level = 0.1;
 
-        let result = analytics.analyze_and_display(&trust_scores, &phi_values, threat_level);
+        let result = analytics.analyze_and_display(&trust_scores, &phi_values, 0.1);
+        assert!(result.is_ok());
 
-        assert!(result.is_ok(), "Analysis should succeed");
         let result = result.unwrap();
-
-        // Private mean should be in reasonable range
         assert!(result.distribution.mean > 0.0 && result.distribution.mean < 1.0);
-
-        // Should have remaining budget
         assert!(result.remaining_budget.0 > 0.0);
     }
 
@@ -877,20 +829,19 @@ mod tests {
 
         let agent = lifecycle.create_agent("did:test:sponsor", AgentClass::Supervised);
 
-        assert!(agent.kredit_cap > 0, "New agent should have KREDIT cap");
-        assert!(agent.kredit_balance > 0, "New agent should have initial KREDIT");
+        assert!(agent.kredit_cap > 0);
+        assert!(agent.kredit_balance > 0);
         assert_eq!(agent.status, AgentStatus::Active);
     }
 
     #[test]
     fn test_epistemic_lifecycle_output() {
         let config = EpistemicLifecycleConfig::default();
-        let mut lifecycle = IntegratedEpistemicLifecycle::new(config);
+        let lifecycle = IntegratedEpistemicLifecycle::new(config);
 
         let mut agent = lifecycle.create_agent("did:test:sponsor", AgentClass::Supervised);
         let initial_trust = agent.k_vector.trust_score();
 
-        // Process several outputs
         for i in 0..5 {
             let result = lifecycle.process_output(
                 &mut agent,
@@ -899,22 +850,18 @@ mod tests {
             assert!(result.is_ok());
         }
 
-        // Trust should have increased
         let final_trust = agent.k_vector.trust_score();
-        assert!(final_trust >= initial_trust, "Trust should not decrease for valid outputs");
-
-        // Should have outputs recorded
+        assert!(final_trust >= initial_trust);
         assert!(agent.epistemic_stats.total_outputs >= 5);
     }
 
     #[test]
     fn test_epistemic_lifecycle_verification() {
         let config = EpistemicLifecycleConfig::default();
-        let mut lifecycle = IntegratedEpistemicLifecycle::new(config);
+        let lifecycle = IntegratedEpistemicLifecycle::new(config);
 
         let mut agent = lifecycle.create_agent("did:test:sponsor", AgentClass::Supervised);
 
-        // Process output
         let result = lifecycle.process_output(
             &mut agent,
             OutputContent::Text("Test output".to_string()),
@@ -922,12 +869,10 @@ mod tests {
 
         let initial_trust = agent.k_vector.trust_score();
 
-        // Verify as correct
         lifecycle.verify_output(&mut agent, &result.output_id, true);
         let trust_after_correct = agent.k_vector.trust_score();
-        assert!(trust_after_correct > initial_trust, "Trust should increase after correct verification");
+        assert!(trust_after_correct > initial_trust);
 
-        // Verify another as incorrect
         let result2 = lifecycle.process_output(
             &mut agent,
             OutputContent::Text("Another output".to_string()),
@@ -935,49 +880,40 @@ mod tests {
 
         lifecycle.verify_output(&mut agent, &result2.output_id, false);
         let trust_after_incorrect = agent.k_vector.trust_score();
-        assert!(trust_after_incorrect < trust_after_correct, "Trust should decrease after incorrect verification");
+        assert!(trust_after_incorrect < trust_after_correct);
     }
 
     #[test]
     fn test_full_integration_flow() {
-        // Create all systems
         let mut trust_pipeline = IntegratedTrustPipeline::new(TrustPipelineConfig::default());
-        let _attack_response = IntegratedAttackResponse::new(AttackResponseConfig::default());
         let mut privacy_analytics = IntegratedPrivacyAnalytics::new(PrivacyAnalyticsConfig::default());
         let epistemic_lifecycle = IntegratedEpistemicLifecycle::new(EpistemicLifecycleConfig::default());
 
-        // Create agents
         let agent1 = epistemic_lifecycle.create_agent("did:sponsor:1", AgentClass::Supervised);
         let agent2 = epistemic_lifecycle.create_agent("did:sponsor:2", AgentClass::Supervised);
 
-        // Register in trust pipeline
         trust_pipeline.register_agent(agent1.clone());
         trust_pipeline.register_agent(agent2.clone());
 
-        // Process attestation
         let attest_result = trust_pipeline.process_attestation(
             agent1.agent_id.as_str(),
             agent2.agent_id.as_str(),
             0.9,
         ).unwrap();
 
-        // Collect trust scores for privacy analytics
         let trust_scores: Vec<f64> = trust_pipeline.agents()
             .values()
             .map(|a| a.k_vector.trust_score() as f64)
             .collect();
 
-        // Analyze with privacy
         let analytics_result = privacy_analytics.analyze_and_display(
             &trust_scores,
             &[0.7],
             0.1,
         ).unwrap();
 
-        // Verify invariants
         let invariant_results = trust_pipeline.verify_invariants();
 
-        // All systems worked together
         assert!(attest_result.new_trust > 0.0);
         assert!(analytics_result.distribution.mean > 0.0);
         assert!(invariant_results.iter().all(|r| r.holds));
