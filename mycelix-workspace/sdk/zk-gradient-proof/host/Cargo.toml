@@ -1,0 +1,13 @@
+[package]
+name = "zk-gradient-host"
+version = "0.1.0"
+edition = "2021"
+description = "Host prover and verifier for gradient quality proofs"
+
+[dependencies]
+zk-gradient-methods = { path = "../methods" }
+zk-gradient-core = { path = "../core" }
+risc0-zkvm = "2.3.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

@@ -1,0 +1,65 @@
+{
+  "name": "@mycelix/zk-tax",
+  "version": "0.1.0",
+  "description": "Zero-knowledge tax bracket proofs for privacy-preserving compliance",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "wasm"
+  ],
+  "scripts": {
+    "build": "npm run build:wasm && npm run build:ts",
+    "build:wasm": "cd .. && wasm-pack build --target web --out-dir ts/wasm",
+    "build:ts": "tsup src/index.ts --format cjs,esm --dts",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "zkp",
+    "zero-knowledge",
+    "tax",
+    "privacy",
+    "compliance",
+    "wasm",
+    "risc0"
+  ],
+  "author": "Luminous Dynamics <dev@luminousdynamics.org>",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Luminous-Dynamics/mycelix.git",
+    "directory": "mycelix-workspace/sdk/zk-tax/ts"
+  },
+  "bugs": {
+    "url": "https://github.com/Luminous-Dynamics/mycelix/issues"
+  },
+  "homepage": "https://github.com/Luminous-Dynamics/mycelix/tree/main/mycelix-workspace/sdk/zk-tax",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.30",
+    "eslint": "^8.57.1",
+    "prettier": "^3.8.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.1"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./wasm": {
+      "import": "./wasm/mycelix_zk_tax.js",
+      "types": "./wasm/mycelix_zk_tax.d.ts"
+    }
+  },
+  "sideEffects": false
+}

@@ -1,0 +1,146 @@
+[package]
+name = "mycelix-zk-tax"
+version = "0.1.0"
+edition = "2021"
+description = "Zero-knowledge tax bracket proofs for privacy-preserving compliance"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Luminous-Dynamics/mycelix"
+keywords = ["zkp", "privacy", "tax", "compliance", "risc0"]
+categories = ["cryptography", "wasm"]
+readme = "README.md"
+authors = ["Luminous Dynamics <dev@luminousdynamics.org>"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# =============================================================================
+# SECURITY CRITICAL: Feature Configuration (FIND-002 mitigation)
+# =============================================================================
+#
+# For PRODUCTION builds:
+#   cargo build --release --features prover
+#
+# For TESTING only (NO cryptographic guarantees):
+#   cargo test --features std
+#   (without 'prover' feature, only simulation mode is available)
+#
+# WARNING: Never deploy without 'prover' feature enabled!
+# =============================================================================
+
+default = ["std", "prover"]
+# Standard library (enabled by default)
+std = ["serde/std", "thiserror", "hex/std"]
+# no_std support (requires alloc)
+alloc = ["serde/alloc", "hex/alloc"]
+# RISC-0 prover for PRODUCTION ZK proofs (cryptographically secure)
+prover = ["std", "risc0-zkvm", "zk-tax-methods"]
+# Verifier-only mode (can verify proofs but not generate them)
+verifier-only = []
+wasm = ["alloc", "wasm-bindgen", "console_error_panic_hook", "getrandom/js", "serde-wasm-bindgen"]
+# GPU acceleration (10-20x faster proofs)
+cuda = ["risc0-zkvm/cuda"]
+metal = ["risc0-zkvm/metal"]
+# CLI tool
+cli = ["std", "clap", "indicatif", "colored"]
+# HTTP server
+server = ["std", "axum", "tower-http", "tokio"]
+# Blockchain anchoring
+anchoring = ["std"]
+# Business entity support
+entity = ["std"]
+# Service layer (rate limiting, caching)
+service = ["std"]
+# Proof aggregation
+aggregation = ["std"]
+# Observability
+tracing-support = ["std", "tracing", "tracing-subscriber"]
+# Property-based testing (for dev)
+proptest = ["dep:proptest"]
+# Benchmarking
+bench = ["criterion"]
+# All features for development
+full = ["prover", "cli", "server", "anchoring", "entity", "service", "aggregation", "tracing-support"]
+
+[dependencies]
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+thiserror = { version = "1.0", optional = true }
+hex = { version = "0.4", default-features = false }
+base64 = { version = "0.21", default-features = false, features = ["alloc"] }
+
+# no_std compatible error handling
+derive_more = { version = "0.99", default-features = false, features = ["display", "from"] }
+
+# Risc0 (optional, for proving)
+risc0-zkvm = { version = "^3.0.4", optional = true }
+
+# Methods crate (optional, for proving)
+zk-tax-methods = { path = "methods", optional = true }
+
+# WASM support (optional)
+wasm-bindgen = { version = "0.2", optional = true }
+console_error_panic_hook = { version = "0.1", optional = true }
+getrandom = { version = "0.2", optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+
+# For commitment hashing
+sha3 = "0.10"
+sha2 = "0.10"
+
+# For global cache
+lazy_static = "1.4"
+
+# For binary serialization
+bincode = "1.3"
+
+# CLI dependencies (optional)
+clap = { version = "4.4", features = ["derive"], optional = true }
+indicatif = { version = "0.17", optional = true }
+colored = { version = "2.0", optional = true }
+
+# HTTP server dependencies (optional)
+axum = { version = "0.7", features = ["macros"], optional = true }
+tower-http = { version = "0.5", features = ["cors", "trace"], optional = true }
+tokio = { version = "1.35", features = ["full"], optional = true }
+
+# Observability (optional)
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"], optional = true }
+
+# Property-based testing (optional)
+proptest = { version = "1.4", optional = true }
+
+# Benchmarking (optional)
+criterion = { version = "0.5", features = ["html_reports"], optional = true }
+
+[[bin]]
+name = "zk-tax"
+path = "src/bin/zk-tax.rs"
+required-features = ["cli", "prover"]
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+criterion = { version = "0.5", features = ["html_reports"] }
+proptest = "1.4"
+tokio-test = "0.4"
+
+[[bench]]
+name = "proof_generation"
+harness = false
+
+[[test]]
+name = "property_tests"
+path = "tests/property_tests.rs"
+
+[[example]]
+name = "axum_server"
+path = "examples/axum_server.rs"
+required-features = ["server", "prover"]
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-O3", "--enable-mutable-globals"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

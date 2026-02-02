@@ -1,0 +1,240 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # =============================================================================
+  # Formatting & Linting
+  # =============================================================================
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+
+  # =============================================================================
+  # Tests
+  # =============================================================================
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run tests
+        run: cargo test --all-features
+
+      - name: Run tests (no default features)
+        run: cargo test --no-default-features --features alloc
+
+  test-features:
+    name: Test Features
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - ""
+          - "prover"
+          - "verifier-only"
+          - "cli"
+          - "server"
+          - "anchoring"
+          - "entity"
+          - "service"
+          - "aggregation"
+          - "tracing-support"
+          - "full"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test with features ${{ matrix.features }}
+        run: cargo test --features "${{ matrix.features }}"
+
+  property-tests:
+    name: Property Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run property tests
+        run: cargo test --test property_tests --features proptest
+        env:
+          PROPTEST_CASES: 1000
+
+  # =============================================================================
+  # WASM Build
+  # =============================================================================
+  wasm:
+    name: WASM Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Build WASM
+        run: wasm-pack build --target web --out-dir pkg
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-pkg
+          path: pkg/
+
+  # =============================================================================
+  # Python Bindings
+  # =============================================================================
+  python:
+    name: Python Bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install maturin
+        run: pip install maturin
+
+      - name: Build Python wheel
+        run: |
+          cd python
+          maturin build --release
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-wheel
+          path: python/target/wheels/*.whl
+
+  # =============================================================================
+  # Documentation
+  # =============================================================================
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build docs
+        run: cargo doc --all-features --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+      - name: Upload docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs
+          path: target/doc/
+
+  # =============================================================================
+  # Security Audit
+  # =============================================================================
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  # =============================================================================
+  # Coverage
+  # =============================================================================
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Generate coverage
+        run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          fail_ci_if_error: false
+
+  # =============================================================================
+  # MSRV Check
+  # =============================================================================
+  msrv:
+    name: MSRV (1.75.0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.75.0
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --all-features
+
+  # =============================================================================
+  # Benchmarks (only on main)
+  # =============================================================================
+  bench:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Run benchmarks
+        run: cargo bench --features prover -- --noplot
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmarks
+          path: target/criterion/

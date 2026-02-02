@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZK Tax Proof Demo</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --bg: #0f172a;
+            --card: #1e293b;
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, var(--primary), #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 1.1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card h2 {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            color: var(--muted);
+            margin-bottom: 0.5rem;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.2);
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        button {
+            width: 100%;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            background: var(--primary);
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: var(--primary-dark);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .proof-result {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            margin-top: 1rem;
+        }
+
+        .proof-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .status.verified {
+            color: var(--success);
+        }
+
+        .status.dev-mode {
+            color: var(--warning);
+        }
+
+        .bracket-display {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .bracket-item {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 0.5rem;
+        }
+
+        .bracket-item .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .bracket-item .label {
+            font-size: 0.75rem;
+            color: var(--muted);
+            margin-top: 0.25rem;
+        }
+
+        .brackets-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .bracket-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .bracket-row:hover {
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .bracket-row.active {
+            background: rgba(99, 102, 241, 0.2);
+            border-left: 3px solid var(--primary);
+        }
+
+        .commitment {
+            font-family: monospace;
+            font-size: 0.75rem;
+            word-break: break-all;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+            color: var(--muted);
+        }
+
+        .jurisdictions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 0.5rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .jurisdiction-chip {
+            padding: 0.5rem;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 0.5rem;
+            text-align: center;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .jurisdiction-chip:hover {
+            background: rgba(99, 102, 241, 0.3);
+        }
+
+        .jurisdiction-chip.selected {
+            background: var(--primary);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(99, 102, 241, 0.3);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            color: var(--muted);
+            font-size: 0.875rem;
+        }
+
+        footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 ZK Tax Proof Demo</h1>
+            <p class="subtitle">Prove your tax bracket without revealing your income</p>
+        </header>
+
+        <div class="grid">
+            <!-- Proof Generator -->
+            <div class="card">
+                <h2>📝 Generate Proof</h2>
+
+                <div class="form-group">
+                    <label for="income">Income (Private - Never Revealed)</label>
+                    <input type="number" id="income" value="85000" min="0" step="1000">
+                </div>
+
+                <div class="form-group">
+                    <label for="jurisdiction">Jurisdiction</label>
+                    <select id="jurisdiction">
+                        <option value="US">🇺🇸 United States</option>
+                        <option value="UK">🇬🇧 United Kingdom</option>
+                        <option value="DE">🇩🇪 Germany</option>
+                        <option value="FR">🇫🇷 France</option>
+                        <option value="CA">🇨🇦 Canada</option>
+                        <option value="AU">🇦🇺 Australia</option>
+                        <option value="JP">🇯🇵 Japan</option>
+                        <option value="CH">🇨🇭 Switzerland</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="filingStatus">Filing Status</label>
+                    <select id="filingStatus">
+                        <option value="single">Single</option>
+                        <option value="mfj">Married Filing Jointly</option>
+                        <option value="mfs">Married Filing Separately</option>
+                        <option value="hoh">Head of Household</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="taxYear">Tax Year</label>
+                    <select id="taxYear">
+                        <option value="2024" selected>2024</option>
+                        <option value="2023">2023</option>
+                        <option value="2022">2022</option>
+                    </select>
+                </div>
+
+                <button id="generateBtn" onclick="generateProof()">
+                    🔒 Generate ZK Proof
+                </button>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>Generating proof...</p>
+                </div>
+
+                <div class="proof-result" id="proofResult" style="display: none;">
+                    <div class="proof-header">
+                        <strong>Proof Generated</strong>
+                        <span class="status verified" id="proofStatus">
+                            ✓ Verified
+                        </span>
+                    </div>
+
+                    <div class="bracket-display">
+                        <div class="bracket-item">
+                            <div class="value" id="bracketIndex">-</div>
+                            <div class="label">Bracket Index</div>
+                        </div>
+                        <div class="bracket-item">
+                            <div class="value" id="taxRate">-</div>
+                            <div class="label">Marginal Rate</div>
+                        </div>
+                        <div class="bracket-item">
+                            <div class="value" id="bracketLower">-</div>
+                            <div class="label">Lower Bound</div>
+                        </div>
+                        <div class="bracket-item">
+                            <div class="value" id="bracketUpper">-</div>
+                            <div class="label">Upper Bound</div>
+                        </div>
+                    </div>
+
+                    <div class="commitment" id="commitment">
+                        Commitment: Loading...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bracket Viewer -->
+            <div class="card">
+                <h2>📊 Tax Brackets</h2>
+
+                <div class="brackets-list" id="bracketsList">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Supported Jurisdictions -->
+        <div class="card" style="margin-top: 2rem;">
+            <h2>🌍 58 Supported Jurisdictions</h2>
+            <div class="jurisdictions-grid" id="jurisdictionsGrid">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+
+        <footer>
+            <p>
+                Built with <a href="https://github.com/Luminous-Dynamics/mycelix">Mycelix ZK-Tax SDK</a> |
+                Powered by <a href="https://risczero.com">RISC Zero</a> zkVM
+            </p>
+            <p style="margin-top: 0.5rem;">
+                ⚠️ Demo uses dev mode proofs (not cryptographically secure)
+            </p>
+        </footer>
+    </div>
+
+    <script type="module">
+        // Import WASM module
+        import init, {
+            prove_bracket,
+            verify_proof,
+            get_brackets,
+            get_jurisdictions,
+            get_proof_info
+        } from './pkg/mycelix_zk_tax.js';
+
+        // Initialize WASM
+        let wasmReady = false;
+        let jurisdictions = [];
+
+        async function initWasm() {
+            try {
+                await init();
+                wasmReady = true;
+                jurisdictions = get_jurisdictions();
+                populateJurisdictions();
+                updateBrackets();
+                console.log('WASM initialized successfully');
+            } catch (e) {
+                console.error('Failed to initialize WASM:', e);
+                // Fallback to mock data for demo
+                populateMockData();
+            }
+        }
+
+        function populateJurisdictions() {
+            const grid = document.getElementById('jurisdictionsGrid');
+            const byRegion = {};
+
+            jurisdictions.forEach(j => {
+                if (!byRegion[j.region]) byRegion[j.region] = [];
+                byRegion[j.region].push(j);
+            });
+
+            let html = '';
+            for (const [region, countries] of Object.entries(byRegion)) {
+                countries.forEach(j => {
+                    html += `<div class="jurisdiction-chip" onclick="selectJurisdiction('${j.code}')" title="${j.name}">${j.code}</div>`;
+                });
+            }
+            grid.innerHTML = html;
+        }
+
+        function populateMockData() {
+            // Fallback mock jurisdictions
+            const mockJurisdictions = [
+                {code: 'US', name: 'United States', region: 'Americas'},
+                {code: 'UK', name: 'United Kingdom', region: 'Europe'},
+                {code: 'DE', name: 'Germany', region: 'Europe'},
+                // ... more could be added
+            ];
+
+            const grid = document.getElementById('jurisdictionsGrid');
+            grid.innerHTML = mockJurisdictions.map(j =>
+                `<div class="jurisdiction-chip" onclick="selectJurisdiction('${j.code}')">${j.code}</div>`
+            ).join('');
+        }
+
+        window.selectJurisdiction = function(code) {
+            document.getElementById('jurisdiction').value = code;
+            updateBrackets();
+        };
+
+        window.updateBrackets = function() {
+            const jurisdiction = document.getElementById('jurisdiction').value;
+            const taxYear = parseInt(document.getElementById('taxYear').value);
+            const filingStatus = document.getElementById('filingStatus').value;
+            const income = parseInt(document.getElementById('income').value) || 0;
+
+            if (!wasmReady) {
+                // Show mock brackets
+                showMockBrackets(jurisdiction, income);
+                return;
+            }
+
+            try {
+                const brackets = get_brackets(jurisdiction, taxYear, filingStatus);
+                const list = document.getElementById('bracketsList');
+
+                list.innerHTML = brackets.map((b, i) => {
+                    const isActive = income >= b.lower && income <= b.upper;
+                    const upper = b.upper === 18446744073709551615 ? '∞' : `$${b.upper.toLocaleString()}`;
+                    return `
+                        <div class="bracket-row ${isActive ? 'active' : ''}">
+                            <span>Bracket ${i}: $${b.lower.toLocaleString()} - ${upper}</span>
+                            <span>${b.rate_percent}%</span>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Failed to get brackets:', e);
+            }
+        };
+
+        function showMockBrackets(jurisdiction, income) {
+            const mockBrackets = {
+                US: [
+                    {lower: 0, upper: 11600, rate: 10},
+                    {lower: 11600, upper: 47150, rate: 12},
+                    {lower: 47150, upper: 100525, rate: 22},
+                    {lower: 100525, upper: 191950, rate: 24},
+                    {lower: 191950, upper: 243725, rate: 32},
+                    {lower: 243725, upper: 609350, rate: 35},
+                    {lower: 609350, upper: Infinity, rate: 37},
+                ]
+            };
+
+            const brackets = mockBrackets[jurisdiction] || mockBrackets.US;
+            const list = document.getElementById('bracketsList');
+
+            list.innerHTML = brackets.map((b, i) => {
+                const isActive = income >= b.lower && income <= b.upper;
+                const upper = b.upper === Infinity ? '∞' : `$${b.upper.toLocaleString()}`;
+                return `
+                    <div class="bracket-row ${isActive ? 'active' : ''}">
+                        <span>Bracket ${i}: $${b.lower.toLocaleString()} - ${upper}</span>
+                        <span>${b.rate}%</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        window.generateProof = async function() {
+            const btn = document.getElementById('generateBtn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('proofResult');
+
+            btn.disabled = true;
+            loading.classList.add('active');
+            result.style.display = 'none';
+
+            const income = parseInt(document.getElementById('income').value);
+            const jurisdiction = document.getElementById('jurisdiction').value;
+            const filingStatus = document.getElementById('filingStatus').value;
+            const taxYear = parseInt(document.getElementById('taxYear').value);
+
+            try {
+                if (!wasmReady) {
+                    // Simulate proof generation
+                    await new Promise(r => setTimeout(r, 500));
+                    showMockProof(income, jurisdiction);
+                } else {
+                    const proof = prove_bracket(income, jurisdiction, filingStatus, taxYear);
+                    const info = get_proof_info(proof);
+
+                    document.getElementById('bracketIndex').textContent = info.bracket_index;
+                    document.getElementById('taxRate').textContent = `${info.rate_percent}%`;
+                    document.getElementById('bracketLower').textContent = `$${info.bracket_lower.toLocaleString()}`;
+                    document.getElementById('bracketUpper').textContent = info.bracket_upper === 18446744073709551615 ? '∞' : `$${info.bracket_upper.toLocaleString()}`;
+                    document.getElementById('commitment').textContent = `Commitment: ${info.commitment}`;
+
+                    const status = document.getElementById('proofStatus');
+                    if (info.is_dev_mode) {
+                        status.className = 'status dev-mode';
+                        status.innerHTML = '⚠️ Dev Mode';
+                    } else {
+                        status.className = 'status verified';
+                        status.innerHTML = '✓ Verified';
+                    }
+                }
+
+                result.style.display = 'block';
+            } catch (e) {
+                console.error('Proof generation failed:', e);
+                alert('Failed to generate proof: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                loading.classList.remove('active');
+            }
+        };
+
+        function showMockProof(income, jurisdiction) {
+            // Mock proof for demo
+            const mockBrackets = {
+                US: [{l: 0, u: 11600, r: 10}, {l: 11600, u: 47150, r: 12}, {l: 47150, u: 100525, r: 22}, {l: 100525, u: 191950, r: 24}]
+            };
+
+            const brackets = mockBrackets[jurisdiction] || mockBrackets.US;
+            const bracket = brackets.find(b => income >= b.l && income <= b.u) || brackets[brackets.length - 1];
+            const idx = brackets.indexOf(bracket);
+
+            document.getElementById('bracketIndex').textContent = idx;
+            document.getElementById('taxRate').textContent = `${bracket.r}%`;
+            document.getElementById('bracketLower').textContent = `$${bracket.l.toLocaleString()}`;
+            document.getElementById('bracketUpper').textContent = bracket.u === Infinity ? '∞' : `$${bracket.u.toLocaleString()}`;
+            document.getElementById('commitment').textContent = `Commitment: 0x${Array(64).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)).join('')}`;
+
+            const status = document.getElementById('proofStatus');
+            status.className = 'status dev-mode';
+            status.innerHTML = '⚠️ Demo Mode';
+        }
+
+        // Event listeners
+        document.getElementById('income').addEventListener('input', updateBrackets);
+        document.getElementById('jurisdiction').addEventListener('change', updateBrackets);
+        document.getElementById('taxYear').addEventListener('change', updateBrackets);
+        document.getElementById('filingStatus').addEventListener('change', updateBrackets);
+
+        // Initialize
+        initWasm();
+    </script>
+</body>
+</html>

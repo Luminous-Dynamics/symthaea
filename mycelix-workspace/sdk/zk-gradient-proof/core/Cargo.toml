@@ -1,0 +1,8 @@
+[package]
+name = "zk-gradient-core"
+version = "0.1.0"
+edition = "2021"
+description = "Shared types for ZK gradient proof verification"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }

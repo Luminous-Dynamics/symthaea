@@ -1,0 +1,14 @@
+[package]
+name = "mycelix-zkproof-methods"
+version = "0.1.0"
+edition = "2021"
+description = "RISC-0 guest programs for Mycelix ZK proofs"
+
+[build-dependencies]
+# risc0-build is optional - only needed when building real guest programs
+risc0-build = { version = "2.3.2", optional = true }
+
+[features]
+default = []
+# Enable to build real RISC-0 guest programs (requires toolchain)
+risc0-build = ["dep:risc0-build"]

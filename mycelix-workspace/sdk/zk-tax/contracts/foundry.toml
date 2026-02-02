@@ -1,0 +1,29 @@
+[profile.default]
+src = "."
+out = "out"
+libs = ["lib"]
+solc = "0.8.20"
+
+# Optimizer
+optimizer = true
+optimizer_runs = 200
+
+# Contract verification
+etherscan_api_key = "${ETHERSCAN_API_KEY}"
+
+[profile.default.fmt]
+bracket_spacing = true
+int_types = "long"
+line_length = 120
+multiline_func_header = "attributes_first"
+quote_style = "double"
+tab_width = 4
+wrap_comments = true
+
+[rpc_endpoints]
+mainnet = "${ETH_RPC_URL}"
+sepolia = "${SEPOLIA_RPC_URL}"
+
+[etherscan]
+mainnet = { key = "${ETHERSCAN_API_KEY}" }
+sepolia = { key = "${ETHERSCAN_API_KEY}" }
