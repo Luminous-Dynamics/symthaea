@@ -9,6 +9,7 @@ name = "registry"
 
 [dependencies]
 getrandom = { workspace = true }
+getrandom_03 = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }

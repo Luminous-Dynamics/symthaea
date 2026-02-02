@@ -29,6 +29,7 @@ derive_more = "0.99"
 
 # WASM compatibility - getrandom 0.2 with "js" feature for Holochain WASM runtime
 getrandom = { version = "0.2", features = ["js"] }
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
 
 [profile.dev]
 opt-level = "z"
