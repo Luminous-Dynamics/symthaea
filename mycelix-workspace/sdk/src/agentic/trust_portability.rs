@@ -65,10 +65,12 @@ impl Default for PortabilityConfig {
 pub struct ChainId(pub String);
 
 impl ChainId {
+    /// Create a new chain identifier.
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
     }
 
+    /// Return the identifier as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -157,16 +159,26 @@ pub struct PortableTrust {
 /// K-Vector dimensions for selective export
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum KVectorDimension {
-    Reputation,      // k_r
-    Activity,        // k_a
-    Integrity,       // k_i
-    Performance,     // k_p
-    Margin,          // k_m
-    Stake,           // k_s
-    History,         // k_h
-    Topology,        // k_topo
-    Validity,        // k_v
-    Phi,             // k_phi
+    /// Reputation dimension (k_r).
+    Reputation,
+    /// Activity dimension (k_a).
+    Activity,
+    /// Integrity dimension (k_i).
+    Integrity,
+    /// Performance dimension (k_p).
+    Performance,
+    /// Margin dimension (k_m).
+    Margin,
+    /// Stake dimension (k_s).
+    Stake,
+    /// History dimension (k_h).
+    History,
+    /// Topology dimension (k_topo).
+    Topology,
+    /// Validity dimension (k_v).
+    Validity,
+    /// Composite Phi dimension (k_phi).
+    Phi,
 }
 
 /// Trust proof (portable)
@@ -213,8 +225,11 @@ pub struct ExportResult {
 /// Export status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ExportStatus {
+    /// Export is pending confirmation.
     Pending,
+    /// Export confirmed on source chain.
     Confirmed,
+    /// Export failed.
     Failed,
 }
 
@@ -236,9 +251,13 @@ pub struct ImportResult {
 /// Import status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ImportStatus {
+    /// Import verified and applied.
     Verified,
+    /// Import pending verification.
     Pending,
+    /// Import rejected.
     Rejected,
+    /// Import package expired.
     Expired,
 }
 
@@ -281,13 +300,30 @@ pub trait BridgeAdapter {
 /// Bridge errors
 #[derive(Debug, Clone)]
 pub enum BridgeError {
-    ChainNotSupported(ChainId),
-    ProofTypeNotSupported(ProofType),
-    VerificationFailed(String),
+    /// Target chain is not supported.
+    ChainNotSupported(/// Chain ID.
+        ChainId),
+    /// Proof type not supported by target chain.
+    ProofTypeNotSupported(/// Proof type.
+        ProofType),
+    /// Proof verification failed.
+    VerificationFailed(/// Error message.
+        String),
+    /// Trust package has expired.
     PackageExpired,
-    InsufficientReputation { required: f64, actual: f64 },
-    NetworkError(String),
-    InvalidProof(String),
+    /// Source chain reputation is too low.
+    InsufficientReputation {
+        /// Required reputation.
+        required: f64,
+        /// Actual reputation.
+        actual: f64,
+    },
+    /// Network communication error.
+    NetworkError(/// Error message.
+        String),
+    /// Proof data is invalid.
+    InvalidProof(/// Error message.
+        String),
 }
 
 impl std::fmt::Display for BridgeError {
@@ -323,6 +359,7 @@ pub struct MockBridgeAdapter {
 }
 
 impl MockBridgeAdapter {
+    /// Create a new mock bridge adapter for testing.
     pub fn new(chain_id: &str, chain_type: ChainType) -> Self {
         Self {
             profile: ChainProfile {
@@ -620,9 +657,13 @@ impl PortabilityEngine {
 /// Portability statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PortabilityStats {
+    /// Number of registered chains.
     pub registered_chains: usize,
+    /// Number of pending exports.
     pub pending_exports: usize,
+    /// Number of completed imports.
     pub completed_imports: usize,
+    /// Total exports processed.
     pub total_exports: usize,
 }
 

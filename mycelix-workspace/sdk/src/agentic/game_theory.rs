@@ -80,28 +80,48 @@ pub struct StrategyAction {
 pub enum ActionType {
     /// Vote honestly based on true preference
     VoteHonest,
-    /// Vote strategically
-    VoteStrategic { target_outcome: String },
-    /// Attest honestly
+    /// Vote strategically.
+    VoteStrategic {
+        /// Desired outcome.
+        target_outcome: String,
+    },
+    /// Attest honestly.
     AttestHonest,
-    /// False attestation
-    AttestFalse { inflated_trust: f64 },
+    /// False attestation.
+    AttestFalse {
+        /// Inflated trust value.
+        inflated_trust: f64,
+    },
     /// Participate in consensus
     Participate,
     /// Abstain from participation
     Abstain,
-    /// Collude with others
-    Collude { partners: Vec<String> },
-    /// Sybil attack
-    CreateSybils { count: u32 },
-    /// Trust manipulation
-    ManipulateTrust { target_delta: f64 },
+    /// Collude with others.
+    Collude {
+        /// Partner agent IDs.
+        partners: Vec<String>,
+    },
+    /// Sybil attack.
+    CreateSybils {
+        /// Number of sybil identities to create.
+        count: u32,
+    },
+    /// Trust manipulation.
+    ManipulateTrust {
+        /// Desired trust change.
+        target_delta: f64,
+    },
     /// Cooperate
     Cooperate,
     /// Defect
     Defect,
-    /// Custom action
-    Custom { name: String, params: HashMap<String, f64> },
+    /// Custom action.
+    Custom {
+        /// Action name.
+        name: String,
+        /// Action parameters.
+        params: HashMap<String, f64>,
+    },
 }
 
 /// Conditions for taking an action
@@ -175,6 +195,7 @@ pub struct EquilibriumFinder {
 }
 
 impl EquilibriumFinder {
+    /// Create a new equilibrium finder for the given game.
     pub fn new(game: GameDefinition) -> Self {
         Self { game }
     }
@@ -369,6 +390,7 @@ pub struct IncentiveAnalyzer {
 }
 
 impl IncentiveAnalyzer {
+    /// Create a new incentive analyzer for the given game and honest strategy.
     pub fn new(game: GameDefinition, honest_strategy_id: String) -> Self {
         Self { game, honest_strategy_id }
     }

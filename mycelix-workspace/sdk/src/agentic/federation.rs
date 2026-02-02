@@ -71,10 +71,12 @@ impl Default for FederationConfig {
 pub struct SwarmId(pub String);
 
 impl SwarmId {
+    /// Create a new swarm identifier.
     pub fn new(id: impl Into<String>) -> Self {
         Self(id.into())
     }
 
+    /// Return the identifier as a string slice.
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -239,23 +241,45 @@ pub struct FederatedProposal {
 /// Types of federated proposals
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FederatedProposalType {
-    /// Add new swarm to federation
-    AddSwarm { swarm_id: SwarmId, profile: Box<SwarmProfile> },
-    /// Remove swarm from federation
-    RemoveSwarm { swarm_id: SwarmId, reason: String },
-    /// Update federation parameters
-    UpdateConfig { changes: FederationConfigChanges },
-    /// Emergency action
-    Emergency { action: EmergencyAction },
-    /// Custom proposal
-    Custom { data: Vec<u8> },
+    /// Add new swarm to federation.
+    AddSwarm {
+        /// ID of the swarm to add.
+        swarm_id: SwarmId,
+        /// Profile of the swarm to add.
+        profile: Box<SwarmProfile>,
+    },
+    /// Remove swarm from federation.
+    RemoveSwarm {
+        /// ID of the swarm to remove.
+        swarm_id: SwarmId,
+        /// Reason for removal.
+        reason: String,
+    },
+    /// Update federation parameters.
+    UpdateConfig {
+        /// Proposed configuration changes.
+        changes: FederationConfigChanges,
+    },
+    /// Emergency action.
+    Emergency {
+        /// The emergency action to execute.
+        action: EmergencyAction,
+    },
+    /// Custom proposal with opaque data.
+    Custom {
+        /// Serialized proposal data.
+        data: Vec<u8>,
+    },
 }
 
 /// Configuration changes proposal
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FederationConfigChanges {
+    /// New minimum swarm reputation, if changing.
     pub min_swarm_reputation: Option<f64>,
+    /// New Byzantine threshold, if changing.
     pub byzantine_threshold: Option<f64>,
+    /// New stake requirement, if changing.
     pub stake_requirement: Option<u64>,
 }
 
@@ -303,8 +327,11 @@ pub struct FederatedVote {
 /// Vote decisions
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FederatedVoteDecision {
+    /// Vote to approve the proposal.
     Approve,
+    /// Vote to reject the proposal.
     Reject,
+    /// Abstain from voting.
     Abstain,
 }
 
@@ -372,10 +399,15 @@ pub struct TrustTransfer {
 /// Transfer status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TransferStatus {
+    /// Transfer is pending processing.
     Pending,
+    /// Transfer has been confirmed by validators.
     Confirmed,
+    /// Transfer completed successfully.
     Completed,
+    /// Transfer failed.
     Failed,
+    /// Transfer was reverted after completion.
     Reverted,
 }
 
@@ -446,20 +478,124 @@ impl CrossSwarmTrust {
 /// Federation events
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FederationEvent {
-    SwarmJoined { swarm_id: SwarmId, timestamp: u64 },
-    SwarmLeft { swarm_id: SwarmId, reason: String, timestamp: u64 },
-    AttestationCreated { attestation_id: String, source: SwarmId, target: SwarmId, timestamp: u64 },
-    AttestationConfirmed { attestation_id: String, timestamp: u64 },
-    AttestationExpired { attestation_id: String, timestamp: u64 },
-    TransferInitiated { transfer_id: String, source: SwarmId, target: SwarmId, timestamp: u64 },
-    TransferCompleted { transfer_id: String, timestamp: u64 },
-    TransferFailed { transfer_id: String, reason: String, timestamp: u64 },
-    ProposalCreated { proposal_id: String, proposer: SwarmId, timestamp: u64 },
-    ProposalPassed { proposal_id: String, timestamp: u64 },
-    ProposalFailed { proposal_id: String, timestamp: u64 },
-    BridgeCreated { bridge_id: String, source: SwarmId, target: SwarmId, timestamp: u64 },
-    BridgeDeactivated { bridge_id: String, reason: String, timestamp: u64 },
-    EmergencyAction { action: EmergencyAction, timestamp: u64 },
+    /// A swarm joined the federation.
+    SwarmJoined {
+        /// Swarm that joined.
+        swarm_id: SwarmId,
+        /// When the swarm joined.
+        timestamp: u64,
+    },
+    /// A swarm left the federation.
+    SwarmLeft {
+        /// Swarm that left.
+        swarm_id: SwarmId,
+        /// Reason for leaving.
+        reason: String,
+        /// When the swarm left.
+        timestamp: u64,
+    },
+    /// A cross-swarm attestation was created.
+    AttestationCreated {
+        /// Attestation identifier.
+        attestation_id: String,
+        /// Source swarm.
+        source: SwarmId,
+        /// Target swarm.
+        target: SwarmId,
+        /// Creation time.
+        timestamp: u64,
+    },
+    /// An attestation received sufficient confirmations.
+    AttestationConfirmed {
+        /// Attestation identifier.
+        attestation_id: String,
+        /// Confirmation time.
+        timestamp: u64,
+    },
+    /// An attestation expired.
+    AttestationExpired {
+        /// Attestation identifier.
+        attestation_id: String,
+        /// Expiration time.
+        timestamp: u64,
+    },
+    /// A trust transfer was initiated.
+    TransferInitiated {
+        /// Transfer identifier.
+        transfer_id: String,
+        /// Source swarm.
+        source: SwarmId,
+        /// Target swarm.
+        target: SwarmId,
+        /// Initiation time.
+        timestamp: u64,
+    },
+    /// A trust transfer completed.
+    TransferCompleted {
+        /// Transfer identifier.
+        transfer_id: String,
+        /// Completion time.
+        timestamp: u64,
+    },
+    /// A trust transfer failed.
+    TransferFailed {
+        /// Transfer identifier.
+        transfer_id: String,
+        /// Failure reason.
+        reason: String,
+        /// Failure time.
+        timestamp: u64,
+    },
+    /// A federated proposal was created.
+    ProposalCreated {
+        /// Proposal identifier.
+        proposal_id: String,
+        /// Proposing swarm.
+        proposer: SwarmId,
+        /// Creation time.
+        timestamp: u64,
+    },
+    /// A federated proposal passed.
+    ProposalPassed {
+        /// Proposal identifier.
+        proposal_id: String,
+        /// Time the proposal passed.
+        timestamp: u64,
+    },
+    /// A federated proposal failed.
+    ProposalFailed {
+        /// Proposal identifier.
+        proposal_id: String,
+        /// Time the proposal failed.
+        timestamp: u64,
+    },
+    /// A trust bridge was created between swarms.
+    BridgeCreated {
+        /// Bridge identifier.
+        bridge_id: String,
+        /// Source swarm.
+        source: SwarmId,
+        /// Target swarm.
+        target: SwarmId,
+        /// Creation time.
+        timestamp: u64,
+    },
+    /// A trust bridge was deactivated.
+    BridgeDeactivated {
+        /// Bridge identifier.
+        bridge_id: String,
+        /// Deactivation reason.
+        reason: String,
+        /// Deactivation time.
+        timestamp: u64,
+    },
+    /// An emergency action was triggered.
+    EmergencyAction {
+        /// The emergency action taken.
+        action: EmergencyAction,
+        /// When the action was triggered.
+        timestamp: u64,
+    },
 }
 
 impl FederationEngine {
@@ -990,37 +1126,89 @@ impl FederationEngine {
 /// Transfer result
 #[derive(Debug, Clone)]
 pub struct TransferResult {
+    /// Transfer identifier.
     pub transfer_id: String,
+    /// Whether the transfer succeeded.
     pub success: bool,
+    /// Error message if the transfer failed.
     pub error: Option<String>,
 }
 
 /// Federation statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FederationStats {
+    /// Number of registered swarms.
     pub swarm_count: usize,
+    /// Number of active attestations.
     pub active_attestations: usize,
+    /// Number of active trust bridges.
     pub active_bridges: usize,
+    /// Number of pending trust transfers.
     pub pending_transfers: usize,
+    /// Number of completed trust transfers.
     pub completed_transfers: usize,
+    /// Number of active proposals.
     pub active_proposals: usize,
+    /// Number of agents with cross-swarm trust.
     pub tracked_agents: usize,
 }
 
 /// Federation errors
 #[derive(Debug, Clone)]
 pub enum FederationError {
-    SwarmNotFound(SwarmId),
-    InsufficientRequirements { swarm_id: SwarmId, reason: String },
-    InsufficientReputation { swarm_id: SwarmId, required: f64, actual: f64 },
-    AttestationNotFound(String),
-    AttestationExpired(String),
-    NoBridge { source: SwarmId, target: SwarmId },
-    BridgeCapacityExceeded { bridge_id: String, capacity: f64, requested: f64 },
-    ProposalNotFound(String),
-    ProposalNotActive(String),
-    ProposalExpired(String),
+    /// Swarm not found in the federation.
+    SwarmNotFound(/// Swarm ID that was not found.
+        SwarmId),
+    /// Swarm does not meet federation requirements.
+    InsufficientRequirements {
+        /// Swarm ID.
+        swarm_id: SwarmId,
+        /// Reason for insufficiency.
+        reason: String,
+    },
+    /// Swarm reputation is below the required threshold.
+    InsufficientReputation {
+        /// Swarm ID.
+        swarm_id: SwarmId,
+        /// Required reputation.
+        required: f64,
+        /// Actual reputation.
+        actual: f64,
+    },
+    /// Attestation not found.
+    AttestationNotFound(/// Attestation ID.
+        String),
+    /// Attestation has expired.
+    AttestationExpired(/// Attestation ID.
+        String),
+    /// No bridge exists between the specified swarms.
+    NoBridge {
+        /// Source swarm.
+        source: SwarmId,
+        /// Target swarm.
+        target: SwarmId,
+    },
+    /// Bridge capacity would be exceeded by the transfer.
+    BridgeCapacityExceeded {
+        /// Bridge ID.
+        bridge_id: String,
+        /// Maximum bridge capacity.
+        capacity: f64,
+        /// Requested transfer amount.
+        requested: f64,
+    },
+    /// Proposal not found.
+    ProposalNotFound(/// Proposal ID.
+        String),
+    /// Proposal is not in active state.
+    ProposalNotActive(/// Proposal ID.
+        String),
+    /// Proposal voting deadline has passed.
+    ProposalExpired(/// Proposal ID.
+        String),
+    /// Cryptographic signature verification failed.
     InvalidSignature,
+    /// Proof verification failed.
     InvalidProof,
 }
 

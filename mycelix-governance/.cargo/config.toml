@@ -1,3 +1,1 @@
 # WASM build configuration for Holochain zomes
-
-[target.wasm32-unknown-unknown]

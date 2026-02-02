@@ -856,30 +856,38 @@ pub enum CoordinationEvent {
 /// Coordination error types
 #[derive(Debug, Clone)]
 pub enum CoordinationError {
-    /// Agent trust too low
+    /// Agent trust too low.
     InsufficientTrust {
+        /// Agent identifier.
         agent_id: String,
+        /// Agent's current trust.
         trust: f64,
+        /// Required trust level.
         required: f64,
     },
-    /// Agent not a member
+    /// Agent not a member.
     NotMember {
+        /// Agent identifier.
         agent_id: String,
     },
-    /// Group is full
+    /// Group is full.
     GroupFull {
+        /// Maximum group size.
         max_size: usize,
     },
-    /// Proposal not found
+    /// Proposal not found.
     ProposalNotFound {
+        /// Proposal identifier.
         proposal_id: String,
     },
-    /// Proposal already finalized
+    /// Proposal already finalized.
     ProposalFinalized {
+        /// Proposal identifier.
         proposal_id: String,
     },
-    /// Proposal expired
+    /// Proposal expired.
     ProposalExpired {
+        /// Proposal identifier.
         proposal_id: String,
     },
 }

@@ -999,22 +999,50 @@ pub struct SwarmHealth {
 /// Orchestration errors
 #[derive(Debug, Clone)]
 pub enum OrchestrationError {
-    /// Too many swarms
-    TooManySwarms { max: usize },
-    /// Too many agents
-    TooManyAgents { max: usize },
-    /// Swarm not found
-    SwarmNotFound { swarm_id: String },
-    /// Agent not found
-    AgentNotFound { agent_id: String },
-    /// Swarm is full
-    SwarmFull { swarm_id: String, max: usize },
-    /// Spawn blocked by hook
-    SpawnBlocked { reason: String },
-    /// Terminate blocked by hook
-    TerminateBlocked { reason: String },
-    /// Max restarts exceeded
-    MaxRestartsExceeded { agent_id: String, max: u32 },
+    /// Too many swarms.
+    TooManySwarms {
+        /// Maximum allowed swarms.
+        max: usize,
+    },
+    /// Too many agents.
+    TooManyAgents {
+        /// Maximum allowed agents.
+        max: usize,
+    },
+    /// Swarm not found.
+    SwarmNotFound {
+        /// Swarm identifier.
+        swarm_id: String,
+    },
+    /// Agent not found.
+    AgentNotFound {
+        /// Agent identifier.
+        agent_id: String,
+    },
+    /// Swarm is full.
+    SwarmFull {
+        /// Swarm identifier.
+        swarm_id: String,
+        /// Maximum swarm capacity.
+        max: usize,
+    },
+    /// Spawn blocked by hook.
+    SpawnBlocked {
+        /// Reason for blocking.
+        reason: String,
+    },
+    /// Terminate blocked by hook.
+    TerminateBlocked {
+        /// Reason for blocking.
+        reason: String,
+    },
+    /// Max restarts exceeded.
+    MaxRestartsExceeded {
+        /// Agent identifier.
+        agent_id: String,
+        /// Maximum allowed restarts.
+        max: u32,
+    },
 }
 
 impl std::fmt::Display for OrchestrationError {

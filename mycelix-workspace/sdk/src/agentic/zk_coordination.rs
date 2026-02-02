@@ -648,24 +648,49 @@ impl ZKAgentGroup {
 /// ZK coordination errors
 #[derive(Debug, Clone)]
 pub enum ZKCoordinationError {
-    /// Proof verification failed
-    ProofVerificationFailed { agent_id: String },
-    /// Proof expired
-    ProofExpired { agent_id: String },
+    /// Proof verification failed.
+    ProofVerificationFailed {
+        /// Agent whose proof failed.
+        agent_id: String,
+    },
+    /// Proof expired.
+    ProofExpired {
+        /// Agent whose proof expired.
+        agent_id: String,
+    },
     /// Proof required but not provided
     ProofRequired,
-    /// Agent not a member
-    NotMember { agent_id: String },
-    /// Agent already a member
-    AlreadyMember { agent_id: String },
+    /// Agent not a member.
+    NotMember {
+        /// Agent identifier.
+        agent_id: String,
+    },
+    /// Agent already a member.
+    AlreadyMember {
+        /// Agent identifier.
+        agent_id: String,
+    },
     /// Group is full
     GroupFull,
-    /// Insufficient trust
-    InsufficientTrust { agent_id: String, trust: f64, required: f64 },
-    /// Proposal not found
-    ProposalNotFound { proposal_id: String },
-    /// Proposal already finalized
-    ProposalFinalized { proposal_id: String },
+    /// Insufficient trust.
+    InsufficientTrust {
+        /// Agent identifier.
+        agent_id: String,
+        /// Agent's current trust.
+        trust: f64,
+        /// Required trust level.
+        required: f64,
+    },
+    /// Proposal not found.
+    ProposalNotFound {
+        /// Proposal identifier.
+        proposal_id: String,
+    },
+    /// Proposal already finalized.
+    ProposalFinalized {
+        /// Proposal identifier.
+        proposal_id: String,
+    },
     /// Underlying proof error
     ProofError(String),
 }

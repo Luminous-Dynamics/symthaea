@@ -91,24 +91,60 @@ pub struct TrustEvent {
 pub enum TrustEventType {
     /// Agent registration
     AgentRegistered,
-    /// Trust score change
-    TrustChanged { old_value: f64, new_value: f64 },
-    /// Vote cast
-    VoteCast { proposal_id: String, vote: String },
-    /// Interaction between agents
-    Interaction { counterparty: String, interaction_type: String },
-    /// KREDIT transfer
-    KreditTransfer { to: String, amount: u64 },
-    /// Attestation created
-    AttestationCreated { target: String, trust_level: f64 },
-    /// Constraint violation
-    ConstraintViolation { constraint: String },
-    /// Rate limit hit
+    /// Trust score change.
+    TrustChanged {
+        /// Previous trust value.
+        old_value: f64,
+        /// New trust value.
+        new_value: f64,
+    },
+    /// Vote cast.
+    VoteCast {
+        /// Proposal being voted on.
+        proposal_id: String,
+        /// Vote decision.
+        vote: String,
+    },
+    /// Interaction between agents.
+    Interaction {
+        /// Other agent involved.
+        counterparty: String,
+        /// Type of interaction.
+        interaction_type: String,
+    },
+    /// KREDIT transfer.
+    KreditTransfer {
+        /// Recipient agent.
+        to: String,
+        /// Transfer amount.
+        amount: u64,
+    },
+    /// Attestation created.
+    AttestationCreated {
+        /// Target agent of attestation.
+        target: String,
+        /// Attested trust level.
+        trust_level: f64,
+    },
+    /// Constraint violation.
+    ConstraintViolation {
+        /// Name of the violated constraint.
+        constraint: String,
+    },
+    /// Rate limit hit.
     RateLimitHit,
-    /// Proof submitted
-    ProofSubmitted { proof_type: String },
-    /// Group membership change
-    GroupMembershipChanged { group_id: String, action: String },
+    /// Proof submitted.
+    ProofSubmitted {
+        /// Type of proof submitted.
+        proof_type: String,
+    },
+    /// Group membership change.
+    GroupMembershipChanged {
+        /// Group identifier.
+        group_id: String,
+        /// Membership action (join/leave).
+        action: String,
+    },
 }
 
 /// Event source
@@ -222,8 +258,11 @@ pub enum AttackSeverity {
 pub enum RecommendedResponse {
     /// Log and monitor
     Monitor,
-    /// Rate limit the agent
-    RateLimit { factor: f64 },
+    /// Rate limit the agent.
+    RateLimit {
+        /// Rate limit reduction factor (0.0-1.0).
+        factor: f64,
+    },
     /// Quarantine agent
     Quarantine,
     /// Suspend agent
@@ -232,8 +271,11 @@ pub enum RecommendedResponse {
     AlertHuman,
     /// Freeze all related operations
     Freeze,
-    /// Custom response
-    Custom { action: String },
+    /// Custom response.
+    Custom {
+        /// Description of the custom action.
+        action: String,
+    },
 }
 
 // ============================================================================
@@ -266,14 +308,23 @@ pub struct DetectionResult {
 /// Detected attack types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DetectedAttackType {
+    /// Sybil attack (fake identity proliferation).
     Sybil,
+    /// Artificial trust score manipulation.
     TrustManipulation,
+    /// Coordinated malicious behavior.
     Collusion,
+    /// Network isolation attempt.
     EclipseAttempt,
+    /// Rapid exploitation window attack.
     FlashAttack,
+    /// Circular attestation ring.
     CircularAttestation,
+    /// Rate limit abuse.
     RateAbuse,
+    /// Forged or invalid proof submission.
     ProofForgery,
+    /// Unclassified attack.
     Unknown,
 }
 
@@ -946,10 +997,15 @@ impl StreamingAnalyzer {
 /// Detection statistics
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetectionStats {
+    /// Total trust events processed in the current window.
     pub total_events_processed: usize,
+    /// Total detections raised.
     pub total_detections: usize,
+    /// Detection counts grouped by attack type.
     pub detections_by_type: HashMap<String, usize>,
+    /// Number of agents being tracked.
     pub agents_tracked: usize,
+    /// Number of active attack signatures.
     pub signatures_active: usize,
 }
 
@@ -983,10 +1039,15 @@ pub struct Alert {
 /// Alert status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AlertStatus {
+    /// Newly created, unreviewed.
     New,
+    /// Acknowledged by a reviewer.
     Acknowledged,
+    /// Under active investigation.
     Investigating,
+    /// Resolved and closed.
     Resolved,
+    /// Determined to be a false positive.
     FalsePositive,
 }
 

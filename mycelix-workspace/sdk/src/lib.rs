@@ -49,7 +49,7 @@
 //! );
 //! ```
 
-#![allow(missing_docs)]
+#![warn(missing_docs)]
 #![deny(clippy::unwrap_used)]
 
 pub mod matl;

@@ -576,9 +576,13 @@ pub enum PrivacyError {
     /// Privacy budget exceeded
     #[error("Privacy budget exceeded: requested (ε={requested_epsilon}, δ={requested_delta}), remaining (ε={remaining_epsilon}, δ={remaining_delta})")]
     BudgetExceeded {
+        /// Epsilon requested for the query.
         requested_epsilon: f64,
+        /// Delta requested for the query.
         requested_delta: f64,
+        /// Remaining epsilon budget.
         remaining_epsilon: f64,
+        /// Remaining delta budget.
         remaining_delta: f64,
     },
 

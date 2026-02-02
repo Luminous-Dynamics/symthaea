@@ -106,8 +106,13 @@ pub enum DecayCurve {
     Exponential,
     /// Linear decay: T(t) = T₀ - (T₀ - floor) * (t/full_decay_time)
     Linear,
-    /// Stepped decay: Trust drops at fixed intervals
-    Stepped { step_interval_ms: u64, step_size: f64 },
+    /// Stepped decay: Trust drops at fixed intervals.
+    Stepped {
+        /// Interval between trust drops (ms).
+        step_interval_ms: u64,
+        /// Amount of trust dropped per step.
+        step_size: f64,
+    },
 }
 
 /// Velocity limit configuration
@@ -201,16 +206,30 @@ pub struct TrustSnapshot {
 pub enum SnapshotReason {
     /// Regular interval snapshot
     Periodic,
-    /// Trust changed significantly
-    SignificantChange { delta: f64 },
-    /// Manual snapshot request
+    /// Trust changed significantly.
+    SignificantChange {
+        /// Amount of change.
+        delta: f64,
+    },
+    /// Manual snapshot request.
     Manual,
-    /// Decay applied
-    Decay { decayed_amount: f64 },
-    /// Velocity limit applied
-    VelocityLimited { requested: f64, actual: f64 },
-    /// Activity recorded
-    Activity { outcome: String },
+    /// Decay applied.
+    Decay {
+        /// Amount decayed.
+        decayed_amount: f64,
+    },
+    /// Velocity limit applied.
+    VelocityLimited {
+        /// Requested change.
+        requested: f64,
+        /// Actual change after limiting.
+        actual: f64,
+    },
+    /// Activity recorded.
+    Activity {
+        /// Activity outcome description.
+        outcome: String,
+    },
 }
 
 // ============================================================================
@@ -671,10 +690,18 @@ pub struct TrustUpdateResult {
 /// Temporal trust errors
 #[derive(Debug, Clone)]
 pub enum TemporalTrustError {
-    /// Agent not found
-    AgentNotFound { agent_id: String },
-    /// Velocity limit exceeded
-    VelocityLimitExceeded { requested: f64, allowed: f64 },
+    /// Agent not found.
+    AgentNotFound {
+        /// Agent ID that was not found.
+        agent_id: String,
+    },
+    /// Velocity limit exceeded.
+    VelocityLimitExceeded {
+        /// Requested change amount.
+        requested: f64,
+        /// Maximum allowed change.
+        allowed: f64,
+    },
 }
 
 impl std::fmt::Display for TemporalTrustError {

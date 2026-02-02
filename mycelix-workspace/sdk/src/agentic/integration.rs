@@ -707,21 +707,31 @@ pub struct OutputProcessingResult {
 /// Integration errors
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum IntegrationError {
+    /// Agent not found in the pipeline.
     #[error("Agent not found: {0}")]
-    AgentNotFound(String),
+    AgentNotFound(/// Agent ID.
+        String),
 
+    /// Agent's trust is below the required threshold.
     #[error("Insufficient trust: {agent} has {actual}, needs {required}")]
     InsufficientTrust {
+        /// Agent identifier.
         agent: String,
+        /// Required trust level.
         required: f64,
+        /// Actual trust level.
         actual: f64,
     },
 
+    /// Error from privacy-preserving analytics.
     #[error("Privacy error: {0}")]
-    PrivacyError(String),
+    PrivacyError(/// Error description.
+        String),
 
+    /// Error during epistemic classification.
     #[error("Classification error: {0}")]
-    ClassificationError(String),
+    ClassificationError(/// Error description.
+        String),
 }
 
 // ============================================================================
@@ -808,7 +818,15 @@ mod tests {
 
     #[test]
     fn test_privacy_analytics() {
-        let config = PrivacyAnalyticsConfig::default();
+        // Use higher epsilon budget to ensure it's not exhausted by 4 queries
+        let config = PrivacyAnalyticsConfig {
+            dp: DPConfig {
+                epsilon: 10.0,
+                delta: 1e-6,
+                ..Default::default()
+            },
+            dashboard: DashboardConfig::default(),
+        };
         let mut analytics = IntegratedPrivacyAnalytics::new(config);
 
         let trust_scores = vec![0.5, 0.6, 0.7, 0.4, 0.55, 0.65];

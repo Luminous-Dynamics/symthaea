@@ -82,6 +82,7 @@ pub struct NetworkAgent {
 }
 
 impl NetworkAgent {
+    /// Create a new network agent with the given ID and initial trust score.
     pub fn new(id: String, trust: f64) -> Self {
         Self {
             id,
@@ -296,14 +297,18 @@ impl Default for TrustNetwork {
 /// Network state snapshot
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkSnapshot {
+    /// Map of agent ID to captured state.
     pub agent_states: HashMap<String, AgentState>,
 }
 
 /// Agent state for snapshot
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentState {
+    /// Current trust score.
     pub trust: f64,
+    /// Whether the agent is stressed.
     pub stressed: bool,
+    /// Whether the agent has failed.
     pub failed: bool,
 }
 
@@ -733,76 +738,112 @@ impl CascadeEngine {
 /// Cascade simulation result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CascadeResult {
+    /// Agent that received the initial shock.
     pub initial_agent: String,
+    /// Magnitude of the initial shock.
     pub shock_magnitude: f64,
+    /// Total number of agents affected by the cascade.
     pub agents_affected: usize,
+    /// Number of agents that failed.
     pub agents_failed: usize,
+    /// Number of agents under stress.
     pub agents_stressed: usize,
+    /// Total trust lost across all agents.
     pub total_trust_loss: f64,
+    /// Maximum propagation depth reached.
     pub max_depth_reached: u32,
+    /// Events generated during the cascade.
     pub events: Vec<CascadeEvent>,
 }
 
 /// Recovery simulation result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecoveryResult {
+    /// Number of ticks until recovery (or simulation end).
     pub ticks_to_recovery: u32,
+    /// Whether the network fully recovered.
     pub fully_recovered: bool,
+    /// Per-tick snapshots of network state.
     pub snapshots: Vec<TickSnapshot>,
 }
 
 /// Snapshot at a simulation tick
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TickSnapshot {
+    /// Tick number.
     pub tick: u32,
+    /// Number of failed agents at this tick.
     pub failed_count: usize,
+    /// Number of stressed agents at this tick.
     pub stressed_count: usize,
+    /// Average trust across all agents.
     pub average_trust: f64,
 }
 
 /// Critical agent analysis
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CriticalAgent {
+    /// Agent identifier.
     pub agent_id: String,
+    /// Total trust loss if this agent fails.
     pub failure_impact: f64,
+    /// Number of agents affected by failure cascade.
     pub cascade_reach: usize,
+    /// Number of agent failures caused.
     pub failures_caused: usize,
 }
 
 /// Network resilience score
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResilienceScore {
+    /// Overall resilience score (0.0-1.0).
     pub overall: f64,
+    /// Resistance to cascade propagation (0.0-1.0).
     pub cascade_resistance: f64,
+    /// Resistance to agent failures (0.0-1.0).
     pub failure_resistance: f64,
+    /// Risk from trust concentration in few agents (0.0-1.0).
     pub concentration_risk: f64,
+    /// Average number of agents affected per shock.
     pub average_cascade_size: f64,
+    /// Maximum cascade size observed.
     pub maximum_cascade_size: usize,
 }
 
 /// Contagion path between agents
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContagionPath {
+    /// Ordered list of agent IDs forming the path.
     pub nodes: Vec<String>,
+    /// Cumulative propagation weight along the path.
     pub total_weight: f64,
 }
 
 /// Topology analysis result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TopologyAnalysis {
+    /// Number of nodes in the network.
     pub node_count: usize,
+    /// Number of edges in the network.
     pub edge_count: usize,
+    /// Graph density (0.0-1.0).
     pub density: f64,
+    /// Average node degree.
     pub average_degree: f64,
+    /// Clustering coefficient (0.0-1.0).
     pub clustering_coefficient: f64,
+    /// Overall topology risk assessment.
     pub risk_assessment: TopologyRisk,
 }
 
 /// Topology risk level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TopologyRisk {
+    /// Low systemic risk.
     Low,
+    /// Medium systemic risk.
     Medium,
+    /// High systemic risk.
     High,
 }
 

@@ -227,14 +227,18 @@ impl SlashingEngine {
 pub enum SlashResult {
     /// Slashing is disabled
     Disabled,
-    /// Successfully slashed
+    /// Successfully slashed.
     Slashed {
+        /// Details of the slash event.
         event: SlashEvent,
+        /// Cumulative slash fraction for this agent.
         cumulative_slash: f64,
     },
-    /// Agent suspended due to excessive violations
+    /// Agent suspended due to excessive violations.
     Suspended {
+        /// Details of the slash event.
         event: SlashEvent,
+        /// Cumulative slash fraction for this agent.
         cumulative_slash: f64,
     },
 }

@@ -30,37 +30,49 @@ pub struct Invariant {
 /// Types of invariants
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum InvariantType {
-    /// Trust scores must be within bounds
+    /// Trust scores must be within bounds.
     TrustBounds {
+        /// Minimum allowed trust.
         min: f64,
+        /// Maximum allowed trust.
         max: f64,
     },
-    /// Byzantine tolerance threshold
+    /// Byzantine tolerance threshold.
     ByzantineTolerance {
+        /// Maximum fraction of Byzantine agents tolerated.
         max_byzantine_fraction: f64,
     },
-    /// Slashing amounts must be bounded
+    /// Slashing amounts must be bounded.
     SlashingBounds {
+        /// Maximum fraction that can be slashed.
         max_slash_fraction: f64,
     },
-    /// K-Vector dimension bounds
+    /// K-Vector dimension bounds.
     KVectorBounds {
+        /// Dimension name.
         dimension: String,
+        /// Minimum allowed value.
         min: f64,
+        /// Maximum allowed value.
         max: f64,
     },
-    /// Monotonicity (values only increase or decrease)
+    /// Monotonicity (values only increase or decrease).
     Monotonicity {
+        /// Property to check.
         property: String,
+        /// Required direction.
         direction: MonotonicityDirection,
     },
-    /// Conservation (sum of values is constant)
+    /// Conservation (sum of values is constant).
     Conservation {
+        /// Property to check.
         property: String,
+        /// Allowed deviation.
         tolerance: f64,
     },
-    /// Custom predicate
+    /// Custom predicate.
     Custom {
+        /// Predicate identifier.
         predicate: String,
     },
 }
@@ -167,34 +179,46 @@ pub enum PropertyFormula {
 /// Atomic predicate in property formula
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AtomicPredicate {
-    /// Trust score comparison
+    /// Trust score comparison.
     TrustCompare {
+        /// Agent to check.
         agent_id: String,
+        /// Comparison operator.
         operator: CompareOp,
+        /// Threshold value.
         value: f64,
     },
-    /// Byzantine count comparison
+    /// Byzantine count comparison.
     ByzantineCount {
+        /// Comparison operator.
         operator: CompareOp,
+        /// Threshold count.
         value: usize,
     },
-    /// Network health comparison
+    /// Network health comparison.
     HealthCompare {
+        /// Comparison operator.
         operator: CompareOp,
+        /// Threshold value.
         value: f64,
     },
-    /// Agent status check
+    /// Agent status check.
     AgentStatus {
+        /// Agent to check.
         agent_id: String,
+        /// Expected status.
         status: String,
     },
-    /// Consensus reached
+    /// Consensus reached.
     ConsensusReached {
+        /// Proposal identifier.
         proposal_id: String,
     },
-    /// Custom predicate
+    /// Custom predicate.
     Custom {
+        /// Predicate name.
         name: String,
+        /// Predicate parameters.
         params: HashMap<String, String>,
     },
 }
