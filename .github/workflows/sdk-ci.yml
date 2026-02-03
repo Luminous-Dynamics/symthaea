@@ -1,0 +1,77 @@
+name: Mycelix SDK CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mycelix-workspace/sdk/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "mycelix-workspace/sdk/**"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-workspace/sdk/target
+          key: ${{ runner.os }}-cargo-check-${{ hashFiles('mycelix-workspace/sdk/**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-check-
+      - run: cargo check
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-workspace/sdk/target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('mycelix-workspace/sdk/**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+      - run: cargo test
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/sdk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-workspace/sdk/target
+          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('mycelix-workspace/sdk/**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-clippy-
+      - run: cargo clippy -- -D warnings
