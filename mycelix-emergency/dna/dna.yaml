@@ -1,0 +1,72 @@
+---
+manifest_version: "0"
+name: mycelix_emergency_dna
+
+integrity:
+  network_seed: "mycelix-emergency-v1"
+  zomes:
+    - name: incidents_integrity
+      path: "../target/wasm32-unknown-unknown/release/incidents_integrity.wasm"
+
+    - name: triage_integrity
+      path: "../target/wasm32-unknown-unknown/release/triage_integrity.wasm"
+
+    - name: resources_integrity
+      path: "../target/wasm32-unknown-unknown/release/resources_integrity.wasm"
+
+    - name: coordination_integrity
+      path: "../target/wasm32-unknown-unknown/release/coordination_integrity.wasm"
+
+    - name: shelters_integrity
+      path: "../target/wasm32-unknown-unknown/release/shelters_integrity.wasm"
+
+    - name: comms_integrity
+      path: "../target/wasm32-unknown-unknown/release/comms_integrity.wasm"
+
+    - name: emergency_bridge_integrity
+      path: "../target/wasm32-unknown-unknown/release/emergency_bridge_integrity.wasm"
+
+coordinator:
+  zomes:
+    - name: incidents
+      path: "../target/wasm32-unknown-unknown/release/incidents.wasm"
+      dependencies:
+        - name: incidents_integrity
+
+    - name: triage
+      path: "../target/wasm32-unknown-unknown/release/triage.wasm"
+      dependencies:
+        - name: triage_integrity
+        - name: incidents_integrity
+
+    - name: resources
+      path: "../target/wasm32-unknown-unknown/release/resources.wasm"
+      dependencies:
+        - name: resources_integrity
+        - name: incidents_integrity
+
+    - name: coordination
+      path: "../target/wasm32-unknown-unknown/release/coordination.wasm"
+      dependencies:
+        - name: coordination_integrity
+        - name: incidents_integrity
+
+    - name: shelters
+      path: "../target/wasm32-unknown-unknown/release/shelters.wasm"
+      dependencies:
+        - name: shelters_integrity
+        - name: incidents_integrity
+
+    - name: comms
+      path: "../target/wasm32-unknown-unknown/release/comms.wasm"
+      dependencies:
+        - name: comms_integrity
+        - name: incidents_integrity
+
+    - name: emergency_bridge
+      path: "../target/wasm32-unknown-unknown/release/emergency_bridge.wasm"
+      dependencies:
+        - name: emergency_bridge_integrity
+        - name: incidents_integrity
+        - name: resources_integrity
+        - name: coordination_integrity

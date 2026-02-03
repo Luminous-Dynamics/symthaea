@@ -1,0 +1,62 @@
+---
+manifest_version: "0"
+name: mycelix_water_dna
+
+integrity:
+  network_seed: "mycelix-water-v1"
+  zomes:
+    - name: flow_integrity
+      path: "../target/wasm32-unknown-unknown/release/flow_integrity.wasm"
+
+    - name: purity_integrity
+      path: "../target/wasm32-unknown-unknown/release/purity_integrity.wasm"
+
+    - name: capture_integrity
+      path: "../target/wasm32-unknown-unknown/release/capture_integrity.wasm"
+
+    - name: steward_integrity
+      path: "../target/wasm32-unknown-unknown/release/steward_integrity.wasm"
+
+    - name: wisdom_integrity
+      path: "../target/wasm32-unknown-unknown/release/wisdom_integrity.wasm"
+
+    - name: water_bridge_integrity
+      path: "../target/wasm32-unknown-unknown/release/water_bridge_integrity.wasm"
+
+coordinator:
+  zomes:
+    - name: flow
+      path: "../target/wasm32-unknown-unknown/release/flow.wasm"
+      dependencies:
+        - name: flow_integrity
+
+    - name: purity
+      path: "../target/wasm32-unknown-unknown/release/purity.wasm"
+      dependencies:
+        - name: purity_integrity
+        - name: flow_integrity
+
+    - name: capture
+      path: "../target/wasm32-unknown-unknown/release/capture.wasm"
+      dependencies:
+        - name: capture_integrity
+        - name: flow_integrity
+
+    - name: steward
+      path: "../target/wasm32-unknown-unknown/release/steward.wasm"
+      dependencies:
+        - name: steward_integrity
+        - name: flow_integrity
+
+    - name: wisdom
+      path: "../target/wasm32-unknown-unknown/release/wisdom.wasm"
+      dependencies:
+        - name: wisdom_integrity
+
+    - name: water_bridge
+      path: "../target/wasm32-unknown-unknown/release/water_bridge.wasm"
+      dependencies:
+        - name: water_bridge_integrity
+        - name: flow_integrity
+        - name: purity_integrity
+        - name: steward_integrity
