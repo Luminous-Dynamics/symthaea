@@ -92,7 +92,7 @@ pub struct ClassificationHints {
 }
 
 /// Scope of claimed agreement
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgreementScope {
     /// Only the agent agrees
     Self_,
@@ -105,7 +105,7 @@ pub enum AgreementScope {
 }
 
 /// Expected relevance duration
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RelevanceDuration {
     /// Discard immediately
     Ephemeral,
@@ -417,6 +417,384 @@ impl EpistemicStats {
     }
 }
 
+// =============================================================================
+// Content-Aware Classification
+// =============================================================================
+
+/// Content analyzer for automatic E-N-M-H inference
+pub struct ContentAnalyzer {
+    /// Keywords indicating high empirical level
+    crypto_keywords: Vec<&'static str>,
+    /// Keywords indicating public data sources
+    public_data_keywords: Vec<&'static str>,
+    /// Keywords indicating network-wide scope
+    network_scope_keywords: Vec<&'static str>,
+    /// Keywords indicating foundational/long-term relevance
+    foundational_keywords: Vec<&'static str>,
+}
+
+impl Default for ContentAnalyzer {
+    fn default() -> Self {
+        Self {
+            crypto_keywords: vec![
+                "proof", "zkp", "zero-knowledge", "signature", "hash", "merkle",
+                "commitment", "attestation", "cryptographic", "verified",
+            ],
+            public_data_keywords: vec![
+                "public", "blockchain", "on-chain", "ledger", "published",
+                "reproducible", "open-source", "transparent",
+            ],
+            network_scope_keywords: vec![
+                "network", "global", "consensus", "protocol", "constitutional",
+                "governance", "axiomatic", "universal",
+            ],
+            foundational_keywords: vec![
+                "foundational", "permanent", "immutable", "forever", "constitutional",
+                "core", "fundamental", "persistent", "archival",
+            ],
+        }
+    }
+}
+
+impl ContentAnalyzer {
+    /// Analyze text content to extract classification hints
+    pub fn analyze_text(&self, text: &str) -> ClassificationHints {
+        let lower = text.to_lowercase();
+
+        let has_crypto_proof = self.crypto_keywords.iter()
+            .any(|kw| lower.contains(kw));
+
+        let uses_public_data = self.public_data_keywords.iter()
+            .any(|kw| lower.contains(kw));
+
+        let is_network_scope = self.network_scope_keywords.iter()
+            .any(|kw| lower.contains(kw));
+
+        let is_foundational = self.foundational_keywords.iter()
+            .any(|kw| lower.contains(kw));
+
+        // Determine agreement scope
+        let agreement_scope = if lower.contains("axiomatic") || lower.contains("mathematical") {
+            Some(AgreementScope::Axiomatic)
+        } else if is_network_scope {
+            Some(AgreementScope::Network)
+        } else if lower.contains("community") || lower.contains("local") || lower.contains("dao") {
+            Some(AgreementScope::Community)
+        } else {
+            Some(AgreementScope::Self_)
+        };
+
+        // Determine relevance duration
+        let relevance_duration = if is_foundational {
+            Some(RelevanceDuration::LongTerm)
+        } else if lower.contains("persistent") || lower.contains("archive") {
+            Some(RelevanceDuration::MediumTerm)
+        } else if lower.contains("temporal") || lower.contains("session") {
+            Some(RelevanceDuration::ShortTerm)
+        } else {
+            Some(RelevanceDuration::Ephemeral)
+        };
+
+        // Count affected harmonies (simple heuristic)
+        let affected_harmonies_count = [
+            lower.contains("individual") || lower.contains("personal"),
+            lower.contains("local") || lower.contains("community"),
+            lower.contains("network") || lower.contains("global"),
+            lower.contains("civilization") || lower.contains("humanity"),
+        ].iter().filter(|&&x| x).count();
+
+        ClassificationHints {
+            has_crypto_proof,
+            uses_public_data,
+            third_party_verified: lower.contains("verified") || lower.contains("audited"),
+            is_personal_opinion: lower.contains("opinion") || lower.contains("believe") || lower.contains("think"),
+            agreement_scope,
+            relevance_duration,
+            affected_harmonies_count,
+            civilizational_scope: lower.contains("civilization") || lower.contains("kosmic"),
+        }
+    }
+
+    /// Analyze JSON content for classification hints
+    pub fn analyze_json(&self, json_str: &str) -> ClassificationHints {
+        // Try to parse as JSON and look for specific fields
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(json_str) {
+            let has_proof = value.get("proof").is_some()
+                || value.get("signature").is_some()
+                || value.get("attestation").is_some();
+
+            let is_public = value.get("public").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false)
+                || value.get("published").is_some();
+
+            let scope_str = value.get("scope")
+                .and_then(|v| v.as_str())
+                .unwrap_or("personal");
+
+            let agreement_scope = match scope_str {
+                "axiomatic" | "constitutional" => Some(AgreementScope::Axiomatic),
+                "network" | "global" => Some(AgreementScope::Network),
+                "community" | "local" => Some(AgreementScope::Community),
+                _ => Some(AgreementScope::Self_),
+            };
+
+            let retention_str = value.get("retention")
+                .and_then(|v| v.as_str())
+                .unwrap_or("ephemeral");
+
+            let relevance_duration = match retention_str {
+                "forever" | "foundational" => Some(RelevanceDuration::LongTerm),
+                "persistent" | "archive" => Some(RelevanceDuration::MediumTerm),
+                "temporal" | "session" => Some(RelevanceDuration::ShortTerm),
+                _ => Some(RelevanceDuration::Ephemeral),
+            };
+
+            ClassificationHints {
+                has_crypto_proof: has_proof,
+                uses_public_data: is_public,
+                third_party_verified: value.get("verified").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false),
+                is_personal_opinion: value.get("type").map(|v| v.as_str() == Some("opinion")).unwrap_or(false),
+                agreement_scope,
+                relevance_duration,
+                affected_harmonies_count: value.get("harmonics_affected")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0) as usize,
+                civilizational_scope: value.get("civilizational").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false),
+            }
+        } else {
+            // Fall back to text analysis if JSON parsing fails
+            self.analyze_text(json_str)
+        }
+    }
+
+    /// Analyze output content and return classification hints
+    pub fn analyze_content(&self, content: &OutputContent) -> ClassificationHints {
+        match content {
+            OutputContent::Text(text) => self.analyze_text(text),
+            OutputContent::Json(json) => self.analyze_json(json),
+            OutputContent::DataReference(hash) => {
+                // Data references are typically cryptographically verifiable
+                ClassificationHints {
+                    has_crypto_proof: true,
+                    uses_public_data: hash.starts_with("ipfs://") || hash.starts_with("arweave://"),
+                    relevance_duration: Some(RelevanceDuration::LongTerm),
+                    ..Default::default()
+                }
+            }
+            OutputContent::ActionResult { success, details, .. } => {
+                let mut hints = self.analyze_text(details);
+                // Successful actions are more trustworthy
+                if *success {
+                    hints.third_party_verified = true;
+                }
+                hints
+            }
+            OutputContent::Analysis { findings, recommendations, .. } => {
+                // Combine analysis of findings and recommendations
+                let all_text = format!(
+                    "{} {}",
+                    findings.join(" "),
+                    recommendations.join(" ")
+                );
+                self.analyze_text(&all_text)
+            }
+        }
+    }
+}
+
+/// Auto-classify output content
+pub fn auto_classify(content: &OutputContent) -> EpistemicClassificationExtended {
+    let analyzer = ContentAnalyzer::default();
+    let hints = analyzer.analyze_content(content);
+    classify_output(&hints)
+}
+
+// =============================================================================
+// ZK-Aware Classification
+// =============================================================================
+
+use crate::agentic::zk_trust::{TrustProof, ProofStatement};
+
+/// ZK-enhanced epistemic classifier
+///
+/// Automatically elevates classification to E3+ when ZK proofs are attached.
+pub struct ZKEpistemicClassifier {
+    content_analyzer: ContentAnalyzer,
+}
+
+impl Default for ZKEpistemicClassifier {
+    fn default() -> Self {
+        Self {
+            content_analyzer: ContentAnalyzer::default(),
+        }
+    }
+}
+
+impl ZKEpistemicClassifier {
+    /// Create a new ZK-aware classifier
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Classify output with attached ZK proof
+    ///
+    /// When a ZK proof is attached, the output is automatically classified as E3+.
+    /// If the proof is publicly verifiable (e.g., published on-chain), it's E4.
+    pub fn classify_with_proof(
+        &self,
+        content: &OutputContent,
+        proof: &TrustProof,
+        is_publicly_verifiable: bool,
+    ) -> EpistemicClassificationExtended {
+        // Start with content-based hints
+        let mut hints = self.content_analyzer.analyze_content(content);
+
+        // ZK proof guarantees at least E3
+        hints.has_crypto_proof = true;
+
+        // If publicly verifiable (e.g., on IPFS/Arweave), it's E4
+        if is_publicly_verifiable {
+            hints.uses_public_data = true;
+        }
+
+        // Proof scope affects normative level
+        match &proof.statement {
+            ProofStatement::MeetsGovernanceTier { .. } => {
+                hints.agreement_scope = Some(AgreementScope::Network);
+            }
+            ProofStatement::And(statements) | ProofStatement::Or(statements) => {
+                // Compound proofs have broader scope
+                if statements.len() > 2 {
+                    hints.agreement_scope = Some(AgreementScope::Network);
+                }
+            }
+            _ => {}
+        }
+
+        // ZK proofs are typically persistent evidence
+        if hints.relevance_duration.is_none() ||
+           matches!(hints.relevance_duration, Some(RelevanceDuration::Ephemeral)) {
+            hints.relevance_duration = Some(RelevanceDuration::MediumTerm);
+        }
+
+        classify_output(&hints)
+    }
+
+    /// Create classified output with ZK proof attached
+    pub fn create_zk_output(
+        &self,
+        agent_id: &str,
+        content: OutputContent,
+        proof: TrustProof,
+        is_publicly_verifiable: bool,
+    ) -> AgentOutput {
+        let classification = self.classify_with_proof(&content, &proof, is_publicly_verifiable);
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        // Serialize proof for storage
+        let proof_data = bincode::serialize(&proof).ok();
+
+        AgentOutput {
+            output_id: format!("zk-out-{}-{}", agent_id, timestamp),
+            agent_id: agent_id.to_string(),
+            content,
+            classification,
+            classification_confidence: 0.95, // High confidence with ZK proof
+            timestamp,
+            has_proof: true,
+            proof_data,
+            context_references: vec![format!("zk-commitment:{:?}", proof.commitment.commitment)],
+        }
+    }
+
+    /// Upgrade existing classification based on ZK proof
+    ///
+    /// If an output later receives a ZK proof, its classification can be upgraded.
+    pub fn upgrade_with_proof(
+        &self,
+        existing: &EpistemicClassificationExtended,
+        is_publicly_verifiable: bool,
+    ) -> EpistemicClassificationExtended {
+        let new_empirical = if is_publicly_verifiable {
+            EmpiricalLevel::E4PublicRepro
+        } else {
+            // At least E3 with ZK proof
+            existing.empirical.max(EmpiricalLevel::E3Cryptographic)
+        };
+
+        // Upgrade materiality if currently ephemeral
+        let new_materiality = if existing.materiality == MaterialityLevel::M0Ephemeral {
+            MaterialityLevel::M1Temporal
+        } else {
+            existing.materiality
+        };
+
+        EpistemicClassificationExtended::new(
+            new_empirical,
+            existing.normative,
+            new_materiality,
+            existing.harmonic,
+        )
+    }
+}
+
+/// Compute K-Vector update delta based on epistemic classification
+///
+/// Higher epistemic levels produce larger K-Vector updates.
+/// This is used by the trust pipeline to weight attestations.
+pub fn compute_kvector_delta_from_epistemic(
+    classification: &EpistemicClassificationExtended,
+    base_delta: f32,
+) -> KVectorDelta {
+    let weight = calculate_epistemic_weight(classification);
+
+    KVectorDelta {
+        k_r_delta: base_delta * weight * 0.5,  // Reputation
+        k_p_delta: base_delta * weight * 0.3,  // Performance
+        k_h_delta: base_delta * weight * 0.2,  // Historical
+        // Higher E-level increases verification status slightly
+        k_v_delta: if classification.empirical >= EmpiricalLevel::E3Cryptographic {
+            base_delta * 0.1
+        } else {
+            0.0
+        },
+    }
+}
+
+/// K-Vector delta values for epistemic-weighted updates
+#[derive(Debug, Clone, Default)]
+pub struct KVectorDelta {
+    /// Reputation change
+    pub k_r_delta: f32,
+    /// Performance change
+    pub k_p_delta: f32,
+    /// Historical change
+    pub k_h_delta: f32,
+    /// Verification status change
+    pub k_v_delta: f32,
+}
+
+impl KVectorDelta {
+    /// Apply delta to a K-Vector
+    pub fn apply(&self, kvector: &crate::matl::KVector) -> crate::matl::KVector {
+        crate::matl::KVector::new(
+            (kvector.k_r + self.k_r_delta).clamp(0.0, 1.0),
+            kvector.k_a,
+            kvector.k_i,
+            (kvector.k_p + self.k_p_delta).clamp(0.0, 1.0),
+            kvector.k_m,
+            kvector.k_s,
+            (kvector.k_h + self.k_h_delta).clamp(0.0, 1.0),
+            kvector.k_topo,
+            (kvector.k_v + self.k_v_delta).clamp(0.0, 1.0),
+            kvector.k_phi,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -542,5 +920,268 @@ mod tests {
             .build();
 
         assert!(result.is_err());
+    }
+
+    // =========================================================================
+    // Content Analyzer Tests
+    // =========================================================================
+
+    #[test]
+    fn test_content_analyzer_crypto_keywords() {
+        let analyzer = ContentAnalyzer::default();
+
+        let crypto_text = "This claim is backed by a zero-knowledge proof and cryptographic signature";
+        let hints = analyzer.analyze_text(crypto_text);
+
+        assert!(hints.has_crypto_proof);
+    }
+
+    #[test]
+    fn test_content_analyzer_public_data() {
+        let analyzer = ContentAnalyzer::default();
+
+        let public_text = "Data is published on blockchain and publicly reproducible";
+        let hints = analyzer.analyze_text(public_text);
+
+        assert!(hints.uses_public_data);
+    }
+
+    #[test]
+    fn test_content_analyzer_scope_detection() {
+        let analyzer = ContentAnalyzer::default();
+
+        // Network scope
+        let network_text = "This protocol change affects the global network consensus";
+        let hints = analyzer.analyze_text(network_text);
+        assert_eq!(hints.agreement_scope, Some(AgreementScope::Network));
+
+        // Community scope
+        let community_text = "Local DAO community decision";
+        let hints = analyzer.analyze_text(community_text);
+        assert_eq!(hints.agreement_scope, Some(AgreementScope::Community));
+
+        // Axiomatic scope
+        let axiomatic_text = "This is a mathematical axiomatic truth";
+        let hints = analyzer.analyze_text(axiomatic_text);
+        assert_eq!(hints.agreement_scope, Some(AgreementScope::Axiomatic));
+    }
+
+    #[test]
+    fn test_content_analyzer_duration_detection() {
+        let analyzer = ContentAnalyzer::default();
+
+        // Foundational
+        let foundational_text = "This is a foundational permanent record";
+        let hints = analyzer.analyze_text(foundational_text);
+        assert_eq!(hints.relevance_duration, Some(RelevanceDuration::LongTerm));
+
+        // Medium-term (archive keyword without foundational keywords)
+        let archive_text = "Archive this data for later retrieval";
+        let hints = analyzer.analyze_text(archive_text);
+        assert_eq!(hints.relevance_duration, Some(RelevanceDuration::MediumTerm));
+
+        // Temporal
+        let temporal_text = "This is valid for the current session only";
+        let hints = analyzer.analyze_text(temporal_text);
+        assert_eq!(hints.relevance_duration, Some(RelevanceDuration::ShortTerm));
+    }
+
+    #[test]
+    fn test_content_analyzer_json() {
+        let analyzer = ContentAnalyzer::default();
+
+        let json = r#"{"proof": true, "public": true, "scope": "network", "retention": "forever"}"#;
+        let hints = analyzer.analyze_json(json);
+
+        assert!(hints.has_crypto_proof);
+        assert!(hints.uses_public_data);
+        assert_eq!(hints.agreement_scope, Some(AgreementScope::Network));
+        assert_eq!(hints.relevance_duration, Some(RelevanceDuration::LongTerm));
+    }
+
+    #[test]
+    fn test_auto_classify() {
+        // High epistemic content
+        let content = OutputContent::Text(
+            "This cryptographic proof is published on blockchain for global network verification".to_string()
+        );
+        let class = auto_classify(&content);
+
+        assert_eq!(class.empirical, EmpiricalLevel::E4PublicRepro);
+        assert_eq!(class.normative, NormativeLevel::N2Network);
+    }
+
+    #[test]
+    fn test_auto_classify_data_reference() {
+        let content = OutputContent::DataReference("ipfs://QmXyz123".to_string());
+        let class = auto_classify(&content);
+
+        // IPFS references are public and cryptographic
+        assert!(class.empirical >= EmpiricalLevel::E3Cryptographic);
+        assert_eq!(class.materiality, MaterialityLevel::M3Foundational);
+    }
+
+    // =========================================================================
+    // ZK Classifier Tests
+    // =========================================================================
+
+    #[test]
+    fn test_zk_classifier_elevates_to_e3() {
+        use crate::agentic::zk_trust::{KVectorCommitment, ProofData};
+
+        let classifier = ZKEpistemicClassifier::new();
+        let content = OutputContent::Text("Simple claim".to_string());
+
+        // Create a mock proof
+        let proof = TrustProof {
+            statement: ProofStatement::TrustExceedsThreshold { threshold: 0.5 },
+            commitment: KVectorCommitment {
+                commitment: [0u8; 32],
+                agent_id: "test".to_string(),
+                timestamp: 1000,
+                epoch: None,
+            },
+            proof_data: ProofData::Simulation {
+                verification_hash: [0u8; 32],
+                result: true,
+            },
+            created_at: 1000,
+            previous_commitment: None,
+        };
+
+        let class = classifier.classify_with_proof(&content, &proof, false);
+
+        // Should be at least E3 with proof
+        assert!(class.empirical >= EmpiricalLevel::E3Cryptographic);
+    }
+
+    #[test]
+    fn test_zk_classifier_public_is_e4() {
+        use crate::agentic::zk_trust::{KVectorCommitment, ProofData};
+
+        let classifier = ZKEpistemicClassifier::new();
+        let content = OutputContent::Text("Publicly verifiable claim".to_string());
+
+        let proof = TrustProof {
+            statement: ProofStatement::WellFormed,
+            commitment: KVectorCommitment {
+                commitment: [0u8; 32],
+                agent_id: "test".to_string(),
+                timestamp: 1000,
+                epoch: None,
+            },
+            proof_data: ProofData::Simulation {
+                verification_hash: [0u8; 32],
+                result: true,
+            },
+            created_at: 1000,
+            previous_commitment: None,
+        };
+
+        let class = classifier.classify_with_proof(&content, &proof, true);
+
+        // Should be E4 when publicly verifiable
+        assert_eq!(class.empirical, EmpiricalLevel::E4PublicRepro);
+    }
+
+    #[test]
+    fn test_zk_classifier_upgrade() {
+        let classifier = ZKEpistemicClassifier::new();
+
+        let low_class = EpistemicClassificationExtended::new(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M0Ephemeral,
+            HarmonicLevel::H0None,
+        );
+
+        let upgraded = classifier.upgrade_with_proof(&low_class, false);
+
+        // Should be upgraded to at least E3
+        assert_eq!(upgraded.empirical, EmpiricalLevel::E3Cryptographic);
+        // Materiality should also be upgraded
+        assert!(upgraded.materiality >= MaterialityLevel::M1Temporal);
+    }
+
+    #[test]
+    fn test_kvector_delta_from_epistemic() {
+        // High epistemic level
+        let high_class = EpistemicClassificationExtended::new(
+            EmpiricalLevel::E4PublicRepro,
+            NormativeLevel::N3Axiomatic,
+            MaterialityLevel::M3Foundational,
+            HarmonicLevel::H4Kosmic,
+        );
+
+        let high_delta = compute_kvector_delta_from_epistemic(&high_class, 0.1);
+
+        // Low epistemic level
+        let low_class = EpistemicClassificationExtended::new(
+            EmpiricalLevel::E0Null,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M0Ephemeral,
+            HarmonicLevel::H0None,
+        );
+
+        let low_delta = compute_kvector_delta_from_epistemic(&low_class, 0.1);
+
+        // High epistemic should produce larger deltas
+        assert!(high_delta.k_r_delta > low_delta.k_r_delta);
+        assert!(high_delta.k_p_delta > low_delta.k_p_delta);
+
+        // Only high E-level gets k_v boost
+        assert!(high_delta.k_v_delta > 0.0);
+        assert_eq!(low_delta.k_v_delta, 0.0);
+    }
+
+    #[test]
+    fn test_kvector_delta_apply() {
+        let kvector = crate::matl::KVector::new(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5);
+
+        let delta = KVectorDelta {
+            k_r_delta: 0.1,
+            k_p_delta: 0.05,
+            k_h_delta: 0.02,
+            k_v_delta: 0.01,
+        };
+
+        let updated = delta.apply(&kvector);
+
+        assert!((updated.k_r - 0.6).abs() < 0.001);
+        assert!((updated.k_p - 0.55).abs() < 0.001);
+        assert!((updated.k_h - 0.52).abs() < 0.001);
+        assert!((updated.k_v - 0.51).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_create_zk_output() {
+        use crate::agentic::zk_trust::{KVectorCommitment, ProofData};
+
+        let classifier = ZKEpistemicClassifier::new();
+        let content = OutputContent::Text("ZK-proven claim".to_string());
+
+        let proof = TrustProof {
+            statement: ProofStatement::IsVerified,
+            commitment: KVectorCommitment {
+                commitment: [1u8; 32],
+                agent_id: "zk-agent".to_string(),
+                timestamp: 2000,
+                epoch: Some(5),
+            },
+            proof_data: ProofData::Simulation {
+                verification_hash: [2u8; 32],
+                result: true,
+            },
+            created_at: 2000,
+            previous_commitment: None,
+        };
+
+        let output = classifier.create_zk_output("zk-agent", content, proof, false);
+
+        assert!(output.has_proof);
+        assert!(output.proof_data.is_some());
+        assert!(output.classification.empirical >= EmpiricalLevel::E3Cryptographic);
+        assert!(output.classification_confidence >= 0.9);
+        assert!(output.output_id.starts_with("zk-out-"));
     }
 }

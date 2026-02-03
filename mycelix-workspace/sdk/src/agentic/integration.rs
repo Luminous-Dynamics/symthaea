@@ -38,6 +38,12 @@ use crate::agentic::{
         check_zk_operation_phi, ZKOperationType, ZKPhiGatingResult, ZKGatingRecommendation,
         phi_weighted_attestation, CoherenceHistory, export_phi_metrics, PhiCoherenceExport,
     },
+    // Uncertainty (GIS)
+    uncertainty::{
+        MoralUncertainty, MoralUncertaintyType, MoralActionGuidance, EscalationRequest,
+        get_recommendations, should_proceed, maybe_escalate,
+    },
+    lifecycle::{gate_action_on_uncertainty, record_uncertainty_outcome, UncertaintyCheckResult},
 };
 use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel};
 use serde::{Deserialize, Serialize};
@@ -2094,6 +2100,418 @@ impl ZKIntegratedPipeline {
             network_coherence_level: CoherenceState::from_phi(avg_phi),
         }
     }
+
+    // =========================================================================
+    // Phase 4: GIS (Graceful Ignorance System) Integration
+    // =========================================================================
+
+    /// Process output with moral uncertainty assessment
+    ///
+    /// Combines ZK proof, epistemic classification, and moral uncertainty.
+    /// High uncertainty outputs are automatically escalated to sponsor.
+    pub fn process_zk_output_with_uncertainty(
+        &mut self,
+        agent_id: &str,
+        content: OutputContent,
+        statement: ProofStatement,
+        uncertainty: MoralUncertainty,
+    ) -> Result<GISOutputResult, IntegrationError> {
+        // Check if uncertainty allows proceeding
+        let guidance = MoralActionGuidance::from_uncertainty(&uncertainty);
+
+        if guidance.requires_human() {
+            // Create escalation request
+            let escalation = EscalationRequest::new(
+                agent_id,
+                uncertainty,
+                "zk_output_generation",
+                Some(format!("ZK proof statement: {:?}", statement)),
+            );
+
+            // Add to agent's pending escalations
+            if let Some(agent) = self.matl_pipeline.trust_pipeline.agents.get_mut(agent_id) {
+                agent.pending_escalations.push(escalation.clone());
+            }
+
+            return Ok(GISOutputResult {
+                output_result: None,
+                uncertainty,
+                guidance,
+                escalation: Some(escalation),
+                calibration_updated: false,
+            });
+        }
+
+        // Proceed with ZK output processing
+        let output_result = self.process_zk_output(agent_id, content, statement)?;
+
+        Ok(GISOutputResult {
+            output_result: Some(output_result),
+            uncertainty,
+            guidance,
+            escalation: None,
+            calibration_updated: false,
+        })
+    }
+
+    /// Infer moral uncertainty from output content characteristics
+    ///
+    /// Auto-estimates uncertainty based on:
+    /// - Epistemic level (lower E → higher epistemic uncertainty)
+    /// - Harmonic level (higher H → higher axiological uncertainty)
+    /// - Materiality level (higher M → higher deontic uncertainty)
+    pub fn infer_uncertainty_from_content(
+        &self,
+        content: &OutputContent,
+    ) -> MoralUncertainty {
+        use crate::agentic::epistemic_classifier::{auto_classify, ContentAnalyzer};
+
+        // Auto-classify the content
+        let classification = auto_classify(content);
+
+        // Infer epistemic uncertainty from E-level
+        // Lower E = less verifiable = higher uncertainty
+        let epistemic = match classification.empirical {
+            EmpiricalLevel::E4PublicRepro => 0.1,
+            EmpiricalLevel::E3Cryptographic => 0.2,
+            EmpiricalLevel::E2PrivateVerify => 0.4,
+            EmpiricalLevel::E1Testimonial => 0.6,
+            EmpiricalLevel::E0Null => 0.8,
+        };
+
+        // Infer axiological uncertainty from H-level
+        // Higher H = more values at stake = higher uncertainty
+        let axiological = match classification.harmonic {
+            HarmonicLevel::H0None => 0.1,
+            HarmonicLevel::H1Local => 0.25,
+            HarmonicLevel::H2Network => 0.4,
+            HarmonicLevel::H3Civilizational => 0.6,
+            HarmonicLevel::H4Kosmic => 0.8,
+        };
+
+        // Infer deontic uncertainty from M-level
+        // Higher M = more lasting impact = higher uncertainty
+        let deontic = match classification.materiality {
+            MaterialityLevel::M0Ephemeral => 0.1,
+            MaterialityLevel::M1Temporal => 0.25,
+            MaterialityLevel::M2Persistent => 0.45,
+            MaterialityLevel::M3Foundational => 0.7,
+        };
+
+        MoralUncertainty::new(epistemic, axiological, deontic)
+    }
+
+    /// Process output with auto-inferred uncertainty
+    ///
+    /// Combines content analysis, uncertainty inference, and ZK proof generation.
+    pub fn process_zk_output_auto_uncertainty(
+        &mut self,
+        agent_id: &str,
+        content: OutputContent,
+        statement: ProofStatement,
+    ) -> Result<GISOutputResult, IntegrationError> {
+        let uncertainty = self.infer_uncertainty_from_content(&content);
+        self.process_zk_output_with_uncertainty(agent_id, content, statement, uncertainty)
+    }
+
+    /// Record the outcome of an uncertainty-gated action
+    ///
+    /// Updates calibration tracking to improve future uncertainty estimates.
+    pub fn record_gis_outcome(
+        &mut self,
+        agent_id: &str,
+        was_uncertain: bool,
+        was_good_outcome: bool,
+    ) -> Result<CalibrationUpdateResult, IntegrationError> {
+        let agent = self.matl_pipeline.trust_pipeline.agents.get_mut(agent_id)
+            .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
+
+        let old_score = agent.uncertainty_calibration.calibration_score();
+
+        // Record the outcome
+        record_uncertainty_outcome(agent, was_uncertain, was_good_outcome);
+
+        let new_score = agent.uncertainty_calibration.calibration_score();
+
+        // Update K-Vector k_s (social/stability dimension) based on calibration
+        // Well-calibrated agents are more socially reliable
+        let calibration_delta = (new_score - old_score) * 0.1;
+        agent.k_vector.k_s = (agent.k_vector.k_s + calibration_delta).clamp(0.0, 1.0);
+
+        Ok(CalibrationUpdateResult {
+            agent_id: agent_id.to_string(),
+            old_calibration_score: old_score,
+            new_calibration_score: new_score,
+            k_s_delta: calibration_delta,
+            is_overconfident: agent.uncertainty_calibration.is_overconfident(),
+            is_overcautious: agent.uncertainty_calibration.is_overcautious(),
+            total_calibration_events: agent.uncertainty_calibration.total_events,
+        })
+    }
+
+    /// Process a resolved escalation from sponsor
+    ///
+    /// When a sponsor resolves an escalation, this updates calibration
+    /// and potentially allows the blocked action to proceed.
+    pub fn resolve_escalation(
+        &mut self,
+        agent_id: &str,
+        blocked_action: &str,
+        sponsor_approved: bool,
+    ) -> Result<EscalationResolutionResult, IntegrationError> {
+        let agent = self.matl_pipeline.trust_pipeline.agents.get_mut(agent_id)
+            .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
+
+        // Find and remove the escalation
+        let escalation_idx = agent.pending_escalations.iter()
+            .position(|e| e.blocked_action == blocked_action)
+            .ok_or_else(|| IntegrationError::ZKError(
+                format!("No pending escalation for action: {}", blocked_action)
+            ))?;
+
+        let escalation = agent.pending_escalations.remove(escalation_idx);
+
+        // Update calibration: agent was uncertain, outcome determined by sponsor
+        // If sponsor approved, the uncertainty may have been overcautious
+        // If sponsor rejected, the uncertainty was appropriate
+        record_uncertainty_outcome(agent, true, sponsor_approved);
+
+        Ok(EscalationResolutionResult {
+            agent_id: agent_id.to_string(),
+            blocked_action: blocked_action.to_string(),
+            sponsor_approved,
+            escalation,
+            calibration_updated: true,
+            new_calibration_score: agent.uncertainty_calibration.calibration_score(),
+        })
+    }
+
+    /// Check action gating with combined Phi coherence and moral uncertainty
+    ///
+    /// Both coherence and uncertainty must be acceptable for action to proceed.
+    pub fn check_combined_gating(
+        &self,
+        agent_id: &str,
+        uncertainty: &MoralUncertainty,
+        zk_operation: ZKOperationType,
+    ) -> Result<CombinedGatingResult, IntegrationError> {
+        // Check Phi coherence
+        let phi_gating = self.check_phi_for_zk_operation(agent_id, zk_operation)?;
+
+        // Check moral uncertainty
+        let guidance = MoralActionGuidance::from_uncertainty(uncertainty);
+
+        let permitted = phi_gating.permitted && guidance.can_proceed();
+
+        let recommendation = if !phi_gating.permitted {
+            CombinedGatingRecommendation::WaitForCoherence
+        } else if guidance.requires_human() {
+            CombinedGatingRecommendation::EscalateForUncertainty
+        } else if !guidance.can_proceed() {
+            CombinedGatingRecommendation::PauseForReflection
+        } else {
+            CombinedGatingRecommendation::Proceed
+        };
+
+        Ok(CombinedGatingResult {
+            permitted,
+            phi_gating,
+            uncertainty_guidance: guidance,
+            recommendation,
+            requires_escalation: guidance.requires_human(),
+        })
+    }
+
+    /// Get agent's uncertainty calibration summary
+    pub fn get_calibration_summary(&self, agent_id: &str) -> Result<CalibrationSummary, IntegrationError> {
+        let agent = self.matl_pipeline.trust_pipeline().get_agent(agent_id)
+            .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
+
+        let cal = &agent.uncertainty_calibration;
+
+        Ok(CalibrationSummary {
+            agent_id: agent_id.to_string(),
+            calibration_score: cal.calibration_score(),
+            total_events: cal.total_events,
+            appropriate_uncertainty: cal.appropriate_uncertainty,
+            appropriate_confidence: cal.appropriate_confidence,
+            overconfident: cal.overconfident,
+            overcautious: cal.overcautious,
+            tendency: if cal.is_overconfident() {
+                CalibrationTendency::Overconfident
+            } else if cal.is_overcautious() {
+                CalibrationTendency::Overcautious
+            } else {
+                CalibrationTendency::WellCalibrated
+            },
+        })
+    }
+
+    /// Get network-wide GIS health summary
+    pub fn gis_network_health(&self) -> GISNetworkHealth {
+        let agents = self.matl_pipeline.trust_pipeline().agents();
+
+        let mut total_calibration = 0.0;
+        let mut pending_escalations = 0;
+        let mut overconfident_count = 0;
+        let mut overcautious_count = 0;
+
+        for agent in agents.values() {
+            total_calibration += agent.uncertainty_calibration.calibration_score() as f64;
+            pending_escalations += agent.pending_escalations.len();
+
+            if agent.uncertainty_calibration.is_overconfident() {
+                overconfident_count += 1;
+            }
+            if agent.uncertainty_calibration.is_overcautious() {
+                overcautious_count += 1;
+            }
+        }
+
+        let agent_count = agents.len();
+        let avg_calibration = if agent_count > 0 {
+            total_calibration / agent_count as f64
+        } else {
+            0.5
+        };
+
+        GISNetworkHealth {
+            agent_count,
+            average_calibration_score: avg_calibration,
+            pending_escalations_total: pending_escalations,
+            overconfident_agents: overconfident_count,
+            overcautious_agents: overcautious_count,
+            well_calibrated_agents: agent_count - overconfident_count - overcautious_count,
+        }
+    }
+}
+
+/// Result of processing a GIS-aware output
+#[derive(Debug, Clone)]
+pub struct GISOutputResult {
+    /// The ZK output result (if not escalated)
+    pub output_result: Option<ZKOutputResult>,
+    /// Moral uncertainty assessment
+    pub uncertainty: MoralUncertainty,
+    /// Action guidance
+    pub guidance: MoralActionGuidance,
+    /// Escalation request (if uncertainty triggered escalation)
+    pub escalation: Option<EscalationRequest>,
+    /// Whether calibration was updated
+    pub calibration_updated: bool,
+}
+
+/// Result of updating uncertainty calibration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CalibrationUpdateResult {
+    /// Agent ID
+    pub agent_id: String,
+    /// Previous calibration score
+    pub old_calibration_score: f32,
+    /// New calibration score
+    pub new_calibration_score: f32,
+    /// Change in k_s (stability dimension)
+    pub k_s_delta: f32,
+    /// Whether agent tends to be overconfident
+    pub is_overconfident: bool,
+    /// Whether agent tends to be overcautious
+    pub is_overcautious: bool,
+    /// Total calibration events recorded
+    pub total_calibration_events: u32,
+}
+
+/// Result of resolving an escalation
+#[derive(Debug, Clone)]
+pub struct EscalationResolutionResult {
+    /// Agent ID
+    pub agent_id: String,
+    /// Action that was blocked
+    pub blocked_action: String,
+    /// Whether sponsor approved
+    pub sponsor_approved: bool,
+    /// The resolved escalation
+    pub escalation: EscalationRequest,
+    /// Whether calibration was updated
+    pub calibration_updated: bool,
+    /// New calibration score
+    pub new_calibration_score: f32,
+}
+
+/// Combined gating result (Phi + uncertainty)
+#[derive(Debug, Clone)]
+pub struct CombinedGatingResult {
+    /// Whether action is permitted
+    pub permitted: bool,
+    /// Phi gating result
+    pub phi_gating: ZKPhiGatingResult,
+    /// Uncertainty guidance
+    pub uncertainty_guidance: MoralActionGuidance,
+    /// Combined recommendation
+    pub recommendation: CombinedGatingRecommendation,
+    /// Whether escalation is required
+    pub requires_escalation: bool,
+}
+
+/// Combined gating recommendation
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CombinedGatingRecommendation {
+    /// Proceed with action
+    Proceed,
+    /// Wait for Phi coherence to improve
+    WaitForCoherence,
+    /// Pause for reflection (uncertainty)
+    PauseForReflection,
+    /// Escalate to sponsor for uncertainty
+    EscalateForUncertainty,
+}
+
+/// Summary of agent's uncertainty calibration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CalibrationSummary {
+    /// Agent ID
+    pub agent_id: String,
+    /// Overall calibration score (0-1)
+    pub calibration_score: f32,
+    /// Total calibration events
+    pub total_events: u32,
+    /// Times appropriately uncertain
+    pub appropriate_uncertainty: u32,
+    /// Times appropriately confident
+    pub appropriate_confidence: u32,
+    /// Times overconfident
+    pub overconfident: u32,
+    /// Times overcautious
+    pub overcautious: u32,
+    /// Calibration tendency
+    pub tendency: CalibrationTendency,
+}
+
+/// Agent's calibration tendency
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CalibrationTendency {
+    /// Agent is well-calibrated
+    WellCalibrated,
+    /// Agent tends to be overconfident
+    Overconfident,
+    /// Agent tends to be overcautious
+    Overcautious,
+}
+
+/// Network-wide GIS health metrics
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GISNetworkHealth {
+    /// Total number of agents
+    pub agent_count: usize,
+    /// Average calibration score across agents
+    pub average_calibration_score: f64,
+    /// Total pending escalations
+    pub pending_escalations_total: usize,
+    /// Number of overconfident agents
+    pub overconfident_agents: usize,
+    /// Number of overcautious agents
+    pub overcautious_agents: usize,
+    /// Number of well-calibrated agents
+    pub well_calibrated_agents: usize,
 }
 
 /// Information about a Phi update
@@ -2262,6 +2680,63 @@ impl ObservabilityExports {
             self.counter_inc("phi_state_transitions_total", 1.0, labels,
                 "Total Phi state transitions");
         }
+    }
+
+    /// Export GIS calibration metrics for an agent
+    pub fn export_gis_calibration(&mut self, summary: &CalibrationSummary) {
+        let mut labels = HashMap::new();
+        labels.insert("agent_id".to_string(), summary.agent_id.clone());
+        labels.insert("tendency".to_string(), format!("{:?}", summary.tendency));
+
+        self.gauge("gis_calibration_score", summary.calibration_score as f64, labels.clone(),
+            "Agent uncertainty calibration score");
+        self.gauge("gis_total_events", summary.total_events as f64, labels.clone(),
+            "Total calibration events");
+        self.gauge("gis_appropriate_uncertainty", summary.appropriate_uncertainty as f64, labels.clone(),
+            "Times appropriately uncertain");
+        self.gauge("gis_appropriate_confidence", summary.appropriate_confidence as f64, labels.clone(),
+            "Times appropriately confident");
+        self.gauge("gis_overconfident", summary.overconfident as f64, labels.clone(),
+            "Times overconfident");
+        self.gauge("gis_overcautious", summary.overcautious as f64, labels,
+            "Times overcautious");
+    }
+
+    /// Export GIS network health metrics
+    pub fn export_gis_network_health(&mut self, health: &GISNetworkHealth) {
+        let mut labels = HashMap::new();
+        labels.insert("source".to_string(), "gis_network".to_string());
+
+        self.gauge("gis_network_agent_count", health.agent_count as f64, labels.clone(),
+            "Total agents in network");
+        self.gauge("gis_network_avg_calibration", health.average_calibration_score, labels.clone(),
+            "Network-wide average calibration score");
+        self.gauge("gis_network_pending_escalations", health.pending_escalations_total as f64, labels.clone(),
+            "Total pending escalations");
+        self.gauge("gis_network_overconfident", health.overconfident_agents as f64, labels.clone(),
+            "Number of overconfident agents");
+        self.gauge("gis_network_overcautious", health.overcautious_agents as f64, labels.clone(),
+            "Number of overcautious agents");
+        self.gauge("gis_network_well_calibrated", health.well_calibrated_agents as f64, labels,
+            "Number of well-calibrated agents");
+    }
+
+    /// Export escalation event
+    pub fn export_gis_escalation(&mut self, escalation: &EscalationRequest) {
+        let mut labels = HashMap::new();
+        labels.insert("agent_id".to_string(), escalation.agent_id.clone());
+        labels.insert("guidance".to_string(), format!("{:?}", escalation.guidance));
+        labels.insert("action".to_string(), escalation.blocked_action.clone());
+
+        self.counter_inc("gis_escalations_total", 1.0, labels.clone(),
+            "Total escalations to sponsors");
+
+        self.gauge("gis_escalation_epistemic", escalation.uncertainty.epistemic as f64, labels.clone(),
+            "Epistemic uncertainty at escalation");
+        self.gauge("gis_escalation_axiological", escalation.uncertainty.axiological as f64, labels.clone(),
+            "Axiological uncertainty at escalation");
+        self.gauge("gis_escalation_deontic", escalation.uncertainty.deontic as f64, labels,
+            "Deontic uncertainty at escalation");
     }
 }
 
@@ -3190,8 +3665,8 @@ mod tests {
             ProofStatement::WellFormed,
         );
 
-        // Should have some valid proofs
-        assert!(aggregate.valid_count > 0);
+        // Should have some proofs included
+        assert!(aggregate.total_count > 0);
     }
 
     #[test]

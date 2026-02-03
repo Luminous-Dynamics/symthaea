@@ -528,6 +528,222 @@ pub fn update_agent_coherence(
     }
 }
 
+// ============================================================================
+// ZK Operation Phi Gating
+// ============================================================================
+
+/// ZK operation types that can be gated by Phi coherence
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ZKOperationType {
+    /// Generate a trust proof
+    GenerateProof,
+    /// Verify a trust proof
+    VerifyProof,
+    /// Create K-Vector commitment
+    CreateCommitment,
+    /// Prove trust improvement
+    ProveImprovement,
+    /// Aggregate proofs (high stakes)
+    AggregateProofs,
+    /// Participate in Byzantine consensus
+    ByzantineConsensus,
+}
+
+impl ZKOperationType {
+    /// Get the minimum coherence state required for this operation
+    pub fn required_coherence(&self) -> CoherenceState {
+        match self {
+            // Low-stakes: available to most agents
+            Self::VerifyProof => CoherenceState::Degraded,
+            Self::CreateCommitment => CoherenceState::Unstable,
+            // Medium-stakes: require stable coherence
+            Self::GenerateProof => CoherenceState::Stable,
+            Self::ProveImprovement => CoherenceState::Stable,
+            // High-stakes: require good coherence
+            Self::AggregateProofs => CoherenceState::Stable,
+            Self::ByzantineConsensus => CoherenceState::Coherent,
+        }
+    }
+
+    /// Check if this is a high-stakes operation
+    pub fn is_high_stakes(&self) -> bool {
+        matches!(self, Self::AggregateProofs | Self::ByzantineConsensus)
+    }
+}
+
+/// Result of ZK operation Phi gating check
+#[derive(Debug, Clone)]
+pub struct ZKPhiGatingResult {
+    /// Whether the operation is permitted
+    pub permitted: bool,
+    /// Current coherence state
+    pub current_state: CoherenceState,
+    /// Required coherence state
+    pub required_state: CoherenceState,
+    /// Current Phi value
+    pub current_phi: f64,
+    /// Recommendation for the agent
+    pub recommendation: ZKGatingRecommendation,
+}
+
+/// Recommendations for ZK gating decisions
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ZKGatingRecommendation {
+    /// Proceed with operation
+    Proceed,
+    /// Wait for coherence to improve
+    WaitForCoherence,
+    /// Use a lower-stakes alternative
+    UseLowerStakesAlternative,
+    /// Escalate to sponsor for approval
+    EscalateToSponsor,
+    /// Operation denied
+    Deny,
+}
+
+/// Check if a ZK operation is permitted based on agent's Phi coherence
+pub fn check_zk_operation_phi(
+    agent: &InstrumentalActor,
+    operation: ZKOperationType,
+) -> ZKPhiGatingResult {
+    let current_phi = agent.k_vector.k_phi as f64;
+    let current_state = CoherenceState::from_phi(current_phi);
+    let required_state = operation.required_coherence();
+
+    // Compare states (higher state index = more restrictive)
+    let state_order = |s: &CoherenceState| -> u8 {
+        match s {
+            CoherenceState::Coherent => 4,
+            CoherenceState::Stable => 3,
+            CoherenceState::Unstable => 2,
+            CoherenceState::Degraded => 1,
+            CoherenceState::Critical => 0,
+        }
+    };
+
+    let permitted = state_order(&current_state) >= state_order(&required_state);
+
+    let recommendation = if permitted {
+        ZKGatingRecommendation::Proceed
+    } else if current_state == CoherenceState::Critical {
+        ZKGatingRecommendation::Deny
+    } else if operation.is_high_stakes() {
+        ZKGatingRecommendation::EscalateToSponsor
+    } else if state_order(&current_state) + 1 >= state_order(&required_state) {
+        // Close to threshold - might improve soon
+        ZKGatingRecommendation::WaitForCoherence
+    } else {
+        ZKGatingRecommendation::UseLowerStakesAlternative
+    };
+
+    ZKPhiGatingResult {
+        permitted,
+        current_state,
+        required_state,
+        current_phi,
+        recommendation,
+    }
+}
+
+/// Check if agent can participate in Byzantine consensus
+pub fn check_byzantine_participation(agent: &InstrumentalActor) -> ZKPhiGatingResult {
+    check_zk_operation_phi(agent, ZKOperationType::ByzantineConsensus)
+}
+
+/// Check if agent can generate trust proofs
+pub fn check_proof_generation(agent: &InstrumentalActor) -> ZKPhiGatingResult {
+    check_zk_operation_phi(agent, ZKOperationType::GenerateProof)
+}
+
+/// Check if agent can aggregate proofs
+pub fn check_proof_aggregation(agent: &InstrumentalActor) -> ZKPhiGatingResult {
+    check_zk_operation_phi(agent, ZKOperationType::AggregateProofs)
+}
+
+// ============================================================================
+// Phi-Weighted Trust Updates
+// ============================================================================
+
+/// Calculate a Phi-weighted multiplier for trust updates
+///
+/// Higher coherence = updates have more impact
+/// Lower coherence = updates are dampened
+pub fn phi_weight_multiplier(phi: f64) -> f64 {
+    // Non-linear scaling: sqrt gives more weight to moderate phi
+    // Range: 0.0 (phi=0) to 1.0 (phi=1)
+    phi.sqrt().clamp(0.0, 1.0)
+}
+
+/// Apply Phi-weighting to a K-Vector trust delta
+pub fn apply_phi_weighting_to_delta(
+    base_delta: f32,
+    phi: f64,
+) -> f32 {
+    let multiplier = phi_weight_multiplier(phi);
+    (base_delta * multiplier as f32).clamp(-0.5, 0.5)
+}
+
+/// Phi-weighted attestation value
+///
+/// Attestations from high-coherence agents are weighted more heavily
+/// in Byzantine aggregation and consensus.
+pub fn phi_weighted_attestation(
+    attestation_value: f32,
+    attester_phi: f64,
+) -> f32 {
+    let weight = phi_weight_multiplier(attester_phi);
+    attestation_value * weight as f32
+}
+
+// ============================================================================
+// Observability Export
+// ============================================================================
+
+/// Export Phi coherence metrics for observability
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhiCoherenceExport {
+    /// Agent ID
+    pub agent_id: String,
+    /// Current Phi value
+    pub phi: f64,
+    /// Coherence state
+    pub coherence_state: String,
+    /// K-Vector k_phi dimension
+    pub k_phi: f32,
+    /// Sample size used for measurement
+    pub sample_size: usize,
+    /// Trend direction
+    pub trend: i8,
+    /// Rolling average
+    pub rolling_phi: f64,
+    /// Can perform high-stakes actions
+    pub can_high_stakes: bool,
+    /// Is critical (blocked)
+    pub is_critical: bool,
+}
+
+/// Export agent's Phi coherence metrics
+pub fn export_phi_metrics(
+    agent_id: &str,
+    agent: &InstrumentalActor,
+    history: &CoherenceHistory,
+) -> PhiCoherenceExport {
+    let phi = agent.k_vector.k_phi as f64;
+    let state = CoherenceState::from_phi(phi);
+
+    PhiCoherenceExport {
+        agent_id: agent_id.to_string(),
+        phi,
+        coherence_state: format!("{:?}", state),
+        k_phi: agent.k_vector.k_phi,
+        sample_size: agent.output_history.len(),
+        trend: history.trend,
+        rolling_phi: history.rolling_phi,
+        can_high_stakes: state.allows_high_stakes(),
+        is_critical: matches!(state, CoherenceState::Critical),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -655,5 +871,154 @@ mod tests {
 
         // Should return None for insufficient outputs
         assert!(result.is_none());
+    }
+
+    // =========================================================================
+    // ZK Phi Gating Tests
+    // =========================================================================
+
+    use crate::matl::KVector;
+    use crate::agentic::{AgentId, AgentClass, AgentConstraints, AgentStatus, UncertaintyCalibration};
+    use crate::agentic::epistemic_classifier::EpistemicStats;
+
+    fn create_test_agent_with_phi(phi: f32) -> InstrumentalActor {
+        InstrumentalActor {
+            agent_id: AgentId::from_string("test-agent".to_string()),
+            sponsor_did: "did:example:sponsor".to_string(),
+            agent_class: AgentClass::Supervised,
+            kredit_balance: 5000,
+            kredit_cap: 10000,
+            constraints: AgentConstraints::default(),
+            behavior_log: vec![],
+            status: AgentStatus::Active,
+            created_at: 1000,
+            last_activity: 2000,
+            actions_this_hour: 5,
+            k_vector: KVector::new(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, phi),
+            epistemic_stats: EpistemicStats::default(),
+            output_history: vec![],
+            uncertainty_calibration: UncertaintyCalibration::default(),
+            pending_escalations: vec![],
+        }
+    }
+
+    #[test]
+    fn test_zk_operation_type_required_coherence() {
+        // Low-stakes operations have lower requirements
+        assert_eq!(ZKOperationType::VerifyProof.required_coherence(), CoherenceState::Degraded);
+
+        // High-stakes operations require high coherence
+        assert_eq!(ZKOperationType::ByzantineConsensus.required_coherence(), CoherenceState::Coherent);
+    }
+
+    #[test]
+    fn test_zk_gating_coherent_agent() {
+        let agent = create_test_agent_with_phi(0.8); // Coherent
+
+        // Should be able to do all operations
+        let result = check_zk_operation_phi(&agent, ZKOperationType::ByzantineConsensus);
+        assert!(result.permitted);
+        assert_eq!(result.recommendation, ZKGatingRecommendation::Proceed);
+
+        let result = check_zk_operation_phi(&agent, ZKOperationType::GenerateProof);
+        assert!(result.permitted);
+    }
+
+    #[test]
+    fn test_zk_gating_degraded_agent() {
+        let agent = create_test_agent_with_phi(0.2); // Degraded
+
+        // Can verify proofs
+        let result = check_zk_operation_phi(&agent, ZKOperationType::VerifyProof);
+        assert!(result.permitted);
+
+        // Cannot participate in Byzantine consensus
+        let result = check_zk_operation_phi(&agent, ZKOperationType::ByzantineConsensus);
+        assert!(!result.permitted);
+        assert_eq!(result.recommendation, ZKGatingRecommendation::EscalateToSponsor);
+    }
+
+    #[test]
+    fn test_zk_gating_critical_agent() {
+        let agent = create_test_agent_with_phi(0.05); // Critical
+
+        // Cannot do anything
+        let result = check_zk_operation_phi(&agent, ZKOperationType::VerifyProof);
+        assert!(!result.permitted);
+        assert_eq!(result.recommendation, ZKGatingRecommendation::Deny);
+    }
+
+    #[test]
+    fn test_phi_weight_multiplier() {
+        // High phi = high weight
+        assert!((phi_weight_multiplier(1.0) - 1.0).abs() < 0.001);
+
+        // Low phi = low weight
+        assert!(phi_weight_multiplier(0.1) < 0.4);
+
+        // Zero phi = zero weight
+        assert!(phi_weight_multiplier(0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_apply_phi_weighting_to_delta() {
+        // High coherence: delta passes through mostly unchanged
+        let high_phi_delta = apply_phi_weighting_to_delta(0.1, 0.9);
+        assert!(high_phi_delta > 0.08);
+
+        // Low coherence: delta is dampened
+        let low_phi_delta = apply_phi_weighting_to_delta(0.1, 0.25);
+        assert!(low_phi_delta < 0.06);
+
+        // Zero coherence: delta is zero
+        let zero_phi_delta = apply_phi_weighting_to_delta(0.1, 0.0);
+        assert!(zero_phi_delta.abs() < 0.001);
+    }
+
+    #[test]
+    fn test_phi_weighted_attestation() {
+        // High-coherence attester's attestation weighted more
+        let high_attestation = phi_weighted_attestation(1.0, 0.9);
+        let low_attestation = phi_weighted_attestation(1.0, 0.2);
+
+        assert!(high_attestation > low_attestation);
+        assert!(high_attestation > 0.9);
+        assert!(low_attestation < 0.5);
+    }
+
+    #[test]
+    fn test_export_phi_metrics() {
+        let agent = create_test_agent_with_phi(0.65);
+        let history = CoherenceHistory::default();
+
+        let export = export_phi_metrics("agent-123", &agent, &history);
+
+        assert_eq!(export.agent_id, "agent-123");
+        assert!((export.phi - 0.65).abs() < 0.01);
+        assert_eq!(export.coherence_state, "Stable");
+        assert!(export.can_high_stakes);
+        assert!(!export.is_critical);
+    }
+
+    #[test]
+    fn test_byzantine_participation_check() {
+        let coherent_agent = create_test_agent_with_phi(0.75);
+        let result = check_byzantine_participation(&coherent_agent);
+        assert!(result.permitted);
+
+        let unstable_agent = create_test_agent_with_phi(0.4);
+        let result = check_byzantine_participation(&unstable_agent);
+        assert!(!result.permitted);
+    }
+
+    #[test]
+    fn test_proof_generation_check() {
+        let stable_agent = create_test_agent_with_phi(0.55);
+        let result = check_proof_generation(&stable_agent);
+        assert!(result.permitted);
+
+        let degraded_agent = create_test_agent_with_phi(0.15);
+        let result = check_proof_generation(&degraded_agent);
+        assert!(!result.permitted);
     }
 }
