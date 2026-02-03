@@ -1,6 +1,6 @@
 {
   "key": "proof:round-1:client-001",
-  "data": "{\"gradient_hash\":\"0x1234...abcd\",\"epochs\":5,\"learning_rate\":0.01,\"norm_valid\":true,\"client_id\":\"client-001\",\"round\":1}",
+  "data": "{\"client_id\":\"client-001\",\"epochs\":5,\"gradient_hash\":\"0x1234...abcd\",\"learning_rate\":0.01,\"norm_valid\":true,\"round\":1}",
   "classification": {
     "empirical": "E3Cryptographic",
     "normative": "N2Network",
@@ -11,11 +11,11 @@
     "version": "1.0",
     "family": null
   },
-  "stored_at": 1769963405746,
+  "stored_at": 1770118193063,
   "modified_at": null,
   "created_by": "fl-aggregator",
-  "expires_at": 1770568205746,
-  "cid": "4de28e461262b4be2cff57f80bfe88fe",
-  "version": 29,
+  "expires_at": 1770722993063,
+  "cid": "5f3b17652544245af32c09b72d6085ae",
+  "version": 32,
   "size_bytes": 136
 }

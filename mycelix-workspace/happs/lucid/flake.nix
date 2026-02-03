@@ -12,9 +12,10 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
 
-    # Holochain from holonix
+    # Holochain from holonix - using stable 0.6.x release (recommended)
+    # Compatible with: Tryorama 0.19.0, @holochain/client 0.20.0
     holonix = {
-      url = "github:holochain/holonix/main";
+      url = "github:holochain/holonix/main-0.6";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -38,6 +39,7 @@
         holochainPackages = holonix.packages.${system};
 
         # Rust toolchain with wasm32 target
+        # Use latest stable Rust for zome builds (wasmer issues affect sweettest only)
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
           extensions = [ "rust-src" "rust-analyzer" ];
           targets = [ "wasm32-unknown-unknown" ];

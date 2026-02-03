@@ -17,7 +17,10 @@
 //! - `k_phi` (Coherence): Integrated information / consciousness metric (Φ)
 //!
 //! Trust Score Formula (weighted average):
-//!   T = 0.24×k_r + 0.11×k_a + 0.19×k_i + 0.11×k_p + 0.05×k_m + 0.07×k_s + 0.05×k_h + 0.04×k_topo + 0.09×k_v + 0.05×k_phi
+//!   T = 0.25×k_r + 0.11×k_a + 0.20×k_i + 0.11×k_p + 0.05×k_m + 0.07×k_s + 0.05×k_h + 0.04×k_topo + 0.12×k_v
+//!
+//! Note: k_phi (Coherence) is tracked but has 0% weight in trust calculation.
+//! Phi coherence is used for gating high-stakes operations, not trust scoring.
 //!
 //! ## Performance Optimizations
 //!
@@ -85,36 +88,43 @@ pub struct KVector {
     /// - 1.0: Fully verified with ZK proofs and active attestations
     pub k_v: f32,
 
-    /// k_phi: Coherence - Integrated information / consciousness metric (0.0-1.0)
-    /// Weight: 0.05 (5%)
+    /// k_phi: Coherence - Output consistency metric (0.0-1.0)
+    /// Weight: 0.00 (0%) - TRACKED FOR GATING ONLY, NOT USED IN TRUST SCORE
     ///
-    /// Measures the agent's coherence based on Integrated Information Theory (IIT):
-    /// - 0.0: No coherent behavior observed
-    /// - 0.3: Low coherence, scattered behavior patterns
-    /// - 0.5: Moderate coherence, some consistent patterns
-    /// - 0.7: High coherence, well-integrated behavior
-    /// - 0.9: Very high coherence, emergent intelligence indicators
-    /// - 1.0: Maximum coherence, fully integrated agent
+    /// Measures the agent's output coherence over time:
+    /// - 0.0-0.1: Critical - agent should be suspended
+    /// - 0.1-0.3: Degraded - restricted operations only
+    /// - 0.3-0.5: Unstable - monitoring required
+    /// - 0.5-0.7: Stable - normal operations allowed
+    /// - 0.7-1.0: Coherent - high-stakes operations allowed
+    ///
+    /// This value is used by ZK operation gating (see phi_bridge.rs) to prevent
+    /// incoherent agents from performing critical operations. It does NOT affect
+    /// the trust score calculation.
     pub k_phi: f32,
 }
 
 /// Default weights for K-Vector trust score calculation
+///
+/// Note: k_phi weight is 0% - coherence is tracked for gating but doesn't affect trust score.
+/// The 5% that was on k_phi has been redistributed to k_r (+1%), k_i (+1%), and k_v (+3%).
 pub const KVECTOR_WEIGHTS: KVectorWeights = KVectorWeights {
-    w_r: 0.24,     // Reputation
+    w_r: 0.25,     // Reputation (was 0.24)
     w_a: 0.11,     // Activity
-    w_i: 0.19,     // Integrity
+    w_i: 0.20,     // Integrity (was 0.19)
     w_p: 0.11,     // Performance
     w_m: 0.05,     // Membership
     w_s: 0.07,     // Stake
     w_h: 0.05,     // Historical
     w_topo: 0.04,  // Topology
-    w_v: 0.09,     // Verification
-    w_phi: 0.05,   // Coherence (Phi)
+    w_v: 0.12,     // Verification (was 0.09)
+    w_phi: 0.00,   // Coherence - tracked but not weighted (used for gating only)
 };
 
 /// Pre-computed weight array for SIMD-friendly operations
 /// Order: [k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo, k_v, k_phi]
-pub const KVECTOR_WEIGHTS_ARRAY: [f32; 10] = [0.24, 0.11, 0.19, 0.11, 0.05, 0.07, 0.05, 0.04, 0.09, 0.05];
+/// Note: k_phi (index 9) has 0 weight - tracked for gating, not scoring
+pub const KVECTOR_WEIGHTS_ARRAY: [f32; 10] = [0.25, 0.11, 0.20, 0.11, 0.05, 0.07, 0.05, 0.04, 0.12, 0.00];
 
 /// Configurable weights for K-Vector components
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

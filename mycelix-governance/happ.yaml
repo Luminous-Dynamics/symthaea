@@ -1,0 +1,15 @@
+---
+manifest_version: "0"
+name: mycelix-governance
+roles:
+  - name: governance
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: "./dna/mycelix_governance.dna"
+      modifiers:
+        network_seed: ~
+        properties: ~
+        origin_time: ~
+        quantum_time: ~

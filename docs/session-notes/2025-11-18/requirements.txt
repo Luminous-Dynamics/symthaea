@@ -1,6 +1,0 @@
-# K-Index Experiments Requirements
-# Python 3.8+
-
-numpy>=1.20.0
-scipy>=1.7.0
-matplotlib>=3.4.0

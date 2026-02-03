@@ -1,23 +1,24 @@
-//! Phi Query Router - Consciousness-Aware Knowledge Graph Queries
+//! Phi Query Router - Coherence-Based Query Routing
 //!
-//! Routes DKG queries based on agent coherence levels, prioritizes results
-//! from coherent sources, and implements KREDIT cost deduction.
+//! Routes DKG queries based on agent coherence levels.
 //!
-//! # Routing Strategy
+//! # DEPRECATION NOTICE
+//!
+//! This module uses Phi (coherence) for query routing, which is over-engineered.
+//! Consider using trust score instead:
+//! - Trust score already captures agent reliability
+//! - Phi adds complexity without clear benefit for query routing
+//! - Cost multipliers based on "consciousness" are arbitrary
+//!
+//! **Recommended alternative**: Use `agent.k_vector.trust_score()` for access control
+//! and KREDIT pricing, not Phi coherence.
+//!
+//! # Current Routing Strategy (DEPRECATED)
 //!
 //! 1. **Coherent agents** (Phi >= 0.7): Full access, priority results, lower costs
 //! 2. **Stable agents** (Phi 0.5-0.7): Standard access, normal costs
-//! 3. **Unstable agents** (Phi 0.3-0.5): Limited access, higher costs, human approval for sensitive
-//! 4. **Degraded/Critical** (Phi < 0.3): Restricted access, maximum costs, mandatory approval
-//!
-//! # Cost Model
-//!
-//! Base cost multiplied by coherence factor:
-//! - Coherent: 0.8x (20% discount)
-//! - Stable: 1.0x (normal)
-//! - Unstable: 1.5x (50% premium)
-//! - Degraded: 2.0x (100% premium)
-//! - Critical: 3.0x (200% premium)
+//! 3. **Unstable agents** (Phi 0.3-0.5): Limited access, higher costs
+//! 4. **Degraded/Critical** (Phi < 0.3): Restricted access, maximum costs
 
 use serde::{Deserialize, Serialize};
 use super::{

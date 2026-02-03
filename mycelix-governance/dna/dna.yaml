@@ -1,0 +1,61 @@
+---
+manifest_version: "0"
+name: mycelix_governance_dna
+
+integrity:
+  network_seed: "mycelix-governance-v1"
+  zomes:
+    - name: proposals_integrity
+      path: "../target/wasm32-unknown-unknown/release/proposals_integrity.wasm"
+
+    - name: voting_integrity
+      path: "../target/wasm32-unknown-unknown/release/voting_integrity.wasm"
+
+    - name: execution_integrity
+      path: "../target/wasm32-unknown-unknown/release/execution_integrity.wasm"
+
+    - name: constitution_integrity
+      path: "../target/wasm32-unknown-unknown/release/constitution_integrity.wasm"
+
+    - name: governance_bridge_integrity
+      path: "../target/wasm32-unknown-unknown/release/governance_bridge_integrity.wasm"
+
+    - name: threshold_signing_integrity
+      path: "../target/wasm32-unknown-unknown/release/threshold_signing_integrity.wasm"
+
+coordinator:
+  zomes:
+    - name: proposals
+      path: "../target/wasm32-unknown-unknown/release/proposals.wasm"
+      dependencies:
+        - name: proposals_integrity
+
+    - name: voting
+      path: "../target/wasm32-unknown-unknown/release/voting.wasm"
+      dependencies:
+        - name: voting_integrity
+        - name: proposals_integrity
+
+    - name: execution
+      path: "../target/wasm32-unknown-unknown/release/execution.wasm"
+      dependencies:
+        - name: execution_integrity
+        - name: proposals_integrity
+
+    - name: constitution
+      path: "../target/wasm32-unknown-unknown/release/constitution.wasm"
+      dependencies:
+        - name: constitution_integrity
+
+    - name: governance_bridge
+      path: "../target/wasm32-unknown-unknown/release/governance_bridge.wasm"
+      dependencies:
+        - name: governance_bridge_integrity
+        - name: proposals_integrity
+        - name: voting_integrity
+
+    - name: threshold_signing
+      path: "../target/wasm32-unknown-unknown/release/threshold_signing_coordinator.wasm"
+      dependencies:
+        - name: threshold_signing_integrity
+        - name: voting_integrity

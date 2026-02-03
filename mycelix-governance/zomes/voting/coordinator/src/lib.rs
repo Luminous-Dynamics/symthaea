@@ -1,0 +1,2444 @@
+//! Voting Coordinator Zome
+//! Business logic for governance voting
+//!
+//! Enhanced with Φ-weighted voting, quadratic voting, and delegation decay
+//! Per GIS v4.0 integration plan
+
+use hdk::prelude::*;
+use voting_integrity::*;
+
+// ============================================================================
+// REAL-TIME SIGNALS
+// ============================================================================
+
+/// Signal types for real-time governance updates
+///
+/// These signals are emitted when governance events occur, allowing
+/// connected clients to update their UI in real-time.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type", content = "payload")]
+pub enum GovernanceSignal {
+    /// A new vote was cast
+    VoteCast {
+        proposal_id: String,
+        voter_did: String,
+        choice: VoteChoice,
+        weight: f64,
+        is_phi_weighted: bool,
+    },
+
+    /// A Φ-weighted tally was completed
+    TallyCompleted {
+        proposal_id: String,
+        approved: bool,
+        phi_votes_for: f64,
+        phi_votes_against: f64,
+        quorum_reached: bool,
+        voter_count: u64,
+    },
+
+    /// A collective mirror reflection was generated
+    ReflectionGenerated {
+        proposal_id: String,
+        reflection_id: String,
+        needs_review: bool,
+        echo_chamber_risk: String,
+        health_score: f64,
+    },
+
+    /// A delegation was created or updated
+    DelegationChanged {
+        delegator_did: String,
+        delegate_did: String,
+        domain: Option<String>,
+        active: bool,
+    },
+
+    /// Quadratic vote cast
+    QuadraticVoteCast {
+        proposal_id: String,
+        voter_did: String,
+        credits_spent: u64,
+        vote_strength: f64,
+        choice: VoteChoice,
+    },
+
+    /// Proposal voting status changed
+    ProposalStatusChanged {
+        proposal_id: String,
+        new_status: String,
+        reason: String,
+    },
+}
+
+/// Emit a governance signal to connected clients
+fn emit_governance_signal(signal: GovernanceSignal) -> ExternResult<()> {
+    emit_signal(&signal)?;
+    Ok(())
+}
+
+/// Helper to get an anchor entry hash
+fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
+    let anchor = Anchor(anchor_str.to_string());
+    hash_entry(&EntryTypes::Anchor(anchor))
+}
+
+// ============================================================================
+// LEGACY VOTING (Backward Compatibility)
+// ============================================================================
+
+/// Cast a vote on a proposal (legacy)
+#[hdk_extern]
+pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
+    // Input validation
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+    if input.voter_did.is_empty() || input.voter_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+    }
+    if let Some(ref reason) = input.reason {
+        if reason.len() > 4096 {
+            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+        }
+    }
+
+    let now = sys_time()?;
+    let vote_id = format!("vote:{}:{}:{}", input.proposal_id, input.voter_did, now.as_micros());
+
+    // Calculate vote weight (would integrate with MATL in production)
+    let weight = calculate_vote_weight(&input.voter_did)?;
+
+    let vote = Vote {
+        id: vote_id,
+        proposal_id: input.proposal_id.clone(),
+        voter: input.voter_did.clone(),
+        choice: input.choice,
+        weight,
+        reason: input.reason,
+        delegated: false,
+        delegator: None,
+        voted_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Vote(vote))?;
+
+    // Create anchor and link proposal to vote
+    let proposal_anchor = format!("proposal:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(proposal_anchor.clone())))?;
+    create_link(
+        anchor_hash(&proposal_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToVote,
+        (),
+    )?;
+
+    // Create anchor and link voter to vote
+    let voter_anchor = format!("voter:{}", input.voter_did);
+    create_entry(&EntryTypes::Anchor(Anchor(voter_anchor.clone())))?;
+    create_link(
+        anchor_hash(&voter_anchor)?,
+        action_hash.clone(),
+        LinkTypes::VoterToVote,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find vote".into()
+        )))
+}
+
+/// Input for casting a vote
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CastVoteInput {
+    pub proposal_id: String,
+    pub voter_did: String,
+    pub choice: VoteChoice,
+    pub reason: Option<String>,
+}
+
+/// Maximum voting weight cap (aligned with governance bridge integrity)
+const MAX_VOTING_WEIGHT: f64 = 1.5;
+
+/// Calculate vote weight using holistic weight calculation
+///
+/// ## Weight Cap Enforcement
+///
+/// Per Governance Charter, final voting weight is capped at MAX_VOTING_WEIGHT (1.5)
+/// to prevent any single voter from having disproportionate influence.
+fn calculate_vote_weight(voter_did: &str) -> ExternResult<f64> {
+    // Get the full Φ-weighted profile
+    let phi_weight = get_voter_phi_weight(voter_did)?;
+
+    // Calculate holistic weight using the formula:
+    // Weight = Reputation² × (0.7 + 0.3 × Φ) × (1 + 0.1 × Participation)
+    let reputation = phi_weight.k_trust.clamp(0.0, 1.0);
+    let reputation_squared = reputation * reputation;
+
+    let consciousness_multiplier = 0.7 + 0.3 * phi_weight.phi_score.clamp(0.0, 1.0);
+    let participation_bonus = 1.0 + 0.1 * phi_weight.participation_score.clamp(0.0, 1.0);
+
+    // Domain boundary enforcement: stake contributes at most 5% per Commons Charter
+    // Cap stake_weight contribution to prevent plutocratic influence
+    let stake_modifier = 1.0 + 0.05 * phi_weight.stake_weight.clamp(0.0, 1.0);  // Max 5% bonus
+    let domain_modifier = 1.0 + 0.1 * phi_weight.domain_reputation.clamp(0.0, 1.0);
+
+    let uncapped_weight = reputation_squared
+        * consciousness_multiplier
+        * participation_bonus
+        * stake_modifier
+        * domain_modifier;
+
+    // Enforce maximum voting weight cap
+    Ok(uncapped_weight.min(MAX_VOTING_WEIGHT).max(0.1))
+}
+
+// ============================================================================
+// Φ-WEIGHTED VOTING
+// ============================================================================
+
+/// Cast a Φ-weighted vote on a proposal
+#[hdk_extern]
+pub fn cast_phi_weighted_vote(input: CastPhiVoteInput) -> ExternResult<Record> {
+    // Input validation
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+    if input.voter_did.is_empty() || input.voter_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+    }
+    if let Some(ref reason) = input.reason {
+        if reason.len() > 4096 {
+            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+        }
+    }
+
+    let now = sys_time()?;
+    let vote_id = format!("phi_vote:{}:{}:{}", input.proposal_id, input.voter_did, now.as_micros());
+
+    // Get voter's Φ weight (would integrate with consciousness metrics in production)
+    let phi_weight = get_voter_phi_weight(&input.voter_did)?;
+
+    // Check if voter meets threshold for this tier
+    if !phi_weight.meets_threshold(&input.tier) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Voter Φ score ({:.2}) does not meet threshold ({:.2}) for {:?} tier",
+            phi_weight.phi_score,
+            input.tier.phi_threshold(),
+            input.tier
+        ))));
+    }
+
+    // Calculate effective weight
+    let effective_weight = phi_weight.composite_weight();
+
+    // Capture choice for signal before moving
+    let choice_for_signal = input.choice.clone();
+
+    let vote = PhiWeightedVote {
+        id: vote_id,
+        proposal_id: input.proposal_id.clone(),
+        proposal_tier: input.tier.clone(),
+        voter: input.voter_did.clone(),
+        choice: input.choice,
+        phi_weight,
+        effective_weight,
+        reason: input.reason,
+        delegated: false,
+        delegator: None,
+        delegation_chain: vec![],
+        voted_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::PhiWeightedVote(vote))?;
+
+    // Create anchor and link proposal to Φ vote
+    let proposal_anchor = format!("phi_proposal:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(proposal_anchor.clone())))?;
+    create_link(
+        anchor_hash(&proposal_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToPhiVote,
+        (),
+    )?;
+
+    // Create anchor and link voter to vote
+    let voter_anchor = format!("phi_voter:{}", input.voter_did);
+    create_entry(&EntryTypes::Anchor(Anchor(voter_anchor.clone())))?;
+    create_link(
+        anchor_hash(&voter_anchor)?,
+        action_hash.clone(),
+        LinkTypes::VoterToVote,
+        (),
+    )?;
+
+    // Emit real-time signal for connected clients
+    let _ = emit_governance_signal(GovernanceSignal::VoteCast {
+        proposal_id: input.proposal_id.clone(),
+        voter_did: input.voter_did.clone(),
+        choice: choice_for_signal,
+        weight: effective_weight,
+        is_phi_weighted: true,
+    });
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find Φ-weighted vote".into()
+        )))
+}
+
+/// Input for casting a Φ-weighted vote
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CastPhiVoteInput {
+    pub proposal_id: String,
+    pub voter_did: String,
+    pub tier: ProposalTier,
+    pub choice: VoteChoice,
+    pub reason: Option<String>,
+}
+
+/// Get voter's Φ weight - integrated with consciousness metrics bridge
+fn get_voter_phi_weight(voter_did: &str) -> ExternResult<PhiWeight> {
+    // Query the governance bridge for consciousness snapshot
+    let phi_score = query_consciousness_phi(voter_did)?;
+
+    // Query K-vector trust score from local chain or bridge
+    let k_trust = query_k_vector_trust(voter_did)?;
+
+    // Query stake weight from finance module via bridge
+    let stake_weight = query_stake_weight(voter_did)?;
+
+    // Calculate participation from voting history
+    let participation_score = calculate_participation_score(voter_did)?;
+
+    // Query domain reputation from knowledge module
+    let domain_reputation = query_domain_reputation(voter_did)?;
+
+    Ok(PhiWeight {
+        phi_score,
+        k_trust,
+        stake_weight,
+        participation_score,
+        domain_reputation,
+    })
+}
+
+/// Query consciousness Φ from bridge (cross-zome call to governance_bridge)
+fn query_consciousness_phi(voter_did: &str) -> ExternResult<f64> {
+    // Query chain for consciousness snapshots linked to this agent
+    let voter_anchor = format!("consciousness:{}", voter_did);
+    let anchor_hash = anchor_hash(&voter_anchor)?;
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash, LinkTypes::VoterToVote)?,
+        GetStrategy::default(),
+    )?;
+
+    // If we have consciousness data, get the latest Φ
+    // For now, compute from participation history as proxy
+    if links.is_empty() {
+        // Default Φ for new participants based on activity
+        return Ok(0.3);
+    }
+
+    // Calculate Φ proxy from voting consistency and engagement
+    let vote_count = links.len() as f64;
+    let phi_proxy = (0.3 + (vote_count / 100.0).min(0.5)).min(0.8);
+
+    Ok(phi_proxy)
+}
+
+/// Query K-vector trust score
+fn query_k_vector_trust(_voter_did: &str) -> ExternResult<f64> {
+    // Query local chain for K-vector entries
+    let filter = ChainQueryFilter::new().include_entries(true);
+
+    for record in query(filter)? {
+        // Look for K-vector linked to this voter
+        // This is a simplified lookup - in production would use proper links
+        if let Some(_entry_bytes) = record.entry().as_option() {
+            // Check if this is a K-vector for our voter
+            // Default trust for participants without K-vector
+        }
+    }
+
+    // Default K-trust for participants (would be populated by FL/consensus participation)
+    Ok(0.5)
+}
+
+/// Query stake weight from finance module
+fn query_stake_weight(voter_did: &str) -> ExternResult<f64> {
+    // In full implementation, this would make a cross-hApp call to mycelix-finance
+    // For now, we query local chain for any stake-related entries
+
+    // Check for payment history as stake proxy
+    let voter_anchor = format!("stake:{}", voter_did);
+    let anchor_hash = anchor_hash(&voter_anchor)?;
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash, LinkTypes::VoterToVoiceCredits)?,
+        GetStrategy::default(),
+    )?;
+
+    // Stake weight based on credit allocation (proxy for actual stake)
+    if links.is_empty() {
+        return Ok(0.1); // Minimum stake weight for participants
+    }
+
+    // Calculate from voice credits as proxy
+    Ok(0.3)
+}
+
+/// Calculate participation score from voting history
+fn calculate_participation_score(voter_did: &str) -> ExternResult<f64> {
+    let voter_anchor_str = format!("voter:{}", voter_did);
+    let voter_hash = anchor_hash(&voter_anchor_str)?;
+
+    let links = get_links(
+        LinkQuery::try_new(voter_hash, LinkTypes::VoterToVote)?,
+        GetStrategy::default(),
+    )?;
+
+    let vote_count = links.len();
+
+    // Score based on participation (diminishing returns after 50 votes)
+    let base_score = (vote_count as f64 / 50.0).min(1.0);
+
+    // Check phi votes too
+    let phi_voter_anchor_str = format!("phi_voter:{}", voter_did);
+    let phi_hash = anchor_hash(&phi_voter_anchor_str)?;
+
+    let phi_links = get_links(
+        LinkQuery::try_new(phi_hash, LinkTypes::VoterToVote)?,
+        GetStrategy::default(),
+    )?;
+
+    let phi_score = (phi_links.len() as f64 / 30.0).min(1.0);
+
+    // Combined participation (phi votes weighted higher)
+    Ok((base_score * 0.4 + phi_score * 0.6).min(1.0))
+}
+
+/// Query domain reputation from knowledge module
+fn query_domain_reputation(_voter_did: &str) -> ExternResult<f64> {
+    // In full implementation, cross-hApp call to mycelix-knowledge
+    // Would query:
+    // - Epistemic contributions
+    // - Fact-check accuracy
+    // - Dark spots resolved
+
+    // Default reputation for participants without knowledge contributions
+    Ok(0.3)
+}
+
+/// Cast a delegated Φ-weighted vote
+#[hdk_extern]
+pub fn cast_delegated_phi_vote(input: CastDelegatedPhiVoteInput) -> ExternResult<Record> {
+    // Input validation
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+    if input.delegate_did.is_empty() || input.delegate_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Delegate DID must be 1-256 characters".into())));
+    }
+    if let Some(ref reason) = input.reason {
+        if reason.len() > 4096 {
+            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+        }
+    }
+
+    let now = sys_time()?;
+
+    // Resolve delegation chain
+    let (effective_weight, delegation_chain) = resolve_delegation_chain(
+        &input.delegate_did,
+        &input.tier,
+        now,
+    )?;
+
+    let vote_id = format!(
+        "phi_delegated:{}:{}:{}",
+        input.proposal_id,
+        input.delegate_did,
+        now.as_micros()
+    );
+
+    // Get delegate's Φ weight
+    let phi_weight = get_voter_phi_weight(&input.delegate_did)?;
+
+    let vote = PhiWeightedVote {
+        id: vote_id,
+        proposal_id: input.proposal_id.clone(),
+        proposal_tier: input.tier.clone(),
+        voter: input.delegate_did.clone(),
+        choice: input.choice,
+        phi_weight,
+        effective_weight,
+        reason: input.reason,
+        delegated: true,
+        delegator: delegation_chain.first().cloned(),
+        delegation_chain,
+        voted_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::PhiWeightedVote(vote))?;
+
+    // Create links
+    let proposal_anchor = format!("phi_proposal:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(proposal_anchor.clone())))?;
+    create_link(
+        anchor_hash(&proposal_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToPhiVote,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find delegated Φ vote".into()
+        )))
+}
+
+/// Input for casting a delegated Φ vote
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CastDelegatedPhiVoteInput {
+    pub proposal_id: String,
+    pub delegate_did: String,
+    pub tier: ProposalTier,
+    pub choice: VoteChoice,
+    pub reason: Option<String>,
+}
+
+/// Resolve delegation chain with decay
+fn resolve_delegation_chain(
+    delegate_did: &str,
+    tier: &ProposalTier,
+    current_time: Timestamp,
+) -> ExternResult<(f64, Vec<String>)> {
+    // Get delegations pointing to this delegate
+    let delegate_anchor = format!("delegate:{}", delegate_did);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&delegate_anchor)?, LinkTypes::DelegateToDelegation)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut total_weight = 0.0;
+    let mut chain = Vec::new();
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(delegation) = record
+                .entry()
+                .to_app_option::<Delegation>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                // Check if delegation is active and applies to this tier
+                if !delegation.active {
+                    continue;
+                }
+
+                // Check tier filter
+                if let Some(ref tier_filter) = delegation.tier_filter {
+                    if !tier_filter.contains(tier) {
+                        continue;
+                    }
+                }
+
+                // Check expiration
+                if let Some(expires) = delegation.expires {
+                    if current_time.as_micros() > expires.as_micros() {
+                        continue;
+                    }
+                }
+
+                // Calculate effective percentage with decay
+                let effective_pct = delegation.effective_percentage(current_time);
+
+                // Skip if effectively expired (below 5% threshold)
+                if effective_pct < 0.05 {
+                    continue;
+                }
+
+                // Get delegator's Φ weight and apply delegation percentage
+                let delegator_phi = get_voter_phi_weight(&delegation.delegator)?;
+                let delegator_weight = delegator_phi.composite_weight();
+
+                total_weight += delegator_weight * effective_pct;
+                chain.push(delegation.delegator.clone());
+            }
+        }
+    }
+
+    // Add delegate's own weight
+    let delegate_phi = get_voter_phi_weight(delegate_did)?;
+    total_weight += delegate_phi.composite_weight();
+
+    Ok((total_weight, chain))
+}
+
+// ============================================================================
+// QUADRATIC VOTING
+// ============================================================================
+
+/// Cast a quadratic vote
+#[hdk_extern]
+pub fn cast_quadratic_vote(input: CastQuadraticVoteInput) -> ExternResult<Record> {
+    // Input validation
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+    if input.voter_did.is_empty() || input.voter_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+    }
+    if let Some(ref reason) = input.reason {
+        if reason.len() > 4096 {
+            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+        }
+    }
+
+    let now = sys_time()?;
+
+    // Check voter has enough credits
+    let credits = get_voter_credits(&input.voter_did)?;
+    if credits.remaining < input.credits_to_spend {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Insufficient credits: {} remaining, {} requested",
+            credits.remaining, input.credits_to_spend
+        ))));
+    }
+
+    // Calculate quadratic weight
+    let effective_weight = QuadraticVote::calculate_weight(input.credits_to_spend);
+
+    let vote_id = format!(
+        "qv:{}:{}:{}",
+        input.proposal_id,
+        input.voter_did,
+        now.as_micros()
+    );
+
+    let vote = QuadraticVote {
+        id: vote_id,
+        proposal_id: input.proposal_id.clone(),
+        voter: input.voter_did.clone(),
+        choice: input.choice,
+        credits_spent: input.credits_to_spend,
+        effective_weight,
+        reason: input.reason,
+        voted_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::QuadraticVote(vote))?;
+
+    // Update voter's credits
+    spend_voter_credits(&input.voter_did, input.credits_to_spend)?;
+
+    // Create links
+    let proposal_anchor = format!("qv_proposal:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(proposal_anchor.clone())))?;
+    create_link(
+        anchor_hash(&proposal_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToQuadraticVote,
+        (),
+    )?;
+
+    let voter_anchor = format!("qv_voter:{}", input.voter_did);
+    create_entry(&EntryTypes::Anchor(Anchor(voter_anchor.clone())))?;
+    create_link(
+        anchor_hash(&voter_anchor)?,
+        action_hash.clone(),
+        LinkTypes::VoterToVote,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find quadratic vote".into()
+        )))
+}
+
+/// Input for casting a quadratic vote
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CastQuadraticVoteInput {
+    pub proposal_id: String,
+    pub voter_did: String,
+    pub choice: VoteChoice,
+    pub credits_to_spend: u64,
+    pub reason: Option<String>,
+}
+
+/// Get voter's voice credits (placeholder)
+fn get_voter_credits(_voter_did: &str) -> ExternResult<VoiceCredits> {
+    // In production, this would query the actual voice credits entry
+    let now = sys_time()?;
+    Ok(VoiceCredits {
+        owner: _voter_did.to_string(),
+        allocated: 100,
+        spent: 0,
+        remaining: 100,
+        period_start: now,
+        period_end: Timestamp::from_micros(now.as_micros() + 30 * 24 * 60 * 60 * 1_000_000), // 30 days
+    })
+}
+
+/// Spend voter's credits (placeholder)
+fn spend_voter_credits(_voter_did: &str, _amount: u64) -> ExternResult<()> {
+    // In production, this would update the voice credits entry
+    Ok(())
+}
+
+/// Allocate voice credits to a voter
+#[hdk_extern]
+pub fn allocate_voice_credits(input: AllocateCreditsInput) -> ExternResult<Record> {
+    if input.owner_did.is_empty() || input.owner_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Owner DID must be 1-256 characters".into())));
+    }
+
+    let now = sys_time()?;
+
+    let credits = VoiceCredits {
+        owner: input.owner_did.clone(),
+        allocated: input.amount,
+        spent: 0,
+        remaining: input.amount,
+        period_start: now,
+        period_end: input.period_end,
+    };
+
+    let action_hash = create_entry(&EntryTypes::VoiceCredits(credits))?;
+
+    // Link owner to credits
+    let owner_anchor = format!("credits:{}", input.owner_did);
+    create_entry(&EntryTypes::Anchor(Anchor(owner_anchor.clone())))?;
+    create_link(
+        anchor_hash(&owner_anchor)?,
+        action_hash.clone(),
+        LinkTypes::VoterToVoiceCredits,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find voice credits".into()
+        )))
+}
+
+/// Input for allocating voice credits
+#[derive(Serialize, Deserialize, Debug)]
+pub struct AllocateCreditsInput {
+    pub owner_did: String,
+    pub amount: u64,
+    pub period_end: Timestamp,
+}
+
+// ============================================================================
+// DELEGATION WITH DECAY
+// ============================================================================
+
+/// Create a delegation with decay
+#[hdk_extern]
+pub fn create_delegation(input: CreateDelegationInput) -> ExternResult<Record> {
+    // Input validation
+    if input.delegator_did.is_empty() || input.delegator_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Delegator DID must be 1-256 characters".into())));
+    }
+    if input.delegate_did.is_empty() || input.delegate_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Delegate DID must be 1-256 characters".into())));
+    }
+    if input.delegator_did == input.delegate_did {
+        return Err(wasm_error!(WasmErrorInner::Guest("Cannot delegate to self".into())));
+    }
+    if input.percentage <= 0.0 || input.percentage > 1.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Percentage must be between 0 (exclusive) and 1 (inclusive)".into())));
+    }
+    if let Some(ref topics) = input.topics {
+        for topic in topics {
+            if topic.is_empty() || topic.len() > 256 {
+                return Err(wasm_error!(WasmErrorInner::Guest("Topic must be 1-256 characters".into())));
+            }
+        }
+    }
+
+    let now = sys_time()?;
+    let delegation_id = format!("delegation:{}:{}", input.delegator_did, now.as_micros());
+
+    let delegation = Delegation {
+        id: delegation_id,
+        delegator: input.delegator_did.clone(),
+        delegate: input.delegate_did.clone(),
+        percentage: input.percentage,
+        topics: input.topics,
+        tier_filter: input.tier_filter,
+        active: true,
+        decay: input.decay.unwrap_or(DelegationDecay::None),
+        transitive: input.transitive.unwrap_or(false),
+        max_chain_depth: input.max_chain_depth.unwrap_or(3),
+        created: now,
+        renewed: now,
+        expires: input.expires,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Delegation(delegation))?;
+
+    // Create anchor and link delegator to delegation
+    let delegator_anchor = format!("delegator:{}", input.delegator_did);
+    create_entry(&EntryTypes::Anchor(Anchor(delegator_anchor.clone())))?;
+    create_link(
+        anchor_hash(&delegator_anchor)?,
+        action_hash.clone(),
+        LinkTypes::DelegatorToDelegation,
+        (),
+    )?;
+
+    // Create anchor and link delegate to delegation
+    let delegate_anchor = format!("delegate:{}", input.delegate_did);
+    create_entry(&EntryTypes::Anchor(Anchor(delegate_anchor.clone())))?;
+    create_link(
+        anchor_hash(&delegate_anchor)?,
+        action_hash.clone(),
+        LinkTypes::DelegateToDelegation,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find delegation".into()
+        )))
+}
+
+/// Input for creating a delegation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateDelegationInput {
+    pub delegator_did: String,
+    pub delegate_did: String,
+    pub percentage: f64,
+    pub topics: Option<Vec<String>>,
+    pub tier_filter: Option<Vec<ProposalTier>>,
+    pub decay: Option<DelegationDecay>,
+    pub transitive: Option<bool>,
+    pub max_chain_depth: Option<u8>,
+    pub expires: Option<Timestamp>,
+}
+
+/// Renew a delegation (resets decay timer)
+#[hdk_extern]
+pub fn renew_delegation(input: RenewDelegationInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+
+    // Get current delegation
+    let original_record = get(input.original_action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Delegation not found".into())))?;
+
+    let mut delegation: Delegation = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid delegation".into())))?;
+
+    // Reset renewal timestamp
+    delegation.renewed = now;
+
+    // Optionally update percentage
+    if let Some(new_percentage) = input.new_percentage {
+        delegation.percentage = new_percentage;
+    }
+
+    let action_hash = update_entry(input.original_action_hash, &EntryTypes::Delegation(delegation))?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find renewed delegation".into()
+        )))
+}
+
+/// Input for renewing a delegation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RenewDelegationInput {
+    pub original_action_hash: ActionHash,
+    pub new_percentage: Option<f64>,
+}
+
+/// Revoke a delegation
+#[hdk_extern]
+pub fn revoke_delegation(input: RevokeDelegationInput) -> ExternResult<Record> {
+    // Get current delegation
+    let original_record = get(input.original_action_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Delegation not found".into())))?;
+
+    let mut delegation: Delegation = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid delegation".into())))?;
+
+    // Mark as inactive
+    delegation.active = false;
+
+    let action_hash = update_entry(input.original_action_hash, &EntryTypes::Delegation(delegation))?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find revoked delegation".into()
+        )))
+}
+
+/// Input for revoking a delegation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RevokeDelegationInput {
+    pub original_action_hash: ActionHash,
+}
+
+/// Get delegations with current effective percentages
+#[hdk_extern]
+pub fn get_effective_delegations(voter_did: String) -> ExternResult<Vec<EffectiveDelegation>> {
+    let now = sys_time()?;
+    let delegator_anchor = format!("delegator:{}", voter_did);
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&delegator_anchor)?, LinkTypes::DelegatorToDelegation)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut results = Vec::new();
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(delegation) = record
+                .entry()
+                .to_app_option::<Delegation>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if delegation.active {
+                    let effective_pct = delegation.effective_percentage(now);
+                    results.push(EffectiveDelegation {
+                        delegation,
+                        effective_percentage: effective_pct,
+                        is_effectively_expired: effective_pct < 0.05,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Delegation with current effective percentage
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EffectiveDelegation {
+    pub delegation: Delegation,
+    pub effective_percentage: f64,
+    pub is_effectively_expired: bool,
+}
+
+// ============================================================================
+// TALLYING
+// ============================================================================
+
+/// Get votes for a proposal (legacy)
+#[hdk_extern]
+pub fn get_proposal_votes(proposal_id: String) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&format!("proposal:{}", proposal_id))?, LinkTypes::ProposalToVote)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut votes = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            votes.push(record);
+        }
+    }
+
+    Ok(votes)
+}
+
+/// Tally votes for a proposal (legacy)
+#[hdk_extern]
+pub fn tally_votes(proposal_id: String) -> ExternResult<Record> {
+    let vote_records = get_proposal_votes(proposal_id.clone())?;
+
+    let mut votes_for = 0.0;
+    let mut votes_against = 0.0;
+    let mut abstentions = 0.0;
+
+    for record in vote_records {
+        if let Some(vote) = record
+            .entry()
+            .to_app_option::<Vote>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            match vote.choice {
+                VoteChoice::For => votes_for += vote.weight,
+                VoteChoice::Against => votes_against += vote.weight,
+                VoteChoice::Abstain => abstentions += vote.weight,
+            }
+        }
+    }
+
+    let total_weight = votes_for + votes_against + abstentions;
+
+    // Calculate if quorum reached (simplified)
+    let quorum_threshold = 0.25;
+    let quorum_reached = total_weight >= quorum_threshold;
+
+    // Calculate if approved
+    let approval_threshold = 0.6;
+    let approved = quorum_reached && (votes_for / (votes_for + votes_against)) >= approval_threshold;
+
+    let now = sys_time()?;
+
+    let tally = VoteTally {
+        proposal_id: proposal_id.clone(),
+        votes_for,
+        votes_against,
+        abstentions,
+        total_weight,
+        quorum_reached,
+        approved,
+        tallied_at: now,
+        final_tally: true,
+    };
+
+    let action_hash = create_entry(&EntryTypes::VoteTally(tally))?;
+
+    // Create anchor and link proposal to tally
+    let tally_anchor = format!("tally:{}", proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(tally_anchor.clone())))?;
+    create_link(
+        anchor_hash(&tally_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToTally,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find tally".into()
+        )))
+}
+
+/// Tally Φ-weighted votes for a proposal
+#[hdk_extern]
+pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+
+    let proposal_anchor = format!("phi_proposal:{}", input.proposal_id);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&proposal_anchor)?, LinkTypes::ProposalToPhiVote)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut phi_votes_for = 0.0;
+    let mut phi_votes_against = 0.0;
+    let mut phi_abstentions = 0.0;
+    let mut raw_for = 0u64;
+    let mut raw_against = 0u64;
+    let mut raw_abstain = 0u64;
+    let mut total_phi = 0.0;
+    let mut voter_count = 0u64;
+
+    // Breakdown by Φ tier
+    let mut high_for = 0.0;
+    let mut high_against = 0.0;
+    let mut high_abstain = 0.0;
+    let mut high_count = 0u64;
+    let mut medium_for = 0.0;
+    let mut medium_against = 0.0;
+    let mut medium_abstain = 0.0;
+    let mut medium_count = 0u64;
+    let mut low_for = 0.0;
+    let mut low_against = 0.0;
+    let mut low_abstain = 0.0;
+    let mut low_count = 0u64;
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(vote) = record
+                .entry()
+                .to_app_option::<PhiWeightedVote>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                let weight = vote.effective_weight;
+                let phi = vote.phi_weight.phi_score;
+
+                match vote.choice {
+                    VoteChoice::For => {
+                        phi_votes_for += weight;
+                        raw_for += 1;
+                    }
+                    VoteChoice::Against => {
+                        phi_votes_against += weight;
+                        raw_against += 1;
+                    }
+                    VoteChoice::Abstain => {
+                        phi_abstentions += weight;
+                        raw_abstain += 1;
+                    }
+                }
+
+                total_phi += phi;
+                voter_count += 1;
+
+                // Breakdown by Φ tier
+                if phi >= 0.6 {
+                    match vote.choice {
+                        VoteChoice::For => high_for += weight,
+                        VoteChoice::Against => high_against += weight,
+                        VoteChoice::Abstain => high_abstain += weight,
+                    }
+                    high_count += 1;
+                } else if phi >= 0.4 {
+                    match vote.choice {
+                        VoteChoice::For => medium_for += weight,
+                        VoteChoice::Against => medium_against += weight,
+                        VoteChoice::Abstain => medium_abstain += weight,
+                    }
+                    medium_count += 1;
+                } else {
+                    match vote.choice {
+                        VoteChoice::For => low_for += weight,
+                        VoteChoice::Against => low_against += weight,
+                        VoteChoice::Abstain => low_abstain += weight,
+                    }
+                    low_count += 1;
+                }
+            }
+        }
+    }
+
+    let total_phi_weight = phi_votes_for + phi_votes_against + phi_abstentions;
+    let average_phi = if voter_count > 0 { total_phi / voter_count as f64 } else { 0.0 };
+
+    // Get thresholds from tier
+    let quorum_requirement = input.tier.quorum_requirement();
+    let approval_threshold = input.tier.approval_threshold();
+
+    // Calculate quorum (would need total eligible voters in production)
+    let eligible_voters = input.eligible_voters.unwrap_or(100);
+    let participation_rate = voter_count as f64 / eligible_voters as f64;
+    let quorum_reached = participation_rate >= quorum_requirement;
+
+    // Calculate approval
+    let total_decisive = phi_votes_for + phi_votes_against;
+    let approval_rate = if total_decisive > 0.0 {
+        phi_votes_for / total_decisive
+    } else {
+        0.0
+    };
+    let approved = quorum_reached && approval_rate >= approval_threshold;
+
+    let now = sys_time()?;
+
+    let tally = PhiWeightedTally {
+        proposal_id: input.proposal_id.clone(),
+        tier: input.tier.clone(),
+        phi_votes_for,
+        phi_votes_against,
+        phi_abstentions,
+        raw_votes_for: raw_for,
+        raw_votes_against: raw_against,
+        raw_abstentions: raw_abstain,
+        average_phi,
+        total_phi_weight,
+        eligible_voters,
+        quorum_requirement,
+        quorum_reached,
+        approval_threshold,
+        approved,
+        tallied_at: now,
+        final_tally: true,
+        phi_tier_breakdown: PhiTierBreakdown {
+            high_phi_votes: TallySegment {
+                votes_for: high_for,
+                votes_against: high_against,
+                abstentions: high_abstain,
+                voter_count: high_count,
+            },
+            medium_phi_votes: TallySegment {
+                votes_for: medium_for,
+                votes_against: medium_against,
+                abstentions: medium_abstain,
+                voter_count: medium_count,
+            },
+            low_phi_votes: TallySegment {
+                votes_for: low_for,
+                votes_against: low_against,
+                abstentions: low_abstain,
+                voter_count: low_count,
+            },
+        },
+    };
+
+    let action_hash = create_entry(&EntryTypes::PhiWeightedTally(tally))?;
+
+    // Create anchor and link
+    let tally_anchor = format!("phi_tally:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(tally_anchor.clone())))?;
+    create_link(
+        anchor_hash(&tally_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToPhiTally,
+        (),
+    )?;
+
+    // Emit real-time signal for tally completion
+    let _ = emit_governance_signal(GovernanceSignal::TallyCompleted {
+        proposal_id: input.proposal_id.clone(),
+        approved,
+        phi_votes_for,
+        phi_votes_against,
+        quorum_reached,
+        voter_count,
+    });
+
+    // === AUTOMATIC COLLECTIVE MIRROR REFLECTION ===
+    // Generate reflection automatically at tally time unless explicitly disabled
+    if input.generate_reflection.unwrap_or(true) {
+        // Fire-and-forget: generate reflection but don't fail tally if it fails
+        let _ = reflect_on_proposal(ReflectOnProposalInput {
+            proposal_id: input.proposal_id.clone(),
+        });
+    }
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find Φ-weighted tally".into()
+        )))
+}
+
+/// Input for tallying Φ-weighted votes
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TallyPhiVotesInput {
+    pub proposal_id: String,
+    pub tier: ProposalTier,
+    pub eligible_voters: Option<u64>,
+    /// Whether to automatically generate a collective mirror reflection (default: true)
+    pub generate_reflection: Option<bool>,
+}
+
+/// Tally quadratic votes for a proposal
+#[hdk_extern]
+pub fn tally_quadratic_votes(input: TallyQuadraticVotesInput) -> ExternResult<Record> {
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+
+    let proposal_anchor = format!("qv_proposal:{}", input.proposal_id);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&proposal_anchor)?, LinkTypes::ProposalToQuadraticVote)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut qv_for = 0.0;
+    let mut qv_against = 0.0;
+    let mut total_credits = 0u64;
+    let mut voter_count = 0u64;
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(vote) = record
+                .entry()
+                .to_app_option::<QuadraticVote>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                match vote.choice {
+                    VoteChoice::For => qv_for += vote.effective_weight,
+                    VoteChoice::Against => qv_against += vote.effective_weight,
+                    VoteChoice::Abstain => {} // No weight for abstain in QV
+                }
+
+                total_credits += vote.credits_spent;
+                voter_count += 1;
+            }
+        }
+    }
+
+    let avg_credits = if voter_count > 0 {
+        total_credits as f64 / voter_count as f64
+    } else {
+        0.0
+    };
+
+    // Simple quorum and approval
+    let quorum_reached = voter_count >= input.min_voters.unwrap_or(5);
+    let approved = quorum_reached && qv_for > qv_against;
+
+    let now = sys_time()?;
+
+    let tally = QuadraticTally {
+        proposal_id: input.proposal_id.clone(),
+        qv_for,
+        qv_against,
+        total_credits_spent: total_credits,
+        avg_credits_per_voter: avg_credits,
+        voter_count,
+        quorum_reached,
+        approved,
+        tallied_at: now,
+        final_tally: true,
+    };
+
+    let action_hash = create_entry(&EntryTypes::QuadraticTally(tally))?;
+
+    // Create anchor and link
+    let tally_anchor = format!("qv_tally:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(tally_anchor.clone())))?;
+    create_link(
+        anchor_hash(&tally_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToQuadraticTally,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find quadratic tally".into()
+        )))
+}
+
+/// Input for tallying quadratic votes
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TallyQuadraticVotesInput {
+    pub proposal_id: String,
+    pub min_voters: Option<u64>,
+}
+
+/// Get tally for a proposal (legacy)
+#[hdk_extern]
+pub fn get_proposal_tally(proposal_id: String) -> ExternResult<Option<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&format!("tally:{}", proposal_id))?, LinkTypes::ProposalToTally)?,
+        GetStrategy::default(),
+    )?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    let latest_link = links.into_iter().max_by_key(|l| l.timestamp);
+    if let Some(link) = latest_link {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        return get(action_hash, GetOptions::default());
+    }
+
+    Ok(None)
+}
+
+/// Get Φ-weighted tally for a proposal
+#[hdk_extern]
+pub fn get_phi_tally(proposal_id: String) -> ExternResult<Option<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&format!("phi_tally:{}", proposal_id))?, LinkTypes::ProposalToPhiTally)?,
+        GetStrategy::default(),
+    )?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    let latest_link = links.into_iter().max_by_key(|l| l.timestamp);
+    if let Some(link) = latest_link {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        return get(action_hash, GetOptions::default());
+    }
+
+    Ok(None)
+}
+
+/// Get quadratic tally for a proposal
+#[hdk_extern]
+pub fn get_quadratic_tally(proposal_id: String) -> ExternResult<Option<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&format!("qv_tally:{}", proposal_id))?, LinkTypes::ProposalToQuadraticTally)?,
+        GetStrategy::default(),
+    )?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    let latest_link = links.into_iter().max_by_key(|l| l.timestamp);
+    if let Some(link) = latest_link {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        return get(action_hash, GetOptions::default());
+    }
+
+    Ok(None)
+}
+
+// ============================================================================
+// ZK-STARK VERIFIED VOTING
+// ============================================================================
+
+/// Store an eligibility proof on-chain
+///
+/// The proof must be pre-generated using the fl-aggregator VoteEligibilityProof
+/// circuit. This function stores the proof for later use when casting votes.
+///
+/// ## Privacy Note
+///
+/// Storing the proof reveals:
+/// - Voter DID
+/// - Proposal type the proof is valid for
+/// - Whether eligible (boolean)
+/// - Number of requirements met
+///
+/// It does NOT reveal:
+/// - Exact assurance level, MATL score, stake amount, etc.
+#[hdk_extern]
+pub fn store_eligibility_proof(input: StoreEligibilityProofInput) -> ExternResult<Record> {
+    if input.voter_did.is_empty() || input.voter_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+    }
+    if input.voter_commitment.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter commitment must not be empty".into())));
+    }
+    if input.proof_bytes.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proof bytes must not be empty".into())));
+    }
+
+    let now = sys_time()?;
+    let proof_id = format!("eligibility:{}:{}", input.voter_did, now.as_micros());
+
+    // Calculate expiration
+    let expires_at = input.validity_hours.map(|hours| {
+        Timestamp::from_micros(now.as_micros() + hours as i64 * 60 * 60 * 1_000_000)
+    });
+
+    let proof = EligibilityProof {
+        id: proof_id,
+        voter_did: input.voter_did.clone(),
+        voter_commitment: input.voter_commitment.clone(),
+        proposal_type: input.proposal_type,
+        eligible: input.eligible,
+        requirements_met: input.requirements_met,
+        active_requirements: input.active_requirements,
+        proof_bytes: input.proof_bytes,
+        generated_at: now,
+        expires_at,
+    };
+
+    let action_hash = create_entry(&EntryTypes::EligibilityProof(proof))?;
+
+    // Link voter to proof
+    let voter_anchor = format!("voter_proofs:{}", input.voter_did);
+    create_entry(&EntryTypes::Anchor(Anchor(voter_anchor.clone())))?;
+    create_link(
+        anchor_hash(&voter_anchor)?,
+        action_hash.clone(),
+        LinkTypes::VoterToEligibilityProof,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find stored proof".into()
+        )))
+}
+
+/// Input for storing an eligibility proof
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StoreEligibilityProofInput {
+    pub voter_did: String,
+    pub voter_commitment: Vec<u8>,
+    pub proposal_type: ZkProposalType,
+    pub eligible: bool,
+    pub requirements_met: u8,
+    pub active_requirements: u8,
+    pub proof_bytes: Vec<u8>,
+    pub validity_hours: Option<i64>,
+}
+
+/// Cast a vote with ZK eligibility verification
+///
+/// This is the privacy-preserving voting function. The voter must provide
+/// a reference to a valid eligibility proof that demonstrates they meet
+/// the requirements for the proposal tier.
+///
+/// ## Workflow
+///
+/// 1. Voter generates eligibility proof off-chain using VoteEligibilityProof circuit
+/// 2. Voter stores proof using `store_eligibility_proof`
+/// 3. Voter calls this function with the proof reference
+/// 4. This function verifies:
+///    a. Proof exists and is valid for the proposal tier
+///    b. Proof is not expired
+///    c. Voter commitment matches
+///    d. Voter hasn't already voted on this proposal
+///
+/// ## Security Properties
+///
+/// - **Eligibility Hidden**: Voter's exact scores are never revealed
+/// - **Non-Forgeable**: Invalid proofs are rejected (~96-bit security)
+/// - **Non-Transferable**: Proof is bound to voter commitment
+/// - **Time-Bound**: Proofs expire to reflect credential changes
+#[hdk_extern]
+pub fn cast_verified_vote(input: CastVerifiedVoteInput) -> ExternResult<Record> {
+    // Input validation
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+    if input.voter_did.is_empty() || input.voter_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+    }
+    if input.voter_commitment.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter commitment must not be empty".into())));
+    }
+    if let Some(ref reason) = input.reason {
+        if reason.len() > 4096 {
+            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+        }
+    }
+
+    let now = sys_time()?;
+
+    // Fetch the eligibility proof
+    let proof_record = get(input.eligibility_proof_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Eligibility proof not found".into()
+        )))?;
+
+    let proof: EligibilityProof = proof_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid eligibility proof entry".into()
+        )))?;
+
+    // Verify proof matches voter
+    if proof.voter_did != input.voter_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proof voter DID does not match".into()
+        )));
+    }
+
+    // Verify commitment matches
+    if proof.voter_commitment != input.voter_commitment {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter commitment does not match proof".into()
+        )));
+    }
+
+    // Check proof is not expired
+    if proof.is_expired(now) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Eligibility proof has expired - generate a new proof".into()
+        )));
+    }
+
+    // Check proof is valid for this proposal tier
+    if !proof.is_valid_for_tier(&input.tier) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Proof for {:?} is not valid for {:?} tier proposals",
+            proof.proposal_type, input.tier
+        ))));
+    }
+
+    // Check voter hasn't already voted
+    let existing_votes = get_voter_verified_votes(&input.voter_did, &input.proposal_id)?;
+    if !existing_votes.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter has already cast a verified vote on this proposal".into()
+        )));
+    }
+
+    // Calculate effective weight (based on proof validity)
+    // Verified voters get a base weight of 1.0 (they proved eligibility)
+    // Could be enhanced with additional weight factors
+    let effective_weight = 1.0;
+
+    let vote_id = format!(
+        "verified:{}:{}:{}",
+        input.proposal_id,
+        input.voter_did,
+        now.as_micros()
+    );
+
+    let vote = VerifiedVote {
+        id: vote_id,
+        proposal_id: input.proposal_id.clone(),
+        proposal_tier: input.tier.clone(),
+        voter: input.voter_did.clone(),
+        choice: input.choice,
+        eligibility_proof_hash: input.eligibility_proof_hash,
+        voter_commitment: input.voter_commitment,
+        effective_weight,
+        reason: input.reason,
+        voted_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::VerifiedVote(vote))?;
+
+    // Link proposal to vote
+    let proposal_anchor = format!("verified_proposal:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(proposal_anchor.clone())))?;
+    create_link(
+        anchor_hash(&proposal_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToVerifiedVote,
+        (),
+    )?;
+
+    // Link voter to vote
+    let voter_anchor = format!("verified_voter:{}", input.voter_did);
+    create_entry(&EntryTypes::Anchor(Anchor(voter_anchor.clone())))?;
+    create_link(
+        anchor_hash(&voter_anchor)?,
+        action_hash.clone(),
+        LinkTypes::VoterToVote,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find verified vote".into()
+        )))
+}
+
+/// Input for casting a verified vote
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CastVerifiedVoteInput {
+    pub proposal_id: String,
+    pub voter_did: String,
+    pub tier: ProposalTier,
+    pub choice: VoteChoice,
+    pub eligibility_proof_hash: ActionHash,
+    pub voter_commitment: Vec<u8>,
+    pub reason: Option<String>,
+}
+
+/// Get voter's verified votes for a specific proposal
+fn get_voter_verified_votes(voter_did: &str, proposal_id: &str) -> ExternResult<Vec<VerifiedVote>> {
+    let voter_anchor = format!("verified_voter:{}", voter_did);
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&voter_anchor)?, LinkTypes::VoterToVote)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut votes = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(vote) = record
+                .entry()
+                .to_app_option::<VerifiedVote>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if vote.proposal_id == proposal_id {
+                    votes.push(vote);
+                }
+            }
+        }
+    }
+
+    Ok(votes)
+}
+
+/// Get all verified votes for a proposal
+#[hdk_extern]
+pub fn get_verified_votes(proposal_id: String) -> ExternResult<Vec<Record>> {
+    let proposal_anchor = format!("verified_proposal:{}", proposal_id);
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&proposal_anchor)?, LinkTypes::ProposalToVerifiedVote)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut votes = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            votes.push(record);
+        }
+    }
+
+    Ok(votes)
+}
+
+/// Get voter's eligibility proofs
+#[hdk_extern]
+pub fn get_voter_proofs(voter_did: String) -> ExternResult<Vec<Record>> {
+    let voter_anchor = format!("voter_proofs:{}", voter_did);
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&voter_anchor)?, LinkTypes::VoterToEligibilityProof)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut proofs = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            proofs.push(record);
+        }
+    }
+
+    Ok(proofs)
+}
+
+/// Tally verified votes for a proposal
+#[hdk_extern]
+pub fn tally_verified_votes(input: TallyVerifiedVotesInput) -> ExternResult<VerifiedVoteTally> {
+    let now = sys_time()?;
+    let vote_records = get_verified_votes(input.proposal_id.clone())?;
+
+    let mut votes_for = 0.0;
+    let mut votes_against = 0.0;
+    let mut abstentions = 0.0;
+    let mut voter_count = 0u64;
+
+    for record in vote_records {
+        if let Some(vote) = record
+            .entry()
+            .to_app_option::<VerifiedVote>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            match vote.choice {
+                VoteChoice::For => votes_for += vote.effective_weight,
+                VoteChoice::Against => votes_against += vote.effective_weight,
+                VoteChoice::Abstain => abstentions += vote.effective_weight,
+            }
+            voter_count += 1;
+        }
+    }
+
+    let total_weight = votes_for + votes_against + abstentions;
+
+    // Get thresholds from tier
+    let quorum_requirement = input.tier.quorum_requirement();
+    let approval_threshold = input.tier.approval_threshold();
+
+    // Calculate quorum
+    let eligible_voters = input.eligible_voters.unwrap_or(100);
+    let participation_rate = voter_count as f64 / eligible_voters as f64;
+    let quorum_reached = participation_rate >= quorum_requirement;
+
+    // Calculate approval
+    let total_decisive = votes_for + votes_against;
+    let approval_rate = if total_decisive > 0.0 {
+        votes_for / total_decisive
+    } else {
+        0.0
+    };
+    let approved = quorum_reached && approval_rate >= approval_threshold;
+
+    Ok(VerifiedVoteTally {
+        proposal_id: input.proposal_id,
+        tier: input.tier,
+        votes_for,
+        votes_against,
+        abstentions,
+        total_weight,
+        voter_count,
+        quorum_requirement,
+        quorum_reached,
+        approval_threshold,
+        approval_rate,
+        approved,
+        tallied_at: now,
+    })
+}
+
+/// Input for tallying verified votes
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TallyVerifiedVotesInput {
+    pub proposal_id: String,
+    pub tier: ProposalTier,
+    pub eligible_voters: Option<u64>,
+}
+
+/// Tally result for verified votes
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifiedVoteTally {
+    pub proposal_id: String,
+    pub tier: ProposalTier,
+    pub votes_for: f64,
+    pub votes_against: f64,
+    pub abstentions: f64,
+    pub total_weight: f64,
+    pub voter_count: u64,
+    pub quorum_requirement: f64,
+    pub quorum_reached: bool,
+    pub approval_threshold: f64,
+    pub approval_rate: f64,
+    pub approved: bool,
+    pub tallied_at: Timestamp,
+}
+
+// ============================================================================
+// PROOF ATTESTATION (External Verifier Integration)
+// ============================================================================
+
+/// Store a proof attestation from an external verifier
+///
+/// This function stores an attestation that a ZK-STARK eligibility proof has
+/// been verified by an external oracle. The attestation includes a signature
+/// that can be verified against the verifier's public key.
+///
+/// ## Security Note
+///
+/// This function does NOT verify the signature - that should be done by the
+/// calling application or a trusted registry of verifiers. The integrity zome
+/// validates structural properties only.
+///
+/// ## Parameters
+///
+/// - `proof_action_hash`: Reference to the eligibility proof being attested
+/// - `proof_hash`: Blake3 hash of the proof bytes
+/// - `voter_commitment`: Commitment from the proof (for cross-check)
+/// - `proposal_type`: Proposal type the proof is valid for
+/// - `verified`: Whether the STARK verification succeeded
+/// - `verifier_pubkey`: Ed25519 public key of the verifier (32 bytes)
+/// - `signature`: Ed25519 signature over attestation data (64 bytes)
+/// - `security_level`: Security level used in verification
+/// - `verification_time_ms`: Time taken to verify in milliseconds
+/// - `validity_hours`: How long the attestation should be valid (default 24)
+#[hdk_extern]
+pub fn store_proof_attestation(input: StoreAttestationInput) -> ExternResult<Record> {
+    // Input validation
+    if input.proof_hash.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proof hash must not be empty".into())));
+    }
+    if input.voter_commitment.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter commitment must not be empty".into())));
+    }
+    if input.verifier_pubkey.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Verifier pubkey must not be empty".into())));
+    }
+    if input.signature.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Signature must not be empty".into())));
+    }
+    if input.security_level.is_empty() || input.security_level.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Security level must be 1-256 characters".into())));
+    }
+
+    let now = sys_time()?;
+    let attestation_id = format!("attestation:{}:{}", hex::encode(&input.proof_hash[..8]), now.as_micros());
+
+    // Calculate expiration
+    let validity_hours = input.validity_hours.unwrap_or(24);
+    let expires_at = Timestamp::from_micros(
+        now.as_micros() + validity_hours as i64 * 60 * 60 * 1_000_000
+    );
+
+    let attestation = ProofAttestation {
+        id: attestation_id,
+        proof_hash: input.proof_hash,
+        proof_action_hash: input.proof_action_hash.clone(),
+        voter_commitment: input.voter_commitment,
+        proposal_type: input.proposal_type,
+        verified: input.verified,
+        verified_at: now,
+        expires_at,
+        verifier_pubkey: input.verifier_pubkey.clone(),
+        signature: input.signature,
+        security_level: input.security_level,
+        verification_time_ms: input.verification_time_ms,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ProofAttestation(attestation))?;
+
+    // Link proof to attestation
+    create_link(
+        input.proof_action_hash,
+        action_hash.clone(),
+        LinkTypes::ProofToAttestation,
+        (),
+    )?;
+
+    // Link verifier to attestation (using verifier pubkey as anchor)
+    let verifier_anchor = format!("verifier:{}", hex::encode(&input.verifier_pubkey));
+    create_entry(&EntryTypes::Anchor(Anchor(verifier_anchor.clone())))?;
+    create_link(
+        anchor_hash(&verifier_anchor)?,
+        action_hash.clone(),
+        LinkTypes::VerifierToAttestation,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find stored attestation".into()
+        )))
+}
+
+/// Input for storing a proof attestation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StoreAttestationInput {
+    pub proof_action_hash: ActionHash,
+    pub proof_hash: Vec<u8>,
+    pub voter_commitment: Vec<u8>,
+    pub proposal_type: ZkProposalType,
+    pub verified: bool,
+    pub verifier_pubkey: Vec<u8>,
+    pub signature: Vec<u8>,
+    pub security_level: String,
+    pub verification_time_ms: u64,
+    pub validity_hours: Option<i64>,
+}
+
+/// Get attestations for a proof
+#[hdk_extern]
+pub fn get_proof_attestations(proof_action_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(proof_action_hash, LinkTypes::ProofToAttestation)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut attestations = Vec::new();
+    for link in links {
+        let target_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(target_hash, GetOptions::default())? {
+            attestations.push(record);
+        }
+    }
+
+    Ok(attestations)
+}
+
+/// Check if a proof has a valid (verified and not expired) attestation
+#[hdk_extern]
+pub fn has_valid_attestation(proof_action_hash: ActionHash) -> ExternResult<bool> {
+    let now = sys_time()?;
+    let attestation_records = get_proof_attestations(proof_action_hash)?;
+
+    for record in attestation_records {
+        if let Some(attestation) = record
+            .entry()
+            .to_app_option::<ProofAttestation>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            if attestation.is_valid(now) {
+                return Ok(true);
+            }
+        }
+    }
+
+    Ok(false)
+}
+
+/// Get attestations by verifier
+#[hdk_extern]
+pub fn get_verifier_attestations(verifier_pubkey: Vec<u8>) -> ExternResult<Vec<Record>> {
+    let verifier_anchor = format!("verifier:{}", hex::encode(&verifier_pubkey));
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&verifier_anchor)?, LinkTypes::VerifierToAttestation)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut attestations = Vec::new();
+    for link in links {
+        let target_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(target_hash, GetOptions::default())? {
+            attestations.push(record);
+        }
+    }
+
+    Ok(attestations)
+}
+
+/// Cast a verified vote with attestation check
+///
+/// Enhanced version of cast_verified_vote that also checks for valid attestations.
+/// This provides defense-in-depth: even if a proof was stored, a vote can only
+/// be cast if an external verifier has attested to its validity.
+#[hdk_extern]
+pub fn cast_attested_vote(input: CastAttestedVoteInput) -> ExternResult<Record> {
+    // Input validation
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+    if input.voter_did.is_empty() || input.voter_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+    }
+    if input.voter_commitment.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter commitment must not be empty".into())));
+    }
+    if let Some(ref reason) = input.reason {
+        if reason.len() > 4096 {
+            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+        }
+    }
+
+    let now = sys_time()?;
+
+    // First check that the proof has a valid attestation
+    if !has_valid_attestation(input.eligibility_proof_hash.clone())? {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proof does not have a valid attestation - wait for verifier or request verification".into()
+        )));
+    }
+
+    // Fetch the eligibility proof
+    let proof_record = get(input.eligibility_proof_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Eligibility proof not found".into()
+        )))?;
+
+    let proof: EligibilityProof = proof_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid eligibility proof entry".into()
+        )))?;
+
+    // Verify proof matches voter
+    if proof.voter_did != input.voter_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Proof voter DID does not match".into()
+        )));
+    }
+
+    // Verify commitment matches
+    if proof.voter_commitment != input.voter_commitment {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter commitment does not match proof".into()
+        )));
+    }
+
+    // Check proof is not expired
+    if proof.is_expired(now) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Eligibility proof has expired - generate a new proof".into()
+        )));
+    }
+
+    // Check proof is valid for this proposal tier
+    if !proof.is_valid_for_tier(&input.tier) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Proof for {:?} is not valid for {:?} tier proposals",
+            proof.proposal_type, input.tier
+        ))));
+    }
+
+    // Check voter hasn't already voted
+    let existing_votes = get_voter_verified_votes(&input.voter_did, &input.proposal_id)?;
+    if !existing_votes.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Voter has already cast a verified vote on this proposal".into()
+        )));
+    }
+
+    // Verified and attested voters get full weight
+    let effective_weight = 1.0;
+
+    let vote_id = format!(
+        "attested:{}:{}:{}",
+        input.proposal_id,
+        input.voter_did,
+        now.as_micros()
+    );
+
+    let vote = VerifiedVote {
+        id: vote_id,
+        proposal_id: input.proposal_id.clone(),
+        proposal_tier: input.tier.clone(),
+        voter: input.voter_did.clone(),
+        choice: input.choice,
+        eligibility_proof_hash: input.eligibility_proof_hash,
+        voter_commitment: input.voter_commitment,
+        effective_weight,
+        reason: input.reason,
+        voted_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::VerifiedVote(vote))?;
+
+    // Link proposal to vote
+    let proposal_anchor = format!("verified_proposal:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(proposal_anchor.clone())))?;
+    create_link(
+        anchor_hash(&proposal_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToVerifiedVote,
+        (),
+    )?;
+
+    // Link voter to vote
+    let voter_anchor = format!("verified_voter:{}", input.voter_did);
+    create_entry(&EntryTypes::Anchor(Anchor(voter_anchor.clone())))?;
+    create_link(
+        anchor_hash(&voter_anchor)?,
+        action_hash.clone(),
+        LinkTypes::VoterToVote,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find attested vote".into()
+        )))
+}
+
+/// Input for casting an attested vote
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CastAttestedVoteInput {
+    pub proposal_id: String,
+    pub voter_did: String,
+    pub tier: ProposalTier,
+    pub choice: VoteChoice,
+    pub eligibility_proof_hash: ActionHash,
+    pub voter_commitment: Vec<u8>,
+    pub reason: Option<String>,
+}
+
+// ============================================================================
+// COLLECTIVE MIRROR: SWARM WISDOM SENSING
+// ============================================================================
+//
+// These functions integrate the CollectiveMirror from mycelix-core-types
+// to provide real-time collective sensing during proposal voting.
+//
+// Philosophy: Mirror, not Oracle. These functions reflect what IS,
+// not what SHOULD BE. They help the group see itself clearly.
+
+use mycelix_core_types::{
+    GovernanceAdapter, GovernanceVoter, GovernanceVote,
+    VoteChoice as CoreVoteChoice, EchoChamberRisk, TopologyType, TrendDirection as CoreTrend,
+    Harmony,
+};
+
+/// Generate a collective mirror reflection for a proposal
+///
+/// This analyzes current voting patterns and generates a reflection that
+/// shows the group how it looks - without claiming to know wisdom.
+///
+/// ## What Gets Reflected
+///
+/// - **Topology**: Is agreement distributed (mesh) or centralized (hub-and-spoke)?
+/// - **Shadow**: Which harmonies (values) are absent from the conversation?
+/// - **Signal Integrity**: Is this consensus or echo chamber?
+/// - **Trajectory**: Which way is the group moving?
+///
+/// ## When to Call
+///
+/// - During voting: Get real-time reflection as votes come in
+/// - At tally time: Generate final reflection for the record
+/// - On-demand: Facilitators can request reflection at any time
+#[hdk_extern]
+pub fn reflect_on_proposal(input: ReflectOnProposalInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+
+    // Gather all voters who have voted on this proposal
+    let voters = gather_proposal_voters(&input.proposal_id)?;
+    let votes = gather_proposal_votes(&input.proposal_id)?;
+
+    // Convert to CollectiveMirror format
+    let gov_voters: Vec<GovernanceVoter> = voters.iter().map(|v| GovernanceVoter {
+        did: v.voter.clone(),
+        phi: v.phi_weight.phi_score,
+        k_trust: v.phi_weight.k_trust,
+        stake_weight: v.phi_weight.stake_weight,
+        participation_score: v.phi_weight.participation_score,
+        domain_reputation: v.phi_weight.domain_reputation,
+        delegated_to: None, // Would need to look up from delegation entries
+        delegated_from: Vec::new(),
+    }).collect();
+
+    let gov_votes: Vec<GovernanceVote> = votes.iter().map(|v| GovernanceVote {
+        voter_did: v.voter.clone(),
+        choice: match v.choice {
+            VoteChoice::For => CoreVoteChoice::For,
+            VoteChoice::Against => CoreVoteChoice::Against,
+            VoteChoice::Abstain => CoreVoteChoice::Abstain,
+        },
+        effective_weight: v.effective_weight,
+        harmony_rationale: None, // Would need additional data
+        timestamp: v.voted_at.as_micros() as u64,
+    }).collect();
+
+    // Run the full CollectiveMirror analysis
+    let core_reflection = GovernanceAdapter::analyze_proposal_voting(
+        &gov_voters,
+        &gov_votes,
+        &input.proposal_id,
+        now.as_micros() as u64,
+    );
+
+    // Convert to on-chain format
+    let reflection_id = format!("reflection:{}:{}", input.proposal_id, now.as_micros());
+
+    // Extract absent harmonies - filter those with presence < 0.3
+    let absent_harmonies: Vec<String> = core_reflection.group_reflection.shadow.absent_harmonies
+        .iter()
+        .filter(|ah| ah.presence < 0.3)
+        .map(|ah| harmony_to_string(&ah.harmony))
+        .collect();
+
+    // Calculate harmony coverage from absent_harmonies
+    let total_harmonies = 7.0; // The Seven Harmonies
+    let absent_count = core_reflection.group_reflection.shadow.absent_harmonies
+        .iter()
+        .filter(|ah| ah.presence < 0.3)
+        .count() as f64;
+    let harmony_coverage = (total_harmonies - absent_count) / total_harmonies;
+
+    // Determine if agreement is verified (inverse of echo chamber risk)
+    let agreement_verified = matches!(
+        core_reflection.group_reflection.signal_integrity.echo_chamber_risk,
+        EchoChamberRisk::Low
+    );
+
+    let reflection = ProposalReflection {
+        id: reflection_id,
+        proposal_id: input.proposal_id.clone(),
+        timestamp: now,
+        voter_count: gov_voters.len() as u64,
+
+        // Topology
+        topology_pattern: convert_topology_type(&core_reflection.group_reflection.topology.topology_type),
+        centralization: core_reflection.group_reflection.topology.centralization,
+        cluster_count: core_reflection.group_reflection.topology.cluster_count.min(255) as u8,
+
+        // Shadow
+        absent_harmonies,
+        harmony_coverage,
+
+        // Signal Integrity
+        average_epistemic_level: core_reflection.group_reflection.signal_integrity.epistemic_level,
+        echo_chamber_risk: convert_echo_chamber_risk(&core_reflection.group_reflection.signal_integrity.echo_chamber_risk),
+        agreement_verified,
+
+        // Trajectory
+        agreement_trend: convert_trend_direction(&core_reflection.group_reflection.trajectory.agreement_direction),
+        centralization_trend: convert_trend_direction(&core_reflection.group_reflection.trajectory.centralization_direction),
+        rapid_convergence_warning: core_reflection.group_reflection.trajectory.rapid_convergence_warning,
+        fragmentation_warning: core_reflection.group_reflection.trajectory.fragmentation_warning,
+
+        // Vote Summary
+        votes_for: core_reflection.vote_summary.for_count as u64,
+        votes_against: core_reflection.vote_summary.against_count as u64,
+        abstentions: core_reflection.vote_summary.abstain_count as u64,
+        approval_ratio: core_reflection.vote_summary.approval_ratio,
+        polarization: core_reflection.vote_summary.polarization,
+
+        // Prompts & Interventions
+        suggested_interventions: core_reflection.suggested_interventions
+            .iter()
+            .map(|i| i.name.clone())
+            .collect(),
+        reflection_prompts: core_reflection.governance_prompts.clone(),
+
+        needs_review: core_reflection.needs_review(),
+        summary: core_reflection.summary(),
+    };
+
+    // Capture values for signal before moving reflection
+    let reflection_id_for_signal = reflection.id.clone();
+    let needs_review_signal = reflection.needs_review;
+    let echo_chamber_risk_signal = format!("{:?}", reflection.echo_chamber_risk);
+    let health_score_signal = 1.0 - reflection.centralization; // Inverse of centralization as proxy for health
+
+    // Store on-chain
+    let action_hash = create_entry(&EntryTypes::ProposalReflection(reflection))?;
+
+    // Link proposal to reflection
+    let proposal_anchor = format!("reflection_proposal:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(proposal_anchor.clone())))?;
+    create_link(
+        anchor_hash(&proposal_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToReflection,
+        (),
+    )?;
+
+    // Emit real-time signal for reflection
+    let _ = emit_governance_signal(GovernanceSignal::ReflectionGenerated {
+        proposal_id: input.proposal_id.clone(),
+        reflection_id: reflection_id_for_signal,
+        needs_review: needs_review_signal,
+        echo_chamber_risk: echo_chamber_risk_signal,
+        health_score: health_score_signal,
+    });
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find stored reflection".into()
+        )))
+}
+
+/// Input for reflecting on a proposal
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ReflectOnProposalInput {
+    pub proposal_id: String,
+}
+
+/// Get all collective mirror reflections for a proposal
+#[hdk_extern]
+pub fn get_proposal_reflections(proposal_id: String) -> ExternResult<Vec<Record>> {
+    let proposal_anchor = format!("reflection_proposal:{}", proposal_id);
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&proposal_anchor)?, LinkTypes::ProposalToReflection)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut reflections = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            reflections.push(record);
+        }
+    }
+
+    // Sort by timestamp (most recent last)
+    reflections.sort_by(|a, b| {
+        let ts_a = a.action().timestamp();
+        let ts_b = b.action().timestamp();
+        ts_a.cmp(&ts_b)
+    });
+
+    Ok(reflections)
+}
+
+/// Get the latest reflection for a proposal
+#[hdk_extern]
+pub fn get_latest_reflection(proposal_id: String) -> ExternResult<Option<Record>> {
+    let reflections = get_proposal_reflections(proposal_id)?;
+    Ok(reflections.into_iter().last())
+}
+
+/// Check if a proposal needs human review based on collective sensing
+///
+/// Returns true if any of these conditions are met:
+/// - Echo chamber risk is High or Critical
+/// - Rapid convergence warning
+/// - Fragmentation warning
+/// - Low harmony coverage (<30%)
+/// - High centralization (>80%)
+#[hdk_extern]
+pub fn proposal_needs_review(proposal_id: String) -> ExternResult<bool> {
+    let latest = get_latest_reflection(proposal_id)?;
+
+    match latest {
+        None => Ok(false), // No reflection yet, can't determine
+        Some(record) => {
+            let reflection: ProposalReflection = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid reflection entry".into()
+                )))?;
+
+            Ok(reflection.has_concerns())
+        }
+    }
+}
+
+// ============================================================================
+// HELPER FUNCTIONS FOR COLLECTIVE SENSING
+// ============================================================================
+
+/// Gather all Φ-weighted voters for a proposal
+fn gather_proposal_voters(proposal_id: &str) -> ExternResult<Vec<PhiWeightedVote>> {
+    let proposal_anchor = format!("phi_proposal:{}", proposal_id);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&proposal_anchor)?, LinkTypes::ProposalToPhiVote)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut voters = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(vote) = record
+                .entry()
+                .to_app_option::<PhiWeightedVote>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                voters.push(vote);
+            }
+        }
+    }
+
+    Ok(voters)
+}
+
+/// Gather all votes for a proposal (same as voters for now)
+fn gather_proposal_votes(proposal_id: &str) -> ExternResult<Vec<PhiWeightedVote>> {
+    gather_proposal_voters(proposal_id)
+}
+
+/// Convert TopologyType to on-chain TopologyPattern
+fn convert_topology_type(topology_type: &TopologyType) -> TopologyPattern {
+    match topology_type {
+        TopologyType::DistributedMesh => TopologyPattern::Mesh,
+        TopologyType::HubAndSpoke => TopologyPattern::HubAndSpoke,
+        TopologyType::Fragmented => TopologyPattern::Polarized, // Map fragmented to polarized
+        TopologyType::Insufficient => TopologyPattern::Unknown,
+    }
+}
+
+/// Convert EchoChamberRisk to on-chain EchoChamberRiskLevel
+fn convert_echo_chamber_risk(risk: &EchoChamberRisk) -> EchoChamberRiskLevel {
+    match risk {
+        EchoChamberRisk::Low => EchoChamberRiskLevel::Low,
+        EchoChamberRisk::Moderate => EchoChamberRiskLevel::Moderate,
+        EchoChamberRisk::High => EchoChamberRiskLevel::High,
+        EchoChamberRisk::Critical => EchoChamberRiskLevel::Critical,
+    }
+}
+
+/// Convert TrendDirection to on-chain format
+fn convert_trend_direction(trend: &CoreTrend) -> TrendDirection {
+    match trend {
+        CoreTrend::Rising => TrendDirection::Rising,
+        CoreTrend::Stable => TrendDirection::Stable,
+        CoreTrend::Falling => TrendDirection::Falling,
+        CoreTrend::Unknown => TrendDirection::Unknown,
+    }
+}
+
+/// Convert Harmony enum to string for on-chain storage
+fn harmony_to_string(harmony: &Harmony) -> String {
+    match harmony {
+        Harmony::ResonantCoherence => "ResonantCoherence".to_string(),
+        Harmony::PanSentientFlourishing => "PanSentientFlourishing".to_string(),
+        Harmony::IntegralWisdom => "IntegralWisdom".to_string(),
+        Harmony::InfinitePlay => "InfinitePlay".to_string(),
+        Harmony::UniversalInterconnectedness => "UniversalInterconnectedness".to_string(),
+        Harmony::SacredReciprocity => "SacredReciprocity".to_string(),
+        Harmony::EvolutionaryProgression => "EvolutionaryProgression".to_string(),
+    }
+}

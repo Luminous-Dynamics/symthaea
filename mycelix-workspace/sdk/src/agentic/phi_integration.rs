@@ -1,15 +1,27 @@
-//! # Enhanced Phi Integration for Emergent Behavior Detection
+//! # Phi Integration for Agent Coherence
 //!
-//! Deep integration of consciousness metrics (Phi) for detecting emergent
-//! behaviors in multi-agent systems.
+//! Integration of coherence metrics for multi-agent systems.
+//!
+//! ## IMPORTANT: Phi Usage Guidelines
+//!
+//! Phi (coherence) should be used sparingly:
+//!
+//! **Meaningful uses (keep):**
+//! - Gating high-stakes ZK operations (see `phi_bridge.rs`)
+//! - One-time coherence checks before critical decisions
+//!
+//! **Over-engineered uses (deprecated):**
+//! - `EmergentBehaviorDetector` - use simple clustering instead
+//! - `PhiEvolutionTracker` - use variance tracking instead
+//! - `collective_phi` in dashboards - informational only, don't act on it
 //!
 //! ## Features
 //!
 //! - **Phi-Gated Actions**: Gate high-stakes actions on coherence thresholds
-//! - **Collective Phi**: Measure population-level coherence and emergence
-//! - **Emergent Behavior Detection**: Detect patterns that emerge from interactions
-//! - **Agent Clustering**: Group agents by Phi similarity
-//! - **Temporal Phi Analysis**: Track coherence evolution over time
+//! - **Collective Phi**: Measure population-level coherence (informational)
+//! - ~~**Emergent Behavior Detection**~~: DEPRECATED - use simple clustering
+//! - ~~**Agent Clustering**~~: DEPRECATED - use k-means on K-Vector
+//! - ~~**Temporal Phi Analysis**~~: DEPRECATED - use variance tracking
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -291,6 +303,11 @@ pub struct EmergentBehavior {
 }
 
 /// Detector for emergent behaviors
+///
+/// DEPRECATED: This is over-engineered. For Byzantine detection, use the MATL
+/// Byzantine detector. For clustering, use simple k-means on K-Vectors.
+/// For oscillation detection, use variance tracking on trust scores.
+#[deprecated(since = "0.2.0", note = "Use simpler approaches: MATL Byzantine detection, k-means clustering, or variance tracking")]
 pub struct EmergentBehaviorDetector {
     /// History of collective Phi measurements
     phi_history: Vec<(u64, f64)>,

@@ -1,22 +1,31 @@
-//! # Phi Bridge for Agent Coherence Measurement
+//! # Phi Bridge for Agent Coherence Gating
 //!
-//! Integrates the consciousness metric (Phi) from mycelix-math as a quality
-//! signal for AI agent outputs.
+//! **THIS IS THE PRIMARY LEGITIMATE USE OF PHI IN THE CODEBASE.**
 //!
-//! ## How Phi Measures Agent Coherence
+//! This module provides coherence gating for high-stakes operations. Phi measures
+//! output consistency - an agent producing wildly inconsistent outputs should be
+//! prevented from performing critical ZK operations.
 //!
-//! Phi (Φ) is the Integrated Information metric that measures how much a system
-//! is "more than the sum of its parts." For agent outputs:
+//! ## When to Use Phi
 //!
-//! - High Phi (> 0.7): Outputs are coherent, integrated, consistent
-//! - Low Phi (< 0.3): Outputs are fragmented, inconsistent, possibly adversarial
+//! ✓ **Gating ZK operations** - prevent incoherent agents from generating proofs
+//! ✓ **Byzantine consensus participation** - only coherent agents should vote
+//! ✓ **One-time coherence checks** - before critical decisions
 //!
-//! ## Usage
+//! ## When NOT to Use Phi
 //!
-//! 1. Convert agent outputs to vectors (using epistemic classification)
-//! 2. Measure Phi across recent output sequence
-//! 3. Update agent's k_phi dimension based on measured coherence
-//! 4. Gate high-stakes actions on Phi threshold
+//! ✗ **Trust scoring** - k_phi has 0% weight, use trust_score() instead
+//! ✗ **Query routing** - use trust score, not coherence
+//! ✗ **Dashboards** - collective_phi is informational only, don't gate on it
+//! ✗ **Emergent behavior detection** - use simple clustering instead
+//!
+//! ## Coherence States
+//!
+//! - `Coherent` (Phi >= 0.7): All operations allowed
+//! - `Stable` (0.5-0.7): Normal operations allowed
+//! - `Unstable` (0.3-0.5): Restricted operations
+//! - `Degraded` (0.1-0.3): Monitoring required
+//! - `Critical` (< 0.1): Agent suspended
 
 use super::epistemic_classifier::{AgentOutput, calculate_epistemic_weight};
 use serde::{Deserialize, Serialize};

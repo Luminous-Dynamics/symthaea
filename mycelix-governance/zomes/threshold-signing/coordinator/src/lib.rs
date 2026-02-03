@@ -1,0 +1,517 @@
+//! Threshold Signing Coordinator Zome
+//!
+//! Business logic for DKG-based threshold signatures on governance decisions.
+//!
+//! Workflow:
+//! 1. Create committee with threshold and member count
+//! 2. Members register with their K-Vector trust scores
+//! 3. Members run DKG ceremony off-chain using feldman-dkg
+//! 4. Public commitments are submitted to advance ceremony
+//! 5. Once complete, members can collectively sign governance decisions
+//! 6. Threshold signatures are verified and stored
+
+use hdk::prelude::*;
+use threshold_signing_integrity::*;
+
+/// Helper to get an anchor entry hash
+fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
+    let anchor = Anchor(anchor_str.to_string());
+    hash_entry(&EntryTypes::Anchor(anchor))
+}
+
+/// Create a new signing committee
+///
+/// This initiates a DKG ceremony. Members must register and complete
+/// the DKG protocol off-chain before the committee can sign.
+#[hdk_extern]
+pub fn create_committee(input: CreateCommitteeInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+    let committee_id = format!("committee:{}:{}", input.name, now.as_micros());
+
+    let committee = SigningCommittee {
+        id: committee_id.clone(),
+        name: input.name,
+        threshold: input.threshold,
+        member_count: input.member_count,
+        phase: DkgPhase::Registration,
+        public_key: None,
+        commitments: Vec::new(),
+        scope: input.scope,
+        created_at: now,
+        active: true,
+        epoch: 1,
+    };
+
+    let action_hash = create_entry(&EntryTypes::SigningCommittee(committee))?;
+
+    // Create anchor and link for committee lookup
+    let committee_anchor = format!("committee:{}", committee_id);
+    create_entry(&EntryTypes::Anchor(Anchor(committee_anchor.clone())))?;
+    create_link(
+        anchor_hash(&committee_anchor)?,
+        action_hash.clone(),
+        LinkTypes::EpochToCommittee,
+        (),
+    )?;
+
+    // Link to all committees list
+    let all_anchor = "all_committees";
+    create_entry(&EntryTypes::Anchor(Anchor(all_anchor.to_string())))?;
+    create_link(
+        anchor_hash(all_anchor)?,
+        action_hash.clone(),
+        LinkTypes::EpochToCommittee,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find committee".into())))
+}
+
+/// Input for creating a signing committee
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateCommitteeInput {
+    pub name: String,
+    pub threshold: u32,
+    pub member_count: u32,
+    pub scope: CommitteeScope,
+}
+
+/// Register as a committee member
+///
+/// Called by validators who want to participate in the signing committee.
+#[hdk_extern]
+pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+    let caller = agent_info()?.agent_initial_pubkey;
+
+    let member = CommitteeMember {
+        committee_id: input.committee_id.clone(),
+        participant_id: input.participant_id,
+        agent: caller.clone(),
+        member_did: input.member_did,
+        trust_score: input.trust_score,
+        public_share: None,
+        vss_commitment: None,
+        deal_submitted: false,
+        qualified: false,
+        registered_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::CommitteeMember(member))?;
+
+    // Link committee to member
+    let committee_anchor = format!("committee:{}", input.committee_id);
+    create_link(
+        anchor_hash(&committee_anchor)?,
+        action_hash.clone(),
+        LinkTypes::CommitteeToMember,
+        (),
+    )?;
+
+    // Link agent to committee
+    create_link(
+        AnyLinkableHash::from(caller),
+        action_hash.clone(),
+        LinkTypes::AgentToCommittee,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find member".into())))
+}
+
+/// Input for registering as a committee member
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RegisterMemberInput {
+    pub committee_id: String,
+    pub participant_id: u32,
+    pub member_did: String,
+    pub trust_score: f64,
+}
+
+/// Submit DKG deal (public commitments from off-chain DKG)
+///
+/// Called by members after running DKG dealing phase off-chain.
+#[hdk_extern]
+pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
+    // Get member's record
+    let member_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("committee:{}", input.committee_id))?,
+            LinkTypes::CommitteeToMember,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let caller = agent_info()?.agent_initial_pubkey;
+    let mut member_action_hash = None;
+    let mut member: Option<CommitteeMember> = None;
+
+    for link in member_links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah.clone(), GetOptions::default())? {
+            if let Some(m) = record.entry().to_app_option::<CommitteeMember>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if m.agent == caller {
+                    member_action_hash = Some(ah);
+                    member = Some(m);
+                    break;
+                }
+            }
+        }
+    }
+
+    let (original_hash, mut member) = match (member_action_hash, member) {
+        (Some(ah), Some(m)) => (ah, m),
+        _ => return Err(wasm_error!(WasmErrorInner::Guest(
+            "Caller is not a member of this committee".into()
+        ))),
+    };
+
+    // Update member with deal info
+    member.vss_commitment = Some(input.vss_commitment);
+    member.deal_submitted = true;
+
+    let action_hash = update_entry(original_hash, &EntryTypes::CommitteeMember(member))?;
+
+    // Check if all members have submitted - would advance phase in production
+    // (Simplified here - actual implementation would check all members)
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated member".into())))
+}
+
+/// Input for submitting DKG deal
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubmitDkgDealInput {
+    pub committee_id: String,
+    pub vss_commitment: Vec<u8>,
+}
+
+/// Finalize DKG ceremony
+///
+/// Called after all members have submitted valid deals.
+/// Updates committee with combined public key.
+#[hdk_extern]
+pub fn finalize_dkg(input: FinalizeDkgInput) -> ExternResult<Record> {
+    // Get committee
+    let committee_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("committee:{}", input.committee_id))?,
+            LinkTypes::EpochToCommittee,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let latest_link = committee_links.into_iter().max_by_key(|l| l.timestamp);
+    let committee_hash = match latest_link {
+        Some(link) => ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?,
+        None => return Err(wasm_error!(WasmErrorInner::Guest("Committee not found".into()))),
+    };
+
+    let record = get(committee_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Committee not found".into())))?;
+
+    let mut committee: SigningCommittee = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid committee entry".into())))?;
+
+    // Update committee with DKG result
+    committee.phase = DkgPhase::Complete;
+    committee.public_key = Some(input.combined_public_key);
+    committee.commitments = input.public_commitments;
+
+    // Mark all qualified members
+    let member_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("committee:{}", input.committee_id))?,
+            LinkTypes::CommitteeToMember,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    for member_id in &input.qualified_members {
+        for link in &member_links {
+            let ah = ActionHash::try_from(link.target.clone())
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+            if let Some(record) = get(ah.clone(), GetOptions::default())? {
+                if let Some(mut m) = record.entry().to_app_option::<CommitteeMember>()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                {
+                    if m.participant_id == *member_id {
+                        m.qualified = true;
+                        update_entry(ah, &EntryTypes::CommitteeMember(m))?;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    let action_hash = update_entry(committee_hash, &EntryTypes::SigningCommittee(committee))?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated committee".into())))
+}
+
+/// Input for finalizing DKG
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FinalizeDkgInput {
+    pub committee_id: String,
+    pub combined_public_key: Vec<u8>,
+    pub public_commitments: Vec<Vec<u8>>,
+    pub qualified_members: Vec<u32>,
+}
+
+/// Submit a signature share
+///
+/// Called by committee members to contribute their partial signature.
+#[hdk_extern]
+pub fn submit_signature_share(input: SubmitSignatureShareInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+    let caller = agent_info()?.agent_initial_pubkey;
+
+    let share = SignatureShare {
+        signature_id: input.signature_id.clone(),
+        participant_id: input.participant_id,
+        signer: caller,
+        share: input.share,
+        content_hash: input.content_hash,
+        submitted_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::SignatureShare(share))?;
+
+    // Link to signature
+    let sig_anchor = format!("signature:{}", input.signature_id);
+    create_entry(&EntryTypes::Anchor(Anchor(sig_anchor.clone())))?;
+    create_link(
+        anchor_hash(&sig_anchor)?,
+        action_hash.clone(),
+        LinkTypes::SignatureToShare,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find share".into())))
+}
+
+/// Input for submitting a signature share
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubmitSignatureShareInput {
+    pub signature_id: String,
+    pub participant_id: u32,
+    pub share: Vec<u8>,
+    pub content_hash: Vec<u8>,
+}
+
+/// Combine signature shares into threshold signature
+///
+/// Called when enough shares have been collected to meet threshold.
+#[hdk_extern]
+pub fn combine_signatures(input: CombineSignaturesInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+    let sig_id = format!("sig:{}:{}", input.committee_id, now.as_micros());
+
+    let signature = ThresholdSignature {
+        id: sig_id.clone(),
+        committee_id: input.committee_id.clone(),
+        signed_content_hash: input.content_hash,
+        signed_content_description: input.content_description,
+        signature: input.combined_signature,
+        signer_count: input.signers.len() as u32,
+        signers: input.signers,
+        verified: input.verified,
+        signed_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ThresholdSignature(signature))?;
+
+    // Link committee to signature
+    let committee_anchor = format!("committee:{}", input.committee_id);
+    create_link(
+        anchor_hash(&committee_anchor)?,
+        action_hash.clone(),
+        LinkTypes::CommitteeToSignature,
+        (),
+    )?;
+
+    // Create signature anchor for lookups
+    let sig_anchor = format!("signature:{}", sig_id);
+    create_entry(&EntryTypes::Anchor(Anchor(sig_anchor.clone())))?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find signature".into())))
+}
+
+/// Input for combining signatures
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CombineSignaturesInput {
+    pub committee_id: String,
+    pub content_hash: Vec<u8>,
+    pub content_description: String,
+    pub combined_signature: Vec<u8>,
+    pub signers: Vec<u32>,
+    pub verified: bool,
+}
+
+/// Get committee by ID
+#[hdk_extern]
+pub fn get_committee(committee_id: String) -> ExternResult<Option<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("committee:{}", committee_id))?,
+            LinkTypes::EpochToCommittee,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let latest = links.into_iter().max_by_key(|l| l.timestamp);
+    if let Some(link) = latest {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        return get(ah, GetOptions::default());
+    }
+
+    Ok(None)
+}
+
+/// Get committee members
+#[hdk_extern]
+pub fn get_committee_members(committee_id: String) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("committee:{}", committee_id))?,
+            LinkTypes::CommitteeToMember,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut members = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            members.push(record);
+        }
+    }
+
+    Ok(members)
+}
+
+/// Get signature shares for a signature
+#[hdk_extern]
+pub fn get_signature_shares(signature_id: String) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("signature:{}", signature_id))?,
+            LinkTypes::SignatureToShare,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut shares = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            shares.push(record);
+        }
+    }
+
+    Ok(shares)
+}
+
+/// Get all active committees
+#[hdk_extern]
+pub fn get_all_committees(_: ()) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_committees")?, LinkTypes::EpochToCommittee)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut committees = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            // Only include active committees
+            if let Some(committee) = record.entry().to_app_option::<SigningCommittee>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if committee.active {
+                    committees.push(record);
+                }
+            }
+        }
+    }
+
+    Ok(committees)
+}
+
+/// Initiate key rotation for a committee
+///
+/// Creates a new epoch and initiates a fresh DKG ceremony.
+#[hdk_extern]
+pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
+    // Get current committee
+    let current = get_committee(committee_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Committee not found".into())))?;
+
+    let current_committee: SigningCommittee = current
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid committee entry".into())))?;
+
+    // Deactivate current committee
+    let mut old_committee = current_committee.clone();
+    old_committee.active = false;
+    update_entry(
+        current.action_address().clone(),
+        &EntryTypes::SigningCommittee(old_committee),
+    )?;
+
+    // Create new committee for next epoch
+    let now = sys_time()?;
+    let new_committee = SigningCommittee {
+        id: format!("{}:epoch:{}", committee_id, current_committee.epoch + 1),
+        name: current_committee.name,
+        threshold: current_committee.threshold,
+        member_count: current_committee.member_count,
+        phase: DkgPhase::Registration,
+        public_key: None,
+        commitments: Vec::new(),
+        scope: current_committee.scope,
+        created_at: now,
+        active: true,
+        epoch: current_committee.epoch + 1,
+    };
+
+    let action_hash = create_entry(&EntryTypes::SigningCommittee(new_committee.clone()))?;
+
+    // Link to committee ID
+    create_link(
+        anchor_hash(&format!("committee:{}", committee_id))?,
+        action_hash.clone(),
+        LinkTypes::EpochToCommittee,
+        (),
+    )?;
+
+    // Link to epoch anchor
+    create_link(
+        anchor_hash(&format!("epoch:{}", new_committee.epoch))?,
+        action_hash.clone(),
+        LinkTypes::EpochToCommittee,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find new committee".into())))
+}
