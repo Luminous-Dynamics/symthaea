@@ -1,0 +1,142 @@
+# Mycelix Workspace - Claude Context
+
+**Version**: Holochain 0.6.0
+**Status**: 3 production + 9 beta + 14 scaffold hApps (see [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md))
+
+---
+
+## Quick Commands
+
+```bash
+nix develop          # Enter environment
+just                 # See all commands
+just dev             # Start all services
+just build           # Build everything
+just test            # Run all tests
+just status          # Check status
+```
+
+---
+
+## hApp Status
+
+| Stage | Count | hApps |
+|-------|-------|-------|
+| Production | 3 | core (62 tests), mail (12 zomes), desci (141 tests, REST not hApp) |
+| Beta | 9 | marketplace, supplychain, observatory, epistemic-markets, fabrication, edunet, consensus, civic-happ, lucid |
+| Scaffold | 14 | identity, knowledge, governance, justice, finance, property, energy, media, health, space, care, emergency, water, housing |
+| Stub/Other | 3 | bots (Python), music (early), symthaea-bridge |
+| Dormant | 2 | climate, mutualaid (restored from archive) |
+
+Full breakdown: [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md)
+
+---
+
+## Directory Structure
+
+```
+mycelix-workspace/
+├── happs/           # 18 hApps (mostly symlinks to mycelix-*)
+├── sdk/             # Rust SDK (MATL, epistemic, bridge, etc.)
+├── sdk-ts/          # TypeScript SDK
+├── observatory/     # SvelteKit dashboard
+├── cli/             # @mycelix/cli
+└── tests/           # Unit, integration, byzantine
+```
+
+---
+
+## Core Concepts
+
+### MATL (45% Byzantine Tolerance)
+```
+Composite = 0.4·PoGQ + 0.3·Consistency + 0.3·Reputation
+```
+
+### Epistemic Charter (E-N-M)
+- **E (Empirical)**: E0-E4 (Subjective → Publicly Reproducible)
+- **N (Normative)**: N0-N3 (Personal → Axiomatic)
+- **M (Materiality)**: M0-M3 (Ephemeral → Foundational)
+
+---
+
+## Version Compatibility
+
+| Component | Version |
+|-----------|---------|
+| holochain | 0.6.0 |
+| hdk | 0.6.0 |
+| hdi | 0.7.0 |
+| @holochain/client | 0.20.0 |
+
+**Critical**: Pin `getrandom = "0.2"` with `features = ["js"]` for WASM.
+
+---
+
+## Common Issues
+
+### "getrandom" WASM Error
+Pin to `getrandom = "0.2"` with `features = ["js"]`
+
+### Conductor Connection Failed
+```bash
+just stop && just dev
+```
+
+### Build Artifacts Missing
+```bash
+cargo build --release --target wasm32-unknown-unknown
+hc dna pack .
+```
+
+---
+
+## Test Coverage
+
+| Suite | Tests | Status |
+|-------|-------|--------|
+| Mycelix-Core | 62 | Verified |
+| DeSci | 141 | Verified |
+| Rust SDK | 789 pass, 2 ignored | Verified |
+| TypeScript SDK | 6,421 pass / 196 skip | All pass (libsodium ESM compat fixed) |
+| Identity unit | 23 | Pass (recovery + trust_credential) |
+| WASM zomes | 66 | Compile to wasm32-unknown-unknown |
+| Sweettest | Compiles | Needs persistent session for first build |
+| Tryorama | 13 suites | Needs running conductor + hApp bundles |
+| Python SDK | N/A | `sdk-python/` directory does not exist |
+
+See [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md) for full details.
+
+## Development Priorities
+
+1. **P0**: Run sweettest in persistent session, fix CI `continue-on-error` flags
+2. **P1**: Add `cargo doc` + `cargo test --doc` to CI pipeline
+3. **P2**: Tryorama ecosystem test execution, E2E coverage
+
+---
+
+## SDK Quick Reference
+
+### Rust
+```rust
+use mycelix_sdk::matl::{ProofOfGradientQuality, CompositeTrustScore};
+let pogq = ProofOfGradientQuality::new(0.95, 0.88, 0.12);
+```
+
+### TypeScript
+```typescript
+import { matl, epistemic } from '@mycelix/sdk';
+const composite = matl.calculateComposite({ quality: 0.9, consistency: 0.85, reputation: 0.8 });
+```
+
+---
+
+## Resources
+
+- Holochain Docs: https://developer.holochain.org
+- Website: https://mycelix.net
+- Parent roadmap: `THE_SUBSTRATE_ROADMAP.md`
+
+---
+
+*Building decentralized trust infrastructure, one spore at a time.* 🍄
