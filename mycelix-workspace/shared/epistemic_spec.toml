@@ -1,0 +1,9 @@
+## Canonical Epistemic Charter classification codes
+##
+## All SDKs (Rust, TypeScript, Python) must be able to
+## produce and parse these codes consistently.
+
+basic = "E1-N1-M1"
+financial = "E3-N2-M2"
+foundational = "E4-N3-M3"
+

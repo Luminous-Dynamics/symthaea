@@ -1,0 +1,136 @@
+# Mycelix hApp Standard Justfile
+# Copy this to your app directory and customize APP_NAME
+
+# Application name (customize this)
+APP_NAME := "mycelix-app"
+
+# Directories
+ZOMES_DIR := "zomes"
+DNA_DIR := "dna"
+UI_DIR := "ui"
+TESTS_DIR := "tests"
+
+# Default recipe
+default:
+    @just --list
+
+# === Development ===
+
+# Start full development environment
+dev:
+    just build-zomes
+    just start-conductor &
+    sleep 3
+    just start-ui
+
+# Watch and rebuild zomes on changes
+watch:
+    cargo watch -C {{ZOMES_DIR}} -x 'build --release --target wasm32-unknown-unknown'
+
+# === Building ===
+
+# Build all zomes to WASM
+build-zomes:
+    @echo "🔨 Building zomes..."
+    cd {{ZOMES_DIR}} && cargo build --release --target wasm32-unknown-unknown
+    @echo "✅ Zomes built"
+
+# Package DNA
+package-dna: build-zomes
+    @echo "📦 Packaging DNA..."
+    hc dna pack {{DNA_DIR}}/
+    @echo "✅ DNA packaged"
+
+# Package hApp
+package-happ: package-dna
+    @echo "📦 Packaging hApp..."
+    hc app pack .
+    @echo "✅ hApp packaged"
+
+# Build UI for production
+build-ui:
+    @echo "🔨 Building UI..."
+    cd {{UI_DIR}} && pnpm install && pnpm build
+    @echo "✅ UI built"
+
+# Build everything
+build: package-happ build-ui
+    @echo "🎉 Full build complete"
+
+# === Running ===
+
+# Start Holochain conductor with sandbox
+start-conductor:
+    @echo "🚀 Starting Holochain conductor..."
+    hc sandbox generate -a {{APP_NAME}} -r
+
+# Start UI development server
+start-ui:
+    @echo "🚀 Starting UI dev server..."
+    cd {{UI_DIR}} && pnpm dev
+
+# === Testing ===
+
+# Run all tests
+test: test-zomes test-tryorama test-ui
+
+# Run zome unit tests
+test-zomes:
+    @echo "🧪 Testing zomes..."
+    cd {{ZOMES_DIR}} && cargo test
+
+# Run Tryorama integration tests
+test-tryorama: package-happ
+    @echo "🧪 Running Tryorama tests..."
+    cd {{TESTS_DIR}}/tryorama && npm test
+
+# Run UI tests
+test-ui:
+    @echo "🧪 Testing UI..."
+    cd {{UI_DIR}} && pnpm test
+
+# === Linting ===
+
+# Lint all code
+lint: lint-rust lint-ui
+
+# Lint Rust code
+lint-rust:
+    cd {{ZOMES_DIR}} && cargo clippy -- -D warnings
+
+# Lint UI code
+lint-ui:
+    cd {{UI_DIR}} && pnpm lint
+
+# Format all code
+format:
+    cd {{ZOMES_DIR}} && cargo fmt
+    cd {{UI_DIR}} && pnpm format
+
+# === Cleaning ===
+
+# Clean all build artifacts
+clean:
+    cd {{ZOMES_DIR}} && cargo clean
+    rm -rf {{DNA_DIR}}/workdir/*.dna
+    rm -rf *.happ
+    cd {{UI_DIR}} && rm -rf dist node_modules/.vite
+
+# === Documentation ===
+
+# Generate documentation
+docs:
+    cd {{ZOMES_DIR}} && cargo doc --no-deps --open
+
+# === Release ===
+
+# Create a release build
+release: clean build
+    @echo "📦 Release build complete"
+    @ls -la *.happ
+
+# === CI ===
+
+# Run CI checks
+ci: lint test build
+    @echo "✅ CI checks passed"

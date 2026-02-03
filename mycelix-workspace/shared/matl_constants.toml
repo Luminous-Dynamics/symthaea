@@ -1,0 +1,15 @@
+## Canonical MATL constants for all SDKs
+##
+## These values must match:
+## - Rust:    sdk/src/matl/mod.rs
+## - TS:      sdk-ts/src/matl/index.ts
+## - Python:  sdk-python/mycelix/matl/__init__.py
+## - WASM:    sdk-wasm/src/lib.rs (where applicable)
+
+default_quality_weight = 0.4
+default_consistency_weight = 0.3
+default_reputation_weight = 0.3
+
+max_byzantine_tolerance = 0.45
+default_byzantine_threshold = 0.5
+
