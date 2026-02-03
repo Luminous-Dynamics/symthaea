@@ -599,9 +599,817 @@ criterion_group!(
     targets = benchmark_coherence_checks
 );
 
+// =============================================================================
+// DASHBOARD BENCHMARKS
+// =============================================================================
+
+use mycelix_sdk::agentic::dashboard::{
+    Dashboard, DashboardConfig, MetricsInput, MetricsAggregator, AlertPanel,
+    AlertSeverity, EventStream, EventPriority, DashboardEventType,
+    TimeSeries, ChartType, ChartDataBuilder, DashboardAlert,
+};
+
+/// Benchmark dashboard metrics aggregation
+fn benchmark_dashboard_metrics(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_dashboard_metrics");
+
+    // Single metrics update
+    group.bench_function("single_update", |b| {
+        let config = DashboardConfig::default();
+        let mut agg = MetricsAggregator::new(config);
+        let input = create_metrics_input(10);
+
+        b.iter(|| {
+            let mut a = agg.clone();
+            a.update(black_box(input.clone()), black_box(current_timestamp()))
+        })
+    });
+
+    // Batch metrics updates
+    for count in [10, 50, 100] {
+        group.throughput(Throughput::Elements(count as u64));
+        group.bench_with_input(
+            BenchmarkId::new("batch_update", count),
+            &count,
+            |b, &count| {
+                let config = DashboardConfig::default();
+                let mut agg = MetricsAggregator::new(config);
+                let inputs: Vec<MetricsInput> = (0..count)
+                    .map(|i| create_metrics_input(10 + i))
+                    .collect();
+
+                b.iter(|| {
+                    let mut a = agg.clone();
+                    for (i, input) in inputs.iter().enumerate() {
+                        a.update(black_box(input.clone()), black_box(1000 + i as u64 * 60));
+                    }
+                    a.latest().cloned()
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark alert panel operations
+fn benchmark_alert_panel(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_alert_panel");
+
+    // Create alert
+    group.bench_function("create_alert", |b| {
+        let config = DashboardConfig::default();
+        let mut panel = AlertPanel::new(config);
+
+        b.iter(|| {
+            let mut p = panel.clone();
+            p.create_alert(
+                black_box(AlertSeverity::High),
+                black_box("Test Alert"),
+                black_box("Description"),
+                black_box("test"),
+            )
+        })
+    });
+
+    // Get active alerts with many alerts
+    group.bench_function("get_active_100_alerts", |b| {
+        let config = DashboardConfig::default();
+        let mut panel = AlertPanel::new(config);
+        for i in 0..100 {
+            panel.create_alert(
+                AlertSeverity::Medium,
+                &format!("Alert {}", i),
+                "Description",
+                "test",
+            );
+        }
+
+        b.iter(|| black_box(&panel).active_alerts())
+    });
+
+    // Critical alerts filter
+    group.bench_function("get_critical_alerts", |b| {
+        let config = DashboardConfig::default();
+        let mut panel = AlertPanel::new(config);
+        for i in 0..100 {
+            let severity = if i % 10 == 0 { AlertSeverity::Critical } else { AlertSeverity::Low };
+            panel.create_alert(severity, &format!("Alert {}", i), "Description", "test");
+        }
+
+        b.iter(|| black_box(&panel).critical_alerts())
+    });
+
+    group.finish();
+}
+
+/// Benchmark event stream operations
+fn benchmark_event_stream(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_event_stream");
+
+    // Emit event
+    group.bench_function("emit_event", |b| {
+        let config = DashboardConfig::default();
+        let mut stream = EventStream::new(config);
+
+        b.iter(|| {
+            let mut s = stream.clone();
+            s.emit(
+                black_box(DashboardEventType::TrustUpdate),
+                black_box(EventPriority::Medium),
+                black_box("agent-1"),
+                black_box("Trust updated"),
+            )
+        })
+    });
+
+    // Filter by priority
+    group.bench_function("filter_by_priority", |b| {
+        let config = DashboardConfig::default();
+        let mut stream = EventStream::new(config);
+        for i in 0..100 {
+            let priority = match i % 4 {
+                0 => EventPriority::Critical,
+                1 => EventPriority::High,
+                2 => EventPriority::Medium,
+                _ => EventPriority::Low,
+            };
+            stream.emit(DashboardEventType::Custom, priority, &format!("src-{}", i), "Event");
+        }
+
+        b.iter(|| black_box(&stream).by_priority(black_box(EventPriority::High)))
+    });
+
+    group.finish();
+}
+
+/// Benchmark chart data building
+fn benchmark_chart_building(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_chart_building");
+
+    // Build trust over time chart
+    group.bench_function("trust_over_time_100_points", |b| {
+        let config = DashboardConfig::default();
+        let mut agg = MetricsAggregator::new(config);
+
+        for i in 0..100 {
+            let input = create_metrics_input(10);
+            agg.update(input, 1000 + i * 60);
+        }
+
+        b.iter(|| ChartDataBuilder::trust_over_time(black_box(agg.history())))
+    });
+
+    // Build multiple charts
+    group.bench_function("build_all_charts", |b| {
+        let config = DashboardConfig::default();
+        let mut agg = MetricsAggregator::new(config);
+
+        for i in 0..100 {
+            let input = create_metrics_input(10);
+            agg.update(input, 1000 + i * 60);
+        }
+
+        b.iter(|| {
+            let h = agg.history();
+            let _ = ChartDataBuilder::trust_over_time(black_box(h));
+            let _ = ChartDataBuilder::health_over_time(black_box(h));
+            let _ = ChartDataBuilder::tps_over_time(black_box(h));
+            ChartDataBuilder::alert_trend(black_box(h))
+        })
+    });
+
+    group.finish();
+}
+
+// =============================================================================
+// VERIFICATION BENCHMARKS
+// =============================================================================
+
+use mycelix_sdk::agentic::verification::{
+    VerificationEngine, SystemState, Invariant, InvariantType, ViolationSeverity as VerifSeverity,
+    CompareOp,
+};
+
+/// Benchmark verification engine operations
+fn benchmark_verification_engine(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_verification");
+
+    // Check invariants with small state
+    group.bench_function("check_invariants_10_agents", |b| {
+        let mut engine = VerificationEngine::with_defaults();
+        let state = create_system_state(10, 0);
+
+        b.iter(|| {
+            let mut e = engine.clone();
+            e.check_invariants(black_box(&state))
+        })
+    });
+
+    // Check invariants with larger state
+    group.bench_function("check_invariants_100_agents", |b| {
+        let mut engine = VerificationEngine::with_defaults();
+        let state = create_system_state(100, 0);
+
+        b.iter(|| {
+            let mut e = engine.clone();
+            e.check_invariants(black_box(&state))
+        })
+    });
+
+    // Check with violations
+    group.bench_function("check_with_violations", |b| {
+        let mut engine = VerificationEngine::with_defaults();
+        let state = create_system_state(50, 30); // 60% Byzantine
+
+        b.iter(|| {
+            let mut e = engine.clone();
+            e.check_invariants(black_box(&state))
+        })
+    });
+
+    // Batch state checks
+    for count in [10, 50] {
+        group.throughput(Throughput::Elements(count as u64));
+        group.bench_with_input(
+            BenchmarkId::new("batch_checks", count),
+            &count,
+            |b, &count| {
+                let mut engine = VerificationEngine::with_defaults();
+                let states: Vec<SystemState> = (0..count)
+                    .map(|i| create_system_state(20, i % 3))
+                    .collect();
+
+                b.iter(|| {
+                    let mut e = engine.clone();
+                    for state in &states {
+                        e.check_invariants(black_box(state));
+                    }
+                    e.summary()
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark comparison operator evaluations
+fn benchmark_compare_ops(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_compare_ops");
+
+    // Float comparisons
+    group.bench_function("float_comparison_batch", |b| {
+        let pairs: Vec<(f64, f64)> = (0..1000)
+            .map(|i| (rand_float(i) as f64, rand_float(i + 1000) as f64))
+            .collect();
+
+        b.iter(|| {
+            pairs.iter()
+                .map(|(a, b)| CompareOp::Lt.eval(black_box(*a), black_box(*b)))
+                .filter(|&x| x)
+                .count()
+        })
+    });
+
+    // Integer comparisons
+    group.bench_function("usize_comparison_batch", |b| {
+        let pairs: Vec<(usize, usize)> = (0..1000)
+            .map(|i| (i * 17 % 100, i * 31 % 100))
+            .collect();
+
+        b.iter(|| {
+            pairs.iter()
+                .map(|(a, b)| CompareOp::Lt.eval_usize(black_box(*a), black_box(*b)))
+                .filter(|&x| x)
+                .count()
+        })
+    });
+
+    group.finish();
+}
+
+// =============================================================================
+// INTEGRATION BENCHMARKS
+// =============================================================================
+
+use mycelix_sdk::agentic::integration::{
+    IntegratedTrustPipeline, TrustPipelineConfig,
+    IntegratedEpistemicLifecycle, EpistemicLifecycleConfig,
+    IntegratedAttackResponse, AttackResponseConfig,
+};
+use mycelix_sdk::agentic::epistemic_classifier::OutputContent;
+
+/// Benchmark trust pipeline operations
+fn benchmark_trust_pipeline(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_trust_pipeline");
+
+    // Register agent
+    group.bench_function("register_agent", |b| {
+        let config = TrustPipelineConfig::default();
+        let mut pipeline = IntegratedTrustPipeline::new(config.clone());
+        let agent = create_test_agent();
+
+        b.iter(|| {
+            let mut p = IntegratedTrustPipeline::new(config.clone());
+            p.register_agent(black_box(agent.clone()))
+        })
+    });
+
+    // Process attestation
+    group.bench_function("process_attestation", |b| {
+        let config = TrustPipelineConfig::default();
+        let mut pipeline = IntegratedTrustPipeline::new(config);
+
+        for i in 0..10 {
+            let agent = create_kvector_agent_with_seed(i);
+            pipeline.register_agent(agent);
+        }
+
+        b.iter(|| {
+            let mut p = pipeline.clone();
+            p.process_attestation(
+                black_box("agent-0"),
+                black_box("agent-1"),
+                black_box(0.8),
+            )
+        })
+    });
+
+    // Verify invariants
+    group.bench_function("verify_invariants", |b| {
+        let config = TrustPipelineConfig::default();
+        let mut pipeline = IntegratedTrustPipeline::new(config);
+
+        for i in 0..20 {
+            let agent = create_kvector_agent_with_seed(i);
+            pipeline.register_agent(agent);
+        }
+
+        b.iter(|| {
+            let mut p = pipeline.clone();
+            p.verify_invariants()
+        })
+    });
+
+    // Cascade simulation
+    group.bench_function("simulate_cascade", |b| {
+        let config = TrustPipelineConfig::default();
+        let mut pipeline = IntegratedTrustPipeline::new(config);
+
+        for i in 0..20 {
+            let agent = create_kvector_agent_with_seed(i);
+            pipeline.register_agent(agent);
+        }
+
+        // Create attestation chain
+        for i in 0..19 {
+            let _ = pipeline.process_attestation(
+                &format!("agent-{}", i),
+                &format!("agent-{}", i + 1),
+                0.8,
+            );
+        }
+
+        b.iter(|| {
+            let mut p = pipeline.clone();
+            p.simulate_cascade(black_box("agent-0"), black_box(0.5))
+        })
+    });
+
+    group.finish();
+}
+
+/// Benchmark epistemic lifecycle operations
+fn benchmark_epistemic_lifecycle(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_epistemic_lifecycle");
+
+    // Create agent
+    group.bench_function("create_agent", |b| {
+        let config = EpistemicLifecycleConfig::default();
+        let lifecycle = IntegratedEpistemicLifecycle::new(config);
+
+        b.iter(|| {
+            lifecycle.create_agent(
+                black_box("did:test:sponsor"),
+                black_box(AgentClass::Supervised),
+            )
+        })
+    });
+
+    // Process output
+    group.bench_function("process_output", |b| {
+        let config = EpistemicLifecycleConfig::default();
+        let lifecycle = IntegratedEpistemicLifecycle::new(config);
+        let mut agent = lifecycle.create_agent("did:test:sponsor", AgentClass::Supervised);
+
+        b.iter(|| {
+            let mut a = agent.clone();
+            lifecycle.process_output(
+                black_box(&mut a),
+                black_box(OutputContent::Text("Test output".to_string())),
+            )
+        })
+    });
+
+    // Batch output processing
+    for count in [5, 10, 20] {
+        group.bench_with_input(
+            BenchmarkId::new("batch_outputs", count),
+            &count,
+            |b, &count| {
+                let config = EpistemicLifecycleConfig::default();
+                let lifecycle = IntegratedEpistemicLifecycle::new(config);
+                let mut agent = lifecycle.create_agent("did:test:sponsor", AgentClass::Supervised);
+
+                b.iter(|| {
+                    let mut a = agent.clone();
+                    for i in 0..count {
+                        let _ = lifecycle.process_output(
+                            black_box(&mut a),
+                            black_box(OutputContent::Text(format!("Output {}", i))),
+                        );
+                    }
+                    a.k_vector.trust_score()
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark attack response operations
+fn benchmark_attack_response(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_attack_response");
+
+    // Process normal behavior
+    group.bench_function("process_normal_behavior", |b| {
+        let config = AttackResponseConfig::default();
+        let mut response = IntegratedAttackResponse::new(config);
+        let agent = create_test_agent_with_history(20);
+
+        b.iter(|| {
+            let mut r = response.clone();
+            let mut a = agent.clone();
+            r.process_behavior(black_box(&mut a))
+        })
+    });
+
+    // Process suspicious behavior
+    group.bench_function("process_suspicious_behavior", |b| {
+        let config = AttackResponseConfig::default();
+        let mut response = IntegratedAttackResponse::new(config);
+        let agent = create_suspicious_agent();
+
+        b.iter(|| {
+            let mut r = response.clone();
+            let mut a = agent.clone();
+            r.process_behavior(black_box(&mut a))
+        })
+    });
+
+    group.finish();
+}
+
+// =============================================================================
+// ADDITIONAL HELPER FUNCTIONS
+// =============================================================================
+
+/// Create metrics input for dashboard testing
+fn create_metrics_input(seed: usize) -> MetricsInput {
+    let trust_scores: Vec<f64> = (0..10)
+        .map(|i| rand_float(seed + i) as f64)
+        .collect();
+    let phi_values: Vec<f64> = (0..3)
+        .map(|i| rand_float(seed + i + 100) as f64)
+        .collect();
+
+    MetricsInput {
+        trust_scores,
+        transaction_count: seed % 100,
+        alerts: vec![],
+        phi_values,
+        threats: vec![rand_float(seed + 200) as f64 * 0.3],
+    }
+}
+
+/// Create a system state for verification testing
+fn create_system_state(num_agents: usize, byzantine_count: usize) -> SystemState {
+    let mut trust_scores = std::collections::HashMap::new();
+    for i in 0..num_agents {
+        trust_scores.insert(format!("agent-{}", i), rand_float(i) as f64);
+    }
+
+    SystemState {
+        index: 0,
+        timestamp: current_timestamp(),
+        trust_scores,
+        byzantine_count,
+        network_health: 0.9,
+        variables: std::collections::HashMap::new(),
+    }
+}
+
+impl Clone for IntegratedTrustPipeline {
+    fn clone(&self) -> Self {
+        // Create a fresh pipeline for benchmarking
+        // (Full clone not needed, just re-create with same config)
+        let config = TrustPipelineConfig::default();
+        let mut new_pipeline = IntegratedTrustPipeline::new(config);
+        for (id, agent) in self.agents() {
+            new_pipeline.register_agent(agent.clone());
+        }
+        new_pipeline
+    }
+}
+
+impl Clone for IntegratedAttackResponse {
+    fn clone(&self) -> Self {
+        IntegratedAttackResponse::new(AttackResponseConfig::default())
+    }
+}
+
+impl Clone for MetricsAggregator {
+    fn clone(&self) -> Self {
+        MetricsAggregator::new(DashboardConfig::default())
+    }
+}
+
+impl Clone for AlertPanel {
+    fn clone(&self) -> Self {
+        AlertPanel::new(DashboardConfig::default())
+    }
+}
+
+impl Clone for EventStream {
+    fn clone(&self) -> Self {
+        EventStream::new(DashboardConfig::default())
+    }
+}
+
+impl Clone for VerificationEngine {
+    fn clone(&self) -> Self {
+        VerificationEngine::with_defaults()
+    }
+}
+
+// =============================================================================
+// ZK TRUST BENCHMARKS
+// =============================================================================
+
+use mycelix_sdk::agentic::integration::{ZKIntegratedPipeline, ZKTrustConfig};
+use mycelix_sdk::agentic::zk_trust::ProofStatement;
+use mycelix_sdk::matl::KVectorDimension;
+
+/// Benchmark ZK proof generation
+fn benchmark_zk_proof_generation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_zk_proof_generation");
+
+    // Simple threshold proof
+    group.bench_function("threshold_proof", |b| {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+        let agent = create_test_agent();
+        pipeline.register_agent_with_commitment(agent);
+
+        b.iter(|| {
+            let mut p = pipeline.clone();
+            p.generate_trust_proof(
+                black_box("test-agent"),
+                black_box(ProofStatement::TrustExceedsThreshold { threshold: 0.5 }),
+            )
+        })
+    });
+
+    // Dimension proof
+    group.bench_function("dimension_proof", |b| {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+        let agent = create_test_agent();
+        pipeline.register_agent_with_commitment(agent);
+
+        b.iter(|| {
+            let mut p = pipeline.clone();
+            p.generate_trust_proof(
+                black_box("test-agent"),
+                black_box(ProofStatement::DimensionExceedsThreshold {
+                    dimension: KVectorDimension::Integrity,
+                    threshold: 0.5,
+                }),
+            )
+        })
+    });
+
+    // Compound AND proof
+    group.bench_function("compound_and_proof", |b| {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+        let agent = create_test_agent();
+        pipeline.register_agent_with_commitment(agent);
+
+        let statement = ProofStatement::And(vec![
+            ProofStatement::TrustExceedsThreshold { threshold: 0.5 },
+            ProofStatement::DimensionExceedsThreshold {
+                dimension: KVectorDimension::Integrity,
+                threshold: 0.5,
+            },
+            ProofStatement::IsVerified,
+        ]);
+
+        b.iter(|| {
+            let mut p = pipeline.clone();
+            p.generate_trust_proof(black_box("test-agent"), black_box(statement.clone()))
+        })
+    });
+
+    // WellFormed proof
+    group.bench_function("wellformed_proof", |b| {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+        let agent = create_test_agent();
+        pipeline.register_agent_with_commitment(agent);
+
+        b.iter(|| {
+            let mut p = pipeline.clone();
+            p.generate_trust_proof(black_box("test-agent"), black_box(ProofStatement::WellFormed))
+        })
+    });
+
+    group.finish();
+}
+
+/// Benchmark ZK attestation processing
+fn benchmark_zk_attestation(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_zk_attestation");
+
+    // Single attestation
+    group.bench_function("single_attestation", |b| {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let agent1 = create_kvector_agent_with_seed(0);
+        let agent2 = create_kvector_agent_with_seed(1);
+        pipeline.register_agent_with_commitment(agent1);
+        pipeline.register_agent_with_commitment(agent2);
+
+        b.iter(|| {
+            let mut p = pipeline.clone();
+            p.process_zk_attestation(
+                black_box("agent-0"),
+                black_box("agent-1"),
+                black_box(0.8),
+            )
+        })
+    });
+
+    group.finish();
+}
+
+/// Benchmark ZK improvement proofs
+fn benchmark_zk_improvement(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_zk_improvement");
+
+    // Improvement proof
+    group.bench_function("improvement_proof", |b| {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+        let agent = create_test_agent();
+        pipeline.register_agent_with_commitment(agent);
+
+        let prev_kv = KVector::new(0.4, 0.3, 0.5, 0.4, 0.3, 0.2, 0.4, 0.3, 0.5, 0.4);
+
+        b.iter(|| {
+            let mut p = pipeline.clone();
+            p.generate_improvement_proof(
+                black_box("test-agent"),
+                black_box(&prev_kv),
+                black_box(1000),
+            )
+        })
+    });
+
+    group.finish();
+}
+
+/// Benchmark ZK aggregate proofs
+fn benchmark_zk_aggregate(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_zk_aggregate");
+
+    // Aggregate 10 proofs
+    for count in [5, 10, 20] {
+        group.bench_with_input(
+            BenchmarkId::new("aggregate_proofs", count),
+            &count,
+            |b, &count| {
+                let config = ZKTrustConfig::default();
+                let mut pipeline = ZKIntegratedPipeline::new(config);
+
+                // Register agents and generate proofs
+                let statement = ProofStatement::TrustExceedsThreshold { threshold: 0.5 };
+                let mut proofs = Vec::new();
+
+                for i in 0..count {
+                    let agent = create_kvector_agent_with_seed(i);
+                    pipeline.register_agent_with_commitment(agent);
+                    let result = pipeline.generate_trust_proof(
+                        &format!("agent-{}", i),
+                        statement.clone(),
+                    );
+                    if let Ok(r) = result {
+                        proofs.push(r.proof);
+                    }
+                }
+
+                b.iter(|| {
+                    pipeline.aggregate_trust_proofs(
+                        black_box(proofs.clone()),
+                        black_box(statement.clone()),
+                    )
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+/// Benchmark ZK network health computation
+fn benchmark_zk_network_health(c: &mut Criterion) {
+    let mut group = c.benchmark_group("agentic_zk_network_health");
+
+    // Health with many agents
+    for count in [10, 50, 100] {
+        group.bench_with_input(
+            BenchmarkId::new("network_health", count),
+            &count,
+            |b, &count| {
+                let config = ZKTrustConfig::default();
+                let mut pipeline = ZKIntegratedPipeline::new(config);
+
+                for i in 0..*count {
+                    let agent = create_kvector_agent_with_seed(i);
+                    pipeline.register_agent_with_commitment(agent);
+                    let _ = pipeline.generate_trust_proof(
+                        &format!("agent-{}", i),
+                        ProofStatement::WellFormed,
+                    );
+                }
+
+                b.iter(|| pipeline.zk_network_health())
+            },
+        );
+    }
+
+    group.finish();
+}
+
+impl Clone for ZKIntegratedPipeline {
+    fn clone(&self) -> Self {
+        let config = ZKTrustConfig::default();
+        let mut new_pipeline = ZKIntegratedPipeline::new(config);
+        for (id, agent) in self.matl_pipeline().trust_pipeline().agents() {
+            new_pipeline.register_agent_with_commitment(agent.clone());
+        }
+        new_pipeline
+    }
+}
+
+// =============================================================================
+// CRITERION GROUPS
+// =============================================================================
+
+criterion_group!(
+    name = dashboard_benchmarks;
+    config = Criterion::default().sample_size(100);
+    targets = benchmark_dashboard_metrics, benchmark_alert_panel, benchmark_event_stream, benchmark_chart_building
+);
+
+criterion_group!(
+    name = verification_benchmarks;
+    config = Criterion::default().sample_size(100);
+    targets = benchmark_verification_engine, benchmark_compare_ops
+);
+
+criterion_group!(
+    name = integration_benchmarks;
+    config = Criterion::default().sample_size(50);
+    targets = benchmark_trust_pipeline, benchmark_epistemic_lifecycle, benchmark_attack_response
+);
+
+criterion_group!(
+    name = zk_trust_benchmarks;
+    config = Criterion::default().sample_size(50);
+    targets = benchmark_zk_proof_generation, benchmark_zk_attestation, benchmark_zk_improvement, benchmark_zk_aggregate, benchmark_zk_network_health
+);
+
 criterion_main!(
     kvector_benchmarks,
     gaming_benchmarks,
     uncertainty_benchmarks,
-    coherence_benchmarks
+    coherence_benchmarks,
+    dashboard_benchmarks,
+    verification_benchmarks,
+    integration_benchmarks,
+    zk_trust_benchmarks
 );

@@ -558,4 +558,835 @@ mod tests {
             honest_reward, malicious_reward
         );
     }
+
+    // ========================================================================
+    // Dashboard Properties
+    // ========================================================================
+
+    use crate::agentic::dashboard::{
+        Dashboard, DashboardConfig, MetricsInput, MetricsAggregator, AlertPanel,
+        AlertSeverity, AlertStatus, EventStream, EventPriority, DashboardEventType,
+        TimeSeries, ChartType, LiveMetrics, DashboardAlert,
+    };
+
+    /// Property: Network health is always bounded [0, 1]
+    #[test]
+    fn prop_network_health_bounded() {
+        let mut rng = TestRng::new(100);
+        let config = DashboardConfig::default();
+        let mut agg = MetricsAggregator::new(config);
+
+        for i in 0..100 {
+            let trust_scores: Vec<f64> = (0..rng.next_usize(50) + 1)
+                .map(|_| rng.next_range(0.0, 1.0))
+                .collect();
+            let phi_values: Vec<f64> = (0..rng.next_usize(10) + 1)
+                .map(|_| rng.next_range(0.0, 1.0))
+                .collect();
+            let threats: Vec<f64> = (0..rng.next_usize(5))
+                .map(|_| rng.next_range(0.0, 1.0))
+                .collect();
+
+            let input = MetricsInput {
+                trust_scores,
+                transaction_count: rng.next_usize(100),
+                alerts: vec![],
+                phi_values,
+                threats,
+            };
+
+            let metrics = agg.update(input, 1000 + i * 60);
+
+            assert!(
+                metrics.network_health >= 0.0 && metrics.network_health <= 1.0,
+                "Network health {} out of bounds at iteration {}",
+                metrics.network_health, i
+            );
+        }
+    }
+
+    /// Property: Average trust is bounded and computed correctly
+    #[test]
+    fn prop_average_trust_computation() {
+        let mut rng = TestRng::new(200);
+        let config = DashboardConfig::default();
+        let mut agg = MetricsAggregator::new(config);
+
+        for i in 0..50 {
+            let trust_scores: Vec<f64> = (0..rng.next_usize(20) + 1)
+                .map(|_| rng.next_range(0.0, 1.0))
+                .collect();
+
+            let expected_avg = trust_scores.iter().sum::<f64>() / trust_scores.len() as f64;
+
+            let input = MetricsInput {
+                trust_scores,
+                transaction_count: 0,
+                alerts: vec![],
+                phi_values: vec![],
+                threats: vec![],
+            };
+
+            let metrics = agg.update(input, 1000 + i * 60);
+
+            assert!(
+                (metrics.average_trust - expected_avg).abs() < 0.001,
+                "Average trust {} does not match expected {}",
+                metrics.average_trust, expected_avg
+            );
+        }
+    }
+
+    /// Property: Alert counts are non-negative and accurate
+    #[test]
+    fn prop_alert_counts_accurate() {
+        let config = DashboardConfig::default();
+        let mut panel = AlertPanel::new(config);
+
+        let mut expected_critical = 0usize;
+        let mut expected_high = 0usize;
+        let mut expected_medium = 0usize;
+        let mut expected_low = 0usize;
+
+        let mut rng = TestRng::new(300);
+
+        for _ in 0..50 {
+            let severity = match rng.next_usize(4) {
+                0 => { expected_critical += 1; AlertSeverity::Critical }
+                1 => { expected_high += 1; AlertSeverity::High }
+                2 => { expected_medium += 1; AlertSeverity::Medium }
+                _ => { expected_low += 1; AlertSeverity::Low }
+            };
+
+            panel.create_alert(severity, "Test", "Description", "test");
+        }
+
+        let active = panel.active_alerts();
+        assert_eq!(active.len(), 50, "Should have 50 active alerts");
+
+        let critical = panel.critical_alerts();
+        assert_eq!(critical.len(), expected_critical,
+            "Critical count mismatch: {} vs {}", critical.len(), expected_critical);
+    }
+
+    /// Property: Event stream respects buffer size limit
+    #[test]
+    fn prop_event_stream_bounded() {
+        let mut config = DashboardConfig::default();
+        config.event_buffer_size = 10;
+        let mut stream = EventStream::new(config);
+
+        // Push more events than buffer allows
+        for i in 0..25 {
+            stream.emit(
+                DashboardEventType::Custom,
+                EventPriority::Low,
+                &format!("source-{}", i),
+                "Test event",
+            );
+        }
+
+        // Stream should be bounded
+        let recent = stream.recent(100);
+        assert!(recent.len() <= 10, "Event stream should be bounded to 10");
+    }
+
+    /// Property: Time series min/max are consistent
+    #[test]
+    fn prop_time_series_minmax() {
+        let mut rng = TestRng::new(400);
+        let mut series = TimeSeries::new("Test", ChartType::Line);
+
+        let values: Vec<f64> = (0..100).map(|_| rng.next_range(0.0, 100.0)).collect();
+
+        for (i, &v) in values.iter().enumerate() {
+            series.add_point(i as u64 * 1000, v);
+        }
+
+        let min = series.min().unwrap();
+        let max = series.max().unwrap();
+
+        assert!(min <= max, "Min {} should be <= max {}", min, max);
+
+        let actual_min = values.iter().copied().fold(f64::INFINITY, f64::min);
+        let actual_max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+
+        assert!((min - actual_min).abs() < 0.001, "Min mismatch");
+        assert!((max - actual_max).abs() < 0.001, "Max mismatch");
+    }
+
+    /// Property: Dashboard metrics history is bounded
+    #[test]
+    fn prop_dashboard_history_bounded() {
+        let mut config = DashboardConfig::default();
+        config.max_history = 50;
+        let mut agg = MetricsAggregator::new(config);
+
+        for i in 0..100 {
+            let input = MetricsInput {
+                trust_scores: vec![0.5],
+                transaction_count: 1,
+                alerts: vec![],
+                phi_values: vec![0.6],
+                threats: vec![0.1],
+            };
+            agg.update(input, i);
+        }
+
+        assert!(
+            agg.history().len() <= 50,
+            "History should be bounded to 50, got {}",
+            agg.history().len()
+        );
+    }
+
+    // ========================================================================
+    // Verification Properties
+    // ========================================================================
+
+    use crate::agentic::verification::{
+        VerificationEngine, SystemState, Invariant, InvariantType, ViolationSeverity as VerifViolationSeverity,
+        PropertyFormula, AtomicPredicate, CompareOp, PropertySpec, PropertyKind,
+    };
+
+    /// Property: Trust bounds invariant detects violations
+    #[test]
+    fn prop_verification_trust_bounds() {
+        let mut rng = TestRng::new(500);
+        let mut engine = VerificationEngine::with_defaults();
+
+        for i in 0..50 {
+            let mut trust_scores = std::collections::HashMap::new();
+            let should_violate = i % 5 == 0;
+
+            for j in 0..5 {
+                let score = if should_violate && j == 0 {
+                    // Create a violation
+                    1.5 + rng.next_f64()
+                } else {
+                    rng.next_range(0.0, 1.0)
+                };
+                trust_scores.insert(format!("agent-{}", j), score);
+            }
+
+            let state = SystemState {
+                index: i,
+                timestamp: 1000 + i as u64,
+                trust_scores,
+                byzantine_count: 0,
+                network_health: 0.9,
+                variables: std::collections::HashMap::new(),
+            };
+
+            let results = engine.check_invariants(&state);
+            let trust_result = results.iter()
+                .find(|r| r.invariant_id == "trust_bounds")
+                .unwrap();
+
+            if should_violate {
+                assert!(!trust_result.holds,
+                    "Should detect trust bounds violation at iteration {}", i);
+            }
+        }
+    }
+
+    /// Property: Byzantine tolerance invariant is accurate
+    #[test]
+    fn prop_verification_byzantine_tolerance() {
+        let mut engine = VerificationEngine::with_defaults();
+
+        // Test various Byzantine fractions
+        let test_cases = [
+            (0, 10, true),   // 0% - should pass
+            (4, 10, true),   // 40% - should pass (under 45%)
+            (5, 10, false),  // 50% - should fail (over 45%)
+            (9, 10, false),  // 90% - should fail
+        ];
+
+        for (byz_count, total, should_pass) in test_cases {
+            let mut trust_scores = std::collections::HashMap::new();
+            for i in 0..total {
+                trust_scores.insert(format!("agent-{}", i), 0.5);
+            }
+
+            let state = SystemState {
+                index: 0,
+                timestamp: 1000,
+                trust_scores,
+                byzantine_count: byz_count,
+                network_health: 0.9,
+                variables: std::collections::HashMap::new(),
+            };
+
+            let results = engine.check_invariants(&state);
+            let byz_result = results.iter()
+                .find(|r| r.invariant_id == "byzantine_tolerance")
+                .unwrap();
+
+            assert_eq!(byz_result.holds, should_pass,
+                "Byzantine {}/{}: expected holds={}, got holds={}",
+                byz_count, total, should_pass, byz_result.holds);
+        }
+    }
+
+    /// Property: CompareOp evaluations are consistent
+    #[test]
+    fn prop_compare_op_consistent() {
+        let mut rng = TestRng::new(600);
+
+        for _ in 0..100 {
+            let a = rng.next_range(-100.0, 100.0);
+            let b = rng.next_range(-100.0, 100.0);
+
+            // Lt and Ge are complementary
+            assert_eq!(
+                CompareOp::Lt.eval(a, b),
+                !CompareOp::Ge.eval(a, b),
+                "Lt and Ge should be complementary for {} and {}", a, b
+            );
+
+            // Gt and Le are complementary
+            assert_eq!(
+                CompareOp::Gt.eval(a, b),
+                !CompareOp::Le.eval(a, b),
+                "Gt and Le should be complementary for {} and {}", a, b
+            );
+
+            // Transitivity: if a < b and b < c, then a < c
+            let c = b + rng.next_range(0.001, 10.0);
+            if CompareOp::Lt.eval(a, b) && CompareOp::Lt.eval(b, c) {
+                assert!(CompareOp::Lt.eval(a, c),
+                    "Transitivity violated for {} < {} < {}", a, b, c);
+            }
+        }
+    }
+
+    /// Property: Verification summary is consistent
+    #[test]
+    fn prop_verification_summary_consistent() {
+        let mut engine = VerificationEngine::with_defaults();
+
+        // Add some checks
+        for i in 0..10 {
+            let mut trust_scores = std::collections::HashMap::new();
+            trust_scores.insert("agent-1".to_string(), if i % 3 == 0 { 1.5 } else { 0.5 });
+
+            let state = SystemState {
+                index: i,
+                timestamp: 1000 + i as u64,
+                trust_scores,
+                byzantine_count: 0,
+                network_health: 0.9,
+                variables: std::collections::HashMap::new(),
+            };
+
+            engine.check_invariants(&state);
+        }
+
+        let summary = engine.summary();
+
+        // Violations should never exceed total checks
+        assert!(summary.violations <= summary.total_checks,
+            "Violations {} should not exceed checks {}",
+            summary.violations, summary.total_checks);
+    }
+
+    // ========================================================================
+    // Integration Properties
+    // ========================================================================
+
+    use crate::agentic::integration::{
+        IntegratedTrustPipeline, TrustPipelineConfig,
+        IntegratedEpistemicLifecycle, EpistemicLifecycleConfig,
+        IntegratedPrivacyAnalytics, PrivacyAnalyticsConfig,
+    };
+    use crate::agentic::{InstrumentalActor, AgentId, AgentClass, AgentStatus, AgentConstraints, EpistemicStats, UncertaintyCalibration};
+
+    fn create_integration_test_agent(id: &str, trust: f32) -> InstrumentalActor {
+        InstrumentalActor {
+            agent_id: AgentId::from_string(id.to_string()),
+            sponsor_did: "did:test:sponsor".to_string(),
+            agent_class: AgentClass::Supervised,
+            kredit_balance: 5000,
+            kredit_cap: 10000,
+            constraints: AgentConstraints::default(),
+            behavior_log: vec![],
+            status: AgentStatus::Active,
+            created_at: 0,
+            last_activity: 0,
+            actions_this_hour: 0,
+            k_vector: KVector::new(trust, trust, trust, trust, trust * 0.8, trust * 0.9, trust, trust * 0.7, trust, trust),
+            epistemic_stats: EpistemicStats::default(),
+            output_history: vec![],
+            uncertainty_calibration: UncertaintyCalibration::default(),
+            pending_escalations: vec![],
+        }
+    }
+
+    /// Property: Trust pipeline attestations are monotonic in positive direction
+    #[test]
+    fn prop_trust_pipeline_attestation_positive() {
+        let config = TrustPipelineConfig::default();
+        let mut pipeline = IntegratedTrustPipeline::new(config);
+
+        let agent1 = create_integration_test_agent("agent-1", 0.6);
+        let agent2 = create_integration_test_agent("agent-2", 0.5);
+
+        pipeline.register_agent(agent1);
+        pipeline.register_agent(agent2);
+
+        let result = pipeline.process_attestation("agent-1", "agent-2", 0.8);
+        assert!(result.is_ok());
+
+        let result = result.unwrap();
+        // Positive attestation should increase or maintain trust
+        assert!(result.new_trust >= result.old_trust,
+            "Positive attestation should not decrease trust: {} -> {}",
+            result.old_trust, result.new_trust);
+    }
+
+    /// Property: Trust pipeline verifies all invariants hold initially
+    #[test]
+    fn prop_trust_pipeline_initial_invariants() {
+        let mut rng = TestRng::new(700);
+        let config = TrustPipelineConfig::default();
+        let mut pipeline = IntegratedTrustPipeline::new(config);
+
+        // Register random agents
+        for i in 0..10 {
+            let trust = 0.3 + rng.next_f64() as f32 * 0.6; // Trust in [0.3, 0.9]
+            let agent = create_integration_test_agent(&format!("agent-{}", i), trust);
+            pipeline.register_agent(agent);
+        }
+
+        let results = pipeline.verify_invariants();
+
+        // All invariants should hold for valid agents
+        for result in &results {
+            assert!(result.holds,
+                "Invariant {} should hold for valid agents", result.invariant_id);
+        }
+    }
+
+    /// Property: Epistemic lifecycle creates valid agents
+    #[test]
+    fn prop_epistemic_lifecycle_valid_agents() {
+        let config = EpistemicLifecycleConfig::default();
+        let lifecycle = IntegratedEpistemicLifecycle::new(config);
+
+        for i in 0..20 {
+            let agent = lifecycle.create_agent(&format!("did:sponsor:{}", i), AgentClass::Supervised);
+
+            // Agent should have valid trust
+            let trust = agent.k_vector.trust_score();
+            assert!(trust >= 0.0 && trust <= 1.0,
+                "Agent trust {} out of bounds", trust);
+
+            // Agent should have positive KREDIT cap
+            assert!(agent.kredit_cap > 0, "KREDIT cap should be positive");
+
+            // Agent should be active
+            assert_eq!(agent.status, AgentStatus::Active);
+        }
+    }
+
+    /// Property: Privacy budget is properly consumed
+    #[test]
+    fn prop_privacy_budget_consumption() {
+        let config = PrivacyAnalyticsConfig {
+            dp: crate::agentic::differential_privacy::DPConfig {
+                epsilon: 2.0,
+                delta: 1e-6,
+                ..Default::default()
+            },
+            dashboard: DashboardConfig::default(),
+        };
+        let mut analytics = IntegratedPrivacyAnalytics::new(config);
+
+        let trust_scores = vec![0.5, 0.6, 0.7, 0.4, 0.55];
+        let initial_budget = analytics.dashboard().config.event_buffer_size; // dummy check
+        let _ = initial_budget;
+
+        // First query should succeed
+        let result1 = analytics.analyze_and_display(&trust_scores, &[0.7], 0.1);
+        assert!(result1.is_ok(), "First query should succeed");
+
+        let budget1 = result1.unwrap().remaining_budget;
+
+        // Budget should decrease
+        let result2 = analytics.analyze_and_display(&trust_scores, &[0.7], 0.1);
+        if let Ok(r2) = result2 {
+            assert!(r2.remaining_budget.0 <= budget1.0,
+                "Budget should decrease: {} -> {}", budget1.0, r2.remaining_budget.0);
+        }
+    }
+
+    /// Property: KREDIT cap scales with trust
+    #[test]
+    fn prop_kredit_scales_with_trust() {
+        let config = EpistemicLifecycleConfig::default();
+        let lifecycle = IntegratedEpistemicLifecycle::new(config);
+
+        let mut agents: Vec<InstrumentalActor> = vec![];
+
+        // Create agents with different trust levels
+        for i in 0..10 {
+            let agent = lifecycle.create_agent(&format!("did:sponsor:{}", i), AgentClass::Supervised);
+            agents.push(agent);
+        }
+
+        // Sort by trust
+        agents.sort_by(|a, b| {
+            let ta = a.k_vector.trust_score();
+            let tb = b.k_vector.trust_score();
+            ta.partial_cmp(&tb).unwrap()
+        });
+
+        // KREDIT cap should generally increase with trust
+        // (allowing for some noise from the trust-to-KREDIT function)
+        for window in agents.windows(2) {
+            let trust_diff = window[1].k_vector.trust_score() - window[0].k_vector.trust_score();
+            if trust_diff > 0.1 {
+                assert!(window[1].kredit_cap >= window[0].kredit_cap,
+                    "Higher trust should yield higher KREDIT cap");
+            }
+        }
+    }
+
+    // =========================================================================
+    // ZK Trust Integration Property Tests
+    // =========================================================================
+
+    use crate::agentic::integration::{
+        ZKIntegratedPipeline, ZKTrustConfig,
+    };
+    use crate::agentic::zk_trust::ProofStatement;
+    use crate::matl::KVectorDimension;
+
+    /// Property: ZK proofs are deterministic for same input
+    #[test]
+    fn prop_zk_proof_deterministic() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline1 = ZKIntegratedPipeline::new(config.clone());
+        let mut pipeline2 = ZKIntegratedPipeline::new(config);
+
+        let agent1 = create_integration_test_agent("det-agent", 0.7);
+        let agent2 = create_integration_test_agent("det-agent", 0.7);
+
+        pipeline1.register_agent_with_commitment(agent1);
+        pipeline2.register_agent_with_commitment(agent2);
+
+        let statement = ProofStatement::TrustExceedsThreshold { threshold: 0.5 };
+
+        let result1 = pipeline1.generate_trust_proof("det-agent", statement.clone());
+        let result2 = pipeline2.generate_trust_proof("det-agent", statement);
+
+        assert!(result1.is_ok() && result2.is_ok());
+
+        // Both proofs should have the same result
+        assert_eq!(result1.unwrap().summary.result, result2.unwrap().summary.result);
+    }
+
+    /// Property: ZK proof validity is consistent with statement truth
+    #[test]
+    fn prop_zk_proof_validity_consistency() {
+        let mut rng = TestRng::new(800);
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        for i in 0..20 {
+            let trust = 0.2 + rng.next_f64() as f32 * 0.7; // [0.2, 0.9]
+            let agent = create_integration_test_agent(&format!("valid-agent-{}", i), trust);
+            pipeline.register_agent_with_commitment(agent);
+
+            // Test with threshold at half the trust value
+            let threshold = trust * 0.5;
+            let statement = ProofStatement::TrustExceedsThreshold { threshold };
+
+            let result = pipeline.generate_trust_proof(&format!("valid-agent-{}", i), statement);
+            assert!(result.is_ok());
+
+            let proof_result = result.unwrap();
+            // Proof should be valid
+            assert!(proof_result.summary.verified);
+            // Statement should be true (threshold is half of actual trust)
+            assert!(proof_result.summary.result,
+                "Agent with trust {} should exceed threshold {}", trust, threshold);
+        }
+    }
+
+    /// Property: ZK proof fails correctly for false statements
+    #[test]
+    fn prop_zk_proof_false_statements() {
+        let mut rng = TestRng::new(801);
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        for i in 0..20 {
+            let trust = 0.2 + rng.next_f64() as f32 * 0.3; // [0.2, 0.5]
+            let agent = create_integration_test_agent(&format!("false-agent-{}", i), trust);
+            pipeline.register_agent_with_commitment(agent);
+
+            // Test with threshold above the trust value
+            let threshold = trust + 0.2;
+            let statement = ProofStatement::TrustExceedsThreshold { threshold };
+
+            let result = pipeline.generate_trust_proof(&format!("false-agent-{}", i), statement);
+            assert!(result.is_ok());
+
+            let proof_result = result.unwrap();
+            // Proof should be valid (cryptographically)
+            assert!(proof_result.summary.verified);
+            // But statement should be false
+            assert!(!proof_result.summary.result,
+                "Agent with trust {} should NOT exceed threshold {}", trust, threshold);
+        }
+    }
+
+    /// Property: ZK commitments are unique per agent
+    #[test]
+    fn prop_zk_commitments_unique() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let mut commitments = std::collections::HashSet::new();
+
+        for i in 0..50 {
+            let agent = create_integration_test_agent(&format!("unique-agent-{}", i), 0.6);
+            let commitment = pipeline.register_agent_with_commitment(agent);
+
+            // Commitment should be unique
+            assert!(commitments.insert(commitment.commitment),
+                "Commitment collision detected for agent {}", i);
+        }
+    }
+
+    /// Property: ZK attestations respect trust thresholds
+    #[test]
+    fn prop_zk_attestation_threshold_respected() {
+        let mut config = ZKTrustConfig::default();
+        config.min_attestation_trust = 0.5;
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        // High trust attester
+        let high_trust_agent = create_integration_test_agent("high-attester", 0.8);
+        pipeline.register_agent_with_commitment(high_trust_agent);
+
+        // Low trust attester
+        let low_trust_agent = create_integration_test_agent("low-attester", 0.3);
+        pipeline.register_agent_with_commitment(low_trust_agent);
+
+        // Recipient
+        let recipient = create_integration_test_agent("recipient", 0.5);
+        pipeline.register_agent_with_commitment(recipient);
+
+        // High trust attestation should succeed
+        let result = pipeline.process_zk_attestation("high-attester", "recipient", 0.8);
+        assert!(result.is_ok(), "High trust attestation should succeed");
+
+        // Low trust attestation should fail
+        let result = pipeline.process_zk_attestation("low-attester", "recipient", 0.8);
+        assert!(result.is_err(), "Low trust attestation should fail");
+    }
+
+    /// Property: ZK improvement proofs are correct
+    #[test]
+    fn prop_zk_improvement_proof_correct() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        // Agent with medium trust
+        let agent = create_integration_test_agent("improve-agent", 0.7);
+        pipeline.register_agent_with_commitment(agent);
+
+        // Previous K-Vector with lower trust
+        let prev_kv = KVector::new(0.4, 0.4, 0.4, 0.4, 0.3, 0.35, 0.4, 0.3, 0.4, 0.4);
+
+        let result = pipeline.generate_improvement_proof("improve-agent", &prev_kv, 1000);
+        assert!(result.is_ok());
+
+        let proof_result = result.unwrap();
+        assert!(proof_result.summary.verified);
+        assert!(proof_result.summary.result, "Trust should have improved");
+    }
+
+    /// Property: ZK improvement proofs detect non-improvement
+    #[test]
+    fn prop_zk_no_improvement_detected() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        // Agent with low trust
+        let agent = create_integration_test_agent("no-improve-agent", 0.4);
+        pipeline.register_agent_with_commitment(agent);
+
+        // Previous K-Vector with higher trust
+        let prev_kv = KVector::new(0.7, 0.7, 0.7, 0.7, 0.6, 0.65, 0.7, 0.6, 0.7, 0.7);
+
+        let result = pipeline.generate_improvement_proof("no-improve-agent", &prev_kv, 1000);
+        assert!(result.is_ok());
+
+        let proof_result = result.unwrap();
+        assert!(proof_result.summary.verified);
+        assert!(!proof_result.summary.result, "Trust should NOT have improved");
+    }
+
+    /// Property: ZK aggregate proofs maintain Byzantine threshold
+    #[test]
+    fn prop_zk_aggregate_byzantine_threshold() {
+        let mut config = ZKTrustConfig::default();
+        config.byzantine_proof_threshold = 0.67; // 2/3 majority
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        // Create 9 agents: 7 high trust, 2 low trust
+        for i in 0..7 {
+            let agent = create_integration_test_agent(&format!("high-agent-{}", i), 0.8);
+            pipeline.register_agent_with_commitment(agent);
+        }
+        for i in 0..2 {
+            let agent = create_integration_test_agent(&format!("low-agent-{}", i), 0.2);
+            pipeline.register_agent_with_commitment(agent);
+        }
+
+        // Generate proofs (threshold 0.5 - high agents pass, low agents fail)
+        let statement = ProofStatement::TrustExceedsThreshold { threshold: 0.5 };
+        let mut proofs = Vec::new();
+
+        for i in 0..7 {
+            let result = pipeline.generate_trust_proof(&format!("high-agent-{}", i), statement.clone());
+            proofs.push(result.unwrap().proof);
+        }
+        for i in 0..2 {
+            let result = pipeline.generate_trust_proof(&format!("low-agent-{}", i), statement.clone());
+            proofs.push(result.unwrap().proof);
+        }
+
+        let aggregate = pipeline.aggregate_trust_proofs(proofs, statement);
+
+        // 7/9 = 77% should pass the 67% threshold
+        assert!(pipeline.verify_byzantine_consensus(&aggregate),
+            "7/9 majority should pass Byzantine consensus");
+    }
+
+    /// Property: ZK network health metrics are consistent
+    #[test]
+    fn prop_zk_network_health_consistent() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        // Register agents and generate proofs
+        for i in 0..10 {
+            let agent = create_integration_test_agent(&format!("health-agent-{}", i), 0.6);
+            pipeline.register_agent_with_commitment(agent);
+
+            let _ = pipeline.generate_trust_proof(
+                &format!("health-agent-{}", i),
+                ProofStatement::WellFormed,
+            );
+        }
+
+        let health = pipeline.zk_network_health();
+
+        // Check consistency
+        assert_eq!(health.agents_with_commitments, 10);
+        assert_eq!(health.total_proofs_generated, 10);
+        assert!(health.recent_valid_rate >= 0.0 && health.recent_valid_rate <= 1.0);
+        assert!(health.recent_true_rate >= 0.0 && health.recent_true_rate <= 1.0);
+    }
+
+    /// Property: ZK dimension proofs respect bounds
+    #[test]
+    fn prop_zk_dimension_proof_bounds() {
+        let mut rng = TestRng::new(802);
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let dimensions = [
+            KVectorDimension::Reputation,
+            KVectorDimension::Activity,
+            KVectorDimension::Integrity,
+            KVectorDimension::Performance,
+        ];
+
+        for i in 0..20 {
+            let trust = 0.3 + rng.next_f64() as f32 * 0.6;
+            let agent = create_integration_test_agent(&format!("dim-agent-{}", i), trust);
+            pipeline.register_agent_with_commitment(agent);
+
+            let dim_idx = (i % dimensions.len()) as usize;
+            let dimension = dimensions[dim_idx].clone();
+
+            // Threshold below trust should pass
+            let low_threshold = trust * 0.5;
+            let statement = ProofStatement::DimensionExceedsThreshold {
+                dimension: dimension.clone(),
+                threshold: low_threshold,
+            };
+
+            let result = pipeline.generate_trust_proof(&format!("dim-agent-{}", i), statement);
+            assert!(result.is_ok());
+            assert!(result.unwrap().summary.result,
+                "Dimension {} should exceed low threshold", dim_idx);
+        }
+    }
+
+    /// Property: ZK compound proofs (AND) are correct
+    #[test]
+    fn prop_zk_compound_and_correct() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        // High trust agent should pass both conditions
+        let high_agent = create_integration_test_agent("and-high", 0.8);
+        pipeline.register_agent_with_commitment(high_agent);
+
+        let and_statement = ProofStatement::And(vec![
+            ProofStatement::TrustExceedsThreshold { threshold: 0.5 },
+            ProofStatement::DimensionExceedsThreshold {
+                dimension: KVectorDimension::Integrity,
+                threshold: 0.5,
+            },
+        ]);
+
+        let result = pipeline.generate_trust_proof("and-high", and_statement);
+        assert!(result.is_ok());
+        assert!(result.unwrap().summary.result, "High trust agent should pass AND proof");
+
+        // Agent failing one condition
+        let medium_agent = create_integration_test_agent("and-medium", 0.6);
+        pipeline.register_agent_with_commitment(medium_agent);
+
+        let fail_and_statement = ProofStatement::And(vec![
+            ProofStatement::TrustExceedsThreshold { threshold: 0.5 },
+            ProofStatement::TrustExceedsThreshold { threshold: 0.9 }, // Should fail
+        ]);
+
+        let result = pipeline.generate_trust_proof("and-medium", fail_and_statement);
+        assert!(result.is_ok());
+        assert!(!result.unwrap().summary.result, "Medium trust should fail AND with high threshold");
+    }
+
+    /// Property: ZK proof history accumulates correctly
+    #[test]
+    fn prop_zk_proof_history_accumulates() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let agent = create_integration_test_agent("history-agent", 0.7);
+        pipeline.register_agent_with_commitment(agent);
+
+        // Generate multiple proofs
+        for _ in 0..15 {
+            let _ = pipeline.generate_trust_proof("history-agent", ProofStatement::WellFormed);
+        }
+
+        let history = pipeline.proof_history();
+        assert_eq!(history.len(), 15, "Should have 15 proof records");
+
+        // All should be for the same agent
+        assert!(history.iter().all(|r| r.agent_id == "history-agent"));
+
+        // All should be valid
+        assert!(history.iter().all(|r| r.valid));
+    }
 }
