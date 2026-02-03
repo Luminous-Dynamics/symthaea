@@ -120,6 +120,7 @@
               holochainPackages.holochain
               holochainPackages.hc
               holochainPackages.lair-keystore
+              holochainPackages.bootstrap-srv  # kitsune2-bootstrap-srv for tests
 
               # Rust
               rustToolchain
@@ -169,6 +170,8 @@
             buildInputs = [
               holochainPackages.holochain
               holochainPackages.hc
+              holochainPackages.lair-keystore
+              holochainPackages.bootstrap-srv  # kitsune2-bootstrap-srv for tests
               rustToolchain
               pkgs.nodejs_20
               pkgs.nodePackages.pnpm
