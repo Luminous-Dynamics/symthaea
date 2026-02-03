@@ -103,6 +103,8 @@ impl DPRng {
     /// Uses the inverse CDF method: X = μ - b * sign(U - 0.5) * ln(1 - 2|U - 0.5|)
     pub fn sample_laplace(&mut self, scale: f64) -> f64 {
         let u: f64 = self.rng.gen();
+        // Clamp to (0, 1) exclusive to avoid ln(0) = -inf when u is exactly 0.0 or 1.0
+        let u = u.clamp(f64::EPSILON, 1.0 - f64::EPSILON);
         let u_shifted = u - 0.5;
         let sign = if u_shifted >= 0.0 { 1.0 } else { -1.0 };
         -scale * sign * (1.0 - 2.0 * u_shifted.abs()).ln()
