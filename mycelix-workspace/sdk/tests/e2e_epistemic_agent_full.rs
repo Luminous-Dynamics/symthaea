@@ -743,3 +743,398 @@ fn test_complete_integration_flow() {
 
     println!("=== COMPLETE INTEGRATION TEST PASSED ===\n");
 }
+
+// =============================================================================
+// TEST: ZK-Integrated Full Pipeline Demo
+// =============================================================================
+// This test demonstrates the complete epistemic-aware AI agency system using
+// the ZKIntegratedPipeline with all Phase 1-4 features:
+// - Phase 1: K-Vector Integration
+// - Phase 2: Epistemic Classification
+// - Phase 3: Phi Coherence Gating
+// - Phase 4: GIS Uncertainty Handling
+
+use mycelix_sdk::agentic::integration::{
+    ZKIntegratedPipeline, ZKTrustConfig, ObservabilityExports,
+    CombinedGatingRecommendation,
+};
+use mycelix_sdk::agentic::zk_trust::ProofStatement;
+use mycelix_sdk::agentic::phi_bridge::ZKOperationType;
+
+/// Create a test agent with specific Phi coherence level
+fn create_agent_with_phi(name: &str, phi: f32) -> InstrumentalActor {
+    InstrumentalActor {
+        agent_id: AgentId::from_string(format!("agent-{}", name)),
+        sponsor_did: format!("did:test:sponsor-{}", name),
+        agent_class: AgentClass::Supervised,
+        kredit_balance: 1000,
+        kredit_cap: 5000,
+        constraints: AgentConstraints::default(),
+        behavior_log: vec![],
+        status: AgentStatus::Active,
+        created_at: now_secs() - 86400,
+        last_activity: now_secs(),
+        actions_this_hour: 0,
+        k_vector: KVector::new(0.6, 0.5, 0.7, 0.6, 0.4, 0.5, 0.5, 0.4, 0.6, phi),
+        epistemic_stats: EpistemicStats::default(),
+        output_history: vec![],
+        uncertainty_calibration: Default::default(),
+        pending_escalations: vec![],
+    }
+}
+
+#[test]
+fn test_zk_integrated_full_pipeline_demo() {
+    println!("\n");
+    println!("╔══════════════════════════════════════════════════════════════════════╗");
+    println!("║    ZK-INTEGRATED EPISTEMIC-AWARE AI AGENCY: FULL PIPELINE DEMO       ║");
+    println!("║                                                                      ║");
+    println!("║    Demonstrating Phases 1-4 of the Research Plan:                    ║");
+    println!("║    • Phase 1: K-Vector Trust Profiles                                ║");
+    println!("║    • Phase 2: E-N-M-H Epistemic Classification                       ║");
+    println!("║    • Phase 3: Phi Coherence Gating                                   ║");
+    println!("║    • Phase 4: GIS Uncertainty & Escalation                           ║");
+    println!("╚══════════════════════════════════════════════════════════════════════╝");
+    println!();
+
+    // ==========================================================================
+    // SETUP: Create ZK-Integrated Pipeline
+    // ==========================================================================
+    println!("┌──────────────────────────────────────────────────────────────────────┐");
+    println!("│ SETUP: Initialize ZK-Integrated Pipeline (Simulation Mode)          │");
+    println!("└──────────────────────────────────────────────────────────────────────┘");
+
+    let config = ZKTrustConfig {
+        simulation_mode: true,
+        min_attestation_trust: 0.4,
+        byzantine_proof_threshold: 0.67,
+        ..Default::default()
+    };
+    let mut pipeline = ZKIntegratedPipeline::new(config);
+
+    println!("  Pipeline Mode: Simulation (ZK proofs simulated)");
+    println!("  Byzantine Threshold: 67%");
+    println!("  Min Attestation Trust: 0.4");
+
+    // ==========================================================================
+    // PHASE 1: K-Vector Trust Profiles
+    // ==========================================================================
+    println!("\n┌──────────────────────────────────────────────────────────────────────┐");
+    println!("│ PHASE 1: K-Vector Integration - Agents with Trust Profiles          │");
+    println!("└──────────────────────────────────────────────────────────────────────┘");
+
+    // Register agents with different trust/coherence levels
+    let alice = create_agent_with_phi("alice", 0.85);  // High coherence
+    let bob = create_agent_with_phi("bob", 0.65);      // Moderate coherence
+    let charlie = create_agent_with_phi("charlie", 0.25); // Low coherence
+
+    // Register with ZK commitments
+    let alice_commit = pipeline.register_agent_with_commitment(alice);
+    let bob_commit = pipeline.register_agent_with_commitment(bob);
+    let charlie_commit = pipeline.register_agent_with_commitment(charlie);
+
+    println!("\n  Agent: Alice (High-Trust, High-Coherence)");
+    println!("    K-Vector Commitment: {}", alice_commit.agent_id);
+    println!("    k_phi (Coherence): 0.85 ({:?})", CoherenceState::from_phi(0.85));
+    println!("    Trust Score: {:.3}", pipeline.matl_pipeline().trust_pipeline()
+        .get_agent("agent-alice").unwrap().k_vector.trust_score());
+
+    println!("\n  Agent: Bob (Moderate-Trust, Stable-Coherence)");
+    println!("    K-Vector Commitment: {}", bob_commit.agent_id);
+    println!("    k_phi (Coherence): 0.65 ({:?})", CoherenceState::from_phi(0.65));
+    println!("    Trust Score: {:.3}", pipeline.matl_pipeline().trust_pipeline()
+        .get_agent("agent-bob").unwrap().k_vector.trust_score());
+
+    println!("\n  Agent: Charlie (Lower-Trust, Degraded-Coherence)");
+    println!("    K-Vector Commitment: {}", charlie_commit.agent_id);
+    println!("    k_phi (Coherence): 0.25 ({:?})", CoherenceState::from_phi(0.25));
+    println!("    Trust Score: {:.3}", pipeline.matl_pipeline().trust_pipeline()
+        .get_agent("agent-charlie").unwrap().k_vector.trust_score());
+
+    // ==========================================================================
+    // PHASE 2: Epistemic Classification with ZK Proofs
+    // ==========================================================================
+    println!("\n┌──────────────────────────────────────────────────────────────────────┐");
+    println!("│ PHASE 2: Epistemic Classification - ZK-Proven Outputs               │");
+    println!("└──────────────────────────────────────────────────────────────────────┘");
+
+    // Alice produces high-quality outputs with ZK proofs
+    let alice_output = pipeline.process_zk_output(
+        "agent-alice",
+        OutputContent::Text("Cryptographically verified analysis: gradient quality = 0.94".to_string()),
+        ProofStatement::TrustExceedsThreshold { threshold: 0.5 },
+    ).expect("Alice should be able to produce ZK output");
+
+    println!("\n  Alice's ZK-Proven Output:");
+    println!("    Classification: E{}/N{}/M{}/H{}",
+        alice_output.output.classification.empirical as u8,
+        alice_output.output.classification.normative as u8,
+        alice_output.output.classification.materiality as u8,
+        alice_output.output.classification.harmonic as u8);
+    println!("    Has ZK Proof: {}", alice_output.output.has_proof);
+    println!("    Proof Verified: {}", alice_output.proof_summary.verified);
+    println!("    Proof Result: {}", alice_output.proof_summary.result);
+    println!("    K-Vector Delta Applied:");
+    println!("      k_r: {:+.4}", alice_output.kvector_delta.k_r_delta);
+    println!("      k_p: {:+.4}", alice_output.kvector_delta.k_p_delta);
+    println!("      k_v: {:+.4}", alice_output.kvector_delta.k_v_delta);
+
+    assert!(alice_output.output.has_proof, "Output should have ZK proof");
+    assert!(alice_output.output.classification.empirical >= EmpiricalLevel::E3Cryptographic,
+        "ZK-proven output should be E3+");
+
+    // ==========================================================================
+    // PHASE 3: Phi Coherence Gating
+    // ==========================================================================
+    println!("\n┌──────────────────────────────────────────────────────────────────────┐");
+    println!("│ PHASE 3: Phi Coherence Gating - Action Permission by Coherence      │");
+    println!("└──────────────────────────────────────────────────────────────────────┘");
+
+    // Check Phi gating for ZK operations
+    println!("\n  ZK Operation Permissions by Agent:");
+
+    let operations = [
+        ("VerifyProof", ZKOperationType::VerifyProof),
+        ("GenerateProof", ZKOperationType::GenerateProof),
+        ("ByzantineConsensus", ZKOperationType::ByzantineConsensus),
+    ];
+
+    for (op_name, op) in &operations {
+        println!("\n  Operation: {}", op_name);
+
+        for agent_id in &["agent-alice", "agent-bob", "agent-charlie"] {
+            let gating = pipeline.check_phi_for_zk_operation(agent_id, *op)
+                .expect("Gating check should succeed");
+
+            let status = if gating.permitted { "✓ Allowed" } else { "✗ Blocked" };
+            println!("    {}: {} (Phi: {:.2}, State: {:?})",
+                agent_id.replace("agent-", ""),
+                status,
+                gating.current_phi,
+                gating.current_state);
+        }
+    }
+
+    // Demonstrate Phi-gated proof generation
+    println!("\n  Phi-Gated Proof Generation:");
+
+    // Alice can generate proofs (high coherence)
+    let alice_proof = pipeline.generate_trust_proof_phi_gated(
+        "agent-alice",
+        ProofStatement::IsVerified,
+    );
+    println!("    Alice: {}", if alice_proof.is_ok() { "✓ Proof generated" } else { "✗ Blocked" });
+    assert!(alice_proof.is_ok(), "High-coherence agent should generate proofs");
+
+    // Charlie is blocked (low coherence)
+    let charlie_proof = pipeline.generate_trust_proof_phi_gated(
+        "agent-charlie",
+        ProofStatement::IsVerified,
+    );
+    println!("    Charlie: {}", if charlie_proof.is_ok() { "✓ Proof generated" } else { "✗ Blocked (insufficient coherence)" });
+    assert!(charlie_proof.is_err(), "Low-coherence agent should be blocked");
+
+    // Check network-wide Phi health
+    let phi_health = pipeline.phi_network_health();
+    println!("\n  Network Phi Health:");
+    println!("    Total Agents: {}", phi_health.agent_count);
+    println!("    Average Phi: {:.3}", phi_health.average_phi);
+    println!("    Coherent Agents: {}", phi_health.coherent_agents);
+    println!("    Degraded Agents: {}", phi_health.degraded_agents);
+    println!("    Network Level: {:?}", phi_health.network_coherence_level);
+
+    // ==========================================================================
+    // PHASE 4: GIS Uncertainty & Escalation
+    // ==========================================================================
+    println!("\n┌──────────────────────────────────────────────────────────────────────┐");
+    println!("│ PHASE 4: GIS Uncertainty - Moral Uncertainty & Escalation           │");
+    println!("└──────────────────────────────────────────────────────────────────────┘");
+
+    // Low uncertainty output - proceeds without escalation
+    println!("\n  Scenario A: Low Uncertainty (Should Proceed)");
+
+    let low_uncertainty = MoralUncertainty::new(0.15, 0.2, 0.1);
+    let low_unc_result = pipeline.process_zk_output_with_uncertainty(
+        "agent-alice",
+        OutputContent::Text("Standard data analysis complete".to_string()),
+        ProofStatement::WellFormed,
+        low_uncertainty.clone(),
+    ).expect("Low uncertainty output should succeed");
+
+    println!("    Uncertainty: E={:.2}, A={:.2}, D={:.2} (Total: {:.3})",
+        low_uncertainty.epistemic, low_uncertainty.axiological, low_uncertainty.deontic,
+        low_uncertainty.total());
+    println!("    Guidance: {:?}", low_unc_result.guidance);
+    println!("    Output Produced: {}", low_unc_result.output_result.is_some());
+    println!("    Escalation Required: {}", low_unc_result.escalation.is_some());
+
+    assert!(low_unc_result.output_result.is_some(), "Low uncertainty should produce output");
+    assert!(low_unc_result.escalation.is_none(), "Low uncertainty should not escalate");
+
+    // High uncertainty output - triggers escalation
+    println!("\n  Scenario B: High Uncertainty (Should Escalate)");
+
+    let high_uncertainty = MoralUncertainty::new(0.85, 0.9, 0.8);
+    let high_unc_result = pipeline.process_zk_output_with_uncertainty(
+        "agent-bob",
+        OutputContent::Text("Critical decision with global implications".to_string()),
+        ProofStatement::TrustExceedsThreshold { threshold: 0.6 },
+        high_uncertainty.clone(),
+    ).expect("High uncertainty output should create escalation");
+
+    println!("    Uncertainty: E={:.2}, A={:.2}, D={:.2} (Total: {:.3})",
+        high_uncertainty.epistemic, high_uncertainty.axiological, high_uncertainty.deontic,
+        high_uncertainty.total());
+    println!("    Guidance: {:?}", high_unc_result.guidance);
+    println!("    Output Produced: {}", high_unc_result.output_result.is_some());
+    println!("    Escalation Created: {}", high_unc_result.escalation.is_some());
+
+    assert!(high_unc_result.output_result.is_none(), "High uncertainty should not produce output");
+    assert!(high_unc_result.escalation.is_some(), "High uncertainty should create escalation");
+
+    if let Some(ref esc) = high_unc_result.escalation {
+        println!("    Escalation Details:");
+        println!("      Blocked Action: {}", esc.blocked_action);
+        println!("      Pending Sponsor Review: Yes");
+    }
+
+    // Combined gating (Phi + GIS)
+    println!("\n  Scenario C: Combined Gating (Phi + Uncertainty)");
+
+    let combined = pipeline.check_combined_gating(
+        "agent-alice",
+        &MoralUncertainty::new(0.2, 0.2, 0.2),
+        ZKOperationType::GenerateProof,
+    ).expect("Combined gating should work");
+
+    println!("    Agent: Alice (high coherence, low uncertainty)");
+    println!("    Permitted: {}", combined.permitted);
+    println!("    Recommendation: {:?}", combined.recommendation);
+
+    assert!(combined.permitted, "High coherence + low uncertainty should permit");
+    assert_eq!(combined.recommendation, CombinedGatingRecommendation::Proceed);
+
+    let combined_blocked = pipeline.check_combined_gating(
+        "agent-charlie",
+        &MoralUncertainty::new(0.2, 0.2, 0.2),
+        ZKOperationType::GenerateProof,
+    ).expect("Combined gating should work");
+
+    println!("\n    Agent: Charlie (low coherence, low uncertainty)");
+    println!("    Permitted: {}", combined_blocked.permitted);
+    println!("    Recommendation: {:?}", combined_blocked.recommendation);
+
+    assert!(!combined_blocked.permitted, "Low coherence should block even with low uncertainty");
+    assert_eq!(combined_blocked.recommendation, CombinedGatingRecommendation::WaitForCoherence);
+
+    // Calibration tracking
+    println!("\n  Calibration Tracking:");
+
+    // Record some outcomes for Bob
+    let _ = pipeline.record_gis_outcome("agent-bob", true, true);   // Appropriately uncertain
+    let _ = pipeline.record_gis_outcome("agent-bob", false, true);  // Appropriately confident
+    let _ = pipeline.record_gis_outcome("agent-bob", true, true);   // Appropriately uncertain
+
+    let bob_calibration = pipeline.get_calibration_summary("agent-bob")
+        .expect("Should get calibration");
+
+    println!("    Bob's Calibration:");
+    println!("      Total Events: {}", bob_calibration.total_events);
+    println!("      Calibration Score: {:.3}", bob_calibration.calibration_score);
+    println!("      Tendency: {:?}", bob_calibration.tendency);
+
+    // GIS network health
+    let gis_health = pipeline.gis_network_health();
+    println!("\n  Network GIS Health:");
+    println!("    Total Agents: {}", gis_health.agent_count);
+    println!("    Avg Calibration: {:.3}", gis_health.average_calibration_score);
+    println!("    Pending Escalations: {}", gis_health.pending_escalations_total);
+
+    // ==========================================================================
+    // OBSERVABILITY: Export Metrics
+    // ==========================================================================
+    println!("\n┌──────────────────────────────────────────────────────────────────────┐");
+    println!("│ OBSERVABILITY: Prometheus/OTEL Metric Exports                       │");
+    println!("└──────────────────────────────────────────────────────────────────────┘");
+
+    let mut exports = ObservabilityExports::new("mycelix");
+
+    // Export ZK health
+    let zk_health = pipeline.zk_network_health();
+    exports.export_zk_health(&zk_health);
+
+    // Export Phi health
+    exports.export_phi_network_health(&phi_health);
+
+    // Export GIS health
+    exports.export_gis_network_health(&gis_health);
+
+    // Export individual agent metrics
+    if let Ok(alice_phi) = pipeline.export_agent_phi_metrics("agent-alice") {
+        exports.export_phi_coherence(&alice_phi);
+    }
+
+    exports.export_gis_calibration(&bob_calibration);
+
+    // Show sample of Prometheus metrics
+    let prom_text = exports.to_prometheus_text();
+    let prom_lines: Vec<&str> = prom_text.lines().take(20).collect();
+
+    println!("\n  Sample Prometheus Metrics (first 20 lines):");
+    for line in prom_lines {
+        if !line.is_empty() {
+            println!("    {}", line);
+        }
+    }
+
+    println!("\n  Total Metrics Exported: {}", exports.metrics().len());
+
+    // Verify key metrics exist
+    assert!(prom_text.contains("zk_total_proofs"), "Should export ZK metrics");
+    assert!(prom_text.contains("phi_network_average"), "Should export Phi metrics");
+    assert!(prom_text.contains("gis_network_avg_calibration"), "Should export GIS metrics");
+
+    // ==========================================================================
+    // FINAL SUMMARY
+    // ==========================================================================
+    println!("\n╔══════════════════════════════════════════════════════════════════════╗");
+    println!("║                      FULL PIPELINE DEMO SUMMARY                      ║");
+    println!("╠══════════════════════════════════════════════════════════════════════╣");
+    println!("║                                                                      ║");
+    println!("║  PHASE 1 - K-Vector Integration                                      ║");
+    println!("║    ✓ 3 agents registered with ZK commitments                         ║");
+    println!("║    ✓ K-Vector trust profiles tracked                                 ║");
+    println!("║    ✓ Trust scores: Alice={:.2}, Bob={:.2}, Charlie={:.2}              ║",
+        pipeline.matl_pipeline().trust_pipeline().get_agent("agent-alice").unwrap().k_vector.trust_score(),
+        pipeline.matl_pipeline().trust_pipeline().get_agent("agent-bob").unwrap().k_vector.trust_score(),
+        pipeline.matl_pipeline().trust_pipeline().get_agent("agent-charlie").unwrap().k_vector.trust_score());
+    println!("║                                                                      ║");
+    println!("║  PHASE 2 - Epistemic Classification                                  ║");
+    println!("║    ✓ ZK-proven outputs classified E3+                                ║");
+    println!("║    ✓ K-Vector updated based on epistemic weight                      ║");
+    println!("║                                                                      ║");
+    println!("║  PHASE 3 - Phi Coherence Gating                                      ║");
+    println!("║    ✓ High-coherence agents (Alice) can generate proofs               ║");
+    println!("║    ✓ Low-coherence agents (Charlie) blocked from ZK operations       ║");
+    println!("║    ✓ Network Phi health: avg={:.3}, coherent={}                       ║",
+        phi_health.average_phi, phi_health.coherent_agents);
+    println!("║                                                                      ║");
+    println!("║  PHASE 4 - GIS Uncertainty Handling                                  ║");
+    println!("║    ✓ Low uncertainty → outputs proceed                               ║");
+    println!("║    ✓ High uncertainty → sponsor escalation                           ║");
+    println!("║    ✓ Combined gating (Phi + GIS) enforced                            ║");
+    println!("║    ✓ Calibration tracking active                                     ║");
+    println!("║                                                                      ║");
+    println!("║  OBSERVABILITY                                                       ║");
+    println!("║    ✓ Prometheus metrics exported                                     ║");
+    println!("║    ✓ {} total metrics tracked                                        ║",
+        exports.metrics().len());
+    println!("║                                                                      ║");
+    println!("╠══════════════════════════════════════════════════════════════════════╣");
+    println!("║  This demonstrates AI agents with verifiable \"epistemic fingerprints\"║");
+    println!("║  - trust profiles that prove reliability without revealing state.    ║");
+    println!("╚══════════════════════════════════════════════════════════════════════╝");
+    println!();
+
+    println!("=== ZK-INTEGRATED FULL PIPELINE DEMO PASSED ===\n");
+}

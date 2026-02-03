@@ -327,7 +327,7 @@ pub fn epistemic_weighted_aggregation(
         let pogq = participant_map
             .get(&update.gradient.participant_id)
             .and_then(|p| p.pogq.as_ref())
-            .map(|p| p.quality as f64)
+            .map(|p| p.quality)
             .unwrap_or(0.5);
 
         // Phi multiplier
@@ -732,7 +732,7 @@ pub fn classify_byzantine_batch(
     gradient_deviations: &std::collections::HashMap<String, f64>,
 ) -> Vec<EpistemicByzantineResult> {
     // Detect coordination by looking for similar deviation patterns
-    let coordinated_groups = detect_coordination(&detections, gradient_deviations);
+    let coordinated_groups = detect_coordination(detections, gradient_deviations);
 
     detections.iter().map(|(pid, confidence)| {
         let phi = participant_phis.get(pid).copied();

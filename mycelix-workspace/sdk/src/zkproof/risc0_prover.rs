@@ -133,12 +133,14 @@ impl SimulationProofMarker {
 /// **SECURITY WARNING**: `ProverMode::Simulation` provides NO cryptographic
 /// guarantees. Use `ProductionProver` for real security.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum ProverMode {
     /// Simulation mode - no real proofs, instant "verification"
     ///
     /// **WARNING**: Simulation mode provides NO cryptographic security!
     /// Only use for testing with `--features simulation`.
     #[cfg(feature = "simulation")]
+    #[default]
     Simulation,
     /// Real RISC-0 proofs (requires risc0 feature and toolchain)
     #[cfg(feature = "risc0")]
@@ -154,18 +156,6 @@ impl Default for ProverMode {
 }
 
 #[cfg(all(feature = "simulation", not(feature = "risc0")))]
-impl Default for ProverMode {
-    fn default() -> Self {
-        // Log warning when simulation is used
-        #[cfg(feature = "std")]
-        eprintln!(
-            "\n\x1b[1;33m[ZK_PROOF_SECURITY_WARNING]\x1b[0m Running in simulation mode - \
-             proofs provide NO cryptographic guarantees!\n"
-        );
-        ProverMode::Simulation
-    }
-}
-
 /// Proof receipt containing the proof and public output
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GradientProofReceipt {

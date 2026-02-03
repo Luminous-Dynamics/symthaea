@@ -13,7 +13,6 @@
 use serde::{Deserialize, Serialize};
 use rand::Rng;
 use rand_distr::{Distribution, Normal};
-use std::collections::HashMap;
 
 /// Configuration for differential privacy
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,7 +110,9 @@ impl DPRng {
     }
 
     /// Sample from Gaussian distribution
+    #[allow(clippy::unwrap_used)]
     pub fn sample_gaussian(&mut self, sigma: f64) -> f64 {
+        // unwrap is safe here: Normal::new(0.0, 1.0) is a valid distribution
         let normal = Normal::new(0.0, sigma).unwrap_or_else(|_| Normal::new(0.0, 1.0).unwrap());
         normal.sample(&mut self.rng)
     }

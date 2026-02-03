@@ -674,7 +674,7 @@ impl MatlFeedbackComputer {
         // Update history
         let history = self.historical_gradients
             .entry(participant_id.to_string())
-            .or_insert_with(Vec::new);
+            .or_default();
         history.push(gradient.to_vec());
         if history.len() > self.max_history {
             history.remove(0);

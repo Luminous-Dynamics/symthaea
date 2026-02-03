@@ -687,7 +687,7 @@ pub fn verify_cross_domain_proof(
     let domain_trust = if trust_source_domain { 1.0 } else { 0.5 };
 
     // Calculate credits based on improvement and domain trust
-    let base_credit = proof.improvement_epsilon.max(0.0).min(1.0);
+    let base_credit = proof.improvement_epsilon.clamp(0.0, 1.0);
     let scaled_credit = base_credit * domain_trust;
 
     CrossDomainVerification {
@@ -1127,7 +1127,7 @@ pub fn verify_merkle_proof(
 
     for sibling in proof {
         let mut combined = Vec::new();
-        if idx % 2 == 0 {
+        if idx.is_multiple_of(2) {
             combined.extend_from_slice(&current);
             combined.extend_from_slice(sibling);
         } else {

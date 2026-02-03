@@ -34,16 +34,15 @@ use crate::agentic::{
     epistemic_classifier::{AgentOutput, AgentOutputBuilder, OutputContent, calculate_epistemic_weight},
     // Phi coherence
     phi_bridge::{
-        CoherenceState, PhiMeasurementConfig, measure_agent_phi, update_agent_coherence,
-        check_zk_operation_phi, ZKOperationType, ZKPhiGatingResult, ZKGatingRecommendation,
+        CoherenceState, PhiMeasurementConfig, update_agent_coherence,
+        check_zk_operation_phi, ZKOperationType, ZKPhiGatingResult,
         phi_weighted_attestation, CoherenceHistory, export_phi_metrics, PhiCoherenceExport,
     },
     // Uncertainty (GIS)
     uncertainty::{
-        MoralUncertainty, MoralUncertaintyType, MoralActionGuidance, EscalationRequest,
-        get_recommendations, should_proceed, maybe_escalate,
+        MoralUncertainty, MoralActionGuidance, EscalationRequest,
     },
-    lifecycle::{gate_action_on_uncertainty, record_uncertainty_outcome, UncertaintyCheckResult},
+    lifecycle::record_uncertainty_outcome,
 };
 use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel};
 use serde::{Deserialize, Serialize};
@@ -152,7 +151,8 @@ impl IntegratedTrustPipeline {
             from_trust as f64 * attestation_weight
         };
 
-        // Update to_agent's trust
+        // Update to_agent's trust (unwrap safe: existence checked above via _to)
+        #[allow(clippy::unwrap_used)]
         let to_agent_mut = self.agents.get_mut(to_agent).unwrap();
         let old_trust = to_agent_mut.k_vector.trust_score();
 
@@ -245,6 +245,7 @@ pub struct AttestationResult {
 
 /// Configuration for integrated attack response
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct AttackResponseConfig {
     /// Adaptive threshold config
     pub thresholds: AdaptiveConfig,
@@ -254,15 +255,6 @@ pub struct AttackResponseConfig {
     pub gaming: GamingDetectionConfig,
 }
 
-impl Default for AttackResponseConfig {
-    fn default() -> Self {
-        Self {
-            thresholds: AdaptiveConfig::default(),
-            slashing: SlashingConfig::default(),
-            gaming: GamingDetectionConfig::default(),
-        }
-    }
-}
 
 /// Integrated attack response system
 pub struct IntegratedAttackResponse {
@@ -716,7 +708,7 @@ pub struct OutputProcessingResult {
 // Flow 5: MATL-Integrated Trust Pipeline
 // ============================================================================
 
-use crate::matl::{MatlEngine, ProofOfGradientQuality, NetworkStatus};
+use crate::matl::{MatlEngine, ProofOfGradientQuality};
 
 /// Configuration for MATL-integrated pipeline
 #[derive(Debug, Clone)]
@@ -1018,8 +1010,8 @@ impl MLEnhancedAttackResponse {
 
         // Track K-Vector history
         let history = self.kvector_history.entry(agent_id.clone())
-            .or_insert_with(Vec::new);
-        history.push(agent.k_vector.clone());
+            .or_default();
+        history.push(agent.k_vector);
 
         // Extract features
         let features = AgentFeatures::extract(agent, history);
@@ -1054,8 +1046,8 @@ impl MLEnhancedAttackResponse {
 
         // Track K-Vector history
         let history = self.kvector_history.entry(agent_id.clone())
-            .or_insert_with(Vec::new);
-        history.push(agent.k_vector.clone());
+            .or_default();
+        history.push(agent.k_vector);
 
         // Extract features
         let features = AgentFeatures::extract(agent, history);
@@ -1381,7 +1373,7 @@ use crate::agentic::zk_trust::{
     AggregatedTrustProof, AggregateStatement, aggregate_proofs,
 };
 use crate::agentic::epistemic_classifier::{
-    ZKEpistemicClassifier, ContentAnalyzer, auto_classify,
+    ZKEpistemicClassifier,
     compute_kvector_delta_from_epistemic, KVectorDelta,
 };
 
@@ -1418,7 +1410,8 @@ impl Default for ZKTrustConfig {
 pub struct ZKIntegratedPipeline {
     /// Core MATL-integrated pipeline
     matl_pipeline: MatlIntegratedPipeline,
-    /// ZK trust prover
+    /// ZK trust prover (reserved for future proof generation)
+    #[allow(dead_code)]
     prover: TrustProver,
     /// ZK trust verifier
     verifier: TrustVerifier,
@@ -2022,7 +2015,7 @@ impl ZKIntegratedPipeline {
         // Update coherence history
         let history = self.coherence_histories
             .entry(agent_id.to_string())
-            .or_insert_with(CoherenceHistory::default);
+            .or_default();
         history.add_measurement(update_result.measurement.clone());
 
         Ok(PhiUpdateInfo {
@@ -2164,7 +2157,7 @@ impl ZKIntegratedPipeline {
         &self,
         content: &OutputContent,
     ) -> MoralUncertainty {
-        use crate::agentic::epistemic_classifier::{auto_classify, ContentAnalyzer};
+        use crate::agentic::epistemic_classifier::auto_classify;
 
         // Auto-classify the content
         let classification = auto_classify(content);
@@ -3766,5 +3759,381 @@ mod tests {
         assert_eq!(info.agent_id, "update-test");
         // Phi was measured
         assert!(info.phi_measurement > 0.0);
+    }
+
+    // =========================================================================
+    // Phase 4: GIS (Graceful Ignorance System) Integration Tests
+    // =========================================================================
+
+    fn create_agent_with_calibration(id: &str, phi: f32) -> InstrumentalActor {
+        let mut agent = create_agent_with_phi(id, phi);
+        // Initialize calibration
+        agent.uncertainty_calibration = UncertaintyCalibration::default();
+        agent
+    }
+
+    #[test]
+    fn test_gis_output_low_uncertainty_proceeds() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let agent = create_agent_with_calibration("low-uncertainty-agent", 0.7);
+        pipeline.register_agent_with_commitment(agent);
+
+        // Low uncertainty should proceed without escalation
+        let content = OutputContent::Text("A simple verified statement".to_string());
+        let statement = ProofStatement::WellFormed;
+        let uncertainty = MoralUncertainty::new(0.1, 0.1, 0.1); // Low uncertainty
+
+        let result = pipeline.process_zk_output_with_uncertainty(
+            "low-uncertainty-agent",
+            content,
+            statement,
+            uncertainty,
+        );
+
+        assert!(result.is_ok());
+        let gis_result = result.unwrap();
+
+        // Should proceed with output (no escalation)
+        assert!(gis_result.output_result.is_some());
+        assert!(gis_result.escalation.is_none());
+        assert!(gis_result.guidance.can_proceed());
+    }
+
+    #[test]
+    fn test_gis_output_high_uncertainty_escalates() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let agent = create_agent_with_calibration("high-uncertainty-agent", 0.7);
+        pipeline.register_agent_with_commitment(agent);
+
+        // High uncertainty should trigger escalation
+        let content = OutputContent::Text("A complex decision with global impact".to_string());
+        let statement = ProofStatement::TrustExceedsThreshold { threshold: 0.5 };
+        let uncertainty = MoralUncertainty::new(0.8, 0.9, 0.85); // High uncertainty
+
+        let result = pipeline.process_zk_output_with_uncertainty(
+            "high-uncertainty-agent",
+            content,
+            statement,
+            uncertainty,
+        );
+
+        assert!(result.is_ok());
+        let gis_result = result.unwrap();
+
+        // Should NOT proceed with output (escalation required)
+        assert!(gis_result.output_result.is_none());
+        assert!(gis_result.escalation.is_some());
+        assert!(gis_result.guidance.requires_human());
+
+        // Escalation should be pending on agent
+        let agent = pipeline.matl_pipeline().trust_pipeline().get_agent("high-uncertainty-agent").unwrap();
+        assert!(!agent.pending_escalations.is_empty());
+    }
+
+    #[test]
+    fn test_gis_infer_uncertainty_from_content() {
+        let config = ZKTrustConfig::default();
+        let pipeline = ZKIntegratedPipeline::new(config);
+
+        // Simple text with low epistemic content
+        let simple_content = OutputContent::Text("Hello world".to_string());
+        let simple_uncertainty = pipeline.infer_uncertainty_from_content(&simple_content);
+
+        // High epistemic content (contains "proof", "cryptographic")
+        let crypto_content = OutputContent::Text(
+            "This is a cryptographic proof with verifiable commitments".to_string()
+        );
+        let crypto_uncertainty = pipeline.infer_uncertainty_from_content(&crypto_content);
+
+        // Foundational content with global impact
+        let global_content = OutputContent::Text(
+            "This foundational change affects the entire network globally forever".to_string()
+        );
+        let global_uncertainty = pipeline.infer_uncertainty_from_content(&global_content);
+
+        // Simple content should have higher epistemic uncertainty (lower E)
+        assert!(simple_uncertainty.epistemic > crypto_uncertainty.epistemic);
+
+        // Global content should have higher axiological/deontic uncertainty
+        assert!(global_uncertainty.axiological >= simple_uncertainty.axiological);
+        assert!(global_uncertainty.deontic >= simple_uncertainty.deontic);
+    }
+
+    #[test]
+    fn test_gis_auto_uncertainty_processing() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let agent = create_agent_with_calibration("auto-unc-agent", 0.7);
+        pipeline.register_agent_with_commitment(agent);
+
+        // Process with auto-inferred uncertainty
+        let content = OutputContent::Text("A moderate statement with some verifiable claims".to_string());
+        let statement = ProofStatement::WellFormed;
+
+        let result = pipeline.process_zk_output_auto_uncertainty(
+            "auto-unc-agent",
+            content,
+            statement,
+        );
+
+        assert!(result.is_ok());
+        let gis_result = result.unwrap();
+
+        // Uncertainty should be inferred (not all zeros)
+        assert!(gis_result.uncertainty.epistemic > 0.0 ||
+                gis_result.uncertainty.axiological > 0.0 ||
+                gis_result.uncertainty.deontic > 0.0);
+    }
+
+    #[test]
+    fn test_gis_record_outcome_updates_calibration() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let agent = create_agent_with_calibration("calibration-agent", 0.6);
+        pipeline.register_agent_with_commitment(agent);
+
+        // Record: Agent was uncertain, and outcome was good (appropriate uncertainty)
+        let result1 = pipeline.record_gis_outcome("calibration-agent", true, true);
+        assert!(result1.is_ok());
+        let update1 = result1.unwrap();
+        assert!(update1.total_calibration_events == 1);
+
+        // Record: Agent was confident, and outcome was good (appropriate confidence)
+        let result2 = pipeline.record_gis_outcome("calibration-agent", false, true);
+        assert!(result2.is_ok());
+        let update2 = result2.unwrap();
+        assert!(update2.total_calibration_events == 2);
+
+        // Calibration score should be improving with good behavior
+        let agent = pipeline.matl_pipeline().trust_pipeline().get_agent("calibration-agent").unwrap();
+        assert!(agent.uncertainty_calibration.calibration_score() > 0.0);
+    }
+
+    #[test]
+    fn test_gis_resolve_escalation() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let agent = create_agent_with_calibration("resolve-agent", 0.7);
+        pipeline.register_agent_with_commitment(agent);
+
+        // First, create an escalation
+        let content = OutputContent::Text("Complex decision".to_string());
+        let statement = ProofStatement::WellFormed;
+        let uncertainty = MoralUncertainty::new(0.9, 0.9, 0.9);
+
+        let _ = pipeline.process_zk_output_with_uncertainty(
+            "resolve-agent",
+            content,
+            statement,
+            uncertainty,
+        );
+
+        // Verify escalation exists
+        let agent = pipeline.matl_pipeline().trust_pipeline().get_agent("resolve-agent").unwrap();
+        assert!(!agent.pending_escalations.is_empty());
+
+        // Resolve the escalation (sponsor approves)
+        let result = pipeline.resolve_escalation("resolve-agent", "zk_output_generation", true);
+        assert!(result.is_ok());
+
+        let resolution = result.unwrap();
+        assert!(resolution.sponsor_approved);
+        assert!(resolution.calibration_updated);
+
+        // Escalation should be removed
+        let agent = pipeline.matl_pipeline().trust_pipeline().get_agent("resolve-agent").unwrap();
+        assert!(agent.pending_escalations.is_empty());
+    }
+
+    #[test]
+    fn test_gis_combined_gating() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        // High coherence, low uncertainty -> proceed
+        let good_agent = create_agent_with_calibration("good-gating", 0.8);
+        pipeline.register_agent_with_commitment(good_agent);
+
+        let low_uncertainty = MoralUncertainty::new(0.2, 0.2, 0.2);
+        let result = pipeline.check_combined_gating(
+            "good-gating",
+            &low_uncertainty,
+            ZKOperationType::GenerateProof,
+        );
+
+        assert!(result.is_ok());
+        let combined = result.unwrap();
+        assert!(combined.permitted);
+        assert_eq!(combined.recommendation, CombinedGatingRecommendation::Proceed);
+        assert!(!combined.requires_escalation);
+
+        // Low coherence -> wait for coherence
+        let low_phi_agent = create_agent_with_calibration("low-phi-gating", 0.1);
+        pipeline.register_agent_with_commitment(low_phi_agent);
+
+        let result = pipeline.check_combined_gating(
+            "low-phi-gating",
+            &low_uncertainty,
+            ZKOperationType::GenerateProof,
+        );
+
+        assert!(result.is_ok());
+        let combined = result.unwrap();
+        assert!(!combined.permitted);
+        assert_eq!(combined.recommendation, CombinedGatingRecommendation::WaitForCoherence);
+
+        // High coherence, high uncertainty -> escalate
+        let high_uncertainty = MoralUncertainty::new(0.9, 0.9, 0.9);
+        let result = pipeline.check_combined_gating(
+            "good-gating",
+            &high_uncertainty,
+            ZKOperationType::GenerateProof,
+        );
+
+        assert!(result.is_ok());
+        let combined = result.unwrap();
+        assert!(!combined.permitted);
+        assert!(combined.requires_escalation);
+        assert_eq!(combined.recommendation, CombinedGatingRecommendation::EscalateForUncertainty);
+    }
+
+    #[test]
+    fn test_gis_calibration_summary() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let agent = create_agent_with_calibration("summary-agent", 0.6);
+        pipeline.register_agent_with_commitment(agent);
+
+        // Record some outcomes
+        let _ = pipeline.record_gis_outcome("summary-agent", true, true);   // Appropriate uncertainty
+        let _ = pipeline.record_gis_outcome("summary-agent", false, true);  // Appropriate confidence
+        let _ = pipeline.record_gis_outcome("summary-agent", false, false); // Overconfident
+        let _ = pipeline.record_gis_outcome("summary-agent", true, false);  // Overcautious
+
+        let summary = pipeline.get_calibration_summary("summary-agent");
+        assert!(summary.is_ok());
+
+        let cal = summary.unwrap();
+        assert_eq!(cal.total_events, 4);
+        assert!(cal.appropriate_uncertainty > 0);
+        assert!(cal.appropriate_confidence > 0);
+        assert!(cal.overconfident > 0);
+        assert!(cal.overcautious > 0);
+    }
+
+    #[test]
+    fn test_gis_network_health() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        // Register agents with varying calibration states
+        for i in 0..5 {
+            let agent = create_agent_with_calibration(&format!("health-agent-{}", i), 0.6);
+            pipeline.register_agent_with_commitment(agent);
+
+            // Make some agents overconfident, some overcautious
+            // Note: is_overconfident() requires total_events >= 10, so record enough events
+            if i < 2 {
+                // Overconfident: confident but wrong (need > 10 events with more wrong than right)
+                for _ in 0..8 {
+                    let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), false, false);
+                }
+                for _ in 0..3 {
+                    let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), false, true);
+                }
+            } else if i < 4 {
+                // Well-calibrated: mix of appropriate outcomes
+                for _ in 0..6 {
+                    let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), true, true);
+                }
+                for _ in 0..6 {
+                    let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), false, true);
+                }
+            } else {
+                // Overcautious: uncertain when shouldn't be (but threshold requires 10 events)
+                for _ in 0..8 {
+                    let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), true, false);
+                }
+                for _ in 0..3 {
+                    let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), true, true);
+                }
+            }
+        }
+
+        let health = pipeline.gis_network_health();
+
+        assert_eq!(health.agent_count, 5);
+        assert!(health.average_calibration_score > 0.0 && health.average_calibration_score <= 1.0);
+        // Should detect some overconfident agents (the first 2)
+        assert!(health.overconfident_agents > 0);
+    }
+
+    #[test]
+    fn test_gis_observability_exports() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let agent = create_agent_with_calibration("obs-gis-agent", 0.6);
+        pipeline.register_agent_with_commitment(agent);
+
+        // Record some outcomes
+        let _ = pipeline.record_gis_outcome("obs-gis-agent", true, true);
+        let _ = pipeline.record_gis_outcome("obs-gis-agent", false, true);
+
+        let calibration = pipeline.get_calibration_summary("obs-gis-agent").unwrap();
+        let network_health = pipeline.gis_network_health();
+
+        let mut exports = ObservabilityExports::new("mycelix");
+        exports.export_gis_calibration(&calibration);
+        exports.export_gis_network_health(&network_health);
+
+        let prom_text = exports.to_prometheus_text();
+        assert!(prom_text.contains("gis_calibration_score"));
+        assert!(prom_text.contains("gis_total_events"));
+        assert!(prom_text.contains("gis_network_avg_calibration"));
+        assert!(prom_text.contains("gis_network_well_calibrated"));
+    }
+
+    #[test]
+    fn test_gis_escalation_observability_export() {
+        let config = ZKTrustConfig::default();
+        let mut pipeline = ZKIntegratedPipeline::new(config);
+
+        let agent = create_agent_with_calibration("esc-obs-agent", 0.7);
+        pipeline.register_agent_with_commitment(agent);
+
+        // Create an escalation
+        let content = OutputContent::Text("High stakes decision".to_string());
+        let statement = ProofStatement::WellFormed;
+        let uncertainty = MoralUncertainty::new(0.9, 0.85, 0.9);
+
+        let result = pipeline.process_zk_output_with_uncertainty(
+            "esc-obs-agent",
+            content,
+            statement,
+            uncertainty,
+        ).unwrap();
+
+        // Export the escalation
+        if let Some(ref escalation) = result.escalation {
+            let mut exports = ObservabilityExports::new("mycelix");
+            exports.export_gis_escalation(escalation);
+
+            let prom_text = exports.to_prometheus_text();
+            assert!(prom_text.contains("gis_escalations_total"));
+            assert!(prom_text.contains("gis_escalation_epistemic"));
+            assert!(prom_text.contains("gis_escalation_axiological"));
+            assert!(prom_text.contains("gis_escalation_deontic"));
+        } else {
+            panic!("Expected escalation to be created");
+        }
     }
 }

@@ -680,7 +680,7 @@ impl CampaignResults {
         let mut report = String::new();
 
         report.push_str(&format!("# Security Test Report: {}\n\n", self.campaign_id));
-        report.push_str(&format!("## Summary\n\n"));
+        report.push_str("## Summary\n\n");
         report.push_str(&format!("- Scenarios Executed: {}\n", self.scenarios_executed));
         report.push_str(&format!("- Detection Rate: {:.1}%\n", self.detection_rate * 100.0));
         report.push_str(&format!("- False Positive Rate: {:.2}\n", self.false_positive_rate));
@@ -689,13 +689,13 @@ impl CampaignResults {
             report.push_str(&format!("- Avg Detection Latency: {}ms\n", latency));
         }
 
-        report.push_str(&format!("\n## Impact Assessment\n\n"));
+        report.push_str("\n## Impact Assessment\n\n");
         report.push_str(&format!("- Agents with Trust Changes: {}\n", self.total_impact.trust_changes.len()));
         report.push_str(&format!("- KREDIT Drained: {:.2}\n", self.total_impact.kredit_drained));
         report.push_str(&format!("- Proposals Affected: {}\n", self.total_impact.proposals_affected));
         report.push_str(&format!("- Agents Compromised: {}\n", self.total_impact.agents_compromised));
 
-        report.push_str(&format!("\n## Scenario Details\n\n"));
+        report.push_str("\n## Scenario Details\n\n");
         for result in &self.scenario_results {
             report.push_str(&format!("### {}\n", result.scenario_id));
             report.push_str(&format!("- Detected: {}\n", if result.detected { "YES" } else { "NO" }));
@@ -705,7 +705,7 @@ impl CampaignResults {
             if !result.triggered_signals.is_empty() {
                 report.push_str(&format!("- Signals: {}\n", result.triggered_signals.join(", ")));
             }
-            report.push_str("\n");
+            report.push('\n');
         }
 
         report

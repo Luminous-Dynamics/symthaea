@@ -575,10 +575,7 @@ impl StreamingAnalyzer {
 
         // Track burst windows
         profile.burst_windows.push_back((event.timestamp, 1));
-        profile.burst_windows = profile.burst_windows.iter()
-            .filter(|(t, _)| self.current_time - *t < self.config.flash_attack_window_ms)
-            .cloned()
-            .collect();
+        profile.burst_windows.retain(|(t, _)| self.current_time - *t < self.config.flash_attack_window_ms);
     }
 
     /// Run detection algorithms
@@ -817,7 +814,7 @@ impl StreamingAnalyzer {
         // Collect agents with K-Vectors
         let agents_with_kvectors: Vec<_> = self.agent_activity.iter()
             .filter_map(|(id, profile)| {
-                profile.last_kvector.as_ref().map(|kv| (id.clone(), kv.clone()))
+                profile.last_kvector.as_ref().map(|kv| (id.clone(), *kv))
             })
             .collect();
 
@@ -1114,6 +1111,7 @@ impl AlertPipeline {
     }
 
     /// Resolve alert
+    #[allow(clippy::unwrap_used)]
     pub fn resolve(&mut self, alert_id: &str, action: &str) -> bool {
         if let Some(pos) = self.alerts.iter().position(|a| a.id == alert_id) {
             let mut alert = self.alerts.remove(pos).unwrap();
@@ -1132,6 +1130,7 @@ impl AlertPipeline {
     }
 
     /// Mark as false positive
+    #[allow(clippy::unwrap_used)]
     pub fn mark_false_positive(&mut self, alert_id: &str) -> bool {
         if let Some(pos) = self.alerts.iter().position(|a| a.id == alert_id) {
             let mut alert = self.alerts.remove(pos).unwrap();

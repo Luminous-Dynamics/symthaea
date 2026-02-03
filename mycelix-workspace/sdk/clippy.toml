@@ -1,0 +1,13 @@
+# Clippy configuration for Mycelix SDK
+# Allow certain lints that are too noisy or not applicable
+
+# Allow inconsistent digit grouping - we have various numeric formats
+unreadable-literal-lint-fractions = true
+# Set threshold high to avoid false positives on constants
+literal-representation-threshold = 1000000
+
+# Allow complex types in certain contexts (trait objects, generics)
+type-complexity-threshold = 500
+
+# Allow more function arguments for builders and constructors
+too-many-arguments-threshold = 10

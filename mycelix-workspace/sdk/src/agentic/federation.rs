@@ -834,8 +834,8 @@ impl FederationEngine {
         let bridge = self.bridges.values()
             .find(|b| {
                 b.active &&
-                ((&b.source == &source_swarm && &b.target == &target_swarm) ||
-                 (b.bridge_type == BridgeType::Bidirectional && &b.target == &source_swarm && &b.source == &target_swarm))
+                ((b.source == source_swarm && b.target == target_swarm) ||
+                 (b.bridge_type == BridgeType::Bidirectional && b.target == source_swarm && b.source == target_swarm))
             })
             .ok_or(FederationError::NoBridge {
                 source: source_swarm.clone(),

@@ -436,6 +436,7 @@ pub enum EventType {
 }
 
 /// Lifecycle hooks
+#[derive(Default)]
 pub struct LifecycleHooks {
     /// Called before spawning an agent
     pub pre_spawn: Option<Box<dyn Fn(&AgentTemplate) -> bool + Send + Sync>>,
@@ -449,17 +450,6 @@ pub struct LifecycleHooks {
     pub on_health_check: Option<Box<dyn Fn(&OrchestratedAgent) -> f64 + Send + Sync>>,
 }
 
-impl Default for LifecycleHooks {
-    fn default() -> Self {
-        Self {
-            pre_spawn: None,
-            post_spawn: None,
-            pre_terminate: None,
-            post_terminate: None,
-            on_health_check: None,
-        }
-    }
-}
 
 impl Orchestrator {
     /// Create a new orchestrator

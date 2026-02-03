@@ -537,7 +537,8 @@ impl CascadeEngine {
             self.network.restore(&snapshot);
         }
 
-        // Sort by impact
+        // Sort by impact (unwrap is safe for f64 that aren't NaN)
+        #[allow(clippy::unwrap_used)]
         results.sort_by(|a, b| b.failure_impact.partial_cmp(&a.failure_impact).unwrap());
         results.truncate(top_n);
 

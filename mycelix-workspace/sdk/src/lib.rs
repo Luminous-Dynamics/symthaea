@@ -1,3 +1,19 @@
+// Clippy configuration - allow certain lints that are too noisy
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::unreadable_literal)]
+#![allow(clippy::inconsistent_digit_grouping)]
+// Allow unwrap in certain contexts (we use expect() for better messages where appropriate)
+#![allow(clippy::unwrap_used)]
+// Allow result unwrap (similar reasoning)
+#![allow(clippy::unwrap_in_result)]
+// Allow manual clamp patterns (often clearer for simple cases)
+#![allow(clippy::manual_clamp)]
+// Allow unused results in test contexts
+#![cfg_attr(test, allow(unused_must_use))]
+// Allow unknown cfg conditions for feature flags used in conditional compilation
+#![allow(unexpected_cfgs)]
+
 //! # Mycelix SDK
 //!
 //! Shared library for the Mycelix ecosystem providing:

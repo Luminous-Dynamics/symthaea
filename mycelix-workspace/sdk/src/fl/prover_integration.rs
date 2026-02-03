@@ -35,8 +35,7 @@ use thiserror::Error;
 use hex;
 
 use crate::zkproof::{
-    GradientProofReceipt, GradientProofOutput, GradientConstraints,
-    compute_commitment,
+    GradientProofReceipt, GradientConstraints,
 };
 
 #[cfg(any(feature = "simulation", feature = "risc0"))]
@@ -396,12 +395,12 @@ impl ProverIntegration {
     /// Prove using external HTTP service
     fn prove_external(
         &self,
-        url: &str,
-        timeout_ms: u64,
+        _url: &str,
+        _timeout_ms: u64,
         input: &GradientProofInput<'_>,
     ) -> Result<GradientProofReceipt, ProverIntegrationError> {
         // Build request
-        let request = GradientProofRequest {
+        let _request = GradientProofRequest {
             gradient: input.gradient.to_vec(),
             model_hash: *input.model_hash,
             epochs: input.epochs,
@@ -413,9 +412,9 @@ impl ProverIntegration {
 
         #[cfg(not(feature = "std"))]
         {
-            return Err(ProverIntegrationError::BackendNotAvailable(
+            Err(ProverIntegrationError::BackendNotAvailable(
                 "External service requires std feature".to_string(),
-            ));
+            ))
         }
 
         #[cfg(feature = "std")]
@@ -517,14 +516,14 @@ impl ProverIntegration {
         &self,
         api_key: &str,
         endpoint: Option<&str>,
-        input: &GradientProofInput<'_>,
+        _input: &GradientProofInput<'_>,
     ) -> Result<GradientProofReceipt, ProverIntegrationError> {
         #[cfg(not(feature = "std"))]
         {
             let _ = (api_key, endpoint);
-            return Err(ProverIntegrationError::BackendNotAvailable(
+            Err(ProverIntegrationError::BackendNotAvailable(
                 "Bonsai requires std feature".to_string(),
-            ));
+            ))
         }
 
         #[cfg(feature = "std")]

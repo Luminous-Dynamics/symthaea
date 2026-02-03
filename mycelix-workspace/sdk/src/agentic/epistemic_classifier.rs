@@ -617,17 +617,11 @@ use crate::agentic::zk_trust::{TrustProof, ProofStatement};
 /// ZK-enhanced epistemic classifier
 ///
 /// Automatically elevates classification to E3+ when ZK proofs are attached.
+#[derive(Default)]
 pub struct ZKEpistemicClassifier {
     content_analyzer: ContentAnalyzer,
 }
 
-impl Default for ZKEpistemicClassifier {
-    fn default() -> Self {
-        Self {
-            content_analyzer: ContentAnalyzer::default(),
-        }
-    }
-}
 
 impl ZKEpistemicClassifier {
     /// Create a new ZK-aware classifier

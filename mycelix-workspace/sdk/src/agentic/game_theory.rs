@@ -222,7 +222,7 @@ impl EquilibriumFinder {
                         .map(|(i, p)| (p.id.clone(), payoffs[i]))
                         .collect(),
                     is_pure: true,
-                    stability: self.calculate_stability(&profile),
+                    stability: self.calculate_stability(profile),
                     pareto_optimal: is_pareto,
                 });
             }
@@ -344,7 +344,7 @@ impl EquilibriumFinder {
             }
         }
 
-        min_loss.max(0.0).min(10.0) / 10.0 // Normalize to [0, 1]
+        min_loss.clamp(0.0, 10.0) / 10.0 // Normalize to [0, 1]
     }
 }
 

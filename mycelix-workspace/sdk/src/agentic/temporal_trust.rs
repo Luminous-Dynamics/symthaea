@@ -425,7 +425,9 @@ impl TemporalTrustManager {
         let period_delta = new_trust - state.period_start_trust;
 
         // Check limits
-        let limited = if period_delta > 0.0 && period_delta > config.max_increase_per_period {
+        
+
+        if period_delta > 0.0 && period_delta > config.max_increase_per_period {
             match config.violation_action {
                 VelocityViolationAction::Clamp => {
                     let clamped = state.period_start_trust + config.max_increase_per_period;
@@ -457,9 +459,7 @@ impl TemporalTrustManager {
             }
         } else {
             (new_trust.clamp(0.0, 1.0), false)
-        };
-
-        limited
+        }
     }
 
     /// Get current trust with decay applied

@@ -162,7 +162,7 @@ impl SlashingEngine {
         // Record history
         self.history
             .entry(agent_id.to_string())
-            .or_insert_with(VecDeque::new)
+            .or_default()
             .push_back(event.clone());
 
         // Update cumulative slash
@@ -435,7 +435,7 @@ impl RewardEngine {
         // Record history
         self.history
             .entry(agent_id.to_string())
-            .or_insert_with(VecDeque::new)
+            .or_default()
             .push_back(event.clone());
 
         Some(event)
@@ -630,7 +630,7 @@ impl CommitRevealVoting {
 
         let mut hasher = Sha3_256::new();
         hasher.update(b"vote-commitment-v1");
-        hasher.update(&[vote as u8]);
+        hasher.update([vote as u8]);
         hasher.update(salt);
         hasher.finalize().into()
     }
@@ -644,7 +644,7 @@ impl CommitRevealVoting {
     ) -> bool {
         let agent_commits = self.commits
             .entry(agent_id.to_string())
-            .or_insert_with(HashMap::new);
+            .or_default();
 
         if agent_commits.contains_key(proposal_id) {
             return false; // Already committed
@@ -684,7 +684,7 @@ impl CommitRevealVoting {
 
         self.reveals
             .entry(agent_id.to_string())
-            .or_insert_with(HashMap::new)
+            .or_default()
             .insert(proposal_id.to_string(), reveal);
 
         Ok(())

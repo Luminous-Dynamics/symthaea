@@ -391,7 +391,7 @@ impl BridgeAdapter for MockBridgeAdapter {
             id: format!("pkg-{}-{}", agent_id, timestamp),
             agent_id: agent_id.to_string(),
             source_chain: self.profile.id.clone(),
-            kvector: kvector.clone(),
+            kvector: *kvector,
             dimensions: dimensions.to_vec(),
             trust_score: kvector.trust_score() as f64,
             proof: TrustProof {
@@ -544,7 +544,7 @@ impl PortabilityEngine {
             id: format!("export-{}-{}", agent_id, timestamp),
             agent_id: agent_id.to_string(),
             source_chain: ChainId::new("mycelix"), // Assuming we're on Mycelix
-            kvector: kvector.clone(),
+            kvector: *kvector,
             dimensions: dims,
             trust_score: kvector.trust_score() as f64,
             proof,
