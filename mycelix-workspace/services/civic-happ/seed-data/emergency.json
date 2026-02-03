@@ -1,0 +1,68 @@
+[
+  {
+    "domain": "emergency",
+    "knowledge_type": "contact_info",
+    "title": "211 - Community Resource Helpline",
+    "content": "Dial 2-1-1 for free, confidential information and referrals to local social services including food, housing, utility assistance, healthcare, childcare, crisis counseling, and more. Available 24/7 in most areas. Multilingual support available. You can also text your ZIP code to 898-211 or visit 211.org to search online.",
+    "geographic_scope": "United States",
+    "keywords": ["211", "helpline", "social services", "community resources", "referral"],
+    "source": "United Way",
+    "links": ["https://www.211.org"],
+    "contact_phone": "2-1-1"
+  },
+  {
+    "domain": "emergency",
+    "knowledge_type": "contact_info",
+    "title": "988 Suicide and Crisis Lifeline",
+    "content": "Call or text 988 for free, confidential support 24/7 for anyone in suicidal crisis or emotional distress. The 988 Lifeline connects you with trained crisis counselors. For veterans, press 1 after dialing. For Spanish, press 2. Chat is available at 988lifeline.org. If someone is in immediate danger, call 911.",
+    "geographic_scope": "United States",
+    "keywords": ["988", "suicide", "crisis", "mental health", "lifeline", "emotional distress"],
+    "source": "SAMHSA",
+    "links": ["https://988lifeline.org"],
+    "contact_phone": "988"
+  },
+  {
+    "domain": "emergency",
+    "knowledge_type": "resource",
+    "title": "FEMA Disaster Assistance",
+    "content": "After a federally declared disaster, FEMA provides assistance including temporary housing, home repairs, low-cost loans for uninsured property damage, and other programs. Apply online at DisasterAssistance.gov, call the FEMA helpline, or visit a local Disaster Recovery Center. Apply within 60 days of a disaster declaration. Documentation needed: SSN, address, insurance info, contact info.",
+    "geographic_scope": "United States",
+    "keywords": ["fema", "disaster", "hurricane", "flood", "emergency assistance", "natural disaster"],
+    "source": "Federal Emergency Management Agency",
+    "links": ["https://www.disasterassistance.gov"],
+    "contact_phone": "1-800-621-3362"
+  },
+  {
+    "domain": "emergency",
+    "knowledge_type": "contact_info",
+    "title": "Domestic Violence Hotline",
+    "content": "The National Domestic Violence Hotline provides 24/7 confidential support for victims of domestic violence. Call, text, or chat for safety planning, local resources, and emotional support. Trained advocates speak 200+ languages. If you are in immediate danger, call 911. Text START to 88788 for text support.",
+    "geographic_scope": "United States",
+    "keywords": ["domestic violence", "abuse", "safety", "hotline", "shelter"],
+    "source": "National Domestic Violence Hotline",
+    "links": ["https://www.thehotline.org"],
+    "contact_phone": "1-800-799-7233"
+  },
+  {
+    "domain": "emergency",
+    "knowledge_type": "resource",
+    "title": "Emergency Shelter and Housing",
+    "content": "For emergency shelter, contact your local 2-1-1, Salvation Army, or local homeless services agency. HUD-funded shelters are available nationwide. Many shelters accept walk-ins, but calling ahead is recommended. For families with children, contact your school district's McKinney-Vento liaison for educational stability support. The HUD hotline can help locate nearby shelters.",
+    "geographic_scope": "United States",
+    "keywords": ["shelter", "homeless", "housing", "emergency housing", "hud"],
+    "source": "U.S. Department of Housing and Urban Development",
+    "links": ["https://www.hud.gov/topics/homelessness"],
+    "contact_phone": "1-800-569-4287"
+  },
+  {
+    "domain": "emergency",
+    "knowledge_type": "contact_info",
+    "title": "Poison Control",
+    "content": "Call Poison Control immediately if you suspect a poisoning. Free, confidential expert advice is available 24/7. Do not induce vomiting unless directed by Poison Control. Have the product container available when you call. Online tool available at webPOISONCONTROL for non-emergency cases for adults and children over 6 months.",
+    "geographic_scope": "United States",
+    "keywords": ["poison", "poison control", "overdose", "toxic", "ingestion"],
+    "source": "American Association of Poison Control Centers",
+    "links": ["https://www.poison.org"],
+    "contact_phone": "1-800-222-1222"
+  }
+]

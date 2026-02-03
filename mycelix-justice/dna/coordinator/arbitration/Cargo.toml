@@ -1,0 +1,17 @@
+[package]
+name = "arbitration"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "arbitration"
+
+[dependencies]
+getrandom.workspace = true
+hdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+mycelix_justice_integrity.workspace = true

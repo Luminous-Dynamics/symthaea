@@ -1,0 +1,42 @@
+[workspace]
+
+[package]
+name = "symthaea-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Bridge connecting Symthaea LLM inference to civic-happ DHT knowledge"
+license = "Apache-2.0"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# HTTP server
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Holochain client
+holochain_client = "0.6"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+# HTTP client for inference server
+reqwest = { version = "0.12", features = ["json"] }
+
+# Utilities
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tokio-test = "0.4"

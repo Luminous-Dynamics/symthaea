@@ -1,0 +1,18 @@
+[package]
+name = "dkg_integrity"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <dev@luminousdynamics.org>"]
+description = "DKG Integrity Zome - Entry types and validation for the Distributed Knowledge Graph"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "dkg_integrity"
+
+[dependencies]
+# Holochain
+hdi.workspace = true
+holochain_serialized_bytes.workspace = true
+
+# Serialization
+serde.workspace = true

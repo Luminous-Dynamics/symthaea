@@ -1,0 +1,23 @@
+[package]
+name = "orbital-mechanics"
+version = "0.1.0"
+edition = "2021"
+description = "Orbital mechanics library for mycelix-space: SGP4 propagation, covariance, and conjunction analysis"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+nalgebra = { workspace = true }
+chrono = { workspace = true }
+
+# SGP4/SDP4 propagation (NORAD algorithms)
+sgp4 = { workspace = true }
+
+# Error handling
+thiserror = "1.0"
+
+[dev-dependencies]
+approx = "0.5"

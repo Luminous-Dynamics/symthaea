@@ -1,0 +1,57 @@
+{
+  "name": "@mycelix/fabrication-sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Mycelix Fabrication hApp - Distributed Manufacturing Commons",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "lint": "eslint src/",
+    "test": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@holochain/client": "^0.18.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.30",
+    "eslint": "^8.57.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.1"
+  },
+  "peerDependencies": {
+    "@holochain/client": ">=0.17.0"
+  },
+  "keywords": [
+    "mycelix",
+    "fabrication",
+    "holochain",
+    "3d-printing",
+    "distributed-manufacturing",
+    "hdc",
+    "proof-of-grounded-fabrication"
+  ],
+  "author": "Luminous Dynamics",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Luminous-Dynamics/mycelix"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

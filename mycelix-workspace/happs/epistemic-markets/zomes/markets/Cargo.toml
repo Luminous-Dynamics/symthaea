@@ -1,0 +1,21 @@
+[package]
+name = "epistemic_markets"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk.workspace = true
+hdi.workspace = true
+getrandom.workspace = true
+getrandom_03.workspace = true
+holochain_serialized_bytes.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[features]
+default = []
+mock = []

@@ -1,0 +1,15 @@
+---
+manifest_version: "0"
+name: civic-happ
+description: "Civic AI hApp - Knowledge storage and agent reputation for Symthaea"
+roles:
+  - name: civic
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/civic.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

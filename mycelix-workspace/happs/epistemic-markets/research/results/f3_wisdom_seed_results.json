@@ -1,0 +1,63 @@
+{
+  "citation_network_stats": {
+    "avg_degree": 0.0,
+    "clustering_coefficient": 0.0,
+    "max_depth": 0,
+    "total_edges": 0,
+    "total_nodes": 0
+  },
+  "experiment": "F3_Wisdom_Seed_Transmission",
+  "format_effectiveness": {
+    "Detailed": {
+      "avg_brier_with_seed": 0.230506951090419,
+      "avg_brier_without_seed": 0.23361891745916327,
+      "brier_improvement": 0.003111966368744279,
+      "citation_rate": 0.2296429488826098,
+      "format": "Detailed",
+      "sample_size": 75
+    },
+    "Minimal": {
+      "avg_brier_with_seed": 0.2384737277684174,
+      "avg_brier_without_seed": 0.2281828041865628,
+      "brier_improvement": -0.0102909235818546,
+      "citation_rate": 0.2385645691180187,
+      "format": "Minimal",
+      "sample_size": 75
+    },
+    "NaturalLanguage": {
+      "avg_brier_with_seed": 0.23637572022891296,
+      "avg_brier_without_seed": 0.23013132548846965,
+      "brier_improvement": -0.006244394740443304,
+      "citation_rate": 0.2292946669943475,
+      "format": "NaturalLanguage",
+      "sample_size": 75
+    },
+    "Structured { has_conditions: true, has_caveats: true, has_examples: true }": {
+      "avg_brier_with_seed": 0.2342278280058145,
+      "avg_brier_without_seed": 0.2297399100458088,
+      "brier_improvement": -0.004487917960005694,
+      "citation_rate": 0.24303091738469337,
+      "format": "Structured { has_conditions: true, has_caveats: true, has_examples: true }",
+      "sample_size": 75
+    }
+  },
+  "run_date": "2026-01-30",
+  "summary": {
+    "avg_brier_improvement": -0.007786601888554292,
+    "avg_citations_per_seed": 198.99,
+    "best_format": "Detailed",
+    "network_depth": 0,
+    "recommendations": [
+      "Best format: Detailed (Brier improvement: 0.0031)"
+    ],
+    "top_influencer_seeds": [
+      "seed_0",
+      "seed_1",
+      "seed_2",
+      "seed_3",
+      "seed_4"
+    ],
+    "transmission_rate": 0.49322407815947056,
+    "wisdom_is_transmissible": false
+  }
+}

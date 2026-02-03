@@ -1,0 +1,16 @@
+[package]
+name = "agent_reputation_coordinator"
+version = "0.1.0"
+edition = "2021"
+description = "Agent reputation coordinator zome - MATL trust computation for AI agents"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+getrandom = { workspace = true }
+agent_reputation_integrity = { path = "../integrity" }

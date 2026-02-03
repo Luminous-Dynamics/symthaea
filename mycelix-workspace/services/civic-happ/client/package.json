@@ -1,0 +1,39 @@
+{
+  "name": "@mycelix/civic-client",
+  "version": "0.1.0",
+  "description": "TypeScript client for the Civic hApp - knowledge storage and agent reputation",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./knowledge": {
+      "import": "./dist/knowledge.js",
+      "types": "./dist/knowledge.d.ts"
+    },
+    "./reputation": {
+      "import": "./dist/reputation.js",
+      "types": "./dist/reputation.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@holochain/client": "^0.20.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.1"
+  },
+  "peerDependencies": {
+    "@holochain/client": ">=0.18.0"
+  }
+}

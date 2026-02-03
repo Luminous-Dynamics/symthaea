@@ -1,0 +1,18 @@
+[package]
+name = "education_coordinator"
+version = "0.1.0"
+edition = "2021"
+description = "Legacy Bridge: Academic credential coordinator with CSV import and DNS-DID verification"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+education_integrity = { path = "../integrity" }
+
+[features]
+default = []

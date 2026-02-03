@@ -1,0 +1,57 @@
+---
+manifest_version: "0"
+name: knowledge
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: dkg_integrity
+      path: ./target/wasm32-unknown-unknown/release/dkg_integrity.wasm
+    - name: claims_integrity
+      path: ./target/wasm32-unknown-unknown/release/claims_integrity.wasm
+    - name: graph_integrity
+      path: ./target/wasm32-unknown-unknown/release/graph_integrity.wasm
+    - name: query_integrity
+      path: ./target/wasm32-unknown-unknown/release/query_integrity.wasm
+    - name: inference_integrity
+      path: ./target/wasm32-unknown-unknown/release/inference_integrity.wasm
+    - name: knowledge_bridge_integrity
+      path: ./target/wasm32-unknown-unknown/release/knowledge_bridge_integrity.wasm
+    - name: factcheck_integrity
+      path: ./target/wasm32-unknown-unknown/release/factcheck_integrity.wasm
+    - name: markets_integration_integrity
+      path: ./target/wasm32-unknown-unknown/release/markets_integration_integrity.wasm
+coordinator:
+  zomes:
+    - name: dkg
+      path: ./target/wasm32-unknown-unknown/release/dkg.wasm
+      dependencies:
+        - name: dkg_integrity
+    - name: claims
+      path: ./target/wasm32-unknown-unknown/release/claims.wasm
+      dependencies:
+        - name: claims_integrity
+    - name: graph
+      path: ./target/wasm32-unknown-unknown/release/graph.wasm
+      dependencies:
+        - name: graph_integrity
+    - name: query
+      path: ./target/wasm32-unknown-unknown/release/query.wasm
+      dependencies:
+        - name: query_integrity
+    - name: inference
+      path: ./target/wasm32-unknown-unknown/release/inference.wasm
+      dependencies:
+        - name: inference_integrity
+    - name: knowledge_bridge
+      path: ./target/wasm32-unknown-unknown/release/knowledge_bridge.wasm
+      dependencies:
+        - name: knowledge_bridge_integrity
+    - name: factcheck
+      path: ./target/wasm32-unknown-unknown/release/factcheck.wasm
+      dependencies:
+        - name: factcheck_integrity
+    - name: markets_integration
+      path: ./target/wasm32-unknown-unknown/release/markets_integration.wasm
+      dependencies:
+        - name: markets_integration_integrity

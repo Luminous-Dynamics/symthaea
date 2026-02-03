@@ -1,0 +1,14 @@
+---
+manifest_version: "0"
+name: knowledge
+description: "Mycelix Knowledge Graph - Distributed truth engine with confidence scoring"
+roles:
+  - name: knowledge
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./workdir/knowledge.dna
+      modifiers:
+        network_seed: ~
+        properties: ~

@@ -1,0 +1,17 @@
+[package]
+name = "civic_knowledge_coordinator"
+version = "0.1.0"
+edition = "2021"
+description = "Civic knowledge coordinator zome - CRUD and search for civic information"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+getrandom = { workspace = true }
+getrandom_03 = { workspace = true }
+civic_knowledge_integrity = { path = "../integrity" }

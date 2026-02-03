@@ -1,0 +1,35 @@
+[package]
+name = "celestrak-demo"
+version = "0.1.0"
+edition = "2021"
+description = "Demo tool for fetching real TLEs from CelesTrak and running conjunction analysis"
+
+[[bin]]
+name = "celestrak-demo"
+path = "src/main.rs"
+
+[dependencies]
+# Our orbital mechanics library
+orbital-mechanics = { path = "../../lib/orbital-mechanics" }
+
+# HTTP client for fetching TLEs (using rustls for NixOS compatibility)
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+
+# JSON parsing (CelesTrak offers JSON format)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Time handling
+chrono = "0.4"
+
+# CLI argument parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# Pretty output
+colored = "2.1"
+
+# Error handling
+anyhow = "1.0"
+
+# Async runtime (for Holochain client)
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

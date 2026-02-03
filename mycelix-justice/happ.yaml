@@ -1,0 +1,22 @@
+---
+# Mycelix Justice hApp Bundle
+# Decentralized Dispute Resolution for the Civilizational OS
+
+manifest_version: "0"
+name: mycelix-justice
+description: |
+  A three-tier decentralized dispute resolution system featuring
+  mediation, arbitration, and restorative justice with MATL-weighted
+  juror selection and cross-hApp enforcement.
+
+roles:
+  - name: justice
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_justice.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

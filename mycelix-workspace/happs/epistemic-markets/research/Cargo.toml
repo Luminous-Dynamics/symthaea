@@ -1,0 +1,30 @@
+[package]
+name = "epistemic-markets-research"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Research validation infrastructure for Epistemic Markets"
+
+[dependencies]
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+# No additional dev dependencies needed - uses built-in test framework
+
+[features]
+default = []
+# Enable extended analysis with more iterations
+extended = []
+# Enable parallel simulation execution
+parallel = []
+
+[lib]
+name = "epistemic_markets_research"
+path = "mod.rs"
+
+[[bin]]
+name = "run_f2_f3_experiments"
+path = "bin/run_f2_f3_experiments.rs"

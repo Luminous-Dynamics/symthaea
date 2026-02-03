@@ -1,0 +1,16 @@
+[package]
+name = "observations_integrity"
+version = "0.1.0"
+edition = "2021"
+description = "Integrity zome for sensor observations"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "observations_integrity"
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+mycelix-space-shared = { path = "../../../../zomes/shared" }
+getrandom = { workspace = true }

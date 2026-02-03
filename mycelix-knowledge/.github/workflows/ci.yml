@@ -1,0 +1,396 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  NODE_VERSION: '20'
+  HOLOCHAIN_VERSION: '0.3.0'
+
+jobs:
+  # ============================================================================
+  # Rust Zomes - Build & Test
+  # ============================================================================
+  rust:
+    name: Rust Zomes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+        working-directory: zomes
+        continue-on-error: true
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+        working-directory: zomes
+        continue-on-error: true
+
+      - name: Build zomes
+        run: cargo build --release --target wasm32-unknown-unknown
+        working-directory: zomes
+
+      - name: Run Rust tests
+        run: cargo test --all
+        working-directory: zomes
+
+  # ============================================================================
+  # TypeScript SDK - Build & Test
+  # ============================================================================
+  typescript:
+    name: TypeScript SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: client
+
+      - name: Build SDK
+        run: npm run build
+        working-directory: client
+
+      - name: Run unit tests
+        run: npm test
+        working-directory: client
+        continue-on-error: true
+
+      - name: Upload SDK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: knowledge-sdk
+          path: client/dist/
+
+  # ============================================================================
+  # GraphQL Server
+  # ============================================================================
+  graphql:
+    name: GraphQL Server
+    runs-on: ubuntu-latest
+    needs: typescript
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: graphql
+
+      - name: Build
+        run: npm run build
+        working-directory: graphql
+
+  # ============================================================================
+  # Demo App
+  # ============================================================================
+  demo:
+    name: Demo App
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: demo
+
+      - name: Build demo
+        run: npm run build
+        working-directory: demo
+
+  # ============================================================================
+  # Storybook
+  # ============================================================================
+  storybook:
+    name: Storybook
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: storybook
+
+      - name: Build Storybook
+        run: npm run build-storybook
+        working-directory: storybook
+
+      - name: Upload Storybook artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook
+          path: storybook/storybook-static/
+
+  # ============================================================================
+  # VS Code Extension
+  # ============================================================================
+  vscode:
+    name: VS Code Extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: vscode-extension
+
+      - name: Build extension
+        run: npm run package
+        working-directory: vscode-extension
+
+      - name: Package VSIX
+        run: npx @vscode/vsce package
+        working-directory: vscode-extension
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension
+          path: vscode-extension/*.vsix
+
+  # ============================================================================
+  # Browser Extension
+  # ============================================================================
+  browser-extension:
+    name: Browser Extension
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package Chrome extension
+        run: |
+          cd browser-extension
+          zip -r ../mycelix-knowledge-chrome.zip . -x "*.git*"
+
+      - name: Upload Chrome extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-extension-chrome
+          path: mycelix-knowledge-chrome.zip
+
+  # ============================================================================
+  # Widgets
+  # ============================================================================
+  widgets:
+    name: Embeddable Widgets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: widgets
+
+      - name: Build widgets
+        run: npm run build
+        working-directory: widgets
+
+      - name: Upload widgets artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: widgets
+          path: widgets/dist/
+
+  # ============================================================================
+  # LLM Module
+  # ============================================================================
+  llm:
+    name: LLM Integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: llm
+
+      - name: Build
+        run: npm run build
+        working-directory: llm
+
+  # ============================================================================
+  # Publish NPM Packages
+  # ============================================================================
+  publish-npm:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    needs: [rust, typescript, graphql, widgets, llm]
+    if: github.event_name == 'release'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish @mycelix/knowledge-client
+        run: |
+          cd client
+          npm ci && npm run build
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
+
+      - name: Publish @mycelix/knowledge-graphql
+        run: |
+          cd graphql
+          npm ci && npm run build
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
+
+      - name: Publish @mycelix/knowledge-widgets
+        run: |
+          cd widgets
+          npm ci && npm run build
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
+
+      - name: Publish @mycelix/knowledge-llm
+        run: |
+          cd llm
+          npm ci && npm run build
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
+
+  # ============================================================================
+  # Publish VS Code Extension
+  # ============================================================================
+  publish-vscode:
+    name: Publish VS Code Extension
+    runs-on: ubuntu-latest
+    needs: [vscode]
+    if: github.event_name == 'release'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download VSIX
+        uses: actions/download-artifact@v4
+        with:
+          name: vscode-extension
+          path: vscode-extension/
+
+      - name: Publish to VS Code Marketplace
+        run: |
+          cd vscode-extension
+          npx @vscode/vsce publish
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+  # ============================================================================
+  # Deploy Documentation
+  # ============================================================================
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: [storybook]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download Storybook
+        uses: actions/download-artifact@v4
+        with:
+          name: storybook
+          path: docs-site/public/storybook/
+
+      - name: Build docs site
+        run: |
+          cd docs-site
+          npm ci
+          npm run build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site/dist/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,26 @@
+[package]
+name = "mycelix-space-shared"
+version = "0.1.0"
+edition = "2021"
+description = "Shared types and utilities for Mycelix Space zomes"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+# Holochain
+hdi = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+
+# Orbital mechanics (no Holochain deps)
+orbital-mechanics = { path = "../../lib/orbital-mechanics" }
+
+# Time handling
+chrono = { workspace = true }
+
+# Cryptography (for ZK proofs in future)
+sha3 = { workspace = true }

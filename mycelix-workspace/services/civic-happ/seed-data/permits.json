@@ -1,0 +1,54 @@
+[
+  {
+    "domain": "permits",
+    "knowledge_type": "process",
+    "title": "Building Permit Application Process",
+    "content": "To obtain a building permit: 1) Determine if your project requires a permit (most structural, electrical, plumbing, and mechanical work does). 2) Prepare construction documents (site plan, floor plan, structural details). 3) Submit application to your local building department with required fees. 4) Plan review typically takes 2-6 weeks. 5) Once approved, post the permit visibly at the job site. 6) Schedule required inspections at each construction phase.",
+    "geographic_scope": "United States",
+    "keywords": ["building permit", "construction permit", "how to get permit", "permit application"],
+    "source": "International Code Council",
+    "links": ["https://www.iccsafe.org/building-safety-journal/bsj-perspectives/understanding-the-building-permit-process/"]
+  },
+  {
+    "domain": "permits",
+    "knowledge_type": "faq",
+    "title": "When Do You Need a Building Permit?",
+    "content": "Permits are generally required for: new construction, additions, major renovations, structural changes, electrical work, plumbing, HVAC installation, roof replacement, demolition, fences over certain heights, decks, swimming pools, and solar panel installation. Permits are usually NOT required for: painting, wallpapering, minor repairs, replacing fixtures in kind, landscaping (unless grading). Check with your local jurisdiction as requirements vary.",
+    "geographic_scope": "United States",
+    "keywords": ["need permit", "permit required", "when permit", "exempt", "no permit needed"],
+    "source": "National Association of Home Builders",
+    "links": ["https://www.nahb.org"]
+  },
+  {
+    "domain": "permits",
+    "knowledge_type": "contact_info",
+    "title": "City of Austin Building Permits",
+    "content": "Austin Development Services Department handles building permits. Residential permits can be submitted online through Austin Build + Connect (AB+C) portal. Fees vary: small projects start around $200, new homes $2,000-$5,000+. Plan review takes 15-30 business days for residential, longer for commercial. Express review available for additional fee. Walk-in hours: Mon-Fri 7:45 AM - 4:30 PM.",
+    "geographic_scope": "Austin, TX",
+    "keywords": ["austin permit", "austin building", "development services", "austin construction"],
+    "source": "City of Austin Development Services",
+    "links": ["https://www.austintexas.gov/department/development-services"],
+    "contact_phone": "3-1-1",
+    "address": "6310 Wilhelmina Delco Dr, Austin, TX 78752"
+  },
+  {
+    "domain": "permits",
+    "knowledge_type": "regulation",
+    "title": "Zoning and Land Use Basics",
+    "content": "Zoning regulations control how property can be used (residential, commercial, industrial, mixed-use). Before starting a project, check your property's zoning designation with your local planning department. Common zoning issues: setback requirements, height restrictions, lot coverage limits, parking requirements, and use restrictions. A variance or special use permit may be needed if your project doesn't conform to zoning rules.",
+    "geographic_scope": "United States",
+    "keywords": ["zoning", "land use", "setback", "variance", "special use permit"],
+    "source": "American Planning Association",
+    "links": ["https://www.planning.org/knowledgebase/zoning/"]
+  },
+  {
+    "domain": "permits",
+    "knowledge_type": "process",
+    "title": "Home Renovation Permit Checklist",
+    "content": "Before renovating: 1) Check if permit is required with local building department. 2) Verify contractor licensing (if hiring). 3) Check HOA restrictions if applicable. 4) Submit permit application with plans. 5) Wait for approval before starting work. 6) Post permit on site. 7) Call for inspections at required stages (foundation, framing, rough-in, final). 8) Obtain Certificate of Occupancy if required. Working without a permit can result in fines, forced removal, and problems selling your home.",
+    "geographic_scope": "United States",
+    "keywords": ["renovation permit", "remodel permit", "home improvement", "inspection", "contractor"],
+    "source": "National Association of Home Builders",
+    "links": ["https://www.nahb.org"]
+  }
+]

@@ -1,0 +1,19 @@
+[package]
+name = "conjunctions_coordinator"
+version = "0.1.0"
+edition = "2021"
+description = "Coordinator zome for conjunction analysis and CDMs"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "conjunctions_coordinator"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+conjunctions_integrity = { path = "../integrity" }
+mycelix-space-shared = { path = "../../../../zomes/shared" }
+orbital-mechanics = { path = "../../../../lib/orbital-mechanics" }
+getrandom = { workspace = true }
+chrono = { workspace = true }

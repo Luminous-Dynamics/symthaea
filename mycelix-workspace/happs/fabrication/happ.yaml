@@ -1,0 +1,21 @@
+---
+# Mycelix Fabrication hApp Bundle
+# The Physical Hands of the Civilizational OS
+
+manifest_version: "0"
+name: fabrication
+description: |
+  A decentralized manufacturing commons that transforms bits into atoms
+  through parametric intelligence, metabolic accountability, and anticipatory repair.
+
+roles:
+  - name: fabrication
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./workdir/fabrication.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

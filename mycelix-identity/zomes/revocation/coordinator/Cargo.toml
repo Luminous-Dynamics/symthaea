@@ -1,0 +1,14 @@
+[package]
+name = "revocation"
+version = "0.1.0"
+edition = "2021"
+description = "Credential revocation registry coordinator zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+revocation_integrity = { path = "../integrity" }

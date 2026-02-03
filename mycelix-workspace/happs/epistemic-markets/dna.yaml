@@ -1,0 +1,82 @@
+---
+# Epistemic Markets DNA Configuration
+# A Holochain DNA for collective truth-seeking
+
+manifest_version: "0"
+name: epistemic_markets
+integrity:
+  network_seed: ~
+  properties:
+    # Epistemic Charter Integration
+    epistemic_charter:
+      default_position:
+        empirical: "testimonial"
+        normative: "communal"
+        materiality: "persistent"
+      resolution_thresholds:
+        measurable:
+          min_oracles: 3
+          consensus: 0.95
+          byzantine_tolerance: 0.45
+        cryptographic:
+          min_oracles: 5
+          consensus: 0.90
+          byzantine_tolerance: 0.45
+        testimonial:
+          min_oracles: 11
+          consensus: 0.75
+          byzantine_tolerance: 0.35
+    matl:
+      quality_weight: 0.4
+      consistency_weight: 0.3
+      reputation_weight: 0.3
+      min_trust_for_oracle: 0.5
+    stakes:
+      monetary:
+        min_stake: 1
+        max_stake: 1000000
+        currency: "HAM"
+      reputation:
+        min_stake: 1
+        max_stake: 1000
+        recovery_rate: 0.1
+    question_markets:
+      min_question_value: 10
+      auto_spawn_threshold: 100
+      curiosity_signal_weight: 0.2
+    wisdom:
+      seed_dormancy_days: 365
+      min_resolution_age_days: 30
+      max_lineage_depth: 10
+    cascade:
+      window_size: 20
+      similarity_threshold: 0.8
+
+  zomes: []
+
+coordinator:
+  zomes:
+    # Combined zomes (contain both integrity and coordinator code)
+    - name: markets
+      path: target/wasm32-unknown-unknown/release/epistemic_markets.wasm
+      dependencies: []
+
+    - name: predictions
+      path: target/wasm32-unknown-unknown/release/predictions.wasm
+      dependencies: []
+
+    - name: resolution
+      path: target/wasm32-unknown-unknown/release/resolution.wasm
+      dependencies: []
+
+    - name: scoring
+      path: target/wasm32-unknown-unknown/release/scoring.wasm
+      dependencies: []
+
+    - name: question_markets
+      path: target/wasm32-unknown-unknown/release/question_markets.wasm
+      dependencies: []
+
+    - name: markets_bridge
+      path: target/wasm32-unknown-unknown/release/markets_bridge.wasm
+      dependencies: []

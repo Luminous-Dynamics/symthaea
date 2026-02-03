@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Mycelix Knowledge - Fact Checker",
+  "version": "0.1.0",
+  "description": "Fact-check any text on the web using the Mycelix decentralized knowledge graph",
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{mycelix-knowledge@luminousdynamics.org}",
+      "strict_min_version": "109.0"
+    }
+  }
+}

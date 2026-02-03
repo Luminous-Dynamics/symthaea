@@ -1,0 +1,57 @@
+[
+  {
+    "domain": "tax",
+    "knowledge_type": "resource",
+    "title": "VITA Free Tax Preparation",
+    "content": "The IRS Volunteer Income Tax Assistance (VITA) program offers free tax preparation for people who generally make $64,000 or less, persons with disabilities, and limited English speaking taxpayers. VITA sites are located at community centers, libraries, schools, and shopping malls. Trained IRS-certified volunteers prepare basic tax returns. Bring photo ID, SSN/ITIN for all family members, all income documents (W-2, 1099), and prior year tax return.",
+    "geographic_scope": "United States",
+    "keywords": ["vita", "free tax prep", "free tax filing", "volunteer tax", "low income tax"],
+    "source": "Internal Revenue Service",
+    "links": ["https://www.irs.gov/individuals/free-tax-return-preparation-for-qualifying-taxpayers"],
+    "contact_phone": "1-800-906-9887"
+  },
+  {
+    "domain": "tax",
+    "knowledge_type": "deadline",
+    "title": "Federal Tax Filing Deadlines",
+    "content": "Individual federal income tax returns (Form 1040) are due April 15. If April 15 falls on a weekend or holiday, the deadline moves to the next business day. File Form 4868 for an automatic 6-month extension (until October 15), but estimated taxes are still due by April 15. Quarterly estimated tax payments are due April 15, June 15, September 15, and January 15.",
+    "geographic_scope": "United States",
+    "keywords": ["tax deadline", "filing deadline", "april 15", "extension", "estimated taxes"],
+    "source": "Internal Revenue Service",
+    "links": ["https://www.irs.gov/filing/individuals/when-to-file"],
+    "contact_phone": "1-800-829-1040"
+  },
+  {
+    "domain": "tax",
+    "knowledge_type": "resource",
+    "title": "Earned Income Tax Credit (EITC)",
+    "content": "The EITC is a refundable tax credit for low-to-moderate income workers. For 2024, maximum credit ranges from $632 (no children) to $7,830 (3+ children). Income limits: $18,591 single no children, $56,004 single with 3+ children. Must have earned income, valid SSN, and file a tax return even if you don't owe taxes. Investment income must be $11,600 or less.",
+    "geographic_scope": "United States",
+    "keywords": ["eitc", "earned income credit", "tax credit", "refund", "low income"],
+    "source": "Internal Revenue Service",
+    "links": ["https://www.irs.gov/credits-deductions/individuals/earned-income-tax-credit-eitc"],
+    "contact_phone": "1-800-829-1040"
+  },
+  {
+    "domain": "tax",
+    "knowledge_type": "contact_info",
+    "title": "IRS Contact Information",
+    "content": "IRS main helpline: 1-800-829-1040 (Mon-Fri 7AM-7PM local time). For refund status: 1-800-829-1954 or Where's My Refund tool at irs.gov. For tax forms: 1-800-829-3676. For identity theft: 1-800-908-4490. Visit a local Taxpayer Assistance Center (by appointment) for in-person help. Use the IRS Free File program for free online filing if income is below $79,000.",
+    "geographic_scope": "United States",
+    "keywords": ["irs", "irs phone", "irs contact", "tax help", "refund status"],
+    "source": "Internal Revenue Service",
+    "links": ["https://www.irs.gov/help/telephone-assistance", "https://www.irs.gov/refunds"],
+    "contact_phone": "1-800-829-1040"
+  },
+  {
+    "domain": "tax",
+    "knowledge_type": "faq",
+    "title": "Free Tax Filing Options",
+    "content": "Free ways to file your taxes: 1) IRS Free File (income under $79,000) at irs.gov/freefile. 2) IRS Direct File (available in select states) for simple returns. 3) VITA/TCE for in-person help. 4) Free Fillable Forms at irs.gov for any income level. 5) MyFreeTaxes.com (via United Way) for income under $79,000. Always use irs.gov as your starting point to avoid scam sites.",
+    "geographic_scope": "United States",
+    "keywords": ["free filing", "free tax", "irs free file", "direct file", "myfreetaxes"],
+    "source": "Internal Revenue Service",
+    "links": ["https://www.irs.gov/filing/free-file-do-your-federal-taxes-for-free"],
+    "contact_phone": "1-800-829-1040"
+  }
+]

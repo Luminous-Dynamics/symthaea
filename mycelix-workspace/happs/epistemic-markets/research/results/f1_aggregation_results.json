@@ -1,0 +1,3595 @@
+{
+  "experiment": "F1_Aggregation_Effectiveness",
+  "timestamp": "2026-01-30T09:50:01.915531Z",
+  "duration_ms": 109943,
+  "parameters": {
+    "agent_counts": [
+      10,
+      50,
+      100,
+      500
+    ],
+    "diversity_levels": [
+      0.2,
+      0.5,
+      0.8
+    ],
+    "correlation_levels": [
+      0.0,
+      0.3,
+      0.6
+    ],
+    "aggregation_methods": [
+      "SimpleMean",
+      "Median",
+      "BrierWeighted",
+      "Extremized"
+    ],
+    "iterations_per_condition": 100,
+    "questions_per_iteration": 50,
+    "num_experts": 5,
+    "seed": 42
+  },
+  "results": [
+    {
+      "agent_count": 10,
+      "diversity": 0.2,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.2168018028899353,
+          "brier_std": 0.12021428984861614,
+          "brier_ci_lower": 0.21346963277967404,
+          "brier_ci_upper": 0.22013397300019658,
+          "calibration": 0.04808571593944646,
+          "resolution": 0.054842414735995354,
+          "wisdom_ratio": 1.2529610639992577,
+          "beat_rate": 32.800000000000004
+        },
+        "Median": {
+          "brier_score": 0.20860822367645615,
+          "brier_std": 0.1555853165263851,
+          "brier_ci_lower": 0.20429561872759675,
+          "brier_ci_upper": 0.21292082862531556,
+          "calibration": 0.062234126610554046,
+          "resolution": 0.06303599394947451,
+          "wisdom_ratio": 1.3021740602481764,
+          "beat_rate": 36.7
+        },
+        "BrierWeighted": {
+          "brier_score": 0.2168018028899353,
+          "brier_std": 0.12021428984861614,
+          "brier_ci_lower": 0.21346963277967404,
+          "brier_ci_upper": 0.22013397300019658,
+          "calibration": 0.04808571593944646,
+          "resolution": 0.054842414735995354,
+          "wisdom_ratio": 1.2529610639992577,
+          "beat_rate": 32.800000000000004
+        },
+        "Extremized": {
+          "brier_score": 0.21474077113801016,
+          "brier_std": 0.14301376551754144,
+          "brier_ci_lower": 0.21077663180471148,
+          "brier_ci_upper": 0.21870491047130883,
+          "calibration": 0.05720550620701658,
+          "resolution": 0.056903446487920506,
+          "wisdom_ratio": 1.2649866915647316,
+          "beat_rate": 35.480000000000004
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.1971334051003653,
+        "brier_std": 0.18820894886653616,
+        "calibration": 0.05646268465996085,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.27164421762593066,
+        "brier_std": 0.26765663700453624,
+        "calibration": 0.13382831850226812,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.019668397789569997,
+        "Median": -0.01147481857609084,
+        "BrierWeighted": -0.019668397789569997,
+        "Extremized": -0.017607366037644845
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.1636111465145956
+        },
+        "Median": {
+          "p_value": 1.8407845314705185e-07,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.07375258046375392
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.1636111465145956
+        },
+        "Extremized": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.12311658233686044
+        }
+      }
+    },
+    {
+      "agent_count": 10,
+      "diversity": 0.2,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20913743988160519,
+          "brier_std": 0.13917513489041575,
+          "brier_ci_lower": 0.20527970196078543,
+          "brier_ci_upper": 0.21299517780242494,
+          "calibration": 0.0556700539561663,
+          "resolution": 0.031194467651543267,
+          "wisdom_ratio": 1.1491577388974579,
+          "beat_rate": 34.48
+        },
+        "Median": {
+          "brier_score": 0.20649860342334295,
+          "brier_std": 0.16321757221034144,
+          "brier_ci_lower": 0.20197444314028845,
+          "brier_ci_upper": 0.21102276370639744,
+          "calibration": 0.06528702888413658,
+          "resolution": 0.033833304109805507,
+          "wisdom_ratio": 1.1638427744736066,
+          "beat_rate": 38.78
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20913743988160519,
+          "brier_std": 0.13917513489041575,
+          "brier_ci_lower": 0.20527970196078543,
+          "brier_ci_upper": 0.21299517780242494,
+          "calibration": 0.0556700539561663,
+          "resolution": 0.031194467651543267,
+          "wisdom_ratio": 1.1491577388974579,
+          "beat_rate": 34.48
+        },
+        "Extremized": {
+          "brier_score": 0.2073833329694839,
+          "brier_std": 0.16545073542754388,
+          "brier_ci_lower": 0.20279727256013771,
+          "brier_ci_upper": 0.2119693933788301,
+          "calibration": 0.06618029417101755,
+          "resolution": 0.03294857456366454,
+          "wisdom_ratio": 1.1588776402224805,
+          "beat_rate": 39.519999999999996
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19993488041831317,
+        "brier_std": 0.19028862640306857,
+        "calibration": 0.05708658792092057,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.24033190753314845,
+        "brier_std": 0.21894207900282966,
+        "calibration": 0.10947103950141483,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.009202559463292015,
+        "Median": -0.006563723005029776,
+        "BrierWeighted": -0.009202559463292015,
+        "Extremized": -0.007448452551170742
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 2.9350879799938667e-06,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.06612215228343742
+        },
+        "Median": {
+          "p_value": 0.004460844261076513,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.04021456094550277
+        },
+        "BrierWeighted": {
+          "p_value": 2.9350879799938667e-06,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.06612215228343742
+        },
+        "Extremized": {
+          "p_value": 0.001456020166070715,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.045019156499504685
+        }
+      }
+    },
+    {
+      "agent_count": 10,
+      "diversity": 0.2,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20338396389618987,
+          "brier_std": 0.16032667595512703,
+          "brier_ci_lower": 0.1989399351690895,
+          "brier_ci_upper": 0.20782799262329024,
+          "calibration": 0.06413067038205082,
+          "resolution": 0.014541159373299972,
+          "wisdom_ratio": 1.0714960958314392,
+          "beat_rate": 39.06
+        },
+        "Median": {
+          "brier_score": 0.20318937137767626,
+          "brier_std": 0.16834453297235147,
+          "brier_ci_lower": 0.19852309899273132,
+          "brier_ci_upper": 0.2078556437626212,
+          "calibration": 0.0673378131889406,
+          "resolution": 0.014735751891813587,
+          "wisdom_ratio": 1.072522257399102,
+          "beat_rate": 41.52
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20338396389618987,
+          "brier_std": 0.16032667595512703,
+          "brier_ci_lower": 0.1989399351690895,
+          "brier_ci_upper": 0.20782799262329024,
+          "calibration": 0.06413067038205082,
+          "resolution": 0.014541159373299972,
+          "wisdom_ratio": 1.0714960958314392,
+          "beat_rate": 39.06
+        },
+        "Extremized": {
+          "brier_score": 0.2029895003067546,
+          "brier_std": 0.1902177285492641,
+          "brier_ci_lower": 0.1977169338729984,
+          "brier_ci_upper": 0.20826206674051082,
+          "calibration": 0.07608709141970565,
+          "resolution": 0.014935622962735234,
+          "wisdom_ratio": 1.073578303016485,
+          "beat_rate": 47.72
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.1976107107310411,
+        "brier_std": 0.18710143403912774,
+        "calibration": 0.05613043021173832,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.21792512326948985,
+        "brier_std": 0.19443387208789703,
+        "calibration": 0.09721693604394852,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.005773253165148762,
+        "Median": -0.005578660646635147,
+        "BrierWeighted": -0.005773253165148762,
+        "Extremized": -0.0053787895757135
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.010888989818542028,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03600931118140693
+        },
+        "Median": {
+          "p_value": 0.01911727609189451,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03313835351903809
+        },
+        "BrierWeighted": {
+          "p_value": 0.010888989818542028,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03600931118140693
+        },
+        "Extremized": {
+          "p_value": 0.045555558598525225,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.028277015064452616
+        }
+      }
+    },
+    {
+      "agent_count": 10,
+      "diversity": 0.5,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.2171211695525833,
+          "brier_std": 0.11965866919858421,
+          "brier_ci_lower": 0.2138044004609947,
+          "brier_ci_upper": 0.22043793864417188,
+          "calibration": 0.04786346767943369,
+          "resolution": 0.05547197949948493,
+          "wisdom_ratio": 1.2554885809329177,
+          "beat_rate": 33.339999999999996
+        },
+        "Median": {
+          "brier_score": 0.209250710564525,
+          "brier_std": 0.156240527630685,
+          "brier_ci_lower": 0.20491994409043918,
+          "brier_ci_upper": 0.2135814770386108,
+          "calibration": 0.062496211052274,
+          "resolution": 0.06334243848754323,
+          "wisdom_ratio": 1.3027107450037108,
+          "beat_rate": 37.68
+        },
+        "BrierWeighted": {
+          "brier_score": 0.2171211695525833,
+          "brier_std": 0.11965866919858421,
+          "brier_ci_lower": 0.2138044004609947,
+          "brier_ci_upper": 0.22043793864417188,
+          "calibration": 0.04786346767943369,
+          "resolution": 0.05547197949948493,
+          "wisdom_ratio": 1.2554885809329177,
+          "beat_rate": 33.339999999999996
+        },
+        "Extremized": {
+          "brier_score": 0.21510017385780095,
+          "brier_std": 0.14223711018881433,
+          "brier_ci_lower": 0.2111575623118861,
+          "brier_ci_upper": 0.2190427854037158,
+          "calibration": 0.05689484407552573,
+          "resolution": 0.05749297519426727,
+          "wisdom_ratio": 1.2672846523698065,
+          "beat_rate": 36.7
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19749953523210328,
+        "brier_std": 0.18786712854279972,
+        "calibration": 0.05636013856283991,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.2725931490520682,
+        "brier_std": 0.268371507725124,
+        "calibration": 0.134185753862562,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.019621634320480003,
+        "Median": -0.011751175332421704,
+        "BrierWeighted": -0.019621634320480003,
+        "Extremized": -0.017600638625697662
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.16398004801404029
+        },
+        "Median": {
+          "p_value": 1.0496471158916165e-07,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.07521208172183504
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.16398004801404029
+        },
+        "Extremized": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.12374153694723893
+        }
+      }
+    },
+    {
+      "agent_count": 10,
+      "diversity": 0.5,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20728828147736153,
+          "brier_std": 0.13902233562073887,
+          "brier_ci_lower": 0.20343477893621192,
+          "brier_ci_upper": 0.21114178401851114,
+          "calibration": 0.05560893424829555,
+          "resolution": 0.03191519875070725,
+          "wisdom_ratio": 1.1539652821821131,
+          "beat_rate": 34.82
+        },
+        "Median": {
+          "brier_score": 0.20444132149829422,
+          "brier_std": 0.16197021378000565,
+          "brier_ci_lower": 0.1999517362269424,
+          "brier_ci_upper": 0.20893090676964604,
+          "calibration": 0.06478808551200226,
+          "resolution": 0.03476215872977456,
+          "wisdom_ratio": 1.170034895465419,
+          "beat_rate": 39.839999999999996
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20728828147736153,
+          "brier_std": 0.13902233562073887,
+          "brier_ci_lower": 0.20343477893621192,
+          "brier_ci_upper": 0.21114178401851114,
+          "calibration": 0.05560893424829555,
+          "resolution": 0.03191519875070725,
+          "wisdom_ratio": 1.1539652821821131,
+          "beat_rate": 34.82
+        },
+        "Extremized": {
+          "brier_score": 0.2052048377290518,
+          "brier_std": 0.16530356965935536,
+          "brier_ci_lower": 0.20062285654668124,
+          "brier_ci_upper": 0.20978681891142234,
+          "calibration": 0.06612142786374214,
+          "resolution": 0.03399864249901699,
+          "wisdom_ratio": 1.165681486242094,
+          "beat_rate": 40.04
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19855698630814153,
+        "brier_std": 0.19088806827843444,
+        "calibration": 0.057266420483530325,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.23920348022806878,
+        "brier_std": 0.22014085244855117,
+        "calibration": 0.11007042622427558,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.00873129516922,
+        "Median": -0.00588433519015269,
+        "BrierWeighted": -0.00873129516922,
+        "Extremized": -0.006647851420910261
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 8.962572523696366e-06,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.06280498115813193
+        },
+        "Median": {
+          "p_value": 0.010202237027400418,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03632973651652412
+        },
+        "BrierWeighted": {
+          "p_value": 8.962572523696366e-06,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.06280498115813193
+        },
+        "Extremized": {
+          "p_value": 0.0044594017230417116,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.04021601853250739
+        }
+      }
+    },
+    {
+      "agent_count": 10,
+      "diversity": 0.5,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.2080587291143526,
+          "brier_std": 0.16397943765969974,
+          "brier_ci_lower": 0.20351345099845486,
+          "brier_ci_upper": 0.21260400723025036,
+          "calibration": 0.0655917750638799,
+          "resolution": 0.015432805324225057,
+          "wisdom_ratio": 1.0741752359534165,
+          "beat_rate": 39.28
+        },
+        "Median": {
+          "brier_score": 0.2082284203900304,
+          "brier_std": 0.17317573845633258,
+          "brier_ci_lower": 0.20342823382125153,
+          "brier_ci_upper": 0.21302860695880926,
+          "calibration": 0.06927029538253303,
+          "resolution": 0.015263114048547272,
+          "wisdom_ratio": 1.073299859932463,
+          "beat_rate": 41.46
+        },
+        "BrierWeighted": {
+          "brier_score": 0.2080587291143526,
+          "brier_std": 0.16397943765969974,
+          "brier_ci_lower": 0.20351345099845486,
+          "brier_ci_upper": 0.21260400723025036,
+          "calibration": 0.0655917750638799,
+          "resolution": 0.015432805324225057,
+          "wisdom_ratio": 1.0741752359534165,
+          "beat_rate": 39.28
+        },
+        "Extremized": {
+          "brier_score": 0.20858752796596344,
+          "brier_std": 0.19483537537776383,
+          "brier_ci_lower": 0.20318696689229343,
+          "brier_ci_upper": 0.21398808903963346,
+          "calibration": 0.07793415015110554,
+          "resolution": 0.014904006472614223,
+          "wisdom_ratio": 1.0714520499760953,
+          "beat_rate": 47.02
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.20136466160003721,
+        "brier_std": 0.19009712782937319,
+        "calibration": 0.05702913834881195,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.22349153443857767,
+        "brier_std": 0.1998457593051879,
+        "calibration": 0.09992287965259394,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.006694067514315394,
+        "Median": -0.0068637587899931796,
+        "BrierWeighted": -0.006694067514315394,
+        "Extremized": -0.007222866365926228
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.003894497153218879,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.040822603186427164
+        },
+        "Median": {
+          "p_value": 0.005069487825691166,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.03963464427047281
+        },
+        "BrierWeighted": {
+          "p_value": 0.003894497153218879,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.040822603186427164
+        },
+        "Extremized": {
+          "p_value": 0.00875803201208325,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.03707163728312635
+        }
+      }
+    },
+    {
+      "agent_count": 10,
+      "diversity": 0.8,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.2206957050321662,
+          "brier_std": 0.12272221043872815,
+          "brier_ci_lower": 0.21729401890979186,
+          "brier_ci_upper": 0.22409739115454055,
+          "calibration": 0.04908888417549126,
+          "resolution": 0.058121543006291826,
+          "wisdom_ratio": 1.263356022256168,
+          "beat_rate": 33.2
+        },
+        "Median": {
+          "brier_score": 0.2138454750601255,
+          "brier_std": 0.15752209455657917,
+          "brier_ci_lower": 0.209479185363217,
+          "brier_ci_upper": 0.218211764757034,
+          "calibration": 0.06300883782263167,
+          "resolution": 0.06497177297833254,
+          "wisdom_ratio": 1.3038258020660238,
+          "beat_rate": 37.46
+        },
+        "BrierWeighted": {
+          "brier_score": 0.2206957050321662,
+          "brier_std": 0.12272221043872815,
+          "brier_ci_lower": 0.21729401890979186,
+          "brier_ci_upper": 0.22409739115454055,
+          "calibration": 0.04908888417549126,
+          "resolution": 0.058121543006291826,
+          "wisdom_ratio": 1.263356022256168,
+          "beat_rate": 33.2
+        },
+        "Extremized": {
+          "brier_score": 0.21947870327362629,
+          "brier_std": 0.14605908279305904,
+          "brier_ci_lower": 0.2154301520520694,
+          "brier_ci_upper": 0.22352725449518318,
+          "calibration": 0.05842363311722362,
+          "resolution": 0.05933854476483175,
+          "wisdom_ratio": 1.2703612873584995,
+          "beat_rate": 36.4
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19850219631342025,
+        "brier_std": 0.18984787162303918,
+        "calibration": 0.05695436148691175,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.27881724803845803,
+        "brier_std": 0.27554830657523105,
+        "calibration": 0.13777415328761553,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.022193508718745952,
+        "Median": -0.015343278746705241,
+        "BrierWeighted": -0.022193508718745952,
+        "Extremized": -0.02097650696020603
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.18084345644855024
+        },
+        "Median": {
+          "p_value": 5.7127635955112055e-12,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.0974039787237225
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.18084345644855024
+        },
+        "Extremized": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.1436165869254854
+        }
+      }
+    },
+    {
+      "agent_count": 10,
+      "diversity": 0.8,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.2120039748442429,
+          "brier_std": 0.1382569205604875,
+          "brier_ci_lower": 0.20817168852613072,
+          "brier_ci_upper": 0.2158362611623551,
+          "calibration": 0.055302768224195,
+          "resolution": 0.0355330312563078,
+          "wisdom_ratio": 1.1676054955215511,
+          "beat_rate": 33.44
+        },
+        "Median": {
+          "brier_score": 0.2095079702355806,
+          "brier_std": 0.1600543754990554,
+          "brier_ci_lower": 0.20507148929204136,
+          "brier_ci_upper": 0.21394445117911984,
+          "calibration": 0.06402175019962217,
+          "resolution": 0.03802903586497011,
+          "wisdom_ratio": 1.1815159386166,
+          "beat_rate": 38.019999999999996
+        },
+        "BrierWeighted": {
+          "brier_score": 0.2120039748442429,
+          "brier_std": 0.1382569205604875,
+          "brier_ci_lower": 0.20817168852613072,
+          "brier_ci_upper": 0.2158362611623551,
+          "calibration": 0.055302768224195,
+          "resolution": 0.0355330312563078,
+          "wisdom_ratio": 1.1676054955215511,
+          "beat_rate": 33.44
+        },
+        "Extremized": {
+          "brier_score": 0.21059577607294092,
+          "brier_std": 0.1644402036576322,
+          "brier_ci_lower": 0.20603772617518537,
+          "brier_ci_upper": 0.21515382597069646,
+          "calibration": 0.06577608146305289,
+          "resolution": 0.036941230027609795,
+          "wisdom_ratio": 1.1754129675175204,
+          "beat_rate": 38.64
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.20075348920873132,
+        "brier_std": 0.19044304907881826,
+        "calibration": 0.05713291472364548,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.2475370061005507,
+        "brier_std": 0.22823691116309136,
+        "calibration": 0.11411845558154568,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.011250485635511592,
+        "Median": -0.008754481026849281,
+        "BrierWeighted": -0.011250485635511592,
+        "Extremized": -0.009842286864209598
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 8.742119028681827e-09,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.08137376118246101
+        },
+        "Median": {
+          "p_value": 0.00010992800822506865,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.05469691784153034
+        },
+        "BrierWeighted": {
+          "p_value": 8.742119028681827e-09,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.08137376118246101
+        },
+        "Extremized": {
+          "p_value": 2.3149925931775783e-05,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.0598532879751319
+        }
+      }
+    },
+    {
+      "agent_count": 10,
+      "diversity": 0.8,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20369239215737073,
+          "brier_std": 0.1605623678337842,
+          "brier_ci_lower": 0.19924183038470414,
+          "brier_ci_upper": 0.20814295393003732,
+          "calibration": 0.06422494713351368,
+          "resolution": 0.01895774845956641,
+          "wisdom_ratio": 1.0930704787683962,
+          "beat_rate": 39.36
+        },
+        "Median": {
+          "brier_score": 0.20431566336387905,
+          "brier_std": 0.16940626739979153,
+          "brier_ci_lower": 0.1996199612020864,
+          "brier_ci_upper": 0.2090113655256717,
+          "calibration": 0.06776250695991662,
+          "resolution": 0.01833447725305809,
+          "wisdom_ratio": 1.089736033699996,
+          "beat_rate": 41.48
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20369239215737073,
+          "brier_std": 0.1605623678337842,
+          "brier_ci_lower": 0.19924183038470414,
+          "brier_ci_upper": 0.20814295393003732,
+          "calibration": 0.06422494713351368,
+          "resolution": 0.01895774845956641,
+          "wisdom_ratio": 1.0930704787683962,
+          "beat_rate": 39.36
+        },
+        "Extremized": {
+          "brier_score": 0.20335505441405335,
+          "brier_std": 0.19053619679209233,
+          "brier_ci_lower": 0.19807366049097658,
+          "brier_ci_upper": 0.20863644833713013,
+          "calibration": 0.07621447871683694,
+          "resolution": 0.019295086202883782,
+          "wisdom_ratio": 1.0948837306182557,
+          "beat_rate": 47.78
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.1972961098561662,
+        "brier_std": 0.18623016403972778,
+        "calibration": 0.055869049211918334,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.22265014061693714,
+        "brier_std": 0.20462304206243598,
+        "calibration": 0.10231152103121799,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.006396282301204537,
+        "Median": -0.007019553507712856,
+        "BrierWeighted": -0.006396282301204537,
+        "Extremized": -0.006058944557887164
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.00484933724646508,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.03983674622826959
+        },
+        "Median": {
+          "p_value": 0.003389947658066328,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.041436209034386016
+        },
+        "BrierWeighted": {
+          "p_value": 0.00484933724646508,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.03983674622826959
+        },
+        "Extremized": {
+          "p_value": 0.024540423050972926,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.031799441050555405
+        }
+      }
+    },
+    {
+      "agent_count": 50,
+      "diversity": 0.2,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.21141990418746456,
+          "brier_std": 0.10329597154616416,
+          "brier_ci_lower": 0.2085566859350424,
+          "brier_ci_upper": 0.21428312243988673,
+          "calibration": 0.041318388618465665,
+          "resolution": 0.059875610822234054,
+          "wisdom_ratio": 1.2832070662994093,
+          "beat_rate": 30.599999999999998
+        },
+        "Median": {
+          "brier_score": 0.20064663442023106,
+          "brier_std": 0.15029576571918354,
+          "brier_ci_lower": 0.1964806483393836,
+          "brier_ci_upper": 0.2048126205010785,
+          "calibration": 0.06011830628767342,
+          "resolution": 0.07064888058946756,
+          "wisdom_ratio": 1.3521059837041756,
+          "beat_rate": 33.160000000000004
+        },
+        "BrierWeighted": {
+          "brier_score": 0.21141990418746456,
+          "brier_std": 0.10329597154616416,
+          "brier_ci_lower": 0.2085566859350424,
+          "brier_ci_upper": 0.21428312243988673,
+          "calibration": 0.041318388618465665,
+          "resolution": 0.059875610822234054,
+          "wisdom_ratio": 1.2832070662994093,
+          "beat_rate": 30.599999999999998
+        },
+        "Extremized": {
+          "brier_score": 0.20721971139434045,
+          "brier_std": 0.12293434779679849,
+          "brier_ci_lower": 0.20381214512440027,
+          "brier_ci_upper": 0.21062727766428063,
+          "calibration": 0.049173739118719396,
+          "resolution": 0.06407580361535817,
+          "wisdom_ratio": 1.309216739972297,
+          "beat_rate": 31.6
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19758564224745417,
+        "brier_std": 0.18976156083738374,
+        "calibration": 0.05692846825121512,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.2712955150096986,
+        "brier_std": 0.2685703510777952,
+        "calibration": 0.1342851755388976,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.01383426194001039,
+        "Median": -0.0030609921727768885,
+        "BrierWeighted": -0.01383426194001039,
+        "Extremized": -0.009634069146886276
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.13392837816359274
+        },
+        "Median": {
+          "p_value": 0.14983186007680604,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.02036645648751093
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.13392837816359274
+        },
+        "Extremized": {
+          "p_value": 3.0078383783660456e-08,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.07836759473284627
+        }
+      }
+    },
+    {
+      "agent_count": 50,
+      "diversity": 0.2,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.2029032212391471,
+          "brier_std": 0.12716950519920892,
+          "brier_ci_lower": 0.19937826239527637,
+          "brier_ci_upper": 0.20642818008301786,
+          "calibration": 0.05086780207968357,
+          "resolution": 0.03399385400823704,
+          "wisdom_ratio": 1.167537281077322,
+          "beat_rate": 31.619999999999997
+        },
+        "Median": {
+          "brier_score": 0.19834693013175678,
+          "brier_std": 0.15287578279923508,
+          "brier_ci_lower": 0.19410942962605238,
+          "brier_ci_upper": 0.20258443063746118,
+          "calibration": 0.06115031311969404,
+          "resolution": 0.03855014511562738,
+          "wisdom_ratio": 1.194357155364187,
+          "beat_rate": 35.260000000000005
+        },
+        "BrierWeighted": {
+          "brier_score": 0.2029032212391471,
+          "brier_std": 0.12716950519920892,
+          "brier_ci_lower": 0.19937826239527637,
+          "brier_ci_upper": 0.20642818008301786,
+          "calibration": 0.05086780207968357,
+          "resolution": 0.03399385400823704,
+          "wisdom_ratio": 1.167537281077322,
+          "beat_rate": 31.619999999999997
+        },
+        "Extremized": {
+          "brier_score": 0.19913454696459568,
+          "brier_std": 0.1509225393081054,
+          "brier_ci_lower": 0.19495118760623242,
+          "brier_ci_upper": 0.20331790632295893,
+          "calibration": 0.06036901572324216,
+          "resolution": 0.03776252828278848,
+          "wisdom_ratio": 1.1896332347068954,
+          "beat_rate": 35.699999999999996
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19477529855177034,
+        "brier_std": 0.18660054852278166,
+        "calibration": 0.055980164556834494,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.23689707524738415,
+        "brier_std": 0.21571520901900737,
+        "calibration": 0.10785760450950369,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.008127922687376776,
+        "Median": -0.0035716315799864395,
+        "BrierWeighted": -0.008127922687376776,
+        "Extremized": -0.0043592484128253395
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 6.2071153199561024e-06,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.06391408596459128
+        },
+        "Median": {
+          "p_value": 0.09853225488761641,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.023362965111857537
+        },
+        "BrierWeighted": {
+          "p_value": 6.2071153199561024e-06,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.06391408596459128
+        },
+        "Extremized": {
+          "p_value": 0.041110935760249934,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.0288840118434929
+        }
+      }
+    },
+    {
+      "agent_count": 50,
+      "diversity": 0.2,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20014032085657912,
+          "brier_std": 0.15709575931147426,
+          "brier_ci_lower": 0.19578584856975123,
+          "brier_ci_upper": 0.20449479314340702,
+          "calibration": 0.0628383037245897,
+          "resolution": 0.015982480932676513,
+          "wisdom_ratio": 1.0798563770872016,
+          "beat_rate": 37.3
+        },
+        "Median": {
+          "brier_score": 0.19943585904603603,
+          "brier_std": 0.16360611734538136,
+          "brier_ci_lower": 0.19490092884131,
+          "brier_ci_upper": 0.20397078925076206,
+          "calibration": 0.06544244693815254,
+          "resolution": 0.016686942743219607,
+          "wisdom_ratio": 1.0836707241267367,
+          "beat_rate": 40.0
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20014032085657912,
+          "brier_std": 0.15709575931147426,
+          "brier_ci_lower": 0.19578584856975123,
+          "brier_ci_upper": 0.20449479314340702,
+          "calibration": 0.0628383037245897,
+          "resolution": 0.015982480932676513,
+          "wisdom_ratio": 1.0798563770872016,
+          "beat_rate": 37.3
+        },
+        "Extremized": {
+          "brier_score": 0.1988809616843704,
+          "brier_std": 0.1864573215967175,
+          "brier_ci_lower": 0.19371262841345593,
+          "brier_ci_upper": 0.20404929495528484,
+          "calibration": 0.074582928638687,
+          "resolution": 0.017241840104885248,
+          "wisdom_ratio": 1.0866942715826593,
+          "beat_rate": 47.5
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19359511461281873,
+        "brier_std": 0.18424131147266573,
+        "calibration": 0.05527239344179972,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.21612280178925564,
+        "brier_std": 0.19432839145462233,
+        "calibration": 0.09716419572731116,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.006545206243760399,
+        "Median": -0.005840744433217304,
+        "BrierWeighted": -0.006545206243760399,
+        "Extremized": -0.005285847071551664
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0032184750106400983,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.04166379966236515
+        },
+        "Median": {
+          "p_value": 0.01159049998500139,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03570003694230563
+        },
+        "BrierWeighted": {
+          "p_value": 0.0032184750106400983,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.04166379966236515
+        },
+        "Extremized": {
+          "p_value": 0.04500942784153383,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.028348830854624477
+        }
+      }
+    },
+    {
+      "agent_count": 50,
+      "diversity": 0.5,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.21122479923381038,
+          "brier_std": 0.10212985852425724,
+          "brier_ci_lower": 0.20839390398526467,
+          "brier_ci_upper": 0.2140556944823561,
+          "calibration": 0.0408519434097029,
+          "resolution": 0.06007121179298497,
+          "wisdom_ratio": 1.2843946923414544,
+          "beat_rate": 30.520000000000003
+        },
+        "Median": {
+          "brier_score": 0.2001809076663454,
+          "brier_std": 0.15002921408412148,
+          "brier_ci_lower": 0.19602231001987053,
+          "brier_ci_upper": 0.20433950531282025,
+          "calibration": 0.060011685633648594,
+          "resolution": 0.07111510336044996,
+          "wisdom_ratio": 1.3552541757827483,
+          "beat_rate": 33.18
+        },
+        "BrierWeighted": {
+          "brier_score": 0.21122479923381038,
+          "brier_std": 0.10212985852425724,
+          "brier_ci_lower": 0.20839390398526467,
+          "brier_ci_upper": 0.2140556944823561,
+          "calibration": 0.0408519434097029,
+          "resolution": 0.06007121179298497,
+          "wisdom_ratio": 1.2843946923414544,
+          "beat_rate": 30.520000000000003
+        },
+        "Extremized": {
+          "brier_score": 0.20692791563069043,
+          "brier_std": 0.12151297377172104,
+          "brier_ci_lower": 0.20355974783865025,
+          "brier_ci_upper": 0.21029608342273062,
+          "calibration": 0.04860518950868842,
+          "resolution": 0.06436809539610491,
+          "wisdom_ratio": 1.311065306002426,
+          "beat_rate": 31.580000000000002
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19617687624357816,
+        "brier_std": 0.18782043955490696,
+        "calibration": 0.05634613186647208,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.27129601102679535,
+        "brier_std": 0.26841344341750856,
+        "calibration": 0.13420672170875428,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.015047922990232221,
+        "Median": -0.004004031422767229,
+        "BrierWeighted": -0.015047922990232221,
+        "Extremized": -0.010751039387112277
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.14734107348888703
+        },
+        "Median": {
+          "p_value": 0.059139893098078655,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.026688344981412527
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.14734107348888703
+        },
+        "Extremized": {
+          "p_value": 3.96064958607667e-10,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.08847647336250361
+        }
+      }
+    },
+    {
+      "agent_count": 50,
+      "diversity": 0.5,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20380864853348146,
+          "brier_std": 0.12854082891441387,
+          "brier_ci_lower": 0.20024567853552036,
+          "brier_ci_upper": 0.20737161853144256,
+          "calibration": 0.051416331565765555,
+          "resolution": 0.03458460318912601,
+          "wisdom_ratio": 1.1696915387937745,
+          "beat_rate": 30.740000000000002
+        },
+        "Median": {
+          "brier_score": 0.19904851207334157,
+          "brier_std": 0.1562820873483289,
+          "brier_ci_lower": 0.19471659362265548,
+          "brier_ci_upper": 0.20338043052402766,
+          "calibration": 0.06251283493933156,
+          "resolution": 0.03934473964926591,
+          "wisdom_ratio": 1.1976640731419732,
+          "beat_rate": 34.14
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20380864853348146,
+          "brier_std": 0.12854082891441387,
+          "brier_ci_lower": 0.20024567853552036,
+          "brier_ci_upper": 0.20737161853144256,
+          "calibration": 0.051416331565765555,
+          "resolution": 0.03458460318912601,
+          "wisdom_ratio": 1.1696915387937745,
+          "beat_rate": 30.740000000000002
+        },
+        "Extremized": {
+          "brier_score": 0.20022609251583517,
+          "brier_std": 0.15278209312527738,
+          "brier_ci_lower": 0.19599118895539905,
+          "brier_ci_upper": 0.2044609960762713,
+          "calibration": 0.061112837250110956,
+          "resolution": 0.0381671592067723,
+          "wisdom_ratio": 1.1906203069100687,
+          "beat_rate": 34.22
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19499729487487352,
+        "brier_std": 0.18762479230821208,
+        "calibration": 0.056287437692463624,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.23839325172260747,
+        "brier_std": 0.2183893708702619,
+        "calibration": 0.10919468543513094,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.00881135365860794,
+        "Median": -0.004051217198468043,
+        "BrierWeighted": -0.00881135365860794,
+        "Extremized": -0.005228797640961652
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 1.2541709821789482e-06,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.06854906517270702
+        },
+        "Median": {
+          "p_value": 0.06680316968194866,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.025922466657605482
+        },
+        "BrierWeighted": {
+          "p_value": 1.2541709821789482e-06,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.06854906517270702
+        },
+        "Extremized": {
+          "p_value": 0.015520736673349411,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03422389060132965
+        }
+      }
+    },
+    {
+      "agent_count": 50,
+      "diversity": 0.5,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.2002814198383907,
+          "brier_std": 0.15728308837506166,
+          "brier_ci_lower": 0.19592175505483672,
+          "brier_ci_upper": 0.2046410846219447,
+          "calibration": 0.06291323535002467,
+          "resolution": 0.016691151270044946,
+          "wisdom_ratio": 1.0833384908271233,
+          "beat_rate": 37.3
+        },
+        "Median": {
+          "brier_score": 0.19948295449985906,
+          "brier_std": 0.16701277395588415,
+          "brier_ci_lower": 0.19485359659150697,
+          "brier_ci_upper": 0.20411231240821115,
+          "calibration": 0.06680510958235367,
+          "resolution": 0.01748961660857659,
+          "wisdom_ratio": 1.0876747421975292,
+          "beat_rate": 40.8
+        },
+        "BrierWeighted": {
+          "brier_score": 0.2002814198383907,
+          "brier_std": 0.15728308837506166,
+          "brier_ci_lower": 0.19592175505483672,
+          "brier_ci_upper": 0.2046410846219447,
+          "calibration": 0.06291323535002467,
+          "resolution": 0.016691151270044946,
+          "wisdom_ratio": 1.0833384908271233,
+          "beat_rate": 37.3
+        },
+        "Extremized": {
+          "brier_score": 0.19913993780594405,
+          "brier_std": 0.18651269833775108,
+          "brier_ci_lower": 0.19397006957008067,
+          "brier_ci_upper": 0.20430980604180743,
+          "calibration": 0.07460507933510044,
+          "resolution": 0.0178326333024916,
+          "wisdom_ratio": 1.0895482518422246,
+          "beat_rate": 47.92
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.1946764417258313,
+        "brier_std": 0.18458937272375078,
+        "calibration": 0.055376811817125234,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.21697257110843565,
+        "brier_std": 0.19612100109186706,
+        "calibration": 0.09806050054593353,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.005604978112559417,
+        "Median": -0.004806512774027771,
+        "BrierWeighted": -0.005604978112559417,
+        "Extremized": -0.004463496080112761
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.011740096223674445,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03563624144506642
+        },
+        "Median": {
+          "p_value": 0.041850265902262596,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.028779312265643796
+        },
+        "BrierWeighted": {
+          "p_value": 0.011740096223674445,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03563624144506642
+        },
+        "Extremized": {
+          "p_value": 0.09060774439200814,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.023931325426593368
+        }
+      }
+    },
+    {
+      "agent_count": 50,
+      "diversity": 0.8,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.21215523848062676,
+          "brier_std": 0.10245838588444489,
+          "brier_ci_lower": 0.20931523691825266,
+          "brier_ci_upper": 0.21499524004300086,
+          "calibration": 0.04098335435377796,
+          "resolution": 0.06251413575717149,
+          "wisdom_ratio": 1.2946622303784407,
+          "beat_rate": 30.86
+        },
+        "Median": {
+          "brier_score": 0.2020009575102561,
+          "brier_std": 0.14753817822071771,
+          "brier_ci_lower": 0.19791140785514796,
+          "brier_ci_upper": 0.20609050716536423,
+          "calibration": 0.05901527128828709,
+          "resolution": 0.07266841672754215,
+          "wisdom_ratio": 1.359742932029679,
+          "beat_rate": 32.7
+        },
+        "BrierWeighted": {
+          "brier_score": 0.21215523848062676,
+          "brier_std": 0.10245838588444489,
+          "brier_ci_lower": 0.20931523691825266,
+          "brier_ci_upper": 0.21499524004300086,
+          "calibration": 0.04098335435377796,
+          "resolution": 0.06251413575717149,
+          "wisdom_ratio": 1.2946622303784407,
+          "beat_rate": 30.86
+        },
+        "Extremized": {
+          "brier_score": 0.20804353744473889,
+          "brier_std": 0.12187569285736288,
+          "brier_ci_lower": 0.20466531559259388,
+          "brier_ci_upper": 0.2114217592968839,
+          "calibration": 0.04875027714294516,
+          "resolution": 0.06662583679305936,
+          "wisdom_ratio": 1.3202494901374031,
+          "beat_rate": 31.56
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19764516110907707,
+        "brier_std": 0.18804497535064332,
+        "calibration": 0.056413492605192996,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.27466937423779825,
+        "brier_std": 0.27331143342186487,
+        "calibration": 0.13665571671093243,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.01451007737154969,
+        "Median": -0.0043557964011790296,
+        "BrierWeighted": -0.01451007737154969,
+        "Extremized": -0.010398376335661819
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.14161922663816426
+        },
+        "Median": {
+          "p_value": 0.03683342730698569,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.029523181414526756
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.14161922663816426
+        },
+        "Extremized": {
+          "p_value": 1.6153158810539026e-09,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.08531952591918021
+        }
+      }
+    },
+    {
+      "agent_count": 50,
+      "diversity": 0.8,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20518238294157157,
+          "brier_std": 0.12690846474829995,
+          "brier_ci_lower": 0.2016646597698425,
+          "brier_ci_upper": 0.20870010611330064,
+          "calibration": 0.05076338589931998,
+          "resolution": 0.03889338500533049,
+          "wisdom_ratio": 1.189555187183911,
+          "beat_rate": 31.019999999999996
+        },
+        "Median": {
+          "brier_score": 0.20097079464171771,
+          "brier_std": 0.1527676103191973,
+          "brier_ci_lower": 0.19673629252418487,
+          "brier_ci_upper": 0.20520529675925056,
+          "calibration": 0.06110704412767892,
+          "resolution": 0.04310497330518434,
+          "wisdom_ratio": 1.2144837680620713,
+          "beat_rate": 33.48
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20518238294157157,
+          "brier_std": 0.12690846474829995,
+          "brier_ci_lower": 0.2016646597698425,
+          "brier_ci_upper": 0.20870010611330064,
+          "calibration": 0.05076338589931998,
+          "resolution": 0.03889338500533049,
+          "wisdom_ratio": 1.189555187183911,
+          "beat_rate": 31.019999999999996
+        },
+        "Extremized": {
+          "brier_score": 0.20165789399260148,
+          "brier_std": 0.1509157499587925,
+          "brier_ci_lower": 0.19747472282539982,
+          "brier_ci_upper": 0.20584106515980313,
+          "calibration": 0.060366299983517,
+          "resolution": 0.04241787395430058,
+          "wisdom_ratio": 1.2103457152828188,
+          "beat_rate": 33.94
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19588986493540467,
+        "brier_std": 0.18679266708668255,
+        "calibration": 0.05603780012600476,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.24407576794690206,
+        "brier_std": 0.22737978870741507,
+        "calibration": 0.11368989435370754,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.0092925180061669,
+        "Median": -0.005080929706313048,
+        "BrierWeighted": -0.0092925180061669,
+        "Extremized": -0.005768029057196811
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 2.251884110293645e-07,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.07322220802683993
+        },
+        "Median": {
+          "p_value": 0.01868372970837817,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03325920786282379
+        },
+        "BrierWeighted": {
+          "p_value": 2.251884110293645e-07,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.07322220802683993
+        },
+        "Extremized": {
+          "p_value": 0.006880549942558378,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.03822019278154712
+        }
+      }
+    },
+    {
+      "agent_count": 50,
+      "diversity": 0.8,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.2029148090416786,
+          "brier_std": 0.15757308730498634,
+          "brier_ci_lower": 0.19854710589789706,
+          "brier_ci_upper": 0.20728251218546015,
+          "calibration": 0.06302923492199454,
+          "resolution": 0.02109800994194408,
+          "wisdom_ratio": 1.1039747174766852,
+          "beat_rate": 37.519999999999996
+        },
+        "Median": {
+          "brier_score": 0.20246556136198665,
+          "brier_std": 0.16777356538341417,
+          "brier_ci_lower": 0.19781511539115754,
+          "brier_ci_upper": 0.20711600733281577,
+          "calibration": 0.06710942615336567,
+          "resolution": 0.021547257621636035,
+          "wisdom_ratio": 1.1064243097773643,
+          "beat_rate": 40.36
+        },
+        "BrierWeighted": {
+          "brier_score": 0.2029148090416786,
+          "brier_std": 0.15757308730498634,
+          "brier_ci_lower": 0.19854710589789706,
+          "brier_ci_upper": 0.20728251218546015,
+          "calibration": 0.06302923492199454,
+          "resolution": 0.02109800994194408,
+          "wisdom_ratio": 1.1039747174766852,
+          "beat_rate": 37.519999999999996
+        },
+        "Extremized": {
+          "brier_score": 0.202104599470893,
+          "brier_std": 0.18700604842048152,
+          "brier_ci_lower": 0.1969210562684209,
+          "brier_ci_upper": 0.20728814267336507,
+          "calibration": 0.07480241936819261,
+          "resolution": 0.0219082195127297,
+          "wisdom_ratio": 1.1084004004366308,
+          "beat_rate": 47.78
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.1975342008269812,
+        "brier_std": 0.18695755851409301,
+        "calibration": 0.0560872675542279,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.22401281898362269,
+        "brier_std": 0.20715838621188373,
+        "calibration": 0.10357919310594187,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.005380608214697408,
+        "Median": -0.004931360535005452,
+        "BrierWeighted": -0.005380608214697408,
+        "Extremized": -0.004570398643911788
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.01575510419756876,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03414674616537224
+        },
+        "Median": {
+          "p_value": 0.037672804332385734,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.02939295307777347
+        },
+        "BrierWeighted": {
+          "p_value": 0.01575510419756876,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03414674616537224
+        },
+        "Extremized": {
+          "p_value": 0.08395983879112867,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.024439843965021312
+        }
+      }
+    },
+    {
+      "agent_count": 100,
+      "diversity": 0.2,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.21075790671597033,
+          "brier_std": 0.09948113802307995,
+          "brier_ci_lower": 0.20800043025395637,
+          "brier_ci_upper": 0.2135153831779843,
+          "calibration": 0.03979245520923198,
+          "resolution": 0.060021100078321454,
+          "wisdom_ratio": 1.2847869435295227,
+          "beat_rate": 30.56
+        },
+        "Median": {
+          "brier_score": 0.20048038332915888,
+          "brier_std": 0.14789445784532101,
+          "brier_ci_lower": 0.19638095810669937,
+          "brier_ci_upper": 0.2045798085516184,
+          "calibration": 0.05915778313812841,
+          "resolution": 0.07029862346513291,
+          "wisdom_ratio": 1.3506508831326058,
+          "beat_rate": 32.0
+        },
+        "BrierWeighted": {
+          "brier_score": 0.21075790671597033,
+          "brier_std": 0.09948113802307995,
+          "brier_ci_lower": 0.20800043025395637,
+          "brier_ci_upper": 0.2135153831779843,
+          "calibration": 0.03979245520923198,
+          "resolution": 0.060021100078321454,
+          "wisdom_ratio": 1.2847869435295227,
+          "beat_rate": 30.56
+        },
+        "Extremized": {
+          "brier_score": 0.20621563964772688,
+          "brier_std": 0.11834043694142779,
+          "brier_ci_lower": 0.20293541009009228,
+          "brier_ci_upper": 0.20949586920536148,
+          "calibration": 0.04733617477657112,
+          "resolution": 0.06456336714656491,
+          "wisdom_ratio": 1.3130866662531364,
+          "beat_rate": 30.959999999999997
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19746384835933115,
+        "brier_std": 0.1873984073106788,
+        "calibration": 0.05621952219320364,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.2707790067942918,
+        "brier_std": 0.2669224577340661,
+        "calibration": 0.13346122886703304,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.013294058356639188,
+        "Median": -0.0030165349698277333,
+        "BrierWeighted": -0.013294058356639188,
+        "Extremized": -0.008751791288395733
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.13363395936981462
+        },
+        "Median": {
+          "p_value": 0.14923108931021156,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.020396538273142386
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.13363395936981462
+        },
+        "Extremized": {
+          "p_value": 1.7042838607039812e-07,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.07395436010370152
+        }
+      }
+    },
+    {
+      "agent_count": 100,
+      "diversity": 0.2,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20504534793627424,
+          "brier_std": 0.12762980416554248,
+          "brier_ci_lower": 0.20150763025600116,
+          "brier_ci_upper": 0.20858306561654733,
+          "calibration": 0.051051921666217,
+          "resolution": 0.03439799775341057,
+          "wisdom_ratio": 1.1677580013378361,
+          "beat_rate": 31.480000000000004
+        },
+        "Median": {
+          "brier_score": 0.20068580260174804,
+          "brier_std": 0.1535994655799489,
+          "brier_ci_lower": 0.19642824263277814,
+          "brier_ci_upper": 0.20494336257071794,
+          "calibration": 0.06143978623197957,
+          "resolution": 0.038757543087936774,
+          "wisdom_ratio": 1.193125485637115,
+          "beat_rate": 34.1
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20504534793627424,
+          "brier_std": 0.12762980416554248,
+          "brier_ci_lower": 0.20150763025600116,
+          "brier_ci_upper": 0.20858306561654733,
+          "calibration": 0.051051921666217,
+          "resolution": 0.03439799775341057,
+          "wisdom_ratio": 1.1677580013378361,
+          "beat_rate": 31.480000000000004
+        },
+        "Extremized": {
+          "brier_score": 0.20160949612697818,
+          "brier_std": 0.1516030725704304,
+          "brier_ci_lower": 0.1974072733489781,
+          "brier_ci_upper": 0.20581171890497826,
+          "calibration": 0.060641229028172164,
+          "resolution": 0.037833849562706634,
+          "wisdom_ratio": 1.1876590651210102,
+          "beat_rate": 34.22
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19770204707720465,
+        "brier_std": 0.18828598376974043,
+        "calibration": 0.056485795130922126,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.2394433456896848,
+        "brier_std": 0.21750540616366587,
+        "calibration": 0.10875270308183294,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.00734330085906959,
+        "Median": -0.0029837555245433856,
+        "BrierWeighted": -0.00734330085906959,
+        "Extremized": -0.003907449049773526
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 4.73604935322669e-05,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.05753594081790604
+        },
+        "Median": {
+          "p_value": 0.1695677336085879,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.019425559283540172
+        },
+        "BrierWeighted": {
+          "p_value": 4.73604935322669e-05,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.05753594081790604
+        },
+        "Extremized": {
+          "p_value": 0.06837726907518293,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.02577420749805871
+        }
+      }
+    },
+    {
+      "agent_count": 100,
+      "diversity": 0.2,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20205318554903545,
+          "brier_std": 0.15908338724478502,
+          "brier_ci_lower": 0.19764361902675487,
+          "brier_ci_upper": 0.20646275207131604,
+          "calibration": 0.06363335489791401,
+          "resolution": 0.016156461776862335,
+          "wisdom_ratio": 1.0799614306152148,
+          "beat_rate": 37.980000000000004
+        },
+        "Median": {
+          "brier_score": 0.20111387758751845,
+          "brier_std": 0.1654302351369262,
+          "brier_ci_lower": 0.1965283854172371,
+          "brier_ci_upper": 0.2056993697577998,
+          "calibration": 0.06617209405477048,
+          "resolution": 0.01709576973837934,
+          "wisdom_ratio": 1.0850054205281772,
+          "beat_rate": 40.6
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20205318554903545,
+          "brier_std": 0.15908338724478502,
+          "brier_ci_lower": 0.19764361902675487,
+          "brier_ci_upper": 0.20646275207131604,
+          "calibration": 0.06363335489791401,
+          "resolution": 0.016156461776862335,
+          "wisdom_ratio": 1.0799614306152148,
+          "beat_rate": 37.980000000000004
+        },
+        "Extremized": {
+          "brier_score": 0.20118995656821378,
+          "brier_std": 0.18904055926723703,
+          "brier_ci_lower": 0.19595001960222908,
+          "brier_ci_upper": 0.2064298935341985,
+          "calibration": 0.07561622370689482,
+          "resolution": 0.017019690757684003,
+          "wisdom_ratio": 1.084595131128792,
+          "beat_rate": 47.8
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19657740197606907,
+        "brier_std": 0.1867124435959419,
+        "calibration": 0.056013733078782574,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.2182096473258978,
+        "brier_std": 0.1965616887978841,
+        "calibration": 0.09828084439894205,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.005475783572966381,
+        "Median": -0.004536475611449375,
+        "BrierWeighted": -0.005475783572966381,
+        "Extremized": -0.004612554592144713
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.014936263109678327,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.034420838453362045
+        },
+        "Median": {
+          "p_value": 0.05249528317714214,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.027422288360374667
+        },
+        "BrierWeighted": {
+          "p_value": 0.014936263109678327,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.034420838453362045
+        },
+        "Extremized": {
+          "p_value": 0.08446840865539418,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.024399814569021554
+        }
+      }
+    },
+    {
+      "agent_count": 100,
+      "diversity": 0.5,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.21208417899558846,
+          "brier_std": 0.10027999988279397,
+          "brier_ci_lower": 0.20930455921255567,
+          "brier_ci_upper": 0.21486379877862125,
+          "calibration": 0.040111999953117594,
+          "resolution": 0.060895362979841605,
+          "wisdom_ratio": 1.2871282679747096,
+          "beat_rate": 30.620000000000005
+        },
+        "Median": {
+          "brier_score": 0.2015576744891904,
+          "brier_std": 0.1506973885138012,
+          "brier_ci_lower": 0.19738055599244206,
+          "brier_ci_upper": 0.20573479298593875,
+          "calibration": 0.06027895540552049,
+          "resolution": 0.07142186748623966,
+          "wisdom_ratio": 1.3543495313053437,
+          "beat_rate": 31.919999999999998
+        },
+        "BrierWeighted": {
+          "brier_score": 0.21208417899558846,
+          "brier_std": 0.10027999988279397,
+          "brier_ci_lower": 0.20930455921255567,
+          "brier_ci_upper": 0.21486379877862125,
+          "calibration": 0.040111999953117594,
+          "resolution": 0.060895362979841605,
+          "wisdom_ratio": 1.2871282679747096,
+          "beat_rate": 30.620000000000005
+        },
+        "Extremized": {
+          "brier_score": 0.20780040388767745,
+          "brier_std": 0.11935103070316572,
+          "brier_ci_lower": 0.2044921621001264,
+          "brier_ci_upper": 0.2111086456752285,
+          "calibration": 0.04774041228126629,
+          "resolution": 0.06517913808775261,
+          "wisdom_ratio": 1.3136622300454428,
+          "beat_rate": 30.580000000000002
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19834861181964045,
+        "brier_std": 0.1892864994627375,
+        "calibration": 0.05678594983882125,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.27297954197543006,
+        "brier_std": 0.26907521809352863,
+        "calibration": 0.13453760904676432,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.01373556717594801,
+        "Median": -0.0032090626695499558,
+        "BrierWeighted": -0.01373556717594801,
+        "Extremized": -0.009451792068037007
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.13697214990029888
+        },
+        "Median": {
+          "p_value": 0.1321273213741967,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.021294746386770085
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.13697214990029888
+        },
+        "Extremized": {
+          "p_value": 2.1516483261763142e-08,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.0791932169529752
+        }
+      }
+    },
+    {
+      "agent_count": 100,
+      "diversity": 0.5,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20404856564721502,
+          "brier_std": 0.12789627841048926,
+          "brier_ci_lower": 0.2005034616777139,
+          "brier_ci_upper": 0.20759366961671613,
+          "calibration": 0.051158511364195705,
+          "resolution": 0.034898725782896906,
+          "wisdom_ratio": 1.171031468279146,
+          "beat_rate": 31.319999999999997
+        },
+        "Median": {
+          "brier_score": 0.19941783628495996,
+          "brier_std": 0.15623541853415507,
+          "brier_ci_lower": 0.1950872114278048,
+          "brier_ci_upper": 0.20374846114211512,
+          "calibration": 0.06249416741366203,
+          "resolution": 0.039529455145151965,
+          "wisdom_ratio": 1.1982242706147206,
+          "beat_rate": 34.599999999999994
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20404856564721502,
+          "brier_std": 0.12789627841048926,
+          "brier_ci_lower": 0.2005034616777139,
+          "brier_ci_upper": 0.20759366961671613,
+          "calibration": 0.051158511364195705,
+          "resolution": 0.034898725782896906,
+          "wisdom_ratio": 1.171031468279146,
+          "beat_rate": 31.319999999999997
+        },
+        "Extremized": {
+          "brier_score": 0.20046968378089902,
+          "brier_std": 0.15192909165650112,
+          "brier_ci_lower": 0.1962584242148819,
+          "brier_ci_upper": 0.20468094334691614,
+          "calibration": 0.06077163666260045,
+          "resolution": 0.0384776076492129,
+          "wisdom_ratio": 1.191937289087893,
+          "beat_rate": 34.160000000000004
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19656424237196193,
+        "brier_std": 0.1874398672625786,
+        "calibration": 0.056231960178773584,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.23894729143011192,
+        "brier_std": 0.21851630610455527,
+        "calibration": 0.10925815305227764,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.007484323275253085,
+        "Median": -0.002853593912998026,
+        "BrierWeighted": -0.007484323275253085,
+        "Extremized": -0.003905441408937088
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 3.507051789308768e-05,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.05851869474443806
+        },
+        "Median": {
+          "p_value": 0.19652712552056073,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.018264705530738497
+        },
+        "BrierWeighted": {
+          "p_value": 3.507051789308768e-05,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.05851869474443806
+        },
+        "Extremized": {
+          "p_value": 0.06911501996529301,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.02570568524010505
+        }
+      }
+    },
+    {
+      "agent_count": 100,
+      "diversity": 0.5,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.2016832014911325,
+          "brier_std": 0.15908030174601084,
+          "brier_ci_lower": 0.1972737204945145,
+          "brier_ci_upper": 0.2060926824877505,
+          "calibration": 0.06363212069840433,
+          "resolution": 0.016917517855829706,
+          "wisdom_ratio": 1.0838816407650764,
+          "beat_rate": 37.64
+        },
+        "Median": {
+          "brier_score": 0.20083104590145678,
+          "brier_std": 0.16869800885883948,
+          "brier_ci_lower": 0.19615497566481604,
+          "brier_ci_upper": 0.20550711613809752,
+          "calibration": 0.0674792035435358,
+          "resolution": 0.017769673445505424,
+          "wisdom_ratio": 1.088480709572287,
+          "beat_rate": 41.44
+        },
+        "BrierWeighted": {
+          "brier_score": 0.2016832014911325,
+          "brier_std": 0.15908030174601084,
+          "brier_ci_lower": 0.1972737204945145,
+          "brier_ci_upper": 0.2060926824877505,
+          "calibration": 0.06363212069840433,
+          "resolution": 0.016917517855829706,
+          "wisdom_ratio": 1.0838816407650764,
+          "beat_rate": 37.64
+        },
+        "Extremized": {
+          "brier_score": 0.20080434888020768,
+          "brier_std": 0.18891334461454629,
+          "brier_ci_lower": 0.19556793812449147,
+          "brier_ci_upper": 0.2060407596359239,
+          "calibration": 0.07556533784581852,
+          "resolution": 0.01779637046675453,
+          "wisdom_ratio": 1.0886254235328896,
+          "beat_rate": 47.760000000000005
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19707354536582558,
+        "brier_std": 0.18879044093046676,
+        "calibration": 0.05663713227914002,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.2186007193469622,
+        "brier_std": 0.1984283193723718,
+        "calibration": 0.0992141596861859,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.004609656125306921,
+        "Median": -0.003757500535631203,
+        "BrierWeighted": -0.004609656125306921,
+        "Extremized": -0.0037308035143820972
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.04046421100560016,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.02897691338721964
+        },
+        "Median": {
+          "p_value": 0.11526186799613569,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.022273532219193804
+        },
+        "BrierWeighted": {
+          "p_value": 0.04046421100560016,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.02897691338721964
+        },
+        "Extremized": {
+          "p_value": 0.16257976498144244,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.019748755822381572
+        }
+      }
+    },
+    {
+      "agent_count": 100,
+      "diversity": 0.8,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.209002964200299,
+          "brier_std": 0.09913812347006135,
+          "brier_ci_lower": 0.20625499561661126,
+          "brier_ci_upper": 0.21175093278398677,
+          "calibration": 0.03965524938802454,
+          "resolution": 0.06364925506317365,
+          "wisdom_ratio": 1.3045375710660978,
+          "beat_rate": 30.080000000000002
+        },
+        "Median": {
+          "brier_score": 0.198822925660011,
+          "brier_std": 0.14586923875875704,
+          "brier_ci_lower": 0.1947796366466118,
+          "brier_ci_upper": 0.2028662146734102,
+          "calibration": 0.05834769550350282,
+          "resolution": 0.07382929360346166,
+          "wisdom_ratio": 1.3713318942389492,
+          "beat_rate": 30.94
+        },
+        "BrierWeighted": {
+          "brier_score": 0.209002964200299,
+          "brier_std": 0.09913812347006135,
+          "brier_ci_lower": 0.20625499561661126,
+          "brier_ci_upper": 0.21175093278398677,
+          "calibration": 0.03965524938802454,
+          "resolution": 0.06364925506317365,
+          "wisdom_ratio": 1.3045375710660978,
+          "beat_rate": 30.080000000000002
+        },
+        "Extremized": {
+          "brier_score": 0.20416736487090195,
+          "brier_std": 0.11780957205368404,
+          "brier_ci_lower": 0.20090185013721842,
+          "brier_ci_upper": 0.20743287960458548,
+          "calibration": 0.04712382882147362,
+          "resolution": 0.06848485439257071,
+          "wisdom_ratio": 1.3354348744025506,
+          "beat_rate": 30.520000000000003
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.1948527591349988,
+        "brier_std": 0.18788359446874794,
+        "calibration": 0.05636507834062438,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.27265221926347266,
+        "brier_std": 0.27291024424953614,
+        "calibration": 0.13645512212476807,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.014150205065300209,
+        "Median": -0.003970166525012198,
+        "BrierWeighted": -0.014150205065300209,
+        "Extremized": -0.009314605735903148
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.1427322262113769
+        },
+        "Median": {
+          "p_value": 0.054285094882389195,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.027217297894987846
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.1427322262113769
+        },
+        "Extremized": {
+          "p_value": 2.267101306685504e-08,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.07906493142729203
+        }
+      }
+    },
+    {
+      "agent_count": 100,
+      "diversity": 0.8,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20595531515546622,
+          "brier_std": 0.12708400700063996,
+          "brier_ci_lower": 0.20243272620075017,
+          "brier_ci_upper": 0.20947790411018227,
+          "calibration": 0.050833602800255985,
+          "resolution": 0.03888936775926871,
+          "wisdom_ratio": 1.1888242977847545,
+          "beat_rate": 31.259999999999998
+        },
+        "Median": {
+          "brier_score": 0.20167704168743927,
+          "brier_std": 0.15382842752514772,
+          "brier_ci_lower": 0.1974131352171413,
+          "brier_ci_upper": 0.20594094815773725,
+          "calibration": 0.061531371010059094,
+          "resolution": 0.04316764122729566,
+          "wisdom_ratio": 1.2140434075495674,
+          "beat_rate": 34.260000000000005
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20595531515546622,
+          "brier_std": 0.12708400700063996,
+          "brier_ci_lower": 0.20243272620075017,
+          "brier_ci_upper": 0.20947790411018227,
+          "calibration": 0.050833602800255985,
+          "resolution": 0.03888936775926871,
+          "wisdom_ratio": 1.1888242977847545,
+          "beat_rate": 31.259999999999998
+        },
+        "Extremized": {
+          "brier_score": 0.20260832207556012,
+          "brier_std": 0.15099639726142708,
+          "brier_ci_lower": 0.19842291547917904,
+          "brier_ci_upper": 0.2067937286719412,
+          "calibration": 0.06039855890457083,
+          "resolution": 0.042236360839174814,
+          "wisdom_ratio": 1.2084631095430687,
+          "beat_rate": 33.4
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.1989877679717046,
+        "brier_std": 0.18939746434776852,
+        "calibration": 0.056819239304330554,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.24484468291473493,
+        "brier_std": 0.22774945730034787,
+        "calibration": 0.11387472865017394,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.006967547183761635,
+        "Median": -0.0026892737157346858,
+        "BrierWeighted": -0.006967547183761635,
+        "Extremized": -0.0036205541038555333
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.00010587749153856407,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.05482631015660805
+        },
+        "Median": {
+          "p_value": 0.21639000520832963,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.01748229348112556
+        },
+        "BrierWeighted": {
+          "p_value": 0.00010587749153856407,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.05482631015660805
+        },
+        "Extremized": {
+          "p_value": 0.08998376196134394,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.023977751585603065
+        }
+      }
+    },
+    {
+      "agent_count": 100,
+      "diversity": 0.8,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20751394940405551,
+          "brier_std": 0.1599164393255885,
+          "brier_ci_lower": 0.20308129185617854,
+          "brier_ci_upper": 0.2119466069519325,
+          "calibration": 0.0639665757302354,
+          "resolution": 0.0213916170540413,
+          "wisdom_ratio": 1.103085200370743,
+          "beat_rate": 36.22
+        },
+        "Median": {
+          "brier_score": 0.2068813051953992,
+          "brier_std": 0.1692948898950441,
+          "brier_ci_lower": 0.2021886902605306,
+          "brier_ci_upper": 0.21157392013026782,
+          "calibration": 0.06771795595801765,
+          "resolution": 0.022024261262697603,
+          "wisdom_ratio": 1.1064584411911733,
+          "beat_rate": 39.42
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20751394940405551,
+          "brier_std": 0.1599164393255885,
+          "brier_ci_lower": 0.20308129185617854,
+          "brier_ci_upper": 0.2119466069519325,
+          "calibration": 0.0639665757302354,
+          "resolution": 0.0213916170540413,
+          "wisdom_ratio": 1.103085200370743,
+          "beat_rate": 36.22
+        },
+        "Extremized": {
+          "brier_score": 0.2074979432809223,
+          "brier_std": 0.19016009484740098,
+          "brier_ci_lower": 0.20222697437187748,
+          "brier_ci_upper": 0.21276891218996713,
+          "calibration": 0.0760640379389604,
+          "resolution": 0.021407623177174512,
+          "wisdom_ratio": 1.1031702909372536,
+          "beat_rate": 45.76
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.20162432538639485,
+        "brier_std": 0.1904010161866535,
+        "calibration": 0.05712030485599605,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.22890556645809682,
+        "brier_std": 0.21034467641751353,
+        "calibration": 0.10517233820875677,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.005889624017660661,
+        "Median": -0.0052569798090043585,
+        "BrierWeighted": -0.005889624017660661,
+        "Extremized": -0.00587361789452745
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.009208143376401079,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.03682938441162661
+        },
+        "Median": {
+          "p_value": 0.028111710588107908,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.031052206078183875
+        },
+        "BrierWeighted": {
+          "p_value": 0.009208143376401079,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.03682938441162661
+        },
+        "Extremized": {
+          "p_value": 0.02895524685096218,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.030887752234457447
+        }
+      }
+    },
+    {
+      "agent_count": 500,
+      "diversity": 0.2,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20698071410657914,
+          "brier_std": 0.09559149646136154,
+          "brier_ci_lower": 0.2043310530080125,
+          "brier_ci_upper": 0.2096303752051458,
+          "calibration": 0.03823659858454462,
+          "resolution": 0.06079810703673588,
+          "wisdom_ratio": 1.293738029164541,
+          "beat_rate": 28.299999999999997
+        },
+        "Median": {
+          "brier_score": 0.19460102925094377,
+          "brier_std": 0.14428226681493833,
+          "brier_ci_lower": 0.19060172885556723,
+          "brier_ci_upper": 0.19860032964632032,
+          "calibration": 0.05771290672597534,
+          "resolution": 0.07317779189237125,
+          "wisdom_ratio": 1.376040107156917,
+          "beat_rate": 28.62
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20698071410657914,
+          "brier_std": 0.09559149646136154,
+          "brier_ci_lower": 0.2043310530080125,
+          "brier_ci_upper": 0.2096303752051458,
+          "calibration": 0.03823659858454462,
+          "resolution": 0.06079810703673588,
+          "wisdom_ratio": 1.293738029164541,
+          "beat_rate": 28.299999999999997
+        },
+        "Extremized": {
+          "brier_score": 0.2015814284038907,
+          "brier_std": 0.11361562414914804,
+          "brier_ci_lower": 0.1984321639751342,
+          "brier_ci_upper": 0.20473069283264722,
+          "calibration": 0.04544624965965922,
+          "resolution": 0.06619739273942432,
+          "wisdom_ratio": 1.3283903346829675,
+          "beat_rate": 28.54
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.1902559157996171,
+        "brier_std": 0.1838535601178663,
+        "calibration": 0.05515606803535989,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.267778821143315,
+        "brier_std": 0.2666305245277555,
+        "calibration": 0.13331526226387774,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.016724798306962052,
+        "Median": -0.004345113451326682,
+        "BrierWeighted": -0.016724798306962052,
+        "Extremized": -0.011325512604273613
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.17496115163049342
+        },
+        "Median": {
+          "p_value": 0.03321461207585319,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.030115367239827762
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.17496115163049342
+        },
+        "Extremized": {
+          "p_value": 1.8189894035458565e-12,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.0996827037574175
+        }
+      }
+    },
+    {
+      "agent_count": 500,
+      "diversity": 0.2,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.2041571194451315,
+          "brier_std": 0.12785106118237297,
+          "brier_ci_lower": 0.2006132688332486,
+          "brier_ci_upper": 0.20770097005701443,
+          "calibration": 0.05114042447294919,
+          "resolution": 0.03458822480851534,
+          "wisdom_ratio": 1.169419635732131,
+          "beat_rate": 30.78
+        },
+        "Median": {
+          "brier_score": 0.1998297509656818,
+          "brier_std": 0.15411403214186462,
+          "brier_ci_lower": 0.19555792793930407,
+          "brier_ci_upper": 0.20410157399205955,
+          "calibration": 0.06164561285674585,
+          "resolution": 0.03891559328796504,
+          "wisdom_ratio": 1.194743741109142,
+          "beat_rate": 31.979999999999997
+        },
+        "BrierWeighted": {
+          "brier_score": 0.2041571194451315,
+          "brier_std": 0.12785106118237297,
+          "brier_ci_lower": 0.2006132688332486,
+          "brier_ci_upper": 0.20770097005701443,
+          "calibration": 0.05114042447294919,
+          "resolution": 0.03458822480851534,
+          "wisdom_ratio": 1.169419635732131,
+          "beat_rate": 30.78
+        },
+        "Extremized": {
+          "brier_score": 0.20059922224545804,
+          "brier_std": 0.15183315336352135,
+          "brier_ci_lower": 0.19639062195324855,
+          "brier_ci_upper": 0.20480782253766752,
+          "calibration": 0.060733261345408546,
+          "resolution": 0.038146122008188815,
+          "wisdom_ratio": 1.1901608669325363,
+          "beat_rate": 32.62
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.1965356987193241,
+        "brier_std": 0.18836686484319579,
+        "calibration": 0.056510059452958734,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.23874534425364685,
+        "brier_std": 0.21758606757571142,
+        "calibration": 0.10879303378785571,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.007621420725807404,
+        "Median": -0.0032940522463577038,
+        "BrierWeighted": -0.007621420725807404,
+        "Extremized": -0.0040635235261339275
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 2.4973336909539512e-05,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.059611712686027996
+        },
+        "Median": {
+          "p_value": 0.13069204163524795,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.02137412278802408
+        },
+        "BrierWeighted": {
+          "p_value": 2.4973336909539512e-05,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.059611712686027996
+        },
+        "Extremized": {
+          "p_value": 0.05843280152361796,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.02676308458406956
+        }
+      }
+    },
+    {
+      "agent_count": 500,
+      "diversity": 0.2,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.19945834389463343,
+          "brier_std": 0.1565190488815321,
+          "brier_ci_lower": 0.19511985720535263,
+          "brier_ci_upper": 0.20379683058391423,
+          "calibration": 0.06260761955261283,
+          "resolution": 0.01627661054726237,
+          "wisdom_ratio": 1.0816040594213532,
+          "beat_rate": 37.28
+        },
+        "Median": {
+          "brier_score": 0.19864634156326882,
+          "brier_std": 0.16278684985670963,
+          "brier_ci_lower": 0.19413412029473914,
+          "brier_ci_upper": 0.2031585628317985,
+          "calibration": 0.06511473994268385,
+          "resolution": 0.01708861287862698,
+          "wisdom_ratio": 1.086025308818407,
+          "beat_rate": 40.58
+        },
+        "BrierWeighted": {
+          "brier_score": 0.19945834389463343,
+          "brier_std": 0.1565190488815321,
+          "brier_ci_lower": 0.19511985720535263,
+          "brier_ci_upper": 0.20379683058391423,
+          "calibration": 0.06260761955261283,
+          "resolution": 0.01627661054726237,
+          "wisdom_ratio": 1.0816040594213532,
+          "beat_rate": 37.28
+        },
+        "Extremized": {
+          "brier_score": 0.19808369319110994,
+          "brier_std": 0.18562662399220672,
+          "brier_ci_lower": 0.19293838568303867,
+          "brier_ci_upper": 0.2032290006991812,
+          "calibration": 0.0742506495968827,
+          "resolution": 0.017651261250785866,
+          "wisdom_ratio": 1.0891101178821219,
+          "beat_rate": 47.86
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19421321067293248,
+        "brier_std": 0.18506292423942605,
+        "calibration": 0.05551887727182781,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.2157349544418958,
+        "brier_std": 0.19424918817887088,
+        "calibration": 0.09712459408943544,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.005245133221700948,
+        "Median": -0.00443313089033634,
+        "BrierWeighted": -0.005245133221700948,
+        "Extremized": -0.003870482518177454
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.01780750005325249,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03351114934049302
+        },
+        "Median": {
+          "p_value": 0.054148574240358016,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.027232733444000717
+        },
+        "BrierWeighted": {
+          "p_value": 0.01780750005325249,
+          "significant_at_05": true,
+          "significant_at_01": false,
+          "effect_size": -0.03351114934049302
+        },
+        "Extremized": {
+          "p_value": 0.1403790007029393,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.02085090185306581
+        }
+      }
+    },
+    {
+      "agent_count": 500,
+      "diversity": 0.5,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20841082373252104,
+          "brier_std": 0.0972260085732571,
+          "brier_ci_lower": 0.20571585626970287,
+          "brier_ci_upper": 0.2111057911953392,
+          "calibration": 0.03889040342930284,
+          "resolution": 0.06131906345820673,
+          "wisdom_ratio": 1.294222067549164,
+          "beat_rate": 29.48
+        },
+        "Median": {
+          "brier_score": 0.19640292044337063,
+          "brier_std": 0.14888321231623716,
+          "brier_ci_lower": 0.19227608834525164,
+          "brier_ci_upper": 0.2005297525414896,
+          "calibration": 0.059553284926494865,
+          "resolution": 0.07332696674735714,
+          "wisdom_ratio": 1.3733496761750021,
+          "beat_rate": 29.42
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20841082373252104,
+          "brier_std": 0.0972260085732571,
+          "brier_ci_lower": 0.20571585626970287,
+          "brier_ci_upper": 0.2111057911953392,
+          "calibration": 0.03889040342930284,
+          "resolution": 0.06131906345820673,
+          "wisdom_ratio": 1.294222067549164,
+          "beat_rate": 29.48
+        },
+        "Extremized": {
+          "brier_score": 0.20331799055855235,
+          "brier_std": 0.11569708958954301,
+          "brier_ci_lower": 0.20011103085134965,
+          "brier_ci_upper": 0.20652495026575504,
+          "calibration": 0.04627883583581721,
+          "resolution": 0.06641189663217542,
+          "wisdom_ratio": 1.3266405321522683,
+          "beat_rate": 29.54
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.1931765614186882,
+        "brier_std": 0.18783386189460732,
+        "calibration": 0.05635015856838219,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.26972988719072777,
+        "brier_std": 0.26856777564384765,
+        "calibration": 0.13428388782192383,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.015234262313832847,
+        "Median": -0.0032263590246824347,
+        "BrierWeighted": -0.015234262313832847,
+        "Extremized": -0.010141429139864155
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.15668916720317952
+        },
+        "Median": {
+          "p_value": 0.12544135736619566,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.021670401749724802
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.15668916720317952
+        },
+        "Extremized": {
+          "p_value": 5.736611186080154e-10,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.08765500649880446
+        }
+      }
+    },
+    {
+      "agent_count": 500,
+      "diversity": 0.5,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20417261148099614,
+          "brier_std": 0.12771271030174253,
+          "brier_ci_lower": 0.20063259575987158,
+          "brier_ci_upper": 0.2077126272021207,
+          "calibration": 0.05108508412069701,
+          "resolution": 0.03548906207540173,
+          "wisdom_ratio": 1.1738189163471857,
+          "beat_rate": 30.28
+        },
+        "Median": {
+          "brier_score": 0.19963028461326304,
+          "brier_std": 0.15731870602810005,
+          "brier_ci_lower": 0.1952696325587365,
+          "brier_ci_upper": 0.20399093666778959,
+          "calibration": 0.06292748241124002,
+          "resolution": 0.04003138894313482,
+          "wisdom_ratio": 1.2005276354771837,
+          "beat_rate": 32.6
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20417261148099614,
+          "brier_std": 0.12771271030174253,
+          "brier_ci_lower": 0.20063259575987158,
+          "brier_ci_upper": 0.2077126272021207,
+          "calibration": 0.05108508412069701,
+          "resolution": 0.03548906207540173,
+          "wisdom_ratio": 1.1738189163471857,
+          "beat_rate": 30.28
+        },
+        "Extremized": {
+          "brier_score": 0.20056375872831206,
+          "brier_std": 0.15178287990187356,
+          "brier_ci_lower": 0.19635655194536383,
+          "brier_ci_upper": 0.20477096551126028,
+          "calibration": 0.060713151960749424,
+          "resolution": 0.039097914828085806,
+          "wisdom_ratio": 1.1949400782872677,
+          "beat_rate": 32.28
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19713545463166426,
+        "brier_std": 0.19082529253538966,
+        "calibration": 0.05724758776061689,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.23966167355639786,
+        "brier_std": 0.21983660289635926,
+        "calibration": 0.10991830144817963,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.0070371568493318715,
+        "Median": -0.0024948299815987784,
+        "BrierWeighted": -0.0070371568493318715,
+        "Extremized": -0.003428304096647794
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 9.77275741120831e-05,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.05510146040049904
+        },
+        "Median": {
+          "p_value": 0.2621341722817383,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.015858444584162516
+        },
+        "BrierWeighted": {
+          "p_value": 9.77275741120831e-05,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.05510146040049904
+        },
+        "Extremized": {
+          "p_value": 0.11023568112657278,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.022586895826882225
+        }
+      }
+    },
+    {
+      "agent_count": 500,
+      "diversity": 0.5,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20670126657662485,
+          "brier_std": 0.15961206513106485,
+          "brier_ci_lower": 0.20227704585098094,
+          "brier_ci_upper": 0.21112548730226877,
+          "calibration": 0.06384482605242595,
+          "resolution": 0.01704714730086443,
+          "wisdom_ratio": 1.0824723891788297,
+          "beat_rate": 38.92
+        },
+        "Median": {
+          "brier_score": 0.2060876966219534,
+          "brier_std": 0.16947863288748577,
+          "brier_ci_lower": 0.20138998859117951,
+          "brier_ci_upper": 0.21078540465272727,
+          "calibration": 0.06779145315499431,
+          "resolution": 0.01766071725553589,
+          "wisdom_ratio": 1.0856951557274797,
+          "beat_rate": 42.5
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20670126657662485,
+          "brier_std": 0.15961206513106485,
+          "brier_ci_lower": 0.20227704585098094,
+          "brier_ci_upper": 0.21112548730226877,
+          "calibration": 0.06384482605242595,
+          "resolution": 0.01704714730086443,
+          "wisdom_ratio": 1.0824723891788297,
+          "beat_rate": 38.92
+        },
+        "Extremized": {
+          "brier_score": 0.20657045343735914,
+          "brier_std": 0.1897205452045875,
+          "brier_ci_lower": 0.20131166822281188,
+          "brier_ci_upper": 0.2118292386519064,
+          "calibration": 0.075888218081835,
+          "resolution": 0.017177960440130147,
+          "wisdom_ratio": 1.0831578773938222,
+          "beat_rate": 48.68
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.20333245037466227,
+        "brier_std": 0.18905956133942695,
+        "calibration": 0.05671786840182808,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.22374841387748928,
+        "brier_std": 0.19979896675667475,
+        "calibration": 0.09989948337833737,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.0033688162019625822,
+        "Median": -0.002755246247291121,
+        "BrierWeighted": -0.0033688162019625822,
+        "Extremized": -0.0032380030626968648
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.13558414928601592,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.02110627538836924
+        },
+        "Median": {
+          "p_value": 0.25032653474542776,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.016257189477804475
+        },
+        "BrierWeighted": {
+          "p_value": 0.13558414928601592,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.02110627538836924
+        },
+        "Extremized": {
+          "p_value": 0.2274958290596838,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.017067224106936462
+        }
+      }
+    },
+    {
+      "agent_count": 500,
+      "diversity": 0.8,
+      "correlation": 0.0,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.2092821302404637,
+          "brier_std": 0.0962681170711702,
+          "brier_ci_lower": 0.20661371417545477,
+          "brier_ci_upper": 0.2119505463054726,
+          "calibration": 0.03850724682846808,
+          "resolution": 0.06419085478116279,
+          "wisdom_ratio": 1.3067192344965524,
+          "beat_rate": 29.38
+        },
+        "Median": {
+          "brier_score": 0.19797592927419164,
+          "brier_std": 0.14425668087248292,
+          "brier_ci_lower": 0.1939773380849569,
+          "brier_ci_upper": 0.20197452046342637,
+          "calibration": 0.05770267234899317,
+          "resolution": 0.07549705574743484,
+          "wisdom_ratio": 1.3813446211578244,
+          "beat_rate": 29.459999999999997
+        },
+        "BrierWeighted": {
+          "brier_score": 0.2092821302404637,
+          "brier_std": 0.0962681170711702,
+          "brier_ci_lower": 0.20661371417545477,
+          "brier_ci_upper": 0.2119505463054726,
+          "calibration": 0.03850724682846808,
+          "resolution": 0.06419085478116279,
+          "wisdom_ratio": 1.3067192344965524,
+          "beat_rate": 29.38
+        },
+        "Extremized": {
+          "brier_score": 0.20428287317832822,
+          "brier_std": 0.11454886964812443,
+          "brier_ci_lower": 0.20110774050411487,
+          "brier_ci_upper": 0.20745800585254157,
+          "calibration": 0.04581954785924977,
+          "resolution": 0.06919011184329826,
+          "wisdom_ratio": 1.3386975656197029,
+          "beat_rate": 29.34
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19424831606077517,
+        "brier_std": 0.187123675064381,
+        "calibration": 0.056137102519314294,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.2734729850216265,
+        "brier_std": 0.2732579834960393,
+        "calibration": 0.13662899174801965,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.01503381417968852,
+        "Median": -0.0037276132134164697,
+        "BrierWeighted": -0.01503381417968852,
+        "Extremized": -0.01003455711755305
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.1561660769637174
+        },
+        "Median": {
+          "p_value": 0.0676734962247052,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.025840142660093015
+        },
+        "BrierWeighted": {
+          "p_value": 0.0,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.1561660769637174
+        },
+        "Extremized": {
+          "p_value": 5.878248998669733e-10,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.08760066466284289
+        }
+      }
+    },
+    {
+      "agent_count": 500,
+      "diversity": 0.8,
+      "correlation": 0.3,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20558465954100397,
+          "brier_std": 0.12650551366239365,
+          "brier_ci_lower": 0.20207810560353187,
+          "brier_ci_upper": 0.20909121347847606,
+          "calibration": 0.050602205464957466,
+          "resolution": 0.03945600166276769,
+          "wisdom_ratio": 1.1919209426951343,
+          "beat_rate": 31.6
+        },
+        "Median": {
+          "brier_score": 0.20131382672760625,
+          "brier_std": 0.1536229457909183,
+          "brier_ci_lower": 0.19705561592039347,
+          "brier_ci_upper": 0.20557203753481904,
+          "calibration": 0.06144917831636733,
+          "resolution": 0.043726834476165405,
+          "wisdom_ratio": 1.2172073085438455,
+          "beat_rate": 33.22
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20558465954100397,
+          "brier_std": 0.12650551366239365,
+          "brier_ci_lower": 0.20207810560353187,
+          "brier_ci_upper": 0.20909121347847606,
+          "calibration": 0.050602205464957466,
+          "resolution": 0.03945600166276769,
+          "wisdom_ratio": 1.1919209426951343,
+          "beat_rate": 31.6
+        },
+        "Extremized": {
+          "brier_score": 0.2020994402742298,
+          "brier_std": 0.15035816509670374,
+          "brier_ci_lower": 0.1979317245708813,
+          "brier_ci_upper": 0.2062671559775783,
+          "calibration": 0.0601432660386815,
+          "resolution": 0.04294122092954186,
+          "wisdom_ratio": 1.2124757043922274,
+          "beat_rate": 33.52
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.19910807794992044,
+        "brier_std": 0.1900785205344599,
+        "calibration": 0.05702355616033797,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.24504066120377166,
+        "brier_std": 0.22823596918660743,
+        "calibration": 0.11411798459330372,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.0064765815910835245,
+        "Median": -0.002205748777685812,
+        "BrierWeighted": -0.0064765815910835245,
+        "Extremized": -0.0029913623243093546
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.00029455285675394904,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.05119604200309904
+        },
+        "Median": {
+          "p_value": 0.30997337637292244,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.014358198681386103
+        },
+        "BrierWeighted": {
+          "p_value": 0.00029455285675394904,
+          "significant_at_05": true,
+          "significant_at_01": true,
+          "effect_size": -0.05119604200309904
+        },
+        "Extremized": {
+          "p_value": 0.15949195420764073,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.019894911077063506
+        }
+      }
+    },
+    {
+      "agent_count": 500,
+      "diversity": 0.8,
+      "correlation": 0.6,
+      "method_results": {
+        "SimpleMean": {
+          "brier_score": 0.20096398448811442,
+          "brier_std": 0.15590524354370752,
+          "brier_ci_lower": 0.19664251161476842,
+          "brier_ci_upper": 0.20528545736146042,
+          "calibration": 0.06236209741748301,
+          "resolution": 0.021594606057100396,
+          "wisdom_ratio": 1.1074551050134933,
+          "beat_rate": 38.14
+        },
+        "Median": {
+          "brier_score": 0.20001490999108684,
+          "brier_std": 0.16522327533080658,
+          "brier_ci_lower": 0.19543515445395324,
+          "brier_ci_upper": 0.20459466552822045,
+          "calibration": 0.06608931013232264,
+          "resolution": 0.022543680554127976,
+          "wisdom_ratio": 1.1127100002451447,
+          "beat_rate": 41.68
+        },
+        "BrierWeighted": {
+          "brier_score": 0.20096398448811442,
+          "brier_std": 0.15590524354370752,
+          "brier_ci_lower": 0.19664251161476842,
+          "brier_ci_upper": 0.20528545736146042,
+          "calibration": 0.06236209741748301,
+          "resolution": 0.021594606057100396,
+          "wisdom_ratio": 1.1074551050134933,
+          "beat_rate": 38.14
+        },
+        "Extremized": {
+          "brier_score": 0.19957961546403863,
+          "brier_std": 0.18523955835827777,
+          "brier_ci_lower": 0.19444503686796036,
+          "brier_ci_upper": 0.2047141940601169,
+          "calibration": 0.0740958233433111,
+          "resolution": 0.02297897508117619,
+          "wisdom_ratio": 1.115136884234135,
+          "beat_rate": 47.68
+        }
+      },
+      "expert_baseline": {
+        "brier_score": 0.1972430313963122,
+        "brier_std": 0.18819403461765807,
+        "calibration": 0.05645821038529742,
+        "resolution": 0.05
+      },
+      "individual_baseline": {
+        "brier_score": 0.22255859054521482,
+        "brier_std": 0.2066300704795754,
+        "calibration": 0.1033150352397877,
+        "resolution": 0.03
+      },
+      "beats_expert": {
+        "SimpleMean": false,
+        "Median": false,
+        "BrierWeighted": false,
+        "Extremized": false
+      },
+      "beats_expert_margin": {
+        "SimpleMean": -0.0037209530918022315,
+        "Median": -0.0027718785947746516,
+        "BrierWeighted": -0.0037209530918022315,
+        "Extremized": -0.0023365840677264382
+      },
+      "statistical_significance": {
+        "SimpleMean": {
+          "p_value": 0.09148130022903667,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.023866760393848295
+        },
+        "Median": {
+          "p_value": 0.23551103660347295,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.016776562437857828
+        },
+        "BrierWeighted": {
+          "p_value": 0.09148130022903667,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.023866760393848295
+        },
+        "Extremized": {
+          "p_value": 0.37242829222613594,
+          "significant_at_05": false,
+          "significant_at_01": false,
+          "effect_size": -0.012613850348353649
+        }
+      }
+    }
+  ],
+  "summary": {
+    "best_method": "Median",
+    "best_method_avg_brier": 0.20212320703138018,
+    "optimal_conditions": {
+      "min_agents_for_effectiveness": 10,
+      "optimal_diversity": 0.2,
+      "max_correlation_tolerance": 0.0,
+      "conditions_where_aggregation_fails": []
+    },
+    "expert_comparison": {
+      "aggregate_beats_expert_rate": 0.0,
+      "best_method_vs_expert": "Median beats expert in 0.0% of conditions",
+      "conditions_where_expert_wins": [
+        "agents=10, diversity=0.2, correlation=0.0",
+        "agents=10, diversity=0.2, correlation=0.3",
+        "agents=10, diversity=0.2, correlation=0.6",
+        "agents=10, diversity=0.5, correlation=0.0",
+        "agents=10, diversity=0.5, correlation=0.3"
+      ],
+      "avg_improvement_over_expert": -0.005012897687404245
+    },
+    "key_findings": [
+      "Median is the most effective aggregation method overall across all conditions tested.",
+      "A minimum of 10 agents is required for crowd aggregation to consistently outperform individual predictions.",
+      "Diversity level of 0.2 provides optimal aggregation performance. Too low diversity (0.2) results in correlated errors.",
+      "High correlation between predictions significantly degrades aggregation effectiveness.",
+      "Expert predictions outperform crowd aggregation in most conditions, suggesting limited wisdom of crowds effect in this setup.",
+      "Extremized aggregation shows particular strength with high-diversity crowds, effectively counteracting regression to the mean."
+    ],
+    "method_rankings": {
+      "by_low_diversity": [
+        "Median",
+        "Extremized",
+        "SimpleMean",
+        "BrierWeighted"
+      ],
+      "by_high_diversity": [
+        "Median",
+        "Extremized",
+        "SimpleMean",
+        "BrierWeighted"
+      ],
+      "by_low_correlation": [
+        "Median",
+        "Extremized",
+        "SimpleMean",
+        "BrierWeighted"
+      ],
+      "by_high_correlation": [
+        "Extremized",
+        "Median",
+        "SimpleMean",
+        "BrierWeighted"
+      ],
+      "by_small_crowd": [
+        "Median",
+        "Extremized",
+        "SimpleMean",
+        "BrierWeighted"
+      ],
+      "by_large_crowd": [
+        "Median",
+        "Extremized",
+        "SimpleMean",
+        "BrierWeighted"
+      ]
+    }
+  }
+}

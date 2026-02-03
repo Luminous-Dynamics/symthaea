@@ -1,0 +1,21 @@
+---
+manifest_version: "0"
+name: civic
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: civic_knowledge_integrity
+      path: ../target/wasm32-unknown-unknown/release/civic_knowledge_integrity.wasm
+    - name: agent_reputation_integrity
+      path: ../target/wasm32-unknown-unknown/release/agent_reputation_integrity.wasm
+coordinator:
+  zomes:
+    - name: civic_knowledge
+      path: ../target/wasm32-unknown-unknown/release/civic_knowledge_coordinator.wasm
+      dependencies:
+        - name: civic_knowledge_integrity
+    - name: agent_reputation
+      path: ../target/wasm32-unknown-unknown/release/agent_reputation_coordinator.wasm
+      dependencies:
+        - name: agent_reputation_integrity

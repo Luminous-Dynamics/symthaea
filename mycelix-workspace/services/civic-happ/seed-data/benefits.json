@@ -1,0 +1,69 @@
+[
+  {
+    "domain": "benefits",
+    "knowledge_type": "eligibility_rule",
+    "title": "SNAP (Food Stamps) Eligibility",
+    "content": "SNAP eligibility is based on gross monthly income at or below 130% of the federal poverty level ($1,580/month for a single person, $2,137 for a household of 2 as of 2024). Net income must be at or below 100% of the poverty level. Most households must also have assets below $2,750 ($4,250 if a member is aged 60+ or disabled). Apply online at your state's SNAP portal or in person at your local SNAP office.",
+    "geographic_scope": "United States",
+    "keywords": ["snap", "food stamps", "food assistance", "ebt", "income limits"],
+    "source": "USDA Food and Nutrition Service",
+    "links": ["https://www.fns.usda.gov/snap/recipient/eligibility"],
+    "contact_phone": "1-800-221-5689"
+  },
+  {
+    "domain": "benefits",
+    "knowledge_type": "eligibility_rule",
+    "title": "Medicaid Eligibility",
+    "content": "Medicaid provides free or low-cost health coverage. In states that expanded Medicaid, adults with income up to 138% of the federal poverty level ($20,783/year for an individual) qualify. Children, pregnant women, elderly, and disabled individuals may qualify at higher income levels. Apply through your state Medicaid agency or at HealthCare.gov during open enrollment.",
+    "geographic_scope": "United States",
+    "keywords": ["medicaid", "health insurance", "low income health", "healthcare"],
+    "source": "Centers for Medicare & Medicaid Services",
+    "links": ["https://www.medicaid.gov/medicaid/eligibility/index.html"],
+    "contact_phone": "1-877-267-2323"
+  },
+  {
+    "domain": "benefits",
+    "knowledge_type": "eligibility_rule",
+    "title": "TANF (Temporary Assistance for Needy Families)",
+    "content": "TANF provides temporary financial assistance to pregnant women and families with children. Eligibility varies by state but generally requires: household income below state threshold, children under 18 (or 19 if in school), US citizen or qualified non-citizen. TANF has a 60-month lifetime limit on federal benefits. Contact your local Department of Social Services to apply.",
+    "geographic_scope": "United States",
+    "keywords": ["tanf", "welfare", "cash assistance", "temporary assistance", "needy families"],
+    "source": "Administration for Children and Families",
+    "links": ["https://www.acf.hhs.gov/ofa/programs/tanf"],
+    "contact_phone": "1-202-401-9215"
+  },
+  {
+    "domain": "benefits",
+    "knowledge_type": "eligibility_rule",
+    "title": "WIC (Women, Infants, and Children)",
+    "content": "WIC provides supplemental foods, nutrition education, and healthcare referrals for low-income pregnant, breastfeeding, and postpartum women, and children up to age 5. Income must be at or below 185% of the federal poverty level ($2,248/month for a single person). Participants must be determined to be at nutritional risk by a health professional.",
+    "geographic_scope": "United States",
+    "keywords": ["wic", "women infants children", "nutrition", "baby food", "formula"],
+    "source": "USDA Food and Nutrition Service",
+    "links": ["https://www.fns.usda.gov/wic"],
+    "contact_phone": "1-800-311-2229"
+  },
+  {
+    "domain": "benefits",
+    "knowledge_type": "resource",
+    "title": "SSI (Supplemental Security Income)",
+    "content": "SSI provides monthly payments to adults and children with a disability or blindness who have limited income and resources, and to people age 65 and older without disabilities who meet the financial limits. The maximum federal SSI payment in 2024 is $943/month for an individual and $1,415 for a couple. Resources must be below $2,000 for individuals or $3,000 for couples.",
+    "geographic_scope": "United States",
+    "keywords": ["ssi", "supplemental security income", "disability", "social security"],
+    "source": "Social Security Administration",
+    "links": ["https://www.ssa.gov/ssi"],
+    "contact_phone": "1-800-772-1213"
+  },
+  {
+    "domain": "benefits",
+    "knowledge_type": "process",
+    "title": "How to Apply for Benefits - Texas",
+    "content": "In Texas, apply for SNAP, Medicaid, and TANF through the Texas Health and Human Services (HHS) website at YourTexasBenefits.com. You can also apply by calling 2-1-1, visiting a local HHS office, or mailing a completed application. Processing takes up to 30 days for SNAP (7 days for expedited) and 45 days for Medicaid. Bring ID, proof of income, and proof of residency.",
+    "geographic_scope": "Texas",
+    "keywords": ["apply", "texas benefits", "yourtexasbenefits", "hhs", "how to apply"],
+    "source": "Texas Health and Human Services",
+    "links": ["https://www.yourtexasbenefits.com"],
+    "contact_phone": "2-1-1",
+    "address": "Texas Health and Human Services, 4900 N. Lamar Blvd, Austin, TX 78751"
+  }
+]

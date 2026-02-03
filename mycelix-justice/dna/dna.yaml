@@ -1,0 +1,72 @@
+---
+# Mycelix Justice DNA Configuration
+# Decentralized Dispute Resolution for Mycelix Civilizational OS
+
+manifest_version: "0"
+name: mycelix_justice
+integrity:
+  network_seed: ~
+  properties:
+    # Mediation tier configuration
+    mediation:
+      timeout_days: 14
+      max_mediators: 3
+
+    # Arbitration tier configuration
+    arbitration:
+      juror_count: 5
+      selection_algorithm: "matl_weighted_random"
+      deliberation_days: 7
+      minimum_juror_trust: 0.4
+
+    # Appeal configuration
+    appeal:
+      appeal_window_days: 30
+      appeal_juror_count: 7
+      max_appeals: 2
+
+    # Evidence handling
+    evidence:
+      max_size_mb: 100
+      encryption_required: true
+      retention_years: 7
+
+    # MATL Integration
+    matl:
+      quality_weight: 0.4
+      consistency_weight: 0.3
+      reputation_weight: 0.3
+
+  zomes:
+    - name: mycelix_justice_integrity
+      path: ../target/wasm32-unknown-unknown/release/mycelix_justice_integrity.wasm
+
+    - name: justice_bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/justice_bridge_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: cases
+      path: ../target/wasm32-unknown-unknown/release/cases.wasm
+      dependencies:
+        - name: mycelix_justice_integrity
+
+    - name: arbitration
+      path: ../target/wasm32-unknown-unknown/release/arbitration.wasm
+      dependencies:
+        - name: mycelix_justice_integrity
+
+    - name: restorative
+      path: ../target/wasm32-unknown-unknown/release/restorative.wasm
+      dependencies:
+        - name: mycelix_justice_integrity
+
+    - name: enforcement
+      path: ../target/wasm32-unknown-unknown/release/enforcement.wasm
+      dependencies:
+        - name: mycelix_justice_integrity
+
+    - name: justice_bridge
+      path: ../target/wasm32-unknown-unknown/release/justice_bridge.wasm
+      dependencies:
+        - name: justice_bridge_integrity

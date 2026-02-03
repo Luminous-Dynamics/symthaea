@@ -1,0 +1,54 @@
+[
+  {
+    "domain": "voting",
+    "knowledge_type": "deadline",
+    "title": "Voter Registration Deadlines",
+    "content": "Most states require voter registration 15-30 days before an election. 21 states plus DC offer same-day registration. Online registration is available in 40 states plus DC. You can register at vote.gov, your state election website, or at your local DMV. Federal elections are held on the first Tuesday after the first Monday in November.",
+    "geographic_scope": "United States",
+    "keywords": ["voter registration", "register to vote", "deadline", "election"],
+    "source": "U.S. Election Assistance Commission",
+    "links": ["https://vote.gov", "https://www.eac.gov/voters/register-and-vote-in-your-state"]
+  },
+  {
+    "domain": "voting",
+    "knowledge_type": "faq",
+    "title": "Voter ID Requirements",
+    "content": "Voter ID requirements vary by state. Strict photo ID states (e.g., Georgia, Indiana, Tennessee) require government-issued photo ID. Some states accept non-photo ID like utility bills or bank statements. Other states request but do not require ID. If you lack ID, most states allow you to cast a provisional ballot. Check your state's requirements at vote.org/voter-id-laws.",
+    "geographic_scope": "United States",
+    "keywords": ["voter id", "identification", "photo id", "provisional ballot"],
+    "source": "National Conference of State Legislatures",
+    "links": ["https://www.vote.org/voter-id-laws/", "https://www.ncsl.org/elections-and-campaigns/voter-id"]
+  },
+  {
+    "domain": "voting",
+    "knowledge_type": "process",
+    "title": "Early Voting and Absentee Ballots",
+    "content": "Most states offer some form of early voting, typically 10-45 days before Election Day. All states allow absentee/mail-in voting, though some require an excuse. Five states (Colorado, Hawaii, Oregon, Utah, Washington) conduct elections entirely by mail. Request absentee ballots from your county election office or state election website. Return deadlines vary by state.",
+    "geographic_scope": "United States",
+    "keywords": ["early voting", "absentee ballot", "mail in voting", "vote by mail"],
+    "source": "National Conference of State Legislatures",
+    "links": ["https://www.ncsl.org/elections-and-campaigns/early-voting"]
+  },
+  {
+    "domain": "voting",
+    "knowledge_type": "contact_info",
+    "title": "Texas Voter Registration",
+    "content": "In Texas, the voter registration deadline is 30 days before an election. Texas requires one of seven forms of photo ID to vote in person. Acceptable IDs include Texas driver's license, Texas personal ID card, US military ID, US citizenship certificate with photo, US passport, or Texas Election ID Certificate (free from DPS). Early voting runs 17 days through 4 days before Election Day.",
+    "geographic_scope": "Texas",
+    "keywords": ["texas voting", "texas voter id", "texas registration", "texas early voting"],
+    "source": "Texas Secretary of State",
+    "links": ["https://www.votetexas.gov"],
+    "contact_phone": "1-800-252-8683"
+  },
+  {
+    "domain": "voting",
+    "knowledge_type": "resource",
+    "title": "Voting Accessibility and Assistance",
+    "content": "Under the Americans with Disabilities Act and the Voting Rights Act, all polling places must be accessible. Voters with disabilities can request assistance from a person of their choice (except their employer or union representative). Curbside voting is available at most polling locations. For language assistance, contact your local election office or call the Election Assistance Commission.",
+    "geographic_scope": "United States",
+    "keywords": ["accessible voting", "disability", "language assistance", "ada", "curbside voting"],
+    "source": "U.S. Election Assistance Commission",
+    "links": ["https://www.eac.gov/voters/voting-accessibility"],
+    "contact_phone": "1-866-747-1471"
+  }
+]

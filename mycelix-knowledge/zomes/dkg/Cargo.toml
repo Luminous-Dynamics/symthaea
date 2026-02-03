@@ -1,0 +1,23 @@
+[package]
+name = "dkg"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <dev@luminousdynamics.org>"]
+description = "DKG Coordinator Zome - Truth Engine interface for the Distributed Knowledge Graph"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "dkg"
+
+[dependencies]
+# Holochain
+hdk.workspace = true
+
+# Integrity zome types
+dkg_integrity = { path = "../dkg_integrity" }
+
+# Mycelix SDK (for confidence calculation)
+mycelix-sdk = { path = "../../../mycelix-workspace/sdk", default-features = false, features = ["holochain"] }
+
+# Serialization
+serde.workspace = true

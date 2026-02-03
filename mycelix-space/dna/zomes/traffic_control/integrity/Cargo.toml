@@ -1,0 +1,16 @@
+[package]
+name = "traffic_control_integrity"
+version = "0.1.0"
+edition = "2021"
+description = "Integrity zome for automated space traffic coordination"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "traffic_control_integrity"
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+mycelix-space-shared = { path = "../../../../zomes/shared" }
+getrandom = { workspace = true }
