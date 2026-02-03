@@ -26,7 +26,7 @@ integrity:
     - name: grid_integrity
       path: ../target/wasm32-unknown-unknown/release/grid_integrity.wasm
     - name: energy_bridge_integrity
-      path: ../zomes/bridge/integrity/target/wasm32-unknown-unknown/release/energy_bridge_integrity.wasm
+      path: ../target/wasm32-unknown-unknown/release/energy_bridge_integrity.wasm
 
 coordinator:
   zomes:
@@ -51,6 +51,6 @@ coordinator:
         - name: grid_integrity
         - name: projects_integrity
     - name: energy_bridge
-      path: ../zomes/bridge/coordinator/target/wasm32-unknown-unknown/release/energy_bridge.wasm
+      path: ../target/wasm32-unknown-unknown/release/energy_bridge.wasm
       dependencies:
         - name: energy_bridge_integrity

@@ -29,8 +29,6 @@ integrity:
       path: ../target/wasm32-unknown-unknown/release/disputes_integrity.wasm
     - name: commons_integrity
       path: ../target/wasm32-unknown-unknown/release/commons_integrity.wasm
-    - name: property_bridge_integrity
-      path: ../zomes/bridge/integrity/target/wasm32-unknown-unknown/release/property_bridge_integrity.wasm
 
 coordinator:
   zomes:
@@ -53,7 +51,3 @@ coordinator:
       dependencies:
         - name: commons_integrity
         - name: registry_integrity
-    - name: property_bridge
-      path: ../zomes/bridge/coordinator/target/wasm32-unknown-unknown/release/property_bridge.wasm
-      dependencies:
-        - name: property_bridge_integrity
