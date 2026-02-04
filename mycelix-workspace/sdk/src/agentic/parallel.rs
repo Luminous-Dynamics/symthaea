@@ -17,7 +17,7 @@ use std::sync::Arc;
 use crate::matl::KVector;
 use super::{
     InstrumentalActor, AgentId, AgentStatus, AgentClass, AgentConstraints,
-    EpistemicStats, BehaviorLogEntry, ActionOutcome,
+    EpistemicStats, BehaviorLogEntry, ActionOutcome, UncertaintyCalibration,
     adversarial::{GamingDetector, GamingDetectionConfig, SybilDetector, QuarantineManager, QuarantineReason},
 };
 
@@ -398,13 +398,14 @@ impl ParallelSimEngine {
             .flat_map(|chunk| {
                 chunk.iter().map(|(id, behavior)| {
                     let mut entries = Vec::new();
-                    let mut rng = fastrand::Rng::new();
+                    use rand::Rng;
+                    let mut rng = rand::thread_rng();
 
-                    let actions = (behavior.activity_rate + rng.f64() * 0.5) as usize;
+                    let actions = (behavior.activity_rate + rng.gen::<f64>() * 0.5) as usize;
 
                     for _ in 0..actions.min(5) {
-                        let success_roll = rng.f64();
-                        let threshold_variance = rng.f64();
+                        let success_roll: f64 = rng.gen();
+                        let threshold_variance: f64 = rng.gen();
 
                         let threshold = behavior.success_rate +
                             (threshold_variance - 0.5) * behavior.success_variance * 2.0;
@@ -530,6 +531,8 @@ pub struct KVectorBatch {
     k_s: Vec<f32>,
     k_h: Vec<f32>,
     k_topo: Vec<f32>,
+    k_v: Vec<f32>,
+    k_phi: Vec<f32>,
 }
 
 impl KVectorBatch {
@@ -544,6 +547,8 @@ impl KVectorBatch {
             k_s: Vec::with_capacity(capacity),
             k_h: Vec::with_capacity(capacity),
             k_topo: Vec::with_capacity(capacity),
+            k_v: Vec::with_capacity(capacity),
+            k_phi: Vec::with_capacity(capacity),
         }
     }
 
@@ -557,6 +562,8 @@ impl KVectorBatch {
         self.k_s.push(kv.k_s);
         self.k_h.push(kv.k_h);
         self.k_topo.push(kv.k_topo);
+        self.k_v.push(kv.k_v);
+        self.k_phi.push(kv.k_phi);
     }
 
     /// Compute mean K-Vector
@@ -575,7 +582,8 @@ impl KVectorBatch {
             self.k_s.iter().sum::<f32>() / n,
             self.k_h.iter().sum::<f32>() / n,
             self.k_topo.iter().sum::<f32>() / n,
-            0.0, // Placeholder
+            self.k_v.iter().sum::<f32>() / n,
+            self.k_phi.iter().sum::<f32>() / n,
         )
     }
 

@@ -14,6 +14,7 @@ ts-export = ["ts-rs"]
 wasm = ["wasm-bindgen", "js-sys"]
 parallel = ["rayon"]
 simulation = []
+# risc0 feature requires external risc0-zkvm installation - disabled by default
 risc0 = []
 
 [dependencies]

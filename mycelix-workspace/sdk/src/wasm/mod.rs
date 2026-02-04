@@ -464,12 +464,12 @@ impl WasmAgentGroup {
     /// Check consensus (returns JSON result)
     #[wasm_bindgen(js_name = checkConsensus)]
     pub fn check_consensus(&mut self, proposal_id: &str) -> String {
-        let proposal = match self.proposals.iter_mut().find(|p| p.id == proposal_id) {
-            Some(p) => p,
-            None => return r#"{"error":"Proposal not found"}"#.to_string(),
-        };
+        // First check if proposal exists (immutable borrow)
+        if !self.proposals.iter().any(|p| p.id == proposal_id) {
+            return r#"{"error":"Proposal not found"}"#.to_string();
+        }
 
-        // Calculate vote weights
+        // Calculate vote weights (immutable borrow of votes)
         let mut approval_weight = 0.0;
         let mut rejection_weight = 0.0;
         let mut abstention_weight = 0.0;
@@ -484,7 +484,7 @@ impl WasmAgentGroup {
 
         let total_vote_weight = approval_weight + rejection_weight + abstention_weight;
 
-        // Calculate total possible
+        // Calculate total possible (needs immutable self access)
         let total_possible = if self.config.quadratic_voting {
             self.members.iter().map(|(_, t)| t.sqrt()).sum()
         } else {
@@ -507,16 +507,21 @@ impl WasmAgentGroup {
             if active_weight > 0.0 {
                 let approval_ratio = approval_weight / active_weight;
                 if approval_ratio >= self.config.approval_threshold {
-                    proposal.finalized = true;
                     "approved"
                 } else {
-                    proposal.finalized = true;
                     "rejected"
                 }
             } else {
                 "pending"
             }
         };
+
+        // Now get mutable reference to finalize if needed
+        if decision == "approved" || decision == "rejected" {
+            if let Some(proposal) = self.proposals.iter_mut().find(|p| p.id == proposal_id) {
+                proposal.finalized = true;
+            }
+        }
 
         format!(
             r#"{{"proposalId":"{}","decision":"{}","approvalWeight":{},"rejectionWeight":{},"abstentionWeight":{},"participationRate":{},"quorumReached":{}}}"#,
