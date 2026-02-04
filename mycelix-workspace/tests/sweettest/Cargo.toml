@@ -1,0 +1,42 @@
+[package]
+name = "mycelix-sweettest"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Sweettest integration tests for Mycelix ecosystem hApps"
+
+# Note: These tests require:
+# 1. WASM zomes built: cargo build --release --target wasm32-unknown-unknown
+# 2. DNA bundles packed: hc dna pack <dna-dir>
+# 3. hApp bundles packed: hc app pack <happ-dir>
+# Tests are #[ignore] by default - run with: cargo test -- --ignored
+
+[dev-dependencies]
+# Holochain sweettest framework
+holochain = { version = "0.6", features = ["test_utils"] }
+
+# Async runtime
+tokio = { version = "1", features = ["full", "test-util"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Prevent nonce expiration from parallel test resource contention
+serial_test = "3"
+
+[[test]]
+name = "identity_workflow"
+path = "tests/identity_workflow.rs"
+
+[[test]]
+name = "governance_workflow"
+path = "tests/governance_workflow.rs"
+
+[[test]]
+name = "cross_happ_bridge"
+path = "tests/cross_happ_bridge.rs"
+
+[[test]]
+name = "privacy_zk_attestation"
+path = "tests/privacy_zk_attestation.rs"
