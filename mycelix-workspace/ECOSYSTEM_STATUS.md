@@ -21,7 +21,7 @@
 
 | hApp | Zomes | Tests | Notes |
 |------|-------|-------|-------|
-| **Core (0TML)** | 6 (agents, bridge, dkg, epistemic_storage, federated_learning, pogq_validation) | 62 verified | 45% BFT validated. REST API **not implemented** (documented as planned). Python coordinator + Rust zomes. |
+| **Core (0TML)** | 6 (agents, bridge, dkg, epistemic_storage, federated_learning, pogq_validation) | 62 verified | 45% BFT validated. REST API implemented (4 endpoints: /health, /status, /trust/{id}, /pogq/validate). Python coordinator + Rust zomes. |
 | **Mail** | 12 | Submodule tests | PQC encryption, decentralized email. Most complete hApp. |
 | **DeSci** | N/A (REST API) | 141 verified | Actix-web service, **not a Holochain hApp**. CLI + REST. |
 
@@ -76,11 +76,11 @@
 
 ## SDKs
 
-| SDK | Version | Claimed Tests | Verified (2026-02-02) | Notes |
+| SDK | Version | Claimed Tests | Verified (2026-02-04) | Notes |
 |-----|---------|---------------|----------------------|-------|
-| **Rust** (`mycelix-sdk`) | 0.6.0 | 866 | **868 pass, 5 fail, 2 ignored** (875 total) | 5 pre-existing test failures in agentic/ module (gradient estimator, bandit selection, network health, local DP, byzantine invariant). |
-| **TypeScript** (`@mycelix/sdk`) | 0.6.0 | 5,828 | **6,314 pass, 2 fail, 15 skip, 23 errors** (libsodium ESM compat issue) | Actual count higher than claimed. 2 test files fail due to libsodium/vitest incompatibility. |
-| **Python** | 0.1.0 | 5 test files | **Verified** - `sdk-python/` exists | MATL, epistemic, FL, bridge modules implemented. |
+| **Rust** (`mycelix-sdk`) | 0.6.0 | 866 | **996 pass** (1002 w/ parallel feature) | All tests pass. Agentic module tests fixed. |
+| **TypeScript** (`@mycelix/sdk`) | 0.6.0 | 5,828 | **6,316 pass / 15 skip** | All tests pass. libsodium ESM compat fixed. |
+| **Python** (`mycelix`) | 0.1.0 | 45 | **45 pass**, 87% coverage | MATL, epistemic, FL, bridge modules. Verified 2026-02-04. |
 
 ### SDK Rust Modules
 agentic, bridge, credentials, crypto, dkg, economics, epistemic, error, fl, hyperfeel, identity, intentions, matl, pagination, pog, storage, temporal, wasm, zkproof
@@ -98,7 +98,7 @@ academic, climate, consensus, desci, edunet, energy, epistemic-markets, fabricat
 |-----------|--------|-------|
 | **Justfile** | Exists | Comprehensive task runner at `mycelix-workspace/justfile` |
 | **CI** | Exists | `.github/workflows/mycelix-ci.yml` + `mycelix-release.yml` |
-| **Observatory** | Demo only | `mycelix-workspace/observatory/` - SvelteKit, mock data |
+| **Observatory** | Live + Demo | `mycelix-workspace/observatory/` - SvelteKit, 3-tier fallback (live→sim→static) |
 | **SMS Gateway** | Exists | `mycelix-workspace/services/sms-gateway/` |
 | **Civic hApp** | Exists | `mycelix-workspace/services/civic-happ/` |
 | **Website** | Live | https://mycelix.net (GitHub Pages) |
@@ -109,7 +109,7 @@ academic, climate, consensus, desci, edunet, energy, epistemic-markets, fabricat
 
 1. ~~**Rust SDK 5 test failures**~~: Fixed 2026-02-04. All 996 tests pass (1002 with parallel feature).
 2. ~~**TS SDK libsodium errors**~~: Fixed. All 6,316 tests pass.
-3. **Core REST API**: Documented but not implemented. Most visible credibility gap.
+3. ~~**Core REST API**~~: Implemented 2026-02-04. 4 endpoints: /health, /status, /trust/{id}, /pogq/validate.
 4. ~~**Observatory mock-only**~~: Live conductor connection fully implemented, awaiting conductor.
 5. **Scope sprawl**: 27+ hApps, most in scaffold state. 14 scaffolds with types but no core logic.
 6. **SDK-TS bundle size**: 29 integration modules, unclear how many are functional.
@@ -119,10 +119,10 @@ academic, climate, consensus, desci, edunet, energy, epistemic-markets, fabricat
 
 ## Priority Actions
 
-1. Verify SDK test suites (run and record actual pass/fail)
-2. Remove Python SDK references or create the package
-3. Implement Core REST API (3 endpoints minimum)
-4. Connect Observatory to real conductor (or clearly label demo mode)
+1. ~~Verify SDK test suites (run and record actual pass/fail)~~: Done 2026-02-04
+2. ~~Remove Python SDK references or create the package~~: SDK exists, 45 tests pass
+3. ~~Implement Core REST API (3 endpoints minimum)~~: 4 endpoints implemented
+4. ~~Connect Observatory to real conductor (or clearly label demo mode)~~: 3-tier fallback system
 5. Promote Identity + Governance from scaffold to beta
 6. Audit SDK-TS integration modules for empty exports
 

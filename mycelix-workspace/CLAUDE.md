@@ -103,7 +103,7 @@ hc dna pack .
 | WASM zomes | 66 | Compile to wasm32-unknown-unknown |
 | Sweettest | Compiles | Ready - `just test-sweettest` |
 | Tryorama | 13 suites | Needs running conductor + hApp bundles |
-| Python SDK | 5 test files | `sdk-python/` exists with MATL, epistemic, FL, bridge modules |
+| Python SDK | 45 pass | Verified 2026-02-04, 87% coverage (MATL, epistemic, FL, bridge) |
 
 See [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md) for full details.
 
