@@ -97,13 +97,13 @@ hc dna pack .
 |-------|-------|--------|
 | Mycelix-Core | 62 | Verified |
 | DeSci | 141 | Verified |
-| Rust SDK | 789 pass, 2 ignored | Verified |
-| TypeScript SDK | 6,421 pass / 196 skip | All pass (libsodium ESM compat fixed) |
+| Rust SDK | 996 pass (1002 w/ parallel) | Verified 2026-02-04 |
+| TypeScript SDK | 6,316 pass / 15 skip | All pass (libsodium ESM compat fixed) |
 | Identity unit | 23 | Pass (recovery + trust_credential) |
 | WASM zomes | 66 | Compile to wasm32-unknown-unknown |
-| Sweettest | Compiles | Needs persistent session for first build |
+| Sweettest | Compiles | Ready - `just test-sweettest` |
 | Tryorama | 13 suites | Needs running conductor + hApp bundles |
-| Python SDK | N/A | `sdk-python/` directory does not exist |
+| Python SDK | 5 test files | `sdk-python/` exists with MATL, epistemic, FL, bridge modules |
 
 See [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md) for full details.
 
