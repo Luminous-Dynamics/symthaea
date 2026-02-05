@@ -438,7 +438,6 @@ impl CausalSpace {
     ///
     /// Returns the number of links removed.
     pub fn remove_effects_of(&mut self, variable: &HV16) -> usize {
-        let initial_count = self.causal_links.len();
         let mut removed = 0;
 
         // Remove links where the effect matches the variable

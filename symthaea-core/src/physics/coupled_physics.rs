@@ -34,7 +34,7 @@ use super::geometry::{GeometryOptimizer, GeometryWeights, EngineGeometry};
 use super::pulse_dynamics::{PulseDynamics, PulseProfile, ThermalCycling};
 use super::high_entropy_alloys::HEADesigner;
 use super::advanced_materials::AdvancedMaterials;
-use super::trigger_systems::{LcfPhysicsConstants, GamowIntegrationResult, DDChannelResult, LatticeLifetimeModel, QFactorParams};
+use super::trigger_systems::{LcfPhysicsConstants, GamowIntegrationResult, DDChannelResult};
 
 /// Operating conditions for coupled simulation
 #[derive(Debug, Clone)]
@@ -249,7 +249,7 @@ impl TritiumInventory {
             if equilibrium_inventory_g <= target_g {
                 f64::INFINITY
             } else {
-                -(1.0 - target_g / equilibrium_inventory_g).ln() / decay_constant
+                -((1.0_f64 - target_g / equilibrium_inventory_g).ln()) / decay_constant
             }
         } else {
             f64::INFINITY
@@ -296,40 +296,6 @@ pub struct ReactionRateResult {
     pub screening_ue_ev: f64,
     /// Number of phonon modes assumed
     pub phonon_modes: u32,
-    /// Q factor (fusion power / input power) - None means Q << 1
-    pub q_factor: Option<f64>,
-    /// Whether net energy gain (Q > 1) is achievable
-    pub energy_gain_achievable: bool,
-    /// Lattice lifetime model with dpa tracking
-    pub lattice_lifetime: Option<LatticeLifetimeModel>,
-    /// Number of thermal-Gamow coupling iterations to converge
-    pub coupling_iterations: u32,
-    /// Convergence achieved (temperature change < 1K)
-    pub converged: bool,
-}
-
-/// Configuration for thermal-Gamow coupling iteration.
-#[derive(Debug, Clone)]
-pub struct ThermalGamowCouplingConfig {
-    /// Maximum iterations for convergence
-    pub max_iterations: u32,
-    /// Temperature convergence threshold (K)
-    pub temp_tolerance_k: f64,
-    /// Whether to compute Q factor
-    pub compute_q_factor: bool,
-    /// Whether to track lattice lifetime
-    pub track_lattice_lifetime: bool,
-}
-
-impl Default for ThermalGamowCouplingConfig {
-    fn default() -> Self {
-        Self {
-            max_iterations: 10,
-            temp_tolerance_k: 1.0,
-            compute_q_factor: true,
-            track_lattice_lifetime: true,
-        }
-    }
 }
 
 /// Complete coupled simulation result
@@ -446,15 +412,6 @@ impl CoupledPhysicsEngine {
     /// Uses the full Gamow peak integration from trigger_systems for D-D reactions,
     /// including temperature-dependent screening, phonon enhancement, and multi-channel
     /// branching with neutron/tritium tracking.
-    ///
-    /// ## Thermal-Gamow Coupling (Enhancement #2)
-    ///
-    /// Implements iterative coupling between lattice temperature and reaction rate:
-    /// 1. T_lattice affects reaction rate via Gamow integration
-    /// 2. Reaction rate affects power deposition
-    /// 3. Power deposition affects T_lattice
-    ///
-    /// Iterates until temperature converges (< 1K change between iterations).
     fn calculate_reaction_rate(
         &self,
         conditions: &OperatingConditions,
@@ -465,70 +422,23 @@ impl CoupledPhysicsEngine {
             return None;
         }
 
-        let config = ThermalGamowCouplingConfig::default();
+        // Use the lattice temperature from thermal profile
+        // Core center is where fusion happens
+        let lattice_temp_k = thermal_profile.t_core_center;
 
-        // Initial lattice temperature from thermal profile
-        let mut lattice_temp_k = thermal_profile.t_core_center;
-        let measured_ue_ev = 300.0; // PdD screening energy at 300K
-        let phonon_modes = 2u32; // Assume 2 coherent modes
+        // Screening energy: use PdD value (measured ~300eV at 300K)
+        // Temperature-adjusted via the new method
+        let measured_ue_ev = 300.0;
+        let screening_ue_ev = LcfPhysicsConstants::screening_energy_at_temperature(measured_ue_ev, lattice_temp_k);
 
-        // Coupling iteration
-        let mut iterations = 0u32;
-        let mut converged = false;
-        let mut gamow = GamowIntegrationResult {
-            sigma_v_cm3_s: 0.0,
-            gamow_peak_kev: 0.0,
-            gamow_width_kev: 0.0,
-            screening_enhancement: 1.0,
-            phonon_enhancement: 1.0,
-            gain_factor_q: None,
-            energy_gain_achievable: false,
-        };
+        // Phonon modes: assume 2 coherent modes for PdD lattice
+        let phonon_modes = 2u32;
 
-        for _iter in 0..config.max_iterations {
-            iterations += 1;
-
-            // Temperature-adjusted screening energy
-            let screening_ue_ev = LcfPhysicsConstants::screening_energy_at_temperature(
-                measured_ue_ev, lattice_temp_k
-            );
-
-            // Gamow integration with Q factor calculation
-            let q_params = QFactorParams::lcf_typical();
-            gamow = LcfPhysicsConstants::dd_reaction_rate_with_q(
-                lattice_temp_k,
-                screening_ue_ev,
-                phonon_modes,
-                &q_params,
-            );
-
-            // Compute new temperature from fusion power
-            // Power deposition: P_fusion ∝ <σv> × n² × V
-            // This feeds back into T_lattice through thermal transport
-            // For now, use a simplified thermal feedback model:
-            // ΔT = P_fusion × R_thermal, where R_thermal ≈ 0.01 K/W for PdD
-            let _power_w = conditions.power_kw * 1000.0; // For future power-dependent thermal feedback
-            let thermal_resistance = 0.01; // K/W (simplified)
-
-            // Fusion power from Gamow result scaled to operating conditions
-            // At these reaction rates, fusion power is negligible compared to input
-            // but we model the feedback for self-consistency
-            let fusion_contribution_k = gamow.sigma_v_cm3_s * 1e10 * thermal_resistance;
-
-            let new_temp = thermal_profile.t_core_center + fusion_contribution_k;
-            let temp_change = (new_temp - lattice_temp_k).abs();
-
-            lattice_temp_k = new_temp;
-
-            if temp_change < config.temp_tolerance_k {
-                converged = true;
-                break;
-            }
-        }
-
-        // Final screening energy after convergence
-        let screening_ue_ev = LcfPhysicsConstants::screening_energy_at_temperature(
-            measured_ue_ev, lattice_temp_k
+        // Gamow integration with all enhancements
+        let gamow = LcfPhysicsConstants::dd_reaction_rate_integrated(
+            lattice_temp_k,
+            screening_ue_ev,
+            phonon_modes,
         );
 
         // Scale reaction rate by power and estimate total reactions/s
@@ -540,43 +450,19 @@ impl CoupledPhysicsEngine {
         let total_reaction_rate_s = power_w / q_value_j;
 
         // Branching with neutron/tritium tracking
-        let branching = LcfPhysicsConstants::dd_branched_yield(
-            total_reaction_rate_s, gamow.gamow_peak_kev
-        );
+        // Use Gamow peak energy as effective CM energy
+        let branching = LcfPhysicsConstants::dd_branched_yield(total_reaction_rate_s, gamow.gamow_peak_kev);
 
-        // Tritium inventory projection (1 year snapshot)
+        // Tritium inventory projection (assume 1 year of operation for snapshot)
         let tritium = TritiumInventory::from_branching(&branching, 1.0);
 
-        // Lattice lifetime model (Enhancement #4)
-        let lattice_lifetime = if config.track_lattice_lifetime {
-            let mut model = LatticeLifetimeModel::pdd_typical();
-            // Estimate core surface area from power (rough scaling)
-            let core_radius_cm = (power_w / 50000.0).powf(1.0/3.0) * 5.0; // ~5cm at 50kW
-            let core_surface_cm2 = 4.0 * std::f64::consts::PI * core_radius_cm.powi(2);
-            // Update for 1 year of operation to get snapshot
-            model.update(
-                8760.0, // hours per year
-                branching.neutron_production_rate_s,
-                core_surface_cm2,
-                lattice_temp_k,
-            );
-            Some(model)
-        } else {
-            None
-        };
-
         Some(ReactionRateResult {
-            gamow: gamow.clone(),
+            gamow,
             branching,
             tritium,
             lattice_temp_k,
             screening_ue_ev,
             phonon_modes,
-            q_factor: gamow.gain_factor_q,
-            energy_gain_achievable: gamow.energy_gain_achievable,
-            lattice_lifetime,
-            coupling_iterations: iterations,
-            converged,
         })
     }
 
@@ -952,142 +838,5 @@ mod tests {
         assert_eq!(inv.inventory_g, 0.0);
         assert_eq!(inv.activity_ci, 0.0);
         assert!(!inv.requires_license);
-    }
-
-    // === New tests for Enhancement #2: Thermal-Gamow Coupling ===
-
-    #[test]
-    fn test_thermal_gamow_coupling_converges() {
-        let engine = setup();
-        let conditions = OperatingConditions::consumer();
-        let result = engine.simulate(&conditions);
-
-        let rr = result.reaction_rate.expect("D-D should have reaction rate");
-
-        // Coupling should converge within max iterations
-        assert!(rr.converged, "Thermal-Gamow coupling should converge");
-        assert!(rr.coupling_iterations <= 10, "Should converge within 10 iterations");
-    }
-
-    #[test]
-    fn test_thermal_gamow_coupling_temperature_reasonable() {
-        let engine = setup();
-        let conditions = OperatingConditions::consumer();
-        let result = engine.simulate(&conditions);
-
-        let rr = result.reaction_rate.expect("D-D should have reaction rate");
-
-        // Lattice temperature should be physically reasonable
-        assert!(rr.lattice_temp_k > 200.0, "Temperature should be above cryogenic");
-        assert!(rr.lattice_temp_k < 2000.0, "Temperature should be below melting point of Pd");
-    }
-
-    // === New tests for Enhancement #3: Q Factor ===
-
-    #[test]
-    fn test_q_factor_computed() {
-        let engine = setup();
-        let conditions = OperatingConditions::consumer();
-        let result = engine.simulate(&conditions);
-
-        let rr = result.reaction_rate.expect("D-D should have reaction rate");
-
-        // Q factor should be computed (will be << 1 at room temperature)
-        assert!(rr.q_factor.is_some(), "Q factor should be computed");
-
-        let q = rr.q_factor.unwrap();
-        // Q << 1 is expected for LCF at room temperature
-        // This is the honest physics assessment
-        assert!(q < 1.0, "Q < 1 expected at room temperature (LCF is not yet breakeven)");
-    }
-
-    #[test]
-    fn test_q_factor_energy_gain_flag() {
-        let engine = setup();
-        let conditions = OperatingConditions::consumer();
-        let result = engine.simulate(&conditions);
-
-        let rr = result.reaction_rate.expect("D-D should have reaction rate");
-
-        // At room temperature, energy gain is NOT achievable
-        // This is the key physics honesty check
-        assert!(!rr.energy_gain_achievable,
-            "Energy gain (Q > 1) should NOT be achievable at room temperature");
-    }
-
-    // === New tests for Enhancement #4: Lattice Lifetime ===
-
-    #[test]
-    fn test_lattice_lifetime_tracked() {
-        let engine = setup();
-        let conditions = OperatingConditions::consumer();
-        let result = engine.simulate(&conditions);
-
-        let rr = result.reaction_rate.expect("D-D should have reaction rate");
-
-        // Lattice lifetime should be tracked
-        assert!(rr.lattice_lifetime.is_some(), "Lattice lifetime should be tracked");
-
-        let lifetime = rr.lattice_lifetime.as_ref().unwrap();
-
-        // Initial D/Pd ratio should be preserved
-        assert!(lifetime.initial_d_pd_ratio > 0.0);
-        assert!(lifetime.current_d_pd_ratio > 0.0);
-        assert!(lifetime.current_d_pd_ratio <= lifetime.initial_d_pd_ratio,
-            "D/Pd ratio should decrease with damage");
-    }
-
-    #[test]
-    fn test_lattice_dpa_accumulation() {
-        let engine = setup();
-        let conditions = OperatingConditions::consumer();
-        let result = engine.simulate(&conditions);
-
-        let rr = result.reaction_rate.expect("D-D should have reaction rate");
-        let lifetime = rr.lattice_lifetime.as_ref().unwrap();
-
-        // DPA should accumulate over 1 year of operation
-        assert!(lifetime.accumulated_dpa >= 0.0, "DPA should be non-negative");
-        assert!(lifetime.dpa_rate_per_year >= 0.0, "DPA rate should be non-negative");
-    }
-
-    #[test]
-    fn test_lattice_lifetime_model_replacement_schedule() {
-        let model = LatticeLifetimeModel::pdd_typical();
-
-        // Test replacement schedule calculation
-        let neutron_rate = 1e10; // 10^10 n/s (high rate for test)
-        let core_surface = 100.0; // 100 cm²
-        let reactor_lifetime = 25.0; // 25 years
-
-        let (years_between, total_replacements) = model.replacement_schedule(
-            neutron_rate, core_surface, reactor_lifetime
-        );
-
-        // Should compute a finite replacement schedule
-        assert!(years_between > 0.0, "Years between replacements should be positive");
-        assert!(total_replacements > 0, "Should need at least one replacement at high flux");
-    }
-
-    #[test]
-    fn test_lattice_lifetime_model_update() {
-        let mut model = LatticeLifetimeModel::pdd_typical();
-
-        let initial_ratio = model.current_d_pd_ratio;
-
-        // Update with moderate neutron flux
-        model.update(
-            1000.0,  // 1000 hours
-            1e8,     // 10^8 n/s
-            50.0,    // 50 cm²
-            500.0,   // 500 K (some annealing)
-        );
-
-        // D/Pd ratio should decrease (or stay same if negligible flux)
-        assert!(model.current_d_pd_ratio <= initial_ratio,
-            "D/Pd ratio should not increase with irradiation");
-
-        // Operating hours should be tracked
-        assert_eq!(model.operating_hours, 1000.0);
     }
 }

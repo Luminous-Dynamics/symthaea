@@ -47,6 +47,10 @@ proptest = "1.4"
 criterion = "0.5"
 tokio = { version = "1.35", features = ["rt-multi-thread", "macros"] }  # For async tests
 
+[[example]]
+name = "primitive_showcase"
+path = "examples/primitive_showcase.rs"
+
 [[bench]]
 name = "hdc_ltc_learning"
 harness = false

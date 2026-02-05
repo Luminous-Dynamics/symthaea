@@ -205,8 +205,14 @@ full = ["service", "shell", "gui", "demo"]  # All binaries
 # Voice features
 voice-tts = ["ort", "hound", "hf-hub"]  # TTS with Kokoro (ONNX) - CPU
 voice-tts-cuda = ["voice-tts", "ort/cuda"]  # TTS with CUDA acceleration (requires CUDA toolkit)
-voice = ["voice-tts"]  # Voice features (referenced in symthaea.rs)
+voice-tts-async = ["voice-tts", "futures"]  # Async/streaming TTS
 voice-stt = ["symthaea-stt", "hound"]  # STT with symthaea-stt crate (HDC + LTC + CfC)
+audio-sentinel = ["symthaea-sentinel"]  # Zero-shot temporal audio pattern recognition (HDC + LTC + CfC)
+audio = ["voice-tts", "rodio"]  # Full audio including playback
+audio-cuda = ["voice-tts-cuda", "rodio"]  # Full audio with GPU acceleration
+pyphi = ["pyo3"]  # Enhancement #8 Week 4: Enable PyPhi integration for exact IIT Φ validation
+# Semantic encoding with Burn ML framework
+semantic-burn = ["burn", "burn-ndarray"]  # Pure Rust semantic encoder
 # Perception & Embeddings (Phase 1 Activation)
 embeddings = ["tokenizers", "ort", "hf-hub"]  # Qwen3/BGE text embeddings via ONNX
 vision = ["ort", "hf-hub"]  # SigLIP image embeddings via ONNX
@@ -214,6 +220,7 @@ perception = ["embeddings", "vision"]  # Full multimodal perception stack
 webcam = []  # Live webcam capture for video perception
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub", "safetensors", "half"]
+neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 # Database backends (deferred - compile guards only)
 qdrant = []   # Vector database for large-scale memory
 datalog = []  # Datalog reasoning engine
@@ -223,6 +230,10 @@ duck = []     # DuckDB analytical queries
 hdf5 = []     # HDF5 file loading for C-Mod plasma data (add hdf5 crate when ready)
 # Swarm Intelligence - Hybrid Iroh + Holochain
 swarm = ["iroh"]  # Real-time P2P tensor streaming via Iroh 0.95+
+# Desktop integration features
+notifications = ["zbus"]  # E1: D-Bus desktop notifications
+systemd = ["libsystemd"]  # D1: Systemd socket activation
+desktop = ["notifications", "systemd"]
 # Mycelix integration
 # mycelix = ["mycelix-sdk", "sha3"]  # Full Mycelix SDK integration for governance
 # Disabled until mycelix-sdk is available as a proper crate
@@ -231,15 +242,18 @@ mycelix = ["sha3"]  # Mycelix-ready (hashing only, SDK integration pending)
 # GPU acceleration for CfC networks
 gpu = ["burn", "burn-ndarray"]  # GPU acceleration via Burn/WGPU for CfC networks
 cuda = ["gpu"]  # CUDA backend (requires CUDA toolkit)
+cfc-gpu = ["gpu"]  # Alias for CfC GPU acceleration
 
 # Module compilation gates (only flags actually referenced in cfg attributes)
 integration_module = []        # Integration module in lib.rs
 observability_module = []      # Observability module in lib.rs
 api_module = ["axum", "tower-http"]  # HTTP API binary + module
+full_consciousness = []        # Extended consciousness submodules
 full_perception = []           # Extended perception submodules
 full_language = []             # Advanced language features (grammar, parsers)
 school_lookahead = []          # CfC-based lookahead in school module
 physiology_module = []         # Physiology integration in school
+mycelix_module = []            # Mycelix governance hooks
 databases_module = []          # Database backends in experience module
 magi_loop = []                 # MAGI Loop world-grounded prediction (recursive_improvement)
 epistemic_conflict = []        # Epistemic conflict detection + reliability + Φ_eff
@@ -249,6 +263,7 @@ counterfactual = ["epistemic_conflict"]  # Causal queries v0 with reference harn
 reasoning_engine = ["epistemic_conflict", "conscious_tool_gate", "temporal_planning", "counterfactual"]  # Full ConsciousReasoningEngine
 nvml = []                      # NVIDIA Management Library for GPU monitoring
 network = []                   # Mycelix network client (real HTTP fetching)
+partnership_module = []        # Partnership module for Φ_dyad computation
 web_research_module = []       # Web research epistemic verification (scaffolded)
 benchmarks_module = []         # Benchmarks module compilation gate
 consciousness_module = []      # Consciousness examples compilation gate
@@ -257,18 +272,11 @@ language_module = []           # Language examples compilation gate
 brain_module = []              # Brain subsystem examples compilation gate
 soul_module = []               # Soul/identity examples compilation gate
 school_module = []             # School/learning examples compilation gate
-partnership_module = []        # Partnership/dyad examples compilation gate
-full_consciousness = []        # Full consciousness submodules (recursive_improvement)
-mycelix_module = []            # Mycelix integration in consciousness/brain modules
-notifications = ["zbus"]       # Desktop notifications via D-Bus
-audio = []                     # Audio perception compilation gate
-semantic-burn = ["burn", "burn-ndarray"]  # Semantic encoding via Burn framework
 
 [dev-dependencies]
 criterion = "0.5"
 proptest = "1.4"
 tempfile = "3.8"  # For perception tests
-tower = { version = "0.4", features = ["util"] }  # For axum router testing (ServiceExt::oneshot)
 
 # Binaries
 # Note: Some binaries require specific features or external crates
@@ -574,18 +582,6 @@ harness = false
 
 [[bench]]
 name = "streaming"
-harness = false
-
-[[bench]]
-name = "ai_benchmarks"
-harness = false
-
-[[bench]]
-name = "memory_benchmark"
-harness = false
-
-[[bench]]
-name = "semantic_benchmark"
 harness = false
 
 [profile.test]
