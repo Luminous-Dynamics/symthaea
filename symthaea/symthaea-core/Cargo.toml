@@ -1,0 +1,77 @@
+[package]
+name = "symthaea-core"
+version = "0.5.0"
+edition = "2021"
+authors = ["Luminous Dynamics"]
+description = "Core primitives for Symthaea: HDC, Phi Engine, and basic Consciousness structures"
+license = "MIT"
+
+[dependencies]
+ndarray = { version = "0.15", features = ["serde"] }
+rand = "0.8"
+rand_distr = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+im = "15.1"  # Immutable data structures for functional state updates
+bincode = "1.3"  # Binary serialization (v1 API)
+rayon = "1.10"  # Parallel processing
+anyhow = "1.0"  # Error handling
+blake3 = "1.5"  # Fast hashing
+sha3 = "0.10"  # SHAKE-256 Keccak sponge for deterministic genesis
+ordered-float = "4.2"  # Orderable floats for heap-based top-k selection
+parking_lot = "0.12"  # Fast synchronization primitives
+once_cell = "1.19"  # Lazy initialization
+nalgebra = "0.32"  # Linear algebra
+bumpalo = "3.16"  # Arena allocation
+chrono = { version = "0.4", features = ["serde"] }  # DateTime
+
+# Multi-Database Consciousness Architecture (optional dependencies)
+# Qdrant: Sensory Cortex - ultra-fast vector similarity for perception
+qdrant-client = { version = "1.16", optional = true }
+# CozoDB: Prefrontal Cortex - recursive Datalog for causal reasoning
+# Disabled: cozo sqlite3-src conflicts with rusqlite libsqlite3-sys (links = "sqlite3")
+# cozo = { version = "0.7", optional = true }
+# LanceDB: Long-Term Memory - multimodal embeddings storage
+# Disabled: lancedb jumped from 0.4 to 0.23+ with breaking API changes; re-enable when needed
+# lancedb = { version = "0.23", optional = true }
+# DuckDB: Epistemic Auditor - analytical queries for self-reflection
+# Disabled: duckdb sqlite3-src conflicts with rusqlite libsqlite3-sys (links = "sqlite3")
+# duckdb = { version = "0.10", features = ["bundled"], optional = true }
+# Tokio async runtime (required for async database operations)
+tokio = { version = "1.35", features = ["rt", "sync", "time"], optional = true }
+
+[dev-dependencies]
+proptest = "1.4"
+criterion = "0.5"
+tokio = { version = "1.35", features = ["rt-multi-thread", "macros"] }  # For async tests
+
+[[bench]]
+name = "hdc_ltc_learning"
+harness = false
+
+[[bench]]
+name = "hdc_improvements"
+harness = false
+
+[[bench]]
+name = "simd_continuous"
+harness = false
+
+[features]
+default = []
+embeddings = []       # Enable embedding model integration
+thread_local_cache = []  # Enable thread-local caching in Phi engine
+rayon = []            # Enable parallel computation with rayon
+simd = []             # Enable SIMD-accelerated continuous HV operations (4x+ speedup)
+
+# Multi-Database Consciousness Architecture features
+# Each database maps to a "brain region" with specialized computational role
+qdrant = ["dep:qdrant-client", "dep:tokio"]  # Sensory Cortex: vector similarity (<10ms)
+datalog = []                                 # Prefrontal Cortex: recursive reasoning (cozo dep pending fix)
+lance = ["dep:tokio"]                         # Long-Term Memory: multimodal storage (lancedb dep pending upgrade)
+duck = []                                    # Epistemic Auditor: analytics/Phi stats (duckdb dep pending fix)
+
+# Enable all databases (full consciousness infrastructure)
+full-databases = ["qdrant", "datalog", "lance", "duck"]

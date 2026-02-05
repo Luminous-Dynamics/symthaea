@@ -1,0 +1,96 @@
+{
+  "hai": {
+    "inference_ms": {
+      "mean": 5.7360027730464935,
+      "std": 3.4513133756124326,
+      "ci_lower": 5.051187322560609,
+      "ci_upper": 6.420818223532378,
+      "n": 100
+    },
+    "action_ms": {
+      "mean": 460.9915353823453,
+      "std": 236.73978311082857,
+      "ci_lower": 414.0172263078458,
+      "ci_upper": 507.9658444568448,
+      "n": 100
+    },
+    "free_energy": {
+      "mean": 0.18898615147670475,
+      "std": 0.0021885640789017498,
+      "ci_lower": 0.18855189288222277,
+      "ci_upper": 0.18942041007118673,
+      "n": 100
+    },
+    "success": {
+      "mean": 1.0,
+      "std": 0.0,
+      "ci_lower": 1.0,
+      "ci_upper": 1.0,
+      "n": 100
+    }
+  },
+  "pymdp": {
+    "inference_ms": {
+      "mean": 0.6702619418501854,
+      "std": 1.6491865589392434,
+      "ci_lower": 0.3430275492054334,
+      "ci_upper": 0.9974963344949375,
+      "n": 100
+    },
+    "action_ms": {
+      "mean": 0.13731657527387142,
+      "std": 0.32878579760104626,
+      "ci_lower": 0.07207833997234155,
+      "ci_upper": 0.2025548105754013,
+      "n": 100
+    },
+    "free_energy": {
+      "mean": -8.975954787809927,
+      "std": 0.4552656218672943,
+      "ci_lower": -9.06628936424475,
+      "ci_upper": -8.885620211375105,
+      "n": 100
+    },
+    "success": {
+      "mean": 0.18,
+      "std": 0.38612291966536916,
+      "ci_lower": 0.10338483574339492,
+      "ci_upper": 0.2566151642566051,
+      "n": 100
+    }
+  },
+  "comparisons": [
+    {
+      "metric": "inference_ms",
+      "t_statistic": 13.243425029821172,
+      "p_value": 1.4210441429531304e-26,
+      "cohens_d": 1.872903128944441,
+      "significant": true,
+      "effect_interpretation": "large"
+    },
+    {
+      "metric": "action_ms",
+      "t_statistic": 19.466680602129,
+      "p_value": 1.2784382047891202e-35,
+      "cohens_d": 2.753004372191608,
+      "significant": true,
+      "effect_interpretation": "large"
+    },
+    {
+      "metric": "free_energy",
+      "t_statistic": 201.30742587925704,
+      "p_value": 3.531154327589126e-131,
+      "cohens_d": 28.46916918848619,
+      "significant": true,
+      "effect_interpretation": "large"
+    },
+    {
+      "metric": "success",
+      "t_statistic": 21.2367605815953,
+      "p_value": 1.2055047444742173e-38,
+      "cohens_d": 3.003331483536241,
+      "significant": true,
+      "effect_interpretation": "large"
+    }
+  ]
+}

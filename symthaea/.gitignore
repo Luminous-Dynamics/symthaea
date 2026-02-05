@@ -1,0 +1,78 @@
+# Build artifacts
+target/
+target-test/
+symthaea-core/target/
+
+# Python cache
+__pycache__/
+__pyphi_cache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Environment
+.env
+.env.local
+
+# Benchmark intermediate files (keep history)
+# .benchmark-history/
+
+# Large datasets (keep small ones)
+datasets/*.parquet
+datasets/*.csv
+datasets/*.json
+
+# Nix build
+result
+result-*
+
+# Rust specific
+**/*.rs.bk
+Cargo.lock.bak
+
+# Editor backups
+*.backup
+*.bak
+*.orig
+
+# Archives (old code - preserved locally)
+.archive/
+archive/
+
+# Large data directories
+data/
+models/
+results/
+zenodo-dataset/
+studies/
+sentinel-demo/
+
+# Datasets subdirectory (large files)
+datasets/
+symthaea-hlb/benchmarks/ai_benchmarks/data/
+
+# TLA+ model checking state files (large binary)
+tla/states/
+tla/*.jar
+
+# HuggingFace cache
+.hf_cache/
+**/.hf_cache/
+
+# Audio test data (large wav files)
+crates/symthaea-sentinel/test-data/

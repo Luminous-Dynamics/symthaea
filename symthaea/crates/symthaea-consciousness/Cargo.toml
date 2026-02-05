@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-consciousness"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+symthaea-math = { path = "../symthaea-math" }
+symthaea-dynamics = { path = "../symthaea-dynamics" }
+# HDC Global Workspace (Improvement #23) - used by GlobalWorkspaceRouter
+symthaea-core = { path = "../../symthaea-core" }
+# Explicit versions (crate not yet in workspace)
+serde = { version = "1.0", features = ["derive"] }
+anyhow = "1.0"
+petgraph = { version = "0.6", features = ["serde-1"] }
+tracing = "0.1"
+rand = "0.8"

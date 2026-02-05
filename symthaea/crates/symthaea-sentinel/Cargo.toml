@@ -1,0 +1,66 @@
+[package]
+name = "symthaea-sentinel"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics"]
+description = "Symthaea Sentinel: Zero-shot temporal audio pattern recognition via HDC + LTC + CfC"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea-hlb"
+keywords = ["audio", "hdc", "ltc", "classification", "environmental-sound"]
+categories = ["multimedia::audio", "science", "algorithms"]
+
+[lib]
+name = "symthaea_sentinel"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sentinel-demo"
+path = "src/bin/sentinel_demo.rs"
+
+[[bin]]
+name = "sentinel-audio"
+path = "src/bin/sentinel_audio.rs"
+
+[[bin]]
+name = "sentinel-live"
+path = "src/bin/sentinel_live.rs"
+required-features = ["live-audio"]
+
+[[bin]]
+name = "sentinel-test"
+path = "src/bin/sentinel_test.rs"
+
+[[bin]]
+name = "sentinel-inspect"
+path = "src/bin/sentinel_inspect.rs"
+
+[[bin]]
+name = "sentinel-diagnostic"
+path = "src/bin/sentinel_diagnostic.rs"
+
+[[bin]]
+name = "sentinel-spectral"
+path = "src/bin/sentinel_spectral.rs"
+
+[[bin]]
+name = "sentinel-regularity"
+path = "src/bin/sentinel_regularity.rs"
+
+[dependencies]
+anyhow = "1.0"
+ctrlc = "3.4"
+rand = "0.8"
+ndarray = { version = "0.15", features = ["rayon"] }
+nalgebra = "0.33"
+symphonia = { version = "0.5", default-features = false, features = ["wav", "mp3", "ogg", "flac", "pcm", "vorbis"] }
+hound = "3.5"
+rustfft = "6.1"
+walkdir = "2.5"
+
+# Optional live audio
+cpal = { version = "0.17", optional = true }
+ringbuf = { version = "0.4", optional = true }
+
+[features]
+default = []
+live-audio = ["cpal", "ringbuf"]

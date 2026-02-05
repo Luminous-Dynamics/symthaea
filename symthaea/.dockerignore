@@ -1,0 +1,13 @@
+target/
+.git/
+.github/
+docs/
+papers/
+examples/
+benches/
+tests/
+*.md
+LICENSE*
+.gitignore
+.cargo/
+.vscode/
