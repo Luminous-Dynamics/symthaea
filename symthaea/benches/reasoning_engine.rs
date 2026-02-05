@@ -106,6 +106,25 @@ mod benches {
         });
     }
 
+    pub fn bench_tier1_cycle(c: &mut Criterion) {
+        let mut engine = ConsciousReasoningEngine::new();
+        let ctx = ReasoningContext {
+            theory_metrics: make_metrics(0.7),
+            phi: 0.8,
+            available_budget_us: 8_000, // Tier 1
+            available_actions: make_actions(),
+            tool: None,
+            recent_utility: 0.5,
+            cycle_id: 0,
+        };
+
+        c.bench_function("full_tier1_cycle", |b| {
+            b.iter(|| {
+                engine.reason(black_box(&ctx));
+            })
+        });
+    }
+
     pub fn bench_tier2_cycle(c: &mut Criterion) {
         let mut engine = ConsciousReasoningEngine::new();
         let ctx = ReasoningContext {
@@ -129,6 +148,46 @@ mod benches {
             })
         });
     }
+
+    pub fn bench_evs(c: &mut Criterion) {
+        use symthaea::consciousness::temporal_planning::mcts::evs;
+
+        c.bench_function("evs_calculation", |b| {
+            b.iter(|| {
+                evs(black_box(0.5), black_box(0.7), black_box(5), black_box(0.5))
+            })
+        });
+    }
+
+    pub fn bench_multi_cycle_stability(c: &mut Criterion) {
+        c.bench_function("50_cycle_stability", |b| {
+            b.iter(|| {
+                let mut engine = ConsciousReasoningEngine::new();
+                for i in 0..50 {
+                    let consensus = 0.5 + 0.3 * ((i as f64 * 0.1).sin());
+                    let ctx = ReasoningContext {
+                        theory_metrics: MultiTheoryMetrics {
+                            phi: 0.8,
+                            gwt: consensus,
+                            ast: consensus,
+                            pp: consensus,
+                            rpt: consensus,
+                            embodiment: consensus,
+                            unified: 0.8 * 0.2 + consensus * 0.8,
+                        },
+                        phi: 0.8,
+                        available_budget_us: 20_000,
+                        available_actions: make_actions(),
+                        tool: None,
+                        recent_utility: 0.5,
+                        cycle_id: i,
+                    };
+                    black_box(engine.reason(&ctx));
+                }
+                engine.stats()
+            })
+        });
+    }
 }
 
 #[cfg(feature = "reasoning_engine")]
@@ -138,7 +197,10 @@ criterion_group!(
     benches::bench_effective_phi,
     benches::bench_tool_classification,
     benches::bench_tier0_cycle,
+    benches::bench_tier1_cycle,
     benches::bench_tier2_cycle,
+    benches::bench_evs,
+    benches::bench_multi_cycle_stability,
 );
 
 #[cfg(feature = "reasoning_engine")]

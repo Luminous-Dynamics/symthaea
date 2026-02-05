@@ -158,7 +158,6 @@ impl LiteratureValidation {
         results.push(Self::validate_hea_properties());
         results.push(Self::validate_radiation_damage());
         results.push(Self::validate_fusion_parameters());
-        results.push(Self::validate_lcf_trigger_physics());
 
         Self { results }
     }
@@ -636,162 +635,6 @@ impl LiteratureValidation {
         ValidationResult::new("Fusion Parameters", params)
     }
 
-    /// Validate LCF trigger physics parameters against published experiments
-    fn validate_lcf_trigger_physics() -> ValidationResult {
-        let raiola = LiteratureReference {
-            key: "Raiola2004".to_string(),
-            citation: "Raiola et al., Eur. Phys. J. A 19 (2004) 283-287".to_string(),
-            doi: Some("10.1140/epja/i2003-10159-0".to_string()),
-            year: 2004,
-        };
-
-        let steinetz = LiteratureReference {
-            key: "Steinetz2020".to_string(),
-            citation: "Steinetz et al., Phys. Rev. C 101 (2020) 044610".to_string(),
-            doi: Some("10.1103/PhysRevC.101.044610".to_string()),
-            year: 2020,
-        };
-
-        let nist_estar = LiteratureReference {
-            key: "NIST-ESTAR".to_string(),
-            citation: "Berger et al., NIST ESTAR database".to_string(),
-            doi: None,
-            year: 2017,
-        };
-
-        let jones = LiteratureReference {
-            key: "Jones1986".to_string(),
-            citation: "Jones et al., Phys. Rev. Lett. 56 (1986) 588".to_string(),
-            doi: Some("10.1103/PhysRevLett.56.588".to_string()),
-            year: 1986,
-        };
-
-        let crc = LiteratureReference {
-            key: "CRC-104".to_string(),
-            citation: "CRC Handbook of Chemistry and Physics, 104th ed.".to_string(),
-            doi: None,
-            year: 2023,
-        };
-
-        let mut params = Vec::new();
-
-        // Electron screening energy in Pd
-        params.push(ValidatedParameter::new(
-            "Pd screening energy Ue",
-            309.0,  // code value
-            309.0,  // Raiola et al. 2004: 309 ± 12 eV
-            "eV",
-            0.05,   // Within experimental uncertainty
-            raiola.clone(),
-            "Measured via d(d,p)t in deuterated Pd; anomalously high vs Debye theory (25 eV)",
-        ));
-
-        // D-D S-factor
-        params.push(ValidatedParameter::new(
-            "D-D S(0) factor",
-            55.0,   // code value (keV·barn)
-            55.0,   // ENDF/B-VIII.0, confirmed by Krauss et al. (1987)
-            "keV·barn",
-            0.05,
-            LiteratureReference {
-                key: "ENDF-VIII".to_string(),
-                citation: "Brown et al., Nuclear Data Sheets 148 (2018) 1-142".to_string(),
-                doi: Some("10.1016/j.nds.2018.02.001".to_string()),
-                year: 2018,
-            },
-            "Astrophysical S-factor; roughly constant at low energies",
-        ));
-
-        // Pd Debye temperature
-        params.push(ValidatedParameter::new(
-            "Pd Debye temperature",
-            274.0,  // code value (K)
-            274.0,  // CRC Handbook
-            "K",
-            0.03,
-            crc.clone(),
-            "Determines maximum phonon energy (~23.6 meV)",
-        ));
-
-        // PdD optical phonon energy
-        params.push(ValidatedParameter::new(
-            "PdD₀.₇ optical phonon",
-            56.0,   // code value (meV)
-            56.0,   // Ross et al. 1998 via inelastic neutron scattering
-            "meV",
-            0.10,
-            LiteratureReference {
-                key: "Ross1998".to_string(),
-                citation: "Ross et al., J. Alloys Compd. 270 (1998) 244-248".to_string(),
-                doi: None,
-                year: 1998,
-            },
-            "D optical phonon band in PdD; higher than Pd acoustic modes",
-        ));
-
-        // Electron range at 50 keV in Pd
-        params.push(ValidatedParameter::new(
-            "e⁻ CSDA range (50 keV, Pd)",
-            8.7,    // code value (μm)
-            8.7,    // NIST ESTAR
-            "μm",
-            0.05,
-            nist_estar.clone(),
-            "CSDA range; actual path shorter due to straggling",
-        ));
-
-        // Pd K-edge energy
-        params.push(ValidatedParameter::new(
-            "Pd K-edge",
-            24.35,  // code value (keV)
-            24.35,  // NIST X-ray transition energies
-            "keV",
-            0.01,
-            nist_estar.clone(),
-            "Important for X-ray trigger optimization",
-        ));
-
-        // Muon fusions per muon
-        params.push(ValidatedParameter::new(
-            "Fusions per muon (D-T)",
-            150.0,  // code value
-            150.0,  // Jones et al. 1986
-            "",
-            0.10,
-            jones.clone(),
-            "Limited by alpha sticking (~0.5%)",
-        ));
-
-        // Muon lifetime
-        params.push(ValidatedParameter::new(
-            "Muon lifetime",
-            2.196,  // code value (μs)
-            2.196,  // PDG 2024
-            "μs",
-            0.01,
-            LiteratureReference {
-                key: "PDG2024".to_string(),
-                citation: "Particle Data Group, Phys. Rev. D 110 (2024)".to_string(),
-                doi: None,
-                year: 2024,
-            },
-            "Fundamental constant; well-measured",
-        ));
-
-        // NASA LCF neutron rate
-        params.push(ValidatedParameter::new(
-            "NASA LCF neutron rate",
-            1e3,    // code value (n/s per cm²)
-            1e3,    // Steinetz et al. 2020
-            "n/s/cm²",
-            0.50,   // Wide tolerance - order of magnitude
-            steinetz,
-            "From deuterated PdAu under 12 keV X-rays; first NASA confirmation of LCF",
-        ));
-
-        ValidationResult::new("LCF Trigger Physics", params)
-    }
-
     /// Print validation summary
     pub fn print_summary(&self) {
         println!("\n");
@@ -863,8 +706,8 @@ mod tests {
     fn test_validation_runs() {
         let validation = LiteratureValidation::validate_all();
 
-        // Should have 6 categories
-        assert_eq!(validation.results.len(), 6);
+        // Should have 5 categories
+        assert_eq!(validation.results.len(), 5);
 
         // Check each category has parameters
         for result in &validation.results {
