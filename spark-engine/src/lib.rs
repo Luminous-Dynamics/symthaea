@@ -56,6 +56,10 @@ pub mod literature;
 pub mod hypothesis_models;
 pub mod rate_gap;
 pub mod experimental_design;
+pub mod uncertainty;
+
+// Integration modules
+pub mod bridge;
 
 // Core re-exports
 pub use physics::{GamowIntegration, GamowResult, QFactor, QFactorParams};

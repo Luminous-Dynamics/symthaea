@@ -31,6 +31,14 @@ proptest = "1.0"
 # name = "gamow_integration"
 # harness = false
 
+[[bin]]
+name = "spark"
+path = "src/bin/spark.rs"
+
+[[example]]
+name = "analysis_runner"
+path = "examples/analysis_runner.rs"
+
 [profile.release]
 opt-level = 3
 lto = true

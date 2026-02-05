@@ -571,6 +571,281 @@ impl LiteratureDatabase {
             },
             notes: "Nano-powder Pd. Gas loading method.".to_string(),
         });
+
+        // Czerski 2004 - Screening in metals
+        self.observations.push(Observation {
+            id: "czerski2004".to_string(),
+            author: "Czerski".to_string(),
+            year: 2004,
+            venue: "Europhysics Letters".to_string(),
+            doi: Some("10.1209/epl/i2004-10095-7".to_string()),
+            host_material: HostMaterial::Titanium,
+            fuel: Fuel::Deuterium,
+            trigger: TriggerMethod::IonImplantation,
+            effects: vec![
+                ObservedEffect::ChargedParticles {
+                    type_: "protons".to_string(),
+                    rate_per_s: 1e4,
+                },
+            ],
+            signal: SignalClaim {
+                metric: "screening energy".to_string(),
+                value: 363.0,
+                unit: "eV".to_string(),
+                uncertainty: Some(25.0),
+                signal_to_background: Some(50.0),
+            },
+            controls: vec![
+                ControlExperiment {
+                    control_type: ControlType::DifferentMaterial,
+                    result: ControlResult::NullAsExpected,
+                    notes: "Different Ue for Ta, Al".to_string(),
+                },
+            ],
+            credibility: Credibility {
+                score: 8.5,
+                peer_reviewed: true,
+                multi_method: false,
+                proper_controls: true,
+                statistical_rigor: true,
+                author_reputation: Reputation::Academic,
+                conflicts: None,
+            },
+            replications: ReplicationStatus {
+                successes: 3,
+                failures: 1,
+                partial: 1,
+                notes: vec!["Confirmed by multiple accelerator labs".to_string()],
+            },
+            conditions: ExperimentalConditions {
+                temperature_k: Some(300.0),
+                pressure_atm: None,
+                loading_ratio: Some(1.5), // TiD2
+                current_density: None,
+                trigger_power_w: None,
+                sample_mass_g: Some(0.2),
+                duration_hours: Some(2.0),
+            },
+            notes: "Confirms anomalously large screening in metals. Ti shows Ue = 363 eV.".to_string(),
+        });
+
+        // McKubre 1998 - SRI excess heat
+        self.observations.push(Observation {
+            id: "mckubre1998".to_string(),
+            author: "McKubre".to_string(),
+            year: 1998,
+            venue: "ICCF-7 Proceedings".to_string(),
+            doi: None,
+            host_material: HostMaterial::Palladium,
+            fuel: Fuel::Deuterium,
+            trigger: TriggerMethod::Electrolysis,
+            effects: vec![
+                ObservedEffect::ExcessHeat { power_w: 20.0, duration_s: 86400.0 },
+            ],
+            signal: SignalClaim {
+                metric: "excess power".to_string(),
+                value: 20.0,
+                unit: "W".to_string(),
+                uncertainty: Some(5.0),
+                signal_to_background: Some(4.0),
+            },
+            controls: vec![
+                ControlExperiment {
+                    control_type: ControlType::HydrogenControl,
+                    result: ControlResult::NullAsExpected,
+                    notes: "H2O showed no excess".to_string(),
+                },
+            ],
+            credibility: Credibility {
+                score: 6.5,
+                peer_reviewed: false, // Conference proceedings
+                multi_method: true,
+                proper_controls: true,
+                statistical_rigor: true,
+                author_reputation: Reputation::National, // SRI
+                conflicts: Some("EPRI funding".to_string()),
+            },
+            replications: ReplicationStatus {
+                successes: 10,
+                failures: 20,
+                partial: 15,
+                notes: vec![
+                    "Required D/Pd > 0.9".to_string(),
+                    "Highly variable results".to_string(),
+                ],
+            },
+            conditions: ExperimentalConditions {
+                temperature_k: Some(320.0),
+                pressure_atm: Some(1.0),
+                loading_ratio: Some(0.95),
+                current_density: Some(200.0),
+                trigger_power_w: None,
+                sample_mass_g: Some(15.0),
+                duration_hours: Some(200.0),
+            },
+            notes: "SRI systematic studies. Shows loading threshold D/Pd > 0.9.".to_string(),
+        });
+
+        // Storms 2007 - Review/meta-analysis
+        self.observations.push(Observation {
+            id: "storms2007".to_string(),
+            author: "Storms".to_string(),
+            year: 2007,
+            venue: "The Science of Low Energy Nuclear Reaction".to_string(),
+            doi: None,
+            host_material: HostMaterial::Palladium,
+            fuel: Fuel::Deuterium,
+            trigger: TriggerMethod::Electrolysis,
+            effects: vec![
+                ObservedEffect::ExcessHeat { power_w: 10.0, duration_s: 1e6 },
+                ObservedEffect::Helium4 { amount_atoms: 1e14 },
+            ],
+            signal: SignalClaim {
+                metric: "He-4/heat correlation".to_string(),
+                value: 24.0,
+                unit: "MeV/He".to_string(),
+                uncertainty: Some(5.0),
+                signal_to_background: None,
+            },
+            controls: vec![],
+            credibility: Credibility {
+                score: 5.0,
+                peer_reviewed: false, // Book
+                multi_method: true,
+                proper_controls: false,
+                statistical_rigor: false,
+                author_reputation: Reputation::Independent,
+                conflicts: Some("LENR advocate".to_string()),
+            },
+            replications: ReplicationStatus {
+                successes: 0,
+                failures: 0,
+                partial: 0,
+                notes: vec!["Review paper, not original experiment".to_string()],
+            },
+            conditions: ExperimentalConditions {
+                temperature_k: None,
+                pressure_atm: None,
+                loading_ratio: None,
+                current_density: None,
+                trigger_power_w: None,
+                sample_mass_g: None,
+                duration_hours: None,
+            },
+            notes: "Meta-analysis claiming He-4/heat correlation = 24 MeV (D+D→He4 Q-value).".to_string(),
+        });
+
+        // Iwamura 2002 - Transmutation claims
+        self.observations.push(Observation {
+            id: "iwamura2002".to_string(),
+            author: "Iwamura".to_string(),
+            year: 2002,
+            venue: "Japanese Journal of Applied Physics".to_string(),
+            doi: Some("10.1143/JJAP.41.4642".to_string()),
+            host_material: HostMaterial::Palladium,
+            fuel: Fuel::Deuterium,
+            trigger: TriggerMethod::GasLoading,
+            effects: vec![
+                ObservedEffect::Transmutation {
+                    from: "Cs".to_string(),
+                    to: "Pr".to_string(),
+                    amount: "10^12 atoms".to_string(),
+                },
+                ObservedEffect::Transmutation {
+                    from: "Sr".to_string(),
+                    to: "Mo".to_string(),
+                    amount: "10^11 atoms".to_string(),
+                },
+            ],
+            signal: SignalClaim {
+                metric: "transmutation rate".to_string(),
+                value: 1e12,
+                unit: "atoms".to_string(),
+                uncertainty: None,
+                signal_to_background: Some(100.0),
+            },
+            controls: vec![
+                ControlExperiment {
+                    control_type: ControlType::HydrogenControl,
+                    result: ControlResult::NullAsExpected,
+                    notes: "No transmutation with H".to_string(),
+                },
+            ],
+            credibility: Credibility {
+                score: 4.5,
+                peer_reviewed: true,
+                multi_method: true, // XPS, SIMS
+                proper_controls: true,
+                statistical_rigor: false,
+                author_reputation: Reputation::Industrial, // Mitsubishi Heavy Industries
+                conflicts: Some("MHI funding".to_string()),
+            },
+            replications: ReplicationStatus {
+                successes: 1,
+                failures: 5,
+                partial: 2,
+                notes: vec![
+                    "Toyota partially replicated".to_string(),
+                    "Most attempts failed".to_string(),
+                ],
+            },
+            conditions: ExperimentalConditions {
+                temperature_k: Some(343.0),
+                pressure_atm: Some(1.0),
+                loading_ratio: Some(0.7),
+                current_density: None,
+                trigger_power_w: None,
+                sample_mass_g: Some(1.0),
+                duration_hours: Some(100.0),
+            },
+            notes: "Controversial transmutation claims. Requires Cs or Sr surface layer.".to_string(),
+        });
+
+        // Huizenga 1993 - Negative review
+        self.observations.push(Observation {
+            id: "huizenga1993".to_string(),
+            author: "Huizenga".to_string(),
+            year: 1993,
+            venue: "Cold Fusion: The Scientific Fiasco of the Century".to_string(),
+            doi: None,
+            host_material: HostMaterial::Palladium,
+            fuel: Fuel::Deuterium,
+            trigger: TriggerMethod::Electrolysis,
+            effects: vec![],
+            signal: SignalClaim {
+                metric: "no effect".to_string(),
+                value: 0.0,
+                unit: "N/A".to_string(),
+                uncertainty: None,
+                signal_to_background: None,
+            },
+            controls: vec![],
+            credibility: Credibility {
+                score: 7.0,
+                peer_reviewed: false,
+                multi_method: false,
+                proper_controls: false,
+                statistical_rigor: false,
+                author_reputation: Reputation::Established, // DOE panel chair
+                conflicts: Some("DOE panel chair - skeptical position".to_string()),
+            },
+            replications: ReplicationStatus {
+                successes: 0,
+                failures: 0,
+                partial: 0,
+                notes: vec!["Review/critique, not experiment".to_string()],
+            },
+            conditions: ExperimentalConditions {
+                temperature_k: None,
+                pressure_atm: None,
+                loading_ratio: None,
+                current_density: None,
+                trigger_power_w: None,
+                sample_mass_g: None,
+                duration_hours: None,
+            },
+            notes: "Skeptical review. Documents failed replications at major labs.".to_string(),
+        });
     }
 
     /// Get all observations.

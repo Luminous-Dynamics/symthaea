@@ -343,6 +343,126 @@ impl SuperScreeningModel {
 }
 
 // ============================================================================
+// Hypothesis 4: Oppenheimer-Phillips Effect
+// ============================================================================
+
+/// Model for Oppenheimer-Phillips (stripping) reactions.
+///
+/// In the O-P mechanism, the neutron in a deuteron can be captured by
+/// a target nucleus before the Coulomb barrier is fully penetrated,
+/// because the neutron experiences no Coulomb repulsion. This effectively
+/// reduces the barrier for certain reactions.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OppenheimerPhillipsModel {
+    /// Target nucleus (typically Pd)
+    pub target_z: u32,
+    /// Target mass number
+    pub target_a: u32,
+    /// Effective barrier reduction (keV)
+    pub barrier_reduction_kev: f64,
+    /// Enhancement factor over direct D-D
+    pub enhancement_factor: f64,
+    /// Predicted neutron rate per cm³
+    pub predicted_rate_per_cm3: f64,
+    /// Expected products
+    pub products: String,
+}
+
+impl OppenheimerPhillipsModel {
+    /// Compute O-P model for D + Pd stripping.
+    ///
+    /// D + ¹⁰⁶Pd → n + ¹⁰⁷Ag (stripping)
+    /// The neutron from D is captured by Pd, releasing the proton.
+    pub fn compute_pd() -> Self {
+        let target_z = 46; // Pd
+        let target_a = 106;
+
+        // Coulomb barrier for d + Pd: V_c = Z_d * Z_Pd * e² / R
+        // R ≈ 1.2 * (A_d^(1/3) + A_Pd^(1/3)) fm
+        // For d + Pd: R ≈ 1.2 * (2^0.33 + 106^0.33) ≈ 7.2 fm
+        // V_c ≈ 1 * 46 * 1.44 / 7.2 ≈ 9.2 MeV
+
+        // O-P reduces this because neutron can tunnel ahead
+        // Effective barrier reduction: ~50% for favorable cases
+        let full_barrier_kev = 9200.0;
+        let barrier_reduction_kev = full_barrier_kev * 0.5;
+
+        // Enhancement is enormous but reaction produces different products
+        // This is NOT D-D fusion, so doesn't produce 2.45 MeV neutrons
+        let enhancement_factor = 1e10; // Very rough estimate
+
+        // However, O-P on Pd is endothermic (Q < 0), so rate is suppressed
+        // D + ¹⁰⁶Pd → p + ¹⁰⁷Pd* requires energy input
+        let predicted_rate_per_cm3 = 1e-30; // Negligible for energy-producing reaction
+
+        Self {
+            target_z,
+            target_a,
+            barrier_reduction_kev,
+            enhancement_factor,
+            predicted_rate_per_cm3,
+            products: "p + ¹⁰⁷Pd (not D-D fusion products)".to_string(),
+        }
+    }
+
+    /// Check if O-P could explain neutron observations.
+    ///
+    /// Key issue: O-P on most targets doesn't produce 2.45 MeV neutrons.
+    /// If observations show 2.45 MeV neutrons, O-P is not the explanation.
+    pub fn explains_dd_neutrons(&self) -> bool {
+        // O-P produces different products than D-D, so cannot explain
+        // observations of 2.45 MeV neutrons which are D-D signature
+        false
+    }
+}
+
+// ============================================================================
+// Hypothesis 5: Electron Capture / Virtual Photon
+// ============================================================================
+
+/// Model for electron-assisted fusion.
+///
+/// A lattice electron could briefly form a virtual "dineutron" state,
+/// reducing the Coulomb barrier. This is highly speculative.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElectronAssistedModel {
+    /// Electron screening contribution (eV)
+    pub screening_ev: f64,
+    /// Virtual state lifetime (s)
+    pub virtual_lifetime_s: f64,
+    /// Enhancement factor (highly uncertain)
+    pub enhancement_factor: f64,
+    /// Theoretical basis
+    pub theory_status: String,
+}
+
+impl ElectronAssistedModel {
+    /// Compute electron-assisted model.
+    pub fn compute() -> Self {
+        // This is highly speculative physics
+        // The idea is that an electron could briefly screen the D-D
+        // interaction more effectively than static screening
+
+        // Virtual state lifetime from uncertainty principle
+        // Δt ~ ℏ / ΔE, for ΔE ~ 1 keV, Δt ~ 10⁻¹⁸ s
+        let virtual_lifetime_s = 1e-18;
+
+        // Extra screening from dynamic electron
+        let screening_ev = 500.0; // Speculative
+
+        // Enhancement is modest because virtual state is brief
+        let enhancement_factor = 10.0;
+
+        Self {
+            screening_ev,
+            virtual_lifetime_s,
+            enhancement_factor,
+            theory_status: "Highly speculative - no accepted theoretical framework".to_string(),
+        }
+    }
+}
+
+// ============================================================================
 // Combined Model Comparison
 // ============================================================================
 
