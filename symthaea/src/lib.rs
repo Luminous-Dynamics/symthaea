@@ -357,6 +357,13 @@ pub mod gui_bridge;
 // Physics: Spark Engine, plasma encoding, and physical simulations
 pub mod physics;
 
+// Physics Discovery: HDC-based anomaly detection, symbolic regression, pattern matching
+pub mod physics_discovery;
+
+// Meta: Self-analysis, code quality metrics, active inference exploration, dream synthesis
+#[cfg(feature = "code_generation")]
+pub mod meta;
+
 // REPL Orchestrator - Unified interactive system
 // Wires together: cognitive_loop, language, action, voice, shell, observability
 pub mod repl;
