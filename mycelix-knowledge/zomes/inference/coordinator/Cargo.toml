@@ -14,4 +14,3 @@ serde_json = { workspace = true }
 inference_integrity = { path = "../integrity" }
 graph_integrity = { path = "../../graph/integrity" }
 claims_integrity = { path = "../../claims/integrity" }
-getrandom = { workspace = true }

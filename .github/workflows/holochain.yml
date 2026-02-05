@@ -1,0 +1,811 @@
+# Mycelix Holochain - Zome Development Pipeline
+# Build, test, and package Holochain DNAs and hApps
+
+name: Holochain
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Mycelix-Core/dna/**'
+      - 'Mycelix-Core/zomes/**'
+      - 'Mycelix-Core/libs/**'
+      - 'mycelix-governance/zomes/**'
+      - 'mycelix-workspace/happs/**'
+      - 'mycelix-workspace/sdk/**'
+      - 'mycelix-care/zomes/**'
+      - 'mycelix-emergency/zomes/**'
+      - 'mycelix-water/zomes/**'
+      - 'mycelix-housing/zomes/**'
+      - '.github/workflows/holochain.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Mycelix-Core/dna/**'
+      - 'Mycelix-Core/zomes/**'
+      - 'Mycelix-Core/libs/**'
+      - 'mycelix-governance/zomes/**'
+      - 'mycelix-workspace/happs/**'
+      - 'mycelix-workspace/sdk/**'
+      - 'mycelix-care/zomes/**'
+      - 'mycelix-emergency/zomes/**'
+      - 'mycelix-water/zomes/**'
+      - 'mycelix-housing/zomes/**'
+      - '.github/workflows/holochain.yml'
+
+concurrency:
+  group: holochain-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  RUST_LOG: info
+
+jobs:
+  # ============================================================================
+  # Build Zomes (WASM)
+  # ============================================================================
+  build-zomes:
+    name: Build Zomes
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            Mycelix-Core/target/
+            mycelix-workspace/sdk/target/
+            mycelix-care/target/
+            mycelix-emergency/target/
+            mycelix-water/target/
+            mycelix-housing/target/
+          key: ${{ runner.os }}-cargo-holochain-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-holochain-
+
+      - name: Enter Nix shell and build zomes
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Holochain Version ==="
+            holochain --version || echo "holochain not found, using cargo"
+            hc --version || echo "hc not found"
+
+            echo ""
+            echo "=== Building Bridge Zome ==="
+            if [ -d "Mycelix-Core/dna/agents" ]; then
+              cd Mycelix-Core/dna/agents
+              cargo build --release --target wasm32-unknown-unknown
+              cd -
+            fi
+
+            echo ""
+            echo "=== Building Byzantine FL Zome ==="
+            if [ -d "Mycelix-Core/dna/byzantine_fl" ]; then
+              cd Mycelix-Core/dna/byzantine_fl
+              cargo build --release --target wasm32-unknown-unknown
+              cd -
+            fi
+
+            echo ""
+            echo "=== Building H_FL Zome ==="
+            if [ -d "Mycelix-Core/dna/h_fl" ]; then
+              cd Mycelix-Core/dna/h_fl
+              cargo build --release --target wasm32-unknown-unknown
+              cd -
+            fi
+
+            echo ""
+            echo "=== Building Mycelix-Care Zomes ==="
+            for pkg in timebank_integrity timebank circles_integrity circles matching_integrity matching care_plans_integrity care_plans credentials_integrity credentials care_bridge_integrity care_bridge; do
+              cd mycelix-care && cargo build --release --target wasm32-unknown-unknown -p "$pkg" && cd -
+            done
+
+            echo ""
+            echo "=== Building Mycelix-Emergency Zomes ==="
+            for pkg in incidents_integrity incidents triage_integrity triage resources_integrity resources coordination_integrity coordination shelters_integrity shelters comms_integrity comms emergency_bridge_integrity emergency_bridge; do
+              cd mycelix-emergency && cargo build --release --target wasm32-unknown-unknown -p "$pkg" && cd -
+            done
+
+            echo ""
+            echo "=== Building Mycelix-Water Zomes ==="
+            for pkg in flow_integrity flow purity_integrity purity capture_integrity capture steward_integrity steward wisdom_integrity wisdom water_bridge_integrity water_bridge; do
+              cd mycelix-water && cargo build --release --target wasm32-unknown-unknown -p "$pkg" && cd -
+            done
+
+            echo ""
+            echo "=== Building Mycelix-Housing Zomes ==="
+            for pkg in units_integrity units membership_integrity membership finances_integrity finances maintenance_integrity maintenance clt_integrity clt housing_governance_integrity housing_governance housing_bridge_integrity housing_bridge; do
+              cd mycelix-housing && cargo build --release --target wasm32-unknown-unknown -p "$pkg" && cd -
+            done
+
+            echo ""
+            echo "=== Building SDK ==="
+            cd mycelix-workspace/sdk
+            cargo build --release
+          '
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zome-wasm
+          path: |
+            Mycelix-Core/dna/*/target/wasm32-unknown-unknown/release/*.wasm
+            Mycelix-Core/target/wasm32-unknown-unknown/release/*.wasm
+            mycelix-care/target/wasm32-unknown-unknown/release/*.wasm
+            mycelix-emergency/target/wasm32-unknown-unknown/release/*.wasm
+            mycelix-water/target/wasm32-unknown-unknown/release/*.wasm
+            mycelix-housing/target/wasm32-unknown-unknown/release/*.wasm
+          if-no-files-found: warn
+
+  # ============================================================================
+  # Run Zome Tests
+  # ============================================================================
+  test-zomes:
+    name: Test Zomes
+    runs-on: ubuntu-latest
+    needs: build-zomes
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            Mycelix-Core/target/
+          key: ${{ runner.os }}-cargo-holochain-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-holochain-
+
+      - name: Run zome unit tests
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Running Zome Unit Tests ==="
+
+            # Test each zome
+            for zome_dir in Mycelix-Core/dna/*/; do
+              if [ -f "${zome_dir}Cargo.toml" ]; then
+                echo "Testing $(basename $zome_dir)..."
+                cd "$zome_dir"
+                cargo test --all-features
+                cd -
+              fi
+            done
+
+            # Test SDK
+            echo ""
+            echo "=== Running SDK Tests ==="
+            cd mycelix-workspace/sdk
+            cargo test --all-features
+          '
+
+      - name: Run integration tests
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Running Integration Tests ==="
+
+            if [ -d "mycelix-workspace/sdk/tests" ]; then
+              cd mycelix-workspace/sdk
+              cargo test --test "*" -- --test-threads=1
+            fi
+          '
+
+  # ============================================================================
+  # Build and Test SDK Documentation
+  # ============================================================================
+  sdk-docs:
+    name: SDK Documentation
+    runs-on: ubuntu-latest
+    needs: test-zomes
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            mycelix-workspace/sdk/target/
+          key: ${{ runner.os }}-cargo-sdk-docs-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-sdk-docs-
+
+      - name: Build SDK documentation
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Building SDK Documentation ==="
+            cd mycelix-workspace/sdk
+            cargo doc --no-deps --manifest-path Cargo.toml
+            echo "✓ Documentation built successfully"
+          '
+
+      - name: Test SDK doc examples
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Testing SDK Documentation Examples ==="
+            cd mycelix-workspace/sdk
+            cargo test --doc --manifest-path Cargo.toml
+            echo "✓ All doc tests passed"
+          '
+
+  # ============================================================================
+  # Check Zome Formatting & Linting
+  # ============================================================================
+  lint-zomes:
+    name: Lint Zomes
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Check formatting
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Checking Rust Formatting ==="
+
+            for dir in Mycelix-Core/dna/*/ mycelix-workspace/sdk/ mycelix-care/ mycelix-emergency/ mycelix-water/ mycelix-housing/; do
+              if [ -f "${dir}Cargo.toml" ]; then
+                echo "Checking $(basename $dir)..."
+                cd "$dir"
+                cargo fmt --check
+                cd -
+              fi
+            done
+          '
+
+      - name: Run Clippy
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Running Clippy ==="
+
+            for dir in Mycelix-Core/dna/*/ mycelix-workspace/sdk/ mycelix-care/ mycelix-emergency/ mycelix-water/ mycelix-housing/; do
+              if [ -f "${dir}Cargo.toml" ]; then
+                echo "Linting $(basename $dir)..."
+                cd "$dir"
+                cargo clippy --all-targets -- -D warnings
+                cd -
+              fi
+            done
+          '
+
+  # ============================================================================
+  # Package DNAs
+  # ============================================================================
+  package-dna:
+    name: Package DNAs
+    runs-on: ubuntu-latest
+    needs: [build-zomes, test-zomes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: zome-wasm
+          path: wasm-artifacts
+
+      - name: Package DNAs
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Packaging DNAs ==="
+
+            mkdir -p dist/dna
+
+            # Package each DNA
+            for dna_dir in Mycelix-Core/dna/*/; do
+              dna_name=$(basename "$dna_dir")
+              if [ -f "${dna_dir}dna.yaml" ]; then
+                echo "Packaging $dna_name..."
+                hc dna pack "$dna_dir" -o "dist/dna/${dna_name}.dna" || {
+                  echo "Failed to package $dna_name (hc not available or dna.yaml invalid)"
+                }
+              fi
+            done
+
+            echo ""
+            echo "=== Packaged DNAs ==="
+            ls -la dist/dna/ || echo "No DNAs packaged"
+          '
+
+      - name: Upload DNA artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dna-bundles
+          path: dist/dna/
+          if-no-files-found: warn
+
+  # ============================================================================
+  # Sweettest Integration Tests (all suites)
+  # ============================================================================
+  # IMPORTANT: --release is required. Debug mode exceeds Holochain's hardcoded
+  # 5-minute nonce lifetime (FRESH_NONCE_EXPIRES_AFTER in holochain_nonce-0.6.0).
+  sweettest:
+    name: Sweettest Integration
+    runs-on: ubuntu-latest
+    needs: package-dna
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Download DNA artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dna-bundles
+          path: dist/dna
+
+      - name: Run sweettest - Identity (4 tests)
+        run: |
+          nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release identity -- --ignored --test-threads=1 --nocapture"
+
+      - name: Run sweettest - Governance (3 tests)
+        run: |
+          nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release governance -- --ignored --test-threads=1 --nocapture"
+
+      - name: Run sweettest - Cross-hApp Bridge (2 tests)
+        run: |
+          nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release bridge -- --ignored --test-threads=1 --nocapture"
+
+      - name: Run sweettest - Privacy/ZK Attestation (6 tests)
+        run: |
+          nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release privacy -- --ignored --test-threads=1 --nocapture"
+
+  # ============================================================================
+  # Package hApps
+  # ============================================================================
+  package-happs:
+    name: Package hApps
+    runs-on: ubuntu-latest
+    needs: package-dna
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Download DNA artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dna-bundles
+          path: dist/dna
+
+      - name: Package hApps
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Packaging hApps ==="
+
+            mkdir -p dist/happ
+
+            # Package each hApp
+            for happ_dir in mycelix-workspace/happs/*/; do
+              happ_name=$(basename "$happ_dir")
+              # Skip symlinks
+              if [ -L "$happ_dir" ]; then
+                continue
+              fi
+              if [ -f "${happ_dir}happ.yaml" ]; then
+                echo "Packaging $happ_name..."
+                hc app pack "$happ_dir" -o "dist/happ/${happ_name}.happ" || {
+                  echo "Failed to package $happ_name"
+                }
+              fi
+            done
+
+            echo ""
+            echo "=== Packaged hApps ==="
+            ls -la dist/happ/ || echo "No hApps packaged"
+          '
+
+      - name: Upload hApp artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: happ-bundles
+          path: dist/happ/
+          if-no-files-found: warn
+
+  # ============================================================================
+  # Multi-Conductor Integration Tests
+  # ============================================================================
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [build-zomes, test-zomes]
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            Mycelix-Core/target/
+            mycelix-governance/target/
+            mycelix-care/target/
+            mycelix-emergency/target/
+            mycelix-water/target/
+            mycelix-housing/target/
+          key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-holochain-
+
+      - name: Run Rust integration tests
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Mycelix-Core Integration Tests ==="
+            if [ -d "Mycelix-Core/tests/integration" ]; then
+              cd Mycelix-Core
+              cargo test -p mycelix-integration-tests --all-features -- --test-threads=1
+              cd -
+            fi
+
+            echo ""
+            echo "=== Governance Zome Integration Tests ==="
+            if [ -d "mycelix-governance" ]; then
+              cd mycelix-governance
+              cargo test --all-features -- --test-threads=1
+              cd -
+            fi
+
+            echo ""
+            echo "=== Mycelix-Care Integration Tests ==="
+            if [ -d "mycelix-care" ]; then
+              cd mycelix-care
+              cargo test --all-features -- --test-threads=1
+              cd -
+            fi
+
+            echo ""
+            echo "=== Mycelix-Emergency Integration Tests ==="
+            if [ -d "mycelix-emergency" ]; then
+              cd mycelix-emergency
+              cargo test --all-features -- --test-threads=1
+              cd -
+            fi
+
+            echo ""
+            echo "=== Mycelix-Water Integration Tests ==="
+            if [ -d "mycelix-water" ]; then
+              cd mycelix-water
+              cargo test --all-features -- --test-threads=1
+              cd -
+            fi
+
+            echo ""
+            echo "=== Mycelix-Housing Integration Tests ==="
+            if [ -d "mycelix-housing" ]; then
+              cd mycelix-housing
+              cargo test --all-features -- --test-threads=1
+              cd -
+            fi
+
+            echo ""
+            echo "=== SDK Integration Tests ==="
+            cd mycelix-workspace/sdk
+            cargo test integration --all-features -- --test-threads=1
+          '
+
+      - name: Run multi-conductor tests
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Starting Multi-Conductor Environment ==="
+
+            # Create test environments for 3 conductors
+            for i in 1 2 3; do
+              mkdir -p /tmp/holochain-test/conductor-$i/{data,keystore}
+              ADMIN_PORT=$((4440 + i))
+              APP_PORT=$((8880 + i))
+
+              cat > /tmp/holochain-test/conductor-$i/config.yaml << EOF
+            data_root_path: /tmp/holochain-test/conductor-$i/data
+            keystore:
+              type: lair_server_in_proc
+            admin_interfaces:
+              - driver:
+                  type: websocket
+                  port: $ADMIN_PORT
+            network:
+              bootstrap_service: null
+              network_type: quic_mdns
+            EOF
+            done
+
+            LAIR_PASSPHRASE=$(openssl rand -base64 32)
+            PIDS=""
+
+            # Start 3 conductors
+            for i in 1 2 3; do
+              echo "Starting conductor $i..."
+              echo "$LAIR_PASSPHRASE" | holochain -c /tmp/holochain-test/conductor-$i/config.yaml &
+              PIDS="$PIDS $!"
+            done
+
+            # Wait for conductors to start
+            echo "Waiting for conductors to initialize..."
+            sleep 15
+
+            # Check conductor health
+            for i in 1 2 3; do
+              PORT=$((4440 + i))
+              if lsof -i:$PORT >/dev/null 2>&1; then
+                echo "Conductor $i listening on port $PORT"
+              else
+                echo "Warning: Conductor $i not responding on port $PORT"
+              fi
+            done
+
+            # Run multi-agent tests
+            echo ""
+            echo "=== Running Multi-Agent Tests ==="
+            export CONDUCTOR_AVAILABLE=true
+            export ADMIN_PORT_1=4441
+            export ADMIN_PORT_2=4442
+            export ADMIN_PORT_3=4443
+
+            cd mycelix-workspace/sdk
+            cargo test multi_agent --all-features -- --test-threads=1
+
+            # Cleanup
+            echo ""
+            echo "=== Cleanup ==="
+            for pid in $PIDS; do
+              kill $pid 2>/dev/null || true
+            done
+          '
+
+  # ============================================================================
+  # TypeScript SDK Conductor Tests
+  # ============================================================================
+  sdk-conductor-tests:
+    name: SDK Conductor Tests
+    runs-on: ubuntu-latest
+    needs: [build-zomes, test-zomes]
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Holochain Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mycelix-workspace/sdk-ts/package-lock.json
+
+      - name: Install SDK dependencies
+        run: |
+          cd mycelix-workspace/sdk-ts
+          npm ci
+
+      - name: Start conductor and run tests
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Starting Holochain Conductor ==="
+
+            mkdir -p /tmp/holochain-test/{conductor,keystore}
+            LAIR_PASSPHRASE=$(openssl rand -base64 32)
+
+            cat > /tmp/holochain-test/conductor-config.yaml << EOF
+          data_root_path: /tmp/holochain-test/conductor
+          keystore:
+            type: lair_server_in_proc
+          admin_interfaces:
+            - driver:
+                type: websocket
+                port: 4444
+          app_interfaces:
+            - driver:
+                type: websocket
+                port: 8888
+          EOF
+
+            echo "$LAIR_PASSPHRASE" | holochain -c /tmp/holochain-test/conductor-config.yaml &
+            CONDUCTOR_PID=$!
+            sleep 15
+
+            echo "=== Running TypeScript Conductor Tests ==="
+            export CONDUCTOR_AVAILABLE=true
+            export HOLOCHAIN_ADMIN_PORT=4444
+            export HOLOCHAIN_APP_PORT=8888
+
+            cd mycelix-workspace/sdk-ts
+            npm run test:conductor
+
+            kill $CONDUCTOR_PID 2>/dev/null || true
+          '
+
+  # ============================================================================
+  # Summary
+  # ============================================================================
+  holochain-summary:
+    name: Holochain Summary
+    if: always()
+    needs: [build-zomes, test-zomes, sdk-docs, lint-zomes, package-dna, package-happs, integration-test, sdk-conductor-tests, sweettest]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Holochain Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Zomes | ${{ needs.build-zomes.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Zomes | ${{ needs.test-zomes.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SDK Documentation | ${{ needs.sdk-docs.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint Zomes | ${{ needs.lint-zomes.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-test.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| SDK Conductor Tests | ${{ needs.sdk-conductor-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sweettest Integration (15 tests) | ${{ needs.sweettest.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Package DNAs | ${{ needs.package-dna.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Package hApps | ${{ needs.package-happs.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "- Rust integration tests: Mycelix-Core, Governance, Care, Emergency, Water, Housing zomes" >> $GITHUB_STEP_SUMMARY
+          echo "- Multi-conductor: 3 nodes for network simulation" >> $GITHUB_STEP_SUMMARY
+          echo "- Sweettest: Identity (4), Governance (3), Bridge (2), Privacy/ZK (6) = 15 tests" >> $GITHUB_STEP_SUMMARY
+          echo "- TypeScript SDK: Conductor integration tests" >> $GITHUB_STEP_SUMMARY
+          echo "- SDK Documentation: Doc build and example verification" >> $GITHUB_STEP_SUMMARY

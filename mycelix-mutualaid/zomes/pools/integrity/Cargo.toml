@@ -7,7 +7,6 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-getrandom = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 hdi = { workspace = true }
 serde = { workspace = true }

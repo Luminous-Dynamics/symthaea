@@ -8,7 +8,6 @@ crate-type = ["cdylib", "rlib"]
 name = "factcheck"
 
 [dependencies]
-getrandom = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }

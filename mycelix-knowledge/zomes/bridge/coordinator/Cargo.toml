@@ -13,4 +13,3 @@ hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 knowledge_bridge_integrity = { path = "../integrity" }
-getrandom = { workspace = true }

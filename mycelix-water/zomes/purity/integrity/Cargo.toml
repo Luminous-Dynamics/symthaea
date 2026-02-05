@@ -12,4 +12,3 @@ hdi = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-getrandom = { workspace = true }

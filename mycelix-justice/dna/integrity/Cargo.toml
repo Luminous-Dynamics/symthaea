@@ -9,7 +9,6 @@ crate-type = ["cdylib", "rlib"]
 name = "mycelix_justice_integrity"
 
 [dependencies]
-getrandom.workspace = true
 hdi.workspace = true
 holochain_serialized_bytes.workspace = true
 serde.workspace = true

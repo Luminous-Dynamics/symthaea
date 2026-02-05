@@ -15,4 +15,3 @@ holochain_serialized_bytes = { workspace = true }
 traffic_control_integrity = { path = "../integrity" }
 mycelix-space-shared = { path = "../../../../zomes/shared" }
 orbital-mechanics = { path = "../../../../lib/orbital-mechanics" }
-getrandom = { workspace = true }

@@ -10,7 +10,6 @@ crate-type = ["cdylib", "rlib"]
 name = "cases"
 
 [dependencies]
-getrandom.workspace = true
 getrandom_03.workspace = true
 hdk.workspace = true
 serde.workspace = true

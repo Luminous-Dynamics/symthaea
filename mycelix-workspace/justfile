@@ -1,0 +1,1024 @@
+# Mycelix Ecosystem - Task Runner
+# Run `just` to see all available commands
+
+# Default: show help
+default:
+    @just --list --unsorted
+
+# ============================================================
+# ONE-COMMAND STARTUP (NEW!)
+# ============================================================
+
+# 🚀 RECOMMENDED: Build and start everything in one command
+up: _ensure-built
+    @echo ""
+    @echo "🍄 =================================="
+    @echo "   MYCELIX ECOSYSTEM STARTING"
+    @echo "🍄 =================================="
+    @echo ""
+    @just _check-deps
+    @just stop 2>/dev/null || true
+    @echo "🔐 Starting Lair keystore..."
+    @mkdir -p .lair
+    @lair-keystore server run --piped &>/dev/null &
+    @sleep 2
+    @echo "🔌 Starting Holochain conductor..."
+    @if [ ! -f "conductor-config.yaml" ]; then just _generate-conductor-config; fi
+    @holochain -c conductor-config.yaml &>/dev/null &
+    @sleep 3
+    @echo "📊 Starting Observatory dashboard..."
+    @if [ -f "observatory/package.json" ]; then cd observatory && pnpm dev &>/dev/null &; fi
+    @sleep 2
+    @echo ""
+    @echo "✅ =================================="
+    @echo "   MYCELIX IS READY!"
+    @echo "✅ =================================="
+    @echo ""
+    @echo "📊 Observatory:     http://localhost:5173"
+    @echo "🔌 Conductor Admin: ws://localhost:4444"
+    @echo "🔌 Conductor App:   ws://localhost:4445"
+    @echo ""
+    @echo "Commands:"
+    @echo "  just status    - Check ecosystem status"
+    @echo "  just logs      - View live logs"
+    @echo "  just stop      - Stop all services"
+    @echo "  just test      - Run all tests"
+    @echo ""
+
+# Quick start for new developers (minimal)
+quick-start:
+    @echo ""
+    @echo "🍄 MYCELIX QUICK START"
+    @echo "======================"
+    @echo ""
+    @just _check-deps
+    @echo "✓ Dependencies verified"
+    @echo ""
+    @echo "Building minimal hApps..."
+    @just build-sdk 2>/dev/null || true
+    @just build-production 2>/dev/null || true
+    @echo ""
+    @echo "Starting services..."
+    @just up
+    @echo ""
+    @echo "📖 Next steps:"
+    @echo "   1. Visit http://localhost:5173 (Observatory)"
+    @echo "   2. Run 'just test' to verify everything works"
+    @echo "   3. See 'just' for all available commands"
+    @echo ""
+
+# Full ecosystem: build everything then start
+all: build up
+    @echo "🍄 Full ecosystem is running!"
+
+# View live logs from all services
+logs:
+    @echo "📋 Live logs (Ctrl+C to stop):"
+    @tail -f /tmp/mycelix-*.log 2>/dev/null || echo "No logs found. Services may not be running."
+
+# ============================================================
+# DEVELOPMENT
+# ============================================================
+
+# Start all services for local development
+dev:
+    @echo "🍄 Starting Mycelix development environment..."
+    @just _check-deps
+    just _start-lair &
+    sleep 2
+    just _start-conductor &
+    sleep 3
+    just _start-observatory &
+    @echo ""
+    @echo "✅ All services started!"
+    @echo "   Observatory: http://localhost:5173"
+    @echo "   Conductor Admin: localhost:4444"
+    @echo "   Conductor App: localhost:4445"
+
+# Stop all running services
+stop:
+    @echo "🛑 Stopping all services..."
+    -pkill -f "lair-keystore" 2>/dev/null || true
+    -pkill -f "holochain" 2>/dev/null || true
+    -pkill -f "vite" 2>/dev/null || true
+    @echo "✅ All services stopped"
+
+# Restart all services
+restart: stop dev
+
+# ============================================================
+# BUILDING
+# ============================================================
+
+# Build all components
+build: build-sdk build-happs
+    @echo "✅ All components built!"
+
+# Build the Rust SDK
+build-sdk:
+    @echo "🔨 Building mycelix-sdk (Rust)..."
+    cd sdk && cargo build --release
+
+# Build the TypeScript SDK
+build-sdk-ts:
+    @echo "🔨 Building @mycelix/sdk (TypeScript)..."
+    @if [ -f "sdk-ts/package.json" ]; then \
+        cd sdk-ts && pnpm install && pnpm build; \
+    else \
+        echo "⚠️  sdk-ts not found"; \
+    fi
+
+# Build all hApps (18 total)
+build-happs: build-core build-epistemic-markets build-fabrication build-mail build-marketplace build-edunet build-supplychain build-identity build-knowledge build-governance build-justice build-finance build-property build-energy build-media build-desci build-music
+    @echo "✅ All hApps built!"
+
+# Build production-ready hApps only
+build-production: build-core build-epistemic-markets build-fabrication build-edunet build-marketplace
+    @echo "✅ Production hApps built!"
+
+# Build Mycelix-Core
+build-core:
+    @echo "🧠 Building Mycelix-Core..."
+    @if [ -d "happs/core/dna" ]; then \
+        cd happs/core && hc dna pack dna && hc app pack .; \
+    else \
+        echo "⚠️  happs/core not found, skipping"; \
+    fi
+
+# Build Mycelix-Mail
+build-mail:
+    @echo "📧 Building Mycelix-Mail..."
+    @if [ -d "happs/mail/holochain/dna" ]; then \
+        cd happs/mail/holochain && hc dna pack dna && hc app pack .; \
+    else \
+        echo "⚠️  happs/mail not found, skipping"; \
+    fi
+
+# Build Mycelix-Marketplace
+build-marketplace:
+    @echo "🏪 Building Mycelix-Marketplace..."
+    @if [ -f "happs/marketplace/backend/build-happ.sh" ]; then \
+        cd happs/marketplace/backend && ./build-happ.sh; \
+    elif [ -f "happs/marketplace/backend/happ.yaml" ]; then \
+        cd happs/marketplace/backend && hc dna pack . && hc app pack .; \
+    else \
+        echo "⚠️  happs/marketplace not found, skipping"; \
+    fi
+
+# Build Mycelix-EduNet
+build-edunet:
+    @echo "📚 Building Mycelix-EduNet..."
+    @if [ -d "happs/edunet/dna" ] && [ -d "happs/edunet/happ" ]; then \
+        cd happs/edunet && hc dna pack dna && hc app pack happ; \
+    else \
+        echo "⚠️  happs/edunet not found, skipping"; \
+    fi
+
+# Build Mycelix-SupplyChain
+build-supplychain:
+    @echo "📦 Building Mycelix-SupplyChain..."
+    @if [ -d "happs/supplychain/holochain" ]; then \
+        cd happs/supplychain/holochain && hc dna pack . && hc app pack .; \
+    else \
+        echo "⚠️  happs/supplychain not found, skipping"; \
+    fi
+
+# Build Mycelix-Music
+build-music:
+    @echo "🎵 Building Mycelix-Music..."
+    @if [ -d "happs/music/dnas" ]; then \
+        cd happs/music && hc dna pack dnas && hc app pack .; \
+    else \
+        echo "⚠️  happs/music not found or not ready, skipping"; \
+    fi
+
+# Build Epistemic Markets (Native hApp)
+build-epistemic-markets:
+    @echo "🔮 Building Epistemic Markets..."
+    @if [ -d "happs/epistemic-markets/zomes" ]; then \
+        cd happs/epistemic-markets && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack . && hc app pack .; \
+    else \
+        echo "⚠️  happs/epistemic-markets not found, skipping"; \
+    fi
+
+# Build Fabrication (Native hApp)
+build-fabrication:
+    @echo "🏭 Building Fabrication..."
+    @if [ -d "happs/fabrication/zomes" ]; then \
+        cd happs/fabrication && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack . && hc app pack .; \
+    else \
+        echo "⚠️  happs/fabrication not found, skipping"; \
+    fi
+
+# Build Mycelix-Identity
+build-identity:
+    @echo "🪪 Building Mycelix-Identity..."
+    @if [ -d "happs/identity" ] && [ -f "happs/identity/Cargo.toml" ]; then \
+        cd happs/identity && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack . 2>/dev/null || true && hc app pack . 2>/dev/null || true; \
+    else \
+        echo "⚠️  happs/identity not ready, skipping"; \
+    fi
+
+# Build Mycelix-Knowledge
+build-knowledge:
+    @echo "📚 Building Mycelix-Knowledge..."
+    @if [ -d "happs/knowledge" ] && [ -f "happs/knowledge/Cargo.toml" ]; then \
+        cd happs/knowledge && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack . 2>/dev/null || true && hc app pack . 2>/dev/null || true; \
+    else \
+        echo "⚠️  happs/knowledge not ready, skipping"; \
+    fi
+
+# Build Mycelix-Governance
+build-governance:
+    @echo "🏛️ Building Mycelix-Governance..."
+    @if [ -d "happs/governance" ] && [ -f "happs/governance/Cargo.toml" ]; then \
+        cd happs/governance && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack . 2>/dev/null || true && hc app pack . 2>/dev/null || true; \
+    else \
+        echo "⚠️  happs/governance not ready, skipping"; \
+    fi
+
+# Build Mycelix-Justice
+build-justice:
+    @echo "⚖️ Building Mycelix-Justice..."
+    @if [ -d "happs/justice" ] && [ -f "happs/justice/Cargo.toml" ]; then \
+        cd happs/justice && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack . 2>/dev/null || true && hc app pack . 2>/dev/null || true; \
+    else \
+        echo "⚠️  happs/justice not ready, skipping"; \
+    fi
+
+# Build Mycelix-Finance
+build-finance:
+    @echo "💰 Building Mycelix-Finance..."
+    @if [ -d "happs/finance/dna" ]; then \
+        cd happs/finance && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna && hc app pack .; \
+    else \
+        echo "⚠️  happs/finance not ready, skipping"; \
+    fi
+
+# Build Mycelix-Property
+build-property:
+    @echo "🏠 Building Mycelix-Property..."
+    @if [ -d "happs/property/dna" ]; then \
+        cd happs/property && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna && hc app pack .; \
+    else \
+        echo "⚠️  happs/property not ready, skipping"; \
+    fi
+
+# Build Mycelix-Energy
+build-energy:
+    @echo "⚡ Building Mycelix-Energy..."
+    @if [ -d "happs/energy/dna" ]; then \
+        cd happs/energy && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna && hc app pack .; \
+    else \
+        echo "⚠️  happs/energy not ready, skipping"; \
+    fi
+
+# Build Mycelix-Media
+build-media:
+    @echo "📰 Building Mycelix-Media..."
+    @if [ -d "happs/media/dna" ]; then \
+        cd happs/media && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna && hc app pack .; \
+    else \
+        echo "⚠️  happs/media not ready, skipping"; \
+    fi
+
+# Build Mycelix-DeSci
+build-desci:
+    @echo "🔬 Building Mycelix-DeSci..."
+    @if [ -d "happs/desci" ] && [ -f "happs/desci/Cargo.toml" ]; then \
+        cd happs/desci && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack . 2>/dev/null || true && hc app pack . 2>/dev/null || true; \
+    else \
+        echo "⚠️  happs/desci not ready, skipping"; \
+    fi
+
+# Build all hApps to WASM (compilation verification)
+build-wasm-all:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo ""
+    echo "🔨 Building ALL hApps to WASM"
+    echo "=============================="
+    echo ""
+
+    passed=0
+    failed=0
+    errors=""
+
+    declare -A HAPPS
+    HAPPS[core]="/srv/luminous-dynamics/Mycelix-Core"
+    HAPPS[epistemic-markets]="/srv/luminous-dynamics/mycelix-workspace/happs/epistemic-markets"
+    HAPPS[health]="/srv/luminous-dynamics/mycelix-health"
+    HAPPS[energy]="/srv/luminous-dynamics/mycelix-energy"
+    HAPPS[identity]="/srv/luminous-dynamics/mycelix-identity"
+    HAPPS[governance]="/srv/luminous-dynamics/mycelix-governance"
+    HAPPS[finance]="/srv/luminous-dynamics/mycelix-finance"
+    HAPPS[justice]="/srv/luminous-dynamics/mycelix-justice"
+    HAPPS[media]="/srv/luminous-dynamics/mycelix-media"
+    HAPPS[property]="/srv/luminous-dynamics/mycelix-property"
+    HAPPS[climate]="/srv/luminous-dynamics/mycelix-climate"
+    HAPPS[space]="/srv/luminous-dynamics/mycelix-space"
+    HAPPS[consensus]="/srv/luminous-dynamics/mycelix-workspace/happs/consensus"
+    HAPPS[fabrication]="/srv/luminous-dynamics/mycelix-workspace/happs/fabrication"
+
+    for name in "${!HAPPS[@]}"; do
+        dir="${HAPPS[$name]}"
+        if [ -f "$dir/Cargo.toml" ]; then
+            echo -n "  $name... "
+            if (cd "$dir" && cargo build --target wasm32-unknown-unknown 2>/dev/null); then
+                echo "OK"
+                ((passed++))
+            else
+                echo "FAIL"
+                ((failed++))
+                errors="$errors $name"
+            fi
+        fi
+    done
+
+    echo ""
+    echo "Results: $passed passed, $failed failed"
+    if [ "$failed" -gt 0 ]; then
+        echo "Failed:$errors"
+        exit 1
+    fi
+
+# ============================================================
+# TESTING
+# ============================================================
+
+# Run all tests (SDKs + hApps where available)
+test: test-sdk-rust test-sdk-ts test-sdk-python test-happs test-byzantine
+    @echo "✅ All tests (where available) completed!"
+
+# Run Rust SDK tests
+test-sdk-rust:
+    @echo "🧪 Testing mycelix-sdk (Rust)..."
+    cd sdk && cargo test
+
+# Run TypeScript SDK tests
+test-sdk-ts:
+    @echo "🧪 Testing @mycelix/sdk (TypeScript)..."
+    @if [ -f "sdk-ts/package.json" ]; then \
+        cd sdk-ts && pnpm test; \
+    else \
+        echo "⚠️  sdk-ts not found, skipping"; \
+    fi
+
+# Run Python SDK tests
+test-sdk-python:
+    @echo "🧪 Testing mycelix (Python SDK)..."
+    @if [ -f "sdk-python/pyproject.toml" ]; then \
+        cd sdk-python && pytest; \
+    else \
+        echo "⚠️  sdk-python not found, skipping"; \
+    fi
+
+# Run hApp tests (front-end / per-hApp test runners)
+test-happs:
+    @echo "🧪 Testing hApps (where configured)..."
+    @if [ -f "happs/mail/package.json" ]; then cd happs/mail && pnpm test; fi
+    @if [ -f "happs/marketplace/package.json" ]; then cd happs/marketplace && pnpm test; fi
+    @if [ -f "happs/edunet/package.json" ]; then cd happs/edunet && pnpm test; fi
+
+# Run Byzantine fault tolerance tests (0TML or future E2E)
+test-byzantine:
+    @echo "🛡️ Testing Byzantine fault tolerance..."
+    @if [ -d "core/0tml" ]; then \
+        cd core/0tml && python -m pytest tests/byzantine/ -v; \
+    else \
+        echo "ℹ️  core/0tml not present in this workspace; see tests/byzantine/README.md for current Byzantine test locations"; \
+    fi
+
+# Run integration tests (placeholder)
+test-integration:
+    @echo "🔗 Integration tests entrypoint (see tests/integration/README.md)..."
+    @if [ -d "tests/ecosystem" ]; then \
+        cd tests/ecosystem && pnpm test; \
+    else \
+        echo "⚠️  tests/ecosystem not found, skipping"; \
+    fi
+
+# Run tests with coverage
+test-coverage:
+    @echo "📊 Running tests with coverage..."
+    cd sdk && cargo tarpaulin --out Html
+
+# ============================================================
+# HOLOCHAIN 0.6 MIGRATION
+# ============================================================
+
+# Check migration status for all hApps
+migrate:
+    @echo "Holochain 0.6 Migration Status"
+    @echo "=================================="
+    @echo ""
+    @echo "Required Versions:"
+    @echo "  holochain: 0.6.0"
+    @echo "  hc:        0.6.0"
+    @echo "  hdk:       0.6.0"
+    @echo "  hdi:       0.7.0"
+    @echo "  @holochain/client: 0.20.0"
+    @echo "  tryorama:  0.19.0"
+    @echo ""
+    @echo "Current Versions:"
+    @echo "  holochain: $(holochain --version 2>/dev/null || echo 'not installed')"
+    @echo "  hc:        $(hc --version 2>/dev/null || echo 'not installed')"
+    @echo ""
+    @echo "hApps (via happs/ symlinks):"
+    @echo "  [x] core        - Byzantine FL Engine (3 zomes)"
+    @echo "  [x] mail        - Decentralized Email (10 zomes)"
+    @echo "  [ ] marketplace - P2P Commerce (9 zomes, Phase 4)"
+    @echo "  [ ] edunet      - Privacy Education (20 zomes, Phase 9)"
+    @echo "  [ ] supplychain - Provenance Tracking (Alpha)"
+    @echo "  [ ] music       - Entertainment Royalties (Early Dev)"
+    @echo ""
+    @echo "SDK:"
+    @echo "  [x] sdk (Rust - MATL, Epistemic, Bridge, ZK)"
+    @echo "  [x] sdk-ts (TypeScript bindings)"
+    @echo "  [x] sdk-python (Python bindings)"
+
+# Check all zomes compile
+check-zomes:
+    @echo "Checking core zomes..."
+    cd ../Mycelix-Core/civitas_dna/zomes/civitas_reputation && cargo check
+    cd ../Mycelix-Core/civitas_dna/zomes/causal_contribution && cargo check
+    @echo "Checking Mail zomes..."
+    cd ../Mycelix-Mail/holochain && cargo check
+    @echo "All zomes check passed!"
+
+# Check SDK-TS
+check-sdk-ts:
+    @echo "Running SDK-TS tests..."
+    cd sdk-ts && npm test
+
+# Migrate a specific hApp to Holochain 0.6
+migrate-happ happ:
+    @echo "🔄 Migrating {{happ}} to Holochain 0.6..."
+    @just _migrate-cargo "happs/{{happ}}"
+    @just _migrate-package-json "happs/{{happ}}"
+    @echo "✅ Migration complete for {{happ}}"
+    @echo "   Please review changes and run tests"
+
+# ============================================================
+# DOCUMENTATION
+# ============================================================
+
+# Serve documentation locally
+docs:
+    @echo "📚 Starting documentation server..."
+    cd docs && pnpm dev
+
+# Build documentation
+docs-build:
+    @echo "📚 Building documentation..."
+    cd docs && pnpm build
+
+# ============================================================
+# CODE QUALITY
+# ============================================================
+
+# Format all code
+fmt:
+    @echo "🎨 Formatting code..."
+    cd sdk && cargo fmt
+    @if [ -f "happs/mail/package.json" ]; then cd happs/mail && pnpm format; fi
+    @if [ -f "happs/marketplace/package.json" ]; then cd happs/marketplace && pnpm format; fi
+    @if [ -f "observatory/package.json" ]; then cd observatory && pnpm format; fi
+    @if [ -d "core/0tml" ]; then cd core/0tml && ruff format .; fi
+
+# Lint all code
+lint:
+    @echo "🔍 Linting code..."
+    cd sdk && cargo clippy -- -D warnings
+    @if [ -f "happs/mail/package.json" ]; then cd happs/mail && pnpm lint; fi
+    @if [ -d "core/0tml" ]; then cd core/0tml && ruff check .; fi
+
+# Run all checks (format, lint, test)
+check: fmt lint test
+    @echo "✅ All checks passed!"
+
+# ============================================================
+# RELEASE
+# ============================================================
+
+# Create a new release
+release version:
+    @echo "🚀 Creating release v{{version}}..."
+    @echo "Updating version numbers..."
+    # Update Cargo.toml versions
+    @sed -i 's/^version = ".*"/version = "{{version}}"/' sdk/Cargo.toml
+    @echo "Running tests..."
+    just test
+    @echo "Building release artifacts..."
+    just build
+    @echo "Creating git tag..."
+    git add -A
+    git commit -m "Release v{{version}}"
+    git tag -a "v{{version}}" -m "Release v{{version}}"
+    @echo "✅ Release v{{version}} ready!"
+    @echo "   Run 'git push && git push --tags' to publish"
+
+# ============================================================
+# CLEANUP
+# ============================================================
+
+# Clean build artifacts
+clean:
+    @echo "🧹 Cleaning build artifacts..."
+    cd sdk && cargo clean
+    rm -rf happs/*/target
+    rm -rf happs/*/*.happ
+    rm -rf happs/*/*.dna
+    rm -rf observatory/.svelte-kit
+    rm -rf node_modules
+    @echo "✅ Clean complete"
+
+# Deep clean (including dependencies)
+clean-all: clean
+    @echo "🧹 Deep cleaning..."
+    rm -rf .venv
+    rm -rf **/node_modules
+    rm -rf **/.pnpm-store
+    @echo "✅ Deep clean complete"
+
+# ============================================================
+# STATUS & VERIFICATION
+# ============================================================
+
+# Show ecosystem status
+status:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo ""
+    echo "Mycelix Ecosystem Status"
+    echo "========================"
+    echo ""
+    echo "SDKs:"
+    if [ -f "sdk/Cargo.toml" ]; then echo "  [OK] Rust SDK"; else echo "  [--] Rust SDK (missing)"; fi
+    if [ -f "sdk-ts/package.json" ]; then
+        version=$(grep '"version"' sdk-ts/package.json | head -1 | cut -d'"' -f4)
+        echo "  [OK] TypeScript SDK (v$version)"
+    else
+        echo "  [--] TypeScript SDK (missing)"
+    fi
+    echo ""
+    echo "hApps (18 total):"
+    echo ""
+    echo "  Production Ready:"
+    for happ in core epistemic-markets fabrication edunet marketplace; do
+        if [ -d "happs/$happ" ]; then
+            if [ -L "happs/$happ" ]; then
+                target=$(readlink "happs/$happ")
+                if [ -d "happs/$happ" ]; then
+                    echo "    [OK] $happ -> $target"
+                else
+                    echo "    [!!] $happ -> $target (broken)"
+                fi
+            else
+                echo "    [OK] $happ (native)"
+            fi
+        else
+            echo "    [--] $happ (missing)"
+        fi
+    done
+    echo ""
+    echo "  Active Development:"
+    for happ in mail supplychain identity; do
+        if [ -d "happs/$happ" ]; then
+            if [ -L "happs/$happ" ]; then
+                target=$(readlink "happs/$happ")
+                echo "    [WIP] $happ -> $target"
+            else
+                echo "    [WIP] $happ (native)"
+            fi
+        else
+            echo "    [--] $happ (missing)"
+        fi
+    done
+    echo ""
+    echo "  Early Stage:"
+    for happ in knowledge governance justice finance property energy media desci music desktop; do
+        if [ -d "happs/$happ" ]; then
+            if [ -L "happs/$happ" ]; then
+                target=$(readlink "happs/$happ")
+                echo "    [..] $happ -> $target"
+            else
+                echo "    [..] $happ (native)"
+            fi
+        else
+            echo "    [--] $happ (missing)"
+        fi
+    done
+    echo ""
+    echo "Tools:"
+    echo "  holochain: $(holochain --version 2>/dev/null || echo 'not installed')"
+    echo "  hc:        $(hc --version 2>/dev/null || echo 'not installed')"
+    echo "  cargo:     $(cargo --version 2>/dev/null || echo 'not installed')"
+    echo "  node:      $(node --version 2>/dev/null || echo 'not installed')"
+    echo ""
+
+# Verify WASM build artifacts exist
+verify-builds:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo ""
+    echo "Verifying WASM Build Artifacts"
+    echo "=============================="
+    echo ""
+    for happ in epistemic-markets fabrication edunet marketplace mail supplychain core identity governance knowledge; do
+        echo "Checking $happ..."
+        if [ -d "happs/$happ" ]; then
+            wasm_count=$(find -L "happs/$happ" -name "*.wasm" 2>/dev/null | wc -l)
+            dna_count=$(find -L "happs/$happ" -name "*.dna" 2>/dev/null | wc -l)
+            happ_count=$(find -L "happs/$happ" -name "*.happ" 2>/dev/null | wc -l)
+            if [ "$wasm_count" -gt 0 ]; then
+                echo "  [OK] WASM: $wasm_count files"
+            else
+                echo "  [--] WASM: No artifacts found"
+            fi
+            if [ "$dna_count" -gt 0 ]; then
+                echo "  [OK] DNA:  $dna_count bundles"
+            else
+                echo "  [..] DNA:  No bundles found"
+            fi
+            if [ "$happ_count" -gt 0 ]; then
+                echo "  [OK] hApp: $happ_count packages"
+            else
+                echo "  [..] hApp: No packages found"
+            fi
+        else
+            echo "  [--] Directory not found"
+        fi
+        echo ""
+    done
+
+# Verify all hApps can compile to WASM (comprehensive build test)
+verify-all-builds:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo ""
+    echo "🔨 Comprehensive Build Verification"
+    echo "===================================="
+    echo ""
+
+    passed=0
+    failed=0
+    skipped=0
+
+    # Core hApps with Cargo.toml
+    for happ_dir in /srv/luminous-dynamics/mycelix-identity \
+                    /srv/luminous-dynamics/mycelix-governance \
+                    /srv/luminous-dynamics/mycelix-knowledge \
+                    /srv/luminous-dynamics/mycelix-finance; do
+        name=$(basename "$happ_dir")
+        if [ -f "$happ_dir/Cargo.toml" ]; then
+            echo -n "Building $name... "
+            if cd "$happ_dir" && cargo build --release --target wasm32-unknown-unknown 2>/dev/null; then
+                wasm_count=$(find target/wasm32-unknown-unknown/release -maxdepth 1 -name "*.wasm" 2>/dev/null | wc -l)
+                echo "✅ ($wasm_count WASM files)"
+                ((passed++))
+            else
+                echo "❌ (build failed)"
+                ((failed++))
+            fi
+        else
+            echo "⏭️  $name (no Cargo.toml)"
+            ((skipped++))
+        fi
+    done
+
+    # Workspace native hApps
+    cd /srv/luminous-dynamics/mycelix-workspace
+    for happ in happs/epistemic-markets happs/fabrication; do
+        name=$(basename "$happ")
+        if [ -f "$happ/Cargo.toml" ]; then
+            echo -n "Building $name... "
+            if cd "$happ" && cargo build --release --target wasm32-unknown-unknown 2>/dev/null; then
+                wasm_count=$(find target/wasm32-unknown-unknown/release -maxdepth 1 -name "*.wasm" 2>/dev/null | wc -l)
+                echo "✅ ($wasm_count WASM files)"
+                ((passed++))
+            else
+                echo "❌ (build failed)"
+                ((failed++))
+            fi
+            cd /srv/luminous-dynamics/mycelix-workspace
+        fi
+    done
+
+    echo ""
+    echo "Summary: $passed passed, $failed failed, $skipped skipped"
+    echo ""
+
+    if [ "$failed" -gt 0 ]; then
+        exit 1
+    fi
+
+# Check symlinks are valid
+verify-symlinks:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo ""
+    echo "Verifying hApp Symlinks"
+    echo "======================="
+    echo ""
+    for happ in happs/*; do
+        name=$(basename "$happ")
+        if [ -L "$happ" ]; then
+            target=$(readlink "$happ")
+            if [ -d "$happ" ]; then
+                echo "[OK] $name -> $target"
+            else
+                echo "[!!] $name -> $target (BROKEN)"
+            fi
+        elif [ -d "$happ" ]; then
+            echo "[native] $name"
+        fi
+    done
+    echo ""
+
+# ============================================================
+# SDK-TS SPECIFIC
+# ============================================================
+
+# Run SDK-TS with coverage
+test-sdk-ts-coverage:
+    @echo "📊 Testing SDK-TS with coverage..."
+    @if [ -f "sdk-ts/package.json" ]; then \
+        cd sdk-ts && pnpm test:coverage; \
+    else \
+        echo "⚠️  sdk-ts not found"; \
+    fi
+
+# Lint TypeScript SDK
+lint-sdk-ts:
+    @echo "🔍 Linting @mycelix/sdk..."
+    @if [ -f "sdk-ts/package.json" ]; then \
+        cd sdk-ts && pnpm lint; \
+    else \
+        echo "⚠️  sdk-ts not found"; \
+    fi
+
+# Generate SDK-TS documentation
+docs-sdk-ts:
+    @echo "📚 Generating SDK-TS documentation..."
+    @if [ -f "sdk-ts/package.json" ]; then \
+        cd sdk-ts && pnpm docs; \
+    else \
+        echo "⚠️  sdk-ts not found"; \
+    fi
+
+# ============================================================
+# ECOSYSTEM TESTS
+# ============================================================
+
+# Test specific hApp
+test-edunet:
+    @echo "🧪 Testing EduNet..."
+    @if [ -f "happs/edunet/package.json" ]; then \
+        cd happs/edunet && pnpm test; \
+    elif [ -d "happs/edunet" ]; then \
+        cd happs/edunet && cargo test; \
+    else \
+        echo "⚠️  happs/edunet not found"; \
+    fi
+
+test-marketplace:
+    @echo "🧪 Testing Marketplace..."
+    @if [ -f "happs/marketplace/package.json" ]; then \
+        cd happs/marketplace && pnpm test; \
+    elif [ -d "happs/marketplace" ]; then \
+        cd happs/marketplace && cargo test; \
+    else \
+        echo "⚠️  happs/marketplace not found"; \
+    fi
+
+test-epistemic-markets:
+    @echo "🧪 Testing Epistemic Markets..."
+    @if [ -d "happs/epistemic-markets" ]; then \
+        cd happs/epistemic-markets && cargo test; \
+    else \
+        echo "⚠️  happs/epistemic-markets not found"; \
+    fi
+
+test-civic:
+    @echo "🧪 Testing Civic hApp..."
+    @if [ -f "services/civic-happ/client/package.json" ]; then \
+        cd services/civic-happ/client && npx vitest run; \
+    else \
+        echo "⚠️  civic-happ client not found"; \
+    fi
+
+test-civic-integration:
+    @echo "🧪 Testing Civic hApp (integration, needs conductor)..."
+    @if [ -d "services/civic-happ/tests" ]; then \
+        cd services/civic-happ && npx vitest run; \
+    else \
+        echo "⚠️  civic-happ tests not found"; \
+    fi
+
+test-fabrication:
+    @echo "🧪 Testing Fabrication..."
+    @if [ -d "happs/fabrication" ]; then \
+        cd happs/fabrication && cargo test; \
+    else \
+        echo "⚠️  happs/fabrication not found"; \
+    fi
+
+# Run ecosystem-wide tests (cross-hApp)
+test-ecosystem:
+    @echo "🌐 Running ecosystem tests..."
+    @just _check-deps
+    @if [ -d "tests/ecosystem" ]; then \
+        if [ ! -d "node_modules" ] && [ ! -d "tests/ecosystem/node_modules" ]; then \
+            echo "⚠️  Missing JS dependencies. Run 'pnpm install' from mycelix-workspace root."; \
+            exit 1; \
+        fi; \
+        cd tests/ecosystem && pnpm test; \
+    else \
+        echo "⚠️  tests/ecosystem not found"; \
+    fi
+
+# ============================================================
+# INTERNAL RECIPES (prefixed with _)
+# ============================================================
+
+_check-deps:
+    @command -v holochain >/dev/null 2>&1 || { echo "❌ holochain not found. Run 'nix develop' first."; exit 1; }
+    @command -v hc >/dev/null 2>&1 || { echo "❌ hc not found. Run 'nix develop' first."; exit 1; }
+
+_start-lair:
+    @echo "🔐 Starting Lair keystore..."
+    @mkdir -p .lair
+    lair-keystore server run --piped 2>&1 | while read line; do echo "[lair] $line"; done
+
+_start-conductor:
+    @echo "🔌 Starting Holochain conductor..."
+    @if [ ! -f "conductor-config.yaml" ]; then just _generate-conductor-config; fi
+    holochain -c conductor-config.yaml 2>&1 | while read line; do echo "[conductor] $line"; done
+
+_start-observatory:
+    @echo "📊 Starting Observatory dashboard..."
+    @if [ -f "observatory/package.json" ]; then \
+        cd observatory && pnpm dev 2>&1 | while read line; do echo "[observatory] $line"; done; \
+    else \
+        echo "⚠️  Observatory not set up yet"; \
+    fi
+
+_generate-conductor-config:
+    @echo "📝 Generating conductor config..."
+    @printf '%s\n' \
+        '---' \
+        'signing_service_uri: ~' \
+        'encryption_service_uri: ~' \
+        'decryption_service_uri: ~' \
+        'dpki: ~' \
+        'keystore:' \
+        '  type: lair_server_in_proc' \
+        'admin_interfaces:' \
+        '  - driver:' \
+        '      type: websocket' \
+        '      port: 4444' \
+        'network:' \
+        '  bootstrap_service: https://bootstrap.holo.host' \
+        '  transport_pool:' \
+        '    - type: webrtc' \
+        '      signal_url: wss://signal.holo.host' \
+        > conductor-config.yaml
+
+_check-hdk-versions:
+    @echo ""
+    @for dir in happs/*/dna/zomes/*/; do \
+        if [ -f "$$dir/Cargo.toml" ]; then \
+            echo "$$dir:"; \
+            grep -E "^hdk|^hdi" "$$dir/Cargo.toml" 2>/dev/null || echo "  (no hdk/hdi found)"; \
+            echo ""; \
+        fi; \
+    done
+
+_migrate-cargo path:
+    @echo "Updating Cargo.toml in {{path}}..."
+    @find {{path}} -name "Cargo.toml" -exec sed -i \
+        -e 's/hdk = "[0-9.]*"/hdk = "0.6.0"/' \
+        -e 's/hdi = "[0-9.]*"/hdi = "0.7.0"/' \
+        -e 's/holochain = "[0-9.]*"/holochain = "0.6.0"/' \
+        {} \;
+
+_migrate-package-json path:
+    @echo "Updating package.json in {{path}}..."
+    @if [ -f "{{path}}/package.json" ]; then \
+        sed -i 's/"@holochain\/client": "[^"]*"/"@holochain\/client": "^0.20.0"/' {{path}}/package.json; \
+        sed -i 's/"@holochain\/tryorama": "[^"]*"/"@holochain\/tryorama": "^0.19.0"/' {{path}}/package.json; \
+    fi
+
+_ensure-built:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    # Check if we have at least some builds
+    sdk_built=false
+    happs_built=false
+
+    if [ -f "sdk/target/release/libmycelix_sdk.rlib" ] || [ -d "sdk/target/release" ]; then
+        sdk_built=true
+    fi
+
+    # Count .happ files
+    happ_count=$(find happs -name "*.happ" 2>/dev/null | wc -l)
+    if [ "$happ_count" -gt 0 ]; then
+        happs_built=true
+    fi
+
+    if [ "$sdk_built" = false ] || [ "$happs_built" = false ]; then
+        echo "📦 First run detected - building minimal ecosystem..."
+        echo ""
+
+        if [ "$sdk_built" = false ]; then
+            echo "Building SDK..."
+            cd sdk && cargo build --release 2>/dev/null || true
+            cd ..
+        fi
+
+        if [ "$happs_built" = false ]; then
+            echo "Building production hApps..."
+            just build-production 2>/dev/null || true
+        fi
+
+        echo ""
+        echo "✓ Minimal build complete"
+    fi
+
+# Health check for all services
+_health-check:
+    #!/usr/bin/env bash
+    echo ""
+    echo "🏥 Health Check"
+    echo "==============="
+
+    # Check lair
+    if pgrep -x "lair-keystore" > /dev/null; then
+        echo "  [✓] Lair keystore running"
+    else
+        echo "  [✗] Lair keystore not running"
+    fi
+
+    # Check conductor
+    if pgrep -x "holochain" > /dev/null; then
+        echo "  [✓] Holochain conductor running"
+    else
+        echo "  [✗] Holochain conductor not running"
+    fi
+
+    # Check observatory
+    if pgrep -f "vite" > /dev/null && [ -f "observatory/package.json" ]; then
+        echo "  [✓] Observatory running"
+    else
+        echo "  [~] Observatory not running"
+    fi
+
+    echo ""
+
+# ============================================================
+# SWEETTEST INTEGRATION TESTS
+# ============================================================
+
+# Run sweettest integration tests (requires DNA bundles)
+# IMPORTANT: --release is required. Debug mode exceeds Holochain's 5-min nonce lifetime.
+test-sweettest:
+    @echo "Running sweettest integration tests (release mode)..."
+    @echo "Note: Tests are #[ignore] by default. Using --ignored flag."
+    cd tests/sweettest && cargo test --release -- --ignored --nocapture
+
+# Run specific sweettest suite
+test-sweettest-identity:
+    cd tests/sweettest && cargo test --release identity -- --ignored --nocapture
+
+test-sweettest-governance:
+    cd tests/sweettest && cargo test --release governance -- --ignored --nocapture
+
+test-sweettest-bridge:
+    cd tests/sweettest && cargo test --release bridge -- --ignored --nocapture
+
+test-sweettest-privacy:
+    cd tests/sweettest && cargo test --release privacy -- --ignored --nocapture

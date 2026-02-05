@@ -9,7 +9,6 @@ crate-type = ["cdylib", "rlib"]
 name = "justice_bridge"
 
 [dependencies]
-getrandom = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

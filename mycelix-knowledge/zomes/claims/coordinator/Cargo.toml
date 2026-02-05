@@ -12,5 +12,4 @@ hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 claims_integrity = { path = "../integrity" }
-getrandom = { workspace = true }
 getrandom_03 = { workspace = true }

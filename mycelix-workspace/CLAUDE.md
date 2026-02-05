@@ -69,14 +69,17 @@ Composite = 0.4·PoGQ + 0.3·Consistency + 0.3·Reputation
 | hdi | 0.7.0 |
 | @holochain/client | 0.20.0 |
 
-**Critical**: Pin `getrandom = "0.2"` with `features = ["js"]` for WASM.
+**Critical**: Use `getrandom v0.3` with `getrandom_backend="custom"` for WASM.
+Do NOT use `getrandom v0.2 features=["js"]` — it pulls in wasm-bindgen which is
+incompatible with Holochain's WASM runtime. HDK 0.6 provides `__getrandom_v03_custom`.
 
 ---
 
 ## Common Issues
 
-### "getrandom" WASM Error
-Pin to `getrandom = "0.2"` with `features = ["js"]`
+### "getrandom" / wasm-bindgen WASM Error
+Use `getrandom_03 = { package = "getrandom", version = "0.3" }` in workspace Cargo.toml
+and set `getrandom_backend="custom"` in `.cargo/config.toml`. See commit `1deaeb047`.
 
 ### Conductor Connection Failed
 ```bash
@@ -101,7 +104,7 @@ hc dna pack .
 | TypeScript SDK | 6,316 pass / 15 skip | All pass (libsodium ESM compat fixed) |
 | Identity unit | 23 | Pass (recovery + trust_credential) |
 | WASM zomes | 66 | Compile to wasm32-unknown-unknown |
-| Sweettest | Compiles | Ready - `just test-sweettest` |
+| Sweettest | 15/15 pass | `just test-sweettest` (--release required) |
 | Tryorama | 13 suites | Needs running conductor + hApp bundles |
 | Python SDK | 45 pass | Verified 2026-02-04, 87% coverage (MATL, epistemic, FL, bridge) |
 
@@ -109,7 +112,7 @@ See [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md) for full details.
 
 ## Development Priorities
 
-1. **P0**: Run sweettest in persistent session, fix CI `continue-on-error` flags
+1. **P0**: Sweettests passing (15/15). Fix CI `continue-on-error` flags, expand CI sweettest coverage
 2. **P1**: Add `cargo doc` + `cargo test --doc` to CI pipeline
 3. **P2**: Tryorama ecosystem test execution, E2E coverage
 
