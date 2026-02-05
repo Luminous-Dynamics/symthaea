@@ -95,6 +95,8 @@ pub async fn setup_test_agents(
 }
 
 /// Wait for DHT propagation between agents.
+/// Sweettest conductors gossip directly, but propagation still takes time,
+/// especially with 3+ conductors.
 pub async fn wait_for_dht_sync() {
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 }

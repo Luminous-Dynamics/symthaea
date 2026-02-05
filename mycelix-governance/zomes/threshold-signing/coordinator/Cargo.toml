@@ -14,8 +14,6 @@ holochain_serialized_bytes = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-# WASM compatibility - force getrandom feature unification
-getrandom = { workspace = true }
 
 [features]
 default = []

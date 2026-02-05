@@ -31,7 +31,7 @@ integrity:
     - name: treasury_integrity
       path: ../target/wasm32-unknown-unknown/release/treasury_integrity.wasm
     - name: finance_bridge_integrity
-      path: ../zomes/bridge/integrity/target/wasm32-unknown-unknown/release/finance_bridge_integrity.wasm
+      path: ../target/wasm32-unknown-unknown/release/finance_bridge_integrity.wasm
 
 coordinator:
   zomes:
@@ -54,6 +54,6 @@ coordinator:
         - name: treasury_integrity
         - name: payments_integrity
     - name: finance_bridge
-      path: ../zomes/bridge/coordinator/target/wasm32-unknown-unknown/release/finance_bridge.wasm
+      path: ../target/wasm32-unknown-unknown/release/finance_bridge.wasm
       dependencies:
         - name: finance_bridge_integrity

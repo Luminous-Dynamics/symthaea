@@ -136,10 +136,10 @@ async fn test_service_endpoint_crud() {
         .call_zome_fn("did_registry", "create_did", ())
         .await;
 
-    // Add a service endpoint
+    // Add a service endpoint (fields must match ServiceEndpoint struct: id, type_, service_endpoint)
     let service = serde_json::json!({
         "id": "mail-endpoint",
-        "service_type": "MycelixMail",
+        "type_": "MycelixMail",
         "service_endpoint": "https://mail.mycelix.net/alice"
     });
 

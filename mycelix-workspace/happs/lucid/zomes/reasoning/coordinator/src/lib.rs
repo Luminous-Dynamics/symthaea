@@ -14,7 +14,7 @@ fn create_anchor(s: &str) -> ExternResult<EntryHash> {
 
 fn generate_uuid() -> String {
     let mut bytes = [0u8; 16];
-    getrandom::getrandom(&mut bytes).expect("Failed to generate random bytes");
+    getrandom_03::fill(&mut bytes).expect("Failed to generate random bytes");
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     format!(

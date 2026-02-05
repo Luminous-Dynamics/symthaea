@@ -101,11 +101,23 @@ async fn test_identity_to_governance_flow() {
     );
 
     // Step 2: Create a governance proposal (requires an identity)
+    let now = Timestamp::now();
+    let voting_ends = Timestamp::from_micros(now.as_micros() + 24 * 60 * 60 * 1_000_000);
+
     let proposal_input = serde_json::json!({
+        "id": "MIP-BRIDGE-001",
         "title": "Test cross-hApp integration",
         "description": "Verifying identity-governance bridge",
-        "proposal_type": "Fast",
-        "voting_period_hours": 24
+        "proposal_type": "Standard",
+        "author": format!("did:mycelix:{}", agent.agent_pubkey),
+        "status": "Active",
+        "actions": "{}",
+        "discussion_url": null,
+        "voting_starts": now,
+        "voting_ends": voting_ends,
+        "created": now,
+        "updated": now,
+        "version": 1
     });
 
     let proposal_record: Record = agent

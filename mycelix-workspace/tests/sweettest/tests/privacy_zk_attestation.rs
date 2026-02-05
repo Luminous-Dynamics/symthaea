@@ -13,6 +13,7 @@ mod harness;
 use harness::{setup_test_agents, wait_for_dht_sync, DnaPaths};
 use holochain::prelude::*;
 use serde::Serialize;
+use serial_test::serial;
 
 /// Input for submitting a ZK proof attestation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,12 +39,13 @@ pub struct ValidAttestationInput {
 
 impl DnaPaths {
     pub fn lucid() -> std::path::PathBuf {
-        Self::workspace_root().join("happs/lucid/workdir/lucid.dna")
+        Self::workspace_root().join("happs/lucid/lucid.dna")
     }
 }
 
 /// Test submitting a ZK proof attestation
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
 #[ignore] // Run with: cargo test -- --ignored
 async fn test_submit_proof_attestation() {
     let dna_path = DnaPaths::lucid();
@@ -73,7 +75,8 @@ async fn test_submit_proof_attestation() {
 }
 
 /// Test retrieving attestations by subject
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
 #[ignore]
 async fn test_get_subject_attestations() {
     let dna_path = DnaPaths::lucid();
@@ -110,7 +113,8 @@ async fn test_get_subject_attestations() {
 }
 
 /// Test retrieving attestations by proof type
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
 #[ignore]
 async fn test_get_attestations_by_type() {
     let dna_path = DnaPaths::lucid();
@@ -151,7 +155,8 @@ async fn test_get_attestations_by_type() {
 }
 
 /// Test checking for valid attestation
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
 #[ignore]
 async fn test_has_valid_attestation() {
     let dna_path = DnaPaths::lucid();
@@ -198,7 +203,8 @@ async fn test_has_valid_attestation() {
 }
 
 /// Test attestation with expiration
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
 #[ignore]
 async fn test_attestation_expiration() {
     let dna_path = DnaPaths::lucid();
@@ -240,7 +246,8 @@ async fn test_attestation_expiration() {
 }
 
 /// Test multi-agent attestation verification
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
 #[ignore]
 async fn test_multi_agent_attestation() {
     let dna_path = DnaPaths::lucid();

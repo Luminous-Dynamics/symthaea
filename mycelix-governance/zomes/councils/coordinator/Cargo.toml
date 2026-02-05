@@ -14,5 +14,3 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 councils_integrity = { path = "../integrity" }
 mycelix-core-types = { workspace = true }
-# WASM compatibility - force getrandom feature unification
-getrandom = { workspace = true }
