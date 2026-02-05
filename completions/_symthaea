@@ -1,0 +1,141 @@
+#compdef symthaea symthaea-shell symthaea-repl symthaea-service symthaea-gui
+
+# Symthaea Shell Completions for Zsh
+# E2: Shell Completions
+#
+# Install: Copy to a directory in $fpath, e.g.:
+#   mkdir -p ~/.zsh/completions
+#   cp _symthaea ~/.zsh/completions/
+#   echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
+#   autoload -Uz compinit && compinit
+
+local -a commands
+local -a slash_commands
+local -a services
+local -a rebuild_opts
+
+# Main symthaea shell commands
+commands=(
+    'install:Install packages to NixOS configuration'
+    'add:Add packages (alias for install)'
+    'remove:Remove packages from configuration'
+    'uninstall:Uninstall packages (alias for remove)'
+    'enable:Enable a systemd service'
+    'disable:Disable a systemd service'
+    'search:Search nixpkgs for packages'
+    'rebuild:Rebuild NixOS configuration'
+    'switch:Switch to new configuration'
+    'status:Show consciousness metrics'
+    'help:Show help information'
+)
+
+# Slash commands
+slash_commands=(
+    '/help:Show available commands'
+    '/quit:Exit the shell'
+    '/exit:Exit the shell'
+    '/q:Exit the shell (shortcut)'
+    '/status:Show connection and metrics status'
+    '/reconnect:Reconnect to symthaea service'
+    '/history:Show command history'
+    '/clear:Clear output buffer'
+    '/center:Increase Phi through centering'
+    '/phi:Show current Phi value'
+    '/coherence:Show coherence metrics'
+)
+
+# Common services
+services=(
+    'nginx:Web server'
+    'postgresql:PostgreSQL database'
+    'mysql:MySQL database'
+    'redis:Redis cache server'
+    'docker:Docker container runtime'
+    'sshd:SSH server'
+    'cups:Print service'
+    'bluetooth:Bluetooth service'
+    'networkmanager:Network management'
+    'pipewire:Audio service'
+    'xserver:X11 display server'
+)
+
+rebuild_opts=(
+    '--dry-run:Show what would be built without building'
+    '--rollback:Rollback to previous generation'
+    '--test:Build and activate without making bootable'
+    '--build-host:Build on remote host'
+    '--target-host:Activate on remote host'
+)
+
+_symthaea() {
+    local curcontext="$curcontext" state line
+
+    _arguments -C \
+        '1: :->command' \
+        '*: :->args'
+
+    case $state in
+        command)
+            if [[ "$words[CURRENT]" == /* ]]; then
+                _describe -t slash-commands 'slash commands' slash_commands
+            else
+                _describe -t commands 'symthaea commands' commands
+            fi
+            ;;
+        args)
+            case $words[2] in
+                install|add)
+                    # Query nixpkgs for available packages
+                    local -a packages
+                    if (( $+commands[nix-env] )); then
+                        packages=(${(f)"$(nix-env -qaP --no-name 2>/dev/null | head -100)"})
+                    fi
+                    _describe -t packages 'packages' packages
+                    ;;
+                remove|uninstall)
+                    # Show installed packages
+                    local -a installed
+                    if (( $+commands[nix-env] )); then
+                        installed=(${(f)"$(nix-env -q 2>/dev/null)"})
+                    fi
+                    _describe -t installed 'installed packages' installed
+                    ;;
+                enable|disable)
+                    _describe -t services 'services' services
+                    ;;
+                rebuild|switch)
+                    _describe -t options 'options' rebuild_opts
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_symthaea_service() {
+    local curcontext="$curcontext" state line
+
+    _arguments \
+        '(-s --socket)'{-s,--socket}'[Socket path]:socket path:_files' \
+        '(-i --interval)'{-i,--interval}'[Metrics interval in ms]:interval:(100 250 500 1000 2000)' \
+        '(-h --help)'{-h,--help}'[Show help]'
+}
+
+_symthaea_gui() {
+    _arguments \
+        '--socket[Socket path]:socket path:_files' \
+        '--theme[Color theme]:theme:(dark light system)' \
+        '--help[Show help]'
+}
+
+# Register completions based on command name
+case "$service" in
+    symthaea|symthaea-shell|symthaea-repl)
+        _symthaea "$@"
+        ;;
+    symthaea-service)
+        _symthaea_service "$@"
+        ;;
+    symthaea-gui)
+        _symthaea_gui "$@"
+        ;;
+esac

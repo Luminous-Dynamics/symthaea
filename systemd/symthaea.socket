@@ -1,0 +1,41 @@
+# Symthaea Socket Activation Unit
+# D1: Systemd Socket Activation
+#
+# This allows on-demand activation of the service when a client connects.
+# Install alongside symthaea.service for socket activation.
+#
+# Install: sudo cp symthaea.socket /etc/systemd/system/
+# Enable:  sudo systemctl enable symthaea.socket
+# Start:   sudo systemctl start symthaea.socket
+
+[Unit]
+Description=Symthaea IPC Socket
+Documentation=https://github.com/Luminous-Dynamics/symthaea-hlb
+
+[Socket]
+# Primary socket path
+ListenStream=/run/symthaea/symthaea.sock
+
+# User-accessible socket (optional)
+# ListenStream=%t/symthaea.sock
+
+# Socket permissions
+SocketMode=0666
+
+# Accept connections from all users
+# (service handles authentication)
+SocketUser=root
+SocketGroup=root
+
+# Allow multiple connections
+Accept=no
+MaxConnections=64
+
+# Keep socket for fast reconnect
+KeepAlive=true
+
+# Receive buffer
+ReceiveBuffer=64K
+
+[Install]
+WantedBy=sockets.target
