@@ -661,6 +661,7 @@ mod tests {
             output: HV16::random(2),
             transformation: TransformationType::Bind,
             phi_contribution: 0.005,
+            timestamp: 0.0,
         };
 
         model.learn_from_execution(&execution, "test context");
@@ -714,6 +715,7 @@ mod tests {
             output: HV16::random(2),
             transformation: TransformationType::Bind,
             phi_contribution: 0.005,
+            timestamp: 0.0,
         };
 
         // Start: No evidence = E0/N0/M0

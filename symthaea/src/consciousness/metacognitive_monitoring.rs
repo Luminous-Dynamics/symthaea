@@ -610,6 +610,7 @@ mod tests {
             output: HV16::random(2),
             transformation: TransformationType::Bind,
             phi_contribution: 0.002,  // Above threshold
+            timestamp: 0.0,
         };
 
         let chain = ReasoningChain::new(HV16::random(3));
@@ -642,6 +643,7 @@ mod tests {
             output: HV16::random(2),
             transformation: TransformationType::Bind,
             phi_contribution: 0.001,  // Below threshold
+            timestamp: 0.0,
         };
 
         let chain = ReasoningChain::new(HV16::random(3));
