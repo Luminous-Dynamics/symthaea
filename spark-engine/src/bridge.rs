@@ -327,6 +327,368 @@ impl HonestReactorAssessment {
     }
 }
 
+// ============================================================================
+// Physics Discovery Integration
+// ============================================================================
+
+/// Experimental observation for HDC encoding.
+///
+/// Captures a single experimental measurement for pattern analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LcfObservation {
+    /// Measurement timestamp (seconds from start)
+    pub timestamp_s: f64,
+    /// Temperature (K)
+    pub temperature_k: f64,
+    /// D/Pd loading ratio
+    pub loading_ratio: f64,
+    /// Measured neutron rate (n/s)
+    pub neutron_rate: f64,
+    /// Trigger energy (keV)
+    pub trigger_energy_kev: Option<f64>,
+    /// Host material screening energy (eV)
+    pub screening_ev: f64,
+    /// Expected rate from Gamow physics
+    pub gamow_predicted_rate: f64,
+    /// Enhancement factor (observed/predicted)
+    pub enhancement_factor: f64,
+    /// Is this an anomaly?
+    pub is_anomaly: bool,
+}
+
+impl LcfObservation {
+    /// Create observation from experimental conditions and measured rate.
+    pub fn from_measurement(
+        conditions: &ExperimentalConditions,
+        neutron_rate: f64,
+        timestamp_s: f64,
+        trigger_energy_kev: Option<f64>,
+    ) -> Self {
+        let screening = conditions.host_material.screening_ev();
+        let gamow = GamowIntegration::dd_rate(conditions.temperature_k, screening, 0);
+
+        let n_d = conditions.host_material.d_density_full() * conditions.loading_ratio;
+        let volume_cm3 = 1.0; // Normalize to 1 cm³
+        let predicted_rate = gamow.to_neutron_rate(n_d, volume_cm3);
+
+        let enhancement_factor = if predicted_rate > 0.0 {
+            neutron_rate / predicted_rate
+        } else {
+            f64::INFINITY
+        };
+
+        let is_anomaly = enhancement_factor > 1e3; // >1000× is anomalous
+
+        Self {
+            timestamp_s,
+            temperature_k: conditions.temperature_k,
+            loading_ratio: conditions.loading_ratio,
+            neutron_rate,
+            trigger_energy_kev,
+            screening_ev: screening,
+            gamow_predicted_rate: predicted_rate,
+            enhancement_factor,
+            is_anomaly,
+        }
+    }
+}
+
+/// Experimental data pipeline for physics discovery.
+///
+/// Ingests experimental data and converts it to formats suitable for
+/// HDC-based anomaly detection and pattern recognition.
+#[derive(Debug, Clone)]
+pub struct ExperimentalDataPipeline {
+    /// Collected observations
+    pub observations: Vec<LcfObservation>,
+    /// Temperature series for pattern analysis
+    pub temperature_series: Vec<(f64, f64)>,
+    /// Neutron rate series
+    pub rate_series: Vec<(f64, f64)>,
+    /// Enhancement factor series
+    pub enhancement_series: Vec<(f64, f64)>,
+}
+
+impl ExperimentalDataPipeline {
+    /// Create new empty pipeline.
+    pub fn new() -> Self {
+        Self {
+            observations: Vec::new(),
+            temperature_series: Vec::new(),
+            rate_series: Vec::new(),
+            enhancement_series: Vec::new(),
+        }
+    }
+
+    /// Add observation to pipeline.
+    pub fn add_observation(&mut self, obs: LcfObservation) {
+        let t = obs.timestamp_s;
+        self.temperature_series.push((t, obs.temperature_k));
+        self.rate_series.push((t, obs.neutron_rate));
+        self.enhancement_series.push((t, obs.enhancement_factor));
+        self.observations.push(obs);
+    }
+
+    /// Add measurement directly from conditions.
+    pub fn add_measurement(
+        &mut self,
+        conditions: &ExperimentalConditions,
+        neutron_rate: f64,
+        timestamp_s: f64,
+        trigger_energy_kev: Option<f64>,
+    ) {
+        let obs = LcfObservation::from_measurement(
+            conditions,
+            neutron_rate,
+            timestamp_s,
+            trigger_energy_kev,
+        );
+        self.add_observation(obs);
+    }
+
+    /// Load NASA LCF baseline data.
+    ///
+    /// Creates synthetic observations based on NASA's published results.
+    /// Steinetz et al. (2020): ~10³ n/s from PdAu under X-ray irradiation
+    pub fn load_nasa_baseline(&mut self) {
+        use crate::rate_gap::TriggerType;
+
+        // NASA baseline conditions (Steinetz et al. 2020)
+        let conditions = ExperimentalConditions {
+            temperature_k: 300.0,
+            loading_ratio: 0.7,
+            host_material: crate::rate_gap::HostMaterial::Palladium,
+            active_volume_cm3: 0.01,
+            trigger: TriggerType::XRay,
+            trigger_intensity: 1e12, // photons/s/cm²
+        };
+
+        // Synthetic NASA observations based on published data
+        // These represent the typical observed neutron rates
+        let nasa_data = [
+            (0.0, 1000.0),      // Baseline observation
+            (3600.0, 1200.0),   // Hour 1
+            (7200.0, 950.0),    // Hour 2
+            (10800.0, 1100.0),  // Hour 3
+            (14400.0, 1050.0),  // Hour 4
+        ];
+
+        for (timestamp_s, neutron_rate) in nasa_data {
+            self.add_measurement(
+                &conditions,
+                neutron_rate,
+                timestamp_s,
+                Some(12.0), // 12 keV X-rays
+            );
+        }
+    }
+
+    /// Identify anomalies using statistical analysis.
+    pub fn detect_anomalies(&self) -> Vec<&LcfObservation> {
+        self.observations.iter()
+            .filter(|o| o.is_anomaly)
+            .collect()
+    }
+
+    /// Calculate statistics on enhancement factors.
+    pub fn enhancement_statistics(&self) -> EnhancementStats {
+        if self.observations.is_empty() {
+            return EnhancementStats::default();
+        }
+
+        let enhancements: Vec<f64> = self.observations.iter()
+            .map(|o| o.enhancement_factor.log10())
+            .filter(|e| e.is_finite())
+            .collect();
+
+        if enhancements.is_empty() {
+            return EnhancementStats::default();
+        }
+
+        let n = enhancements.len() as f64;
+        let mean = enhancements.iter().sum::<f64>() / n;
+        let variance = enhancements.iter()
+            .map(|e| (e - mean).powi(2))
+            .sum::<f64>() / n;
+        let std_dev = variance.sqrt();
+
+        let mut sorted = enhancements.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+        let median = if sorted.len() % 2 == 0 {
+            (sorted[sorted.len()/2 - 1] + sorted[sorted.len()/2]) / 2.0
+        } else {
+            sorted[sorted.len()/2]
+        };
+
+        let min = sorted.first().copied().unwrap_or(0.0);
+        let max = sorted.last().copied().unwrap_or(0.0);
+
+        EnhancementStats {
+            mean_log10: mean,
+            std_dev_log10: std_dev,
+            median_log10: median,
+            min_log10: min,
+            max_log10: max,
+            n_observations: self.observations.len(),
+            n_anomalies: self.observations.iter().filter(|o| o.is_anomaly).count(),
+        }
+    }
+
+    /// Search for correlations between variables.
+    pub fn find_correlations(&self) -> Vec<Correlation> {
+        let mut correlations = Vec::new();
+
+        if self.observations.len() < 3 {
+            return correlations;
+        }
+
+        // Temperature vs enhancement
+        let temp_corr = self.pearson_correlation(
+            &self.observations.iter().map(|o| o.temperature_k).collect::<Vec<_>>(),
+            &self.observations.iter().map(|o| o.enhancement_factor.log10()).collect::<Vec<_>>(),
+        );
+
+        if let Some(r) = temp_corr {
+            correlations.push(Correlation {
+                variable_x: "temperature_k".to_string(),
+                variable_y: "enhancement_factor".to_string(),
+                pearson_r: r,
+                significant: r.abs() > 0.5,
+            });
+        }
+
+        // Loading ratio vs enhancement
+        let loading_corr = self.pearson_correlation(
+            &self.observations.iter().map(|o| o.loading_ratio).collect::<Vec<_>>(),
+            &self.observations.iter().map(|o| o.enhancement_factor.log10()).collect::<Vec<_>>(),
+        );
+
+        if let Some(r) = loading_corr {
+            correlations.push(Correlation {
+                variable_x: "loading_ratio".to_string(),
+                variable_y: "enhancement_factor".to_string(),
+                pearson_r: r,
+                significant: r.abs() > 0.5,
+            });
+        }
+
+        correlations
+    }
+
+    fn pearson_correlation(&self, x: &[f64], y: &[f64]) -> Option<f64> {
+        if x.len() != y.len() || x.len() < 2 {
+            return None;
+        }
+
+        let n = x.len() as f64;
+        let mean_x = x.iter().sum::<f64>() / n;
+        let mean_y: f64 = y.iter().filter(|v| v.is_finite()).sum::<f64>()
+            / y.iter().filter(|v| v.is_finite()).count() as f64;
+
+        let mut cov = 0.0;
+        let mut var_x = 0.0;
+        let mut var_y = 0.0;
+
+        for (xi, yi) in x.iter().zip(y.iter()) {
+            if !yi.is_finite() { continue; }
+            cov += (xi - mean_x) * (yi - mean_y);
+            var_x += (xi - mean_x).powi(2);
+            var_y += (yi - mean_y).powi(2);
+        }
+
+        if var_x > 0.0 && var_y > 0.0 {
+            Some(cov / (var_x.sqrt() * var_y.sqrt()))
+        } else {
+            None
+        }
+    }
+
+    /// Generate report summarizing the experimental data.
+    pub fn generate_report(&self) -> DataPipelineReport {
+        let stats = self.enhancement_statistics();
+        let correlations = self.find_correlations();
+        let anomalies = self.detect_anomalies();
+
+        let conclusion = if stats.n_anomalies > 0 {
+            format!(
+                "{} of {} observations show >1000× enhancement over Gamow prediction. \
+                 Mean enhancement: 10^{:.1} ({:.1e}×). This gap requires explanation.",
+                stats.n_anomalies,
+                stats.n_observations,
+                stats.mean_log10,
+                10f64.powf(stats.mean_log10)
+            )
+        } else {
+            "All observations consistent with standard Gamow physics.".to_string()
+        };
+
+        DataPipelineReport {
+            n_observations: stats.n_observations,
+            n_anomalies: stats.n_anomalies,
+            enhancement_stats: stats,
+            correlations,
+            anomaly_timestamps: anomalies.iter().map(|o| o.timestamp_s).collect(),
+            conclusion,
+        }
+    }
+}
+
+impl Default for ExperimentalDataPipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Enhancement factor statistics.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EnhancementStats {
+    /// Mean enhancement (log10)
+    pub mean_log10: f64,
+    /// Standard deviation (log10)
+    pub std_dev_log10: f64,
+    /// Median enhancement (log10)
+    pub median_log10: f64,
+    /// Minimum enhancement (log10)
+    pub min_log10: f64,
+    /// Maximum enhancement (log10)
+    pub max_log10: f64,
+    /// Number of observations
+    pub n_observations: usize,
+    /// Number flagged as anomalies
+    pub n_anomalies: usize,
+}
+
+/// Correlation between variables.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Correlation {
+    /// X variable name
+    pub variable_x: String,
+    /// Y variable name
+    pub variable_y: String,
+    /// Pearson correlation coefficient
+    pub pearson_r: f64,
+    /// Whether correlation is statistically significant
+    pub significant: bool,
+}
+
+/// Data pipeline analysis report.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DataPipelineReport {
+    /// Total observations
+    pub n_observations: usize,
+    /// Anomalous observations
+    pub n_anomalies: usize,
+    /// Enhancement statistics
+    pub enhancement_stats: EnhancementStats,
+    /// Variable correlations
+    pub correlations: Vec<Correlation>,
+    /// Timestamps of anomalies
+    pub anomaly_timestamps: Vec<f64>,
+    /// Summary conclusion
+    pub conclusion: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -380,5 +742,63 @@ mod tests {
         assert!(assessment.claimed_power_w > assessment.physics_power_w);
         assert!(assessment.anomaly_flag.assumes_anomaly);
         assert!(assessment.verdict.contains("UNVALIDATED") || assessment.verdict.contains("IMPOSSIBLE"));
+    }
+
+    #[test]
+    fn test_lcf_observation() {
+        let conditions = ExperimentalConditions::default();
+        let obs = LcfObservation::from_measurement(&conditions, 1000.0, 0.0, Some(12.0));
+
+        assert!(obs.is_anomaly); // 1000 n/s is anomalous
+        assert!(obs.enhancement_factor > 1e30); // Huge enhancement
+        assert_eq!(obs.temperature_k, 300.0);
+    }
+
+    #[test]
+    fn test_data_pipeline() {
+        let mut pipeline = ExperimentalDataPipeline::new();
+
+        // Add some observations
+        let conditions = ExperimentalConditions::default();
+        pipeline.add_measurement(&conditions, 1000.0, 0.0, Some(12.0));
+        pipeline.add_measurement(&conditions, 1200.0, 3600.0, Some(12.0));
+        pipeline.add_measurement(&conditions, 800.0, 7200.0, Some(12.0));
+
+        assert_eq!(pipeline.observations.len(), 3);
+
+        let anomalies = pipeline.detect_anomalies();
+        assert_eq!(anomalies.len(), 3); // All should be anomalies
+
+        let stats = pipeline.enhancement_statistics();
+        assert!(stats.mean_log10 > 30.0); // Enhancement > 10^30
+    }
+
+    #[test]
+    fn test_data_pipeline_report() {
+        let mut pipeline = ExperimentalDataPipeline::new();
+
+        let conditions = ExperimentalConditions::default();
+        for i in 0..5 {
+            pipeline.add_measurement(&conditions, 1000.0 + i as f64 * 100.0, i as f64 * 3600.0, Some(12.0));
+        }
+
+        let report = pipeline.generate_report();
+        assert_eq!(report.n_observations, 5);
+        assert!(report.n_anomalies > 0);
+        assert!(report.conclusion.contains("enhancement"));
+    }
+
+    #[test]
+    fn test_enhancement_statistics() {
+        let mut pipeline = ExperimentalDataPipeline::new();
+
+        let conditions = ExperimentalConditions::default();
+        pipeline.add_measurement(&conditions, 1e3, 0.0, None);
+        pipeline.add_measurement(&conditions, 1e4, 1.0, None);
+        pipeline.add_measurement(&conditions, 1e5, 2.0, None);
+
+        let stats = pipeline.enhancement_statistics();
+        assert_eq!(stats.n_observations, 3);
+        assert!(stats.std_dev_log10 > 0.0); // Should have variance
     }
 }
