@@ -45,6 +45,13 @@ pub struct ContinuousMind {
     last_input_text: Option<String>,
     /// Optional genesis-seeded RNG for deterministic dream processing
     seeded_rng: Option<symthaea_core::genesis::ShakeRng>,
+    /// Optional federated learning aggregator.
+    /// When enabled, the tick loop participates in distributed gradient exchange.
+    pub(crate) federated: Option<crate::swarm::FederatedAggregator>,
+    /// Incoming gradient messages from network peers.
+    pub(crate) federated_inbox: Vec<crate::swarm::GradientMessage>,
+    /// Outgoing gradient messages to broadcast to peers.
+    pub(crate) federated_outbox: Vec<crate::swarm::GradientMessage>,
 }
 
 impl ContinuousMind {
@@ -66,6 +73,9 @@ impl ContinuousMind {
             shutdown_requested: false,
             last_input_text: None,
             seeded_rng: None,
+            federated: None,
+            federated_inbox: Vec::new(),
+            federated_outbox: Vec::new(),
         }
     }
 
@@ -188,6 +198,34 @@ impl ContinuousMind {
     /// Check if shutdown was requested
     pub fn is_shutdown_requested(&self) -> bool {
         self.shutdown_requested
+    }
+
+    // ========================================================================
+    // Federated Learning Interface
+    // ========================================================================
+
+    /// Enable federated learning with initial weights.
+    pub fn enable_federated(&mut self, weights: Vec<f32>) {
+        use crate::swarm::FederatedAggregator;
+        self.federated = Some(
+            FederatedAggregator::new(weights)
+                .with_byzantine_tolerance(0.1)
+        );
+    }
+
+    /// Receive a gradient message from a network peer.
+    pub fn receive_gradient(&mut self, msg: crate::swarm::GradientMessage) {
+        self.federated_inbox.push(msg);
+    }
+
+    /// Drain outgoing gradient messages (for network broadcast).
+    pub fn drain_outbox(&mut self) -> Vec<crate::swarm::GradientMessage> {
+        std::mem::take(&mut self.federated_outbox)
+    }
+
+    /// Check if federated learning is enabled.
+    pub fn is_federated(&self) -> bool {
+        self.federated.is_some()
     }
 
     // ========================================================================
@@ -356,6 +394,7 @@ impl ContinuousMind {
             relationship_stage: RelationshipStage::NoRelation,
             relation_mode: RelationMode::IIt,
             trust: 0.0,
+            code_context: None,
             constraints: Vec::new(),
             original_input: None,
         }

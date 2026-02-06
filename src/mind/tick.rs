@@ -38,6 +38,9 @@ impl ContinuousMind {
         self.update_consciousness();
         self.process_goals();
 
+        // Federated Learning Gradient Exchange
+        self.process_federated();
+
         // Generate output if appropriate
         let output = self.generate_output();
 
@@ -188,5 +191,55 @@ impl ContinuousMind {
         }
 
         None
+    }
+
+    /// Process federated learning gradient exchange.
+    ///
+    /// Receives gradients from peers, aggregates when enough are collected,
+    /// and exports local gradients for broadcast.
+    fn process_federated(&mut self) {
+        let federated = match &mut self.federated {
+            Some(f) => f,
+            None => return,
+        };
+
+        // Step 1: Receive pending gradients from inbox
+        let inbox = std::mem::take(&mut self.federated_inbox);
+        let mut received = 0;
+        for msg in inbox {
+            if federated.receive_gradient(msg) {
+                received += 1;
+            }
+        }
+
+        if received > 0 {
+            tracing::debug!(
+                target: "symthaea::mind::federated",
+                received,
+                pending = federated.pending_contributions(),
+                round = federated.aggregation_round(),
+                "Received gradients from peers"
+            );
+        }
+
+        // Step 2: Aggregate every 10 ticks if we have enough contributions
+        if self.state.tick % 10 == 0 && federated.pending_contributions() >= 2 {
+            if let Some(aggregated) = federated.aggregate() {
+                let lr = 0.01f32;
+                federated.apply_gradient(&aggregated, lr);
+
+                tracing::info!(
+                    target: "symthaea::mind::federated",
+                    round = federated.aggregation_round(),
+                    "Applied federated gradient aggregation"
+                );
+            }
+        }
+
+        // Step 3: Export local gradient every 5 ticks
+        if self.state.tick % 5 == 0 {
+            let msg = federated.export_local_gradient(0.0);
+            self.federated_outbox.push(msg);
+        }
     }
 }

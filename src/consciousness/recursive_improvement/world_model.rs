@@ -11,7 +11,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use ndarray::{Array1, Array2};
 use crate::dynamics::CrystalizedConcept;
 
 /// A point in the latent consciousness space
@@ -292,6 +291,9 @@ pub struct WorldModelStats {
 
     /// Concepts crystallized
     pub concepts_crystallized: u64,
+
+    /// Current consciousness level (average of state dimensions)
+    pub consciousness_level: f64,
 }
 
 /// The consciousness world model

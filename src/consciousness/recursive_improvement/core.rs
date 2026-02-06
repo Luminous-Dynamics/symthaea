@@ -21,11 +21,31 @@ impl ComponentId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+
+    // Well-known component identifiers used across the system
+    pub const fn _const(_s: &'static str) -> Self { Self(String::new()) } // placeholder for const context
+
+    pub fn PrimitiveEvolution() -> Self { Self("PrimitiveEvolution".into()) }
+    pub fn HRM() -> Self { Self("HRM".into()) }
+    pub fn MetaCognition() -> Self { Self("MetaCognition".into()) }
+    pub fn ByzantineCollective() -> Self { Self("ByzantineCollective".into()) }
+    pub fn MetaLearning() -> Self { Self("MetaLearning".into()) }
+    pub fn CausalDefense() -> Self { Self("CausalDefense".into()) }
+    pub fn UnifiedIntelligence() -> Self { Self("UnifiedIntelligence".into()) }
+    pub fn CollectiveSharing() -> Self { Self("CollectiveSharing".into()) }
+    pub fn Cache() -> Self { Self("Cache".into()) }
+    pub fn Integration() -> Self { Self("Integration".into()) }
 }
 
 impl From<&str> for ComponentId {
     fn from(s: &str) -> Self {
         Self(s.to_string())
+    }
+}
+
+impl From<String> for ComponentId {
+    fn from(s: String) -> Self {
+        Self(s)
     }
 }
 
@@ -52,6 +72,20 @@ pub enum BottleneckType {
     Integration,
     /// Resource contention
     Contention,
+    /// General computation bottleneck
+    Computation,
+    /// I/O bound bottleneck
+    IO,
+    /// Low accuracy detected
+    LowAccuracy,
+    /// Low Phi (integrated information) detected
+    LowPhi,
+    /// Oscillation in metrics
+    Oscillation,
+    /// Phi stagnation (not improving)
+    PhiStagnation,
+    /// Resource exhaustion
+    ResourceExhaustion,
 }
 
 /// A detected bottleneck in the system
@@ -59,6 +93,12 @@ pub enum BottleneckType {
 pub struct Bottleneck {
     /// Which component is bottlenecked
     pub component_id: ComponentId,
+
+    /// Alias for component_id (backward compatibility)
+    pub id: ComponentId,
+
+    /// Alias for component_id (backward compatibility)
+    pub component: ComponentId,
 
     /// Type of bottleneck
     pub bottleneck_type: BottleneckType,
@@ -87,8 +127,11 @@ impl Bottleneck {
         severity: f32,
         description: impl Into<String>,
     ) -> Self {
+        let cid: ComponentId = component_id.into();
         Self {
-            component_id: component_id.into(),
+            id: cid.clone(),
+            component: cid.clone(),
+            component_id: cid,
             bottleneck_type,
             severity: severity.clamp(0.0, 1.0),
             description: description.into(),
@@ -135,6 +178,19 @@ pub enum ImprovementType {
     Redundancy,
     /// Tune hyperparameters
     HyperparameterTuning,
+    // Extended variants used by improvement_generator and gradient_optimizer
+    /// Increase cache size
+    IncreaseCacheSize,
+    /// Parallelize (alias for Parallelization used in some modules)
+    Parallelize,
+    /// Increase evolution rate for adaptive systems
+    IncreaseEvolutionRate,
+    /// Add synthetic training data
+    AddSyntheticData,
+    /// Optimize specific algorithm
+    OptimizeAlgorithm,
+    /// Tune a specific hyperparameter
+    TuneHyperparameter,
 }
 
 /// Configuration for the performance monitor
@@ -408,6 +464,17 @@ impl PerformanceMonitor {
     /// Get uptime
     pub fn uptime(&self) -> Duration {
         self.created_at.elapsed()
+    }
+
+    /// Get a snapshot of current stats for all components
+    pub fn get_stats(&self) -> HashMap<ComponentId, ComponentMetrics> {
+        self.metrics.clone()
+    }
+
+    /// Record a phi (integrated information) measurement for a component
+    pub fn record_phi(&mut self, component_id: impl Into<ComponentId>, phi: f64) {
+        // Store phi as an accuracy metric (0.0-1.0 range)
+        self.record_accuracy(component_id, phi as f32);
     }
 }
 

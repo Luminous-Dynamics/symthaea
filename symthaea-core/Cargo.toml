@@ -63,6 +63,10 @@ harness = false
 name = "simd_continuous"
 harness = false
 
+[[bench]]
+name = "primitive_system_bench"
+harness = false
+
 [features]
 default = []
 embeddings = []       # Enable embedding model integration

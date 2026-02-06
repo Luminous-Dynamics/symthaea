@@ -271,6 +271,22 @@ pub mod hd_ltc_codec;
 pub mod ltc_generative_core;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// LOCAL MODULES - Code Understanding (Consciousness-Aware Code)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// HDC encoder for code AST structures.
+#[cfg(feature = "code_understanding")]
+pub mod code_encoder;
+
+/// Algebraic operations on code hypervectors (similarity, analogy, compose).
+#[cfg(feature = "code_understanding")]
+pub mod code_algebra;
+
+/// Project-level HDC memory for codebase indexing and retrieval.
+#[cfg(feature = "code_understanding")]
+pub mod code_memory;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL MODULES - Testing
 // ═══════════════════════════════════════════════════════════════════════════════
 #[cfg(test)]

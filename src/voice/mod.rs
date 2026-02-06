@@ -60,6 +60,10 @@ pub mod rap;
 // REPL voice output (consciousness-modulated speech for interactive use)
 pub mod repl_voice;
 
+// Kokoro TTS engine (ONNX-based neural TTS)
+pub mod kokoro_engine;
+pub mod g2p;
+
 // Re-export formant types
 pub use formant_targets::{FormantTarget, FormantDatabase};
 pub use phoneme_hdc::{PhonemeHdcCodec, PhonemeSpec, Place, Manner, AcousticParams, PitchContour};
@@ -85,6 +89,10 @@ pub use rap::{RapSynthesizer, RapConfig, FlowStyle, Verse, LyricLine, PhonemeDic
 
 // Re-export REPL voice types
 pub use repl_voice::{ReplVoiceOutput, ReplVoiceConfig, SimpleG2P};
+
+// Re-export Kokoro TTS types
+pub use kokoro_engine::{KokoroEngine, KokoroConfig, save_wav};
+pub use g2p::G2PConverter;
 
 /// LTC-driven speech pacing parameters
 ///
@@ -313,6 +321,9 @@ pub struct VoiceOutput {
     /// Whether TTS is initialized
     initialized: bool,
 
+    /// Kokoro TTS engine (when available)
+    kokoro: Option<kokoro_engine::KokoroEngine>,
+
     /// Statistics
     stats: VoiceStats,
 }
@@ -340,14 +351,27 @@ impl VoiceOutput {
             config,
             current_pacing: LTCPacing::default(),
             initialized: false,
+            kokoro: None,
             stats: VoiceStats::default(),
         }
     }
 
-    /// Initialize the TTS engine
+    /// Initialize the TTS engine.
+    ///
+    /// Attempts to load the Kokoro ONNX model when the `voice-tts` feature is enabled.
+    /// Falls back to simulated TTS (sine wave) if the model cannot be loaded.
     pub fn initialize(&mut self) -> Result<()> {
-        // In a full implementation, this would load the Kokoro ONNX model
-        // For now, we just mark as initialized
+        // Attempt to load Kokoro TTS
+        let kokoro_config = kokoro_engine::KokoroConfig {
+            sample_rate: self.config.sample_rate,
+            ..kokoro_engine::KokoroConfig::default()
+        };
+        self.kokoro = kokoro_engine::KokoroEngine::load(kokoro_config);
+        if self.kokoro.is_some() {
+            tracing::info!("VoiceOutput initialized with Kokoro TTS engine");
+        } else {
+            tracing::info!("VoiceOutput initialized with simulated TTS (Kokoro unavailable)");
+        }
         self.initialized = true;
         Ok(())
     }
@@ -384,8 +408,24 @@ impl VoiceOutput {
         let start = std::time::Instant::now();
 
         let samples = if self.config.enable_tts && self.initialized {
-            // Would use real TTS here
-            self.simulate_tts(text, pacing)
+            // Try Kokoro TTS first, fall back to simulated
+            if let Some(ref kokoro) = self.kokoro {
+                if let Some(mut audio) = kokoro.synthesize(text, Some(self.config.voice_id)) {
+                    // Apply pacing by resampling: rate > 1.0 = faster = fewer samples
+                    if (pacing.rate - 1.0).abs() > 0.05 {
+                        audio = resample_audio(&audio, pacing.rate);
+                    }
+                    // Apply volume
+                    for s in &mut audio {
+                        *s *= self.config.volume * pacing.emphasis * 0.5;
+                    }
+                    audio
+                } else {
+                    self.simulate_tts(text, pacing)
+                }
+            } else {
+                self.simulate_tts(text, pacing)
+            }
         } else {
             self.simulate_tts(text, pacing)
         };
@@ -499,6 +539,27 @@ impl Default for VoiceOutput {
     fn default() -> Self {
         Self::new(VoiceOutputConfig::default())
     }
+}
+
+/// Simple linear resampling to adjust speech rate.
+/// rate > 1.0 = faster (fewer output samples), rate < 1.0 = slower (more samples).
+fn resample_audio(samples: &[f32], rate: f32) -> Vec<f32> {
+    if samples.is_empty() || rate <= 0.0 {
+        return samples.to_vec();
+    }
+    let out_len = (samples.len() as f32 / rate) as usize;
+    let mut output = Vec::with_capacity(out_len);
+    for i in 0..out_len {
+        let src_pos = i as f32 * rate;
+        let idx = src_pos as usize;
+        let frac = src_pos - idx as f32;
+        if idx + 1 < samples.len() {
+            output.push(samples[idx] * (1.0 - frac) + samples[idx + 1] * frac);
+        } else if idx < samples.len() {
+            output.push(samples[idx]);
+        }
+    }
+    output
 }
 
 /// Speech recognizer configuration (for future STT support)

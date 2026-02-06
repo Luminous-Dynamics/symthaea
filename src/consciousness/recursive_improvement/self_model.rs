@@ -37,8 +37,9 @@ use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 use serde::{Serialize, Deserialize};
 
-use crate::consciousness::recursive_improvement::types::{
-    BottleneckType, Bottleneck, instant_now, ComponentId,
+use crate::consciousness::recursive_improvement::types::instant_now;
+use crate::consciousness::recursive_improvement::core::{
+    BottleneckType, Bottleneck, ComponentId,
 };
 use crate::consciousness::recursive_improvement::intrinsic_motivation::{
     IntrinsicMotivationSystem, DriveType, MotivationConfig,
@@ -837,27 +838,32 @@ impl UnifiedImprovementController {
 
         // Update capabilities based on bottlenecks
         for bottleneck in bottlenecks {
+            let sev_f64 = bottleneck.severity as f64;
             let (domain, severity) = match bottleneck.bottleneck_type {
                 BottleneckType::Latency => {
-                    (CapabilityDomain::Reasoning, 1.0 - bottleneck.severity)
+                    (CapabilityDomain::Reasoning, 1.0 - sev_f64)
                 }
                 BottleneckType::LowPhi | BottleneckType::PhiStagnation => {
-                    (CapabilityDomain::Integration, 1.0 - bottleneck.severity)
+                    (CapabilityDomain::Integration, 1.0 - sev_f64)
                 }
                 BottleneckType::Memory => {
-                    (CapabilityDomain::Memory, 1.0 - bottleneck.severity)
+                    (CapabilityDomain::Memory, 1.0 - sev_f64)
                 }
                 BottleneckType::Accuracy | BottleneckType::LowAccuracy => {
-                    (CapabilityDomain::Learning, 1.0 - bottleneck.severity)
+                    (CapabilityDomain::Learning, 1.0 - sev_f64)
                 }
                 BottleneckType::ResourceExhaustion | BottleneckType::Computation => {
-                    (CapabilityDomain::Metacognition, 1.0 - bottleneck.severity)
+                    (CapabilityDomain::Metacognition, 1.0 - sev_f64)
                 }
                 BottleneckType::IO => {
-                    (CapabilityDomain::Perception, 1.0 - bottleneck.severity)
+                    (CapabilityDomain::Perception, 1.0 - sev_f64)
                 }
                 BottleneckType::Oscillation => {
-                    (CapabilityDomain::Integration, 1.0 - bottleneck.severity)
+                    (CapabilityDomain::Integration, 1.0 - sev_f64)
+                }
+                // Remaining variants: Throughput, Energy, Integration, Contention
+                _ => {
+                    (CapabilityDomain::Integration, 1.0 - sev_f64)
                 }
             };
 
@@ -868,7 +874,7 @@ impl UnifiedImprovementController {
                 self.self_model.add_limitation(KnownLimitation {
                     description: format!("{:?} bottleneck", bottleneck.bottleneck_type),
                     domain,
-                    severity: bottleneck.severity,
+                    severity: sev_f64,
                     cause: format!("{:?}", bottleneck.component),
                     remediable: true,
                     improvement_path: Some(format!("Address {:?}", bottleneck.bottleneck_type)),
@@ -1362,16 +1368,13 @@ mod tests {
         let mut controller = UnifiedImprovementController::new(ControllerConfig::default());
         let motivation = IntrinsicMotivationSystem::new(MotivationConfig::default());
 
-        // Create a bottleneck
-        let bottleneck = Bottleneck {
-            id: "test_bottleneck".to_string(),
-            component: ComponentId::MetaCognition,
-            bottleneck_type: BottleneckType::LowPhi,
-            severity: 0.7,
-            description: "Test phi degradation".to_string(),
-            suggested_fix: None,
-            detected_at: Instant::now(),
-        };
+        // Create a bottleneck using the new() constructor
+        let bottleneck = Bottleneck::new(
+            ComponentId::MetaCognition(),
+            BottleneckType::LowPhi,
+            0.7,
+            "Test phi degradation",
+        );
 
         // Run cycle with bottleneck
         controller.cycle(0.5, &motivation, &[bottleneck]);
