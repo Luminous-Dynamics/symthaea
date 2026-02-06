@@ -82,6 +82,8 @@ mod gradient_proof;
 mod risc0_prover;
 mod risc0_integration;
 pub mod trust_risc0;
+pub mod proof_system;
+pub mod trust_proof_system;
 
 pub use circuit::GradientProofCircuit;
 pub use types::{GradientProof, PublicInputs, ProofMetadata};
@@ -117,6 +119,21 @@ pub use risc0_integration::{
 // Real RISC-0 prover (only with feature flag)
 #[cfg(feature = "risc0")]
 pub use risc0_integration::Risc0GradientProver;
+
+// Generic proof system abstraction
+pub use proof_system::{
+    ProofStatement, ProofWitness, ProofReceipt, ProofOutput,
+    ProofSystem, ProofSystemError, ProofStats,
+    BackendConfig, BackendType, GenericReceipt,
+    SimulationBackend, ProofSystemBackend, ProofSystemBuilder,
+    is_simulation_proof,
+};
+
+// K-Vector trust proof system (uses generic abstraction)
+pub use trust_proof_system::{
+    TrustStatement, TrustWitness, TrustReceipt, TrustPublicData,
+    TrustProofSystem,
+};
 
 /// Prove gradient computation was done correctly
 ///
