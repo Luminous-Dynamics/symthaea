@@ -3,6 +3,8 @@
 //! The mathematical and structural foundation for the Holographic Liquid Brain.
 //! Contains primitives for Hyperdimensional Computing (HDC) and Integrated Information (Phi).
 
+#![allow(clippy::needless_range_loop)]
+
 pub mod core;
 pub mod genesis;
 pub mod hdc;
