@@ -1315,6 +1315,11 @@ impl FederatedCoordinator {
         self.aggregator.read().local_weights().to_vec()
     }
 
+    /// Get a reference to the network backend
+    pub fn backend(&self) -> &Arc<dyn NetworkBackend> {
+        &self.backend
+    }
+
     /// Update local model weights
     pub fn update_weights(&self, weights: Vec<f32>) {
         self.aggregator.write().update_local_weights(weights);
