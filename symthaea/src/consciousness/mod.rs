@@ -99,12 +99,16 @@ pub mod reasoning_engine;
 // Modules with external dependencies (cfg-gated)
 // ============================================================================
 
-// Empathic unification - needs API alignment (cfg-gated for now)
-#[cfg(feature = "full_consciousness")]
-pub mod empathic_unification;
+// TODO: Empathic unification disabled - references non-existent types:
+//   - crate::language::emotional_core::{CoreEmotion, EmpathyModel, EmpathyType, EmpathicCue, EmotionalRegulator}
+//   - missing ContextKind variants (ErrorHandling, Writing, Review, Planning, Setup)
+//   - UserStateInference.infer() method doesn't exist
+//   - record_undo/record_error methods on UserStateInference don't exist
+//   - 15 compilation errors total - written against a different API version
+// #[cfg(feature = "full_consciousness")]
+// pub mod empathic_unification;
 
-// Stub types for integration_module compatibility when full module is disabled
-#[cfg(not(feature = "full_consciousness"))]
+// Stub types for integration_module compatibility (always available since full module is disabled)
 pub mod empathic_unification {
     //! Stub empathic unification types for integration_module compatibility
 

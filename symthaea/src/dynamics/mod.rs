@@ -22,6 +22,12 @@ pub mod cfc_coherence;
 pub mod temporal_signatures;
 pub mod world_model;
 
+// Code understanding dynamics (Consciousness-Aware Code)
+#[cfg(feature = "code_generation")]
+pub mod cfc_code_sequencer;
+#[cfg(feature = "code_generation")]
+pub mod temporal_code;
+
 /// A crystallized concept - a stable, consolidated memory representation
 ///
 /// Crystallized concepts represent knowledge that has been consolidated from

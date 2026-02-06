@@ -439,6 +439,14 @@ pub struct StructuredThought {
     pub trust: f32,
 
     // ========================================================================
+    // CODE CONTEXT (Optional - when code_generation feature is active)
+    // ========================================================================
+
+    /// Code-specific context for code understanding/generation tasks.
+    /// Present when the input involves actual code or code generation requests.
+    pub code_context: Option<CodeContext>,
+
+    // ========================================================================
     // TRANSLATION CONSTRAINTS (How)
     // ========================================================================
 
@@ -447,6 +455,26 @@ pub struct StructuredThought {
 
     /// Original user input (for reference in translation)
     pub original_input: Option<String>,
+}
+
+/// Context for code understanding and generation within StructuredThought.
+///
+/// Carries the code-specific information computed by the HDC+CfC pipeline,
+/// enabling the LLM translation layer to produce accurate code output.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CodeContext {
+    /// Programming language (e.g., "rust", "python", "nix")
+    pub language: String,
+    /// Generated source code (if applicable)
+    pub generated_code: Option<String>,
+    /// Phi-based integration/quality score of the code
+    pub phi_score: Option<f32>,
+    /// Semantic similarity between intent and generated code (0.0-1.0)
+    pub intent_similarity: Option<f32>,
+    /// Whether the generated code passed syntactic verification
+    pub syntactically_valid: Option<bool>,
+    /// Notes from the generation process (uncertainties, TODOs)
+    pub notes: Vec<String>,
 }
 
 impl StructuredThought {
@@ -564,6 +592,29 @@ impl StructuredThought {
             }
         }
 
+        // Code context (from code understanding/generation pipeline)
+        if let Some(ref ctx) = self.code_context {
+            prompt.push_str(&format!("CODE_LANGUAGE: {}\n", ctx.language));
+            if let Some(ref code) = ctx.generated_code {
+                prompt.push_str(&format!("GENERATED_CODE:\n```{}\n{}\n```\n", ctx.language, code));
+            }
+            if let Some(phi) = ctx.phi_score {
+                prompt.push_str(&format!("CODE_PHI: {:.3}\n", phi));
+            }
+            if let Some(sim) = ctx.intent_similarity {
+                prompt.push_str(&format!("CODE_INTENT_SIMILARITY: {:.3}\n", sim));
+            }
+            if let Some(valid) = ctx.syntactically_valid {
+                prompt.push_str(&format!("CODE_VALID: {}\n", valid));
+            }
+            if !ctx.notes.is_empty() {
+                prompt.push_str("CODE_NOTES:\n");
+                for note in &ctx.notes {
+                    prompt.push_str(&format!("  - {}\n", note));
+                }
+            }
+        }
+
         // Original input
         if let Some(ref input) = self.original_input {
             prompt.push_str(&format!("\nORIGINAL_INPUT: {}\n", input));
@@ -601,6 +652,7 @@ impl Default for StructuredThought {
             emotional_tone: EmotionalTone::default(),
             structured_data: None,
             domain_context: None,
+            code_context: None,
             phi: 0.0,
             meta_awareness: 0.0,
             coherence: 0.0,

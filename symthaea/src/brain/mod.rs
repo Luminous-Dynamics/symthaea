@@ -11,13 +11,21 @@ pub mod actor_model;
 pub mod prefrontal;
 pub mod social_coherence;
 
-// Bridge modules need recursive_improvement which needs internal API alignment
-#[cfg(feature = "full_consciousness")]
-pub mod affective_bridge;
-#[cfg(feature = "full_consciousness")]
-pub mod consciousness_bridge;
-#[cfg(feature = "full_consciousness")]
-pub mod hippocampus_bridge;
+// TODO: Bridge modules disabled - they reference non-existent fields/methods:
+//   - pending_concepts on ConsciousnessWorldModel (10 errors)
+//   - uid on CrystalizedConcept (5 errors)
+//   - missing methods on CoreAffect (decay, intensity, to_emotion_category)
+//   - missing methods on HippocampusActor (remember)
+//   - RecallQuery fields (query, threshold, emotion_filter, context_tags) don't exist
+//   - String treated as Option (is_some/is_none/as_deref)
+//   - missing imports from language::emotional_core and brain::prefrontal
+// These modules were written against an earlier API version and need refactoring.
+// #[cfg(feature = "full_consciousness")]
+// pub mod affective_bridge;
+// #[cfg(feature = "full_consciousness")]
+// pub mod consciousness_bridge;
+// #[cfg(feature = "full_consciousness")]
+// pub mod hippocampus_bridge;
 
 // Dark spot actor needs mycelix DHT
 #[cfg(feature = "mycelix_module")]

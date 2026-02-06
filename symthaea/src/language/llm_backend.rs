@@ -325,6 +325,50 @@ pub fn simulated_backend() -> Box<dyn LLMBackend> {
     Box::new(SimulatedBackend)
 }
 
+/// Create a backend based on environment configuration.
+///
+/// Priority:
+/// 1. `SYMTHAEA_LLM_PROVIDER` env var (`ollama`, `openai`, `anthropic`)
+/// 2. OpenAI (if `OPENAI_API_KEY` is set)
+/// 3. Anthropic (if `ANTHROPIC_API_KEY` is set)
+/// 4. Ollama (default, works offline with local models)
+pub fn create_backend_from_env() -> Box<dyn LLMBackend> {
+    if let Ok(provider) = std::env::var("SYMTHAEA_LLM_PROVIDER") {
+        match provider.to_lowercase().as_str() {
+            "openai" => {
+                if let Some(backend) = super::openai_backend::OpenAiBackend::from_env() {
+                    return Box::new(backend);
+                }
+                tracing::warn!("SYMTHAEA_LLM_PROVIDER=openai but OPENAI_API_KEY not set, falling back to Ollama");
+            }
+            "anthropic" => {
+                if let Some(backend) = super::anthropic_backend::AnthropicBackend::from_env() {
+                    return Box::new(backend);
+                }
+                tracing::warn!("SYMTHAEA_LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY not set, falling back to Ollama");
+            }
+            "ollama" => {
+                return Box::new(OllamaBackend::new());
+            }
+            "simulated" => {
+                return Box::new(SimulatedBackend);
+            }
+            other => {
+                tracing::warn!("Unknown LLM provider '{}', falling back to Ollama", other);
+            }
+        }
+    }
+
+    // Auto-detect: try API keys first, then Ollama
+    if let Some(backend) = super::openai_backend::OpenAiBackend::from_env() {
+        return Box::new(backend);
+    }
+    if let Some(backend) = super::anthropic_backend::AnthropicBackend::from_env() {
+        return Box::new(backend);
+    }
+    Box::new(OllamaBackend::new())
+}
+
 /// Summarize a prompt to ~20 words for simulated responses.
 fn summarize_prompt(prompt: &str) -> String {
     let words: Vec<&str> = prompt.split_whitespace().collect();
@@ -535,6 +579,40 @@ mod tests {
     fn test_simulated_backend_factory() {
         let backend = simulated_backend();
         assert_eq!(backend.name(), "Simulated");
+    }
+
+    #[test]
+    fn test_create_backend_from_env_default() {
+        // Clear all provider env vars
+        let prev_provider = std::env::var("SYMTHAEA_LLM_PROVIDER").ok();
+        let prev_openai = std::env::var("OPENAI_API_KEY").ok();
+        let prev_anthropic = std::env::var("ANTHROPIC_API_KEY").ok();
+
+        std::env::remove_var("SYMTHAEA_LLM_PROVIDER");
+        std::env::remove_var("OPENAI_API_KEY");
+        std::env::remove_var("ANTHROPIC_API_KEY");
+
+        let backend = create_backend_from_env();
+        assert_eq!(backend.name(), "Ollama");
+
+        // Restore
+        if let Some(v) = prev_provider { std::env::set_var("SYMTHAEA_LLM_PROVIDER", v); }
+        if let Some(v) = prev_openai { std::env::set_var("OPENAI_API_KEY", v); }
+        if let Some(v) = prev_anthropic { std::env::set_var("ANTHROPIC_API_KEY", v); }
+    }
+
+    #[test]
+    fn test_create_backend_from_env_simulated() {
+        let prev = std::env::var("SYMTHAEA_LLM_PROVIDER").ok();
+        std::env::set_var("SYMTHAEA_LLM_PROVIDER", "simulated");
+
+        let backend = create_backend_from_env();
+        assert_eq!(backend.name(), "Simulated");
+
+        match prev {
+            Some(v) => std::env::set_var("SYMTHAEA_LLM_PROVIDER", v),
+            None => std::env::remove_var("SYMTHAEA_LLM_PROVIDER"),
+        }
     }
 
     // =========================================================================

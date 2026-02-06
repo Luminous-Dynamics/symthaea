@@ -23,6 +23,8 @@ use crate::language::{
     llm_backend,
     PluginRegistry,
 };
+#[cfg(feature = "full_language")]
+use crate::language::learning_persistence::LearningPersistence;
 use crate::mind::{ContinuousMind, MindConfig, StructuredThought, DomainContext, ConstraintType, EpistemicStatus};
 use crate::mind::structured_thought::{EpistemicCube, ETier, NTier};
 #[cfg(feature = "magi_loop")]
@@ -129,6 +131,9 @@ pub struct Symthaea {
     recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
     /// Domain plugin registry for multi-domain awareness.
     plugin_registry: PluginRegistry,
+    /// Cross-session learning persistence (thresholds, patterns).
+    #[cfg(feature = "full_language")]
+    learning_persistence: Option<LearningPersistence>,
     /// Brier Score calibration tracker for epistemic calibration.
     #[cfg(feature = "magi_loop")]
     calibration: BrierScoreTracker,
@@ -202,6 +207,31 @@ impl Symthaea {
             }
         };
 
+        // Initialize learning persistence (non-fatal on failure)
+        #[cfg(feature = "full_language")]
+        let learning_persistence = {
+            let mut lp = LearningPersistence::new();
+            match lp.initialize() {
+                Ok(()) => {
+                    tracing::info!(
+                        target: "symthaea::init",
+                        session = lp.session_count(),
+                        "Learning persistence loaded (session #{})",
+                        lp.session_count()
+                    );
+                    Some(lp)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        target: "symthaea::init",
+                        error = %e,
+                        "Learning persistence unavailable, starting fresh"
+                    );
+                    None
+                }
+            }
+        };
+
         Ok(Self {
             mind,
             language,
@@ -214,6 +244,8 @@ impl Symthaea {
             dyad_calculator: PhiDyadCalculator::new(),
             recent_ai_states: Vec::new(),
             plugin_registry,
+            #[cfg(feature = "full_language")]
+            learning_persistence,
             #[cfg(feature = "magi_loop")]
             calibration: BrierScoreTracker::with_defaults(),
             #[cfg(feature = "neural-bridge")]
@@ -279,6 +311,31 @@ impl Symthaea {
             }
         };
 
+        // Initialize learning persistence on resume (non-fatal on failure)
+        #[cfg(feature = "full_language")]
+        let learning_persistence = {
+            let mut lp = LearningPersistence::new();
+            match lp.initialize() {
+                Ok(()) => {
+                    tracing::info!(
+                        target: "symthaea::init",
+                        session = lp.session_count(),
+                        "Learning persistence loaded on resume (session #{})",
+                        lp.session_count()
+                    );
+                    Some(lp)
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        target: "symthaea::init",
+                        error = %e,
+                        "Learning persistence unavailable on resume, starting fresh"
+                    );
+                    None
+                }
+            }
+        };
+
         Ok(Self {
             mind,
             language,
@@ -291,6 +348,8 @@ impl Symthaea {
             dyad_calculator: PhiDyadCalculator::new(),
             recent_ai_states: state.recent_ai_states,
             plugin_registry,
+            #[cfg(feature = "full_language")]
+            learning_persistence,
             #[cfg(feature = "magi_loop")]
             calibration: BrierScoreTracker::with_defaults(),
             #[cfg(feature = "neural-bridge")]
@@ -487,6 +546,21 @@ impl Symthaea {
         self.recent_ai_states.push(ai_hv);
         if self.recent_ai_states.len() > 8 {
             self.recent_ai_states.remove(0);
+        }
+
+        // ====================================================================
+        // PHASE 7.25: LEARNING PERSISTENCE AUTO-SAVE
+        // ====================================================================
+        #[cfg(feature = "full_language")]
+        if let Some(ref mut lp) = self.learning_persistence {
+            lp.update_processed_count(self.interactions);
+            if let Err(e) = lp.maybe_auto_save() {
+                tracing::warn!(
+                    target: "symthaea::persistence",
+                    error = %e,
+                    "Learning auto-save failed"
+                );
+            }
         }
 
         // ====================================================================
@@ -741,9 +815,27 @@ impl Symthaea {
 
     /// Save state to a file (pause the system).
     ///
-    /// Persists partnership state, trajectory, and interaction count.
+    /// Persists partnership state, trajectory, interaction count, and learning state.
     /// Mind and language state are ephemeral and rebuilt on resume.
-    pub fn pause(&self, path: &str) -> Result<()> {
+    pub fn pause(&mut self, path: &str) -> Result<()> {
+        // Save learning state on pause
+        #[cfg(feature = "full_language")]
+        if let Some(ref mut lp) = self.learning_persistence {
+            if let Err(e) = lp.save() {
+                tracing::warn!(
+                    target: "symthaea::persistence",
+                    error = %e,
+                    "Failed to save learning state on pause"
+                );
+            } else {
+                tracing::info!(
+                    target: "symthaea::persistence",
+                    stats = %lp.stats(),
+                    "Learning state saved on pause"
+                );
+            }
+        }
+
         let state = PersistedState {
             hdc_dim: self.hdc_dim,
             ltc_neurons: self.ltc_neurons,
@@ -772,6 +864,12 @@ impl Symthaea {
             interactions: self.partner.interactions_count,
             trajectory_points: self.trajectory.points().len(),
         }
+    }
+
+    /// Get learning persistence statistics, if available.
+    #[cfg(feature = "full_language")]
+    pub fn learning_stats(&self) -> Option<crate::language::learning_persistence::LearningStats> {
+        self.learning_persistence.as_ref().map(|lp| lp.stats())
     }
 
     /// Get a reference to the mind for introspection.

@@ -501,12 +501,18 @@ impl PluginRegistry {
 
     /// Create a registry pre-loaded with all built-in domain plugins
     ///
-    /// Registers: generic (default), nixos, mathematics, programming
+    /// Registers: generic (default), nixos, mathematics, programming,
+    /// general-assistant, code-assistant, research, code (if feature enabled)
     pub fn with_builtins() -> Self {
         let mut registry = Self::new(); // starts with GenericPlugin
         registry.register(Box::new(super::nixos_plugin::NixOsPlugin));
         registry.register(Box::new(super::math_plugin::MathPlugin::new()));
         registry.register(Box::new(super::programming_plugin::ProgrammingPlugin));
+        registry.register(Box::new(super::general_assistant_plugin::GeneralAssistantPlugin));
+        registry.register(Box::new(super::code_assistant_plugin::CodeAssistantPlugin));
+        registry.register(Box::new(super::research_plugin::ResearchPlugin));
+        #[cfg(feature = "code_generation")]
+        registry.register(Box::new(super::code_domain_plugin::CodeDomainPlugin));
         registry
     }
 }
