@@ -140,6 +140,100 @@ impl ToolDescriptor {
     pub fn has_rollback(&self) -> bool {
         self.rollback_command.is_some()
     }
+
+    /// Create a builder for constructing a ToolDescriptor.
+    pub fn builder(name: impl Into<String>) -> ToolDescriptorBuilder {
+        ToolDescriptorBuilder::new(name)
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ToolDescriptor Builder
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Builder for ergonomic construction of ToolDescriptor.
+///
+/// Provides sensible defaults:
+/// - `domain`: None (triggers escalation to Elevated)
+/// - `is_read_only`: false
+/// - `rollback_command`: None (triggers escalation to Critical if not read-only)
+/// - `calibration_count`: 0 (cold start)
+/// - `raw_command`: None
+///
+/// # Example
+///
+/// ```ignore
+/// let tool = ToolDescriptor::builder("nixos-rebuild")
+///     .command("nixos-rebuild switch")
+///     .domain("nixos")
+///     .rollback("nixos-rebuild switch --rollback")
+///     .calibration_count(100)
+///     .build();
+/// ```
+#[derive(Debug, Clone)]
+pub struct ToolDescriptorBuilder {
+    name: String,
+    domain: Option<String>,
+    is_read_only: bool,
+    rollback_command: Option<String>,
+    calibration_count: usize,
+    raw_command: Option<String>,
+}
+
+impl ToolDescriptorBuilder {
+    /// Create a new builder with the given tool name.
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            domain: None,
+            is_read_only: false,
+            rollback_command: None,
+            calibration_count: 0,
+            raw_command: None,
+        }
+    }
+
+    /// Set the raw command string.
+    pub fn command(mut self, command: impl Into<String>) -> Self {
+        self.raw_command = Some(command.into());
+        self
+    }
+
+    /// Set the domain (e.g., "nixos", "filesystem", "network").
+    pub fn domain(mut self, domain: impl Into<String>) -> Self {
+        self.domain = Some(domain.into());
+        self
+    }
+
+    /// Mark as read-only.
+    pub fn read_only(mut self) -> Self {
+        self.is_read_only = true;
+        self
+    }
+
+    /// Set the rollback command.
+    pub fn rollback(mut self, rollback: impl Into<String>) -> Self {
+        self.rollback_command = Some(rollback.into());
+        self
+    }
+
+    /// Set the calibration count (number of historical outcomes).
+    pub fn calibration_count(mut self, count: usize) -> Self {
+        self.calibration_count = count;
+        self
+    }
+
+    /// Build the ToolDescriptor.
+    pub fn build(self) -> ToolDescriptor {
+        ToolDescriptor {
+            name: self.name,
+            domain: self.domain,
+            is_read_only: self.is_read_only,
+            rollback_command: self.rollback_command,
+            calibration_count: self.calibration_count,
+            raw_command: self.raw_command,
+        }
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -334,5 +428,45 @@ mod tests {
             .with_rollback("nixos-rebuild switch --rollback");
         assert!(td.has_rollback());
         assert_eq!(td.domain, Some("nixos".to_string()));
+    }
+
+    #[test]
+    fn test_tool_descriptor_builder_defaults() {
+        let td = ToolDescriptor::builder("test-tool").build();
+        assert_eq!(td.name, "test-tool");
+        assert!(td.domain.is_none());
+        assert!(!td.is_read_only);
+        assert!(td.rollback_command.is_none());
+        assert_eq!(td.calibration_count, 0);
+        assert!(td.raw_command.is_none());
+    }
+
+    #[test]
+    fn test_tool_descriptor_builder_full() {
+        let td = ToolDescriptor::builder("nixos-rebuild")
+            .command("nixos-rebuild switch")
+            .domain("nixos")
+            .rollback("nixos-rebuild switch --rollback")
+            .calibration_count(50)
+            .build();
+
+        assert_eq!(td.name, "nixos-rebuild");
+        assert_eq!(td.raw_command, Some("nixos-rebuild switch".to_string()));
+        assert_eq!(td.domain, Some("nixos".to_string()));
+        assert!(td.has_rollback());
+        assert_eq!(td.calibration_count, 50);
+        assert!(!td.is_read_only);
+    }
+
+    #[test]
+    fn test_tool_descriptor_builder_read_only() {
+        let td = ToolDescriptor::builder("nix-search")
+            .command("nix search nixpkgs#emacs")
+            .domain("nixos")
+            .read_only()
+            .build();
+
+        assert!(td.is_read_only);
+        assert!(!td.has_rollback()); // read-only doesn't need rollback
     }
 }

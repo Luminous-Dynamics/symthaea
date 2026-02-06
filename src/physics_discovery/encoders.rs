@@ -195,7 +195,7 @@ impl PhysicsEncoder {
         unit: &str,
         uncertainty: Option<f64>,
     ) -> EncodedMeasurement {
-        let d = self.config.dimensions;
+        let _d = self.config.dimensions;
 
         // Get or create basis for this quantity
         let quantity_basis = self.get_quantity_basis(quantity);

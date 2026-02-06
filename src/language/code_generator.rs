@@ -365,7 +365,7 @@ impl CodeGenerator {
         let purpose_hv = self.encoder.encode_name(&spec.purpose);
         let lang_hv = self.encoder.encode_name(&spec.language);
 
-        RealHV::bundle(&[&name_hv, &purpose_hv, &lang_hv])
+        RealHV::bundle(&[name_hv, purpose_hv, lang_hv])
     }
 
     /// Find similar patterns from context

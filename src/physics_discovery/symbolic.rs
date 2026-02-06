@@ -3,7 +3,7 @@
 //! Uses HDC-guided search to discover mathematical relationships in data.
 //! Inspired by "AI Feynman" but using hyperdimensional representations.
 
-use super::encoders::{EncodedMeasurement, PhysicsEncoder, PhysicalQuantity};
+use super::encoders::{EncodedMeasurement, PhysicalQuantity};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -91,6 +91,7 @@ impl MathOp {
 enum ExprNode {
     Const(f64),
     Var(usize), // Index into variable list
+    #[allow(dead_code)]
     Param(String), // Named parameter to fit
     BinaryOp(MathOp, Box<ExprNode>, Box<ExprNode>),
     UnaryOp(MathOp, Box<ExprNode>),
@@ -194,7 +195,7 @@ impl SymbolicRegressor {
         }
 
         let n_vars = inputs.len();
-        let n_points = target.len();
+        let _n_points = target.len();
 
         // Generate initial population
         let mut population: Vec<ExprNode> = (0..self.config.population_size)
@@ -262,7 +263,7 @@ impl SymbolicRegressor {
                 complexity: expr.complexity(),
                 interpretation: self.interpret(&expr, var_names),
                 variables: var_names.iter().enumerate()
-                    .map(|(i, name)| (name.clone(), PhysicalQuantity::Other))
+                    .map(|(_i, name)| (name.clone(), PhysicalQuantity::Other))
                     .collect(),
             }
         })

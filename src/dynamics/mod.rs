@@ -205,6 +205,8 @@ pub use cfc::{
     OnlineLearningConfig, OnlineLearningStats, NetworkOnlineLearningStats,
     // Phi-gated attention
     PhiGatedConfig, compute_phi_attention_weights,
+    // Activation types
+    ActivationType,
 };
 pub use cfc_coherence::{
     CfCCoherenceBridge, CoherenceConfig, TemporalCoherenceMetrics, CoherenceSummary

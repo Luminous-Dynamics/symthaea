@@ -49,8 +49,9 @@ impl ParserRegistry {
     }
 
     /// Get a mutable reference to a parser by language name
-    pub fn get_mut(&mut self, language: &str) -> Option<&mut dyn CodeParser> {
-        self.parsers.get_mut(language).map(|p| p.as_mut())
+    #[allow(dead_code)]
+    pub fn get_mut(&mut self, language: &str) -> Option<&mut Box<dyn CodeParser>> {
+        self.parsers.get_mut(language)
     }
 
     /// List all registered languages
