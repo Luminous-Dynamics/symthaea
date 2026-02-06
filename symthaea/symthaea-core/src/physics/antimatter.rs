@@ -397,12 +397,12 @@ mod tests {
 
     #[test]
     fn test_cpt_double_transform_identity() {
-        let (model, _, _, _) = setup();
+        let (model, hadrons, _, _) = setup();
 
         // Double conjugation should recover original
         assert!(Antimatter::verify_cpt_symmetry(&model.electron));
         assert!(Antimatter::verify_cpt_symmetry(&model.up_quark));
-        assert!(Antimatter::verify_cpt_symmetry(&model.proton));
+        assert!(Antimatter::verify_cpt_symmetry(&hadrons.proton));
     }
 
     #[test]

@@ -664,4 +664,100 @@ mod tests {
             "Noble gases should share character"
         );
     }
+
+    #[test]
+    fn test_all_118_elements_exist() {
+        let (_, _, table, _) = setup();
+
+        assert_eq!(table.len(), 118, "Should have exactly 118 elements");
+
+        let hydrogen = table.element(1).unwrap();
+        assert_eq!(hydrogen.data.symbol, "H");
+
+        let oganesson = table.element(118).unwrap();
+        assert_eq!(oganesson.data.symbol, "Og");
+
+        let gold = table.by_symbol("Au").unwrap();
+        assert_eq!(gold.data.atomic_number, 79);
+
+        let uranium = table.by_symbol("U").unwrap();
+        assert_eq!(uranium.data.atomic_number, 92);
+    }
+
+    #[test]
+    fn test_lanthanide_similarity_cluster() {
+        let (_, _, table, _) = setup();
+
+        let la = table.element(57).unwrap();
+        let ce = table.element(58).unwrap();
+        let fe = table.element(26).unwrap();
+
+        let la_ce = la.vector.similarity(&ce.vector);
+        let la_fe = la.vector.similarity(&fe.vector);
+
+        assert!(la_ce > 0.5, "La-Ce similarity should exceed 0.5: {}", la_ce);
+        assert!(la_ce > la_fe, "Lanthanides should cluster: La-Ce={} > La-Fe={}", la_ce, la_fe);
+    }
+
+    #[test]
+    fn test_actinide_similarity_cluster() {
+        let (_, _, table, _) = setup();
+
+        let ac = table.element(89).unwrap();
+        let th = table.element(90).unwrap();
+        let pb = table.element(82).unwrap();
+
+        let ac_th = ac.vector.similarity(&th.vector);
+        let ac_pb = ac.vector.similarity(&pb.vector);
+
+        assert!(ac_th > 0.5, "Ac-Th similarity should exceed 0.5: {}", ac_th);
+        assert!(ac_th > ac_pb, "Actinides should cluster: Ac-Th={} > Ac-Pb={}", ac_th, ac_pb);
+    }
+
+    #[test]
+    fn test_superheavy_orthogonal_to_light() {
+        let (_, _, table, _) = setup();
+
+        let hydrogen = table.element(1).unwrap();
+        let oganesson = table.element(118).unwrap();
+        let flerovium = table.element(114).unwrap();
+
+        // Superheavy elements should share some character with each other
+        let og_fl = oganesson.vector.similarity(&flerovium.vector);
+        assert!(og_fl > 0.3, "Superheavy elements should cluster: Og-Fl={}", og_fl);
+
+        // Hydrogen and Oganesson are very different (opposite ends of table)
+        let h_og = hydrogen.vector.similarity(&oganesson.vector);
+        assert!(h_og < 0.8, "H and Og should be quite different: {}", h_og);
+    }
+
+    #[test]
+    fn test_noble_gases_all_periods() {
+        let (_, _, table, _) = setup();
+
+        let he = table.element(2).unwrap();
+        let ne = table.element(10).unwrap();
+        let ar = table.element(18).unwrap();
+        let xe = table.element(54).unwrap();
+        let rn = table.element(86).unwrap();
+        let og = table.element(118).unwrap();
+
+        // All should be in group 18
+        assert_eq!(he.data.group, 18);
+        assert_eq!(ne.data.group, 18);
+        assert_eq!(ar.data.group, 18);
+        assert_eq!(xe.data.group, 18);
+        assert_eq!(rn.data.group, 18);
+        assert_eq!(og.data.group, 18);
+
+        // He, Ne, Ar, Rn should have no electronegativity
+        assert!(he.data.electronegativity.is_none());
+        assert!(ne.data.electronegativity.is_none());
+        assert!(ar.data.electronegativity.is_none());
+        assert!(rn.data.electronegativity.is_none());
+
+        // Noble gases should share noble character
+        let ne_ar = ne.vector.similarity(&ar.vector);
+        assert!(ne_ar > 0.3, "Ne and Ar should share noble character: {}", ne_ar);
+    }
 }
