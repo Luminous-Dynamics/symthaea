@@ -20,7 +20,6 @@ use symthaea::swarm::{
     FederatedNode,
     GradientMessage,
     LocalChannelBackend,
-    NetworkBackend,
     NodeAddress,
 };
 
@@ -197,18 +196,18 @@ async fn test_gradient_aggregation_flow() {
     // Node 0's aggregator should have received contributions
     let stats = coordinators[0].stats();
     // Note: The stats count gradients processed, actual count depends on timing
-    assert!(stats.uptime_seconds >= 0, "Stats should be available");
+    let _ = stats.uptime_seconds; // Verify stats are available
 }
 
 #[tokio::test]
 async fn test_aggregation_with_different_trust_scores() {
     // Create a network where we manually set up aggregators
-    let config = FederatedNetworkConfig::for_testing().with_num_nodes(3);
+    let _config = FederatedNetworkConfig::for_testing().with_num_nodes(3);
 
     // Create aggregators with weights
     let mut agg0 = FederatedAggregator::new(vec![0.0; 4]);
-    let mut agg1 = FederatedAggregator::new(vec![1.0, 0.0, 0.0, 0.0]);
-    let mut agg2 = FederatedAggregator::new(vec![0.0, 0.0, 1.0, 0.0]);
+    let agg1 = FederatedAggregator::new(vec![1.0, 0.0, 0.0, 0.0]);
+    let agg2 = FederatedAggregator::new(vec![0.0, 0.0, 1.0, 0.0]);
 
     // Export gradients from nodes 1 and 2
     let grad1 = agg1.export_local_gradient(0.0);
@@ -272,7 +271,7 @@ async fn test_gradient_sharing_with_differential_privacy() {
 
 #[tokio::test]
 async fn test_dp_noise_adds_variance() {
-    let mut aggregator = FederatedAggregator::new(vec![1.0, 2.0, 3.0, 4.0])
+    let aggregator = FederatedAggregator::new(vec![1.0, 2.0, 3.0, 4.0])
         .with_differential_privacy(DifferentialPrivacyConfig::moderate_privacy());
 
     // Export multiple gradients and check variance
@@ -307,7 +306,7 @@ async fn test_event_subscription_node_joined() {
 
     // Register a peer
     let peer = FederatedNode::with_random_id(NodeAddress::Channel("test-peer".to_string()));
-    coordinator.register_peer(peer);
+    coordinator.register_peer(peer).await;
 
     // Should receive NodeJoined event
     let event = rx.try_recv();
@@ -328,13 +327,13 @@ async fn test_event_subscription_node_left() {
     // Register and then unregister a peer
     let peer = FederatedNode::with_random_id(NodeAddress::Channel("leaving-peer".to_string()));
     let peer_id = peer.node_id;
-    coordinator.register_peer(peer);
+    coordinator.register_peer(peer).await;
 
     // Clear the join event
     let _ = rx.try_recv();
 
     // Unregister
-    coordinator.unregister_peer(&peer_id, "test removal");
+    coordinator.unregister_peer(&peer_id, "test removal").await;
 
     // Should receive NodeLeft event
     let event = rx.try_recv();
@@ -364,7 +363,7 @@ async fn test_sync_round_increments_round_number() {
 
 #[tokio::test]
 async fn test_sync_round_with_multiple_nodes() {
-    let mut coordinators = create_test_network(3, 4).await;
+    let coordinators = create_test_network(3, 4).await;
 
     // Set different weights
     coordinators[0].update_weights(vec![1.0, 0.0, 0.0, 0.0]);
@@ -406,7 +405,7 @@ async fn test_coordinator_stats() {
 
     let stats = coordinators[0].stats();
     assert_eq!(stats.active_nodes, 2, "Should show 2 active peers");
-    assert!(stats.uptime_seconds >= 0);
+    let _ = stats.uptime_seconds; // Verify stats are available
 }
 
 #[tokio::test]
@@ -451,9 +450,22 @@ async fn test_process_join_request() {
         .process_message(NodeAddress::Channel("new-peer".to_string()), join_request)
         .await;
 
-    assert!(result.is_ok());
-    // Note: The peer is registered but the ack goes to backend (which has no receiver for "new-peer")
-    // In a real scenario, the joining peer would have set up their backend first
+    assert!(result.is_ok(), "Process join request should succeed: {:?}", result);
+
+    // Wait for async peer registration with retry logic
+    let mut attempts = 0;
+    const MAX_ATTEMPTS: i32 = 20;
+    while coordinator.peer_count() < 1 && attempts < MAX_ATTEMPTS {
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        attempts += 1;
+    }
+
+    // Verify the peer was actually registered
+    assert_eq!(
+        coordinator.peer_count(), 1,
+        "Peer should be registered after join request (waited {}ms)",
+        attempts * 25
+    );
 }
 
 #[tokio::test]
@@ -463,7 +475,7 @@ async fn test_process_leave_message() {
 
     // First register a peer
     let peer = FederatedNode::new([99u8; 32], NodeAddress::Channel("leaving".to_string()));
-    coordinator.register_peer(peer);
+    coordinator.register_peer(peer).await;
     assert_eq!(coordinator.peer_count(), 1);
 
     // Process leave message
@@ -490,21 +502,39 @@ async fn test_process_leave_message() {
 
 #[tokio::test]
 async fn test_network_continues_with_node_failure() {
-    let mut coordinators = create_test_network(4, 5).await;
+    let coordinators = create_test_network(4, 5).await;
+
+    // Verify initial state: 4 nodes, each sees 3 peers
+    assert_eq!(coordinators[0].peer_count(), 3, "Initial peer count should be 3");
 
     // All nodes share gradients initially
     for coordinator in &coordinators {
         coordinator.share_gradient(0.0).await.unwrap();
     }
 
+    // Ensure message propagation
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
     // "Remove" node 2 by dropping it from node 0's perspective
     let node2_id = coordinators[2].local_node_id();
-    coordinators[0].unregister_peer(&node2_id, "simulated failure");
+    coordinators[0].unregister_peer(&node2_id, "simulated failure").await;
 
-    // Node 0 should still have 2 peers
-    assert_eq!(coordinators[0].peer_count(), 2);
+    // Wait for async unregister to complete with retry logic
+    let mut attempts = 0;
+    const MAX_ATTEMPTS: i32 = 20;
+    while coordinators[0].peer_count() > 2 && attempts < MAX_ATTEMPTS {
+        tokio::time::sleep(Duration::from_millis(25)).await;
+        attempts += 1;
+    }
 
-    // Node 0 can still broadcast
+    // Node 0 should now have 2 peers (3 - 1 removed)
+    assert_eq!(
+        coordinators[0].peer_count(), 2,
+        "Node 0 should have 2 peers after unregistering node 2 (waited {}ms)",
+        attempts * 25
+    );
+
+    // Node 0 can still broadcast to remaining peers
     let sent = coordinators[0].share_gradient(0.0).await.unwrap();
     assert_eq!(sent, 2, "Should still broadcast to remaining 2 peers");
 }
@@ -544,13 +574,13 @@ async fn test_late_joiner_can_sync() {
         coordinator2.local_node_id(),
         NodeAddress::Channel("node-2".to_string()),
     );
-    coordinator1.register_peer(peer2);
+    coordinator1.register_peer(peer2).await;
 
     let peer1 = FederatedNode::new(
         coordinator1.local_node_id(),
         NodeAddress::Channel("node-1".to_string()),
     );
-    coordinator2.register_peer(peer1);
+    coordinator2.register_peer(peer1).await;
 
     // Late joiner can request sync
     assert_eq!(coordinator2.peer_count(), 1);
@@ -617,8 +647,8 @@ async fn test_coordinator_shutdown() {
     // Register some peers
     let peer1 = FederatedNode::with_random_id(NodeAddress::Channel("peer-1".to_string()));
     let peer2 = FederatedNode::with_random_id(NodeAddress::Channel("peer-2".to_string()));
-    coordinator.register_peer(peer1);
-    coordinator.register_peer(peer2);
+    coordinator.register_peer(peer1).await;
+    coordinator.register_peer(peer2).await;
 
     assert_eq!(coordinator.peer_count(), 2);
 
