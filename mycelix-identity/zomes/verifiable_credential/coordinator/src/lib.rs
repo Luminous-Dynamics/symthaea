@@ -28,30 +28,37 @@ fn string_to_entry_hash(s: &str) -> EntryHash {
     )
 }
 
-/// Compute hash of credential content for signing
+/// Compute cryptographic hash of credential content for signing
+///
+/// Uses BLAKE2b-256 (via holo_hash) for a secure 32-byte hash.
+/// The hash covers the essential credential fields in a deterministic order
+/// to ensure consistent verification across signing and verification.
 fn compute_credential_hash(vc: &VerifiableCredential) -> Vec<u8> {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    // Build deterministic content to hash:
+    // - Credential ID
+    // - Issuer DID
+    // - Subject DID
+    // - Valid from timestamp
+    // - Claims (JSON serialized)
+    // - Schema ID (if present)
+    let mut content = Vec::new();
+    content.extend(vc.id.as_bytes());
+    content.push(0); // null separator
+    content.extend(vc.issuer.did().as_bytes());
+    content.push(0);
+    content.extend(vc.credential_subject.id.as_bytes());
+    content.push(0);
+    content.extend(vc.valid_from.as_bytes());
+    content.push(0);
+    // Serialize claims deterministically (serde_json sorts keys by default for objects)
+    if let Ok(claims_json) = serde_json::to_string(&vc.credential_subject.claims) {
+        content.extend(claims_json.as_bytes());
+    }
+    content.push(0);
+    content.extend(vc.mycelix_schema_id.as_bytes());
 
-    let mut hasher = DefaultHasher::new();
-    vc.id.hash(&mut hasher);
-    vc.issuer.did().hash(&mut hasher);
-    vc.credential_subject.id.hash(&mut hasher);
-    vc.valid_from.hash(&mut hasher);
-    let h1 = hasher.finish();
-    hasher.write_u64(h1);
-    let h2 = hasher.finish();
-    hasher.write_u64(h2);
-    let h3 = hasher.finish();
-    hasher.write_u64(h3);
-    let h4 = hasher.finish();
-
-    let mut result = Vec::with_capacity(32);
-    result.extend_from_slice(&h1.to_le_bytes());
-    result.extend_from_slice(&h2.to_le_bytes());
-    result.extend_from_slice(&h3.to_le_bytes());
-    result.extend_from_slice(&h4.to_le_bytes());
-    result
+    // Use BLAKE2b-256 for cryptographic hashing
+    holo_hash::blake2b_256(&content).to_vec()
 }
 
 /// Issue a new verifiable credential
