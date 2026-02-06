@@ -463,13 +463,18 @@ impl EmpathicUnification {
         // Map context to emotional implications
         let (context_emotion, context_stress) = match context {
             ContextKind::ErrorHandling => (CoreEmotion::Fear, 0.7),
-            ContextKind::DevWork => (CoreEmotion::Curiosity, 0.3),
+            ContextKind::DevWork | ContextKind::Development => (CoreEmotion::Curiosity, 0.3),
             ContextKind::Writing => (CoreEmotion::Peace, 0.2),
             ContextKind::Review => (CoreEmotion::Anticipation, 0.3),
             ContextKind::Planning => (CoreEmotion::Anticipation, 0.4),
             ContextKind::Exploration => (CoreEmotion::Curiosity, 0.2),
-            ContextKind::Setup => (CoreEmotion::Anticipation, 0.4),
-            ContextKind::Upgrade => (CoreEmotion::Fear, 0.5),
+            ContextKind::Setup | ContextKind::Configuration => (CoreEmotion::Anticipation, 0.4),
+            ContextKind::Upgrade | ContextKind::Maintenance => (CoreEmotion::Fear, 0.5),
+            ContextKind::Troubleshooting => (CoreEmotion::Frustration, 0.6),
+            ContextKind::Help => (CoreEmotion::Confusion, 0.4),
+            ContextKind::Task => (CoreEmotion::Determination, 0.3),
+            ContextKind::Conversation => (CoreEmotion::Peace, 0.1),
+            ContextKind::Unknown => (CoreEmotion::Neutral, 0.2),
         };
 
         // Combine text detection with context

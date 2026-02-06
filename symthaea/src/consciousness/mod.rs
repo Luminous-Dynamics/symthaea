@@ -99,16 +99,13 @@ pub mod reasoning_engine;
 // Modules with external dependencies (cfg-gated)
 // ============================================================================
 
-// TODO: Empathic unification disabled - references non-existent types:
-//   - crate::language::emotional_core::{CoreEmotion, EmpathyModel, EmpathyType, EmpathicCue, EmotionalRegulator}
-//   - missing ContextKind variants (ErrorHandling, Writing, Review, Planning, Setup)
-//   - UserStateInference.infer() method doesn't exist
-//   - record_undo/record_error methods on UserStateInference don't exist
-//   - 15 compilation errors total - written against a different API version
-// #[cfg(feature = "full_consciousness")]
-// pub mod empathic_unification;
+// Empathic unification - re-enabled after adding required types to emotional_core
+// and ContextKind variants to user_state_inference
+#[cfg(feature = "full_consciousness")]
+pub mod empathic_unification;
 
-// Stub types for integration_module compatibility (always available since full module is disabled)
+// Stub types for integration_module compatibility when full_consciousness is disabled
+#[cfg(not(feature = "full_consciousness"))]
 pub mod empathic_unification {
     //! Stub empathic unification types for integration_module compatibility
 
@@ -295,6 +292,36 @@ pub mod empathic_unification {
 #[cfg(feature = "mycelix_module")]
 pub mod gis_integration;
 
+// ============================================================================
+// Ported from crates/symthaea-consciousness (2026-02-06) — Tier 1 high-value
+// ============================================================================
+
+/// Hierarchical LTC architecture with 25x speedup (CSR sparse matrix)
+pub mod hierarchical_ltc;
+
+/// Narrative Self-Model (Damasio autobiographical self, Tulving autonoetic consciousness)
+pub mod narrative_self;
+
+/// Attention Schema Theory (Graziano) — attention as a control mechanism
+pub mod attention_schema;
+
+/// Consciousness Thermodynamics — free energy, entropy, phase transitions
+pub mod consciousness_thermodynamics;
+
+/// Epistemic Causal Reasoning — 3D epistemic cube (Empirical × Normative × Materiality)
+pub mod epistemic_tiers;
+
+/// Metacognitive Monitoring — self-correction via Φ observation
+pub mod metacognitive_monitoring;
+
+/// Operational Fiduciary Harmonics — Seven Harmonics optimization framework
+pub mod harmonics;
+
+/// Unified Emergent Intelligence — collective + context-aware + meta-cognitive
+/// Gated: depends on meta_reasoning + context_aware_evolution (not yet ported)
+#[cfg(feature = "full_consciousness")]
+pub mod unified_intelligence;
+
 // Recursive improvement (needs internal API alignment - cfg-gated)
 // MAGI Loop can be enabled standalone via the magi_loop feature
 #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
@@ -367,6 +394,127 @@ pub use compositionality::{
     CompositionalityEngine, CompositionalityConfig, ComposedPrimitive,
     CompositionType, CompositionResult, CompositionStats, CompositionMetadata,
 };
+
+// ── Ported Tier 1 re-exports ──────────────────────────────────────────────
+pub use hierarchical_ltc::{HierarchicalLTC, HierarchicalConfig};
+pub use narrative_self::{NarrativeSelfModel, NarrativeSelfConfig, ProtoSelf, CoreSelf, AutobiographicalSelf};
+pub use attention_schema::{AttentionSchema, AttentionState, AttentionSchemaConfig};
+pub use consciousness_thermodynamics::{ConsciousnessThermodynamicsAnalyzer, ThermodynamicsConfig};
+pub use epistemic_tiers::{EpistemicCoordinate, EmpiricalTier, NormativeTier, MaterialityTier};
+pub use metacognitive_monitoring::{MetacognitiveMonitor, MonitoringResult};
+pub use harmonics::{FiduciaryHarmonic, HarmonicField, HarmonicResolver};
+
+// ============================================================================
+// Ported from crates/symthaea-consciousness (2026-02-06) — Tiers 2–5
+// ============================================================================
+
+// ── Tier 2: Primitive Reasoning Layer ───────────────────────────────────────
+pub mod adaptive_reasoning;
+pub mod causal_explanation;
+pub mod negation_detector;
+pub mod synthetic_states;
+pub mod temporal_primitives;
+
+/// Gated: depends on crate::hdc::integrated_information (not in main src)
+#[cfg(feature = "full_consciousness")]
+pub mod primitive_validation;
+
+// ── Tier 3: Consciousness Integration ──────────────────────────────────────
+pub mod compositionality_primitives;
+pub mod consciousness_signatures;
+pub mod causal_emergence;
+
+/// Gated: depends on consciousness_profile (which needs integrated_information)
+#[cfg(feature = "full_consciousness")]
+pub mod dimension_synergies;
+
+/// Gated: depends on crate::hdc::integrated_information
+#[cfg(feature = "full_consciousness")]
+pub mod consciousness_profile;
+
+/// Gated: depends on crate::hdc::integrated_information
+#[cfg(feature = "full_consciousness")]
+pub mod meta_primitives;
+
+/// Gated: depends on crate::hdc::integrated_information + synthetic_states
+#[cfg(feature = "full_consciousness")]
+pub mod phi_validation;
+
+// ── Tier 4: Dynamics & Field ───────────────────────────────────────────────
+pub mod consciousness_field_dynamics;
+pub mod consciousness_holography;
+pub mod consciousness_resonance;
+pub mod consciousness_topology;
+pub mod dissipative_consciousness;
+pub mod embodied_cognition;
+pub mod enactive_cognition;
+pub mod meta_cognitive_optimizer;
+pub mod phenomenal_binding;
+pub mod predictive_processing;
+pub mod predictive_self;
+pub mod quantum_coherence;
+pub mod sensorimotor_contingencies;
+
+// ── Tier 4 (NEEDS_CHAIN — dependencies now satisfied) ──────────────────────
+pub mod consciousness_equation_v2;
+pub mod context_aware_evolution;
+pub mod temporal_consciousness;
+pub mod unified_consciousness_pipeline;
+
+/// Gated: depends on recursive_improvement (feature-gated)
+#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+pub mod consciousness_driven_evolution;
+
+/// Gated: depends on autopoietic_consciousness::LifeState (not in src version)
+#[cfg(feature = "full_consciousness")]
+pub mod unified_living_mind;
+
+// ── Final batch: remaining unique modules from crate ────────────────────────
+pub mod differentiable;
+pub mod meta_reasoning;
+
+/// Gated: depends on unified_intelligence (gated behind full_consciousness)
+#[cfg(feature = "full_consciousness")]
+pub mod byzantine_collective;
+
+/// Gated: depends on byzantine_collective (gated)
+#[cfg(feature = "full_consciousness")]
+pub mod meta_learning_byzantine;
+
+/// Gated: depends on meta_learning_byzantine (gated)
+#[cfg(feature = "full_consciousness")]
+pub mod causal_byzantine;
+
+/// Gated: depends on observability (gated behind observability_module)
+#[cfg(feature = "observability_module")]
+pub mod gwt_integration;
+
+/// Gated: depends on gwt_integration + unified_value_evaluator (gated)
+#[cfg(all(feature = "observability_module", feature = "full_perception"))]
+pub mod narrative_gwt_integration;
+
+/// Gated: depends on unified_value_evaluator (gated behind full_perception)
+#[cfg(feature = "full_perception")]
+pub mod mycelix_bridge;
+
+/// Gated: depends on mycelix_bridge (gated)
+#[cfg(feature = "full_perception")]
+pub mod value_system_tests;
+
+/// Gated: depends on consciousness_driven_evolution (gated)
+#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+pub mod consciousness_guided_discovery;
+
+/// Gated: depends on consciousness_guided_discovery (gated)
+#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+pub mod meta_meta_learning;
+
+/// Gated: depends on consciousness_profile (gated behind full_consciousness)
+#[cfg(feature = "full_consciousness")]
+pub mod multi_objective_evolution;
+
+// Re-exports from consciousness_equation_v2 (needed by differentiable.rs)
+pub use consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent, EquationConfig};
 
 // ============================================================================
 // Convenience constructors for optional engines
