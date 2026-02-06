@@ -462,6 +462,26 @@ jobs:
         run: |
           nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release privacy -- --ignored --test-threads=1 --nocapture"
 
+      - name: Run sweettest - EduNet (7 tests)
+        run: |
+          nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release edunet -- --ignored --test-threads=1 --nocapture"
+
+      - name: Run sweettest - Supply Chain (11 tests)
+        run: |
+          nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release supplychain -- --ignored --test-threads=1 --nocapture"
+
+      - name: Run sweettest - Health (10 tests)
+        run: |
+          nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release health -- --ignored --test-threads=1 --nocapture"
+
+      - name: Run sweettest - Marketplace (10 tests)
+        run: |
+          nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release marketplace -- --ignored --test-threads=1 --nocapture"
+
+      - name: Run sweettest - Climate (11 tests)
+        run: |
+          nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release climate -- --ignored --test-threads=1 --nocapture"
+
   # ============================================================================
   # Package hApps
   # ============================================================================
@@ -824,7 +844,7 @@ jobs:
           echo "| Lint Zomes | $(format_status '${{ needs.lint-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | $(format_status '${{ needs.integration-test.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| SDK Conductor Tests | $(format_status '${{ needs.sdk-conductor-tests.result }}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Sweettest Integration (15 tests)** | $(format_status '${{ needs.sweettest.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Sweettest Integration (64 tests)** | $(format_status '${{ needs.sweettest.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Package DNAs | $(format_status '${{ needs.package-dna.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Package hApps | $(format_status '${{ needs.package-happs.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -837,6 +857,11 @@ jobs:
           echo "| Sweettest Governance | 3 | Proposal lifecycle, voting, execution |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Bridge | 2 | Cross-hApp communication |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Privacy | 6 | ZK attestations, anonymous credentials |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sweettest EduNet | 7 | Courses, enrollment, FL gradients, credentials |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sweettest Supply Chain | 11 | Inventory, shipments, provenance claims |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sweettest Health | 10 | Patient CRUD, DID linking, consent access |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sweettest Marketplace | 10 | Listings, transactions, reputation, Bridge |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sweettest Climate | 11 | Carbon credits, transfers, footprints, projects |" >> $GITHUB_STEP_SUMMARY
           echo "| Zome Unit Tests | ~50 | Per-zome unit tests |" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | 3+ | Multi-conductor network tests |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

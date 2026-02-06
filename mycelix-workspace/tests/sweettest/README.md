@@ -6,13 +6,16 @@ End-to-end integration tests using Holochain's [sweettest](https://docs.rs/holoc
 
 ```bash
 # From mycelix-workspace/
-just test-sweettest             # Run all 33 tests
+just test-sweettest             # Run all 64 tests
 just test-sweettest-identity    # Run identity suite only (4 tests)
 just test-sweettest-governance  # Run governance suite only (3 tests)
 just test-sweettest-bridge      # Run bridge suite only (2 tests)
 just test-sweettest-privacy     # Run privacy/ZK suite only (6 tests)
 just test-sweettest-edunet      # Run edunet suite only (7 tests)
 just test-sweettest-supplychain # Run supplychain suite only (11 tests)
+just test-sweettest-health      # Run health suite only (10 tests)
+just test-sweettest-marketplace # Run marketplace suite only (10 tests)
+just test-sweettest-climate     # Run climate suite only (11 tests)
 ```
 
 Or directly:
@@ -79,7 +82,7 @@ Sweettest MUST run with `--release` due to Holochain's hardcoded 5-minute nonce 
 | `test_attestation_expiration` | 1 | Expired attestation not counted as valid |
 | `test_multi_agent_attestation` | 2 | Agent 1 submits, Agent 2 retrieves via DHT |
 
-### Supply Chain Workflow (11 tests) - NEW
+### Supply Chain Workflow (11 tests)
 **File:** `tests/supplychain_workflow.rs`
 
 | Test | Agents | Description |
@@ -95,6 +98,53 @@ Sweettest MUST run with `--release` due to Holochain's hardcoded 5-minute nonce 
 | `test_multi_agent_claim_visibility` | 2 | Claim visible to verifier via DHT |
 | `test_provider_profile` | 1 | Create and retrieve provider profile |
 
+### Health Workflow (10 tests) - NEW
+**File:** `tests/health_workflow.rs`
+
+| Test | Agents | Description |
+|------|--------|-------------|
+| `test_create_and_get_patient` | 1 | Create patient record, retrieve by hash |
+| `test_update_patient` | 1 | Update patient with new allergies/contacts |
+| `test_delete_patient` | 1 | Soft delete patient record |
+| `test_link_patient_to_did` | 1 | Link patient to DID, resolve by DID |
+| `test_verify_did_patient_link` | 1 | Verify DID-patient link integrity |
+| `test_create_health_summary` | 1 | Create health summary with vital signs |
+| `test_add_patient_allergy` | 1 | Add allergy to patient record |
+| `test_multi_agent_consent_access` | 2 | Provider accesses patient with consent |
+| `test_access_denied_without_consent` | 2 | Verify consent-based access control |
+
+### Marketplace Workflow (10 tests) - NEW
+**File:** `tests/marketplace_workflow.rs`
+
+| Test | Agents | Description |
+|------|--------|-------------|
+| `test_create_and_get_listing` | 1 | Create listing, retrieve by hash |
+| `test_list_active_listings` | 1 | Create multiple listings, verify list |
+| `test_update_listing` | 1 | Update listing price/description |
+| `test_create_transaction` | 2 | Buyer initiates transaction with seller |
+| `test_transaction_status_progression` | 2 | Status: Initiated → Paid → Shipped |
+| `test_deliver_item` | 2 | Buyer confirms delivery |
+| `test_leave_feedback` | 2 | Buyer leaves feedback for seller |
+| `test_get_reputation_score` | 1 | Get agent reputation score |
+| `test_report_to_bridge` | 2 | Report transaction outcome to MATL Bridge |
+| `test_multi_agent_listing_visibility` | 2 | Listing visible via DHT propagation |
+
+### Climate Workflow (11 tests) - NEW
+**File:** `tests/climate_workflow.rs`
+
+| Test | Agents | Description |
+|------|--------|-------------|
+| `test_create_and_get_carbon_credit` | 1 | Create carbon credit, retrieve by hash |
+| `test_get_credits_by_owner` | 1 | List credits owned by agent |
+| `test_transfer_credit` | 2 | Transfer credit to another agent |
+| `test_multi_agent_credit_visibility` | 2 | Credit visible to verifier via DHT |
+| `test_retire_credit` | 1 | Retire credit (permanent offset) |
+| `test_get_credits_by_status` | 1 | Filter credits by Active/Transferred/Retired |
+| `test_calculate_footprint` | 1 | Calculate carbon footprint from activities |
+| `test_get_footprint` | 1 | Retrieve footprint calculation |
+| `test_create_project` | 1 | Create climate project (reforestation, etc.) |
+| `test_link_credit_to_project` | 1 | Create credit linked to project |
+
 ## Architecture
 
 ```
@@ -108,7 +158,10 @@ tests/sweettest/
     ├── cross_happ_bridge.rs     # Multi-hApp tests (2)
     ├── privacy_zk_attestation.rs # LUCID privacy tests (6)
     ├── edunet_workflow.rs       # EduNet hApp tests (7)
-    └── supplychain_workflow.rs  # Supply chain hApp tests (11)
+    ├── supplychain_workflow.rs  # Supply chain hApp tests (11)
+    ├── health_workflow.rs       # Health hApp tests (10)
+    ├── marketplace_workflow.rs  # Marketplace hApp tests (10)
+    └── climate_workflow.rs      # Climate hApp tests (11)
 ```
 
 ### Test Harness
@@ -128,6 +181,9 @@ Tests expect pre-built DNA bundles at:
 - `mycelix-workspace/happs/lucid/lucid.dna`
 - `mycelix-edunet/dna/edunet.dna`
 - `mycelix-supplychain/holochain/dna/supplychain.dna`
+- `mycelix-health/dna/health.dna`
+- `mycelix-marketplace/backend/mycelix_marketplace.dna`
+- `mycelix-climate/dnas/climate/workdir/climate.dna`
 
 Build them with:
 ```bash
@@ -135,6 +191,9 @@ cd mycelix-identity && cargo build --release --target wasm32-unknown-unknown && 
 cd mycelix-governance && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
 cd mycelix-edunet && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
 cd mycelix-supplychain/holochain && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
+cd mycelix-health && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
+cd mycelix-marketplace/backend && cargo build --release --target wasm32-unknown-unknown && hc dna pack .
+cd mycelix-climate && cargo build --release --target wasm32-unknown-unknown && hc dna pack dnas/climate/workdir/
 ```
 
 ## Version Compatibility
@@ -148,7 +207,7 @@ cd mycelix-supplychain/holochain && cargo build --release --target wasm32-unknow
 
 ## CI Integration
 
-The GitHub Actions workflow (`holochain.yml`) runs all 4 suites:
+The GitHub Actions workflow (`holochain.yml`) runs all 9 suites (64 tests):
 
 ```yaml
 - name: Run sweettest - Identity (4 tests)
@@ -162,6 +221,21 @@ The GitHub Actions workflow (`holochain.yml`) runs all 4 suites:
 
 - name: Run sweettest - Privacy/ZK Attestation (6 tests)
   run: cargo test --release privacy -- --ignored --test-threads=1 --nocapture
+
+- name: Run sweettest - EduNet (7 tests)
+  run: cargo test --release edunet -- --ignored --test-threads=1 --nocapture
+
+- name: Run sweettest - Supply Chain (11 tests)
+  run: cargo test --release supplychain -- --ignored --test-threads=1 --nocapture
+
+- name: Run sweettest - Health (10 tests)
+  run: cargo test --release health -- --ignored --test-threads=1 --nocapture
+
+- name: Run sweettest - Marketplace (10 tests)
+  run: cargo test --release marketplace -- --ignored --test-threads=1 --nocapture
+
+- name: Run sweettest - Climate (11 tests)
+  run: cargo test --release climate -- --ignored --test-threads=1 --nocapture
 ```
 
 ## Troubleshooting

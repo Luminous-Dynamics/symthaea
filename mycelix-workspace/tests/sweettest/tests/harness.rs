@@ -37,6 +37,18 @@ impl DnaPaths {
     pub fn supplychain() -> PathBuf {
         Self::workspace_root().join("../mycelix-supplychain/holochain/dna/supplychain.dna")
     }
+
+    pub fn health() -> PathBuf {
+        Self::workspace_root().join("../mycelix-health/dna/health.dna")
+    }
+
+    pub fn marketplace() -> PathBuf {
+        Self::workspace_root().join("../mycelix-marketplace/backend/mycelix_marketplace.dna")
+    }
+
+    pub fn climate() -> PathBuf {
+        Self::workspace_root().join("../mycelix-climate/dnas/climate/workdir/climate.dna")
+    }
 }
 
 /// A test agent with conductor and cell references for Holochain 0.6 API.
