@@ -22,6 +22,7 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
+use super::chemistry::Chemistry;
 use serde::{Deserialize, Serialize};
 
 /// DNA base
@@ -143,6 +144,79 @@ impl MolBioEncoder {
             hydrogen_bond: genesis.hv("molbio::hydrogen_bond", PHYSICS_DIM),
             watson_crick: genesis.hv("molbio::watson_crick", PHYSICS_DIM),
 
+            double_helix: genesis.hv("molbio::double_helix", PHYSICS_DIM),
+            major_groove: genesis.hv("molbio::major_groove", PHYSICS_DIM),
+            minor_groove: genesis.hv("molbio::minor_groove", PHYSICS_DIM),
+        }
+    }
+
+    /// Create MolBioEncoder from Chemistry module
+    ///
+    /// This constructor derives molecular biology vectors from chemistry,
+    /// grounding nucleotides in actual functional groups.
+    pub fn from_chemistry(chemistry: &Chemistry, genesis: &GenesisSeed) -> Self {
+        // Nucleobases are composed of rings with amino/carbonyl groups
+        // Adenine: purine + amino
+        let adenine = ContinuousHV::bundle(&[
+            &genesis.hv("purine::ring", PHYSICS_DIM),
+            &chemistry.amino,
+        ]);
+
+        // Thymine: pyrimidine + carbonyl + methyl
+        let thymine = ContinuousHV::bundle(&[
+            &genesis.hv("pyrimidine::ring", PHYSICS_DIM),
+            &chemistry.carbonyl,
+            &chemistry.methyl,
+        ]);
+
+        // Guanine: purine + carbonyl + amino
+        let guanine = ContinuousHV::bundle(&[
+            &genesis.hv("purine::ring", PHYSICS_DIM),
+            &chemistry.carbonyl,
+            &chemistry.amino,
+        ]);
+
+        // Cytosine: pyrimidine + amino
+        let cytosine = ContinuousHV::bundle(&[
+            &genesis.hv("pyrimidine::ring", PHYSICS_DIM),
+            &chemistry.amino,
+        ]);
+
+        // Uracil: pyrimidine + carbonyl (no methyl, unlike thymine)
+        let uracil = ContinuousHV::bundle(&[
+            &genesis.hv("pyrimidine::ring", PHYSICS_DIM),
+            &chemistry.carbonyl,
+        ]);
+
+        // Sugars from hydroxyl groups
+        let deoxyribose = ContinuousHV::bundle(&[
+            &chemistry.hydroxyl,
+            &genesis.hv("sugar::five_ring", PHYSICS_DIM),
+        ]);
+
+        let ribose = ContinuousHV::bundle(&[
+            &chemistry.hydroxyl,
+            &chemistry.hydroxyl.permute(100), // extra OH group
+            &genesis.hv("sugar::five_ring", PHYSICS_DIM),
+        ]);
+
+        // Phosphate from chemistry
+        let phosphate = chemistry.phosphate.clone();
+
+        // Hydrogen bonding from chemistry
+        let hydrogen_bond = chemistry.hydrogen_bond.clone();
+
+        Self {
+            adenine,
+            thymine,
+            guanine,
+            cytosine,
+            uracil,
+            deoxyribose,
+            ribose,
+            phosphate,
+            hydrogen_bond,
+            watson_crick: genesis.hv("molbio::watson_crick", PHYSICS_DIM),
             double_helix: genesis.hv("molbio::double_helix", PHYSICS_DIM),
             major_groove: genesis.hv("molbio::major_groove", PHYSICS_DIM),
             minor_groove: genesis.hv("molbio::minor_groove", PHYSICS_DIM),

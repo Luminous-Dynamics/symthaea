@@ -26,6 +26,8 @@ use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
 use super::consciousness_bridge::PhysicsConsciousnessBridge;
+use super::periodic_table::PeriodicTable;
+use super::hadrons::Hadrons;
 use serde::{Deserialize, Serialize};
 
 /// Ion type
@@ -145,6 +147,54 @@ impl NeuroEncoder {
             k_ion: genesis.hv(IonType::Potassium.domain_label(), PHYSICS_DIM),
             ca_ion: genesis.hv(IonType::Calcium.domain_label(), PHYSICS_DIM),
             cl_ion: genesis.hv(IonType::Chloride.domain_label(), PHYSICS_DIM),
+
+            channel_open: genesis.hv("channel::open", PHYSICS_DIM),
+            channel_closed: genesis.hv("channel::closed", PHYSICS_DIM),
+            channel_inactivated: genesis.hv("channel::inactivated", PHYSICS_DIM),
+            voltage_sensor: genesis.hv("channel::voltage_sensor", PHYSICS_DIM),
+            selectivity_filter: genesis.hv("channel::selectivity_filter", PHYSICS_DIM),
+
+            voltage_gating: genesis.hv(GatingType::Voltage.domain_label(), PHYSICS_DIM),
+            ligand_gating: genesis.hv(GatingType::Ligand.domain_label(), PHYSICS_DIM),
+            mechanical_gating: genesis.hv(GatingType::Mechanical.domain_label(), PHYSICS_DIM),
+            leak_gating: genesis.hv(GatingType::Leak.domain_label(), PHYSICS_DIM),
+
+            glutamate: genesis.hv("nt::glutamate", PHYSICS_DIM),
+            gaba: genesis.hv("nt::gaba", PHYSICS_DIM),
+            dopamine: genesis.hv("nt::dopamine", PHYSICS_DIM),
+            serotonin: genesis.hv("nt::serotonin", PHYSICS_DIM),
+            acetylcholine: genesis.hv("nt::acetylcholine", PHYSICS_DIM),
+            norepinephrine: genesis.hv("nt::norepinephrine", PHYSICS_DIM),
+
+            soma: genesis.hv("neuron::soma", PHYSICS_DIM),
+            dendrite: genesis.hv("neuron::dendrite", PHYSICS_DIM),
+            axon: genesis.hv("neuron::axon", PHYSICS_DIM),
+            synapse: genesis.hv("neuron::synapse", PHYSICS_DIM),
+            spine: genesis.hv("neuron::spine", PHYSICS_DIM),
+
+            ltp: genesis.hv("plasticity::ltp", PHYSICS_DIM),
+            ltd: genesis.hv("plasticity::ltd", PHYSICS_DIM),
+            stdp: genesis.hv("plasticity::stdp", PHYSICS_DIM),
+        }
+    }
+
+    /// Create NeuroEncoder from periodic table
+    ///
+    /// This constructor derives ion vectors from actual elements,
+    /// grounding neuroscience in atomic physics.
+    pub fn from_table(table: &PeriodicTable, hadrons: &Hadrons, genesis: &GenesisSeed) -> Self {
+        // Get actual ion vectors from periodic table
+        // Na+ (Z=11), K+ (Z=19), Ca2+ (Z=20), Cl- (Z=17)
+        let na_ion = table.ion(11, 1, hadrons);
+        let k_ion = table.ion(19, 1, hadrons);
+        let ca_ion = table.ion(20, 2, hadrons);
+        let cl_ion = table.ion(17, -1, hadrons);
+
+        Self {
+            na_ion,
+            k_ion,
+            ca_ion,
+            cl_ion,
 
             channel_open: genesis.hv("channel::open", PHYSICS_DIM),
             channel_closed: genesis.hv("channel::closed", PHYSICS_DIM),
