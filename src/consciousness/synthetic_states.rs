@@ -38,7 +38,9 @@
 //! ```
 
 use crate::hdc::binary_hv::HV16;
+use crate::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Type of consciousness state to generate
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -123,6 +125,265 @@ impl StateType {
             StateType::Awake,
             StateType::AlertFocused,
         ]
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NSM PRIMITIVE GROUNDING
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// NSM primitive grounding for consciousness state types
+///
+/// Maps each consciousness level to Wierzbicka's semantic primitives:
+/// - Unconscious states: Negation of awareness primitives (NOT + FEEL, NOT + KNOW)
+/// - Emerging states: Partial awareness (MAYBE, BODY)
+/// - Full consciousness: Complete awareness (FEEL + KNOW + SEE + THINK + I)
+///
+/// # Semantic Structure
+///
+/// The grounding captures a fundamental spectrum from:
+/// - **Absence** (NOT, NOT+FEEL) - no subjective experience
+/// - **Emergence** (MAYBE, BODY) - pre-conscious bodily states
+/// - **Presence** (FEEL, KNOW, I) - full phenomenal consciousness
+#[derive(Debug, Clone)]
+pub struct StateTypePrimitiveGrounding {
+    /// The consciousness state type
+    pub state_type: StateType,
+    /// NSM primitives that define this state (Wierzbicka's 65 primes)
+    pub nsm_primitives: Vec<String>,
+    /// HDC encoding of the primitive composition
+    pub primitive_encoding: HV16,
+    /// Consciousness level (0.0 = unconscious, 1.0 = peak consciousness)
+    pub consciousness_level: f64,
+    /// Integration capacity (how much information integration is possible)
+    pub integration_capacity: f64,
+}
+
+impl StateTypePrimitiveGrounding {
+    /// Create grounding for a state type with given primitive system
+    pub fn new(state_type: StateType, primitives: &PrimitiveSystem) -> Self {
+        let nsm_primitives = Self::primitives_for_state(&state_type);
+
+        // Compose primitives using HDC binding
+        let primitive_encoding = Self::encode_primitives(&nsm_primitives, primitives);
+
+        // Calculate derived metrics
+        let consciousness_level = state_type.consciousness_level();
+        let (phi_min, phi_max) = state_type.expected_phi_range();
+        let integration_capacity = (phi_min + phi_max) / 2.0;
+
+        Self {
+            state_type,
+            nsm_primitives,
+            primitive_encoding,
+            consciousness_level,
+            integration_capacity,
+        }
+    }
+
+    /// Get NSM primitives for each state type
+    ///
+    /// Semantic decomposition based on Wierzbicka's Natural Semantic Metalanguage:
+    /// - Mental predicates: KNOW, THINK, FEEL, SEE, HEAR, WANT
+    /// - Existence/Location: THERE IS, SOMEWHERE, HERE
+    /// - Body: BODY, ALIVE
+    /// - Negation/Modality: NOT, MAYBE, CAN
+    /// - Self: I, ME
+    fn primitives_for_state(state_type: &StateType) -> Vec<String> {
+        match state_type {
+            // No subjective experience, complete absence of integration
+            StateType::DeepAnesthesia => vec![
+                "NOT".to_string(),
+                "FEEL".to_string(),
+                "NOT".to_string(),
+                "KNOW".to_string(),
+                "NOT".to_string(),
+                "I".to_string(),
+            ],
+
+            // Minimal awareness, nearly absent
+            StateType::LightAnesthesia => vec![
+                "VERY".to_string(),
+                "NOT".to_string(),
+                "FEEL".to_string(),
+                "MAYBE".to_string(),
+                "BODY".to_string(),
+            ],
+
+            // Local bodily awareness only, no global integration
+            StateType::DeepSleep => vec![
+                "NOT".to_string(),
+                "KNOW".to_string(),
+                "BODY".to_string(),
+                "SOMEWHERE".to_string(),
+                "NOT".to_string(),
+                "SEE".to_string(),
+            ],
+
+            // Some integration emerging
+            StateType::LightSleep => vec![
+                "MAYBE".to_string(),
+                "FEEL".to_string(),
+                "BODY".to_string(),
+                "NOT".to_string(),
+                "SEE".to_string(),
+                "SOMEWHERE".to_string(),
+            ],
+
+            // Weak but present awareness
+            StateType::Drowsy => vec![
+                "FEEL".to_string(),
+                "BODY".to_string(),
+                "NOT".to_string(),
+                "VERY".to_string(),
+                "KNOW".to_string(),
+                "HERE".to_string(),
+            ],
+
+            // Moderate integration, relaxed awareness
+            StateType::RestingAwake => vec![
+                "FEEL".to_string(),
+                "KNOW".to_string(),
+                "BODY".to_string(),
+                "HERE".to_string(),
+                "I".to_string(),
+            ],
+
+            // Full awareness, good integration
+            StateType::Awake => vec![
+                "FEEL".to_string(),
+                "KNOW".to_string(),
+                "SEE".to_string(),
+                "THINK".to_string(),
+                "I".to_string(),
+                "HERE".to_string(),
+            ],
+
+            // Peak awareness, strong integration
+            StateType::AlertFocused => vec![
+                "VERY".to_string(),
+                "FEEL".to_string(),
+                "KNOW".to_string(),
+                "SEE".to_string(),
+                "THINK".to_string(),
+                "DO".to_string(),
+                "I".to_string(),
+                "WANT".to_string(),
+            ],
+        }
+    }
+
+    /// Encode primitives as HDC vector using binding composition
+    fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
+        if primitives.is_empty() {
+            return HV16::zero();
+        }
+
+        // Look up or create vectors for each primitive
+        let vectors: Vec<HV16> = primitives
+            .iter()
+            .filter_map(|name| {
+                // Try to find the primitive in the system
+                if let Some(p) = Primitive::all_tier1()
+                    .into_iter()
+                    .chain(Primitive::all_tier2())
+                    .chain(Primitive::all_tier3())
+                    .find(|p| p.canonical_name().to_uppercase() == name.to_uppercase())
+                {
+                    Some(system.primitive_hv(&p))
+                } else {
+                    // Fallback: create deterministic vector from name
+                    let seed = name
+                        .bytes()
+                        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                    Some(HV16::random(seed))
+                }
+            })
+            .collect();
+
+        if vectors.is_empty() {
+            return HV16::zero();
+        }
+
+        // Compose through sequential binding (order-preserving)
+        let mut result = vectors[0].clone();
+        for v in &vectors[1..] {
+            result = HV16::bind(&result, v);
+        }
+        result
+    }
+
+    /// Semantic similarity to another state grounding
+    pub fn similarity(&self, other: &Self) -> f64 {
+        self.primitive_encoding
+            .similarity(&other.primitive_encoding) as f64
+    }
+}
+
+/// Unified NSM grounding system for synthetic states
+///
+/// Provides semantic foundation for consciousness state generation
+/// using Wierzbicka's Natural Semantic Metalanguage.
+#[derive(Debug, Clone)]
+pub struct SyntheticStatesNSMGrounding {
+    /// Grounding for each state type
+    pub state_groundings: HashMap<StateType, StateTypePrimitiveGrounding>,
+    /// Reference to primitive system
+    primitive_system: PrimitiveSystem,
+}
+
+impl SyntheticStatesNSMGrounding {
+    /// Create complete NSM grounding for synthetic states
+    pub fn new(primitive_system: PrimitiveSystem) -> Self {
+        let mut state_groundings = HashMap::new();
+
+        for state_type in StateType::all_ordered() {
+            let grounding = StateTypePrimitiveGrounding::new(state_type.clone(), &primitive_system);
+            state_groundings.insert(state_type, grounding);
+        }
+
+        Self {
+            state_groundings,
+            primitive_system,
+        }
+    }
+
+    /// Get grounding for a specific state type
+    pub fn grounding(&self, state_type: &StateType) -> Option<&StateTypePrimitiveGrounding> {
+        self.state_groundings.get(state_type)
+    }
+
+    /// Find states semantically similar to a query vector
+    pub fn find_similar(&self, query: &HV16, threshold: f64) -> Vec<(&StateType, f64)> {
+        let mut similar: Vec<_> = self
+            .state_groundings
+            .iter()
+            .map(|(st, g)| (st, query.similarity(&g.primitive_encoding) as f64))
+            .filter(|(_, sim)| *sim >= threshold)
+            .collect();
+
+        similar.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        similar
+    }
+
+    /// Semantic distance between two state types
+    pub fn semantic_distance(&self, state1: &StateType, state2: &StateType) -> f64 {
+        match (self.grounding(state1), self.grounding(state2)) {
+            (Some(g1), Some(g2)) => 1.0 - g1.similarity(g2),
+            _ => 1.0,
+        }
+    }
+
+    /// Get consciousness ordering based on semantic primitives
+    pub fn consciousness_ordering(&self) -> Vec<(StateType, f64)> {
+        let mut ordering: Vec<_> = self
+            .state_groundings
+            .iter()
+            .map(|(st, g)| (st.clone(), g.consciousness_level))
+            .collect();
+
+        ordering.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+        ordering
     }
 }
 
@@ -246,9 +507,7 @@ impl SyntheticStateGenerator {
     /// **Encoding**: Sequential BIND + periodic cross-ring bindings
     fn generate_moderate_integration(&mut self) -> Vec<HV16> {
         let n = self.num_components;
-        let node_patterns: Vec<HV16> = (0..n)
-            .map(|_| HV16::random(self.next_seed()))
-            .collect();
+        let node_patterns: Vec<HV16> = (0..n).map(|_| HV16::random(self.next_seed())).collect();
 
         let mut components = Vec::new();
 
@@ -278,9 +537,7 @@ impl SyntheticStateGenerator {
     /// **Encoding**: Sequential BIND operations
     fn generate_moderate_low_integration(&mut self) -> Vec<HV16> {
         let n = self.num_components;
-        let node_patterns: Vec<HV16> = (0..n)
-            .map(|_| HV16::random(self.next_seed()))
-            .collect();
+        let node_patterns: Vec<HV16> = (0..n).map(|_| HV16::random(self.next_seed())).collect();
 
         let mut components = Vec::new();
 
@@ -388,7 +645,9 @@ impl SyntheticStateGenerator {
     /// Generate next random seed using LCG
     fn next_seed(&mut self) -> u64 {
         // Linear Congruential Generator (LCG) - simple but sufficient for our needs
-        self.seed = self.seed.wrapping_mul(6364136223846793005)
+        self.seed = self
+            .seed
+            .wrapping_mul(6364136223846793005)
             .wrapping_add(1442695040888963407);
         self.seed
     }
@@ -414,9 +673,12 @@ mod tests {
         let states = StateType::all_ordered();
 
         for i in 1..states.len() {
-            assert!(states[i].consciousness_level() > states[i - 1].consciousness_level(),
-                    "{:?} should have higher level than {:?}",
-                    states[i], states[i - 1]);
+            assert!(
+                states[i].consciousness_level() > states[i - 1].consciousness_level(),
+                "{:?} should have higher level than {:?}",
+                states[i],
+                states[i - 1]
+            );
         }
     }
 
@@ -429,10 +691,16 @@ mod tests {
             let (_, prev_max) = states[i - 1].expected_phi_range();
             let (curr_min, _) = states[i].expected_phi_range();
 
-            assert!(curr_min >= prev_max,
-                    "Φ ranges should not overlap: {:?} [{}, {}] vs {:?} [{}, {}]",
-                    states[i - 1], prev_max, curr_min,
-                    states[i], curr_min, prev_max);
+            assert!(
+                curr_min >= prev_max,
+                "Φ ranges should not overlap: {:?} [{}, {}] vs {:?} [{}, {}]",
+                states[i - 1],
+                prev_max,
+                curr_min,
+                states[i],
+                curr_min,
+                prev_max
+            );
         }
     }
 
@@ -450,13 +718,21 @@ mod tests {
         for state_type in StateType::all_ordered() {
             let state = generator.generate_state(&state_type);
 
-            assert_eq!(state.len(), generator.num_components,
-                       "State {:?} should have {} components",
-                       state_type, generator.num_components);
+            assert_eq!(
+                state.len(),
+                generator.num_components,
+                "State {:?} should have {} components",
+                state_type,
+                generator.num_components
+            );
 
             // HV16 has fixed dimension of 16384 bits (2048 bytes * 8 bits)
             // Just verify we have the right number of components
-            assert!(!state.is_empty(), "State {:?} should not be empty", state_type);
+            assert!(
+                !state.is_empty(),
+                "State {:?} should not be empty",
+                state_type
+            );
         }
     }
 
@@ -473,9 +749,11 @@ mod tests {
         let avg_similarity = similarities.iter().sum::<f64>() / similarities.len() as f64;
 
         // High integration should have noticeable similarity between components
-        assert!(avg_similarity > 0.3,
-                "High integration should have avg similarity > 0.3, got {:.3}",
-                avg_similarity);
+        assert!(
+            avg_similarity > 0.3,
+            "High integration should have avg similarity > 0.3, got {:.3}",
+            avg_similarity
+        );
     }
 
     #[test]
@@ -493,9 +771,11 @@ mod tests {
         // For binary hypervectors, similarity ≈ 0.5 means "random/no correlation"
         // Values significantly above 0.5 indicate positive correlation (shared structure)
         // Random state should have similarity close to 0.5 (the expected value for uncorrelated vectors)
-        assert!(avg_similarity < 0.6 && avg_similarity > 0.4,
-                "Random state should have avg similarity near 0.5 (random), got {:.3}",
-                avg_similarity);
+        assert!(
+            avg_similarity < 0.6 && avg_similarity > 0.4,
+            "Random state should have avg similarity near 0.5 (random), got {:.3}",
+            avg_similarity
+        );
     }
 
     #[test]
@@ -508,7 +788,10 @@ mod tests {
 
         // Same seed should produce identical states
         for (comp1, comp2) in state1.iter().zip(state2.iter()) {
-            assert_eq!(comp1, comp2, "Same seed should produce identical components");
+            assert_eq!(
+                comp1, comp2,
+                "Same seed should produce identical components"
+            );
         }
     }
 
@@ -529,7 +812,10 @@ mod tests {
             }
         }
 
-        assert!(any_different, "Different seeds should produce different states");
+        assert!(
+            any_different,
+            "Different seeds should produce different states"
+        );
     }
 
     #[test]
