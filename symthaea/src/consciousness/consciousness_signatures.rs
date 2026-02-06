@@ -431,7 +431,7 @@ pub struct ConsciousnessSignatureAnalyzer {
     /// Running statistics
     pub stats: SignatureStats,
     /// Start time for relative timestamps
-    started_at: Instant,
+    _started_at: Instant,
 }
 
 impl ConsciousnessSignatureAnalyzer {
@@ -443,7 +443,7 @@ impl ConsciousnessSignatureAnalyzer {
             provenance_chain: VecDeque::with_capacity(100),
             known_entities: HashMap::new(),
             stats: SignatureStats::default(),
-            started_at: Instant::now(),
+            _started_at: Instant::now(),
         }
     }
 

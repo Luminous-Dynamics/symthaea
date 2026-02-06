@@ -361,7 +361,7 @@ pub struct AgentStats {
 /// Adaptive primitive reasoner with RL
 pub struct AdaptiveReasoner {
     /// Base primitive reasoner
-    base_reasoner: PrimitiveReasoner,
+    _base_reasoner: PrimitiveReasoner,
 
     /// Q-learning agent
     agent: QLearningAgent,
@@ -375,7 +375,7 @@ impl AdaptiveReasoner {
     pub fn new(_tier: PrimitiveTier) -> Self {
         // Use default config - tier can be used for future extensions
         Self {
-            base_reasoner: PrimitiveReasoner::new(ReasonerConfig::default()),
+            _base_reasoner: PrimitiveReasoner::new(ReasonerConfig::default()),
             agent: QLearningAgent::new(0.1, 0.95, 0.3), // α=0.1, γ=0.95, ε=0.3
             use_rl: true,
         }

@@ -382,7 +382,7 @@ pub struct ConsciousnessFieldAnalyzer {
     current_time: f64,
 
     /// Start time
-    started_at: Instant,
+    _started_at: Instant,
 }
 
 impl ConsciousnessFieldAnalyzer {
@@ -397,7 +397,7 @@ impl ConsciousnessFieldAnalyzer {
             energy_tracker: EnergyTracker::new(),
             stats: FieldDynamicsStats::default(),
             current_time: 0.0,
-            started_at: Instant::now(),
+            _started_at: Instant::now(),
         }
     }
 

@@ -133,7 +133,7 @@ impl Default for MisakiVocab {
 /// G2P converter using espeak-ng when available, with fallback to lookup table.
 pub struct G2PConverter {
     /// Misaki vocabulary for IPA → phoneme ID conversion
-    vocab: MisakiVocab,
+    _vocab: MisakiVocab,
     /// Word → phoneme ID sequence lookup table (fallback)
     word_map: HashMap<String, Vec<u32>>,
     /// Character → phoneme ID fallback
@@ -207,7 +207,7 @@ impl G2PConverter {
         }
 
         Self {
-            vocab,
+            _vocab: vocab,
             word_map,
             char_map,
             #[cfg(feature = "voice-tts")]

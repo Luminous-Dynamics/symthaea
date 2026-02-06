@@ -177,7 +177,7 @@ impl HierarchicalConfig {
 #[derive(Clone)]
 pub struct LocalCircuit {
     /// Circuit identifier
-    id: usize,
+    _id: usize,
 
     /// Number of neurons
     size: usize,
@@ -246,7 +246,7 @@ impl LocalCircuit {
             .collect();
 
         Self {
-            id,
+            _id: id,
             size,
             state,
             tau,
@@ -473,7 +473,7 @@ pub struct HierarchicalLTC {
     global: GlobalIntegrator,
 
     /// Inter-circuit communication matrix
-    inter_circuit: SparseMatrix,
+    _inter_circuit: SparseMatrix,
 
     /// Total evolution steps
     steps: usize,
@@ -526,7 +526,7 @@ impl HierarchicalLTC {
             config,
             circuits,
             global,
-            inter_circuit,
+            _inter_circuit: inter_circuit,
             steps: 0,
             circuit_output_refs,
         })

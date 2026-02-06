@@ -514,7 +514,7 @@ pub struct CausalExplainer {
     explanations: Vec<CausalExplanation>,
 
     /// Enable verbose explanations
-    verbose: bool,
+    _verbose: bool,
 }
 
 impl CausalExplainer {
@@ -523,7 +523,7 @@ impl CausalExplainer {
         Self {
             causal_model: CausalModel::new(),
             explanations: Vec::new(),
-            verbose: true,
+            _verbose: true,
         }
     }
 

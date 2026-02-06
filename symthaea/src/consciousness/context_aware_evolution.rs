@@ -501,8 +501,8 @@ impl ContextAwareResult {
 
 /// Context-aware multi-objective optimizer
 pub struct ContextAwareOptimizer {
-    config: EvolutionConfig,
-    context_weights: HashMap<ReasoningContext, ObjectiveWeights>,
+    _config: EvolutionConfig,
+    _context_weights: HashMap<ReasoningContext, ObjectiveWeights>,
 }
 
 impl ContextAwareOptimizer {
@@ -525,14 +525,14 @@ impl ContextAwareOptimizer {
         }
 
         Ok(Self {
-            config,
-            context_weights,
+            _config: config,
+            _context_weights: context_weights,
         })
     }
 
     /// Get weights for a specific context
     pub fn get_weights_for_context(&self, context: &ReasoningContext) -> ObjectiveWeights {
-        self.context_weights
+        self._context_weights
             .get(context)
             .copied()
             .unwrap_or_else(ObjectiveWeights::balanced)
@@ -540,7 +540,7 @@ impl ContextAwareOptimizer {
 
     /// Set custom weights for a context
     pub fn set_weights_for_context(&mut self, context: ReasoningContext, weights: ObjectiveWeights) {
-        self.context_weights.insert(context, weights);
+        self._context_weights.insert(context, weights);
     }
 
     /// Detect context from query and task type

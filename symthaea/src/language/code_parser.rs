@@ -228,6 +228,16 @@ pub struct CodeDiagnostic {
     pub span: Option<Span>,
 }
 
+impl std::fmt::Display for CodeDiagnostic {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(ref span) = self.span {
+            write!(f, "[{:?}] {} at {}:{}", self.severity, self.message, span.start_line + 1, span.start_col + 1)
+        } else {
+            write!(f, "[{:?}] {}", self.severity, self.message)
+        }
+    }
+}
+
 /// The result of parsing source code
 #[derive(Debug, Clone)]
 pub struct ParsedCode {

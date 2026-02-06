@@ -518,7 +518,7 @@ pub struct HolographicBinder {
     bindings: HashMap<String, Vec<String>>,
 
     /// Binding strength matrix
-    binding_strength: Vec<Vec<f64>>,
+    _binding_strength: Vec<Vec<f64>>,
 }
 
 impl HolographicBinder {
@@ -527,7 +527,7 @@ impl HolographicBinder {
         Self {
             field: HolographicField::new(config),
             bindings: HashMap::new(),
-            binding_strength: Vec::new(),
+            _binding_strength: Vec::new(),
         }
     }
 
@@ -591,7 +591,7 @@ pub struct HolographicConsciousnessAnalyzer {
     binder: HolographicBinder,
 
     /// Configuration
-    config: HolographicConfig,
+    _config: HolographicConfig,
 
     /// Analysis history
     history: VecDeque<HolographicAnalysis>,
@@ -626,7 +626,7 @@ impl HolographicConsciousnessAnalyzer {
             memory: HolographicMemory::new(config.clone()),
             binder: HolographicBinder::new(config.clone()),
             history: VecDeque::with_capacity(100),
-            config,
+            _config: config,
         }
     }
 

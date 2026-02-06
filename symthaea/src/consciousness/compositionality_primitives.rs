@@ -171,7 +171,7 @@ pub struct CompositionalityEngine {
     operator_encodings: HashMap<CompositionType, HV16>,
 
     /// Reference to base primitive system
-    base_system: Arc<PrimitiveSystem>,
+    _base_system: Arc<PrimitiveSystem>,
 
     /// Composition statistics
     stats: CompositionStats,
@@ -185,7 +185,7 @@ impl fmt::Debug for CompositionalityEngine {
         f.debug_struct("CompositionalityEngine")
             .field("composed_primitives", &self.composed_primitives.len())
             .field("operator_encodings", &self.operator_encodings.len())
-            .field("base_system", &"<PrimitiveSystem>")
+            .field("_base_system", &"<PrimitiveSystem>")
             .field("stats", &self.stats)
             .field("config", &self.config)
             .finish()
@@ -248,7 +248,7 @@ impl CompositionalityEngine {
         let mut engine = Self {
             composed_primitives: HashMap::new(),
             operator_encodings: HashMap::new(),
-            base_system,
+            _base_system: base_system,
             stats: CompositionStats::default(),
             config,
         };
@@ -873,7 +873,7 @@ pub struct CompositionResult {
 
 /// Discover useful compositions automatically
 pub struct CompositionDiscovery {
-    engine: Arc<CompositionalityEngine>,
+    _engine: Arc<CompositionalityEngine>,
 }
 
 impl CompositionDiscovery {

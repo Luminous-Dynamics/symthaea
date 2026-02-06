@@ -260,7 +260,7 @@ impl PlasmaEncoder {
     }
 
     /// Create a plasma
-    pub fn create_plasma(&self, name: &str, density_m3: f64, temp_ev: f64, b_field_t: f64, genesis: &GenesisSeed) -> Plasma {
+    pub fn create_plasma(&self, name: &str, density_m3: f64, temp_ev: f64, b_field_t: f64, _genesis: &GenesisSeed) -> Plasma {
         let debye = self.debye_length_m(temp_ev, density_m3);
         let omega_p = self.plasma_frequency_rad_s(density_m3);
 
@@ -337,7 +337,7 @@ impl PlasmaEncoder {
     }
 
     /// Alfvén wave in plasma
-    pub fn alfven_wave(&self, plasma: &Plasma, genesis: &GenesisSeed) -> ContinuousHV {
+    pub fn alfven_wave(&self, plasma: &Plasma, _genesis: &GenesisSeed) -> ContinuousHV {
         let mass_density = plasma.density_m3 * 1.67e-27;  // Assume protons
         let v_a = self.alfven_velocity(plasma.magnetic_field_t, mass_density);
 

@@ -371,7 +371,7 @@ impl GREncoder {
 
     /// Gravitational wave from binary neutron star merger
     pub fn binary_ns_merger(&self, m1_solar: f64, m2_solar: f64, distance_mpc: f64) -> GravitationalWave {
-        let m_total = m1_solar + m2_solar;
+        let _m_total = m1_solar + m2_solar;
         let freq = 1000.0;  // ~kHz for NS mergers
         let strain = 1e-22 * (40.0 / distance_mpc);
 

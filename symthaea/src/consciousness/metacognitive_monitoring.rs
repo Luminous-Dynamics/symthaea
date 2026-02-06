@@ -371,13 +371,13 @@ struct Anomaly {
 /// Self-correction engine
 struct SelfCorrectionEngine {
     /// Confidence threshold for proposing corrections
-    confidence_threshold: f64,
+    _confidence_threshold: f64,
 }
 
 impl SelfCorrectionEngine {
     fn new() -> Self {
         Self {
-            confidence_threshold: 0.5,
+            _confidence_threshold: 0.5,
         }
     }
 
