@@ -115,7 +115,7 @@ impl ThermoEncoder {
             return self.entropy.scale(0.0);
         }
 
-        let s = K_BOLTZMANN * microstates.ln();
+        let _s = K_BOLTZMANN * microstates.ln();
         // Normalize to reasonable scale (divide by k_B to get dimensionless)
         let s_normalized = microstates.ln() as f32 / 100.0;
 

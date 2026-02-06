@@ -436,7 +436,7 @@ impl TemporalIdentityCoherence {
         &mut self,
         narrative: &NarrativeSelfModel,
         present_state: &HV16,
-        predictive: &PredictiveSelfModel,
+        _predictive: &PredictiveSelfModel,
     ) {
         // Get past self from narrative
         self.past_self = Some(narrative.unified_self().clone());

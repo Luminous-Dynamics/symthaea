@@ -266,7 +266,7 @@ impl MetaCognitiveReasoner {
         &mut self,
         query: &str,
         primitives: Vec<CandidatePrimitive>,
-        chain: &mut ReasoningChain,
+        _chain: &mut ReasoningChain,
     ) -> Result<MetaReasoningResult> {
         // Step 1: Detect context with confidence estimation
         let context_reflection = self.reflect_on_context(query)?;
@@ -608,7 +608,7 @@ impl MetaLearningEngine {
         &mut self,
         context_reflection: &ContextReflection,
         result: &ContextAwareResult,
-        decision_history: &[MetaDecision],
+        _decision_history: &[MetaDecision],
     ) -> Result<Vec<MetaLearningInsight>> {
         let mut new_insights = Vec::new();
 

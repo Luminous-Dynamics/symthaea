@@ -110,8 +110,8 @@ impl ReasoningState {
         // Divide into 8 chunks, count active bits per chunk
         let mut chunk_features = Vec::new();
         for i in 0..8 {
-            let start = i * 2048;
-            let end = (i + 1) * 2048;
+            let _start = i * 2048;
+            let _end = (i + 1) * 2048;
             // This is a simplified feature - would need actual HV access
             chunk_features.push(popcount); // Placeholder
         }

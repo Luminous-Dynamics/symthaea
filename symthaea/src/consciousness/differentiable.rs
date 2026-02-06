@@ -398,14 +398,14 @@ impl DifferentiableConsciousness {
     /// by running the equation 7 times (once per component gradient).
     pub fn forward(&self, state: &ConsciousnessStateV2) -> (f64, ConsciousnessGradient) {
         // Get component values
-        let phi_val = state.get_core(CoreComponent::Integration);
-        let binding_val = state.get_core(CoreComponent::Binding);
-        let workspace_val = state.get_core(CoreComponent::Workspace);
-        let attention_val = state.get_core(CoreComponent::Attention);
-        let recursion_val = state.get_core(CoreComponent::Recursion);
-        let efficacy_val = state.get_core(CoreComponent::Efficacy);
-        let knowledge_val = state.get_core(CoreComponent::Knowledge);
-        let substrate_val = state.substrate_feasibility;
+        let _phi_val = state.get_core(CoreComponent::Integration);
+        let _binding_val = state.get_core(CoreComponent::Binding);
+        let _workspace_val = state.get_core(CoreComponent::Workspace);
+        let _attention_val = state.get_core(CoreComponent::Attention);
+        let _recursion_val = state.get_core(CoreComponent::Recursion);
+        let _efficacy_val = state.get_core(CoreComponent::Efficacy);
+        let _knowledge_val = state.get_core(CoreComponent::Knowledge);
+        let _substrate_val = state.substrate_feasibility;
 
         // Compute forward pass for value
         let c_value = self.compute_value(state);
@@ -624,7 +624,7 @@ impl DifferentiableConsciousness {
     ///
     /// Returns the component that would most increase consciousness if improved
     pub fn suggest_improvement(&self, state: &ConsciousnessStateV2) -> (CoreComponent, f64, String) {
-        let (c, gradient) = self.forward(state);
+        let (_c, gradient) = self.forward(state);
 
         let (component, grad_value) = gradient.highest_impact_component();
 

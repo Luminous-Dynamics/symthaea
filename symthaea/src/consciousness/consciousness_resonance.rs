@@ -987,7 +987,7 @@ impl ResonanceAnalyzer {
         let n = self.oscillators.len();
 
         // Calculate mean field for coupling
-        let mean_phase: f64 = self.oscillators.iter().map(|o| o.phase).sum::<f64>() / n as f64;
+        let _mean_phase: f64 = self.oscillators.iter().map(|o| o.phase).sum::<f64>() / n as f64;
         let mean_freq: f64 = self
             .oscillators
             .iter()

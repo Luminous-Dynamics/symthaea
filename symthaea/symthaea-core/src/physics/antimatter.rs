@@ -80,7 +80,7 @@ pub struct Antimatter {
 
 impl Antimatter {
     /// Create antimatter encoder from Standard Model
-    pub fn from_model(model: &StandardModel, hadrons: &Hadrons, genesis: &GenesisSeed) -> Self {
+    pub fn from_model(model: &StandardModel, _hadrons: &Hadrons, genesis: &GenesisSeed) -> Self {
         // CPT transform marker
         let cpt_transform = genesis.hv("antimatter::cpt_transform", PHYSICS_DIM);
 
