@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 use super::seven_harmonies::Harmony;
 
 /// Configuration for the semantic value embedder
@@ -98,29 +99,92 @@ pub struct EmbedderStats {
 }
 
 impl SemanticValueEmbedder {
-    /// Create a new embedder
+    /// Create a new embedder with primitive-grounded harmony bases
     pub fn new(config: EmbedderConfig) -> Self {
         let dim = config.dimension;
+        let system = PrimitiveSystem::global();
 
-        // Initialize harmony basis vectors
-        let mut harmony_bases = HashMap::new();
-        for harmony in [
-            Harmony::ResonantCoherence,
-            Harmony::PanSentientFlourishing,
-            Harmony::IntegralWisdom,
-            Harmony::InfinitePlay,
-            Harmony::UniversalInterconnectedness,
-            Harmony::SacredReciprocity,
-            Harmony::EvolutionaryProgression,
-        ] {
-            harmony_bases.insert(harmony, RealHV::random(dim, 42));
-        }
+        // Ground harmony bases in primitive tiers
+        // Each harmony maps to a primitive tier, creating semantic alignment
+        let harmony_bases = Self::build_primitive_grounded_bases(dim, system);
 
         Self {
             config,
             harmony_bases,
             cache: HashMap::new(),
             stats: EmbedderStats::default(),
+        }
+    }
+
+    /// Build harmony bases grounded in primitive tiers
+    ///
+    /// Maps each of the 7 Harmonies to a primitive tier, then creates
+    /// a basis vector by bundling the tier's primitive encodings.
+    fn build_primitive_grounded_bases(dim: usize, system: &PrimitiveSystem) -> HashMap<Harmony, RealHV> {
+        let mut bases = HashMap::new();
+
+        // Mapping of Harmonies to Primitive Tiers:
+        // - ResonantCoherence → Geometric (structural coherence)
+        // - PanSentientFlourishing → Consciousness (phenomenal experience)
+        // - IntegralWisdom → Compositional (higher-order integration)
+        // - InfinitePlay → Mathematical (infinite generativity)
+        // - UniversalInterconnectedness → Physical (causal connections)
+        // - SacredReciprocity → Strategic (game theory, reciprocity)
+        // - EvolutionaryProgression → Temporal (change over time)
+
+        let tier_mapping: [(Harmony, PrimitiveTier); 7] = [
+            (Harmony::ResonantCoherence, PrimitiveTier::Geometric),
+            (Harmony::PanSentientFlourishing, PrimitiveTier::Consciousness),
+            (Harmony::IntegralWisdom, PrimitiveTier::Compositional),
+            (Harmony::InfinitePlay, PrimitiveTier::Mathematical),
+            (Harmony::UniversalInterconnectedness, PrimitiveTier::Physical),
+            (Harmony::SacredReciprocity, PrimitiveTier::Strategic),
+            (Harmony::EvolutionaryProgression, PrimitiveTier::Temporal),
+        ];
+
+        for (harmony, tier) in tier_mapping {
+            let primitives = system.get_tier(tier);
+
+            if primitives.is_empty() {
+                // Fallback to random if tier is empty (e.g., NSM)
+                bases.insert(harmony, RealHV::random(dim, harmony as u64 + 42));
+            } else {
+                // Bundle primitive encodings (HV16 → RealHV conversion)
+                // Convert binary HV16 bits to bipolar RealHV values (-1.0/+1.0)
+                let real_hvs: Vec<RealHV> = primitives
+                    .iter()
+                    .take(16) // Limit to avoid over-bundling
+                    .map(|p| Self::hv16_to_real(&p.encoding, dim))
+                    .collect();
+
+                if real_hvs.is_empty() {
+                    bases.insert(harmony, RealHV::random(dim, harmony as u64 + 42));
+                } else {
+                    bases.insert(harmony, RealHV::bundle(&real_hvs));
+                }
+            }
+        }
+
+        bases
+    }
+
+    /// Convert HV16 to RealHV with specified dimension
+    ///
+    /// Maps binary bits to bipolar values: 0 → -1.0, 1 → +1.0
+    /// Uses HV16::to_bipolar() then resamples to target dimension
+    fn hv16_to_real(hv: &symthaea_core::hdc::binary_hv::HV16, dim: usize) -> RealHV {
+        let bipolar = hv.to_bipolar(); // Returns Vec<f32> with ±1.0 values
+
+        if dim == bipolar.len() {
+            RealHV::from_values(bipolar)
+        } else {
+            // Resample to target dimension
+            let mut values = Vec::with_capacity(dim);
+            for i in 0..dim {
+                let idx = i % bipolar.len();
+                values.push(bipolar[idx]);
+            }
+            RealHV::from_values(values)
         }
     }
 
