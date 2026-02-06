@@ -64,6 +64,9 @@ pub mod bridge;
 // Extended fusion physics (D-T, p-B11, muon-catalyzed)
 pub mod reactions;
 
+// Multi-physics discovery engine
+pub mod multi_physics;
+
 // Core re-exports
 pub use physics::{GamowIntegration, GamowResult, QFactor, QFactorParams};
 pub use lattice::{LatticeLifetime, LatticeState};
