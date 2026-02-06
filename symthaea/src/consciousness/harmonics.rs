@@ -23,12 +23,344 @@
 //! - **HarmonicResolver**: Resolves conflicts using hierarchical constraints
 //! - **Integration**: Connects to existing modules (coherence, social, causal, etc.)
 
+use crate::consciousness::primitive_reasoning::{ReasoningChain, TransformationType};
+use crate::hdc::binary_hv::HV16;
+use crate::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::consciousness::primitive_reasoning::{ReasoningChain, TransformationType};
-use crate::hdc::primitive_system::{Primitive, PrimitiveTier};
+// ═══════════════════════════════════════════════════════════════════════════
+// NSM PRIMITIVE GROUNDING FOR FIDUCIARY HARMONICS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// NSM primitive grounding for the Seven Fiduciary Harmonics.
+///
+/// Each harmonic is decomposed into Natural Semantic Metalanguage primitives
+/// that capture its philosophical essence, enabling cross-domain semantic reasoning.
+///
+/// ## Harmonic Semantics (rooted in Infinite Love)
+///
+/// - ResonantCoherence: unity, integration → TOGETHER + SAME + GOOD + ONE
+/// - PanSentientFlourishing: care for all → ALL + FEEL + GOOD + LIVE + WANT
+/// - IntegralWisdom: embodied knowing → KNOW + VERY + I + SEE + THINK
+/// - InfinitePlay: joyful creation → DO + GOOD + MORE + NOT + SAME + VERY
+/// - UniversalInterconnectedness: fundamental unity → ALL + TOGETHER + ONE + FEEL
+/// - SacredReciprocity: generous flow → DO + GIVE + OTHER + GOOD + WANT
+/// - EvolutionaryProgression: wise becoming → BECOME + MORE + GOOD + AFTER + CHANGE
+#[derive(Debug, Clone)]
+pub struct FiduciaryHarmonicPrimitiveGrounding {
+    /// The harmonic being grounded
+    pub harmonic: FiduciaryHarmonic,
+
+    /// NSM primitives composing this harmonic's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Love dimension: 0.0 (neutral) to 1.0 (pure love)
+    pub love_dimension: f32,
+
+    /// Unity dimension: 0.0 (separate) to 1.0 (unified)
+    pub unity_dimension: f32,
+
+    /// Growth dimension: 0.0 (static) to 1.0 (evolutionary)
+    pub growth_dimension: f32,
+}
+
+impl FiduciaryHarmonicPrimitiveGrounding {
+    /// Get NSM grounding for a specific fiduciary harmonic
+    pub fn for_harmonic(harmonic: FiduciaryHarmonic, primitive_system: &PrimitiveSystem) -> Self {
+        let (primitives, love, unity, growth) = match harmonic {
+            // Resonant Coherence: luminous order, harmonious integration
+            FiduciaryHarmonic::ResonantCoherence => (
+                vec!["NSM_TOGETHER", "NSM_SAME", "NSM_GOOD", "NSM_ONE"],
+                0.7,
+                1.0,
+                0.4,
+            ),
+
+            // Pan-Sentient Flourishing: unconditional care for all beings
+            FiduciaryHarmonic::PanSentientFlourishing => (
+                vec!["NSM_ALL", "NSM_FEEL", "NSM_GOOD", "NSM_LIVE", "NSM_WANT"],
+                1.0,
+                0.8,
+                0.6,
+            ),
+
+            // Integral Wisdom: self-illuminating intelligence
+            FiduciaryHarmonic::IntegralWisdom => (
+                vec!["NSM_KNOW", "NSM_VERY", "NSM_I", "NSM_SEE", "NSM_THINK"],
+                0.6,
+                0.5,
+                0.7,
+            ),
+
+            // Infinite Play: joyful generativity, endless novelty
+            FiduciaryHarmonic::InfinitePlay => (
+                vec!["NSM_DO", "NSM_GOOD", "NSM_MORE", "NSM_NOT", "NSM_SAME"],
+                0.8,
+                0.4,
+                0.9,
+            ),
+
+            // Universal Interconnectedness: fundamental unity
+            FiduciaryHarmonic::UniversalInterconnectedness => (
+                vec!["NSM_ALL", "NSM_TOGETHER", "NSM_ONE", "NSM_FEEL", "NSM_SAME"],
+                0.9,
+                1.0,
+                0.5,
+            ),
+
+            // Sacred Reciprocity: generous flow, mutual upliftment
+            FiduciaryHarmonic::SacredReciprocity => (
+                vec!["NSM_DO", "NSM_OTHER", "NSM_GOOD", "NSM_WANT", "NSM_I"],
+                0.95,
+                0.7,
+                0.6,
+            ),
+
+            // Evolutionary Progression: wise becoming
+            FiduciaryHarmonic::EvolutionaryProgression => (
+                vec![
+                    "NSM_BECOME",
+                    "NSM_MORE",
+                    "NSM_GOOD",
+                    "NSM_AFTER",
+                    "NSM_CHANGE",
+                ],
+                0.7,
+                0.5,
+                1.0,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(8700 + harmonic as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            harmonic,
+            nsm_primitives,
+            primitive_encoding,
+            love_dimension: love,
+            unity_dimension: unity,
+            growth_dimension: growth,
+        }
+    }
+
+    /// Get all fiduciary harmonic groundings
+    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<FiduciaryHarmonic, Self> {
+        FiduciaryHarmonic::all()
+            .into_iter()
+            .map(|h| (h, Self::for_harmonic(h, primitive_system)))
+            .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+
+    /// Calculate similarity between two harmonics
+    pub fn similarity(&self, other: &Self) -> f32 {
+        self.primitive_encoding
+            .similarity(&other.primitive_encoding)
+    }
+
+    /// Get the Infinite Love resonance score (meta-principle binding all harmonics)
+    pub fn infinite_love_score(&self) -> f32 {
+        // Infinite Love = Love × Unity × Growth (geometric mean-ish)
+        (self.love_dimension * self.unity_dimension * self.growth_dimension).powf(1.0 / 3.0)
+    }
+}
+
+/// NSM primitive grounding for resolution strategies.
+///
+/// Each strategy for resolving harmonic interference is grounded in NSM primitives.
+///
+/// ## Strategy Semantics
+///
+/// - SlowEvolution: reduce change rate → NOT + VERY + CHANGE + FOR_SOME_TIME
+/// - IncreasePlay: add novelty → MORE + DO + GOOD + NOT + SAME
+/// - EncourageExploration: seek new → MOVE + SEE + MAYBE + DO
+/// - RestoreBoundaries: protect self → I + NOT + OTHER + NEAR + DO
+/// - HierarchicalBalance: order by priority → ALL + SAME + PART + BIG + SMALL
+#[derive(Debug, Clone)]
+pub struct ResolutionStrategyPrimitiveGrounding {
+    /// The resolution strategy being grounded
+    pub strategy: ResolutionStrategyType,
+
+    /// NSM primitives composing this strategy's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Conservativeness: 0.0 (disruptive) to 1.0 (conservative)
+    pub conservativeness: f32,
+
+    /// Self-focus: 0.0 (other-focused) to 1.0 (self-focused)
+    pub self_focus: f32,
+}
+
+/// Simplified resolution strategy type for NSM grounding (excludes Custom)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ResolutionStrategyType {
+    SlowEvolution,
+    IncreasePlay,
+    EncourageExploration,
+    RestoreBoundaries,
+    HierarchicalBalance,
+}
+
+impl ResolutionStrategyPrimitiveGrounding {
+    /// Get NSM grounding for a specific resolution strategy
+    pub fn for_strategy(
+        strategy: ResolutionStrategyType,
+        primitive_system: &PrimitiveSystem,
+    ) -> Self {
+        let (primitives, conservativeness, self_focus) = match strategy {
+            // Slow Evolution: reduce rate of change
+            ResolutionStrategyType::SlowEvolution => (
+                vec!["NSM_NOT", "NSM_VERY", "NSM_CHANGE", "NSM_FOR_SOME_TIME"],
+                0.9,
+                0.5,
+            ),
+
+            // Increase Play: add joyful novelty
+            ResolutionStrategyType::IncreasePlay => (
+                vec!["NSM_MORE", "NSM_DO", "NSM_GOOD", "NSM_NOT", "NSM_SAME"],
+                0.2,
+                0.4,
+            ),
+
+            // Encourage Exploration: seek new possibilities
+            ResolutionStrategyType::EncourageExploration => {
+                (vec!["NSM_MOVE", "NSM_SEE", "NSM_MAYBE", "NSM_DO"], 0.3, 0.3)
+            }
+
+            // Restore Boundaries: protect integrity
+            ResolutionStrategyType::RestoreBoundaries => (
+                vec!["NSM_I", "NSM_NOT", "NSM_OTHER", "NSM_NEAR", "NSM_DO"],
+                0.7,
+                0.9,
+            ),
+
+            // Hierarchical Balance: order by priority
+            ResolutionStrategyType::HierarchicalBalance => (
+                vec!["NSM_ALL", "NSM_SAME", "NSM_PART", "NSM_BIG", "NSM_SMALL"],
+                0.6,
+                0.5,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(8800 + strategy as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            strategy,
+            nsm_primitives,
+            primitive_encoding,
+            conservativeness,
+            self_focus,
+        }
+    }
+
+    /// Get all resolution strategy groundings
+    pub fn all_groundings(
+        primitive_system: &PrimitiveSystem,
+    ) -> HashMap<ResolutionStrategyType, Self> {
+        [
+            ResolutionStrategyType::SlowEvolution,
+            ResolutionStrategyType::IncreasePlay,
+            ResolutionStrategyType::EncourageExploration,
+            ResolutionStrategyType::RestoreBoundaries,
+            ResolutionStrategyType::HierarchicalBalance,
+        ]
+        .into_iter()
+        .map(|s| (s, Self::for_strategy(s, primitive_system)))
+        .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+}
+
+/// Unified harmonics NSM grounding system.
+///
+/// Provides access to all harmonic concept groundings for
+/// cross-domain semantic reasoning about consciousness values.
+#[derive(Debug, Clone)]
+pub struct HarmonicsNSMGrounding {
+    /// Fiduciary harmonic groundings
+    pub harmonics: HashMap<FiduciaryHarmonic, FiduciaryHarmonicPrimitiveGrounding>,
+
+    /// Resolution strategy groundings
+    pub strategies: HashMap<ResolutionStrategyType, ResolutionStrategyPrimitiveGrounding>,
+}
+
+impl HarmonicsNSMGrounding {
+    /// Create complete harmonics NSM grounding system
+    pub fn new(primitive_system: &PrimitiveSystem) -> Self {
+        Self {
+            harmonics: FiduciaryHarmonicPrimitiveGrounding::all_groundings(primitive_system),
+            strategies: ResolutionStrategyPrimitiveGrounding::all_groundings(primitive_system),
+        }
+    }
+
+    /// Get total number of grounded concepts
+    pub fn concept_count(&self) -> usize {
+        self.harmonics.len() + self.strategies.len()
+    }
+
+    /// Describe a harmonic semantically
+    pub fn describe_harmonic(&self, harmonic: FiduciaryHarmonic) -> String {
+        self.harmonics
+            .get(&harmonic)
+            .map(|g| format!("{}[{}]", harmonic.name(), g.semantic_formula()))
+            .unwrap_or_default()
+    }
+
+    /// Calculate Infinite Love resonance across all harmonics
+    pub fn infinite_love_resonance(&self) -> f32 {
+        let scores: Vec<f32> = self
+            .harmonics
+            .values()
+            .map(|g| g.infinite_love_score())
+            .collect();
+        if scores.is_empty() {
+            return 0.0;
+        }
+        scores.iter().sum::<f32>() / scores.len() as f32
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ORIGINAL FIDUCIARY HARMONICS IMPLEMENTATION
+// ═══════════════════════════════════════════════════════════════════════════
 
 /// The Seven Fiduciary Harmonics
 ///
@@ -102,8 +434,12 @@ impl FiduciaryHarmonic {
     /// Get the harmony's core principle
     pub fn principle(&self) -> &'static str {
         match self {
-            Self::ResonantCoherence => "Luminous order, harmonious integration, boundless creativity",
-            Self::PanSentientFlourishing => "Unconditional care, intrinsic value, holistic well-being",
+            Self::ResonantCoherence => {
+                "Luminous order, harmonious integration, boundless creativity"
+            }
+            Self::PanSentientFlourishing => {
+                "Unconditional care, intrinsic value, holistic well-being"
+            }
             Self::IntegralWisdom => "Self-illuminating intelligence, embodied knowing",
             Self::InfinitePlay => "Joyful generativity, divine play, endless novelty",
             Self::UniversalInterconnectedness => "Fundamental unity, empathic resonance",
@@ -118,13 +454,13 @@ impl FiduciaryHarmonic {
     /// but in temporal resolution, we use these priorities.
     pub fn priority(&self) -> u8 {
         match self {
-            Self::ResonantCoherence => 1,          // Foundation - coherence enables all else
-            Self::PanSentientFlourishing => 2,     // Care - without this, system is hollow
-            Self::IntegralWisdom => 3,             // Understanding - guides wise action
+            Self::ResonantCoherence => 1, // Foundation - coherence enables all else
+            Self::PanSentientFlourishing => 2, // Care - without this, system is hollow
+            Self::IntegralWisdom => 3,    // Understanding - guides wise action
             Self::UniversalInterconnectedness => 4, // Unity - sees the whole
-            Self::SacredReciprocity => 5,          // Exchange - enables growth
-            Self::InfinitePlay => 6,               // Creativity - generates novelty
-            Self::EvolutionaryProgression => 7,    // Evolution - builds on all above
+            Self::SacredReciprocity => 5, // Exchange - enables growth
+            Self::InfinitePlay => 6,      // Creativity - generates novelty
+            Self::EvolutionaryProgression => 7, // Evolution - builds on all above
         }
     }
 }
@@ -232,7 +568,8 @@ impl HarmonicField {
                 harmonic_a: FiduciaryHarmonic::ResonantCoherence,
                 harmonic_b: FiduciaryHarmonic::EvolutionaryProgression,
                 tension_magnitude: tension,
-                description: "Rapid evolution fragmenting coherence - need stabilization".to_string(),
+                description: "Rapid evolution fragmenting coherence - need stabilization"
+                    .to_string(),
                 resolution_strategy: ResolutionStrategy::SlowEvolution,
             });
         }
@@ -309,7 +646,11 @@ impl HarmonicField {
     }
 
     /// Measure harmonic contribution from a single primitive execution
-    fn measure_from_primitive(&mut self, primitive: &Primitive, transformation: TransformationType) {
+    fn measure_from_primitive(
+        &mut self,
+        primitive: &Primitive,
+        transformation: TransformationType,
+    ) {
         // Map transformations to harmonics
         match transformation {
             TransformationType::Bind => {
@@ -455,7 +796,10 @@ impl HarmonicField {
         }
 
         // Set Sacred Reciprocity harmonic
-        self.set_level(FiduciaryHarmonic::SacredReciprocity, reciprocity_level as f64);
+        self.set_level(
+            FiduciaryHarmonic::SacredReciprocity,
+            reciprocity_level as f64,
+        );
     }
 
     /// **Revolutionary Improvement #54**: Measure Universal Interconnectedness from collective learning
@@ -471,8 +815,7 @@ impl HarmonicField {
         &mut self,
         collective_learning: &crate::physiology::social_coherence::CollectiveLearning,
     ) {
-        let (task_types, total_observations, total_contributors) =
-            collective_learning.get_stats();
+        let (task_types, total_observations, total_contributors) = collective_learning.get_stats();
 
         // Base level: awareness of collective
         let mut interconnectedness_level = 0.2;
@@ -526,7 +869,10 @@ impl HarmonicField {
 
         if !self.interferences.is_empty() {
             lines.push(String::new());
-            lines.push(format!("⚠️  {} Interference(s) Detected:", self.interferences.len()));
+            lines.push(format!(
+                "⚠️  {} Interference(s) Detected:",
+                self.interferences.len()
+            ));
             for interference in &self.interferences {
                 lines.push(format!("   • {}", interference.description));
             }
@@ -796,7 +1142,8 @@ mod tests {
         assert!(
             result.final_coherence >= result.initial_coherence * 0.95,
             "Coherence should not significantly decrease: initial={}, final={}",
-            result.initial_coherence, result.final_coherence
+            result.initial_coherence,
+            result.final_coherence
         );
     }
 
@@ -857,8 +1204,16 @@ mod tests {
 
         // Sacred Reciprocity should be elevated (base 0.3 + lending 0.2 = 0.5)
         let reciprocity = field.get_level(FiduciaryHarmonic::SacredReciprocity);
-        assert!(reciprocity >= 0.5, "Reciprocity should be >= 0.5, got {}", reciprocity);
-        assert!(reciprocity <= 1.0, "Reciprocity should be <= 1.0, got {}", reciprocity);
+        assert!(
+            reciprocity >= 0.5,
+            "Reciprocity should be >= 0.5, got {}",
+            reciprocity
+        );
+        assert!(
+            reciprocity <= 1.0,
+            "Reciprocity should be <= 1.0, got {}",
+            reciprocity
+        );
     }
 
     #[test]
@@ -871,12 +1226,7 @@ mod tests {
 
         // Grant an outgoing loan (lending to instance_b)
         let _outgoing = protocol
-            .grant_loan(
-                "instance_b".to_string(),
-                0.2,
-                Duration::from_secs(60),
-                0.9,
-            )
+            .grant_loan("instance_b".to_string(), 0.2, Duration::from_secs(60), 0.9)
             .expect("Should grant loan");
 
         // Accept an incoming loan (borrowing from instance_c)
@@ -896,13 +1246,17 @@ mod tests {
 
         let reciprocity = field.get_level(FiduciaryHarmonic::SacredReciprocity);
         // Base 0.3 + lent 0.2 + borrowed 0.2 + balance 0.2 = 0.9
-        assert!(reciprocity >= 0.8, "Reciprocity with balance should be >= 0.8, got {}", reciprocity);
+        assert!(
+            reciprocity >= 0.8,
+            "Reciprocity with balance should be >= 0.8, got {}",
+            reciprocity
+        );
     }
 
     #[test]
     fn test_interconnectedness_harmonic_from_learning() {
-        use crate::physiology::social_coherence::CollectiveLearning;
         use crate::physiology::coherence::TaskComplexity;
+        use crate::physiology::social_coherence::CollectiveLearning;
 
         let mut field = HarmonicField::new();
         let mut learning = CollectiveLearning::new("instance_a".to_string());
@@ -923,8 +1277,7 @@ mod tests {
 
         // Universal Interconnectedness should be elevated above base (0.2)
         // With 1 task type and 20 observations, expect modest increase
-        let interconnectedness =
-            field.get_level(FiduciaryHarmonic::UniversalInterconnectedness);
+        let interconnectedness = field.get_level(FiduciaryHarmonic::UniversalInterconnectedness);
         assert!(
             interconnectedness > 0.3,
             "Interconnectedness should be elevated above base, got {}",
@@ -934,8 +1287,8 @@ mod tests {
 
     #[test]
     fn test_interconnectedness_harmonic_with_diversity() {
-        use crate::physiology::social_coherence::CollectiveLearning;
         use crate::physiology::coherence::TaskComplexity;
+        use crate::physiology::social_coherence::CollectiveLearning;
 
         let mut field = HarmonicField::new();
 
@@ -962,8 +1315,7 @@ mod tests {
         // Measure interconnectedness (should be high due to diversity)
         field.measure_interconnectedness_from_learning(&instance_a);
 
-        let interconnectedness =
-            field.get_level(FiduciaryHarmonic::UniversalInterconnectedness);
+        let interconnectedness = field.get_level(FiduciaryHarmonic::UniversalInterconnectedness);
         // Should be elevated due to:
         // - 3 task types (breadth)
         // - 45 total observations (depth)
