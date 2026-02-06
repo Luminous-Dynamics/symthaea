@@ -402,13 +402,13 @@ mod tests {
         }
     }
 
-    fn make_parsed_file(name: &str, funcs: &[&str], types: &[&str]) -> ParsedCode {
+    fn make_parsed_file(_name: &str, funcs: &[&str], types: &[&str]) -> ParsedCode {
         let mut parsed = ParsedCode::new("", "rust");
         for f in funcs {
-            parsed.entities.push(CodeEntity::new(EntityKind::Function, f, test_span()));
+            parsed.entities.push(CodeEntity::new(EntityKind::Function, *f, test_span()));
         }
         for t in types {
-            parsed.entities.push(CodeEntity::new(EntityKind::Struct, t, test_span()));
+            parsed.entities.push(CodeEntity::new(EntityKind::Struct, *t, test_span()));
         }
         parsed
     }

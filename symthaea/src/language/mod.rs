@@ -52,6 +52,8 @@ pub mod code_verifier;
 pub mod epistemic_generation;
 #[cfg(feature = "code_generation")]
 pub mod code_domain_plugin;
+#[cfg(feature = "code_generation")]
+pub mod triune_intent;
 
 // Modules needing HDC submodules that don't exist yet (cfg-gated)
 #[cfg(feature = "full_language")]
@@ -80,7 +82,7 @@ pub use emotional_core::{EmotionalCore, EmotionalCoreConfig, EmotionalAnalysis, 
 pub use llm_organ::{LLMOrgan, LLMOrganConfig, ConversationMessage, MessageRole, LLMGenerationResult, LLMQuery, QueryType, TRANSLATION_SYSTEM_PROMPT};
 pub use nix_parser::{NixParser, NixConfig, NixOption, NixValue};
 // Export backend module for creating custom backends
-pub use llm_backend::{OllamaBackend, SimulatedBackend, LLMBackend, default_backend, simulated_backend, create_backend_from_env};
+pub use llm_backend::{OllamaBackend, SimulatedBackend, LLMBackend, default_backend, simulated_backend, create_backend_from_env, GenerationParams};
 pub use openai_backend::OpenAiBackend;
 pub use anthropic_backend::AnthropicBackend;
 pub use general_assistant_plugin::GeneralAssistantPlugin;
