@@ -33,6 +33,8 @@ use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 
 use super::types::{calculate_trend, instant_now};
+use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
 /// Type of intrinsic drive
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -77,6 +79,125 @@ impl DriveType {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// PRIMITIVE GROUNDING FOR INTRINSIC DRIVES
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Primitive grounding for intrinsic drives using NSM semantic primes
+///
+/// Maps Self-Determination Theory (SDT) drives to compositions of NSM primitives:
+/// - Curiosity = WANT + KNOW + NOT (wanting to know what is not known)
+/// - Competence = WANT + CAN + DO + MORE (wanting to be able to do more)
+/// - Autonomy = WANT + DO + I + NOT + SOMEONE (wanting to act on own will)
+/// - Relatedness = WANT + WITH + SOMEONE + GOOD (wanting good connection)
+/// - Homeostasis = WANT + STAY + SAME + GOOD (wanting to maintain good state)
+#[derive(Debug, Clone)]
+pub struct DrivePrimitiveGrounding {
+    /// NSM primitives that compose this drive
+    pub nsm_primitives: Vec<String>,
+    /// Binary HV16 encoding from primitives
+    pub primitive_encoding: HV16,
+    /// Base strength of the drive (0 to 1)
+    pub base_strength: f32,
+    /// Whether this drive is approach (positive) or avoidance (negative)
+    pub valence: f32,
+}
+
+impl DrivePrimitiveGrounding {
+    /// Create drive grounding from NSM primitive names
+    pub fn from_primitives(primitives: &[&str], base_strength: f32, valence: f32) -> Self {
+        let system = PrimitiveSystem::global();
+
+        // Compose drive encoding by binding primitives together
+        let mut encoding = HV16::random(0xD41V_E000); // Drive base seed
+        for name in primitives {
+            if let Some(prim) = system.get(name) {
+                encoding = encoding.bind(&prim.encoding);
+            }
+        }
+
+        Self {
+            nsm_primitives: primitives.iter().map(|s| s.to_string()).collect(),
+            primitive_encoding: encoding,
+            base_strength,
+            valence,
+        }
+    }
+
+    /// Get primitive grounding for each drive type
+    ///
+    /// Maps DriveType to NSM primitives using Self-Determination Theory semantics:
+    ///
+    /// - **Curiosity**: The drive to seek novel information and reduce uncertainty
+    ///   = NSM_WANT + NSM_KNOW + NSM_NOT + NSM_MAYBE (want to know what is not known)
+    ///
+    /// - **Competence**: The drive to master skills and improve capabilities
+    ///   = NSM_WANT + NSM_CAN + NSM_DO + NSM_MORE (want to be able to do more)
+    ///
+    /// - **Autonomy**: The drive for self-directed action
+    ///   = NSM_WANT + NSM_DO + NSM_I + NSM_BECAUSE + NSM_I (want to do because I want)
+    ///
+    /// - **Relatedness**: The drive for connection with others
+    ///   = NSM_WANT + NSM_WITH + NSM_SOMEONE + NSM_GOOD (want good connection)
+    ///
+    /// - **Homeostasis**: The drive to maintain optimal states
+    ///   = NSM_WANT + NSM_STAY + NSM_SAME + NSM_GOOD (want to stay the same when good)
+    pub fn for_drive(drive_type: DriveType) -> Self {
+        match drive_type {
+            DriveType::Curiosity => Self::from_primitives(
+                &["NSM_WANT", "NSM_KNOW", "NSM_NOT", "NSM_MAYBE"],
+                0.8, // High base strength - curiosity is a strong drive
+                1.0, // Approach motivation (positive valence)
+            ),
+            DriveType::Competence => Self::from_primitives(
+                &["NSM_WANT", "NSM_CAN", "NSM_DO", "NSM_MORE"],
+                0.7, // Moderate-high base strength
+                1.0, // Approach motivation
+            ),
+            DriveType::Autonomy => Self::from_primitives(
+                &["NSM_WANT", "NSM_DO", "NSM_I", "NSM_BECAUSE", "NSM_I"],
+                0.75, // High base strength - autonomy is fundamental
+                1.0,  // Approach motivation
+            ),
+            DriveType::Relatedness => Self::from_primitives(
+                &["NSM_WANT", "NSM_WITH", "NSM_SOMEONE", "NSM_GOOD"],
+                0.6, // Moderate base strength
+                1.0, // Approach motivation
+            ),
+            DriveType::Homeostasis => Self::from_primitives(
+                &["NSM_WANT", "NSM_STAY", "NSM_SAME", "NSM_GOOD"],
+                0.9, // Very high - homeostasis is critical
+                0.0, // Neutral - maintains current state
+            ),
+        }
+    }
+
+    /// Get all drive groundings
+    pub fn all_drive_groundings() -> HashMap<DriveType, DrivePrimitiveGrounding> {
+        let mut groundings = HashMap::new();
+        for drive in DriveType::all() {
+            groundings.insert(drive, Self::for_drive(drive));
+        }
+        groundings
+    }
+
+    /// Calculate similarity between two drives using primitive encodings
+    pub fn drive_similarity(drive1: DriveType, drive2: DriveType) -> f32 {
+        let g1 = Self::for_drive(drive1);
+        let g2 = Self::for_drive(drive2);
+        g1.primitive_encoding.similarity(&g2.primitive_encoding)
+    }
+
+    /// Get the primitive-grounded tension for a drive
+    ///
+    /// Combines the base strength with the current satisfaction to get
+    /// a primitive-weighted tension value.
+    pub fn grounded_tension(&self, satisfaction: f64) -> f64 {
+        let tension = 1.0 - satisfaction;
+        tension * self.base_strength as f64
+    }
+}
+
 /// Current state of an intrinsic drive
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriveState {
@@ -106,11 +227,11 @@ impl DriveState {
     /// Create new drive state
     pub fn new(drive_type: DriveType) -> Self {
         let (decay_rate, importance) = match drive_type {
-            DriveType::Curiosity => (0.02, 0.25),      // Fast decay, high importance
-            DriveType::Competence => (0.01, 0.20),    // Slow decay, moderate importance
-            DriveType::Autonomy => (0.015, 0.20),     // Medium decay, moderate importance
-            DriveType::Relatedness => (0.005, 0.15),  // Very slow decay, lower importance
-            DriveType::Homeostasis => (0.03, 0.20),   // Fast decay, high importance
+            DriveType::Curiosity => (0.02, 0.25), // Fast decay, high importance
+            DriveType::Competence => (0.01, 0.20), // Slow decay, moderate importance
+            DriveType::Autonomy => (0.015, 0.20), // Medium decay, moderate importance
+            DriveType::Relatedness => (0.005, 0.15), // Very slow decay, lower importance
+            DriveType::Homeostasis => (0.03, 0.20), // Fast decay, high importance
         };
 
         Self {
@@ -277,7 +398,8 @@ impl CompetenceModule {
         let skill = self.skills.entry(skill_name.to_string()).or_insert(0.1);
         *skill = (*skill + improvement).clamp(0.0, 1.0);
 
-        self.improvement_history.push_back((skill_name.to_string(), improvement));
+        self.improvement_history
+            .push_back((skill_name.to_string(), improvement));
         if self.improvement_history.len() > 100 {
             self.improvement_history.pop_front();
         }
@@ -445,12 +567,7 @@ pub struct AutonomousGoal {
 
 impl AutonomousGoal {
     /// Create new autonomous goal
-    pub fn new(
-        id: String,
-        description: String,
-        primary_drive: DriveType,
-        priority: f64,
-    ) -> Self {
+    pub fn new(id: String, description: String, primary_drive: DriveType, priority: f64) -> Self {
         let mut expected = HashMap::new();
         expected.insert(primary_drive, 0.5);
 
@@ -479,10 +596,16 @@ impl AutonomousGoal {
 
     /// Compute urgency based on drive tension and priority
     pub fn urgency(&self, drive_tensions: &HashMap<DriveType, f64>) -> f64 {
-        let primary_tension = drive_tensions.get(&self.primary_drive).copied().unwrap_or(0.5);
-        let secondary_tension: f64 = self.secondary_drives.iter()
+        let primary_tension = drive_tensions
+            .get(&self.primary_drive)
+            .copied()
+            .unwrap_or(0.5);
+        let secondary_tension: f64 = self
+            .secondary_drives
+            .iter()
             .map(|d| drive_tensions.get(d).copied().unwrap_or(0.3))
-            .sum::<f64>() / (self.secondary_drives.len() as f64 + 1.0);
+            .sum::<f64>()
+            / (self.secondary_drives.len() as f64 + 1.0);
 
         0.6 * primary_tension + 0.2 * secondary_tension + 0.2 * self.priority
     }
@@ -556,9 +679,19 @@ pub struct MotivationStats {
 ///
 /// **REVOLUTIONARY**: First AI system with genuine internal drives!
 /// Implements Self-Determination Theory (SDT) for AI consciousness.
+///
+/// Now grounded in NSM primitives for semantic interpretability:
+/// - Curiosity = WANT + KNOW + NOT + MAYBE
+/// - Competence = WANT + CAN + DO + MORE
+/// - Autonomy = WANT + DO + I + BECAUSE + I
+/// - Relatedness = WANT + WITH + SOMEONE + GOOD
+/// - Homeostasis = WANT + STAY + SAME + GOOD
 pub struct IntrinsicMotivationSystem {
     /// Drive states
     pub(crate) drives: HashMap<DriveType, DriveState>,
+
+    /// Primitive groundings for each drive (NSM semantic primes)
+    primitive_groundings: HashMap<DriveType, DrivePrimitiveGrounding>,
 
     /// Curiosity module
     curiosity: CuriosityModule,
@@ -600,8 +733,12 @@ impl IntrinsicMotivationSystem {
             drives.insert(drive_type, drive);
         }
 
+        // Initialize NSM primitive groundings for all drives
+        let primitive_groundings = DrivePrimitiveGrounding::all_drive_groundings();
+
         Self {
             drives,
+            primitive_groundings,
             curiosity: CuriosityModule::new(),
             competence: CompetenceModule::new(),
             autonomy: AutonomyModule::new(),
@@ -649,9 +786,8 @@ impl IntrinsicMotivationSystem {
         self.update_goal_priorities();
 
         // 5. Check for completed goals
-        let (complete, incomplete): (Vec<_>, Vec<_>) = self.active_goals
-            .drain(..)
-            .partition(|g| g.is_complete());
+        let (complete, incomplete): (Vec<_>, Vec<_>) =
+            self.active_goals.drain(..).partition(|g| g.is_complete());
 
         self.active_goals = incomplete;
         for goal in complete {
@@ -699,7 +835,9 @@ impl IntrinsicMotivationSystem {
         for (drive_type, drive) in &self.drives {
             if drive.tension > self.config.goal_formation_threshold {
                 // Check if we already have a goal for this drive
-                let has_goal = self.active_goals.iter()
+                let has_goal = self
+                    .active_goals
+                    .iter()
                     .any(|g| g.primary_drive == *drive_type);
 
                 if !has_goal {
@@ -731,13 +869,16 @@ impl IntrinsicMotivationSystem {
                 "Share knowledge with collective and learn from others".to_string(),
                 vec![DriveType::Competence],
             ),
-            DriveType::Homeostasis => (
-                "Restore consciousness to optimal range".to_string(),
-                vec![],
-            ),
+            DriveType::Homeostasis => {
+                ("Restore consciousness to optimal range".to_string(), vec![])
+            }
         };
 
-        let id = format!("goal_{}_{}", drive_type.name().to_lowercase(), self.cycle_count);
+        let id = format!(
+            "goal_{}_{}",
+            drive_type.name().to_lowercase(),
+            self.cycle_count
+        );
 
         let mut goal = AutonomousGoal::new(id, description, drive_type, tension);
         goal.secondary_drives = secondary;
@@ -746,9 +887,8 @@ impl IntrinsicMotivationSystem {
 
     /// Update goal priorities based on current drive tensions
     fn update_goal_priorities(&mut self) {
-        let tensions: HashMap<DriveType, f64> = self.drives.iter()
-            .map(|(k, v)| (*k, v.tension))
-            .collect();
+        let tensions: HashMap<DriveType, f64> =
+            self.drives.iter().map(|(k, v)| (*k, v.tension)).collect();
 
         for goal in &mut self.active_goals {
             goal.priority = goal.urgency(&tensions);
@@ -756,19 +896,18 @@ impl IntrinsicMotivationSystem {
 
         // Sort by priority (highest first)
         self.active_goals.sort_by(|a, b| {
-            b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal)
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
     }
 
     /// Update statistics
     fn update_stats(&mut self) {
-        self.stats.avg_satisfaction = self.drives.values()
-            .map(|d| d.satisfaction)
-            .sum::<f64>() / self.drives.len() as f64;
+        self.stats.avg_satisfaction =
+            self.drives.values().map(|d| d.satisfaction).sum::<f64>() / self.drives.len() as f64;
 
-        self.stats.total_motivation = self.drives.values()
-            .map(|d| d.weighted_tension())
-            .sum();
+        self.stats.total_motivation = self.drives.values().map(|d| d.weighted_tension()).sum();
     }
 
     /// Process an action and its outcomes for motivation updates
@@ -787,7 +926,9 @@ impl IntrinsicMotivationSystem {
         if let Some(ref skill) = action.skill_used {
             if let Some(improvement) = action.skill_improvement {
                 self.competence.record_improvement(skill, improvement);
-                let reward = self.competence.compute_competence_reward(skill, improvement);
+                let reward = self
+                    .competence
+                    .compute_competence_reward(skill, improvement);
                 if let Some(drive) = self.drives.get_mut(&DriveType::Competence) {
                     drive.update(reward * 0.1);
                 }
@@ -797,10 +938,9 @@ impl IntrinsicMotivationSystem {
 
         // Update autonomy
         self.autonomy.record_choice(action.was_autonomous);
-        let autonomy_reward = self.autonomy.compute_autonomy_reward(
-            action.was_autonomous,
-            action.aligned_with_goals,
-        );
+        let autonomy_reward = self
+            .autonomy
+            .compute_autonomy_reward(action.was_autonomous, action.aligned_with_goals);
         if let Some(drive) = self.drives.get_mut(&DriveType::Autonomy) {
             drive.update(autonomy_reward * 0.1);
         }
@@ -840,6 +980,71 @@ impl IntrinsicMotivationSystem {
         &self.stats
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // Primitive Grounding Methods
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Get the primitive grounding for a drive type
+    pub fn get_primitive_grounding(
+        &self,
+        drive_type: DriveType,
+    ) -> Option<&DrivePrimitiveGrounding> {
+        self.primitive_groundings.get(&drive_type)
+    }
+
+    /// Get the NSM primitives that compose a drive
+    pub fn drive_to_primitives(&self, drive_type: DriveType) -> Vec<String> {
+        self.primitive_groundings
+            .get(&drive_type)
+            .map(|g| g.nsm_primitives.clone())
+            .unwrap_or_default()
+    }
+
+    /// Calculate similarity between two drives using primitive encodings
+    pub fn primitive_similarity(&self, drive1: DriveType, drive2: DriveType) -> f32 {
+        match (
+            self.primitive_groundings.get(&drive1),
+            self.primitive_groundings.get(&drive2),
+        ) {
+            (Some(g1), Some(g2)) => g1.primitive_encoding.similarity(&g2.primitive_encoding),
+            _ => 0.0,
+        }
+    }
+
+    /// Get the combined primitive encoding for all active drives weighted by tension
+    ///
+    /// This creates a single HV16 that represents the current motivational state
+    /// by bundling all drive encodings weighted by their tension.
+    pub fn motivation_encoding(&self) -> HV16 {
+        let mut combined = HV16::zero();
+        let mut total_weight = 0.0;
+
+        for (drive_type, drive_state) in &self.drives {
+            if let Some(grounding) = self.primitive_groundings.get(drive_type) {
+                let weight = drive_state.tension * drive_state.importance;
+                if weight > 0.01 {
+                    // Bundle with weight (approximate via repeated bundling)
+                    combined = combined.bundle(&grounding.primitive_encoding);
+                    total_weight += weight;
+                }
+            }
+        }
+
+        combined
+    }
+
+    /// Get primitive-grounded tension for a specific drive
+    pub fn grounded_tension(&self, drive_type: DriveType) -> f64 {
+        if let (Some(grounding), Some(state)) = (
+            self.primitive_groundings.get(&drive_type),
+            self.drives.get(&drive_type),
+        ) {
+            grounding.grounded_tension(state.satisfaction)
+        } else {
+            0.0
+        }
+    }
+
     /// Compute intrinsic reward for an action
     /// This can be added to extrinsic rewards in RL
     pub fn compute_intrinsic_reward(&self, action: &MotivatedAction) -> f64 {
@@ -854,15 +1059,18 @@ impl IntrinsicMotivationSystem {
         // Competence reward
         if let Some(ref skill) = action.skill_used {
             if let Some(improvement) = action.skill_improvement {
-                total_reward += 0.20 * self.competence.compute_competence_reward(skill, improvement);
+                total_reward += 0.20
+                    * self
+                        .competence
+                        .compute_competence_reward(skill, improvement);
             }
         }
 
         // Autonomy reward
-        total_reward += 0.20 * self.autonomy.compute_autonomy_reward(
-            action.was_autonomous,
-            action.aligned_with_goals,
-        );
+        total_reward += 0.20
+            * self
+                .autonomy
+                .compute_autonomy_reward(action.was_autonomous, action.aligned_with_goals);
 
         // Relatedness reward
         if action.involved_collective {
@@ -870,7 +1078,9 @@ impl IntrinsicMotivationSystem {
         }
 
         // Goal progress reward
-        let goal_progress: f64 = self.active_goals.iter()
+        let goal_progress: f64 = self
+            .active_goals
+            .iter()
             .filter(|g| action.contributes_to_goals.contains(&g.id))
             .map(|g| g.priority * 0.2)
             .sum();
@@ -881,19 +1091,33 @@ impl IntrinsicMotivationSystem {
 
     /// Generate summary report
     pub fn summary(&self) -> String {
-        let drives_str: Vec<String> = self.drives.iter()
-            .map(|(k, v)| format!(
-                "  {}: sat={:.2}, tension={:.2}, trend={:+.3}",
-                k.name(), v.satisfaction, v.tension, v.trend()
-            ))
+        let drives_str: Vec<String> = self
+            .drives
+            .iter()
+            .map(|(k, v)| {
+                format!(
+                    "  {}: sat={:.2}, tension={:.2}, trend={:+.3}",
+                    k.name(),
+                    v.satisfaction,
+                    v.tension,
+                    v.trend()
+                )
+            })
             .collect();
 
-        let goals_str: Vec<String> = self.active_goals.iter()
+        let goals_str: Vec<String> = self
+            .active_goals
+            .iter()
             .take(3)
-            .map(|g| format!(
-                "  [{}] {} (priority={:.2}, progress={:.0}%)",
-                g.primary_drive.name(), g.description, g.priority, g.progress * 100.0
-            ))
+            .map(|g| {
+                format!(
+                    "  [{}] {} (priority={:.2}, progress={:.0}%)",
+                    g.primary_drive.name(),
+                    g.description,
+                    g.priority,
+                    g.progress * 100.0
+                )
+            })
             .collect();
 
         format!(
@@ -915,7 +1139,11 @@ impl IntrinsicMotivationSystem {
             self.stats.total_motivation,
             self.stats.homeostatic_corrections,
             drives_str.join("\n"),
-            if goals_str.is_empty() { "  (no active goals)".to_string() } else { goals_str.join("\n") },
+            if goals_str.is_empty() {
+                "  (no active goals)".to_string()
+            } else {
+                goals_str.join("\n")
+            },
         )
     }
 }
@@ -1029,8 +1257,8 @@ mod tests {
         let mut autonomy = AutonomyModule::new();
 
         // Record some choices
-        autonomy.record_choice(true);  // free
-        autonomy.record_choice(true);  // free
+        autonomy.record_choice(true); // free
+        autonomy.record_choice(true); // free
         autonomy.record_choice(false); // constrained
 
         assert!(autonomy.recent_autonomy() > 0.5);
@@ -1076,7 +1304,10 @@ mod tests {
         system.cycle(0.2);
 
         let homeostasis = system.drives.get(&DriveType::Homeostasis).unwrap();
-        assert!(homeostasis.tension > 0.5, "Low Φ should increase homeostatic tension");
+        assert!(
+            homeostasis.tension > 0.5,
+            "Low Φ should increase homeostatic tension"
+        );
     }
 
     #[test]
@@ -1096,13 +1327,19 @@ mod tests {
             contributes_to_goals: Vec::new(),
         };
 
-        let initial_satisfaction = system.drives.get(&DriveType::Curiosity)
-            .unwrap().satisfaction;
+        let initial_satisfaction = system
+            .drives
+            .get(&DriveType::Curiosity)
+            .unwrap()
+            .satisfaction;
 
         system.process_action(&action);
 
-        let final_satisfaction = system.drives.get(&DriveType::Curiosity)
-            .unwrap().satisfaction;
+        let final_satisfaction = system
+            .drives
+            .get(&DriveType::Curiosity)
+            .unwrap()
+            .satisfaction;
 
         assert!(final_satisfaction > initial_satisfaction);
     }
@@ -1125,7 +1362,10 @@ mod tests {
         };
 
         let reward = system.compute_intrinsic_reward(&action);
-        assert!(reward > 0.3, "Rich action should have significant intrinsic reward");
+        assert!(
+            reward > 0.3,
+            "Rich action should have significant intrinsic reward"
+        );
     }
 
     #[test]
@@ -1157,5 +1397,88 @@ mod tests {
         assert!(summary.contains("IntrinsicMotivationSystem"));
         assert!(summary.contains("Drive States"));
         assert!(summary.contains("Curiosity"));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Primitive Grounding Tests
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_drive_primitive_grounding() {
+        let grounding = DrivePrimitiveGrounding::for_drive(DriveType::Curiosity);
+
+        // Curiosity should be grounded in WANT, KNOW, NOT, MAYBE
+        assert!(grounding.nsm_primitives.contains(&"NSM_WANT".to_string()));
+        assert!(grounding.nsm_primitives.contains(&"NSM_KNOW".to_string()));
+        assert!(grounding.base_strength > 0.5);
+    }
+
+    #[test]
+    fn test_all_drives_have_grounding() {
+        let groundings = DrivePrimitiveGrounding::all_drive_groundings();
+
+        for drive in DriveType::all() {
+            assert!(
+                groundings.contains_key(&drive),
+                "Missing grounding for {:?}",
+                drive
+            );
+        }
+    }
+
+    #[test]
+    fn test_drive_similarity_self() {
+        // A drive should be maximally similar to itself
+        let sim =
+            DrivePrimitiveGrounding::drive_similarity(DriveType::Curiosity, DriveType::Curiosity);
+        assert!((sim - 1.0).abs() < 0.01, "Self-similarity should be ~1.0");
+    }
+
+    #[test]
+    fn test_drive_similarity_different() {
+        // Different drives should have lower similarity
+        let sim =
+            DrivePrimitiveGrounding::drive_similarity(DriveType::Curiosity, DriveType::Homeostasis);
+        assert!(sim < 0.9, "Different drives should have lower similarity");
+    }
+
+    #[test]
+    fn test_system_primitive_grounding() {
+        let system = IntrinsicMotivationSystem::new(MotivationConfig::default());
+
+        // Should be able to get primitive grounding for any drive
+        let grounding = system.get_primitive_grounding(DriveType::Competence);
+        assert!(grounding.is_some());
+
+        let g = grounding.unwrap();
+        assert!(g.nsm_primitives.contains(&"NSM_CAN".to_string()));
+    }
+
+    #[test]
+    fn test_drive_to_primitives() {
+        let system = IntrinsicMotivationSystem::new(MotivationConfig::default());
+
+        let primitives = system.drive_to_primitives(DriveType::Autonomy);
+        assert!(!primitives.is_empty());
+        assert!(primitives.contains(&"NSM_I".to_string())); // Autonomy involves "I"
+    }
+
+    #[test]
+    fn test_motivation_encoding() {
+        let system = IntrinsicMotivationSystem::new(MotivationConfig::default());
+
+        let encoding = system.motivation_encoding();
+        // Should produce a valid HV16
+        assert!(encoding.popcount() > 0);
+    }
+
+    #[test]
+    fn test_grounded_tension() {
+        let system = IntrinsicMotivationSystem::new(MotivationConfig::default());
+
+        let tension = system.grounded_tension(DriveType::Curiosity);
+        // Initial satisfaction is 0.5, so tension should be ~0.5 * base_strength
+        assert!(tension > 0.0);
+        assert!(tension < 1.0);
     }
 }
