@@ -7,6 +7,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
 /// Configuration for emotional core
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,6 +62,106 @@ pub struct EmotionalAnalysis {
     pub embedding: RealHV,
 }
 
+/// Primitive grounding for emotions using NSM semantic primes
+///
+/// Maps Plutchik's 8 basic emotions to compositions of NSM primitives:
+/// - joy = FEEL + GOOD + VERY
+/// - sadness = FEEL + BAD + NOT_WANT
+/// - anger = FEEL + BAD + WANT + NOT_CAN
+/// - fear = FEEL + BAD + MAYBE_HAPPEN
+/// - surprise = FEEL + NOT_KNOW + HAPPEN
+/// - disgust = FEEL + BAD + BODY
+/// - trust = FEEL + GOOD + SOMEONE + TRUE
+/// - anticipation = FEEL + WANT + AFTER_HAPPEN
+#[derive(Debug, Clone)]
+pub struct EmotionPrimitiveGrounding {
+    /// NSM primitives that compose this emotion
+    pub nsm_primitives: Vec<String>,
+    /// Binary HV16 encoding from primitives
+    pub primitive_encoding: HV16,
+    /// Valence weight (-1 to 1)
+    pub valence_weight: f32,
+    /// Arousal weight (0 to 1)
+    pub arousal_weight: f32,
+}
+
+impl EmotionPrimitiveGrounding {
+    /// Create emotion grounding from NSM primitive names
+    pub fn from_primitives(primitives: &[&str], valence: f32, arousal: f32) -> Self {
+        let system = PrimitiveSystem::global();
+
+        // Compose emotion encoding by binding primitives together
+        let mut encoding = HV16::random(0xE0C0_FEED); // Base seed for emotions
+        for name in primitives {
+            if let Some(prim) = system.get(name) {
+                encoding = encoding.bind(&prim.encoding);
+            }
+        }
+
+        Self {
+            nsm_primitives: primitives.iter().map(|s| s.to_string()).collect(),
+            primitive_encoding: encoding,
+            valence_weight: valence,
+            arousal_weight: arousal,
+        }
+    }
+
+    /// Get the 8 Plutchik emotions grounded in NSM primitives
+    pub fn plutchik_emotions() -> HashMap<String, EmotionPrimitiveGrounding> {
+        let mut emotions = HashMap::new();
+
+        // Joy: feeling very good
+        emotions.insert("joy".to_string(), Self::from_primitives(
+            &["NSM_FEEL", "NSM_GOOD", "NSM_VERY"],
+            1.0, 0.7 // positive valence, moderate-high arousal
+        ));
+
+        // Sadness: feeling bad, not wanting what happened
+        emotions.insert("sadness".to_string(), Self::from_primitives(
+            &["NSM_FEEL", "NSM_BAD", "NSM_NOT", "NSM_WANT"],
+            -0.8, 0.2 // negative valence, low arousal
+        ));
+
+        // Anger: feeling bad, wanting something you can't have
+        emotions.insert("anger".to_string(), Self::from_primitives(
+            &["NSM_FEEL", "NSM_BAD", "NSM_WANT", "NSM_NOT", "NSM_CAN"],
+            -0.6, 0.9 // negative valence, high arousal
+        ));
+
+        // Fear: feeling bad about what might happen
+        emotions.insert("fear".to_string(), Self::from_primitives(
+            &["NSM_FEEL", "NSM_BAD", "NSM_MAYBE", "NSM_HAPPEN"],
+            -0.7, 0.8 // negative valence, high arousal
+        ));
+
+        // Surprise: not knowing what happened
+        emotions.insert("surprise".to_string(), Self::from_primitives(
+            &["NSM_FEEL", "NSM_NOT", "NSM_KNOW", "NSM_HAPPEN"],
+            0.0, 0.9 // neutral valence, high arousal
+        ));
+
+        // Disgust: feeling bad in the body
+        emotions.insert("disgust".to_string(), Self::from_primitives(
+            &["NSM_FEEL", "NSM_BAD", "NSM_BODY"],
+            -0.8, 0.5 // negative valence, moderate arousal
+        ));
+
+        // Trust: feeling good about someone being true
+        emotions.insert("trust".to_string(), Self::from_primitives(
+            &["NSM_FEEL", "NSM_GOOD", "NSM_SOMEONE", "NSM_TRUE"],
+            0.7, 0.3 // positive valence, low arousal
+        ));
+
+        // Anticipation: wanting what will happen after
+        emotions.insert("anticipation".to_string(), Self::from_primitives(
+            &["NSM_FEEL", "NSM_WANT", "NSM_AFTER", "NSM_HAPPEN"],
+            0.4, 0.6 // mildly positive valence, moderate arousal
+        ));
+
+        emotions
+    }
+}
+
 impl EmotionalAnalysis {
     /// Create a neutral analysis
     pub fn neutral(dimension: usize) -> Self {
@@ -93,8 +195,10 @@ pub struct EmotionalResponse {
 pub struct EmotionalCore {
     /// Configuration
     config: EmotionalCoreConfig,
-    /// Emotion embeddings
+    /// Emotion embeddings (RealHV for continuous operations)
     emotion_embeddings: HashMap<String, RealHV>,
+    /// Primitive-grounded emotions (NSM semantic primes)
+    primitive_groundings: HashMap<String, EmotionPrimitiveGrounding>,
     /// Emotional memory (recent states)
     memory: Vec<EmotionalAnalysis>,
     /// Current emotional state
@@ -117,15 +221,27 @@ pub struct EmotionalCoreStats {
 }
 
 impl EmotionalCore {
-    /// Create a new emotional core
+    /// Create a new emotional core with primitive-grounded emotions
     pub fn new(config: EmotionalCoreConfig) -> Self {
         let dim = config.dimension;
 
-        // Initialize emotion embeddings with deterministic seeds based on emotion name
+        // Initialize primitive groundings for all 8 Plutchik emotions
+        let primitive_groundings = EmotionPrimitiveGrounding::plutchik_emotions();
+
+        // Initialize emotion embeddings - now using primitive compositions as seeds
+        // This ensures emotional embeddings are grounded in NSM semantic primes
         let mut emotion_embeddings = HashMap::new();
-        for (idx, emotion) in config.categories.iter().enumerate() {
-            let seed = 0xE0C0_0000 + idx as u64;  // Emotional Core seed base
-            emotion_embeddings.insert(emotion.clone(), RealHV::random(dim, seed));
+        for emotion in &config.categories {
+            let embedding = if let Some(grounding) = primitive_groundings.get(emotion) {
+                // Use primitive encoding to seed the RealHV, ensuring grounding
+                let seed = grounding.primitive_encoding.hamming_weight() as u64;
+                RealHV::random(dim, 0xE0C0_0000 + seed)
+            } else {
+                // Fallback for unknown emotions
+                let seed = 0xE0C0_DEAD;
+                RealHV::random(dim, seed)
+            };
+            emotion_embeddings.insert(emotion.clone(), embedding);
         }
         emotion_embeddings.insert("neutral".to_string(), RealHV::zero(dim));
 
@@ -133,8 +249,30 @@ impl EmotionalCore {
             current_state: EmotionalAnalysis::neutral(dim),
             config,
             emotion_embeddings,
+            primitive_groundings,
             memory: Vec::new(),
             stats: EmotionalCoreStats::default(),
+        }
+    }
+
+    /// Get the primitive grounding for an emotion
+    pub fn get_primitive_grounding(&self, emotion: &str) -> Option<&EmotionPrimitiveGrounding> {
+        self.primitive_groundings.get(emotion)
+    }
+
+    /// Get the NSM primitives that compose an emotion
+    pub fn emotion_to_primitives(&self, emotion: &str) -> Vec<String> {
+        self.primitive_groundings
+            .get(emotion)
+            .map(|g| g.nsm_primitives.clone())
+            .unwrap_or_default()
+    }
+
+    /// Calculate emotion similarity using primitive encodings
+    pub fn primitive_similarity(&self, emotion1: &str, emotion2: &str) -> f32 {
+        match (self.primitive_groundings.get(emotion1), self.primitive_groundings.get(emotion2)) {
+            (Some(g1), Some(g2)) => g1.primitive_encoding.similarity(&g2.primitive_encoding),
+            _ => 0.0,
         }
     }
 
