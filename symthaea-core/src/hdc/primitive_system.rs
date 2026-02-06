@@ -64,6 +64,7 @@
 //! ```
 
 use crate::hdc::binary_hv::HV16;
+use crate::hdc::universal_semantics::SemanticPrime;
 use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use once_cell::sync::Lazy;
@@ -314,6 +315,9 @@ impl PrimitiveSystem {
         };
 
         // Initialize all tiers
+        // Tier 0: NSM (Natural Semantic Metalanguage) - 65 Wierzbicka primes
+        system.init_tier0_nsm();
+
         system.init_tier1_mathematical();
         system.init_tier2_physical();
         system.init_tier3_geometric();
@@ -387,7 +391,7 @@ impl PrimitiveSystem {
         //   derived ⊗ parent1 should recover parent2
         // If we embedded, we'd get:
         //   domain.rotation ⊗ (parent1 ⊗ parent2) ⊗ parent1 = domain.rotation ⊗ parent2 ≠ parent2
-        let mut result = parent_encodings[0].clone();
+        let mut result = *parent_encodings[0];
         for enc in &parent_encodings[1..] {
             result = result.bind(enc);
         }
@@ -433,7 +437,7 @@ impl PrimitiveSystem {
 
         // Register PROBABILITY immediately so later derived primitives can reference it
         self.primitives.insert("PROBABILITY".to_string(), probability.clone());
-        self.by_tier.entry(PrimitiveTier::Mathematical).or_insert_with(Vec::new).push("PROBABILITY".to_string());
+        self.by_tier.entry(PrimitiveTier::Mathematical).or_default().push("PROBABILITY".to_string());
 
         // EXPECTED_VALUE = COMPOSE(PROBABILITY, VALUE)
         // E[X] = Σ P(x) × V(x)
@@ -449,7 +453,7 @@ impl PrimitiveSystem {
         );
         // Register immediately so VARIANCE can reference it
         self.primitives.insert("EXPECTED_VALUE".to_string(), expected_value.clone());
-        self.by_tier.entry(PrimitiveTier::Mathematical).or_insert_with(Vec::new).push("EXPECTED_VALUE".to_string());
+        self.by_tier.entry(PrimitiveTier::Mathematical).or_default().push("EXPECTED_VALUE".to_string());
 
         // SHANNON_ENTROPY = COMPOSE(PROBABILITY, INFORMATION)
         // H = -Σ P(x) log P(x)
@@ -585,7 +589,7 @@ impl PrimitiveSystem {
 
         // Register SHANNON_ENTROPY so info theory primitives can derive from it
         self.primitives.insert("SHANNON_ENTROPY".to_string(), shannon_entropy.clone());
-        self.by_tier.entry(PrimitiveTier::Mathematical).or_insert_with(Vec::new).push("SHANNON_ENTROPY".to_string());
+        self.by_tier.entry(PrimitiveTier::Mathematical).or_default().push("SHANNON_ENTROPY".to_string());
 
         // MUTUAL_INFORMATION = COMPOSE(SHANNON_ENTROPY, MEMBERSHIP)
         // I(X;Y) = H(X) + H(Y) - H(X,Y) — uses SHANNON_ENTROPY (just registered) + MEMBERSHIP (Tier 1)
@@ -647,7 +651,7 @@ impl PrimitiveSystem {
 
         // Register MUTUAL_INFORMATION so consciousness derivations can use it
         self.primitives.insert("MUTUAL_INFORMATION".to_string(), mutual_info.clone());
-        self.by_tier.entry(PrimitiveTier::Mathematical).or_insert_with(Vec::new).push("MUTUAL_INFORMATION".to_string());
+        self.by_tier.entry(PrimitiveTier::Mathematical).or_default().push("MUTUAL_INFORMATION".to_string());
 
         // INTEGRATED_INFORMATION = COMPOSE(MUTUAL_INFORMATION, SELF)
         // Φ = information above minimum information partition
@@ -716,7 +720,7 @@ impl PrimitiveSystem {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // === BINDING RULES FOR DERIVED PRIMITIVES ===
@@ -741,6 +745,163 @@ impl PrimitiveSystem {
             result_tier: PrimitiveTier::MetaCognitive,
             example: "CONSERVATION_LAW ⊗ IDENTITY → persistent self".to_string(),
         });
+    }
+
+    /// Initialize Tier 0: NSM (Natural Semantic Metalanguage) Primitives
+    ///
+    /// Bridges the 65 Wierzbicka semantic primes from `universal_semantics.rs`
+    /// into the PrimitiveSystem. These are the universal concepts found across
+    /// all human languages - the "atoms" of human thought.
+    ///
+    /// Categories:
+    /// - Substantives: I, YOU, SOMEONE, SOMETHING, PEOPLE, BODY
+    /// - Relational: KIND_OF, PART_OF
+    /// - Determiners: THIS, SAME, OTHER
+    /// - Quantifiers: ONE, TWO, SOME, ALL, MUCH, LITTLE
+    /// - Evaluators: GOOD, BAD
+    /// - Descriptors: BIG, SMALL
+    /// - Mental: THINK, KNOW, WANT, FEEL, SEE, HEAR
+    /// - Speech: SAY, WORDS, TRUE
+    /// - Actions: DO, HAPPEN, MOVE, TOUCH
+    /// - Existence: BE, THERE_IS, HAVE
+    /// - Life: LIVE, DIE
+    /// - Logical: NOT, MAYBE, CAN, BECAUSE, IF
+    /// - Time: WHEN, NOW, BEFORE, AFTER, LONG_TIME, SHORT_TIME, FOR_SOME_TIME, IN_ONE_MOMENT
+    /// - Space: WHERE, HERE, ABOVE, BELOW, FAR, NEAR, SIDE, INSIDE, ON
+    /// - Intensifiers: VERY, MORE
+    /// - Similarity: LIKE
+    /// - Social: WITH
+    fn init_tier0_nsm(&mut self) {
+        // Create NSM domain manifold - grounding for human semantic understanding
+        let nsm_domain = DomainManifold::new(
+            "nsm",
+            PrimitiveTier::NSM,
+            "Natural Semantic Metalanguage - universal human concepts"
+        );
+
+        // Register all 65 semantic primes
+        for prime in SemanticPrime::all() {
+            let name = Self::semantic_prime_to_name(prime);
+            let description = prime.description();
+
+            let primitive = Primitive::base(
+                &name,
+                PrimitiveTier::NSM,
+                "nsm",
+                nsm_domain.embed(HV16::random(seed_from_name(&name))),
+                description,
+            );
+
+            self.primitives.insert(name.clone(), primitive);
+            self.by_tier.entry(PrimitiveTier::NSM).or_default().push(name);
+        }
+
+        // Store the domain
+        self.domains.insert("nsm".to_string(), nsm_domain);
+    }
+
+    /// Convert SemanticPrime enum variant to primitive name string
+    fn semantic_prime_to_name(prime: SemanticPrime) -> String {
+        match prime {
+            // Substantives
+            SemanticPrime::I => "NSM_I".to_string(),
+            SemanticPrime::You => "NSM_YOU".to_string(),
+            SemanticPrime::Someone => "NSM_SOMEONE".to_string(),
+            SemanticPrime::Something => "NSM_SOMETHING".to_string(),
+            SemanticPrime::People => "NSM_PEOPLE".to_string(),
+            SemanticPrime::Body => "NSM_BODY".to_string(),
+
+            // Relational
+            SemanticPrime::KindOf => "NSM_KIND_OF".to_string(),
+            SemanticPrime::PartOf => "NSM_PART_OF".to_string(),
+
+            // Determiners
+            SemanticPrime::This => "NSM_THIS".to_string(),
+            SemanticPrime::Same => "NSM_SAME".to_string(),
+            SemanticPrime::Other => "NSM_OTHER".to_string(),
+
+            // Quantifiers
+            SemanticPrime::One => "NSM_ONE".to_string(),
+            SemanticPrime::Two => "NSM_TWO".to_string(),
+            SemanticPrime::Some => "NSM_SOME".to_string(),
+            SemanticPrime::All => "NSM_ALL".to_string(),
+            SemanticPrime::Much => "NSM_MUCH".to_string(),
+            SemanticPrime::Little => "NSM_LITTLE".to_string(),
+
+            // Evaluators
+            SemanticPrime::Good => "NSM_GOOD".to_string(),
+            SemanticPrime::Bad => "NSM_BAD".to_string(),
+
+            // Descriptors
+            SemanticPrime::Big => "NSM_BIG".to_string(),
+            SemanticPrime::Small => "NSM_SMALL".to_string(),
+
+            // Mental predicates
+            SemanticPrime::Think => "NSM_THINK".to_string(),
+            SemanticPrime::Know => "NSM_KNOW".to_string(),
+            SemanticPrime::Want => "NSM_WANT".to_string(),
+            SemanticPrime::Feel => "NSM_FEEL".to_string(),
+            SemanticPrime::See => "NSM_SEE".to_string(),
+            SemanticPrime::Hear => "NSM_HEAR".to_string(),
+
+            // Speech
+            SemanticPrime::Say => "NSM_SAY".to_string(),
+            SemanticPrime::Words => "NSM_WORDS".to_string(),
+            SemanticPrime::True => "NSM_TRUE".to_string(),
+
+            // Actions
+            SemanticPrime::Do => "NSM_DO".to_string(),
+            SemanticPrime::Happen => "NSM_HAPPEN".to_string(),
+            SemanticPrime::Move => "NSM_MOVE".to_string(),
+            SemanticPrime::Touch => "NSM_TOUCH".to_string(),
+
+            // Existence
+            SemanticPrime::Be => "NSM_BE".to_string(),
+            SemanticPrime::ThereIs => "NSM_THERE_IS".to_string(),
+            SemanticPrime::Have => "NSM_HAVE".to_string(),
+
+            // Life/Death
+            SemanticPrime::Live => "NSM_LIVE".to_string(),
+            SemanticPrime::Die => "NSM_DIE".to_string(),
+
+            // Logical
+            SemanticPrime::Not => "NSM_NOT".to_string(),
+            SemanticPrime::Maybe => "NSM_MAYBE".to_string(),
+            SemanticPrime::Can => "NSM_CAN".to_string(),
+            SemanticPrime::Because => "NSM_BECAUSE".to_string(),
+            SemanticPrime::If => "NSM_IF".to_string(),
+
+            // Time
+            SemanticPrime::When => "NSM_WHEN".to_string(),
+            SemanticPrime::Now => "NSM_NOW".to_string(),
+            SemanticPrime::Before => "NSM_BEFORE".to_string(),
+            SemanticPrime::After => "NSM_AFTER".to_string(),
+            SemanticPrime::LongTime => "NSM_LONG_TIME".to_string(),
+            SemanticPrime::ShortTime => "NSM_SHORT_TIME".to_string(),
+            SemanticPrime::ForSomeTime => "NSM_FOR_SOME_TIME".to_string(),
+            SemanticPrime::InOneMoment => "NSM_IN_ONE_MOMENT".to_string(),
+
+            // Space
+            SemanticPrime::Where => "NSM_WHERE".to_string(),
+            SemanticPrime::Here => "NSM_HERE".to_string(),
+            SemanticPrime::Above => "NSM_ABOVE".to_string(),
+            SemanticPrime::Below => "NSM_BELOW".to_string(),
+            SemanticPrime::Far => "NSM_FAR".to_string(),
+            SemanticPrime::Near => "NSM_NEAR".to_string(),
+            SemanticPrime::Side => "NSM_SIDE".to_string(),
+            SemanticPrime::Inside => "NSM_INSIDE".to_string(),
+            SemanticPrime::On => "NSM_ON".to_string(),
+
+            // Intensifiers
+            SemanticPrime::Very => "NSM_VERY".to_string(),
+            SemanticPrime::More => "NSM_MORE".to_string(),
+
+            // Similarity
+            SemanticPrime::Like => "NSM_LIKE".to_string(),
+
+            // Social
+            SemanticPrime::With => "NSM_WITH".to_string(),
+        }
     }
 
     /// Initialize Tier 1: Mathematical & Logical Primitives
@@ -987,7 +1148,7 @@ impl PrimitiveSystem {
             let tier = primitive.tier;
 
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // === BINDING RULES ===
@@ -1226,7 +1387,7 @@ impl PrimitiveSystem {
             let tier = primitive.tier;
 
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // === BINDING RULES ===
@@ -1451,7 +1612,7 @@ impl PrimitiveSystem {
             let tier = primitive.tier;
 
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // === BINDING RULES ===
@@ -1683,7 +1844,7 @@ impl PrimitiveSystem {
             let tier = primitive.tier;
 
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // === BINDING RULES ===
@@ -1978,7 +2139,7 @@ impl PrimitiveSystem {
             let tier = primitive.tier;
 
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // === BINDING RULES ===
@@ -2116,7 +2277,7 @@ impl PrimitiveSystem {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // Binding rules
@@ -2248,7 +2409,7 @@ impl PrimitiveSystem {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // Binding rules
@@ -2372,7 +2533,7 @@ impl PrimitiveSystem {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // Binding rules
@@ -2446,14 +2607,12 @@ impl PrimitiveSystem {
         // Register domain and primitives
         self.domains.insert("quantum".to_string(), quantum_domain);
 
-        for primitive in vec![
-            superposition, entanglement, measurement,
-            uncertainty_heisenberg, wave_particle_duality, planck_constant,
-        ] {
+        for primitive in [superposition, entanglement, measurement,
+            uncertainty_heisenberg, wave_particle_duality, planck_constant] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // Binding rules
@@ -2543,14 +2702,12 @@ impl PrimitiveSystem {
         // Register domain and primitives
         self.domains.insert("economics".to_string(), economics_domain);
 
-        for primitive in vec![
-            scarcity, supply, demand, exchange, value_subjective,
-            capital, debt, trust_economic,
-        ] {
+        for primitive in [scarcity, supply, demand, exchange, value_subjective,
+            capital, debt, trust_economic] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // Binding rules
@@ -2632,14 +2789,12 @@ impl PrimitiveSystem {
         // Register domain and primitives
         self.domains.insert("linguistics".to_string(), linguistics_domain);
 
-        for primitive in vec![
-            sign, reference, context_dependency, metaphor,
-            syntax, semantics, pragmatics,
-        ] {
+        for primitive in [sign, reference, context_dependency, metaphor,
+            syntax, semantics, pragmatics] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // Binding rules
@@ -2731,14 +2886,12 @@ impl PrimitiveSystem {
         // Register domain and primitives
         self.domains.insert("morality".to_string(), moral_domain);
 
-        for primitive in vec![
-            norm, obligation, permission, prohibition,
-            fairness, harm, care, rights,
-        ] {
+        for primitive in [norm, obligation, permission, prohibition,
+            fairness, harm, care, rights] {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // Binding rules
@@ -2871,7 +3024,7 @@ impl PrimitiveSystem {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // === BINDING RULES ===
@@ -3002,7 +3155,7 @@ impl PrimitiveSystem {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // === BINDING RULES ===
@@ -3236,7 +3389,7 @@ impl PrimitiveSystem {
             let name = primitive.name.clone();
             let tier = primitive.tier;
             self.primitives.insert(name.clone(), primitive);
-            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+            self.by_tier.entry(tier).or_default().push(name);
         }
 
         // === BINDING RULES FOR CONSCIOUSNESS ===
@@ -3633,7 +3786,7 @@ impl PrimitiveSystem {
     pub fn similarity_matrix(&self, names: &[&str]) -> Vec<Vec<f32>> {
         let encodings: Vec<_> = names
             .iter()
-            .filter_map(|n| self.get(n).map(|p| p.encoding.clone()))
+            .filter_map(|n| self.get(n).map(|p| p.encoding))
             .collect();
 
         let n = encodings.len();
@@ -3686,7 +3839,7 @@ impl PrimitiveSystem {
         for name in names {
             let prim = self.primitives.get(*name)
                 .ok_or_else(|| PrimitiveError::NotFound(name.to_string()))?;
-            encodings.push(prim.encoding.clone());
+            encodings.push(prim.encoding);
         }
 
         let encoding = HV16::bundle(&encodings);
@@ -3719,7 +3872,7 @@ impl PrimitiveSystem {
         for (name, weight) in weighted {
             let prim = self.primitives.get(*name)
                 .ok_or_else(|| PrimitiveError::NotFound(name.to_string()))?;
-            encodings.push(prim.encoding.clone());
+            encodings.push(prim.encoding);
             weights.push(*weight / total_weight);
         }
 
@@ -3805,7 +3958,7 @@ impl PrimitiveSystem {
         let first = self.primitives.get(names[0])
             .ok_or_else(|| PrimitiveError::NotFound(names[0].to_string()))?;
 
-        let mut encoding = first.encoding.clone();
+        let mut encoding = first.encoding;
 
         for (i, name) in names.iter().enumerate().skip(1) {
             let prim = self.primitives.get(*name)
@@ -4349,10 +4502,10 @@ impl CompositionAlgebra {
     pub fn get_encoding(&self, name: &str, system: &PrimitiveSystem) -> Option<HV16> {
         // First check compositions
         if let Some(comp) = self.compositions.get(name) {
-            return Some(comp.encoding.clone());
+            return Some(comp.encoding);
         }
         // Then check primitives
-        system.get(name).map(|p| p.encoding.clone())
+        system.get(name).map(|p| p.encoding)
     }
 
     /// List all defined compositions.
@@ -4661,7 +4814,7 @@ impl PrimitiveGraph {
         for name in names {
             if let Some(prim) = system.get(name) {
                 nodes.push((prim.name.clone(), prim.tier, prim.is_base));
-                encodings.push(prim.encoding.clone());
+                encodings.push(prim.encoding);
             }
         }
 
@@ -4686,7 +4839,7 @@ impl PrimitiveGraph {
 
         for prim in prims {
             nodes.push((prim.name.clone(), prim.tier, prim.is_base));
-            encodings.push(prim.encoding.clone());
+            encodings.push(prim.encoding);
         }
 
         let edges = Self::compute_edges(&encodings, similarity_threshold);
@@ -4712,7 +4865,7 @@ impl PrimitiveGraph {
             if let Some(prim) = system.get(name) {
                 if prim.domain == domain {
                     nodes.push((prim.name.clone(), prim.tier, prim.is_base));
-                    encodings.push(prim.encoding.clone());
+                    encodings.push(prim.encoding);
                 }
             }
         }
@@ -4740,7 +4893,7 @@ impl PrimitiveGraph {
         let mut encodings = Vec::new();
 
         for _ in 0..depth {
-            let current_batch: Vec<String> = to_visit.drain(..).collect();
+            let current_batch: Vec<String> = std::mem::take(&mut to_visit);
 
             for name in current_batch {
                 if visited.contains(&name) {
@@ -4752,7 +4905,7 @@ impl PrimitiveGraph {
                     let idx = nodes.len();
                     node_map.insert(name.clone(), idx);
                     nodes.push((prim.name.clone(), prim.tier, prim.is_base));
-                    encodings.push(prim.encoding.clone());
+                    encodings.push(prim.encoding);
 
                     // Find similar primitives for next iteration
                     let similar = system.find_similar(&name, top_k);
@@ -4799,7 +4952,7 @@ impl PrimitiveGraph {
         dot.push_str("  fontsize=16;\n");
         dot.push_str("  rankdir=LR;\n");
         dot.push_str("  node [shape=box, style=rounded];\n");
-        dot.push_str("\n");
+        dot.push('\n');
 
         // Nodes with tier-based colors
         for (i, (name, tier, is_base)) in self.nodes.iter().enumerate() {
@@ -4811,7 +4964,7 @@ impl PrimitiveGraph {
             ));
         }
 
-        dot.push_str("\n");
+        dot.push('\n');
 
         // Edges with similarity-based styling
         for (from, to, sim) in &self.edges {
