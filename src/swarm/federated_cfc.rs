@@ -588,6 +588,80 @@ impl FederatedAggregator {
             *w -= learning_rate * g;
         }
     }
+
+    /// Apply weight deltas from FedAvg aggregation
+    ///
+    /// In FedAvg, clients compute delta = trained_weights - global_weights.
+    /// After aggregation, the averaged delta should be **added** to global weights:
+    /// new_weights = old_weights + aggregated_delta
+    ///
+    /// This is different from `apply_gradient` which subtracts.
+    ///
+    /// # Arguments
+    ///
+    /// * `delta` - The aggregated weight delta from FedAvg
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use symthaea::swarm::federated_cfc::{FederatedAggregator, GradientMessage};
+    ///
+    /// let mut aggregator = FederatedAggregator::new(vec![1.0, 2.0, 3.0, 4.0]);
+    ///
+    /// // Simulate receiving weight deltas from clients
+    /// let msg = GradientMessage::new([1u8; 32], vec![0.1, 0.2, 0.1, 0.2], 0.8);
+    /// aggregator.receive_gradient(msg);
+    ///
+    /// if let Some(delta) = aggregator.aggregate() {
+    ///     aggregator.apply_weight_delta(&delta);
+    ///     // weights are now [1.1, 2.2, 3.1, 4.2]
+    /// }
+    /// ```
+    pub fn apply_weight_delta(&mut self, delta: &[f32]) {
+        if delta.len() != self.local_weights.len() {
+            return;
+        }
+
+        for (w, d) in self.local_weights.iter_mut().zip(delta.iter()) {
+            *w += d;
+        }
+    }
+
+    /// Aggregate and apply weight deltas in one step
+    ///
+    /// This is the standard FedAvg update: aggregates all received weight deltas
+    /// and applies them to the global model.
+    ///
+    /// # Returns
+    ///
+    /// Returns `true` if aggregation and update were successful, `false` if no
+    /// contributions were pending.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use symthaea::swarm::federated_cfc::{FederatedAggregator, GradientMessage};
+    ///
+    /// let mut aggregator = FederatedAggregator::new(vec![0.0; 4]);
+    ///
+    /// // Receive gradients from multiple clients
+    /// for i in 0..5 {
+    ///     let msg = GradientMessage::new([i as u8; 32], vec![0.1; 4], 0.8);
+    ///     aggregator.receive_gradient(msg);
+    /// }
+    ///
+    /// // Aggregate and update global model
+    /// let updated = aggregator.aggregate_and_apply();
+    /// assert!(updated);
+    /// ```
+    pub fn aggregate_and_apply(&mut self) -> bool {
+        if let Some(delta) = self.aggregate() {
+            self.apply_weight_delta(&delta);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 // ============================================================================
@@ -950,5 +1024,79 @@ mod tests {
         let low = DifferentialPrivacyConfig::low_privacy();
         assert!((low.clip_norm - 2.0).abs() < 1e-6);
         assert!((low.noise_multiplier - 0.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_apply_weight_delta() {
+        let mut aggregator = FederatedAggregator::new(vec![1.0, 2.0, 3.0, 4.0]);
+
+        let delta = vec![0.1, 0.2, 0.3, 0.4];
+        aggregator.apply_weight_delta(&delta);
+
+        // w = w + delta = [1.1, 2.2, 3.3, 4.4]
+        let expected = vec![1.1, 2.2, 3.3, 4.4];
+        for (w, e) in aggregator.local_weights().iter().zip(expected.iter()) {
+            assert!((w - e).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_aggregate_and_apply() {
+        let mut aggregator = FederatedAggregator::new(vec![1.0, 2.0, 3.0, 4.0]);
+
+        // Add two deltas that should average to [0.2, 0.2, 0.2, 0.2]
+        let msg1 = GradientMessage::new([1u8; 32], vec![0.1, 0.3, 0.1, 0.3], 0.5);
+        let msg2 = GradientMessage::new([2u8; 32], vec![0.3, 0.1, 0.3, 0.1], 0.5);
+        aggregator.receive_gradient(msg1);
+        aggregator.receive_gradient(msg2);
+
+        // Aggregate and apply
+        let updated = aggregator.aggregate_and_apply();
+        assert!(updated);
+
+        // Expected: [1.0, 2.0, 3.0, 4.0] + [0.2, 0.2, 0.2, 0.2] = [1.2, 2.2, 3.2, 4.2]
+        let expected = vec![1.2, 2.2, 3.2, 4.2];
+        for (w, e) in aggregator.local_weights().iter().zip(expected.iter()) {
+            assert!(
+                (w - e).abs() < 1e-6,
+                "Expected {}, got {} (diff: {})",
+                e,
+                w,
+                (w - e).abs()
+            );
+        }
+    }
+
+    #[test]
+    fn test_fedavg_convergence_simulation() {
+        // Simulate a simple FedAvg scenario where all clients push weights toward 0.5
+        let mut aggregator = FederatedAggregator::new(vec![0.0; 4]);
+
+        // Run 5 rounds
+        for _ in 0..5 {
+            // Each client "trains" by computing delta toward target
+            let target = 0.5f32;
+            let current: Vec<f32> = aggregator.local_weights().to_vec();
+
+            // Simulate 3 clients each moving 20% toward target
+            for client_id in 0..3 {
+                let delta: Vec<f32> = current.iter()
+                    .map(|&w| (target - w) * 0.2)
+                    .collect();
+
+                let mut source_id = [0u8; 32];
+                source_id[0] = client_id as u8;
+                let msg = GradientMessage::new(source_id, delta, 0.8);
+                aggregator.receive_gradient(msg);
+            }
+
+            aggregator.aggregate_and_apply();
+        }
+
+        // After 5 rounds, weights should be close to 0.5
+        // (1 - 0.8^5) * 0.5 ≈ 0.34 (converging toward 0.5)
+        for w in aggregator.local_weights() {
+            assert!(*w > 0.3, "Weight {} should be > 0.3 after convergence", w);
+        }
     }
 }

@@ -513,6 +513,10 @@ pub struct LocalChannelBackend {
     /// Our own sender (for others to send to us)
     self_sender: mpsc::Sender<ChannelEnvelope>,
 
+    /// Mapping from 32-byte node IDs to sender keys (channel IDs).
+    /// Populated via `register_node()` and used by `unregister_node()`.
+    node_id_map: Arc<RwLock<HashMap<[u8; 32], String>>>,
+
     /// Whether the backend is initialized
     ready: Arc<std::sync::atomic::AtomicBool>,
 }
@@ -532,6 +536,7 @@ impl LocalChannelBackend {
             senders: Arc::new(RwLock::new(HashMap::new())),
             receiver: Arc::new(tokio::sync::Mutex::new(rx)),
             self_sender: tx,
+            node_id_map: Arc::new(RwLock::new(HashMap::new())),
             ready: Arc::new(std::sync::atomic::AtomicBool::new(true)),
         }
     }
@@ -633,15 +638,18 @@ impl NetworkBackend for LocalChannelBackend {
     }
 
     async fn register_node(&self, node: &FederatedNode) -> NetworkResult<()> {
-        // For local channels, registration happens via register_peer_sender
-        debug!("Node registration requested for {}", node.short_id());
+        if let NodeAddress::Channel(ref id) = node.address {
+            self.node_id_map.write().insert(node.node_id, id.clone());
+        }
+        debug!("Node registered: {}", node.short_id());
         Ok(())
     }
 
     async fn unregister_node(&self, node_id: &[u8; 32]) -> NetworkResult<()> {
-        let short_id = hex::encode(&node_id[..8]);
-        self.senders.write().remove(&short_id);
-        debug!("Node {} unregistered", short_id);
+        if let Some(key) = self.node_id_map.write().remove(node_id) {
+            self.senders.write().remove(&key);
+            debug!("Node {} unregistered (key: {})", hex::encode(&node_id[..8]), key);
+        }
         Ok(())
     }
 
@@ -1326,9 +1334,12 @@ impl FederatedCoordinator {
     }
 
     /// Register a peer node
-    pub fn register_peer(&self, node: FederatedNode) {
+    pub async fn register_peer(&self, node: FederatedNode) {
         let node_id = node.node_id;
         let address = node.address.clone();
+
+        // Register with backend for routing (node_id → address mapping)
+        let _ = self.backend.register_node(&node).await;
 
         self.peers.write().insert(node_id, node);
 
@@ -1340,13 +1351,16 @@ impl FederatedCoordinator {
     }
 
     /// Unregister a peer node
-    pub fn unregister_peer(&self, node_id: &[u8; 32], reason: &str) {
+    pub async fn unregister_peer(&self, node_id: &[u8; 32], reason: &str) {
         if self.peers.write().remove(node_id).is_some() {
             info!(
                 "Peer unregistered: {} ({})",
                 hex::encode(&node_id[..8]),
                 reason
             );
+
+            // Also remove from backend routing
+            let _ = self.backend.unregister_node(node_id).await;
 
             let _ = self.event_tx.send(CoordinatorEvent::NodeLeft {
                 node_id: *node_id,
@@ -1391,7 +1405,7 @@ impl FederatedCoordinator {
                     .await?;
             }
             FederatedMessage::Leave { node_id, reason } => {
-                self.unregister_peer(&node_id, &reason);
+                self.unregister_peer(&node_id, &reason).await;
             }
             FederatedMessage::ModelUpdate { weights, round, .. } => {
                 self.handle_model_update(weights, round).await?;
@@ -1450,9 +1464,10 @@ impl FederatedCoordinator {
             is_active: true,
         };
 
-        self.register_peer(node);
+        self.register_peer(node).await;
 
-        // Send acknowledgment
+        // Send acknowledgment (best-effort — the joining peer may not have
+        // a backend channel set up yet, e.g. in test scenarios)
         let peers: Vec<([u8; 32], String)> = self
             .peers
             .read()
@@ -1466,9 +1481,9 @@ impl FederatedCoordinator {
             peers,
         };
 
-        self.backend
-            .send(&NodeAddress::Channel(address), ack)
-            .await?;
+        if let Err(e) = self.backend.send(&NodeAddress::Channel(address), ack).await {
+            debug!("JoinAck delivery failed (peer may connect later): {}", e);
+        }
 
         Ok(())
     }
@@ -1706,7 +1721,7 @@ pub async fn create_test_network(
                     coordinators[j].local_node_id(),
                     NodeAddress::Channel(format!("node-{}", j)),
                 );
-                coordinators[i].register_peer(peer_node);
+                coordinators[i].register_peer(peer_node).await;
             }
         }
     }
@@ -1975,10 +1990,10 @@ mod tests {
         let peer = FederatedNode::with_random_id(NodeAddress::Channel("peer-1".to_string()));
         let peer_id = peer.node_id;
 
-        coordinator.register_peer(peer);
+        coordinator.register_peer(peer).await;
         assert_eq!(coordinator.peer_count(), 1);
 
-        coordinator.unregister_peer(&peer_id, "test");
+        coordinator.unregister_peer(&peer_id, "test").await;
         assert_eq!(coordinator.peer_count(), 0);
     }
 
@@ -2001,7 +2016,7 @@ mod tests {
         let mut rx = coordinator.subscribe_events();
 
         let peer = FederatedNode::with_random_id(NodeAddress::Channel("peer-1".to_string()));
-        coordinator.register_peer(peer);
+        coordinator.register_peer(peer).await;
 
         let event = rx.try_recv();
         assert!(event.is_ok());
