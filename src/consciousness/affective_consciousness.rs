@@ -97,6 +97,34 @@ impl Default for CoreAffect {
     }
 }
 
+/// Physiological state bridging body to affect
+/// Used by embodied_cognition to represent body state
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct PhysiologicalState {
+    /// Change in heart rate from baseline
+    pub heart_rate_delta: f64,
+    /// Skin conductance (sweat response)
+    pub skin_conductance: f64,
+    /// Muscle tension level
+    pub muscle_tension: f64,
+    /// Change in breathing rate from baseline
+    pub respiration_delta: f64,
+    /// Gut feeling / interoceptive signal
+    pub gut_feeling: f64,
+}
+
+impl Default for PhysiologicalState {
+    fn default() -> Self {
+        Self {
+            heart_rate_delta: 0.0,
+            skin_conductance: 0.0,
+            muscle_tension: 0.0,
+            respiration_delta: 0.0,
+            gut_feeling: 0.0,
+        }
+    }
+}
+
 /// Discrete emotion categories
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EmotionCategory {

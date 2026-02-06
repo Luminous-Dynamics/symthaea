@@ -14,7 +14,7 @@ use anyhow::Result;
 // =============================================================================
 
 /// Type of transformation applied during reasoning
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TransformationType {
     /// Bind two vectors (XOR in binary HV)
     Bind,
