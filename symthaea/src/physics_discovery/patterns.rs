@@ -5,7 +5,7 @@
 //! - Cross-domain transfer (applying patterns from one field to another)
 //! - Guiding symbolic regression toward physically meaningful forms
 
-use super::encoders::{EncodedMeasurement, PhysicsEncoder, PhysicalQuantity, PhysicsEncoderConfig};
+use super::encoders::PhysicalQuantity;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -112,16 +112,13 @@ pub struct PatternMatch {
 /// Library of known physics patterns.
 pub struct PatternLibrary {
     patterns: Vec<PhysicsPattern>,
-    encoder: PhysicsEncoder,
 }
 
 impl PatternLibrary {
     /// Create library with standard physics patterns.
     pub fn standard() -> Self {
-        let encoder = PhysicsEncoder::new(PhysicsEncoderConfig::default());
         let mut library = Self {
             patterns: Vec::new(),
-            encoder,
         };
         library.add_standard_patterns();
         library
@@ -131,7 +128,6 @@ impl PatternLibrary {
     pub fn new() -> Self {
         Self {
             patterns: Vec::new(),
-            encoder: PhysicsEncoder::new(PhysicsEncoderConfig::default()),
         }
     }
 
@@ -449,7 +445,6 @@ impl Default for PatternLibrary {
 /// Pattern matching engine.
 pub struct PatternMatcher {
     library: PatternLibrary,
-    encoder: PhysicsEncoder,
     /// Minimum similarity to consider a match
     match_threshold: f64,
 }
@@ -459,7 +454,6 @@ impl PatternMatcher {
     pub fn new() -> Self {
         Self {
             library: PatternLibrary::standard(),
-            encoder: PhysicsEncoder::new(PhysicsEncoderConfig::default()),
             match_threshold: 0.5,
         }
     }
@@ -468,7 +462,6 @@ impl PatternMatcher {
     pub fn with_library(library: PatternLibrary) -> Self {
         Self {
             library,
-            encoder: PhysicsEncoder::new(PhysicsEncoderConfig::default()),
             match_threshold: 0.5,
         }
     }

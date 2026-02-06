@@ -360,7 +360,8 @@ impl RustParser {
 
     fn find_child_kind<'a>(&self, node: &tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
         let mut cursor = node.walk();
-        node.children(&mut cursor).find(|c| c.kind() == kind)
+        let children: Vec<_> = node.children(&mut cursor).collect();
+        children.into_iter().find(|c| c.kind() == kind)
     }
 }
 

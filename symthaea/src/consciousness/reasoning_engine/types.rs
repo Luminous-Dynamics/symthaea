@@ -39,6 +39,138 @@ pub struct ReasoningContext {
     pub cycle_id: u64,
 }
 
+impl ReasoningContext {
+    /// Create a builder for constructing a ReasoningContext.
+    pub fn builder() -> ReasoningContextBuilder {
+        ReasoningContextBuilder::new()
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ReasoningContext Builder
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Builder for ergonomic construction of ReasoningContext.
+///
+/// Provides sensible defaults:
+/// - `phi`: 0.5 (neutral consciousness)
+/// - `available_budget_us`: 20_000 (Tier 2 budget)
+/// - `available_actions`: empty
+/// - `tool`: None
+/// - `recent_utility`: 0.5 (neutral prior)
+/// - `cycle_id`: 0
+///
+/// # Example
+///
+/// ```ignore
+/// let ctx = ReasoningContext::builder()
+///     .with_phi(0.8)
+///     .with_budget_us(8_000)
+///     .with_actions(actions)
+///     .build();
+/// ```
+#[derive(Debug, Clone)]
+pub struct ReasoningContextBuilder {
+    theory_metrics: Option<MultiTheoryMetrics>,
+    phi: f64,
+    available_budget_us: u64,
+    available_actions: Vec<PlannedAction>,
+    tool: Option<ToolDescriptor>,
+    recent_utility: f64,
+    cycle_id: u64,
+}
+
+impl ReasoningContextBuilder {
+    /// Create a new builder with sensible defaults.
+    pub fn new() -> Self {
+        Self {
+            theory_metrics: None,
+            phi: 0.5,
+            available_budget_us: 20_000, // Tier 2 by default
+            available_actions: Vec::new(),
+            tool: None,
+            recent_utility: 0.5,
+            cycle_id: 0,
+        }
+    }
+
+    /// Set the multi-theory consciousness metrics.
+    pub fn with_theory_metrics(mut self, metrics: MultiTheoryMetrics) -> Self {
+        self.theory_metrics = Some(metrics);
+        self
+    }
+
+    /// Set the raw Φ value.
+    pub fn with_phi(mut self, phi: f64) -> Self {
+        self.phi = phi;
+        self
+    }
+
+    /// Set the available budget in microseconds.
+    pub fn with_budget_us(mut self, budget_us: u64) -> Self {
+        self.available_budget_us = budget_us;
+        self
+    }
+
+    /// Set the available actions for planning.
+    pub fn with_actions(mut self, actions: Vec<PlannedAction>) -> Self {
+        self.available_actions = actions;
+        self
+    }
+
+    /// Set the tool being considered for gating.
+    pub fn with_tool(mut self, tool: ToolDescriptor) -> Self {
+        self.tool = Some(tool);
+        self
+    }
+
+    /// Set the recent utility of simulation.
+    pub fn with_recent_utility(mut self, utility: f64) -> Self {
+        self.recent_utility = utility;
+        self
+    }
+
+    /// Set the cycle identifier.
+    pub fn with_cycle_id(mut self, cycle_id: u64) -> Self {
+        self.cycle_id = cycle_id;
+        self
+    }
+
+    /// Build the ReasoningContext.
+    ///
+    /// If theory_metrics was not set, creates default metrics based on phi.
+    pub fn build(self) -> ReasoningContext {
+        let theory_metrics = self.theory_metrics.unwrap_or_else(|| {
+            // Create default metrics with phi and consensus at phi level
+            MultiTheoryMetrics {
+                phi: self.phi,
+                gwt: self.phi,
+                ast: self.phi,
+                pp: self.phi,
+                rpt: self.phi,
+                embodiment: self.phi,
+                unified: self.phi,
+            }
+        });
+
+        ReasoningContext {
+            theory_metrics,
+            phi: self.phi,
+            available_budget_us: self.available_budget_us,
+            available_actions: self.available_actions,
+            tool: self.tool,
+            recent_utility: self.recent_utility,
+            cycle_id: self.cycle_id,
+        }
+    }
+}
+
+impl Default for ReasoningContextBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Reasoning Result (output of reason())
 // ─────────────────────────────────────────────────────────────────────────────
@@ -338,5 +470,65 @@ mod tests {
             0.5, 0.8, 2.0, conflicts, plan, None, None, None, 15000, false,
         );
         assert!(result.is_full());
+    }
+
+    #[test]
+    fn test_reasoning_context_builder_defaults() {
+        let ctx = ReasoningContext::builder().build();
+        assert_eq!(ctx.phi, 0.5);
+        assert_eq!(ctx.available_budget_us, 20_000);
+        assert!(ctx.available_actions.is_empty());
+        assert!(ctx.tool.is_none());
+        assert_eq!(ctx.recent_utility, 0.5);
+        assert_eq!(ctx.cycle_id, 0);
+        // Default metrics derive from phi
+        assert_eq!(ctx.theory_metrics.phi, 0.5);
+        assert_eq!(ctx.theory_metrics.gwt, 0.5);
+    }
+
+    #[test]
+    fn test_reasoning_context_builder_custom() {
+        let actions = vec![PlannedAction {
+            id: "test".to_string(),
+            description: "Test action".to_string(),
+            embedding: vec![0.0; 4],
+            prior: 1.0,
+            is_epistemic: false,
+        }];
+
+        let ctx = ReasoningContext::builder()
+            .with_phi(0.8)
+            .with_budget_us(8_000)
+            .with_actions(actions)
+            .with_recent_utility(0.7)
+            .with_cycle_id(42)
+            .build();
+
+        assert_eq!(ctx.phi, 0.8);
+        assert_eq!(ctx.available_budget_us, 8_000);
+        assert_eq!(ctx.available_actions.len(), 1);
+        assert_eq!(ctx.recent_utility, 0.7);
+        assert_eq!(ctx.cycle_id, 42);
+    }
+
+    #[test]
+    fn test_reasoning_context_builder_with_explicit_metrics() {
+        let metrics = MultiTheoryMetrics {
+            phi: 0.9,
+            gwt: 0.85,
+            ast: 0.8,
+            pp: 0.75,
+            rpt: 0.7,
+            embodiment: 0.65,
+            unified: 0.8,
+        };
+
+        let ctx = ReasoningContext::builder()
+            .with_theory_metrics(metrics)
+            .with_phi(0.9)
+            .build();
+
+        assert_eq!(ctx.theory_metrics.gwt, 0.85);
+        assert_eq!(ctx.theory_metrics.ast, 0.8);
     }
 }
