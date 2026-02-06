@@ -80,6 +80,7 @@ use std::time::Instant;
 use serde::{Serialize, Deserialize};
 
 use crate::hdc::binary_hv::HV16;
+use crate::hdc::primitive_system::PrimitiveSystem;
 use super::affective_consciousness::{CoreAffect, PhysiologicalState};
 
 // ============================================================================
@@ -436,7 +437,7 @@ pub struct ActionPattern {
     pub encoding: HV16,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MovementType {
     Reach,
     Grasp,
@@ -995,6 +996,313 @@ pub struct EmbodimentSummary {
     pub agency: f64,
     pub ownership: f64,
     pub overall_embodiment: f64,
+}
+
+// ============================================================================
+// NSM PRIMITIVE GROUNDING (Wierzbicka's Natural Semantic Metalanguage)
+// ============================================================================
+
+/// NSM grounding for body parts - spatial/functional semantic primitives
+#[derive(Debug, Clone)]
+pub struct BodyPartPrimitiveGrounding {
+    /// The body part being grounded
+    pub body_part: BodyPart,
+    /// NSM primitive composition (e.g., ["BODY", "PART", "SEE", "KNOW"])
+    pub nsm_primitives: Vec<String>,
+    /// HDC encoding via primitive binding
+    pub primitive_encoding: HV16,
+    /// Whether this part is a locus of agency
+    pub agency_locus: bool,
+    /// Whether this part is a sensory organ
+    pub sensory_organ: bool,
+}
+
+impl BodyPartPrimitiveGrounding {
+    pub fn new(body_part: BodyPart, system: &PrimitiveSystem) -> Self {
+        let (primitives, agency, sensory) = Self::nsm_mapping(body_part);
+        let encoding = encode_primitives(&primitives, system);
+
+        Self {
+            body_part,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            agency_locus: agency,
+            sensory_organ: sensory,
+        }
+    }
+
+    fn nsm_mapping(part: BodyPart) -> (Vec<String>, bool, bool) {
+        match part {
+            // Head: seat of cognition and perception
+            BodyPart::Head => (
+                vec!["I".into(), "KNOW".into(), "SEE".into(), "HEAR".into(), "THINK".into()],
+                true,  // agency (decision-making)
+                true,  // sensory (eyes, ears)
+            ),
+            // Torso: central body mass
+            BodyPart::Torso => (
+                vec!["BODY".into(), "BIG".into(), "PART".into(), "INSIDE".into()],
+                false,
+                false,
+            ),
+            // Arms: action limbs
+            BodyPart::LeftArm => (
+                vec!["BODY".into(), "PART".into(), "ONE".into(), "SIDE".into(), "DO".into()],
+                true,
+                false,
+            ),
+            BodyPart::RightArm => (
+                vec!["BODY".into(), "PART".into(), "OTHER".into(), "SIDE".into(), "DO".into()],
+                true,
+                false,
+            ),
+            // Hands: manipulation and touch
+            BodyPart::LeftHand => (
+                vec!["BODY".into(), "PART".into(), "TOUCH".into(), "DO".into(), "HAVE".into()],
+                true,
+                true,  // tactile sensing
+            ),
+            BodyPart::RightHand => (
+                vec!["BODY".into(), "PART".into(), "TOUCH".into(), "DO".into(), "HAVE".into()],
+                true,
+                true,
+            ),
+            // Legs: locomotion
+            BodyPart::LeftLeg => (
+                vec!["BODY".into(), "PART".into(), "MOVE".into(), "GO".into(), "ONE".into()],
+                true,
+                false,
+            ),
+            BodyPart::RightLeg => (
+                vec!["BODY".into(), "PART".into(), "MOVE".into(), "GO".into(), "OTHER".into()],
+                true,
+                false,
+            ),
+            // Feet: ground contact
+            BodyPart::LeftFoot => (
+                vec!["BODY".into(), "PART".into(), "BELOW".into(), "TOUCH".into()],
+                false,
+                true,  // proprioceptive sensing
+            ),
+            BodyPart::RightFoot => (
+                vec!["BODY".into(), "PART".into(), "BELOW".into(), "TOUCH".into()],
+                false,
+                true,
+            ),
+        }
+    }
+}
+
+/// NSM grounding for movement types - action semantic primitives
+#[derive(Debug, Clone)]
+pub struct MovementTypePrimitiveGrounding {
+    /// The movement type being grounded
+    pub movement_type: MovementType,
+    /// NSM primitive composition
+    pub nsm_primitives: Vec<String>,
+    /// HDC encoding via primitive binding
+    pub primitive_encoding: HV16,
+    /// Whether this movement requires external object
+    pub requires_object: bool,
+    /// Whether this movement is self-directed
+    pub self_directed: bool,
+}
+
+impl MovementTypePrimitiveGrounding {
+    pub fn new(movement_type: MovementType, system: &PrimitiveSystem) -> Self {
+        let (primitives, requires_obj, self_dir) = Self::nsm_mapping(movement_type);
+        let encoding = encode_primitives(&primitives, system);
+
+        Self {
+            movement_type,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            requires_object: requires_obj,
+            self_directed: self_dir,
+        }
+    }
+
+    fn nsm_mapping(movement: MovementType) -> (Vec<String>, bool, bool) {
+        match movement {
+            // Reach: extending toward something
+            MovementType::Reach => (
+                vec!["DO".into(), "MOVE".into(), "FAR".into(), "WANT".into()],
+                true,   // toward an object
+                false,
+            ),
+            // Grasp: taking hold
+            MovementType::Grasp => (
+                vec!["DO".into(), "HAVE".into(), "TOUCH".into(), "WANT".into()],
+                true,
+                false,
+            ),
+            // Release: letting go
+            MovementType::Release => (
+                vec!["DO".into(), "NOT".into(), "HAVE".into(), "NOW".into()],
+                true,
+                false,
+            ),
+            // Push: applying force away
+            MovementType::Push => (
+                vec!["DO".into(), "MOVE".into(), "SOMETHING".into(), "FAR".into()],
+                true,
+                false,
+            ),
+            // Pull: applying force toward
+            MovementType::Pull => (
+                vec!["DO".into(), "MOVE".into(), "SOMETHING".into(), "NEAR".into()],
+                true,
+                false,
+            ),
+            // Walk: locomotion
+            MovementType::Walk => (
+                vec!["DO".into(), "MOVE".into(), "GO".into(), "BODY".into()],
+                false,
+                true,
+            ),
+            // Turn: rotation
+            MovementType::Turn => (
+                vec!["DO".into(), "MOVE".into(), "BODY".into(), "OTHER".into(), "SIDE".into()],
+                false,
+                true,
+            ),
+            // Look: visual attention
+            MovementType::Look => (
+                vec!["DO".into(), "SEE".into(), "WANT".into(), "KNOW".into()],
+                true,   // looking at something
+                false,
+            ),
+            // Speak: vocalization
+            MovementType::Speak => (
+                vec!["DO".into(), "SAY".into(), "WORDS".into(), "SOMEONE".into()],
+                false,
+                true,
+            ),
+            // Breathe: respiration
+            MovementType::Breathe => (
+                vec!["DO".into(), "LIVE".into(), "BODY".into(), "INSIDE".into()],
+                false,
+                true,
+            ),
+        }
+    }
+}
+
+/// Unified NSM grounding system for embodied cognition
+#[derive(Debug)]
+pub struct EmbodiedNSMGrounding {
+    /// Body part groundings indexed by part
+    pub body_parts: HashMap<BodyPart, BodyPartPrimitiveGrounding>,
+    /// Movement type groundings indexed by type
+    pub movements: HashMap<MovementType, MovementTypePrimitiveGrounding>,
+}
+
+impl EmbodiedNSMGrounding {
+    /// Create complete grounding system from primitive system
+    pub fn new(system: &PrimitiveSystem) -> Self {
+        let mut body_parts = HashMap::new();
+        let mut movements = HashMap::new();
+
+        // Ground all body parts
+        for part in BodyPart::all() {
+            body_parts.insert(*part, BodyPartPrimitiveGrounding::new(*part, system));
+        }
+
+        // Ground all movement types
+        for movement in &[
+            MovementType::Reach, MovementType::Grasp, MovementType::Release,
+            MovementType::Push, MovementType::Pull, MovementType::Walk,
+            MovementType::Turn, MovementType::Look, MovementType::Speak,
+            MovementType::Breathe,
+        ] {
+            movements.insert(*movement, MovementTypePrimitiveGrounding::new(*movement, system));
+        }
+
+        Self { body_parts, movements }
+    }
+
+    /// Find body parts by semantic similarity to query vector
+    pub fn query_body_parts(&self, query: &HV16, threshold: f32) -> Vec<(&BodyPart, f32)> {
+        let mut results: Vec<_> = self.body_parts.iter()
+            .map(|(part, grounding)| (part, grounding.primitive_encoding.similarity(query)))
+            .filter(|(_, sim)| *sim >= threshold)
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Find movements by semantic similarity to query vector
+    pub fn query_movements(&self, query: &HV16, threshold: f32) -> Vec<(&MovementType, f32)> {
+        let mut results: Vec<_> = self.movements.iter()
+            .map(|(movement, grounding)| (movement, grounding.primitive_encoding.similarity(query)))
+            .filter(|(_, sim)| *sim >= threshold)
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Get agency-related body parts
+    pub fn agency_parts(&self) -> Vec<&BodyPart> {
+        self.body_parts.iter()
+            .filter(|(_, g)| g.agency_locus)
+            .map(|(p, _)| p)
+            .collect()
+    }
+
+    /// Get sensory body parts
+    pub fn sensory_parts(&self) -> Vec<&BodyPart> {
+        self.body_parts.iter()
+            .filter(|(_, g)| g.sensory_organ)
+            .map(|(p, _)| p)
+            .collect()
+    }
+
+    /// Get object-directed movements
+    pub fn object_movements(&self) -> Vec<&MovementType> {
+        self.movements.iter()
+            .filter(|(_, g)| g.requires_object)
+            .map(|(m, _)| m)
+            .collect()
+    }
+
+    /// Get self-directed movements
+    pub fn self_movements(&self) -> Vec<&MovementType> {
+        self.movements.iter()
+            .filter(|(_, g)| g.self_directed)
+            .map(|(m, _)| m)
+            .collect()
+    }
+}
+
+/// Encode NSM primitives into HDC vector via sequential binding
+fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
+    let vectors: Vec<HV16> = primitives
+        .iter()
+        .map(|name| {
+            if let Some(p) = system.get(name) {
+                p.encoding.clone()
+            } else if let Some(p) = system.get(&name.to_lowercase()) {
+                p.encoding.clone()
+            } else {
+                // Fallback: deterministic random for unknown primitives
+                let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                HV16::random(seed)
+            }
+        })
+        .collect();
+
+    if vectors.is_empty() {
+        return HV16::random(0);
+    }
+
+    // Bind sequentially with position encoding for order preservation
+    let mut result = vectors[0].clone();
+    for (i, v) in vectors.iter().enumerate().skip(1) {
+        let position_hv = HV16::random(i as u64 * 1000);
+        let positioned = v.bind(&position_hv);
+        result = result.bind(&positioned);
+    }
+    result
 }
 
 // ============================================================================
