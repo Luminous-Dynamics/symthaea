@@ -27,6 +27,7 @@ use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
 use super::periodic_table::PeriodicTable;
 use super::hadrons::Hadrons;
+use super::nuclear::NuclearPhysics;
 use serde::{Deserialize, Serialize};
 
 /// Stellar spectral class (Harvard classification)
@@ -194,6 +195,58 @@ impl StellarEncoder {
             white_dwarf: genesis.hv("stellar::white_dwarf", PHYSICS_DIM),
             neutron_star: genesis.hv("stellar::neutron_star", PHYSICS_DIM),
             black_hole: genesis.hv("stellar::black_hole", PHYSICS_DIM),
+
+            mass: genesis.hv("stellar::mass", PHYSICS_DIM),
+            radius: genesis.hv("stellar::radius", PHYSICS_DIM),
+            temperature: genesis.hv("stellar::temperature", PHYSICS_DIM),
+            luminosity: genesis.hv("stellar::luminosity", PHYSICS_DIM),
+            spin_vector: genesis.hv("stellar::spin", PHYSICS_DIM),
+        }
+    }
+
+    /// Create StellarEncoder from nuclear physics
+    ///
+    /// This constructor grounds stellar concepts in nuclear energy scales,
+    /// connecting stellar evolution to nuclear fusion processes.
+    pub fn from_nuclear(nuclear: &NuclearPhysics, genesis: &GenesisSeed) -> Self {
+        // Main sequence is powered by nuclear fusion
+        let main_sequence = nuclear.nuclear_energy.bind(&genesis.hv("stellar::main_sequence", PHYSICS_DIM));
+
+        // White dwarf: electron degeneracy, sub-nuclear energy scale
+        let white_dwarf = ContinuousHV::bundle(&[
+            &nuclear.chemical_energy,
+            &genesis.hv("stellar::white_dwarf", PHYSICS_DIM),
+        ]);
+
+        // Neutron star: nuclear degeneracy
+        let neutron_star = nuclear.nuclear_energy.bind(&genesis.hv("stellar::neutron_star", PHYSICS_DIM));
+
+        // Black hole: relativistic energy scale
+        let black_hole = nuclear.relativistic_energy.bind(&genesis.hv("stellar::black_hole", PHYSICS_DIM));
+
+        Self {
+            class_o: genesis.hv(SpectralClass::O.domain_label(), PHYSICS_DIM),
+            class_b: genesis.hv(SpectralClass::B.domain_label(), PHYSICS_DIM),
+            class_a: genesis.hv(SpectralClass::A.domain_label(), PHYSICS_DIM),
+            class_f: genesis.hv(SpectralClass::F.domain_label(), PHYSICS_DIM),
+            class_g: genesis.hv(SpectralClass::G.domain_label(), PHYSICS_DIM),
+            class_k: genesis.hv(SpectralClass::K.domain_label(), PHYSICS_DIM),
+            class_m: genesis.hv(SpectralClass::M.domain_label(), PHYSICS_DIM),
+
+            lum_ia: genesis.hv(LuminosityClass::Ia.domain_label(), PHYSICS_DIM),
+            lum_ib: genesis.hv(LuminosityClass::Ib.domain_label(), PHYSICS_DIM),
+            lum_ii: genesis.hv(LuminosityClass::II.domain_label(), PHYSICS_DIM),
+            lum_iii: genesis.hv(LuminosityClass::III.domain_label(), PHYSICS_DIM),
+            lum_iv: genesis.hv(LuminosityClass::IV.domain_label(), PHYSICS_DIM),
+            lum_v: genesis.hv(LuminosityClass::V.domain_label(), PHYSICS_DIM),
+            lum_vi: genesis.hv(LuminosityClass::VI.domain_label(), PHYSICS_DIM),
+            lum_vii: genesis.hv(LuminosityClass::VII.domain_label(), PHYSICS_DIM),
+
+            main_sequence,
+            red_giant: genesis.hv("stellar::red_giant", PHYSICS_DIM),
+            white_dwarf,
+            neutron_star,
+            black_hole,
 
             mass: genesis.hv("stellar::mass", PHYSICS_DIM),
             radius: genesis.hv("stellar::radius", PHYSICS_DIM),

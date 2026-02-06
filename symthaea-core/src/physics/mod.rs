@@ -40,6 +40,7 @@ mod qft;
 mod molecular_biology;
 mod neuroscience;
 mod quantum_gravity;
+mod emergence_chain;
 
 pub use standard_model::*;
 pub use hadrons::*;
@@ -77,3 +78,4 @@ pub use qft::*;
 pub use molecular_biology::*;
 pub use neuroscience::*;
 pub use quantum_gravity::*;
+pub use emergence_chain::*;
