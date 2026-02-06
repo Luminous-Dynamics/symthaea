@@ -24,6 +24,13 @@ pub use identification::{
     UnidentifiedReason, CausalAssumption, CausalDAG, CausalQuery,
     CounterfactualReasoner, CausalReferenceHarness, HarnessResult,
 };
+
+// Note: IdentificationMethod now includes:
+// - DSeparation (Rule 1)
+// - BackdoorAdjustment (special case of Rule 1)
+// - FrontdoorCriterion (special case of Rule 1)
+// - Rule2ActionObservation (Pearl's Rule 2)
+// - Rule3ActionDeletion (Pearl's Rule 3)
 pub use hdc_surgery::GraphSurgery;
 pub use semantic_roles::{SemanticRole, RoleSubstitution};
 pub use composer::CounterfactualComposer;

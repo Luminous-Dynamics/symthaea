@@ -234,7 +234,7 @@ impl EmotionalCore {
         for emotion in &config.categories {
             let embedding = if let Some(grounding) = primitive_groundings.get(emotion) {
                 // Use primitive encoding to seed the RealHV, ensuring grounding
-                let seed = grounding.primitive_encoding.hamming_weight() as u64;
+                let seed = grounding.primitive_encoding.popcount() as u64;
                 RealHV::random(dim, 0xE0C0_0000 + seed)
             } else {
                 // Fallback for unknown emotions
@@ -425,6 +425,321 @@ impl EmotionalCore {
 impl Default for EmotionalCore {
     fn default() -> Self {
         Self::new(EmotionalCoreConfig::default())
+    }
+}
+
+// ============================================================================
+// Types for Empathic Unification Integration
+// ============================================================================
+
+/// Core emotion type for empathic processing
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum CoreEmotion {
+    /// Calm, neutral state
+    #[default]
+    Neutral,
+    /// Positive, happy state
+    Joy,
+    /// Negative, sad state
+    Sadness,
+    /// Negative, aggressive state
+    Anger,
+    /// Negative, anxious state
+    Fear,
+    /// Positive, astonished state
+    Surprise,
+    /// Negative, repulsed state
+    Disgust,
+    /// Positive, believing state
+    Trust,
+    /// Positive, expecting state
+    Anticipation,
+    /// Frustrated state
+    Frustration,
+    /// Confused state
+    Confusion,
+    /// Curious, engaged state
+    Curiosity,
+    /// Focused, determined state
+    Determination,
+    /// Peaceful, serene state
+    Peace,
+    /// Grateful, appreciative state
+    Gratitude,
+    /// Loving, caring state
+    Love,
+}
+
+impl CoreEmotion {
+    /// Get valence of the emotion (-1.0 to 1.0)
+    pub fn valence(&self) -> f64 {
+        match self {
+            Self::Neutral => 0.0,
+            Self::Joy | Self::Trust | Self::Anticipation | Self::Curiosity | Self::Determination => 0.7,
+            Self::Peace | Self::Gratitude | Self::Love => 0.8,
+            Self::Surprise => 0.2,
+            Self::Sadness | Self::Fear | Self::Confusion => -0.5,
+            Self::Anger | Self::Disgust | Self::Frustration => -0.7,
+        }
+    }
+
+    /// Get arousal level (0.0 to 1.0)
+    pub fn arousal(&self) -> f64 {
+        match self {
+            Self::Neutral | Self::Sadness | Self::Peace => 0.2,
+            Self::Trust | Self::Confusion | Self::Gratitude => 0.3,
+            Self::Joy | Self::Anticipation | Self::Curiosity | Self::Love => 0.6,
+            Self::Fear | Self::Surprise | Self::Frustration => 0.8,
+            Self::Anger | Self::Disgust | Self::Determination => 0.7,
+        }
+    }
+
+    /// Convert from string
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "joy" | "happy" | "happiness" => Self::Joy,
+            "sadness" | "sad" => Self::Sadness,
+            "anger" | "angry" => Self::Anger,
+            "fear" | "afraid" | "scared" => Self::Fear,
+            "surprise" | "surprised" => Self::Surprise,
+            "disgust" | "disgusted" => Self::Disgust,
+            "trust" | "trusting" => Self::Trust,
+            "anticipation" | "anticipating" => Self::Anticipation,
+            "frustration" | "frustrated" => Self::Frustration,
+            "confusion" | "confused" => Self::Confusion,
+            "curiosity" | "curious" => Self::Curiosity,
+            "determination" | "determined" => Self::Determination,
+            "peace" | "peaceful" | "calm" | "serene" => Self::Peace,
+            "gratitude" | "grateful" | "thankful" => Self::Gratitude,
+            "love" | "loving" | "affection" | "caring" => Self::Love,
+            _ => Self::Neutral,
+        }
+    }
+
+    /// Get default valence (alias for valence() for compatibility)
+    pub fn default_valence(&self) -> f32 {
+        self.valence() as f32
+    }
+
+    /// Get default arousal (alias for arousal() for compatibility)
+    pub fn default_arousal(&self) -> f32 {
+        self.arousal() as f32
+    }
+}
+
+/// Type of empathy being expressed
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum EmpathyType {
+    /// Cognitive empathy - understanding perspective
+    #[default]
+    Cognitive,
+    /// Affective empathy - feeling with them
+    Affective,
+    /// Compassionate empathy - moved to help
+    Compassionate,
+    /// Supportive empathy - focused on assistance
+    Supportive,
+}
+
+/// An empathic cue detected in text or context
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EmpathicCue {
+    /// The cue type
+    pub cue_type: EmpathyCueType,
+    /// Intensity (0.0 to 1.0)
+    pub intensity: f64,
+    /// Source text or context that triggered the cue
+    pub source: String,
+    /// Detected core emotion
+    pub detected_emotion: CoreEmotion,
+    /// Strength of the detection (0.0 to 1.0)
+    pub strength: f32,
+}
+
+/// Types of empathic cues
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EmpathyCueType {
+    /// Emotional expression in text
+    EmotionalExpression,
+    /// Signs of stress or frustration
+    StressSignal,
+    /// Request for help or support
+    HelpRequest,
+    /// Expression of uncertainty
+    Uncertainty,
+    /// Positive feedback
+    PositiveFeedback,
+    /// Negative feedback
+    NegativeFeedback,
+}
+
+/// Model for empathic response generation
+#[derive(Debug, Clone, Default)]
+pub struct EmpathyModel {
+    /// Current empathy type being applied
+    pub empathy_type: EmpathyType,
+    /// Detected empathic cues
+    pub cues: Vec<EmpathicCue>,
+    /// Current compassion level (0.0 to 1.0)
+    pub compassion_level: f64,
+    /// Mirror emotion (what we reflect back)
+    pub mirror_emotion: CoreEmotion,
+}
+
+impl EmpathyModel {
+    /// Create a new empathy model
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Process text for empathic cues
+    pub fn process(&mut self, text: &str) -> &[EmpathicCue] {
+        self.cues.clear();
+
+        // Simple keyword-based cue detection
+        let lower = text.to_lowercase();
+
+        if lower.contains("help") || lower.contains("stuck") || lower.contains("can't") {
+            self.cues.push(EmpathicCue {
+                cue_type: EmpathyCueType::HelpRequest,
+                intensity: 0.7,
+                source: text.to_string(),
+                detected_emotion: CoreEmotion::Confusion,
+                strength: 0.6,
+            });
+        }
+
+        if lower.contains("frustrated") || lower.contains("annoying") || lower.contains("ugh") {
+            self.cues.push(EmpathicCue {
+                cue_type: EmpathyCueType::StressSignal,
+                intensity: 0.8,
+                source: text.to_string(),
+                detected_emotion: CoreEmotion::Frustration,
+                strength: 0.8,
+            });
+        }
+
+        if lower.contains("thanks") || lower.contains("great") || lower.contains("perfect") {
+            self.cues.push(EmpathicCue {
+                cue_type: EmpathyCueType::PositiveFeedback,
+                intensity: 0.6,
+                source: text.to_string(),
+                detected_emotion: CoreEmotion::Gratitude,
+                strength: 0.7,
+            });
+        }
+
+        &self.cues
+    }
+
+    /// Detect emotion from text input
+    pub fn detect_emotion(&mut self, text: &str) -> EmpathicCue {
+        let lower = text.to_lowercase();
+
+        // Check for various emotional signals
+        let (emotion, strength, cue_type) = if lower.contains("frustrated") || lower.contains("annoying") || lower.contains("ugh") {
+            (CoreEmotion::Frustration, 0.8, EmpathyCueType::StressSignal)
+        } else if lower.contains("angry") || lower.contains("furious") {
+            (CoreEmotion::Anger, 0.9, EmpathyCueType::StressSignal)
+        } else if lower.contains("sad") || lower.contains("disappointed") {
+            (CoreEmotion::Sadness, 0.7, EmpathyCueType::EmotionalExpression)
+        } else if lower.contains("scared") || lower.contains("afraid") || lower.contains("worried") {
+            (CoreEmotion::Fear, 0.7, EmpathyCueType::StressSignal)
+        } else if lower.contains("happy") || lower.contains("great") || lower.contains("awesome") {
+            (CoreEmotion::Joy, 0.8, EmpathyCueType::PositiveFeedback)
+        } else if lower.contains("thanks") || lower.contains("thank you") || lower.contains("grateful") {
+            (CoreEmotion::Gratitude, 0.7, EmpathyCueType::PositiveFeedback)
+        } else if lower.contains("confused") || lower.contains("don't understand") {
+            (CoreEmotion::Confusion, 0.6, EmpathyCueType::Uncertainty)
+        } else if lower.contains("help") || lower.contains("stuck") || lower.contains("can't") {
+            (CoreEmotion::Confusion, 0.5, EmpathyCueType::HelpRequest)
+        } else if lower.contains("curious") || lower.contains("interesting") || lower.contains("wonder") {
+            (CoreEmotion::Curiosity, 0.6, EmpathyCueType::EmotionalExpression)
+        } else {
+            (CoreEmotion::Neutral, 0.3, EmpathyCueType::EmotionalExpression)
+        };
+
+        EmpathicCue {
+            cue_type,
+            intensity: strength as f64,
+            source: text.to_string(),
+            detected_emotion: emotion,
+            strength,
+        }
+    }
+
+    /// Mirror the detected emotion for empathic response
+    pub fn mirror(&mut self, cue: &EmpathicCue) -> CoreEmotion {
+        // Mirror the emotion with appropriate response
+        let mirrored = match cue.detected_emotion {
+            CoreEmotion::Fear | CoreEmotion::Sadness => CoreEmotion::Love, // Compassion
+            CoreEmotion::Anger | CoreEmotion::Frustration => CoreEmotion::Peace, // Calming
+            CoreEmotion::Joy | CoreEmotion::Gratitude => CoreEmotion::Joy, // Share joy
+            CoreEmotion::Confusion => CoreEmotion::Trust, // Reassurance
+            CoreEmotion::Curiosity => CoreEmotion::Curiosity, // Engage
+            _ => CoreEmotion::Peace, // Default to calm
+        };
+        self.mirror_emotion = mirrored;
+        mirrored
+    }
+
+    /// Get recommended empathy type based on cues
+    pub fn recommended_empathy_type(&self) -> EmpathyType {
+        if self.cues.iter().any(|c| c.cue_type == EmpathyCueType::StressSignal) {
+            EmpathyType::Compassionate
+        } else if self.cues.iter().any(|c| c.cue_type == EmpathyCueType::HelpRequest) {
+            EmpathyType::Supportive
+        } else {
+            EmpathyType::Cognitive
+        }
+    }
+}
+
+/// Emotional regulator for managing emotional state
+#[derive(Debug, Clone, Default)]
+pub struct EmotionalRegulator {
+    /// Current emotional state
+    pub current_emotion: CoreEmotion,
+    /// Target emotional state (what we're regulating toward)
+    pub target_emotion: CoreEmotion,
+    /// Regulation strength (0.0 to 1.0)
+    pub regulation_strength: f64,
+    /// Emotional inertia (resistance to change)
+    pub inertia: f64,
+}
+
+impl EmotionalRegulator {
+    /// Create a new regulator
+    pub fn new() -> Self {
+        Self {
+            current_emotion: CoreEmotion::Neutral,
+            target_emotion: CoreEmotion::Neutral,
+            regulation_strength: 0.5,
+            inertia: 0.3,
+        }
+    }
+
+    /// Regulate toward target emotion
+    pub fn regulate(&mut self) {
+        // Simple regulation - if strength overcomes inertia, move toward target
+        if self.regulation_strength > self.inertia {
+            self.current_emotion = self.target_emotion;
+        }
+    }
+
+    /// Set target emotion
+    pub fn set_target(&mut self, emotion: CoreEmotion) {
+        self.target_emotion = emotion;
+    }
+
+    /// Get current valence
+    pub fn valence(&self) -> f64 {
+        self.current_emotion.valence()
+    }
+
+    /// Get current arousal
+    pub fn arousal(&self) -> f64 {
+        self.current_emotion.arousal()
     }
 }
 

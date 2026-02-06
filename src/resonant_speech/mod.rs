@@ -128,6 +128,9 @@ pub struct UserState {
 
     /// Whether user is in learning mode
     pub is_learning: bool,
+
+    /// Trust level in Symthaea (0.0 to 1.0)
+    pub trust_in_sophia: f64,
 }
 
 impl Default for UserState {
@@ -140,6 +143,7 @@ impl Default for UserState {
             context: ContextKind::Unknown,
             is_rushed: false,
             is_learning: false,
+            trust_in_sophia: 0.5,
         }
     }
 }
@@ -156,6 +160,8 @@ impl UserState {
             is_rushed: inferred.idle_time_secs < 0.5 && inferred.interaction_count > 5,
             is_learning: inferred.context == ContextKind::Help ||
                         inferred.context == ContextKind::Exploration,
+            // Trust starts high and degrades with frustration
+            trust_in_sophia: (1.0 - inferred.frustration * 0.5).max(0.0),
         }
     }
 

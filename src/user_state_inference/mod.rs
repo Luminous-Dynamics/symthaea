@@ -57,6 +57,16 @@ pub enum ContextKind {
     DevWork,
     /// System upgrade operations
     Upgrade,
+    /// Handling errors or failures
+    ErrorHandling,
+    /// Writing documentation or content
+    Writing,
+    /// Reviewing code or content
+    Review,
+    /// Planning or architecting
+    Planning,
+    /// Initial setup or onboarding
+    Setup,
     /// Unknown context
     Unknown,
 }
@@ -138,6 +148,11 @@ impl ContextKind {
             ContextKind::Development => "Development",
             ContextKind::DevWork => "Development Work",
             ContextKind::Upgrade => "System Upgrade",
+            ContextKind::ErrorHandling => "Error Handling",
+            ContextKind::Writing => "Writing",
+            ContextKind::Review => "Review",
+            ContextKind::Planning => "Planning",
+            ContextKind::Setup => "Setup",
             ContextKind::Unknown => "Unknown",
         }
     }
@@ -484,6 +499,33 @@ impl UserStateInference {
         self.current_state = UserState::default();
         self.interaction_history.clear();
         self.last_interaction = None;
+    }
+
+    /// Infer user state from context for empathic unification
+    ///
+    /// This method provides a simplified inference based on context,
+    /// returning a resonant_speech::UserState for empathic processing.
+    pub fn infer(&self, context: ContextKind, _locale: &str) -> crate::resonant_speech::UserState {
+        // Update context in a temporary state
+        let mut inferred = self.current_state.clone();
+        inferred.context = context;
+
+        // Context-based adjustments
+        match context {
+            ContextKind::ErrorHandling | ContextKind::Troubleshooting => {
+                inferred.frustration = (inferred.frustration + 0.2).min(1.0);
+                inferred.cognitive_load.level = (inferred.cognitive_load.level + 0.2).min(1.0);
+            }
+            ContextKind::Exploration | ContextKind::Help => {
+                inferred.confidence = (inferred.confidence - 0.1).max(0.0);
+            }
+            ContextKind::Setup | ContextKind::Configuration => {
+                inferred.cognitive_load.level = (inferred.cognitive_load.level + 0.1).min(1.0);
+            }
+            _ => {}
+        }
+
+        crate::resonant_speech::UserState::from_inferred(&inferred)
     }
 }
 

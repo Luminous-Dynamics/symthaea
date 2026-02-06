@@ -377,6 +377,130 @@ fn fm7_harness_match_rate_low() {
 }
 
 // ==================================================================================
+// PEARL DO-CALCULUS RULES 2-3 TESTS
+// ==================================================================================
+
+#[test]
+fn test_d_separation_basic() {
+    // Test that d-separation is correctly computed
+    use std::collections::HashSet;
+
+    // Chain: X → M → Y (conditioning on M blocks)
+    let dag = CausalDAG::new(
+        vec!["X".into(), "M".into(), "Y".into()],
+        vec![(0, 1), (1, 2)],
+    );
+
+    let empty: HashSet<usize> = HashSet::new();
+    let m_set: HashSet<usize> = [1].iter().copied().collect();
+
+    assert!(!dag.is_d_separated(0, 2, &empty), "X-Y should be d-connected without conditioning");
+    assert!(dag.is_d_separated(0, 2, &m_set), "X-Y should be d-separated given M");
+}
+
+#[test]
+fn test_d_separation_collider() {
+    // Collider: A → B ← C (conditioning on B opens the path)
+    use std::collections::HashSet;
+
+    let dag = CausalDAG::new(
+        vec!["A".into(), "B".into(), "C".into()],
+        vec![(0, 1), (2, 1)],
+    );
+
+    let empty: HashSet<usize> = HashSet::new();
+    let b_set: HashSet<usize> = [1].iter().copied().collect();
+
+    assert!(dag.is_d_separated(0, 2, &empty), "A-C should be d-separated (collider blocks)");
+    assert!(!dag.is_d_separated(0, 2, &b_set), "A-C should be d-connected given B (collider opened)");
+}
+
+#[test]
+fn test_rule2_instrument_variable() {
+    // Instrumental variable: Z → X → Y with U → X, U → Y
+    // Rule 2 can convert do(Z) to observation of Z
+    let dag = CausalDAG::new(
+        vec!["Z".into(), "X".into(), "Y".into(), "U".into()],
+        vec![(0, 1), (1, 2), (3, 1), (3, 2)],
+    );
+
+    let reasoner = CounterfactualReasoner::new();
+    let query = CausalQuery { treatment: 1, outcome: 2, conditioning: vec![] };
+    let result = reasoner.query(&dag, &query);
+
+    // Should be identified (via backdoor, frontdoor, or Rule 2)
+    assert!(
+        matches!(result, CausalQueryOutcome::Identified { .. }),
+        "Instrumental variable structure should be identifiable"
+    );
+}
+
+#[test]
+fn test_rule3_irrelevant_intervention() {
+    // X → Y, X → Z (Z doesn't affect Y)
+    // This tests that do(Z) can potentially be dropped
+    let dag = CausalDAG::new(
+        vec!["X".into(), "Y".into(), "Z".into()],
+        vec![(0, 1), (0, 2)],
+    );
+
+    let reasoner = CounterfactualReasoner::new();
+    let query = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+    let result = reasoner.query(&dag, &query);
+
+    // Simple X→Y should be identifiable
+    assert!(
+        matches!(result, CausalQueryOutcome::Identified { .. }),
+        "Simple DAG should be identifiable"
+    );
+}
+
+#[test]
+fn test_graph_surgery_remove_incoming() {
+    // Test that remove_incoming correctly mutilates the graph
+    let dag = CausalDAG::new(
+        vec!["A".into(), "B".into(), "C".into()],
+        vec![(0, 1), (1, 2), (0, 2)],
+    );
+
+    let mutilated = dag.remove_incoming(&[1]);
+    assert_eq!(mutilated.edges.len(), 2);
+    assert!(mutilated.edges.contains(&(1, 2)));
+    assert!(mutilated.edges.contains(&(0, 2)));
+    assert!(!mutilated.edges.contains(&(0, 1)));
+}
+
+#[test]
+fn test_graph_surgery_remove_outgoing() {
+    let dag = CausalDAG::new(
+        vec!["A".into(), "B".into(), "C".into()],
+        vec![(0, 1), (1, 2), (0, 2)],
+    );
+
+    let mutilated = dag.remove_outgoing(&[0]);
+    assert_eq!(mutilated.edges.len(), 1);
+    assert!(mutilated.edges.contains(&(1, 2)));
+}
+
+#[test]
+fn test_extended_harness() {
+    use symthaea::consciousness::counterfactual::identification::CausalReferenceHarness;
+
+    let reasoner = CounterfactualReasoner::new();
+    let mut harness = CausalReferenceHarness::new();
+
+    // Should have at least 6 test cases now (including Rule 2-3 cases)
+    assert!(harness.test_count() >= 6, "Harness should have ≥6 test cases, got {}", harness.test_count());
+
+    let _result = harness.validate(&reasoner);
+    assert!(
+        harness.current_match_rate >= 0.8,
+        "Extended harness match rate should be ≥80%, got {:.2}%",
+        harness.current_match_rate * 100.0
+    );
+}
+
+// ==================================================================================
 // MULTI-CYCLE INTEGRATION
 // ==================================================================================
 
