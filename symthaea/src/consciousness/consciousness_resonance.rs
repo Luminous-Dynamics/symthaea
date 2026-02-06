@@ -50,9 +50,394 @@
 //! println!("Mode: {:?}", state.resonance_mode);
 //! ```
 
+use crate::hdc::binary_hv::HV16;
+use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::f64::consts::PI;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NSM PRIMITIVE GROUNDING FOR CONSCIOUSNESS RESONANCE
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// NSM primitive grounding for frequency bands.
+///
+/// Each neural frequency band is decomposed into Natural Semantic Metalanguage
+/// primitives, enabling cross-domain semantic reasoning about consciousness states.
+///
+/// ## Frequency Band Semantics
+///
+/// - Delta: unconscious, restorative → NOT + KNOW + SLEEP + GOOD
+/// - Theta: memory, dreams → THINK + BEFORE + MAYBE + SEE
+/// - Alpha: relaxed awareness → FEEL + GOOD + NOT + MOVE
+/// - Beta: active cognition → THINK + DO + WANT + MORE
+/// - Gamma: conscious binding → KNOW + FEEL + SEE + TOGETHER
+/// - HighGamma: peak experience → VERY + GOOD + KNOW + FEEL + ALL
+#[derive(Debug, Clone)]
+pub struct FrequencyBandPrimitiveGrounding {
+    /// The frequency band being grounded
+    pub band: FrequencyBand,
+
+    /// NSM primitives composing this band's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Consciousness level: 0.0 (unconscious) to 1.0 (peak awareness)
+    pub consciousness_level: f32,
+
+    /// Arousal level: 0.0 (low) to 1.0 (high)
+    pub arousal_level: f32,
+}
+
+impl FrequencyBandPrimitiveGrounding {
+    /// Get NSM grounding for a specific frequency band
+    pub fn for_band(band: FrequencyBand, primitive_system: &PrimitiveSystem) -> Self {
+        let (primitives, consciousness_level, arousal_level) = match band {
+            // Delta: deep sleep, unconscious regeneration
+            FrequencyBand::Delta => (
+                vec!["NSM_NOT", "NSM_KNOW", "NSM_LIVE", "NSM_GOOD"],
+                0.0,
+                0.1,
+            ),
+
+            // Theta: dreams, memory, inner exploration
+            FrequencyBand::Theta => (
+                vec!["NSM_THINK", "NSM_BEFORE", "NSM_MAYBE", "NSM_SEE"],
+                0.3,
+                0.3,
+            ),
+
+            // Alpha: relaxed, calm awareness
+            FrequencyBand::Alpha => (
+                vec!["NSM_FEEL", "NSM_GOOD", "NSM_NOT", "NSM_MOVE"],
+                0.5,
+                0.4,
+            ),
+
+            // Beta: active thinking, problem-solving
+            FrequencyBand::Beta => (
+                vec!["NSM_THINK", "NSM_DO", "NSM_WANT", "NSM_MORE"],
+                0.7,
+                0.7,
+            ),
+
+            // Gamma: conscious binding, unified perception
+            FrequencyBand::Gamma => (
+                vec!["NSM_KNOW", "NSM_FEEL", "NSM_SEE", "NSM_SAME"],
+                0.85,
+                0.8,
+            ),
+
+            // High Gamma: peak experience, intense awareness
+            FrequencyBand::HighGamma => (
+                vec!["NSM_VERY", "NSM_GOOD", "NSM_KNOW", "NSM_FEEL", "NSM_ALL"],
+                1.0,
+                1.0,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(9000 + band as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            band,
+            nsm_primitives,
+            primitive_encoding,
+            consciousness_level,
+            arousal_level,
+        }
+    }
+
+    /// Get all frequency band groundings
+    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<FrequencyBand, Self> {
+        [
+            FrequencyBand::Delta,
+            FrequencyBand::Theta,
+            FrequencyBand::Alpha,
+            FrequencyBand::Beta,
+            FrequencyBand::Gamma,
+            FrequencyBand::HighGamma,
+        ]
+        .into_iter()
+        .map(|b| (b, Self::for_band(b, primitive_system)))
+        .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+
+    /// Calculate similarity between two frequency bands
+    pub fn similarity(&self, other: &Self) -> f32 {
+        self.primitive_encoding
+            .similarity(&other.primitive_encoding)
+    }
+}
+
+/// NSM primitive grounding for resonance modes.
+///
+/// Each resonance mode represents a discrete state of consciousness,
+/// grounded in NSM primitives for semantic reasoning.
+#[derive(Debug, Clone)]
+pub struct ResonanceModePrimitiveGrounding {
+    /// The resonance mode being grounded
+    pub mode: ResonanceModeType,
+
+    /// NSM primitives composing this mode's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Awareness level: 0.0 (none) to 1.0 (full)
+    pub awareness: f32,
+
+    /// Vividness of experience: 0.0 (dull) to 1.0 (vivid)
+    pub vividness: f32,
+
+    /// Integration level: 0.0 (fragmented) to 1.0 (unified)
+    pub integration: f32,
+}
+
+/// Simplified resonance mode type for NSM grounding (excludes Transitional)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ResonanceModeType {
+    DeepSleep,
+    Dreaming,
+    Relaxed,
+    Focused,
+    Conscious,
+    Peak,
+}
+
+impl ResonanceModePrimitiveGrounding {
+    /// Get NSM grounding for a specific resonance mode
+    pub fn for_mode(mode: ResonanceModeType, primitive_system: &PrimitiveSystem) -> Self {
+        let (primitives, awareness, vividness, integration) = match mode {
+            // Deep Sleep: unconscious, no awareness
+            ResonanceModeType::DeepSleep => (
+                vec!["NSM_NOT", "NSM_KNOW", "NSM_NOT", "NSM_FEEL", "NSM_LIVE"],
+                0.0,
+                0.0,
+                0.2,
+            ),
+
+            // Dreaming: internal world, fragmented awareness
+            ResonanceModeType::Dreaming => (
+                vec!["NSM_SEE", "NSM_NOT", "NSM_TRUE", "NSM_THINK", "NSM_MAYBE"],
+                0.3,
+                0.6,
+                0.3,
+            ),
+
+            // Relaxed: calm, open awareness
+            ResonanceModeType::Relaxed => (
+                vec!["NSM_FEEL", "NSM_GOOD", "NSM_NOW", "NSM_NOT", "NSM_WANT"],
+                0.5,
+                0.4,
+                0.5,
+            ),
+
+            // Focused: directed, concentrated awareness
+            ResonanceModeType::Focused => (
+                vec!["NSM_WANT", "NSM_KNOW", "NSM_THIS", "NSM_VERY", "NSM_DO"],
+                0.7,
+                0.7,
+                0.7,
+            ),
+
+            // Conscious: full awareness, binding
+            ResonanceModeType::Conscious => (
+                vec!["NSM_KNOW", "NSM_FEEL", "NSM_SEE", "NSM_NOW", "NSM_I"],
+                0.85,
+                0.8,
+                0.85,
+            ),
+
+            // Peak: maximal awareness, unity experience
+            ResonanceModeType::Peak => (
+                vec![
+                    "NSM_ALL", "NSM_GOOD", "NSM_SAME", "NSM_KNOW", "NSM_FEEL", "NSM_VERY",
+                ],
+                1.0,
+                1.0,
+                1.0,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(9100 + mode as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            mode,
+            nsm_primitives,
+            primitive_encoding,
+            awareness,
+            vividness,
+            integration,
+        }
+    }
+
+    /// Get all resonance mode groundings
+    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<ResonanceModeType, Self> {
+        [
+            ResonanceModeType::DeepSleep,
+            ResonanceModeType::Dreaming,
+            ResonanceModeType::Relaxed,
+            ResonanceModeType::Focused,
+            ResonanceModeType::Conscious,
+            ResonanceModeType::Peak,
+        ]
+        .into_iter()
+        .map(|m| (m, Self::for_mode(m, primitive_system)))
+        .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+
+    /// Calculate similarity between two modes
+    pub fn similarity(&self, other: &Self) -> f32 {
+        self.primitive_encoding
+            .similarity(&other.primitive_encoding)
+    }
+}
+
+/// NSM primitive grounding for coupling types.
+///
+/// Coupling types describe how oscillators relate to each other,
+/// enabling semantic reasoning about synchronization patterns.
+#[derive(Debug, Clone)]
+pub struct CouplingTypePrimitiveGrounding {
+    /// The coupling type being grounded
+    pub coupling: CouplingTypeSimple,
+
+    /// NSM primitives composing this coupling's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Coherence tendency: -1.0 (anti) to 1.0 (sync)
+    pub coherence_direction: f32,
+
+    /// Flexibility: 0.0 (rigid) to 1.0 (adaptive)
+    pub flexibility: f32,
+}
+
+/// Simplified coupling type for NSM grounding
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum CouplingTypeSimple {
+    Synchronous,
+    Antisynchronous,
+    CrossFrequency,
+    Adaptive,
+}
+
+impl CouplingTypePrimitiveGrounding {
+    /// Get NSM grounding for a coupling type
+    pub fn for_coupling(coupling: CouplingTypeSimple, primitive_system: &PrimitiveSystem) -> Self {
+        let (primitives, coherence_direction, flexibility) = match coupling {
+            // Synchronous: together, same phase
+            CouplingTypeSimple::Synchronous => (
+                vec!["NSM_SAME", "NSM_WHEN", "NSM_WITH", "NSM_TOUCH"],
+                1.0,
+                0.3,
+            ),
+
+            // Antisynchronous: opposite phase, complementary
+            CouplingTypeSimple::Antisynchronous => (
+                vec!["NSM_OTHER", "NSM_NOT", "NSM_SAME", "NSM_WHEN"],
+                -1.0,
+                0.3,
+            ),
+
+            // Cross-frequency: harmonic relationship
+            CouplingTypeSimple::CrossFrequency => (
+                vec!["NSM_PART", "NSM_SAME", "NSM_MORE", "NSM_LIKE"],
+                0.5,
+                0.5,
+            ),
+
+            // Adaptive: learns and changes
+            CouplingTypeSimple::Adaptive => (
+                vec!["NSM_BECOME", "NSM_CAN", "NSM_BECAUSE", "NSM_HAPPEN"],
+                0.0,
+                1.0,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(9200 + coupling as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            coupling,
+            nsm_primitives,
+            primitive_encoding,
+            coherence_direction,
+            flexibility,
+        }
+    }
+
+    /// Get all coupling type groundings
+    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<CouplingTypeSimple, Self> {
+        [
+            CouplingTypeSimple::Synchronous,
+            CouplingTypeSimple::Antisynchronous,
+            CouplingTypeSimple::CrossFrequency,
+            CouplingTypeSimple::Adaptive,
+        ]
+        .into_iter()
+        .map(|c| (c, Self::for_coupling(c, primitive_system)))
+        .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+
+    /// Calculate similarity between two coupling types
+    pub fn similarity(&self, other: &Self) -> f32 {
+        self.primitive_encoding
+            .similarity(&other.primitive_encoding)
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // CORE FREQUENCY BANDS (Neuroscience Foundation)
@@ -125,6 +510,26 @@ impl FrequencyBand {
         };
         base.max(0.0).min(1.0)
     }
+
+    /// Get the NSM primitive grounding for this frequency band
+    pub fn primitive_grounding(
+        &self,
+        primitive_system: &PrimitiveSystem,
+    ) -> FrequencyBandPrimitiveGrounding {
+        FrequencyBandPrimitiveGrounding::for_band(*self, primitive_system)
+    }
+
+    /// Get all frequency bands
+    pub fn all() -> Vec<Self> {
+        vec![
+            Self::Delta,
+            Self::Theta,
+            Self::Alpha,
+            Self::Beta,
+            Self::Gamma,
+            Self::HighGamma,
+        ]
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -147,7 +552,11 @@ pub enum ResonanceMode {
     /// Peak experience - gamma-high gamma coherence
     Peak,
     /// Transitional - between modes
-    Transitional { from: Box<ResonanceMode>, to: Box<ResonanceMode>, progress: f64 },
+    Transitional {
+        from: Box<ResonanceMode>,
+        to: Box<ResonanceMode>,
+        progress: f64,
+    },
 }
 
 impl ResonanceMode {
@@ -184,6 +593,28 @@ impl ResonanceMode {
             }
         }
     }
+
+    /// Convert to simple mode type for NSM grounding (returns None for Transitional)
+    pub fn to_mode_type(&self) -> Option<ResonanceModeType> {
+        match self {
+            Self::DeepSleep => Some(ResonanceModeType::DeepSleep),
+            Self::Dreaming => Some(ResonanceModeType::Dreaming),
+            Self::Relaxed => Some(ResonanceModeType::Relaxed),
+            Self::Focused => Some(ResonanceModeType::Focused),
+            Self::Conscious => Some(ResonanceModeType::Conscious),
+            Self::Peak => Some(ResonanceModeType::Peak),
+            Self::Transitional { .. } => None,
+        }
+    }
+
+    /// Get the NSM primitive grounding for this mode (None for Transitional)
+    pub fn primitive_grounding(
+        &self,
+        primitive_system: &PrimitiveSystem,
+    ) -> Option<ResonanceModePrimitiveGrounding> {
+        self.to_mode_type()
+            .map(|mode_type| ResonanceModePrimitiveGrounding::for_mode(mode_type, primitive_system))
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -217,7 +648,7 @@ impl CognitiveOscillator {
             current_frequency: natural_frequency,
             phase: 0.0,
             amplitude: 1.0,
-            q_factor: 10.0,  // Moderate resonance sharpness
+            q_factor: 10.0, // Moderate resonance sharpness
             damping: 0.1,
             name: name.to_string(),
         }
@@ -227,13 +658,13 @@ impl CognitiveOscillator {
     pub fn from_dimension(dim_name: &str, dim_value: f64) -> Self {
         // Map consciousness dimensions to frequency bands
         let natural_freq = match dim_name {
-            "Φ" | "phi" => 45.0,      // Integration → gamma
-            "B" | "binding" => 40.0,   // Binding → gamma
+            "Φ" | "phi" => 45.0,         // Integration → gamma
+            "B" | "binding" => 40.0,     // Binding → gamma
             "W" | "wakefulness" => 10.0, // Wakefulness → alpha
-            "A" | "arousal" => 20.0,   // Arousal → beta
-            "R" | "recursion" => 50.0, // Recursion → gamma
-            "E" | "entropy" => 6.0,    // Entropy → theta
-            "K" | "knowledge" => 15.0, // Knowledge → beta
+            "A" | "arousal" => 20.0,     // Arousal → beta
+            "R" | "recursion" => 50.0,   // Recursion → gamma
+            "E" | "entropy" => 6.0,      // Entropy → theta
+            "K" | "knowledge" => 15.0,   // Knowledge → beta
             _ => 10.0,
         };
 
@@ -242,7 +673,7 @@ impl CognitiveOscillator {
             current_frequency: natural_freq,
             phase: 0.0,
             amplitude: dim_value,
-            q_factor: 5.0 + dim_value * 15.0,  // Higher values → sharper resonance
+            q_factor: 5.0 + dim_value * 15.0, // Higher values → sharper resonance
             damping: 0.1 * (1.0 - dim_value * 0.5),
             name: dim_name.to_string(),
         }
@@ -259,7 +690,8 @@ impl CognitiveOscillator {
 
         // Update amplitude based on resonance
         let target_amplitude = driving_amplitude * response;
-        self.amplitude += (target_amplitude - self.amplitude) * (1.0 - (-dt * omega_0 / self.q_factor).exp());
+        self.amplitude +=
+            (target_amplitude - self.amplitude) * (1.0 - (-dt * omega_0 / self.q_factor).exp());
 
         // Update phase (entrainment towards driving frequency)
         let phase_coupling = 0.1 * (omega_d - omega_0) * dt;
@@ -280,7 +712,7 @@ impl CognitiveOscillator {
         let denominator = (omega_0.powi(2) - omega.powi(2)).powi(2) + (gamma * omega).powi(2);
         let response = omega_0.powi(2) / denominator.sqrt();
 
-        response.min(1.0)  // Normalize
+        response.min(1.0) // Normalize
     }
 
     /// Get instantaneous value
@@ -315,6 +747,26 @@ pub enum CouplingType {
     CrossFrequency { ratio: f64 },
     /// Adaptive (learned)
     Adaptive,
+}
+
+impl CouplingType {
+    /// Convert to simple type for NSM grounding
+    pub fn to_simple(&self) -> CouplingTypeSimple {
+        match self {
+            Self::Synchronous => CouplingTypeSimple::Synchronous,
+            Self::Antisynchronous => CouplingTypeSimple::Antisynchronous,
+            Self::CrossFrequency { .. } => CouplingTypeSimple::CrossFrequency,
+            Self::Adaptive => CouplingTypeSimple::Adaptive,
+        }
+    }
+
+    /// Get the NSM primitive grounding for this coupling type
+    pub fn primitive_grounding(
+        &self,
+        primitive_system: &PrimitiveSystem,
+    ) -> CouplingTypePrimitiveGrounding {
+        CouplingTypePrimitiveGrounding::for_coupling(self.to_simple(), primitive_system)
+    }
 }
 
 /// Phase synchronization metrics
@@ -397,7 +849,8 @@ impl PowerSpectrum {
             (self.gamma, FrequencyBand::Gamma),
             (self.high_gamma, FrequencyBand::HighGamma),
         ];
-        bands.iter()
+        bands
+            .iter()
             .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
             .map(|(_, band)| *band)
             .unwrap_or(FrequencyBand::Alpha)
@@ -419,7 +872,8 @@ impl PowerSpectrum {
             self.high_gamma / total,
         ];
 
-        -probs.iter()
+        -probs
+            .iter()
             .filter(|&&p| p > 0.0)
             .map(|&p| p * p.ln())
             .sum::<f64>()
@@ -448,7 +902,7 @@ pub struct ResonanceConfig {
 impl Default for ResonanceConfig {
     fn default() -> Self {
         Self {
-            dt: 0.001,  // 1ms time step
+            dt: 0.001, // 1ms time step
             coupling_strength: 0.3,
             noise_level: 0.05,
             history_window: 100,
@@ -476,16 +930,23 @@ impl ResonanceAnalyzer {
     /// Create new analyzer
     pub fn new(config: ResonanceConfig) -> Self {
         let dimension_names = ["Φ", "B", "W", "A", "R", "E", "K"];
-        let oscillators: Vec<_> = dimension_names.iter()
+        let oscillators: Vec<_> = dimension_names
+            .iter()
             .map(|&name| CognitiveOscillator::from_dimension(name, 0.5))
             .collect();
 
         let n = oscillators.len();
-        let couplings = vec![vec![OscillatorCoupling {
-            strength: config.coupling_strength,
-            coupling_type: CouplingType::Synchronous,
-            preferred_phase_diff: 0.0,
-        }; n]; n];
+        let couplings = vec![
+            vec![
+                OscillatorCoupling {
+                    strength: config.coupling_strength,
+                    coupling_type: CouplingType::Synchronous,
+                    preferred_phase_diff: 0.0,
+                };
+                n
+            ];
+            n
+        ];
 
         Self {
             config,
@@ -526,15 +987,14 @@ impl ResonanceAnalyzer {
         let n = self.oscillators.len();
 
         // Calculate mean field for coupling
-        let mean_phase: f64 = self.oscillators.iter()
-            .map(|o| o.phase)
-            .sum::<f64>() / n as f64;
-        let mean_freq: f64 = self.oscillators.iter()
+        let mean_phase: f64 = self.oscillators.iter().map(|o| o.phase).sum::<f64>() / n as f64;
+        let mean_freq: f64 = self
+            .oscillators
+            .iter()
             .map(|o| o.current_frequency)
-            .sum::<f64>() / n as f64;
-        let mean_amp: f64 = self.oscillators.iter()
-            .map(|o| o.amplitude)
-            .sum::<f64>() / n as f64;
+            .sum::<f64>()
+            / n as f64;
+        let mean_amp: f64 = self.oscillators.iter().map(|o| o.amplitude).sum::<f64>() / n as f64;
 
         // Update each oscillator
         for i in 0..n {
@@ -570,15 +1030,20 @@ impl ResonanceAnalyzer {
         let synchronization = self.compute_synchronization();
 
         // Calculate dominant frequency
-        let dominant_frequency = self.oscillators.iter()
+        let dominant_frequency = self
+            .oscillators
+            .iter()
             .max_by(|a, b| a.amplitude.partial_cmp(&b.amplitude).unwrap())
             .map(|o| o.current_frequency)
             .unwrap_or(10.0);
 
         // Calculate overall Q-factor
-        let q_factor = self.oscillators.iter()
+        let q_factor = self
+            .oscillators
+            .iter()
             .map(|o| o.q_factor * o.amplitude)
-            .sum::<f64>() / dimensions.iter().sum::<f64>();
+            .sum::<f64>()
+            / dimensions.iter().sum::<f64>();
 
         // Cross-frequency coupling (gamma-theta, etc.)
         let cross_frequency_coupling = self.compute_cross_frequency_coupling();
@@ -590,7 +1055,9 @@ impl ResonanceAnalyzer {
         let stability = self.compute_stability();
 
         // Resonance energy
-        let resonance_energy = self.oscillators.iter()
+        let resonance_energy = self
+            .oscillators
+            .iter()
             .map(|o| o.amplitude.powi(2) * o.q_factor)
             .sum();
 
@@ -662,8 +1129,9 @@ impl ResonanceAnalyzer {
         for i in 0..n {
             for j in (i + 1)..n {
                 let phase_diff = (self.oscillators[i].phase - self.oscillators[j].phase).abs();
-                let freq_diff = (self.oscillators[i].current_frequency -
-                                self.oscillators[j].current_frequency).abs();
+                let freq_diff = (self.oscillators[i].current_frequency
+                    - self.oscillators[j].current_frequency)
+                    .abs();
 
                 // PLV: 1 if phases match, 0 if random
                 let plv = phase_diff.cos().abs();
@@ -675,7 +1143,8 @@ impl ResonanceAnalyzer {
                 coherence_sum += (amp_i * amp_j).sqrt();
 
                 // Entrainment: how close frequencies are
-                let max_freq = self.oscillators[i].current_frequency
+                let max_freq = self.oscillators[i]
+                    .current_frequency
                     .max(self.oscillators[j].current_frequency);
                 let entrainment = 1.0 - (freq_diff / max_freq).min(1.0);
                 entrainment_sum += entrainment;
@@ -712,15 +1181,19 @@ impl ResonanceAnalyzer {
                 let freq_i = self.oscillators[i].current_frequency;
                 let freq_j = self.oscillators[j].current_frequency;
 
-                let ratio = if freq_i > freq_j { freq_i / freq_j } else { freq_j / freq_i };
+                let ratio = if freq_i > freq_j {
+                    freq_i / freq_j
+                } else {
+                    freq_j / freq_i
+                };
 
                 // Check for harmonic ratios (2:1, 3:1, 4:1)
                 for harmonic in 2..=5 {
                     let target_ratio = harmonic as f64;
                     let closeness = 1.0 - (ratio - target_ratio).abs() / target_ratio;
                     if closeness > 0.8 {
-                        let amp_product = self.oscillators[i].amplitude *
-                                         self.oscillators[j].amplitude;
+                        let amp_product =
+                            self.oscillators[i].amplitude * self.oscillators[j].amplitude;
                         cfc_sum += closeness * amp_product;
                     }
                 }
@@ -728,15 +1201,23 @@ impl ResonanceAnalyzer {
             }
         }
 
-        if pairs > 0 { cfc_sum / pairs as f64 } else { 0.0 }
+        if pairs > 0 {
+            cfc_sum / pairs as f64
+        } else {
+            0.0
+        }
     }
 
     /// Calculate consciousness level from resonance properties
     fn resonance_consciousness(&self, dims: &[f64; 7], sync: &SynchronizationMetrics) -> f64 {
         // Base from dimensions (Φ-weighted)
         let phi = dims[0];
-        let base_consciousness = phi * 0.4 + dims[1] * 0.2 + dims[2] * 0.15 +
-                                  dims[3] * 0.1 + dims[4] * 0.1 + dims[6] * 0.05;
+        let base_consciousness = phi * 0.4
+            + dims[1] * 0.2
+            + dims[2] * 0.15
+            + dims[3] * 0.1
+            + dims[4] * 0.1
+            + dims[6] * 0.05;
 
         // Boost from synchronization
         let sync_boost = sync.plv * 0.3 + sync.coherence * 0.2;
@@ -759,8 +1240,9 @@ impl ResonanceAnalyzer {
         // Count mode changes
         let mut mode_changes = 0;
         for i in 1..recent.len() {
-            if std::mem::discriminant(&recent[i].mode) !=
-               std::mem::discriminant(&recent[i - 1].mode) {
+            if std::mem::discriminant(&recent[i].mode)
+                != std::mem::discriminant(&recent[i - 1].mode)
+            {
                 mode_changes += 1;
             }
         }
@@ -782,9 +1264,11 @@ impl ResonanceAnalyzer {
 
         // Simple trend analysis
         let recent: Vec<_> = self.history.iter().rev().take(5).collect();
-        let consciousness_trend: f64 = recent.windows(2)
+        let consciousness_trend: f64 = recent
+            .windows(2)
             .map(|w| w[0].consciousness_level - w[1].consciousness_level)
-            .sum::<f64>() / (recent.len() - 1) as f64;
+            .sum::<f64>()
+            / (recent.len() - 1) as f64;
 
         let current = recent[0];
         let predicted_consciousness = current.consciousness_level + consciousness_trend;
@@ -844,25 +1328,44 @@ impl HarmonicAnalyzer {
 
         // Derive harmonics from power spectrum
         let harmonics = vec![
-            Harmonic { number: 1, frequency: fundamental, amplitude: 1.0, phase: 0.0 },
-            Harmonic { number: 2, frequency: fundamental * 2.0,
-                      amplitude: state.power_spectrum.beta / state.power_spectrum.alpha.max(0.01),
-                      phase: 0.0 },
-            Harmonic { number: 3, frequency: fundamental * 3.0,
-                      amplitude: state.power_spectrum.gamma / state.power_spectrum.alpha.max(0.01),
-                      phase: 0.0 },
-            Harmonic { number: 4, frequency: fundamental * 4.0,
-                      amplitude: state.power_spectrum.high_gamma / state.power_spectrum.alpha.max(0.01),
-                      phase: 0.0 },
+            Harmonic {
+                number: 1,
+                frequency: fundamental,
+                amplitude: 1.0,
+                phase: 0.0,
+            },
+            Harmonic {
+                number: 2,
+                frequency: fundamental * 2.0,
+                amplitude: state.power_spectrum.beta / state.power_spectrum.alpha.max(0.01),
+                phase: 0.0,
+            },
+            Harmonic {
+                number: 3,
+                frequency: fundamental * 3.0,
+                amplitude: state.power_spectrum.gamma / state.power_spectrum.alpha.max(0.01),
+                phase: 0.0,
+            },
+            Harmonic {
+                number: 4,
+                frequency: fundamental * 4.0,
+                amplitude: state.power_spectrum.high_gamma / state.power_spectrum.alpha.max(0.01),
+                phase: 0.0,
+            },
         ];
 
-        Self { fundamental, harmonics }
+        Self {
+            fundamental,
+            harmonics,
+        }
     }
 
     /// Get harmonic richness (complexity of harmonic structure)
     pub fn richness(&self) -> f64 {
         let total_power: f64 = self.harmonics.iter().map(|h| h.amplitude.powi(2)).sum();
-        let harmonic_power: f64 = self.harmonics.iter()
+        let harmonic_power: f64 = self
+            .harmonics
+            .iter()
             .filter(|h| h.number > 1)
             .map(|h| h.amplitude.powi(2))
             .sum();
@@ -885,8 +1388,8 @@ impl HarmonicAnalyzer {
                     for den in 1..=4 {
                         let simple_ratio = num as f64 / den as f64;
                         if (ratio - simple_ratio).abs() < 0.05 {
-                            let amp_weight = self.harmonics[i].amplitude *
-                                            self.harmonics[j].amplitude;
+                            let amp_weight =
+                                self.harmonics[i].amplitude * self.harmonics[j].amplitude;
                             consonance_sum += amp_weight;
                         }
                     }
@@ -912,16 +1415,33 @@ mod tests {
         assert!(FrequencyBand::Theta.center_frequency() < FrequencyBand::Alpha.center_frequency());
         assert!(FrequencyBand::Alpha.center_frequency() < FrequencyBand::Beta.center_frequency());
         assert!(FrequencyBand::Beta.center_frequency() < FrequencyBand::Gamma.center_frequency());
-        assert!(FrequencyBand::Gamma.center_frequency() < FrequencyBand::HighGamma.center_frequency());
+        assert!(
+            FrequencyBand::Gamma.center_frequency() < FrequencyBand::HighGamma.center_frequency()
+        );
     }
 
     #[test]
     fn test_resonance_modes() {
-        assert!(ResonanceMode::DeepSleep.consciousness_level() < ResonanceMode::Dreaming.consciousness_level());
-        assert!(ResonanceMode::Dreaming.consciousness_level() < ResonanceMode::Relaxed.consciousness_level());
-        assert!(ResonanceMode::Relaxed.consciousness_level() < ResonanceMode::Focused.consciousness_level());
-        assert!(ResonanceMode::Focused.consciousness_level() < ResonanceMode::Conscious.consciousness_level());
-        assert!(ResonanceMode::Conscious.consciousness_level() < ResonanceMode::Peak.consciousness_level());
+        assert!(
+            ResonanceMode::DeepSleep.consciousness_level()
+                < ResonanceMode::Dreaming.consciousness_level()
+        );
+        assert!(
+            ResonanceMode::Dreaming.consciousness_level()
+                < ResonanceMode::Relaxed.consciousness_level()
+        );
+        assert!(
+            ResonanceMode::Relaxed.consciousness_level()
+                < ResonanceMode::Focused.consciousness_level()
+        );
+        assert!(
+            ResonanceMode::Focused.consciousness_level()
+                < ResonanceMode::Conscious.consciousness_level()
+        );
+        assert!(
+            ResonanceMode::Conscious.consciousness_level()
+                < ResonanceMode::Peak.consciousness_level()
+        );
     }
 
     #[test]
@@ -935,7 +1455,7 @@ mod tests {
     #[test]
     fn test_oscillator_from_dimension() {
         let osc = CognitiveOscillator::from_dimension("Φ", 0.8);
-        assert_eq!(osc.natural_frequency, 45.0);  // Phi maps to gamma
+        assert_eq!(osc.natural_frequency, 45.0); // Phi maps to gamma
         assert_eq!(osc.amplitude, 0.8);
     }
 
@@ -958,7 +1478,7 @@ mod tests {
     #[test]
     fn test_analyzer_creation() {
         let analyzer = ResonanceAnalyzer::new(ResonanceConfig::default());
-        assert_eq!(analyzer.oscillators.len(), 7);  // 7 dimensions
+        assert_eq!(analyzer.oscillators.len(), 7); // 7 dimensions
     }
 
     #[test]
@@ -1043,16 +1563,20 @@ mod tests {
         let sleep_dims = [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
         let sleep_state = analyzer.analyze(sleep_dims);
         // Low input should produce low consciousness level
-        assert!(sleep_state.consciousness_level >= 0.0 && sleep_state.consciousness_level <= 1.0,
-            "Sleep state consciousness level should be in valid range");
+        assert!(
+            sleep_state.consciousness_level >= 0.0 && sleep_state.consciousness_level <= 1.0,
+            "Sleep state consciousness level should be in valid range"
+        );
 
         // Peak consciousness
         let mut analyzer2 = ResonanceAnalyzer::default();
         let peak_dims = [1.0, 0.9, 0.8, 0.7, 0.9, 0.2, 0.8];
         let peak_state = analyzer2.analyze(peak_dims);
         // High input should produce valid consciousness level
-        assert!(peak_state.consciousness_level >= 0.0 && peak_state.consciousness_level <= 1.0,
-            "Peak state consciousness level should be in valid range");
+        assert!(
+            peak_state.consciousness_level >= 0.0 && peak_state.consciousness_level <= 1.0,
+            "Peak state consciousness level should be in valid range"
+        );
     }
 
     #[test]
@@ -1097,7 +1621,7 @@ mod tests {
         let mut analyzer = ResonanceAnalyzer::default();
 
         // High CFC should occur with high gamma and theta together
-        let dims = [0.9, 0.8, 0.5, 0.5, 0.8, 0.7, 0.5];  // High Φ, R with high E
+        let dims = [0.9, 0.8, 0.5, 0.5, 0.8, 0.7, 0.5]; // High Φ, R with high E
         let state = analyzer.analyze(dims);
 
         // CFC should be computed (may or may not be high)
