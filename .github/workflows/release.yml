@@ -213,7 +213,6 @@ jobs:
         if: steps.check.outputs.exists == 'true'
         run: npm test
         working-directory: mycelix-workspace/sdk-ts
-        continue-on-error: true
 
       - name: Build
         if: steps.check.outputs.exists == 'true'
