@@ -8,6 +8,8 @@
 //! - Arousal: activation-deactivation dimension
 //! - Dominance: control dimension (optional)
 
+use crate::hdc::binary_hv::HV16;
+use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 
@@ -186,6 +188,325 @@ impl EmotionCategory {
             EmotionCategory::Trust => "trust",
         }
     }
+
+    /// Get all emotion categories
+    pub fn all() -> Vec<Self> {
+        vec![
+            EmotionCategory::Joy,
+            EmotionCategory::Contentment,
+            EmotionCategory::Serenity,
+            EmotionCategory::Fear,
+            EmotionCategory::Anger,
+            EmotionCategory::Sadness,
+            EmotionCategory::Surprise,
+            EmotionCategory::Neutral,
+            EmotionCategory::Disgust,
+            EmotionCategory::Anticipation,
+            EmotionCategory::Trust,
+        ]
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NSM PRIMITIVE GROUNDING
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// NSM primitive grounding for emotion categories
+///
+/// Maps each emotion to Wierzbicka's semantic primitives, capturing
+/// the universal semantic core of emotional experience:
+///
+/// # Semantic Dimensions
+/// - **Valence**: GOOD vs BAD
+/// - **Arousal**: VERY, MOVE, DO
+/// - **Agency**: CAN, WANT, DO
+/// - **Social**: OTHER, I
+/// - **Temporal**: NOW, BEFORE, AFTER, HAPPEN
+///
+/// # Grounding Philosophy
+///
+/// Emotions are grounded as felt evaluations (FEEL + GOOD/BAD) with
+/// additional modifiers capturing arousal, agency, and social dimensions.
+#[derive(Debug, Clone)]
+pub struct EmotionPrimitiveGrounding {
+    /// The emotion category
+    pub emotion: EmotionCategory,
+    /// NSM primitives that define this emotion
+    pub nsm_primitives: Vec<String>,
+    /// HDC encoding of the primitive composition
+    pub primitive_encoding: HV16,
+    /// Core affect coordinates
+    pub core_affect: CoreAffect,
+    /// Valence dimension (-1 to 1)
+    pub valence: f32,
+    /// Arousal dimension (0 to 1)
+    pub arousal: f32,
+}
+
+impl EmotionPrimitiveGrounding {
+    /// Create grounding for an emotion with given primitive system
+    pub fn new(emotion: EmotionCategory, primitives: &PrimitiveSystem) -> Self {
+        let nsm_primitives = Self::primitives_for_emotion(&emotion);
+        let primitive_encoding = Self::encode_primitives(&nsm_primitives, primitives);
+        let core_affect = emotion.typical_affect();
+
+        Self {
+            emotion,
+            nsm_primitives,
+            primitive_encoding,
+            valence: core_affect.valence,
+            arousal: core_affect.arousal,
+            core_affect,
+        }
+    }
+
+    /// Get NSM primitives for each emotion
+    ///
+    /// Based on Wierzbicka's NSM analysis of emotion concepts:
+    /// - Evaluative core: GOOD, BAD
+    /// - Experiential: FEEL, BODY
+    /// - Volitional: WANT, CAN, DO
+    /// - Cognitive: KNOW, THINK
+    /// - Temporal: NOW, BEFORE, AFTER, HAPPEN
+    /// - Social: I, OTHER, SOMEONE
+    fn primitives_for_emotion(emotion: &EmotionCategory) -> Vec<String> {
+        match emotion {
+            // Joy: intense positive feeling with high energy
+            EmotionCategory::Joy => vec![
+                "GOOD".to_string(),
+                "VERY".to_string(),
+                "FEEL".to_string(),
+                "I".to_string(),
+                "WANT".to_string(),
+                "NOW".to_string(),
+            ],
+
+            // Contentment: satisfied, fulfilled state
+            EmotionCategory::Contentment => vec![
+                "GOOD".to_string(),
+                "FEEL".to_string(),
+                "I".to_string(),
+                "NOW".to_string(),
+                "HAVE".to_string(),
+            ],
+
+            // Serenity: calm, peaceful state
+            EmotionCategory::Serenity => vec![
+                "GOOD".to_string(),
+                "FEEL".to_string(),
+                "I".to_string(),
+                "NOT".to_string(),
+                "MOVE".to_string(),
+                "NOW".to_string(),
+            ],
+
+            // Fear: threat response, loss of control
+            EmotionCategory::Fear => vec![
+                "BAD".to_string(),
+                "FEEL".to_string(),
+                "SOMETHING".to_string(),
+                "HAPPEN".to_string(),
+                "NOT".to_string(),
+                "CAN".to_string(),
+            ],
+
+            // Anger: frustrated agency, desire to act against
+            EmotionCategory::Anger => vec![
+                "BAD".to_string(),
+                "FEEL".to_string(),
+                "WANT".to_string(),
+                "DO".to_string(),
+                "OTHER".to_string(),
+                "BECAUSE".to_string(),
+            ],
+
+            // Sadness: loss, absence of desired state
+            EmotionCategory::Sadness => vec![
+                "BAD".to_string(),
+                "FEEL".to_string(),
+                "NOT".to_string(),
+                "HAVE".to_string(),
+                "WANT".to_string(),
+                "BEFORE".to_string(),
+            ],
+
+            // Surprise: unexpected event, schema violation
+            EmotionCategory::Surprise => vec![
+                "FEEL".to_string(),
+                "NOT".to_string(),
+                "KNOW".to_string(),
+                "BEFORE".to_string(),
+                "HAPPEN".to_string(),
+                "NOW".to_string(),
+            ],
+
+            // Neutral: baseline state
+            EmotionCategory::Neutral => vec![
+                "FEEL".to_string(),
+                "NOT".to_string(),
+                "VERY".to_string(),
+                "NOT".to_string(),
+                "GOOD".to_string(),
+                "NOT".to_string(),
+                "BAD".to_string(),
+            ],
+
+            // Disgust: rejection, contamination avoidance
+            EmotionCategory::Disgust => vec![
+                "BAD".to_string(),
+                "FEEL".to_string(),
+                "NOT".to_string(),
+                "WANT".to_string(),
+                "THIS".to_string(),
+                "BODY".to_string(),
+            ],
+
+            // Anticipation: future-oriented expectation
+            EmotionCategory::Anticipation => vec![
+                "FEEL".to_string(),
+                "WANT".to_string(),
+                "KNOW".to_string(),
+                "AFTER".to_string(),
+                "HAPPEN".to_string(),
+                "SOMETHING".to_string(),
+            ],
+
+            // Trust: positive social expectation
+            EmotionCategory::Trust => vec![
+                "GOOD".to_string(),
+                "FEEL".to_string(),
+                "OTHER".to_string(),
+                "CAN".to_string(),
+                "DO".to_string(),
+                "GOOD".to_string(),
+            ],
+        }
+    }
+
+    /// Encode primitives as HDC vector
+    fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
+        if primitives.is_empty() {
+            return HV16::zero();
+        }
+
+        let vectors: Vec<HV16> = primitives
+            .iter()
+            .map(|name| {
+                // Try to get primitive from system by name
+                if let Some(p) = system.get(name) {
+                    p.encoding.clone()
+                } else if let Some(p) = system.get(&name.to_lowercase()) {
+                    p.encoding.clone()
+                } else {
+                    // Fallback: create deterministic vector from name
+                    let seed = name
+                        .bytes()
+                        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                    HV16::random(seed)
+                }
+            })
+            .collect();
+
+        if vectors.is_empty() {
+            return HV16::zero();
+        }
+
+        let mut result = vectors[0].clone();
+        for v in &vectors[1..] {
+            result = HV16::bind(&result, v);
+        }
+        result
+    }
+
+    /// Semantic similarity to another emotion grounding
+    pub fn similarity(&self, other: &Self) -> f64 {
+        self.primitive_encoding
+            .similarity(&other.primitive_encoding) as f64
+    }
+}
+
+/// Unified NSM grounding system for affective consciousness
+#[derive(Debug, Clone)]
+pub struct AffectiveNSMGrounding {
+    /// Grounding for each emotion category
+    pub emotion_groundings: HashMap<EmotionCategory, EmotionPrimitiveGrounding>,
+    /// Valence axis endpoints (negative to positive)
+    pub valence_axis: (HV16, HV16),
+    /// Arousal axis endpoints (low to high)
+    pub arousal_axis: (HV16, HV16),
+}
+
+impl AffectiveNSMGrounding {
+    /// Create complete NSM grounding for affective consciousness
+    pub fn new(primitive_system: &PrimitiveSystem) -> Self {
+        let mut emotion_groundings = HashMap::new();
+
+        for emotion in EmotionCategory::all() {
+            let grounding = EmotionPrimitiveGrounding::new(emotion.clone(), primitive_system);
+            emotion_groundings.insert(emotion, grounding);
+        }
+
+        // Create valence axis from BAD to GOOD
+        let bad_vec = Self::encode_simple(&["BAD", "FEEL"], primitive_system);
+        let good_vec = Self::encode_simple(&["GOOD", "FEEL"], primitive_system);
+        let valence_axis = (bad_vec, good_vec);
+
+        // Create arousal axis from calm to activated
+        let low_arousal = Self::encode_simple(&["NOT", "MOVE", "FEEL"], primitive_system);
+        let high_arousal = Self::encode_simple(&["VERY", "MOVE", "DO", "FEEL"], primitive_system);
+        let arousal_axis = (low_arousal, high_arousal);
+
+        Self {
+            emotion_groundings,
+            valence_axis,
+            arousal_axis,
+        }
+    }
+
+    fn encode_simple(primitives: &[&str], system: &PrimitiveSystem) -> HV16 {
+        let vec_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+        EmotionPrimitiveGrounding::encode_primitives(&vec_primitives, system)
+    }
+
+    /// Get grounding for a specific emotion
+    pub fn grounding(&self, emotion: &EmotionCategory) -> Option<&EmotionPrimitiveGrounding> {
+        self.emotion_groundings.get(emotion)
+    }
+
+    /// Find emotions semantically similar to a query vector
+    pub fn find_similar(&self, query: &HV16, threshold: f64) -> Vec<(&EmotionCategory, f64)> {
+        let mut similar: Vec<_> = self
+            .emotion_groundings
+            .iter()
+            .map(|(em, g)| (em, query.similarity(&g.primitive_encoding) as f64))
+            .filter(|(_, sim)| *sim >= threshold)
+            .collect();
+
+        similar.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        similar
+    }
+
+    /// Semantic distance between two emotions
+    pub fn semantic_distance(&self, e1: &EmotionCategory, e2: &EmotionCategory) -> f64 {
+        match (self.grounding(e1), self.grounding(e2)) {
+            (Some(g1), Some(g2)) => 1.0 - g1.similarity(g2),
+            _ => 1.0,
+        }
+    }
+
+    /// Project a vector onto the valence dimension
+    pub fn valence_projection(&self, vector: &HV16) -> f64 {
+        let neg_sim = vector.similarity(&self.valence_axis.0) as f64;
+        let pos_sim = vector.similarity(&self.valence_axis.1) as f64;
+        (pos_sim - neg_sim) / 2.0 // Range: -0.5 to 0.5, normalized
+    }
+
+    /// Project a vector onto the arousal dimension
+    pub fn arousal_projection(&self, vector: &HV16) -> f64 {
+        let low_sim = vector.similarity(&self.arousal_axis.0) as f64;
+        let high_sim = vector.similarity(&self.arousal_axis.1) as f64;
+        (high_sim - low_sim + 1.0) / 2.0 // Range: 0 to 1
+    }
 }
 
 /// Configuration for the affective consciousness analyzer
@@ -293,7 +614,11 @@ impl AffectiveConsciousnessAnalyzer {
     }
 
     /// Process a stimulus and update affective state
-    pub fn process_stimulus(&mut self, stimulus: &str, base_affect: Option<CoreAffect>) -> CoreAffect {
+    pub fn process_stimulus(
+        &mut self,
+        stimulus: &str,
+        base_affect: Option<CoreAffect>,
+    ) -> CoreAffect {
         // Check if we have a somatic marker for this stimulus
         let marker_affect = self.somatic_markers.get(stimulus).copied();
 
@@ -341,8 +666,10 @@ impl AffectiveConsciousnessAnalyzer {
         // Update stats
         self.stats.updates += 1;
         let n = self.stats.updates as f32;
-        self.stats.avg_valence = (self.stats.avg_valence * (n - 1.0) + self.current_affect.valence) / n;
-        self.stats.avg_arousal = (self.stats.avg_arousal * (n - 1.0) + self.current_affect.arousal) / n;
+        self.stats.avg_valence =
+            (self.stats.avg_valence * (n - 1.0) + self.current_affect.valence) / n;
+        self.stats.avg_arousal =
+            (self.stats.avg_arousal * (n - 1.0) + self.current_affect.arousal) / n;
     }
 
     /// Record an affective event
@@ -377,7 +704,9 @@ impl AffectiveConsciousnessAnalyzer {
     /// Decay affect toward neutral over time
     pub fn decay(&mut self, dt: f32) {
         let decay_factor = (1.0 - self.config.decay_rate * dt).max(0.0);
-        self.current_affect = self.current_affect.blend(&CoreAffect::neutral(), 1.0 - decay_factor);
+        self.current_affect = self
+            .current_affect
+            .blend(&CoreAffect::neutral(), 1.0 - decay_factor);
     }
 
     /// Get current affect
@@ -401,13 +730,17 @@ impl AffectiveConsciousnessAnalyzer {
             return (0.0, 0.0);
         }
 
-        let valence_trend: f32 = recent.windows(2)
+        let valence_trend: f32 = recent
+            .windows(2)
             .map(|w| w[0].valence - w[1].valence)
-            .sum::<f32>() / (recent.len() - 1) as f32;
+            .sum::<f32>()
+            / (recent.len() - 1) as f32;
 
-        let arousal_trend: f32 = recent.windows(2)
+        let arousal_trend: f32 = recent
+            .windows(2)
             .map(|w| w[0].arousal - w[1].arousal)
-            .sum::<f32>() / (recent.len() - 1) as f32;
+            .sum::<f32>()
+            / (recent.len() - 1) as f32;
 
         (valence_trend, arousal_trend)
     }
