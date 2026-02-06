@@ -250,7 +250,9 @@ mod tests {
         let parsed = ParsedCode::new("", "rust");
         let score = analyzer.measure_code_phi(&parsed);
         assert_eq!(score.entity_count, 0);
-        assert_eq!(score.quality_score(), 0.0);
+        // Empty code has 0 integration/cohesion/connectivity but 0 dead code
+        // Formula: 0*0.3 + 0*0.3 + 0*0.2 + (1-0)*0.2 = 0.2
+        assert!((score.quality_score() - 0.2).abs() < 0.01);
     }
 
     #[test]

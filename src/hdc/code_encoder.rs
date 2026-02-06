@@ -387,7 +387,8 @@ mod tests {
         let encoder = CodeHDEncoder::new(512);
         let hv1 = encoder.encode_name("hello");
         let hv2 = encoder.encode_name("hello");
-        assert_eq!(hv1.similarity(&hv2), 1.0);
+        // Use approximate comparison due to floating-point precision
+        assert!((hv1.similarity(&hv2) - 1.0).abs() < 1e-5);
     }
 
     #[test]

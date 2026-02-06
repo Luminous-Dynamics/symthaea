@@ -185,10 +185,10 @@ mod tests {
     fn make_parsed(funcs: &[&str], types: &[&str]) -> ParsedCode {
         let mut parsed = ParsedCode::new("", "rust");
         for f in funcs {
-            parsed.entities.push(CodeEntity::new(EntityKind::Function, f, test_span()));
+            parsed.entities.push(CodeEntity::new(EntityKind::Function, *f, test_span()));
         }
         for t in types {
-            parsed.entities.push(CodeEntity::new(EntityKind::Struct, t, test_span()));
+            parsed.entities.push(CodeEntity::new(EntityKind::Struct, *t, test_span()));
         }
         parsed
     }
