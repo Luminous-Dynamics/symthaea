@@ -33,7 +33,8 @@ use crate::consciousness::primitive_reasoning::{
 use crate::consciousness::epistemic_tiers::{
     EpistemicCoordinate, EmpiricalTier, NormativeTier, MaterialityTier,
 };
-use crate::hdc::primitive_system::Primitive;
+use crate::hdc::binary_hv::HV16;
+use crate::hdc::primitive_system::{Primitive, PrimitiveSystem};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -476,7 +477,7 @@ pub struct CausalInteraction {
 }
 
 /// Types of causal interactions
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum InteractionType {
     /// Synergistic (combined effect > sum of parts)
     Synergistic,
@@ -628,6 +629,211 @@ pub struct CausalSummary {
     pub high_confidence_relations: usize,
     pub average_confidence: f64,
     pub explanations_generated: usize,
+}
+
+// ==============================================================================
+// NSM PRIMITIVE GROUNDING (Wierzbicka's Natural Semantic Metalanguage)
+// ==============================================================================
+
+/// NSM grounding for causal mechanisms - how effects occur
+#[derive(Debug, Clone)]
+pub struct CausalMechanismPrimitiveGrounding {
+    /// The mechanism being grounded
+    pub mechanism_type: String,
+    /// NSM primitive composition
+    pub nsm_primitives: Vec<String>,
+    /// HDC encoding via primitive binding
+    pub primitive_encoding: HV16,
+    /// Semantic polarity (+1 = constructive, -1 = reductive, 0 = neutral)
+    pub polarity: i8,
+}
+
+impl CausalMechanismPrimitiveGrounding {
+    pub fn for_mechanism(mechanism: &CausalMechanism, system: &PrimitiveSystem) -> Self {
+        let (name, primitives, polarity) = Self::nsm_mapping(mechanism);
+        let encoding = encode_primitives(&primitives, system);
+
+        Self {
+            mechanism_type: name,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            polarity,
+        }
+    }
+
+    fn nsm_mapping(mechanism: &CausalMechanism) -> (String, Vec<String>, i8) {
+        match mechanism {
+            // IntegrationIncrease: Making many into one coherent whole
+            CausalMechanism::IntegrationIncrease { .. } => (
+                "IntegrationIncrease".into(),
+                vec!["DO".into(), "MAKE".into(), "ALL".into(), "ONE".into(), "BECAUSE".into()],
+                1,  // constructive
+            ),
+            // FragmentationReduction: Stopping separation, creating unity
+            CausalMechanism::FragmentationReduction { .. } => (
+                "FragmentationReduction".into(),
+                vec!["DO".into(), "NOT".into(), "APART".into(), "SAME".into(), "NOW".into()],
+                1,  // constructive (reduces negative)
+            ),
+            // ConnectionCreation: Making new links between concepts
+            CausalMechanism::ConnectionCreation { .. } => (
+                "ConnectionCreation".into(),
+                vec!["DO".into(), "MAKE".into(), "ONE".into(), "NEAR".into(), "OTHER".into()],
+                1,  // constructive
+            ),
+            // RepresentationRefinement: Improving knowledge precision
+            CausalMechanism::RepresentationRefinement { .. } => (
+                "RepresentationRefinement".into(),
+                vec!["DO".into(), "KNOW".into(), "GOOD".into(), "SAME".into(), "THING".into()],
+                0,  // neutral (refinement)
+            ),
+            // PatternAmplification: Making patterns stronger/larger
+            CausalMechanism::PatternAmplification { .. } => (
+                "PatternAmplification".into(),
+                vec!["DO".into(), "MAKE".into(), "BIG".into(), "SAME".into(), "KIND".into()],
+                1,  // constructive
+            ),
+            // Other: Generic causal mechanism
+            CausalMechanism::Other { .. } => (
+                "Other".into(),
+                vec!["DO".into(), "SOMETHING".into(), "BECAUSE".into()],
+                0,  // neutral
+            ),
+        }
+    }
+}
+
+/// NSM grounding for causal interaction types
+#[derive(Debug, Clone)]
+pub struct InteractionTypePrimitiveGrounding {
+    /// The interaction type being grounded
+    pub interaction_type: InteractionType,
+    /// NSM primitive composition
+    pub nsm_primitives: Vec<String>,
+    /// HDC encoding via primitive binding
+    pub primitive_encoding: HV16,
+    /// Effect multiplier semantic (+1 = amplifying, -1 = dampening, 0 = neutral)
+    pub effect_direction: i8,
+}
+
+impl InteractionTypePrimitiveGrounding {
+    pub fn new(interaction_type: InteractionType, system: &PrimitiveSystem) -> Self {
+        let (primitives, direction) = Self::nsm_mapping(interaction_type);
+        let encoding = encode_primitives(&primitives, system);
+
+        Self {
+            interaction_type,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            effect_direction: direction,
+        }
+    }
+
+    fn nsm_mapping(interaction: InteractionType) -> (Vec<String>, i8) {
+        match interaction {
+            // Synergistic: Together produces more than sum
+            InteractionType::Synergistic => (
+                vec!["TOGETHER".into(), "MORE".into(), "GOOD".into(), "BECAUSE".into()],
+                1,  // amplifying
+            ),
+            // Antagonistic: Together produces less than sum
+            InteractionType::Antagonistic => (
+                vec!["TOGETHER".into(), "LESS".into(), "BECAUSE".into(), "NOT".into(), "SAME".into()],
+                -1, // dampening
+            ),
+            // Additive: Together equals sum of parts
+            InteractionType::Additive => (
+                vec!["TOGETHER".into(), "SAME".into(), "ALL".into()],
+                0,  // neutral
+            ),
+        }
+    }
+}
+
+/// Unified NSM grounding system for causal explanations
+#[derive(Debug)]
+pub struct CausalNSMGrounding {
+    /// Interaction type groundings
+    pub interactions: HashMap<InteractionType, InteractionTypePrimitiveGrounding>,
+}
+
+impl CausalNSMGrounding {
+    /// Create grounding system from primitive system
+    pub fn new(system: &PrimitiveSystem) -> Self {
+        let mut interactions = HashMap::new();
+
+        for interaction in &[
+            InteractionType::Synergistic,
+            InteractionType::Antagonistic,
+            InteractionType::Additive,
+        ] {
+            interactions.insert(*interaction, InteractionTypePrimitiveGrounding::new(*interaction, system));
+        }
+
+        Self { interactions }
+    }
+
+    /// Get grounding for a specific causal mechanism
+    pub fn ground_mechanism(&self, mechanism: &CausalMechanism, system: &PrimitiveSystem) -> CausalMechanismPrimitiveGrounding {
+        CausalMechanismPrimitiveGrounding::for_mechanism(mechanism, system)
+    }
+
+    /// Query interactions by semantic similarity
+    pub fn query_interactions(&self, query: &HV16, threshold: f32) -> Vec<(&InteractionType, f32)> {
+        let mut results: Vec<_> = self.interactions.iter()
+            .map(|(t, g)| (t, g.primitive_encoding.similarity(query)))
+            .filter(|(_, sim)| *sim >= threshold)
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Get amplifying interactions (synergistic)
+    pub fn amplifying_interactions(&self) -> Vec<&InteractionType> {
+        self.interactions.iter()
+            .filter(|(_, g)| g.effect_direction > 0)
+            .map(|(t, _)| t)
+            .collect()
+    }
+
+    /// Get dampening interactions (antagonistic)
+    pub fn dampening_interactions(&self) -> Vec<&InteractionType> {
+        self.interactions.iter()
+            .filter(|(_, g)| g.effect_direction < 0)
+            .map(|(t, _)| t)
+            .collect()
+    }
+}
+
+/// Encode NSM primitives into HDC vector via sequential binding
+fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
+    let vectors: Vec<HV16> = primitives
+        .iter()
+        .map(|name| {
+            if let Some(p) = system.get(name) {
+                p.encoding.clone()
+            } else if let Some(p) = system.get(&name.to_lowercase()) {
+                p.encoding.clone()
+            } else {
+                // Fallback: deterministic random for unknown primitives
+                let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                HV16::random(seed)
+            }
+        })
+        .collect();
+
+    if vectors.is_empty() {
+        return HV16::random(0);
+    }
+
+    // Bind sequentially with position encoding for order preservation
+    let mut result = vectors[0].clone();
+    for (i, v) in vectors.iter().enumerate().skip(1) {
+        let position_hv = HV16::random(i as u64 * 1000);
+        let positioned = v.bind(&position_hv);
+        result = result.bind(&positioned);
+    }
+    result
 }
 
 #[cfg(test)]
