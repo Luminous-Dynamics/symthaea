@@ -365,7 +365,7 @@ HAI opens new directions for efficient, interpretable cognitive architectures th
 
 ## Appendix A: Implementation Details
 
-**Repository:** [To be added]
+**Repository:** https://github.com/Luminous-Dynamics/symthaea
 **Language:** Rust (Edition 2021)
 **Dependencies:** ndarray, nalgebra, rand
 **Lines of code:** ~3,700 (core FEP), ~800 (tests)
