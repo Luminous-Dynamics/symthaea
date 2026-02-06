@@ -19,7 +19,6 @@
 //!
 //! ## Limitations
 //!
-//! - Proof verification requires external cryptographic libraries
 //! - Expiration date parsing is simplified (use proper ISO 8601 library)
 //! - Credential revocation not implemented (use external revocation lists)
 //!
@@ -30,12 +29,94 @@
 //! 3. Verify issuer identity through trusted DID resolution
 //! 4. Use credential type matching to prevent cross-context reuse
 
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use ed25519_dalek::{Signature, VerifyingKey, Verifier};
 use serde::{Deserialize, Serialize};
+use sha3::{Sha3_256, Digest};
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::sync::RwLock;
 
 use crate::epistemic::EpistemicClaim;
+
+/// Domain separator for credential signatures
+const CREDENTIAL_DOMAIN_SEPARATOR: &[u8] = b"mycelix-credential-v1";
+
+/// Trait for looking up public keys from DID verification methods
+///
+/// Implementations should resolve DID URLs to Ed25519 public keys.
+/// Example verification_method: "did:example:issuer#key-1"
+pub trait CredentialKeyRegistry: Send + Sync {
+    /// Look up the Ed25519 public key for a verification method
+    ///
+    /// Returns the 32-byte public key if found, or None if unknown.
+    fn get_public_key(&self, verification_method: &str) -> Option<[u8; 32]>;
+}
+
+/// A simple in-memory credential key registry for testing
+#[derive(Clone, Debug, Default)]
+pub struct InMemoryCredentialKeyRegistry {
+    keys: HashMap<String, [u8; 32]>,
+}
+
+impl InMemoryCredentialKeyRegistry {
+    /// Create a new empty registry
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a public key for a verification method
+    pub fn register(&mut self, verification_method: impl Into<String>, public_key: [u8; 32]) {
+        self.keys.insert(verification_method.into(), public_key);
+    }
+}
+
+impl CredentialKeyRegistry for InMemoryCredentialKeyRegistry {
+    fn get_public_key(&self, verification_method: &str) -> Option<[u8; 32]> {
+        self.keys.get(verification_method).copied()
+    }
+}
+
+/// Error types for credential verification
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CredentialVerificationError {
+    /// No proof attached to credential
+    NoProof,
+    /// Credential has expired
+    Expired,
+    /// Unsupported proof type (only Ed25519Signature2020 supported)
+    UnsupportedProofType(String),
+    /// Invalid base64 encoding in proof_value
+    InvalidBase64(String),
+    /// Invalid signature format (expected 64 bytes)
+    InvalidSignatureFormat(String),
+    /// Public key not found for verification method
+    PublicKeyNotFound(String),
+    /// Invalid public key format
+    InvalidPublicKey(String),
+    /// Signature verification failed
+    SignatureVerificationFailed(String),
+    /// No key registry configured
+    NoKeyRegistry,
+}
+
+impl std::fmt::Display for CredentialVerificationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoProof => write!(f, "No proof attached to credential"),
+            Self::Expired => write!(f, "Credential has expired"),
+            Self::UnsupportedProofType(t) => write!(f, "Unsupported proof type: {} (expected Ed25519Signature2020)", t),
+            Self::InvalidBase64(e) => write!(f, "Invalid base64 in proof_value: {}", e),
+            Self::InvalidSignatureFormat(e) => write!(f, "Invalid signature format: {}", e),
+            Self::PublicKeyNotFound(m) => write!(f, "Public key not found for: {}", m),
+            Self::InvalidPublicKey(e) => write!(f, "Invalid public key: {}", e),
+            Self::SignatureVerificationFailed(e) => write!(f, "Signature verification failed: {}", e),
+            Self::NoKeyRegistry => write!(f, "No key registry configured for signature verification"),
+        }
+    }
+}
+
+impl std::error::Error for CredentialVerificationError {}
 
 /// A W3C-compatible Verifiable Credential
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -148,6 +229,64 @@ impl VerifiableCredential {
             hasher.update(proof.proof_value.as_bytes());
         }
         format!("{:x}", hasher.finalize())
+    }
+
+    /// Compute the message to be signed for this credential
+    ///
+    /// The signed message is a SHA3-256 hash of the canonicalized credential
+    /// (without the proof field) plus a domain separator to prevent
+    /// cross-protocol signature reuse.
+    ///
+    /// The message includes:
+    /// - Domain separator ("mycelix-credential-v1")
+    /// - Credential ID
+    /// - Issuer
+    /// - Issuance date
+    /// - Credential types (sorted for determinism)
+    /// - Subject ID
+    /// - Subject claims (JSON canonicalized)
+    pub fn compute_signing_message(&self) -> [u8; 32] {
+        let mut hasher = Sha3_256::new();
+
+        // Domain separation prevents cross-protocol attacks
+        hasher.update(CREDENTIAL_DOMAIN_SEPARATOR);
+
+        // Include credential identity
+        hasher.update(self.id.as_bytes());
+        hasher.update(self.issuer.as_bytes());
+        hasher.update(self.issuance_date.as_bytes());
+
+        // Include expiration if present
+        if let Some(ref exp) = self.expiration_date {
+            hasher.update(b"exp:");
+            hasher.update(exp.as_bytes());
+        }
+
+        // Include credential types (sorted for determinism)
+        let mut types = self.credential_type.clone();
+        types.sort();
+        for t in &types {
+            hasher.update(b"type:");
+            hasher.update(t.as_bytes());
+        }
+
+        // Include subject
+        hasher.update(b"subject:");
+        hasher.update(self.credential_subject.id.as_bytes());
+
+        // Include claims (JSON serialized - stable ordering via serde_json)
+        if let Ok(claims_json) = serde_json::to_string(&self.credential_subject.claims) {
+            hasher.update(b"claims:");
+            hasher.update(claims_json.as_bytes());
+        }
+
+        // Include epistemic classification if present
+        if let Some(ref epistemic) = self.epistemic {
+            hasher.update(b"epistemic:");
+            hasher.update(epistemic.code().as_bytes());
+        }
+
+        hasher.finalize().into()
     }
 }
 
@@ -316,23 +455,64 @@ pub struct CacheStats {
 /// - Uses cache to avoid re-verification of recently verified credentials
 /// - Batches signature verification for better throughput
 /// - Lazy proof checking: only verifies proofs when necessary
+///
+/// # Security
+///
+/// When a key registry is configured, all credentials undergo full Ed25519
+/// signature verification. Without a registry, verification will fail for
+/// credentials requiring signature verification (this is the secure default).
 pub struct BatchCredentialVerifier {
     cache: CredentialCache,
+    /// Key registry for signature verification (required for secure operation)
+    key_registry: Option<Arc<dyn CredentialKeyRegistry>>,
 }
 
 impl BatchCredentialVerifier {
-    /// Create a new batch verifier with default cache
+    /// Create a new batch verifier with default cache but NO key registry
+    ///
+    /// WARNING: Without a key registry, signature verification will fail.
+    /// Use `with_registry()` for production use.
     pub fn new() -> Self {
         Self {
             cache: CredentialCache::default_cache(),
+            key_registry: None,
         }
     }
 
-    /// Create with custom cache settings
+    /// Create a verifier with a key registry for signature verification
+    ///
+    /// This is the recommended constructor for production use.
+    pub fn with_registry(registry: Arc<dyn CredentialKeyRegistry>) -> Self {
+        Self {
+            cache: CredentialCache::default_cache(),
+            key_registry: Some(registry),
+        }
+    }
+
+    /// Create with custom cache settings and a key registry
+    pub fn with_cache_and_registry(
+        ttl_secs: u64,
+        max_entries: usize,
+        registry: Arc<dyn CredentialKeyRegistry>,
+    ) -> Self {
+        Self {
+            cache: CredentialCache::new(ttl_secs, max_entries),
+            key_registry: Some(registry),
+        }
+    }
+
+    /// Create with custom cache settings (no registry - for testing only)
+    #[deprecated(note = "Use with_cache_and_registry for secure verification")]
     pub fn with_cache(ttl_secs: u64, max_entries: usize) -> Self {
         Self {
             cache: CredentialCache::new(ttl_secs, max_entries),
+            key_registry: None,
         }
+    }
+
+    /// Set the key registry for signature verification
+    pub fn set_registry(&mut self, registry: Arc<dyn CredentialKeyRegistry>) {
+        self.key_registry = Some(registry);
     }
 
     /// Verify a single credential with caching
@@ -371,7 +551,7 @@ impl BatchCredentialVerifier {
             .collect()
     }
 
-    /// Internal verification without cache
+    /// Internal verification without cache - PERFORMS REAL SIGNATURE VERIFICATION
     fn verify_uncached(&self, credential: &VerifiableCredential) -> VerificationResult {
         // Check expiration first (cheap)
         if credential.is_expired() {
@@ -383,18 +563,99 @@ impl BatchCredentialVerifier {
                     .duration_since(UNIX_EPOCH)
                     .map(|d| d.as_secs())
                     .unwrap_or(0),
-                error: Some("Credential has expired".to_string()),
+                error: Some(CredentialVerificationError::Expired.to_string()),
             };
         }
 
         // Check proof exists
-        if !credential.has_proof() {
-            return VerificationResult::failure("No proof attached to credential");
+        let proof = match &credential.proof {
+            Some(p) => p,
+            None => {
+                return VerificationResult::failure(CredentialVerificationError::NoProof.to_string());
+            }
+        };
+
+        // Check proof type
+        if proof.proof_type != "Ed25519Signature2020" {
+            return VerificationResult::failure(
+                CredentialVerificationError::UnsupportedProofType(proof.proof_type.clone()).to_string()
+            );
         }
 
-        // In a real implementation, verify the signature here
-        // For now, we trust that having a proof means it's valid
-        VerificationResult::success()
+        // Get key registry or fail
+        let registry = match &self.key_registry {
+            Some(r) => r,
+            None => {
+                return VerificationResult::failure(
+                    CredentialVerificationError::NoKeyRegistry.to_string()
+                );
+            }
+        };
+
+        // Decode base64 signature
+        let signature_bytes = match BASE64.decode(&proof.proof_value) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                return VerificationResult::failure(
+                    CredentialVerificationError::InvalidBase64(e.to_string()).to_string()
+                );
+            }
+        };
+
+        // Validate signature length (Ed25519 signatures are 64 bytes)
+        if signature_bytes.len() != 64 {
+            return VerificationResult::failure(
+                CredentialVerificationError::InvalidSignatureFormat(
+                    format!("Expected 64 bytes, got {}", signature_bytes.len())
+                ).to_string()
+            );
+        }
+
+        // Look up public key from verification method
+        let public_key_bytes = match registry.get_public_key(&proof.verification_method) {
+            Some(key) => key,
+            None => {
+                return VerificationResult::failure(
+                    CredentialVerificationError::PublicKeyNotFound(
+                        proof.verification_method.clone()
+                    ).to_string()
+                );
+            }
+        };
+
+        // Parse public key
+        let verifying_key = match VerifyingKey::from_bytes(&public_key_bytes) {
+            Ok(key) => key,
+            Err(e) => {
+                return VerificationResult::failure(
+                    CredentialVerificationError::InvalidPublicKey(e.to_string()).to_string()
+                );
+            }
+        };
+
+        // Parse signature
+        let signature_array: [u8; 64] = match signature_bytes.try_into() {
+            Ok(arr) => arr,
+            Err(_) => {
+                return VerificationResult::failure(
+                    CredentialVerificationError::InvalidSignatureFormat(
+                        "Failed to convert signature bytes".to_string()
+                    ).to_string()
+                );
+            }
+        };
+        let signature = Signature::from_bytes(&signature_array);
+
+        // Compute the message that was signed
+        let message = credential.compute_signing_message();
+
+        // VERIFY THE SIGNATURE
+        match verifying_key.verify(&message, &signature) {
+            Ok(()) => VerificationResult::success(),
+            Err(e) => VerificationResult::failure(
+                CredentialVerificationError::SignatureVerificationFailed(e.to_string()).to_string()
+            ),
+        }
     }
 
     /// Get cache statistics
@@ -548,6 +809,54 @@ mod chrono_lite {
 mod tests {
     use super::*;
     use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+    use ed25519_dalek::{SigningKey, Signer};
+
+    /// Create a test keypair and sign a credential
+    fn create_signed_credential(
+        issuer: &str,
+        subject: &str,
+        verification_method: &str,
+    ) -> (VerifiableCredential, SigningKey) {
+        // Fixed test key for reproducibility
+        let signing_key = SigningKey::from_bytes(&[
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+            0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+            0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+            0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+        ]);
+
+        // Create credential without proof first
+        let mut vc = VerifiableCredential::builder()
+            .issuer(issuer)
+            .subject(subject)
+            .claims(serde_json::json!({"test": "value"}))
+            .build();
+
+        // Compute signing message and sign
+        let message = vc.compute_signing_message();
+        let signature = signing_key.sign(&message);
+
+        // Add proof with base64-encoded signature
+        vc.proof = Some(CredentialProof {
+            proof_type: "Ed25519Signature2020".to_string(),
+            created: "2024-01-01T00:00:00Z".to_string(),
+            verification_method: verification_method.to_string(),
+            proof_purpose: "assertionMethod".to_string(),
+            proof_value: BASE64.encode(signature.to_bytes()),
+        });
+
+        (vc, signing_key)
+    }
+
+    fn create_test_registry(
+        verification_method: &str,
+        signing_key: &SigningKey,
+    ) -> Arc<InMemoryCredentialKeyRegistry> {
+        let mut registry = InMemoryCredentialKeyRegistry::new();
+        let public_key = signing_key.verifying_key();
+        registry.register(verification_method, public_key.to_bytes());
+        Arc::new(registry)
+    }
 
     #[test]
     fn test_build_credential() {
@@ -648,11 +957,107 @@ mod tests {
         assert_eq!(stats.max_entries, 100);
     }
 
-    #[test]
-    fn test_batch_verifier() {
-        let verifier = BatchCredentialVerifier::new();
+    // =========================================================================
+    // SIGNATURE VERIFICATION TESTS
+    // =========================================================================
 
-        // Create a credential with a proof
+    #[test]
+    fn test_signature_verification_success() {
+        let verification_method = "did:example:issuer#key-1";
+        let (vc, signing_key) = create_signed_credential(
+            "did:example:issuer",
+            "did:example:subject",
+            verification_method,
+        );
+        let registry = create_test_registry(verification_method, &signing_key);
+
+        let verifier = BatchCredentialVerifier::with_registry(registry);
+        let result = verifier.verify(&vc);
+
+        assert!(result.is_valid, "Expected valid, got error: {:?}", result.error);
+        assert!(result.signature_verified);
+    }
+
+    #[test]
+    fn test_signature_verification_wrong_key() {
+        let verification_method = "did:example:issuer#key-1";
+        let (vc, _) = create_signed_credential(
+            "did:example:issuer",
+            "did:example:subject",
+            verification_method,
+        );
+
+        // Register wrong key
+        let wrong_key = SigningKey::from_bytes(&[0x42; 32]);
+        let registry = create_test_registry(verification_method, &wrong_key);
+
+        let verifier = BatchCredentialVerifier::with_registry(registry);
+        let result = verifier.verify(&vc);
+
+        assert!(!result.is_valid);
+        assert!(result.error.as_ref().unwrap().contains("Signature verification failed"));
+    }
+
+    #[test]
+    fn test_signature_verification_key_not_found() {
+        let (vc, _) = create_signed_credential(
+            "did:example:issuer",
+            "did:example:subject",
+            "did:example:issuer#key-1",
+        );
+
+        // Empty registry
+        let registry = Arc::new(InMemoryCredentialKeyRegistry::new());
+
+        let verifier = BatchCredentialVerifier::with_registry(registry);
+        let result = verifier.verify(&vc);
+
+        assert!(!result.is_valid);
+        assert!(result.error.as_ref().unwrap().contains("Public key not found"));
+    }
+
+    #[test]
+    fn test_signature_verification_no_registry() {
+        let (vc, _) = create_signed_credential(
+            "did:example:issuer",
+            "did:example:subject",
+            "did:example:issuer#key-1",
+        );
+
+        // Verifier without registry
+        let verifier = BatchCredentialVerifier::new();
+        let result = verifier.verify(&vc);
+
+        assert!(!result.is_valid);
+        assert!(result.error.as_ref().unwrap().contains("No key registry configured"));
+    }
+
+    #[test]
+    fn test_signature_verification_tampered_credential() {
+        let verification_method = "did:example:issuer#key-1";
+        let (mut vc, signing_key) = create_signed_credential(
+            "did:example:issuer",
+            "did:example:subject",
+            verification_method,
+        );
+        let registry = create_test_registry(verification_method, &signing_key);
+
+        // Tamper with the credential after signing
+        vc.credential_subject.id = "did:example:tampered".to_string();
+
+        let verifier = BatchCredentialVerifier::with_registry(registry);
+        let result = verifier.verify(&vc);
+
+        assert!(!result.is_valid);
+        assert!(result.error.as_ref().unwrap().contains("Signature verification failed"));
+    }
+
+    #[test]
+    fn test_signature_verification_invalid_base64() {
+        let verification_method = "did:example:issuer#key-1";
+        let signing_key = SigningKey::from_bytes(&[0x01; 32]);
+        let registry = create_test_registry(verification_method, &signing_key);
+
         let mut vc = VerifiableCredential::builder()
             .issuer("did:example:issuer")
             .subject("did:example:subject")
@@ -661,14 +1066,59 @@ mod tests {
         vc.proof = Some(CredentialProof {
             proof_type: "Ed25519Signature2020".to_string(),
             created: "2024-01-01T00:00:00Z".to_string(),
-            verification_method: "did:example:issuer#key-1".to_string(),
+            verification_method: verification_method.to_string(),
             proof_purpose: "assertionMethod".to_string(),
-            proof_value: "test_signature".to_string(),
+            proof_value: "!!!invalid_base64!!!".to_string(),
         });
+
+        let verifier = BatchCredentialVerifier::with_registry(registry);
+        let result = verifier.verify(&vc);
+
+        assert!(!result.is_valid);
+        assert!(result.error.as_ref().unwrap().contains("Invalid base64"));
+    }
+
+    #[test]
+    fn test_signature_verification_unsupported_proof_type() {
+        let verification_method = "did:example:issuer#key-1";
+        let signing_key = SigningKey::from_bytes(&[0x01; 32]);
+        let registry = create_test_registry(verification_method, &signing_key);
+
+        let mut vc = VerifiableCredential::builder()
+            .issuer("did:example:issuer")
+            .subject("did:example:subject")
+            .build();
+
+        vc.proof = Some(CredentialProof {
+            proof_type: "SomeOtherProofType".to_string(),
+            created: "2024-01-01T00:00:00Z".to_string(),
+            verification_method: verification_method.to_string(),
+            proof_purpose: "assertionMethod".to_string(),
+            proof_value: "dGVzdA==".to_string(),
+        });
+
+        let verifier = BatchCredentialVerifier::with_registry(registry);
+        let result = verifier.verify(&vc);
+
+        assert!(!result.is_valid);
+        assert!(result.error.as_ref().unwrap().contains("Unsupported proof type"));
+    }
+
+    #[test]
+    fn test_batch_verifier_with_registry() {
+        let verification_method = "did:example:issuer#key-1";
+        let (vc, signing_key) = create_signed_credential(
+            "did:example:issuer",
+            "did:example:subject",
+            verification_method,
+        );
+        let registry = create_test_registry(verification_method, &signing_key);
+
+        let verifier = BatchCredentialVerifier::with_registry(registry);
 
         // First verification
         let result1 = verifier.verify(&vc);
-        assert!(result1.is_valid);
+        assert!(result1.is_valid, "First verification failed: {:?}", result1.error);
 
         // Second verification should use cache
         let result2 = verifier.verify(&vc);
@@ -680,53 +1130,107 @@ mod tests {
     }
 
     #[test]
-    fn test_batch_verify_multiple() {
-        let verifier = BatchCredentialVerifier::new();
+    fn test_batch_verify_multiple_with_signature() {
+        let verification_method = "did:example:issuer#key-1";
 
-        let credentials: Vec<_> = (0..5).map(|_| {
+        // All credentials signed with the same key for testing
+        let signing_key = SigningKey::from_bytes(&[
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+            0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+            0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+            0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+        ]);
+        let registry = create_test_registry(verification_method, &signing_key);
+
+        let credentials: Vec<_> = (0..5).map(|i| {
             let mut vc = VerifiableCredential::builder()
+                .id(format!("urn:uuid:test-{}", i))
                 .issuer("did:example:issuer")
                 .subject("did:example:subject")
+                .claims(serde_json::json!({"index": i}))
                 .build();
+
+            // Sign each credential
+            let message = vc.compute_signing_message();
+            let signature = signing_key.sign(&message);
+
             vc.proof = Some(CredentialProof {
                 proof_type: "Ed25519Signature2020".to_string(),
                 created: "2024-01-01T00:00:00Z".to_string(),
-                verification_method: "did:example:issuer#key-1".to_string(),
+                verification_method: verification_method.to_string(),
                 proof_purpose: "assertionMethod".to_string(),
-                proof_value: "test_signature".to_string(),
+                proof_value: BASE64.encode(signature.to_bytes()),
             });
             vc
         }).collect();
 
+        let verifier = BatchCredentialVerifier::with_registry(registry);
         let results = verifier.verify_batch(&credentials);
+
         assert_eq!(results.len(), 5);
-        assert!(results.iter().all(|r| r.is_valid));
+        for (i, result) in results.iter().enumerate() {
+            assert!(result.is_valid, "Credential {} failed: {:?}", i, result.error);
+        }
     }
 
     #[test]
-    fn test_filter_valid() {
-        let verifier = BatchCredentialVerifier::new();
+    fn test_filter_valid_with_signatures() {
+        let verification_method = "did:example:issuer#key-1";
+        let (valid_vc, signing_key) = create_signed_credential(
+            "did:example:issuer",
+            "did:example:subject",
+            verification_method,
+        );
+        let registry = create_test_registry(verification_method, &signing_key);
 
-        // Mix of credentials with and without proofs
-        let mut valid = VerifiableCredential::builder()
+        // Credential without proof
+        let invalid_vc = VerifiableCredential::builder()
             .issuer("did:example:issuer")
             .subject("did:example:subject")
             .build();
-        valid.proof = Some(CredentialProof {
-            proof_type: "Ed25519Signature2020".to_string(),
-            created: "2024-01-01T00:00:00Z".to_string(),
-            verification_method: "did:example:issuer#key-1".to_string(),
-            proof_purpose: "assertionMethod".to_string(),
-            proof_value: "test_signature".to_string(),
-        });
 
-        let invalid = VerifiableCredential::builder()
+        let credentials = vec![valid_vc.clone(), invalid_vc, valid_vc];
+        let verifier = BatchCredentialVerifier::with_registry(registry);
+        let valid_only = verifier.filter_valid(&credentials);
+
+        assert_eq!(valid_only.len(), 2);
+    }
+
+    #[test]
+    fn test_signing_message_deterministic() {
+        let vc1 = VerifiableCredential::builder()
+            .id("urn:uuid:test-1")
             .issuer("did:example:issuer")
             .subject("did:example:subject")
-            .build(); // No proof
+            .claims(serde_json::json!({"test": "value"}))
+            .build();
 
-        let credentials = vec![valid.clone(), invalid, valid];
-        let valid_only = verifier.filter_valid(&credentials);
-        assert_eq!(valid_only.len(), 2);
+        let vc2 = VerifiableCredential::builder()
+            .id("urn:uuid:test-1")
+            .issuer("did:example:issuer")
+            .subject("did:example:subject")
+            .claims(serde_json::json!({"test": "value"}))
+            .build();
+
+        // Same credentials should produce same signing message
+        assert_eq!(vc1.compute_signing_message(), vc2.compute_signing_message());
+    }
+
+    #[test]
+    fn test_signing_message_different_for_different_inputs() {
+        let vc1 = VerifiableCredential::builder()
+            .id("urn:uuid:test-1")
+            .issuer("did:example:issuer")
+            .subject("did:example:subject")
+            .build();
+
+        let vc2 = VerifiableCredential::builder()
+            .id("urn:uuid:test-2")
+            .issuer("did:example:issuer")
+            .subject("did:example:subject")
+            .build();
+
+        // Different IDs should produce different signing messages
+        assert_ne!(vc1.compute_signing_message(), vc2.compute_signing_message());
     }
 }

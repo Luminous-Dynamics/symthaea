@@ -16,6 +16,10 @@ parallel = ["rayon"]
 simulation = []
 # risc0 feature requires external risc0-zkvm installation - disabled by default
 risc0 = []
+# Full WebAuthn CBOR/COSE verification support
+webauthn-full = ["ciborium", "p256", "ecdsa"]
+# Stub WebAuthn for testing (accepts any signature) - DO NOT USE IN PRODUCTION
+stub-webauthn = []
 
 [dependencies]
 # Serialization
@@ -63,6 +67,11 @@ rayon = { version = "1.8", optional = true }
 
 # Thiserror for error handling
 thiserror = "1.0"
+
+# WebAuthn CBOR/COSE support (optional)
+ciborium = { version = "0.2", optional = true }
+p256 = { version = "0.13", features = ["ecdsa"], optional = true }
+ecdsa = { version = "0.16", optional = true }
 
 [dev-dependencies]
 approx = "0.5"
