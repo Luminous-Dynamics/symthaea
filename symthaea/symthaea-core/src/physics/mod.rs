@@ -31,6 +31,16 @@ mod economics;
 mod design_integration;
 mod trajectory_analysis;
 
+// HDC Scientific Knowledge Expansion modules
+mod antimatter;
+mod thermodynamics;
+mod astrophysics;
+mod phase_transitions;
+mod qft;
+mod molecular_biology;
+mod neuroscience;
+mod quantum_gravity;
+
 pub use standard_model::*;
 pub use hadrons::*;
 pub use periodic_table::*;
@@ -57,3 +67,13 @@ pub use manufacturing::*;
 pub use economics::*;
 pub use design_integration::*;
 pub use trajectory_analysis::*;
+
+// HDC Scientific Knowledge Expansion exports
+pub use antimatter::*;
+pub use thermodynamics::*;
+pub use astrophysics::*;
+pub use phase_transitions::*;
+pub use qft::*;
+pub use molecular_biology::*;
+pub use neuroscience::*;
+pub use quantum_gravity::*;
