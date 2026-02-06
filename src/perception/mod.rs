@@ -149,3 +149,11 @@ pub mod conscious_perception;
 
 #[cfg(feature = "full_perception")]
 pub mod resilience;
+
+// Ported from crates/symthaea-perception (2026-02-06)
+// Code semantic analysis (syn-based Rust parsing, project structure analysis)
+pub mod code_perception;
+// OCR with dual-engine approach (rten pure-Rust + Tesseract fallback)
+pub mod ocr;
+// Traditional CV feature extraction (brightness, edges, dominant colors)
+pub mod visual_features;
