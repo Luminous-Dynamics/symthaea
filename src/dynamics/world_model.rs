@@ -519,6 +519,36 @@ impl HierarchicalCfCWorldModel {
     pub fn num_levels(&self) -> usize {
         self.config.num_levels
     }
+
+    /// Get combined CfC state from all layers
+    /// Returns a flattened vector of all layer states
+    pub fn cfc_state(&self) -> Vec<f32> {
+        let mut state = Vec::new();
+        for layer in &self.layers {
+            state.extend(layer.state().iter());
+        }
+        state
+    }
+
+    /// Compute consciousness level from the CfC state
+    /// Returns a value between 0.0 and 1.0 based on the integration/complexity of the state
+    pub fn consciousness(&self) -> f32 {
+        // Simple proxy for consciousness: normalized variance across layers
+        // Higher variance = more differentiated states = higher consciousness
+        let states: Vec<f32> = self.cfc_state();
+        if states.is_empty() {
+            return 0.0;
+        }
+
+        let mean = states.iter().sum::<f32>() / states.len() as f32;
+        let variance = states.iter()
+            .map(|x| (x - mean).powi(2))
+            .sum::<f32>() / states.len() as f32;
+
+        // Normalize to 0-1 range using sigmoid-like function
+        let normalized = (variance * 10.0).tanh();
+        normalized.clamp(0.0, 1.0)
+    }
 }
 
 #[cfg(test)]

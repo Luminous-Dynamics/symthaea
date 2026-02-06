@@ -5,13 +5,13 @@ members = [
     "symthaea-core",
     "crates/symthaea-stt",
     "crates/symthaea-sentinel",
-    "crates/symthaea-consciousness",
-    "crates/symthaea-perception",
-    "crates/symthaea-math",
-    "crates/symthaea-dynamics",
-    "crates/symthaea-gym",
-    # "rust-sentinels",        # Excluded: pyo3 ^0.22 conflicts with root pyo3 ^0.24 (links = "python")
-    # "tools/clinical_validation",  # Standalone tool, no workspace deps
+    # "crates/symthaea-consciousness",   # Blocked: depends on removed symthaea-math
+    # "crates/symthaea-perception",      # Blocked: depends on removed symthaea-math
+    # "crates/symthaea-dynamics",        # Blocked: depends on removed symthaea-math
+    # "crates/symthaea-gym",             # Archived 2026-02-06: superseded by src/swarm/
+    # "crates/symthaea-math",            # Archived 2026-02-06: superseded by symthaea-core::hdc::real_hv
+    # "rust-sentinels",                  # Excluded: pyo3 ^0.22 conflicts with root pyo3 ^0.24 (links = "python")
+    # "tools/clinical_validation",       # Standalone tool, no workspace deps
 ]
 
 [workspace.dependencies]
@@ -29,7 +29,7 @@ edition = "2021"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
 description = "Symthaea: Holographic Liquid Brain lineage - Consciousness-first AI in Rust"
 license = "MIT"
-repository = "https://github.com/Luminous-Dynamics/symthaea-hlb"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
 homepage = "https://luminousdynamics.org"
 documentation = "https://docs.rs/symthaea"
 keywords = ["consciousness", "ai", "hdc", "integrated-information", "neuroscience"]
@@ -137,6 +137,8 @@ rand = "0.8"
 rand_chacha = "0.3"  # Deterministic RNG for reproducible JL projections
 blake3 = "1.5"
 hex = "0.4"     # Hex encoding for node IDs in federated network
+ed25519-dalek = { version = "2.1", features = ["serde"] }  # MFDI identity signatures
+sha2 = "0.10"   # MFDI credential hashing
 md5 = "0.7"  # For experience module topic hashing
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1.10"  # For Thalamus pattern matching
@@ -163,6 +165,7 @@ futures = { version = "0.3", optional = true }  # Async TTS streaming
 rodio = { version = "0.19", default-features = false, optional = true }  # Audio playback (no backends by default)
 hound = { version = "3.5", optional = true }        # WAV file I/O
 hf-hub = { version = "0.4", optional = true }       # HuggingFace Hub for model download
+espeak-rs = { version = "0.1", optional = true }    # espeak-ng bindings for proper G2P
 
 # Enhancement #8 Week 4: PyPhi Integration (IIT 3.0 exact Φ calculation)
 pyo3 = { version = "0.24", features = ["auto-initialize"], optional = true }  # Rust-Python bridge for PyPhi
@@ -207,7 +210,7 @@ gui = ["eframe", "egui"]  # Enable symthaea-gui binary
 demo = ["clap", "ctrlc"]  # Demo binaries with CLI argument parsing and signal handling
 full = ["service", "shell", "gui", "demo"]  # All binaries
 # Voice features
-voice-tts = ["ort", "hound", "hf-hub"]  # TTS with Kokoro (ONNX) - CPU
+voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
 voice-tts-cuda = ["voice-tts", "ort/cuda"]  # TTS with CUDA acceleration (requires CUDA toolkit)
 voice-tts-async = ["voice-tts", "futures"]  # Async/streaming TTS
 voice-stt = ["symthaea-stt", "hound"]  # STT with symthaea-stt crate (HDC + LTC + CfC)
@@ -234,6 +237,7 @@ duck = []     # DuckDB analytical queries
 hdf5 = []     # HDF5 file loading for C-Mod plasma data (add hdf5 crate when ready)
 # Swarm Intelligence - Hybrid Iroh + Holochain
 swarm = ["iroh"]  # Real-time P2P tensor streaming via Iroh 0.95+
+holochain = []    # Holochain conductor connectivity (real integration in symthaea-mycelix-bridge)
 # Desktop integration features
 notifications = ["zbus"]  # E1: D-Bus desktop notifications
 systemd = ["libsystemd"]  # D1: Systemd socket activation
@@ -242,6 +246,9 @@ desktop = ["notifications", "systemd"]
 # mycelix = ["mycelix-sdk", "sha3"]  # Full Mycelix SDK integration for governance
 # Disabled until mycelix-sdk is available as a proper crate
 mycelix = ["sha3"]  # Mycelix-ready (hashing only, SDK integration pending)
+
+# Identity: MFDI (Multi-Factor Delegated Identity) for cognitive agents
+identity = []  # Ed25519 signatures, capability gating, signed request/output
 
 # GPU acceleration for CfC networks
 gpu = ["burn", "burn-ndarray"]  # GPU acceleration via Burn/WGPU for CfC networks
