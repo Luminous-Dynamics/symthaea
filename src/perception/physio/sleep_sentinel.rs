@@ -476,7 +476,8 @@ impl AdaptiveThreshold {
         // Determine which thresholds need adjustment based on the error type
         let actual_state = match actual {
             SleepStage::Wake => ConsciousnessState::Awake,
-            SleepStage::N1 | SleepStage::N2 => ConsciousnessState::LightSleep,
+            SleepStage::N1 => ConsciousnessState::Transitional,  // N1 = Transitional
+            SleepStage::N2 => ConsciousnessState::LightSleep,    // N2 = LightSleep
             SleepStage::N3 => ConsciousnessState::DeepSleep,
             SleepStage::REM => ConsciousnessState::REM,
             _ => return, // Don't adapt for unknown/movement
@@ -1244,26 +1245,26 @@ impl SleepSentinel {
             (-synchrony_score) * 0.3;          // Desynchronized
 
         // N3 (Deep Sleep): High synchrony, low frequency, high phi
-        // Delta waves (<4 Hz), highly synchronized
+        // Delta waves (<4 Hz), highly synchronized - the most distinctive pattern
         let deep_score =
-            synchrony_score * 0.35 +           // Synchronized
-            low_freq_score.max(0.0) * 0.35 +   // Slow delta waves
-            phi_score * 0.3;                   // High integration
+            synchrony_score.max(0.0) * 0.4 +   // HIGH synchrony required
+            low_freq_score.max(0.0) * 0.35 +   // Slow delta waves (<4 Hz)
+            phi_score.max(0.0) * 0.25;         // High integration
 
         // REM: High complexity, low phi, low synchrony (the paradox)
-        // Active but disconnected - this is the key insight
+        // Active but disconnected - this is the KEY insight distinguishing REM from wake
         let rem_score =
-            complexity_score * 0.35 +          // Active brain
-            (-phi_score) * 0.35 +              // LOW integration (key!)
-            (-synchrony_score) * 0.3;          // Desynchronized
+            complexity_score.max(0.0) * 0.3 +   // Active brain (like wake)
+            (-phi_score).max(0.0) * 0.4 +       // LOW integration (key paradox!)
+            (-synchrony_score).max(0.0) * 0.3;  // Desynchronized
 
         // N2 (Light Sleep): Moderate values, sleep spindles (12-14 Hz bursts)
         // Theta background with spindle activity
+        // NOTE: Removed 0.2 base score that was biasing toward N2
         let n2_score =
-            0.2 +  // Base score (N2 is most common stage)
-            (1.0 - complexity_score.abs()) * 0.3 +   // Moderate complexity
-            synchrony_score.max(0.0) * 0.25 +        // Some synchrony
-            (1.0 - high_freq_score.abs()) * 0.25;    // Moderate frequency
+            (1.0 - complexity_score.abs()) * 0.35 +   // Moderate complexity
+            synchrony_score.max(0.0) * 0.3 +          // Some synchrony (more than wake)
+            (1.0 - high_freq_score.abs()) * 0.35;     // Moderate frequency (spindles)
 
         // N1 (Transitional): Low complexity, theta range, transitional
         let n1_score =
