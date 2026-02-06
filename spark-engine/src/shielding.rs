@@ -17,6 +17,8 @@ pub struct ShieldingResult {
     pub dose_rate_msv_hr: f64,
     /// Is public-safe (< 1 mSv/year at 2000 hr exposure)?
     pub public_safe: bool,
+    /// Total mass for spherical shell (kg)
+    pub total_mass_kg: f64,
 }
 
 /// Shielding material properties.
@@ -123,12 +125,21 @@ impl NeutronShielding {
         let annual_dose = dose_rate * 2000.0;
         let public_safe = annual_dose < 1.0;
 
+        // Total mass for spherical shell at distance
+        // Shell volume = 4π/3 × ((r + t)³ - r³)
+        let r_inner_cm = distance_m * 100.0;
+        let r_outer_cm = r_inner_cm + thickness_cm;
+        let shell_volume_cm3 = (4.0 / 3.0) * std::f64::consts::PI *
+            (r_outer_cm.powi(3) - r_inner_cm.powi(3));
+        let total_mass_kg = shell_volume_cm3 * material.density / 1000.0;
+
         ShieldingResult {
             material: material.name.to_string(),
             thickness_cm,
             areal_density,
             dose_rate_msv_hr: dose_rate,
             public_safe,
+            total_mass_kg,
         }
     }
 

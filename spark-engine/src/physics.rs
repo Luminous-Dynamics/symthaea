@@ -5,6 +5,65 @@
 use crate::constants::*;
 use serde::{Deserialize, Serialize};
 
+// ============================================================================
+// D-D Multi-Channel Branching (Direction A Enhancement)
+// ============================================================================
+
+/// D-D reaction channel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DDChannel {
+    /// D + D → He3 (0.82 MeV) + n (2.45 MeV)
+    Neutron,
+    /// D + D → T (1.01 MeV) + p (3.02 MeV)
+    Proton,
+}
+
+/// Detailed D-D branching result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DDBranchingResult {
+    /// Total reaction rate <σv> (cm³/s)
+    pub total_sigma_v_cm3_s: f64,
+    /// Neutron branch rate (cm³/s)
+    pub neutron_sigma_v_cm3_s: f64,
+    /// Proton branch rate (cm³/s)
+    pub proton_sigma_v_cm3_s: f64,
+    /// Neutron branch fraction (energy-dependent)
+    pub neutron_fraction: f64,
+    /// Proton branch fraction
+    pub proton_fraction: f64,
+    /// Neutron production rate (n/s/cm³) at given density
+    pub neutron_rate_per_cm3: f64,
+    /// Tritium production rate (T/s/cm³) from proton channel
+    pub tritium_rate_per_cm3: f64,
+    /// He3 production rate (He3/s/cm³) from neutron channel
+    pub he3_rate_per_cm3: f64,
+    /// Total power density (W/cm³)
+    pub power_density_w_cm3: f64,
+    /// Neutron branch power (W/cm³)
+    pub neutron_power_w_cm3: f64,
+    /// Proton branch power (W/cm³)
+    pub proton_power_w_cm3: f64,
+}
+
+impl DDBranchingResult {
+    /// Get neutron production rate for given volume.
+    pub fn neutron_rate(&self, volume_cm3: f64) -> f64 {
+        self.neutron_rate_per_cm3 * volume_cm3
+    }
+
+    /// Get tritium accumulation rate for given volume (atoms/s).
+    pub fn tritium_rate(&self, volume_cm3: f64) -> f64 {
+        self.tritium_rate_per_cm3 * volume_cm3
+    }
+
+    /// Tritium activity buildup rate (Bq/s) for given volume.
+    /// T half-life = 12.32 years = 3.89e8 s, λ = 1.78e-9 /s
+    pub fn tritium_activity_rate_bq_s(&self, volume_cm3: f64) -> f64 {
+        let lambda_t = 1.78e-9; // T decay constant
+        self.tritium_rate(volume_cm3) * lambda_t
+    }
+}
+
 /// Result of Gamow peak thermal integration for D-D reaction rate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GamowResult {
@@ -211,6 +270,74 @@ impl GamowIntegration {
 
         (prefactor * exponent.exp()).max(1.0).min(1e6)
     }
+
+    /// Energy-dependent D-D branching ratio.
+    ///
+    /// At low energies (E < 100 keV), the branching is nearly 50/50.
+    /// There's a slight energy dependence: neutron fraction decreases at higher E.
+    ///
+    /// R_n(E) ≈ 0.5 × (1 - 0.003 × E_keV) for E < 100 keV
+    pub fn dd_branching_ratio(e_cm_kev: f64) -> (f64, f64) {
+        // Neutron fraction with weak energy dependence
+        let neutron_frac = if e_cm_kev < 100.0 {
+            0.5 * (1.0 - 0.003 * e_cm_kev)
+        } else {
+            0.35 // Asymptotic value at high energy
+        };
+        let neutron_frac = neutron_frac.clamp(0.35, 0.5);
+        let proton_frac = 1.0 - neutron_frac;
+        (neutron_frac, proton_frac)
+    }
+
+    /// Full D-D branching calculation with all products.
+    ///
+    /// Returns detailed breakdown of neutron/proton channels,
+    /// product rates, and power distribution.
+    pub fn dd_branched(
+        t_k: f64,
+        ue_ev: f64,
+        phonon_modes: u32,
+        n_d_cm3: f64,
+    ) -> DDBranchingResult {
+        let gamow = Self::dd_rate(t_k, ue_ev, phonon_modes);
+
+        // Branching at Gamow peak energy
+        let (neutron_frac, proton_frac) = Self::dd_branching_ratio(gamow.gamow_peak_kev);
+
+        let neutron_sigma_v = gamow.sigma_v_cm3_s * neutron_frac;
+        let proton_sigma_v = gamow.sigma_v_cm3_s * proton_frac;
+
+        // Reaction rate density: R = n² × <σv> / 4
+        let total_rate_density = n_d_cm3.powi(2) * gamow.sigma_v_cm3_s / 4.0;
+        let neutron_rate_density = n_d_cm3.powi(2) * neutron_sigma_v / 4.0;
+        let proton_rate_density = n_d_cm3.powi(2) * proton_sigma_v / 4.0;
+
+        // Product rates
+        let neutron_rate_per_cm3 = neutron_rate_density; // 1 neutron per reaction
+        let he3_rate_per_cm3 = neutron_rate_density;     // 1 He3 per neutron channel
+        let tritium_rate_per_cm3 = proton_rate_density;  // 1 T per proton channel
+
+        // Power density
+        // Neutron channel: Q = 3.269 MeV
+        // Proton channel: Q = 4.033 MeV
+        let neutron_power = neutron_rate_density * DD_Q_NEUTRON * 1.602e-13;
+        let proton_power = proton_rate_density * DD_Q_PROTON * 1.602e-13;
+        let total_power = neutron_power + proton_power;
+
+        DDBranchingResult {
+            total_sigma_v_cm3_s: gamow.sigma_v_cm3_s,
+            neutron_sigma_v_cm3_s: neutron_sigma_v,
+            proton_sigma_v_cm3_s: proton_sigma_v,
+            neutron_fraction: neutron_frac,
+            proton_fraction: proton_frac,
+            neutron_rate_per_cm3,
+            tritium_rate_per_cm3,
+            he3_rate_per_cm3,
+            power_density_w_cm3: total_power,
+            neutron_power_w_cm3: neutron_power,
+            proton_power_w_cm3: proton_power,
+        }
+    }
 }
 
 /// Parameters for Q factor calculation.
@@ -347,5 +474,44 @@ mod tests {
 
         let high_e = GamowIntegration::screening_enhancement(309.0, 100000.0);
         assert!(high_e < enhancement, "Enhancement should decrease at high energy");
+    }
+
+    #[test]
+    fn test_dd_branching_ratio() {
+        // At low energy, should be ~50/50
+        let (n_frac, p_frac) = GamowIntegration::dd_branching_ratio(1.0);
+        assert!((n_frac - 0.5).abs() < 0.01, "Low energy should be ~50% neutron");
+        assert!((n_frac + p_frac - 1.0).abs() < 0.001, "Fractions must sum to 1");
+
+        // At higher energy, neutron fraction decreases
+        let (n_frac_high, _) = GamowIntegration::dd_branching_ratio(50.0);
+        assert!(n_frac_high < n_frac, "Neutron fraction should decrease with energy");
+    }
+
+    #[test]
+    fn test_dd_branched() {
+        let n_d = 4.8e22; // D atoms/cm³ in PdD
+        let result = GamowIntegration::dd_branched(300.0, SCREENING_PD_EV, 2, n_d);
+
+        // Check branching fractions sum to 1
+        assert!((result.neutron_fraction + result.proton_fraction - 1.0).abs() < 0.001);
+
+        // Check sigma_v consistency
+        let sigma_sum = result.neutron_sigma_v_cm3_s + result.proton_sigma_v_cm3_s;
+        assert!((sigma_sum - result.total_sigma_v_cm3_s).abs() / result.total_sigma_v_cm3_s < 0.001);
+
+        // Check power is distributed correctly
+        assert!(result.neutron_power_w_cm3 > 0.0 || result.total_sigma_v_cm3_s == 0.0);
+        assert!(result.proton_power_w_cm3 > 0.0 || result.total_sigma_v_cm3_s == 0.0);
+    }
+
+    #[test]
+    fn test_tritium_activity() {
+        let n_d = 4.8e22;
+        let result = GamowIntegration::dd_branched(300.0, SCREENING_PD_EV, 2, n_d);
+
+        // At room temperature, rates are tiny but should be non-negative
+        assert!(result.tritium_rate_per_cm3 >= 0.0);
+        assert!(result.tritium_activity_rate_bq_s(1.0) >= 0.0);
     }
 }

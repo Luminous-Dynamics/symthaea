@@ -368,12 +368,237 @@ impl PhysicsKnowledgeBase {
             },
         ];
 
+        // QFT tunneling corrections (Direction C enhancement)
+        let qft_facts = vec![
+            PhysicsQuantity {
+                name: "vacuum_fluctuation_energy".to_string(),
+                value: 0.5, // hbar*omega ~ 0.5 eV for typical modes
+                unit: "eV".to_string(),
+                domains: vec![PhysicsDomain::Quantum, PhysicsDomain::Particle],
+                uncertainty: None,
+                interpretation: "Zero-point energy of vacuum fluctuations per mode".to_string(),
+            },
+            PhysicsQuantity {
+                name: "instanton_action".to_string(),
+                value: 87.0, // S/hbar for D-D at Coulomb barrier
+                unit: "hbar".to_string(),
+                domains: vec![PhysicsDomain::Particle, PhysicsDomain::Quantum],
+                uncertainty: Some(5.0),
+                interpretation: "WKB instanton action for D-D tunneling".to_string(),
+            },
+            PhysicsQuantity {
+                name: "coulomb_correction_factor".to_string(),
+                value: 0.97, // 1 - Zα for D-D
+                unit: "dimensionless".to_string(),
+                domains: vec![PhysicsDomain::Particle],
+                uncertainty: None,
+                interpretation: "Relativistic Coulomb wave correction".to_string(),
+            },
+            PhysicsQuantity {
+                name: "radiative_correction".to_string(),
+                value: 1.001, // ~0.1% QED correction
+                unit: "dimensionless".to_string(),
+                domains: vec![PhysicsDomain::Particle, PhysicsDomain::Electromagnetic],
+                uncertainty: Some(0.0005),
+                interpretation: "QED radiative correction to tunneling".to_string(),
+            },
+            PhysicsQuantity {
+                name: "pair_production_threshold".to_string(),
+                value: 1.022e6, // 2*m_e*c^2 in eV
+                unit: "eV".to_string(),
+                domains: vec![PhysicsDomain::Particle, PhysicsDomain::Quantum],
+                uncertainty: None,
+                interpretation: "Electron-positron pair production threshold".to_string(),
+            },
+        ];
+
+        // Lattice defect contributions
+        let defect_facts = vec![
+            PhysicsQuantity {
+                name: "vacancy_formation_energy_pd".to_string(),
+                value: 1.4, // eV
+                unit: "eV".to_string(),
+                domains: vec![PhysicsDomain::CondensedMatter],
+                uncertainty: Some(0.1),
+                interpretation: "Pd monovacancy formation energy".to_string(),
+            },
+            PhysicsQuantity {
+                name: "dislocation_density_annealed".to_string(),
+                value: 1e10, // /m^2
+                unit: "m^-2".to_string(),
+                domains: vec![PhysicsDomain::CondensedMatter],
+                uncertainty: None,
+                interpretation: "Dislocation density in annealed Pd".to_string(),
+            },
+            PhysicsQuantity {
+                name: "dislocation_density_cold_worked".to_string(),
+                value: 1e15, // /m^2
+                unit: "m^-2".to_string(),
+                domains: vec![PhysicsDomain::CondensedMatter],
+                uncertainty: None,
+                interpretation: "Dislocation density in cold-worked Pd".to_string(),
+            },
+            PhysicsQuantity {
+                name: "grain_boundary_energy_pd".to_string(),
+                value: 0.5, // J/m^2
+                unit: "J/m^2".to_string(),
+                domains: vec![PhysicsDomain::CondensedMatter],
+                uncertainty: Some(0.1),
+                interpretation: "Pd high-angle grain boundary energy".to_string(),
+            },
+            PhysicsQuantity {
+                name: "d_trapping_energy_vacancy".to_string(),
+                value: 0.2, // eV
+                unit: "eV".to_string(),
+                domains: vec![PhysicsDomain::CondensedMatter, PhysicsDomain::Chemistry],
+                uncertainty: Some(0.05),
+                interpretation: "D trapping energy at Pd vacancy".to_string(),
+            },
+            PhysicsQuantity {
+                name: "d_diffusion_activation_pd".to_string(),
+                value: 0.23, // eV
+                unit: "eV".to_string(),
+                domains: vec![PhysicsDomain::CondensedMatter, PhysicsDomain::Statistical],
+                uncertainty: Some(0.02),
+                interpretation: "D diffusion activation energy in Pd".to_string(),
+            },
+            PhysicsQuantity {
+                name: "local_d_concentration_defect".to_string(),
+                value: 2.0, // Enhancement factor at defects
+                unit: "dimensionless".to_string(),
+                domains: vec![PhysicsDomain::CondensedMatter, PhysicsDomain::Chemistry],
+                uncertainty: Some(0.5),
+                interpretation: "D concentration enhancement at defects".to_string(),
+            },
+        ];
+
+        // Nuclear structure effects
+        let nuclear_structure_facts = vec![
+            PhysicsQuantity {
+                name: "dd_s_factor_0".to_string(),
+                value: 55.0, // keV·barn
+                unit: "keV·barn".to_string(),
+                domains: vec![PhysicsDomain::Nuclear],
+                uncertainty: Some(3.0),
+                interpretation: "D-D astrophysical S-factor at E=0".to_string(),
+            },
+            PhysicsQuantity {
+                name: "dd_s_factor_slope".to_string(),
+                value: 0.0, // Nearly flat for D-D
+                unit: "barn".to_string(),
+                domains: vec![PhysicsDomain::Nuclear],
+                uncertainty: Some(0.1),
+                interpretation: "D-D S-factor energy derivative".to_string(),
+            },
+            PhysicsQuantity {
+                name: "deuteron_radius".to_string(),
+                value: 2.13, // fm
+                unit: "fm".to_string(),
+                domains: vec![PhysicsDomain::Nuclear, PhysicsDomain::Particle],
+                uncertainty: Some(0.01),
+                interpretation: "Deuteron rms charge radius".to_string(),
+            },
+            PhysicsQuantity {
+                name: "deuteron_binding_energy".to_string(),
+                value: 2.225, // MeV
+                unit: "MeV".to_string(),
+                domains: vec![PhysicsDomain::Nuclear],
+                uncertainty: Some(0.001),
+                interpretation: "Deuteron binding energy".to_string(),
+            },
+            PhysicsQuantity {
+                name: "dd_form_factor_correction".to_string(),
+                value: 0.99, // Small correction at low E
+                unit: "dimensionless".to_string(),
+                domains: vec![PhysicsDomain::Nuclear, PhysicsDomain::Particle],
+                uncertainty: Some(0.01),
+                interpretation: "Nuclear form factor correction to σ".to_string(),
+            },
+            PhysicsQuantity {
+                name: "polarization_enhancement".to_string(),
+                value: 1.5, // Factor for aligned spins
+                unit: "dimensionless".to_string(),
+                domains: vec![PhysicsDomain::Nuclear, PhysicsDomain::Quantum],
+                uncertainty: Some(0.1),
+                interpretation: "Cross-section enhancement for polarized D".to_string(),
+            },
+        ];
+
+        // Relativistic and GR effects (minimal but for completeness)
+        let relativistic_facts = vec![
+            PhysicsQuantity {
+                name: "time_dilation_lattice".to_string(),
+                value: 1.0 + 1e-15, // Negligible at thermal velocities
+                unit: "dimensionless".to_string(),
+                domains: vec![PhysicsDomain::GeneralRelativity, PhysicsDomain::Statistical],
+                uncertainty: None,
+                interpretation: "Time dilation for thermal D atoms".to_string(),
+            },
+            PhysicsQuantity {
+                name: "gravitational_binding_lattice".to_string(),
+                value: 1e-30, // eV - totally negligible
+                unit: "eV".to_string(),
+                domains: vec![PhysicsDomain::GeneralRelativity],
+                uncertainty: None,
+                interpretation: "Gravitational correction to Coulomb potential".to_string(),
+            },
+            PhysicsQuantity {
+                name: "relativistic_mass_correction".to_string(),
+                value: 1.0 + 1e-8, // At ~meV energies
+                unit: "dimensionless".to_string(),
+                domains: vec![PhysicsDomain::Particle],
+                uncertainty: None,
+                interpretation: "Relativistic mass correction for thermal D".to_string(),
+            },
+        ];
+
+        // Electromagnetic effects
+        let em_facts = vec![
+            PhysicsQuantity {
+                name: "xray_photon_energy_trigger".to_string(),
+                value: 8.0, // keV (typical X-ray trigger)
+                unit: "keV".to_string(),
+                domains: vec![PhysicsDomain::Electromagnetic],
+                uncertainty: Some(1.0),
+                interpretation: "X-ray trigger photon energy (NASA)".to_string(),
+            },
+            PhysicsQuantity {
+                name: "photoelectron_range_pd".to_string(),
+                value: 100.0, // nm
+                unit: "nm".to_string(),
+                domains: vec![PhysicsDomain::Electromagnetic, PhysicsDomain::CondensedMatter],
+                uncertainty: Some(20.0),
+                interpretation: "Photoelectron range in Pd at 8 keV".to_string(),
+            },
+            PhysicsQuantity {
+                name: "hot_electron_temperature".to_string(),
+                value: 1e4, // K (speculative)
+                unit: "K".to_string(),
+                domains: vec![PhysicsDomain::Electromagnetic, PhysicsDomain::Statistical],
+                uncertainty: None,
+                interpretation: "Hot electron temperature from X-ray absorption".to_string(),
+            },
+            PhysicsQuantity {
+                name: "electron_thermalization_time".to_string(),
+                value: 1e-12, // ps
+                unit: "s".to_string(),
+                domains: vec![PhysicsDomain::Electromagnetic, PhysicsDomain::Statistical],
+                uncertainty: None,
+                interpretation: "Hot electron thermalization time in Pd".to_string(),
+            },
+        ];
+
         // Encode all facts
         for fact in nuclear_facts.into_iter()
             .chain(chemistry_facts)
             .chain(quantum_facts)
             .chain(condensed_matter_facts)
             .chain(observational_facts)
+            .chain(qft_facts)
+            .chain(defect_facts)
+            .chain(nuclear_structure_facts)
+            .chain(relativistic_facts)
+            .chain(em_facts)
         {
             let encoded = encoder.encode(&fact);
             facts.push((fact, encoded));

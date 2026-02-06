@@ -49,6 +49,8 @@ pub mod lattice;
 pub mod shielding;
 pub mod anomaly;
 pub mod neutron_source;
+pub mod reactor_design;
+pub mod economics;
 pub mod error;
 
 // Path C: Anomaly Investigation modules
@@ -56,6 +58,7 @@ pub mod literature;
 pub mod hypothesis_models;
 pub mod rate_gap;
 pub mod experimental_design;
+pub mod experimental_proposal;
 pub mod uncertainty;
 
 // Integration modules
@@ -70,12 +73,46 @@ pub mod multi_physics;
 // CfC temporal dynamics analysis
 pub mod cfc_physics;
 
+// Bayesian hypothesis discrimination
+pub mod bayesian;
+
+// Emergent physics simulation
+pub mod emergent;
+
+// Design optimization
+pub mod optimization;
+
+// Visualization and export
+pub mod visualization;
+
+// Extended materials database
+pub mod materials;
+
+// Experimental data assimilation and digital twin
+pub mod data_assimilation;
+
+// Temporal degradation modeling
+pub mod degradation;
+
+// ML surrogate models and inverse design
+pub mod surrogate;
+
+// Safety analysis (FMEA, fault trees, control systems, compliance)
+pub mod safety;
+
+// Multi-scale physics coupling
+pub mod multiscale;
+
+// Bayesian optimal experiment design
+pub mod optimal_experiment;
+
 // Core re-exports
 pub use physics::{GamowIntegration, GamowResult, QFactor, QFactorParams};
 pub use lattice::{LatticeLifetime, LatticeState};
 pub use shielding::{NeutronShielding, ShieldingResult};
 pub use anomaly::{AnomalyAnalysis, AnomalyHypothesis};
 pub use neutron_source::{NeutronSourceDesign, SourceSpec};
+pub use reactor_design::{ReactorDesign, ReactorDesigner, MassBreakdown, CostBreakdown, FuelCycle, ThermalConstraint, CoolingMethod};
 pub use error::{SparkError, Result};
 
 // Path C re-exports
