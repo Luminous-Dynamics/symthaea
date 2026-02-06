@@ -1,0 +1,590 @@
+# Mycelix Release Automation
+# Triggered on version tags to build binaries and create GitHub releases
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'mycelix-v*'
+      - 'sdk-v*'
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: '20'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ============================================================================
+  # Parse Release Info
+  # ============================================================================
+  release-info:
+    name: Parse Release Info
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      component: ${{ steps.parse.outputs.component }}
+      prerelease: ${{ steps.parse.outputs.prerelease }}
+
+    steps:
+      - name: Parse tag
+        id: parse
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "Tag: $TAG"
+
+          # Parse component and version
+          if [[ "$TAG" =~ ^mycelix-v(.+)$ ]]; then
+            COMPONENT="mycelix"
+            VERSION="${BASH_REMATCH[1]}"
+          elif [[ "$TAG" =~ ^sdk-v(.+)$ ]]; then
+            COMPONENT="sdk"
+            VERSION="${BASH_REMATCH[1]}"
+          elif [[ "$TAG" =~ ^v(.+)$ ]]; then
+            COMPONENT="all"
+            VERSION="${BASH_REMATCH[1]}"
+          else
+            COMPONENT="all"
+            VERSION="$TAG"
+          fi
+
+          # Check if prerelease
+          PRERELEASE="false"
+          if [[ "$VERSION" =~ (alpha|beta|rc|dev) ]]; then
+            PRERELEASE="true"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "component=$COMPONENT" >> $GITHUB_OUTPUT
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+
+          echo "## Release Info" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag:** $TAG" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "- **Component:** $COMPONENT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Prerelease:** $PRERELEASE" >> $GITHUB_STEP_SUMMARY
+
+  # ============================================================================
+  # Build Rust Binaries
+  # ============================================================================
+  build-rust:
+    name: Build Rust (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    needs: release-info
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: mycelix-cli-linux-x64
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact: mycelix-cli-linux-x64-musl
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: mycelix-cli-linux-arm64
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact: mycelix-cli-macos-x64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: mycelix-cli-macos-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Install cross-compilation tools (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+          if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu
+          fi
+
+      - name: Add Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-release-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build CLI
+        run: |
+          if [ -d "mycelix-workspace/cli" ]; then
+            cd mycelix-workspace/cli
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
+      - name: Build SDK
+        run: |
+          if [ -d "mycelix-workspace/sdk" ]; then
+            cd mycelix-workspace/sdk
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
+      - name: Package binaries
+        run: |
+          mkdir -p dist
+          VERSION="${{ needs.release-info.outputs.version }}"
+
+          # Package CLI
+          if [ -f "mycelix-workspace/cli/target/${{ matrix.target }}/release/mycelix-cli" ]; then
+            cp mycelix-workspace/cli/target/${{ matrix.target }}/release/mycelix-cli dist/
+            cd dist
+            tar -czvf ${{ matrix.artifact }}-${VERSION}.tar.gz mycelix-cli
+            rm mycelix-cli
+            cd ..
+          elif [ -f "mycelix-workspace/cli/target/${{ matrix.target }}/release/mycelix-cli.exe" ]; then
+            cp mycelix-workspace/cli/target/${{ matrix.target }}/release/mycelix-cli.exe dist/
+            cd dist
+            zip ${{ matrix.artifact }}-${VERSION}.zip mycelix-cli.exe
+            rm mycelix-cli.exe
+            cd ..
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/
+          if-no-files-found: ignore
+
+  # ============================================================================
+  # Build TypeScript SDK
+  # ============================================================================
+  build-typescript:
+    name: Build TypeScript SDK
+    runs-on: ubuntu-latest
+    needs: release-info
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check for SDK
+        id: check
+        run: |
+          if [ -f "mycelix-workspace/sdk-ts/package.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install dependencies
+        if: steps.check.outputs.exists == 'true'
+        run: npm ci
+        working-directory: mycelix-workspace/sdk-ts
+
+      - name: Run tests
+        if: steps.check.outputs.exists == 'true'
+        run: npm test
+        working-directory: mycelix-workspace/sdk-ts
+        continue-on-error: true
+
+      - name: Build
+        if: steps.check.outputs.exists == 'true'
+        run: npm run build
+        working-directory: mycelix-workspace/sdk-ts
+
+      - name: Package
+        if: steps.check.outputs.exists == 'true'
+        run: npm pack
+        working-directory: mycelix-workspace/sdk-ts
+
+      - name: Upload artifact
+        if: steps.check.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-typescript
+          path: mycelix-workspace/sdk-ts/*.tgz
+
+  # ============================================================================
+  # Build Python SDK
+  # ============================================================================
+  build-python:
+    name: Build Python SDK
+    runs-on: ubuntu-latest
+    needs: release-info
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build package
+        run: |
+          if [ -f "mycelix-workspace/sdk-python/pyproject.toml" ]; then
+            cd mycelix-workspace/sdk-python
+            python -m build
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-python
+          path: mycelix-workspace/sdk-python/dist/
+          if-no-files-found: ignore
+
+  # ============================================================================
+  # Build Holochain Packages
+  # ============================================================================
+  build-holochain:
+    name: Build Holochain Packages
+    runs-on: ubuntu-latest
+    needs: release-info
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Setup Cachix
+        uses: cachix/cachix-action@v14
+        with:
+          name: holochain-ci
+          skipPush: true
+
+      - name: Build zomes and DNAs
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            mkdir -p dist/wasm dist/dna
+
+            # Build WASM
+            WASM_BUILD_FAILED=0
+            for zome_dir in Mycelix-Core/dna/*/; do
+              if [ -f "${zome_dir}Cargo.toml" ]; then
+                echo "Building $(basename $zome_dir)..."
+                cd "$zome_dir"
+                if ! cargo build --release --target wasm32-unknown-unknown; then
+                  echo "::warning::WASM build failed for $(basename $zome_dir)"
+                  WASM_BUILD_FAILED=1
+                fi
+                cd -
+              fi
+            done
+
+            # Copy WASM files (empty result is OK if no WASMs built)
+            find Mycelix-Core -name "*.wasm" -path "*wasm32-unknown-unknown/release/*" -exec cp {} dist/wasm/ \; 2>/dev/null || true
+
+            # Package DNAs
+            for dna_dir in Mycelix-Core/dna/*/; do
+              if [ -f "${dna_dir}dna.yaml" ]; then
+                if ! hc dna pack "$dna_dir" -o "dist/dna/$(basename $dna_dir).dna"; then
+                  echo "::warning::DNA pack failed for $(basename $dna_dir)"
+                fi
+              fi
+            done
+
+            # Fail if any WASM build failed
+            if [ $WASM_BUILD_FAILED -ne 0 ]; then
+              echo "::error::One or more WASM builds failed"
+              exit 1
+            fi
+          '
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: holochain-wasm
+          path: dist/wasm/
+          if-no-files-found: ignore
+
+      - name: Upload DNA artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: holochain-dna
+          path: dist/dna/
+          if-no-files-found: ignore
+
+  # ============================================================================
+  # Build Smart Contracts
+  # ============================================================================
+  build-contracts:
+    name: Build Smart Contracts
+    runs-on: ubuntu-latest
+    needs: release-info
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Build contracts
+        run: |
+          cd Mycelix-Core/contracts
+          forge install
+          forge build
+
+      - name: Package ABIs
+        run: |
+          mkdir -p dist/abi
+          find Mycelix-Core/contracts/out -name "*.json" -exec cp {} dist/abi/ \; 2>/dev/null || true
+
+          # Create combined ABI package
+          VERSION="${{ needs.release-info.outputs.version }}"
+          cd dist
+          tar -czvf mycelix-contracts-abi-${VERSION}.tar.gz abi/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: contracts-abi
+          path: dist/*.tar.gz
+
+  # ============================================================================
+  # Create GitHub Release
+  # ============================================================================
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs:
+      - release-info
+      - build-rust
+      - build-typescript
+      - build-python
+      - build-holochain
+      - build-contracts
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name "*.tar.gz" -o -name "*.zip" -o -name "*.tgz" -o -name "*.whl" -o -name "*.dna" -o -name "*.wasm" \) -exec mv {} release/ \;
+          ls -la release/
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.release-info.outputs.version }}"
+
+          # Try to extract changelog from CHANGELOG.md if it exists
+          CHANGELOG=""
+          if [ -f "CHANGELOG.md" ]; then
+            CHANGELOG=$(sed -n "/## \[${VERSION}\]/,/## \[/p" CHANGELOG.md | sed '$d' || echo "")
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="See commit history for changes."
+          fi
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Mycelix ${{ needs.release-info.outputs.version }}
+          draft: false
+          prerelease: ${{ needs.release-info.outputs.prerelease == 'true' }}
+          generate_release_notes: true
+          body: |
+            ## Mycelix ${{ needs.release-info.outputs.version }}
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ### Installation
+
+            #### CLI (Rust)
+            ```bash
+            # Linux x64
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mycelix-cli-linux-x64-${{ needs.release-info.outputs.version }}.tar.gz | tar xz
+            sudo mv mycelix-cli /usr/local/bin/
+
+            # macOS (Apple Silicon)
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mycelix-cli-macos-arm64-${{ needs.release-info.outputs.version }}.tar.gz | tar xz
+            sudo mv mycelix-cli /usr/local/bin/
+            ```
+
+            #### Python SDK
+            ```bash
+            pip install mycelix==${{ needs.release-info.outputs.version }}
+            ```
+
+            #### TypeScript SDK
+            ```bash
+            npm install @mycelix/sdk@${{ needs.release-info.outputs.version }}
+            ```
+
+            ### Artifacts
+
+            | Artifact | Description |
+            |----------|-------------|
+            | `mycelix-cli-*` | Command-line interface binaries |
+            | `sdk-typescript` | TypeScript/JavaScript SDK |
+            | `sdk-python` | Python SDK |
+            | `holochain-dna` | Packaged Holochain DNAs |
+            | `holochain-wasm` | Compiled zome WASM files |
+            | `contracts-abi` | Smart contract ABIs |
+
+          files: release/*
+
+  # ============================================================================
+  # Publish to Package Registries
+  # ============================================================================
+  publish-npm:
+    name: Publish to NPM
+    runs-on: ubuntu-latest
+    needs: [release-info, create-release]
+    if: ${{ needs.release-info.outputs.prerelease != 'true' }}
+    environment: npm
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Check for SDK
+        id: check
+        run: |
+          if [ -f "mycelix-workspace/sdk-ts/package.json" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install and build
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          cd mycelix-workspace/sdk-ts
+          npm ci
+          npm run build
+
+      - name: Publish
+        if: steps.check.outputs.exists == 'true'
+        run: npm publish --access public --provenance
+        working-directory: mycelix-workspace/sdk-ts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        continue-on-error: true
+
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [release-info, create-release]
+    if: ${{ needs.release-info.outputs.prerelease != 'true' }}
+    environment: pypi
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build and publish
+        run: |
+          if [ -f "mycelix-workspace/sdk-python/pyproject.toml" ]; then
+            cd mycelix-workspace/sdk-python
+            python -m build
+            twine upload dist/* --skip-existing
+          fi
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        continue-on-error: true
+
+  # ============================================================================
+  # Summary
+  # ============================================================================
+  release-summary:
+    name: Release Summary
+    if: always()
+    needs:
+      - release-info
+      - build-rust
+      - build-typescript
+      - build-python
+      - build-holochain
+      - build-contracts
+      - create-release
+      - publish-npm
+      - publish-pypi
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.release-info.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Prerelease:** ${{ needs.release-info.outputs.prerelease }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Rust | ${{ needs.build-rust.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build TypeScript | ${{ needs.build-typescript.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Python | ${{ needs.build-python.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Holochain | ${{ needs.build-holochain.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Contracts | ${{ needs.build-contracts.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Create Release | ${{ needs.create-release.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Publish NPM | ${{ needs.publish-npm.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Publish PyPI | ${{ needs.publish-pypi.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY

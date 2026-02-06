@@ -789,23 +789,59 @@ jobs:
     steps:
       - name: Generate summary
         run: |
+          # Helper function to format status with emoji
+          format_status() {
+            case "$1" in
+              success) echo "✅ success" ;;
+              failure) echo "❌ **FAILED**" ;;
+              cancelled) echo "⏹️ cancelled" ;;
+              skipped) echo "⏭️ skipped" ;;
+              *) echo "❓ $1" ;;
+            esac
+          }
+
           echo "## Holochain Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check for any failures
+          FAILURES=""
+          [ "${{ needs.build-zomes.result }}" = "failure" ] && FAILURES="$FAILURES build-zomes"
+          [ "${{ needs.test-zomes.result }}" = "failure" ] && FAILURES="$FAILURES test-zomes"
+          [ "${{ needs.sweettest.result }}" = "failure" ] && FAILURES="$FAILURES sweettest"
+          [ "${{ needs.integration-test.result }}" = "failure" ] && FAILURES="$FAILURES integration-test"
+
+          if [ -n "$FAILURES" ]; then
+            echo "> [!CAUTION]" >> $GITHUB_STEP_SUMMARY
+            echo "> **Pipeline failed:**$FAILURES" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+
           echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Build Zomes | ${{ needs.build-zomes.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Test Zomes | ${{ needs.test-zomes.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| SDK Documentation | ${{ needs.sdk-docs.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Lint Zomes | ${{ needs.lint-zomes.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Integration Tests | ${{ needs.integration-test.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| SDK Conductor Tests | ${{ needs.sdk-conductor-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Sweettest Integration (15 tests) | ${{ needs.sweettest.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Package DNAs | ${{ needs.package-dna.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Package hApps | ${{ needs.package-happs.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Zomes | $(format_status '${{ needs.build-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Zomes | $(format_status '${{ needs.test-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| SDK Documentation | $(format_status '${{ needs.sdk-docs.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint Zomes | $(format_status '${{ needs.lint-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | $(format_status '${{ needs.integration-test.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| SDK Conductor Tests | $(format_status '${{ needs.sdk-conductor-tests.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Sweettest Integration (15 tests)** | $(format_status '${{ needs.sweettest.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Package DNAs | $(format_status '${{ needs.package-dna.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Package hApps | $(format_status '${{ needs.package-happs.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Test Coverage" >> $GITHUB_STEP_SUMMARY
-          echo "- Rust integration tests: Mycelix-Core, Governance, Care, Emergency, Water, Housing zomes" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Test Breakdown" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Suite | Tests | Description |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|-------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Sweettest Identity | 4 | DID registration, profile updates, trust attestations |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sweettest Governance | 3 | Proposal lifecycle, voting, execution |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sweettest Bridge | 2 | Cross-hApp communication |" >> $GITHUB_STEP_SUMMARY
+          echo "| Sweettest Privacy | 6 | ZK attestations, anonymous credentials |" >> $GITHUB_STEP_SUMMARY
+          echo "| Zome Unit Tests | ~50 | Per-zome unit tests |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | 3+ | Multi-conductor network tests |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "### Infrastructure" >> $GITHUB_STEP_SUMMARY
           echo "- Multi-conductor: 3 nodes for network simulation" >> $GITHUB_STEP_SUMMARY
-          echo "- Sweettest: Identity (4), Governance (3), Bridge (2), Privacy/ZK (6) = 15 tests" >> $GITHUB_STEP_SUMMARY
           echo "- TypeScript SDK: Conductor integration tests" >> $GITHUB_STEP_SUMMARY
-          echo "- SDK Documentation: Doc build and example verification" >> $GITHUB_STEP_SUMMARY
+          echo "- Holochain: 0.6.0 | HDK: 0.6.0 | HDI: 0.7.0" >> $GITHUB_STEP_SUMMARY
