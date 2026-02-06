@@ -384,60 +384,60 @@ impl ConsciousnessGradientOptimizer {
             ArchitecturalParameter::new(
                 "evolution_rate",
                 0.1, 0.01, 1.0,
-                ComponentId::PrimitiveEvolution
+                ComponentId::PrimitiveEvolution()
             ),
             ArchitecturalParameter::new(
                 "mutation_rate",
                 0.05, 0.001, 0.5,
-                ComponentId::PrimitiveEvolution
+                ComponentId::PrimitiveEvolution()
             ),
             ArchitecturalParameter::new(
                 "population_size",
                 100.0, 10.0, 1000.0,
-                ComponentId::PrimitiveEvolution
+                ComponentId::PrimitiveEvolution()
             ),
 
             // Byzantine collective parameters
             ArchitecturalParameter::new(
                 "collective_size",
                 7.0, 3.0, 21.0,
-                ComponentId::ByzantineCollective
+                ComponentId::ByzantineCollective()
             ),
             ArchitecturalParameter::new(
                 "trust_threshold",
                 0.6, 0.3, 0.95,
-                ComponentId::ByzantineCollective
+                ComponentId::ByzantineCollective()
             ),
 
             // Meta-cognitive parameters
             ArchitecturalParameter::new(
                 "reflection_depth",
                 3.0, 1.0, 10.0,
-                ComponentId::MetaCognition
+                ComponentId::MetaCognition()
             ),
             ArchitecturalParameter::new(
                 "attention_heads",
                 8.0, 1.0, 32.0,
-                ComponentId::MetaCognition
+                ComponentId::MetaCognition()
             ),
 
             // Integration parameters
             ArchitecturalParameter::new(
                 "integration_strength",
                 0.5, 0.1, 1.0,
-                ComponentId::Integration
+                ComponentId::Integration()
             ),
             ArchitecturalParameter::new(
                 "feedback_gain",
                 0.3, 0.01, 1.0,
-                ComponentId::Integration
+                ComponentId::Integration()
             ),
 
             // Cache parameters
             ArchitecturalParameter::new(
                 "cache_size",
                 1000.0, 100.0, 100000.0,
-                ComponentId::Cache
+                ComponentId::Cache()
             ),
         ]
     }
@@ -454,7 +454,7 @@ impl ConsciousnessGradientOptimizer {
         self.current_accuracy = accuracy;
 
         // Record in monitor
-        self.monitor.record_phi(phi, self.parameters.len(), "gradient_opt".to_string());
+        self.monitor.record_phi("gradient_opt", phi);
     }
 
     /// Estimate consciousness gradient for a parameter
@@ -489,12 +489,12 @@ impl ConsciousnessGradientOptimizer {
 
         // Model consciousness response to parameter changes
         // Different parameters affect Φ differently
-        let sensitivity = match param.component {
-            ComponentId::PrimitiveEvolution => 0.15,  // High Φ sensitivity
-            ComponentId::MetaCognition => 0.20,       // Very high sensitivity
-            ComponentId::Integration => 0.25,         // Highest sensitivity
-            ComponentId::ByzantineCollective => 0.10, // Moderate
-            ComponentId::Cache => 0.05,               // Low direct effect
+        let sensitivity = match param.component.as_str() {
+            "PrimitiveEvolution" => 0.15,  // High Φ sensitivity
+            "MetaCognition" => 0.20,       // Very high sensitivity
+            "Integration" => 0.25,         // Highest sensitivity
+            "ByzantineCollective" => 0.10, // Moderate
+            "Cache" => 0.05,               // Low direct effect
             _ => 0.08,
         };
 
@@ -831,7 +831,7 @@ mod tests {
 
     #[test]
     fn test_parameter_clamping() {
-        let mut param = ArchitecturalParameter::new("test", 5.0, 0.0, 10.0, ComponentId::Cache);
+        let mut param = ArchitecturalParameter::new("test", 5.0, 0.0, 10.0, ComponentId::Cache());
         param.value = 15.0;
         param.clamp();
         assert_eq!(param.value, 10.0);

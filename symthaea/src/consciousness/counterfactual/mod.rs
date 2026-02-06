@@ -23,6 +23,10 @@ pub use identification::{
     CausalQueryOutcome, CausalEstimand, IdentificationMethod,
     UnidentifiedReason, CausalAssumption, CausalDAG, CausalQuery,
     CounterfactualReasoner, CausalReferenceHarness, HarnessResult,
+    // Effect estimation
+    ObservationalData, EffectEstimator,
+    // Shpitser-Pearl ID Algorithm
+    CausalGraphWithLatents, CausalExpression, IDAlgorithm,
 };
 
 // Note: IdentificationMethod now includes:

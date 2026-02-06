@@ -186,15 +186,15 @@ impl ArchitecturalCausalGraph {
     /// Initialize component nodes
     fn initialize_components(&mut self) {
         let components = vec![
-            (ComponentId::PrimitiveEvolution, "Primitive Evolution", "Evolves computational primitives using Phi-driven optimization"),
-            (ComponentId::HRM, "Hierarchical Reasoning Model", "Multi-layer reasoning for complex queries"),
-            (ComponentId::MetaCognition, "Meta-Cognitive Monitor", "Monitors and analyzes system's own reasoning"),
-            (ComponentId::ByzantineCollective, "Byzantine Collective", "Distributed collective with Byzantine resistance"),
-            (ComponentId::MetaLearning, "Meta-Learning Defense", "Learns from attack patterns to improve security"),
-            (ComponentId::CausalDefense, "Causal Byzantine Defense", "Explainable AI security with causal reasoning"),
-            (ComponentId::UnifiedIntelligence, "Unified Intelligence", "Emergent collective consciousness"),
-            (ComponentId::CollectiveSharing, "Collective Sharing", "Shares primitives across collective"),
-            (ComponentId::Cache, "Cache System", "Caches results for fast lookups"),
+            (ComponentId::PrimitiveEvolution(), "Primitive Evolution", "Evolves computational primitives using Phi-driven optimization"),
+            (ComponentId::HRM(), "Hierarchical Reasoning Model", "Multi-layer reasoning for complex queries"),
+            (ComponentId::MetaCognition(), "Meta-Cognitive Monitor", "Monitors and analyzes system's own reasoning"),
+            (ComponentId::ByzantineCollective(), "Byzantine Collective", "Distributed collective with Byzantine resistance"),
+            (ComponentId::MetaLearning(), "Meta-Learning Defense", "Learns from attack patterns to improve security"),
+            (ComponentId::CausalDefense(), "Causal Byzantine Defense", "Explainable AI security with causal reasoning"),
+            (ComponentId::UnifiedIntelligence(), "Unified Intelligence", "Emergent collective consciousness"),
+            (ComponentId::CollectiveSharing(), "Collective Sharing", "Shares primitives across collective"),
+            (ComponentId::Cache(), "Cache System", "Caches results for fast lookups"),
         ];
 
         for (id, name, description) in components {
@@ -219,22 +219,22 @@ impl ArchitecturalCausalGraph {
     fn initialize_edges(&mut self) {
         let edges = vec![
             // Cache enables faster HRM
-            (ComponentId::Cache, ComponentId::HRM, CausalRelationship::Enables, 0.8, "Cache hit -> faster HRM reasoning"),
+            (ComponentId::Cache(), ComponentId::HRM(), CausalRelationship::Enables, 0.8, "Cache hit -> faster HRM reasoning"),
 
             // Primitive evolution feeds unified intelligence
-            (ComponentId::PrimitiveEvolution, ComponentId::UnifiedIntelligence, CausalRelationship::Feeds, 0.9, "Better primitives -> higher collective Phi"),
+            (ComponentId::PrimitiveEvolution(), ComponentId::UnifiedIntelligence(), CausalRelationship::Feeds, 0.9, "Better primitives -> higher collective Phi"),
 
             // HRM impacts meta-cognition
-            (ComponentId::HRM, ComponentId::MetaCognition, CausalRelationship::Feeds, 0.7, "HRM reasoning -> meta-cognitive analysis"),
+            (ComponentId::HRM(), ComponentId::MetaCognition(), CausalRelationship::Feeds, 0.7, "HRM reasoning -> meta-cognitive analysis"),
 
             // Meta-learning impacts causal defense
-            (ComponentId::MetaLearning, ComponentId::CausalDefense, CausalRelationship::Synergizes, 0.85, "Pattern learning + causal reasoning"),
+            (ComponentId::MetaLearning(), ComponentId::CausalDefense(), CausalRelationship::Synergizes, 0.85, "Pattern learning + causal reasoning"),
 
             // Byzantine collective feeds unified intelligence
-            (ComponentId::ByzantineCollective, ComponentId::UnifiedIntelligence, CausalRelationship::Feeds, 0.9, "Secure collective -> unified consciousness"),
+            (ComponentId::ByzantineCollective(), ComponentId::UnifiedIntelligence(), CausalRelationship::Feeds, 0.9, "Secure collective -> unified consciousness"),
 
             // Collective sharing enables primitive evolution
-            (ComponentId::CollectiveSharing, ComponentId::PrimitiveEvolution, CausalRelationship::Enables, 0.75, "Shared primitives -> faster evolution"),
+            (ComponentId::CollectiveSharing(), ComponentId::PrimitiveEvolution(), CausalRelationship::Enables, 0.75, "Shared primitives -> faster evolution"),
         ];
 
         for (from, to, relationship, strength, description) in edges {
@@ -476,21 +476,21 @@ mod tests {
     #[test]
     fn test_downstream_components() {
         let graph = ArchitecturalCausalGraph::new();
-        let downstream = graph.get_downstream_components(ComponentId::Cache);
-        assert!(downstream.contains(&ComponentId::HRM));
+        let downstream = graph.get_downstream_components(ComponentId::Cache());
+        assert!(downstream.contains(&ComponentId::HRM()));
     }
 
     #[test]
     fn test_update_performance() {
         let mut graph = ArchitecturalCausalGraph::new();
         graph.update_component_performance(
-            ComponentId::Cache,
+            ComponentId::Cache(),
             Some(0.5),
             Some(Duration::from_millis(10)),
             Some(0.95),
         );
 
-        let impact = graph.get_impact(ComponentId::Cache);
+        let impact = graph.get_impact(ComponentId::Cache());
         assert!(impact.is_some());
     }
 }
