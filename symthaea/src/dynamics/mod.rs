@@ -45,6 +45,10 @@ pub struct CrystalizedConcept {
     /// Unique identifier
     pub id: u64,
 
+    /// String-based unique identifier (for dream_mode compatibility)
+    #[serde(default)]
+    pub uid: String,
+
     /// Name/label for this concept
     pub name: String,
 
@@ -53,6 +57,10 @@ pub struct CrystalizedConcept {
 
     /// High-dimensional vector representation
     pub embedding: Vec<f32>,
+
+    /// Attractor signature for consciousness patterns (alias for embedding)
+    #[serde(default)]
+    pub attractor_signature: Vec<f32>,
 
     /// Associated concepts by ID and strength
     pub associations: HashMap<u64, f32>,
@@ -84,9 +92,11 @@ impl CrystalizedConcept {
     pub fn new(id: u64, name: impl Into<String>, embedding: Vec<f32>) -> Self {
         Self {
             id,
+            uid: format!("concept_{}", id),
             name: name.into(),
             description: None,
-            embedding,
+            embedding: embedding.clone(),
+            attractor_signature: embedding,
             associations: HashMap::new(),
             confidence: 0.5,
             activation_count: 0,
@@ -108,9 +118,11 @@ impl CrystalizedConcept {
     ) -> Self {
         Self {
             id,
+            uid: format!("concept_{}", id),
             name: name.into(),
             description: Some(description.into()),
-            embedding,
+            embedding: embedding.clone(),
+            attractor_signature: embedding,
             associations: HashMap::new(),
             confidence,
             activation_count: 0,

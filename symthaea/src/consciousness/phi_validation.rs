@@ -404,9 +404,18 @@ impl PhiValidationFramework {
 
     /// Approximate normal cumulative distribution function
     ///
-    /// Uses error function (erf) for standard normal CDF
+    /// Uses Abramowitz & Stegun polynomial approximation of erf
     fn approx_normal_cdf(x: f64) -> f64 {
-        0.5 * (1.0 + libm::erf(x / std::f64::consts::SQRT_2))
+        0.5 * (1.0 + Self::approx_erf(x / std::f64::consts::SQRT_2))
+    }
+
+    /// Abramowitz & Stegun approximation of the error function (max error ~1.5e-7)
+    fn approx_erf(x: f64) -> f64 {
+        let sign = if x >= 0.0 { 1.0 } else { -1.0 };
+        let x = x.abs();
+        let t = 1.0 / (1.0 + 0.3275911 * x);
+        let poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+        sign * (1.0 - poly * (-x * x).exp())
     }
 
     /// Compute AUC (Area Under ROC Curve) for binary classification
@@ -481,8 +490,8 @@ impl PhiValidationFramework {
         let z_upper = z + 1.96 * se;
 
         // Transform back to r
-        let r_lower = (libm::exp(2.0 * z_lower) - 1.0) / (libm::exp(2.0 * z_lower) + 1.0);
-        let r_upper = (libm::exp(2.0 * z_upper) - 1.0) / (libm::exp(2.0 * z_upper) + 1.0);
+        let r_lower = ((2.0_f64 * z_lower).exp() - 1.0) / ((2.0_f64 * z_lower).exp() + 1.0);
+        let r_upper = ((2.0_f64 * z_upper).exp() - 1.0) / ((2.0_f64 * z_upper).exp() + 1.0);
 
         (r_lower, r_upper)
     }

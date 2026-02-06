@@ -415,8 +415,6 @@ pub mod negation_detector;
 pub mod synthetic_states;
 pub mod temporal_primitives;
 
-/// Gated: depends on crate::hdc::integrated_information (not in main src)
-#[cfg(feature = "full_consciousness")]
 pub mod primitive_validation;
 
 // ── Tier 3: Consciousness Integration ──────────────────────────────────────
@@ -424,20 +422,10 @@ pub mod compositionality_primitives;
 pub mod consciousness_signatures;
 pub mod causal_emergence;
 
-/// Gated: depends on consciousness_profile (which needs integrated_information)
-#[cfg(feature = "full_consciousness")]
 pub mod dimension_synergies;
 
-/// Gated: depends on crate::hdc::integrated_information
-#[cfg(feature = "full_consciousness")]
 pub mod consciousness_profile;
-
-/// Gated: depends on crate::hdc::integrated_information
-#[cfg(feature = "full_consciousness")]
 pub mod meta_primitives;
-
-/// Gated: depends on crate::hdc::integrated_information + synthetic_states
-#[cfg(feature = "full_consciousness")]
 pub mod phi_validation;
 
 // ── Tier 4: Dynamics & Field ───────────────────────────────────────────────
