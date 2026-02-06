@@ -37,7 +37,11 @@
 //! of its own causal knowledge!
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
+
+use crate::hdc::binary_hv::HV16;
+use crate::hdc::primitive_system::PrimitiveSystem;
 
 /// Complete epistemic coordinate in 3D space
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -351,6 +355,329 @@ impl MaterialityTier {
             }
         }
     }
+}
+
+// ==============================================================================
+// NSM PRIMITIVE GROUNDING (Wierzbicka's Natural Semantic Metalanguage)
+// ==============================================================================
+
+/// NSM grounding for empirical verification tiers
+#[derive(Debug, Clone)]
+pub struct EmpiricalTierPrimitiveGrounding {
+    /// The tier being grounded
+    pub tier: EmpiricalTier,
+    /// NSM primitive composition
+    pub nsm_primitives: Vec<String>,
+    /// HDC encoding via primitive binding
+    pub primitive_encoding: HV16,
+    /// Verification strength (0.0-1.0)
+    pub verification_strength: f64,
+}
+
+impl EmpiricalTierPrimitiveGrounding {
+    pub fn new(tier: EmpiricalTier, system: &PrimitiveSystem) -> Self {
+        let (primitives, strength) = Self::nsm_mapping(tier);
+        let encoding = encode_primitives(&primitives, system);
+
+        Self {
+            tier,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            verification_strength: strength,
+        }
+    }
+
+    fn nsm_mapping(tier: EmpiricalTier) -> (Vec<String>, f64) {
+        match tier {
+            // E0: No evidence, inferred only
+            EmpiricalTier::E0Null => (
+                vec!["NOT".into(), "SEE".into(), "THINK".into(), "MAYBE".into()],
+                0.0,
+            ),
+            // E1: Single observation (someone said/saw)
+            EmpiricalTier::E1Testimonial => (
+                vec!["SOMEONE".into(), "SAY".into(), "SEE".into(), "ONE".into()],
+                0.25,
+            ),
+            // E2: Multiple internal observations
+            EmpiricalTier::E2PrivatelyVerifiable => (
+                vec!["SEE".into(), "MANY".into(), "TIME".into(), "SAME".into()],
+                0.5,
+            ),
+            // E3: Cryptographic/counterfactual proof
+            EmpiricalTier::E3CryptographicallyProven => (
+                vec!["KNOW".into(), "TRUE".into(), "CAN".into(), "NOT".into(), "OTHER".into()],
+                0.75,
+            ),
+            // E4: Publicly reproducible (open data + code)
+            EmpiricalTier::E4PubliclyReproducible => (
+                vec!["ALL".into(), "CAN".into(), "SEE".into(), "DO".into(), "SAME".into()],
+                1.0,
+            ),
+        }
+    }
+}
+
+/// NSM grounding for normative authority tiers
+#[derive(Debug, Clone)]
+pub struct NormativeTierPrimitiveGrounding {
+    /// The tier being grounded
+    pub tier: NormativeTier,
+    /// NSM primitive composition
+    pub nsm_primitives: Vec<String>,
+    /// HDC encoding via primitive binding
+    pub primitive_encoding: HV16,
+    /// Consensus breadth (0.0-1.0)
+    pub consensus_breadth: f64,
+}
+
+impl NormativeTierPrimitiveGrounding {
+    pub fn new(tier: NormativeTier, system: &PrimitiveSystem) -> Self {
+        let (primitives, breadth) = Self::nsm_mapping(tier);
+        let encoding = encode_primitives(&primitives, system);
+
+        Self {
+            tier,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            consensus_breadth: breadth,
+        }
+    }
+
+    fn nsm_mapping(tier: NormativeTier) -> (Vec<String>, f64) {
+        match tier {
+            // N0: Only this system believes
+            NormativeTier::N0Personal => (
+                vec!["I".into(), "THINK".into(), "THIS".into()],
+                0.0,
+            ),
+            // N1: Local community agrees
+            NormativeTier::N1Communal => (
+                vec!["SOME".into(), "PEOPLE".into(), "THINK".into(), "SAME".into()],
+                0.33,
+            ),
+            // N2: Network-wide consensus
+            NormativeTier::N2Network => (
+                vec!["MANY".into(), "PEOPLE".into(), "THINK".into(), "SAME".into()],
+                0.67,
+            ),
+            // N3: Mathematical/constitutional truth
+            NormativeTier::N3Axiomatic => (
+                vec!["TRUE".into(), "BECAUSE".into(), "TRUE".into(), "ALWAYS".into()],
+                1.0,
+            ),
+        }
+    }
+}
+
+/// NSM grounding for materiality/permanence tiers
+#[derive(Debug, Clone)]
+pub struct MaterialityTierPrimitiveGrounding {
+    /// The tier being grounded
+    pub tier: MaterialityTier,
+    /// NSM primitive composition
+    pub nsm_primitives: Vec<String>,
+    /// HDC encoding via primitive binding
+    pub primitive_encoding: HV16,
+    /// Temporal persistence (0.0-1.0)
+    pub temporal_persistence: f64,
+}
+
+impl MaterialityTierPrimitiveGrounding {
+    pub fn new(tier: MaterialityTier, system: &PrimitiveSystem) -> Self {
+        let (primitives, persistence) = Self::nsm_mapping(tier);
+        let encoding = encode_primitives(&primitives, system);
+
+        Self {
+            tier,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            temporal_persistence: persistence,
+        }
+    }
+
+    fn nsm_mapping(tier: MaterialityTier) -> (Vec<String>, f64) {
+        match tier {
+            // M0: Session-specific only
+            MaterialityTier::M0Ephemeral => (
+                vec!["NOW".into(), "NOT".into(), "AFTER".into()],
+                0.0,
+            ),
+            // M1: Until model updates
+            MaterialityTier::M1Temporal => (
+                vec!["NOW".into(), "SOME".into(), "TIME".into(), "MAYBE".into(), "NOT".into()],
+                0.33,
+            ),
+            // M2: Long-term archived
+            MaterialityTier::M2Persistent => (
+                vec!["LONG".into(), "TIME".into(), "SAME".into(), "KNOW".into()],
+                0.67,
+            ),
+            // M3: Core principle, foundational
+            MaterialityTier::M3Foundational => (
+                vec!["ALWAYS".into(), "TRUE".into(), "BECAUSE".into(), "THIS".into()],
+                1.0,
+            ),
+        }
+    }
+}
+
+/// Unified NSM grounding system for epistemic tiers
+#[derive(Debug)]
+pub struct EpistemicNSMGrounding {
+    /// Empirical tier groundings
+    pub empirical_tiers: HashMap<EmpiricalTier, EmpiricalTierPrimitiveGrounding>,
+    /// Normative tier groundings
+    pub normative_tiers: HashMap<NormativeTier, NormativeTierPrimitiveGrounding>,
+    /// Materiality tier groundings
+    pub materiality_tiers: HashMap<MaterialityTier, MaterialityTierPrimitiveGrounding>,
+}
+
+impl EpistemicNSMGrounding {
+    /// Create complete grounding system from primitive system
+    pub fn new(system: &PrimitiveSystem) -> Self {
+        let mut empirical_tiers = HashMap::new();
+        let mut normative_tiers = HashMap::new();
+        let mut materiality_tiers = HashMap::new();
+
+        // Ground empirical tiers
+        for tier in &[
+            EmpiricalTier::E0Null,
+            EmpiricalTier::E1Testimonial,
+            EmpiricalTier::E2PrivatelyVerifiable,
+            EmpiricalTier::E3CryptographicallyProven,
+            EmpiricalTier::E4PubliclyReproducible,
+        ] {
+            empirical_tiers.insert(*tier, EmpiricalTierPrimitiveGrounding::new(*tier, system));
+        }
+
+        // Ground normative tiers
+        for tier in &[
+            NormativeTier::N0Personal,
+            NormativeTier::N1Communal,
+            NormativeTier::N2Network,
+            NormativeTier::N3Axiomatic,
+        ] {
+            normative_tiers.insert(*tier, NormativeTierPrimitiveGrounding::new(*tier, system));
+        }
+
+        // Ground materiality tiers
+        for tier in &[
+            MaterialityTier::M0Ephemeral,
+            MaterialityTier::M1Temporal,
+            MaterialityTier::M2Persistent,
+            MaterialityTier::M3Foundational,
+        ] {
+            materiality_tiers.insert(*tier, MaterialityTierPrimitiveGrounding::new(*tier, system));
+        }
+
+        Self {
+            empirical_tiers,
+            normative_tiers,
+            materiality_tiers,
+        }
+    }
+
+    /// Get combined encoding for an epistemic coordinate
+    pub fn encode_coordinate(&self, coord: &EpistemicCoordinate) -> HV16 {
+        let e_enc = self.empirical_tiers.get(&coord.empirical)
+            .map(|g| g.primitive_encoding.clone())
+            .unwrap_or_else(|| HV16::random(0));
+        let n_enc = self.normative_tiers.get(&coord.normative)
+            .map(|g| g.primitive_encoding.clone())
+            .unwrap_or_else(|| HV16::random(1));
+        let m_enc = self.materiality_tiers.get(&coord.materiality)
+            .map(|g| g.primitive_encoding.clone())
+            .unwrap_or_else(|| HV16::random(2));
+
+        // Bind the three axes together
+        e_enc.bind(&n_enc).bind(&m_enc)
+    }
+
+    /// Query empirical tiers by semantic similarity
+    pub fn query_empirical(&self, query: &HV16, threshold: f32) -> Vec<(&EmpiricalTier, f32)> {
+        let mut results: Vec<_> = self.empirical_tiers.iter()
+            .map(|(tier, grounding)| (tier, grounding.primitive_encoding.similarity(query)))
+            .filter(|(_, sim)| *sim >= threshold)
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Query normative tiers by semantic similarity
+    pub fn query_normative(&self, query: &HV16, threshold: f32) -> Vec<(&NormativeTier, f32)> {
+        let mut results: Vec<_> = self.normative_tiers.iter()
+            .map(|(tier, grounding)| (tier, grounding.primitive_encoding.similarity(query)))
+            .filter(|(_, sim)| *sim >= threshold)
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Query materiality tiers by semantic similarity
+    pub fn query_materiality(&self, query: &HV16, threshold: f32) -> Vec<(&MaterialityTier, f32)> {
+        let mut results: Vec<_> = self.materiality_tiers.iter()
+            .map(|(tier, grounding)| (tier, grounding.primitive_encoding.similarity(query)))
+            .filter(|(_, sim)| *sim >= threshold)
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Get tiers with high verification strength
+    pub fn high_verification_tiers(&self) -> Vec<&EmpiricalTier> {
+        self.empirical_tiers.iter()
+            .filter(|(_, g)| g.verification_strength >= 0.5)
+            .map(|(t, _)| t)
+            .collect()
+    }
+
+    /// Get tiers with high consensus breadth
+    pub fn high_consensus_tiers(&self) -> Vec<&NormativeTier> {
+        self.normative_tiers.iter()
+            .filter(|(_, g)| g.consensus_breadth >= 0.5)
+            .map(|(t, _)| t)
+            .collect()
+    }
+
+    /// Get tiers with high temporal persistence
+    pub fn high_persistence_tiers(&self) -> Vec<&MaterialityTier> {
+        self.materiality_tiers.iter()
+            .filter(|(_, g)| g.temporal_persistence >= 0.5)
+            .map(|(t, _)| t)
+            .collect()
+    }
+}
+
+/// Encode NSM primitives into HDC vector via sequential binding
+fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
+    let vectors: Vec<HV16> = primitives
+        .iter()
+        .map(|name| {
+            if let Some(p) = system.get(name) {
+                p.encoding.clone()
+            } else if let Some(p) = system.get(&name.to_lowercase()) {
+                p.encoding.clone()
+            } else {
+                // Fallback: deterministic random for unknown primitives
+                let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                HV16::random(seed)
+            }
+        })
+        .collect();
+
+    if vectors.is_empty() {
+        return HV16::random(0);
+    }
+
+    // Bind sequentially with position encoding for order preservation
+    let mut result = vectors[0].clone();
+    for (i, v) in vectors.iter().enumerate().skip(1) {
+        let position_hv = HV16::random(i as u64 * 1000);
+        let positioned = v.bind(&position_hv);
+        result = result.bind(&positioned);
+    }
+    result
 }
 
 // ==============================================================================
