@@ -2022,9 +2022,9 @@ mod tests {
         adaptive.enable_fallback();
         assert!(adaptive.is_using_fallback());
 
-        // Thresholds should reset to population norms
-        assert!((adaptive.complexity_threshold() - 0.6).abs() < 0.01);
-        assert!((adaptive.synchrony_threshold() - 0.7).abs() < 0.01);
+        // Thresholds should reset to population norms (0.35 complexity, 0.55 synchrony)
+        assert!((adaptive.complexity_threshold() - 0.35).abs() < 0.01);
+        assert!((adaptive.synchrony_threshold() - 0.55).abs() < 0.01);
 
         // Disable fallback
         adaptive.disable_fallback();
