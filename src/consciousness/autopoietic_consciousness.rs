@@ -8,9 +8,327 @@
 //! - Structural coupling: Interaction with environment while maintaining identity
 //! - Self-referential dynamics: The system observes and modifies itself
 
+use crate::hdc::binary_hv::HV16;
+use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::RealHV;
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NSM PRIMITIVE GROUNDING FOR AUTOPOIETIC CONSCIOUSNESS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// NSM primitive grounding for autopoietic phases.
+///
+/// Each phase of autopoietic operation (Maturana & Varela) is decomposed
+/// into Natural Semantic Metalanguage primitives that capture its essence.
+///
+/// ## Autopoietic Phase Semantics
+///
+/// - Producing: creating components → DO + MAKE + PART + I
+/// - Maintaining: sustaining organization → DO + SAME + LIVE + FOR_SOME_TIME
+/// - Adapting: responding to perturbation → CHANGE + BECAUSE + HAPPEN + I
+/// - Regulating: controlling boundaries → DO + NOT + LET + OTHER
+/// - Observing: self-reference → SEE + I + KNOW + NOW
+/// - Integrating: unifying components → ALL + TOGETHER + ONE + BECOME
+#[derive(Debug, Clone)]
+pub struct AutopoieticPhasePrimitiveGrounding {
+    /// The autopoietic phase being grounded
+    pub phase: AutopoieticPhase,
+
+    /// NSM primitives composing this phase's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Self-directedness: 0.0 (external) to 1.0 (internal)
+    pub self_directedness: f32,
+
+    /// Generativity: 0.0 (conservative) to 1.0 (creative)
+    pub generativity: f32,
+
+    /// Boundary focus: 0.0 (internal) to 1.0 (boundary)
+    pub boundary_focus: f32,
+}
+
+impl AutopoieticPhasePrimitiveGrounding {
+    /// Get NSM grounding for a specific autopoietic phase
+    pub fn for_phase(phase: AutopoieticPhase, primitive_system: &PrimitiveSystem) -> Self {
+        let (primitives, self_directedness, generativity, boundary_focus) = match phase {
+            // Producing: self-production of components
+            AutopoieticPhase::Producing => (
+                vec!["NSM_DO", "NSM_MAKE", "NSM_PART", "NSM_I"],
+                1.0,
+                1.0,
+                0.3,
+            ),
+
+            // Maintaining: preserving organization
+            AutopoieticPhase::Maintaining => (
+                vec!["NSM_DO", "NSM_SAME", "NSM_LIVE", "NSM_FOR_SOME_TIME"],
+                0.8,
+                0.2,
+                0.4,
+            ),
+
+            // Adapting: responding to perturbations
+            AutopoieticPhase::Adapting => (
+                vec!["NSM_CHANGE", "NSM_BECAUSE", "NSM_HAPPEN", "NSM_I"],
+                0.5,
+                0.6,
+                0.6,
+            ),
+
+            // Regulating: boundary control
+            AutopoieticPhase::Regulating => (
+                vec!["NSM_DO", "NSM_NOT", "NSM_LET", "NSM_OTHER"],
+                0.7,
+                0.3,
+                1.0,
+            ),
+
+            // Observing: metacognitive self-reference
+            AutopoieticPhase::Observing => (
+                vec!["NSM_SEE", "NSM_I", "NSM_KNOW", "NSM_NOW"],
+                1.0,
+                0.4,
+                0.2,
+            ),
+
+            // Integrating: unifying all components
+            AutopoieticPhase::Integrating => (
+                vec!["NSM_ALL", "NSM_TOGETHER", "NSM_ONE", "NSM_BECOME"],
+                0.9,
+                0.5,
+                0.1,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(8500 + phase as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            phase,
+            nsm_primitives,
+            primitive_encoding,
+            self_directedness,
+            generativity,
+            boundary_focus,
+        }
+    }
+
+    /// Get all autopoietic phase groundings
+    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<AutopoieticPhase, Self> {
+        [
+            AutopoieticPhase::Producing,
+            AutopoieticPhase::Maintaining,
+            AutopoieticPhase::Adapting,
+            AutopoieticPhase::Regulating,
+            AutopoieticPhase::Observing,
+            AutopoieticPhase::Integrating,
+        ]
+        .into_iter()
+        .map(|p| (p, Self::for_phase(p, primitive_system)))
+        .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+
+    /// Calculate similarity between two phases
+    pub fn similarity(&self, other: &Self) -> f32 {
+        self.primitive_encoding
+            .similarity(&other.primitive_encoding)
+    }
+}
+
+/// NSM primitive grounding for component types.
+///
+/// Each type of internal autopoietic component is grounded in NSM primitives.
+///
+/// ## Component Type Semantics
+///
+/// - Boundary: interface with world → I + NOT + OTHER + NEAR
+/// - Processing: active computation → DO + THINK + CHANGE + SOMETHING
+/// - Memory: storage/recall → KNOW + BEFORE + SAME + AFTER
+/// - Integration: unifying function → ALL + TOGETHER + ONE + SAME
+/// - SelfModel: self-representation → I + THINK + I + KNOW
+#[derive(Debug, Clone)]
+pub struct ComponentTypePrimitiveGrounding {
+    /// The component type being grounded
+    pub component_type: ComponentType,
+
+    /// NSM primitives composing this type's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Internal vs external focus: 0.0 (external) to 1.0 (internal)
+    pub internal_focus: f32,
+
+    /// Temporal span: 0.0 (momentary) to 1.0 (persistent)
+    pub temporal_span: f32,
+
+    /// Self-reference level: 0.0 (world-oriented) to 1.0 (self-oriented)
+    pub self_reference_level: f32,
+}
+
+impl ComponentTypePrimitiveGrounding {
+    /// Get NSM grounding for a specific component type
+    pub fn for_type(component_type: ComponentType, primitive_system: &PrimitiveSystem) -> Self {
+        let (primitives, internal_focus, temporal_span, self_reference_level) = match component_type
+        {
+            // Boundary: interface/membrane
+            ComponentType::Boundary => (
+                vec!["NSM_I", "NSM_NOT", "NSM_OTHER", "NSM_NEAR"],
+                0.3,
+                0.8,
+                0.5,
+            ),
+
+            // Processing: active transformation
+            ComponentType::Processing => (
+                vec!["NSM_DO", "NSM_THINK", "NSM_CHANGE", "NSM_SOMETHING"],
+                0.5,
+                0.3,
+                0.3,
+            ),
+
+            // Memory: temporal persistence
+            ComponentType::Memory => (
+                vec!["NSM_KNOW", "NSM_BEFORE", "NSM_SAME", "NSM_AFTER"],
+                0.7,
+                1.0,
+                0.4,
+            ),
+
+            // Integration: unifying
+            ComponentType::Integration => (
+                vec!["NSM_ALL", "NSM_TOGETHER", "NSM_ONE", "NSM_SAME"],
+                0.8,
+                0.6,
+                0.6,
+            ),
+
+            // SelfModel: recursive self-representation
+            ComponentType::SelfModel => (
+                vec!["NSM_I", "NSM_THINK", "NSM_I", "NSM_KNOW"],
+                1.0,
+                0.7,
+                1.0,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(8600 + component_type as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            component_type,
+            nsm_primitives,
+            primitive_encoding,
+            internal_focus,
+            temporal_span,
+            self_reference_level,
+        }
+    }
+
+    /// Get all component type groundings
+    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<ComponentType, Self> {
+        [
+            ComponentType::Boundary,
+            ComponentType::Processing,
+            ComponentType::Memory,
+            ComponentType::Integration,
+            ComponentType::SelfModel,
+        ]
+        .into_iter()
+        .map(|t| (t, Self::for_type(t, primitive_system)))
+        .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+
+    /// Calculate similarity between two component types
+    pub fn similarity(&self, other: &Self) -> f32 {
+        self.primitive_encoding
+            .similarity(&other.primitive_encoding)
+    }
+}
+
+/// Unified autopoietic NSM grounding system.
+///
+/// Provides access to all autopoietic concept groundings for
+/// cross-domain semantic reasoning about self-maintaining systems.
+#[derive(Debug, Clone)]
+pub struct AutopoieticNSMGrounding {
+    /// Autopoietic phase groundings
+    pub phases: HashMap<AutopoieticPhase, AutopoieticPhasePrimitiveGrounding>,
+
+    /// Component type groundings
+    pub component_types: HashMap<ComponentType, ComponentTypePrimitiveGrounding>,
+}
+
+impl AutopoieticNSMGrounding {
+    /// Create complete autopoietic NSM grounding system
+    pub fn new(primitive_system: &PrimitiveSystem) -> Self {
+        Self {
+            phases: AutopoieticPhasePrimitiveGrounding::all_groundings(primitive_system),
+            component_types: ComponentTypePrimitiveGrounding::all_groundings(primitive_system),
+        }
+    }
+
+    /// Get total number of grounded concepts
+    pub fn concept_count(&self) -> usize {
+        self.phases.len() + self.component_types.len()
+    }
+
+    /// Describe current autopoietic state semantically
+    pub fn describe_state(&self, phase: AutopoieticPhase) -> String {
+        self.phases
+            .get(&phase)
+            .map(|g| format!("Autopoiesis[{}]", g.semantic_formula()))
+            .unwrap_or_default()
+    }
+
+    /// Get semantic description of a component
+    pub fn describe_component(&self, component_type: ComponentType) -> String {
+        self.component_types
+            .get(&component_type)
+            .map(|g| format!("Component[{}]", g.semantic_formula()))
+            .unwrap_or_default()
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ORIGINAL AUTOPOIETIC CONSCIOUSNESS IMPLEMENTATION
+// ═══════════════════════════════════════════════════════════════════════════
 
 /// Configuration for autopoietic consciousness
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -76,7 +394,7 @@ impl Default for AutopoieticState {
 }
 
 /// Phases of autopoietic operation
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AutopoieticPhase {
     /// Self-production of components
     Producing,
@@ -295,23 +613,25 @@ impl AutopoieticConsciousness {
         };
 
         // Calculate operational closure
-        let boundary_count = self.components.values()
+        let boundary_count = self
+            .components
+            .values()
             .filter(|c| c.component_type == ComponentType::Boundary)
             .count();
-        self.state.closure = (boundary_count as f32 / self.components.len().max(1) as f32)
-            .min(1.0);
+        self.state.closure = (boundary_count as f32 / self.components.len().max(1) as f32).min(1.0);
 
         // Update self-model
-        let component_states: Vec<RealHV> = self.components.values()
-            .map(|c| c.state.clone())
-            .collect();
+        let component_states: Vec<RealHV> =
+            self.components.values().map(|c| c.state.clone()).collect();
 
         if !component_states.is_empty() {
             self.self_model = RealHV::bundle(&component_states);
         }
 
         // Calculate self-reference
-        let model_components: Vec<_> = self.components.values()
+        let model_components: Vec<_> = self
+            .components
+            .values()
             .filter(|c| c.component_type == ComponentType::SelfModel)
             .collect();
 
@@ -349,7 +669,9 @@ impl AutopoieticConsciousness {
         }
 
         // Regenerate essential components
-        let boundary_count = self.components.values()
+        let boundary_count = self
+            .components
+            .values()
             .filter(|c| c.component_type == ComponentType::Boundary)
             .count();
 
@@ -357,7 +679,9 @@ impl AutopoieticConsciousness {
             self.produce_component(ComponentType::Boundary);
         }
 
-        let processing_count = self.components.values()
+        let processing_count = self
+            .components
+            .values()
             .filter(|c| c.component_type == ComponentType::Processing)
             .count();
 
@@ -368,9 +692,11 @@ impl AutopoieticConsciousness {
         // Update adaptation based on history
         if self.history.len() >= 2 {
             let recent: Vec<_> = self.history.iter().rev().take(5).collect();
-            let integrity_trend: f32 = recent.windows(2)
+            let integrity_trend: f32 = recent
+                .windows(2)
                 .map(|w| w[0].integrity - w[1].integrity)
-                .sum::<f32>() / (recent.len() - 1).max(1) as f32;
+                .sum::<f32>()
+                / (recent.len() - 1).max(1) as f32;
 
             self.state.adaptation = (self.state.adaptation + integrity_trend * 0.1).clamp(0.0, 1.0);
         }
@@ -381,9 +707,7 @@ impl AutopoieticConsciousness {
         self.state.phase = AutopoieticPhase::Integrating;
 
         // Bundle all component states
-        let states: Vec<RealHV> = self.components.values()
-            .map(|c| c.state.clone())
-            .collect();
+        let states: Vec<RealHV> = self.components.values().map(|c| c.state.clone()).collect();
 
         if states.len() >= 2 {
             let integrated = RealHV::bundle(&states);
@@ -403,9 +727,7 @@ impl AutopoieticConsciousness {
         }
 
         // Closure = how much components reference each other
-        let component_states: Vec<_> = self.components.values()
-            .map(|c| &c.state)
-            .collect();
+        let component_states: Vec<_> = self.components.values().map(|c| &c.state).collect();
 
         let mut total_similarity = 0.0;
         let mut count = 0;
@@ -562,12 +884,7 @@ mod tests {
     #[test]
     fn test_perturbation() {
         let mut system = AutopoieticConsciousness::default();
-        let perturbation = Perturbation::new(
-            1,
-            "environment",
-            0.5,
-            RealHV::random(512, 42)
-        );
+        let perturbation = Perturbation::new(1, "environment", 0.5, RealHV::random(512, 42));
         system.process_perturbation(&perturbation);
         assert!(system.stats.perturbations_processed > 0);
     }
