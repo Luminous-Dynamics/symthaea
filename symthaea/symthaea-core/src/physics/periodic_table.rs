@@ -155,6 +155,12 @@ pub struct PeriodicTable {
     pub reactive: ContinuousHV,
     pub oxidizing: ContinuousHV,
     pub reducing: ContinuousHV,
+    /// Lanthanide series marker (elements 57-71)
+    pub lanthanide: ContinuousHV,
+    /// Actinide series marker (elements 89-103)
+    pub actinide: ContinuousHV,
+    /// Superheavy elements marker (elements 104+)
+    pub superheavy: ContinuousHV,
 
     /// Reference to building blocks
     proton: ContinuousHV,
@@ -176,6 +182,9 @@ impl PeriodicTable {
         let reactive = genesis.hv("chemistry::reactive", PHYSICS_DIM);
         let oxidizing = genesis.hv("chemistry::oxidizing", PHYSICS_DIM);
         let reducing = genesis.hv("chemistry::reducing", PHYSICS_DIM);
+        let lanthanide = genesis.hv("chemistry::lanthanide", PHYSICS_DIM);
+        let actinide = genesis.hv("chemistry::actinide", PHYSICS_DIM);
+        let superheavy = genesis.hv("chemistry::superheavy", PHYSICS_DIM);
 
         // Store building blocks
         let proton = hadrons.proton.clone();
@@ -192,6 +201,9 @@ impl PeriodicTable {
             reactive,
             oxidizing,
             reducing,
+            lanthanide,
+            actinide,
+            superheavy,
             proton,
             neutron,
             electron,
@@ -243,17 +255,133 @@ impl PeriodicTable {
             ElementData { symbol: "Se", name: "Selenium", atomic_number: 34, standard_neutrons: 46, atomic_mass: 78.97, electronegativity: Some(2.55), group: 16, period: 4 },
             ElementData { symbol: "Br", name: "Bromine", atomic_number: 35, standard_neutrons: 44, atomic_mass: 79.90, electronegativity: Some(2.96), group: 17, period: 4 },
             ElementData { symbol: "Kr", name: "Krypton", atomic_number: 36, standard_neutrons: 48, atomic_mass: 83.80, electronegativity: Some(3.00), group: 18, period: 4 },
+
+            // Period 5 (Rb-Xe, Z=37-54)
+            ElementData { symbol: "Rb", name: "Rubidium", atomic_number: 37, standard_neutrons: 48, atomic_mass: 85.47, electronegativity: Some(0.82), group: 1, period: 5 },
+            ElementData { symbol: "Sr", name: "Strontium", atomic_number: 38, standard_neutrons: 50, atomic_mass: 87.62, electronegativity: Some(0.95), group: 2, period: 5 },
+            ElementData { symbol: "Y", name: "Yttrium", atomic_number: 39, standard_neutrons: 50, atomic_mass: 88.91, electronegativity: Some(1.22), group: 3, period: 5 },
+            ElementData { symbol: "Zr", name: "Zirconium", atomic_number: 40, standard_neutrons: 51, atomic_mass: 91.22, electronegativity: Some(1.33), group: 4, period: 5 },
+            ElementData { symbol: "Nb", name: "Niobium", atomic_number: 41, standard_neutrons: 52, atomic_mass: 92.91, electronegativity: Some(1.60), group: 5, period: 5 },
+            ElementData { symbol: "Mo", name: "Molybdenum", atomic_number: 42, standard_neutrons: 54, atomic_mass: 95.95, electronegativity: Some(2.16), group: 6, period: 5 },
+            ElementData { symbol: "Tc", name: "Technetium", atomic_number: 43, standard_neutrons: 55, atomic_mass: 98.00, electronegativity: Some(1.90), group: 7, period: 5 },
+            ElementData { symbol: "Ru", name: "Ruthenium", atomic_number: 44, standard_neutrons: 57, atomic_mass: 101.07, electronegativity: Some(2.20), group: 8, period: 5 },
+            ElementData { symbol: "Rh", name: "Rhodium", atomic_number: 45, standard_neutrons: 58, atomic_mass: 102.91, electronegativity: Some(2.28), group: 9, period: 5 },
+            ElementData { symbol: "Pd", name: "Palladium", atomic_number: 46, standard_neutrons: 60, atomic_mass: 106.42, electronegativity: Some(2.20), group: 10, period: 5 },
+            ElementData { symbol: "Ag", name: "Silver", atomic_number: 47, standard_neutrons: 60, atomic_mass: 107.87, electronegativity: Some(1.93), group: 11, period: 5 },
+            ElementData { symbol: "Cd", name: "Cadmium", atomic_number: 48, standard_neutrons: 64, atomic_mass: 112.41, electronegativity: Some(1.69), group: 12, period: 5 },
+            ElementData { symbol: "In", name: "Indium", atomic_number: 49, standard_neutrons: 66, atomic_mass: 114.82, electronegativity: Some(1.78), group: 13, period: 5 },
+            ElementData { symbol: "Sn", name: "Tin", atomic_number: 50, standard_neutrons: 69, atomic_mass: 118.71, electronegativity: Some(1.96), group: 14, period: 5 },
+            ElementData { symbol: "Sb", name: "Antimony", atomic_number: 51, standard_neutrons: 71, atomic_mass: 121.76, electronegativity: Some(2.05), group: 15, period: 5 },
+            ElementData { symbol: "Te", name: "Tellurium", atomic_number: 52, standard_neutrons: 76, atomic_mass: 127.60, electronegativity: Some(2.10), group: 16, period: 5 },
+            ElementData { symbol: "I", name: "Iodine", atomic_number: 53, standard_neutrons: 74, atomic_mass: 126.90, electronegativity: Some(2.66), group: 17, period: 5 },
+            ElementData { symbol: "Xe", name: "Xenon", atomic_number: 54, standard_neutrons: 77, atomic_mass: 131.29, electronegativity: Some(2.60), group: 18, period: 5 },
+
+            // Period 6 (Cs-Rn, Z=55-86) including Lanthanides
+            ElementData { symbol: "Cs", name: "Cesium", atomic_number: 55, standard_neutrons: 78, atomic_mass: 132.91, electronegativity: Some(0.79), group: 1, period: 6 },
+            ElementData { symbol: "Ba", name: "Barium", atomic_number: 56, standard_neutrons: 81, atomic_mass: 137.33, electronegativity: Some(0.89), group: 2, period: 6 },
+            // Lanthanides (Z=57-71)
+            ElementData { symbol: "La", name: "Lanthanum", atomic_number: 57, standard_neutrons: 82, atomic_mass: 138.91, electronegativity: Some(1.10), group: 3, period: 6 },
+            ElementData { symbol: "Ce", name: "Cerium", atomic_number: 58, standard_neutrons: 82, atomic_mass: 140.12, electronegativity: Some(1.12), group: 3, period: 6 },
+            ElementData { symbol: "Pr", name: "Praseodymium", atomic_number: 59, standard_neutrons: 82, atomic_mass: 140.91, electronegativity: Some(1.13), group: 3, period: 6 },
+            ElementData { symbol: "Nd", name: "Neodymium", atomic_number: 60, standard_neutrons: 84, atomic_mass: 144.24, electronegativity: Some(1.14), group: 3, period: 6 },
+            ElementData { symbol: "Pm", name: "Promethium", atomic_number: 61, standard_neutrons: 84, atomic_mass: 145.00, electronegativity: Some(1.13), group: 3, period: 6 },
+            ElementData { symbol: "Sm", name: "Samarium", atomic_number: 62, standard_neutrons: 88, atomic_mass: 150.36, electronegativity: Some(1.17), group: 3, period: 6 },
+            ElementData { symbol: "Eu", name: "Europium", atomic_number: 63, standard_neutrons: 89, atomic_mass: 151.96, electronegativity: Some(1.20), group: 3, period: 6 },
+            ElementData { symbol: "Gd", name: "Gadolinium", atomic_number: 64, standard_neutrons: 93, atomic_mass: 157.25, electronegativity: Some(1.20), group: 3, period: 6 },
+            ElementData { symbol: "Tb", name: "Terbium", atomic_number: 65, standard_neutrons: 94, atomic_mass: 158.93, electronegativity: Some(1.10), group: 3, period: 6 },
+            ElementData { symbol: "Dy", name: "Dysprosium", atomic_number: 66, standard_neutrons: 97, atomic_mass: 162.50, electronegativity: Some(1.22), group: 3, period: 6 },
+            ElementData { symbol: "Ho", name: "Holmium", atomic_number: 67, standard_neutrons: 98, atomic_mass: 164.93, electronegativity: Some(1.23), group: 3, period: 6 },
+            ElementData { symbol: "Er", name: "Erbium", atomic_number: 68, standard_neutrons: 99, atomic_mass: 167.26, electronegativity: Some(1.24), group: 3, period: 6 },
+            ElementData { symbol: "Tm", name: "Thulium", atomic_number: 69, standard_neutrons: 100, atomic_mass: 168.93, electronegativity: Some(1.25), group: 3, period: 6 },
+            ElementData { symbol: "Yb", name: "Ytterbium", atomic_number: 70, standard_neutrons: 103, atomic_mass: 173.05, electronegativity: Some(1.10), group: 3, period: 6 },
+            ElementData { symbol: "Lu", name: "Lutetium", atomic_number: 71, standard_neutrons: 104, atomic_mass: 174.97, electronegativity: Some(1.27), group: 3, period: 6 },
+            // Continue Period 6
+            ElementData { symbol: "Hf", name: "Hafnium", atomic_number: 72, standard_neutrons: 106, atomic_mass: 178.49, electronegativity: Some(1.30), group: 4, period: 6 },
+            ElementData { symbol: "Ta", name: "Tantalum", atomic_number: 73, standard_neutrons: 108, atomic_mass: 180.95, electronegativity: Some(1.50), group: 5, period: 6 },
+            ElementData { symbol: "W", name: "Tungsten", atomic_number: 74, standard_neutrons: 110, atomic_mass: 183.84, electronegativity: Some(2.36), group: 6, period: 6 },
+            ElementData { symbol: "Re", name: "Rhenium", atomic_number: 75, standard_neutrons: 111, atomic_mass: 186.21, electronegativity: Some(1.90), group: 7, period: 6 },
+            ElementData { symbol: "Os", name: "Osmium", atomic_number: 76, standard_neutrons: 114, atomic_mass: 190.23, electronegativity: Some(2.20), group: 8, period: 6 },
+            ElementData { symbol: "Ir", name: "Iridium", atomic_number: 77, standard_neutrons: 115, atomic_mass: 192.22, electronegativity: Some(2.20), group: 9, period: 6 },
+            ElementData { symbol: "Pt", name: "Platinum", atomic_number: 78, standard_neutrons: 117, atomic_mass: 195.08, electronegativity: Some(2.28), group: 10, period: 6 },
+            ElementData { symbol: "Au", name: "Gold", atomic_number: 79, standard_neutrons: 118, atomic_mass: 196.97, electronegativity: Some(2.54), group: 11, period: 6 },
+            ElementData { symbol: "Hg", name: "Mercury", atomic_number: 80, standard_neutrons: 121, atomic_mass: 200.59, electronegativity: Some(2.00), group: 12, period: 6 },
+            ElementData { symbol: "Tl", name: "Thallium", atomic_number: 81, standard_neutrons: 123, atomic_mass: 204.38, electronegativity: Some(1.62), group: 13, period: 6 },
+            ElementData { symbol: "Pb", name: "Lead", atomic_number: 82, standard_neutrons: 125, atomic_mass: 207.20, electronegativity: Some(1.87), group: 14, period: 6 },
+            ElementData { symbol: "Bi", name: "Bismuth", atomic_number: 83, standard_neutrons: 126, atomic_mass: 208.98, electronegativity: Some(2.02), group: 15, period: 6 },
+            ElementData { symbol: "Po", name: "Polonium", atomic_number: 84, standard_neutrons: 125, atomic_mass: 209.00, electronegativity: Some(2.00), group: 16, period: 6 },
+            ElementData { symbol: "At", name: "Astatine", atomic_number: 85, standard_neutrons: 125, atomic_mass: 210.00, electronegativity: Some(2.20), group: 17, period: 6 },
+            ElementData { symbol: "Rn", name: "Radon", atomic_number: 86, standard_neutrons: 136, atomic_mass: 222.00, electronegativity: None, group: 18, period: 6 },
+
+            // Period 7 (Fr-Og, Z=87-118) including Actinides
+            ElementData { symbol: "Fr", name: "Francium", atomic_number: 87, standard_neutrons: 136, atomic_mass: 223.00, electronegativity: Some(0.70), group: 1, period: 7 },
+            ElementData { symbol: "Ra", name: "Radium", atomic_number: 88, standard_neutrons: 138, atomic_mass: 226.00, electronegativity: Some(0.90), group: 2, period: 7 },
+            // Actinides (Z=89-103)
+            ElementData { symbol: "Ac", name: "Actinium", atomic_number: 89, standard_neutrons: 138, atomic_mass: 227.00, electronegativity: Some(1.10), group: 3, period: 7 },
+            ElementData { symbol: "Th", name: "Thorium", atomic_number: 90, standard_neutrons: 142, atomic_mass: 232.04, electronegativity: Some(1.30), group: 3, period: 7 },
+            ElementData { symbol: "Pa", name: "Protactinium", atomic_number: 91, standard_neutrons: 140, atomic_mass: 231.04, electronegativity: Some(1.50), group: 3, period: 7 },
+            ElementData { symbol: "U", name: "Uranium", atomic_number: 92, standard_neutrons: 146, atomic_mass: 238.03, electronegativity: Some(1.38), group: 3, period: 7 },
+            ElementData { symbol: "Np", name: "Neptunium", atomic_number: 93, standard_neutrons: 144, atomic_mass: 237.00, electronegativity: Some(1.36), group: 3, period: 7 },
+            ElementData { symbol: "Pu", name: "Plutonium", atomic_number: 94, standard_neutrons: 150, atomic_mass: 244.00, electronegativity: Some(1.28), group: 3, period: 7 },
+            ElementData { symbol: "Am", name: "Americium", atomic_number: 95, standard_neutrons: 148, atomic_mass: 243.00, electronegativity: Some(1.30), group: 3, period: 7 },
+            ElementData { symbol: "Cm", name: "Curium", atomic_number: 96, standard_neutrons: 151, atomic_mass: 247.00, electronegativity: Some(1.30), group: 3, period: 7 },
+            ElementData { symbol: "Bk", name: "Berkelium", atomic_number: 97, standard_neutrons: 150, atomic_mass: 247.00, electronegativity: Some(1.30), group: 3, period: 7 },
+            ElementData { symbol: "Cf", name: "Californium", atomic_number: 98, standard_neutrons: 153, atomic_mass: 251.00, electronegativity: Some(1.30), group: 3, period: 7 },
+            ElementData { symbol: "Es", name: "Einsteinium", atomic_number: 99, standard_neutrons: 153, atomic_mass: 252.00, electronegativity: Some(1.30), group: 3, period: 7 },
+            ElementData { symbol: "Fm", name: "Fermium", atomic_number: 100, standard_neutrons: 157, atomic_mass: 257.00, electronegativity: Some(1.30), group: 3, period: 7 },
+            ElementData { symbol: "Md", name: "Mendelevium", atomic_number: 101, standard_neutrons: 157, atomic_mass: 258.00, electronegativity: Some(1.30), group: 3, period: 7 },
+            ElementData { symbol: "No", name: "Nobelium", atomic_number: 102, standard_neutrons: 157, atomic_mass: 259.00, electronegativity: Some(1.30), group: 3, period: 7 },
+            ElementData { symbol: "Lr", name: "Lawrencium", atomic_number: 103, standard_neutrons: 159, atomic_mass: 262.00, electronegativity: Some(1.30), group: 3, period: 7 },
+            // Superheavy elements (Z=104-118)
+            ElementData { symbol: "Rf", name: "Rutherfordium", atomic_number: 104, standard_neutrons: 157, atomic_mass: 267.00, electronegativity: None, group: 4, period: 7 },
+            ElementData { symbol: "Db", name: "Dubnium", atomic_number: 105, standard_neutrons: 157, atomic_mass: 268.00, electronegativity: None, group: 5, period: 7 },
+            ElementData { symbol: "Sg", name: "Seaborgium", atomic_number: 106, standard_neutrons: 160, atomic_mass: 269.00, electronegativity: None, group: 6, period: 7 },
+            ElementData { symbol: "Bh", name: "Bohrium", atomic_number: 107, standard_neutrons: 163, atomic_mass: 270.00, electronegativity: None, group: 7, period: 7 },
+            ElementData { symbol: "Hs", name: "Hassium", atomic_number: 108, standard_neutrons: 161, atomic_mass: 269.00, electronegativity: None, group: 8, period: 7 },
+            ElementData { symbol: "Mt", name: "Meitnerium", atomic_number: 109, standard_neutrons: 169, atomic_mass: 278.00, electronegativity: None, group: 9, period: 7 },
+            ElementData { symbol: "Ds", name: "Darmstadtium", atomic_number: 110, standard_neutrons: 171, atomic_mass: 281.00, electronegativity: None, group: 10, period: 7 },
+            ElementData { symbol: "Rg", name: "Roentgenium", atomic_number: 111, standard_neutrons: 171, atomic_mass: 282.00, electronegativity: None, group: 11, period: 7 },
+            ElementData { symbol: "Cn", name: "Copernicium", atomic_number: 112, standard_neutrons: 173, atomic_mass: 285.00, electronegativity: None, group: 12, period: 7 },
+            ElementData { symbol: "Nh", name: "Nihonium", atomic_number: 113, standard_neutrons: 173, atomic_mass: 286.00, electronegativity: None, group: 13, period: 7 },
+            ElementData { symbol: "Fl", name: "Flerovium", atomic_number: 114, standard_neutrons: 175, atomic_mass: 289.00, electronegativity: None, group: 14, period: 7 },
+            ElementData { symbol: "Mc", name: "Moscovium", atomic_number: 115, standard_neutrons: 175, atomic_mass: 290.00, electronegativity: None, group: 15, period: 7 },
+            ElementData { symbol: "Lv", name: "Livermorium", atomic_number: 116, standard_neutrons: 177, atomic_mass: 293.00, electronegativity: None, group: 16, period: 7 },
+            ElementData { symbol: "Ts", name: "Tennessine", atomic_number: 117, standard_neutrons: 177, atomic_mass: 294.00, electronegativity: None, group: 17, period: 7 },
+            ElementData { symbol: "Og", name: "Oganesson", atomic_number: 118, standard_neutrons: 176, atomic_mass: 294.00, electronegativity: None, group: 18, period: 7 },
         ];
 
         for data in element_data {
             let mut vector = self.compose_element(data.atomic_number, data.standard_neutrons, hadrons);
+            let z = data.atomic_number;
 
-            // Add noble gas character to group 18 elements (He, Ne, Ar, Kr, etc.)
-            // This makes them share a common "full shell" signature
+            // Add noble gas character to group 18 elements
             if data.group == 18 {
                 vector = ContinuousHV::weighted_bundle(
                     &[&vector, &self.noble],
                     &[1.0, 0.5],
+                );
+            }
+
+            // Add lanthanide character (La=57 through Lu=71)
+            if z >= 57 && z <= 71 {
+                vector = ContinuousHV::weighted_bundle(
+                    &[&vector, &self.lanthanide],
+                    &[1.0, 0.4],
+                );
+            }
+
+            // Add actinide character (Ac=89 through Lr=103)
+            if z >= 89 && z <= 103 {
+                vector = ContinuousHV::weighted_bundle(
+                    &[&vector, &self.actinide],
+                    &[1.0, 0.4],
+                );
+            }
+
+            // Add superheavy character (Rf=104 through Og=118)
+            if z >= 104 {
+                vector = ContinuousHV::weighted_bundle(
+                    &[&vector, &self.superheavy],
+                    &[1.0, 0.3],
                 );
             }
 
