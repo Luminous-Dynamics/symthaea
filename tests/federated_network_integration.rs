@@ -70,7 +70,7 @@ async fn test_three_node_gradient_sharing() {
 
     // Verify nodes 1 and 2 can receive the gradient
     let result1 = coordinators[1]
-        .backend
+        .backend()
         .receive(Duration::from_millis(100))
         .await;
     assert!(result1.is_ok(), "Node 1 should receive gradient");
@@ -80,7 +80,7 @@ async fn test_three_node_gradient_sharing() {
     assert!(matches!(source, NodeAddress::Channel(_)));
 
     let result2 = coordinators[2]
-        .backend
+        .backend()
         .receive(Duration::from_millis(100))
         .await;
     assert!(result2.is_ok(), "Node 2 should receive gradient");
@@ -102,7 +102,7 @@ async fn test_three_node_heartbeat_exchange() {
     // Each node should be able to receive 2 heartbeats
     for coordinator in &coordinators {
         let mut received = 0;
-        while let Ok(_) = coordinator.backend.receive(Duration::from_millis(10)).await {
+        while let Ok(_) = coordinator.backend().receive(Duration::from_millis(10)).await {
             received += 1;
         }
         assert_eq!(received, 2, "Should receive 2 heartbeats from peers");
@@ -116,7 +116,7 @@ async fn test_three_node_bidirectional_communication() {
     // Node 0 sends, Node 1 receives
     coordinators[0].share_gradient(0.0).await.unwrap();
     let (source, _) = coordinators[1]
-        .backend
+        .backend()
         .receive(Duration::from_millis(100))
         .await
         .unwrap();
@@ -125,7 +125,7 @@ async fn test_three_node_bidirectional_communication() {
     // Node 1 sends, Node 0 receives
     coordinators[1].share_gradient(0.0).await.unwrap();
     let (source, _) = coordinators[0]
-        .backend
+        .backend()
         .receive(Duration::from_millis(100))
         .await
         .unwrap();
@@ -159,7 +159,7 @@ async fn test_five_node_broadcast() {
     // All other nodes should receive
     for i in 1..5 {
         let result = coordinators[i]
-            .backend
+            .backend()
             .receive(Duration::from_millis(100))
             .await;
         assert!(result.is_ok(), "Node {} should receive", i);
@@ -186,7 +186,7 @@ async fn test_gradient_aggregation_flow() {
     // Node 0 receives and processes the gradients
     for _ in 0..2 {
         let result = coordinators[0]
-            .backend
+            .backend()
             .receive(Duration::from_millis(100))
             .await;
         if let Ok((source, msg)) = result {
@@ -400,7 +400,7 @@ async fn test_coordinator_stats() {
 
     // Receive messages on node 1
     let _ = coordinators[1]
-        .backend
+        .backend()
         .receive(Duration::from_millis(50))
         .await;
 
@@ -418,7 +418,7 @@ async fn test_stats_track_gradients() {
 
     // Node 0 receives and processes it
     let result = coordinators[0]
-        .backend
+        .backend()
         .receive(Duration::from_millis(100))
         .await;
     if let Ok((source, msg)) = result {
@@ -664,7 +664,7 @@ async fn test_large_gradient_vectors() {
 
     // Other node can receive
     let result = coordinators[1]
-        .backend
+        .backend()
         .receive(Duration::from_millis(200))
         .await;
     assert!(result.is_ok());

@@ -25,8 +25,13 @@
 
 pub mod types;
 pub mod narrative;
+pub mod telemetry;
 
-pub use types::{ReasoningContext, ReasoningResult, ReasoningEvent, PosthocOutcome};
+pub use types::{ReasoningContext, ReasoningResult, ReasoningEvent, PosthocOutcome, ReasoningContextBuilder};
+pub use telemetry::{
+    TelemetrySink, TelemetryError, TelemetryExporter, TelemetryExporterBuilder,
+    TelemetryConfig, PrometheusMetrics, PrometheusSink, JsonLinesSink, CsvSink,
+};
 pub use narrative::generate_narrative;
 
 use std::collections::VecDeque;
