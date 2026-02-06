@@ -112,8 +112,8 @@ fn main() {
             aggregator.receive_gradient(msg);
         }
 
-        // Aggregate
-        if let Some(_new_weights) = aggregator.aggregate() {
+        // Aggregate and update global model
+        if aggregator.aggregate_and_apply() {
             // Evaluate global model
             let mut eval_model = CfCNetwork::new(config.clone());
             eval_model.set_weights(aggregator.local_weights());
@@ -193,7 +193,7 @@ fn main() {
                     .with_sample_count(samples_per_client as u64);
                 agg.receive_gradient(msg);
             }
-            agg.aggregate();
+            agg.aggregate_and_apply();
         }
 
         // Evaluate
@@ -264,8 +264,8 @@ fn main() {
             agg_no_bft.receive_gradient(msg1);
             agg_with_bft.receive_gradient(msg2);
         }
-        agg_no_bft.aggregate();
-        agg_with_bft.aggregate();
+        agg_no_bft.aggregate_and_apply();
+        agg_with_bft.aggregate_and_apply();
     }
 
     // Evaluate both
@@ -318,8 +318,8 @@ fn main() {
             agg_trusted.receive_gradient(msg1);
             agg_equal.receive_gradient(msg2);
         }
-        agg_trusted.aggregate();
-        agg_equal.aggregate();
+        agg_trusted.aggregate_and_apply();
+        agg_equal.aggregate_and_apply();
     }
 
     let loss_trusted = evaluate_model(&config, agg_trusted.local_weights(), &client_data, output_dim);
