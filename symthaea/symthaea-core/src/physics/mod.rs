@@ -42,6 +42,15 @@ mod neuroscience;
 mod quantum_gravity;
 mod emergence_chain;
 
+// Phase 2: Additional physics domains
+mod general_relativity;
+mod quantum_information;
+mod electromagnetism;
+mod condensed_matter;
+mod fluid_dynamics;
+mod plasma_physics;
+mod cosmology;
+
 pub use standard_model::*;
 pub use hadrons::*;
 pub use periodic_table::*;
@@ -79,3 +88,12 @@ pub use molecular_biology::*;
 pub use neuroscience::*;
 pub use quantum_gravity::*;
 pub use emergence_chain::*;
+
+// Phase 2: Additional physics domain exports
+pub use general_relativity::*;
+pub use quantum_information::*;
+pub use electromagnetism::*;
+pub use condensed_matter::*;
+pub use fluid_dynamics::*;
+pub use plasma_physics::*;
+pub use cosmology::*;
