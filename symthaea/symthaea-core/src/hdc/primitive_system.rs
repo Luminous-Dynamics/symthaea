@@ -330,6 +330,12 @@ impl PrimitiveSystem {
         system.init_linguistic_primitives();
         system.init_social_moral_primitives();
 
+        // Initialize Tier 6: Temporal primitives (Allen's Interval Algebra extended)
+        system.init_tier6_temporal();
+
+        // Initialize Tier 7: Compositional primitives (composition operators)
+        system.init_tier7_compositional();
+
         // Initialize Tier 9: Consciousness-specific primitives
         // Qualia, attention, memory operations, and agency
         // MUST come before init_derived_primitives so SALIENCE/SELECTION exist
@@ -2748,6 +2754,271 @@ impl PrimitiveSystem {
             pattern: vec![PrimitiveTier::Strategic, PrimitiveTier::MetaCognitive],
             result_tier: PrimitiveTier::MetaCognitive,
             example: "OBLIGATION ⊗ REFLECTION → moral judgment".to_string(),
+        });
+    }
+
+    /// Initialize Tier 6: Temporal Primitives
+    ///
+    /// Extended Allen's Interval Algebra plus temporal reasoning concepts.
+    /// Note: Some temporal primitives (BEFORE, AFTER, DURING, MEETS) already exist
+    /// in Tier 4 (Strategic) with domain "temporal". This tier adds higher-level
+    /// temporal reasoning concepts.
+    ///
+    /// ## Interval Relations (Extended)
+    /// - STARTS: Interval x begins at same point as y
+    /// - FINISHES: Interval x ends at same point as y
+    /// - EQUALS_TEMPORAL: Intervals have same start and end
+    ///
+    /// ## Temporal Reasoning
+    /// - INSTANT: A point in time (zero duration)
+    /// - DURATION: The length of an interval
+    /// - TEMPO: Rate of change over time
+    /// - RHYTHM: Repeating temporal pattern
+    /// - ANTICIPATE: Expectation of future state
+    /// - PERSIST: Continuation through time
+    fn init_tier6_temporal(&mut self) {
+        let temporal_domain = DomainManifold::new(
+            "temporal_reasoning",
+            PrimitiveTier::Temporal,
+            "Extended temporal reasoning and interval algebra"
+        );
+
+        // === INTERVAL RELATIONS (Extended Allen's) ===
+
+        let starts = Primitive::base(
+            "STARTS",
+            PrimitiveTier::Temporal,
+            "temporal_reasoning",
+            temporal_domain.embed(HV16::random(seed_from_name("STARTS"))),
+            "Relation: interval x begins at same point as interval y begins"
+        );
+
+        let finishes = Primitive::base(
+            "FINISHES",
+            PrimitiveTier::Temporal,
+            "temporal_reasoning",
+            temporal_domain.embed(HV16::random(seed_from_name("FINISHES"))),
+            "Relation: interval x ends at same point as interval y ends"
+        );
+
+        let equals_temporal = Primitive::base(
+            "EQUALS_TEMPORAL",
+            PrimitiveTier::Temporal,
+            "temporal_reasoning",
+            temporal_domain.embed(HV16::random(seed_from_name("EQUALS_TEMPORAL"))),
+            "Relation: intervals x and y have identical start and end points"
+        );
+
+        // === TEMPORAL CONCEPTS ===
+
+        let instant = Primitive::base(
+            "INSTANT",
+            PrimitiveTier::Temporal,
+            "temporal_reasoning",
+            temporal_domain.embed(HV16::random(seed_from_name("INSTANT"))),
+            "A point in time with zero duration"
+        );
+
+        let duration = Primitive::base(
+            "DURATION",
+            PrimitiveTier::Temporal,
+            "temporal_reasoning",
+            temporal_domain.embed(HV16::random(seed_from_name("DURATION"))),
+            "The length or extent of a temporal interval"
+        );
+
+        let tempo = Primitive::base(
+            "TEMPO",
+            PrimitiveTier::Temporal,
+            "temporal_reasoning",
+            temporal_domain.embed(HV16::random(seed_from_name("TEMPO"))),
+            "Rate of occurrence or change over time"
+        );
+
+        let rhythm = Primitive::base(
+            "RHYTHM",
+            PrimitiveTier::Temporal,
+            "temporal_reasoning",
+            temporal_domain.embed(HV16::random(seed_from_name("RHYTHM"))),
+            "Repeating pattern of temporal events"
+        );
+
+        let anticipate = Primitive::base(
+            "ANTICIPATE",
+            PrimitiveTier::Temporal,
+            "temporal_reasoning",
+            temporal_domain.embed(HV16::random(seed_from_name("ANTICIPATE"))),
+            "Expectation or prediction of a future state"
+        );
+
+        let persist = Primitive::base(
+            "PERSIST",
+            PrimitiveTier::Temporal,
+            "temporal_reasoning",
+            temporal_domain.embed(HV16::random(seed_from_name("PERSIST"))),
+            "Continuation of existence or state through time"
+        );
+
+        // === REGISTER ALL PRIMITIVES ===
+
+        self.domains.insert("temporal_reasoning".to_string(), temporal_domain);
+
+        for primitive in vec![
+            starts, finishes, equals_temporal,
+            instant, duration, tempo, rhythm,
+            anticipate, persist,
+        ] {
+            let name = primitive.name.clone();
+            let tier = primitive.tier;
+            self.primitives.insert(name.clone(), primitive);
+            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+        }
+
+        // === BINDING RULES ===
+
+        self.binding_rules.push(BindingRule {
+            name: "temporal_composition".to_string(),
+            pattern: vec![PrimitiveTier::Temporal, PrimitiveTier::Temporal],
+            result_tier: PrimitiveTier::Temporal,
+            example: "STARTS ⊗ FINISHES → interval containment".to_string(),
+        });
+
+        self.binding_rules.push(BindingRule {
+            name: "temporal_physical".to_string(),
+            pattern: vec![PrimitiveTier::Temporal, PrimitiveTier::Physical],
+            result_tier: PrimitiveTier::Physical,
+            example: "DURATION ⊗ VELOCITY → distance traveled".to_string(),
+        });
+    }
+
+    /// Initialize Tier 7: Compositional Primitives
+    ///
+    /// These primitives enable higher-order composition of other primitives,
+    /// forming a complete algebra for building complex structures from simple ones.
+    ///
+    /// ## Composition Operators
+    /// - SEQUENCE: Sequential composition (do A then B)
+    /// - PARALLEL: Parallel composition (do A and B together)
+    /// - CONDITIONAL: Conditional composition (if P then A else B)
+    /// - ITERATE: Repeated application (do A n times)
+    /// - FIXPOINT: Fixed-point operator (find stable state)
+    ///
+    /// ## Structural Operators
+    /// - ABSTRACT: Extract pattern from instances
+    /// - INSTANTIATE: Create instance from pattern
+    /// - COMPOSE: Combine functions (f ∘ g)
+    /// - CURRY: Partial application
+    fn init_tier7_compositional(&mut self) {
+        let compositional_domain = DomainManifold::new(
+            "composition",
+            PrimitiveTier::Compositional,
+            "Higher-order composition operators for building complex structures"
+        );
+
+        // === COMPOSITION OPERATORS ===
+
+        let sequence_op = Primitive::base(
+            "SEQUENCE_OP",
+            PrimitiveTier::Compositional,
+            "composition",
+            compositional_domain.embed(HV16::random(seed_from_name("SEQUENCE_OP"))),
+            "Sequential composition: do A, then do B"
+        );
+
+        let parallel_op = Primitive::base(
+            "PARALLEL_OP",
+            PrimitiveTier::Compositional,
+            "composition",
+            compositional_domain.embed(HV16::random(seed_from_name("PARALLEL_OP"))),
+            "Parallel composition: do A and B simultaneously"
+        );
+
+        let conditional_op = Primitive::base(
+            "CONDITIONAL_OP",
+            PrimitiveTier::Compositional,
+            "composition",
+            compositional_domain.embed(HV16::random(seed_from_name("CONDITIONAL_OP"))),
+            "Conditional composition: if P then A else B"
+        );
+
+        let iterate_op = Primitive::base(
+            "ITERATE_OP",
+            PrimitiveTier::Compositional,
+            "composition",
+            compositional_domain.embed(HV16::random(seed_from_name("ITERATE_OP"))),
+            "Iteration: repeated application of an operation"
+        );
+
+        let fixpoint_op = Primitive::base(
+            "FIXPOINT_OP",
+            PrimitiveTier::Compositional,
+            "composition",
+            compositional_domain.embed(HV16::random(seed_from_name("FIXPOINT_OP"))),
+            "Fixed-point: find stable state under repeated application"
+        );
+
+        // === STRUCTURAL OPERATORS ===
+
+        let abstract_op = Primitive::base(
+            "ABSTRACT_OP",
+            PrimitiveTier::Compositional,
+            "composition",
+            compositional_domain.embed(HV16::random(seed_from_name("ABSTRACT_OP"))),
+            "Abstraction: extract common pattern from instances"
+        );
+
+        let instantiate_op = Primitive::base(
+            "INSTANTIATE_OP",
+            PrimitiveTier::Compositional,
+            "composition",
+            compositional_domain.embed(HV16::random(seed_from_name("INSTANTIATE_OP"))),
+            "Instantiation: create concrete instance from abstract pattern"
+        );
+
+        let compose_op = Primitive::base(
+            "COMPOSE_OP",
+            PrimitiveTier::Compositional,
+            "composition",
+            compositional_domain.embed(HV16::random(seed_from_name("COMPOSE_OP"))),
+            "Function composition: (f ∘ g)(x) = f(g(x))"
+        );
+
+        let curry_op = Primitive::base(
+            "CURRY_OP",
+            PrimitiveTier::Compositional,
+            "composition",
+            compositional_domain.embed(HV16::random(seed_from_name("CURRY_OP"))),
+            "Currying: transform multi-argument function to chain of single-argument functions"
+        );
+
+        // === REGISTER ALL PRIMITIVES ===
+
+        self.domains.insert("composition".to_string(), compositional_domain);
+
+        for primitive in vec![
+            sequence_op, parallel_op, conditional_op, iterate_op, fixpoint_op,
+            abstract_op, instantiate_op, compose_op, curry_op,
+        ] {
+            let name = primitive.name.clone();
+            let tier = primitive.tier;
+            self.primitives.insert(name.clone(), primitive);
+            self.by_tier.entry(tier).or_insert_with(Vec::new).push(name);
+        }
+
+        // === BINDING RULES ===
+
+        self.binding_rules.push(BindingRule {
+            name: "compositional_algebra".to_string(),
+            pattern: vec![PrimitiveTier::Compositional, PrimitiveTier::Compositional],
+            result_tier: PrimitiveTier::Compositional,
+            example: "SEQUENCE_OP ⊗ ITERATE_OP → loop construct".to_string(),
+        });
+
+        self.binding_rules.push(BindingRule {
+            name: "compositional_lifting".to_string(),
+            pattern: vec![PrimitiveTier::Compositional, PrimitiveTier::Mathematical],
+            result_tier: PrimitiveTier::Compositional,
+            example: "ITERATE_OP ⊗ ADDITION → summation".to_string(),
         });
     }
 
