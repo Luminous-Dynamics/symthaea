@@ -765,7 +765,7 @@ impl PredictiveSelfModel {
     // ========================================================================
 
     /// Learn from raw outcome values (for integration without full NarrativeSelfModel)
-    pub fn learn_from_outcome_raw(&mut self, actual_phi: f64, actual_coherence: f64) {
+    pub fn learn_from_outcome_raw(&mut self, actual_phi: f64, _actual_coherence: f64) {
         // Get the most recent prediction to compare
         if let Some(last_state) = self.predictor.history.back() {
             let prediction_error = (last_state.self_phi - actual_phi).abs();

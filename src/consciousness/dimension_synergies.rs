@@ -253,7 +253,7 @@ impl SynergyProfile {
     /// Detect emergent properties from synergies
     fn detect_emergent_properties(
         profile: &ConsciousnessProfile,
-        synergies: &[DimensionSynergy],
+        _synergies: &[DimensionSynergy],
     ) -> Vec<EmergentProperty> {
         let mut properties = Vec::new();
 

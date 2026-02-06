@@ -695,7 +695,7 @@ impl SenseMakingEngine {
         }
     }
 
-    fn calculate_valence(&self, perception: &PerceptionSummary, category: MeaningCategory) -> f64 {
+    fn calculate_valence(&self, _perception: &PerceptionSummary, category: MeaningCategory) -> f64 {
         let base_valence = match category {
             MeaningCategory::Opportunity => 0.7,
             MeaningCategory::Achievement => 0.8,
