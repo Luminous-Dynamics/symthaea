@@ -213,6 +213,7 @@ pub use symthaea_core::hdc::consciousness_advanced_cognition as core_advanced_co
 pub use symthaea_core::hdc::consciousness_complete_being as core_complete_being;
 pub use symthaea_core::hdc::consciousness_cross_integration as core_cross_integration;
 pub use symthaea_core::hdc::consciousness_feedback_dynamics as core_feedback_dynamics;
+pub use symthaea_core::hdc::integrated_information;
 pub use symthaea_core::hdc::hdc_ltc_unified as core_hdc_ltc_unified;
 
 // Re-export unified HDC-LTC types (revolutionary closed-form dynamics)
