@@ -25,6 +25,19 @@ Sweettest MUST run with `--release` due to Holochain's hardcoded 5-minute nonce 
 
 ## Test Suites
 
+### EduNet Workflow (7 tests) - NEW
+**File:** `tests/edunet_workflow.rs`
+
+| Test | Agents | Description |
+|------|--------|-------------|
+| `test_create_and_get_course` | 1 | Create course, retrieve by hash |
+| `test_list_courses` | 1 | Create multiple courses, verify list |
+| `test_enrollment_and_progress` | 2 | Instructor creates, learner enrolls and updates progress |
+| `test_record_activity` | 1 | Record quiz activity with outcome |
+| `test_fl_gradient_submission` | 2 | Create FL model, submit clipped gradient |
+| `test_issue_completion_credential` | 2 | Issue and verify course completion credential |
+| `test_curriculum_proposal_voting` | 3 | DAO proposal for curriculum change |
+
 ### Identity Workflow (4 tests)
 **File:** `tests/identity_workflow.rs`
 
