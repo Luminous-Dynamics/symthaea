@@ -73,8 +73,9 @@ fn main() {
     println!("Found {} PSG recordings\n", psg_files.len());
 
     // Use first 10 for training, rest for testing
-    let n_train = psg_files.len().min(10);
-    let n_test = (psg_files.len() - n_train).min(10);
+    // Use 2/3 for training, 1/3 for testing (minimum 1 each)
+    let n_train = (psg_files.len() * 2 / 3).max(1).min(psg_files.len() - 1);
+    let n_test = psg_files.len() - n_train;
 
     let config = SleepSentinelConfig {
         local_neurons: 64,

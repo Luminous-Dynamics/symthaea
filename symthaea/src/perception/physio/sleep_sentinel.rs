@@ -97,10 +97,13 @@ impl Default for PopulationNorms {
     fn default() -> Self {
         Self {
             // (mean, std) for each threshold
-            complexity: (0.6, 0.15),
-            synchrony: (0.7, 0.12),
-            phi_proxy: (0.5, 0.1),
-            frequency_bounds: (8.0, 12.0), // Hz boundaries
+            // Calibrated from Sleep-EDF feature analysis:
+            // - Complexity varies widely across stages (0.1 - 0.6)
+            // - Synchrony is typically 0.4 - 0.7 depending on stage
+            complexity: (0.35, 0.20),  // Allow wider range
+            synchrony: (0.55, 0.15),   // Center on moderate synchrony
+            phi_proxy: (0.4, 0.15),    // Phi tends to be lower in real data
+            frequency_bounds: (8.0, 12.0), // Hz boundaries for alpha band
         }
     }
 }
@@ -822,8 +825,11 @@ impl Default for SleepSentinelConfig {
             tau_max: 1000.0,        // 1s max (1 Hz - delta)
             learning_rate: 0.001,
             steps_per_epoch: 3000,  // 30 seconds at 100 Hz
-            complexity_threshold: 0.6,
-            synchrony_threshold: 0.7,
+            // Thresholds calibrated for real EEG:
+            // - Real signals have lower variance than idealized synthetic
+            // - These values represent the median, allowing scoring to work in both directions
+            complexity_threshold: 0.35,  // Lowered from 0.6 - real EEG has lower variance
+            synchrony_threshold: 0.55,   // Lowered from 0.7 - correlation varies more
             enable_adaptive_thresholds: true,
             adaptive_config: AdaptiveThresholdConfig::default(),
         }
@@ -1175,6 +1181,11 @@ impl SleepSentinel {
     }
 
     /// Classify consciousness state based on metrics
+    ///
+    /// Uses a scoring-based approach that computes evidence for each state
+    /// and selects the one with highest score. This is more robust than
+    /// strict AND conditions which fail when real signals don't perfectly
+    /// match idealized patterns.
     fn classify_state(&self) -> ConsciousnessState {
         let m = &self.current_metrics;
 
@@ -1205,37 +1216,75 @@ impl SleepSentinel {
                 )
             };
 
-        // Decision logic based on IIT-inspired principles:
-        //
-        // Wake: High complexity (desynchronized alpha/beta)
-        // Deep Sleep: High synchrony, low complexity (synchronized delta)
-        // REM: High complexity but LOW integration (paradox!)
-        // Light Sleep: In between
+        // Compute continuous evidence scores rather than binary conditions
+        // This handles the reality that real EEG rarely perfectly matches idealized patterns
 
-        // Thresholding with adaptive or default values
-        let high_complexity = m.complexity > complexity_thresh;
-        let high_synchrony = m.synchrony > synchrony_thresh;
-        let high_phi = m.phi_proxy > phi_thresh;
-        let low_freq = m.dominant_freq_hz < freq_bounds.0;
-        let high_freq = m.dominant_freq_hz > freq_bounds.1;
+        // Normalized distances from thresholds (positive = above threshold)
+        let complexity_score = (m.complexity - complexity_thresh) / complexity_thresh.max(0.1);
+        let synchrony_score = (m.synchrony - synchrony_thresh) / synchrony_thresh.max(0.1);
+        let phi_score = (m.phi_proxy - phi_thresh) / phi_thresh.max(0.1);
 
-        // Classification rules
-        if high_complexity && high_freq && !high_synchrony {
-            // Active brain, desynchronized → Wake
-            ConsciousnessState::Awake
-        } else if high_synchrony && low_freq && high_phi {
-            // Synchronized delta, high integration → Deep Sleep
-            ConsciousnessState::DeepSleep
-        } else if high_complexity && !high_phi && !high_synchrony {
-            // Active but disconnected → REM (the paradox!)
-            ConsciousnessState::REM
-        } else if m.complexity > 0.3 && m.synchrony > 0.4 {
-            // Moderate everything → Light Sleep
-            ConsciousnessState::LightSleep
-        } else {
-            // Uncertain
-            ConsciousnessState::Transitional
-        }
+        // Frequency scores: how far from the alpha band (8-12 Hz)?
+        let freq_low = freq_bounds.0;  // 8 Hz
+        let freq_high = freq_bounds.1; // 12 Hz
+
+        // low_freq_score: positive when frequency is low (delta/theta range)
+        let low_freq_score = (freq_low - m.dominant_freq_hz) / freq_low.max(1.0);
+        // high_freq_score: positive when frequency is high (beta range)
+        let high_freq_score = (m.dominant_freq_hz - freq_high) / freq_high.max(1.0);
+
+        // Compute evidence scores for each state
+        // These weights are based on neurophysiological signatures:
+
+        // Wake: High complexity, high frequency, low synchrony
+        // Alpha/beta activity (>12 Hz), desynchronized
+        let wake_score =
+            complexity_score * 0.3 +           // Active brain
+            high_freq_score.max(0.0) * 0.4 +   // Fast frequencies
+            (-synchrony_score) * 0.3;          // Desynchronized
+
+        // N3 (Deep Sleep): High synchrony, low frequency, high phi
+        // Delta waves (<4 Hz), highly synchronized
+        let deep_score =
+            synchrony_score * 0.35 +           // Synchronized
+            low_freq_score.max(0.0) * 0.35 +   // Slow delta waves
+            phi_score * 0.3;                   // High integration
+
+        // REM: High complexity, low phi, low synchrony (the paradox)
+        // Active but disconnected - this is the key insight
+        let rem_score =
+            complexity_score * 0.35 +          // Active brain
+            (-phi_score) * 0.35 +              // LOW integration (key!)
+            (-synchrony_score) * 0.3;          // Desynchronized
+
+        // N2 (Light Sleep): Moderate values, sleep spindles (12-14 Hz bursts)
+        // Theta background with spindle activity
+        let n2_score =
+            0.2 +  // Base score (N2 is most common stage)
+            (1.0 - complexity_score.abs()) * 0.3 +   // Moderate complexity
+            synchrony_score.max(0.0) * 0.25 +        // Some synchrony
+            (1.0 - high_freq_score.abs()) * 0.25;    // Moderate frequency
+
+        // N1 (Transitional): Low complexity, theta range, transitional
+        let n1_score =
+            (-complexity_score).max(0.0) * 0.3 +     // Lower complexity
+            (1.0 - synchrony_score.abs()) * 0.35 +   // Intermediate synchrony
+            (1.0 - phi_score.abs()) * 0.35;          // Intermediate phi
+
+        // Find the state with highest score
+        let scores = [
+            (wake_score, ConsciousnessState::Awake),
+            (n1_score, ConsciousnessState::Transitional),  // N1
+            (n2_score, ConsciousnessState::LightSleep),    // N2
+            (deep_score, ConsciousnessState::DeepSleep),   // N3
+            (rem_score, ConsciousnessState::REM),
+        ];
+
+        scores
+            .iter()
+            .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(_, state)| *state)
+            .unwrap_or(ConsciousnessState::Transitional)
     }
 
     /// Process a full 30-second epoch
