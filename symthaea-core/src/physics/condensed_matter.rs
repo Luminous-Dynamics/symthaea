@@ -217,7 +217,7 @@ impl CMEncoder {
     }
 
     /// Create band structure for a metal
-    pub fn create_metal(&self, fermi_energy_ev: f64, genesis: &GenesisSeed) -> BandStructure {
+    pub fn create_metal(&self, fermi_energy_ev: f64, _genesis: &GenesisSeed) -> BandStructure {
         let vector = self.metal
             .bind(&self.fermi_surface)
             .scale(fermi_energy_ev as f32);
@@ -232,7 +232,7 @@ impl CMEncoder {
     }
 
     /// Create band structure for a semiconductor
-    pub fn create_semiconductor(&self, band_gap_ev: f64, effective_mass: f64, genesis: &GenesisSeed) -> BandStructure {
+    pub fn create_semiconductor(&self, band_gap_ev: f64, effective_mass: f64, _genesis: &GenesisSeed) -> BandStructure {
         let vector = self.semiconductor
             .bind(&self.band_gap)
             .scale(band_gap_ev as f32)
@@ -248,7 +248,7 @@ impl CMEncoder {
     }
 
     /// Create band structure for an insulator
-    pub fn create_insulator(&self, band_gap_ev: f64, genesis: &GenesisSeed) -> BandStructure {
+    pub fn create_insulator(&self, band_gap_ev: f64, _genesis: &GenesisSeed) -> BandStructure {
         let vector = self.insulator
             .bind(&self.band_gap)
             .scale(band_gap_ev as f32);

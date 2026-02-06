@@ -389,7 +389,7 @@ pub struct ConsciousnessTopologyAnalyzer {
     /// Running statistics
     pub stats: TopologyStats,
     /// Analysis start time
-    started_at: Instant,
+    _started_at: Instant,
 }
 
 impl ConsciousnessTopologyAnalyzer {
@@ -401,7 +401,7 @@ impl ConsciousnessTopologyAnalyzer {
             current_complex: SimplicialComplex::new(),
             point_counter: 0,
             stats: TopologyStats::default(),
-            started_at: Instant::now(),
+            _started_at: Instant::now(),
         }
     }
 

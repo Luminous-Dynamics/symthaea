@@ -62,7 +62,7 @@ use crate::consciousness::consciousness_equation_v2::{
 #[derive(Clone)]
 pub struct GammaOscillator {
     /// Oscillation frequency (Hz) - typically 30-100Hz, centered at 40Hz
-    frequency: f64,
+    _frequency: f64,
 
     /// Current phase (radians)
     phase: f64,
@@ -79,12 +79,12 @@ pub struct GammaOscillator {
 
 impl GammaOscillator {
     /// Create new gamma oscillator
-    pub fn new(frequency: f64) -> Self {
+    pub fn new(_frequency: f64) -> Self {
         Self {
-            frequency,
+            _frequency,
             phase: 0.0,
             coupling: 0.5,
-            natural_freq: frequency * (0.95 + rand_float(42) * 0.1), // Slight variation
+            natural_freq: _frequency * (0.95 + rand_float(42) * 0.1), // Slight variation
             amplitude: 1.0,
         }
     }

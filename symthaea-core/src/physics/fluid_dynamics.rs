@@ -253,7 +253,7 @@ impl FluidEncoder {
     }
 
     /// Create a vortex
-    pub fn create_vortex(&self, circulation: f64, core_radius: f64, genesis: &GenesisSeed) -> Vortex {
+    pub fn create_vortex(&self, circulation: f64, core_radius: f64, _genesis: &GenesisSeed) -> Vortex {
         // Rankine vortex: v_θ = Γ/(2πr) for r > core
         let max_velocity = circulation / (2.0 * std::f64::consts::PI * core_radius);
 
@@ -289,7 +289,7 @@ impl FluidEncoder {
     }
 
     /// Shock wave (Ma > 1)
-    pub fn shock(&self, upstream_mach: f64, genesis: &GenesisSeed) -> ContinuousHV {
+    pub fn shock(&self, upstream_mach: f64, _genesis: &GenesisSeed) -> ContinuousHV {
         if upstream_mach <= 1.0 {
             ContinuousHV::zero(PHYSICS_DIM)
         } else {

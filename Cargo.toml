@@ -253,7 +253,6 @@ identity = []  # Ed25519 signatures, capability gating, signed request/output
 # GPU acceleration for CfC networks
 gpu = ["burn", "burn-ndarray"]  # GPU acceleration via Burn/WGPU for CfC networks
 cuda = ["gpu"]  # CUDA backend (requires CUDA toolkit)
-cfc-gpu = ["gpu"]  # Alias for CfC GPU acceleration
 
 # Module compilation gates (only flags actually referenced in cfg attributes)
 integration_module = []        # Integration module in lib.rs

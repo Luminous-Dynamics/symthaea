@@ -20,6 +20,7 @@ mod thermal_transport;
 mod neutron_shielding;
 mod geometry;
 mod pulse_dynamics;
+#[allow(dead_code)]
 mod trigger_systems;
 mod coupled_physics;
 mod spark_prototype_spec;
@@ -36,19 +37,25 @@ mod antimatter;
 mod thermodynamics;
 mod astrophysics;
 mod phase_transitions;
+#[allow(dead_code)]
 mod qft;
 mod molecular_biology;
+#[allow(dead_code)]
 mod neuroscience;
 mod quantum_gravity;
 mod emergence_chain;
 
-// Phase 2: Additional physics domains
-mod general_relativity;
+// Phase 2: Additional physics domains (pub mod to avoid glob conflicts)
+#[allow(dead_code)]
+pub mod general_relativity;
 mod quantum_information;
-mod electromagnetism;
-mod condensed_matter;
+#[allow(dead_code)]
+pub mod electromagnetism;
+#[allow(dead_code)]
+pub mod condensed_matter;
 mod fluid_dynamics;
-mod plasma_physics;
+#[allow(dead_code)]
+pub mod plasma_physics;
 mod cosmology;
 
 pub use standard_model::*;
@@ -89,11 +96,7 @@ pub use neuroscience::*;
 pub use quantum_gravity::*;
 pub use emergence_chain::*;
 
-// Phase 2: Additional physics domain exports
-pub use general_relativity::*;
+// Phase 2: exports (non-conflicting only; access others via physics::module_name)
 pub use quantum_information::*;
-pub use electromagnetism::*;
-pub use condensed_matter::*;
 pub use fluid_dynamics::*;
-pub use plasma_physics::*;
 pub use cosmology::*;

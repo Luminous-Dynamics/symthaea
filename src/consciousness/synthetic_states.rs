@@ -404,7 +404,7 @@ pub struct SyntheticStateGenerator {
     num_components: usize,
 
     /// HDC dimension (should match system default)
-    dimension: usize,
+    _dimension: usize,
 }
 
 impl SyntheticStateGenerator {
@@ -417,9 +417,14 @@ impl SyntheticStateGenerator {
     pub fn with_params(num_components: usize, dimension: usize, seed: u64) -> Self {
         Self {
             num_components,
-            dimension,
+            _dimension: dimension,
             seed,
         }
+    }
+
+    /// Get the HDC dimension
+    pub fn dimension(&self) -> usize {
+        self._dimension
     }
 
     /// Generate state matching specified consciousness level
@@ -702,7 +707,7 @@ mod tests {
     fn test_generator_creation() {
         let generator = SyntheticStateGenerator::new();
         assert_eq!(generator.num_components, 4);
-        assert_eq!(generator.dimension, 16384);
+        assert_eq!(generator.dimension(), 16384);
     }
 
     #[test]

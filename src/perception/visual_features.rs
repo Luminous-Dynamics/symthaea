@@ -28,17 +28,17 @@ pub struct VisualFeatures {
 /// Visual Cortex - Sophia's visual perception system
 pub struct VisualCortex {
     /// Minimum image size to process (width, height)
-    min_size: (u32, u32),
+    _min_size: (u32, u32),
 
     /// Maximum image size before downscaling
-    max_size: (u32, u32),
+    _max_size: (u32, u32),
 }
 
 impl Default for VisualCortex {
     fn default() -> Self {
         Self {
-            min_size: (32, 32),
-            max_size: (2048, 2048),
+            _min_size: (32, 32),
+            _max_size: (2048, 2048),
         }
     }
 }
@@ -60,10 +60,10 @@ impl VisualCortex {
         let (width, height) = img.dimensions();
 
         // Validate size
-        if width < self.min_size.0 || height < self.min_size.1 {
+        if width < self._min_size.0 || height < self._min_size.1 {
             anyhow::bail!(
                 "Image too small: {}x{} (minimum: {}x{})",
-                width, height, self.min_size.0, self.min_size.1
+                width, height, self._min_size.0, self._min_size.1
             );
         }
 
@@ -277,8 +277,8 @@ mod tests {
     #[test]
     fn test_visual_cortex_creation() {
         let cortex = VisualCortex::new();
-        assert_eq!(cortex.min_size, (32, 32));
-        assert_eq!(cortex.max_size, (2048, 2048));
+        assert_eq!(cortex._min_size, (32, 32));
+        assert_eq!(cortex._max_size, (2048, 2048));
     }
 
     #[test]

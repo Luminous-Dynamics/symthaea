@@ -699,7 +699,7 @@ pub struct TemporalConsciousnessAnalyzer {
     pub binding: TemporalBindingAnalysis,
 
     /// Temporal reasoner for Allen algebra
-    temporal_reasoner: TemporalReasoner,
+    _temporal_reasoner: TemporalReasoner,
 
     /// Statistics
     pub stats: TemporalConsciousnessStats,
@@ -739,7 +739,7 @@ impl TemporalConsciousnessAnalyzer {
             identity_coherence: TemporalIdentityCoherence::new(config.clone()),
             husserlian: HusserlianAnalysis::new(10, 5),
             binding: TemporalBindingAnalysis::new(),
-            temporal_reasoner: TemporalReasoner::new(temporal_primitives_config),
+            _temporal_reasoner: TemporalReasoner::new(temporal_primitives_config),
             stats: TemporalConsciousnessStats::default(),
             config,
         }

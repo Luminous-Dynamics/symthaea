@@ -683,6 +683,11 @@ impl AdaptiveThreshold {
             frontal_to_occipital: metrics.frontal_to_occipital,
             occipital_to_frontal: metrics.occipital_to_frontal,
             trajectory_variance: metrics.trajectory_variance,
+            // Pass through band powers (already normalized)
+            delta_power: metrics.delta_power,
+            theta_power: metrics.theta_power,
+            alpha_power: metrics.alpha_power,
+            beta_power: metrics.beta_power,
         }
     }
 
@@ -892,6 +897,14 @@ pub struct IntegrationMetrics {
     pub dominant_freq_hz: f32,
     /// State trajectory variance
     pub trajectory_variance: f32,
+    /// Delta band power (0.5-4 Hz) - high in N3
+    pub delta_power: f32,
+    /// Theta band power (4-8 Hz) - high in N1, REM
+    pub theta_power: f32,
+    /// Alpha band power (8-12 Hz) - high in relaxed wake
+    pub alpha_power: f32,
+    /// Beta band power (12-30 Hz) - high in alert wake
+    pub beta_power: f32,
 }
 
 impl Default for IntegrationMetrics {
@@ -904,8 +917,90 @@ impl Default for IntegrationMetrics {
             phi_proxy: 0.5,
             dominant_freq_hz: 10.0,
             trajectory_variance: 0.1,
+            delta_power: 0.0,
+            theta_power: 0.0,
+            alpha_power: 0.0,
+            beta_power: 0.0,
         }
     }
+}
+
+/// Compute frequency band powers using simple zero-crossing rate estimation
+/// This is a lightweight alternative to FFT that works with LTC dynamics
+fn compute_band_powers(signal: &[f32], sample_rate: f32) -> (f32, f32, f32, f32) {
+    if signal.len() < 10 {
+        return (0.0, 0.0, 0.0, 0.0);
+    }
+
+    // Compute signal energy in different frequency ranges using bandpass-like filtering
+    // Delta (0.5-4 Hz): very slow oscillations
+    // Theta (4-8 Hz): slow oscillations
+    // Alpha (8-12 Hz): medium oscillations
+    // Beta (12-30 Hz): fast oscillations
+
+    let n = signal.len();
+    let dt = 1.0 / sample_rate;
+
+    // Simple moving average filters to extract band components
+    // Delta: 250ms window (2-4 Hz capture)
+    let delta_window = (0.25 / dt).max(3.0) as usize;
+    // Theta: 125ms window (4-8 Hz capture)
+    let theta_window = (0.125 / dt).max(3.0) as usize;
+    // Alpha: 100ms window (8-12 Hz capture)
+    let alpha_window = (0.1 / dt).max(3.0) as usize;
+    // Beta: 33ms window (12-30 Hz capture)
+    let beta_window = (0.033 / dt).max(3.0) as usize;
+
+    // Compute low-pass filtered versions
+    let slow = moving_average(signal, delta_window);
+    let medium = moving_average(signal, theta_window);
+    let fast = moving_average(signal, alpha_window);
+    let vfast = moving_average(signal, beta_window);
+
+    // Band powers from differences between filtered versions
+    let mut delta_power = 0.0f32;
+    let mut theta_power = 0.0f32;
+    let mut alpha_power = 0.0f32;
+    let mut beta_power = 0.0f32;
+
+    for i in 0..n {
+        // Delta: slowest component
+        delta_power += slow[i].powi(2);
+        // Theta: medium - slow
+        theta_power += (medium[i] - slow[i]).powi(2);
+        // Alpha: fast - medium
+        alpha_power += (fast[i] - medium[i]).powi(2);
+        // Beta: original - fast (high freq residual)
+        beta_power += (signal[i] - vfast[i]).powi(2);
+    }
+
+    // Normalize by signal length
+    let n_f = n as f32;
+    delta_power = (delta_power / n_f).sqrt();
+    theta_power = (theta_power / n_f).sqrt();
+    alpha_power = (alpha_power / n_f).sqrt();
+    beta_power = (beta_power / n_f).sqrt();
+
+    // Normalize to sum to 1 (relative power)
+    let total = delta_power + theta_power + alpha_power + beta_power + 1e-10;
+    (delta_power / total, theta_power / total, alpha_power / total, beta_power / total)
+}
+
+/// Simple moving average filter
+fn moving_average(signal: &[f32], window: usize) -> Vec<f32> {
+    let n = signal.len();
+    let mut result = vec![0.0; n];
+    let window = window.min(n).max(1);
+    let half = window / 2;
+
+    for i in 0..n {
+        let start = i.saturating_sub(half);
+        let end = (i + half + 1).min(n);
+        let sum: f32 = signal[start..end].iter().sum();
+        result[i] = sum / (end - start) as f32;
+    }
+
+    result
 }
 
 /// Sleep Sentinel - Dual-channel LTC for consciousness detection
@@ -1230,7 +1325,7 @@ impl SleepSentinel {
         let freq_high = freq_bounds.1; // 12 Hz
 
         // low_freq_score: positive when frequency is low (delta/theta range)
-        let low_freq_score = (freq_low - m.dominant_freq_hz) / freq_low.max(1.0);
+        let _low_freq_score = (freq_low - m.dominant_freq_hz) / freq_low.max(1.0);
         // high_freq_score: positive when frequency is high (beta range)
         let high_freq_score = (m.dominant_freq_hz - freq_high) / freq_high.max(1.0);
 
@@ -1244,19 +1339,23 @@ impl SleepSentinel {
             high_freq_score.max(0.0) * 0.4 +   // Fast frequencies
             (-synchrony_score) * 0.3;          // Desynchronized
 
-        // N3 (Deep Sleep): High synchrony, low frequency, high phi
-        // Delta waves (<4 Hz), highly synchronized - the most distinctive pattern
+        // N3 (Deep Sleep): High delta power, high synchrony, high phi
+        // Delta waves (0.5-4 Hz) are THE defining feature of N3
+        // Use band power as primary discriminator
+        let delta_score = (m.delta_power - 0.3) / 0.3;  // Above 30% delta = deep sleep
         let deep_score =
-            synchrony_score.max(0.0) * 0.4 +   // HIGH synchrony required
-            low_freq_score.max(0.0) * 0.35 +   // Slow delta waves (<4 Hz)
-            phi_score.max(0.0) * 0.25;         // High integration
+            delta_score.max(0.0) * 0.45 +      // Delta power is PRIMARY
+            synchrony_score.max(0.0) * 0.35 +   // HIGH synchrony
+            phi_score.max(0.0) * 0.2;           // High integration
 
-        // REM: High complexity, low phi, low synchrony (the paradox)
-        // Active but disconnected - this is the KEY insight distinguishing REM from wake
+        // REM: High theta, low delta, high complexity, low phi (the paradox)
+        // Active (theta/beta) but disconnected - the KEY insight
+        let theta_beta_score = (m.theta_power + m.beta_power - m.delta_power) / 0.3;
         let rem_score =
-            complexity_score.max(0.0) * 0.3 +   // Active brain (like wake)
-            (-phi_score).max(0.0) * 0.4 +       // LOW integration (key paradox!)
-            (-synchrony_score).max(0.0) * 0.3;  // Desynchronized
+            theta_beta_score.max(0.0) * 0.35 +   // Theta+beta but NOT delta
+            complexity_score.max(0.0) * 0.25 +   // Active brain (like wake)
+            (-phi_score).max(0.0) * 0.25 +       // LOW integration (key paradox!)
+            (-synchrony_score).max(0.0) * 0.15;  // Desynchronized
 
         // N2 (Light Sleep): Moderate values, sleep spindles (12-14 Hz bursts)
         // Theta background with spindle activity
@@ -1304,6 +1403,18 @@ impl SleepSentinel {
         self.frontal_ltc.reset();
         self.occipital_ltc.reset();
         self.integrator_ltc.reset();
+
+        // Compute frequency band powers from raw signal (before subsampling)
+        // This captures the spectral content that LTC dynamics might miss
+        let sample_rate = 100.0; // Sleep-EDF standard is 100 Hz
+        let frontal_f32: Vec<f32> = frontal_data.iter().map(|&x| x as f32).collect();
+        let (delta, theta, alpha, beta) = compute_band_powers(&frontal_f32, sample_rate);
+
+        // Store band powers in metrics (will be updated during processing)
+        self.current_metrics.delta_power = delta;
+        self.current_metrics.theta_power = theta;
+        self.current_metrics.alpha_power = alpha;
+        self.current_metrics.beta_power = beta;
 
         // Subsample to match our effective rate
         let target_samples = self.config.steps_per_epoch;

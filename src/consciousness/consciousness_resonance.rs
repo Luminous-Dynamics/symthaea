@@ -1303,9 +1303,9 @@ impl Default for ResonanceAnalyzer {
 /// Analyze harmonic structure of consciousness
 pub struct HarmonicAnalyzer {
     /// Base frequency (fundamental)
-    fundamental: f64,
+    _fundamental: f64,
     /// Detected harmonics
-    harmonics: Vec<Harmonic>,
+    _harmonics: Vec<Harmonic>,
 }
 
 /// Single harmonic component
@@ -1355,16 +1355,16 @@ impl HarmonicAnalyzer {
         ];
 
         Self {
-            fundamental,
-            harmonics,
+            _fundamental: fundamental,
+            _harmonics: harmonics,
         }
     }
 
     /// Get harmonic richness (complexity of harmonic structure)
     pub fn richness(&self) -> f64 {
-        let total_power: f64 = self.harmonics.iter().map(|h| h.amplitude.powi(2)).sum();
+        let total_power: f64 = self._harmonics.iter().map(|h| h.amplitude.powi(2)).sum();
         let harmonic_power: f64 = self
-            .harmonics
+            ._harmonics
             .iter()
             .filter(|h| h.number > 1)
             .map(|h| h.amplitude.powi(2))
@@ -1377,11 +1377,11 @@ impl HarmonicAnalyzer {
     pub fn consonance(&self) -> f64 {
         // Simple ratios (2:1, 3:2, 4:3) are more consonant
         let mut consonance_sum = 0.0;
-        let n = self.harmonics.len();
+        let n = self._harmonics.len();
 
         for i in 0..n {
             for j in (i + 1)..n {
-                let ratio = self.harmonics[j].frequency / self.harmonics[i].frequency;
+                let ratio = self._harmonics[j].frequency / self._harmonics[i].frequency;
 
                 // Check for simple ratios
                 for num in 1..=4 {
@@ -1389,7 +1389,7 @@ impl HarmonicAnalyzer {
                         let simple_ratio = num as f64 / den as f64;
                         if (ratio - simple_ratio).abs() < 0.05 {
                             let amp_weight =
-                                self.harmonics[i].amplitude * self.harmonics[j].amplitude;
+                                self._harmonics[i].amplitude * self._harmonics[j].amplitude;
                             consonance_sum += amp_weight;
                         }
                     }

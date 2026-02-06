@@ -177,9 +177,9 @@ pub struct SelfPredictor {
     /// Historical self-states
     history: VecDeque<SelfState>,
     /// Learned prediction weights (linear model)
-    phi_weights: Vec<f64>,
+    _phi_weights: Vec<f64>,
     /// Coherence prediction weights
-    coherence_weights: Vec<f64>,
+    _coherence_weights: Vec<f64>,
     /// Configuration
     config: PredictiveSelfConfig,
     /// Prediction error history
@@ -192,10 +192,10 @@ impl SelfPredictor {
         Self {
             history: VecDeque::with_capacity(history_depth),
             // Initialize weights with temporal decay
-            phi_weights: (0..history_depth)
+            _phi_weights: (0..history_depth)
                 .map(|i| config.temporal_decay.powi(i as i32))
                 .collect(),
-            coherence_weights: (0..history_depth)
+            _coherence_weights: (0..history_depth)
                 .map(|i| config.temporal_decay.powi(i as i32))
                 .collect(),
             config,
@@ -373,7 +373,7 @@ impl SelfPredictor {
             let phi_error = actual.self_phi - predicted.self_phi;
 
             // Simple online learning update
-            for (i, weight) in self.phi_weights.iter_mut().enumerate() {
+            for (i, weight) in self._phi_weights.iter_mut().enumerate() {
                 if i < self.history.len() {
                     let contribution = self.history[self.history.len() - 1 - i].self_phi;
                     *weight += self.config.learning_rate * phi_error * contribution;
