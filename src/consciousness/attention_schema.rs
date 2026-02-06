@@ -88,7 +88,7 @@ pub struct AttentionState {
 }
 
 /// Attention modes (how attention is deployed)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AttentionMode {
     /// Focused (narrow, deep attention on single target)
     Focused,
@@ -172,7 +172,7 @@ impl AttentionPrimitiveGrounding {
         let system = PrimitiveSystem::global();
 
         // Compose attention encoding by binding primitives
-        let mut encoding = HV16::random(0xATTE_NDDD); // Attention seed
+        let mut encoding = HV16::random(0xA77E_0DDD); // Attention seed
         for name in primitives {
             if let Some(prim) = system.get(name) {
                 encoding = encoding.bind(&prim.encoding);

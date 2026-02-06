@@ -184,6 +184,9 @@ Key types are re-exported at the crate root for convenience:
 
 */
 
+// HDC code uses index-based iteration for element-wise vector operations.
+#![allow(clippy::needless_range_loop)]
+
 // ============================================================================
 // Symthaea Facade (Primary Entry Point)
 // ============================================================================
@@ -350,6 +353,11 @@ pub mod causal;
 
 // Substrate (enabled - 0 errors)
 pub mod substrate;
+
+// Identity: MFDI (Multi-Factor Delegated Identity) integration
+// Enables agents to prove identity, sign outputs, and carry reputation
+#[cfg(feature = "identity")]
+pub mod identity;
 
 // GUI bridge (enabled - 0 errors)
 pub mod gui_bridge;

@@ -329,6 +329,12 @@ impl CoherenceLendingProtocol {
         let current = self.trust_scores.get(&peer_id).copied().unwrap_or(0.5);
         self.trust_scores.insert(peer_id, (current + delta).clamp(0.0, 1.0));
     }
+
+    /// Accept an incoming loan from another peer (borrowing)
+    pub fn accept_loan(&mut self, loan: CoherenceLoan) {
+        self.total_borrowed += loan.amount;
+        self.active_loans.push(loan);
+    }
 }
 
 /// Collective learning system for shared consciousness growth
@@ -416,11 +422,30 @@ impl CollectiveLearning {
         }
     }
 
-    /// Share knowledge with the collective
+    /// Share knowledge with the collective (single knowledge item)
     pub fn share_knowledge(&mut self, knowledge: impl Into<String>) {
         self.knowledge_pool.push(knowledge.into());
         // More knowledge increases collective boost
         self.collective_boost += 0.01;
+    }
+
+    /// Merge knowledge from another CollectiveLearning instance
+    pub fn merge_from(&mut self, other: &CollectiveLearning) {
+        // Merge knowledge pool
+        self.knowledge_pool.extend(other.knowledge_pool.iter().cloned());
+
+        // Merge threshold observations
+        for (complexity, observations) in &other.threshold_observations {
+            self.threshold_observations
+                .entry(complexity.clone())
+                .or_insert_with(Vec::new)
+                .extend(observations.iter().cloned());
+        }
+
+        // Update participant count and synergy
+        self.participant_count = self.participant_count.saturating_add(other.participant_count);
+        self.synergy = (self.participant_count as f64).ln().max(0.0);
+        self.collective_boost = 1.0 + 0.1 * self.synergy + 0.01 * other.knowledge_pool.len() as f64;
     }
 
     /// Get learning rate modifier

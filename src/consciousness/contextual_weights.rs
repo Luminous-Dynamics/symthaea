@@ -287,7 +287,8 @@ impl ContextualWeights {
             self.cached_profiles.insert(key, combined);
         }
 
-        self.cached_profiles.get(&key).unwrap()
+        // Safe: we just inserted the key if it didn't exist
+        self.cached_profiles.get(&key).expect("profile was just inserted")
     }
 
     /// Compute a combined profile from action type and domain
@@ -501,7 +502,7 @@ impl DomainClassifier {
         let (best_domain, best_score) = domain_scores
             .into_iter()
             .max_by_key(|(_, score)| *score)
-            .unwrap();
+            .unwrap_or((ActionDomain::General, 0));
 
         // Confidence is proportion of matches in the winning domain
         let confidence = best_score as f32 / total_matches as f32;

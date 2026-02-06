@@ -881,14 +881,13 @@ mod tests {
 
         // Accept an incoming loan (borrowing from instance_c)
         let incoming_loan = CoherenceLoan {
-            from_instance: "instance_c".to_string(),
-            to_instance: "instance_a".to_string(),
+            lender_id: "instance_c".to_string(),
+            borrower_id: "instance_a".to_string(),
             amount: 0.2,
-            original_amount: 0.2,
-            duration: Duration::from_secs(60),
-            repayment_rate: 0.2 / 60.0,
-            created_at: Instant::now(),
-            repaid: 0.0,
+            duration_ms: 60_000,
+            interest_rate: 0.01,
+            active: true,
+            remaining: Duration::from_secs(60),
         };
         protocol.accept_loan(incoming_loan);
 
@@ -957,8 +956,8 @@ mod tests {
         }
 
         // Merge all knowledge into instance_a
-        instance_a.merge_knowledge(&instance_b);
-        instance_a.merge_knowledge(&instance_c);
+        instance_a.merge_from(&instance_b);
+        instance_a.merge_from(&instance_c);
 
         // Measure interconnectedness (should be high due to diversity)
         field.measure_interconnectedness_from_learning(&instance_a);
