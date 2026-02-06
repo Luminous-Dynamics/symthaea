@@ -38,7 +38,7 @@
 //! ```
 
 use crate::hdc::binary_hv::HV16;
-use crate::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
+use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -282,21 +282,18 @@ impl StateTypePrimitiveGrounding {
         // Look up or create vectors for each primitive
         let vectors: Vec<HV16> = primitives
             .iter()
-            .filter_map(|name| {
-                // Try to find the primitive in the system
-                if let Some(p) = Primitive::all_tier1()
-                    .into_iter()
-                    .chain(Primitive::all_tier2())
-                    .chain(Primitive::all_tier3())
-                    .find(|p| p.canonical_name().to_uppercase() == name.to_uppercase())
-                {
-                    Some(system.primitive_hv(&p))
+            .map(|name| {
+                // Try to get primitive from system by name
+                if let Some(p) = system.get(name) {
+                    p.encoding.clone()
+                } else if let Some(p) = system.get(&name.to_lowercase()) {
+                    p.encoding.clone()
                 } else {
                     // Fallback: create deterministic vector from name
                     let seed = name
                         .bytes()
                         .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-                    Some(HV16::random(seed))
+                    HV16::random(seed)
                 }
             })
             .collect();
@@ -328,23 +325,20 @@ impl StateTypePrimitiveGrounding {
 pub struct SyntheticStatesNSMGrounding {
     /// Grounding for each state type
     pub state_groundings: HashMap<StateType, StateTypePrimitiveGrounding>,
-    /// Reference to primitive system
-    primitive_system: PrimitiveSystem,
 }
 
 impl SyntheticStatesNSMGrounding {
     /// Create complete NSM grounding for synthetic states
-    pub fn new(primitive_system: PrimitiveSystem) -> Self {
+    pub fn new(primitive_system: &PrimitiveSystem) -> Self {
         let mut state_groundings = HashMap::new();
 
         for state_type in StateType::all_ordered() {
-            let grounding = StateTypePrimitiveGrounding::new(state_type.clone(), &primitive_system);
+            let grounding = StateTypePrimitiveGrounding::new(state_type.clone(), primitive_system);
             state_groundings.insert(state_type, grounding);
         }
 
         Self {
             state_groundings,
-            primitive_system,
         }
     }
 
