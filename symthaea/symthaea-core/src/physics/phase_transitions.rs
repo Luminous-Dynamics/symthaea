@@ -19,6 +19,7 @@ use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
 use super::periodic_table::PeriodicTable;
+use super::thermodynamics::ThermoEncoder;
 use serde::{Deserialize, Serialize};
 
 /// Phase transition order
@@ -95,6 +96,62 @@ impl PhaseEncoder {
             liquid: genesis.hv("phase::liquid", PHYSICS_DIM),
             gas: genesis.hv("phase::gas", PHYSICS_DIM),
             plasma: genesis.hv("phase::plasma", PHYSICS_DIM),
+
+            superconductor: genesis.hv("phase::superconductor", PHYSICS_DIM),
+            superfluid: genesis.hv("phase::superfluid", PHYSICS_DIM),
+            bec: genesis.hv("phase::bec", PHYSICS_DIM),
+            topological: genesis.hv("phase::topological", PHYSICS_DIM),
+
+            phonon: genesis.hv("phase::phonon", PHYSICS_DIM),
+            cooper_pair: genesis.hv("phase::cooper_pair", PHYSICS_DIM),
+            condensate: genesis.hv("phase::condensate", PHYSICS_DIM),
+            vortex: genesis.hv("phase::vortex", PHYSICS_DIM),
+        }
+    }
+
+    /// Create PhaseEncoder from thermodynamics module
+    ///
+    /// This constructor grounds phase concepts in thermodynamic principles,
+    /// connecting phase transitions to entropy and free energy.
+    pub fn from_thermo(thermo: &ThermoEncoder, genesis: &GenesisSeed) -> Self {
+        // Order parameter relates to entropy reduction
+        let order_parameter = thermo.entropy.bind(&genesis.hv("phase::ordering", PHYSICS_DIM));
+
+        // Symmetry breaking is a free energy transition
+        let symmetry_breaking = thermo.gibbs.bind(&genesis.hv("symmetry::broken", PHYSICS_DIM));
+
+        // Critical point is where fluctuations diverge
+        let critical_point = thermo.temperature.bind(&genesis.hv("critical::divergence", PHYSICS_DIM));
+
+        // Phases related to thermodynamic states
+        let solid = ContinuousHV::bundle(&[
+            &thermo.entropy.scale(-1.0), // Low entropy
+            &genesis.hv("phase::solid", PHYSICS_DIM),
+        ]);
+
+        let liquid = thermo.entropy.bind(&genesis.hv("phase::liquid", PHYSICS_DIM));
+
+        let gas = ContinuousHV::bundle(&[
+            &thermo.entropy.scale(2.0), // High entropy
+            &genesis.hv("phase::gas", PHYSICS_DIM),
+        ]);
+
+        let plasma = ContinuousHV::bundle(&[
+            &thermo.energy.scale(3.0), // High energy
+            &genesis.hv("phase::plasma", PHYSICS_DIM),
+        ]);
+
+        Self {
+            order_parameter,
+            symmetry_breaking,
+            critical_point,
+            correlation_length: genesis.hv("phase::correlation_length", PHYSICS_DIM),
+            fluctuations: thermo.uncertainty.clone(),
+
+            solid,
+            liquid,
+            gas,
+            plasma,
 
             superconductor: genesis.hv("phase::superconductor", PHYSICS_DIM),
             superfluid: genesis.hv("phase::superfluid", PHYSICS_DIM),

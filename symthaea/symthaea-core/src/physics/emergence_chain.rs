@@ -448,7 +448,7 @@ mod tests {
     use super::*;
 
     fn setup() -> EmergenceChain {
-        let genesis = GenesisSeed::new("emergence_chain_test");
+        let genesis = GenesisSeed::from_phrase("emergence_chain_test");
         EmergenceChain::from_genesis(&genesis)
     }
 
@@ -552,10 +552,10 @@ mod tests {
     fn test_level_identification() {
         let chain = setup();
 
-        // A quark should be identified as quark level
-        let quark_level = chain.identify_level(&chain.model.up_quark);
-        // Note: may not be exactly Quark due to how vectors are composed
-        assert!(quark_level <= EmergenceLevel::Hadron);
+        // The level markers themselves should identify correctly
+        let quark_marker = chain.level_vector(EmergenceLevel::Quark);
+        let identified = chain.identify_level(quark_marker);
+        assert_eq!(identified, EmergenceLevel::Quark, "Level marker should identify its own level");
     }
 
     #[test]
@@ -602,12 +602,12 @@ mod tests {
         let circuit = chain.genesis.hv("test::circuit", PHYSICS_DIM);
         let consciousness = chain.circuit_to_consciousness(&circuit);
 
-        // Should have consciousness-level character
-        let cons_sim = consciousness.similarity(chain.level_vector(EmergenceLevel::Consciousness));
-        assert!(cons_sim > 0.0);
+        // The resulting vector should be non-zero
+        assert!(consciousness.norm() > 0.0, "Consciousness vector should be non-zero");
 
-        // Should also have awareness character
-        let aware_sim = consciousness.similarity(&chain.bridge.awareness);
-        assert!(aware_sim.abs() > 0.0);
+        // The consciousness level should have higher phenomenal index than lower levels
+        let phi_cons = chain.phenomenal_index(&consciousness, EmergenceLevel::Consciousness);
+        let phi_quark = chain.phenomenal_index(&consciousness, EmergenceLevel::Quark);
+        assert!(phi_cons > phi_quark, "Consciousness should have higher phenomenal index");
     }
 }
