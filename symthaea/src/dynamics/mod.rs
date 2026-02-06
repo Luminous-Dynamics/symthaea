@@ -22,6 +22,14 @@ pub mod cfc_coherence;
 pub mod temporal_signatures;
 pub mod world_model;
 
+// Sparse LTC, differentiable HDC, resonator networks, concept crystallization
+// (Ported from crates/symthaea-dynamics 2026-02-06)
+pub mod ltc;
+pub mod differentiable_hdc;
+pub mod resonator;
+pub mod crate_world_model;
+pub mod crystallization;
+
 // Code understanding dynamics (Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]
 pub mod cfc_code_sequencer;
@@ -221,3 +229,13 @@ pub use hierarchical_cfc::{
     DEFAULT_TIME_CONSTANTS
 };
 pub use cfc_gpu::{GpuCfcNetwork, GpuCfcConfig, GpuCfcStats, GpuBackend};
+
+// Ported from crates/symthaea-dynamics (2026-02-06)
+pub use ltc::{LiquidNetwork, LiquidNetworkConfig, CsrMatrix};
+pub use differentiable_hdc::{DifferentiableHDCEncoder, DifferentiableHDCConfig, HDCEncoder};
+pub use resonator::{ResonatorNetwork, ResonatorConfig, ResonatorMemory, Codebook, Episode};
+pub use crystallization::{
+    ConceptCrystallizer, CrystallizationConfig,
+    CrystalizedConcept as AttractorConcept,  // Alias to avoid conflict with existing CrystalizedConcept
+    RecurrenceAnalyzer, UnifiedLearningMind, StepResult,
+};
