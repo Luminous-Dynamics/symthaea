@@ -427,6 +427,17 @@ impl CollectiveLearning {
     pub fn learning_modifier(&self) -> f64 {
         self.collective_boost * (1.0 + self.synergy * 0.1)
     }
+
+    /// Get statistics about collective learning
+    /// Returns (task_types_count, total_observations, total_contributors)
+    pub fn get_stats(&self) -> (usize, usize, usize) {
+        let task_types = self.threshold_observations.len();
+        let total_observations: usize = self.threshold_observations
+            .values()
+            .map(|v| v.len())
+            .sum();
+        (task_types, total_observations, self.participant_count)
+    }
 }
 
 #[cfg(test)]
