@@ -354,6 +354,55 @@ impl Default for Soul {
     }
 }
 
+// ============================================================================
+// Types for Dream Mode Integration
+// ============================================================================
+
+/// Discovery of a new concept during consciousness processing
+#[derive(Debug, Clone)]
+pub struct ConceptDiscovery {
+    /// Unique identifier for the concept
+    pub uid: String,
+    /// Human-readable name
+    pub name: String,
+    /// Attractor signature (consciousness pattern)
+    pub attractor_signature: Vec<f32>,
+    /// Consciousness level when discovered
+    pub consciousness_at_discovery: f32,
+}
+
+/// Actor that weaves concepts into the soul's narrative identity
+#[derive(Debug, Default)]
+pub struct WeaverActor {
+    /// Concepts discovered and woven
+    discoveries: Vec<ConceptDiscovery>,
+    /// Total concepts processed
+    total_processed: usize,
+}
+
+impl WeaverActor {
+    /// Create a new weaver actor
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a concept discovery
+    pub fn record_concept_discovery(&mut self, discovery: &ConceptDiscovery) {
+        self.discoveries.push(discovery.clone());
+        self.total_processed += 1;
+    }
+
+    /// Get all discoveries
+    pub fn discoveries(&self) -> &[ConceptDiscovery] {
+        &self.discoveries
+    }
+
+    /// Get count of discoveries
+    pub fn discovery_count(&self) -> usize {
+        self.total_processed
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

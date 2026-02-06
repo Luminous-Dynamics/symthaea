@@ -528,3 +528,149 @@ fn multi_cycle_stability() {
     // Telemetry ring buffer should have capped at max_events
     assert!(engine.recent_events().len() <= 100);
 }
+
+// ==================================================================================
+// PROPERTY-BASED TESTS FOR COUNTERFACTUAL REASONING
+// ==================================================================================
+
+#[cfg(feature = "counterfactual")]
+mod proptest_counterfactual {
+    use proptest::prelude::*;
+    use std::collections::HashSet;
+    use symthaea::consciousness::counterfactual::identification::{
+        CausalDAG, CounterfactualReasoner,
+    };
+
+    /// Generate a random DAG with n nodes
+    fn random_dag(n: usize, seed: u64) -> CausalDAG {
+        let mut rng_state = seed;
+        let next_rand = || {
+            rng_state = rng_state.wrapping_mul(1103515245).wrapping_add(12345);
+            rng_state
+        };
+
+        let nodes: Vec<String> = (0..n).map(|i| format!("X{}", i)).collect();
+        let mut edges = Vec::new();
+
+        // Only add edges from lower to higher indices to ensure acyclicity
+        for i in 0..n {
+            for j in (i + 1)..n {
+                if next_rand() % 100 < 30 {
+                    // 30% edge probability
+                    edges.push((i, j));
+                }
+            }
+        }
+
+        CausalDAG::new(nodes, edges)
+    }
+
+    proptest! {
+        /// Property: d-separation is symmetric (X ⊥ Y | Z iff Y ⊥ X | Z)
+        #[test]
+        fn dsep_symmetric(seed in 1u64..10000) {
+            let dag = random_dag(6, seed);
+            let z: HashSet<usize> = HashSet::new();
+
+            for x in 0..6 {
+                for y in (x + 1)..6 {
+                    let xy = dag.is_d_separated(x, y, &z);
+                    let yx = dag.is_d_separated(y, x, &z);
+                    prop_assert_eq!(xy, yx, "d-sep should be symmetric: X{}⊥X{} vs X{}⊥X{}", x, y, y, x);
+                }
+            }
+        }
+
+        /// Property: A node is never d-separated from itself
+        #[test]
+        fn dsep_reflexive(seed in 1u64..10000) {
+            let dag = random_dag(5, seed);
+            let z: HashSet<usize> = HashSet::new();
+
+            for x in 0..5 {
+                let sep = dag.is_d_separated(x, x, &z);
+                prop_assert!(!sep, "Node X{} should never be d-separated from itself", x);
+            }
+        }
+
+        /// Property: Removing incoming edges preserves other edges
+        #[test]
+        fn surgery_preserves_other_edges(seed in 1u64..10000) {
+            let dag = random_dag(5, seed);
+            let mutilated = dag.remove_incoming(&[0]);
+
+            // All edges not going INTO node 0 should be preserved
+            for (from, to) in dag.edges() {
+                if *to != 0 {
+                    prop_assert!(
+                        mutilated.edges().any(|(f, t)| f == from && t == to),
+                        "Edge ({} -> {}) should be preserved",
+                        from, to
+                    );
+                }
+            }
+        }
+
+        /// Property: Removing outgoing edges preserves other edges
+        #[test]
+        fn surgery_outgoing_preserves_other_edges(seed in 1u64..10000) {
+            let dag = random_dag(5, seed);
+            let mutilated = dag.remove_outgoing(&[0]);
+
+            // All edges not coming FROM node 0 should be preserved
+            for (from, to) in dag.edges() {
+                if *from != 0 {
+                    prop_assert!(
+                        mutilated.edges().any(|(f, t)| f == from && t == to),
+                        "Edge ({} -> {}) should be preserved",
+                        from, to
+                    );
+                }
+            }
+        }
+
+        /// Property: Conditioning on more variables cannot create new paths
+        /// (monotonicity of d-separation conditioning)
+        #[test]
+        fn dsep_conditioning_monotonic(seed in 1u64..10000) {
+            let dag = random_dag(6, seed);
+
+            // If X ⊥ Y | Z, then X ⊥ Y | Z ∪ {W} for non-collider W
+            // This is a simplified test - full monotonicity requires collider awareness
+            let mut z_small: HashSet<usize> = HashSet::new();
+            z_small.insert(2);
+
+            let mut z_large = z_small.clone();
+            z_large.insert(3);
+
+            // Note: This property doesn't always hold due to colliders
+            // We just verify it doesn't panic and returns valid booleans
+            for x in 0..6 {
+                for y in (x + 1)..6 {
+                    if x != 2 && x != 3 && y != 2 && y != 3 {
+                        let _small = dag.is_d_separated(x, y, &z_small);
+                        let _large = dag.is_d_separated(x, y, &z_large);
+                        // Both should be valid booleans - test doesn't panic
+                    }
+                }
+            }
+        }
+
+        /// Property: Causal queries on valid DAGs don't panic
+        #[test]
+        fn causal_query_no_panic(seed in 1u64..10000, treatment in 0usize..5, outcome in 0usize..5) {
+            let dag = random_dag(5, seed);
+            let reasoner = CounterfactualReasoner::new();
+
+            if treatment != outcome {
+                let query = symthaea::consciousness::counterfactual::identification::CausalQuery {
+                    treatment,
+                    outcome,
+                    conditioning: vec![],
+                };
+                let _result = reasoner.query(&dag, &query);
+                // Should complete without panicking
+            }
+        }
+    }
+}

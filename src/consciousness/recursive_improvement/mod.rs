@@ -153,17 +153,14 @@ pub mod self_model;
 // TODO: These modules have deep structural mismatches with core types and
 // need significant refactoring before they can be re-enabled.
 //
-// architectural_graph - uses ComponentId in match patterns (E0533), tries to
-//   move ComponentId out of references (E0507/E0382); ~28 compilation errors
-// #[cfg(feature = "full_consciousness")]
-// pub mod architectural_graph;
+// architectural_graph - FIXED: ComponentId function calls now include ()
+#[cfg(feature = "full_consciousness")]
+pub mod architectural_graph;
 //
-// gradient_optimizer - uses ImprovementType variants as struct constructors
-//   with fields (E0559), ComponentId pattern matching (E0533), wrong
-//   record_phi signature (E0061), non-exhaustive match on BottleneckType (E0004);
-//   ~27 compilation errors
-// #[cfg(feature = "full_consciousness")]
-// pub mod gradient_optimizer;
+// gradient_optimizer - FIXED: ComponentId pattern matching now uses as_str(),
+//   record_phi signature corrected, ComponentId function calls added ()
+#[cfg(feature = "full_consciousness")]
+pub mod gradient_optimizer;
 //
 // improvement_generator - ImprovementType variants used as structs with named
 //   fields (from, to, threads, component, count, optimization, name, old_value,
@@ -192,11 +189,10 @@ pub mod self_model;
 // #[cfg(feature = "full_consciousness")]
 // pub mod benchmark_suite;
 //
-// dream_mode - references crate::soul::{WeaverActor, ConceptDiscovery} which
-//   don't exist; uses ConsciousnessWorldModel methods (dream(), pending_concepts,
-//   consciousness_level()) that don't exist; uses wrong ConsciousnessTransition fields
-// #[cfg(feature = "full_consciousness")]
-// pub mod dream_mode;
+// dream_mode - FIXED: Added WeaverActor and ConceptDiscovery to soul module,
+//   added dream(), pending_concepts, consciousness_level() to ConsciousnessWorldModel
+#[cfg(feature = "full_consciousness")]
+pub mod dream_mode;
 //
 // naming_ceremony - references crate::soul::{WeaverActor, ConceptDiscovery} which
 //   don't exist; uses non-existent fields on CrystalizedConcept (uid, attractor_signature,

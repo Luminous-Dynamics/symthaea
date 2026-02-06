@@ -11,7 +11,22 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
+use std::sync::atomic::{AtomicU64, Ordering};
 use crate::dynamics::CrystalizedConcept;
+
+/// Simple pseudo-random float generator for dream mode
+fn rand_float() -> f64 {
+    static COUNTER: AtomicU64 = AtomicU64::new(42);
+    let x = COUNTER.fetch_add(1, Ordering::Relaxed);
+    // Simple xorshift-based PRNG
+    let mut s = x.wrapping_mul(0x9E3779B97F4A7C15);
+    s ^= s >> 30;
+    s = s.wrapping_mul(0xBF58476D1CE4E5B9);
+    s ^= s >> 27;
+    s = s.wrapping_mul(0x94D049BB133111EB);
+    s ^= s >> 31;
+    (s as f64) / (u64::MAX as f64)
+}
 
 /// A point in the latent consciousness space
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -316,6 +331,9 @@ pub struct ConsciousnessWorldModel {
     concepts: HashMap<u64, CrystalizedConcept>,
     next_concept_id: u64,
 
+    /// Pending concepts awaiting crystallization (for dream mode)
+    pub pending_concepts: Vec<CrystalizedConcept>,
+
     /// Statistics
     stats: WorldModelStats,
 }
@@ -351,8 +369,48 @@ impl ConsciousnessWorldModel {
             transition_model: HashMap::new(),
             concepts: HashMap::new(),
             next_concept_id: 1,
+            pending_concepts: Vec::new(),
             stats: WorldModelStats::default(),
         }
+    }
+
+    /// Run dream mode simulation for concept crystallization
+    ///
+    /// Simulates internal processing to consolidate experiences into concepts.
+    pub fn dream(&mut self, steps: usize) {
+        // Simulate internal consciousness processing
+        for _ in 0..steps {
+            // Random walk in consciousness space for exploration
+            self.current_state.phi = (self.current_state.phi + 0.01 * (rand_float() - 0.5)).clamp(0.0, 1.0);
+            self.current_state.integration = (self.current_state.integration + 0.01 * (rand_float() - 0.5)).clamp(0.0, 1.0);
+
+            // Check for crystallization opportunities
+            if self.current_state.phi > 0.7 && rand_float() > 0.95 {
+                let concept = CrystalizedConcept {
+                    id: self.next_concept_id,
+                    uid: format!("concept_{}", self.next_concept_id),
+                    name: format!("Dream Concept {}", self.next_concept_id),
+                    description: Some("Crystallized during dream mode".to_string()),
+                    embedding: vec![self.current_state.phi as f32; 16],
+                    attractor_signature: vec![self.current_state.phi as f32; 16],
+                    associations: HashMap::new(),
+                    confidence: self.current_state.phi as f32,
+                    activation_count: 1,
+                    last_activated: 0,
+                    source_memories: vec![],
+                    abstraction_level: 1,
+                    emotional_valence: 0.0,
+                    tags: vec!["dream".to_string()],
+                };
+                self.pending_concepts.push(concept);
+                self.next_concept_id += 1;
+            }
+        }
+    }
+
+    /// Get current consciousness level
+    pub fn consciousness_level(&self) -> f64 {
+        self.current_state.phi
     }
 
     /// Record a transition and update the model

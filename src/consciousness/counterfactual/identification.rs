@@ -8,7 +8,7 @@
 //! Returns `Identified`, `Unidentified`, or `AssumptionRequired` — never overclaims.
 
 use serde::{Deserialize, Serialize};
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Causal DAG
@@ -81,6 +81,11 @@ impl CausalDAG {
     /// Number of nodes.
     pub fn num_nodes(&self) -> usize {
         self.nodes.len()
+    }
+
+    /// Get all edges as an iterator.
+    pub fn edges(&self) -> impl Iterator<Item = &(usize, usize)> {
+        self.edges.iter()
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -318,6 +323,8 @@ pub enum IdentificationMethod {
     /// Pearl Rule 3: Insertion/deletion of actions.
     /// P(y|do(x),do(z),w) = P(y|do(x),w) if Y ⊥ Z | X,W in G̅_X,Z(W)
     Rule3ActionDeletion,
+    /// Shpitser-Pearl ID Algorithm (complete identification).
+    IDAlgorithm,
 }
 
 /// Reason why a causal effect cannot be identified.
@@ -331,6 +338,11 @@ pub enum UnidentifiedReason {
     DagTooLarge { nodes: usize, max: usize },
     /// Cyclic graph detected (not a DAG).
     CyclicGraph,
+    /// Hedge found: there exists a hedge for P(y|do(x)) proving non-identifiability.
+    HedgeFound {
+        /// The hedge structure that blocks identification.
+        hedge_nodes: Vec<usize>,
+    },
 }
 
 /// An assumption required for identification.
@@ -772,6 +784,863 @@ fn combinations(items: &[usize], k: usize) -> Vec<Vec<usize>> {
         }
     }
     result
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Observational Data and Effect Estimation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Observational data for effect estimation.
+///
+/// Each observation is a vector of variable values, indexed by node index.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObservationalData {
+    /// Variable names (indexed by node).
+    pub variables: Vec<String>,
+    /// Observations: each row contains values for all variables.
+    pub observations: Vec<Vec<f64>>,
+}
+
+impl ObservationalData {
+    /// Create new observational data with variable names.
+    pub fn new(variables: Vec<String>) -> Self {
+        Self {
+            variables,
+            observations: Vec::new(),
+        }
+    }
+
+    /// Add an observation (row of values).
+    pub fn add_observation(&mut self, values: Vec<f64>) {
+        assert_eq!(values.len(), self.variables.len(), "Value count must match variable count");
+        self.observations.push(values);
+    }
+
+    /// Number of observations.
+    pub fn n(&self) -> usize {
+        self.observations.len()
+    }
+
+    /// Get mean of a variable.
+    pub fn mean(&self, var_idx: usize) -> f64 {
+        if self.observations.is_empty() {
+            return 0.0;
+        }
+        let sum: f64 = self.observations.iter().map(|row| row[var_idx]).sum();
+        sum / self.observations.len() as f64
+    }
+
+    /// Get variance of a variable.
+    pub fn variance(&self, var_idx: usize) -> f64 {
+        if self.observations.len() < 2 {
+            return 0.0;
+        }
+        let mean = self.mean(var_idx);
+        let sum_sq: f64 = self.observations.iter()
+            .map(|row| (row[var_idx] - mean).powi(2))
+            .sum();
+        sum_sq / (self.observations.len() - 1) as f64
+    }
+
+    /// Get covariance between two variables.
+    pub fn covariance(&self, var1: usize, var2: usize) -> f64 {
+        if self.observations.len() < 2 {
+            return 0.0;
+        }
+        let mean1 = self.mean(var1);
+        let mean2 = self.mean(var2);
+        let sum: f64 = self.observations.iter()
+            .map(|row| (row[var1] - mean1) * (row[var2] - mean2))
+            .sum();
+        sum / (self.observations.len() - 1) as f64
+    }
+
+    /// Filter observations by a condition on one variable.
+    pub fn filter(&self, var_idx: usize, predicate: impl Fn(f64) -> bool) -> ObservationalData {
+        let filtered: Vec<Vec<f64>> = self.observations.iter()
+            .filter(|row| predicate(row[var_idx]))
+            .cloned()
+            .collect();
+        ObservationalData {
+            variables: self.variables.clone(),
+            observations: filtered,
+        }
+    }
+
+    /// Group observations by discrete values of a variable.
+    pub fn group_by(&self, var_idx: usize, bins: &[f64]) -> HashMap<usize, ObservationalData> {
+        let mut groups: HashMap<usize, Vec<Vec<f64>>> = HashMap::new();
+
+        for row in &self.observations {
+            let value = row[var_idx];
+            let bin = bins.iter().position(|&b| value < b).unwrap_or(bins.len());
+            groups.entry(bin).or_default().push(row.clone());
+        }
+
+        groups.into_iter()
+            .map(|(bin, obs)| (bin, ObservationalData {
+                variables: self.variables.clone(),
+                observations: obs,
+            }))
+            .collect()
+    }
+}
+
+/// Effect estimator using identified adjustment formulas.
+#[derive(Debug, Clone)]
+pub struct EffectEstimator {
+    /// Reasoner for identification.
+    reasoner: CounterfactualReasoner,
+}
+
+impl EffectEstimator {
+    pub fn new() -> Self {
+        Self {
+            reasoner: CounterfactualReasoner::new(),
+        }
+    }
+
+    /// Estimate causal effect with observational data.
+    ///
+    /// Returns `CausalQueryOutcome` with the estimated effect filled in.
+    pub fn estimate(
+        &self,
+        dag: &CausalDAG,
+        query: &CausalQuery,
+        data: &ObservationalData,
+    ) -> CausalQueryOutcome {
+        // First, identify the causal effect
+        let outcome = self.reasoner.query(dag, query);
+
+        match &outcome {
+            CausalQueryOutcome::Identified { estimand, method, confidence } => {
+                // Compute actual effect based on method
+                let effect = match method {
+                    IdentificationMethod::BackdoorAdjustment => {
+                        self.estimate_backdoor(query, &estimand.adjustment_set, data)
+                    }
+                    IdentificationMethod::FrontdoorCriterion => {
+                        self.estimate_frontdoor(query, &estimand.adjustment_set, data)
+                    }
+                    IdentificationMethod::DSeparation => {
+                        // If d-separated, effect is 0
+                        0.0
+                    }
+                    IdentificationMethod::Rule2ActionObservationExchange
+                    | IdentificationMethod::Rule3ActionDeletion => {
+                        // Use linear regression as fallback
+                        self.estimate_regression(query.treatment, query.outcome, data)
+                    }
+                };
+
+                CausalQueryOutcome::Identified {
+                    estimand: CausalEstimand {
+                        effect,
+                        adjustment_set: estimand.adjustment_set.clone(),
+                        description: estimand.description.clone(),
+                    },
+                    method: *method,
+                    confidence: *confidence,
+                }
+            }
+            _ => outcome,
+        }
+    }
+
+    /// Estimate effect using backdoor adjustment.
+    ///
+    /// Formula: E[Y|do(X)] = Σ_z E[Y|X,Z=z] P(Z=z)
+    ///
+    /// For continuous variables, we use regression adjustment:
+    /// ACE = Cov(Y, X) / Var(X) after regressing out Z
+    fn estimate_backdoor(
+        &self,
+        query: &CausalQuery,
+        adjustment_set: &[usize],
+        data: &ObservationalData,
+    ) -> f64 {
+        if data.n() < 2 {
+            return 0.0;
+        }
+
+        let x = query.treatment;
+        let y = query.outcome;
+
+        if adjustment_set.is_empty() {
+            // No confounders: simple regression
+            return self.estimate_regression(x, y, data);
+        }
+
+        // Residualize Y and X on the adjustment set, then compute covariance
+        let y_residuals = self.residualize(y, adjustment_set, data);
+        let x_residuals = self.residualize(x, adjustment_set, data);
+
+        // Compute effect as Cov(Y_res, X_res) / Var(X_res)
+        let n = data.n() as f64;
+        let mean_y = y_residuals.iter().sum::<f64>() / n;
+        let mean_x = x_residuals.iter().sum::<f64>() / n;
+
+        let cov: f64 = y_residuals.iter()
+            .zip(x_residuals.iter())
+            .map(|(yi, xi)| (yi - mean_y) * (xi - mean_x))
+            .sum();
+
+        let var_x: f64 = x_residuals.iter()
+            .map(|xi| (xi - mean_x).powi(2))
+            .sum();
+
+        if var_x.abs() < 1e-10 {
+            return 0.0;
+        }
+
+        cov / var_x
+    }
+
+    /// Estimate effect using frontdoor adjustment.
+    ///
+    /// Formula: P(Y|do(X)) = Σ_m P(M=m|X) Σ_x' P(Y|M=m,X=x') P(X=x')
+    ///
+    /// For continuous variables, we use the product of path coefficients:
+    /// ACE = (Cov(M,X)/Var(X)) * (Cov(Y,M)/Var(M))
+    fn estimate_frontdoor(
+        &self,
+        query: &CausalQuery,
+        mediator_set: &[usize],
+        data: &ObservationalData,
+    ) -> f64 {
+        if mediator_set.is_empty() || data.n() < 2 {
+            return 0.0;
+        }
+
+        let x = query.treatment;
+        let y = query.outcome;
+
+        // Use first mediator (simplification)
+        let m = mediator_set[0];
+
+        // Effect X→M
+        let effect_xm = self.estimate_regression(x, m, data);
+
+        // Effect M→Y (controlling for X)
+        let effect_my = self.estimate_regression_controlled(m, y, x, data);
+
+        // Frontdoor effect is product of path coefficients
+        effect_xm * effect_my
+    }
+
+    /// Simple linear regression coefficient: Cov(Y,X) / Var(X).
+    fn estimate_regression(&self, x: usize, y: usize, data: &ObservationalData) -> f64 {
+        let var_x = data.variance(x);
+        if var_x.abs() < 1e-10 {
+            return 0.0;
+        }
+        data.covariance(y, x) / var_x
+    }
+
+    /// Regression coefficient of X on Y, controlling for Z.
+    fn estimate_regression_controlled(
+        &self,
+        x: usize,
+        y: usize,
+        control: usize,
+        data: &ObservationalData,
+    ) -> f64 {
+        // Residualize both X and Y on control variable
+        let y_residuals = self.residualize(y, &[control], data);
+        let x_residuals = self.residualize(x, &[control], data);
+
+        let n = data.n() as f64;
+        if n < 2.0 {
+            return 0.0;
+        }
+
+        let mean_y = y_residuals.iter().sum::<f64>() / n;
+        let mean_x = x_residuals.iter().sum::<f64>() / n;
+
+        let cov: f64 = y_residuals.iter()
+            .zip(x_residuals.iter())
+            .map(|(yi, xi)| (yi - mean_y) * (xi - mean_x))
+            .sum();
+
+        let var_x: f64 = x_residuals.iter()
+            .map(|xi| (xi - mean_x).powi(2))
+            .sum();
+
+        if var_x.abs() < 1e-10 {
+            return 0.0;
+        }
+
+        cov / var_x
+    }
+
+    /// Compute residuals of variable after regressing out controls.
+    fn residualize(&self, target: usize, controls: &[usize], data: &ObservationalData) -> Vec<f64> {
+        if controls.is_empty() {
+            return data.observations.iter().map(|row| row[target]).collect();
+        }
+
+        // Simple approach: subtract predicted value based on linear regression on controls
+        // For single control: residual = Y - beta * (Z - mean_Z)
+        let n = data.n();
+        if n < 2 {
+            return vec![0.0; n];
+        }
+
+        // Use mean-centering approach for simplicity
+        let target_values: Vec<f64> = data.observations.iter().map(|row| row[target]).collect();
+        let target_mean: f64 = target_values.iter().sum::<f64>() / n as f64;
+
+        // Compute residual by regressing out each control sequentially
+        let mut residuals = target_values.clone();
+
+        for &control in controls {
+            let control_mean = data.mean(control);
+            let control_var = data.variance(control);
+
+            if control_var.abs() < 1e-10 {
+                continue;
+            }
+
+            // Coefficient for this control
+            let cov_tc: f64 = residuals.iter()
+                .zip(data.observations.iter())
+                .map(|(r, row)| (*r - target_mean) * (row[control] - control_mean))
+                .sum::<f64>() / (n - 1) as f64;
+
+            let beta = cov_tc / control_var;
+
+            // Subtract prediction
+            for (i, row) in data.observations.iter().enumerate() {
+                residuals[i] -= beta * (row[control] - control_mean);
+            }
+        }
+
+        residuals
+    }
+}
+
+impl Default for EffectEstimator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shpitser-Pearl ID Algorithm (Complete Identification)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Causal graph with explicit latent (bidirected) edges.
+///
+/// A Semi-Markovian Causal Model (SMCM) represents:
+/// - Directed edges: Direct causal effects (X → Y)
+/// - Bidirected edges: Latent confounders (X ↔ Y, meaning ∃U: U→X, U→Y)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CausalGraphWithLatents {
+    /// Node names.
+    pub nodes: Vec<String>,
+    /// Directed edges: (parent_idx, child_idx).
+    pub directed: Vec<(usize, usize)>,
+    /// Bidirected edges: (node_a, node_b) representing latent confounders.
+    pub bidirected: Vec<(usize, usize)>,
+}
+
+impl CausalGraphWithLatents {
+    pub fn new(
+        nodes: Vec<String>,
+        directed: Vec<(usize, usize)>,
+        bidirected: Vec<(usize, usize)>,
+    ) -> Self {
+        Self { nodes, directed, bidirected }
+    }
+
+    /// Convert to standard CausalDAG (loses bidirected information).
+    pub fn to_dag(&self) -> CausalDAG {
+        CausalDAG::new(self.nodes.clone(), self.directed.clone())
+    }
+
+    /// Get parents of a node (directed edges only).
+    pub fn parents(&self, node: usize) -> Vec<usize> {
+        self.directed.iter()
+            .filter(|(_, c)| *c == node)
+            .map(|(p, _)| *p)
+            .collect()
+    }
+
+    /// Get children of a node (directed edges only).
+    pub fn children(&self, node: usize) -> Vec<usize> {
+        self.directed.iter()
+            .filter(|(p, _)| *p == node)
+            .map(|(_, c)| *c)
+            .collect()
+    }
+
+    /// Get ancestors of a node.
+    pub fn ancestors(&self, node: usize) -> HashSet<usize> {
+        let mut result = HashSet::new();
+        let mut stack = self.parents(node);
+        while let Some(n) = stack.pop() {
+            if result.insert(n) {
+                stack.extend(self.parents(n));
+            }
+        }
+        result
+    }
+
+    /// Get nodes connected to `node` via bidirected edges.
+    pub fn bidirected_neighbors(&self, node: usize) -> HashSet<usize> {
+        let mut result = HashSet::new();
+        for &(a, b) in &self.bidirected {
+            if a == node {
+                result.insert(b);
+            } else if b == node {
+                result.insert(a);
+            }
+        }
+        result
+    }
+
+    /// Find C-components (maximal sets of nodes connected via bidirected edges).
+    ///
+    /// A C-component is a maximal subset of nodes such that every pair is
+    /// connected via a path consisting solely of bidirected edges.
+    pub fn c_components(&self) -> Vec<HashSet<usize>> {
+        let n = self.nodes.len();
+        let mut visited = vec![false; n];
+        let mut components = Vec::new();
+
+        for start in 0..n {
+            if visited[start] {
+                continue;
+            }
+
+            // BFS to find all nodes reachable via bidirected edges
+            let mut component = HashSet::new();
+            let mut queue = VecDeque::new();
+            queue.push_back(start);
+
+            while let Some(node) = queue.pop_front() {
+                if visited[node] {
+                    continue;
+                }
+                visited[node] = true;
+                component.insert(node);
+
+                // Add bidirected neighbors
+                for neighbor in self.bidirected_neighbors(node) {
+                    if !visited[neighbor] {
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+
+            components.push(component);
+        }
+
+        components
+    }
+
+    /// Get the C-component containing a specific node.
+    pub fn c_component_of(&self, node: usize) -> HashSet<usize> {
+        let mut component = HashSet::new();
+        let mut queue = VecDeque::new();
+        queue.push_back(node);
+
+        while let Some(n) = queue.pop_front() {
+            if component.insert(n) {
+                for neighbor in self.bidirected_neighbors(n) {
+                    if !component.contains(&neighbor) {
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+        }
+
+        component
+    }
+
+    /// Induce a subgraph on a subset of nodes.
+    pub fn subgraph(&self, nodes: &HashSet<usize>) -> CausalGraphWithLatents {
+        // Create node mapping
+        let node_list: Vec<usize> = nodes.iter().copied().collect();
+        let mut node_map: HashMap<usize, usize> = HashMap::new();
+        for (new_idx, &old_idx) in node_list.iter().enumerate() {
+            node_map.insert(old_idx, new_idx);
+        }
+
+        let new_nodes: Vec<String> = node_list.iter()
+            .map(|&i| self.nodes[i].clone())
+            .collect();
+
+        let new_directed: Vec<(usize, usize)> = self.directed.iter()
+            .filter(|(p, c)| nodes.contains(p) && nodes.contains(c))
+            .map(|(p, c)| (node_map[p], node_map[c]))
+            .collect();
+
+        let new_bidirected: Vec<(usize, usize)> = self.bidirected.iter()
+            .filter(|(a, b)| nodes.contains(a) && nodes.contains(b))
+            .map(|(a, b)| (node_map[a], node_map[b]))
+            .collect();
+
+        CausalGraphWithLatents::new(new_nodes, new_directed, new_bidirected)
+    }
+
+    /// Check if one set is a subset of another.
+    fn is_subset(subset: &HashSet<usize>, superset: &HashSet<usize>) -> bool {
+        subset.iter().all(|x| superset.contains(x))
+    }
+}
+
+/// Represents an identified causal expression from the ID algorithm.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum CausalExpression {
+    /// Simple probability: P(Y|X)
+    Probability {
+        outcome: Vec<usize>,
+        conditioning: Vec<usize>,
+    },
+    /// Sum over variables: Σ_Z [expression]
+    Sum {
+        sum_over: Vec<usize>,
+        inner: Box<CausalExpression>,
+    },
+    /// Product of expressions: Π [expressions]
+    Product(Vec<CausalExpression>),
+    /// Ratio of expressions: numerator / denominator
+    Fraction {
+        numerator: Box<CausalExpression>,
+        denominator: Box<CausalExpression>,
+    },
+}
+
+impl CausalExpression {
+    /// Convert to human-readable string.
+    pub fn to_string(&self, nodes: &[String]) -> String {
+        match self {
+            CausalExpression::Probability { outcome, conditioning } => {
+                let out_names: Vec<&str> = outcome.iter().map(|&i| nodes[i].as_str()).collect();
+                if conditioning.is_empty() {
+                    format!("P({})", out_names.join(","))
+                } else {
+                    let cond_names: Vec<&str> = conditioning.iter().map(|&i| nodes[i].as_str()).collect();
+                    format!("P({}|{})", out_names.join(","), cond_names.join(","))
+                }
+            }
+            CausalExpression::Sum { sum_over, inner } => {
+                let sum_names: Vec<&str> = sum_over.iter().map(|&i| nodes[i].as_str()).collect();
+                format!("Σ_{{{}}} [{}]", sum_names.join(","), inner.to_string(nodes))
+            }
+            CausalExpression::Product(exprs) => {
+                let inner: Vec<String> = exprs.iter().map(|e| e.to_string(nodes)).collect();
+                inner.join(" × ")
+            }
+            CausalExpression::Fraction { numerator, denominator } => {
+                format!("[{}] / [{}]", numerator.to_string(nodes), denominator.to_string(nodes))
+            }
+        }
+    }
+}
+
+/// Shpitser-Pearl ID Algorithm implementation.
+///
+/// This algorithm provides complete identification for causal effects in
+/// semi-Markovian causal models (graphs with latent confounders).
+///
+/// Reference: Shpitser & Pearl (2006), "Identification of Joint Interventional
+/// Distributions in Recursive Semi-Markovian Causal Models"
+pub struct IDAlgorithm {
+    /// Maximum recursion depth.
+    max_depth: usize,
+}
+
+impl IDAlgorithm {
+    pub fn new() -> Self {
+        Self { max_depth: 100 }
+    }
+
+    /// Main entry point: identify P(y|do(x)) in graph G.
+    ///
+    /// Returns either:
+    /// - `Ok(CausalExpression)`: The identified estimand
+    /// - `Err((hedge_nodes, description))`: Non-identifiable with hedge
+    pub fn identify(
+        &self,
+        graph: &CausalGraphWithLatents,
+        treatment: &[usize],
+        outcome: &[usize],
+    ) -> Result<CausalExpression, (Vec<usize>, String)> {
+        // Convert to sets for the algorithm
+        let x: HashSet<usize> = treatment.iter().copied().collect();
+        let y: HashSet<usize> = outcome.iter().copied().collect();
+        let v: HashSet<usize> = (0..graph.nodes.len()).collect();
+
+        self.id_recursive(graph, &y, &x, &v, 0)
+    }
+
+    /// Recursive ID algorithm.
+    ///
+    /// Computes P_x(y) where:
+    /// - y: outcome variables
+    /// - x: intervention variables
+    /// - v: current variable set
+    fn id_recursive(
+        &self,
+        graph: &CausalGraphWithLatents,
+        y: &HashSet<usize>,
+        x: &HashSet<usize>,
+        v: &HashSet<usize>,
+        depth: usize,
+    ) -> Result<CausalExpression, (Vec<usize>, String)> {
+        if depth > self.max_depth {
+            return Err((vec![], "Maximum recursion depth exceeded".to_string()));
+        }
+
+        // Line 1: If x is empty, return P(y)
+        if x.is_empty() {
+            let outcome_vars: Vec<usize> = y.iter().copied().collect();
+            let conditioning: Vec<usize> = Vec::new();
+            return Ok(CausalExpression::Probability { outcome: outcome_vars, conditioning });
+        }
+
+        // Line 2: Compute ancestors of Y in G
+        let ancestors_y = self.ancestors_of_set(graph, y);
+
+        // If there are variables not ancestors of Y, marginalize them out
+        let relevant: HashSet<usize> = v.iter()
+            .filter(|&&n| ancestors_y.contains(&n) || y.contains(&n))
+            .copied()
+            .collect();
+
+        if relevant.len() < v.len() {
+            // Some variables are not ancestors of Y - marginalize them
+            let new_x: HashSet<usize> = x.intersection(&relevant).copied().collect();
+            return self.id_recursive(graph, y, &new_x, &relevant, depth + 1);
+        }
+
+        // Line 3: Let W = (V \ X) \ An(Y)_G_X̄
+        // Compute ancestors of Y in G with edges into X removed
+        let g_x_bar = self.remove_incoming(graph, x);
+        let an_y_in_g_x_bar = self.ancestors_of_set(&g_x_bar, y);
+
+        let v_minus_x: HashSet<usize> = v.difference(x).copied().collect();
+        let w: HashSet<usize> = v_minus_x.difference(&an_y_in_g_x_bar)
+            .filter(|&&n| !y.contains(&n))
+            .copied()
+            .collect();
+
+        if !w.is_empty() {
+            // Intervene on W as well
+            let x_union_w: HashSet<usize> = x.union(&w).copied().collect();
+            return self.id_recursive(graph, y, &x_union_w, v, depth + 1);
+        }
+
+        // Line 4: Compute C-components of G[V \ X]
+        let v_minus_x_set: HashSet<usize> = v.difference(x).copied().collect();
+        let subgraph = graph.subgraph(&v_minus_x_set);
+        let c_components = subgraph.c_components();
+
+        // Map component indices back to original graph indices
+        let v_minus_x_vec: Vec<usize> = v_minus_x_set.iter().copied().collect();
+        let mapped_components: Vec<HashSet<usize>> = c_components.iter()
+            .map(|comp| comp.iter().map(|&i| v_minus_x_vec[i]).collect())
+            .collect();
+
+        // Line 5: If there's more than one C-component
+        if mapped_components.len() > 1 {
+            // Decompose: P_x(y) = Σ_{v\(y∪x)} Π_i P_{v\s_i}(s_i)
+            let mut product_terms = Vec::new();
+
+            for s_i in &mapped_components {
+                let v_minus_s_i: HashSet<usize> = v.difference(s_i).copied().collect();
+                let term = self.id_recursive(graph, s_i, &v_minus_s_i, v, depth + 1)?;
+                product_terms.push(term);
+            }
+
+            // Sum over variables not in Y or X
+            let sum_over: Vec<usize> = v.iter()
+                .filter(|&&n| !y.contains(&n) && !x.contains(&n))
+                .copied()
+                .collect();
+
+            if sum_over.is_empty() {
+                return Ok(CausalExpression::Product(product_terms));
+            } else {
+                return Ok(CausalExpression::Sum {
+                    sum_over,
+                    inner: Box::new(CausalExpression::Product(product_terms)),
+                });
+            }
+        }
+
+        // Line 6-7: Single C-component S
+        let s: HashSet<usize> = if mapped_components.is_empty() {
+            v_minus_x_set
+        } else {
+            mapped_components[0].clone()
+        };
+
+        // Find C-component of the full graph containing S
+        let full_c_components = graph.c_components();
+        let s_prime: Option<&HashSet<usize>> = full_c_components.iter()
+            .find(|c| CausalGraphWithLatents::is_subset(&s, c));
+
+        match s_prime {
+            Some(c_prime) if c_prime == &s => {
+                // Line 6: S is a C-component in the full graph → FAIL (hedge found)
+                let hedge_nodes: Vec<usize> = s.iter().copied().collect();
+                Err((hedge_nodes.clone(), format!(
+                    "Hedge found: C-component {:?} is a hedge for the causal effect",
+                    hedge_nodes.iter().map(|&i| &graph.nodes[i]).collect::<Vec<_>>()
+                )))
+            }
+            Some(c_prime) => {
+                // Line 7: S ⊂ S' - use factorization
+                // P_x(y) = Σ_{s\y} Π_{v_i ∈ s} P(v_i | v_{π_i}^{(k-1)})
+                // where v_{π_i}^{(k-1)} are predecessors in topological order
+
+                // Get topological order within S'
+                let topo_order = self.topological_sort_subset(graph, c_prime);
+
+                // Build product of conditional probabilities
+                let mut product_terms = Vec::new();
+                for (idx, &node) in topo_order.iter().enumerate() {
+                    if s.contains(&node) {
+                        // P(v_i | predecessors in c_prime)
+                        let predecessors: Vec<usize> = topo_order[..idx].to_vec();
+                        product_terms.push(CausalExpression::Probability {
+                            outcome: vec![node],
+                            conditioning: predecessors,
+                        });
+                    }
+                }
+
+                // Sum over s \ y
+                let sum_over: Vec<usize> = s.difference(y).copied().collect();
+
+                if sum_over.is_empty() {
+                    Ok(CausalExpression::Product(product_terms))
+                } else {
+                    Ok(CausalExpression::Sum {
+                        sum_over,
+                        inner: Box::new(CausalExpression::Product(product_terms)),
+                    })
+                }
+            }
+            None => {
+                // S is not contained in any C-component - shouldn't happen
+                // Fall back to simple factorization
+                let outcome_vars: Vec<usize> = y.iter().copied().collect();
+                Ok(CausalExpression::Probability {
+                    outcome: outcome_vars,
+                    conditioning: x.iter().copied().collect(),
+                })
+            }
+        }
+    }
+
+    /// Compute ancestors of a set of nodes.
+    fn ancestors_of_set(&self, graph: &CausalGraphWithLatents, nodes: &HashSet<usize>) -> HashSet<usize> {
+        let mut result = nodes.clone();
+        for &node in nodes {
+            result.extend(graph.ancestors(node));
+        }
+        result
+    }
+
+    /// Create a graph with incoming edges to X removed.
+    fn remove_incoming(&self, graph: &CausalGraphWithLatents, x: &HashSet<usize>) -> CausalGraphWithLatents {
+        let new_directed: Vec<(usize, usize)> = graph.directed.iter()
+            .filter(|(_, child)| !x.contains(child))
+            .copied()
+            .collect();
+
+        CausalGraphWithLatents::new(
+            graph.nodes.clone(),
+            new_directed,
+            graph.bidirected.clone(),
+        )
+    }
+
+    /// Topological sort of a subset of nodes.
+    fn topological_sort_subset(&self, graph: &CausalGraphWithLatents, nodes: &HashSet<usize>) -> Vec<usize> {
+        let mut result = Vec::new();
+        let mut visited = HashSet::new();
+        let mut temp_mark = HashSet::new();
+
+        fn visit(
+            node: usize,
+            graph: &CausalGraphWithLatents,
+            nodes: &HashSet<usize>,
+            visited: &mut HashSet<usize>,
+            temp_mark: &mut HashSet<usize>,
+            result: &mut Vec<usize>,
+        ) {
+            if visited.contains(&node) {
+                return;
+            }
+            if temp_mark.contains(&node) {
+                return; // Cycle detected, skip
+            }
+            if !nodes.contains(&node) {
+                return;
+            }
+
+            temp_mark.insert(node);
+
+            for child in graph.children(node) {
+                if nodes.contains(&child) {
+                    visit(child, graph, nodes, visited, temp_mark, result);
+                }
+            }
+
+            temp_mark.remove(&node);
+            visited.insert(node);
+            result.push(node);
+        }
+
+        for &node in nodes {
+            visit(node, graph, nodes, &mut visited, &mut temp_mark, &mut result);
+        }
+
+        result.reverse();
+        result
+    }
+
+    /// Convenience method: query using the ID algorithm.
+    pub fn query(
+        &self,
+        graph: &CausalGraphWithLatents,
+        query: &CausalQuery,
+    ) -> CausalQueryOutcome {
+        match self.identify(graph, &[query.treatment], &[query.outcome]) {
+            Ok(expression) => {
+                CausalQueryOutcome::Identified {
+                    estimand: CausalEstimand {
+                        effect: 0.0, // Requires data for actual computation
+                        adjustment_set: vec![],
+                        description: expression.to_string(&graph.nodes),
+                    },
+                    method: IdentificationMethod::IDAlgorithm,
+                    confidence: 0.95,
+                }
+            }
+            Err((hedge_nodes, _description)) => {
+                CausalQueryOutcome::Unidentified {
+                    reason: UnidentifiedReason::HedgeFound { hedge_nodes },
+                    missing: vec![],
+                    suggestions: vec![
+                        "The causal effect is not identifiable from observational data".to_string(),
+                        "Consider running a randomized experiment".to_string(),
+                    ],
+                }
+            }
+        }
+    }
+}
+
+impl Default for IDAlgorithm {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1395,5 +2264,271 @@ mod tests {
 
         // Conditioning on D blocks the A→D→C path
         assert!(!dag.is_d_separated(0, 2, &d_set), "A-C still d-connected given D (via chain)");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Effect Estimation Tests
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_observational_data_basic() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        data.add_observation(vec![1.0, 2.0]);
+        data.add_observation(vec![2.0, 4.0]);
+        data.add_observation(vec![3.0, 6.0]);
+
+        assert_eq!(data.n(), 3);
+        assert!((data.mean(0) - 2.0).abs() < 1e-10);
+        assert!((data.mean(1) - 4.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_effect_estimation_simple_regression() {
+        // Y = 2X + noise
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..100 {
+            let x = i as f64 * 0.1;
+            let y = 2.0 * x + 0.01 * (i % 7) as f64;  // Small noise
+            data.add_observation(vec![x, y]);
+        }
+
+        // Simple chain: X → Y (no confounders)
+        let dag = CausalDAG::new(
+            vec!["X".into(), "Y".into()],
+            vec![(0, 1)],
+        );
+
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+
+        let estimator = EffectEstimator::new();
+        let result = estimator.estimate(&dag, &query, &data);
+
+        if let CausalQueryOutcome::Identified { estimand, .. } = result {
+            // Effect should be approximately 2.0
+            assert!((estimand.effect - 2.0).abs() < 0.1, "Effect should be ~2.0, got {}", estimand.effect);
+        } else {
+            panic!("Expected identified effect");
+        }
+    }
+
+    #[test]
+    fn test_effect_estimation_with_confounder() {
+        // True model: Y = 2X + 1.5Z + noise
+        // Confounder Z affects both X and Y: X = 0.5Z + noise
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into(), "Z".into()]);
+        for i in 0..200 {
+            let z = (i % 10) as f64;
+            let x = 0.5 * z + 0.01 * (i % 3) as f64;
+            let y = 2.0 * x + 1.5 * z + 0.01 * (i % 5) as f64;
+            data.add_observation(vec![x, y, z]);
+        }
+
+        // DAG with confounder: Z → X → Y, Z → Y
+        let dag = CausalDAG::new(
+            vec!["X".into(), "Y".into(), "Z".into()],
+            vec![(0, 1), (2, 0), (2, 1)],
+        );
+
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+
+        let estimator = EffectEstimator::new();
+        let result = estimator.estimate(&dag, &query, &data);
+
+        if let CausalQueryOutcome::Identified { estimand, method, .. } = result {
+            assert_eq!(method, IdentificationMethod::BackdoorAdjustment);
+            // After adjusting for Z, effect should be ~2.0
+            assert!((estimand.effect - 2.0).abs() < 0.5, "Effect should be ~2.0, got {}", estimand.effect);
+        } else {
+            panic!("Expected identified effect");
+        }
+    }
+
+    #[test]
+    fn test_effect_estimation_frontdoor() {
+        // Frontdoor: X → M → Y with hidden confounder U → X, U → Y
+        // True effects: X→M = 0.8, M→Y = 1.5, so total = 1.2
+        let mut data = ObservationalData::new(vec!["X".into(), "M".into(), "Y".into()]);
+        for i in 0..200 {
+            // Simulate U (hidden)
+            let u = (i % 5) as f64;
+            let x = u + 0.01 * (i % 3) as f64;
+            let m = 0.8 * x + 0.01 * (i % 7) as f64;
+            let y = 1.5 * m + 0.3 * u + 0.01 * (i % 11) as f64;
+            data.add_observation(vec![x, m, y]);
+        }
+
+        // DAG: X → M → Y (no explicit edge X → Y, mediated through M)
+        let dag = CausalDAG::new(
+            vec!["X".into(), "M".into(), "Y".into()],
+            vec![(0, 1), (1, 2)],
+        );
+
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 2,
+            conditioning: vec![],
+        };
+
+        let estimator = EffectEstimator::new();
+        let result = estimator.estimate(&dag, &query, &data);
+
+        if let CausalQueryOutcome::Identified { estimand, method, .. } = result {
+            assert_eq!(method, IdentificationMethod::FrontdoorCriterion);
+            // Total effect should be ~1.2 (0.8 * 1.5)
+            assert!((estimand.effect - 1.2).abs() < 0.3, "Effect should be ~1.2, got {}", estimand.effect);
+        } else {
+            panic!("Expected identified effect");
+        }
+    }
+
+    #[test]
+    fn test_observational_data_filter() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..10 {
+            data.add_observation(vec![i as f64, (i * 2) as f64]);
+        }
+
+        let filtered = data.filter(0, |x| x >= 5.0);
+        assert_eq!(filtered.n(), 5);
+        assert!((filtered.mean(0) - 7.0).abs() < 1e-10); // Mean of 5,6,7,8,9
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // ID Algorithm Tests
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_id_simple_chain() {
+        // Simple chain: X → Y (no confounders)
+        // Should be identifiable
+        let graph = CausalGraphWithLatents::new(
+            vec!["X".into(), "Y".into()],
+            vec![(0, 1)],
+            vec![],
+        );
+
+        let id = IDAlgorithm::new();
+        let result = id.identify(&graph, &[0], &[1]);
+
+        assert!(result.is_ok(), "Simple chain should be identifiable");
+    }
+
+    #[test]
+    fn test_id_with_backdoor_confounder() {
+        // X ← U → Y, X → Y
+        // Represented as: X → Y with X ↔ Y (bidirected = latent confounder)
+        // Should NOT be identifiable (bow graph)
+        let graph = CausalGraphWithLatents::new(
+            vec!["X".into(), "Y".into()],
+            vec![(0, 1)],
+            vec![(0, 1)], // Bidirected edge = latent confounder
+        );
+
+        let id = IDAlgorithm::new();
+        let result = id.identify(&graph, &[0], &[1]);
+
+        // With just X ↔ Y and X → Y, effect is NOT identifiable (bow graph)
+        // This is the classic example of non-identifiability
+        assert!(result.is_err(), "Bow graph should NOT be identifiable");
+
+        if let Err((hedge, _)) = result {
+            assert!(!hedge.is_empty(), "Should have found a hedge");
+        }
+    }
+
+    #[test]
+    fn test_id_frontdoor_structure() {
+        // Frontdoor: X → M → Y with X ↔ Y
+        // This IS identifiable via frontdoor criterion
+        let graph = CausalGraphWithLatents::new(
+            vec!["X".into(), "M".into(), "Y".into()],
+            vec![(0, 1), (1, 2)],
+            vec![(0, 2)], // Latent confounder between X and Y
+        );
+
+        let id = IDAlgorithm::new();
+        let result = id.identify(&graph, &[0], &[2]);
+
+        assert!(result.is_ok(), "Frontdoor structure should be identifiable");
+    }
+
+    #[test]
+    fn test_c_components() {
+        // Graph with two C-components:
+        // A ↔ B, C ↔ D (two separate clusters)
+        let graph = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into(), "D".into()],
+            vec![],
+            vec![(0, 1), (2, 3)],
+        );
+
+        let components = graph.c_components();
+        assert_eq!(components.len(), 2, "Should have 2 C-components");
+    }
+
+    #[test]
+    fn test_c_component_chain() {
+        // Chain of bidirected: A ↔ B ↔ C
+        // Should be one C-component
+        let graph = CausalGraphWithLatents::new(
+            vec!["A".into(), "B".into(), "C".into()],
+            vec![],
+            vec![(0, 1), (1, 2)],
+        );
+
+        let components = graph.c_components();
+        assert_eq!(components.len(), 1, "Should have 1 C-component (all connected)");
+        assert_eq!(components[0].len(), 3, "Component should contain all 3 nodes");
+    }
+
+    #[test]
+    fn test_causal_expression_to_string() {
+        let nodes = vec!["X".into(), "Y".into(), "Z".into()];
+
+        let expr = CausalExpression::Sum {
+            sum_over: vec![2],
+            inner: Box::new(CausalExpression::Product(vec![
+                CausalExpression::Probability { outcome: vec![1], conditioning: vec![0, 2] },
+                CausalExpression::Probability { outcome: vec![2], conditioning: vec![] },
+            ])),
+        };
+
+        let s = expr.to_string(&nodes);
+        assert!(s.contains("Σ"), "Should contain sum symbol");
+        assert!(s.contains("P(Y|X,Z)"), "Should contain conditional probability");
+    }
+
+    #[test]
+    fn test_id_query_interface() {
+        // Test the query interface for IDAlgorithm
+        let graph = CausalGraphWithLatents::new(
+            vec!["X".into(), "Y".into()],
+            vec![(0, 1)],
+            vec![],
+        );
+
+        let id = IDAlgorithm::new();
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+
+        let result = id.query(&graph, &query);
+
+        match result {
+            CausalQueryOutcome::Identified { method, .. } => {
+                assert_eq!(method, IdentificationMethod::IDAlgorithm);
+            }
+            _ => panic!("Simple chain should be identified"),
+        }
     }
 }
