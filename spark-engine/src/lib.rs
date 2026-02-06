@@ -67,6 +67,9 @@ pub mod reactions;
 // Multi-physics discovery engine
 pub mod multi_physics;
 
+// CfC temporal dynamics analysis
+pub mod cfc_physics;
+
 // Core re-exports
 pub use physics::{GamowIntegration, GamowResult, QFactor, QFactorParams};
 pub use lattice::{LatticeLifetime, LatticeState};
