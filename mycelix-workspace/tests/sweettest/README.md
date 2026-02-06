@@ -6,11 +6,13 @@ End-to-end integration tests using Holochain's [sweettest](https://docs.rs/holoc
 
 ```bash
 # From mycelix-workspace/
-just test-sweettest          # Run all 15 tests
-just test-sweettest-identity # Run identity suite only (4 tests)
-just test-sweettest-governance # Run governance suite only (3 tests)
-just test-sweettest-bridge   # Run bridge suite only (2 tests)
-just test-sweettest-privacy  # Run privacy/ZK suite only (6 tests)
+just test-sweettest             # Run all 33 tests
+just test-sweettest-identity    # Run identity suite only (4 tests)
+just test-sweettest-governance  # Run governance suite only (3 tests)
+just test-sweettest-bridge      # Run bridge suite only (2 tests)
+just test-sweettest-privacy     # Run privacy/ZK suite only (6 tests)
+just test-sweettest-edunet      # Run edunet suite only (7 tests)
+just test-sweettest-supplychain # Run supplychain suite only (11 tests)
 ```
 
 Or directly:
@@ -77,6 +79,22 @@ Sweettest MUST run with `--release` due to Holochain's hardcoded 5-minute nonce 
 | `test_attestation_expiration` | 1 | Expired attestation not counted as valid |
 | `test_multi_agent_attestation` | 2 | Agent 1 submits, Agent 2 retrieves via DHT |
 
+### Supply Chain Workflow (11 tests) - NEW
+**File:** `tests/supplychain_workflow.rs`
+
+| Test | Agents | Description |
+|------|--------|-------------|
+| `test_create_and_get_item` | 1 | Create inventory item, retrieve by hash |
+| `test_list_inventory_items` | 1 | Create multiple items, verify list |
+| `test_stock_level_management` | 1 | Update stock at multiple locations, verify totals |
+| `test_stock_movement` | 1 | Record inbound movement, verify history |
+| `test_create_and_get_shipment` | 1 | Create shipment with carrier/destination |
+| `test_shipment_tracking_events` | 2 | Add tracking events (pickup, in-transit) |
+| `test_create_and_get_claim` | 1 | Create provenance claim, retrieve it |
+| `test_provenance_chain` | 3 | Build multi-actor chain (farmer→processor→distributor) |
+| `test_multi_agent_claim_visibility` | 2 | Claim visible to verifier via DHT |
+| `test_provider_profile` | 1 | Create and retrieve provider profile |
+
 ## Architecture
 
 ```
@@ -84,11 +102,13 @@ tests/sweettest/
 ├── Cargo.toml
 ├── README.md
 └── tests/
-    ├── harness.rs              # Shared test utilities
-    ├── identity_workflow.rs    # Identity hApp tests
-    ├── governance_workflow.rs  # Governance hApp tests
-    ├── cross_happ_bridge.rs    # Multi-hApp tests
-    └── privacy_zk_attestation.rs # LUCID privacy tests
+    ├── harness.rs               # Shared test utilities
+    ├── identity_workflow.rs     # Identity hApp tests (4)
+    ├── governance_workflow.rs   # Governance hApp tests (3)
+    ├── cross_happ_bridge.rs     # Multi-hApp tests (2)
+    ├── privacy_zk_attestation.rs # LUCID privacy tests (6)
+    ├── edunet_workflow.rs       # EduNet hApp tests (7)
+    └── supplychain_workflow.rs  # Supply chain hApp tests (11)
 ```
 
 ### Test Harness
@@ -106,11 +126,15 @@ Tests expect pre-built DNA bundles at:
 - `mycelix-identity/dna/mycelix_identity_dna.dna`
 - `mycelix-governance/dna/mycelix_governance.dna`
 - `mycelix-workspace/happs/lucid/lucid.dna`
+- `mycelix-edunet/dna/edunet.dna`
+- `mycelix-supplychain/holochain/dna/supplychain.dna`
 
 Build them with:
 ```bash
 cd mycelix-identity && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
 cd mycelix-governance && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
+cd mycelix-edunet && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
+cd mycelix-supplychain/holochain && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
 ```
 
 ## Version Compatibility

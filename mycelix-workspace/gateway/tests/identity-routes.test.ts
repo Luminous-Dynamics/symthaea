@@ -192,7 +192,7 @@ describe('Identity Routes', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           credential: {
-            '@context': ['https://www.w3.org/2018/credentials/v1'],
+            id: 'urn:uuid:3978344f-8596-4c3a-a978-8fcaba3903c5',
             type: ['VerifiableCredential'],
             issuer: 'did:mycelix:issuer123',
             issuanceDate: '2024-01-01T00:00:00Z',

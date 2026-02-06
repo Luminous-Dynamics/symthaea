@@ -36,12 +36,14 @@ describe('Auth Middleware', () => {
     });
 
     it('should validate DID format', () => {
+      // DID method-specific-id can contain alphanumeric, dots, hyphens, underscores, colons
       const isValidDid = (did: string): boolean => {
-        return /^did:[a-z]+:[a-zA-Z0-9]+$/.test(did);
+        return /^did:[a-z]+:[a-zA-Z0-9._:-]+$/.test(did);
       };
 
       expect(isValidDid('did:mycelix:user123')).toBe(true);
       expect(isValidDid('did:web:example.com')).toBe(true);
+      expect(isValidDid('did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK')).toBe(true);
       expect(isValidDid('invalid')).toBe(false);
       expect(isValidDid('did:mycelix:')).toBe(false);
       expect(isValidDid('')).toBe(false);

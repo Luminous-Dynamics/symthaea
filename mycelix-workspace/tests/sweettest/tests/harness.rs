@@ -33,6 +33,10 @@ impl DnaPaths {
     pub fn edunet() -> PathBuf {
         Self::workspace_root().join("../mycelix-edunet/dna/edunet.dna")
     }
+
+    pub fn supplychain() -> PathBuf {
+        Self::workspace_root().join("../mycelix-supplychain/holochain/dna/supplychain.dna")
+    }
 }
 
 /// A test agent with conductor and cell references for Holochain 0.6 API.
