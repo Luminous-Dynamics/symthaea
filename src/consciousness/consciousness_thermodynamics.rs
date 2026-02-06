@@ -30,14 +30,664 @@
 // - Model temperature as exploration parameter
 // - Identify critical points for consciousness transitions
 
-use std::collections::VecDeque;
+use crate::hdc::binary_hv::HV16;
+use crate::hdc::primitive_system::PrimitiveSystem;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
-use serde::{Serialize, Deserialize};
 
 /// Helper function for serde default of Instant
 fn default_instant() -> Instant {
     Instant::now()
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NSM PRIMITIVE GROUNDING FOR CONSCIOUSNESS THERMODYNAMICS
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// NSM primitive grounding for entropy calculation methods.
+///
+/// Each entropy method is decomposed into Natural Semantic Metalanguage
+/// primitives that capture its conceptual essence.
+///
+/// ## Entropy Method Semantics
+///
+/// - Shannon: probability-based information → KNOW + NOT + MAYBE + MUCH
+/// - VonNeumann: quantum state uncertainty → KNOW + NOT + PART + SAME
+/// - Renyi: generalized entropy → KNOW + NOT + MAYBE + MORE
+/// - KolmogorovSinai: dynamical unpredictability → KNOW + NOT + AFTER + MOVE
+#[derive(Debug, Clone)]
+pub struct EntropyMethodPrimitiveGrounding {
+    /// The entropy method being grounded
+    pub method: EntropyMethod,
+
+    /// NSM primitives composing this method's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Information theoretic emphasis: 0.0 (statistical) to 1.0 (dynamical)
+    pub dynamical_emphasis: f32,
+
+    /// Quantum emphasis: 0.0 (classical) to 1.0 (quantum)
+    pub quantum_emphasis: f32,
+}
+
+impl EntropyMethodPrimitiveGrounding {
+    /// Get NSM grounding for a specific entropy method
+    pub fn for_method(method: EntropyMethod, primitive_system: &PrimitiveSystem) -> Self {
+        let (primitives, dynamical_emphasis, quantum_emphasis) = match method {
+            // Shannon: classical information theory
+            EntropyMethod::Shannon => (
+                vec!["NSM_KNOW", "NSM_NOT", "NSM_MAYBE", "NSM_MUCH"],
+                0.0,
+                0.0,
+            ),
+
+            // Von Neumann: quantum information
+            EntropyMethod::VonNeumann => (
+                vec!["NSM_KNOW", "NSM_NOT", "NSM_PART", "NSM_SAME"],
+                0.2,
+                1.0,
+            ),
+
+            // Renyi: generalized entropy family
+            EntropyMethod::Renyi => (
+                vec!["NSM_KNOW", "NSM_NOT", "NSM_MAYBE", "NSM_MORE"],
+                0.3,
+                0.3,
+            ),
+
+            // Kolmogorov-Sinai: dynamical systems chaos
+            EntropyMethod::KolmogorovSinai => (
+                vec!["NSM_KNOW", "NSM_NOT", "NSM_AFTER", "NSM_MOVE"],
+                1.0,
+                0.0,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(8000 + method as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            method,
+            nsm_primitives,
+            primitive_encoding,
+            dynamical_emphasis,
+            quantum_emphasis,
+        }
+    }
+
+    /// Get all entropy method groundings
+    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<EntropyMethod, Self> {
+        [
+            EntropyMethod::Shannon,
+            EntropyMethod::VonNeumann,
+            EntropyMethod::Renyi,
+            EntropyMethod::KolmogorovSinai,
+        ]
+        .into_iter()
+        .map(|m| (m, Self::for_method(m, primitive_system)))
+        .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+}
+
+/// NSM primitive grounding for consciousness phases.
+///
+/// Each phase of consciousness is mapped to NSM primitives that capture
+/// its phenomenological character.
+///
+/// ## Consciousness Phase Semantics
+///
+/// - Frozen: rigid, stuck thinking → NOT + MOVE + NOT + CHANGE + HARD
+/// - Normal: everyday awareness → THINK + KNOW + DO + NOW
+/// - Critical: edge of chaos, creativity → MAYBE + CHANGE + GOOD + BAD
+/// - Chaotic: fragmented, overwhelmed → VERY + MOVE + NOT + TOGETHER
+/// - Flow: effortless action → DO + GOOD + NOT + FEEL + BAD + MOVE
+/// - Unified: deep integration → ALL + TOGETHER + SAME + ONE + FEEL
+#[derive(Debug, Clone)]
+pub struct ConsciousnessPhasePrimitiveGrounding {
+    /// The consciousness phase being grounded
+    pub phase: ConsciousnessPhase,
+
+    /// NSM primitives composing this phase's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Order level: 0.0 (chaotic) to 1.0 (frozen/rigid)
+    pub order: f32,
+
+    /// Creativity potential: 0.0 (low) to 1.0 (high)
+    pub creativity: f32,
+
+    /// Well-being: 0.0 (suffering) to 1.0 (flourishing)
+    pub wellbeing: f32,
+}
+
+impl ConsciousnessPhasePrimitiveGrounding {
+    /// Get NSM grounding for a specific consciousness phase
+    pub fn for_phase(phase: ConsciousnessPhase, primitive_system: &PrimitiveSystem) -> Self {
+        let (primitives, order, creativity, wellbeing) = match phase {
+            // Frozen: rigid, stuck, over-ordered
+            ConsciousnessPhase::Frozen => (
+                vec!["NSM_NOT", "NSM_MOVE", "NSM_NOT", "NSM_CHANGE"],
+                1.0,
+                0.1,
+                0.3,
+            ),
+
+            // Normal: everyday balanced consciousness
+            ConsciousnessPhase::Normal => (
+                vec!["NSM_THINK", "NSM_KNOW", "NSM_DO", "NSM_NOW"],
+                0.5,
+                0.4,
+                0.6,
+            ),
+
+            // Critical: at the edge, maximum creativity
+            ConsciousnessPhase::Critical => (
+                vec!["NSM_MAYBE", "NSM_CHANGE", "NSM_GOOD", "NSM_BAD"],
+                0.5,
+                1.0,
+                0.5,
+            ),
+
+            // Chaotic: fragmented, overwhelming
+            ConsciousnessPhase::Chaotic => (
+                vec!["NSM_VERY", "NSM_MOVE", "NSM_NOT", "NSM_TOGETHER"],
+                0.0,
+                0.3,
+                0.2,
+            ),
+
+            // Flow: effortless doing
+            ConsciousnessPhase::Flow => (
+                vec!["NSM_DO", "NSM_GOOD", "NSM_MOVE", "NSM_NOT", "NSM_THINK"],
+                0.4,
+                0.8,
+                0.95,
+            ),
+
+            // Unified: deep integration, oneness
+            ConsciousnessPhase::Unified => (
+                vec!["NSM_ALL", "NSM_TOGETHER", "NSM_SAME", "NSM_FEEL"],
+                0.6,
+                0.7,
+                0.9,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(8100 + phase as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            phase,
+            nsm_primitives,
+            primitive_encoding,
+            order,
+            creativity,
+            wellbeing,
+        }
+    }
+
+    /// Get all consciousness phase groundings
+    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<ConsciousnessPhase, Self> {
+        [
+            ConsciousnessPhase::Frozen,
+            ConsciousnessPhase::Normal,
+            ConsciousnessPhase::Critical,
+            ConsciousnessPhase::Chaotic,
+            ConsciousnessPhase::Flow,
+            ConsciousnessPhase::Unified,
+        ]
+        .into_iter()
+        .map(|p| (p, Self::for_phase(p, primitive_system)))
+        .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+
+    /// Calculate similarity between two phases
+    pub fn similarity(&self, other: &Self) -> f32 {
+        self.primitive_encoding
+            .similarity(&other.primitive_encoding)
+    }
+}
+
+/// NSM primitive grounding for phase transition orders.
+///
+/// ## Transition Order Semantics
+///
+/// - FirstOrder: abrupt, discontinuous → MOMENT + CHANGE + NOT + SAME
+/// - SecondOrder: continuous, critical → FOR_SOME_TIME + CHANGE + PART + SAME
+/// - Crossover: smooth, gradual → FOR_SOME_TIME + BECOME + SAME + MORE
+#[derive(Debug, Clone)]
+pub struct TransitionOrderPrimitiveGrounding {
+    /// The transition order being grounded
+    pub order: TransitionOrder,
+
+    /// NSM primitives composing this order's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Discontinuity: 0.0 (smooth) to 1.0 (abrupt)
+    pub discontinuity: f32,
+
+    /// Critical behavior: 0.0 (none) to 1.0 (strongly critical)
+    pub criticality: f32,
+}
+
+impl TransitionOrderPrimitiveGrounding {
+    /// Get NSM grounding for a specific transition order
+    pub fn for_order(order: TransitionOrder, primitive_system: &PrimitiveSystem) -> Self {
+        let (primitives, discontinuity, criticality) = match order {
+            // First order: sudden jump
+            TransitionOrder::FirstOrder => (
+                vec!["NSM_MOMENT", "NSM_CHANGE", "NSM_NOT", "NSM_SAME"],
+                1.0,
+                0.3,
+            ),
+
+            // Second order: continuous but singular
+            TransitionOrder::SecondOrder => (
+                vec!["NSM_FOR_SOME_TIME", "NSM_CHANGE", "NSM_PART", "NSM_SAME"],
+                0.3,
+                1.0,
+            ),
+
+            // Crossover: smooth transition
+            TransitionOrder::Crossover => (
+                vec!["NSM_FOR_SOME_TIME", "NSM_BECOME", "NSM_SAME", "NSM_MORE"],
+                0.0,
+                0.0,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(8200 + order as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            order,
+            nsm_primitives,
+            primitive_encoding,
+            discontinuity,
+            criticality,
+        }
+    }
+
+    /// Get all transition order groundings
+    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<TransitionOrder, Self> {
+        [
+            TransitionOrder::FirstOrder,
+            TransitionOrder::SecondOrder,
+            TransitionOrder::Crossover,
+        ]
+        .into_iter()
+        .map(|o| (o, Self::for_order(o, primitive_system)))
+        .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+}
+
+/// NSM primitive grounding for free energy status.
+///
+/// ## Free Energy Status Semantics (Friston's Free Energy Principle)
+///
+/// - Minimizing: actively reducing → DO + LESS + WANT + GOOD
+/// - LocalMinimum: stuck local optimum → SAME + NOT + MOVE + MAYBE + GOOD
+/// - GlobalMinimum: best possible → VERY + GOOD + SAME + NOT + CHANGE
+/// - Increasing: losing coherence → MORE + BAD + CHANGE + NOT + WANT
+/// - Searching: exploring options → MOVE + MAYBE + SEE + WANT + KNOW
+#[derive(Debug, Clone)]
+pub struct FreeEnergyStatusPrimitiveGrounding {
+    /// The free energy status being grounded
+    pub status: FreeEnergyStatus,
+
+    /// NSM primitives composing this status's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Direction: -1.0 (minimizing) to 1.0 (increasing)
+    pub direction: f32,
+
+    /// Stability: 0.0 (dynamic) to 1.0 (stable)
+    pub stability: f32,
+
+    /// Optimality: 0.0 (poor) to 1.0 (optimal)
+    pub optimality: f32,
+}
+
+impl FreeEnergyStatusPrimitiveGrounding {
+    /// Get NSM grounding for a specific free energy status
+    pub fn for_status(status: FreeEnergyStatus, primitive_system: &PrimitiveSystem) -> Self {
+        let (primitives, direction, stability, optimality) = match status {
+            // Minimizing: active reduction
+            FreeEnergyStatus::Minimizing => (
+                vec!["NSM_DO", "NSM_LESS", "NSM_WANT", "NSM_GOOD"],
+                -1.0,
+                0.3,
+                0.5,
+            ),
+
+            // LocalMinimum: stuck at suboptimal
+            FreeEnergyStatus::LocalMinimum => (
+                vec!["NSM_SAME", "NSM_NOT", "NSM_MOVE", "NSM_MAYBE", "NSM_GOOD"],
+                0.0,
+                0.8,
+                0.5,
+            ),
+
+            // GlobalMinimum: optimal state
+            FreeEnergyStatus::GlobalMinimum => (
+                vec!["NSM_VERY", "NSM_GOOD", "NSM_SAME", "NSM_NOT", "NSM_CHANGE"],
+                0.0,
+                1.0,
+                1.0,
+            ),
+
+            // Increasing: deteriorating
+            FreeEnergyStatus::Increasing => (
+                vec!["NSM_MORE", "NSM_BAD", "NSM_CHANGE", "NSM_NOT", "NSM_WANT"],
+                1.0,
+                0.2,
+                0.1,
+            ),
+
+            // Searching: exploring
+            FreeEnergyStatus::Searching => (
+                vec!["NSM_MOVE", "NSM_MAYBE", "NSM_SEE", "NSM_WANT", "NSM_KNOW"],
+                0.0,
+                0.1,
+                0.3,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(8300 + status as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            status,
+            nsm_primitives,
+            primitive_encoding,
+            direction,
+            stability,
+            optimality,
+        }
+    }
+
+    /// Get all free energy status groundings
+    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<FreeEnergyStatus, Self> {
+        [
+            FreeEnergyStatus::Minimizing,
+            FreeEnergyStatus::LocalMinimum,
+            FreeEnergyStatus::GlobalMinimum,
+            FreeEnergyStatus::Increasing,
+            FreeEnergyStatus::Searching,
+        ]
+        .into_iter()
+        .map(|s| (s, Self::for_status(s, primitive_system)))
+        .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+}
+
+/// NSM primitive grounding for equilibrium status.
+///
+/// ## Equilibrium Status Semantics
+///
+/// - Equilibrium: balanced, stable → SAME + NOT + CHANGE + NOW
+/// - Equilibrating: approaching balance → BECOME + SAME + FOR_SOME_TIME
+/// - FarFromEquilibrium: active, living → VERY + NOT + SAME + DO + LIVE
+/// - Metastable: temporarily stable → SAME + NOW + MAYBE + CHANGE + AFTER
+#[derive(Debug, Clone)]
+pub struct EquilibriumStatusPrimitiveGrounding {
+    /// The equilibrium status being grounded
+    pub status: EquilibriumStatus,
+
+    /// NSM primitives composing this status's semantics
+    pub nsm_primitives: Vec<String>,
+
+    /// HDC encoding from bundled primitive vectors
+    pub primitive_encoding: HV16,
+
+    /// Distance from equilibrium: 0.0 (at equilibrium) to 1.0 (far)
+    pub distance: f32,
+
+    /// Stability duration: 0.0 (transient) to 1.0 (permanent)
+    pub permanence: f32,
+
+    /// Activity level: 0.0 (quiescent) to 1.0 (highly active)
+    pub activity: f32,
+}
+
+impl EquilibriumStatusPrimitiveGrounding {
+    /// Get NSM grounding for a specific equilibrium status
+    pub fn for_status(status: EquilibriumStatus, primitive_system: &PrimitiveSystem) -> Self {
+        let (primitives, distance, permanence, activity) = match status {
+            // Equilibrium: true balance
+            EquilibriumStatus::Equilibrium => (
+                vec!["NSM_SAME", "NSM_NOT", "NSM_CHANGE", "NSM_NOW"],
+                0.0,
+                1.0,
+                0.0,
+            ),
+
+            // Equilibrating: approaching balance
+            EquilibriumStatus::Equilibrating => (
+                vec!["NSM_BECOME", "NSM_SAME", "NSM_FOR_SOME_TIME"],
+                0.3,
+                0.5,
+                0.3,
+            ),
+
+            // FarFromEquilibrium: active living systems
+            EquilibriumStatus::FarFromEquilibrium => (
+                vec!["NSM_VERY", "NSM_NOT", "NSM_SAME", "NSM_DO", "NSM_LIVE"],
+                1.0,
+                0.2,
+                1.0,
+            ),
+
+            // Metastable: temporary stability
+            EquilibriumStatus::Metastable => (
+                vec![
+                    "NSM_SAME",
+                    "NSM_NOW",
+                    "NSM_MAYBE",
+                    "NSM_CHANGE",
+                    "NSM_AFTER",
+                ],
+                0.1,
+                0.3,
+                0.2,
+            ),
+        };
+
+        let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
+
+        let encodings: Vec<HV16> = nsm_primitives
+            .iter()
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .collect();
+
+        let primitive_encoding = if encodings.is_empty() {
+            HV16::random(8400 + status as u64 * 100)
+        } else {
+            HV16::bundle(&encodings)
+        };
+
+        Self {
+            status,
+            nsm_primitives,
+            primitive_encoding,
+            distance,
+            permanence,
+            activity,
+        }
+    }
+
+    /// Get all equilibrium status groundings
+    pub fn all_groundings(primitive_system: &PrimitiveSystem) -> HashMap<EquilibriumStatus, Self> {
+        [
+            EquilibriumStatus::Equilibrium,
+            EquilibriumStatus::Equilibrating,
+            EquilibriumStatus::FarFromEquilibrium,
+            EquilibriumStatus::Metastable,
+        ]
+        .into_iter()
+        .map(|s| (s, Self::for_status(s, primitive_system)))
+        .collect()
+    }
+
+    /// Semantic formula representation
+    pub fn semantic_formula(&self) -> String {
+        self.nsm_primitives.join(" + ")
+    }
+}
+
+/// Unified thermodynamics NSM grounding system.
+///
+/// Provides access to all thermodynamic concept groundings for
+/// cross-domain semantic reasoning about consciousness states.
+#[derive(Debug, Clone)]
+pub struct ThermodynamicsNSMGrounding {
+    /// Entropy method groundings
+    pub entropy_methods: HashMap<EntropyMethod, EntropyMethodPrimitiveGrounding>,
+
+    /// Consciousness phase groundings
+    pub phases: HashMap<ConsciousnessPhase, ConsciousnessPhasePrimitiveGrounding>,
+
+    /// Transition order groundings
+    pub transition_orders: HashMap<TransitionOrder, TransitionOrderPrimitiveGrounding>,
+
+    /// Free energy status groundings
+    pub free_energy_statuses: HashMap<FreeEnergyStatus, FreeEnergyStatusPrimitiveGrounding>,
+
+    /// Equilibrium status groundings
+    pub equilibrium_statuses: HashMap<EquilibriumStatus, EquilibriumStatusPrimitiveGrounding>,
+}
+
+impl ThermodynamicsNSMGrounding {
+    /// Create complete thermodynamics NSM grounding system
+    pub fn new(primitive_system: &PrimitiveSystem) -> Self {
+        Self {
+            entropy_methods: EntropyMethodPrimitiveGrounding::all_groundings(primitive_system),
+            phases: ConsciousnessPhasePrimitiveGrounding::all_groundings(primitive_system),
+            transition_orders: TransitionOrderPrimitiveGrounding::all_groundings(primitive_system),
+            free_energy_statuses: FreeEnergyStatusPrimitiveGrounding::all_groundings(
+                primitive_system,
+            ),
+            equilibrium_statuses: EquilibriumStatusPrimitiveGrounding::all_groundings(
+                primitive_system,
+            ),
+        }
+    }
+
+    /// Get total number of grounded concepts
+    pub fn concept_count(&self) -> usize {
+        self.entropy_methods.len()
+            + self.phases.len()
+            + self.transition_orders.len()
+            + self.free_energy_statuses.len()
+            + self.equilibrium_statuses.len()
+    }
+
+    /// Get semantic description of the thermodynamic state
+    pub fn describe_state(
+        &self,
+        phase: ConsciousnessPhase,
+        fe_status: FreeEnergyStatus,
+        eq_status: EquilibriumStatus,
+    ) -> String {
+        let phase_formula = self
+            .phases
+            .get(&phase)
+            .map(|g| g.semantic_formula())
+            .unwrap_or_default();
+        let fe_formula = self
+            .free_energy_statuses
+            .get(&fe_status)
+            .map(|g| g.semantic_formula())
+            .unwrap_or_default();
+        let eq_formula = self
+            .equilibrium_statuses
+            .get(&eq_status)
+            .map(|g| g.semantic_formula())
+            .unwrap_or_default();
+
+        format!(
+            "Phase[{}] & Energy[{}] & Balance[{}]",
+            phase_formula, fe_formula, eq_formula
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ORIGINAL CONSCIOUSNESS THERMODYNAMICS IMPLEMENTATION
+// ═══════════════════════════════════════════════════════════════════════════
 
 /// Boltzmann constant for consciousness (dimensionless, tunable)
 const CONSCIOUSNESS_BOLTZMANN: f64 = 1.0;
@@ -86,7 +736,7 @@ impl Default for ThermodynamicsConfig {
 }
 
 /// Method for calculating consciousness entropy
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EntropyMethod {
     /// Shannon entropy: -Σ p_i log p_i
     Shannon,
@@ -163,7 +813,7 @@ impl Default for ThermodynamicState {
 }
 
 /// Phases of consciousness (like phases of matter)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ConsciousnessPhase {
     /// Low temperature: Frozen, rigid thinking
     Frozen,
@@ -235,7 +885,7 @@ pub struct PhaseTransition {
 }
 
 /// Order of phase transition
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TransitionOrder {
     /// First order: Discontinuous jump (like ice to water)
     FirstOrder,
@@ -343,7 +993,7 @@ pub struct ThermodynamicsReport {
 }
 
 /// Free energy minimization status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FreeEnergyStatus {
     /// Actively minimizing (goal-directed behavior)
     Minimizing,
@@ -358,7 +1008,7 @@ pub enum FreeEnergyStatus {
 }
 
 /// Equilibrium status
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EquilibriumStatus {
     /// In thermal equilibrium
     Equilibrium,
@@ -528,9 +1178,7 @@ impl ConsciousnessThermodynamicsAnalyzer {
                 let probs: Vec<f64> = dims.iter().map(|d| (d.abs() / sum).max(0.0001)).collect();
 
                 // Shannon entropy: -Σ p_i log p_i
-                -probs.iter()
-                    .map(|p| p * p.ln())
-                    .sum::<f64>() / (7.0_f64.ln()) // Normalize by max entropy
+                -probs.iter().map(|p| p * p.ln()).sum::<f64>() / (7.0_f64.ln()) // Normalize by max entropy
             }
             EntropyMethod::VonNeumann => {
                 // Construct density matrix from dims (simplified)
@@ -566,16 +1214,17 @@ impl ConsciousnessThermodynamicsAnalyzer {
                     return 0.5;
                 }
 
-                let recent: Vec<f64> = self.state_history.iter()
+                let recent: Vec<f64> = self
+                    .state_history
+                    .iter()
                     .rev()
                     .take(10)
                     .map(|s| s.entropy)
                     .collect();
 
                 let mean: f64 = recent.iter().sum::<f64>() / recent.len() as f64;
-                let variance: f64 = recent.iter()
-                    .map(|e| (e - mean).powi(2))
-                    .sum::<f64>() / recent.len() as f64;
+                let variance: f64 =
+                    recent.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / recent.len() as f64;
 
                 // High variance = high dynamical entropy
                 (variance * 10.0).min(1.0)
@@ -602,9 +1251,7 @@ impl ConsciousnessThermodynamicsAnalyzer {
     fn calculate_temperature(&self, dims: &[f64; 7]) -> f64 {
         // Temperature ~ variance/fluctuation in dimensions
         let mean: f64 = dims.iter().sum::<f64>() / 7.0;
-        let variance: f64 = dims.iter()
-            .map(|d| (d - mean).powi(2))
-            .sum::<f64>() / 7.0;
+        let variance: f64 = dims.iter().map(|d| (d - mean).powi(2)).sum::<f64>() / 7.0;
 
         // Also influenced by arousal (A) dimension
         let arousal_contribution = dims[3] * 0.5; // A is at index 3
@@ -633,7 +1280,9 @@ impl ConsciousnessThermodynamicsAnalyzer {
         }
 
         // Gradient in free energy
-        let recent_fe: Vec<f64> = self.state_history.iter()
+        let recent_fe: Vec<f64> = self
+            .state_history
+            .iter()
             .rev()
             .take(5)
             .map(|s| s.free_energy)
@@ -651,7 +1300,12 @@ impl ConsciousnessThermodynamicsAnalyzer {
     }
 
     /// Determine consciousness phase from thermodynamic variables
-    fn determine_phase(&self, temperature: f64, entropy: f64, dims: &[f64; 7]) -> ConsciousnessPhase {
+    fn determine_phase(
+        &self,
+        temperature: f64,
+        entropy: f64,
+        dims: &[f64; 7],
+    ) -> ConsciousnessPhase {
         let phi = dims[0]; // Integration
         let binding = dims[1]; // Binding
 
@@ -722,16 +1376,17 @@ impl ConsciousnessThermodynamicsAnalyzer {
             return;
         }
 
-        let recent: Vec<f64> = self.state_history.iter()
+        let recent: Vec<f64> = self
+            .state_history
+            .iter()
             .rev()
             .take(10)
             .map(|s| s.entropy)
             .collect();
 
         let mean: f64 = recent.iter().sum::<f64>() / recent.len() as f64;
-        let variance: f64 = recent.iter()
-            .map(|e| (e - mean).powi(2))
-            .sum::<f64>() / recent.len() as f64;
+        let variance: f64 =
+            recent.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / recent.len() as f64;
 
         self.fluctuations.mean_amplitude = (state.entropy - mean).abs();
         self.fluctuations.variance = variance;
@@ -778,7 +1433,8 @@ impl ConsciousnessThermodynamicsAnalyzer {
             return 1.0;
         }
 
-        let cov: f64 = series.iter()
+        let cov: f64 = series
+            .iter()
             .zip(series.iter().skip(lag))
             .map(|(x, y)| (x - mean) * (y - mean))
             .sum();
@@ -805,7 +1461,9 @@ impl ConsciousnessThermodynamicsAnalyzer {
             (self.stats.average_temperature * (n - 1.0) + state.temperature) / n;
 
         // Stability score: inverse of recent phase changes
-        let recent_transitions = self.transition_history.iter()
+        let recent_transitions = self
+            .transition_history
+            .iter()
             .filter(|t| t.timestamp.elapsed().as_secs() < 60)
             .count() as f64;
         self.stats.stability_score = (1.0 / (1.0 + recent_transitions)).min(1.0);
@@ -813,9 +1471,7 @@ impl ConsciousnessThermodynamicsAnalyzer {
 
     /// Generate comprehensive thermodynamics report
     pub fn generate_report(&self) -> ThermodynamicsReport {
-        let current_state = self.state_history.back()
-            .cloned()
-            .unwrap_or_default();
+        let current_state = self.state_history.back().cloned().unwrap_or_default();
 
         // Free energy status
         let free_energy_status = self.assess_free_energy_status();
@@ -855,7 +1511,9 @@ impl ConsciousnessThermodynamicsAnalyzer {
             return FreeEnergyStatus::Searching;
         }
 
-        let recent_fe: Vec<f64> = self.state_history.iter()
+        let recent_fe: Vec<f64> = self
+            .state_history
+            .iter()
             .rev()
             .take(10)
             .map(|s| s.free_energy)
@@ -889,10 +1547,7 @@ impl ConsciousnessThermodynamicsAnalyzer {
             return EquilibriumStatus::FarFromEquilibrium;
         }
 
-        let recent: Vec<&ThermodynamicState> = self.state_history.iter()
-            .rev()
-            .take(10)
-            .collect();
+        let recent: Vec<&ThermodynamicState> = self.state_history.iter().rev().take(10).collect();
 
         // Check fluctuation-dissipation ratio
         if (self.fluctuations.fdr - 1.0).abs() < 0.1 {
@@ -900,9 +1555,11 @@ impl ConsciousnessThermodynamicsAnalyzer {
         }
 
         // Check entropy production
-        let entropy_prod: f64 = recent.iter()
+        let entropy_prod: f64 = recent
+            .iter()
             .map(|s| s.heat / s.temperature.max(0.01))
-            .sum::<f64>() / recent.len() as f64;
+            .sum::<f64>()
+            / recent.len() as f64;
 
         if entropy_prod.abs() < 0.01 {
             EquilibriumStatus::Equilibrium
@@ -921,7 +1578,9 @@ impl ConsciousnessThermodynamicsAnalyzer {
             return 0.0;
         }
 
-        let recent: Vec<f64> = self.state_history.iter()
+        let recent: Vec<f64> = self
+            .state_history
+            .iter()
             .rev()
             .take(10)
             .map(|s| s.heat / s.temperature.max(0.01))
@@ -945,7 +1604,9 @@ impl ConsciousnessThermodynamicsAnalyzer {
         // Check for approaching critical point
         if current.temperature > 0.35 && current.temperature < 0.5 {
             let trend: f64 = {
-                let temps: Vec<f64> = self.state_history.iter()
+                let temps: Vec<f64> = self
+                    .state_history
+                    .iter()
                     .rev()
                     .take(5)
                     .map(|s| s.temperature)
@@ -968,7 +1629,9 @@ impl ConsciousnessThermodynamicsAnalyzer {
         // Check for flow state emergence
         if current.entropy < 0.4 && current.phase != ConsciousnessPhase::Flow {
             let entropy_trend: f64 = {
-                let entropies: Vec<f64> = self.state_history.iter()
+                let entropies: Vec<f64> = self
+                    .state_history
+                    .iter()
                     .rev()
                     .take(5)
                     .map(|s| s.entropy)
@@ -1221,8 +1884,16 @@ mod tests {
 
         // Should have concentrated distribution and high energy
         // Note: entropy is normalized 0-1, concentrated distribution gives lower entropy
-        assert!(state.entropy < 0.85, "Entropy {} should be < 0.85 for concentrated distribution", state.entropy);
-        assert!(state.internal_energy > 0.1, "Internal energy {} should be positive", state.internal_energy);
+        assert!(
+            state.entropy < 0.85,
+            "Entropy {} should be < 0.85 for concentrated distribution",
+            state.entropy
+        );
+        assert!(
+            state.internal_energy > 0.1,
+            "Internal energy {} should be positive",
+            state.internal_energy
+        );
     }
 
     #[test]
@@ -1305,7 +1976,10 @@ mod tests {
         let report = analyzer.generate_report();
 
         assert!(report.health_score >= 0.0 && report.health_score <= 1.0);
-        assert!(!report.recommendations.is_empty() || report.current_state.phase == ConsciousnessPhase::Normal);
+        assert!(
+            !report.recommendations.is_empty()
+                || report.current_state.phase == ConsciousnessPhase::Normal
+        );
     }
 
     #[test]
