@@ -1114,12 +1114,21 @@ impl DatabaseClient for LanceClientWrapper {
 // ============================================================================
 
 /// DuckDB client for analytical queries (Epistemic Auditor)
-#[derive(Debug)]
 pub struct DuckClientWrapper {
     config: DuckDbConfig,
     #[cfg(feature = "duck")]
-    _conn: Option<()>,  // Placeholder for actual duckdb::Connection
+    conn: std::sync::Mutex<Option<duckdb::Connection>>,
     connected: std::sync::atomic::AtomicBool,
+}
+
+// Manual Debug impl because duckdb::Connection doesn't implement Debug
+impl std::fmt::Debug for DuckClientWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DuckClientWrapper")
+            .field("config", &self.config)
+            .field("connected", &self.connected.load(std::sync::atomic::Ordering::SeqCst))
+            .finish()
+    }
 }
 
 impl DuckClientWrapper {
@@ -1127,7 +1136,7 @@ impl DuckClientWrapper {
         Self {
             config,
             #[cfg(feature = "duck")]
-            _conn: None,
+            conn: std::sync::Mutex::new(None),
             connected: std::sync::atomic::AtomicBool::new(false),
         }
     }
@@ -1135,8 +1144,32 @@ impl DuckClientWrapper {
     /// Open DuckDB database
     #[cfg(feature = "duck")]
     pub fn open(&mut self) -> DatabaseResult<()> {
-        // When duck feature is enabled:
-        // self._conn = Some(duckdb::Connection::open(&self.config.database_path)?);
+        use duckdb::Config;
+
+        let db_config = Config::default()
+            .threads(self.config.threads as u32)
+            .map_err(|e| DatabaseError::ConnectionFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+
+        let connection = if self.config.database_path == ":memory:" {
+            duckdb::Connection::open_in_memory_with_flags(db_config)
+        } else {
+            duckdb::Connection::open_with_flags(&self.config.database_path, db_config)
+        }.map_err(|e| DatabaseError::ConnectionFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+
+        // Initialize schema for Phi metrics storage
+        connection.execute(
+            "CREATE TABLE IF NOT EXISTS phi_metrics (
+                id INTEGER PRIMARY KEY,
+                phi_value DOUBLE NOT NULL,
+                timestamp_ms BIGINT NOT NULL,
+                topology_id TEXT,
+                node_count INTEGER,
+                metadata JSON
+            )",
+            [],
+        ).map_err(|e| DatabaseError::ConnectionFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+
+        *self.conn.lock().unwrap() = Some(connection);
         self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
@@ -1152,8 +1185,41 @@ impl DuckClientWrapper {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("DuckDB".to_string()));
         }
-        let _ = sql;
-        Ok(vec![])
+
+        let guard = self.conn.lock().unwrap();
+        let conn = guard.as_ref()
+            .ok_or_else(|| DatabaseError::Unavailable("DuckDB connection not open".to_string()))?;
+
+        let mut stmt = conn.prepare(sql)
+            .map_err(|e| DatabaseError::QueryFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+
+        let column_count = stmt.column_count();
+        let column_names: Vec<String> = (0..column_count)
+            .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
+            .collect();
+
+        let rows = stmt.query_map([], |row| {
+            let mut map = HashMap::new();
+            for (i, name) in column_names.iter().enumerate() {
+                // Try to extract as different types
+                let value: serde_json::Value = if let Ok(v) = row.get::<_, i64>(i) {
+                    serde_json::Value::Number(v.into())
+                } else if let Ok(v) = row.get::<_, f64>(i) {
+                    serde_json::Number::from_f64(v)
+                        .map(serde_json::Value::Number)
+                        .unwrap_or(serde_json::Value::Null)
+                } else if let Ok(v) = row.get::<_, String>(i) {
+                    serde_json::Value::String(v)
+                } else {
+                    serde_json::Value::Null
+                };
+                map.insert(name.clone(), value);
+            }
+            Ok(map)
+        }).map_err(|e| DatabaseError::QueryFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+
+        let results: Vec<_> = rows.filter_map(|r| r.ok()).collect();
+        Ok(results)
     }
 
     #[cfg(not(feature = "duck"))]
@@ -1167,7 +1233,61 @@ impl DuckClientWrapper {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("DuckDB".to_string()));
         }
-        Ok(PhiStatistics::default())
+
+        let guard = self.conn.lock().unwrap();
+        let conn = guard.as_ref()
+            .ok_or_else(|| DatabaseError::Unavailable("DuckDB connection not open".to_string()))?;
+
+        let mut stmt = conn.prepare(
+            "SELECT
+                AVG(phi_value) as mean_phi,
+                MAX(phi_value) as max_phi,
+                MIN(phi_value) as min_phi,
+                STDDEV(phi_value) as std_phi,
+                COUNT(*) as sample_count
+             FROM phi_metrics"
+        ).map_err(|e| DatabaseError::QueryFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+
+        let result = stmt.query_row([], |row| {
+            Ok(PhiStatistics {
+                mean_phi: row.get::<_, f64>(0).unwrap_or(0.0),
+                max_phi: row.get::<_, f64>(1).unwrap_or(0.0),
+                min_phi: row.get::<_, f64>(2).unwrap_or(0.0),
+                std_phi: row.get::<_, f64>(3).unwrap_or(0.0),
+                sample_count: row.get::<_, i64>(4).unwrap_or(0) as u64,
+            })
+        }).unwrap_or_default();
+
+        Ok(result)
+    }
+
+    /// Store a Phi measurement
+    #[cfg(feature = "duck")]
+    pub fn store_phi_metric(&self, phi_value: f64, topology_id: Option<&str>, node_count: Option<i32>) -> DatabaseResult<()> {
+        if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(DatabaseError::Unavailable("DuckDB".to_string()));
+        }
+
+        let guard = self.conn.lock().unwrap();
+        let conn = guard.as_ref()
+            .ok_or_else(|| DatabaseError::Unavailable("DuckDB connection not open".to_string()))?;
+
+        let timestamp_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+
+        conn.execute(
+            "INSERT INTO phi_metrics (phi_value, timestamp_ms, topology_id, node_count) VALUES (?, ?, ?, ?)",
+            duckdb::params![phi_value, timestamp_ms, topology_id, node_count],
+        ).map_err(|e| DatabaseError::QueryFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+
+        Ok(())
+    }
+
+    #[cfg(not(feature = "duck"))]
+    pub fn store_phi_metric(&self, _phi_value: f64, _topology_id: Option<&str>, _node_count: Option<i32>) -> DatabaseResult<()> {
+        Err(DatabaseError::FeatureNotEnabled("duck".to_string()))
     }
 
     #[cfg(not(feature = "duck"))]
