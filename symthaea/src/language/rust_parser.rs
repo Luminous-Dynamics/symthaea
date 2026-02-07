@@ -4,7 +4,6 @@
 //! enums, traits, impls, use statements, lifetime annotations, generic bounds,
 //! unsafe blocks, and macro invocations.
 
-use std::collections::HashMap;
 use tree_sitter::Parser;
 
 use super::code_parser::*;

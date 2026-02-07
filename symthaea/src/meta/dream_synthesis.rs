@@ -88,10 +88,10 @@ impl DreamSynthesizer {
         let mut pool: Vec<(&str, &RealHV)> = Vec::new();
 
         // We don't have names from the HV references alone, so use indices
-        for (i, hv) in func_hvs.iter().enumerate() {
+        for (_i, hv) in func_hvs.iter().enumerate() {
             pool.push(("function", hv));
         }
-        for (i, hv) in type_hvs.iter().enumerate() {
+        for (_i, hv) in type_hvs.iter().enumerate() {
             pool.push(("type", hv));
         }
 

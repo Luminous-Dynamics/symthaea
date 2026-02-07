@@ -547,7 +547,7 @@ pub enum CausalCategory {
 
 /// Causal Reasoning Engine for physics
 pub struct CausalReasoningEngine {
-    genesis: GenesisSeed,
+    _genesis: GenesisSeed,
 
     // Phenomenon vectors
     phenomena: std::collections::HashMap<String, ContinuousHV>,
@@ -625,7 +625,7 @@ impl CausalReasoningEngine {
         factors.insert("high_temperature".to_string(),
             (genesis.hv("cause::high_temperature", PHYSICS_DIM), CausalCategory::Thermodynamic));
 
-        Self { genesis: genesis.clone(), phenomena, factors }
+        Self { _genesis: genesis.clone(), phenomena, factors }
     }
 
     /// Query: "What causes phenomenon X?"

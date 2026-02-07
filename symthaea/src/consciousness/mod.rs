@@ -31,6 +31,7 @@ pub mod phi_attention;
 pub mod primitive_composition_rules;
 pub mod primitive_discovery;
 pub mod primitive_evolution;
+pub mod primitive_lattice;
 pub mod primitive_reasoning;
 pub mod semantic_value_embedder;
 pub mod seven_harmonies;
@@ -420,7 +421,9 @@ pub mod primitive_validation;
 // ── Tier 3: Consciousness Integration ──────────────────────────────────────
 pub mod compositionality_primitives;
 pub mod consciousness_signatures;
+pub mod causal_calculus;
 pub mod causal_emergence;
+pub mod factor_graph;
 
 pub mod dimension_synergies;
 
@@ -433,12 +436,16 @@ pub mod consciousness_field_dynamics;
 pub mod consciousness_holography;
 pub mod consciousness_resonance;
 pub mod consciousness_topology;
+/// Hodge Laplacian for simplicial complexes -- rigorous Betti numbers, spectral
+/// analysis, and Hodge decomposition of higher-order neural interaction signals
+pub mod hodge_laplacian;
 pub mod dissipative_consciousness;
 pub mod embodied_cognition;
 pub mod enactive_cognition;
 pub mod meta_cognitive_optimizer;
 pub mod phenomenal_binding;
 pub mod predictive_processing;
+pub mod hierarchical_free_energy;
 pub mod predictive_self;
 pub mod quantum_coherence;
 pub mod sensorimotor_contingencies;

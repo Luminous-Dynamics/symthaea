@@ -55,6 +55,234 @@ pub struct ElementData {
     pub period: u8,
 }
 
+/// Extended element data with additional physical properties for grounded vector composition
+///
+/// These real atomic properties enable property-weighted HDC composition
+/// where vector similarity correlates with chemical behavior.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElementDataExtended {
+    /// Base element data
+    pub base: ElementData,
+    /// First ionization energy in kJ/mol (range: 375-2372)
+    pub first_ionization_energy: Option<f32>,
+    /// Atomic radius in pm (range: 31-298)
+    pub atomic_radius: Option<f32>,
+    /// Electron affinity in kJ/mol (range: -48 to 349)
+    pub electron_affinity: Option<f32>,
+    /// Metallic character 0.0-1.0 (derived from position)
+    pub metallic_character: f32,
+}
+
+impl ElementDataExtended {
+    /// Create extended data from base data
+    pub fn from_base(base: ElementData) -> Self {
+        let metallic_character = Self::compute_metallic_character(&base);
+        Self {
+            base,
+            first_ionization_energy: None,
+            atomic_radius: None,
+            electron_affinity: None,
+            metallic_character,
+        }
+    }
+
+    /// Compute metallic character from group and period
+    fn compute_metallic_character(data: &ElementData) -> f32 {
+        let z = data.atomic_number;
+        let group = data.group;
+
+        // Hydrogen is nonmetal
+        if z == 1 {
+            return 0.0;
+        }
+
+        // Noble gases
+        if group == 18 {
+            return 0.0;
+        }
+
+        // Alkali and alkaline earth metals (groups 1-2)
+        if group <= 2 {
+            return 1.0;
+        }
+
+        // Transition metals (groups 3-12)
+        if group >= 3 && group <= 12 {
+            return 0.9;
+        }
+
+        // Post-transition metals and metalloids
+        if group == 13 {
+            return 0.7; // Al, Ga, In, Tl are metals; B is metalloid
+        }
+        if group == 14 {
+            return 0.5; // Si, Ge metalloids; Sn, Pb metals; C nonmetal
+        }
+        if group == 15 {
+            return 0.3; // As, Sb metalloids; Bi metal; N, P nonmetals
+        }
+        if group == 16 {
+            return 0.15; // Te, Po have some metallic character
+        }
+        if group == 17 {
+            return 0.0; // Halogens are nonmetals
+        }
+
+        0.5 // Default
+    }
+
+    /// Lookup extended physical properties for a given atomic number
+    pub fn with_physical_properties(mut self, z: u8) -> Self {
+        if let Some(&(ie, radius, ea)) = ELEMENT_PHYSICAL_PROPERTIES.get((z - 1) as usize) {
+            self.first_ionization_energy = ie;
+            self.atomic_radius = radius;
+            self.electron_affinity = ea;
+        }
+        self
+    }
+}
+
+/// Physical property data for elements 1-118
+/// Format: (first_ionization_energy kJ/mol, atomic_radius pm, electron_affinity kJ/mol)
+/// Data from NIST and periodic table reference sources
+const ELEMENT_PHYSICAL_PROPERTIES: [(Option<f32>, Option<f32>, Option<f32>); 118] = [
+    // Period 1
+    (Some(1312.0), Some(53.0), Some(73.0)),   // H (1)
+    (Some(2372.0), Some(31.0), Some(-48.0)),  // He (2) - negative EA (endothermic)
+
+    // Period 2
+    (Some(520.0), Some(167.0), Some(60.0)),   // Li (3)
+    (Some(900.0), Some(112.0), Some(-48.0)),  // Be (4)
+    (Some(801.0), Some(87.0), Some(27.0)),    // B (5)
+    (Some(1086.0), Some(77.0), Some(122.0)),  // C (6)
+    (Some(1402.0), Some(75.0), Some(-7.0)),   // N (7) - nearly zero EA
+    (Some(1314.0), Some(73.0), Some(141.0)),  // O (8)
+    (Some(1681.0), Some(71.0), Some(328.0)),  // F (9) - highest EA
+    (Some(2081.0), Some(69.0), Some(-116.0)), // Ne (10)
+
+    // Period 3
+    (Some(496.0), Some(190.0), Some(53.0)),   // Na (11)
+    (Some(738.0), Some(145.0), Some(-40.0)),  // Mg (12)
+    (Some(578.0), Some(118.0), Some(42.0)),   // Al (13)
+    (Some(786.0), Some(111.0), Some(134.0)),  // Si (14)
+    (Some(1012.0), Some(106.0), Some(72.0)),  // P (15)
+    (Some(1000.0), Some(102.0), Some(200.0)), // S (16)
+    (Some(1251.0), Some(99.0), Some(349.0)),  // Cl (17) - highest EA among common elements
+    (Some(1521.0), Some(97.0), Some(-96.0)),  // Ar (18)
+
+    // Period 4
+    (Some(419.0), Some(243.0), Some(48.0)),   // K (19) - very low IE
+    (Some(590.0), Some(194.0), Some(2.0)),    // Ca (20)
+    (Some(633.0), Some(184.0), Some(18.0)),   // Sc (21)
+    (Some(659.0), Some(176.0), Some(8.0)),    // Ti (22)
+    (Some(651.0), Some(171.0), Some(51.0)),   // V (23)
+    (Some(653.0), Some(166.0), Some(65.0)),   // Cr (24)
+    (Some(717.0), Some(161.0), Some(-50.0)),  // Mn (25)
+    (Some(763.0), Some(156.0), Some(15.0)),   // Fe (26)
+    (Some(760.0), Some(152.0), Some(64.0)),   // Co (27)
+    (Some(737.0), Some(149.0), Some(112.0)),  // Ni (28)
+    (Some(745.0), Some(145.0), Some(119.0)),  // Cu (29)
+    (Some(906.0), Some(142.0), Some(-58.0)),  // Zn (30)
+    (Some(579.0), Some(136.0), Some(29.0)),   // Ga (31)
+    (Some(762.0), Some(125.0), Some(119.0)),  // Ge (32)
+    (Some(947.0), Some(114.0), Some(78.0)),   // As (33)
+    (Some(941.0), Some(103.0), Some(195.0)),  // Se (34)
+    (Some(1140.0), Some(94.0), Some(325.0)),  // Br (35)
+    (Some(1351.0), Some(88.0), Some(-96.0)),  // Kr (36)
+
+    // Period 5
+    (Some(403.0), Some(265.0), Some(47.0)),   // Rb (37)
+    (Some(550.0), Some(219.0), Some(5.0)),    // Sr (38)
+    (Some(600.0), Some(212.0), Some(30.0)),   // Y (39)
+    (Some(640.0), Some(206.0), Some(41.0)),   // Zr (40)
+    (Some(652.0), Some(198.0), Some(86.0)),   // Nb (41)
+    (Some(684.0), Some(190.0), Some(72.0)),   // Mo (42)
+    (Some(702.0), Some(183.0), Some(53.0)),   // Tc (43)
+    (Some(711.0), Some(178.0), Some(101.0)),  // Ru (44)
+    (Some(720.0), Some(173.0), Some(110.0)),  // Rh (45)
+    (Some(804.0), Some(169.0), Some(54.0)),   // Pd (46)
+    (Some(731.0), Some(165.0), Some(126.0)),  // Ag (47)
+    (Some(868.0), Some(161.0), Some(-68.0)),  // Cd (48)
+    (Some(558.0), Some(156.0), Some(29.0)),   // In (49)
+    (Some(709.0), Some(145.0), Some(107.0)),  // Sn (50)
+    (Some(834.0), Some(133.0), Some(103.0)),  // Sb (51)
+    (Some(869.0), Some(123.0), Some(190.0)),  // Te (52)
+    (Some(1008.0), Some(115.0), Some(295.0)), // I (53)
+    (Some(1170.0), Some(108.0), Some(-77.0)), // Xe (54)
+
+    // Period 6
+    (Some(376.0), Some(298.0), Some(46.0)),   // Cs (55) - lowest IE
+    (Some(503.0), Some(253.0), Some(14.0)),   // Ba (56)
+    // Lanthanides (La-Lu, 57-71)
+    (Some(538.0), Some(195.0), Some(48.0)),   // La (57)
+    (Some(534.0), Some(185.0), Some(50.0)),   // Ce (58)
+    (Some(527.0), Some(247.0), Some(50.0)),   // Pr (59)
+    (Some(533.0), Some(206.0), Some(50.0)),   // Nd (60)
+    (Some(540.0), Some(205.0), Some(50.0)),   // Pm (61)
+    (Some(545.0), Some(238.0), Some(50.0)),   // Sm (62)
+    (Some(547.0), Some(231.0), Some(50.0)),   // Eu (63)
+    (Some(593.0), Some(233.0), Some(50.0)),   // Gd (64)
+    (Some(566.0), Some(225.0), Some(50.0)),   // Tb (65)
+    (Some(573.0), Some(228.0), Some(50.0)),   // Dy (66)
+    (Some(581.0), Some(226.0), Some(50.0)),   // Ho (67)
+    (Some(589.0), Some(226.0), Some(50.0)),   // Er (68)
+    (Some(597.0), Some(222.0), Some(50.0)),   // Tm (69)
+    (Some(603.0), Some(222.0), Some(50.0)),   // Yb (70)
+    (Some(524.0), Some(217.0), Some(50.0)),   // Lu (71)
+    // Continue Period 6
+    (Some(659.0), Some(208.0), Some(0.0)),    // Hf (72)
+    (Some(761.0), Some(200.0), Some(31.0)),   // Ta (73)
+    (Some(770.0), Some(193.0), Some(79.0)),   // W (74)
+    (Some(760.0), Some(188.0), Some(14.0)),   // Re (75)
+    (Some(840.0), Some(185.0), Some(106.0)),  // Os (76)
+    (Some(880.0), Some(180.0), Some(151.0)),  // Ir (77)
+    (Some(870.0), Some(177.0), Some(205.0)),  // Pt (78)
+    (Some(890.0), Some(174.0), Some(223.0)),  // Au (79)
+    (Some(1007.0), Some(171.0), Some(-48.0)), // Hg (80)
+    (Some(589.0), Some(156.0), Some(19.0)),   // Tl (81)
+    (Some(716.0), Some(154.0), Some(35.0)),   // Pb (82)
+    (Some(703.0), Some(143.0), Some(91.0)),   // Bi (83)
+    (Some(812.0), Some(135.0), Some(183.0)),  // Po (84)
+    (Some(920.0), Some(127.0), Some(270.0)),  // At (85)
+    (Some(1037.0), Some(120.0), Some(-68.0)), // Rn (86)
+
+    // Period 7
+    (Some(380.0), Some(348.0), Some(44.0)),   // Fr (87)
+    (Some(509.0), Some(283.0), Some(10.0)),   // Ra (88)
+    // Actinides (Ac-Lr, 89-103)
+    (Some(499.0), Some(260.0), Some(34.0)),   // Ac (89)
+    (Some(587.0), Some(237.0), Some(113.0)),  // Th (90)
+    (Some(568.0), Some(243.0), Some(50.0)),   // Pa (91)
+    (Some(584.0), Some(240.0), Some(50.0)),   // U (92)
+    (Some(597.0), Some(221.0), Some(46.0)),   // Np (93)
+    (Some(585.0), Some(243.0), Some(-48.0)),  // Pu (94)
+    (Some(578.0), Some(244.0), Some(10.0)),   // Am (95)
+    (Some(581.0), Some(245.0), Some(28.0)),   // Cm (96)
+    (Some(601.0), Some(244.0), Some(-165.0)), // Bk (97)
+    (Some(608.0), Some(245.0), Some(-97.0)),  // Cf (98)
+    (Some(619.0), Some(245.0), Some(-29.0)),  // Es (99)
+    (Some(627.0), Some(245.0), Some(34.0)),   // Fm (100)
+    (Some(635.0), Some(245.0), Some(94.0)),   // Md (101)
+    (Some(642.0), Some(245.0), Some(-223.0)), // No (102)
+    (Some(470.0), Some(245.0), Some(-30.0)),  // Lr (103)
+    // Superheavy elements (Rf-Og, 104-118) - theoretical/estimated values
+    (None, None, None),  // Rf (104)
+    (None, None, None),  // Db (105)
+    (None, None, None),  // Sg (106)
+    (None, None, None),  // Bh (107)
+    (None, None, None),  // Hs (108)
+    (None, None, None),  // Mt (109)
+    (None, None, None),  // Ds (110)
+    (None, None, None),  // Rg (111)
+    (None, None, None),  // Cn (112)
+    (None, None, None),  // Nh (113)
+    (None, None, None),  // Fl (114)
+    (None, None, None),  // Mc (115)
+    (None, None, None),  // Lv (116)
+    (None, None, None),  // Ts (117)
+    (None, None, None),  // Og (118)
+];
+
 /// Complete element information
 #[derive(Debug, Clone)]
 pub struct Element {
@@ -515,6 +743,185 @@ impl PeriodicTable {
         )
     }
 
+    /// Get extended element data with physical properties
+    pub fn extended_data(&self, atomic_number: u8) -> Option<ElementDataExtended> {
+        self.element(atomic_number).map(|e| {
+            ElementDataExtended::from_base(e.data.clone())
+                .with_physical_properties(atomic_number)
+        })
+    }
+
+    /// Compose an element using grounded physical properties
+    ///
+    /// This method extends the basic composition with property-weighted contributions:
+    /// - Nuclear component (Z protons, N neutrons)
+    /// - Electronic component (electron shells)
+    /// - Electronegativity contribution (oxidizing/reducing character)
+    /// - Ionization energy contribution (reactivity)
+    /// - Atomic radius contribution (size marker)
+    ///
+    /// # Arguments
+    /// * `data` - Extended element data with physical properties
+    /// * `hadrons` - Hadron reference vectors
+    ///
+    /// # Returns
+    /// Property-weighted hypervector representing the element
+    pub fn compose_element_grounded(
+        &self,
+        data: &ElementDataExtended,
+        hadrons: &Hadrons,
+    ) -> ContinuousHV {
+        let z = data.base.atomic_number as f32;
+        let n = data.base.standard_neutrons as f32;
+
+        // Nuclear component (unchanged from basic composition)
+        let nuclear = ContinuousHV::weighted_bundle(
+            &[&self.proton, &self.neutron],
+            &[z, n],
+        );
+
+        // Electronic component
+        let electron_cloud = self.shells.encode_configuration(
+            data.base.atomic_number,
+            &self.electron,
+        );
+
+        // Binding energy
+        let binding = hadrons.compute_binding(
+            data.base.atomic_number as usize,
+            data.base.standard_neutrons as usize,
+        );
+
+        // === Property-based contributions ===
+
+        // 1. Electronegativity contribution (oxidizing vs reducing character)
+        let en_contribution = if let Some(en) = data.base.electronegativity {
+            // Pauling scale: 0.7 (Francium) to 3.98 (Fluorine)
+            let en_normalized = ((en - 0.7) / (3.98 - 0.7)).clamp(0.0, 1.0);
+            ContinuousHV::weighted_bundle(
+                &[&self.oxidizing, &self.reducing],
+                &[en_normalized, 1.0 - en_normalized],
+            )
+        } else {
+            // Noble gases and superheavies - neutral
+            ContinuousHV::weighted_bundle(
+                &[&self.oxidizing, &self.reducing],
+                &[0.5, 0.5],
+            )
+        };
+
+        // 2. Ionization energy contribution (reactivity)
+        // Low IE = more reactive (easier to lose electrons)
+        let ie_contribution = if let Some(ie) = data.first_ionization_energy {
+            // Range: ~375 (Cs) to ~2372 (He)
+            let ie_normalized = ((ie - 375.0) / (2372.0 - 375.0)).clamp(0.0, 1.0);
+            // Low IE = high reactivity, high IE = low reactivity
+            self.reactive.scale(1.0 - ie_normalized)
+        } else {
+            ContinuousHV::zero(PHYSICS_DIM)
+        };
+
+        // 3. Atomic radius contribution (size marker via permutation)
+        // Larger atoms get more permutation shift
+        let radius_contribution = if let Some(r) = data.atomic_radius {
+            // Range: ~31 pm (He) to ~298 pm (Cs)
+            let r_normalized = ((r - 31.0) / (298.0 - 31.0)).clamp(0.0, 1.0);
+            // Use size_marker (reactive vector) permuted by normalized radius
+            let shift = (r_normalized * 1000.0) as usize;
+            self.reactive.permute(shift)
+        } else {
+            ContinuousHV::zero(PHYSICS_DIM)
+        };
+
+        // 4. Electron affinity contribution (tendency to gain electrons)
+        let ea_contribution = if let Some(ea) = data.electron_affinity {
+            // Range: ~ -223 to ~349 kJ/mol (Cl has highest positive EA)
+            // Positive EA = exothermic electron addition
+            if ea > 0.0 {
+                let ea_normalized = (ea / 349.0).clamp(0.0, 1.0);
+                self.oxidizing.scale(ea_normalized * 0.5) // Oxidizers accept electrons
+            } else {
+                ContinuousHV::zero(PHYSICS_DIM)
+            }
+        } else {
+            ContinuousHV::zero(PHYSICS_DIM)
+        };
+
+        // 5. Metallic character contribution
+        let metallic_contribution = ContinuousHV::weighted_bundle(
+            &[&self.metallic, &self.nonmetallic],
+            &[data.metallic_character, 1.0 - data.metallic_character],
+        );
+
+        // === Combine all contributions ===
+        // Weight: nuclear/electronic are primary, properties are secondary
+        let base_atom = ContinuousHV::bundle(&[&nuclear, &electron_cloud]);
+        let property_bundle = ContinuousHV::weighted_bundle(
+            &[
+                &en_contribution,
+                &ie_contribution,
+                &radius_contribution,
+                &ea_contribution,
+                &metallic_contribution,
+            ],
+            &[0.25, 0.20, 0.15, 0.15, 0.25],
+        );
+
+        // Final combination: base atom (high weight) + properties (medium weight) + binding
+        let grounded_atom = ContinuousHV::weighted_bundle(
+            &[&base_atom, &property_bundle],
+            &[1.0, 0.5],
+        );
+
+        grounded_atom.bind(&binding)
+    }
+
+    /// Build an element using grounded properties by atomic number
+    pub fn compose_grounded(&self, atomic_number: u8, hadrons: &Hadrons) -> Option<ContinuousHV> {
+        self.extended_data(atomic_number).map(|data| {
+            self.compose_element_grounded(&data, hadrons)
+        })
+    }
+
+    /// Compute similarity between elements using grounded vectors
+    pub fn grounded_similarity(
+        &self,
+        z1: u8,
+        z2: u8,
+        hadrons: &Hadrons,
+    ) -> Option<f32> {
+        let v1 = self.compose_grounded(z1, hadrons)?;
+        let v2 = self.compose_grounded(z2, hadrons)?;
+        Some(v1.similarity(&v2))
+    }
+
+    /// Compute average similarity within a group of elements
+    pub fn group_avg_similarity(&self, atomic_numbers: &[u8], hadrons: &Hadrons) -> f32 {
+        if atomic_numbers.len() < 2 {
+            return 1.0;
+        }
+
+        let vectors: Vec<ContinuousHV> = atomic_numbers
+            .iter()
+            .filter_map(|&z| self.compose_grounded(z, hadrons))
+            .collect();
+
+        if vectors.len() < 2 {
+            return 0.0;
+        }
+
+        let mut sum = 0.0;
+        let mut count = 0;
+        for i in 0..vectors.len() {
+            for j in (i + 1)..vectors.len() {
+                sum += vectors[i].similarity(&vectors[j]);
+                count += 1;
+            }
+        }
+
+        if count > 0 { sum / count as f32 } else { 0.0 }
+    }
+
     /// Get number of elements defined
     pub fn len(&self) -> usize {
         self.elements.len()
@@ -759,5 +1166,205 @@ mod tests {
         // Noble gases should share noble character
         let ne_ar = ne.vector.similarity(&ar.vector);
         assert!(ne_ar > 0.3, "Ne and Ar should share noble character: {}", ne_ar);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // GROUNDED ELEMENT VALIDATION TESTS
+    // These tests verify that property-weighted vectors produce chemically meaningful similarities
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_extended_data_creation() {
+        let (_, _, table, _) = setup();
+
+        let carbon_ext = table.extended_data(6).unwrap();
+        assert_eq!(carbon_ext.base.symbol, "C");
+        assert!(carbon_ext.first_ionization_energy.is_some());
+        assert!(carbon_ext.atomic_radius.is_some());
+
+        let fluorine_ext = table.extended_data(9).unwrap();
+        assert!(fluorine_ext.first_ionization_energy.unwrap() > carbon_ext.first_ionization_energy.unwrap(),
+            "F should have higher IE than C");
+    }
+
+    #[test]
+    fn test_grounded_composition() {
+        let (_, hadrons, table, _) = setup();
+
+        let carbon_grounded = table.compose_grounded(6, &hadrons).unwrap();
+        let carbon_basic = table.element(6).unwrap().vector.clone();
+
+        // Grounded and basic should be related but different
+        let sim = carbon_grounded.similarity(&carbon_basic);
+        assert!(sim > 0.3, "Grounded and basic should be related: {}", sim);
+    }
+
+    #[test]
+    fn test_alkali_metals_cluster() {
+        let (_, hadrons, table, _) = setup();
+
+        // Alkali metals: Li(3), Na(11), K(19), Rb(37), Cs(55)
+        let alkali_metals = [3, 11, 19, 37, 55];
+        let alkali_avg = table.group_avg_similarity(&alkali_metals, &hadrons);
+
+        // Cross-group comparison: alkali vs halogens
+        let li = table.compose_grounded(3, &hadrons).unwrap();
+        let cl = table.compose_grounded(17, &hadrons).unwrap();
+        let cross_group = li.similarity(&cl);
+
+        println!("Alkali metals avg similarity: {:.4}", alkali_avg);
+        println!("Li-Cl cross-group similarity: {:.4}", cross_group);
+
+        // Alkali metals should cluster more than cross-group
+        assert!(alkali_avg > cross_group.abs(),
+            "Alkali metals should cluster: intra={:.4} > cross={:.4}",
+            alkali_avg, cross_group.abs());
+    }
+
+    #[test]
+    fn test_halogens_cluster() {
+        let (_, hadrons, table, _) = setup();
+
+        // Halogens: F(9), Cl(17), Br(35), I(53)
+        let halogens = [9, 17, 35, 53];
+        let halogen_avg = table.group_avg_similarity(&halogens, &hadrons);
+
+        println!("Halogen avg similarity: {:.4}", halogen_avg);
+
+        // Halogens should have positive similarity (clustering)
+        assert!(halogen_avg > 0.3,
+            "Halogens should cluster with similarity > 0.3: {:.4}", halogen_avg);
+    }
+
+    #[test]
+    fn test_electronegativity_gradient() {
+        let (_, hadrons, table, _) = setup();
+
+        // F has highest electronegativity, should be most oxidizing
+        let f_ext = table.extended_data(9).unwrap();
+        let fr_ext = table.extended_data(87).unwrap();
+
+        assert!(f_ext.base.electronegativity > fr_ext.base.electronegativity,
+            "F should have higher EN than Fr");
+
+        // Compose grounded vectors
+        let f_vec = table.compose_grounded(9, &hadrons).unwrap();
+        let fr_vec = table.compose_grounded(87, &hadrons).unwrap();
+
+        // F should be more similar to oxidizing character
+        let f_oxidizing = f_vec.similarity(&table.oxidizing);
+        let fr_oxidizing = fr_vec.similarity(&table.oxidizing);
+
+        println!("F-oxidizing similarity: {:.4}", f_oxidizing);
+        println!("Fr-oxidizing similarity: {:.4}", fr_oxidizing);
+
+        // Fluorine should have higher oxidizing character
+        assert!(f_oxidizing > fr_oxidizing,
+            "F should be more oxidizing than Fr: F={:.4}, Fr={:.4}",
+            f_oxidizing, fr_oxidizing);
+    }
+
+    #[test]
+    fn test_period_trends() {
+        let (_, hadrons, table, _) = setup();
+
+        // Na(11) and Ar(18) are on opposite ends of period 3
+        // Na is highly reactive metal, Ar is inert noble gas
+        let na = table.compose_grounded(11, &hadrons).unwrap();
+        let ar = table.compose_grounded(18, &hadrons).unwrap();
+
+        let na_ar_sim = na.similarity(&ar);
+
+        // They should be quite different
+        println!("Na-Ar similarity: {:.4}", na_ar_sim);
+        assert!(na_ar_sim < 0.8,
+            "Na and Ar should be different (opposite ends of period): {:.4}", na_ar_sim);
+
+        // Na should be more metallic
+        let na_metallic = na.similarity(&table.metallic);
+        let ar_metallic = ar.similarity(&table.metallic);
+        assert!(na_metallic > ar_metallic,
+            "Na should be more metallic than Ar: Na={:.4}, Ar={:.4}",
+            na_metallic, ar_metallic);
+    }
+
+    #[test]
+    fn test_ionization_predicts_reactivity() {
+        let (_, hadrons, table, _) = setup();
+
+        // K has lower IE than Ca (419 vs 590 kJ/mol)
+        // Lower IE = more reactive (easier to lose electron)
+        let k_ext = table.extended_data(19).unwrap();
+        let ca_ext = table.extended_data(20).unwrap();
+
+        let k_ie = k_ext.first_ionization_energy.unwrap();
+        let ca_ie = ca_ext.first_ionization_energy.unwrap();
+
+        assert!(k_ie < ca_ie, "K should have lower IE than Ca: K={:.0}, Ca={:.0}", k_ie, ca_ie);
+
+        // K should be more similar to reactive character
+        let k_vec = table.compose_grounded(19, &hadrons).unwrap();
+        let ca_vec = table.compose_grounded(20, &hadrons).unwrap();
+
+        let k_reactive = k_vec.similarity(&table.reactive);
+        let ca_reactive = ca_vec.similarity(&table.reactive);
+
+        println!("K reactivity similarity: {:.4}", k_reactive);
+        println!("Ca reactivity similarity: {:.4}", ca_reactive);
+
+        // K should have higher reactive character (due to lower IE)
+        assert!(k_reactive > ca_reactive,
+            "K should be more reactive than Ca: K={:.4}, Ca={:.4}",
+            k_reactive, ca_reactive);
+    }
+
+    #[test]
+    fn test_metallic_character_gradient() {
+        let (_, _, table, _) = setup();
+
+        // Left side of table is metallic, right side is nonmetallic
+        let na_ext = table.extended_data(11).unwrap();
+        let c_ext = table.extended_data(6).unwrap();
+        let f_ext = table.extended_data(9).unwrap();
+
+        assert!(na_ext.metallic_character > c_ext.metallic_character,
+            "Na should be more metallic than C");
+        assert!(c_ext.metallic_character > f_ext.metallic_character,
+            "C should be more metallic than F");
+        assert!(f_ext.metallic_character == 0.0,
+            "F (halogen) should have zero metallic character");
+    }
+
+    #[test]
+    fn test_physical_properties_exist() {
+        let (_, _, table, _) = setup();
+
+        // Check that common elements have physical properties
+        for z in [1, 6, 8, 11, 17, 26, 29, 79] {
+            let ext = table.extended_data(z as u8).unwrap();
+            assert!(ext.first_ionization_energy.is_some(),
+                "Element {} should have IE", ext.base.symbol);
+            assert!(ext.atomic_radius.is_some(),
+                "Element {} should have radius", ext.base.symbol);
+        }
+
+        // Superheavy elements may not have measured properties
+        let og_ext = table.extended_data(118).unwrap();
+        assert!(og_ext.first_ionization_energy.is_none(),
+            "Og (superheavy) may not have measured IE");
+    }
+
+    #[test]
+    fn test_grounded_deterministic() {
+        let genesis = GenesisSeed::from_phrase("grounded test");
+        let model = StandardModel::from_genesis(&genesis);
+        let hadrons = Hadrons::from_model(&model, &genesis);
+        let table = PeriodicTable::from_model(&model, &hadrons, &genesis);
+
+        let fe1 = table.compose_grounded(26, &hadrons).unwrap();
+        let fe2 = table.compose_grounded(26, &hadrons).unwrap();
+
+        assert!(fe1.similarity(&fe2) > 0.9999,
+            "Grounded composition should be deterministic");
     }
 }

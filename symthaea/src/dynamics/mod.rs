@@ -30,6 +30,19 @@ pub mod resonator;
 pub mod crate_world_model;
 pub mod crystallization;
 
+// CfC/LTC stability analysis: Jacobian, Lyapunov exponents, bifurcations
+pub mod stability_analysis;
+
+// Advanced ODE solvers for continuous-time neural dynamics (Euler, RK4,
+// Dormand-Prince, Implicit Midpoint, Backward Euler, Exponential Integrator)
+pub mod ode_solvers;
+
+// Frequency-domain analysis for neural dynamics signals
+pub mod spectral_analysis;
+
+// Stochastic differential equations for neural noise modeling
+pub mod stochastic_dynamics;
+
 // Code understanding dynamics (Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]
 pub mod cfc_code_sequencer;
@@ -243,11 +256,35 @@ pub use hierarchical_cfc::{
 pub use cfc_gpu::{GpuCfcNetwork, GpuCfcConfig, GpuCfcStats, GpuBackend};
 
 // Ported from crates/symthaea-dynamics (2026-02-06)
-pub use ltc::{LiquidNetwork, LiquidNetworkConfig, CsrMatrix};
+pub use ltc::{LiquidNetwork, LiquidNetworkConfig, CsrMatrix, IntegrationMethod};
 pub use differentiable_hdc::{DifferentiableHDCEncoder, DifferentiableHDCConfig, HDCEncoder};
 pub use resonator::{ResonatorNetwork, ResonatorConfig, ResonatorMemory, Codebook, Episode};
 pub use crystallization::{
     ConceptCrystallizer, CrystallizationConfig,
     CrystalizedConcept as AttractorConcept,  // Alias to avoid conflict with existing CrystalizedConcept
     RecurrenceAnalyzer, UnifiedLearningMind, StepResult,
+};
+
+// Stability analysis for CfC/LTC dynamics
+pub use stability_analysis::{
+    StabilityAnalyzer, StabilityConfig, JacobianResult, LyapunovResult,
+    FixedPoint, FixedPointType, BifurcationPoint, BifurcationType,
+};
+
+// ODE solvers for continuous-time neural dynamics
+pub use ode_solvers::{
+    OdeSolver, OdeConfig, OdeResult, OdeSolverEngine, OdeSystem, newton_solve,
+};
+
+// Frequency-domain spectral analysis
+pub use spectral_analysis::{
+    SpectralAnalyzer, SpectralConfig, WindowType, Complex,
+    FrequencySpectrum, CoherenceResult, BandPower,
+};
+
+// Stochastic differential equations
+pub use stochastic_dynamics::{
+    SdeSystem, SdeConfig, SdeSolver, SdeResult, SdeStatistics,
+    OrnsteinUhlenbeck, StochasticCfC, FokkerPlanckSolver, LangevinDynamics,
+    SimpleRng,
 };

@@ -18,14 +18,13 @@
 //! GeneratedCode (verified)
 //! ```
 
-use std::collections::HashMap;
 
 use symthaea_core::hdc::RealHV;
 
 use super::code_intent::{CodeIntent, CodeSpec, CodeTarget, CodeChange};
-use super::code_parser::{EntityKind, ParsedCode};
+use super::code_parser::EntityKind;
 use super::emitters::{CodeEmitter, RustEmitter, PythonEmitter, NixEmitter};
-use crate::dynamics::cfc_code_sequencer::{CfCCodeSequencer, CodePlanStep, PlanAction};
+use crate::dynamics::cfc_code_sequencer::{CfCCodeSequencer, CodePlanStep};
 use crate::hdc::code_algebra::CodeAlgebra;
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::hdc::code_memory::CodebaseMemory;
@@ -71,7 +70,7 @@ impl<'a> Default for CodeContext<'a> {
 /// The main code generation engine
 pub struct CodeGenerator {
     encoder: CodeHDEncoder,
-    algebra: CodeAlgebra,
+    _algebra: CodeAlgebra,
     sequencer: CfCCodeSequencer,
     rust_emitter: RustEmitter,
     python_emitter: PythonEmitter,
@@ -91,7 +90,7 @@ impl CodeGenerator {
 
         Self {
             encoder,
-            algebra,
+            _algebra: algebra,
             sequencer,
             rust_emitter: RustEmitter,
             python_emitter: PythonEmitter,
@@ -124,7 +123,7 @@ impl CodeGenerator {
     /// Generate new code from a specification
     fn generate_create(
         &self,
-        target: &CodeTarget,
+        _target: &CodeTarget,
         spec: &CodeSpec,
         context: &CodeContext,
     ) -> GeneratedCode {

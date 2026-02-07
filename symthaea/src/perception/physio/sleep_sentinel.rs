@@ -688,6 +688,8 @@ impl AdaptiveThreshold {
             theta_power: metrics.theta_power,
             alpha_power: metrics.alpha_power,
             beta_power: metrics.beta_power,
+            gamma_power: metrics.gamma_power,
+            spectral_entropy: metrics.spectral_entropy,
         }
     }
 
@@ -817,6 +819,8 @@ pub struct SleepSentinelConfig {
     pub enable_adaptive_thresholds: bool,
     /// Configuration for adaptive threshold learning
     pub adaptive_config: AdaptiveThresholdConfig,
+    /// Use spectral_analysis module (Welch PSD) instead of moving-average filters
+    pub use_spectral_analysis: bool,
 }
 
 impl Default for SleepSentinelConfig {
@@ -838,6 +842,7 @@ impl Default for SleepSentinelConfig {
             synchrony_threshold: 0.55,   // Lowered from 0.7 - correlation varies more
             enable_adaptive_thresholds: true,
             adaptive_config: AdaptiveThresholdConfig::default(),
+            use_spectral_analysis: false,
         }
     }
 }
@@ -905,6 +910,10 @@ pub struct IntegrationMetrics {
     pub alpha_power: f32,
     /// Beta band power (12-30 Hz) - high in alert wake
     pub beta_power: f32,
+    /// Gamma band power (30-100 Hz) - high in conscious binding
+    pub gamma_power: f32,
+    /// Spectral entropy (higher = more complex, broadband signal)
+    pub spectral_entropy: f32,
 }
 
 impl Default for IntegrationMetrics {
@@ -921,12 +930,14 @@ impl Default for IntegrationMetrics {
             theta_power: 0.0,
             alpha_power: 0.0,
             beta_power: 0.0,
+            gamma_power: 0.0,
+            spectral_entropy: 0.0,
         }
     }
 }
 
-/// Compute frequency band powers using simple zero-crossing rate estimation
-/// This is a lightweight alternative to FFT that works with LTC dynamics
+/// Compute frequency band powers using moving average bandpass filtering
+/// This approximation works well with the current scoring thresholds
 fn compute_band_powers(signal: &[f32], sample_rate: f32) -> (f32, f32, f32, f32) {
     if signal.len() < 10 {
         return (0.0, 0.0, 0.0, 0.0);
@@ -1001,6 +1012,48 @@ fn moving_average(signal: &[f32], window: usize) -> Vec<f32> {
     }
 
     result
+}
+
+/// Compute frequency band powers using Welch PSD from spectral_analysis module.
+///
+/// Returns (delta, theta, alpha, beta, gamma, spectral_entropy) as normalized ratios.
+/// This is more accurate than the moving-average approximation in `compute_band_powers`.
+fn compute_band_powers_spectral(signal: &[f32], sample_rate: f32) -> (f32, f32, f32, f32, f32, f32) {
+    use crate::dynamics::spectral_analysis::{SpectralAnalyzer, SpectralConfig, WindowType};
+
+    if signal.len() < 32 {
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    }
+
+    // Convert f32 signal to f64 for spectral_analysis module
+    let signal_f64: Vec<f64> = signal.iter().map(|&x| x as f64).collect();
+
+    // Configure for EEG analysis: window size ~2 seconds of data
+    let window_size = (2.0 * sample_rate as f64) as usize;
+    let window_size = window_size.next_power_of_two().min(signal.len());
+    let config = SpectralConfig {
+        sample_rate: sample_rate as f64,
+        window_size,
+        overlap: 0.5,
+        window_type: WindowType::Hann,
+    };
+    let analyzer = SpectralAnalyzer::new(config);
+
+    // Get band powers via Welch PSD
+    let bands = analyzer.band_power(&signal_f64);
+
+    // Normalize to ratios (sum to ~1)
+    let total = bands.total.max(1e-12);
+    let delta = (bands.delta / total) as f32;
+    let theta = (bands.theta / total) as f32;
+    let alpha = (bands.alpha / total) as f32;
+    let beta = (bands.beta / total) as f32;
+    let gamma = (bands.gamma / total) as f32;
+
+    // Compute spectral entropy
+    let entropy = analyzer.spectral_entropy(&signal_f64) as f32;
+
+    (delta, theta, alpha, beta, gamma, entropy)
 }
 
 /// Sleep Sentinel - Dual-channel LTC for consciousness detection
@@ -1461,13 +1514,25 @@ impl SleepSentinel {
         // This captures the spectral content that LTC dynamics might miss
         let sample_rate = 100.0; // Sleep-EDF standard is 100 Hz
         let frontal_f32: Vec<f32> = frontal_data.iter().map(|&x| x as f32).collect();
-        let (delta, theta, alpha, beta) = compute_band_powers(&frontal_f32, sample_rate);
 
-        // Store band powers in metrics (will be updated during processing)
-        self.current_metrics.delta_power = delta;
-        self.current_metrics.theta_power = theta;
-        self.current_metrics.alpha_power = alpha;
-        self.current_metrics.beta_power = beta;
+        if self.config.use_spectral_analysis {
+            // Use proper Welch PSD from spectral_analysis module (higher accuracy)
+            let (delta, theta, alpha, beta, gamma, entropy) =
+                compute_band_powers_spectral(&frontal_f32, sample_rate);
+            self.current_metrics.delta_power = delta;
+            self.current_metrics.theta_power = theta;
+            self.current_metrics.alpha_power = alpha;
+            self.current_metrics.beta_power = beta;
+            self.current_metrics.gamma_power = gamma;
+            self.current_metrics.spectral_entropy = entropy;
+        } else {
+            // Fallback: moving-average bandpass filtering
+            let (delta, theta, alpha, beta) = compute_band_powers(&frontal_f32, sample_rate);
+            self.current_metrics.delta_power = delta;
+            self.current_metrics.theta_power = theta;
+            self.current_metrics.alpha_power = alpha;
+            self.current_metrics.beta_power = beta;
+        }
 
         // Subsample to match our effective rate
         let target_samples = self.config.steps_per_epoch;
