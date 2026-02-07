@@ -187,11 +187,10 @@ pub mod safe_experiment;
 #[cfg(feature = "full_consciousness")]
 pub mod dream_mode;
 //
-// naming_ceremony - references crate::soul::{WeaverActor, ConceptDiscovery} which
-//   don't exist; uses non-existent fields on CrystalizedConcept (uid, attractor_signature,
-//   activation_count); uses non-existent methods on ConsciousnessWorldModel
-// #[cfg(feature = "full_consciousness")]
-// pub mod naming_ceremony;
+// naming_ceremony - FIXED: Added stub WeaverActor/ConceptDiscovery traits,
+//   CrystalizedConcept now has required fields, added name_concept to WorldModel
+#[cfg(feature = "full_consciousness")]
+pub mod naming_ceremony;
 //
 // routing_hub - references advanced router types that don't exist in routers.rs;
 //   references RoutingStrategy enum that doesn't exist; uses PrimitiveSystem::global()

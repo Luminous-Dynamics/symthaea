@@ -674,3 +674,427 @@ mod proptest_counterfactual {
         }
     }
 }
+
+// ==================================================================================
+// E-VALUE SENSITIVITY ANALYSIS TESTS
+// ==================================================================================
+
+#[cfg(feature = "counterfactual")]
+mod sensitivity_analysis_tests {
+    use symthaea::consciousness::counterfactual::{
+        RobustEstimate, IdentificationMethod, SensitivityAnalysis,
+    };
+
+    #[test]
+    fn test_e_value_basic() {
+        // E-value should be > 1 for positive effects
+        let estimate = RobustEstimate {
+            effect: 0.5,  // Moderate effect
+            regression_estimate: 0.5,
+            ipw_estimate: 0.5,
+            dr_estimate: 0.5,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+
+        let e_value = estimate.e_value();
+        assert!(e_value > 1.0, "E-value should be > 1 for non-null effect");
+        assert!(e_value < 10.0, "E-value should be reasonable for moderate effect");
+    }
+
+    #[test]
+    fn test_e_value_null_effect() {
+        // E-value should be 1 for null effects
+        let estimate = RobustEstimate {
+            effect: 0.0,
+            regression_estimate: 0.0,
+            ipw_estimate: 0.0,
+            dr_estimate: 0.0,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+
+        let e_value = estimate.e_value();
+        assert!((e_value - 1.0).abs() < 0.01, "E-value should be ~1 for null effect");
+    }
+
+    #[test]
+    fn test_e_value_large_effect() {
+        // Larger effects should have larger E-values
+        let small_effect = RobustEstimate {
+            effect: 0.2,
+            regression_estimate: 0.2,
+            ipw_estimate: 0.2,
+            dr_estimate: 0.2,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+
+        let large_effect = RobustEstimate {
+            effect: 1.0,
+            regression_estimate: 1.0,
+            ipw_estimate: 1.0,
+            dr_estimate: 1.0,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+
+        assert!(
+            large_effect.e_value() > small_effect.e_value(),
+            "Larger effects should have larger E-values"
+        );
+    }
+
+    #[test]
+    fn test_sensitivity_analysis() {
+        let estimate = RobustEstimate {
+            effect: 0.8,
+            regression_estimate: 0.8,
+            ipw_estimate: 0.85,
+            dr_estimate: 0.82,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+
+        let analysis = estimate.sensitivity_analysis();
+        assert!(analysis.e_value > 1.0);
+        assert!(analysis.robustness_score >= 0.0 && analysis.robustness_score <= 1.0);
+        assert!(!analysis.e_value_interpretation.is_empty());
+    }
+
+    #[test]
+    fn test_e_value_ci_crosses_null() {
+        let estimate = RobustEstimate {
+            effect: 0.1,
+            regression_estimate: 0.1,
+            ipw_estimate: 0.1,
+            dr_estimate: 0.1,
+            method: IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+
+        // CI crosses null (-0.1 to 0.3)
+        let e_value_ci = estimate.e_value_ci(-0.1, 0.3);
+        assert!((e_value_ci - 1.0).abs() < 0.01, "E-value_CI should be 1 when CI crosses null");
+    }
+}
+
+// ==================================================================================
+// PC ALGORITHM (CAUSAL DISCOVERY) TESTS
+// ==================================================================================
+
+#[cfg(feature = "counterfactual")]
+mod causal_discovery_tests {
+    use symthaea::consciousness::counterfactual::{
+        PCAlgorithm, ObservationalData,
+    };
+
+    fn generate_chain_data() -> ObservationalData {
+        // X → Y → Z (chain structure)
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into(), "Z".into()]);
+
+        for i in 0..200 {
+            let x = (i % 2) as f64;
+            let y = 0.5 * x + 0.1 * (i % 7) as f64 / 7.0;
+            let z = 0.5 * y + 0.1 * (i % 11) as f64 / 11.0;
+            data.add_observation(vec![x, y, z]);
+        }
+
+        data
+    }
+
+    fn generate_fork_data() -> ObservationalData {
+        // Y ← X → Z (fork structure)
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into(), "Z".into()]);
+
+        for i in 0..200 {
+            let x = (i % 2) as f64;
+            let y = 0.5 * x + 0.1 * (i % 7) as f64 / 7.0;
+            let z = 0.5 * x + 0.1 * (i % 11) as f64 / 11.0;
+            data.add_observation(vec![x, y, z]);
+        }
+
+        data
+    }
+
+    #[test]
+    fn test_pc_on_empty_data() {
+        let data = ObservationalData::new(vec![]);
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+
+        assert!(result.cpdag.nodes.is_empty());
+    }
+
+    #[test]
+    fn test_pc_discovers_chain() {
+        let data = generate_chain_data();
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+
+        assert_eq!(result.cpdag.nodes.len(), 3);
+        // In a chain X → Y → Z, all variables should be connected
+        assert!(result.skeleton.num_edges() >= 2);
+    }
+
+    #[test]
+    fn test_pc_discovers_fork() {
+        let data = generate_fork_data();
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+
+        assert_eq!(result.cpdag.nodes.len(), 3);
+        // In a fork Y ← X → Z, X should be connected to both Y and Z
+        assert!(result.skeleton.num_edges() >= 2);
+    }
+
+    #[test]
+    fn test_pc_independence_tests_counted() {
+        let data = generate_chain_data();
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+
+        // Should have performed some independence tests
+        assert!(result.independence_tests > 0, "Should perform independence tests");
+    }
+
+    #[test]
+    fn test_pc_custom_alpha() {
+        let data = generate_chain_data();
+
+        // More conservative alpha should result in fewer edges
+        let pc_conservative = PCAlgorithm::with_alpha(0.01);
+        let result_conservative = pc_conservative.discover(&data);
+
+        let pc_liberal = PCAlgorithm::with_alpha(0.10);
+        let result_liberal = pc_liberal.discover(&data);
+
+        // Both should complete without error
+        assert!(result_conservative.is_valid());
+        assert!(result_liberal.is_valid());
+    }
+
+    #[test]
+    fn test_pc_result_summary() {
+        let data = generate_chain_data();
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+
+        let summary = result.summary();
+        assert!(summary.contains("PC Algorithm Result"));
+        assert!(summary.contains("Nodes"));
+    }
+}
+
+// ==================================================================================
+// MEDIATION ANALYSIS TESTS
+// ==================================================================================
+
+#[cfg(feature = "counterfactual")]
+mod mediation_tests {
+    use symthaea::consciousness::counterfactual::{
+        CausalDAG, MediationAnalysis, MediationIdentification, ObservationalData,
+    };
+
+    fn create_mediation_dag() -> CausalDAG {
+        // X → M → Y with direct effect X → Y
+        CausalDAG::new(
+            vec!["X".into(), "M".into(), "Y".into()],
+            vec![(0, 1), (1, 2), (0, 2)],
+        )
+    }
+
+    fn create_mediation_data() -> ObservationalData {
+        let mut data = ObservationalData::new(vec!["X".into(), "M".into(), "Y".into()]);
+
+        for i in 0..300 {
+            let x = (i % 2) as f64;
+            let m = 0.5 * x + 0.1 * (i % 7) as f64 / 7.0;
+            let y = 0.3 * x + 0.4 * m + 0.1 * (i % 11) as f64 / 11.0;
+            data.add_observation(vec![x, m, y]);
+        }
+
+        data
+    }
+
+    #[test]
+    fn test_mediation_identification() {
+        let dag = create_mediation_dag();
+        let analysis = MediationAnalysis::new(&dag, 0, 1, 2);
+
+        match analysis.is_identified() {
+            MediationIdentification::Identified { has_direct_effect, .. } => {
+                assert!(has_direct_effect, "DAG has X → Y direct path");
+            }
+            other => panic!("Expected Identified, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_mediation_not_mediator() {
+        // X → Y with M unconnected
+        let dag = CausalDAG::new(
+            vec!["X".into(), "M".into(), "Y".into()],
+            vec![(0, 2)],  // Only X → Y, M is isolated
+        );
+        let analysis = MediationAnalysis::new(&dag, 0, 1, 2);
+
+        match analysis.is_identified() {
+            MediationIdentification::NotMediator { .. } => {}
+            other => panic!("Expected NotMediator, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_mediation_analysis_estimation() {
+        let dag = create_mediation_dag();
+        let data = create_mediation_data();
+
+        let analysis = MediationAnalysis::new(&dag, 0, 1, 2);
+        let result = analysis.analyze(&data);
+
+        assert!(result.is_identified);
+
+        // Total effect should be approximately direct + indirect
+        let sum = result.natural_direct_effect + result.natural_indirect_effect;
+        assert!(
+            (result.total_effect - sum).abs() < 0.1,
+            "Total = NDE + NIE (got {} vs {})", result.total_effect, sum
+        );
+
+        // Proportion mediated should be between 0 and 1
+        assert!(
+            result.proportion_mediated >= 0.0 && result.proportion_mediated <= 1.0,
+            "Proportion mediated out of range: {}", result.proportion_mediated
+        );
+    }
+
+    #[test]
+    fn test_mediation_summary() {
+        let dag = create_mediation_dag();
+        let data = create_mediation_data();
+
+        let analysis = MediationAnalysis::new(&dag, 0, 1, 2);
+        let result = analysis.analyze(&data);
+
+        let summary = result.summary();
+        assert!(summary.contains("Mediation Analysis"));
+        assert!(summary.contains("Direct Effect"));
+        assert!(summary.contains("Indirect Effect"));
+    }
+
+    #[test]
+    fn test_partial_vs_full_mediation() {
+        let dag = create_mediation_dag();
+        let data = create_mediation_data();
+
+        let analysis = MediationAnalysis::new(&dag, 0, 1, 2);
+        let result = analysis.analyze(&data);
+
+        // With both direct and indirect paths, likely partial mediation
+        if result.is_identified {
+            // At least one should be true (or neither if proportion is very small)
+            let _ = result.is_fully_mediated();
+            let _ = result.is_partially_mediated();
+            // Test completes without panic
+        }
+    }
+}
+
+// ==================================================================================
+// EFFECT ESTIMATION TESTS
+// ==================================================================================
+
+#[cfg(feature = "counterfactual")]
+mod effect_estimation_tests {
+    use symthaea::consciousness::counterfactual::{
+        CausalDAG, CausalQuery, EffectEstimator, ObservationalData, RobustEstimate,
+    };
+
+    fn create_backdoor_data() -> ObservationalData {
+        // Z → X → Y, Z → Y (Z is a confounder)
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into(), "Z".into()]);
+
+        for i in 0..500 {
+            let z = (i % 5) as f64 / 4.0;
+            let x = if z + 0.1 * (i % 3) as f64 / 3.0 > 0.4 { 1.0 } else { 0.0 };
+            let y = 1.5 * x + 0.8 * z + 0.05 * (i % 7) as f64 / 7.0;
+            data.add_observation(vec![x, y, z]);
+        }
+
+        data
+    }
+
+    #[test]
+    fn test_effect_estimator_backdoor() {
+        let dag = CausalDAG::new(
+            vec!["X".into(), "Y".into(), "Z".into()],
+            vec![(0, 1), (2, 0), (2, 1)],  // Z → X → Y, Z → Y
+        );
+
+        let data = create_backdoor_data();
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+
+        let estimator = EffectEstimator::new();
+        let result = estimator.estimate(&dag, &query, &data);
+
+        match result {
+            symthaea::consciousness::counterfactual::CausalQueryOutcome::Identified { estimand, .. } => {
+                // Effect should be approximately 1.5 (the true X → Y coefficient)
+                assert!(
+                    (estimand.effect - 1.5).abs() < 0.5,
+                    "Effect estimate {} should be ~1.5", estimand.effect
+                );
+            }
+            _ => panic!("Expected identified outcome"),
+        }
+    }
+
+    #[test]
+    fn test_robust_estimation() {
+        let dag = CausalDAG::new(
+            vec!["X".into(), "Y".into(), "Z".into()],
+            vec![(0, 1), (2, 0), (2, 1)],
+        );
+
+        let data = create_backdoor_data();
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 1,
+            conditioning: vec![],
+        };
+
+        let estimator = EffectEstimator::new();
+        let robust = estimator.estimate_robust(&dag, &query, &data);
+
+        assert!(robust.is_identified);
+
+        // All estimates should be in reasonable range
+        assert!((robust.regression_estimate - 1.5).abs() < 1.0);
+        assert!((robust.dr_estimate - 1.5).abs() < 1.0);
+
+        // Confidence should be positive
+        assert!(robust.confidence() > 0.0);
+    }
+
+    #[test]
+    fn test_estimates_agreement() {
+        let estimate = RobustEstimate {
+            effect: 1.0,
+            regression_estimate: 1.0,
+            ipw_estimate: 1.05,
+            dr_estimate: 1.02,
+            method: symthaea::consciousness::counterfactual::IdentificationMethod::BackdoorAdjustment,
+            is_identified: true,
+        };
+
+        // Close estimates should agree
+        assert!(estimate.estimates_agree(0.2));
+        // But not if tolerance is very small
+        assert!(!estimate.estimates_agree(0.01));
+    }
+}

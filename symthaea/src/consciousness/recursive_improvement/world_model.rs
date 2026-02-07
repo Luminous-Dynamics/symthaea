@@ -413,6 +413,35 @@ impl ConsciousnessWorldModel {
         self.current_state.phi
     }
 
+    /// Name a pending concept, moving it from pending to crystallized.
+    ///
+    /// Returns true if the concept was found and named successfully.
+    pub fn name_concept(&mut self, uid: &str, name: String) -> bool {
+        // Find and remove from pending
+        let pos = self.pending_concepts.iter().position(|c| c.uid == uid);
+
+        if let Some(idx) = pos {
+            let mut concept = self.pending_concepts.remove(idx);
+
+            // Update the concept with the new name
+            concept.name = name;
+
+            // Move to crystallized concepts
+            self.concepts.insert(concept.id, concept);
+
+            true
+        } else {
+            // Check if already crystallized, just update name
+            for concept in self.concepts.values_mut() {
+                if concept.uid == uid {
+                    concept.name = name;
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
     /// Record a transition and update the model
     pub fn observe_transition(&mut self, transition: ConsciousnessTransition) {
         // Update transition model

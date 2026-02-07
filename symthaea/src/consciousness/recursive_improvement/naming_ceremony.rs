@@ -46,10 +46,65 @@
 //! ceremony.name_concept(&mut world_model, &concept.uid, "Resentment", &mut weaver);
 //! ```
 
-use super::world_model::{ConsciousnessWorldModel, LatentConsciousnessState};
-use crate::soul::{WeaverActor, ConceptDiscovery};
+use super::world_model::ConsciousnessWorldModel;
 use crate::dynamics::CrystalizedConcept;
 use tracing::{info, debug};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Soul Module Stubs (for standalone operation without full soul infrastructure)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Discovery record for a newly named concept.
+///
+/// This is used by the Weaver system (when available) to track the
+/// emergence and naming of concepts over time.
+#[derive(Debug, Clone)]
+pub struct ConceptDiscovery {
+    /// Unique identifier of the discovered concept.
+    pub uid: String,
+    /// Human-assigned name (if named during ceremony).
+    pub name: Option<String>,
+    /// Attractor signature at time of discovery.
+    pub attractor_signature: Vec<f32>,
+    /// Consciousness level when concept was discovered.
+    pub consciousness_at_discovery: f64,
+}
+
+/// Actor that weaves together concept discoveries into the larger tapestry
+/// of understanding.
+///
+/// This trait allows different implementations of concept recording
+/// (in-memory, persistent, distributed, etc.).
+pub trait WeaverActor {
+    /// Record that a concept was discovered/named.
+    fn record_concept_discovery(&mut self, discovery: &ConceptDiscovery);
+
+    /// Get all recorded discoveries.
+    fn discoveries(&self) -> &[ConceptDiscovery];
+}
+
+/// Simple in-memory implementation of WeaverActor.
+#[derive(Debug, Clone, Default)]
+pub struct SimpleWeaver {
+    discoveries: Vec<ConceptDiscovery>,
+}
+
+impl SimpleWeaver {
+    /// Create a new simple weaver.
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl WeaverActor for SimpleWeaver {
+    fn record_concept_discovery(&mut self, discovery: &ConceptDiscovery) {
+        self.discoveries.push(discovery.clone());
+    }
+
+    fn discoveries(&self) -> &[ConceptDiscovery] {
+        &self.discoveries
+    }
+}
 
 /// A pending concept presentation for the naming ceremony
 #[derive(Debug, Clone)]
@@ -252,12 +307,12 @@ impl NamingCeremony {
     }
 
     /// Name a pending concept (the core ceremony)
-    pub fn name_concept(
+    pub fn name_concept<W: WeaverActor>(
         &mut self,
         world_model: &mut ConsciousnessWorldModel,
         concept_uid: &str,
         name: &str,
-        weaver: Option<&mut WeaverActor>,
+        weaver: Option<&mut W>,
     ) -> Result<NamingRecord, NamingError> {
         info!(
             uid = %concept_uid,
@@ -314,13 +369,13 @@ impl NamingCeremony {
     }
 
     /// Name a concept with additional human description
-    pub fn name_concept_with_description(
+    pub fn name_concept_with_description<W: WeaverActor>(
         &mut self,
         world_model: &mut ConsciousnessWorldModel,
         concept_uid: &str,
         name: &str,
         description: &str,
-        weaver: Option<&mut WeaverActor>,
+        weaver: Option<&mut W>,
     ) -> Result<NamingRecord, NamingError> {
         let mut record = self.name_concept(world_model, concept_uid, name, weaver)?;
         record.human_description = Some(description.to_string());
