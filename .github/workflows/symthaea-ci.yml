@@ -1,0 +1,57 @@
+name: Symthaea CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'symthaea/**'
+      - 'symthaea-core/**'
+      - '.github/workflows/symthaea-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'symthaea/**'
+      - 'symthaea-core/**'
+      - '.github/workflows/symthaea-ci.yml'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  check:
+    name: Check & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check compilation (0 warnings enforced)
+        run: cargo check --lib 2>&1
+
+      - name: Run clippy
+        run: cargo clippy --lib -- -D warnings
+
+      - name: Run lib tests
+        run: cargo test --lib
+        env:
+          RUST_BACKTRACE: 1
