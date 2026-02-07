@@ -698,6 +698,7 @@ impl PrimitiveEvolution {
             PrimitiveTier::Temporal => 0.54,
             PrimitiveTier::Compositional => 0.62,
             PrimitiveTier::Consciousness => 0.7,
+            PrimitiveTier::Code => 0.68, // Code understanding tier
         };
         tier_base + (self.rand_f64() * 0.1)
     }

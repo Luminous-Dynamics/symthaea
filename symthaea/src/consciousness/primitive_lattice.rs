@@ -70,11 +70,12 @@ fn tier_to_level(tier: PrimitiveTier) -> u8 {
         PrimitiveTier::Temporal => 6,
         PrimitiveTier::Compositional => 7,
         PrimitiveTier::Consciousness => 8,
+        PrimitiveTier::Code => 9, // Code understanding tier
     }
 }
 
 /// All tiers in ascending order.
-const ALL_TIERS: [PrimitiveTier; 9] = [
+const ALL_TIERS: [PrimitiveTier; 10] = [
     PrimitiveTier::NSM,
     PrimitiveTier::Mathematical,
     PrimitiveTier::Physical,
@@ -84,6 +85,7 @@ const ALL_TIERS: [PrimitiveTier; 9] = [
     PrimitiveTier::Temporal,
     PrimitiveTier::Compositional,
     PrimitiveTier::Consciousness,
+    PrimitiveTier::Code,
 ];
 
 // ============================================================================

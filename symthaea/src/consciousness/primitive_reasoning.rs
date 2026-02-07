@@ -111,6 +111,7 @@ impl TierAwareConfig {
             PrimitiveTier::Temporal => self.temporal_weight,
             PrimitiveTier::Compositional => self.compositional_weight,
             PrimitiveTier::Consciousness => self.consciousness_weight,
+            PrimitiveTier::Code => self.compositional_weight, // Code uses compositional weight
         }
     }
 }
