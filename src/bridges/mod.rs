@@ -351,8 +351,11 @@ impl BridgeRegistry {
     }
 
     /// Get a mutable bridge by name.
-    pub fn get_mut(&mut self, name: &str) -> Option<&mut (dyn ConsciousnessBridge + Send + Sync + '_)> {
-        self.bridges.get_mut(name).map(move |b| &mut **b)
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut (dyn ConsciousnessBridge + Send + Sync)> {
+        match self.bridges.get_mut(name) {
+            Some(b) => Some(b.as_mut()),
+            None => None,
+        }
     }
 
     /// Get all bridge names.
