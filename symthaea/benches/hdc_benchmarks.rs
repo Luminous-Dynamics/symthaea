@@ -449,6 +449,121 @@ fn bench_memory_operations(c: &mut Criterion) {
 }
 
 // =============================================================================
+// SET OPERATIONS BENCHMARKS (intersection, union, cosine_similarity)
+// =============================================================================
+
+fn bench_set_operations(c: &mut Criterion) {
+    let mut group = c.benchmark_group("hdc_set_ops");
+    group.throughput(Throughput::Elements(1));
+
+    let hv1 = HV16::random(42);
+    let hv2 = HV16::random(43);
+
+    // Intersection (SIMD AND)
+    group.bench_function("intersection", |b| {
+        b.iter(|| black_box(hv1.intersection(&hv2)))
+    });
+
+    // Union (SIMD OR)
+    group.bench_function("union", |b| {
+        b.iter(|| black_box(hv1.union(&hv2)))
+    });
+
+    // BitAnd trait operator
+    group.bench_function("bitand_trait", |b| {
+        b.iter(|| black_box(hv1 & hv2))
+    });
+
+    // BitOr trait operator
+    group.bench_function("bitor_trait", |b| {
+        b.iter(|| black_box(hv1 | hv2))
+    });
+
+    // Cosine similarity
+    group.bench_function("cosine_similarity", |b| {
+        b.iter(|| black_box(hv1.cosine_similarity(&hv2)))
+    });
+
+    group.finish();
+}
+
+// =============================================================================
+// WEIGHTED BUNDLE BENCHMARKS
+// =============================================================================
+
+fn bench_weighted_bundle(c: &mut Criterion) {
+    let mut group = c.benchmark_group("hdc_weighted_bundle");
+
+    for count in [3, 10, 50, 100] {
+        let vectors: Vec<HV16> = (0..count).map(|i| HV16::random(i as u64)).collect();
+        let weights: Vec<f32> = (0..count).map(|i| (i as f32 + 1.0)).collect();
+
+        group.throughput(Throughput::Elements(count as u64));
+
+        group.bench_with_input(BenchmarkId::new("stack", count), &(vectors.clone(), weights.clone()), |b, (vecs, ws)| {
+            b.iter(|| black_box(HV16::weighted_bundle(vecs, ws)))
+        });
+
+        group.bench_with_input(BenchmarkId::new("safe", count), &(vectors, weights), |b, (vecs, ws)| {
+            b.iter(|| black_box(HV16::weighted_bundle_safe(vecs, ws)))
+        });
+    }
+
+    group.finish();
+}
+
+// =============================================================================
+// NEW PRIMITIVES BENCHMARKS (ngram, fractional_power, thin, k_winners)
+// =============================================================================
+
+fn bench_new_primitives(c: &mut Criterion) {
+    let mut group = c.benchmark_group("hdc_new_primitives");
+
+    let hv = HV16::random(42);
+
+    // N-gram encoding
+    for n in [2, 3, 5, 8] {
+        let vectors: Vec<HV16> = (0..n).map(|i| HV16::random(i as u64 + 100)).collect();
+        group.bench_with_input(BenchmarkId::new("ngram", n), &vectors, |b, vecs| {
+            b.iter(|| black_box(HV16::ngram(vecs)))
+        });
+    }
+
+    // Fractional power
+    for &exp in &[0.1, 0.5, 0.9] {
+        group.bench_with_input(
+            BenchmarkId::new("fractional_power", format!("{:.1}", exp)),
+            &exp,
+            |b, &e| b.iter(|| black_box(hv.fractional_power(e, 99))),
+        );
+    }
+
+    // Thin (sparsification)
+    for &density in &[0.1, 0.25, 0.4] {
+        group.bench_with_input(
+            BenchmarkId::new("thin", format!("{:.2}", density)),
+            &density,
+            |b, &d| b.iter(|| black_box(hv.thin(d, 42))),
+        );
+    }
+
+    // k_winners
+    let codebook: Vec<HV16> = (0..100).map(|i| HV16::random(i)).collect();
+    let sims: Vec<(usize, f32)> = codebook
+        .iter()
+        .enumerate()
+        .map(|(i, v)| (i, hv.similarity(v)))
+        .collect();
+    for k in [1, 5, 10] {
+        group.bench_with_input(BenchmarkId::new("k_winners", k), &(sims.clone(), k), |b, (s, &k_val)| {
+            b.iter(|| black_box(HV16::k_winners(s, k_val)))
+        });
+    }
+
+    group.finish();
+}
+
+// =============================================================================
 // CRITERION CONFIGURATION
 // =============================================================================
 
@@ -463,6 +578,9 @@ criterion_group!(
     bench_invert_operation,
     bench_auxiliary_operations,
     bench_memory_operations,
+    bench_set_operations,
+    bench_weighted_bundle,
+    bench_new_primitives,
 );
 
 criterion_main!(hdc_benches);

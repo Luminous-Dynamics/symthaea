@@ -251,6 +251,162 @@ fn bind_scalar_unrolled(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048])
     }
 }
 
+/// SIMD-optimized AND (intersection) operation for 2048 bytes
+#[inline]
+#[cfg(target_arch = "x86_64")]
+pub fn intersection_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
+    let mut result = [0u8; 2048];
+    if has_avx512f() {
+        unsafe { intersection_avx512(a, b, &mut result) };
+    } else if has_avx2() {
+        unsafe { intersection_avx2(a, b, &mut result) };
+    } else if has_sse41() {
+        unsafe { intersection_sse41(a, b, &mut result) };
+    } else {
+        intersection_scalar_unrolled(a, b, &mut result);
+    }
+    result
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx512f")]
+#[inline]
+unsafe fn intersection_avx512(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
+    let a_ptr = a.as_ptr() as *const __m512i;
+    let b_ptr = b.as_ptr() as *const __m512i;
+    let r_ptr = result.as_mut_ptr() as *mut __m512i;
+    for i in (0..32).step_by(2) {
+        let r0 = _mm512_and_si512(_mm512_loadu_si512(a_ptr.add(i)), _mm512_loadu_si512(b_ptr.add(i)));
+        let r1 = _mm512_and_si512(_mm512_loadu_si512(a_ptr.add(i + 1)), _mm512_loadu_si512(b_ptr.add(i + 1)));
+        _mm512_storeu_si512(r_ptr.add(i), r0);
+        _mm512_storeu_si512(r_ptr.add(i + 1), r1);
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+#[inline]
+unsafe fn intersection_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
+    let a_ptr = a.as_ptr() as *const __m256i;
+    let b_ptr = b.as_ptr() as *const __m256i;
+    let r_ptr = result.as_mut_ptr() as *mut __m256i;
+    for i in (0..64).step_by(4) {
+        _mm256_storeu_si256(r_ptr.add(i), _mm256_and_si256(_mm256_loadu_si256(a_ptr.add(i)), _mm256_loadu_si256(b_ptr.add(i))));
+        _mm256_storeu_si256(r_ptr.add(i + 1), _mm256_and_si256(_mm256_loadu_si256(a_ptr.add(i + 1)), _mm256_loadu_si256(b_ptr.add(i + 1))));
+        _mm256_storeu_si256(r_ptr.add(i + 2), _mm256_and_si256(_mm256_loadu_si256(a_ptr.add(i + 2)), _mm256_loadu_si256(b_ptr.add(i + 2))));
+        _mm256_storeu_si256(r_ptr.add(i + 3), _mm256_and_si256(_mm256_loadu_si256(a_ptr.add(i + 3)), _mm256_loadu_si256(b_ptr.add(i + 3))));
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "sse4.1")]
+#[inline]
+unsafe fn intersection_sse41(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
+    let a_ptr = a.as_ptr() as *const __m128i;
+    let b_ptr = b.as_ptr() as *const __m128i;
+    let r_ptr = result.as_mut_ptr() as *mut __m128i;
+    for i in (0..128).step_by(4) {
+        _mm_storeu_si128(r_ptr.add(i), _mm_and_si128(_mm_loadu_si128(a_ptr.add(i)), _mm_loadu_si128(b_ptr.add(i))));
+        _mm_storeu_si128(r_ptr.add(i + 1), _mm_and_si128(_mm_loadu_si128(a_ptr.add(i + 1)), _mm_loadu_si128(b_ptr.add(i + 1))));
+        _mm_storeu_si128(r_ptr.add(i + 2), _mm_and_si128(_mm_loadu_si128(a_ptr.add(i + 2)), _mm_loadu_si128(b_ptr.add(i + 2))));
+        _mm_storeu_si128(r_ptr.add(i + 3), _mm_and_si128(_mm_loadu_si128(a_ptr.add(i + 3)), _mm_loadu_si128(b_ptr.add(i + 3))));
+    }
+}
+
+#[inline]
+fn intersection_scalar_unrolled(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
+    use std::ptr::{read_unaligned, write_unaligned};
+    let a_ptr = a.as_ptr() as *const u64;
+    let b_ptr = b.as_ptr() as *const u64;
+    let r_ptr = result.as_mut_ptr() as *mut u64;
+    unsafe {
+        for i in (0..256).step_by(4) {
+            write_unaligned(r_ptr.add(i), read_unaligned(a_ptr.add(i)) & read_unaligned(b_ptr.add(i)));
+            write_unaligned(r_ptr.add(i + 1), read_unaligned(a_ptr.add(i + 1)) & read_unaligned(b_ptr.add(i + 1)));
+            write_unaligned(r_ptr.add(i + 2), read_unaligned(a_ptr.add(i + 2)) & read_unaligned(b_ptr.add(i + 2)));
+            write_unaligned(r_ptr.add(i + 3), read_unaligned(a_ptr.add(i + 3)) & read_unaligned(b_ptr.add(i + 3)));
+        }
+    }
+}
+
+/// SIMD-optimized OR (union) operation for 2048 bytes
+#[inline]
+#[cfg(target_arch = "x86_64")]
+pub fn union_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
+    let mut result = [0u8; 2048];
+    if has_avx512f() {
+        unsafe { union_avx512(a, b, &mut result) };
+    } else if has_avx2() {
+        unsafe { union_avx2(a, b, &mut result) };
+    } else if has_sse41() {
+        unsafe { union_sse41(a, b, &mut result) };
+    } else {
+        union_scalar_unrolled(a, b, &mut result);
+    }
+    result
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx512f")]
+#[inline]
+unsafe fn union_avx512(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
+    let a_ptr = a.as_ptr() as *const __m512i;
+    let b_ptr = b.as_ptr() as *const __m512i;
+    let r_ptr = result.as_mut_ptr() as *mut __m512i;
+    for i in (0..32).step_by(2) {
+        let r0 = _mm512_or_si512(_mm512_loadu_si512(a_ptr.add(i)), _mm512_loadu_si512(b_ptr.add(i)));
+        let r1 = _mm512_or_si512(_mm512_loadu_si512(a_ptr.add(i + 1)), _mm512_loadu_si512(b_ptr.add(i + 1)));
+        _mm512_storeu_si512(r_ptr.add(i), r0);
+        _mm512_storeu_si512(r_ptr.add(i + 1), r1);
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+#[inline]
+unsafe fn union_avx2(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
+    let a_ptr = a.as_ptr() as *const __m256i;
+    let b_ptr = b.as_ptr() as *const __m256i;
+    let r_ptr = result.as_mut_ptr() as *mut __m256i;
+    for i in (0..64).step_by(4) {
+        _mm256_storeu_si256(r_ptr.add(i), _mm256_or_si256(_mm256_loadu_si256(a_ptr.add(i)), _mm256_loadu_si256(b_ptr.add(i))));
+        _mm256_storeu_si256(r_ptr.add(i + 1), _mm256_or_si256(_mm256_loadu_si256(a_ptr.add(i + 1)), _mm256_loadu_si256(b_ptr.add(i + 1))));
+        _mm256_storeu_si256(r_ptr.add(i + 2), _mm256_or_si256(_mm256_loadu_si256(a_ptr.add(i + 2)), _mm256_loadu_si256(b_ptr.add(i + 2))));
+        _mm256_storeu_si256(r_ptr.add(i + 3), _mm256_or_si256(_mm256_loadu_si256(a_ptr.add(i + 3)), _mm256_loadu_si256(b_ptr.add(i + 3))));
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "sse4.1")]
+#[inline]
+unsafe fn union_sse41(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
+    let a_ptr = a.as_ptr() as *const __m128i;
+    let b_ptr = b.as_ptr() as *const __m128i;
+    let r_ptr = result.as_mut_ptr() as *mut __m128i;
+    for i in (0..128).step_by(4) {
+        _mm_storeu_si128(r_ptr.add(i), _mm_or_si128(_mm_loadu_si128(a_ptr.add(i)), _mm_loadu_si128(b_ptr.add(i))));
+        _mm_storeu_si128(r_ptr.add(i + 1), _mm_or_si128(_mm_loadu_si128(a_ptr.add(i + 1)), _mm_loadu_si128(b_ptr.add(i + 1))));
+        _mm_storeu_si128(r_ptr.add(i + 2), _mm_or_si128(_mm_loadu_si128(a_ptr.add(i + 2)), _mm_loadu_si128(b_ptr.add(i + 2))));
+        _mm_storeu_si128(r_ptr.add(i + 3), _mm_or_si128(_mm_loadu_si128(a_ptr.add(i + 3)), _mm_loadu_si128(b_ptr.add(i + 3))));
+    }
+}
+
+#[inline]
+fn union_scalar_unrolled(a: &[u8; 2048], b: &[u8; 2048], result: &mut [u8; 2048]) {
+    use std::ptr::{read_unaligned, write_unaligned};
+    let a_ptr = a.as_ptr() as *const u64;
+    let b_ptr = b.as_ptr() as *const u64;
+    let r_ptr = result.as_mut_ptr() as *mut u64;
+    unsafe {
+        for i in (0..256).step_by(4) {
+            write_unaligned(r_ptr.add(i), read_unaligned(a_ptr.add(i)) | read_unaligned(b_ptr.add(i)));
+            write_unaligned(r_ptr.add(i + 1), read_unaligned(a_ptr.add(i + 1)) | read_unaligned(b_ptr.add(i + 1)));
+            write_unaligned(r_ptr.add(i + 2), read_unaligned(a_ptr.add(i + 2)) | read_unaligned(b_ptr.add(i + 2)));
+            write_unaligned(r_ptr.add(i + 3), read_unaligned(a_ptr.add(i + 3)) | read_unaligned(b_ptr.add(i + 3)));
+        }
+    }
+}
+
 /// SIMD-optimized population count (Hamming weight) for similarity calculation
 ///
 /// Returns the number of matching bits between two 2048-byte arrays.
@@ -702,9 +858,21 @@ pub fn bundle_simd_slice(vectors: &[[u8; 2048]]) -> [u8; 2048] {
 #[cfg(not(target_arch = "x86_64"))]
 pub fn bind_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
     let mut result = [0u8; 2048];
-    for i in 0..2048 {
-        result[i] = a[i] ^ b[i];
-    }
+    for i in 0..2048 { result[i] = a[i] ^ b[i]; }
+    result
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+pub fn intersection_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
+    let mut result = [0u8; 2048];
+    for i in 0..2048 { result[i] = a[i] & b[i]; }
+    result
+}
+
+#[cfg(not(target_arch = "x86_64"))]
+pub fn union_simd(a: &[u8; 2048], b: &[u8; 2048]) -> [u8; 2048] {
+    let mut result = [0u8; 2048];
+    for i in 0..2048 { result[i] = a[i] | b[i]; }
     result
 }
 
@@ -1018,6 +1186,26 @@ mod tests {
         println!("  SIMD:   {}ns", simd_ns);
         println!("  Scalar: {}ns", scalar_ns);
         println!("  Speedup: {:.1}x", scalar_ns as f64 / simd_ns.max(1) as f64);
+    }
+
+    #[test]
+    fn test_intersection_simd_correctness() {
+        let a = HV16::random(42);
+        let b = HV16::random(43);
+        let simd_result = intersection_simd(&a.0, &b.0);
+        let mut scalar = [0u8; 2048];
+        for i in 0..2048 { scalar[i] = a.0[i] & b.0[i]; }
+        assert_eq!(simd_result, scalar, "SIMD intersection must match scalar AND");
+    }
+
+    #[test]
+    fn test_union_simd_correctness() {
+        let a = HV16::random(42);
+        let b = HV16::random(43);
+        let simd_result = union_simd(&a.0, &b.0);
+        let mut scalar = [0u8; 2048];
+        for i in 0..2048 { scalar[i] = a.0[i] | b.0[i]; }
+        assert_eq!(simd_result, scalar, "SIMD union must match scalar OR");
     }
 
     #[test]
