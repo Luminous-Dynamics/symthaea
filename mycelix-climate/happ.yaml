@@ -1,0 +1,17 @@
+---
+manifest_version: "0"
+name: mycelix-climate
+description: |
+  Climate action hApp for carbon tracking, credits, and project verification.
+  Part of the Mycelix ecosystem for decentralized climate coordination.
+roles:
+  - name: climate
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dnas/climate/workdir/climate.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

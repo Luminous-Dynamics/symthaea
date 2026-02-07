@@ -5,38 +5,47 @@
 
 ## hApp Bundle Status
 
-| hApp | Bundle | Zomes | Lines | Ready to Build |
-|------|--------|-------|-------|----------------|
-| lucid | ✅ 5.6M | 6 | - | - |
-| mail | ✅ 18M | 12 | - | - |
-| knowledge | ✅ 5.1M | - | - | - |
-| identity | ✅ 5.5M | - | - | - |
-| justice | ✅ 4.4M | - | - | - |
-| governance | ✅ 4.3M | - | - | - |
-| finance | ✅ 3.4M | - | - | - |
-| marketplace | ✅ 3.3M | 8 | - | - |
-| epistemic-markets | ✅ 3.2M | - | - | - |
-| fabrication | ✅ 7.4M | 6 | - | - |
-| supplychain | ✅ 1.9M | 8 | - | - |
-| edunet | ✅ 948K | 10 | - | - |
-| **health** | ❌ | 36 | 60K+ | ✅ `./scripts/build-happs.sh health` |
-| **energy** | ❌ | 6 | 9.2K | ✅ `./scripts/build-happs.sh energy` |
-| **climate** | ❌ | 3 | 2.4K | ✅ `./scripts/build-happs.sh climate` |
-| **mutualaid** | ❌ | 8 | 7.8K | ✅ `./scripts/build-happs.sh mutualaid` |
-| **property** | ❌ | 6 | 3.3K | ✅ `./scripts/build-happs.sh property` |
-| **media** | ❌ | 5 | 2.7K | ✅ `./scripts/build-happs.sh media` |
-| **consensus** | ❌ | 1 | 1.4K | ✅ `./scripts/build-happs.sh consensus` |
-| **music** | ❌ | 4 | 2.7K | ✅ `./scripts/build-happs.sh music` |
+| hApp | Bundle | Zomes | Manifest | Status |
+|------|--------|-------|----------|--------|
+| lucid | ✅ 5.6M | 6 | v0 | Built |
+| mail | ✅ 18M | 12 | v0 | Built (submodule: holochain/) |
+| knowledge | ✅ 5.1M | - | v0 | Built (submodule) |
+| identity | ✅ 5.5M | - | v0 | Built (submodule) |
+| justice | ✅ 4.4M | - | v0 | Built (submodule) |
+| governance | ✅ 4.3M | - | v0 | Built (submodule) |
+| finance | ✅ 3.4M | - | v0 | Built (submodule) |
+| marketplace | ✅ 3.3M | 8 | v0 | Built (submodule: backend/) |
+| epistemic-markets | ✅ 3.2M | - | v0 | Built |
+| fabrication | ✅ 7.4M | 6 | v0 | Built |
+| supplychain | ✅ 1.9M | 8 | v0 | Built (submodule: holochain/) |
+| edunet | ✅ 948K | 10 | v0 | Built (submodule: happ/) |
+| health | ✅ 8.4M | 22 | v0 | ✅ Scaffolded |
+| energy | ✅ | 11 | v0 | ✅ Scaffolded |
+| climate | ⏳ | 6 | v0 | ✅ Scaffolded (workdir/) |
+| mutualaid | ⏳ | 6 | v0 | ✅ Scaffolded (workdir/) |
+| property | ✅ | 9 | v0 | ✅ Scaffolded |
+| media | ✅ | 8 | v0 | ✅ Scaffolded |
+| consensus | ⏳ | 1 | v0 | ✅ Scaffolded (native workspace) |
+| music | ⏳ | 8 | v0 | ✅ Scaffolded |
 | core | N/A | 6 | - | REST API (not hApp) |
 | desci | N/A | - | - | REST API (not hApp) |
 
+**Legend**: ✅ = Bundle exists | ⏳ = Scaffolded, needs WASM build | v0 = manifest_version "0" (current format)
+
 **Note**: Desktop moved to `tools/desktop/` - it's a Tauri framework, not a hApp.
 
-To build missing bundles:
+To build hApp bundles:
 ```bash
+cd mycelix-workspace
 nix develop
-./scripts/build-happs.sh  # Build all, or specify hApp name
+./scripts/build-happs.sh           # Build all 8 ready hApps
+./scripts/build-happs.sh health    # Build specific hApp
 ```
+
+All 8 scaffolded hApps (health, energy, climate, mutualaid, property, media, consensus, music) have:
+- `happ.yaml` with manifest_version "0" (current Holochain 0.6 format)
+- `dna.yaml` with proper zome references
+- Build script support
 
 ---
 
@@ -148,9 +157,11 @@ academic, climate, consensus, desci, edunet, energy, epistemic-markets, fabricat
 2. ~~**TS SDK libsodium errors**~~: Fixed. All 6,316 tests pass.
 3. ~~**Core REST API**~~: Implemented 2026-02-04. 4 endpoints: /health, /status, /trust/{id}, /pogq/validate.
 4. ~~**Observatory mock-only**~~: Live conductor connection fully implemented, awaiting conductor.
-5. **Scope sprawl**: 27+ hApps, most in scaffold state. 14 scaffolds with types but no core logic.
-6. **SDK-TS bundle size**: 29 integration modules, unclear how many are functional.
-7. **Cross-hApp bridges**: Claimed in architecture docs, not tested in integration.
+5. ~~**hApp scaffolding incomplete**~~: Fixed 2026-02-08. All 8 ready-to-build hApps have v0 manifest format.
+6. **Scope sprawl**: 22 hApps total, 12 with bundles, 8 scaffolded (ready to build), 2 REST APIs.
+7. **SDK-TS bundle size**: 29 integration modules, unclear how many are functional.
+8. **Cross-hApp bridges**: Claimed in architecture docs, not tested in integration.
+9. **WASM builds pending**: 4 hApps (climate, mutualaid, consensus, music) need `nix develop` + WASM compilation.
 
 ---
 

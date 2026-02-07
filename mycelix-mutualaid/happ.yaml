@@ -1,0 +1,17 @@
+---
+manifest_version: "0"
+name: mycelix-mutualaid
+description: |
+  Mutual aid coordination hApp for community support and resource sharing.
+  Features request/offer matching, resource pools, and timebanking.
+roles:
+  - name: mutualaid
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dnas/mutualaid/workdir/mutualaid.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

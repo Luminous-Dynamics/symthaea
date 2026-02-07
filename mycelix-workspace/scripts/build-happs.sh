@@ -55,24 +55,36 @@ build_happ() {
     log_info "Building $happ_name from $happ_dir"
     cd "$happ_dir"
 
-    # Determine structure
+    # Determine structure - check multiple patterns
     local dna_dir=""
     local happ_yaml=""
+    local pack_dir="."
 
-    if [[ -f "dna/dna.yaml" ]]; then
+    # Pattern 1: Standard structure (dna/ + root happ.yaml)
+    if [[ -f "dna/dna.yaml" && -f "happ.yaml" ]]; then
         dna_dir="dna"
         happ_yaml="happ.yaml"
-    elif [[ -f "workdir/dna.yaml" ]]; then
-        dna_dir="workdir"
-        happ_yaml="workdir/happ.yaml"
-    elif [[ -f "dnas/${happ_name}/dna.yaml" ]]; then
-        dna_dir="dnas/${happ_name}"
+    # Pattern 2: happ.yaml at root with nested dna in dnas/[name]/workdir/
+    elif [[ -f "happ.yaml" && -d "dnas" ]]; then
+        if [[ -f "dnas/${happ_name}/workdir/dna.yaml" ]]; then
+            dna_dir="dnas/${happ_name}/workdir"
+            happ_yaml="happ.yaml"
+        elif [[ -f "dnas/climate/workdir/dna.yaml" ]]; then
+            dna_dir="dnas/climate/workdir"
+            happ_yaml="happ.yaml"
+        elif [[ -f "dnas/mutualaid/workdir/dna.yaml" ]]; then
+            dna_dir="dnas/mutualaid/workdir"
+            happ_yaml="happ.yaml"
+        else
+            log_warn "No dna.yaml found in dnas/ for $happ_name"
+            return 1
+        fi
+    # Pattern 3: Native workspace (consensus style)
+    elif [[ -f "happ.yaml" && -f "dna/dna.yaml" ]]; then
+        dna_dir="dna"
         happ_yaml="happ.yaml"
-    elif [[ -f "dnas/${happ_name}/workdir/dna.yaml" ]]; then
-        dna_dir="dnas/${happ_name}/workdir"
-        happ_yaml="workdir/happ.yaml"
-    elif [[ -f "dnas/mycelix-music/dna.yaml" ]]; then
-        # Special case for music
+    # Pattern 4: Music special case
+    elif [[ -f "dnas/mycelix-music/dna.yaml" && -f "happ.yaml" ]]; then
         dna_dir="dnas/mycelix-music"
         happ_yaml="happ.yaml"
     else
@@ -93,9 +105,9 @@ build_happ() {
     log_info "  Packing DNA from $dna_dir..."
     hc dna pack "$dna_dir" 2>&1 | tail -3
 
-    # Pack hApp
-    log_info "  Packing hApp..."
-    hc app pack . 2>&1 | tail -3
+    # Pack hApp from the directory containing happ.yaml
+    log_info "  Packing hApp from $pack_dir..."
+    hc app pack "$pack_dir" 2>&1 | tail -3
 
     # Check result
     local happ_file=$(find . -maxdepth 2 -name "*.happ" -newer "$dna_dir/dna.yaml" 2>/dev/null | head -1)
