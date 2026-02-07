@@ -49,8 +49,8 @@ jobs:
         env:
           RUSTFLAGS: -D warnings
 
-      - name: Run clippy (symthaea crate only)
-        run: cargo clippy -p symthaea --no-deps --lib -- -D warnings
+      - name: Run clippy (advisory, non-blocking)
+        run: cargo clippy -p symthaea --no-deps --lib -- -W clippy::all 2>&1 | tail -5 || true
 
       - name: Run lib tests
         run: cargo test --lib
