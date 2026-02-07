@@ -24,7 +24,7 @@ pub use identification::{
     UnidentifiedReason, CausalAssumption, CausalDAG, CausalQuery,
     CounterfactualReasoner, CausalReferenceHarness, HarnessResult,
     // Effect estimation
-    ObservationalData, EffectEstimator,
+    ObservationalData, EffectEstimator, RobustEstimate,
     // Shpitser-Pearl ID Algorithm
     CausalGraphWithLatents, CausalExpression, IDAlgorithm,
 };
