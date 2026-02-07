@@ -49,7 +49,7 @@ jobs:
         run: cargo check --lib 2>&1
 
       - name: Run clippy
-        run: cargo clippy --lib -- -D warnings
+        run: cargo clippy -p symthaea --lib -- -D warnings
 
       - name: Run lib tests
         run: cargo test --lib
