@@ -1,0 +1,21 @@
+---
+# Mycelix Consensus hApp Bundle
+# Reputation-Based Byzantine Fault Tolerance for distributed agreement
+
+manifest_version: "0"
+name: mycelix-consensus
+description: |
+  RB-BFT (Reputation-Based Byzantine Fault Tolerance) consensus for the Mycelix ecosystem.
+  Provides weighted voting based on agent reputation for 45% Byzantine tolerance.
+
+roles:
+  - name: consensus
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_consensus.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

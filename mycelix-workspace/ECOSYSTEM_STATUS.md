@@ -1,7 +1,44 @@
 # Mycelix Ecosystem Status
 
-**Last verified**: 2026-02-02
+**Last verified**: 2026-02-08
 **Holochain**: 0.6.0 | **HDK**: 0.6.0 | **HDI**: 0.7.0
+
+## hApp Bundle Status
+
+| hApp | Bundle | Zomes | Lines | Ready to Build |
+|------|--------|-------|-------|----------------|
+| lucid | ✅ 5.6M | 6 | - | - |
+| mail | ✅ 18M | 12 | - | - |
+| knowledge | ✅ 5.1M | - | - | - |
+| identity | ✅ 5.5M | - | - | - |
+| justice | ✅ 4.4M | - | - | - |
+| governance | ✅ 4.3M | - | - | - |
+| finance | ✅ 3.4M | - | - | - |
+| marketplace | ✅ 3.3M | 8 | - | - |
+| epistemic-markets | ✅ 3.2M | - | - | - |
+| fabrication | ✅ 7.4M | 6 | - | - |
+| supplychain | ✅ 1.9M | 8 | - | - |
+| edunet | ✅ 948K | 10 | - | - |
+| **health** | ❌ | 36 | 60K+ | ✅ `./scripts/build-happs.sh health` |
+| **energy** | ❌ | 6 | 9.2K | ✅ `./scripts/build-happs.sh energy` |
+| **climate** | ❌ | 3 | 2.4K | ✅ `./scripts/build-happs.sh climate` |
+| **mutualaid** | ❌ | 8 | 7.8K | ✅ `./scripts/build-happs.sh mutualaid` |
+| **property** | ❌ | 6 | 3.3K | ✅ `./scripts/build-happs.sh property` |
+| **media** | ❌ | 5 | 2.7K | ✅ `./scripts/build-happs.sh media` |
+| **consensus** | ❌ | 1 | 1.4K | ✅ `./scripts/build-happs.sh consensus` |
+| **music** | ❌ | 4 | 2.7K | ✅ `./scripts/build-happs.sh music` |
+| core | N/A | 6 | - | REST API (not hApp) |
+| desci | N/A | - | - | REST API (not hApp) |
+
+**Note**: Desktop moved to `tools/desktop/` - it's a Tauri framework, not a hApp.
+
+To build missing bundles:
+```bash
+nix develop
+./scripts/build-happs.sh  # Build all, or specify hApp name
+```
+
+---
 
 ## Status Legend
 

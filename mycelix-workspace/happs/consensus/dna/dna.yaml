@@ -1,0 +1,26 @@
+---
+# Mycelix Consensus DNA
+# Reputation-Based Byzantine Fault Tolerance (RB-BFT)
+
+manifest_version: "0"
+name: mycelix_consensus
+integrity:
+  network_seed: ~
+  properties:
+    # Byzantine fault tolerance threshold
+    byzantine_threshold: 0.45
+    # Minimum reputation for voting weight
+    min_reputation_weight: 0.1
+    # Quorum requirements
+    quorum_threshold: 0.67
+
+  zomes:
+    - name: rbbft_integrity
+      path: ../target/wasm32-unknown-unknown/release/rbbft_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: rbbft
+      path: ../target/wasm32-unknown-unknown/release/rbbft.wasm
+      dependencies:
+        - name: rbbft_integrity
