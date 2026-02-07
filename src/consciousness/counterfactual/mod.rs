@@ -24,9 +24,13 @@ pub use identification::{
     UnidentifiedReason, CausalAssumption, CausalDAG, CausalQuery,
     CounterfactualReasoner, CausalReferenceHarness, HarnessResult,
     // Effect estimation
-    ObservationalData, EffectEstimator, RobustEstimate,
+    ObservationalData, EffectEstimator, RobustEstimate, SensitivityAnalysis,
     // Shpitser-Pearl ID Algorithm
     CausalGraphWithLatents, CausalExpression, IDAlgorithm,
+    // Causal Discovery
+    PCAlgorithm, PCResult, Skeleton, CPDAG,
+    // Mediation Analysis
+    MediationAnalysis, MediationResult, MediationIdentification,
 };
 
 // Note: IdentificationMethod now includes:

@@ -1400,6 +1400,110 @@ impl RobustEstimate {
         // Higher agreement = higher confidence
         (1.0 / (1.0 + spread)).min(0.95)
     }
+
+    /// Compute E-value for sensitivity analysis.
+    ///
+    /// The E-value quantifies the minimum strength of association that an unmeasured
+    /// confounder would need with both treatment and outcome to fully explain away
+    /// the observed effect.
+    ///
+    /// Interpretation:
+    /// - E-value = 1.0: No unmeasured confounding needed (null effect)
+    /// - E-value = 2.0: Confounder needs RR ≥ 2 with both T and Y to explain away
+    /// - E-value > 3.0: Strong robustness to unmeasured confounding
+    ///
+    /// Reference: VanderWeele & Ding (2017). Annals of Internal Medicine.
+    pub fn e_value(&self) -> f64 {
+        // Convert effect (assumed standardized mean difference) to risk ratio
+        // Using the approximation: RR ≈ exp(0.91 * d) for d in reasonable range
+        let rr = self.effect_to_risk_ratio(self.effect.abs());
+
+        // E-value formula: RR + sqrt(RR * (RR - 1))
+        if rr <= 1.0 {
+            1.0 // No unmeasured confounding needed
+        } else {
+            rr + (rr * (rr - 1.0)).sqrt()
+        }
+    }
+
+    /// E-value for the confidence interval bound.
+    ///
+    /// This is the E-value for the CI bound closest to null.
+    /// More conservative: how strong must confounding be to shift CI to include null?
+    pub fn e_value_ci(&self, ci_lower: f64, ci_upper: f64) -> f64 {
+        // Find CI bound closest to null
+        let bound_closest_to_null = if ci_lower.abs() < ci_upper.abs() {
+            ci_lower.abs()
+        } else {
+            ci_upper.abs()
+        };
+
+        // If CI crosses null, E-value_CI = 1
+        if ci_lower * ci_upper < 0.0 {
+            return 1.0;
+        }
+
+        let rr = self.effect_to_risk_ratio(bound_closest_to_null);
+        if rr <= 1.0 {
+            1.0
+        } else {
+            rr + (rr * (rr - 1.0)).sqrt()
+        }
+    }
+
+    /// Convert standardized mean difference to risk ratio.
+    ///
+    /// Uses the approximation from Chinn (2000):
+    /// RR ≈ exp(d * π / sqrt(3)) ≈ exp(0.91 * d)
+    fn effect_to_risk_ratio(&self, d: f64) -> f64 {
+        // exp(d * π / sqrt(3)) ≈ exp(1.814 * d)
+        // Using more conservative conversion: exp(0.91 * d)
+        (0.91 * d).exp()
+    }
+
+    /// Compute robustness to unmeasured confounding.
+    ///
+    /// Returns a sensitivity analysis summary including:
+    /// - E-value (point estimate)
+    /// - Required confounder-treatment RR
+    /// - Required confounder-outcome RR
+    /// - Interpretation
+    pub fn sensitivity_analysis(&self) -> SensitivityAnalysis {
+        let e_value = self.e_value();
+
+        let interpretation = if e_value < 1.5 {
+            "Weak: Small unmeasured confounding could explain effect"
+        } else if e_value < 2.0 {
+            "Moderate: Medium confounding needed to explain effect"
+        } else if e_value < 3.0 {
+            "Good: Strong confounding needed to explain effect"
+        } else {
+            "Robust: Very strong confounding needed to explain effect"
+        };
+
+        SensitivityAnalysis {
+            e_value,
+            e_value_interpretation: interpretation.to_string(),
+            robustness_score: (e_value - 1.0).min(5.0) / 5.0, // Normalized 0-1
+            min_confounder_rr_treatment: e_value,
+            min_confounder_rr_outcome: e_value,
+        }
+    }
+}
+
+/// Sensitivity analysis results for unmeasured confounding.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SensitivityAnalysis {
+    /// E-value: minimum confounder strength to explain away effect.
+    pub e_value: f64,
+    /// Human-readable interpretation.
+    pub e_value_interpretation: String,
+    /// Robustness score (0-1, higher = more robust).
+    pub robustness_score: f64,
+    /// Minimum RR between confounder and treatment.
+    pub min_confounder_rr_treatment: f64,
+    /// Minimum RR between confounder and outcome.
+    pub min_confounder_rr_outcome: f64,
 }
 
 impl Default for EffectEstimator {
@@ -2045,6 +2149,891 @@ impl CausalReferenceHarness {
 impl Default for CausalReferenceHarness {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PC Algorithm (Causal Discovery)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// PC Algorithm for learning causal structure from observational data.
+///
+/// The PC algorithm (named after Peter and Clark) is a constraint-based causal
+/// discovery method that:
+/// 1. Starts with a complete undirected graph
+/// 2. Removes edges based on conditional independence tests
+/// 3. Orients edges using v-structure detection and orientation rules
+///
+/// Returns a CPDAG (Completed Partially Directed Acyclic Graph) where:
+/// - Directed edges represent definite causal directions
+/// - Undirected edges represent uncertain directions
+///
+/// Reference: Spirtes, Glymour, Scheines. "Causation, Prediction, and Search" (2000)
+pub struct PCAlgorithm {
+    /// Significance level for independence tests (default: 0.05).
+    pub alpha: f64,
+    /// Maximum conditioning set size to consider (for scalability).
+    pub max_cond_size: usize,
+}
+
+impl PCAlgorithm {
+    /// Create a new PC algorithm with default parameters.
+    pub fn new() -> Self {
+        Self {
+            alpha: 0.05,
+            max_cond_size: 4,
+        }
+    }
+
+    /// Create with custom significance level.
+    pub fn with_alpha(alpha: f64) -> Self {
+        Self {
+            alpha,
+            max_cond_size: 4,
+        }
+    }
+
+    /// Discover causal structure from observational data.
+    ///
+    /// Returns a CPDAG representing the learned causal structure.
+    pub fn discover(&self, data: &ObservationalData) -> PCResult {
+        let n = data.variables.len();
+        if n == 0 {
+            return PCResult {
+                skeleton: Skeleton::empty(vec![]),
+                cpdag: CPDAG::empty(vec![]),
+                separating_sets: HashMap::new(),
+                independence_tests: 0,
+            };
+        }
+
+        // Phase 1: Learn skeleton (undirected graph)
+        let (skeleton, sep_sets, tests) = self.learn_skeleton(data);
+
+        // Phase 2: Orient v-structures
+        let mut cpdag = CPDAG::from_skeleton(&skeleton, &data.variables);
+        self.orient_v_structures(&mut cpdag, &skeleton, &sep_sets);
+
+        // Phase 3: Apply orientation rules (Meek's rules)
+        self.apply_orientation_rules(&mut cpdag);
+
+        PCResult {
+            skeleton,
+            cpdag,
+            separating_sets: sep_sets,
+            independence_tests: tests,
+        }
+    }
+
+    /// Phase 1: Learn the skeleton using conditional independence tests.
+    fn learn_skeleton(&self, data: &ObservationalData) -> (Skeleton, HashMap<(usize, usize), Vec<usize>>, usize) {
+        let n = data.variables.len();
+
+        // Start with complete graph
+        let mut adjacencies: Vec<HashSet<usize>> = vec![HashSet::new(); n];
+        for i in 0..n {
+            for j in (i + 1)..n {
+                adjacencies[i].insert(j);
+                adjacencies[j].insert(i);
+            }
+        }
+
+        let mut sep_sets: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
+        let mut test_count = 0;
+
+        // Iterate through conditioning set sizes
+        for cond_size in 0..=self.max_cond_size {
+            let mut edges_to_remove = Vec::new();
+
+            for i in 0..n {
+                for &j in &adjacencies[i].clone() {
+                    if i >= j {
+                        continue; // Only check each pair once
+                    }
+
+                    // Get potential conditioning sets from neighbors
+                    let neighbors: Vec<usize> = adjacencies[i]
+                        .iter()
+                        .filter(|&&k| k != j)
+                        .copied()
+                        .collect();
+
+                    if neighbors.len() < cond_size {
+                        continue;
+                    }
+
+                    // Test all conditioning sets of this size
+                    for cond_set in combinations(&neighbors, cond_size) {
+                        test_count += 1;
+
+                        if self.is_independent(data, i, j, &cond_set) {
+                            edges_to_remove.push((i, j));
+                            sep_sets.insert((i.min(j), i.max(j)), cond_set);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Remove edges found to be conditionally independent
+            for (i, j) in edges_to_remove {
+                adjacencies[i].remove(&j);
+                adjacencies[j].remove(&i);
+            }
+        }
+
+        let skeleton = Skeleton {
+            nodes: data.variables.clone(),
+            adjacencies,
+        };
+
+        (skeleton, sep_sets, test_count)
+    }
+
+    /// Test if X ⊥ Y | Z using partial correlation.
+    ///
+    /// Uses Fisher's z-transformation for significance testing.
+    fn is_independent(&self, data: &ObservationalData, x: usize, y: usize, z: &[usize]) -> bool {
+        let n = data.n();
+        if n < 5 {
+            return false; // Not enough data
+        }
+
+        // Compute partial correlation
+        let partial_corr = self.partial_correlation(data, x, y, z);
+
+        // Fisher's z-transformation
+        let z_stat = fisher_z_transform(partial_corr, n, z.len());
+
+        // Two-tailed test against standard normal
+        let critical_value = 1.96; // α = 0.05
+        z_stat.abs() < critical_value
+    }
+
+    /// Compute partial correlation of X and Y given Z.
+    fn partial_correlation(&self, data: &ObservationalData, x: usize, y: usize, z: &[usize]) -> f64 {
+        if z.is_empty() {
+            // Simple correlation
+            return self.correlation(data, x, y);
+        }
+
+        if z.len() == 1 {
+            // First-order partial correlation
+            let rxy = self.correlation(data, x, y);
+            let rxz = self.correlation(data, x, z[0]);
+            let ryz = self.correlation(data, y, z[0]);
+
+            let denom = ((1.0 - rxz * rxz) * (1.0 - ryz * ryz)).sqrt();
+            if denom < 1e-10 {
+                return 0.0;
+            }
+            return (rxy - rxz * ryz) / denom;
+        }
+
+        // Higher-order partial correlation via recursion
+        // r(X,Y|Z) = (r(X,Y|Z-z0) - r(X,z0|Z-z0) * r(Y,z0|Z-z0)) /
+        //            sqrt((1 - r(X,z0|Z-z0)^2) * (1 - r(Y,z0|Z-z0)^2))
+        let z0 = z[0];
+        let z_rest: Vec<usize> = z[1..].to_vec();
+
+        let rxy_z = self.partial_correlation(data, x, y, &z_rest);
+        let rxz0_z = self.partial_correlation(data, x, z0, &z_rest);
+        let ryz0_z = self.partial_correlation(data, y, z0, &z_rest);
+
+        let denom = ((1.0 - rxz0_z * rxz0_z) * (1.0 - ryz0_z * ryz0_z)).sqrt();
+        if denom < 1e-10 {
+            return 0.0;
+        }
+        (rxy_z - rxz0_z * ryz0_z) / denom
+    }
+
+    /// Compute Pearson correlation between two variables.
+    fn correlation(&self, data: &ObservationalData, x: usize, y: usize) -> f64 {
+        let n = data.n();
+        if n < 2 {
+            return 0.0;
+        }
+
+        let mean_x = data.mean(x);
+        let mean_y = data.mean(y);
+
+        let mut sum_xy = 0.0;
+        let mut sum_xx = 0.0;
+        let mut sum_yy = 0.0;
+
+        for obs in &data.observations {
+            let dx = obs[x] - mean_x;
+            let dy = obs[y] - mean_y;
+            sum_xy += dx * dy;
+            sum_xx += dx * dx;
+            sum_yy += dy * dy;
+        }
+
+        let denom = (sum_xx * sum_yy).sqrt();
+        if denom < 1e-10 {
+            return 0.0;
+        }
+        sum_xy / denom
+    }
+
+    /// Phase 2: Orient v-structures (colliders).
+    ///
+    /// For each triple A - B - C where A and C are not adjacent,
+    /// orient as A → B ← C if B is not in the separating set of A and C.
+    fn orient_v_structures(
+        &self,
+        cpdag: &mut CPDAG,
+        skeleton: &Skeleton,
+        sep_sets: &HashMap<(usize, usize), Vec<usize>>,
+    ) {
+        let n = skeleton.nodes.len();
+
+        for b in 0..n {
+            // Find pairs of non-adjacent neighbors of B
+            let neighbors: Vec<usize> = skeleton.adjacencies[b].iter().copied().collect();
+
+            for i in 0..neighbors.len() {
+                for j in (i + 1)..neighbors.len() {
+                    let a = neighbors[i];
+                    let c = neighbors[j];
+
+                    // Check if A and C are non-adjacent
+                    if skeleton.adjacencies[a].contains(&c) {
+                        continue;
+                    }
+
+                    // Check if B is in the separating set
+                    let key = (a.min(c), a.max(c));
+                    let sep_set = sep_sets.get(&key).cloned().unwrap_or_default();
+
+                    if !sep_set.contains(&b) {
+                        // B is not in sep(A,C) → orient as v-structure: A → B ← C
+                        cpdag.orient(a, b);
+                        cpdag.orient(c, b);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Phase 3: Apply Meek's orientation rules.
+    ///
+    /// R1: A → B - C and A-/-C ⟹ B → C
+    /// R2: A → B → C and A - C ⟹ A → C
+    /// R3: A - B, A - C, A - D, B → D, C → D ⟹ A → D
+    /// R4: A - B, B - C, C → D, A → D, A-/-C ⟹ B → C
+    fn apply_orientation_rules(&self, cpdag: &mut CPDAG) {
+        loop {
+            let mut changed = false;
+
+            // R1: A → B - C and A-/-C ⟹ B → C
+            for b in 0..cpdag.nodes.len() {
+                let parents: Vec<usize> = cpdag.parents(b).iter().copied().collect();
+                let undirected: Vec<usize> = cpdag.undirected_neighbors(b).iter().copied().collect();
+
+                for &a in &parents {
+                    for &c in &undirected {
+                        if !cpdag.adjacent(a, c) {
+                            cpdag.orient(b, c);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+
+            // R2: A → B → C and A - C ⟹ A → C
+            for b in 0..cpdag.nodes.len() {
+                let parents: Vec<usize> = cpdag.parents(b).iter().copied().collect();
+                let children: Vec<usize> = cpdag.children(b).iter().copied().collect();
+
+                for &a in &parents {
+                    for &c in &children {
+                        if cpdag.undirected_neighbors(a).contains(&c) {
+                            cpdag.orient(a, c);
+                            changed = true;
+                        }
+                    }
+                }
+            }
+
+            if !changed {
+                break;
+            }
+        }
+    }
+}
+
+impl Default for PCAlgorithm {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Fisher's z-transformation for testing correlation significance.
+fn fisher_z_transform(r: f64, n: usize, k: usize) -> f64 {
+    // z = arctanh(r) * sqrt(n - k - 3)
+    let r_clamped = r.clamp(-0.9999, 0.9999);
+    let z = 0.5 * ((1.0 + r_clamped) / (1.0 - r_clamped)).ln();
+    let df = n as f64 - k as f64 - 3.0;
+    if df <= 0.0 {
+        return 0.0;
+    }
+    z * df.sqrt()
+}
+
+/// Generate all combinations of size k from a slice.
+fn combinations(items: &[usize], k: usize) -> Vec<Vec<usize>> {
+    if k == 0 {
+        return vec![vec![]];
+    }
+    if items.len() < k {
+        return vec![];
+    }
+    if items.len() == k {
+        return vec![items.to_vec()];
+    }
+
+    let mut result = Vec::new();
+
+    // Include first element
+    for mut combo in combinations(&items[1..], k - 1) {
+        combo.insert(0, items[0]);
+        result.push(combo);
+    }
+
+    // Exclude first element
+    result.extend(combinations(&items[1..], k));
+
+    result
+}
+
+/// Undirected skeleton graph.
+#[derive(Debug, Clone)]
+pub struct Skeleton {
+    /// Node names.
+    pub nodes: Vec<String>,
+    /// Adjacency lists (undirected).
+    pub adjacencies: Vec<HashSet<usize>>,
+}
+
+impl Skeleton {
+    /// Create an empty skeleton.
+    pub fn empty(nodes: Vec<String>) -> Self {
+        let n = nodes.len();
+        Self {
+            nodes,
+            adjacencies: vec![HashSet::new(); n],
+        }
+    }
+
+    /// Check if two nodes are adjacent.
+    pub fn adjacent(&self, a: usize, b: usize) -> bool {
+        self.adjacencies[a].contains(&b)
+    }
+
+    /// Get number of edges.
+    pub fn num_edges(&self) -> usize {
+        self.adjacencies.iter().map(|adj| adj.len()).sum::<usize>() / 2
+    }
+}
+
+/// Completed Partially Directed Acyclic Graph (CPDAG).
+///
+/// Represents the equivalence class of DAGs consistent with the data.
+#[derive(Debug, Clone)]
+pub struct CPDAG {
+    /// Node names.
+    pub nodes: Vec<String>,
+    /// Directed edges (parent → child).
+    pub directed: HashSet<(usize, usize)>,
+    /// Undirected edges (unordered pairs stored as (min, max)).
+    pub undirected: HashSet<(usize, usize)>,
+}
+
+impl CPDAG {
+    /// Create an empty CPDAG.
+    pub fn empty(nodes: Vec<String>) -> Self {
+        Self {
+            nodes,
+            directed: HashSet::new(),
+            undirected: HashSet::new(),
+        }
+    }
+
+    /// Create from skeleton (all edges undirected).
+    pub fn from_skeleton(skeleton: &Skeleton, nodes: &[String]) -> Self {
+        let mut undirected = HashSet::new();
+        for (i, adj) in skeleton.adjacencies.iter().enumerate() {
+            for &j in adj {
+                if i < j {
+                    undirected.insert((i, j));
+                }
+            }
+        }
+        Self {
+            nodes: nodes.to_vec(),
+            directed: HashSet::new(),
+            undirected,
+        }
+    }
+
+    /// Orient an undirected edge from a to b.
+    pub fn orient(&mut self, a: usize, b: usize) {
+        let key = (a.min(b), a.max(b));
+        if self.undirected.remove(&key) {
+            self.directed.insert((a, b));
+        }
+    }
+
+    /// Get parents of a node.
+    pub fn parents(&self, node: usize) -> HashSet<usize> {
+        self.directed
+            .iter()
+            .filter(|(_, c)| *c == node)
+            .map(|(p, _)| *p)
+            .collect()
+    }
+
+    /// Get children of a node.
+    pub fn children(&self, node: usize) -> HashSet<usize> {
+        self.directed
+            .iter()
+            .filter(|(p, _)| *p == node)
+            .map(|(_, c)| *c)
+            .collect()
+    }
+
+    /// Get undirected neighbors of a node.
+    pub fn undirected_neighbors(&self, node: usize) -> HashSet<usize> {
+        let mut result = HashSet::new();
+        for &(a, b) in &self.undirected {
+            if a == node {
+                result.insert(b);
+            } else if b == node {
+                result.insert(a);
+            }
+        }
+        result
+    }
+
+    /// Check if two nodes are adjacent (directed or undirected).
+    pub fn adjacent(&self, a: usize, b: usize) -> bool {
+        let key = (a.min(b), a.max(b));
+        self.undirected.contains(&key)
+            || self.directed.contains(&(a, b))
+            || self.directed.contains(&(b, a))
+    }
+
+    /// Convert to CausalDAG (directed edges only).
+    ///
+    /// Note: Loses undirected edge information.
+    pub fn to_dag(&self) -> CausalDAG {
+        CausalDAG::new(
+            self.nodes.clone(),
+            self.directed.iter().copied().collect(),
+        )
+    }
+
+    /// Get number of directed edges.
+    pub fn num_directed(&self) -> usize {
+        self.directed.len()
+    }
+
+    /// Get number of undirected edges.
+    pub fn num_undirected(&self) -> usize {
+        self.undirected.len()
+    }
+}
+
+/// Result of PC algorithm causal discovery.
+#[derive(Debug, Clone)]
+pub struct PCResult {
+    /// Undirected skeleton graph.
+    pub skeleton: Skeleton,
+    /// Completed partially directed graph.
+    pub cpdag: CPDAG,
+    /// Separating sets for each non-adjacent pair.
+    pub separating_sets: HashMap<(usize, usize), Vec<usize>>,
+    /// Number of independence tests performed.
+    pub independence_tests: usize,
+}
+
+impl PCResult {
+    /// Check if the algorithm found a valid structure.
+    pub fn is_valid(&self) -> bool {
+        !self.cpdag.nodes.is_empty()
+    }
+
+    /// Get the learned DAG (directed edges only).
+    pub fn to_dag(&self) -> CausalDAG {
+        self.cpdag.to_dag()
+    }
+
+    /// Summarize the discovered structure.
+    pub fn summary(&self) -> String {
+        format!(
+            "PC Algorithm Result:\n\
+             - Nodes: {}\n\
+             - Skeleton edges: {}\n\
+             - Directed edges: {}\n\
+             - Undirected edges: {}\n\
+             - Independence tests: {}",
+            self.cpdag.nodes.len(),
+            self.skeleton.num_edges(),
+            self.cpdag.num_directed(),
+            self.cpdag.num_undirected(),
+            self.independence_tests
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Causal Mediation Analysis
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Causal mediation analysis for decomposing treatment effects.
+///
+/// Given a treatment X, mediator M, and outcome Y, decomposes the total effect into:
+/// - **Natural Direct Effect (NDE)**: Effect of X on Y NOT through M
+/// - **Natural Indirect Effect (NIE)**: Effect of X on Y THROUGH M
+/// - **Total Effect (TE)** = NDE + NIE (on additive scale)
+///
+/// Reference: VanderWeele (2015). "Explanation in Causal Inference"
+///
+/// # Example
+///
+/// ```ignore
+/// // Smoking → Tar → Cancer
+/// let dag = CausalDAG::new(
+///     vec!["Smoking".into(), "Tar".into(), "Cancer".into()],
+///     vec![(0, 1), (0, 2), (1, 2)],  // Smoking → Tar, Smoking → Cancer, Tar → Cancer
+/// );
+///
+/// let analysis = MediationAnalysis::new(&dag, 0, 1, 2);  // X=Smoking, M=Tar, Y=Cancer
+/// let result = analysis.analyze(&data);
+/// println!("Direct effect: {}", result.nde);
+/// println!("Indirect effect (via Tar): {}", result.nie);
+/// ```
+pub struct MediationAnalysis<'a> {
+    dag: &'a CausalDAG,
+    treatment: usize,
+    mediator: usize,
+    outcome: usize,
+}
+
+impl<'a> MediationAnalysis<'a> {
+    /// Create a new mediation analysis.
+    ///
+    /// # Arguments
+    /// * `dag` - The causal DAG
+    /// * `treatment` - Index of treatment variable X
+    /// * `mediator` - Index of mediator variable M
+    /// * `outcome` - Index of outcome variable Y
+    pub fn new(dag: &'a CausalDAG, treatment: usize, mediator: usize, outcome: usize) -> Self {
+        Self { dag, treatment, mediator, outcome }
+    }
+
+    /// Check if mediation is identified given the causal structure.
+    ///
+    /// Mediation requires:
+    /// 1. X → M path exists
+    /// 2. M → Y path exists (with or without controlling for X)
+    /// 3. No confounding of M → Y that is affected by X
+    pub fn is_identified(&self) -> MediationIdentification {
+        // Check basic structure
+        let x_to_m = self.dag.has_path(self.treatment, self.mediator);
+        let m_to_y = self.dag.has_path(self.mediator, self.outcome);
+        let x_to_y = self.dag.has_path(self.treatment, self.outcome);
+
+        if !x_to_m {
+            return MediationIdentification::NotMediator {
+                reason: "No path from treatment to mediator".to_string(),
+            };
+        }
+
+        if !m_to_y {
+            return MediationIdentification::NotMediator {
+                reason: "No path from mediator to outcome".to_string(),
+            };
+        }
+
+        // Check for exposure-induced confounding
+        // This occurs when X affects a confounder of M → Y
+        let m_parents: HashSet<usize> = self.dag.parents(self.mediator).into_iter().collect();
+        let y_parents: HashSet<usize> = self.dag.parents(self.outcome).into_iter().collect();
+
+        // Potential confounders of M → Y
+        let potential_confounders: Vec<usize> = m_parents.intersection(&y_parents)
+            .filter(|&&n| n != self.treatment && n != self.mediator)
+            .copied()
+            .collect();
+
+        // Check if X affects any of these confounders
+        for &confounder in &potential_confounders {
+            if self.dag.has_path(self.treatment, confounder) {
+                return MediationIdentification::ExposureInducedConfounding {
+                    confounder: self.dag.nodes.get(confounder)
+                        .cloned()
+                        .unwrap_or_else(|| format!("Node_{}", confounder)),
+                };
+            }
+        }
+
+        // Find adjustment set for NDE/NIE
+        let baseline_confounders: Vec<usize> = self.dag.parents(self.treatment)
+            .into_iter()
+            .filter(|&n| self.dag.has_path(n, self.outcome))
+            .collect();
+
+        MediationIdentification::Identified {
+            nde_adjustment: baseline_confounders.clone(),
+            nie_adjustment: baseline_confounders,
+            has_direct_effect: x_to_y,
+        }
+    }
+
+    /// Estimate mediation effects from data.
+    ///
+    /// Uses the difference method (Baron-Kenny approach):
+    /// - NDE = E[Y | do(X=1), M(0)] - E[Y | do(X=0), M(0)]
+    /// - NIE = E[Y | do(X=1), M(1)] - E[Y | do(X=1), M(0)]
+    ///
+    /// For linear models without interactions:
+    /// - Total = c (regression coefficient of Y on X)
+    /// - NDE = c' (regression coefficient of Y on X controlling for M)
+    /// - NIE = a * b (product of coefficients)
+    pub fn analyze(&self, data: &ObservationalData) -> MediationResult {
+        let identification = self.is_identified();
+
+        match &identification {
+            MediationIdentification::Identified { nde_adjustment, .. } => {
+                // Simplified linear mediation analysis
+
+                // Step 1: Total effect (Y ~ X)
+                let total_effect = self.simple_regression(data, self.treatment, self.outcome);
+
+                // Step 2: Effect of X on M (a path)
+                let a_path = self.simple_regression(data, self.treatment, self.mediator);
+
+                // Step 3: Effect of M on Y controlling for X (b path) and direct effect (c')
+                let (c_prime, b_path) = self.multiple_regression_2(
+                    data,
+                    self.outcome,
+                    self.treatment,
+                    self.mediator,
+                );
+
+                // NIE = a * b (indirect effect)
+                let nie = a_path * b_path;
+
+                // NDE = c' (direct effect)
+                let nde = c_prime;
+
+                // Proportion mediated
+                let proportion_mediated = if total_effect.abs() > 1e-10 {
+                    nie / total_effect
+                } else {
+                    0.0
+                };
+
+                MediationResult {
+                    total_effect,
+                    natural_direct_effect: nde,
+                    natural_indirect_effect: nie,
+                    a_path,
+                    b_path,
+                    c_prime,
+                    proportion_mediated: proportion_mediated.clamp(0.0, 1.0),
+                    is_identified: true,
+                    identification,
+                }
+            }
+            _ => {
+                // Not identified - return NaN values
+                MediationResult {
+                    total_effect: f64::NAN,
+                    natural_direct_effect: f64::NAN,
+                    natural_indirect_effect: f64::NAN,
+                    a_path: f64::NAN,
+                    b_path: f64::NAN,
+                    c_prime: f64::NAN,
+                    proportion_mediated: f64::NAN,
+                    is_identified: false,
+                    identification,
+                }
+            }
+        }
+    }
+
+    /// Simple linear regression: Y ~ X
+    fn simple_regression(&self, data: &ObservationalData, x: usize, y: usize) -> f64 {
+        let n = data.n();
+        if n < 2 {
+            return 0.0;
+        }
+
+        let mean_x = data.mean(x);
+        let mean_y = data.mean(y);
+
+        let mut sum_xy = 0.0;
+        let mut sum_xx = 0.0;
+
+        for obs in &data.observations {
+            let dx = obs[x] - mean_x;
+            let dy = obs[y] - mean_y;
+            sum_xy += dx * dy;
+            sum_xx += dx * dx;
+        }
+
+        if sum_xx < 1e-10 {
+            return 0.0;
+        }
+
+        sum_xy / sum_xx
+    }
+
+    /// Multiple regression: Y ~ X + M, returns (coef_x, coef_m)
+    fn multiple_regression_2(&self, data: &ObservationalData, y: usize, x1: usize, x2: usize) -> (f64, f64) {
+        let n = data.n();
+        if n < 3 {
+            return (0.0, 0.0);
+        }
+
+        let mean_y = data.mean(y);
+        let mean_x1 = data.mean(x1);
+        let mean_x2 = data.mean(x2);
+
+        // Compute sums for normal equations
+        let mut sum_x1x1 = 0.0;
+        let mut sum_x2x2 = 0.0;
+        let mut sum_x1x2 = 0.0;
+        let mut sum_x1y = 0.0;
+        let mut sum_x2y = 0.0;
+
+        for obs in &data.observations {
+            let dx1 = obs[x1] - mean_x1;
+            let dx2 = obs[x2] - mean_x2;
+            let dy = obs[y] - mean_y;
+
+            sum_x1x1 += dx1 * dx1;
+            sum_x2x2 += dx2 * dx2;
+            sum_x1x2 += dx1 * dx2;
+            sum_x1y += dx1 * dy;
+            sum_x2y += dx2 * dy;
+        }
+
+        // Solve 2x2 system: [[sum_x1x1, sum_x1x2], [sum_x1x2, sum_x2x2]] * [b1, b2] = [sum_x1y, sum_x2y]
+        let det = sum_x1x1 * sum_x2x2 - sum_x1x2 * sum_x1x2;
+        if det.abs() < 1e-10 {
+            return (0.0, 0.0);
+        }
+
+        let b1 = (sum_x2x2 * sum_x1y - sum_x1x2 * sum_x2y) / det;
+        let b2 = (sum_x1x1 * sum_x2y - sum_x1x2 * sum_x1y) / det;
+
+        (b1, b2)
+    }
+}
+
+/// Result of mediation identification check.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MediationIdentification {
+    /// Mediation effects are identified.
+    Identified {
+        /// Variables to adjust for when estimating NDE.
+        nde_adjustment: Vec<usize>,
+        /// Variables to adjust for when estimating NIE.
+        nie_adjustment: Vec<usize>,
+        /// Whether there is a direct effect (X → Y path exists).
+        has_direct_effect: bool,
+    },
+    /// Not a valid mediator.
+    NotMediator {
+        /// Reason why M is not a valid mediator.
+        reason: String,
+    },
+    /// Exposure-induced confounding blocks identification.
+    ExposureInducedConfounding {
+        /// The confounder that is affected by X.
+        confounder: String,
+    },
+}
+
+/// Result of causal mediation analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MediationResult {
+    /// Total effect of X on Y.
+    pub total_effect: f64,
+    /// Natural Direct Effect (not through mediator).
+    pub natural_direct_effect: f64,
+    /// Natural Indirect Effect (through mediator).
+    pub natural_indirect_effect: f64,
+    /// a-path: Effect of X on M.
+    pub a_path: f64,
+    /// b-path: Effect of M on Y (controlling for X).
+    pub b_path: f64,
+    /// c'-path: Direct effect of X on Y (controlling for M).
+    pub c_prime: f64,
+    /// Proportion of total effect mediated (0-1).
+    pub proportion_mediated: f64,
+    /// Whether the mediation is identified.
+    pub is_identified: bool,
+    /// Identification status.
+    pub identification: MediationIdentification,
+}
+
+impl MediationResult {
+    /// Check if there is significant mediation.
+    ///
+    /// Returns true if:
+    /// - NIE is non-negligible (> threshold)
+    /// - NIE has the same sign as total effect
+    pub fn has_significant_mediation(&self, threshold: f64) -> bool {
+        self.is_identified
+            && self.natural_indirect_effect.abs() > threshold
+            && (self.natural_indirect_effect.signum() == self.total_effect.signum()
+                || self.total_effect.abs() < 1e-10)
+    }
+
+    /// Check if the effect is fully mediated (> 80% through mediator).
+    pub fn is_fully_mediated(&self) -> bool {
+        self.is_identified && self.proportion_mediated > 0.8
+    }
+
+    /// Check if the effect is partially mediated (20-80% through mediator).
+    pub fn is_partially_mediated(&self) -> bool {
+        self.is_identified && self.proportion_mediated > 0.2 && self.proportion_mediated <= 0.8
+    }
+
+    /// Get a summary of the mediation analysis.
+    pub fn summary(&self) -> String {
+        if !self.is_identified {
+            return format!("Mediation not identified: {:?}", self.identification);
+        }
+
+        let mediation_type = if self.is_fully_mediated() {
+            "Full mediation"
+        } else if self.is_partially_mediated() {
+            "Partial mediation"
+        } else if self.proportion_mediated > 0.0 {
+            "Weak mediation"
+        } else {
+            "No mediation"
+        };
+
+        format!(
+            "Mediation Analysis:\n\
+             - Total Effect: {:.4}\n\
+             - Direct Effect (NDE): {:.4}\n\
+             - Indirect Effect (NIE): {:.4}\n\
+             - Proportion Mediated: {:.1}%\n\
+             - Type: {}",
+            self.total_effect,
+            self.natural_direct_effect,
+            self.natural_indirect_effect,
+            self.proportion_mediated * 100.0,
+            mediation_type
+        )
     }
 }
 
