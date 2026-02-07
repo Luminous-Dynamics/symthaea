@@ -162,24 +162,17 @@ pub mod architectural_graph;
 #[cfg(feature = "full_consciousness")]
 pub mod gradient_optimizer;
 //
-// improvement_generator - ImprovementType variants used as structs with named
-//   fields (from, to, threads, component, count, optimization, name, old_value,
-//   new_value), ComponentId::from(f64) not implemented, root_cause move error;
-//   ~36 compilation errors
-// #[cfg(feature = "full_consciousness")]
-// pub mod improvement_generator;
+// improvement_generator - ImprovementType now has struct variants (fixed in core.rs)
+#[cfg(feature = "full_consciousness")]
+pub mod improvement_generator;
 //
-// recursive_optimizer - imports from architectural_graph, safe_experiment, and
-//   improvement_generator (all disabled); wrong arg counts for get_bottlenecks
-//   and record_phi; ~7 compilation errors
-// #[cfg(feature = "full_consciousness")]
-// pub mod recursive_optimizer;
+// recursive_optimizer - depends on improvement_generator and safe_experiment
+#[cfg(feature = "full_consciousness")]
+pub mod recursive_optimizer;
 //
-// safe_experiment - uses ImprovementType variants as struct patterns with named
-//   fields in match arms (E0026), ComponentId::Cache used as pattern (E0533);
-//   ~5 compilation errors
-// #[cfg(feature = "full_consciousness")]
-// pub mod safe_experiment;
+// safe_experiment - ImprovementType struct patterns now match
+#[cfg(feature = "full_consciousness")]
+pub mod safe_experiment;
 
 // TODO: These modules have broken dependencies and need a type refactor before
 // they can be re-enabled. See each module file for specific issues.

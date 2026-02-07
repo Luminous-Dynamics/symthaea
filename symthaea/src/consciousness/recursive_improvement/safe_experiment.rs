@@ -276,7 +276,7 @@ impl SafeExperiment {
         let default_latency = Duration::from_millis(50);
         let latency_ok = latencies.values()
             .all(|&d| {
-                let baseline_latency = self.baseline.latencies.get(&ComponentId::Cache).unwrap_or(&default_latency);
+                let baseline_latency = self.baseline.latencies.get(&ComponentId::Cache()).unwrap_or(&default_latency);
                 d <= baseline_latency.mul_f64(1.0 + self.success_criteria.max_latency_increase)
             });
 
@@ -356,7 +356,7 @@ impl SafeExperiment {
         match &self.improvement.improvement_type {
             ImprovementType::IncreaseCacheSize { .. } => {
                 // Cache improvement -> lower latency
-                if let Some(cache_latency) = latencies.get_mut(&ComponentId::Cache) {
+                if let Some(cache_latency) = latencies.get_mut(&ComponentId::Cache()) {
                     *cache_latency = cache_latency.mul_f64(0.8); // 20% faster
                 }
             }
@@ -479,8 +479,8 @@ mod tests {
 
     fn create_test_baseline() -> SystemSnapshot {
         let mut latencies = HashMap::new();
-        latencies.insert(ComponentId::Cache, Duration::from_millis(50));
-        latencies.insert(ComponentId::HRM, Duration::from_millis(100));
+        latencies.insert(ComponentId::Cache(), Duration::from_millis(50));
+        latencies.insert(ComponentId::HRM(), Duration::from_millis(100));
 
         let mut accuracies = HashMap::new();
         accuracies.insert(AccuracyMetric::AttackDetection, 0.90);

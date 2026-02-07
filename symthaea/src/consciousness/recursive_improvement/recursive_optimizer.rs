@@ -27,6 +27,7 @@ use super::safe_experiment::{
 use super::improvement_generator::{
     GeneratorConfig, ImprovementGenerator, ImprovementOutcome,
 };
+use super::core::Bottleneck;
 
 // Import from core for now (PerformanceMonitor, MonitorConfig, ComponentId still in core.rs)
 use super::core::{PerformanceMonitor, MonitorConfig, ComponentId};
@@ -160,19 +161,21 @@ impl RecursiveOptimizer {
         let starting_phi = self.stats.current_phi;
 
         // Step 1: Identify bottlenecks
-        let bottlenecks = self.monitor.get_bottlenecks(5);
+        let bottlenecks = self.monitor.get_bottlenecks();
 
         // Step 2: Analyze bottlenecks causally
         let mut causal_chains = Vec::new();
-        for bottleneck in &bottlenecks {
+        for bottleneck in bottlenecks {
             if let Ok(chain) = self.causal_graph.analyze_bottleneck(bottleneck) {
                 causal_chains.push(chain);
             }
         }
 
         // Step 3: Generate improvements
+        // Convert to Vec of references for generate_improvements
+        let bottleneck_refs: Vec<&Bottleneck> = bottlenecks.iter().collect();
         let improvements = self.generator.generate_improvements(
-            &bottlenecks,
+            &bottleneck_refs,
             &causal_chains,
             starting_phi,
         );
@@ -275,11 +278,11 @@ impl RecursiveOptimizer {
 
     /// Capture current system state as baseline
     fn capture_baseline(&self) -> SystemSnapshot {
-        let stats = self.monitor.get_stats();
+        let _stats = self.monitor.get_stats();
 
         SystemSnapshot {
             id: format!("baseline_{}", instant_now().elapsed().as_millis()),
-            phi: stats.avg_phi,
+            phi: self.stats.current_phi,
             latencies: HashMap::new(),
             accuracies: HashMap::new(),
             parameters: HashMap::new(),
@@ -288,14 +291,15 @@ impl RecursiveOptimizer {
     }
 
     /// Record performance measurement
-    pub fn record_phi(&mut self, phi: f64, components: usize, context: &str) {
-        self.monitor.record_phi(phi, components, context.to_string());
+    pub fn record_phi(&mut self, phi: f64, _components: usize, context: &str) {
+        self.monitor.record_phi(context, phi);
         self.stats.current_phi = phi;
     }
 
     /// Record latency measurement
     pub fn record_latency(&mut self, operation: &str, duration: Duration, component: ComponentId) {
-        self.monitor.record_latency(operation.to_string(), duration, component);
+        let start = Instant::now() - duration;
+        self.monitor.record_latency(operation.to_string(), start);
         self.causal_graph.update_component_performance(
             component,
             None,

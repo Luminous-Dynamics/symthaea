@@ -158,7 +158,7 @@ impl Bottleneck {
 }
 
 /// Types of improvements that can be applied
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ImprovementType {
     /// Optimize algorithm/implementation
     Optimization,
@@ -180,17 +180,17 @@ pub enum ImprovementType {
     HyperparameterTuning,
     // Extended variants used by improvement_generator and gradient_optimizer
     /// Increase cache size
-    IncreaseCacheSize,
+    IncreaseCacheSize { from: usize, to: usize },
     /// Parallelize (alias for Parallelization used in some modules)
-    Parallelize,
+    Parallelize { component: ComponentId, threads: usize },
     /// Increase evolution rate for adaptive systems
     IncreaseEvolutionRate,
     /// Add synthetic training data
-    AddSyntheticData,
+    AddSyntheticData { count: usize },
     /// Optimize specific algorithm
-    OptimizeAlgorithm,
+    OptimizeAlgorithm { component: ComponentId, optimization: String },
     /// Tune a specific hyperparameter
-    TuneHyperparameter,
+    TuneHyperparameter { name: String, old_value: f64, new_value: f64 },
 }
 
 /// Configuration for the performance monitor

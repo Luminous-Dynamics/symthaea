@@ -242,7 +242,7 @@ impl ImprovementGenerator {
         bottleneck: &Bottleneck,
         causal_chain: Option<&CausalChain>,
     ) -> Option<&CausalPattern> {
-        let root_cause = causal_chain.map(|c| c.root_cause);
+        let root_cause = causal_chain.map(|c| c.root_cause.clone());
 
         self.patterns.effective_causal_patterns.iter()
             .filter(|p| p.bottleneck_type == bottleneck.bottleneck_type)
@@ -273,7 +273,7 @@ impl ImprovementGenerator {
             expected_latency_reduction: Some(0.2 * pattern.success_rate),
             expected_accuracy_gain: None,
             confidence: pattern.success_rate,
-            motivated_by: Some(bottleneck.id.clone()),
+            motivated_by: Some(bottleneck.id.0.clone()),
         })
     }
 
@@ -286,19 +286,21 @@ impl ImprovementGenerator {
     ) -> Option<ArchitecturalImprovement> {
         let (improvement_type, description, expected_phi, expected_latency) = match bottleneck.bottleneck_type {
             BottleneckType::Latency => {
-                match bottleneck.component {
-                    ComponentId::Cache => (
+                if bottleneck.component.as_str() == "Cache" {
+                    (
                         ImprovementType::IncreaseCacheSize { from: 1000, to: 5000 },
                         "Increase cache size to reduce lookups".to_string(),
                         Some(0.02),
                         Some(0.3),
-                    ),
-                    comp => (
-                        ImprovementType::Parallelize { component: comp, threads: 4 },
+                    )
+                } else {
+                    let comp = bottleneck.component.clone();
+                    (
+                        ImprovementType::Parallelize { component: comp.clone(), threads: 4 },
                         format!("Parallelize {:?} to reduce latency", comp),
                         Some(0.01),
                         Some(0.4),
-                    ),
+                    )
                 }
             }
             BottleneckType::LowPhi => (
@@ -314,13 +316,14 @@ impl ImprovementGenerator {
                 None,
             ),
             BottleneckType::ResourceExhaustion => {
-                let root = causal_chain.map(|c| c.root_cause).unwrap_or(bottleneck.component);
+                let root = causal_chain.map(|c| c.root_cause.clone()).unwrap_or(bottleneck.component.clone());
+                let description = format!("Optimize {:?} for memory efficiency", root);
                 (
                     ImprovementType::OptimizeAlgorithm {
                         component: root,
                         optimization: "memory-efficient implementation".to_string(),
                     },
-                    format!("Optimize {:?} for memory efficiency", root),
+                    description,
                     Some(0.01),
                     Some(0.2),
                 )
@@ -348,19 +351,20 @@ impl ImprovementGenerator {
                 Some(-0.05),
             ),
             BottleneckType::Memory => {
-                let root = causal_chain.map(|c| c.root_cause).unwrap_or(bottleneck.component);
+                let root = causal_chain.map(|c| c.root_cause.clone()).unwrap_or(bottleneck.component.clone());
+                let description = format!("Optimize {:?} memory usage", root);
                 (
                     ImprovementType::OptimizeAlgorithm {
                         component: root,
                         optimization: "memory-pool allocation".to_string(),
                     },
-                    format!("Optimize {:?} memory usage", root),
+                    description,
                     Some(0.01),
                     Some(0.15),
                 )
             }
             BottleneckType::Computation => (
-                ImprovementType::Parallelize { component: bottleneck.component, threads: 8 },
+                ImprovementType::Parallelize { component: bottleneck.component.clone(), threads: 8 },
                 format!("Parallelize {:?} for better throughput", bottleneck.component),
                 Some(0.02),
                 Some(0.5),
@@ -370,6 +374,13 @@ impl ImprovementGenerator {
                 "Increase buffer sizes to reduce I/O waits".to_string(),
                 Some(0.01),
                 Some(0.25),
+            ),
+            // Catch-all for newer bottleneck types (Throughput, Energy, Integration, Contention)
+            _ => (
+                ImprovementType::Optimization,
+                format!("General optimization for {:?} bottleneck", bottleneck.bottleneck_type),
+                Some(0.01),
+                None,
             ),
         };
 
@@ -385,8 +396,8 @@ impl ImprovementGenerator {
             expected_phi_gain: expected_phi,
             expected_latency_reduction: expected_latency,
             expected_accuracy_gain: None,
-            confidence,
-            motivated_by: Some(bottleneck.id.clone()),
+            confidence: confidence as f64,
+            motivated_by: Some(bottleneck.id.0.clone()),
         })
     }
 
@@ -399,18 +410,18 @@ impl ImprovementGenerator {
         }
 
         let optimizations = [
-            (ComponentId::HRM, "batch-processing"),
-            (ComponentId::PrimitiveEvolution, "diversity-pressure"),
-            (ComponentId::MetaCognition, "attention-focusing"),
+            (ComponentId::HRM(), "batch-processing"),
+            (ComponentId::PrimitiveEvolution(), "diversity-pressure"),
+            (ComponentId::MetaCognition(), "attention-focusing"),
         ];
 
         let idx = (exploration_factor as usize) % optimizations.len();
-        let (component, optimization) = optimizations[idx];
+        let (component, optimization) = &optimizations[idx];
 
         Some(ArchitecturalImprovement {
             id: format!("explore_{}", instant_now().elapsed().as_millis()),
             improvement_type: ImprovementType::OptimizeAlgorithm {
-                component,
+                component: component.clone(),
                 optimization: optimization.to_string(),
             },
             description: format!("Exploration: {} for {:?}", optimization, component),
@@ -427,7 +438,7 @@ impl ImprovementGenerator {
         match s {
             s if s.starts_with("cache") => Some(ImprovementType::IncreaseCacheSize { from: 1000, to: 5000 }),
             s if s.starts_with("parallel") => Some(ImprovementType::Parallelize {
-                component: ComponentId::HRM,
+                component: ComponentId::HRM(),
                 threads: 4,
             }),
             s if s.starts_with("evolve") => Some(ImprovementType::IncreaseEvolutionRate),
@@ -520,6 +531,10 @@ fn bottleneck_type_to_string(bt: BottleneckType) -> &'static str {
         BottleneckType::Computation => "computation",
         BottleneckType::IO => "io",
         BottleneckType::Oscillation => "oscillation",
+        BottleneckType::Throughput => "throughput",
+        BottleneckType::Energy => "energy",
+        BottleneckType::Integration => "integration",
+        BottleneckType::Contention => "contention",
     }
 }
 

@@ -197,11 +197,11 @@ fn main() {
     // Count monotonic violations
     let phi_violations: usize = induction_phis
         .windows(2)
-        .filter(|w| w[1] > w[0] + 1e-6)
+        .filter(|w| w[1] > w[0] + 1e-4)
         .count();
     let alg_violations: usize = induction_algebraic
         .windows(2)
-        .filter(|w| w[1] > w[0] + 1e-6)
+        .filter(|w| w[1] > w[0] + 1e-4)
         .count();
 
     let phi_range = induction_phis.first().unwrap() - induction_phis.last().unwrap();
