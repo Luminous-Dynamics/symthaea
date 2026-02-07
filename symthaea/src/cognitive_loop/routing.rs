@@ -75,6 +75,11 @@ impl Default for ThalamicRouter {
 }
 
 impl ThalamicRouter {
+    /// Create a new ThalamicRouter with default thresholds.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Route based on input characteristics
     ///
     /// # Arguments
