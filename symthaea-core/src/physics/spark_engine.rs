@@ -415,7 +415,7 @@ impl SparkEngineSpec {
         if let Some(ref pulse) = self.trigger.pulse_duration {
             s.push_str(&format!("    Pulse:     {}\n", pulse));
         }
-        s.push_str("\n");
+        s.push('\n');
 
         s.push_str("  PERFORMANCE:\n\n");
         s.push_str(&format!("    Power:     {:.1} kW\n", self.power_kw));

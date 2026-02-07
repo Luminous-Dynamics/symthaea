@@ -339,9 +339,23 @@ impl DesignIntegrationEngine {
     pub fn compute_metrics(&self, result: &CoupledSimulationResult) -> IntegrationMetrics {
         let state = self.encode_simulation(result);
 
-        // Coupling index: measures similarity pattern to concept vectors
-        #[allow(deprecated)]
-        let coupling_index = self.bridge.phenomenal_index(&state.unified_state);
+        // Coupling index: entropy-based integration measure of state components
+        let coupling_index = {
+            use super::true_phi::TruePhiCalculator;
+            let calc = TruePhiCalculator::new();
+            let components = vec![
+                state.thermal_vector.clone(),
+                state.damage_vector.clone(),
+                state.geometry_vector.clone(),
+                state.pulse_vector.clone(),
+                state.conditions_vector.clone(),
+            ];
+            let n = components.len();
+            let max_pairs = (n * (n - 1)) / 2;
+            let max_phi = (max_pairs as f64) * 4.0;
+            let result = calc.compute_true_phi(&components);
+            (result.phi / max_phi).min(1.0) as f32
+        };
 
         // Design integration: internal consistency
         let perturbed = state.unified_state.scale(0.9);

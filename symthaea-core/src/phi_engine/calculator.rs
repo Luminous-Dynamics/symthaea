@@ -7,7 +7,7 @@
 //! interchangeable use of different calculation methods with consistent interfaces.
 //!
 //! ## Implementations
-//! - `ContinuousPhiCalculator` - Uses cosine similarity on RealHV
+//! - `ContinuousPhiCalculator` - Uses cosine similarity on ContinuousHV
 //! - `TieredPhi` - Binary with multiple approximation tiers
 //! - `ResonatorPhi` - O(n log N) resonator-based approximation
 

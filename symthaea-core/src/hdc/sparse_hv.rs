@@ -5,7 +5,7 @@
 //!
 //! # When to Use Sparse Representations
 //!
-//! | Scenario | Dense (HV16) | Sparse (SparseHV) |
+//! | Scenario | Dense (BinaryHV) | Sparse (SparseHV) |
 //! |----------|--------------|-------------------|
 //! | Storage | 2KB | ~4KB (50% density) |
 //! | Bind | 80ns | 200ns |
@@ -26,7 +26,7 @@
 //! - `lsh_simhash.rs` for locality-preserving hashing
 //! - Pre-computed LSH signatures for O(1) approximate similarity
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::HDC_DIMENSION;
 use std::collections::HashSet;
 
@@ -66,11 +66,11 @@ impl SparseHV {
         }
     }
 
-    /// Create from dense HV16
+    /// Create from dense BinaryHV
     ///
     /// Extracts positions of 1-bits and computes LSH signature.
     /// Time: O(D) = O(16,384)
-    pub fn from_hv16(hv: &HV16) -> Self {
+    pub fn from_hv16(hv: &BinaryHV) -> Self {
         let mut active_indices = Vec::with_capacity(Self::DIM / 2);
 
         for byte_idx in 0..2048 {
@@ -95,10 +95,10 @@ impl SparseHV {
         }
     }
 
-    /// Convert back to dense HV16
+    /// Convert back to dense BinaryHV
     ///
     /// Time: O(k) where k = number of active bits
-    pub fn to_hv16(&self) -> HV16 {
+    pub fn to_hv16(&self) -> BinaryHV {
         let mut data = [0u8; 2048];
 
         for &pos in &self.active_indices {
@@ -107,7 +107,7 @@ impl SparseHV {
             data[byte_idx] |= 1 << bit_pos;
         }
 
-        HV16(data)
+        BinaryHV(data)
     }
 
     /// Create random sparse vector with target density
@@ -116,7 +116,7 @@ impl SparseHV {
     /// - `seed`: Random seed for reproducibility
     /// - `density`: Target density (0.0 to 1.0)
     pub fn random(seed: u64, density: f32) -> Self {
-        let hv = HV16::random(seed);
+        let hv = BinaryHV::random(seed);
         let mut sparse = Self::from_hv16(&hv);
 
         // Adjust density if needed
@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn test_roundtrip_hv16() {
-        let original = HV16::random(42);
+        let original = BinaryHV::random(42);
         let sparse = SparseHV::from_hv16(&original);
         let recovered = sparse.to_hv16();
 
@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn test_density() {
-        let hv = HV16::random(42);
+        let hv = BinaryHV::random(42);
         let sparse = SparseHV::from_hv16(&hv);
 
         // Density should be ~0.5 for random vectors
@@ -393,8 +393,8 @@ mod tests {
 
     #[test]
     fn test_jaccard_vs_hamming() {
-        let a = HV16::random(1);
-        let b = HV16::random(2);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
 
         let sparse_a = SparseHV::from_hv16(&a);
         let sparse_b = SparseHV::from_hv16(&b);

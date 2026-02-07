@@ -14,7 +14,7 @@
 
 use std::collections::HashMap;
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use super::code_parser::EntityKind;
 use crate::mind::structured_thought::EpistemicStatus;
@@ -39,7 +39,7 @@ pub enum CodeIntent {
     },
     /// Find code matching a pattern
     Find {
-        pattern_hv: RealHV,
+        pattern_hv: ContinuousHV,
         scope: SearchScope,
     },
     /// Refactor code structure
@@ -88,7 +88,7 @@ pub struct CodeTarget {
     /// File path, if known
     pub path: Option<String>,
     /// HDC encoding of the target, if available
-    pub hv: Option<RealHV>,
+    pub hv: Option<ContinuousHV>,
 }
 
 impl CodeTarget {
@@ -116,7 +116,7 @@ impl CodeTarget {
     }
 
     /// Set the HDC encoding
-    pub fn with_hv(mut self, hv: RealHV) -> Self {
+    pub fn with_hv(mut self, hv: ContinuousHV) -> Self {
         self.hv = Some(hv);
         self
     }
@@ -132,7 +132,7 @@ pub struct CodeSpec {
     /// Natural language description of purpose
     pub purpose: String,
     /// HDC encoding of the purpose
-    pub purpose_hv: Option<RealHV>,
+    pub purpose_hv: Option<ContinuousHV>,
     /// Optional type signature
     pub signature: Option<String>,
     /// Constraints on the generated code
@@ -186,7 +186,7 @@ impl CodeSpec {
     }
 
     /// Set the purpose HV
-    pub fn with_purpose_hv(mut self, hv: RealHV) -> Self {
+    pub fn with_purpose_hv(mut self, hv: ContinuousHV) -> Self {
         self.purpose_hv = Some(hv);
         self
     }
@@ -260,12 +260,12 @@ pub enum RefactorStrategy {
 pub struct CodeIntentClassifier {
     dim: usize,
     /// Prototype HVs for different intents
-    create_prototype: RealHV,
-    modify_prototype: RealHV,
-    explain_prototype: RealHV,
-    find_prototype: RealHV,
-    refactor_prototype: RealHV,
-    debug_prototype: RealHV,
+    create_prototype: ContinuousHV,
+    modify_prototype: ContinuousHV,
+    explain_prototype: ContinuousHV,
+    find_prototype: ContinuousHV,
+    refactor_prototype: ContinuousHV,
+    debug_prototype: ContinuousHV,
 }
 
 impl CodeIntentClassifier {
@@ -301,7 +301,7 @@ impl CodeIntentClassifier {
     }
 
     /// Encode a set of keywords into a prototype HV
-    fn encode_prototype(dim: usize, keywords: &[&str]) -> RealHV {
+    fn encode_prototype(dim: usize, keywords: &[&str]) -> ContinuousHV {
         let mut values = vec![0.0f32; dim];
 
         for keyword in keywords {
@@ -320,11 +320,11 @@ impl CodeIntentClassifier {
             }
         }
 
-        RealHV::from_values(values)
+        ContinuousHV::from_values(values)
     }
 
     /// Encode text for classification
-    fn encode_text(&self, text: &str) -> RealHV {
+    fn encode_text(&self, text: &str) -> ContinuousHV {
         let mut values = vec![0.0f32; self.dim];
         let text_lower = text.to_lowercase();
 
@@ -340,7 +340,7 @@ impl CodeIntentClassifier {
             }
         }
 
-        RealHV::from_values(values)
+        ContinuousHV::from_values(values)
     }
 
     /// Classify text input into a code intent category

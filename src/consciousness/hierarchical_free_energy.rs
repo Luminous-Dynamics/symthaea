@@ -62,7 +62,7 @@
 //!   hierarchy that this module formalises in free-energy terms.
 //! - [`crate::consciousness::consciousness_thermodynamics`]: free energy is a
 //!   thermodynamic potential; temperature here maps to inverse precision.
-//! - [`crate::hdc::real_hv::RealHV`]: beliefs and prediction errors can be
+//! - [`crate::hdc::ContinuousHV`]: beliefs and prediction errors can be
 //!   lifted into HDC space for downstream HDC+CfC processing.
 //!
 //! ## References
@@ -79,7 +79,7 @@
 use serde::{Deserialize, Serialize};
 
 #[allow(unused_imports)]
-use crate::hdc::real_hv::RealHV;
+use crate::hdc::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -528,7 +528,7 @@ impl HierarchicalFreeEnergy {
     }
 
     /// Convert the current beliefs into a flat `Vec<f32>` suitable for
-    /// constructing a [`RealHV`] for downstream HDC processing.
+    /// constructing a [`ContinuousHV`] for downstream HDC processing.
     ///
     /// The vector concatenates beliefs from all levels (lowest first).
     pub fn beliefs_as_f32(&self) -> Vec<f32> {

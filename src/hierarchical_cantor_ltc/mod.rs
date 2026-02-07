@@ -31,7 +31,7 @@
 //! Level 7:       (leaf nodes, τ ≈ 0.46ms)
 //! ```
 
-use symthaea_core::hdc::{RealHV, HDC_DIMENSION};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 use std::f32::consts::E;
 
 // =============================================================================
@@ -95,7 +95,7 @@ impl CantorLtcConfig {
 #[derive(Clone)]
 pub struct CantorLtcNode {
     /// 16,384D HDC state vector
-    pub state: RealHV,
+    pub state: ContinuousHV,
     /// Time constant (ms) - decreases with depth
     pub tau: f32,
     /// Level in the hierarchy (0 = root, 7 = leaves)
@@ -105,13 +105,13 @@ pub struct CantorLtcNode {
     /// Children (left, right) - None for leaf nodes
     pub children: Option<(Box<CantorLtcNode>, Box<CantorLtcNode>)>,
     /// State history for BPTT (backpropagation through time)
-    pub history: Vec<RealHV>,
+    pub history: Vec<ContinuousHV>,
     /// Local integrated information (Φ)
     pub local_phi: f64,
     /// Weight vector for HDC binding (learned)
-    pub weight: RealHV,
+    pub weight: ContinuousHV,
     /// Bias vector
-    pub bias: RealHV,
+    pub bias: ContinuousHV,
 }
 
 impl CantorLtcNode {
@@ -122,15 +122,15 @@ impl CantorLtcNode {
         let seed = (level * 1000 + index) as u64;
 
         Self {
-            state: RealHV::random(dim, seed),
+            state: ContinuousHV::random(dim, seed),
             tau,
             level,
             index,
             children: None,
             history: Vec::with_capacity(100),
             local_phi: 0.0,
-            weight: RealHV::random(dim, seed + 10000),
-            bias: RealHV::random(dim, seed + 20000).scale(0.1),
+            weight: ContinuousHV::random(dim, seed + 10000),
+            bias: ContinuousHV::random(dim, seed + 20000).scale(0.1),
         }
     }
 
@@ -156,7 +156,7 @@ impl CantorLtcNode {
     /// ```text
     /// dx/dt = (-x + σ(W⊗x + parent⊗bundle(children) + bias)) / τ
     /// ```
-    fn step_single(&mut self, dt: f32, parent_state: Option<&RealHV>) {
+    fn step_single(&mut self, dt: f32, parent_state: Option<&ContinuousHV>) {
         // Save history for BPTT
         self.history.push(self.state.clone());
         if self.history.len() > 100 {
@@ -173,11 +173,11 @@ impl CantorLtcNode {
                 let child_bundle = self.get_child_bundle();
                 parent.bind(&child_bundle)
             }
-            None => RealHV::zero(self.state.values.len()),
+            None => ContinuousHV::zero(self.state.values.len()),
         };
 
         // Add bias and compute full pre-activation
-        let pre_activation = RealHV::bundle(&[
+        let pre_activation = ContinuousHV::bundle_owned(&[
             weighted_state,
             parent_contribution,
             self.bias.clone(),
@@ -187,7 +187,7 @@ impl CantorLtcNode {
         let activated: Vec<f32> = pre_activation.values.iter()
             .map(|&x| 1.0 / (1.0 + E.powf(-x)))
             .collect();
-        let target = RealHV { values: activated };
+        let target = ContinuousHV { values: activated };
 
         // LTC dynamics: dx/dt = (-x + target) / τ
         let dx: Vec<f32> = self.state.values.iter()
@@ -213,11 +213,11 @@ impl CantorLtcNode {
     ///
     /// Uses breadth-first traversal with an explicit work queue to avoid
     /// deep recursion that could overflow the call stack.
-    pub fn step(&mut self, dt: f32, parent_state: Option<&RealHV>) {
+    pub fn step(&mut self, dt: f32, parent_state: Option<&ContinuousHV>) {
         use std::collections::HashMap;
 
         // Store parent states by node index for efficient lookup
-        let mut parent_states: HashMap<usize, RealHV> = HashMap::new();
+        let mut parent_states: HashMap<usize, ContinuousHV> = HashMap::new();
 
         // First, process this node (the root or starting node)
         self.step_single(dt, parent_state);
@@ -266,12 +266,12 @@ impl CantorLtcNode {
     }
 
     /// Get bundled state of children (or zero if leaf)
-    fn get_child_bundle(&self) -> RealHV {
+    fn get_child_bundle(&self) -> ContinuousHV {
         match &self.children {
             Some((left, right)) => {
-                RealHV::bundle(&[left.state.clone(), right.state.clone()])
+                ContinuousHV::bundle_owned(&[left.state.clone(), right.state.clone()])
             }
-            None => RealHV::zero(self.state.values.len()),
+            None => ContinuousHV::zero(self.state.values.len()),
         }
     }
 
@@ -320,7 +320,7 @@ impl CantorLtcNode {
     }
 
     /// Collect all states in this subtree
-    fn collect_states(&self) -> Vec<RealHV> {
+    fn collect_states(&self) -> Vec<ContinuousHV> {
         let mut states = vec![self.state.clone()];
         if let Some((ref left, ref right)) = self.children {
             states.extend(left.collect_states());
@@ -330,7 +330,7 @@ impl CantorLtcNode {
     }
 
     /// Get state at specific level (for cross-level queries)
-    pub fn get_level_states(&self, target_level: usize) -> Vec<&RealHV> {
+    pub fn get_level_states(&self, target_level: usize) -> Vec<&ContinuousHV> {
         if self.level == target_level {
             vec![&self.state]
         } else if self.level < target_level {
@@ -409,9 +409,9 @@ impl HierarchicalCantorLtcNetwork {
     }
 
     /// Step the network with external input (inject at root)
-    pub fn step_with_input(&mut self, dt: f32, input: &RealHV) {
+    pub fn step_with_input(&mut self, dt: f32, input: &ContinuousHV) {
         // Blend input with root state before stepping
-        self.root.state = RealHV::bundle(&[
+        self.root.state = ContinuousHV::bundle_owned(&[
             self.root.state.clone(),
             input.clone(),
         ]);
@@ -448,7 +448,7 @@ impl HierarchicalCantorLtcNetwork {
     }
 
     /// Compute Φ for a set of states at a single level
-    fn compute_level_phi(&self, states: &[&RealHV]) -> f64 {
+    fn compute_level_phi(&self, states: &[&ContinuousHV]) -> f64 {
         let n = states.len() as f64;
         if n < 2.0 {
             return 0.0;
@@ -476,17 +476,17 @@ impl HierarchicalCantorLtcNetwork {
     }
 
     /// Get the root state (global representation)
-    pub fn get_root_state(&self) -> &RealHV {
+    pub fn get_root_state(&self) -> &ContinuousHV {
         &self.root.state
     }
 
     /// Get states at a specific level
-    pub fn get_level_states(&self, level: usize) -> Vec<&RealHV> {
+    pub fn get_level_states(&self, level: usize) -> Vec<&ContinuousHV> {
         self.root.get_level_states(level)
     }
 
     /// Query by similarity (find matching nodes)
-    pub fn query(&self, query: &RealHV, top_k: usize) -> Vec<(usize, usize, f32)> {
+    pub fn query(&self, query: &ContinuousHV, top_k: usize) -> Vec<(usize, usize, f32)> {
         let mut results = Vec::new();
         self.query_recursive(&self.root, query, &mut results);
         results.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
@@ -494,7 +494,7 @@ impl HierarchicalCantorLtcNetwork {
         results
     }
 
-    fn query_recursive(&self, node: &CantorLtcNode, query: &RealHV, results: &mut Vec<(usize, usize, f32)>) {
+    fn query_recursive(&self, node: &CantorLtcNode, query: &ContinuousHV, results: &mut Vec<(usize, usize, f32)>) {
         let similarity = node.state.similarity(query);
         results.push((node.level, node.index, similarity));
 
@@ -642,7 +642,7 @@ mod tests {
         };
         let network = HierarchicalCantorLtcNetwork::new(config);
 
-        let query = RealHV::random(HDC_DIMENSION, 12345);
+        let query = ContinuousHV::random(HDC_DIMENSION, 12345);
         let results = network.query(&query, 5);
 
         assert!(!results.is_empty());

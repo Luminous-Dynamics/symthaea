@@ -83,7 +83,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 // Note: MetaConsciousness would be imported when available
 use serde::{Deserialize, Serialize};
@@ -98,7 +98,7 @@ pub struct CollectiveAgent {
     pub id: String,
 
     /// Agent's internal state (hypervector representation)
-    pub state: Vec<HV16>,
+    pub state: Vec<BinaryHV>,
 
     /// Individual consciousness level (Φ_i)
     pub phi: f64,
@@ -192,14 +192,14 @@ pub struct TopologyMetric {
 /// # Example
 /// ```ignore
 /// use symthaea::hdc::collective_consciousness::{CollectiveConsciousness, CollectiveAgent};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let mut collective = CollectiveConsciousness::new();
 ///
 /// // Add agents
 /// let agent1 = CollectiveAgent {
 ///     id: "agent1".to_string(),
-///     state: vec![HV16::random(1000), HV16::random(1001)],
+///     state: vec![BinaryHV::random(1000), BinaryHV::random(1001)],
 ///     phi: 0.7,
 ///     meta_phi: Some(0.5),
 ///     connections: vec!["agent2".to_string()],
@@ -694,7 +694,7 @@ mod tests {
 
         let agent = CollectiveAgent {
             id: "agent1".to_string(),
-            state: vec![HV16::random(1000)],
+            state: vec![BinaryHV::random(1000)],
             phi: 0.5,
             meta_phi: None,
             connections: vec![],
@@ -710,7 +710,7 @@ mod tests {
 
         let agent = CollectiveAgent {
             id: "agent1".to_string(),
-            state: vec![HV16::random(1000)],
+            state: vec![BinaryHV::random(1000)],
             phi: 0.5,
             meta_phi: None,
             connections: vec![],
@@ -731,7 +731,7 @@ mod tests {
         for i in 0..3 {
             let agent = CollectiveAgent {
                 id: format!("agent{}", i),
-                state: vec![HV16::random(1000 + i)],
+                state: vec![BinaryHV::random(1000 + i)],
                 phi: 0.4,
                 meta_phi: None,
                 connections: vec![],
@@ -755,7 +755,7 @@ mod tests {
         for i in 0..3 {
             let agent = CollectiveAgent {
                 id: format!("agent{}", i),
-                state: vec![HV16::random(1000 + i)],
+                state: vec![BinaryHV::random(1000 + i)],
                 phi: 0.4,
                 meta_phi: Some(0.3),
                 connections: vec![],
@@ -797,7 +797,7 @@ mod tests {
         for i in 0..5 {
             let agent = CollectiveAgent {
                 id: format!("agent{}", i),
-                state: vec![HV16::random(1000 + i)],
+                state: vec![BinaryHV::random(1000 + i)],
                 phi: 0.6,
                 meta_phi: Some(0.5),
                 connections: vec![],
@@ -838,7 +838,7 @@ mod tests {
         for i in 0..5 {
             let agent = CollectiveAgent {
                 id: format!("agent{}", i),
-                state: vec![HV16::random(1000 + i)],
+                state: vec![BinaryHV::random(1000 + i)],
                 phi: 0.5,
                 meta_phi: None,
                 connections: vec![],
@@ -873,7 +873,7 @@ mod tests {
         for i in 0..3 {
             let agent = CollectiveAgent {
                 id: format!("agent{}", i),
-                state: vec![HV16::random(1000 + i)],
+                state: vec![BinaryHV::random(1000 + i)],
                 phi: 0.6,
                 meta_phi: Some(0.5), // Meta-conscious agents
                 connections: vec![],

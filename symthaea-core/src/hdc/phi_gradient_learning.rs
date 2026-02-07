@@ -22,7 +22,7 @@
 //!
 //! This system learns WHICH specific connections maximize Φ.
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::spectral_connectivity::ConnectivityCalculator;
 
 /// Learning configuration for Φ-gradient optimization
@@ -120,7 +120,7 @@ pub struct LearnableNode {
     /// Node ID
     pub id: usize,
     /// Node representation (HDC vector)
-    pub state: RealHV,
+    pub state: ContinuousHV,
     /// Module assignment (for tracking bridge vs intra-module)
     pub module: usize,
     /// Hierarchical level
@@ -177,7 +177,7 @@ impl PhiGradientTopology {
 
                 LearnableNode {
                     id: i,
-                    state: RealHV::random(dim, seed + i as u64 * 12345),
+                    state: ContinuousHV::random(dim, seed + i as u64 * 12345),
                     module,
                     level,
                 }
@@ -217,7 +217,7 @@ impl PhiGradientTopology {
 
     /// Compute Φ for current edge configuration
     pub fn compute_phi(&self) -> f64 {
-        let representations: Vec<RealHV> = self.nodes.iter()
+        let representations: Vec<ContinuousHV> = self.nodes.iter()
             .map(|n| n.state.clone())
             .collect();
         self.phi_calc.algebraic_connectivity(&representations)
@@ -226,7 +226,7 @@ impl PhiGradientTopology {
     /// Compute Φ with a specific edge configuration (for gradient estimation)
     fn compute_phi_with_edges(&self, active_edges: &[bool]) -> f64 {
         // Create temporary states influenced by active edges
-        let mut states: Vec<RealHV> = self.nodes.iter()
+        let mut states: Vec<ContinuousHV> = self.nodes.iter()
             .map(|n| n.state.clone())
             .collect();
 

@@ -38,7 +38,7 @@
 
 #![allow(dead_code)]
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::consciousness_advanced_cognition::{
     AdvancedCognitionEngine, TheoryOfMindEngine, MotorImagerySystem,
 };
@@ -77,7 +77,7 @@ pub enum MotorEffector {
 #[derive(Debug, Clone)]
 pub struct SensoryInput {
     pub modality: SensoryModality,
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     pub intensity: f64,
     pub timestamp: u64,
     pub spatial_location: Option<[f64; 3]>,
@@ -87,9 +87,9 @@ pub struct SensoryInput {
 #[derive(Debug, Clone)]
 pub struct MotorCommand {
     pub effector: MotorEffector,
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     pub intensity: f64,
-    pub predicted_feedback: HV16,
+    pub predicted_feedback: BinaryHV,
     pub confidence: f64,
 }
 
@@ -97,7 +97,7 @@ pub struct MotorCommand {
 #[derive(Debug, Clone)]
 pub struct ActionPerceptionResult {
     pub selected_action: Option<MotorCommand>,
-    pub predicted_consequences: Vec<HV16>,
+    pub predicted_consequences: Vec<BinaryHV>,
     pub prediction_error: f64,
     pub affordances_detected: Vec<Affordance>,
 }
@@ -106,7 +106,7 @@ pub struct ActionPerceptionResult {
 #[derive(Debug, Clone)]
 pub struct Affordance {
     pub name: String,
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     pub relevance: f64,
     pub requires_effector: MotorEffector,
 }
@@ -118,13 +118,13 @@ pub struct SensorimotorGrounding {
     /// Motor repertoire
     motor_repertoire: HashMap<String, MotorCommand>,
     /// Forward model (action -> predicted sensation)
-    forward_model: HashMap<HV16, HV16>,
+    forward_model: HashMap<BinaryHV, BinaryHV>,
     /// Inverse model (goal -> action)
-    inverse_model: HashMap<HV16, HV16>,
+    inverse_model: HashMap<BinaryHV, BinaryHV>,
     /// Prediction error history
     prediction_errors: VecDeque<f64>,
     /// Current body state encoding
-    body_state: HV16,
+    body_state: BinaryHV,
     /// Affordance detector sensitivity
     affordance_threshold: f64,
     /// Integration with motor imagery
@@ -151,7 +151,7 @@ impl SensorimotorGrounding {
             forward_model: HashMap::new(),
             inverse_model: HashMap::new(),
             prediction_errors: VecDeque::with_capacity(1000),
-            body_state: HV16::random(42),
+            body_state: BinaryHV::random(42),
             affordance_threshold: 0.6,
             motor_imagery: MotorImagerySystem::new(),
         }
@@ -167,29 +167,28 @@ impl SensorimotorGrounding {
         }
 
         // Update body state with new input
-        self.body_state = HV16::bundle(&[self.body_state, input.encoding]);
+        self.body_state = BinaryHV::bundle(&[self.body_state, input.encoding]);
     }
 
     /// Select action based on goal
-    pub fn select_action(&mut self, goal: &HV16) -> Option<MotorCommand> {
+    pub fn select_action(&mut self, goal: &BinaryHV) -> Option<MotorCommand> {
         // Check inverse model for matching action
         let mut best_action: Option<(f32, &MotorCommand)> = None;
         let threshold = self.affordance_threshold as f32;
 
-        for (_action_name, command) in &self.motor_repertoire {
+        for command in self.motor_repertoire.values() {
             let similarity = goal.similarity(&command.encoding);
-            if similarity > threshold {
-                if best_action.is_none() || similarity > best_action.unwrap().0 {
+            if similarity > threshold
+                && (best_action.is_none() || similarity > best_action.unwrap().0) {
                     best_action = Some((similarity, command));
                 }
-            }
         }
 
         best_action.map(|(_, cmd)| cmd.clone())
     }
 
     /// Predict consequences of action
-    pub fn predict_consequences(&self, action: &MotorCommand) -> Vec<HV16> {
+    pub fn predict_consequences(&self, action: &MotorCommand) -> Vec<BinaryHV> {
         let mut predictions = Vec::new();
 
         // Use forward model
@@ -205,7 +204,7 @@ impl SensorimotorGrounding {
     }
 
     /// Update models based on prediction error
-    pub fn update_from_feedback(&mut self, predicted: &HV16, actual: &HV16) {
+    pub fn update_from_feedback(&mut self, predicted: &BinaryHV, actual: &BinaryHV) {
         let error = 1.0 - predicted.similarity(actual) as f64;
         self.prediction_errors.push_back(error);
         if self.prediction_errors.len() > 1000 {
@@ -229,7 +228,7 @@ impl SensorimotorGrounding {
             self.sensory_buffers.get(&SensoryModality::Proprioceptive),
         ) {
             if let (Some(v), Some(p)) = (visual.back(), proprio.back()) {
-                let combined = HV16::bundle(&[v.encoding, p.encoding]);
+                let combined = BinaryHV::bundle(&[v.encoding, p.encoding]);
                 affordances.push(Affordance {
                     name: "manipulate".to_string(),
                     encoding: combined,
@@ -243,7 +242,7 @@ impl SensorimotorGrounding {
     }
 
     /// Run complete action-perception cycle
-    pub fn action_perception_cycle(&mut self, goal: &HV16) -> ActionPerceptionResult {
+    pub fn action_perception_cycle(&mut self, goal: &BinaryHV) -> ActionPerceptionResult {
         let affordances = self.detect_affordances();
         let action = self.select_action(goal);
         let predictions = action.as_ref()
@@ -267,7 +266,7 @@ impl SensorimotorGrounding {
     }
 
     /// Get current body state encoding
-    pub fn body_state(&self) -> &HV16 {
+    pub fn body_state(&self) -> &BinaryHV {
         &self.body_state
     }
 }
@@ -517,7 +516,7 @@ impl Default for DevelopmentalTracker {
 #[derive(Debug, Clone)]
 pub struct SocialAgent {
     pub id: String,
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     pub mental_model: AgentMentalState,
     pub relationship_valence: f64,
     pub trust_level: f64,
@@ -527,18 +526,18 @@ pub struct SocialAgent {
 /// Mental state model for another agent
 #[derive(Debug, Clone)]
 pub struct AgentMentalState {
-    pub believed_beliefs: Vec<HV16>,
-    pub inferred_desires: Vec<HV16>,
-    pub predicted_intentions: Vec<HV16>,
+    pub believed_beliefs: Vec<BinaryHV>,
+    pub inferred_desires: Vec<BinaryHV>,
+    pub predicted_intentions: Vec<BinaryHV>,
     pub emotional_estimate: f64,
-    pub attention_focus: Option<HV16>,
+    pub attention_focus: Option<BinaryHV>,
 }
 
 /// Social norm representation
 #[derive(Debug, Clone)]
 pub struct SocialNorm {
     pub name: String,
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     pub importance: f64,
     pub contexts: Vec<String>,
 }
@@ -548,8 +547,8 @@ pub struct SocialNorm {
 pub struct EmpathicResonance {
     pub target_agent: String,
     pub emotional_alignment: f64,
-    pub perspective_shift: HV16,
-    pub shared_attention: Option<HV16>,
+    pub perspective_shift: BinaryHV,
+    pub shared_attention: Option<BinaryHV>,
 }
 
 /// Social consciousness system
@@ -565,9 +564,9 @@ pub struct SocialConsciousness {
     /// Communication history
     communication_history: VecDeque<SocialInteraction>,
     /// Collective attention focus
-    collective_attention: Option<HV16>,
+    collective_attention: Option<BinaryHV>,
     /// Self-other distinction
-    self_encoding: HV16,
+    self_encoding: BinaryHV,
 }
 
 /// Record of social interaction
@@ -575,7 +574,7 @@ pub struct SocialConsciousness {
 pub struct SocialInteraction {
     pub agent_id: String,
     pub interaction_type: InteractionType,
-    pub content: HV16,
+    pub content: BinaryHV,
     pub timestamp: u64,
     pub outcome: InteractionOutcome,
 }
@@ -605,12 +604,12 @@ impl SocialConsciousness {
             group_memberships: HashMap::new(),
             communication_history: VecDeque::with_capacity(1000),
             collective_attention: None,
-            self_encoding: HV16::random(999),
+            self_encoding: BinaryHV::random(999),
         }
     }
 
     /// Register a new social agent
-    pub fn register_agent(&mut self, id: &str, encoding: HV16) {
+    pub fn register_agent(&mut self, id: &str, encoding: BinaryHV) {
         let agent = SocialAgent {
             id: id.to_string(),
             encoding,
@@ -629,7 +628,7 @@ impl SocialConsciousness {
     }
 
     /// Model another agent's mental state
-    pub fn model_agent_mind(&mut self, agent_id: &str, observed_behavior: &HV16) -> Option<AgentMentalState> {
+    pub fn model_agent_mind(&mut self, agent_id: &str, observed_behavior: &BinaryHV) -> Option<AgentMentalState> {
         let agent = self.agents.get_mut(agent_id)?;
 
         // Use ToM engine to infer mental states
@@ -701,7 +700,7 @@ impl SocialConsciousness {
     }
 
     /// Check if behavior violates norms
-    pub fn check_norm_violation(&self, behavior: &HV16) -> Vec<(String, f64)> {
+    pub fn check_norm_violation(&self, behavior: &BinaryHV) -> Vec<(String, f64)> {
         self.norms.iter()
             .map(|norm| {
                 let violation = 1.0 - behavior.similarity(&norm.encoding) as f64;
@@ -712,7 +711,7 @@ impl SocialConsciousness {
     }
 
     /// Update collective attention
-    pub fn update_collective_attention(&mut self, focus: HV16) {
+    pub fn update_collective_attention(&mut self, focus: BinaryHV) {
         self.collective_attention = Some(focus);
     }
 
@@ -741,11 +740,11 @@ pub enum IntrospectionQuery {
     /// "What am I thinking about?"
     CurrentFocus,
     /// "Why did I do X?"
-    ActionExplanation(HV16),
+    ActionExplanation(BinaryHV),
     /// "What do I believe about X?"
-    BeliefQuery(HV16),
+    BeliefQuery(BinaryHV),
     /// "What would happen if X?"
-    Counterfactual(HV16),
+    Counterfactual(BinaryHV),
     /// "How conscious am I?"
     ConsciousnessLevel,
     /// "What are my current goals?"
@@ -762,7 +761,7 @@ pub struct IntrospectionResponse {
     pub query: String,
     pub answer: String,
     pub confidence: f64,
-    pub supporting_evidence: Vec<HV16>,
+    pub supporting_evidence: Vec<BinaryHV>,
     pub timestamp: u64,
 }
 
@@ -1009,7 +1008,7 @@ impl CompleteConsciousBeing {
     }
 
     /// Run a complete consciousness cycle
-    pub fn consciousness_cycle(&mut self, sensory_inputs: Vec<SensoryInput>, goal: &HV16) -> ConsciousnessSnapshot {
+    pub fn consciousness_cycle(&mut self, sensory_inputs: Vec<SensoryInput>, goal: &BinaryHV) -> ConsciousnessSnapshot {
         self.cycle_count += 1;
 
         // 1. Process sensory inputs
@@ -1040,7 +1039,7 @@ impl CompleteConsciousBeing {
     }
 
     /// Register a social agent
-    pub fn register_social_agent(&mut self, id: &str, encoding: HV16) {
+    pub fn register_social_agent(&mut self, id: &str, encoding: BinaryHV) {
         self.social.register_agent(id, encoding);
     }
 
@@ -1091,7 +1090,7 @@ mod tests {
         // Process sensory input
         let input = SensoryInput {
             modality: SensoryModality::Visual,
-            encoding: HV16::random(100),
+            encoding: BinaryHV::random(100),
             intensity: 0.8,
             timestamp: 0,
             spatial_location: Some([0.0, 1.0, 2.0]),
@@ -1099,7 +1098,7 @@ mod tests {
         sm.process_sensory(input);
 
         // Test action selection
-        let goal = HV16::random(200);
+        let goal = BinaryHV::random(200);
         let result = sm.action_perception_cycle(&goal);
 
         assert!(result.prediction_error >= 0.0);
@@ -1128,11 +1127,11 @@ mod tests {
         let mut social = SocialConsciousness::new();
 
         // Register agent
-        social.register_agent("alice", HV16::random(300));
-        social.register_agent("bob", HV16::random(301));
+        social.register_agent("alice", BinaryHV::random(300));
+        social.register_agent("bob", BinaryHV::random(301));
 
         // Model mind
-        let behavior = HV16::random(400);
+        let behavior = BinaryHV::random(400);
         let state = social.model_agent_mind("alice", &behavior);
         assert!(state.is_some());
 
@@ -1165,12 +1164,12 @@ mod tests {
         // Run consciousness cycle
         let inputs = vec![SensoryInput {
             modality: SensoryModality::Visual,
-            encoding: HV16::random(500),
+            encoding: BinaryHV::random(500),
             intensity: 0.9,
             timestamp: 0,
             spatial_location: None,
         }];
-        let goal = HV16::random(600);
+        let goal = BinaryHV::random(600);
 
         let snapshot = being.consciousness_cycle(inputs, &goal);
 

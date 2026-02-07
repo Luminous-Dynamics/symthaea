@@ -19,7 +19,7 @@
 //! ```
 
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use super::code_intent::{CodeIntent, CodeSpec, CodeTarget, CodeChange};
 use super::code_parser::EntityKind;
@@ -52,7 +52,7 @@ pub struct CodeContext<'a> {
     /// The codebase memory for pattern retrieval
     pub memory: Option<&'a CodebaseMemory>,
     /// Additional context HVs (e.g., from conversation)
-    pub context_hvs: Vec<RealHV>,
+    pub context_hvs: Vec<ContinuousHV>,
     /// Additional source files for context
     pub source_files: Vec<(String, String)>,
 }
@@ -132,7 +132,7 @@ impl CodeGenerator {
 
         // 2. Query codebase for similar patterns
         let similar_hvs = self.find_similar_context(&intent_hv, context);
-        let similar_refs: Vec<&RealHV> = similar_hvs.iter().collect();
+        let similar_refs: Vec<&ContinuousHV> = similar_hvs.iter().collect();
 
         // 3. CfC plan
         let plan = self.sequencer.plan_structure(&intent_hv, &similar_refs);
@@ -251,7 +251,7 @@ impl CodeGenerator {
     /// Generate search results
     fn generate_search_result(
         &self,
-        pattern_hv: &RealHV,
+        pattern_hv: &ContinuousHV,
         _scope: &super::code_intent::SearchScope,
         context: &CodeContext,
     ) -> GeneratedCode {
@@ -354,7 +354,7 @@ impl CodeGenerator {
     // ========================================================================
 
     /// Encode a code spec into an HDC vector
-    fn encode_spec(&self, spec: &CodeSpec) -> RealHV {
+    fn encode_spec(&self, spec: &CodeSpec) -> ContinuousHV {
         if let Some(ref hv) = spec.purpose_hv {
             return hv.clone();
         }
@@ -364,11 +364,11 @@ impl CodeGenerator {
         let purpose_hv = self.encoder.encode_name(&spec.purpose);
         let lang_hv = self.encoder.encode_name(&spec.language);
 
-        RealHV::bundle(&[name_hv, purpose_hv, lang_hv])
+        ContinuousHV::bundle_owned(&[name_hv, purpose_hv, lang_hv])
     }
 
     /// Find similar patterns from context
-    fn find_similar_context(&self, intent_hv: &RealHV, context: &CodeContext) -> Vec<RealHV> {
+    fn find_similar_context(&self, intent_hv: &ContinuousHV, context: &CodeContext) -> Vec<ContinuousHV> {
         let mut results = Vec::new();
 
         // Add context HVs directly

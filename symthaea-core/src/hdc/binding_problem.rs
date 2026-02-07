@@ -40,7 +40,7 @@
 // synchrony detection, and integration with consciousness framework.
 // Solves binding problem through compositional HDC algebra.
 
-use crate::hdc::{HV16, HDC_DIMENSION};
+use crate::hdc::{BinaryHV, HDC_DIMENSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -95,7 +95,7 @@ pub struct FeatureValue {
     pub dimension: FeatureDimension,
 
     /// HDC representation of feature value
-    pub value: HV16,
+    pub value: BinaryHV,
 
     /// Activation strength [0,1]
     pub activation: f64,
@@ -106,7 +106,7 @@ pub struct FeatureValue {
 
 impl FeatureValue {
     /// Create new feature value
-    pub fn new(dimension: FeatureDimension, value: HV16, activation: f64) -> Self {
+    pub fn new(dimension: FeatureDimension, value: BinaryHV, activation: f64) -> Self {
         Self {
             dimension,
             value,
@@ -126,7 +126,7 @@ impl FeatureValue {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoundObject {
     /// Bound representation (composition of features)
-    pub representation: HV16,
+    pub representation: BinaryHV,
 
     /// Component features
     pub features: Vec<FeatureValue>,
@@ -167,9 +167,9 @@ impl BoundObject {
     }
 
     /// Bind features using HDC circular convolution
-    fn bind_features(features: &[FeatureValue]) -> HV16 {
+    fn bind_features(features: &[FeatureValue]) -> BinaryHV {
         if features.is_empty() {
-            return HV16::zero();
+            return BinaryHV::zero();
         }
 
         // Start with first feature
@@ -273,7 +273,7 @@ pub struct BindingSystem {
     bound_objects: Vec<BoundObject>,
 
     /// Feature dimension encoders (map values to HVs)
-    encoders: HashMap<FeatureDimension, HashMap<String, HV16>>,
+    encoders: HashMap<FeatureDimension, HashMap<String, BinaryHV>>,
 
     /// Timestep counter
     timestep: usize,
@@ -455,7 +455,7 @@ mod tests {
     fn test_feature_value_creation() {
         let feature = FeatureValue::new(
             FeatureDimension::Color,
-            HV16::ones(),
+            BinaryHV::ones(),
             0.8,
         );
         assert_eq!(feature.dimension, FeatureDimension::Color);
@@ -466,7 +466,7 @@ mod tests {
     fn test_feature_with_phase() {
         let feature = FeatureValue::new(
             FeatureDimension::Color,
-            HV16::ones(),
+            BinaryHV::ones(),
             0.8,
         ).with_phase(0.5);
 
@@ -476,8 +476,8 @@ mod tests {
     #[test]
     fn test_bind_features() {
         let features = vec![
-            FeatureValue::new(FeatureDimension::Color, HV16::random(1), 0.9),
-            FeatureValue::new(FeatureDimension::Shape, HV16::random(2), 0.8),
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::random(1), 0.9),
+            FeatureValue::new(FeatureDimension::Shape, BinaryHV::random(2), 0.8),
         ];
 
         let bound = BoundObject::from_features(features);
@@ -488,9 +488,9 @@ mod tests {
     #[test]
     fn test_perfect_synchrony() {
         let features = vec![
-            FeatureValue::new(FeatureDimension::Color, HV16::ones(), 0.9)
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9)
                 .with_phase(0.0),
-            FeatureValue::new(FeatureDimension::Shape, HV16::zero(), 0.8)
+            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8)
                 .with_phase(0.0),  // Same phase = synchronized
         ];
 
@@ -501,9 +501,9 @@ mod tests {
     #[test]
     fn test_no_synchrony() {
         let features = vec![
-            FeatureValue::new(FeatureDimension::Color, HV16::ones(), 0.9)
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9)
                 .with_phase(0.0),
-            FeatureValue::new(FeatureDimension::Shape, HV16::zero(), 0.8)
+            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8)
                 .with_phase(3.14),  // Opposite phase = desynchronized
         ];
 
@@ -514,9 +514,9 @@ mod tests {
     #[test]
     fn test_conscious_object() {
         let features = vec![
-            FeatureValue::new(FeatureDimension::Color, HV16::ones(), 0.9)
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9)
                 .with_phase(0.0),
-            FeatureValue::new(FeatureDimension::Shape, HV16::zero(), 0.8)
+            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8)
                 .with_phase(0.1),  // Slightly different but synchronized
         ];
 
@@ -536,7 +536,7 @@ mod tests {
         let mut system = BindingSystem::new(BindingConfig::default());
         let feature = FeatureValue::new(
             FeatureDimension::Color,
-            HV16::ones(),
+            BinaryHV::ones(),
             0.8,
         );
         system.detect_feature(feature);
@@ -550,11 +550,11 @@ mod tests {
 
         // Add synchronized features
         system.detect_feature(
-            FeatureValue::new(FeatureDimension::Color, HV16::ones(), 0.9)
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9)
                 .with_phase(0.0)
         );
         system.detect_feature(
-            FeatureValue::new(FeatureDimension::Shape, HV16::zero(), 0.8)
+            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8)
                 .with_phase(0.1)  // Close phase
         );
 
@@ -571,11 +571,11 @@ mod tests {
 
         // Add desynchronized features
         system.detect_feature(
-            FeatureValue::new(FeatureDimension::Color, HV16::ones(), 0.9)
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.9)
                 .with_phase(0.0)
         );
         system.detect_feature(
-            FeatureValue::new(FeatureDimension::Shape, HV16::zero(), 0.8)
+            FeatureValue::new(FeatureDimension::Shape, BinaryHV::zero(), 0.8)
                 .with_phase(3.0)  // Far phase
         );
 
@@ -590,7 +590,7 @@ mod tests {
     fn test_clear() {
         let mut system = BindingSystem::new(BindingConfig::default());
         system.detect_feature(
-            FeatureValue::new(FeatureDimension::Color, HV16::ones(), 0.8)
+            FeatureValue::new(FeatureDimension::Color, BinaryHV::ones(), 0.8)
         );
         system.bind();
 

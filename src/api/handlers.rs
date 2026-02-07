@@ -15,7 +15,7 @@ use crate::api::{
 use symthaea_core::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
     HDC_DIMENSION,
-    RealHV,
+    ContinuousHV,
 };
 
 /// Health check endpoint
@@ -141,19 +141,19 @@ fn standard_node_count(request: &SubmissionRequest) -> usize {
 
 fn build_custom_node_representations(
     input: CustomInput<'_>,
-) -> Result<(Vec<RealHV>, usize), ApiError> {
+) -> Result<(Vec<ContinuousHV>, usize), ApiError> {
     match input {
         CustomInput::NodeRepresentations(node_representations) => {
             let vectors = node_representations
                 .iter()
-                .map(|values| RealHV::from_values(values.clone()))
+                .map(|values| ContinuousHV::from_values(values.clone()))
                 .collect::<Vec<_>>();
             Ok((vectors, node_representations.len()))
         }
         CustomInput::AdjacencyMatrix(adjacency_matrix) => {
             let n_nodes = adjacency_matrix.len();
-            let node_identities: Vec<RealHV> = (0..n_nodes)
-                .map(|i| RealHV::basis(i, HDC_DIMENSION))
+            let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+                .map(|i| ContinuousHV::basis(i, HDC_DIMENSION))
                 .collect();
 
             let mut node_representations = Vec::with_capacity(n_nodes);
@@ -171,7 +171,7 @@ fn build_custom_node_representations(
                 let repr = if connections.is_empty() {
                     node_identities[i].clone()
                 } else {
-                    RealHV::bundle(&connections)
+                    ContinuousHV::bundle_owned(&connections)
                 };
                 node_representations.push(repr);
             }
@@ -179,8 +179,8 @@ fn build_custom_node_representations(
             Ok((node_representations, n_nodes))
         }
         CustomInput::EdgeList(edge_list, n_nodes) => {
-            let node_identities: Vec<RealHV> = (0..n_nodes)
-                .map(|i| RealHV::basis(i, HDC_DIMENSION))
+            let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+                .map(|i| ContinuousHV::basis(i, HDC_DIMENSION))
                 .collect();
             let mut adjacency: Vec<Vec<usize>> = vec![Vec::new(); n_nodes];
 
@@ -194,7 +194,7 @@ fn build_custom_node_representations(
 
             let mut node_representations = Vec::with_capacity(n_nodes);
             for i in 0..n_nodes {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
@@ -202,7 +202,7 @@ fn build_custom_node_representations(
                 let repr = if connections.is_empty() {
                     node_identities[i].clone()
                 } else {
-                    RealHV::bundle(&connections)
+                    ContinuousHV::bundle_owned(&connections)
                 };
                 node_representations.push(repr);
             }
@@ -214,7 +214,7 @@ fn build_custom_node_representations(
 
 fn build_node_representations(
     request: &SubmissionRequest,
-) -> Result<(Vec<RealHV>, usize), ApiError> {
+) -> Result<(Vec<ContinuousHV>, usize), ApiError> {
     if let Some(custom) = custom_input(request)? {
         return build_custom_node_representations(custom);
     }

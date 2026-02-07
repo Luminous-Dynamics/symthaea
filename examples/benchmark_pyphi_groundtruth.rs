@@ -31,7 +31,7 @@ use std::time::Instant;
 
 use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
 use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
-use symthaea::hdc::RealHV;
+use symthaea_core::hdc::real_hv::RealHV;
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::phi_engine::{PhiEngine, PhiMethod};
 

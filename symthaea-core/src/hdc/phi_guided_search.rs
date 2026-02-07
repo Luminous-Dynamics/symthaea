@@ -45,7 +45,6 @@
 
 use serde::{Deserialize, Serialize};
 use crate::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
-use crate::hdc::real_hv::RealHV;
 use crate::hdc::spectral_connectivity::ConnectivityCalculator;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -219,7 +218,7 @@ impl ConsciousnessNetwork {
     }
 
     /// Convert to topology representation for Φ calculation
-    pub fn to_node_representations(&self) -> Vec<RealHV> {
+    pub fn to_node_representations(&self) -> Vec<ContinuousHV> {
         // Create node representations by binding each node with its neighbors
         self.nodes.iter()
             .enumerate()
@@ -228,7 +227,7 @@ impl ConsciousnessNetwork {
 
                 if neighbors.is_empty() {
                     // Isolated node - just return its own representation
-                    RealHV { values: node.values.clone() }
+                    ContinuousHV { values: node.values.clone() }
                 } else {
                     // Bind with weighted neighbors
                     let neighbor_hvs: Vec<&ContinuousHV> = neighbors.iter()
@@ -251,7 +250,7 @@ impl ConsciousnessNetwork {
                     // Bind node with neighbor bundle
                     let representation = node.bind(&neighbor_bundle);
 
-                    RealHV { values: representation.values }
+                    ContinuousHV { values: representation.values }
                 }
             })
             .collect()

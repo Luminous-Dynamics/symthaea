@@ -115,7 +115,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::consciousness_dynamics::ConsciousnessDynamics;
 use serde::{Deserialize, Serialize};
@@ -179,7 +179,7 @@ pub struct TemporalSnapshot {
     pub phi: f64,
 
     /// State at this time
-    pub state: Vec<HV16>,
+    pub state: Vec<BinaryHV>,
 
     /// Metadata
     pub metadata: Option<String>,
@@ -255,12 +255,10 @@ impl TemporalAssessment {
     /// Is experiencing "timelessness"? (flow state)
     pub fn is_timeless(&self) -> bool {
         // All scales roughly equal (unified temporal experience)
-        let scales = vec![
-            self.phi_perception,
+        let scales = [self.phi_perception,
             self.phi_thought,
             self.phi_narrative,
-            self.phi_identity,
-        ];
+            self.phi_identity];
         let mean = scales.iter().sum::<f64>() / scales.len() as f64;
         let variance = scales.iter()
             .map(|s| (s - mean).powi(2))
@@ -277,14 +275,14 @@ impl TemporalAssessment {
 /// # Example
 /// ```ignore
 /// use symthaea::hdc::temporal_consciousness::{TemporalConsciousness, TemporalConfig};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = TemporalConfig::default();
 /// let mut temporal = TemporalConsciousness::new(4, config);
 ///
 /// // Add snapshots over time
 /// for t in 0..100 {
-///     let state = vec![HV16::random(1000 + t); 4];
+///     let state = vec![BinaryHV::random(1000 + t); 4];
 ///     temporal.add_snapshot(t as f64 * 0.1, state);
 /// }
 ///
@@ -371,7 +369,7 @@ impl TemporalConsciousness {
     }
 
     /// Add temporal snapshot
-    pub fn add_snapshot(&mut self, time: f64, state: Vec<HV16>) {
+    pub fn add_snapshot(&mut self, time: f64, state: Vec<BinaryHV>) {
         // Compute Φ for this moment
         let phi = self.iit.compute_phi(&state);
 
@@ -433,12 +431,10 @@ impl TemporalConsciousness {
         let avg_binding = self.compute_average_binding(current_time);
 
         // 6. Dominant scale
-        let scales = vec![
-            (TimeScale::Perception, phi_perception),
+        let scales = [(TimeScale::Perception, phi_perception),
             (TimeScale::Thought, phi_thought),
             (TimeScale::Narrative, phi_narrative),
-            (TimeScale::Identity, phi_identity),
-        ];
+            (TimeScale::Identity, phi_identity)];
         let dominant_scale = scales.iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .map(|(s, _)| *s)
@@ -716,7 +712,7 @@ mod tests {
     fn test_add_snapshot() {
         let mut temporal = TemporalConsciousness::new(4, TemporalConfig::default());
 
-        let state = vec![HV16::random(1000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
         temporal.add_snapshot(0.0, state);
 
         assert_eq!(temporal.history.len(), 1);
@@ -728,7 +724,7 @@ mod tests {
 
         // Add multiple snapshots
         for t in 0..20 {
-            let state = vec![HV16::random(1000 + t); 4];
+            let state = vec![BinaryHV::random(1000 + t); 4];
             temporal.add_snapshot(t as f64 * 0.1, state);
         }
 
@@ -744,7 +740,7 @@ mod tests {
         let mut temporal = TemporalConsciousness::new(4, TemporalConfig::default());
 
         for t in 0..100 {
-            let state = vec![HV16::random(1000 + t); 4];
+            let state = vec![BinaryHV::random(1000 + t); 4];
             temporal.add_snapshot(t as f64 * 0.1, state);
         }
 
@@ -761,7 +757,7 @@ mod tests {
         let mut temporal = TemporalConsciousness::new(4, TemporalConfig::default());
 
         for t in 0..50 {
-            let state = vec![HV16::random(1000 + t); 4];
+            let state = vec![BinaryHV::random(1000 + t); 4];
             temporal.add_snapshot(t as f64 * 0.1, state);
         }
 
@@ -775,7 +771,7 @@ mod tests {
         let mut temporal = TemporalConsciousness::new(4, TemporalConfig::default());
 
         for t in 0..30 {
-            let state = vec![HV16::random(1000 + t); 4];
+            let state = vec![BinaryHV::random(1000 + t); 4];
             temporal.add_snapshot(t as f64 * 0.1, state);
         }
 
@@ -792,7 +788,7 @@ mod tests {
         let mut temporal = TemporalConsciousness::new(4, TemporalConfig::default());
 
         for t in 0..40 {
-            let state = vec![HV16::random(1000 + t); 4];
+            let state = vec![BinaryHV::random(1000 + t); 4];
             temporal.add_snapshot(t as f64 * 0.1, state);
         }
 
@@ -810,7 +806,7 @@ mod tests {
 
         // Uniform Φ across time (simulating flow state)
         for t in 0..50 {
-            let state = vec![HV16::random(1000); 4]; // Same seed = similar states
+            let state = vec![BinaryHV::random(1000); 4]; // Same seed = similar states
             temporal.add_snapshot(t as f64 * 0.1, state);
         }
 

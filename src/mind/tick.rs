@@ -3,7 +3,7 @@
 //! Contains the main cognitive cycle (`tick()`), dream processing,
 //! input handling, consciousness updates, and output generation.
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use crate::chronobiology::{Biorhythm, CircadianPhase};
 
 use super::{ContinuousMind, Goal, InputType, MindOutput, OutputType};
@@ -68,7 +68,7 @@ impl ContinuousMind {
             while i < self.working_memory.len().saturating_sub(1) {
                 let sim = self.working_memory[i].similarity(&self.working_memory[i + 1]);
                 if sim > 0.8 {
-                    let bundled = RealHV::bundle(&[
+                    let bundled = ContinuousHV::bundle_owned(&[
                         self.working_memory[i].clone(),
                         self.working_memory[i + 1].clone(),
                     ]);

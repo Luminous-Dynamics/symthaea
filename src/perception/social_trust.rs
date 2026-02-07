@@ -5,7 +5,7 @@
 //!
 //! "Feeling the trust of the community."
 
-use symthaea_core::hdc::{RealHV, HDC_DIMENSION};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
@@ -22,7 +22,7 @@ pub struct SocialTrustSignal {
 #[derive(Debug, Clone)]
 pub struct TrustPercept {
     pub raw: SocialTrustSignal,
-    pub vector: RealHV,
+    pub vector: ContinuousHV,
 }
 
 /// Hash a string to a u64 seed for deterministic vector generation
@@ -38,14 +38,14 @@ impl TrustPercept {
         // 1. Generate base vector for the Agent ID (Identity)
         // Uses hash-based seed for deterministic mapping
         let identity_seed = hash_to_seed(&signal.agent_did);
-        let identity_vec = RealHV::random(HDC_DIMENSION, identity_seed);
+        let identity_vec = ContinuousHV::random(HDC_DIMENSION, identity_seed);
 
         // 2. Generate concept vectors for "Trust" vs "Distrust"
         // Fixed seeds for consistent concept vectors across all uses
         const TRUST_SEED: u64 = 0x5452555354;       // "TRUST" in hex
         const DISTRUST_SEED: u64 = 0x4449535452;    // "DISTR" in hex
-        let trust_concept = RealHV::random(HDC_DIMENSION, TRUST_SEED);
-        let distrust_concept = RealHV::random(HDC_DIMENSION, DISTRUST_SEED);
+        let trust_concept = ContinuousHV::random(HDC_DIMENSION, TRUST_SEED);
+        let distrust_concept = ContinuousHV::random(HDC_DIMENSION, DISTRUST_SEED);
 
         // 3. Modulate based on score (0.0-1.0)
         // High score (1.0) -> closer to Trust Concept

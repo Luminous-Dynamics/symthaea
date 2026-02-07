@@ -218,8 +218,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 use crate::phi_engine::{PhiEngine, PhiMethod};
-use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::{RealHV, HDC_DIMENSION};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SCHOOL CONFIGURATION
@@ -351,7 +350,7 @@ impl School {
         // Initialize consciousness state
         let consciousness_state: Vec<ContinuousHV> = (0..8)
             .map(|i| {
-                let hv = RealHV::random(HDC_DIMENSION, 42 + i as u64);
+                let hv = ContinuousHV::random(HDC_DIMENSION, 42 + i as u64);
                 ContinuousHV::from_vec(hv.values)
             })
             .collect();

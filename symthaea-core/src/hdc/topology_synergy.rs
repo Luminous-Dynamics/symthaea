@@ -159,7 +159,7 @@ impl TopologySynergy {
         // So β₁ = E - V + β₀
         let e = all_edges.len();
         let v = n_nodes;
-        let beta_1 = if e + beta_0 > v { e + beta_0 - v } else { 0 };
+        let beta_1 = (e + beta_0).saturating_sub(v);
 
         (beta_0, beta_1)
     }

@@ -624,9 +624,9 @@ impl HebbianEngine {
     fn ensure_synapse(&mut self, pre_id: &str, post_id: &str) {
         self.synapses
             .entry(pre_id.to_string())
-            .or_insert_with(HashMap::new)
+            .or_default()
             .entry(post_id.to_string())
-            .or_insert_with(Synapse::new);
+            .or_default();
     }
 
     /// Prune weak synapses to save memory

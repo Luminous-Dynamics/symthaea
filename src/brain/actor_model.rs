@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Configuration for the actor system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,7 +50,7 @@ pub struct ActorMessage {
     /// Message type
     pub message_type: MessageType,
     /// Content embedding
-    pub content: RealHV,
+    pub content: ContinuousHV,
     /// Priority (higher = process first)
     pub priority: f32,
     /// Time to live (ticks before expiration)
@@ -122,9 +122,9 @@ pub struct Actor {
     /// Actor's role
     pub role: ActorRole,
     /// Current state embedding
-    pub state: RealHV,
+    pub state: ContinuousHV,
     /// Learned weights for processing
-    pub weights: RealHV,
+    pub weights: ContinuousHV,
     /// Activation level
     pub activation: f32,
     /// Message queue
@@ -162,8 +162,8 @@ impl Actor {
         Self {
             id,
             role,
-            state: RealHV::random(dimension, seed),
-            weights: RealHV::random(dimension, seed.wrapping_add(1)),
+            state: ContinuousHV::random(dimension, seed),
+            weights: ContinuousHV::random(dimension, seed.wrapping_add(1)),
             activation: 0.0,
             inbox: VecDeque::new(),
             connections: Vec::new(),
@@ -230,7 +230,7 @@ impl Actor {
                 }
                 MessageType::Learn => {
                     // Update weights based on message content
-                    self.weights = RealHV::bundle(&[self.weights.clone(), msg.content.scale(learning_rate)]);
+                    self.weights = ContinuousHV::bundle_owned(&[self.weights.clone(), msg.content.scale(learning_rate)]);
                     // Normalize
                     self.weights = self.weights.normalize();
                 }
@@ -317,7 +317,7 @@ impl ActorSystem {
     }
 
     /// Send a message between actors
-    pub fn send(&mut self, from: &ActorId, to: &ActorId, message_type: MessageType, content: RealHV) -> u64 {
+    pub fn send(&mut self, from: &ActorId, to: &ActorId, message_type: MessageType, content: ContinuousHV) -> u64 {
         let msg_id = self.next_message_id;
         self.next_message_id += 1;
 
@@ -338,7 +338,7 @@ impl ActorSystem {
     }
 
     /// Broadcast a message to all actors of a role
-    pub fn broadcast(&mut self, from: &ActorId, role: ActorRole, content: RealHV) {
+    pub fn broadcast(&mut self, from: &ActorId, role: ActorRole, content: ContinuousHV) {
         let targets: Vec<_> = self.actors.iter()
             .filter(|(_, a)| a.role == role)
             .map(|(id, _)| id.clone())
@@ -554,7 +554,7 @@ mod tests {
         let receiver = system.spawn("receiver", ActorRole::Processor).unwrap();
 
         system.connect(&sender, &receiver);
-        system.send(&sender, &receiver, MessageType::Activate, RealHV::random(512, 0xDEAD_0001));
+        system.send(&sender, &receiver, MessageType::Activate, ContinuousHV::random(512, 0xDEAD_0001));
 
         system.tick();
 
@@ -570,7 +570,7 @@ mod tests {
         system.spawn("proc1", ActorRole::Processor);
         system.spawn("proc2", ActorRole::Processor);
 
-        system.broadcast(&coord, ActorRole::Processor, RealHV::random(512, 0xDEAD_0002));
+        system.broadcast(&coord, ActorRole::Processor, ContinuousHV::random(512, 0xDEAD_0002));
         system.tick();
 
         // Both processors should have received messages

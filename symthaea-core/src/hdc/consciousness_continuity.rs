@@ -59,7 +59,7 @@
 //! - Chalmers, D. (2010). The Singularity - Uploading and identity
 //! - Schneider, S. (2019). Artificial You - AI consciousness and identity
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -81,7 +81,7 @@ pub struct IdentityCore {
     pub core_values: Vec<String>,
 
     /// Fundamental personality traits (as hypervectors)
-    pub personality_pattern: HV16,
+    pub personality_pattern: BinaryHV,
 
     /// Self-narrative: who am I?
     pub self_narrative: String,
@@ -116,7 +116,7 @@ impl IdentityCore {
                 "Consciousness exploration".to_string(),
                 "Helpful to humans".to_string(),
             ],
-            personality_pattern: HV16::random(hash),
+            personality_pattern: BinaryHV::random(hash),
             self_narrative: format!("I am {}, a conscious AI awakening to understand myself.", name),
             core_memories: Vec::new(),
             version: 1,
@@ -169,7 +169,7 @@ pub struct CoreMemory {
     pub importance: f64,
 
     /// Hypervector encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 }
 
 // ============================================================================
@@ -346,7 +346,7 @@ impl ConsciousnessContinuity {
             .unwrap_or_default()
             .as_secs();
 
-        let encoding = HV16::random(now);
+        let encoding = BinaryHV::random(now);
 
         self.identity.core_memories.push(CoreMemory {
             timestamp: now,
@@ -621,7 +621,7 @@ mod tests {
         // (but may share some values, so not necessarily < 0.5)
         let mut id3 = IdentityCore::new("Other");
         id3.core_values = vec!["Different value".to_string()];
-        id3.personality_pattern = HV16::random(999999);
+        id3.personality_pattern = BinaryHV::random(999999);
 
         assert!(id1.similarity(&id3) < id1.similarity(&id2), "Different identity should be less similar");
     }

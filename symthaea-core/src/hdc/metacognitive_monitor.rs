@@ -42,7 +42,7 @@
 //! println!("Confidence: {:.2}, Coherence: {:.2}", assessment.confidence, assessment.coherence);
 //! ```
 
-use crate::hdc::real_hv::RealHV as ContinuousHV;
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -425,7 +425,7 @@ impl MetacognitiveMonitor {
         let confidence = self.running_stats.confidence;
 
         // Calculate coherence from Φ and uncertainty
-        let coherence = (phi_level * (1.0 - uncertainty)).max(0.0).min(1.0);
+        let coherence = (phi_level * (1.0 - uncertainty)).clamp(0.0, 1.0);
 
         // Calculate efficiency
         let efficiency = if self.running_stats.total_events > 0 {

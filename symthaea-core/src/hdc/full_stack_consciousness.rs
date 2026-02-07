@@ -50,7 +50,7 @@ use super::unified_understanding::{
 };
 use super::grounded_understanding::CausalRelation;
 use super::universal_semantics::SemanticPrime;
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use std::collections::{HashMap, VecDeque};
 
 // =============================================================================
@@ -302,8 +302,8 @@ pub struct UnderstandingMemoryTrace {
     pub timestamp: u64,
     /// Original text
     pub text: String,
-    /// Semantic encoding (HV16)
-    pub encoding: HV16,
+    /// Semantic encoding (BinaryHV)
+    pub encoding: BinaryHV,
     /// Emotional valence
     pub emotion: MemoryEmotion,
     /// Context tags from entities and narrative
@@ -369,7 +369,7 @@ impl EpisodicMemoryAdapter {
             id,
             timestamp,
             text: understanding.text.clone(),
-            encoding: understanding.grounded.semantic_hv.clone(),
+            encoding: understanding.grounded.semantic_hv,
             emotion,
             tags: tags.clone(),
             primes: understanding.grounded.primes.clone(),
@@ -404,7 +404,7 @@ impl EpisodicMemoryAdapter {
     }
 
     /// Recall memories by semantic similarity
-    pub fn recall_by_similarity(&mut self, query: &HV16, top_k: usize) -> Vec<&UnderstandingMemoryTrace> {
+    pub fn recall_by_similarity(&mut self, query: &BinaryHV, top_k: usize) -> Vec<&UnderstandingMemoryTrace> {
         let mut scored: Vec<(f32, u64)> = self.traces.iter()
             .map(|t| (query.similarity(&t.encoding), t.id))
             .collect();

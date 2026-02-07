@@ -52,7 +52,7 @@
 //! ### 4. Language ↔ Causality Bridge
 //! Natural language → causal structure → reasoning → natural language
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::causal_encoder::CausalSpace;
 use super::grounded_understanding::{
     CausalRoleMarkers as TextCausalMarkers,
@@ -69,46 +69,46 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub struct CausalRoleMarkers {
     /// X CAUSES Y
-    pub causes: HV16,
+    pub causes: BinaryHV,
     /// X IS_CAUSED_BY Y
-    pub caused_by: HV16,
+    pub caused_by: BinaryHV,
     /// X ENABLES Y (necessary but not sufficient)
-    pub enables: HV16,
+    pub enables: BinaryHV,
     /// X PREVENTS Y
-    pub prevents: HV16,
+    pub prevents: BinaryHV,
     /// X CORRELATES_WITH Y (association, not causation)
-    pub correlates: HV16,
+    pub correlates: BinaryHV,
     /// X BEFORE Y (temporal)
-    pub before: HV16,
+    pub before: BinaryHV,
     /// X AFTER Y (temporal)
-    pub after: HV16,
+    pub after: BinaryHV,
     /// X INTERVENE (do(X))
-    pub intervene: HV16,
+    pub intervene: BinaryHV,
     /// Causal strength markers
-    pub strength_high: HV16,    // > 0.7
-    pub strength_medium: HV16,  // 0.3-0.7
-    pub strength_low: HV16,     // < 0.3
+    pub strength_high: BinaryHV,    // > 0.7
+    pub strength_medium: BinaryHV,  // 0.3-0.7
+    pub strength_low: BinaryHV,     // < 0.3
 }
 
 impl CausalRoleMarkers {
     pub fn new() -> Self {
         Self {
-            causes: HV16::random(1001),
-            caused_by: HV16::random(1002),
-            enables: HV16::random(1003),
-            prevents: HV16::random(1004),
-            correlates: HV16::random(1005),
-            before: HV16::random(1006),
-            after: HV16::random(1007),
-            intervene: HV16::random(1008),
-            strength_high: HV16::random(1009),
-            strength_medium: HV16::random(1010),
-            strength_low: HV16::random(1011),
+            causes: BinaryHV::random(1001),
+            caused_by: BinaryHV::random(1002),
+            enables: BinaryHV::random(1003),
+            prevents: BinaryHV::random(1004),
+            correlates: BinaryHV::random(1005),
+            before: BinaryHV::random(1006),
+            after: BinaryHV::random(1007),
+            intervene: BinaryHV::random(1008),
+            strength_high: BinaryHV::random(1009),
+            strength_medium: BinaryHV::random(1010),
+            strength_low: BinaryHV::random(1011),
         }
     }
 
     /// Get strength marker for a given value
-    pub fn strength_marker(&self, strength: f64) -> &HV16 {
+    pub fn strength_marker(&self, strength: f64) -> &BinaryHV {
         if strength > 0.7 {
             &self.strength_high
         } else if strength > 0.3 {
@@ -133,13 +133,13 @@ impl Default for CausalRoleMarkers {
 #[derive(Clone, Debug)]
 pub struct CausalConcept {
     /// The base semantic hypervector
-    pub semantic: HV16,
+    pub semantic: BinaryHV,
 
     /// Human-readable name
     pub name: String,
 
     /// Full causal hypervector (semantic + causal structure)
-    pub causal_hv: HV16,
+    pub causal_hv: BinaryHV,
 
     /// Direct causes (what causes this concept)
     pub causes: Vec<(String, f64)>,
@@ -153,9 +153,9 @@ pub struct CausalConcept {
 
 impl CausalConcept {
     /// Create a new causal concept from semantic representation
-    pub fn new(semantic: HV16, name: String) -> Self {
+    pub fn new(semantic: BinaryHV, name: String) -> Self {
         Self {
-            semantic: semantic.clone(),
+            semantic,
             name,
             causal_hv: semantic,
             causes: Vec::new(),
@@ -165,19 +165,19 @@ impl CausalConcept {
     }
 
     /// Add a cause and update the causal hypervector
-    pub fn add_cause(&mut self, cause_name: String, cause_hv: &HV16, strength: f64, markers: &CausalRoleMarkers) {
+    pub fn add_cause(&mut self, cause_name: String, cause_hv: &BinaryHV, strength: f64, markers: &CausalRoleMarkers) {
         self.causes.push((cause_name, strength));
         let strength_marker = markers.strength_marker(strength);
         let cause_signature = cause_hv.bind(&markers.caused_by).bind(strength_marker);
-        self.causal_hv = HV16::bundle(&[self.causal_hv.clone(), cause_signature]);
+        self.causal_hv = BinaryHV::bundle(&[self.causal_hv, cause_signature]);
     }
 
     /// Add an effect and update the causal hypervector
-    pub fn add_effect(&mut self, effect_name: String, effect_hv: &HV16, strength: f64, markers: &CausalRoleMarkers) {
+    pub fn add_effect(&mut self, effect_name: String, effect_hv: &BinaryHV, strength: f64, markers: &CausalRoleMarkers) {
         self.effects.push((effect_name, strength));
         let strength_marker = markers.strength_marker(strength);
         let effect_signature = effect_hv.bind(&markers.causes).bind(strength_marker);
-        self.causal_hv = HV16::bundle(&[self.causal_hv.clone(), effect_signature]);
+        self.causal_hv = BinaryHV::bundle(&[self.causal_hv, effect_signature]);
     }
 }
 
@@ -216,15 +216,15 @@ impl CausalMind {
     }
 
     /// Get or create a concept hypervector
-    fn get_or_create_concept(&mut self, name: &str) -> HV16 {
+    fn get_or_create_concept(&mut self, name: &str) -> BinaryHV {
         if let Some(concept) = self.concepts.get(name) {
-            return concept.semantic.clone();
+            return concept.semantic;
         }
 
         // Create new concept with deterministic seed from name
         let seed = name.bytes().fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
-        let semantic = HV16::random(seed);
-        let concept = CausalConcept::new(semantic.clone(), name.to_string());
+        let semantic = BinaryHV::random(seed);
+        let concept = CausalConcept::new(semantic, name.to_string());
         self.concepts.insert(name.to_string(), concept);
         semantic
     }
@@ -235,7 +235,7 @@ impl CausalMind {
         let effect_hv = self.get_or_create_concept(effect);
 
         // Add to causal space
-        self.causal_space.add_causal_link(cause_hv.clone(), effect_hv.clone(), strength);
+        self.causal_space.add_causal_link(cause_hv, effect_hv, strength);
 
         // Update concepts' causal structure
         if let Some(cause_concept) = self.concepts.get_mut(cause) {
@@ -513,7 +513,7 @@ impl CausalMind {
     ///
     /// This creates a hypervector representation of the causal relation that can
     /// be used for similarity queries and causal reasoning.
-    pub fn encode_causal_relation(&mut self, cause: &str, effect: &str, strength: f64) -> HV16 {
+    pub fn encode_causal_relation(&mut self, cause: &str, effect: &str, strength: f64) -> BinaryHV {
         let cause_hv = self.get_or_create_concept(cause);
         let effect_hv = self.get_or_create_concept(effect);
         let strength_marker = self.markers.strength_marker(strength);
@@ -537,7 +537,7 @@ impl CausalMind {
         // Find concepts most related to the extracted relations
         let mut similarities = Vec::new();
 
-        for (name, _concept) in &self.concepts {
+        for name in self.concepts.keys() {
             let mut max_sim = 0.0f32;
 
             for relation in &relations {
@@ -742,7 +742,7 @@ impl LearnedCausalDiscovery {
             let dx = pairs[i].0 - pairs[i-1].0;
             let dy = pairs[i].1 - pairs[i-1].1;
             if dx.abs() > 1e-10 {
-                slopes.push((dy / dx).abs().ln().max(-10.0).min(10.0));
+                slopes.push((dy / dx).abs().ln().clamp(-10.0, 10.0));
             }
         }
 

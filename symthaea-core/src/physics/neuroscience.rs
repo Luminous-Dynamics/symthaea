@@ -771,7 +771,7 @@ impl NeuroEncoder {
 /// Consciousness bridge extension for neural circuits
 impl NeuroEncoder {
     /// Compute integrated information (Φ-like measure) for a circuit
-    pub fn neural_phi(&self, circuit: &NeuralCircuit, bridge: &PhysicsConsciousnessBridge) -> f64 {
+    pub fn neural_phi(&self, circuit: &NeuralCircuit, _bridge: &PhysicsConsciousnessBridge) -> f64 {
         // Measure integration based on connectivity
         let n = circuit.neurons.len() as f64;
         if n <= 1.0 {
@@ -780,12 +780,20 @@ impl NeuroEncoder {
 
         let connectivity = circuit.connectivity.len() as f64 / (n * n);
 
-        // Phenomenal index of circuit activity
-        #[allow(deprecated)]
-        let phenomenal = bridge.phenomenal_index(&circuit.vector);
+        // Phenomenal index of circuit activity (entropy-based)
+        let phenomenal = {
+            use super::true_phi::TruePhiCalculator;
+            let calc = TruePhiCalculator::new();
+            let components: Vec<_> = circuit.neurons.iter().map(|n| n.vector.clone()).collect();
+            let nc = components.len();
+            let max_pairs = if nc > 1 { (nc * (nc - 1)) / 2 } else { 1 };
+            let max_phi = (max_pairs as f64) * 4.0;
+            let result = calc.compute_true_phi(&components);
+            (result.phi / max_phi).min(1.0)
+        };
 
         // Φ estimate: integration × phenomenal × complexity
-        phenomenal as f64 * connectivity * n.ln()
+        phenomenal * connectivity * n.ln()
     }
 
     /// Does circuit Φ increase with connectivity?

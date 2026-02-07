@@ -158,7 +158,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::consciousness_spectrum::{ConsciousnessSpectrum, SpectrumConfig};
 use serde::{Deserialize, Serialize};
@@ -202,7 +202,7 @@ pub struct PrimitiveQualia {
     pub modality: QualiaModality,
 
     /// Encoding in hypervector space
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Valence (-1 to 1, unpleasant to pleasant)
     pub valence: f64,
@@ -231,7 +231,7 @@ impl PrimitiveQualia {
         Self {
             name: name.into(),
             modality,
-            encoding: HV16::random(seed),
+            encoding: BinaryHV::random(seed),
             valence: valence.clamp(-1.0, 1.0),
             arousal: arousal.clamp(0.0, 1.0),
             intensity: intensity.clamp(0.0, 1.0),
@@ -270,7 +270,7 @@ pub struct ComplexQualia {
     pub components: Vec<PrimitiveQualia>,
 
     /// Bound encoding (bundle of primitives)
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Integration strength (0 to 1)
     pub integration: f64,
@@ -286,12 +286,12 @@ impl ComplexQualia {
 
         // Bundle encodings
         let encoding = if primitives.is_empty() {
-            HV16::random(0)
+            BinaryHV::random(0)
         } else {
-            let encodings: Vec<HV16> = primitives.iter()
+            let encodings: Vec<BinaryHV> = primitives.iter()
                 .map(|p| p.encoding.clone())
                 .collect();
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         // Integration = average pairwise similarity
@@ -561,7 +561,7 @@ impl QualiaEncoder {
             .map(|(modality, _)| *modality);
 
         // Zombie detection: High Φ but no qualia?
-        let state: Vec<HV16> = active.iter().map(|q| q.encoding.clone()).collect();
+        let state: Vec<BinaryHV> = active.iter().map(|q| q.encoding.clone()).collect();
         let phi = if !state.is_empty() {
             self.iit.compute_phi(&state)
         } else {

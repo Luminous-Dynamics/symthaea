@@ -12,7 +12,7 @@ use crate::hdc::binary_hv::HV16;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // NSM PRIMITIVE GROUNDING FOR AUTOPOIETIC CONSCIOUSNESS
@@ -420,14 +420,14 @@ pub struct Perturbation {
     /// Intensity (0.0-1.0)
     pub intensity: f32,
     /// Direction/content as hypervector
-    pub content: RealHV,
+    pub content: ContinuousHV,
     /// Timestamp
     pub timestamp: u64,
 }
 
 impl Perturbation {
     /// Create a new perturbation
-    pub fn new(id: u64, source: impl Into<String>, intensity: f32, content: RealHV) -> Self {
+    pub fn new(id: u64, source: impl Into<String>, intensity: f32, content: ContinuousHV) -> Self {
         Self {
             id,
             source: source.into(),
@@ -449,7 +449,7 @@ pub struct Component {
     /// Component type
     pub component_type: ComponentType,
     /// State vector
-    pub state: RealHV,
+    pub state: ContinuousHV,
     /// Health/viability
     pub health: f32,
     /// Generation (when it was produced)
@@ -487,9 +487,9 @@ pub struct AutopoieticConsciousness {
     /// State history
     history: VecDeque<AutopoieticState>,
     /// Self-model (how the system sees itself)
-    self_model: RealHV,
+    self_model: ContinuousHV,
     /// Boundary representation
-    boundary: RealHV,
+    boundary: ContinuousHV,
     /// Statistics
     stats: AutopoieticStats,
 }
@@ -520,8 +520,8 @@ impl AutopoieticConsciousness {
             next_component_id: 1,
             generation: 0,
             history: VecDeque::new(),
-            self_model: RealHV::random(dim, 42),
-            boundary: RealHV::random(dim, 42),
+            self_model: ContinuousHV::random(dim, 42),
+            boundary: ContinuousHV::random(dim, 42),
             stats: AutopoieticStats::default(),
         }
     }
@@ -543,7 +543,7 @@ impl AutopoieticConsciousness {
         let state = match component_type {
             ComponentType::Boundary => self.boundary.perturb(0.1),
             ComponentType::SelfModel => self.self_model.perturb(0.1),
-            _ => RealHV::random(self.config.dimension, 42),
+            _ => ContinuousHV::random(self.config.dimension, 42),
         };
 
         let component = Component {
@@ -572,7 +572,7 @@ impl AutopoieticConsciousness {
             self.stats.boundary_violations += 1;
 
             // Strengthen boundary
-            self.boundary = RealHV::bundle(&[self.boundary.clone(), perturbation.content.clone()]);
+            self.boundary = ContinuousHV::bundle_owned(&[self.boundary.clone(), perturbation.content.clone()]);
             self.state.boundary_strength = (self.state.boundary_strength + 0.1).min(1.0);
 
             return false;
@@ -588,7 +588,7 @@ impl AutopoieticConsciousness {
         for component in self.components.values_mut() {
             if component.component_type == ComponentType::Processing {
                 let perturbation_effect = perturbation.content.clone().scale(adaptation_strength);
-                component.state = RealHV::bundle(&[component.state.clone(), perturbation_effect]);
+                component.state = ContinuousHV::bundle_owned(&[component.state.clone(), perturbation_effect]);
             }
         }
 
@@ -621,11 +621,11 @@ impl AutopoieticConsciousness {
         self.state.closure = (boundary_count as f32 / self.components.len().max(1) as f32).min(1.0);
 
         // Update self-model
-        let component_states: Vec<RealHV> =
+        let component_states: Vec<ContinuousHV> =
             self.components.values().map(|c| c.state.clone()).collect();
 
         if !component_states.is_empty() {
-            self.self_model = RealHV::bundle(&component_states);
+            self.self_model = ContinuousHV::bundle_owned(&component_states);
         }
 
         // Calculate self-reference
@@ -707,13 +707,13 @@ impl AutopoieticConsciousness {
         self.state.phase = AutopoieticPhase::Integrating;
 
         // Bundle all component states
-        let states: Vec<RealHV> = self.components.values().map(|c| c.state.clone()).collect();
+        let states: Vec<ContinuousHV> = self.components.values().map(|c| c.state.clone()).collect();
 
         if states.len() >= 2 {
-            let integrated = RealHV::bundle(&states);
+            let integrated = ContinuousHV::bundle_owned(&states);
 
             // Update self-model with integrated state
-            self.self_model = RealHV::bundle(&[self.self_model.clone(), integrated]);
+            self.self_model = ContinuousHV::bundle_owned(&[self.self_model.clone(), integrated]);
         }
 
         // Update closure based on integration
@@ -753,7 +753,7 @@ impl AutopoieticConsciousness {
     }
 
     /// Get self-model
-    pub fn self_model(&self) -> &RealHV {
+    pub fn self_model(&self) -> &ContinuousHV {
         &self.self_model
     }
 
@@ -884,7 +884,7 @@ mod tests {
     #[test]
     fn test_perturbation() {
         let mut system = AutopoieticConsciousness::default();
-        let perturbation = Perturbation::new(1, "environment", 0.5, RealHV::random(512, 42));
+        let perturbation = Perturbation::new(1, "environment", 0.5, ContinuousHV::random(512, 42));
         system.process_perturbation(&perturbation);
         assert!(system.stats.perturbations_processed > 0);
     }

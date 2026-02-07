@@ -9,7 +9,7 @@
 //! ```text
 //! Source Code → CodeParser::parse() → ParsedCode (AST + entities)
 //!                                         ↓
-//!                           CodeParser::to_hdv() → RealHV (16,384D)
+//!                           CodeParser::to_hdv() → ContinuousHV (16,384D)
 //! ```
 
 use std::collections::HashMap;

@@ -23,7 +23,7 @@
 //! ## HDC Encoding Strategy
 //!
 //! Each frame is encoded as a hypervector composition:
-//! - Frame type: unique HV16 identifier
+//! - Frame type: unique BinaryHV identifier
 //! - Slots: role markers bound to fillers
 //! - Instance: bundle of (frame_type, bound_slots)
 //!
@@ -48,7 +48,7 @@
 //! - COOPERATION: Social + Strategic (coordination)
 //! - ADAPTATION: Physical (biology) + MetaCognitive (learning)
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::{seed_from_name, DomainManifold, PrimitiveTier};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -65,7 +65,7 @@ pub struct FrameSlot {
     /// Description of what this slot represents
     pub description: String,
     /// HDC encoding for this role marker
-    pub role_marker: HV16,
+    pub role_marker: BinaryHV,
     /// Whether this slot is required
     pub required: bool,
     /// Semantic type constraint (primitive tier or domain)
@@ -77,7 +77,7 @@ impl FrameSlot {
     pub fn required(name: impl Into<String>, description: impl Into<String>) -> Self {
         let name_str = name.into();
         Self {
-            role_marker: HV16::random(seed_from_name(&format!("SLOT_{}", name_str))),
+            role_marker: BinaryHV::random(seed_from_name(&format!("SLOT_{}", name_str))),
             name: name_str,
             description: description.into(),
             required: true,
@@ -89,7 +89,7 @@ impl FrameSlot {
     pub fn optional(name: impl Into<String>, description: impl Into<String>) -> Self {
         let name_str = name.into();
         Self {
-            role_marker: HV16::random(seed_from_name(&format!("SLOT_{}", name_str))),
+            role_marker: BinaryHV::random(seed_from_name(&format!("SLOT_{}", name_str))),
             name: name_str,
             description: description.into(),
             required: false,
@@ -104,7 +104,7 @@ impl FrameSlot {
     }
 
     /// Bind a filler to this slot
-    pub fn bind(&self, filler: &HV16) -> HV16 {
+    pub fn bind(&self, filler: &BinaryHV) -> BinaryHV {
         self.role_marker.bind(filler)
     }
 }
@@ -121,7 +121,7 @@ pub struct CrossDomainFrame {
     /// Description of the frame's semantics
     pub description: String,
     /// HDC encoding for the frame type
-    pub frame_encoding: HV16,
+    pub frame_encoding: BinaryHV,
     /// Slots/roles in this frame
     pub slots: Vec<FrameSlot>,
     /// Domains this frame bridges
@@ -140,7 +140,7 @@ impl CrossDomainFrame {
     ) -> Self {
         let name_str = name.into();
         Self {
-            frame_encoding: HV16::random(seed_from_name(&format!("FRAME_{}", name_str))),
+            frame_encoding: BinaryHV::random(seed_from_name(&format!("FRAME_{}", name_str))),
             name: name_str,
             description: description.into(),
             slots: Vec::new(),
@@ -161,7 +161,7 @@ impl CrossDomainFrame {
     }
 
     /// Check if all required slots are present in bindings
-    pub fn validate_bindings(&self, bindings: &HashMap<String, HV16>) -> Result<(), Vec<String>> {
+    pub fn validate_bindings(&self, bindings: &HashMap<String, BinaryHV>) -> Result<(), Vec<String>> {
         let missing: Vec<String> = self
             .slots
             .iter()
@@ -187,22 +187,22 @@ pub struct FrameInstance {
     /// The frame this is an instance of
     pub frame_name: String,
     /// HDC encoding of the complete instance
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     /// Bound slot values
-    pub bindings: HashMap<String, HV16>,
+    pub bindings: HashMap<String, BinaryHV>,
 }
 
 impl FrameInstance {
     /// Create a new frame instance by binding fillers to slots
     pub fn bind(
         frame: &CrossDomainFrame,
-        bindings: HashMap<String, HV16>,
+        bindings: HashMap<String, BinaryHV>,
     ) -> Result<Self, Vec<String>> {
         // Validate required slots
         frame.validate_bindings(&bindings)?;
 
         // Build the instance encoding
-        let mut components = vec![frame.frame_encoding.clone()];
+        let mut components = vec![frame.frame_encoding];
 
         for slot in &frame.slots {
             if let Some(filler) = bindings.get(&slot.name) {
@@ -213,7 +213,7 @@ impl FrameInstance {
         }
 
         // Bundle all components into the instance encoding
-        let encoding = HV16::bundle(&components);
+        let encoding = BinaryHV::bundle(&components);
 
         Ok(Self {
             frame_name: frame.name.clone(),
@@ -223,14 +223,8 @@ impl FrameInstance {
     }
 
     /// Extract a filler from the instance encoding (approximate unbinding)
-    pub fn extract(&self, frame: &CrossDomainFrame, slot_name: &str) -> Option<HV16> {
-        if let Some(slot) = frame.get_slot(slot_name) {
-            // Unbind: encoding ⊗ role_marker^(-1) ≈ filler
-            // For HV16, unbind is self-inverse: bind(bind(a,b), b) ≈ a
-            Some(self.encoding.bind(&slot.role_marker))
-        } else {
-            None
-        }
+    pub fn extract(&self, frame: &CrossDomainFrame, slot_name: &str) -> Option<BinaryHV> {
+        frame.get_slot(slot_name).map(|slot| self.encoding.bind(&slot.role_marker))
     }
 
     /// Check similarity to another instance
@@ -538,7 +532,7 @@ impl UCLFrameSystem {
     pub fn instantiate(
         &self,
         frame_name: &str,
-        bindings: HashMap<String, HV16>,
+        bindings: HashMap<String, BinaryHV>,
     ) -> Result<FrameInstance, String> {
         let frame = self
             .frames
@@ -550,7 +544,7 @@ impl UCLFrameSystem {
     }
 
     /// Check if an encoding matches a frame (approximate frame detection)
-    pub fn detect_frame(&self, encoding: &HV16, threshold: f32) -> Vec<(&str, f32)> {
+    pub fn detect_frame(&self, encoding: &BinaryHV, threshold: f32) -> Vec<(&str, f32)> {
         self.frames
             .iter()
             .map(|(name, frame)| {
@@ -613,8 +607,8 @@ impl Default for UCLFrameSystem {
 // Note: seed_from_name is imported at the top of this module from primitive_system
 
 /// Create a concept encoding from a string name
-pub fn concept_hv(name: &str) -> HV16 {
-    HV16::random(seed_from_name(name))
+pub fn concept_hv(name: &str) -> BinaryHV {
+    BinaryHV::random(seed_from_name(name))
 }
 
 // =============================================================================

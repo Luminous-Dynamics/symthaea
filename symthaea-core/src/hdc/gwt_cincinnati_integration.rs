@@ -25,7 +25,7 @@
 use crate::hdc::cincinnati_ltc::CincinnatiLtcEngine;
 use crate::hdc::global_workspace::{GlobalWorkspace, WorkspaceConfig, WorkspaceContent, WorkspaceAssessment};
 use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::HV16;
+use crate::hdc::BinaryHV;
 use crate::hdc::HDC_DIMENSION;
 use serde::{Serialize, Deserialize};
 
@@ -114,16 +114,16 @@ impl TemporalPattern {
         // Confidence modulates salience
         salience *= 0.5 + 0.5 * self.confidence as f64;
 
-        salience.min(1.0).max(0.0)
+        salience.clamp(0.0, 1.0)
     }
 
     /// Convert to workspace content for GWT
     pub fn to_workspace_content(&self, config: &CincinnatiGwtConfig) -> WorkspaceContent {
-        // Convert continuous encoding to binary HV16 for workspace
-        let binary_hvs: Vec<HV16> = self.encoding
+        // Convert continuous encoding to binary BinaryHV for workspace
+        let binary_hvs: Vec<BinaryHV> = self.encoding
             .chunks(HDC_DIMENSION / 8)
             .enumerate()
-            .map(|(i, _)| HV16::random(self.timestamp as u64 + i as u64))
+            .map(|(i, _)| BinaryHV::random(self.timestamp as u64 + i as u64))
             .collect();
 
         WorkspaceContent {

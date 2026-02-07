@@ -163,7 +163,7 @@ impl PrimitiveDashboard {
 
         // Update per-tier stats
         let tier_stats = self.tier_stats
-            .entry(tier.clone())
+            .entry(tier)
             .or_default();
         tier_stats.activations += 1;
         if success {
@@ -191,7 +191,7 @@ impl PrimitiveDashboard {
 
     /// Record activation using a Primitive reference
     pub fn record_primitive(&mut self, primitive: &Primitive, success: bool) {
-        self.record_activation(&primitive.name, primitive.tier.clone(), success);
+        self.record_activation(&primitive.name, primitive.tier, success);
     }
 
     /// Get statistics for a specific primitive

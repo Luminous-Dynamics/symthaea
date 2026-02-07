@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Configuration for prefrontal simulation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,7 +43,7 @@ pub struct WorkingMemoryItem {
     /// Unique identifier
     pub id: String,
     /// Content embedding
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
     /// Current activation level
     pub activation: f32,
     /// Priority weight
@@ -58,7 +58,7 @@ pub struct WorkingMemoryItem {
 
 impl WorkingMemoryItem {
     /// Create a new working memory item
-    pub fn new(id: impl Into<String>, embedding: RealHV) -> Self {
+    pub fn new(id: impl Into<String>, embedding: ContinuousHV) -> Self {
         Self {
             id: id.into(),
             embedding,
@@ -90,9 +90,9 @@ pub struct PlannedAction {
     /// Goal this action serves
     pub goal_id: String,
     /// Action embedding
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
     /// Expected outcome embedding
-    pub expected_outcome: RealHV,
+    pub expected_outcome: ContinuousHV,
     /// Priority (higher = more urgent)
     pub priority: f32,
     /// Estimated effort
@@ -345,7 +345,7 @@ impl PrefrontalCortex {
     }
 
     /// Plan a sequence of actions to achieve a goal
-    pub fn plan(&self, goal: &RealHV, available_actions: &[PlannedAction]) -> Vec<String> {
+    pub fn plan(&self, goal: &ContinuousHV, available_actions: &[PlannedAction]) -> Vec<String> {
         // Simple greedy planning: select actions that move toward goal
         let mut plan = Vec::new();
         let mut current_state = goal.clone();
@@ -398,7 +398,7 @@ mod tests {
     fn test_working_memory() {
         let mut pfc = PrefrontalCortex::default();
 
-        let item = WorkingMemoryItem::new("test1", RealHV::random(512, 0xCAFE_0001));
+        let item = WorkingMemoryItem::new("test1", ContinuousHV::random(512, 0xCAFE_0001));
         assert!(pfc.add_to_memory(item));
         assert_eq!(pfc.working_memory.len(), 1);
     }
@@ -410,7 +410,7 @@ mod tests {
         let mut pfc = PrefrontalCortex::new(config);
 
         for i in 0..5 {
-            let item = WorkingMemoryItem::new(format!("item{}", i), RealHV::random(512, 0xCAFE_0002 + i as u64));
+            let item = WorkingMemoryItem::new(format!("item{}", i), ContinuousHV::random(512, 0xCAFE_0002 + i as u64));
             pfc.add_to_memory(item);
         }
 
@@ -421,7 +421,7 @@ mod tests {
     fn test_focus_setting() {
         let mut pfc = PrefrontalCortex::default();
 
-        let item = WorkingMemoryItem::new("focus_test", RealHV::random(512, 0xCAFE_0010));
+        let item = WorkingMemoryItem::new("focus_test", ContinuousHV::random(512, 0xCAFE_0010));
         pfc.add_to_memory(item);
 
         assert!(pfc.set_focus("focus_test"));
@@ -435,8 +435,8 @@ mod tests {
         let action = PlannedAction {
             id: "action1".to_string(),
             goal_id: "goal1".to_string(),
-            embedding: RealHV::random(512, 0xCAFE_0020),
-            expected_outcome: RealHV::random(512, 0xCAFE_0021),
+            embedding: ContinuousHV::random(512, 0xCAFE_0020),
+            expected_outcome: ContinuousHV::random(512, 0xCAFE_0021),
             priority: 0.8,
             effort: 0.5,
             dependencies: Vec::new(),

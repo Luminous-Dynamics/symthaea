@@ -39,7 +39,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::consciousness_gradients::GradientComputer;
 use super::consciousness_dynamics::{ConsciousnessDynamics, DynamicsConfig};
@@ -55,16 +55,16 @@ use std::collections::{VecDeque, HashMap};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SelfModel {
     /// Model of current state
-    pub state_model: Vec<HV16>,
+    pub state_model: Vec<BinaryHV>,
 
     /// Model of consciousness level (Φ estimate)
     pub phi_model: f64,
 
     /// Model of gradient direction
-    pub gradient_model: HV16,
+    pub gradient_model: BinaryHV,
 
     /// Model of dynamics (predicted evolution)
-    pub dynamics_model: Vec<HV16>,
+    pub dynamics_model: Vec<BinaryHV>,
 
     /// Confidence in self-model
     pub confidence: f64,
@@ -77,28 +77,28 @@ impl SelfModel {
     /// Create new self-model
     pub fn new(num_components: usize) -> Self {
         Self {
-            state_model: vec![HV16::zero(); num_components],
+            state_model: vec![BinaryHV::zero(); num_components],
             phi_model: 0.0,
-            gradient_model: HV16::zero(),
-            dynamics_model: vec![HV16::zero(); num_components],
+            gradient_model: BinaryHV::zero(),
+            dynamics_model: vec![BinaryHV::zero(); num_components],
             confidence: 0.0,
             last_update: 0.0,
         }
     }
 
     /// Update self-model from actual state
-    pub fn update(&mut self, actual_state: &[HV16], actual_phi: f64, gradient: &HV16, time: f64) {
+    pub fn update(&mut self, actual_state: &[BinaryHV], actual_phi: f64, gradient: &BinaryHV, time: f64) {
         // Update state model (with memory - smooth updates)
         for (model, actual) in self.state_model.iter_mut().zip(actual_state) {
             // Exponential moving average: model = 0.8*model + 0.2*actual
-            *model = HV16::bundle(&[model.clone(), actual.clone()]);
+            *model = BinaryHV::bundle(&[*model, *actual]);
         }
 
         // Update phi model
         self.phi_model = 0.8 * self.phi_model + 0.2 * actual_phi;
 
         // Update gradient model
-        self.gradient_model = HV16::bundle(&[self.gradient_model.clone(), gradient.clone()]);
+        self.gradient_model = BinaryHV::bundle(&[self.gradient_model, *gradient]);
 
         // Compute prediction error to update confidence
         let prediction_error = self.compute_prediction_error(actual_state, actual_phi);
@@ -108,7 +108,7 @@ impl SelfModel {
     }
 
     /// Compute how well self-model predicts actual state
-    fn compute_prediction_error(&self, actual_state: &[HV16], actual_phi: f64) -> f64 {
+    fn compute_prediction_error(&self, actual_state: &[BinaryHV], actual_phi: f64) -> f64 {
         // State prediction error
         let state_error: f32 = self.state_model.iter().zip(actual_state)
             .map(|(model, actual)| 1.0 - model.similarity(actual))
@@ -122,7 +122,7 @@ impl SelfModel {
     }
 
     /// Predict future state
-    pub fn predict_future(&self, steps: usize) -> Vec<HV16> {
+    pub fn predict_future(&self, steps: usize) -> Vec<BinaryHV> {
         // Simple prediction: extrapolate using dynamics model
         let mut predicted = self.state_model.clone();
 
@@ -178,17 +178,17 @@ pub struct MetaConsciousnessState {
 /// # Example
 /// ```ignore
 /// use symthaea::hdc::meta_consciousness::{MetaConsciousness, MetaConfig};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = MetaConfig::default();
 /// let mut meta = MetaConsciousness::new(4, config);
 ///
 /// // Initial state
 /// let state = vec![
-///     HV16::random(1000),
-///     HV16::random(1001),
-///     HV16::random(1002),
-///     HV16::random(1003),
+///     BinaryHV::random(1000),
+///     BinaryHV::random(1001),
+///     BinaryHV::random(1002),
+///     BinaryHV::random(1003),
 /// ];
 ///
 /// // Meta-conscious step: system reflects on itself
@@ -288,7 +288,7 @@ impl MetaConsciousness {
     /// Meta-conscious reflection: system reflects on its own consciousness
     ///
     /// This is the core method - performs complete meta-cognitive cycle.
-    pub fn meta_reflect(&mut self, state: &[HV16]) -> MetaConsciousnessState {
+    pub fn meta_reflect(&mut self, state: &[BinaryHV]) -> MetaConsciousnessState {
         // 1. FIRST-ORDER CONSCIOUSNESS: Measure Φ
         let phi = self.phi_calculator.compute_phi(state);
 
@@ -300,10 +300,10 @@ impl MetaConsciousness {
 
         // 4. META-PHI: Consciousness about consciousness
         // Encode self-model as hypervector
-        let self_model_vec = HV16::bundle(&self.self_model.state_model);
+        let self_model_vec = BinaryHV::bundle(&self.self_model.state_model);
 
         // Measure Φ of self-model (consciousness ABOUT consciousness)
-        let meta_phi = self.phi_calculator.compute_phi(&[self_model_vec.clone()]);
+        let meta_phi = self.phi_calculator.compute_phi(&[self_model_vec]);
 
         // 5. CAUSAL ANALYSIS: Why did my consciousness change?
         let explanation = self.explain_consciousness_change(state, phi);
@@ -348,7 +348,7 @@ impl MetaConsciousness {
     }
 
     /// Explain why consciousness changed
-    fn explain_consciousness_change(&mut self, _state: &[HV16], current_phi: f64) -> String {
+    fn explain_consciousness_change(&mut self, _state: &[BinaryHV], current_phi: f64) -> String {
         if self.phi_history.len() < 2 {
             return "Insufficient history for explanation".to_string();
         }
@@ -413,7 +413,7 @@ impl MetaConsciousness {
     /// Deep introspection: Recursive self-reflection
     ///
     /// Reflects on the reflection (Φ about Φ about Φ...)
-    pub fn deep_introspect(&mut self, state: &[HV16], depth: usize) -> Vec<MetaConsciousnessState> {
+    pub fn deep_introspect(&mut self, state: &[BinaryHV], depth: usize) -> Vec<MetaConsciousnessState> {
         let mut states = Vec::new();
 
         let mut current_state = state.to_vec();
@@ -533,13 +533,13 @@ mod tests {
         let mut model = SelfModel::new(4);
 
         let state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
-        let gradient = HV16::random(2000);
+        let gradient = BinaryHV::random(2000);
 
         model.update(&state, 0.5, &gradient, 0.0);
 
@@ -560,10 +560,10 @@ mod tests {
         let mut meta = MetaConsciousness::new(4, config);
 
         let state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let meta_state = meta.meta_reflect(&state);
@@ -579,10 +579,10 @@ mod tests {
         let mut meta = MetaConsciousness::new(4, config);
 
         let state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         // Do a few reflections
@@ -605,10 +605,10 @@ mod tests {
         let mut meta = MetaConsciousness::new(4, config);
 
         let state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let states = meta.deep_introspect(&state, 3);
@@ -622,10 +622,10 @@ mod tests {
         let mut meta = MetaConsciousness::new(4, config);
 
         let state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         meta.meta_reflect(&state);
@@ -641,10 +641,10 @@ mod tests {
         let mut meta = MetaConsciousness::new(4, config);
 
         let state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         meta.meta_reflect(&state);
@@ -663,10 +663,10 @@ mod tests {
         let mut meta = MetaConsciousness::new(4, config);
 
         let state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         // Do enough reflections to trigger meta-learning

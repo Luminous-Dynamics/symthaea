@@ -7,8 +7,10 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use symthaea_core::genesis::{GenesisSeed, ShakeRng};
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::primitive_system::PrimitiveTier;
+use crate::hdc::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use anyhow::Result;
 
 /// Configuration for the primitive evolver
@@ -77,7 +79,7 @@ pub struct EvolvingConcept {
     /// Concept name
     pub name: String,
     /// Current hypervector representation
-    pub hv: RealHV,
+    pub hv: ContinuousHV,
     /// Fitness score
     pub fitness: f64,
     /// Generation this concept was created
@@ -90,7 +92,7 @@ pub struct EvolvingConcept {
 
 impl EvolvingConcept {
     /// Create a new evolving concept
-    pub fn new(id: u64, name: impl Into<String>, hv: RealHV) -> Self {
+    pub fn new(id: u64, name: impl Into<String>, hv: ContinuousHV) -> Self {
         Self {
             id,
             name: name.into(),
@@ -110,7 +112,7 @@ impl EvolvingConcept {
 
     /// Crossover with another concept
     pub fn crossover(&self, other: &EvolvingConcept, id: u64) -> EvolvingConcept {
-        let new_hv = RealHV::bundle(&[self.hv.clone(), other.hv.clone()]);
+        let new_hv = ContinuousHV::bundle_owned(&[self.hv.clone(), other.hv.clone()]);
         let new_name = format!("{}×{}", self.name, other.name);
 
         let mut child = EvolvingConcept::new(id, new_name, new_hv);
@@ -213,7 +215,7 @@ impl PrimitiveEvolver {
     /// Initialize population randomly
     pub fn initialize_random(&mut self, dim: usize, count: usize) {
         for i in 0..count {
-            let hv = RealHV::random(dim, 42);
+            let hv = ContinuousHV::random(dim, 42);
             let concept = EvolvingConcept::new(0, format!("concept_{}", i), hv);
             self.add_concept(concept);
         }
@@ -222,7 +224,7 @@ impl PrimitiveEvolver {
     /// Evaluate fitness for a concept
     pub fn evaluate_fitness<F>(&mut self, id: u64, fitness_fn: F) -> Option<f64>
     where
-        F: Fn(&RealHV) -> f64,
+        F: Fn(&ContinuousHV) -> f64,
     {
         if let Some(concept) = self.population.get_mut(&id) {
             let fitness = fitness_fn(&concept.hv);
@@ -239,7 +241,7 @@ impl PrimitiveEvolver {
     /// Evaluate all concepts
     pub fn evaluate_all<F>(&mut self, fitness_fn: F)
     where
-        F: Fn(&RealHV) -> f64,
+        F: Fn(&ContinuousHV) -> f64,
     {
         for concept in self.population.values_mut() {
             let fitness = fitness_fn(&concept.hv);
@@ -253,7 +255,7 @@ impl PrimitiveEvolver {
     /// Run one generation of evolution
     pub fn evolve_generation<F>(&mut self, fitness_fn: F)
     where
-        F: Fn(&RealHV) -> f64,
+        F: Fn(&ContinuousHV) -> f64,
     {
         // Evaluate fitness
         self.evaluate_all(&fitness_fn);
@@ -334,7 +336,7 @@ impl PrimitiveEvolver {
     /// Run full evolution
     pub fn evolve<F>(&mut self, fitness_fn: F) -> EvolutionResult
     where
-        F: Fn(&RealHV) -> f64 + Copy,
+        F: Fn(&ContinuousHV) -> f64 + Copy,
     {
         self.stats.total_evolutions += 1;
 
@@ -542,6 +544,40 @@ pub struct CandidatePrimitive {
 
     /// Fitness score (Φ improvement)
     pub fitness: f64,
+
+    /// HDC encoding of this primitive's phenotype
+    pub encoding: HV16,
+}
+
+impl CandidatePrimitive {
+    /// Create a mutated copy of this primitive.
+    ///
+    /// Uses HV16::add_noise to flip bits proportional to `mutation_rate`.
+    pub fn mutate(&self, mutation_rate: f64, generation: usize) -> Self {
+        let encoding = self.encoding.add_noise(mutation_rate as f32, generation as u64);
+        Self {
+            name: format!("{}_mut_g{}", self.name, generation),
+            tier: self.tier,
+            fitness: 0.0,
+            encoding,
+        }
+    }
+
+    /// Recombine two parents into a child (uniform crossover at byte level).
+    pub fn recombine(parent1: &Self, parent2: &Self, generation: usize) -> Self {
+        let b1 = &parent1.encoding.0;
+        let b2 = &parent2.encoding.0;
+        let mut child_bytes = [0u8; HV16::BYTES];
+        for i in 0..HV16::BYTES {
+            child_bytes[i] = if (i + generation) % 2 == 0 { b1[i] } else { b2[i] };
+        }
+        Self {
+            name: format!("cross_g{}", generation),
+            tier: parent1.tier,
+            fitness: 0.0,
+            encoding: BinaryHV(child_bytes),
+        }
+    }
 }
 
 /// Result of evolution (evolution_bridge compatible)
@@ -614,10 +650,14 @@ impl PrimitiveEvolution {
     /// Initialize population with random candidates
     fn initialize_population(&mut self) {
         for i in 0..self.config.population_size {
+            let seed = (self.config.tier as u64)
+                .wrapping_mul(1000)
+                .wrapping_add(i as u64);
             self.population.push(CandidatePrimitive {
                 name: format!("evolved_{}_{}", self.config.tier as u8, i),
                 tier: self.config.tier,
                 fitness: 0.0,
+                encoding: HV16::random(seed),
             });
         }
     }
@@ -742,7 +782,7 @@ mod tests {
 
     #[test]
     fn test_concept_creation() {
-        let hv = RealHV::random(512, 42);
+        let hv = ContinuousHV::random(512, 42);
         let concept = EvolvingConcept::new(1, "test", hv);
         assert_eq!(concept.name, "test");
         assert_eq!(concept.fitness, 0.0);
@@ -750,7 +790,7 @@ mod tests {
 
     #[test]
     fn test_mutation() {
-        let hv = RealHV::random(512, 42);
+        let hv = ContinuousHV::random(512, 42);
         let mut concept = EvolvingConcept::new(1, "test", hv.clone());
         let _original = concept.hv.clone();
         concept.mutate(0.1);

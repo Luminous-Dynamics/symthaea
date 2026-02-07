@@ -58,7 +58,7 @@ use crate::perception::{
     MultiModalIntegrator, ModalityType,
     VisualCortex, VisualCortexConfig, VisualFeatures,
 };
-use symthaea_core::hdc::RealHV as HdcVector;
+use symthaea_core::hdc::ContinuousHV as HdcVector;
 use super::resilience::{
     ResilienceManager, ResilienceConfig, Availability,
     PerceptionCapabilities, ResilientResult, ResilienceStats,

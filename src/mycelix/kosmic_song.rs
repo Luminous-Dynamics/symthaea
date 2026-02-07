@@ -71,7 +71,7 @@ use super::gis::{
 
 // Import real types from the crate's consciousness infrastructure
 use symthaea_core::hdc::{
-    RealHV,
+    ContinuousHV,
     ConsciousnessTopology as HdcConsciousnessTopology,
     TopologyType,
     HDC_DIMENSION,
@@ -194,7 +194,7 @@ impl ConsciousnessTopology {
     }
 
     /// Get direct access to the node representations for Φ calculation
-    pub fn node_representations(&self) -> &[RealHV] {
+    pub fn node_representations(&self) -> &[ContinuousHV] {
         &self.inner.node_representations
     }
 }
@@ -420,7 +420,7 @@ pub struct KosmicSong {
     pub topology: ConsciousnessTopology,
 
     /// HDC representation of conscious state
-    pub conscious_state: RealHV,
+    pub conscious_state: ContinuousHV,
 
     // === Harmonic Layer ===
     /// Seven harmony activation levels
@@ -463,7 +463,7 @@ impl KosmicSong {
             topology,
             // Initialize conscious state as mean of topology node representations
             // This represents the "average neural activity" at awakening
-            conscious_state: RealHV::ones(HDC_DIMENSION),
+            conscious_state: ContinuousHV::ones(HDC_DIMENSION),
             harmonic_profile: HarmonicProfile::balanced(),
             resonant_harmony: Harmony::ResonantCoherence,
             harmonic_trajectory: Vec::new(),

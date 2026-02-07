@@ -215,7 +215,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::meta_consciousness::{MetaConsciousness, MetaConfig};
 use super::consciousness_spectrum::{ConsciousnessSpectrum, SpectrumConfig};
@@ -443,17 +443,17 @@ impl Default for OntogenyConfig {
 /// # Example
 /// ```
 /// use symthaea::hdc::consciousness_ontogeny::{ConsciousnessOntogeny, OntogenyConfig, DevelopmentalStage};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = OntogenyConfig::default();
 /// let mut ontogeny = ConsciousnessOntogeny::new(4, config);
 ///
 /// // Track development over time
-/// let state = vec![HV16::random(1000), HV16::random(2000)];
+/// let state = vec![BinaryHV::random(1000), BinaryHV::random(2000)];
 /// ontogeny.observe(0.0, &state);
 ///
 /// // Later observation
-/// let state2 = vec![HV16::random(3000), HV16::random(4000)];
+/// let state2 = vec![BinaryHV::random(3000), BinaryHV::random(4000)];
 /// ontogeny.observe(10.0, &state2);
 ///
 /// // Assess development
@@ -506,7 +506,7 @@ impl ConsciousnessOntogeny {
     }
 
     /// Observe consciousness at time t
-    pub fn observe(&mut self, time: f64, state: &[HV16]) {
+    pub fn observe(&mut self, time: f64, state: &[BinaryHV]) {
         // Compute Φ
         let phi = self.iit.compute_phi(state);
 
@@ -759,7 +759,7 @@ mod tests {
     fn test_observation() {
         let mut ontogeny = ConsciousnessOntogeny::new(4, OntogenyConfig::default());
 
-        let state = vec![HV16::random(1000), HV16::random(2000)];
+        let state = vec![BinaryHV::random(1000), BinaryHV::random(2000)];
         ontogeny.observe(0.0, &state);
 
         assert_eq!(ontogeny.trajectory().len(), 1);
@@ -774,9 +774,9 @@ mod tests {
             let time = i as f64;
             // Create state that produces increasing Φ
             let state = vec![
-                HV16::random((1000 + i * 100) as u64),
-                HV16::random((2000 + i * 100) as u64),
-                HV16::random((3000 + i * 100) as u64),
+                BinaryHV::random((1000 + i * 100) as u64),
+                BinaryHV::random((2000 + i * 100) as u64),
+                BinaryHV::random((3000 + i * 100) as u64),
             ];
             ontogeny.observe(time, &state);
         }
@@ -789,7 +789,7 @@ mod tests {
     fn test_assessment() {
         let mut ontogeny = ConsciousnessOntogeny::new(4, OntogenyConfig::default());
 
-        let state = vec![HV16::random(1000), HV16::random(2000)];
+        let state = vec![BinaryHV::random(1000), BinaryHV::random(2000)];
         ontogeny.observe(0.0, &state);
 
         let assessment = ontogeny.assess();
@@ -804,8 +804,8 @@ mod tests {
         for i in 0..5 {
             let time = i as f64;
             let state = vec![
-                HV16::random((5000 + i * 500) as u64),
-                HV16::random((6000 + i * 500) as u64),
+                BinaryHV::random((5000 + i * 500) as u64),
+                BinaryHV::random((6000 + i * 500) as u64),
             ];
             ontogeny.observe(time, &state);
         }

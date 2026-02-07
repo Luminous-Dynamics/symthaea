@@ -60,7 +60,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::consciousness_gradients::GradientComputer;
 use super::consciousness_dynamics::ConsciousnessDynamics;
@@ -75,7 +75,7 @@ use std::collections::VecDeque;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LTCNeuron {
     /// Current state (hypervector)
-    pub state: HV16,
+    pub state: BinaryHV,
 
     /// Time constant (how fast neuron responds) - modulated by Φ
     pub tau: f64,
@@ -96,21 +96,21 @@ pub struct LTCNeuron {
     pub bias: f64,
 
     /// Accumulated input
-    pub accumulated_input: HV16,
+    pub accumulated_input: BinaryHV,
 }
 
 impl LTCNeuron {
     /// Create new LTC neuron
     pub fn new(num_inputs: usize, seed: u64) -> Self {
         Self {
-            state: HV16::random(seed),
+            state: BinaryHV::random(seed),
             tau: 1.0,
             tau_base: 1.0,
             tau_phi_scale: 0.5,
             input_weights: vec![1.0 / (num_inputs as f64).sqrt(); num_inputs],
             weight_phi_scale: 0.2,
             bias: 0.0,
-            accumulated_input: HV16::zero(),
+            accumulated_input: BinaryHV::zero(),
         }
     }
 
@@ -124,18 +124,18 @@ impl LTCNeuron {
     /// Compute dx/dt (rate of change)
     pub fn compute_derivative(
         &self,
-        inputs: &[HV16],
-        gradient: &HV16,
+        inputs: &[BinaryHV],
+        gradient: &BinaryHV,
         phi: f64,
-    ) -> HV16 {
+    ) -> BinaryHV {
         // Compute weighted input: Σ w_ij(Φ) * input_j
-        let mut weighted_input = HV16::zero();
+        let mut weighted_input = BinaryHV::zero();
         for (input, &weight) in inputs.iter().zip(&self.input_weights) {
             // Modulate weight by consciousness
             let effective_weight = weight * (1.0 + self.weight_phi_scale * phi);
 
             // Accumulate (simplified - in full version use proper binding)
-            weighted_input = HV16::bundle(&[weighted_input, input.clone()]);
+            weighted_input = BinaryHV::bundle(&[weighted_input, input.clone()]);
         }
 
         // dx/dt = (-x + Σ w_ij * input_j + ∇Φ) / τ
@@ -147,14 +147,14 @@ impl LTCNeuron {
         let forcing = gradient.clone();
 
         // Combine: -x + input + ∇Φ
-        let total = HV16::bundle(&[weighted_input, forcing]);
+        let total = BinaryHV::bundle(&[weighted_input, forcing]);
 
         // Scale by 1/τ
         total
     }
 
     /// Euler integration step
-    pub fn step(&mut self, inputs: &[HV16], gradient: &HV16, phi: f64, dt: f64) {
+    pub fn step(&mut self, inputs: &[BinaryHV], gradient: &BinaryHV, phi: f64, dt: f64) {
         // Update time constant
         self.update_tau(phi);
 
@@ -163,7 +163,7 @@ impl LTCNeuron {
 
         // Euler step: x_new = x_old + dt * dx/dt
         // In HDC: bundle with small weight for dt
-        self.state = HV16::bundle(&[self.state.clone(), dxdt]);
+        self.state = BinaryHV::bundle(&[self.state.clone(), dxdt]);
     }
 }
 
@@ -175,13 +175,13 @@ impl LTCNeuron {
 /// # Example
 /// ```
 /// use symthaea::hdc::liquid_consciousness::{LiquidConsciousness, LiquidConfig};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = LiquidConfig::default();
 /// let mut liquid = LiquidConsciousness::new(8, 4, config);
 ///
 /// // Process input over time
-/// let input = vec![HV16::random(1000), HV16::random(1001)];
+/// let input = vec![BinaryHV::random(1000), BinaryHV::random(1001)];
 /// let trajectory = liquid.process(&input, 10, 0.1);
 ///
 /// println!("Final Φ: {:.3}", trajectory.final_phi);
@@ -259,7 +259,7 @@ pub struct LiquidTrajectory {
     pub times: Vec<f64>,
 
     /// States at each time
-    pub states: Vec<Vec<HV16>>,
+    pub states: Vec<Vec<BinaryHV>>,
 
     /// Consciousness levels
     pub phis: Vec<f64>,
@@ -323,14 +323,14 @@ impl LiquidConsciousness {
     }
 
     /// Get current state as vector of hypervectors
-    fn get_state(&self) -> Vec<HV16> {
+    fn get_state(&self) -> Vec<BinaryHV> {
         self.neurons.iter().map(|n| n.state.clone()).collect()
     }
 
     /// Process input over time
     ///
     /// Returns complete trajectory showing how consciousness evolves.
-    pub fn process(&mut self, input: &[HV16], steps: usize, dt: f64) -> LiquidTrajectory {
+    pub fn process(&mut self, input: &[BinaryHV], steps: usize, dt: f64) -> LiquidTrajectory {
         let mut times = Vec::new();
         let mut states = Vec::new();
         let mut phis = Vec::new();
@@ -387,15 +387,15 @@ impl LiquidConsciousness {
     }
 
     /// Get output state (final neuron states)
-    pub fn get_output(&self) -> Vec<HV16> {
+    pub fn get_output(&self) -> Vec<BinaryHV> {
         self.get_state()
     }
 
     /// Reset network state
     pub fn reset(&mut self) {
         for (i, neuron) in self.neurons.iter_mut().enumerate() {
-            neuron.state = HV16::random(2000 + i as u64);
-            neuron.accumulated_input = HV16::zero();
+            neuron.state = BinaryHV::random(2000 + i as u64);
+            neuron.accumulated_input = BinaryHV::zero();
         }
         self.time = 0.0;
         self.phi_history.clear();
@@ -467,7 +467,7 @@ mod tests {
         let config = LiquidConfig::default();
         let mut liquid = LiquidConsciousness::new(8, 2, config);
 
-        let input = vec![HV16::random(1000), HV16::random(1001)];
+        let input = vec![BinaryHV::random(1000), BinaryHV::random(1001)];
         let trajectory = liquid.process(&input, 10, 0.1);
 
         assert_eq!(trajectory.times.len(), 10);
@@ -483,7 +483,7 @@ mod tests {
         };
         let mut liquid = LiquidConsciousness::new(8, 2, config);
 
-        let input = vec![HV16::random(1000), HV16::random(1001)];
+        let input = vec![BinaryHV::random(1000), BinaryHV::random(1001)];
         let trajectory = liquid.process(&input, 20, 0.1);
 
         // Consciousness should generally increase with processing
@@ -499,7 +499,7 @@ mod tests {
         let config = LiquidConfig::default();
         let mut liquid = LiquidConsciousness::new(8, 2, config);
 
-        let input = vec![HV16::random(1000), HV16::random(1001)];
+        let input = vec![BinaryHV::random(1000), BinaryHV::random(1001)];
         let trajectory = liquid.process(&input, 10, 0.1);
 
         let avg_phi = trajectory.average_phi();
@@ -514,7 +514,7 @@ mod tests {
         let config = LiquidConfig::default();
         let mut liquid = LiquidConsciousness::new(8, 2, config);
 
-        let input = vec![HV16::random(1000), HV16::random(1001)];
+        let input = vec![BinaryHV::random(1000), BinaryHV::random(1001)];
         liquid.process(&input, 10, 0.1);
 
         liquid.reset();
@@ -528,7 +528,7 @@ mod tests {
         let config = LiquidConfig::default();
         let mut liquid = LiquidConsciousness::new(8, 2, config);
 
-        let input = vec![HV16::random(1000), HV16::random(1001)];
+        let input = vec![BinaryHV::random(1000), BinaryHV::random(1001)];
         liquid.process(&input, 10, 0.1);
 
         let stats = liquid.get_consciousness_stats();

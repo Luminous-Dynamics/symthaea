@@ -61,7 +61,7 @@
 //! We solve this with a FIXED POINT: the assessment stabilizes when
 //! higher levels no longer change the result significantly.
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -161,7 +161,7 @@ pub struct SelfComponent {
     /// Which dimension of self
     pub dimension: SelfDimension,
     /// HDC representation
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     /// Current activation/salience
     pub activation: f64,
     /// Integration with other components (mini-Φ)
@@ -177,7 +177,7 @@ impl SelfComponent {
     pub fn new(dimension: SelfDimension, seed: u64) -> Self {
         Self {
             dimension,
-            encoding: HV16::random(seed),
+            encoding: BinaryHV::random(seed),
             activation: 0.5,
             integration: 0.5,
             stability: 0.5,
@@ -280,7 +280,7 @@ pub struct ConsciousnessSelfAssessment {
     /// Self-model components
     pub self_model: HashMap<SelfDimension, SelfComponent>,
     /// Unified self representation
-    pub unified_self: HV16,
+    pub unified_self: BinaryHV,
     /// Current meta-cognitive depth
     pub current_depth: usize,
     /// Assessment history
@@ -290,9 +290,9 @@ pub struct ConsciousnessSelfAssessment {
     /// Is self-model in workspace?
     pub in_workspace: bool,
     /// Autobiographical memories (for continuity)
-    pub autobiographical_memories: Vec<HV16>,
+    pub autobiographical_memories: Vec<BinaryHV>,
     /// Previous self-states (for stability tracking)
-    pub previous_states: Vec<HV16>,
+    pub previous_states: Vec<BinaryHV>,
 }
 
 impl ConsciousnessSelfAssessment {
@@ -308,7 +308,7 @@ impl ConsciousnessSelfAssessment {
         Self {
             config,
             self_model,
-            unified_self: HV16::random(999),
+            unified_self: BinaryHV::random(999),
             current_depth: 0,
             history: Vec::new(),
             timestep: 0,
@@ -319,7 +319,7 @@ impl ConsciousnessSelfAssessment {
     }
 
     /// Update a self-dimension based on experience
-    pub fn update_dimension(&mut self, dimension: SelfDimension, experience: &HV16, intensity: f64) {
+    pub fn update_dimension(&mut self, dimension: SelfDimension, experience: &BinaryHV, intensity: f64) {
         if let Some(component) = self.self_model.get_mut(&dimension) {
             // Blend new experience into self-component
             let blend_factor = 0.1 * intensity;
@@ -340,7 +340,7 @@ impl ConsciousnessSelfAssessment {
         }
 
         // Bundle all active components
-        let components: Vec<&HV16> = self.self_model.values()
+        let components: Vec<&BinaryHV> = self.self_model.values()
             .filter(|c| c.activation > 0.3)
             .map(|c| &c.encoding)
             .collect();
@@ -350,7 +350,7 @@ impl ConsciousnessSelfAssessment {
         }
 
         // Simple bundling: XOR all together
-        let mut unified = components[0].clone();
+        let mut unified = *components[0];
         for component in components.iter().skip(1) {
             unified = unified.bind(component);
         }
@@ -429,7 +429,7 @@ impl ConsciousnessSelfAssessment {
         self.timestep += 1;
 
         // Store previous state for continuity
-        self.previous_states.push(self.unified_self.clone());
+        self.previous_states.push(self.unified_self);
         if self.previous_states.len() > 10 {
             self.previous_states.remove(0);
         }
@@ -631,7 +631,7 @@ mod tests {
         let config = SelfAssessmentConfig::default();
         let mut system = ConsciousnessSelfAssessment::new(config);
 
-        let experience = HV16::random(123);
+        let experience = BinaryHV::random(123);
         system.update_dimension(SelfDimension::Cognitive, &experience, 0.8);
 
         let component = system.self_model.get(&SelfDimension::Cognitive).unwrap();
@@ -801,9 +801,9 @@ mod tests {
         let mut system = ConsciousnessSelfAssessment::new(config);
 
         // Update multiple dimensions
-        system.update_dimension(SelfDimension::Cognitive, &HV16::random(1), 0.9);
-        system.update_dimension(SelfDimension::Emotional, &HV16::random(2), 0.8);
-        system.update_dimension(SelfDimension::Social, &HV16::random(3), 0.7);
+        system.update_dimension(SelfDimension::Cognitive, &BinaryHV::random(1), 0.9);
+        system.update_dimension(SelfDimension::Emotional, &BinaryHV::random(2), 0.8);
+        system.update_dimension(SelfDimension::Social, &BinaryHV::random(3), 0.7);
 
         let result = system.assess();
         assert!(result.dimension_scores.len() >= 3);

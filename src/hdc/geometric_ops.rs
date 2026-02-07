@@ -47,7 +47,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::hdc::RealHV;
+use crate::hdc::ContinuousHV;
 
 // ============================================================================
 // Constants
@@ -65,7 +65,7 @@ const GEO_EPS: f64 = 1e-12;
 /// Stateless namespace for geometric operations on the unit hypersphere S^{d-1}.
 ///
 /// The hypersphere is the natural home of normalized hypervectors: every concept
-/// encoded as a unit-length RealHV lives on this manifold. `HypersphereOps`
+/// encoded as a unit-length ContinuousHV lives on this manifold. `HypersphereOps`
 /// provides the differential-geometric toolkit for working intrinsically on this
 /// surface rather than in the ambient Euclidean space.
 #[derive(Debug, Clone)]
@@ -148,22 +148,22 @@ pub struct PGAResult {
 // Conversion utilities
 // ============================================================================
 
-/// Convert a `RealHV` (f32 values) to a `Vec<f64>` for geometric computations.
+/// Convert a `ContinuousHV` (f32 values) to a `Vec<f64>` for geometric computations.
 ///
 /// Geometric operations are performed in f64 to maintain numerical precision
 /// on the manifold, especially for iterative algorithms like Frechet mean
 /// where accumulated rounding errors can cause divergence.
-pub fn from_real_hv(hv: &RealHV) -> Vec<f64> {
+pub fn from_real_hv(hv: &ContinuousHV) -> Vec<f64> {
     hv.values.iter().map(|&v| v as f64).collect()
 }
 
-/// Convert a `Vec<f64>` back to a `RealHV` (f32 values).
+/// Convert a `Vec<f64>` back to a `ContinuousHV` (f32 values).
 ///
 /// This is the inverse of `from_real_hv`, used to return geometric results
 /// back into the HDC type system.
-pub fn to_real_hv(v: &[f64]) -> RealHV {
+pub fn to_real_hv(v: &[f64]) -> ContinuousHV {
     let values: Vec<f32> = v.iter().map(|&x| x as f32).collect();
-    RealHV::from_values(values)
+    ContinuousHV::from_values(values)
 }
 
 // ============================================================================
@@ -1242,12 +1242,12 @@ mod tests {
     }
 
     // ====================================================================
-    // RealHV conversion round-trip
+    // ContinuousHV conversion round-trip
     // ====================================================================
 
     #[test]
     fn test_real_hv_conversion_roundtrip() {
-        let original = RealHV::random(64, 42);
+        let original = ContinuousHV::random(64, 42);
         let as_f64 = from_real_hv(&original);
         let back = to_real_hv(&as_f64);
 

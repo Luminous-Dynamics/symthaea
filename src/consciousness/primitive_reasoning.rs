@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::{HV16, Primitive, PrimitiveTier};
 use anyhow::Result;
 
@@ -57,6 +57,8 @@ pub enum TaskType {
     Temporal,
     /// Generic/unknown task
     Generic,
+    /// Code understanding, generation, and transformation
+    Code,
 }
 
 /// Configuration for tier-aware primitive selection
@@ -80,6 +82,8 @@ pub struct TierAwareConfig {
     pub compositional_weight: f64,
     /// Weight for Consciousness tier
     pub consciousness_weight: f64,
+    /// Weight for Code tier
+    pub code_weight: f64,
 }
 
 impl Default for TierAwareConfig {
@@ -94,6 +98,7 @@ impl Default for TierAwareConfig {
             temporal_weight: 1.0,
             compositional_weight: 1.0,
             consciousness_weight: 1.0,
+            code_weight: 1.0,
         }
     }
 }
@@ -111,7 +116,7 @@ impl TierAwareConfig {
             PrimitiveTier::Temporal => self.temporal_weight,
             PrimitiveTier::Compositional => self.compositional_weight,
             PrimitiveTier::Consciousness => self.consciousness_weight,
-            PrimitiveTier::Code => self.compositional_weight, // Code uses compositional weight
+            PrimitiveTier::Code => self.code_weight,
         }
     }
 }
@@ -510,7 +515,7 @@ pub struct Concept {
     /// Concept name
     pub name: String,
     /// Hyperdimensional representation
-    pub hv: RealHV,
+    pub hv: ContinuousHV,
     /// Relations to other concepts
     pub relations: HashMap<String, f32>,
     /// Metadata
@@ -519,7 +524,7 @@ pub struct Concept {
 
 impl Concept {
     /// Create a new concept
-    pub fn new(name: impl Into<String>, hv: RealHV) -> Self {
+    pub fn new(name: impl Into<String>, hv: ContinuousHV) -> Self {
         Self {
             name: name.into(),
             hv,
@@ -716,7 +721,7 @@ impl PrimitiveReasoner {
     }
 
     /// Bind two concepts together
-    pub fn bind(&mut self, a: &str, b: &str) -> Option<RealHV> {
+    pub fn bind(&mut self, a: &str, b: &str) -> Option<ContinuousHV> {
         let concept_a = self.concepts.get(a)?;
         let concept_b = self.concepts.get(b)?;
 
@@ -726,7 +731,7 @@ impl PrimitiveReasoner {
     }
 
     /// Find similar concepts
-    pub fn find_similar(&self, query_hv: &RealHV, top_k: usize) -> Vec<(String, f32)> {
+    pub fn find_similar(&self, query_hv: &ContinuousHV, top_k: usize) -> Vec<(String, f32)> {
         let mut similarities: Vec<(String, f32)> = self.concepts
             .iter()
             .map(|(name, concept)| {
@@ -769,7 +774,7 @@ mod tests {
 
     #[test]
     fn test_concept_creation() {
-        let hv = RealHV::random(512, 42);
+        let hv = ContinuousHV::random(512, 42);
         let mut concept = Concept::new("test", hv);
         concept.add_relation("other", 0.8);
         assert_eq!(concept.relations.get("other"), Some(&0.8));
@@ -780,12 +785,12 @@ mod tests {
         let mut reasoner = PrimitiveReasoner::default();
 
         // Add some concepts
-        let hv1 = RealHV::random(512, 42);
+        let hv1 = ContinuousHV::random(512, 42);
         let mut c1 = Concept::new("animal", hv1);
         c1.add_relation("dog", 0.9);
         reasoner.add_concept(c1);
 
-        let hv2 = RealHV::random(512, 42);
+        let hv2 = ContinuousHV::random(512, 42);
         let c2 = Concept::new("dog", hv2);
         reasoner.add_concept(c2);
 

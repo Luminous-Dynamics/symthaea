@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use super::seven_harmonies::{SevenHarmonies, Harmony, AlignmentResult};
 
 /// Configuration for harmonies integration
@@ -49,7 +49,7 @@ pub struct ValuedAction {
     /// Action description
     pub description: String,
     /// Action embedding
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
     /// Expected outcomes
     pub expected_outcomes: Vec<String>,
     /// Affected entities
@@ -58,7 +58,7 @@ pub struct ValuedAction {
 
 impl ValuedAction {
     /// Create a new valued action
-    pub fn new(id: impl Into<String>, description: impl Into<String>, embedding: RealHV) -> Self {
+    pub fn new(id: impl Into<String>, description: impl Into<String>, embedding: ContinuousHV) -> Self {
         Self {
             id: id.into(),
             description: description.into(),
@@ -104,7 +104,7 @@ pub struct HarmoniesIntegrator {
     /// The seven harmonies system
     harmonies: SevenHarmonies,
     /// Harmony embeddings
-    harmony_embeddings: HashMap<Harmony, RealHV>,
+    harmony_embeddings: HashMap<Harmony, ContinuousHV>,
     /// Evaluation history
     history: Vec<ValueEvaluation>,
     /// Statistics
@@ -140,7 +140,7 @@ impl HarmoniesIntegrator {
             Harmony::SacredReciprocity,
             Harmony::EvolutionaryProgression,
         ] {
-            harmony_embeddings.insert(harmony, RealHV::random(512, 42));
+            harmony_embeddings.insert(harmony, ContinuousHV::random(512, 42));
         }
 
         Self {
@@ -293,7 +293,7 @@ impl HarmoniesIntegrator {
         for (harmony, embedding) in self.harmony_embeddings.iter_mut() {
             let weight = self.config.harmony_weights.get(harmony).copied().unwrap_or(1.0);
             let adjustment = action.embedding.clone().scale(learning_rate * weight);
-            *embedding = RealHV::bundle(&[embedding.clone(), adjustment]);
+            *embedding = ContinuousHV::bundle_owned(&[embedding.clone(), adjustment]);
         }
     }
 
@@ -340,7 +340,7 @@ mod tests {
         let action = ValuedAction::new(
             "help_user",
             "Assist user with their request",
-            RealHV::random(512, 42)
+            ContinuousHV::random(512, 42)
         );
 
         let evaluation = integrator.evaluate(&action);
@@ -350,7 +350,7 @@ mod tests {
 
     #[test]
     fn test_valued_action_builder() {
-        let action = ValuedAction::new("test", "description", RealHV::random(512, 42))
+        let action = ValuedAction::new("test", "description", ContinuousHV::random(512, 42))
             .with_outcome("positive outcome")
             .with_entity("user");
 

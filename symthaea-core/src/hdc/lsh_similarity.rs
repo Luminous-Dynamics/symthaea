@@ -31,7 +31,7 @@
 //! Speedup @ n=5000: ~100x (most candidates filtered)
 //! ```
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::lsh_simhash::{SimHashIndex, SimHashConfig};
 use rayon::prelude::*;  // Session 8: Parallel query processing
 
@@ -103,7 +103,7 @@ const PARALLEL_THRESHOLD: usize = 50;
 /// - Precision: 100% on mixed workload (1K cluster + 9K random)
 /// - Candidate reduction: 89.1% (only 10.9% vectors examined)
 ///
-pub fn adaptive_find_most_similar(query: &HV16, targets: &[HV16]) -> Option<(usize, f32)> {
+pub fn adaptive_find_most_similar(query: &BinaryHV, targets: &[BinaryHV]) -> Option<(usize, f32)> {
     if targets.is_empty() {
         return None;
     }
@@ -123,7 +123,7 @@ pub fn adaptive_find_most_similar(query: &HV16, targets: &[HV16]) -> Option<(usi
 /// Used for small datasets (<500 vectors) where LSH overhead exceeds benefit.
 /// This is the original implementation from `simd_hv::simd_find_most_similar()`.
 #[inline]
-fn naive_find_most_similar(query: &HV16, targets: &[HV16]) -> Option<(usize, f32)> {
+fn naive_find_most_similar(query: &BinaryHV, targets: &[BinaryHV]) -> Option<(usize, f32)> {
     let mut best_idx = 0;
     let mut best_sim = query.similarity(&targets[0]);
 
@@ -157,7 +157,7 @@ fn naive_find_most_similar(query: &HV16, targets: &[HV16]) -> Option<(usize, f32
 /// - Stateless API compatible with existing code
 ///
 /// Future optimization: Cache index if vectors stable
-fn lsh_find_most_similar(query: &HV16, targets: &[HV16]) -> Option<(usize, f32)> {
+fn lsh_find_most_similar(query: &BinaryHV, targets: &[BinaryHV]) -> Option<(usize, f32)> {
     // Choose SimHash configuration based on dataset size
     let config = if targets.len() < 1000 {
         SimHashConfig::fast()        // 5 tables, ~80% recall, fastest
@@ -193,7 +193,7 @@ fn lsh_find_most_similar(query: &HV16, targets: &[HV16]) -> Option<(usize, f32)>
 /// Same adaptive routing as `adaptive_find_most_similar()`:
 /// - Small datasets: Naive O(n log k) via sorting
 /// - Large datasets: LSH O(k × candidates) where candidates << n
-pub fn adaptive_find_top_k(query: &HV16, targets: &[HV16], k: usize) -> Vec<(usize, f32)> {
+pub fn adaptive_find_top_k(query: &BinaryHV, targets: &[BinaryHV], k: usize) -> Vec<(usize, f32)> {
     if targets.is_empty() {
         return Vec::new();
     }
@@ -267,8 +267,8 @@ pub fn adaptive_find_top_k(query: &HV16, targets: &[HV16], k: usize) -> Vec<(usi
 /// Perfect scenario for batch-aware LSH!
 ///
 pub fn adaptive_batch_find_most_similar(
-    queries: &[HV16],
-    targets: &[HV16],
+    queries: &[BinaryHV],
+    targets: &[BinaryHV],
 ) -> Vec<Option<(usize, f32)>> {
     if queries.is_empty() || targets.is_empty() {
         return vec![None; queries.len()];
@@ -318,8 +318,8 @@ pub fn adaptive_batch_find_most_similar(
 /// This is where the real speedup comes from!
 #[inline]
 fn batch_lsh_find_most_similar(
-    queries: &[HV16],
-    targets: &[HV16],
+    queries: &[BinaryHV],
+    targets: &[BinaryHV],
 ) -> Vec<Option<(usize, f32)>> {
     // Choose configuration based on dataset size
     let config = if targets.len() < 1000 {
@@ -361,8 +361,8 @@ fn batch_lsh_find_most_similar(
 ///
 /// Same principle as batch_find_most_similar but returns top-k for each query.
 pub fn adaptive_batch_find_top_k(
-    queries: &[HV16],
-    targets: &[HV16],
+    queries: &[BinaryHV],
+    targets: &[BinaryHV],
     k: usize,
 ) -> Vec<Vec<(usize, f32)>> {
     if queries.is_empty() || targets.is_empty() {
@@ -407,8 +407,8 @@ pub fn adaptive_batch_find_top_k(
 /// Batch LSH top-k with index reuse
 #[inline]
 fn batch_lsh_find_top_k(
-    queries: &[HV16],
-    targets: &[HV16],
+    queries: &[BinaryHV],
+    targets: &[BinaryHV],
     k: usize,
 ) -> Vec<Vec<(usize, f32)>> {
     let config = if targets.len() < 1000 {
@@ -440,7 +440,7 @@ fn batch_lsh_find_top_k(
 
 /// Naive top-k: Compute all similarities and sort
 #[inline]
-fn naive_find_top_k(query: &HV16, targets: &[HV16], k: usize) -> Vec<(usize, f32)> {
+fn naive_find_top_k(query: &BinaryHV, targets: &[BinaryHV], k: usize) -> Vec<(usize, f32)> {
     let mut results: Vec<(usize, f32)> = targets
         .iter()
         .enumerate()
@@ -456,7 +456,7 @@ fn naive_find_top_k(query: &HV16, targets: &[HV16], k: usize) -> Vec<(usize, f32
 
 /// LSH-accelerated top-k
 #[inline]
-fn lsh_find_top_k(query: &HV16, targets: &[HV16], k: usize) -> Vec<(usize, f32)> {
+fn lsh_find_top_k(query: &BinaryHV, targets: &[BinaryHV], k: usize) -> Vec<(usize, f32)> {
     // Choose configuration based on dataset size
     let config = if targets.len() < 1000 {
         SimHashConfig::fast()
@@ -479,8 +479,8 @@ mod tests {
     #[test]
     fn test_adaptive_small_dataset() {
         // Small dataset should use naive search
-        let query = HV16::random(1);
-        let targets: Vec<HV16> = (0..10).map(|i| HV16::random(i + 10)).collect();
+        let query = BinaryHV::random(1);
+        let targets: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i + 10)).collect();
 
         let result = adaptive_find_most_similar(&query, &targets);
         assert!(result.is_some());
@@ -493,8 +493,8 @@ mod tests {
     #[test]
     fn test_adaptive_large_dataset() {
         // Large dataset should use LSH search
-        let query = HV16::random(1);
-        let targets: Vec<HV16> = (0..1000).map(|i| HV16::random(i + 10)).collect();
+        let query = BinaryHV::random(1);
+        let targets: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i + 10)).collect();
 
         let result = adaptive_find_most_similar(&query, &targets);
         assert!(result.is_some());
@@ -506,8 +506,8 @@ mod tests {
 
     #[test]
     fn test_adaptive_empty() {
-        let query = HV16::random(1);
-        let targets: Vec<HV16> = vec![];
+        let query = BinaryHV::random(1);
+        let targets: Vec<BinaryHV> = vec![];
 
         let result = adaptive_find_most_similar(&query, &targets);
         assert!(result.is_none());
@@ -515,8 +515,8 @@ mod tests {
 
     #[test]
     fn test_adaptive_single() {
-        let query = HV16::random(1);
-        let targets = vec![HV16::random(2)];
+        let query = BinaryHV::random(1);
+        let targets = vec![BinaryHV::random(2)];
 
         let result = adaptive_find_most_similar(&query, &targets);
         assert!(result.is_some());
@@ -529,10 +529,10 @@ mod tests {
     fn test_naive_vs_lsh_consistency() {
         // For the same dataset, naive and LSH should find similar results
         // (LSH might differ due to approximation, but should be close)
-        let query = HV16::random(1);
+        let query = BinaryHV::random(1);
 
         // Create a dataset with one clearly most similar vector
-        let mut targets: Vec<HV16> = (0..600).map(|i| HV16::random(i + 100)).collect();
+        let mut targets: Vec<BinaryHV> = (0..600).map(|i| BinaryHV::random(i + 100)).collect();
 
         // Make one vector very similar to query (low Hamming distance)
         let mut very_similar = query.clone();
@@ -561,8 +561,8 @@ mod tests {
 
     #[test]
     fn test_top_k_adaptive() {
-        let query = HV16::random(1);
-        let targets: Vec<HV16> = (0..100).map(|i| HV16::random(i + 10)).collect();
+        let query = BinaryHV::random(1);
+        let targets: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i + 10)).collect();
 
         let results = adaptive_find_top_k(&query, &targets, 5);
 
@@ -581,8 +581,8 @@ mod tests {
 
     #[test]
     fn test_top_k_larger_than_dataset() {
-        let query = HV16::random(1);
-        let targets: Vec<HV16> = (0..10).map(|i| HV16::random(i + 10)).collect();
+        let query = BinaryHV::random(1);
+        let targets: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i + 10)).collect();
 
         let results = adaptive_find_top_k(&query, &targets, 20);
 
@@ -597,8 +597,8 @@ mod tests {
     #[test]
     fn test_batch_small_dataset() {
         // Small dataset should use naive for each query
-        let queries: Vec<HV16> = (0..5).map(|i| HV16::random(i)).collect();
-        let targets: Vec<HV16> = (0..10).map(|i| HV16::random(i + 100)).collect();
+        let queries: Vec<BinaryHV> = (0..5).map(|i| BinaryHV::random(i)).collect();
+        let targets: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i + 100)).collect();
 
         let results = adaptive_batch_find_most_similar(&queries, &targets);
 
@@ -614,8 +614,8 @@ mod tests {
     #[test]
     fn test_batch_large_dataset() {
         // Large dataset should build LSH index once, reuse for all queries
-        let queries: Vec<HV16> = (0..10).map(|i| HV16::random(i)).collect();
-        let targets: Vec<HV16> = (0..1000).map(|i| HV16::random(i + 100)).collect();
+        let queries: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
+        let targets: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i + 100)).collect();
 
         let results = adaptive_batch_find_most_similar(&queries, &targets);
 
@@ -630,8 +630,8 @@ mod tests {
 
     #[test]
     fn test_batch_empty() {
-        let queries: Vec<HV16> = vec![];
-        let targets: Vec<HV16> = (0..100).map(|i| HV16::random(i)).collect();
+        let queries: Vec<BinaryHV> = vec![];
+        let targets: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
 
         let results = adaptive_batch_find_most_similar(&queries, &targets);
         assert_eq!(results.len(), 0);
@@ -639,8 +639,8 @@ mod tests {
 
     #[test]
     fn test_batch_top_k() {
-        let queries: Vec<HV16> = (0..5).map(|i| HV16::random(i)).collect();
-        let targets: Vec<HV16> = (0..1000).map(|i| HV16::random(i + 100)).collect();
+        let queries: Vec<BinaryHV> = (0..5).map(|i| BinaryHV::random(i)).collect();
+        let targets: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i + 100)).collect();
 
         let results = adaptive_batch_find_top_k(&queries, &targets, 3);
 
@@ -658,8 +658,8 @@ mod tests {
     #[test]
     fn test_batch_consistency_with_single() {
         // Batch results should match individual query results
-        let queries: Vec<HV16> = (0..3).map(|i| HV16::random(i)).collect();
-        let targets: Vec<HV16> = (0..100).map(|i| HV16::random(i + 100)).collect();
+        let queries: Vec<BinaryHV> = (0..3).map(|i| BinaryHV::random(i)).collect();
+        let targets: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i + 100)).collect();
 
         // Get batch results
         let batch_results = adaptive_batch_find_most_similar(&queries, &targets);

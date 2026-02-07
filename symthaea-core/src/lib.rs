@@ -14,7 +14,7 @@ pub mod physics;
 
 // Re-exports are handled at the module level
 // Key types are available from their respective modules:
-// - hdc::binary_hv::HV16
+// - hdc::binary_hv::BinaryHV
 // - hdc::consciousness::ConsciousnessState
 // - hdc::integrated_information::IntegratedInformation
 // - core::ConsciousnessState (different variant)

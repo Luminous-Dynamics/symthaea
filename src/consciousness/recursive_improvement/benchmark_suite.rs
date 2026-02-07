@@ -24,14 +24,285 @@ use serde::{Serialize, Deserialize};
 
 use super::world_model::LatentConsciousnessState;
 use super::routers::{
-    CausalValidatedRouter, CausalValidatedConfig,
-    InformationGeometricRouter, GeometricRouterConfig,
-    TopologicalConsciousnessRouter, TopologicalRouterConfig,
-    QuantumCoherenceRouter, QuantumRouterConfig,
-    ActiveInferenceRouter, ActiveInferenceConfig,
-    PredictiveProcessingRouter, PredictiveProcessingConfig,
-    ASTRouter, ASTRouterConfig,
+    ConsciousnessRouter, RouterType, RoutingDecision,
+    DirectRouter, PhiMaximizingRouter, ExploratoryRouter, ConsolidatingRouter,
 };
+
+// Stub types for routers that don't exist yet
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum RoutingStrategy {
+    StandardProcessing,
+    DeepIntegration,
+    RapidExploration,
+}
+
+// Stub router configurations
+#[derive(Debug, Clone)]
+struct CausalValidatedConfig {
+    confidence_threshold: f64,
+}
+
+impl Default for CausalValidatedConfig {
+    fn default() -> Self {
+        Self { confidence_threshold: 0.7 }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct GeometricRouterConfig {
+    curvature_scale: f64,
+}
+
+impl Default for GeometricRouterConfig {
+    fn default() -> Self {
+        Self { curvature_scale: 1.0 }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct TopologicalRouterConfig {
+    topology_threshold: f64,
+}
+
+impl Default for TopologicalRouterConfig {
+    fn default() -> Self {
+        Self { topology_threshold: 0.5 }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct QuantumRouterConfig {
+    decoherence_rate: f64,
+}
+
+impl Default for QuantumRouterConfig {
+    fn default() -> Self {
+        Self { decoherence_rate: 0.1 }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ActiveInferenceConfig {
+    free_energy_threshold: f64,
+}
+
+impl Default for ActiveInferenceConfig {
+    fn default() -> Self {
+        Self { free_energy_threshold: 1.0 }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PredictiveProcessingConfig {
+    prediction_horizon: usize,
+}
+
+impl Default for PredictiveProcessingConfig {
+    fn default() -> Self {
+        Self { prediction_horizon: 10 }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ASTRouterConfig {
+    attention_threshold: f64,
+}
+
+impl Default for ASTRouterConfig {
+    fn default() -> Self {
+        Self { attention_threshold: 0.6 }
+    }
+}
+
+// Stub router implementations
+#[derive(Debug)]
+struct CausalValidatedRouter {
+    router: DirectRouter,
+}
+
+impl CausalValidatedRouter {
+    fn new(_config: CausalValidatedConfig) -> Self {
+        Self { router: DirectRouter::new() }
+    }
+
+    fn route_validated(&mut self, target: &LatentConsciousnessState) -> ValidatedDecision {
+        let current = LatentConsciousnessState::default();
+        let decision = self.router.route(&current, target);
+        ValidatedDecision {
+            strategy: RoutingStrategy::StandardProcessing,
+            confidence: decision.confidence as f64,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ValidatedDecision {
+    strategy: RoutingStrategy,
+    confidence: f64,
+}
+
+#[derive(Debug)]
+struct InformationGeometricRouter {
+    router: PhiMaximizingRouter,
+}
+
+impl InformationGeometricRouter {
+    fn new(_config: GeometricRouterConfig) -> Self {
+        Self { router: PhiMaximizingRouter::new() }
+    }
+
+    fn observe_state(&mut self, _state: &LatentConsciousnessState) {}
+
+    fn route(&mut self, target: &LatentConsciousnessState) -> GeometricDecision {
+        let current = LatentConsciousnessState::default();
+        let _decision = self.router.route(&current, target);
+        GeometricDecision {
+            strategy: RoutingStrategy::StandardProcessing,
+            routing_cost: 0.5,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct GeometricDecision {
+    strategy: RoutingStrategy,
+    routing_cost: f64,
+}
+
+#[derive(Debug)]
+struct TopologicalConsciousnessRouter {
+    router: ExploratoryRouter,
+}
+
+impl TopologicalConsciousnessRouter {
+    fn new(_config: TopologicalRouterConfig) -> Self {
+        Self { router: ExploratoryRouter::new() }
+    }
+
+    fn observe_state(&mut self, _state: &LatentConsciousnessState) {}
+
+    fn route(&mut self, target: &LatentConsciousnessState) -> TopologicalDecision {
+        let current = LatentConsciousnessState::default();
+        let _decision = self.router.route(&current, target);
+        TopologicalDecision {
+            strategy: RoutingStrategy::StandardProcessing,
+            transition_detected: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct TopologicalDecision {
+    strategy: RoutingStrategy,
+    transition_detected: bool,
+}
+
+#[derive(Debug)]
+struct QuantumCoherenceRouter {
+    router: ConsolidatingRouter,
+}
+
+impl QuantumCoherenceRouter {
+    fn new(_config: QuantumRouterConfig) -> Self {
+        Self { router: ConsolidatingRouter::new() }
+    }
+
+    fn observe_state(&mut self, _state: &LatentConsciousnessState) {}
+
+    fn route(&mut self, target: &LatentConsciousnessState) -> QuantumDecision {
+        let current = LatentConsciousnessState::default();
+        let _decision = self.router.route(&current, target);
+        QuantumDecision {
+            strategy: RoutingStrategy::StandardProcessing,
+            probability: 0.8,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct QuantumDecision {
+    strategy: RoutingStrategy,
+    probability: f64,
+}
+
+#[derive(Debug)]
+struct ActiveInferenceRouter {
+    router: PhiMaximizingRouter,
+}
+
+impl ActiveInferenceRouter {
+    fn new(_config: ActiveInferenceConfig) -> Self {
+        Self { router: PhiMaximizingRouter::new() }
+    }
+
+    fn observe_state(&mut self, _state: &LatentConsciousnessState) {}
+
+    fn route(&mut self, target: &LatentConsciousnessState) -> ActiveInferenceDecision {
+        let current = LatentConsciousnessState::default();
+        let decision = self.router.route(&current, target);
+        ActiveInferenceDecision {
+            strategy: RoutingStrategy::StandardProcessing,
+            confidence: decision.confidence as f64,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ActiveInferenceDecision {
+    strategy: RoutingStrategy,
+    confidence: f64,
+}
+
+#[derive(Debug)]
+struct PredictiveProcessingRouter {
+    router: ExploratoryRouter,
+}
+
+impl PredictiveProcessingRouter {
+    fn new(_config: PredictiveProcessingConfig) -> Self {
+        Self { router: ExploratoryRouter::new() }
+    }
+
+    fn route(&mut self, target: &LatentConsciousnessState) -> PredictiveDecision {
+        let current = LatentConsciousnessState::default();
+        let _decision = self.router.route(&current, target);
+        PredictiveDecision {
+            strategy: RoutingStrategy::StandardProcessing,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PredictiveDecision {
+    strategy: RoutingStrategy,
+}
+
+#[derive(Debug)]
+struct ASTRouter {
+    router: DirectRouter,
+}
+
+impl ASTRouter {
+    fn new(_config: ASTRouterConfig) -> Self {
+        Self { router: DirectRouter::new() }
+    }
+
+    fn observe(&mut self, _state: &LatentConsciousnessState) {}
+
+    fn route(&mut self) -> ASTDecision {
+        let current = LatentConsciousnessState::default();
+        let target = LatentConsciousnessState::default();
+        let _decision = self.router.route(&current, &target);
+        ASTDecision {
+            strategy: RoutingStrategy::StandardProcessing,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ASTDecision {
+    strategy: RoutingStrategy,
+}
 
 
 /// Individual benchmark result for a router

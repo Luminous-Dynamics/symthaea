@@ -40,7 +40,7 @@ impl PackedBipolar {
     /// Create from bipolar i8 vector
     pub fn from_bipolar(bipolar: &[i8]) -> Self {
         let dimension = bipolar.len();
-        let num_words = (dimension + 63) / 64;
+        let num_words = dimension.div_ceil(64);
         let mut words = vec![0u64; num_words];
 
         for (i, &val) in bipolar.iter().enumerate() {
@@ -59,7 +59,7 @@ impl PackedBipolar {
     /// Values > 0 become +1 (bit=1), values <= 0 become -1 (bit=0)
     pub fn from_continuous(values: &[f32]) -> Self {
         let dimension = values.len();
-        let num_words = (dimension + 63) / 64;
+        let num_words = dimension.div_ceil(64);
         let mut words = vec![0u64; num_words];
 
         for (i, &val) in values.iter().enumerate() {
@@ -76,7 +76,7 @@ impl PackedBipolar {
     /// Create from boolean vector
     pub fn from_binary(binary: &[bool]) -> Self {
         let dimension = binary.len();
-        let num_words = (dimension + 63) / 64;
+        let num_words = dimension.div_ceil(64);
         let mut words = vec![0u64; num_words];
 
         for (i, &val) in binary.iter().enumerate() {

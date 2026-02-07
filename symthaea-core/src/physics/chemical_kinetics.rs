@@ -270,7 +270,7 @@ impl KineticsEncoder {
 
     /// Half-life for first order: t½ = ln(2)/k
     pub fn half_life_first_order(&self, k: f64) -> f64 {
-        0.693147 / k
+        std::f64::consts::LN_2 / k
     }
 
     // ============================================================

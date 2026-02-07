@@ -10,10 +10,10 @@
 //! Codebase (files)
 //!     ↓ index_file()
 //! CodebaseMemory {
-//!     modules: HashMap<PathBuf, RealHV>,     // file-level
-//!     functions: Vec<(path, name, RealHV)>,   // function-level
-//!     types: Vec<(path, name, RealHV)>,       // type-level
-//!     relationships: Vec<RealHV>,             // inter-entity
+//!     modules: HashMap<PathBuf, ContinuousHV>,     // file-level
+//!     functions: Vec<(path, name, ContinuousHV)>,   // function-level
+//!     types: Vec<(path, name, ContinuousHV)>,       // type-level
+//!     relationships: Vec<ContinuousHV>,             // inter-entity
 //! }
 //!     ↓ query()
 //! Vec<CodeMatch> (ranked by cosine similarity)
@@ -22,7 +22,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use super::code_encoder::CodeHDEncoder;
 use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode, CodeRelation};
@@ -45,7 +45,7 @@ pub struct CodeMatch {
 struct FunctionEntry {
     path: PathBuf,
     name: String,
-    hv: RealHV,
+    hv: ContinuousHV,
 }
 
 /// Entry in the type index
@@ -54,22 +54,22 @@ struct TypeEntry {
     path: PathBuf,
     name: String,
     kind: EntityKind,
-    hv: RealHV,
+    hv: ContinuousHV,
 }
 
 /// Project-level HDC memory for fast semantic code retrieval
 pub struct CodebaseMemory {
     encoder: CodeHDEncoder,
     /// Module-level hypervectors (one per file)
-    modules: HashMap<PathBuf, RealHV>,
+    modules: HashMap<PathBuf, ContinuousHV>,
     /// Function-level index
     functions: Vec<FunctionEntry>,
     /// Type-level index (structs, enums, traits, classes)
     types: Vec<TypeEntry>,
     /// Encoded relationship triples
-    relationships: Vec<RealHV>,
+    relationships: Vec<ContinuousHV>,
     /// Overall codebase vector (centroid of all modules)
-    codebase_hv: Option<RealHV>,
+    codebase_hv: Option<ContinuousHV>,
 }
 
 impl CodebaseMemory {
@@ -111,7 +111,7 @@ impl CodebaseMemory {
     }
 
     /// Get the overall codebase hypervector (centroid of all modules)
-    pub fn codebase_hv(&self) -> Option<&RealHV> {
+    pub fn codebase_hv(&self) -> Option<&ContinuousHV> {
         self.codebase_hv.as_ref()
     }
 
@@ -121,7 +121,7 @@ impl CodebaseMemory {
     }
 
     /// Get a module's HV by path
-    pub fn module_hv(&self, path: &Path) -> Option<&RealHV> {
+    pub fn module_hv(&self, path: &Path) -> Option<&ContinuousHV> {
         self.modules.get(path)
     }
 
@@ -195,8 +195,8 @@ impl CodebaseMemory {
             return;
         }
 
-        let module_hvs: Vec<RealHV> = self.modules.values().cloned().collect();
-        self.codebase_hv = Some(RealHV::bundle(&module_hvs));
+        let module_hvs: Vec<ContinuousHV> = self.modules.values().cloned().collect();
+        self.codebase_hv = Some(ContinuousHV::bundle_owned(&module_hvs));
     }
 
     // ========================================================================
@@ -204,7 +204,7 @@ impl CodebaseMemory {
     // ========================================================================
 
     /// Query for the top-k most similar code entities across all indexed files
-    pub fn query(&self, intent_hv: &RealHV, top_k: usize) -> Vec<CodeMatch> {
+    pub fn query(&self, intent_hv: &ContinuousHV, top_k: usize) -> Vec<CodeMatch> {
         let mut results = Vec::new();
 
         // Search functions
@@ -240,7 +240,7 @@ impl CodebaseMemory {
     }
 
     /// Query only functions
-    pub fn query_functions(&self, intent_hv: &RealHV, top_k: usize) -> Vec<CodeMatch> {
+    pub fn query_functions(&self, intent_hv: &ContinuousHV, top_k: usize) -> Vec<CodeMatch> {
         let mut results: Vec<CodeMatch> = self.functions.iter()
             .map(|entry| CodeMatch {
                 path: entry.path.clone(),
@@ -260,7 +260,7 @@ impl CodebaseMemory {
     }
 
     /// Query only types
-    pub fn query_types(&self, intent_hv: &RealHV, top_k: usize) -> Vec<CodeMatch> {
+    pub fn query_types(&self, intent_hv: &ContinuousHV, top_k: usize) -> Vec<CodeMatch> {
         let mut results: Vec<CodeMatch> = self.types.iter()
             .map(|entry| CodeMatch {
                 path: entry.path.clone(),
@@ -280,7 +280,7 @@ impl CodebaseMemory {
     }
 
     /// Query for the most similar module (file)
-    pub fn query_modules(&self, intent_hv: &RealHV, top_k: usize) -> Vec<(PathBuf, f32)> {
+    pub fn query_modules(&self, intent_hv: &ContinuousHV, top_k: usize) -> Vec<(PathBuf, f32)> {
         let mut results: Vec<(PathBuf, f32)> = self.modules.iter()
             .map(|(path, hv)| (path.clone(), intent_hv.similarity(hv)))
             .collect();
@@ -294,17 +294,17 @@ impl CodebaseMemory {
     }
 
     /// Get all function HVs (for use in algebra operations like analogy)
-    pub fn all_function_hvs(&self) -> Vec<&RealHV> {
+    pub fn all_function_hvs(&self) -> Vec<&ContinuousHV> {
         self.functions.iter().map(|f| &f.hv).collect()
     }
 
     /// Get all type HVs
-    pub fn all_type_hvs(&self) -> Vec<&RealHV> {
+    pub fn all_type_hvs(&self) -> Vec<&ContinuousHV> {
         self.types.iter().map(|t| &t.hv).collect()
     }
 
     /// Get all module HVs
-    pub fn all_module_hvs(&self) -> Vec<&RealHV> {
+    pub fn all_module_hvs(&self) -> Vec<&ContinuousHV> {
         self.modules.values().collect()
     }
 
@@ -314,7 +314,7 @@ impl CodebaseMemory {
 
     /// Compute surprise: how much does a file's HV differ from the codebase centroid?
     /// High surprise = file is very different from the norm (potentially interesting)
-    pub fn compute_surprise(&self, file_hv: &RealHV) -> f32 {
+    pub fn compute_surprise(&self, file_hv: &ContinuousHV) -> f32 {
         match &self.codebase_hv {
             Some(centroid) => 1.0 - centroid.similarity(file_hv),
             None => 0.5, // neutral if no codebase indexed
@@ -345,7 +345,7 @@ impl CodebaseMemory {
 
     /// Compute overall codebase coherence (average pairwise module similarity)
     pub fn codebase_coherence(&self) -> f32 {
-        let hvs: Vec<&RealHV> = self.modules.values().collect();
+        let hvs: Vec<&ContinuousHV> = self.modules.values().collect();
         if hvs.len() < 2 {
             return 1.0;
         }

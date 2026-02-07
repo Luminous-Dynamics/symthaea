@@ -14,7 +14,7 @@
 
 use std::collections::HashMap;
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::language::code_parser::{ParsedCode, CodeEntity, EntityKind, Relation};
@@ -179,7 +179,7 @@ impl PhiCodeAnalyzer {
             return 1.0;
         }
 
-        let hvs: Vec<RealHV> = entities.iter()
+        let hvs: Vec<ContinuousHV> = entities.iter()
             .map(|e| self.encoder.encode_entity(e))
             .collect();
 

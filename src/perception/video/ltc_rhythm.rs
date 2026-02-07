@@ -19,7 +19,7 @@
 //! This is what makes Symthaea fundamentally different from transformers:
 //! we "live in time" rather than "spatializing time."
 
-use symthaea_core::hdc::{RealHV, HDC_DIMENSION};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 use crate::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig};
 use super::temporal_features::TemporalFeatures;
 use std::collections::HashMap;
@@ -64,15 +64,15 @@ pub struct RhythmPrototype {
     /// Name/label for this rhythm
     pub name: String,
     /// Root state trajectory
-    pub root_trajectory: Vec<RealHV>,
+    pub root_trajectory: Vec<ContinuousHV>,
     /// Velocity trajectory (state changes between frames)
-    pub velocity_trajectory: Vec<RealHV>,
+    pub velocity_trajectory: Vec<ContinuousHV>,
     /// Multi-level trajectory fingerprint (sampled states at key levels)
-    pub level_fingerprints: Vec<Vec<RealHV>>,
+    pub level_fingerprints: Vec<Vec<ContinuousHV>>,
     /// Mean state across trajectory
-    pub mean_state: RealHV,
+    pub mean_state: ContinuousHV,
     /// Mean velocity (average rate of change)
-    pub mean_velocity: RealHV,
+    pub mean_velocity: ContinuousHV,
     /// Variance signature (how much the state changes)
     pub variance_signature: f32,
     /// Velocity variance (how variable the rate of change is)
@@ -92,8 +92,8 @@ impl RhythmPrototype {
             root_trajectory: Vec::new(),
             velocity_trajectory: Vec::new(),
             level_fingerprints: Vec::new(),
-            mean_state: RealHV::zero(HDC_DIMENSION),
-            mean_velocity: RealHV::zero(HDC_DIMENSION),
+            mean_state: ContinuousHV::zero(HDC_DIMENSION),
+            mean_velocity: ContinuousHV::zero(HDC_DIMENSION),
             variance_signature: 0.0,
             velocity_variance: 0.0,
             frequency_signature: [0.0; 4],
@@ -221,14 +221,14 @@ impl RhythmPrototype {
         // Sample both trajectories at same number of points
         let n_samples = 10.min(n_self).min(n_other);
 
-        let self_samples: Vec<&RealHV> = (0..n_samples)
+        let self_samples: Vec<&ContinuousHV> = (0..n_samples)
             .map(|i| {
                 let idx = i * n_self / n_samples;
                 &self.root_trajectory[idx]
             })
             .collect();
 
-        let other_samples: Vec<&RealHV> = (0..n_samples)
+        let other_samples: Vec<&ContinuousHV> = (0..n_samples)
             .map(|i| {
                 let idx = i * n_other / n_samples;
                 &other.root_trajectory[idx]
@@ -255,7 +255,7 @@ impl RhythmPrototype {
         // 1. Compute velocity trajectory (state differences)
         self.velocity_trajectory.clear();
         for i in 1..self.root_trajectory.len() {
-            let mut velocity = RealHV::zero(HDC_DIMENSION);
+            let mut velocity = ContinuousHV::zero(HDC_DIMENSION);
             for (j, (curr, prev)) in self.root_trajectory[i].values.iter()
                 .zip(self.root_trajectory[i-1].values.iter())
                 .enumerate()
@@ -266,7 +266,7 @@ impl RhythmPrototype {
         }
 
         // 2. Compute mean state
-        let mut sum = RealHV::zero(HDC_DIMENSION);
+        let mut sum = ContinuousHV::zero(HDC_DIMENSION);
         for state in &self.root_trajectory {
             for (i, v) in state.values.iter().enumerate() {
                 sum.values[i] += v;
@@ -279,7 +279,7 @@ impl RhythmPrototype {
 
         // 3. Compute mean velocity
         if !self.velocity_trajectory.is_empty() {
-            let mut vel_sum = RealHV::zero(HDC_DIMENSION);
+            let mut vel_sum = ContinuousHV::zero(HDC_DIMENSION);
             for vel in &self.velocity_trajectory {
                 for (i, v) in vel.values.iter().enumerate() {
                     vel_sum.values[i] += v;
@@ -450,7 +450,7 @@ pub struct LtcRhythmDetector {
     /// Learned patterns (keyed by character A-Z)
     patterns: HashMap<char, RhythmPrototype>,
     /// Current trajectory being recorded
-    current_trajectory: Vec<RealHV>,
+    current_trajectory: Vec<ContinuousHV>,
     /// Frame counter
     frame_count: u64,
     /// Is currently learning?
@@ -503,8 +503,8 @@ impl LtcRhythmDetector {
     }
 
     /// Project 32D temporal features to 16,384D HDC space
-    fn project_features(&self, features: &TemporalFeatures) -> RealHV {
-        let mut hdc = RealHV::zero(HDC_DIMENSION);
+    fn project_features(&self, features: &TemporalFeatures) -> ContinuousHV {
+        let mut hdc = ContinuousHV::zero(HDC_DIMENSION);
 
         // Sparse random projection (Johnson-Lindenstrauss)
         for (i, &f) in features.features.iter().enumerate() {

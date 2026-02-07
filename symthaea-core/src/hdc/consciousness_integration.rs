@@ -14,7 +14,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 
 // === INTEGRATED CONSCIOUSNESS MODULES ===
 // 1. Metacognitive Monitoring
@@ -49,7 +49,7 @@ use super::emergent_self_model::{
     SelfAwareUpdate, IntrospectionReport,
 };
 use super::unified_consciousness_engine::EngineConfig;
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 
 // === ADVANCED CONSCIOUSNESS SYSTEMS ===
 
@@ -272,7 +272,9 @@ impl std::fmt::Display for OptimizationCycleSummary {
 
 /// Index into altered states
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum AlteredStateIndex {
+    #[default]
     Wake,
     Drowsy,
     N1Sleep,
@@ -288,16 +290,11 @@ pub enum AlteredStateIndex {
     MinimallyConscious,
 }
 
-impl Default for AlteredStateIndex {
-    fn default() -> Self {
-        AlteredStateIndex::Wake
-    }
-}
 
 /// Workspace item for global workspace
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceItem {
-    pub content: HV16,
+    pub content: BinaryHV,
     pub activation: f64,
     pub source: String,
     pub is_broadcasting: bool,
@@ -312,13 +309,15 @@ pub struct MetaThought {
     pub intensity: f64,
     pub confidence: f64,
     pub order: u8,
-    pub representation: HV16,
+    pub representation: BinaryHV,
 }
 
 /// Binding level in hierarchical binding
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum BindingLevel {
     /// Raw features bound together (e.g., color + shape)
+    #[default]
     Feature,
     /// Features bound into coherent objects (e.g., "red ball")
     Object,
@@ -326,16 +325,11 @@ pub enum BindingLevel {
     Scene,
 }
 
-impl Default for BindingLevel {
-    fn default() -> Self {
-        BindingLevel::Feature
-    }
-}
 
 /// Bound object from binding problem (hierarchical + temporal)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoundObject {
-    pub representation: HV16,
+    pub representation: BinaryHV,
     pub synchrony: f64,
     pub binding_strength: f64,
     pub conscious: bool,
@@ -357,7 +351,7 @@ pub struct BoundObject {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemporalBindingMemory {
     /// Snapshot of binding representation
-    pub representation: HV16,
+    pub representation: BinaryHV,
     /// Binding strength at snapshot time
     pub strength: f64,
     /// Cycle number
@@ -372,7 +366,7 @@ impl BoundObject {
     }
 
     /// Create a new feature-level bound object
-    pub fn new_feature(representation: HV16, synchrony: f64, binding_strength: f64, conscious: bool) -> Self {
+    pub fn new_feature(representation: BinaryHV, synchrony: f64, binding_strength: f64, conscious: bool) -> Self {
         Self {
             representation,
             synchrony,
@@ -390,14 +384,14 @@ impl BoundObject {
     /// Create an object-level binding from multiple feature bindings
     pub fn from_features(features: &[&BoundObject], seed: u64) -> Self {
         if features.is_empty() {
-            return Self::new_feature(HV16::random(seed), 0.0, 0.0, false);
+            return Self::new_feature(BinaryHV::random(seed), 0.0, 0.0, false);
         }
 
         // Bind all feature representations together
         let bound_repr = features.iter()
-            .map(|f| f.representation.clone())
+            .map(|f| f.representation)
             .reduce(|a, b| a.bind(&b))
-            .unwrap_or_else(|| HV16::random(seed));
+            .unwrap_or_else(|| BinaryHV::random(seed));
 
         // Average synchrony and binding strength
         let avg_synchrony = features.iter().map(|f| f.synchrony).sum::<f64>() / features.len() as f64;
@@ -427,14 +421,14 @@ impl BoundObject {
     /// Create a scene-level binding from multiple object bindings
     pub fn from_objects(objects: &[&BoundObject], seed: u64) -> Self {
         if objects.is_empty() {
-            return Self::new_feature(HV16::random(seed), 0.0, 0.0, false);
+            return Self::new_feature(BinaryHV::random(seed), 0.0, 0.0, false);
         }
 
         // Bind all object representations together
         let bound_repr = objects.iter()
-            .map(|o| o.representation.clone())
+            .map(|o| o.representation)
             .reduce(|a, b| a.bind(&b))
-            .unwrap_or_else(|| HV16::random(seed));
+            .unwrap_or_else(|| BinaryHV::random(seed));
 
         // Average with scene-level coherence weighting
         let avg_synchrony = objects.iter().map(|o| o.synchrony).sum::<f64>() / objects.len() as f64;
@@ -480,7 +474,7 @@ pub struct ConsciousnessState {
     /// Current altered state
     pub altered_state: AlteredStateIndex,
     /// Attention focus
-    pub attention_focus: Option<HV16>,
+    pub attention_focus: Option<BinaryHV>,
     /// Prediction accuracy
     pub prediction_accuracy: f64,
     /// Flow stability
@@ -1244,14 +1238,14 @@ impl ConsciousnessPipeline {
 
     /// Process input with self-awareness
     ///
-    /// Converts binary HV16 to RealHV and processes through self-aware consciousness.
+    /// Converts binary BinaryHV to ContinuousHV and processes through self-aware consciousness.
     /// Returns the self-aware update with prediction error and meta-assessment.
-    pub fn process_self_aware(&mut self, input: &HV16) -> Option<SelfAwareUpdate> {
+    pub fn process_self_aware(&mut self, input: &BinaryHV) -> Option<SelfAwareUpdate> {
         if !self.self_awareness_enabled {
             return None;
         }
 
-        // Convert HV16 to RealHV for self-aware processing
+        // Convert BinaryHV to ContinuousHV for self-aware processing
         let real_input = self.hv16_to_real_hv(input);
 
         if let Some(ref mut sac) = self.self_aware_consciousness {
@@ -1271,8 +1265,8 @@ impl ConsciousnessPipeline {
         }
     }
 
-    /// Convert HV16 binary vector to RealHV for self-aware processing
-    fn hv16_to_real_hv(&self, hv: &HV16) -> RealHV {
+    /// Convert BinaryHV binary vector to ContinuousHV for self-aware processing
+    fn hv16_to_real_hv(&self, hv: &BinaryHV) -> ContinuousHV {
         // Get the dimension from self-aware consciousness or use default
         let dim = if let Some(ref sac) = self.self_aware_consciousness {
             sac.self_vector().dim()
@@ -1280,7 +1274,7 @@ impl ConsciousnessPipeline {
             1024 // Default dimension
         };
 
-        // Create RealHV by mapping binary bits to [-1, 1] values
+        // Create ContinuousHV by mapping binary bits to [-1, 1] values
         let mut values = Vec::with_capacity(dim);
         let bytes = &hv.0;
 
@@ -1299,7 +1293,7 @@ impl ConsciousnessPipeline {
             values.push(if bit == 1 { 1.0_f32 } else { -1.0_f32 });
         }
 
-        RealHV::from_values(values)
+        ContinuousHV::from_values(values)
     }
 
     /// Process self-awareness during the main loop
@@ -1309,7 +1303,7 @@ impl ConsciousnessPipeline {
     /// 2. Make predictions about future states
     /// 3. Assess meta-cognitive quality
     /// 4. Update self-awareness metrics
-    fn process_self_awareness(&mut self, inputs: &[HV16]) {
+    fn process_self_awareness(&mut self, inputs: &[BinaryHV]) {
         if !self.self_awareness_enabled || inputs.is_empty() {
             return;
         }
@@ -1371,7 +1365,7 @@ impl ConsciousnessPipeline {
     }
 
     /// Process meta-consciousness on current state
-    fn process_meta_consciousness(&mut self, inputs: &[HV16]) {
+    fn process_meta_consciousness(&mut self, inputs: &[BinaryHV]) {
         if let Some(ref mut meta) = self.meta_consciousness {
             // Perform meta-reflection on current state
             let meta_state = meta.meta_reflect(inputs);
@@ -1421,7 +1415,7 @@ impl ConsciousnessPipeline {
     }
 
     /// Process temporal consciousness
-    fn process_temporal_consciousness(&mut self, inputs: &[HV16]) {
+    fn process_temporal_consciousness(&mut self, inputs: &[BinaryHV]) {
         if let Some(ref mut temporal) = self.temporal_consciousness {
             // Add current state as a snapshot with current time
             let current_time = self.current_cycle as f64;
@@ -1492,7 +1486,7 @@ impl ConsciousnessPipeline {
     }
 
     /// Process creativity - generate novel combinations
-    fn process_creativity(&mut self, _inputs: &[HV16]) {
+    fn process_creativity(&mut self, _inputs: &[BinaryHV]) {
         if let Some(ref mut creativity) = self.consciousness_creativity {
             // Step the creativity engine forward
             creativity.step();
@@ -1555,9 +1549,9 @@ impl ConsciousnessPipeline {
     fn process_phase_transitions(&mut self) {
         if let Some(ref mut pt) = self.phase_transitions {
             // Observe with current Φ and conscious contents
-            // Extract HV16 vectors from WorkspaceItems
-            let state: Vec<HV16> = self.state.conscious_contents.iter()
-                .map(|item| item.content.clone())
+            // Extract BinaryHV vectors from WorkspaceItems
+            let state: Vec<BinaryHV> = self.state.conscious_contents.iter()
+                .map(|item| item.content)
                 .collect();
             pt.observe(self.state.phi, state);
 
@@ -1608,7 +1602,7 @@ impl ConsciousnessPipeline {
     }
 
     /// Process epistemic consciousness
-    fn process_epistemic(&mut self, inputs: &[HV16]) {
+    fn process_epistemic(&mut self, inputs: &[BinaryHV]) {
         if let Some(ref mut epistemic) = self.epistemic_consciousness {
             // Assess epistemic state and get K-Index
             let k_index = epistemic.assess(inputs);
@@ -1717,7 +1711,7 @@ impl ConsciousnessPipeline {
     }
 
     /// Process collective consciousness
-    fn process_collective(&mut self, _inputs: &[HV16]) {
+    fn process_collective(&mut self, _inputs: &[BinaryHV]) {
         if let Some(ref mut collective) = self.collective_consciousness {
             // Get collective assessment
             // Note: Agent state is managed via add_agent_to_collective
@@ -1964,7 +1958,7 @@ impl ConsciousnessPipeline {
 
         // Run Φ optimization if enabled and due
         if self.phi_optimization_enabled
-            && self.current_cycle % self.optimize_every_n_cycles as u64 == 0
+            && self.current_cycle.is_multiple_of(self.optimize_every_n_cycles as u64)
         {
             self.process_phi_optimization();
             summary.phi_optimized = true;
@@ -1978,7 +1972,7 @@ impl ConsciousnessPipeline {
 
         // Update self-model (create a dummy input for processing)
         if self.self_awareness_enabled {
-            let dummy_input = HV16::random(self.current_cycle as u64);
+            let dummy_input = BinaryHV::random(self.current_cycle);
             if self.process_self_aware(&dummy_input).is_some() {
                 summary.self_model_updated = true;
             }
@@ -2006,7 +2000,7 @@ impl ConsciousnessPipeline {
     }
 
     /// Process input through the consciousness pipeline
-    pub fn process(&mut self, input: Vec<HV16>, priorities: &[f64]) -> &ConsciousnessState {
+    pub fn process(&mut self, input: Vec<BinaryHV>, priorities: &[f64]) -> &ConsciousnessState {
         // Feature detection and binding
         let binding_strength = if input.len() > 1 {
             0.7 + (priorities.iter().sum::<f64>() / priorities.len() as f64) * 0.3
@@ -2048,7 +2042,7 @@ impl ConsciousnessPipeline {
         // Store current bindings in temporal memory for coherence tracking
         for obj in &self.state.bound_objects {
             self.temporal_memory.push(TemporalBindingMemory {
-                representation: obj.representation.clone(),
+                representation: obj.representation,
                 strength: obj.binding_strength,
                 cycle: self.current_cycle,
                 level: obj.level,
@@ -2064,7 +2058,7 @@ impl ConsciousnessPipeline {
         if input.len() >= 2 && self.state.consciousness_level > self.config.consciousness_threshold {
             // LEVEL 1: FEATURE BINDING
             // Group high-priority inputs into bound objects (perceptual binding)
-            let high_priority_inputs: Vec<(usize, &HV16)> = input.iter()
+            let high_priority_inputs: Vec<(usize, &BinaryHV)> = input.iter()
                 .enumerate()
                 .filter(|(i, _)| priorities.get(*i).copied().unwrap_or(0.0) > 0.5)
                 .collect();
@@ -2088,7 +2082,7 @@ impl ConsciousnessPipeline {
                         .copied().unwrap_or(0.5);
 
                     // Start a new cluster with input i
-                    let mut cluster: Vec<&HV16> = vec![high_priority_inputs[i].1];
+                    let mut cluster: Vec<&BinaryHV> = vec![high_priority_inputs[i].1];
                     used[i] = true;
 
                     // Find all inputs similar to the first one in this cluster
@@ -2115,9 +2109,9 @@ impl ConsciousnessPipeline {
 
                         // Create bound representation
                         let bound_representation = cluster.iter()
-                            .map(|hv| (*hv).clone())
+                            .map(|hv| *(*hv))
                             .reduce(|a, b| a.bind(&b))
-                            .unwrap_or_else(|| HV16::random(42));
+                            .unwrap_or_else(|| BinaryHV::random(42));
 
                         // ATTENTION-WEIGHTED: Modulate binding strength by attention
                         let attention_modulated_strength = binding_strength * (0.5 + 0.5 * cluster_attention);
@@ -2241,7 +2235,7 @@ impl ConsciousnessPipeline {
                 let priority = priorities.get(i).copied().unwrap_or(0.5);
                 if priority > 0.6 {
                     self.state.conscious_contents.push(WorkspaceItem {
-                        content: hv.clone(),
+                        content: *hv,
                         activation: priority,
                         source: format!("input_{}", i),
                         is_broadcasting: true,
@@ -2259,7 +2253,7 @@ impl ConsciousnessPipeline {
                 intensity: self.state.consciousness_level,
                 confidence: 0.8,
                 order: 2,
-                representation: HV16::random(99),
+                representation: BinaryHV::random(99),
             });
         }
 
@@ -2309,7 +2303,7 @@ impl ConsciousnessPipeline {
 
         // === Φ-GUIDED TOPOLOGY OPTIMIZATION ===
         // Periodically optimize network topology to maximize Φ
-        if self.phi_optimization_enabled && self.current_cycle % self.optimize_every_n_cycles as u64 == 0 {
+        if self.phi_optimization_enabled && self.current_cycle.is_multiple_of(self.optimize_every_n_cycles as u64) {
             self.process_phi_optimization();
         }
 
@@ -2404,7 +2398,7 @@ impl ConsciousnessPipeline {
     /// Process integrated consciousness systems
     ///
     /// Updates metacognitive metrics, cross-modal binding, and temporal binding.
-    fn process_integrated_systems(&mut self, _input: &[HV16]) {
+    fn process_integrated_systems(&mut self, _input: &[BinaryHV]) {
         use std::f64::consts::PI;
 
         // === 1. METACOGNITIVE MONITORING ===
@@ -2548,7 +2542,7 @@ impl ConsciousnessPipeline {
     }
 
     /// Process a single cycle
-    pub fn process_cycle(&mut self, input: &[HV16]) {
+    pub fn process_cycle(&mut self, input: &[BinaryHV]) {
         // Simplified processing - just update state
         let intensity = input.len() as f64 * 0.1;
         self.state.phi = (self.state.phi + intensity).min(1.0);
@@ -2758,7 +2752,7 @@ mod tests {
     #[test]
     fn test_pipeline_process() {
         let mut pipeline = ConsciousnessPipeline::default();
-        let input = vec![HV16::random(42)];
+        let input = vec![BinaryHV::random(42)];
         pipeline.process_cycle(&input);
         assert!(pipeline.state.phi > 0.0);
     }
@@ -2787,7 +2781,7 @@ mod tests {
         let mut pipeline = ConsciousnessPipeline::new(config);
         pipeline.set_embodiment(0.8);
 
-        let input = vec![HV16::random(1), HV16::random(2), HV16::random(3)];
+        let input = vec![BinaryHV::random(1), BinaryHV::random(2), BinaryHV::random(3)];
         let priorities = vec![0.9, 0.7, 0.5];
 
         let state = pipeline.process(input, &priorities);
@@ -2798,7 +2792,7 @@ mod tests {
     #[test]
     fn test_bound_object() {
         let obj = BoundObject {
-            representation: HV16::random(1),
+            representation: BinaryHV::random(1),
             synchrony: 0.8,
             binding_strength: 0.9,
             conscious: true,
@@ -2816,7 +2810,7 @@ mod tests {
     #[test]
     fn test_workspace_item() {
         let item = WorkspaceItem {
-            content: HV16::random(2),
+            content: BinaryHV::random(2),
             activation: 0.95,
             source: "visual".to_string(),
             is_broadcasting: true,
@@ -2834,7 +2828,7 @@ mod tests {
             intensity: 0.8,
             confidence: 0.9,
             order: 2,
-            representation: HV16::random(42),
+            representation: BinaryHV::random(42),
         };
         assert_eq!(thought.order, 2);
         assert!(thought.confidence > 0.5);
@@ -2848,7 +2842,7 @@ mod tests {
         // Add bound objects with known synchrony and binding_strength
         pipeline.state.bound_objects = vec![
             BoundObject {
-                representation: HV16::random(1),
+                representation: BinaryHV::random(1),
                 synchrony: 0.9,      // High synchrony
                 binding_strength: 0.8, // Strong binding
                 conscious: true,
@@ -2860,7 +2854,7 @@ mod tests {
                 temporal_stability: 0.95,
             },
             BoundObject {
-                representation: HV16::random(2),
+                representation: BinaryHV::random(2),
                 synchrony: 0.7,      // Medium synchrony
                 binding_strength: 0.6, // Medium binding
                 conscious: true,
@@ -2872,7 +2866,7 @@ mod tests {
                 temporal_stability: 0.85,
             },
             BoundObject {
-                representation: HV16::random(3),
+                representation: BinaryHV::random(3),
                 synchrony: 0.5,      // Lower synchrony
                 binding_strength: 0.4, // Weaker binding
                 conscious: false,
@@ -2927,21 +2921,21 @@ mod tests {
 
         pipeline.state.conscious_contents = vec![
             WorkspaceItem {
-                content: HV16::random(1),
+                content: BinaryHV::random(1),
                 activation: 0.9,
                 source: "visual".to_string(),
                 is_broadcasting: true,  // Broadcasting
                 duration_ms: 100,
             },
             WorkspaceItem {
-                content: HV16::random(2),
+                content: BinaryHV::random(2),
                 activation: 0.7,
                 source: "auditory".to_string(),
                 is_broadcasting: true,  // Broadcasting
                 duration_ms: 50,
             },
             WorkspaceItem {
-                content: HV16::random(3),
+                content: BinaryHV::random(3),
                 activation: 0.5,
                 source: "touch".to_string(),
                 is_broadcasting: false,  // Not broadcasting
@@ -2974,7 +2968,7 @@ mod tests {
                 intensity: 0.8,
                 confidence: 0.9,  // High confidence
                 order: 1,         // First-order meta
-                representation: HV16::random(1),
+                representation: BinaryHV::random(1),
             },
             MetaThought {
                 about: "aware of thinking".to_string(),
@@ -2982,7 +2976,7 @@ mod tests {
                 intensity: 0.7,
                 confidence: 0.7,  // Medium confidence
                 order: 2,         // Second-order meta
-                representation: HV16::random(2),
+                representation: BinaryHV::random(2),
             },
         ];
 
@@ -3009,9 +3003,9 @@ mod tests {
 
         // Create multiple high-priority inputs
         let inputs = vec![
-            HV16::random(100),
-            HV16::random(101),
-            HV16::random(102),
+            BinaryHV::random(100),
+            BinaryHV::random(101),
+            BinaryHV::random(102),
         ];
         let priorities = vec![0.8, 0.7, 0.6];  // All above 0.5 threshold
 
@@ -3039,7 +3033,7 @@ mod tests {
         let mut pipeline = ConsciousnessPipeline::default();
         pipeline.set_embodiment(0.8);
 
-        let inputs = vec![HV16::random(200)];
+        let inputs = vec![BinaryHV::random(200)];
         let priorities = vec![0.9];
 
         let state = pipeline.process(inputs, &priorities);
@@ -3058,9 +3052,9 @@ mod tests {
         pipeline.set_embodiment(0.8);
 
         let inputs = vec![
-            HV16::random(300),
-            HV16::random(301),
-            HV16::random(302),
+            BinaryHV::random(300),
+            BinaryHV::random(301),
+            BinaryHV::random(302),
         ];
         let priorities = vec![0.3, 0.2, 0.4];  // All below 0.5 threshold
 
@@ -3086,8 +3080,8 @@ mod tests {
 
         // Process inputs to create binding
         let inputs = vec![
-            HV16::random(400),
-            HV16::random(401),
+            BinaryHV::random(400),
+            BinaryHV::random(401),
         ];
         let priorities = vec![0.8, 0.9];
 
@@ -3110,7 +3104,7 @@ mod tests {
         pipeline.set_embodiment(0.9);
 
         // Create similar HVs (should have higher synchrony)
-        let base_hv = HV16::random(500);
+        let base_hv = BinaryHV::random(500);
         let similar_hv = base_hv.clone();  // Identical = max similarity
 
         let inputs = vec![base_hv, similar_hv];
@@ -3137,9 +3131,9 @@ mod tests {
 
         // Create 4 inputs: 2 similar pairs, each pair dissimilar to the other
         // Similar HVs should cluster together
-        let hv1 = HV16::random(600);
+        let hv1 = BinaryHV::random(600);
         let hv2 = hv1.clone();  // Similar to hv1
-        let hv3 = HV16::random(700);  // Different from hv1/hv2
+        let hv3 = BinaryHV::random(700);  // Different from hv1/hv2
         let hv4 = hv3.clone();  // Similar to hv3
 
         let inputs = vec![hv1, hv2, hv3, hv4];
@@ -3161,7 +3155,7 @@ mod tests {
         pipeline.set_embodiment(0.9);
 
         // First cycle: create bound object
-        let inputs = vec![HV16::random(800), HV16::random(801)];
+        let inputs = vec![BinaryHV::random(800), BinaryHV::random(801)];
         let priorities = vec![0.8, 0.9];
         let state1 = pipeline.process(inputs, &priorities);
 
@@ -3170,7 +3164,7 @@ mod tests {
 
         // Second cycle: process empty or different inputs
         // Bound objects should still exist but be decayed
-        let new_inputs = vec![HV16::random(900)];  // Only 1 input, no new binding
+        let new_inputs = vec![BinaryHV::random(900)];  // Only 1 input, no new binding
         let new_priorities = vec![0.3];  // Low priority
         let state2 = pipeline.process(new_inputs, &new_priorities);
 
@@ -3193,8 +3187,8 @@ mod tests {
         pipeline.set_embodiment(0.9);
 
         // Create consistent inputs across multiple cycles
-        let base1 = HV16::random(1000);
-        let base2 = HV16::random(1001);
+        let base1 = BinaryHV::random(1000);
+        let base2 = BinaryHV::random(1001);
 
         // First cycle
         let inputs1 = vec![base1.clone(), base2.clone()];
@@ -3235,7 +3229,7 @@ mod tests {
 
         // Create many dissimilar high-priority inputs to trigger multiple clusters
         // Each pair should create a separate bound object
-        let inputs: Vec<HV16> = (0..20).map(|i| HV16::random(2000 + i)).collect();
+        let inputs: Vec<BinaryHV> = (0..20).map(|i| BinaryHV::random(2000 + i)).collect();
         let priorities: Vec<f64> = vec![0.9; 20];
 
         let state = pipeline.process(inputs, &priorities);
@@ -3283,7 +3277,7 @@ mod tests {
 
         // Process several cycles to build up metrics
         for i in 0..5 {
-            let inputs = vec![HV16::random(3000 + i), HV16::random(3100 + i)];
+            let inputs = vec![BinaryHV::random(3000 + i), BinaryHV::random(3100 + i)];
             let priorities = vec![0.8, 0.7];
             pipeline.process(inputs, &priorities);
         }
@@ -3322,7 +3316,7 @@ mod tests {
 
         // Process high-quality inputs (should lead to exploiting mode)
         for _ in 0..10 {
-            let inputs = vec![HV16::random(4000), HV16::random(4001)];
+            let inputs = vec![BinaryHV::random(4000), BinaryHV::random(4001)];
             let priorities = vec![0.95, 0.95];  // High priorities = high consciousness = high accuracy
             pipeline.process(inputs, &priorities);
         }
@@ -3351,7 +3345,7 @@ mod tests {
         let mut inputs_quality = 0.5;
         for i in 0..7 {
             inputs_quality += 0.05;  // Increasing quality
-            let inputs = vec![HV16::random(5000 + i), HV16::random(5100 + i)];
+            let inputs = vec![BinaryHV::random(5000 + i), BinaryHV::random(5100 + i)];
             let priorities = vec![inputs_quality, inputs_quality];
             pipeline.process(inputs, &priorities);
         }
@@ -3378,21 +3372,21 @@ mod tests {
 
         // Add workspace items with different source modalities
         pipeline.state.conscious_contents.push(WorkspaceItem {
-            content: HV16::random(6000),
+            content: BinaryHV::random(6000),
             activation: 0.9,
             source: "visual_cortex".to_string(),  // Contains "visual"
             is_broadcasting: true,
             duration_ms: 100,
         });
         pipeline.state.conscious_contents.push(WorkspaceItem {
-            content: HV16::random(6001),
+            content: BinaryHV::random(6001),
             activation: 0.8,
             source: "audio_processing".to_string(),  // Contains "audio"
             is_broadcasting: true,
             duration_ms: 100,
         });
         pipeline.state.conscious_contents.push(WorkspaceItem {
-            content: HV16::random(6002),
+            content: BinaryHV::random(6002),
             activation: 0.7,
             source: "motor_planning".to_string(),  // Contains "motor"
             is_broadcasting: true,
@@ -3400,7 +3394,7 @@ mod tests {
         });
 
         // Process to update cross-modal metrics
-        let inputs = vec![HV16::random(6100)];
+        let inputs = vec![BinaryHV::random(6100)];
         let priorities = vec![0.5];
         pipeline.process(inputs, &priorities);
 
@@ -3504,7 +3498,7 @@ mod tests {
 
         // Process for 20 cycles (should trigger optimization at 5, 10, 15, 20)
         for i in 0..20 {
-            let inputs = vec![HV16::random(7000 + i), HV16::random(7100 + i)];
+            let inputs = vec![BinaryHV::random(7000 + i), BinaryHV::random(7100 + i)];
             let priorities = vec![0.8, 0.7];
             pipeline.process(inputs, &priorities);
             phi_values.push(pipeline.state.phi);
@@ -3572,7 +3566,7 @@ mod tests {
 
         // Process many cycles to see Φ trend
         for i in 0..15 {
-            let inputs = vec![HV16::random(8000 + i), HV16::random(8100 + i)];
+            let inputs = vec![BinaryHV::random(8000 + i), BinaryHV::random(8100 + i)];
             let priorities = vec![0.9, 0.85];
             pipeline.process(inputs, &priorities);
         }
@@ -3603,7 +3597,7 @@ mod tests {
 
         // Process with all systems active
         for i in 0..20 {
-            let inputs = vec![HV16::random(9000 + i), HV16::random(9100 + i)];
+            let inputs = vec![BinaryHV::random(9000 + i), BinaryHV::random(9100 + i)];
             let priorities = vec![0.85, 0.8];
             pipeline.process(inputs, &priorities);
         }
@@ -3728,7 +3722,7 @@ mod tests {
 
         // Process several cycles with feedback dynamics enabled
         for i in 0..10 {
-            let inputs = vec![HV16::random(10000 + i), HV16::random(10100 + i)];
+            let inputs = vec![BinaryHV::random(10000 + i), BinaryHV::random(10100 + i)];
             let priorities = vec![0.7, 0.75];
             pipeline.process(inputs, &priorities);
         }
@@ -3759,7 +3753,7 @@ mod tests {
 
         // Process with both systems active
         for i in 0..15 {
-            let inputs = vec![HV16::random(11000 + i), HV16::random(11100 + i)];
+            let inputs = vec![BinaryHV::random(11000 + i), BinaryHV::random(11100 + i)];
             let priorities = vec![0.8, 0.85];
             pipeline.process(inputs, &priorities);
         }
@@ -3792,7 +3786,7 @@ mod tests {
 
         // Process with all systems active
         for i in 0..20 {
-            let inputs = vec![HV16::random(12000 + i), HV16::random(12100 + i)];
+            let inputs = vec![BinaryHV::random(12000 + i), BinaryHV::random(12100 + i)];
             let priorities = vec![0.85, 0.8];
             pipeline.process(inputs, &priorities);
         }
@@ -3862,7 +3856,7 @@ mod tests {
         pipeline.enable_self_awareness(1024, 16);
 
         // Process input with self-awareness
-        let input = HV16::random(42);
+        let input = BinaryHV::random(42);
         let update = pipeline.process_self_aware(&input);
 
         assert!(update.is_some(), "Should return a self-aware update");
@@ -3888,7 +3882,7 @@ mod tests {
         // Process multiple inputs to let the self-model learn
         let mut prediction_errors = Vec::new();
         for i in 0..20 {
-            let input = HV16::random(1000 + i);
+            let input = BinaryHV::random(1000 + i);
             if let Some(update) = pipeline.process_self_aware(&input) {
                 prediction_errors.push(update.prediction_error);
             }
@@ -3917,7 +3911,7 @@ mod tests {
 
         // Process several cycles with self-awareness enabled
         for i in 0..15 {
-            let inputs = vec![HV16::random(13000 + i), HV16::random(13100 + i)];
+            let inputs = vec![BinaryHV::random(13000 + i), BinaryHV::random(13100 + i)];
             let priorities = vec![0.75, 0.8];
             pipeline.process(inputs, &priorities);
         }
@@ -3943,7 +3937,7 @@ mod tests {
 
         // Process to generate meta-assessment
         for i in 0..5 {
-            let input = HV16::random(2000 + i);
+            let input = BinaryHV::random(2000 + i);
             pipeline.process_self_aware(&input);
         }
 
@@ -3978,7 +3972,7 @@ mod tests {
 
         // Process with ALL systems active
         for i in 0..25 {
-            let inputs = vec![HV16::random(14000 + i), HV16::random(14100 + i)];
+            let inputs = vec![BinaryHV::random(14000 + i), BinaryHV::random(14100 + i)];
             let priorities = vec![0.85, 0.8];
             pipeline.process(inputs, &priorities);
         }
@@ -4038,7 +4032,7 @@ mod tests {
 
         // Process some cycles
         for i in 0..10 {
-            let inputs = vec![HV16::random(15000 + i), HV16::random(15100 + i)];
+            let inputs = vec![BinaryHV::random(15000 + i), BinaryHV::random(15100 + i)];
             let priorities = vec![0.8, 0.85];
             pipeline.process(inputs, &priorities);
         }
@@ -4087,7 +4081,7 @@ mod tests {
 
         // Process some cycles first
         for i in 0..5 {
-            let inputs = vec![HV16::random(16000 + i)];
+            let inputs = vec![BinaryHV::random(16000 + i)];
             let priorities = vec![0.75];
             pipeline.process(inputs, &priorities);
         }
@@ -4131,9 +4125,9 @@ mod tests {
         // Run many processing cycles
         for i in 0..30 {
             let inputs = vec![
-                HV16::random(17000 + i),
-                HV16::random(17100 + i),
-                HV16::random(17200 + i),
+                BinaryHV::random(17000 + i),
+                BinaryHV::random(17100 + i),
+                BinaryHV::random(17200 + i),
             ];
             let priorities = vec![0.9, 0.85, 0.8];
             pipeline.process(inputs, &priorities);

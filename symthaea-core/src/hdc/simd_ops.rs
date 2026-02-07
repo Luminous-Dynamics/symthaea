@@ -1,6 +1,6 @@
 //! SIMD-Optimized Operations for Binary Hypervectors
 //!
-//! This module provides high-performance implementations of HV16 operations
+//! This module provides high-performance implementations of BinaryHV operations
 //! using explicit SIMD intrinsics for maximum throughput.
 //!
 //! # Performance Targets
@@ -519,7 +519,7 @@ unsafe fn matching_bits_avx2_popcnt(a: &[u8; 2048], b: &[u8; 2048]) -> u32 {
 
     // 2048 bytes / 8 bytes = 256 u64s
     // Process 4 at a time for ILP
-    // Use read_unaligned for safety (HV16 should be aligned, but be defensive)
+    // Use read_unaligned for safety (BinaryHV should be aligned, but be defensive)
     for i in (0..256).step_by(4) {
         let xor0 = read_unaligned(a_ptr.add(i)) ^ read_unaligned(b_ptr.add(i));
         let xor1 = read_unaligned(a_ptr.add(i + 1)) ^ read_unaligned(b_ptr.add(i + 1));
@@ -824,7 +824,7 @@ fn bundle_scalar_optimized(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
         for vec in vectors {
             let byte = vec[byte_idx];
             // Unrolled bit extraction
-            bit_counts[0] += ((byte >> 0) & 1) as i16;
+            bit_counts[0] += (byte & 1) as i16;
             bit_counts[1] += ((byte >> 1) & 1) as i16;
             bit_counts[2] += ((byte >> 2) & 1) as i16;
             bit_counts[3] += ((byte >> 3) & 1) as i16;
@@ -847,7 +847,7 @@ fn bundle_scalar_optimized(vectors: &[&[u8; 2048]]) -> [u8; 2048] {
     result
 }
 
-/// Bundle multiple HV16 vectors (convenience function for slices)
+/// Bundle multiple BinaryHV vectors (convenience function for slices)
 #[cfg(target_arch = "x86_64")]
 pub fn bundle_simd_slice(vectors: &[[u8; 2048]]) -> [u8; 2048] {
     let refs: Vec<&[u8; 2048]> = vectors.iter().collect();
@@ -952,12 +952,12 @@ pub fn bundle_simd_slice(vectors: &[[u8; 2048]]) -> [u8; 2048] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::binary_hv::HV16;
+    use crate::hdc::binary_hv::BinaryHV;
 
     #[test]
     fn test_bind_simd_matches_scalar() {
-        let a = HV16::random(42);
-        let b = HV16::random(43);
+        let a = BinaryHV::random(42);
+        let b = BinaryHV::random(43);
 
         // SIMD version
         let simd_result = bind_simd(&a.0, &b.0);
@@ -970,15 +970,15 @@ mod tests {
 
     #[test]
     fn test_matching_bits_simd_matches_scalar() {
-        let a = HV16::random(42);
-        let b = HV16::random(43);
+        let a = BinaryHV::random(42);
+        let b = BinaryHV::random(43);
 
         // SIMD version
         let simd_matching = matching_bits_simd(&a.0, &b.0);
 
         // Scalar version (via similarity * DIM)
         let scalar_similarity = a.similarity(&b);
-        let scalar_matching = (scalar_similarity * HV16::DIM as f32) as u32;
+        let scalar_matching = (scalar_similarity * BinaryHV::DIM as f32) as u32;
 
         // Allow small rounding difference
         let diff = (simd_matching as i32 - scalar_matching as i32).abs();
@@ -988,7 +988,7 @@ mod tests {
 
     #[test]
     fn test_invert_simd_matches_scalar() {
-        let a = HV16::random(42);
+        let a = BinaryHV::random(42);
 
         // SIMD version
         let simd_result = invert_simd(&a.0);
@@ -1001,8 +1001,8 @@ mod tests {
 
     #[test]
     fn test_hamming_distance_simd_matches_scalar() {
-        let a = HV16::random(42);
-        let b = HV16::random(43);
+        let a = BinaryHV::random(42);
+        let b = BinaryHV::random(43);
 
         // SIMD version
         let simd_dist = hamming_distance_simd(&a.0, &b.0);
@@ -1015,7 +1015,7 @@ mod tests {
 
     #[test]
     fn test_simd_self_similarity() {
-        let a = HV16::random(42);
+        let a = BinaryHV::random(42);
 
         let matching = matching_bits_simd(&a.0, &a.0);
         assert_eq!(matching, 16_384, "Self-matching should be all bits");
@@ -1026,7 +1026,7 @@ mod tests {
 
     #[test]
     fn test_simd_inverse_properties() {
-        let a = HV16::random(42);
+        let a = BinaryHV::random(42);
         let inv = invert_simd(&a.0);
 
         // XOR with inverse should be all 1s
@@ -1046,8 +1046,8 @@ mod tests {
         use std::time::Instant;
         use std::hint::black_box;
 
-        let a = HV16::random(1);
-        let b = HV16::random(2);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
         let iterations = 1_000_000;
 
         // Benchmark SIMD bind
@@ -1098,14 +1098,14 @@ mod tests {
 
     #[test]
     fn test_bundle_simd_matches_scalar() {
-        let vectors: Vec<HV16> = (0..10).map(|i| HV16::random(i + 100)).collect();
+        let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i + 100)).collect();
         let refs: Vec<&[u8; 2048]> = vectors.iter().map(|v| &v.0).collect();
 
         // SIMD version
         let simd_result = bundle_simd(&refs);
 
-        // Scalar version (via HV16::bundle)
-        let scalar_result = HV16::bundle(&vectors);
+        // Scalar version (via BinaryHV::bundle)
+        let scalar_result = BinaryHV::bundle(&vectors);
 
         // Results should match exactly
         assert_eq!(simd_result, scalar_result.0, "SIMD bundle must match scalar bundle");
@@ -1113,7 +1113,7 @@ mod tests {
 
     #[test]
     fn test_bundle_simd_single_vector() {
-        let v = HV16::random(42);
+        let v = BinaryHV::random(42);
         let refs: Vec<&[u8; 2048]> = vec![&v.0];
 
         let result = bundle_simd(&refs);
@@ -1131,8 +1131,8 @@ mod tests {
     fn test_bundle_simd_majority_vote() {
         // Create 3 all-ones and 2 all-zeros vectors
         // Majority should be ones
-        let ones = HV16::ones();
-        let zeros = HV16::zero();
+        let ones = BinaryHV::ones();
+        let zeros = BinaryHV::zero();
 
         let vectors = vec![&ones.0, &ones.0, &ones.0, &zeros.0, &zeros.0];
         let result = bundle_simd(&vectors);
@@ -1145,12 +1145,12 @@ mod tests {
 
     #[test]
     fn test_bundle_simd_similarity_preservation() {
-        let a = HV16::random(1);
-        let b = HV16::random(2);
-        let c = HV16::random(3);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
+        let c = BinaryHV::random(3);
 
         let refs: Vec<&[u8; 2048]> = vec![&a.0, &b.0, &c.0];
-        let bundled = HV16(bundle_simd(&refs));
+        let bundled = BinaryHV(bundle_simd(&refs));
 
         // Bundled vector should be similar to all inputs
         assert!(bundled.similarity(&a) > 0.5, "Bundle should be similar to input A");
@@ -1164,7 +1164,7 @@ mod tests {
         use std::time::Instant;
         use std::hint::black_box;
 
-        let vectors: Vec<HV16> = (0..100).map(|i| HV16::random(i)).collect();
+        let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
         let refs: Vec<&[u8; 2048]> = vectors.iter().map(|v| &v.0).collect();
         let iterations = 10_000;
 
@@ -1175,10 +1175,10 @@ mod tests {
         }
         let simd_ns = start.elapsed().as_nanos() / iterations;
 
-        // Benchmark scalar bundle (via HV16::bundle)
+        // Benchmark scalar bundle (via BinaryHV::bundle)
         let start = Instant::now();
         for _ in 0..iterations {
-            black_box(HV16::bundle(black_box(&vectors)));
+            black_box(BinaryHV::bundle(black_box(&vectors)));
         }
         let scalar_ns = start.elapsed().as_nanos() / iterations;
 
@@ -1190,8 +1190,8 @@ mod tests {
 
     #[test]
     fn test_intersection_simd_correctness() {
-        let a = HV16::random(42);
-        let b = HV16::random(43);
+        let a = BinaryHV::random(42);
+        let b = BinaryHV::random(43);
         let simd_result = intersection_simd(&a.0, &b.0);
         let mut scalar = [0u8; 2048];
         for i in 0..2048 { scalar[i] = a.0[i] & b.0[i]; }
@@ -1200,8 +1200,8 @@ mod tests {
 
     #[test]
     fn test_union_simd_correctness() {
-        let a = HV16::random(42);
-        let b = HV16::random(43);
+        let a = BinaryHV::random(42);
+        let b = BinaryHV::random(43);
         let simd_result = union_simd(&a.0, &b.0);
         let mut scalar = [0u8; 2048];
         for i in 0..2048 { scalar[i] = a.0[i] | b.0[i]; }

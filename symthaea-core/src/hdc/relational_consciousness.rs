@@ -208,7 +208,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use serde::{Deserialize, Serialize};
 
@@ -294,10 +294,10 @@ pub struct RelationalInteraction {
     pub time: f64,
 
     /// Agent A state
-    pub state_a: HV16,
+    pub state_a: BinaryHV,
 
     /// Agent B state
-    pub state_b: HV16,
+    pub state_b: BinaryHV,
 
     /// Synchrony (correlation)
     pub synchrony: f64,
@@ -377,19 +377,19 @@ impl Default for RelationalConfig {
 /// # Example
 /// ```ignore
 /// use symthaea::hdc::relational_consciousness::{RelationalConsciousness, RelationalConfig};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = RelationalConfig::default();
 /// let mut relational = RelationalConsciousness::new("Alice", "Bob", config);
 ///
 /// // Interaction cycle
-/// let state_a = HV16::random(1000);
-/// let state_b = HV16::random(2000);
+/// let state_a = BinaryHV::random(1000);
+/// let state_b = BinaryHV::random(2000);
 /// relational.interact(0.0, state_a, state_b, Some("Alice"));
 ///
 /// // Later interaction
-/// let state_a2 = HV16::random(3000);
-/// let state_b2 = HV16::random(4000);
+/// let state_a2 = BinaryHV::random(3000);
+/// let state_b2 = BinaryHV::random(4000);
 /// relational.interact(1.0, state_a2, state_b2, Some("Bob"));
 ///
 /// // Assess relationship
@@ -432,7 +432,7 @@ impl RelationalConsciousness {
     }
 
     /// Record interaction
-    pub fn interact(&mut self, time: f64, state_a: HV16, state_b: HV16, active_agent: Option<impl Into<String>>) {
+    pub fn interact(&mut self, time: f64, state_a: BinaryHV, state_b: BinaryHV, active_agent: Option<impl Into<String>>) {
         if self.interactions.is_empty() {
             self.start_time = time;
         }
@@ -637,8 +637,8 @@ mod tests {
     fn test_interaction() {
         let mut relational = RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
 
-        let state_a = HV16::random(1000);
-        let state_b = HV16::random(2000);
+        let state_a = BinaryHV::random(1000);
+        let state_b = BinaryHV::random(2000);
         relational.interact(0.0, state_a, state_b, Some("Alice"));
 
         assert_eq!(relational.interactions().len(), 1);
@@ -659,8 +659,8 @@ mod tests {
         let mut relational = RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
 
         // Similar states = high synchrony
-        let state_a = HV16::random(1000);
-        let state_b = HV16::random(1001);  // Similar seed
+        let state_a = BinaryHV::random(1000);
+        let state_b = BinaryHV::random(1001);  // Similar seed
         relational.interact(0.0, state_a, state_b, Some("Alice"));
 
         let assessment = relational.assess();
@@ -676,8 +676,8 @@ mod tests {
         // Alternating interactions
         for i in 0..10 {
             let active = if i % 2 == 0 { "Alice" } else { "Bob" };
-            let state_a = HV16::random((1000 + i) as u64);
-            let state_b = HV16::random((2000 + i) as u64);
+            let state_a = BinaryHV::random((1000 + i) as u64);
+            let state_b = BinaryHV::random((2000 + i) as u64);
             relational.interact(i as f64, state_a, state_b, Some(active));
         }
 
@@ -693,8 +693,8 @@ mod tests {
 
         // Simulate developing relationship
         for i in 0..20 {
-            let state_a = HV16::random((1000 + i) as u64);
-            let state_b = HV16::random((2000 + i) as u64);
+            let state_a = BinaryHV::random((1000 + i) as u64);
+            let state_b = BinaryHV::random((2000 + i) as u64);
             let active = if i % 2 == 0 { "Alice" } else { "Bob" };
             relational.interact(i as f64, state_a, state_b, Some(active));
         }
@@ -715,8 +715,8 @@ mod tests {
         let mut relational = RelationalConsciousness::new("Alice", "Bob", config);
 
         // High similarity = I-Thou
-        let state_a = HV16::random(1000);
-        let state_b = HV16::random(1000);  // Same seed = high similarity
+        let state_a = BinaryHV::random(1000);
+        let state_b = BinaryHV::random(1000);  // Same seed = high similarity
         relational.interact(0.0, state_a, state_b, Some("Alice"));
 
         let assessment = relational.assess();

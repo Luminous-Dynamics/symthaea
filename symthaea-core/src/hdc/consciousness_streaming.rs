@@ -292,7 +292,7 @@ impl ConsciousnessEventEmitter {
 
         let mut subs = self.subscribers.write().unwrap();
         subs.entry(event_type)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push((sub_id, Box::new(callback)));
 
         sub_id

@@ -4,7 +4,7 @@
 //! Each objective is encoded as a hyperdimensional vector (HDC) that
 //! captures its semantic meaning.
 
-use symthaea_core::hdc::{RealHV, HDC_DIMENSION};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 use ndarray::Array1;
 use std::hash::{Hash, Hasher};
 
@@ -200,7 +200,7 @@ pub struct LearningObjective {
     pub difficulty: Difficulty,
 
     /// HDC encoding of the objective's semantics
-    pub encoding: RealHV,
+    pub encoding: ContinuousHV,
 
     /// IDs of prerequisite objectives
     pub prerequisites: Vec<String>,
@@ -226,7 +226,7 @@ impl LearningObjective {
             description: String::new(),
             domain: Domain::default(),
             difficulty: Difficulty::Beginner,
-            encoding: RealHV::zero(HDC_DIMENSION),
+            encoding: ContinuousHV::zero(HDC_DIMENSION),
             prerequisites: Vec::new(),
             tags: Vec::new(),
             estimated_minutes: 0,
@@ -379,8 +379,8 @@ impl ObjectiveBuilder {
         });
 
         // Generate HDC encoding
-        let base = RealHV::random(HDC_DIMENSION, seed);
-        let domain_hv = RealHV::random(HDC_DIMENSION, self.domain.seed());
+        let base = ContinuousHV::random(HDC_DIMENSION, seed);
+        let domain_hv = ContinuousHV::random(HDC_DIMENSION, self.domain.seed());
 
         // Bind base with domain, scale by inverse difficulty
         // (easier concepts have stronger/cleaner encodings)

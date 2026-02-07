@@ -35,13 +35,13 @@
 //! # Examples
 //!
 //! ```ignore
-//! use symthaea::hdc::{HV16, CausalSpace};
+//! use symthaea::hdc::{BinaryHV, CausalSpace};
 //!
 //! let mut causal = CausalSpace::new();
 //!
 //! // Encode knowledge: "rain causes wet ground"
-//! let rain = HV16::random(1);
-//! let wet = HV16::random(2);
+//! let rain = BinaryHV::random(1);
+//! let wet = BinaryHV::random(2);
 //! causal.add_causal_link(rain, wet, 0.9); // 90% strength
 //!
 //! // Query: "Why is the ground wet?"
@@ -53,7 +53,7 @@
 //! // Returns: [(wet, 0.9), ...]
 //! ```
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -88,13 +88,13 @@ pub struct CausalSpace {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CausalLink {
     /// The cause hypervector
-    pub cause: HV16,
+    pub cause: BinaryHV,
 
     /// The effect hypervector
-    pub effect: HV16,
+    pub effect: BinaryHV,
 
     /// The encoded causal relation: cause ⊗ effect
-    pub causal_vector: HV16,
+    pub causal_vector: BinaryHV,
 
     /// Causal strength (0.0 to 1.0)
     /// - 1.0 = deterministic causation
@@ -113,7 +113,7 @@ pub struct CausalLink {
 #[derive(Clone, Debug)]
 pub struct CausalQueryResult {
     /// The matched vector (cause or effect)
-    pub vector: HV16,
+    pub vector: BinaryHV,
 
     /// Similarity to query (0.0 to 1.0)
     pub similarity: f32,
@@ -129,7 +129,7 @@ pub struct CausalQueryResult {
 #[derive(Clone, Debug)]
 pub struct CausalChain {
     /// Sequence of events in temporal order
-    pub events: Vec<HV16>,
+    pub events: Vec<BinaryHV>,
 
     /// Strengths between consecutive events
     pub strengths: Vec<f64>,
@@ -158,13 +158,13 @@ impl CausalSpace {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::{HV16, CausalSpace};
+    /// # use symthaea::hdc::{BinaryHV, CausalSpace};
     /// let mut causal = CausalSpace::new();
-    /// let rain = HV16::random(1);
-    /// let wet = HV16::random(2);
+    /// let rain = BinaryHV::random(1);
+    /// let wet = BinaryHV::random(2);
     /// causal.add_causal_link(rain, wet, 0.9);
     /// ```
-    pub fn add_causal_link(&mut self, cause: HV16, effect: HV16, strength: f64) {
+    pub fn add_causal_link(&mut self, cause: BinaryHV, effect: BinaryHV, strength: f64) {
         assert!(
             (0.0..=1.0).contains(&strength),
             "Strength must be in [0.0, 1.0]"
@@ -190,15 +190,15 @@ impl CausalSpace {
         let cause_key = format!("{:?}", cause);
         let effect_key = format!("{:?}", effect);
 
-        self.cause_index.entry(cause_key).or_insert_with(Vec::new).push(idx);
-        self.effect_index.entry(effect_key).or_insert_with(Vec::new).push(idx);
+        self.cause_index.entry(cause_key).or_default().push(idx);
+        self.effect_index.entry(effect_key).or_default().push(idx);
     }
 
     /// Add a causal link with label and timestamp
     pub fn add_causal_link_labeled(
         &mut self,
-        cause: HV16,
-        effect: HV16,
+        cause: BinaryHV,
+        effect: BinaryHV,
         strength: f64,
         label: String,
         timestamp: Option<f64>,
@@ -213,7 +213,7 @@ impl CausalSpace {
     ///
     /// If the exact cause-effect pair exists, increase its strength and observation count.
     /// Otherwise, add as new link.
-    pub fn reinforce_link(&mut self, cause: HV16, effect: HV16, strength_delta: f64) {
+    pub fn reinforce_link(&mut self, cause: BinaryHV, effect: BinaryHV, strength_delta: f64) {
         // Find existing link
         for link in &mut self.causal_links {
             if link.cause == cause && link.effect == effect {
@@ -240,16 +240,16 @@ impl CausalSpace {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::{HV16, CausalSpace};
+    /// # use symthaea::hdc::{BinaryHV, CausalSpace};
     /// # let mut causal = CausalSpace::new();
-    /// # let rain = HV16::random(1);
-    /// # let wet = HV16::random(2);
+    /// # let rain = BinaryHV::random(1);
+    /// # let wet = BinaryHV::random(2);
     /// # causal.add_causal_link(rain, wet, 0.9);
     /// // Query: "Why is the ground wet?"
     /// let causes = causal.query_causes(&wet, 5);
     /// // Returns: rain with high similarity
     /// ```
-    pub fn query_causes(&self, effect: &HV16, top_n: usize) -> Vec<CausalQueryResult> {
+    pub fn query_causes(&self, effect: &BinaryHV, top_n: usize) -> Vec<CausalQueryResult> {
         let mut results = Vec::new();
 
         for link in &self.causal_links {
@@ -295,7 +295,7 @@ impl CausalSpace {
     /// - Unbind: effect ≈ C ⊗ cause⁻¹
     /// - Compute similarity to query
     /// - Rank by similarity × strength
-    pub fn query_effects(&self, cause: &HV16, top_n: usize) -> Vec<CausalQueryResult> {
+    pub fn query_effects(&self, cause: &BinaryHV, top_n: usize) -> Vec<CausalQueryResult> {
         let mut results = Vec::new();
 
         for link in &self.causal_links {
@@ -340,7 +340,7 @@ impl CausalSpace {
     /// # Pearl's do-calculus in HDC space
     /// In traditional causal graphs: P(Y | do(X = x))
     /// In HDC space: Find effects where X is a direct cause (high strength)
-    pub fn query_intervention(&self, cause: &HV16, top_n: usize, min_strength: f64) -> Vec<CausalQueryResult> {
+    pub fn query_intervention(&self, cause: &BinaryHV, top_n: usize, min_strength: f64) -> Vec<CausalQueryResult> {
         // Same as query_effects but filter by strength threshold
         let mut results = self.query_effects(cause, top_n * 2); // Get more candidates
 
@@ -359,14 +359,14 @@ impl CausalSpace {
     /// ```text
     /// rain → wet_ground → slippery → accident
     /// ```
-    pub fn find_causal_chain(&self, start: &HV16, end: &HV16, max_depth: usize) -> Option<CausalChain> {
+    pub fn find_causal_chain(&self, start: &BinaryHV, end: &BinaryHV, max_depth: usize) -> Option<CausalChain> {
         if max_depth == 0 {
             return None;
         }
 
         // BFS for causal path
         let mut visited = Vec::new();
-        let mut queue = vec![(start.clone(), vec![start.clone()], vec![], vec![])];
+        let mut queue = vec![(*start, vec![*start], vec![], vec![])];
 
         while let Some((current, path, strengths, timestamps)) = queue.pop() {
             // Check if we reached the end
@@ -416,7 +416,7 @@ impl CausalSpace {
     }
 
     /// Get all links for a specific cause
-    pub fn get_effects_of(&self, cause: &HV16) -> Vec<&CausalLink> {
+    pub fn get_effects_of(&self, cause: &BinaryHV) -> Vec<&CausalLink> {
         self.causal_links
             .iter()
             .filter(|link| link.cause.similarity(cause) > 0.9)
@@ -424,7 +424,7 @@ impl CausalSpace {
     }
 
     /// Get all links for a specific effect
-    pub fn get_causes_of(&self, effect: &HV16) -> Vec<&CausalLink> {
+    pub fn get_causes_of(&self, effect: &BinaryHV) -> Vec<&CausalLink> {
         self.causal_links
             .iter()
             .filter(|link| link.effect.similarity(effect) > 0.9)
@@ -437,7 +437,7 @@ impl CausalSpace {
     /// arrows INTO X, leaving only arrows OUT of X.
     ///
     /// Returns the number of links removed.
-    pub fn remove_effects_of(&mut self, variable: &HV16) -> usize {
+    pub fn remove_effects_of(&mut self, variable: &BinaryHV) -> usize {
         let mut removed = 0;
 
         // Remove links where the effect matches the variable
@@ -459,8 +459,8 @@ impl CausalSpace {
             for (idx, link) in self.causal_links.iter().enumerate() {
                 let cause_key = format!("{:?}", link.cause);
                 let effect_key = format!("{:?}", link.effect);
-                self.cause_index.entry(cause_key).or_insert_with(Vec::new).push(idx);
-                self.effect_index.entry(effect_key).or_insert_with(Vec::new).push(idx);
+                self.cause_index.entry(cause_key).or_default().push(idx);
+                self.effect_index.entry(effect_key).or_default().push(idx);
             }
         }
 
@@ -490,8 +490,8 @@ mod tests {
     fn test_basic_causality() {
         let mut causal = CausalSpace::new();
 
-        let rain = HV16::random(1);
-        let wet = HV16::random(2);
+        let rain = BinaryHV::random(1);
+        let wet = BinaryHV::random(2);
 
         // Add causal link: rain causes wet ground
         causal.add_causal_link(rain, wet, 0.9);
@@ -514,9 +514,9 @@ mod tests {
     fn test_effect_prediction() {
         let mut causal = CausalSpace::new();
 
-        let rain = HV16::random(1);
-        let wet = HV16::random(2);
-        let slippery = HV16::random(3);
+        let rain = BinaryHV::random(1);
+        let wet = BinaryHV::random(2);
+        let slippery = BinaryHV::random(3);
 
         causal.add_causal_link(rain, wet, 0.9);
         causal.add_causal_link(wet, slippery, 0.7);
@@ -537,9 +537,9 @@ mod tests {
         let mut causal = CausalSpace::new();
 
         // Create chain: A → B → C
-        let a = HV16::random(1);
-        let b = HV16::random(2);
-        let c = HV16::random(3);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
+        let c = BinaryHV::random(3);
 
         causal.add_causal_link(a, b, 0.9);
         causal.add_causal_link(b, c, 0.8);
@@ -557,8 +557,8 @@ mod tests {
     fn test_reinforcement_learning() {
         let mut causal = CausalSpace::new();
 
-        let action = HV16::random(1);
-        let reward = HV16::random(2);
+        let action = BinaryHV::random(1);
+        let reward = BinaryHV::random(2);
 
         // Observe action → reward multiple times
         causal.add_causal_link(action, reward, 0.5);
@@ -574,9 +574,9 @@ mod tests {
     fn test_multiple_causes() {
         let mut causal = CausalSpace::new();
 
-        let rain = HV16::random(1);
-        let sprinkler = HV16::random(2);
-        let wet = HV16::random(3);
+        let rain = BinaryHV::random(1);
+        let sprinkler = BinaryHV::random(2);
+        let wet = BinaryHV::random(3);
 
         // Both rain and sprinkler cause wet ground
         causal.add_causal_link(rain, wet, 0.9);
@@ -594,9 +594,9 @@ mod tests {
     fn test_intervention() {
         let mut causal = CausalSpace::new();
 
-        let treatment = HV16::random(1);
-        let recovery = HV16::random(2);
-        let confound = HV16::random(3);
+        let treatment = BinaryHV::random(1);
+        let recovery = BinaryHV::random(2);
+        let confound = BinaryHV::random(3);
 
         // True causal: treatment → recovery (strong)
         causal.add_causal_link(treatment, recovery, 0.9);
@@ -627,8 +627,8 @@ mod tests {
     fn test_temporal_ordering() {
         let mut causal = CausalSpace::new();
 
-        let event1 = HV16::random(1);
-        let event2 = HV16::random(2);
+        let event1 = BinaryHV::random(1);
+        let event2 = BinaryHV::random(2);
 
         causal.add_causal_link_labeled(
             event1,
@@ -645,8 +645,8 @@ mod tests {
     fn test_fuzzy_causality() {
         let mut causal = CausalSpace::new();
 
-        let smoking = HV16::random(1);
-        let cancer = HV16::random(2);
+        let smoking = BinaryHV::random(1);
+        let cancer = BinaryHV::random(2);
 
         // Probabilistic causation (not deterministic)
         causal.add_causal_link(smoking, cancer, 0.3); // 30% chance
@@ -660,14 +660,14 @@ mod tests {
         let mut causal = CausalSpace::new();
 
         // Actual: studied → passed
-        let studied = HV16::random(1);
-        let passed = HV16::random(2);
-        let failed = HV16::random(3);
+        let studied = BinaryHV::random(1);
+        let passed = BinaryHV::random(2);
+        let failed = BinaryHV::random(3);
 
         causal.add_causal_link(studied, passed, 0.9);
 
         // Counterfactual: what if didn't study?
-        let not_studied = HV16::random(100); // Different vector = different scenario
+        let not_studied = BinaryHV::random(100); // Different vector = different scenario
         causal.add_causal_link(not_studied, failed, 0.8);
 
         // Query effects of not studying should find failure, not passing
@@ -685,9 +685,9 @@ mod tests {
     fn test_causal_strength_matters() {
         let mut causal = CausalSpace::new();
 
-        let cause = HV16::random(1);
-        let strong_effect = HV16::random(2);
-        let weak_effect = HV16::random(3);
+        let cause = BinaryHV::random(1);
+        let strong_effect = BinaryHV::random(2);
+        let weak_effect = BinaryHV::random(3);
 
         causal.add_causal_link(cause, strong_effect, 0.95);
         causal.add_causal_link(cause, weak_effect, 0.2);

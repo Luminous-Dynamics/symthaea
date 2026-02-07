@@ -3,14 +3,14 @@
 //! # Why This Matters
 //!
 //! In HDC, we need deterministic seeds for:
-//! 1. **Reproducibility**: Same concept → same HV16 across runs
+//! 1. **Reproducibility**: Same concept → same BinaryHV across runs
 //! 2. **Debugging**: Known seeds enable bisection-style debugging
 //! 3. **Testing**: Deterministic tests don't flake
 //! 4. **Composition**: Semantic relationships can be algebraically derived
 //!
 //! # Key Insight: BLAKE3 Makes Seed Value Irrelevant
 //!
-//! The HV16::random(seed) function uses BLAKE3, which has perfect avalanche properties.
+//! The BinaryHV::random(seed) function uses BLAKE3, which has perfect avalanche properties.
 //! This means:
 //! - Prime numbers don't help (BLAKE3 doesn't use modular arithmetic)
 //! - Sequential integers work fine (each hash is independent)
@@ -209,7 +209,7 @@ impl NixPrimeConcept {
         PRIMES[*self as usize]
     }
 
-    /// Get the seed for this concept (for HV16 generation).
+    /// Get the seed for this concept (for BinaryHV generation).
     /// Uses the prime as base, offset to avoid collision with test seeds.
     pub fn seed(&self) -> u64 {
         // Use prime + large offset to separate from arbitrary test seeds
@@ -223,7 +223,7 @@ impl NixPrimeConcept {
 
         for i in 0..40 {
             let prime = PRIMES[i];
-            while remaining % prime == 0 {
+            while remaining.is_multiple_of(prime) {
                 remaining /= prime;
                 // Safe because we only iterate over valid indices
                 result.push(unsafe { std::mem::transmute::<u8, NixPrimeConcept>(i as u8) });
@@ -264,7 +264,7 @@ impl GodelNumber {
 
     /// Check if this number contains a concept.
     pub fn contains(&self, concept: NixPrimeConcept) -> bool {
-        self.0 % concept.prime() == 0
+        self.0.is_multiple_of(concept.prime())
     }
 
     /// Get the shared concepts between two Gödel numbers (GCD-based).
@@ -277,7 +277,7 @@ impl GodelNumber {
         NixPrimeConcept::factor(self.0)
     }
 
-    /// Generate a seed for HV16 from this Gödel number.
+    /// Generate a seed for BinaryHV from this Gödel number.
     pub fn seed(&self) -> u64 {
         // Hash the Gödel number to get a good seed distribution
         let mut hasher = std::collections::hash_map::DefaultHasher::new();

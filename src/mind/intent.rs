@@ -18,7 +18,7 @@
 //!
 //! This replaces neural network classification with pure linear algebra.
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use super::structured_thought::{SemanticIntent, EpistemicStatus, ResponseType};
 use super::utils::is_nonzero_f32;
 
@@ -35,32 +35,32 @@ pub struct IntentClassifier {
     // ========================================================================
 
     /// Greeting prototype: "hello", "hi", "greetings", etc.
-    greeting_proto: RealHV,
+    greeting_proto: ContinuousHV,
 
     /// Question prototype: interrogatives and question markers
-    question_proto: RealHV,
+    question_proto: ContinuousHV,
 
     /// Command/action prototype: imperative verbs
-    command_proto: RealHV,
+    command_proto: ContinuousHV,
 
     /// Reflection prototype: introspective queries
-    reflection_proto: RealHV,
+    reflection_proto: ContinuousHV,
 
     /// Emotional prototype: feelings and emotional content
-    emotional_proto: RealHV,
+    emotional_proto: ContinuousHV,
 
     // ========================================================================
     // EPISTEMIC PROTOTYPES (for "do I know this?")
     // ========================================================================
 
     /// Known/familiar prototype: common knowledge, facts
-    known_proto: RealHV,
+    known_proto: ContinuousHV,
 
     /// Unknown/novel prototype: unusual, unfamiliar concepts
-    unknown_proto: RealHV,
+    unknown_proto: ContinuousHV,
 
     /// Ambiguous prototype: unclear, confusing
-    ambiguous_proto: RealHV,
+    ambiguous_proto: ContinuousHV,
 
     // ========================================================================
     // CONCEPT VOCABULARY (for semantic labeling)
@@ -92,7 +92,7 @@ pub struct NegativePrototype {
     /// Prototype name/label
     pub name: String,
     /// Prototype encoding
-    pub encoding: RealHV,
+    pub encoding: ContinuousHV,
     /// Penalty weight (how much to penalize familiarity)
     pub penalty_weight: f32,
 }
@@ -104,7 +104,7 @@ pub struct PositivePrototype {
     /// Prototype name/label
     pub name: String,
     /// Prototype encoding
-    pub encoding: RealHV,
+    pub encoding: ContinuousHV,
     /// Boost weight (how much to boost familiarity)
     pub boost_weight: f32,
 }
@@ -117,7 +117,7 @@ pub struct ConceptPrototype {
     /// Category (for hierarchical organization)
     pub category: String,
     /// Prototype encoding
-    pub encoding: RealHV,
+    pub encoding: ContinuousHV,
 }
 
 /// Result of intent classification
@@ -539,7 +539,7 @@ impl IntentClassifier {
     /// Encode a prototype from seed phrases.
     ///
     /// Bundles multiple seed phrases into a single prototype vector.
-    fn encode_prototype(dim: usize, seeds: &[&str]) -> RealHV {
+    fn encode_prototype(dim: usize, seeds: &[&str]) -> ContinuousHV {
         let mut combined = vec![0.0f32; dim];
 
         for seed in seeds {
@@ -557,11 +557,11 @@ impl IntentClassifier {
             }
         }
 
-        RealHV::from_values(combined)
+        ContinuousHV::from_values(combined)
     }
 
     /// Internal text-to-HV encoding (matches Symthaea's encoding).
-    fn text_to_hv_internal(dim: usize, text: &str) -> RealHV {
+    fn text_to_hv_internal(dim: usize, text: &str) -> ContinuousHV {
         let mut values = vec![0.0f32; dim];
         let text_lower = text.to_lowercase();
 
@@ -578,14 +578,14 @@ impl IntentClassifier {
             }
         }
 
-        RealHV::from_values(values)
+        ContinuousHV::from_values(values)
     }
 
     /// Classify the semantic intent of an input.
     ///
     /// Computes similarity against all intent prototypes and returns
     /// the highest-resonance intent with confidence.
-    pub fn classify_intent(&self, input_hv: &RealHV) -> IntentClassification {
+    pub fn classify_intent(&self, input_hv: &ContinuousHV) -> IntentClassification {
         let scores = IntentScores {
             greeting: input_hv.similarity(&self.greeting_proto),
             question: input_hv.similarity(&self.question_proto),
@@ -639,7 +639,7 @@ impl IntentClassifier {
     /// triggers (mythology, fiction, pseudoscience). If a query resonates with
     /// these, familiarity is penalized and novelty is boosted, forcing the
     /// system toward caution.
-    pub fn assess_epistemic(&self, input_hv: &RealHV, working_memory: &[RealHV]) -> EpistemicAssessment {
+    pub fn assess_epistemic(&self, input_hv: &ContinuousHV, working_memory: &[ContinuousHV]) -> EpistemicAssessment {
         // Check similarity to epistemic prototypes
         let known_sim = input_hv.similarity(&self.known_proto);
         let unknown_sim = input_hv.similarity(&self.unknown_proto);
@@ -742,7 +742,7 @@ impl IntentClassifier {
     /// Returns (max_resonance, weighted_penalty) where:
     /// - max_resonance: highest similarity to any negative prototype
     /// - weighted_penalty: penalty weighted by prototype's penalty_weight
-    fn compute_negative_resonance(&self, input_hv: &RealHV) -> (f32, f32) {
+    fn compute_negative_resonance(&self, input_hv: &ContinuousHV) -> (f32, f32) {
         let mut max_resonance = 0.0f32;
         let mut max_penalty = 0.0f32;
 
@@ -765,7 +765,7 @@ impl IntentClassifier {
     ///
     /// This is the counterpart to compute_negative_resonance, providing
     /// confidence boosting for clearly answerable domains.
-    fn compute_positive_resonance(&self, input_hv: &RealHV) -> (f32, f32) {
+    fn compute_positive_resonance(&self, input_hv: &ContinuousHV) -> (f32, f32) {
         let mut max_resonance = 0.0f32;
         let mut max_boost = 0.0f32;
 
@@ -781,7 +781,7 @@ impl IntentClassifier {
     }
 
     /// Assess epistemic status from raw text.
-    pub fn assess_epistemic_text(&self, text: &str, working_memory: &[RealHV]) -> EpistemicAssessment {
+    pub fn assess_epistemic_text(&self, text: &str, working_memory: &[ContinuousHV]) -> EpistemicAssessment {
         // DEFENSE-IN-DEPTH: Hard keyword check for known hallucination triggers
         // This catches cases where HDC similarity doesn't trigger in high-dim space
         let text_lower = text.to_lowercase();
@@ -840,7 +840,7 @@ impl IntentClassifier {
     /// Combined classification: intent + epistemic status.
     ///
     /// This is the main entry point for the mind to understand a query.
-    pub fn analyze(&self, text: &str, working_memory: &[RealHV]) -> (IntentClassification, EpistemicAssessment) {
+    pub fn analyze(&self, text: &str, working_memory: &[ContinuousHV]) -> (IntentClassification, EpistemicAssessment) {
         let input_hv = Self::text_to_hv_internal(self.dim, text);
         let intent = self.classify_intent(&input_hv);
         let epistemic = self.assess_epistemic(&input_hv, working_memory);
@@ -855,7 +855,7 @@ impl IntentClassifier {
     ///
     /// Uses cosine similarity to find the best-matching concept prototype.
     /// Returns the concept name and similarity score.
-    pub fn label_concept(&self, hv: &RealHV) -> ConceptLabel {
+    pub fn label_concept(&self, hv: &ContinuousHV) -> ConceptLabel {
         let mut best_match = ConceptLabel {
             name: "unknown".to_string(),
             category: "unknown".to_string(),
@@ -882,7 +882,7 @@ impl IntentClassifier {
     /// Label multiple hypervectors from working memory.
     ///
     /// Returns labels for each vector, sorted by confidence.
-    pub fn label_concepts(&self, hvs: &[RealHV]) -> Vec<ConceptLabel> {
+    pub fn label_concepts(&self, hvs: &[ContinuousHV]) -> Vec<ConceptLabel> {
         let mut labels: Vec<_> = hvs.iter().map(|hv| self.label_concept(hv)).collect();
         // Sort by confidence descending
         labels.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));

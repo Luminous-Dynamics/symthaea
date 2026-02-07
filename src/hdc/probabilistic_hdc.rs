@@ -49,7 +49,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::hdc::{HV16, RealHV};
+use crate::hdc::{HV16, ContinuousHV};
 
 // ============================================================================
 // Configuration
@@ -176,9 +176,9 @@ impl ProbabilisticHV {
 
     /// Convert a real-valued hypervector to a probabilistic one.
     ///
-    /// The mean is taken directly from the RealHV values; variance is zero
+    /// The mean is taken directly from the ContinuousHV values; variance is zero
     /// (the observation is treated as perfectly certain).
-    pub fn from_real_hv(hv: &RealHV) -> Self {
+    pub fn from_real_hv(hv: &ContinuousHV) -> Self {
         let dim = hv.values.len();
         let mean: Vec<f64> = hv.values.iter().map(|&v| v as f64).collect();
         Self {
@@ -564,13 +564,13 @@ impl ProbabilisticHV {
     // Conversion
     // ========================================================================
 
-    /// Collapse the PHV to a deterministic RealHV by taking the mean.
+    /// Collapse the PHV to a deterministic ContinuousHV by taking the mean.
     ///
     /// This discards all uncertainty information. It is the "most likely"
     /// hypervector under the diagonal Gaussian model.
-    pub fn to_real_hv(&self) -> RealHV {
+    pub fn to_real_hv(&self) -> ContinuousHV {
         let values: Vec<f32> = self.mean.iter().map(|&v| v as f32).collect();
-        RealHV::from_values(values)
+        ContinuousHV::from_values(values)
     }
 
     /// Return the dimension of this PHV.
@@ -741,19 +741,19 @@ mod tests {
 
     #[test]
     fn test_phv_from_real_hv_has_zero_variance() {
-        let hv = RealHV::random(TEST_DIM, 77);
+        let hv = ContinuousHV::random(TEST_DIM, 77);
         let phv = ProbabilisticHV::from_real_hv(&hv);
 
         assert_eq!(phv.dim, TEST_DIM);
         for i in 0..phv.dim {
             assert_eq!(
                 phv.variance[i], 0.0,
-                "PHV from RealHV should have zero variance at dim {}",
+                "PHV from ContinuousHV should have zero variance at dim {}",
                 i
             );
             assert!(
                 (phv.mean[i] - hv.values[i] as f64).abs() < 1e-5,
-                "PHV mean should match RealHV value at dim {}",
+                "PHV mean should match ContinuousHV value at dim {}",
                 i
             );
         }
@@ -796,14 +796,14 @@ mod tests {
 
     #[test]
     fn test_to_real_hv_roundtrip() {
-        let original = RealHV::random(TEST_DIM, 88);
+        let original = ContinuousHV::random(TEST_DIM, 88);
         let phv = ProbabilisticHV::from_real_hv(&original);
         let recovered = phv.to_real_hv();
 
         for i in 0..TEST_DIM {
             assert!(
                 (original.values[i] - recovered.values[i]).abs() < 1e-5,
-                "RealHV roundtrip failed at dim {}: {} vs {}",
+                "ContinuousHV roundtrip failed at dim {}: {} vs {}",
                 i, original.values[i], recovered.values[i]
             );
         }

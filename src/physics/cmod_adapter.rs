@@ -63,7 +63,7 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
 // Re-export core types for HDC integration
-use symthaea_core::hdc::{HDC_DIMENSION, real_hv::RealHV};
+use symthaea_core::hdc::{HDC_DIMENSION, ContinuousHV};
 
 // Import existing plasma types for integration
 use super::plasma_hdc_encoder::PlasmaState;
@@ -1038,9 +1038,9 @@ pub struct CModHdcEncoder {
     /// HDC dimension (default: HDC_DIMENSION = 16,384)
     dimension: usize,
     /// Basis vectors for each sensor channel
-    sensor_bases: Vec<RealHV>,
+    sensor_bases: Vec<ContinuousHV>,
     /// Level vectors for amplitude encoding
-    level_vectors: Vec<RealHV>,
+    level_vectors: Vec<ContinuousHV>,
     /// Number of quantization levels
     num_levels: usize,
     /// Sensor names for debugging - reserved for diagnostics
@@ -1058,13 +1058,13 @@ impl CModHdcEncoder {
     /// Create a new C-Mod encoder
     pub fn new(dimension: usize, num_levels: usize) -> Self {
         // Generate deterministic basis vectors for each sensor
-        let sensor_bases: Vec<RealHV> = (0..Self::NUM_SENSORS)
-            .map(|i| RealHV::random(dimension, 100_000 + i as u64))
+        let sensor_bases: Vec<ContinuousHV> = (0..Self::NUM_SENSORS)
+            .map(|i| ContinuousHV::random(dimension, 100_000 + i as u64))
             .collect();
 
         // Generate level vectors for amplitude quantization
-        let level_vectors: Vec<RealHV> = (0..num_levels)
-            .map(|i| RealHV::random(dimension, 200_000 + i as u64))
+        let level_vectors: Vec<ContinuousHV> = (0..num_levels)
+            .map(|i| ContinuousHV::random(dimension, 200_000 + i as u64))
             .collect();
 
         Self {
@@ -1087,8 +1087,8 @@ impl CModHdcEncoder {
     /// 1. For each sensor, quantize the normalized value to a level
     /// 2. Bind the sensor basis with the level vector
     /// 3. Bundle all bound vectors to create the final encoding
-    pub fn encode(&self, sample: &CModPlasmaSample) -> RealHV {
-        let mut bound_vectors: Vec<RealHV> = Vec::with_capacity(Self::NUM_SENSORS);
+    pub fn encode(&self, sample: &CModPlasmaSample) -> ContinuousHV {
+        let mut bound_vectors: Vec<ContinuousHV> = Vec::with_capacity(Self::NUM_SENSORS);
 
         for (i, &value) in sample.sensors.iter().enumerate() {
             // Quantize value to level index
@@ -1102,11 +1102,11 @@ impl CModHdcEncoder {
         }
 
         // Bundle all bound vectors
-        RealHV::bundle(&bound_vectors)
+        ContinuousHV::bundle_owned(&bound_vectors)
     }
 
     /// Encode a batch of samples
-    pub fn encode_batch(&self, samples: &[CModPlasmaSample]) -> Vec<RealHV> {
+    pub fn encode_batch(&self, samples: &[CModPlasmaSample]) -> Vec<ContinuousHV> {
         samples.iter().map(|s| self.encode(s)).collect()
     }
 
@@ -1122,7 +1122,7 @@ impl CModHdcEncoder {
 /// state changes, useful for detecting critical state transitions.
 ///
 /// Uses a simplified correlation-based approximation of integration
-/// that can be computed efficiently from RealHV encodings.
+/// that can be computed efficiently from ContinuousHV encodings.
 #[derive(Debug)]
 pub struct CModPhiMonitor {
     /// History of Phi values
@@ -1130,7 +1130,7 @@ pub struct CModPhiMonitor {
     /// Rolling window size
     window_size: usize,
     /// Recent encodings for correlation analysis
-    recent_encodings: Vec<RealHV>,
+    recent_encodings: Vec<ContinuousHV>,
 }
 
 impl CModPhiMonitor {
@@ -1149,7 +1149,7 @@ impl CModPhiMonitor {
     }
 
     /// Update with a new encoded sample
-    pub fn update(&mut self, time_ms: f64, encoding: &RealHV) {
+    pub fn update(&mut self, time_ms: f64, encoding: &ContinuousHV) {
         // Add to recent encodings
         self.recent_encodings.push(encoding.clone());
         if self.recent_encodings.len() > self.window_size {

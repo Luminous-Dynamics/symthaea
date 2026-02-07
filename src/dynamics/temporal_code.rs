@@ -16,7 +16,7 @@
 //! EvolutionPattern (stability, predicted next change)
 //! ```
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use crate::hdc::code_encoder::CodeHDEncoder;
 
@@ -182,12 +182,12 @@ impl TemporalCodeAnalyzer {
     }
 
     /// Encode a commit into an HDC vector
-    fn encode_commit(&self, commit: &CommitInfo) -> RealHV {
+    fn encode_commit(&self, commit: &CommitInfo) -> ContinuousHV {
         // Encode message
         let msg_hv = self.encoder.encode_name(&commit.message);
 
         // Encode changed files
-        let file_hvs: Vec<RealHV> = commit.files_changed.iter()
+        let file_hvs: Vec<ContinuousHV> = commit.files_changed.iter()
             .map(|(path, _)| self.encoder.encode_name(path))
             .collect();
 
@@ -195,13 +195,13 @@ impl TemporalCodeAnalyzer {
             return msg_hv;
         }
 
-        let files_bundled = RealHV::bundle(&file_hvs);
+        let files_bundled = ContinuousHV::bundle_owned(&file_hvs);
 
-        RealHV::bundle(&[msg_hv, files_bundled])
+        ContinuousHV::bundle_owned(&[msg_hv, files_bundled])
     }
 
     /// Project HV to hidden space
-    fn project_to_hidden(&self, hv: &RealHV) -> Vec<f32> {
+    fn project_to_hidden(&self, hv: &ContinuousHV) -> Vec<f32> {
         let hdc_dim = hv.values.len().min(self.encoder.dim());
         let mut hidden = vec![0.0f32; self.hidden_dim];
 

@@ -36,7 +36,7 @@
 //!     └───── decays ───────┴───── predicts ─────┘
 //! ```
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::unified_consciousness_engine::{ConsciousnessUpdate, ConsciousnessDimensions};
 use std::collections::VecDeque;
 
@@ -68,9 +68,9 @@ impl Default for TemporalBindingConfig {
 #[derive(Clone, Debug)]
 pub struct TemporalMoment {
     /// The raw experience vector
-    pub experience: RealHV,
+    pub experience: ContinuousHV,
     /// Integrated with temporal context
-    pub bound_experience: RealHV,
+    pub bound_experience: ContinuousHV,
     /// Timestamp (step number)
     pub step: usize,
     /// Integration strength with past
@@ -103,13 +103,13 @@ pub struct TemporalBindingEngine {
     /// Past moments buffer
     past_moments: VecDeque<TemporalMoment>,
     /// Current prediction of next moment
-    anticipation: Option<RealHV>,
+    anticipation: Option<ContinuousHV>,
     /// Integrated temporal context
-    temporal_context: RealHV,
+    temporal_context: ContinuousHV,
     /// Step counter
     step: usize,
     /// Narrative vector (accumulates coherent experience)
-    narrative: RealHV,
+    narrative: ContinuousHV,
     /// Theta phase (for oscillation simulation)
     theta_phase: f64,
 }
@@ -122,15 +122,15 @@ impl TemporalBindingEngine {
             config,
             past_moments: VecDeque::new(),
             anticipation: None,
-            temporal_context: RealHV::zero(dim),
+            temporal_context: ContinuousHV::zero(dim),
             step: 0,
-            narrative: RealHV::zero(dim),
+            narrative: ContinuousHV::zero(dim),
             theta_phase: 0.0,
         }
     }
 
     /// Bind a new experience into the temporal stream
-    pub fn bind(&mut self, experience: &RealHV) -> TemporalMoment {
+    pub fn bind(&mut self, experience: &ContinuousHV) -> TemporalMoment {
         self.step += 1;
 
         // Update theta phase (4-8Hz oscillation at ~100ms steps)
@@ -182,7 +182,7 @@ impl TemporalBindingEngine {
     }
 
     /// Compute how strongly this experience integrates with past
-    fn compute_past_integration(&self, experience: &RealHV) -> f64 {
+    fn compute_past_integration(&self, experience: &ContinuousHV) -> f64 {
         if self.past_moments.is_empty() {
             return 0.5;
         }
@@ -207,7 +207,7 @@ impl TemporalBindingEngine {
     }
 
     /// Create experience bound with temporal context
-    fn create_bound_experience(&self, experience: &RealHV, theta_weight: f64) -> RealHV {
+    fn create_bound_experience(&self, experience: &ContinuousHV, theta_weight: f64) -> ContinuousHV {
         let mut components = vec![experience.clone()];
 
         // Add decayed past contributions
@@ -231,11 +231,11 @@ impl TemporalBindingEngine {
         }
 
         // Bundle and normalize
-        RealHV::bundle(&components)
+        ContinuousHV::bundle_owned(&components)
     }
 
     /// Update running temporal context
-    fn update_temporal_context(&mut self, bound: &RealHV) {
+    fn update_temporal_context(&mut self, bound: &ContinuousHV) {
         let lr = 0.2;
         self.temporal_context = self.temporal_context
             .scale((1.0 - lr) as f32)
@@ -244,7 +244,7 @@ impl TemporalBindingEngine {
     }
 
     /// Update narrative vector
-    fn update_narrative(&mut self, bound: &RealHV) {
+    fn update_narrative(&mut self, bound: &ContinuousHV) {
         // Narrative accumulates slowly (episodic integration)
         let lr = 0.05;
         self.narrative = self.narrative
@@ -263,7 +263,7 @@ impl TemporalBindingEngine {
         // Simple: predict as continuation of recent trend
         let recent: Vec<&TemporalMoment> = self.past_moments.iter().rev().take(5).collect();
 
-        let mut predicted = RealHV::zero(self.config.dim);
+        let mut predicted = ContinuousHV::zero(self.config.dim);
 
         // Weighted recent history projection
         for (i, moment) in recent.iter().enumerate() {
@@ -278,7 +278,7 @@ impl TemporalBindingEngine {
     }
 
     /// Compute continuity with previous moment
-    fn compute_continuity(&self, bound: &RealHV) -> f64 {
+    fn compute_continuity(&self, bound: &ContinuousHV) -> f64 {
         if let Some(prev) = self.past_moments.back() {
             // Continuity = similarity to previous + narrative coherence
             let immediate = bound.similarity(&prev.bound_experience).max(0.0) as f64;
@@ -327,17 +327,17 @@ impl TemporalBindingEngine {
     }
 
     /// Get the current narrative vector
-    pub fn narrative(&self) -> &RealHV {
+    pub fn narrative(&self) -> &ContinuousHV {
         &self.narrative
     }
 
     /// Get the current temporal context
-    pub fn temporal_context(&self) -> &RealHV {
+    pub fn temporal_context(&self) -> &ContinuousHV {
         &self.temporal_context
     }
 
     /// Get anticipation for next moment
-    pub fn anticipation(&self) -> Option<&RealHV> {
+    pub fn anticipation(&self) -> Option<&ContinuousHV> {
         self.anticipation.as_ref()
     }
 
@@ -416,17 +416,17 @@ impl StreamOfConsciousness {
     }
 
     /// Convert consciousness dimensions to HDC vector
-    fn dimensions_to_vector(&self, dims: &ConsciousnessDimensions) -> RealHV {
+    fn dimensions_to_vector(&self, dims: &ConsciousnessDimensions) -> ContinuousHV {
         let dim = self.binding.config.dim;
 
         // Create basis vectors for each dimension
-        let phi_vec = RealHV::random(dim, (dims.phi * 10000.0) as u64);
-        let workspace_vec = RealHV::random(dim, (dims.workspace * 10000.0 + 1000.0) as u64);
-        let attention_vec = RealHV::random(dim, (dims.attention * 10000.0 + 2000.0) as u64);
-        let temporal_vec = RealHV::random(dim, (dims.temporal * 10000.0 + 3000.0) as u64);
+        let phi_vec = ContinuousHV::random(dim, (dims.phi * 10000.0) as u64);
+        let workspace_vec = ContinuousHV::random(dim, (dims.workspace * 10000.0 + 1000.0) as u64);
+        let attention_vec = ContinuousHV::random(dim, (dims.attention * 10000.0 + 2000.0) as u64);
+        let temporal_vec = ContinuousHV::random(dim, (dims.temporal * 10000.0 + 3000.0) as u64);
 
         // Weighted bundle
-        RealHV::bundle(&[
+        ContinuousHV::bundle_owned(&[
             phi_vec.scale(dims.phi as f32),
             workspace_vec.scale(dims.workspace as f32),
             attention_vec.scale(dims.attention as f32),
@@ -504,7 +504,7 @@ mod tests {
 
         println!("\nTemporal Binding Test:");
         for i in 0..25 {
-            let experience = RealHV::random(1024, i * 100);
+            let experience = ContinuousHV::random(1024, i * 100);
             let moment = engine.bind(&experience);
 
             if i % 5 == 0 {
@@ -532,12 +532,12 @@ mod tests {
         let mut engine = TemporalBindingEngine::new(config);
 
         // Create a sequence of similar experiences (should show high continuity)
-        let base = RealHV::random(1024, 42);
+        let base = ContinuousHV::random(1024, 42);
 
         println!("\nStream Continuity Test:");
         for i in 0..15 {
             // Add small noise to base (simulating continuous experience)
-            let noise = RealHV::random(1024, i * 1000).scale(0.1);
+            let noise = ContinuousHV::random(1024, i * 1000).scale(0.1);
             let experience = base.add(&noise).normalize();
 
             let moment = engine.bind(&experience);
@@ -563,7 +563,7 @@ mod tests {
 
         println!("\nStream of Consciousness Test:");
         for i in 0..20 {
-            let input = RealHV::random(1024, i * 100);
+            let input = ContinuousHV::random(1024, i * 100);
             let update = engine.process(&input);
             let stream_update = stream.process(&update);
 

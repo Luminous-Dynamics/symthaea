@@ -12,7 +12,7 @@
 
 use std::path::{Path, PathBuf};
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use crate::hdc::code_memory::CodebaseMemory;
 
@@ -30,7 +30,7 @@ pub struct ExplorationTarget {
 /// Active code explorer using Free Energy Principle
 pub struct ActiveCodeExplorer {
     /// Current world model: what we expect the codebase to look like
-    expected_model: Option<RealHV>,
+    expected_model: Option<ContinuousHV>,
     /// Dimension of the HDC space
     dim: usize,
     /// History of explored files for tracking model evolution
@@ -59,12 +59,12 @@ impl ActiveCodeExplorer {
     }
 
     /// Set the expected model directly
-    pub fn set_expected_model(&mut self, model: RealHV) {
+    pub fn set_expected_model(&mut self, model: ContinuousHV) {
         self.expected_model = Some(model);
     }
 
     /// Compute surprise: how much does this file differ from expectations?
-    pub fn compute_surprise(&self, file_hv: &RealHV) -> f32 {
+    pub fn compute_surprise(&self, file_hv: &ContinuousHV) -> f32 {
         match &self.expected_model {
             Some(model) => {
                 let similarity = model.similarity(file_hv);
@@ -117,7 +117,7 @@ impl ActiveCodeExplorer {
 
     /// Update the world model after exploring a file (Bayesian update).
     /// Blends the new observation with our prior expectations.
-    pub fn update_model(&mut self, file_hv: &RealHV, path: &Path) {
+    pub fn update_model(&mut self, file_hv: &ContinuousHV, path: &Path) {
         let surprise = self.compute_surprise(file_hv);
         self.total_surprise += surprise;
         self.exploration_count += 1;
@@ -146,7 +146,7 @@ impl ActiveCodeExplorer {
                     }
                 }
 
-                self.expected_model = Some(RealHV::from_values(new_values));
+                self.expected_model = Some(ContinuousHV::from_values(new_values));
             }
             None => {
                 self.expected_model = Some(file_hv.clone());
@@ -203,7 +203,7 @@ mod tests {
     #[test]
     fn test_explorer_no_model() {
         let explorer = ActiveCodeExplorer::new(512);
-        let hv = RealHV::random(512, 42);
+        let hv = ContinuousHV::random(512, 42);
         let surprise = explorer.compute_surprise(&hv);
         assert!((surprise - 0.5).abs() < 1e-6); // neutral without model
     }
@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn test_explorer_with_model() {
         let mut explorer = ActiveCodeExplorer::new(512);
-        let model = RealHV::random(512, 42);
+        let model = ContinuousHV::random(512, 42);
         explorer.set_expected_model(model.clone());
 
         // Same vector should have low surprise
@@ -219,7 +219,7 @@ mod tests {
         assert!(surprise_same < 0.1, "Same vector should have low surprise: {}", surprise_same);
 
         // Random vector should have higher surprise
-        let random = RealHV::random(512, 99);
+        let random = ContinuousHV::random(512, 99);
         let surprise_random = explorer.compute_surprise(&random);
         assert!(surprise_random > surprise_same);
     }
@@ -227,10 +227,10 @@ mod tests {
     #[test]
     fn test_model_update() {
         let mut explorer = ActiveCodeExplorer::new(512);
-        let initial = RealHV::random(512, 42);
+        let initial = ContinuousHV::random(512, 42);
         explorer.set_expected_model(initial);
 
-        let new_file = RealHV::random(512, 99);
+        let new_file = ContinuousHV::random(512, 99);
         explorer.update_model(&new_file, Path::new("test.rs"));
 
         assert_eq!(explorer.exploration_count, 1);
@@ -262,14 +262,14 @@ mod tests {
     #[test]
     fn test_exploration_stats() {
         let mut explorer = ActiveCodeExplorer::new(512);
-        explorer.set_expected_model(RealHV::random(512, 42));
+        explorer.set_expected_model(ContinuousHV::random(512, 42));
 
         let stats = explorer.stats();
         assert_eq!(stats.explorations, 0);
         assert!(stats.has_model);
 
-        explorer.update_model(&RealHV::random(512, 99), Path::new("a.rs"));
-        explorer.update_model(&RealHV::random(512, 100), Path::new("b.rs"));
+        explorer.update_model(&ContinuousHV::random(512, 99), Path::new("a.rs"));
+        explorer.update_model(&ContinuousHV::random(512, 100), Path::new("b.rs"));
 
         let stats = explorer.stats();
         assert_eq!(stats.explorations, 2);

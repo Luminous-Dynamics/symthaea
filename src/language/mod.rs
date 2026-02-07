@@ -333,7 +333,7 @@ impl Default for NixErrorDiagnoser {
 // The integration module expects these types for conscious language processing.
 // These are stub implementations to enable module compilation.
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Consciousness state level for language processing
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -677,7 +677,7 @@ pub struct ConsciousUnderstandingResult {
     /// Current consciousness quadrant (2D space)
     pub quadrant: ConsciousnessQuadrant,
     /// Embedding representation
-    pub embedding: Option<RealHV>,
+    pub embedding: Option<ContinuousHV>,
     /// Processing confidence
     pub confidence: f32,
     /// Epistemic confidence (certainty about interpretation)

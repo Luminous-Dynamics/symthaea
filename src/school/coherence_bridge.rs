@@ -733,7 +733,7 @@ impl CoherenceBridgedSchool {
         // In production, we'd have a proper API for this
         (0..8)
             .map(|i| {
-                let hv = crate::hdc::RealHV::random(crate::hdc::HDC_DIMENSION, 42 + i);
+                let hv = crate::hdc::ContinuousHV::random(crate::hdc::HDC_DIMENSION, 42 + i);
                 crate::hdc::unified_hv::ContinuousHV::from_vec(hv.values)
             })
             .collect()

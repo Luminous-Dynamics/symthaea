@@ -9,7 +9,7 @@
 //! - Deterministic: Same input always produces same output
 //! - Biologically plausible: Binary spikes like neurons
 //!
-//! This module implements the HV16 type (16,384-bit hypervectors)
+//! This module implements the BinaryHV type (16,384-bit hypervectors)
 //! aligned with HDC_DIMENSION standard (2^14)
 
 use serde::{Deserialize, Serialize};
@@ -31,10 +31,10 @@ thread_local! {
 ///
 /// # Examples
 /// ```ignore
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
-/// let a = HV16::random(42);  // Deterministic from seed
-/// let b = HV16::random(43);
+/// let a = BinaryHV::random(42);  // Deterministic from seed
+/// let b = BinaryHV::random(43);
 ///
 /// // Binding (XOR): ~80ns
 /// let c = a.bind(&b);
@@ -45,9 +45,9 @@ thread_local! {
 /// Ensure 8-byte alignment for SIMD operations
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr(align(8))]
-pub struct HV16(#[serde(with = "serde_arrays")] pub [u8; 2048]);
+pub struct BinaryHV(#[serde(with = "serde_arrays")] pub [u8; 2048]);
 
-impl HV16 {
+impl BinaryHV {
     /// Dimension of the hypervector (16,384 bits = 2^14)
     pub const DIM: usize = super::HDC_DIMENSION;  // 16,384
 
@@ -70,9 +70,9 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let v1 = HV16::random(42);
-    /// let v2 = HV16::random(42);
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let v1 = BinaryHV::random(42);
+    /// let v2 = BinaryHV::random(42);
     /// assert_eq!(v1, v2);  // Same seed = same vector
     /// ```
     pub fn random(seed: u64) -> Self {
@@ -95,9 +95,9 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let node0 = HV16::basis(0);
-    /// let node1 = HV16::basis(1);
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let node0 = BinaryHV::basis(0);
+    /// let node1 = BinaryHV::basis(1);
     /// assert!(node0.similarity(&node1) < 0.6);  // Different nodes
     /// ```
     pub fn basis(index: usize) -> Self {
@@ -105,16 +105,16 @@ impl HV16 {
         Self::random(1000000 + index as u64)
     }
 
-    /// Create HV16 from raw 64-bit words
+    /// Create BinaryHV from raw 64-bit words
     ///
     /// Converts from 256 u64 words (256 * 64 = 16384 bits = 2048 bytes)
     /// to the internal u8 representation.
     ///
     /// # Example
     /// ```
-    /// # use symthaea_core::hdc::binary_hv::HV16;
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let bits = vec![0u64; 256];
-    /// let hv = HV16::from_bits(&bits);
+    /// let hv = BinaryHV::from_bits(&bits);
     /// assert_eq!(hv.density(), 0.0);  // All zeros
     /// ```
     pub fn from_bits(bits: &[u64]) -> Self {
@@ -148,9 +148,9 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let cat = HV16::random(1);
-    /// let orange = HV16::random(2);
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let cat = BinaryHV::random(1);
+    /// let orange = BinaryHV::random(2);
     /// let orange_cat = cat.bind(&orange);
     ///
     /// // Unbind to recover: orange_cat ⊗ cat = orange
@@ -187,12 +187,12 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let cat1 = HV16::random(1);
-    /// let cat2 = HV16::random(2);
-    /// let cat3 = HV16::random(3);
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let cat1 = BinaryHV::random(1);
+    /// let cat2 = BinaryHV::random(2);
+    /// let cat3 = BinaryHV::random(3);
     ///
-    /// let cat_prototype = HV16::bundle(&[cat1, cat2, cat3]);
+    /// let cat_prototype = BinaryHV::bundle(&[cat1, cat2, cat3]);
     ///
     /// // Prototype is similar to all inputs
     /// assert!(cat_prototype.similarity(&cat1) > 0.5);
@@ -204,31 +204,9 @@ impl HV16 {
             return Self::zero();
         }
 
-        // Count bits at each position (16,384 bits)
-        let mut counts = [0i32; 16_384];
-
-        for vec in vectors {
-            for byte_idx in 0..2048 {
-                for bit_idx in 0..8 {
-                    let bit = (vec.0[byte_idx] >> bit_idx) & 1;
-                    let pos = byte_idx * 8 + bit_idx;
-                    counts[pos] += if bit == 1 { 1 } else { -1 };
-                }
-            }
-        }
-
-        // Majority vote
-        let mut result = [0u8; 2048];
-        for byte_idx in 0..2048 {
-            for bit_idx in 0..8 {
-                let pos = byte_idx * 8 + bit_idx;
-                if counts[pos] > 0 {
-                    result[byte_idx] |= 1 << bit_idx;
-                }
-            }
-        }
-
-        Self(result)
+        // Dispatch through SIMD-optimized bundle path
+        let refs: Vec<&[u8; 2048]> = vectors.iter().map(|v| &v.0).collect();
+        Self(super::simd_ops::bundle_simd(&refs))
     }
 
     /// Bundle using heap-allocated thread-local buffer (stack-safe!)
@@ -246,9 +224,9 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let vectors: Vec<HV16> = (0..1000).map(|i| HV16::random(i)).collect();
-    /// let result = HV16::bundle_safe(&vectors);  // Won't overflow stack
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let vectors: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i)).collect();
+    /// let result = BinaryHV::bundle_safe(&vectors);  // Won't overflow stack
     /// ```
     pub fn bundle_safe(vectors: &[Self]) -> Self {
         if vectors.is_empty() {
@@ -302,10 +280,10 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea_core::hdc::binary_hv::HV16;
-    /// let a = HV16::random(1);
-    /// let b = HV16::random(2);
-    /// let result = HV16::weighted_bundle(&[a, b], &[3.0, 1.0]);
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let a = BinaryHV::random(1);
+    /// let b = BinaryHV::random(2);
+    /// let result = BinaryHV::weighted_bundle(&[a, b], &[3.0, 1.0]);
     /// // a dominates the result due to higher weight
     /// assert!(result.similarity(&a) > result.similarity(&b));
     /// ```
@@ -360,10 +338,10 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea_core::hdc::binary_hv::HV16;
-    /// let vectors: Vec<HV16> = (0..100).map(|i| HV16::random(i)).collect();
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
     /// let weights: Vec<f32> = (0..100).map(|i| i as f32).collect();
-    /// let result = HV16::weighted_bundle_safe(&vectors, &weights);
+    /// let result = BinaryHV::weighted_bundle_safe(&vectors, &weights);
     /// ```
     pub fn weighted_bundle_safe(vectors: &[Self], weights: &[f32]) -> Self {
         assert_eq!(vectors.len(), weights.len(), "vectors and weights must have same length");
@@ -421,15 +399,15 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let random = HV16::random(42);
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let random = BinaryHV::random(42);
     /// let density = random.density();
     /// assert!(density > 0.45 && density < 0.55);  // ~0.5 for random
     ///
-    /// let zeros = HV16::zero();
+    /// let zeros = BinaryHV::zero();
     /// assert_eq!(zeros.density(), 0.0);
     ///
-    /// let ones = HV16::ones();
+    /// let ones = BinaryHV::ones();
     /// assert_eq!(ones.density(), 1.0);
     /// ```
     #[inline]
@@ -452,8 +430,8 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let saturated = HV16::ones();  // 100% density
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let saturated = BinaryHV::ones();  // 100% density
     /// let balanced = saturated.ensure_density(0.4, 0.6);
     /// assert!(balanced.density() >= 0.4 && balanced.density() <= 0.6);
     /// ```
@@ -523,10 +501,10 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
     /// // Even with biased inputs, result stays balanced
-    /// let biased: Vec<HV16> = (0..10).map(|_| HV16::ones()).collect();
-    /// let result = HV16::bundle_normalized(&biased);
+    /// let biased: Vec<BinaryHV> = (0..10).map(|_| BinaryHV::ones()).collect();
+    /// let result = BinaryHV::bundle_normalized(&biased);
     /// assert!(result.density() >= 0.4 && result.density() <= 0.6);
     /// ```
     pub fn bundle_normalized(vectors: &[Self]) -> Self {
@@ -541,9 +519,9 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let cat = HV16::random(1);
-    /// let dog = HV16::random(2);
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let cat = BinaryHV::random(1);
+    /// let dog = BinaryHV::random(2);
     ///
     /// // Encode "cat dog" sequence
     /// let cat_dog = cat.bind(&dog.permute(1));
@@ -651,13 +629,13 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea_core::hdc::binary_hv::HV16;
-    /// let a = HV16::random(1);
-    /// let b = HV16::random(2);
-    /// let c = HV16::random(3);
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let a = BinaryHV::random(1);
+    /// let b = BinaryHV::random(2);
+    /// let c = BinaryHV::random(3);
     ///
-    /// let abc = HV16::ngram(&[a, b, c]);
-    /// let cba = HV16::ngram(&[c, b, a]);
+    /// let abc = BinaryHV::ngram(&[a, b, c]);
+    /// let cba = BinaryHV::ngram(&[c, b, a]);
     /// assert!(abc.similarity(&cba) < 0.55);  // Different orders
     /// ```
     pub fn ngram(vectors: &[Self]) -> Self {
@@ -670,7 +648,7 @@ impl HV16 {
 
         for i in 1..n {
             let permuted = vectors[i].permute(n - 1 - i);
-            // In-place XOR avoids allocating a new HV16 per iteration
+            // In-place XOR avoids allocating a new BinaryHV per iteration
             for j in 0..2048 {
                 result.0[j] ^= permuted.0[j];
             }
@@ -692,8 +670,8 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea_core::hdc::binary_hv::HV16;
-    /// let base = HV16::random(1);
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let base = BinaryHV::random(1);
     /// let half = base.fractional_power(0.5, 99);
     /// assert!(base.similarity(&half) > 0.2 && base.similarity(&half) < 0.8);
     /// ```
@@ -743,9 +721,9 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea_core::hdc::binary_hv::HV16;
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let sims = vec![(0, 0.9), (1, 0.3), (2, 0.7), (3, 0.5)];
-    /// let top2 = HV16::k_winners(&sims, 2);
+    /// let top2 = BinaryHV::k_winners(&sims, 2);
     /// assert_eq!(top2[0].0, 0);  // highest similarity
     /// assert_eq!(top2[1].0, 2);  // second highest
     /// ```
@@ -784,11 +762,11 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let a = HV16::random(42);
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let a = BinaryHV::random(42);
     /// assert_eq!(a.similarity(&a), 1.0);
     ///
-    /// let b = HV16::random(43);
+    /// let b = BinaryHV::random(43);
     /// let sim = a.similarity(&b);
     /// assert!(sim > 0.45 && sim < 0.55);  // Random vectors ~0.5
     /// ```
@@ -820,14 +798,14 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea_core::hdc::binary_hv::HV16;
-    /// let a = HV16::random(42);
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let a = BinaryHV::random(42);
     /// assert_eq!(a.cosine_similarity(&a), 1.0);
     ///
     /// let inv = a.invert();
     /// assert_eq!(a.cosine_similarity(&inv), -1.0);
     ///
-    /// let b = HV16::random(43);
+    /// let b = BinaryHV::random(43);
     /// let sim = a.cosine_similarity(&b);
     /// assert!(sim.abs() < 0.1);  // Random vectors ~0.0
     /// ```
@@ -843,8 +821,8 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let a = HV16::random(42);
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let a = BinaryHV::random(42);
     /// let b = a.permute(1);  // Slightly different
     ///
     /// let dist = a.hamming_distance(&b);
@@ -873,8 +851,8 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let a = HV16::random(42);
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let a = BinaryHV::random(42);
     /// let inv = a.invert();
     ///
     /// assert_eq!(a.similarity(&inv), 0.0);  // Opposite
@@ -903,9 +881,9 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea_core::hdc::binary_hv::HV16;
-    /// let a = HV16::random(1);
-    /// let b = HV16::random(2);
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let a = BinaryHV::random(1);
+    /// let b = BinaryHV::random(2);
     /// let inter = a.intersection(&b);
     /// assert!(inter.density() < 0.35);  // ~25% for random vectors
     /// ```
@@ -926,9 +904,9 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea_core::hdc::binary_hv::HV16;
-    /// let a = HV16::random(1);
-    /// let b = HV16::random(2);
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let a = BinaryHV::random(1);
+    /// let b = BinaryHV::random(2);
     /// let uni = a.union(&b);
     /// assert!(uni.density() > 0.65);  // ~75% for random vectors
     /// ```
@@ -1005,8 +983,8 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::binary_hv::HV16;
-    /// let original = HV16::random(42);
+    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// let original = BinaryHV::random(42);
     /// let noisy = original.add_noise(0.1, 123);  // Flip 10% of bits
     ///
     /// // Should still be somewhat similar
@@ -1044,8 +1022,8 @@ impl HV16 {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea_core::hdc::binary_hv::HV16;
-    /// let dense = HV16::random(42);
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let dense = BinaryHV::random(42);
     /// let sparse = dense.thin(0.1, 99);
     /// assert!(sparse.density() < 0.15);  // Close to target 10%
     /// ```
@@ -1079,6 +1057,128 @@ impl HV16 {
 
         Self(result)
     }
+
+    /// Bind in-place (XOR mutating self)
+    ///
+    /// Avoids allocating a new BinaryHV. Equivalent to `*self = self.bind(other)`.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let mut a = BinaryHV::random(1);
+    /// let b = BinaryHV::random(2);
+    /// let expected = a.bind(&b);
+    /// a.bind_inplace(&b);
+    /// assert_eq!(a, expected);
+    /// ```
+    #[inline]
+    pub fn bind_inplace(&mut self, other: &Self) {
+        for i in 0..2048 {
+            self.0[i] ^= other.0[i];
+        }
+    }
+
+    /// Batch similarity: compute similarity between one query and many targets
+    ///
+    /// More cache-friendly than calling similarity() in a loop.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let query = BinaryHV::random(0);
+    /// let targets: Vec<BinaryHV> = (1..10).map(|i| BinaryHV::random(i)).collect();
+    /// let sims = BinaryHV::batch_similarity(&query, &targets);
+    /// assert_eq!(sims.len(), 9);
+    /// ```
+    pub fn batch_similarity(query: &Self, targets: &[Self]) -> Vec<f32> {
+        targets.iter().map(|t| query.similarity(t)).collect()
+    }
+
+    /// Parallel batch similarity using rayon
+    ///
+    /// For large target sets (>1000), this provides significant speedup
+    /// on multi-core systems.
+    #[cfg(feature = "rayon")]
+    pub fn batch_similarity_parallel(query: &Self, targets: &[Self]) -> Vec<f32> {
+        use rayon::prelude::*;
+        targets.par_iter().map(|t| query.similarity(t)).collect()
+    }
+
+    /// Find all vectors above a similarity threshold
+    ///
+    /// Returns (index, similarity) pairs for all targets meeting the threshold.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let query = BinaryHV::random(0);
+    /// let mut targets: Vec<BinaryHV> = (1..50).map(|i| BinaryHV::random(i)).collect();
+    /// targets.push(query);  // Add exact match
+    /// let matches = BinaryHV::find_similar(&query, &targets, 0.9);
+    /// assert!(!matches.is_empty());
+    /// ```
+    pub fn find_similar(query: &Self, targets: &[Self], threshold: f32) -> Vec<(usize, f32)> {
+        targets
+            .iter()
+            .enumerate()
+            .filter_map(|(i, t)| {
+                let sim = query.similarity(t);
+                if sim >= threshold {
+                    Some((i, sim))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Find the top-K most similar vectors from a target set
+    ///
+    /// Unlike `k_winners` which takes pre-computed scores, this method
+    /// computes similarity inline and returns the top-K results.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let query = BinaryHV::random(0);
+    /// let targets: Vec<BinaryHV> = (1..100).map(|i| BinaryHV::random(i)).collect();
+    /// let top5 = BinaryHV::top_k_similar_in(&query, &targets, 5);
+    /// assert_eq!(top5.len(), 5);
+    /// ```
+    pub fn top_k_similar_in(query: &Self, targets: &[Self], k: usize) -> Vec<(usize, f32)> {
+        let mut scores: Vec<(usize, f32)> = targets
+            .iter()
+            .enumerate()
+            .map(|(i, t)| (i, query.similarity(t)))
+            .collect();
+
+        let k = k.min(scores.len());
+        if k == 0 {
+            return Vec::new();
+        }
+        scores.select_nth_unstable_by(k - 1, |a, b| {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        scores.truncate(k);
+        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scores
+    }
+
+    /// Batch bind: XOR all vectors with a common operand
+    ///
+    /// Useful for encoding sequences or creating associations in bulk.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
+    /// let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
+    /// let operand = BinaryHV::random(99);
+    /// let bound = BinaryHV::batch_bind(&vectors, &operand);
+    /// assert_eq!(bound.len(), 10);
+    /// ```
+    pub fn batch_bind(vectors: &[Self], operand: &Self) -> Vec<Self> {
+        vectors.iter().map(|v| v.bind(operand)).collect()
+    }
 }
 
 // Custom serde implementation for [u8; 2048] arrays
@@ -1106,22 +1206,22 @@ mod serde_arrays {
     }
 }
 
-impl std::fmt::Debug for HV16 {
+impl std::fmt::Debug for BinaryHV {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "HV16(popcount={}, first_8_bytes={:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}...)",
+        write!(f, "BinaryHV(popcount={}, first_8_bytes={:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}...)",
             self.popcount(),
             self.0[0], self.0[1], self.0[2], self.0[3],
             self.0[4], self.0[5], self.0[6], self.0[7])
     }
 }
 
-impl Default for HV16 {
+impl Default for BinaryHV {
     fn default() -> Self {
         Self::zero()
     }
 }
 
-impl std::ops::BitAnd for HV16 {
+impl std::ops::BitAnd for BinaryHV {
     type Output = Self;
 
     #[inline]
@@ -1130,16 +1230,16 @@ impl std::ops::BitAnd for HV16 {
     }
 }
 
-impl std::ops::BitAnd<&HV16> for HV16 {
+impl std::ops::BitAnd<&BinaryHV> for BinaryHV {
     type Output = Self;
 
     #[inline]
-    fn bitand(self, rhs: &HV16) -> Self {
+    fn bitand(self, rhs: &BinaryHV) -> Self {
         self.intersection(rhs)
     }
 }
 
-impl std::ops::BitOr for HV16 {
+impl std::ops::BitOr for BinaryHV {
     type Output = Self;
 
     #[inline]
@@ -1148,11 +1248,11 @@ impl std::ops::BitOr for HV16 {
     }
 }
 
-impl std::ops::BitOr<&HV16> for HV16 {
+impl std::ops::BitOr<&BinaryHV> for BinaryHV {
     type Output = Self;
 
     #[inline]
-    fn bitor(self, rhs: &HV16) -> Self {
+    fn bitor(self, rhs: &BinaryHV) -> Self {
         self.union(rhs)
     }
 }
@@ -1163,28 +1263,28 @@ mod tests {
 
     #[test]
     fn test_deterministic_random() {
-        let v1 = HV16::random(42);
-        let v2 = HV16::random(42);
+        let v1 = BinaryHV::random(42);
+        let v2 = BinaryHV::random(42);
         assert_eq!(v1, v2, "Same seed produces same vector");
 
-        let v3 = HV16::random(43);
+        let v3 = BinaryHV::random(43);
         assert_ne!(v1, v3, "Different seeds produce different vectors");
     }
 
     #[test]
     fn test_bind_properties() {
-        let a = HV16::random(1);
-        let b = HV16::random(2);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
 
         // Commutative
         assert_eq!(a.bind(&b), b.bind(&a), "Bind is commutative");
 
         // Self-inverse
         let aa = a.bind(&a);
-        assert_eq!(aa, HV16::zero(), "A ⊗ A = 0");
+        assert_eq!(aa, BinaryHV::zero(), "A ⊗ A = 0");
 
         // Identity
-        let a0 = a.bind(&HV16::zero());
+        let a0 = a.bind(&BinaryHV::zero());
         assert_eq!(a0, a, "A ⊗ 0 = A");
 
         // Unbinding works
@@ -1195,11 +1295,11 @@ mod tests {
 
     #[test]
     fn test_bundle_properties() {
-        let a = HV16::random(1);
-        let b = HV16::random(2);
-        let c = HV16::random(3);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
+        let c = BinaryHV::random(3);
 
-        let bundle = HV16::bundle(&[a, b, c]);
+        let bundle = BinaryHV::bundle(&[a, b, c]);
 
         // Similar to all inputs
         assert!(bundle.similarity(&a) > 0.5, "Bundle similar to A");
@@ -1207,14 +1307,14 @@ mod tests {
         assert!(bundle.similarity(&c) > 0.5, "Bundle similar to C");
 
         // More inputs = closer to prototype
-        let large_bundle = HV16::bundle(&vec![a; 100]);
+        let large_bundle = BinaryHV::bundle(&vec![a; 100]);
         assert!(large_bundle.similarity(&a) > 0.95, "Large bundle very close to input");
     }
 
     #[test]
     fn test_permute_for_sequences() {
-        let a = HV16::random(1);
-        let b = HV16::random(2);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
 
         // Encode "A B" sequence
         let ab = a.bind(&b.permute(1));
@@ -1229,13 +1329,13 @@ mod tests {
 
     #[test]
     fn test_similarity() {
-        let a = HV16::random(42);
+        let a = BinaryHV::random(42);
 
         // Self-similarity
         assert_eq!(a.similarity(&a), 1.0, "Self-similarity = 1.0");
 
         // Random vectors ~0.5 similarity
-        let b = HV16::random(43);
+        let b = BinaryHV::random(43);
         let sim = a.similarity(&b);
         assert!(sim > 0.45 && sim < 0.55, "Random vectors ~0.5 similarity, got {}", sim);
 
@@ -1246,12 +1346,12 @@ mod tests {
 
     #[test]
     fn test_hamming_distance() {
-        let a = HV16::random(42);
+        let a = BinaryHV::random(42);
         let b = a;
 
         assert_eq!(a.hamming_distance(&b), 0, "Same vectors have distance 0");
 
-        let c = HV16::random(43);
+        let c = BinaryHV::random(43);
         let dist = a.hamming_distance(&c);
         // 16,384 bits: random vectors should have ~8192 distance (half)
         assert!(dist > 7500 && dist < 8900, "Random vectors ~8192 distance, got {}", dist);
@@ -1263,7 +1363,7 @@ mod tests {
 
     #[test]
     fn test_noise_robustness() {
-        let original = HV16::random(42);
+        let original = BinaryHV::random(42);
 
         // 10% noise should still be recognizable
         let noisy = original.add_noise(0.1, 123);
@@ -1276,22 +1376,22 @@ mod tests {
 
     #[test]
     fn test_bipolar_conversion() {
-        let original = HV16::random(42);
+        let original = BinaryHV::random(42);
         let bipolar = original.to_bipolar();
-        let recovered = HV16::from_bipolar(&bipolar);
+        let recovered = BinaryHV::from_bipolar(&bipolar);
 
         assert_eq!(original, recovered, "Bipolar round-trip preserves vector");
     }
 
     #[test]
     fn test_popcount() {
-        let zero = HV16::zero();
+        let zero = BinaryHV::zero();
         assert_eq!(zero.popcount(), 0, "Zero vector has 0 ones");
 
-        let ones = HV16::ones();
+        let ones = BinaryHV::ones();
         assert_eq!(ones.popcount(), 16_384, "Ones vector has 16,384 ones");
 
-        let random = HV16::random(42);
+        let random = BinaryHV::random(42);
         let count = random.popcount();
         assert!(count > 7900 && count < 8500, "Random vector ~8192 ones, got {}", count);
     }
@@ -1299,12 +1399,12 @@ mod tests {
     #[test]
     fn test_memory_size() {
         use std::mem::size_of;
-        assert_eq!(size_of::<HV16>(), 2048, "HV16 is exactly 2048 bytes");
+        assert_eq!(size_of::<BinaryHV>(), 2048, "BinaryHV is exactly 2048 bytes");
 
         // Compare to Vec<f32>
         let vec_size = size_of::<Vec<f32>>() + 16_384 * size_of::<f32>();
         let improvement = vec_size as f32 / 2048.0;
-        assert!(improvement > 32.0, "HV16 is >32x smaller than Vec<f32>, actual: {}x", improvement);
+        assert!(improvement > 32.0, "BinaryHV is >32x smaller than Vec<f32>, actual: {}x", improvement);
     }
 
     #[test]
@@ -1312,8 +1412,8 @@ mod tests {
     fn test_benchmark_bind() {
         use std::time::Instant;
 
-        let a = HV16::random(1);
-        let b = HV16::random(2);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
 
         let iterations = 100_000;
         let start = Instant::now();
@@ -1341,8 +1441,8 @@ mod tests {
     fn test_benchmark_similarity() {
         use std::time::Instant;
 
-        let a = HV16::random(1);
-        let b = HV16::random(2);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
 
         let iterations = 100_000;
         let start = Instant::now();
@@ -1381,10 +1481,10 @@ mod tests {
         println!("{}", "=".repeat(80));
 
         // Create star topology: hub with 3 spokes
-        let hub = HV16::random(42);
-        let spoke1 = HV16::bind(&hub, &HV16::random(43));
-        let spoke2 = HV16::bind(&hub, &HV16::random(44));
-        let spoke3 = HV16::bind(&hub, &HV16::random(45));
+        let hub = BinaryHV::random(42);
+        let spoke1 = BinaryHV::bind(&hub, &BinaryHV::random(43));
+        let spoke2 = BinaryHV::bind(&hub, &BinaryHV::random(44));
+        let spoke3 = BinaryHV::bind(&hub, &BinaryHV::random(45));
 
         // Measure similarities
         let hub_spoke1 = hub.similarity(&spoke1);
@@ -1453,12 +1553,12 @@ mod tests {
         println!("\n🔬 TESTING: Similarity when binding SAME hub with different randoms");
         println!("{}", "=".repeat(80));
 
-        let hub = HV16::random(100);
-        let r1 = HV16::random(101);
-        let r2 = HV16::random(102);
+        let hub = BinaryHV::random(100);
+        let r1 = BinaryHV::random(101);
+        let r2 = BinaryHV::random(102);
 
-        let bound1 = HV16::bind(&hub, &r1);
-        let bound2 = HV16::bind(&hub, &r2);
+        let bound1 = BinaryHV::bind(&hub, &r1);
+        let bound2 = BinaryHV::bind(&hub, &r2);
 
         let sim_hub_bound1 = hub.similarity(&bound1);
         let sim_hub_bound2 = hub.similarity(&bound2);
@@ -1492,7 +1592,7 @@ mod tests {
         println!("\n🔬 TESTING PERMUTE HYPOTHESIS: Does PERMUTE create structure?");
         println!("{}", "=".repeat(80));
 
-        let hub = HV16::random(100);
+        let hub = BinaryHV::random(100);
 
         // Create permutations at different distances
         let perm1 = hub.permute(1);      // Shift by 1 bit
@@ -1587,7 +1687,7 @@ mod tests {
         let n = 4;
 
         // Create basis vectors for each node
-        let nodes: Vec<HV16> = (0..n).map(|i| HV16::basis(i)).collect();
+        let nodes: Vec<BinaryHV> = (0..n).map(|i| BinaryHV::basis(i)).collect();
 
         println!("✅ Created {} basis vectors for nodes", n);
 
@@ -1610,7 +1710,7 @@ mod tests {
         println!();
 
         // Create node representations by bundling incident edges
-        let mut node_hvs = vec![HV16::zero(); n];
+        let mut node_hvs = vec![BinaryHV::zero(); n];
 
         for i in 0..n {
             // Find all edges connected to node i
@@ -1626,7 +1726,7 @@ mod tests {
 
             // Node representation = bundle of incident edges
             if !incident_edges.is_empty() {
-                node_hvs[i] = HV16::bundle(&incident_edges);
+                node_hvs[i] = BinaryHV::bundle(&incident_edges);
             }
         }
 
@@ -1709,10 +1809,10 @@ mod tests {
 
     #[test]
     fn test_bundle_safe_matches_bundle() {
-        let vectors: Vec<HV16> = (0..10).map(|i| HV16::random(i)).collect();
+        let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
 
-        let safe_result = HV16::bundle_safe(&vectors);
-        let orig_result = HV16::bundle(&vectors);
+        let safe_result = BinaryHV::bundle_safe(&vectors);
+        let orig_result = BinaryHV::bundle(&vectors);
 
         // Results should be identical
         assert_eq!(safe_result, orig_result, "bundle_safe should match bundle");
@@ -1722,8 +1822,8 @@ mod tests {
     fn test_bundle_safe_no_stack_overflow() {
         // This would stack overflow with original bundle in deep recursion
         // But bundle_safe uses heap allocation
-        let vectors: Vec<HV16> = (0..1000).map(|i| HV16::random(i)).collect();
-        let result = HV16::bundle_safe(&vectors);
+        let vectors: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i)).collect();
+        let result = BinaryHV::bundle_safe(&vectors);
 
         // Should complete without stack overflow
         assert!(result.popcount() > 0, "Bundle should produce non-zero result");
@@ -1731,13 +1831,13 @@ mod tests {
 
     #[test]
     fn test_density() {
-        let zero = HV16::zero();
+        let zero = BinaryHV::zero();
         assert_eq!(zero.density(), 0.0, "Zero vector has 0% density");
 
-        let ones = HV16::ones();
+        let ones = BinaryHV::ones();
         assert_eq!(ones.density(), 1.0, "Ones vector has 100% density");
 
-        let random = HV16::random(42);
+        let random = BinaryHV::random(42);
         let density = random.density();
         assert!(density > 0.45 && density < 0.55,
                 "Random vector should have ~50% density, got {:.2}%", density * 100.0);
@@ -1745,7 +1845,7 @@ mod tests {
 
     #[test]
     fn test_ensure_density_already_balanced() {
-        let random = HV16::random(42);
+        let random = BinaryHV::random(42);
         let balanced = random.ensure_density(0.4, 0.6);
 
         // Random vectors are already balanced, should be unchanged or similar
@@ -1756,7 +1856,7 @@ mod tests {
     #[test]
     fn test_ensure_density_from_saturated() {
         // Test rebalancing from all-ones
-        let saturated = HV16::ones();
+        let saturated = BinaryHV::ones();
         let balanced = saturated.ensure_density(0.4, 0.6);
 
         let density = balanced.density();
@@ -1764,7 +1864,7 @@ mod tests {
                 "Rebalanced density should be in [0.4, 0.6], got {:.3}", density);
 
         // Test rebalancing from all-zeros
-        let empty = HV16::zero();
+        let empty = BinaryHV::zero();
         let balanced_up = empty.ensure_density(0.4, 0.6);
 
         let density_up = balanced_up.density();
@@ -1775,8 +1875,8 @@ mod tests {
     #[test]
     fn test_bundle_normalized_prevents_saturation() {
         // Bundle many identical vectors (would normally saturate)
-        let ones_vectors: Vec<HV16> = vec![HV16::ones(); 100];
-        let result = HV16::bundle_normalized(&ones_vectors);
+        let ones_vectors: Vec<BinaryHV> = vec![BinaryHV::ones(); 100];
+        let result = BinaryHV::bundle_normalized(&ones_vectors);
 
         let density = result.density();
         assert!(density >= 0.4 && density <= 0.6,
@@ -1785,7 +1885,7 @@ mod tests {
 
     #[test]
     fn test_permute_matches_legacy() {
-        let v = HV16::random(42);
+        let v = BinaryHV::random(42);
 
         // Test various shift amounts - permute (fast) should match permute_legacy
         for shift in [0, 1, 7, 8, 63, 64, 65, 127, 128, 256, 1000, 16383] {
@@ -1799,7 +1899,7 @@ mod tests {
 
     #[test]
     fn test_permute_word_aligned() {
-        let v = HV16::random(42);
+        let v = BinaryHV::random(42);
 
         // Word-aligned shifts (multiples of 64)
         for shift in [64, 128, 192, 256] {
@@ -1819,7 +1919,7 @@ mod tests {
     fn test_benchmark_permute_vs_legacy() {
         use std::time::Instant;
 
-        let v = HV16::random(42);
+        let v = BinaryHV::random(42);
         let iterations = 10_000;
 
         // Benchmark legacy permute (bit-by-bit)
@@ -1853,20 +1953,20 @@ mod tests {
     fn test_benchmark_bundle_safe() {
         use std::time::Instant;
 
-        let vectors: Vec<HV16> = (0..100).map(|i| HV16::random(i)).collect();
+        let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
         let iterations = 1_000;
 
         // Benchmark original bundle
         let start_orig = Instant::now();
         for _ in 0..iterations {
-            let _ = HV16::bundle(&vectors);
+            let _ = BinaryHV::bundle(&vectors);
         }
         let orig_time = start_orig.elapsed();
 
         // Benchmark safe bundle
         let start_safe = Instant::now();
         for _ in 0..iterations {
-            let _ = HV16::bundle_safe(&vectors);
+            let _ = BinaryHV::bundle_safe(&vectors);
         }
         let safe_time = start_safe.elapsed();
 
@@ -1886,18 +1986,18 @@ mod tests {
     // These tests verify the fundamental algebraic properties of HDC operations.
     // Failure here indicates a bug in the core implementation.
 
-    /// Test: XOR binding forms an Abelian group under HV16
+    /// Test: XOR binding forms an Abelian group under BinaryHV
     #[test]
     fn test_bind_abelian_group_properties() {
-        let a = HV16::random(100);
-        let b = HV16::random(101);
-        let c = HV16::random(102);
+        let a = BinaryHV::random(100);
+        let b = BinaryHV::random(101);
+        let c = BinaryHV::random(102);
 
         // Identity: A ⊗ 0 = A
-        assert_eq!(a.bind(&HV16::zero()), a, "Identity: A ⊗ 0 = A");
+        assert_eq!(a.bind(&BinaryHV::zero()), a, "Identity: A ⊗ 0 = A");
 
         // Self-inverse: A ⊗ A = 0
-        assert_eq!(a.bind(&a), HV16::zero(), "Self-inverse: A ⊗ A = 0");
+        assert_eq!(a.bind(&a), BinaryHV::zero(), "Self-inverse: A ⊗ A = 0");
 
         // Commutativity: A ⊗ B = B ⊗ A
         assert_eq!(a.bind(&b), b.bind(&a), "Commutativity: A ⊗ B = B ⊗ A");
@@ -1919,9 +2019,9 @@ mod tests {
     /// Test: Bind preserves Hamming distance (is an isometry)
     #[test]
     fn test_bind_preserves_distance() {
-        let a = HV16::random(200);
-        let b = HV16::random(201);
-        let key = HV16::random(202);
+        let a = BinaryHV::random(200);
+        let b = BinaryHV::random(201);
+        let key = BinaryHV::random(202);
 
         let dist_original = a.hamming_distance(&b);
         let dist_bound = a.bind(&key).hamming_distance(&b.bind(&key));
@@ -1937,8 +2037,8 @@ mod tests {
     fn test_similarity_bounds() {
         // Test with many random pairs
         for seed in 0..100 {
-            let a = HV16::random(seed);
-            let b = HV16::random(seed + 1000);
+            let a = BinaryHV::random(seed);
+            let b = BinaryHV::random(seed + 1000);
 
             let sim = a.similarity(&b);
             assert!(
@@ -1949,7 +2049,7 @@ mod tests {
         }
 
         // Self-similarity
-        let v = HV16::random(42);
+        let v = BinaryHV::random(42);
         assert_eq!(v.similarity(&v), 1.0, "Self-similarity must be 1.0");
 
         // Inverse similarity
@@ -1964,8 +2064,8 @@ mod tests {
         let mut similarities = Vec::with_capacity(n_pairs);
 
         for i in 0..n_pairs {
-            let a = HV16::random(i as u64 * 2);
-            let b = HV16::random(i as u64 * 2 + 1);
+            let a = BinaryHV::random(i as u64 * 2);
+            let b = BinaryHV::random(i as u64 * 2 + 1);
             similarities.push(a.similarity(&b));
         }
 
@@ -1989,19 +2089,19 @@ mod tests {
     /// Test: Bundle is idempotent with single input
     #[test]
     fn test_bundle_single_input() {
-        let a = HV16::random(300);
-        let bundled = HV16::bundle(&[a]);
+        let a = BinaryHV::random(300);
+        let bundled = BinaryHV::bundle(&[a]);
         assert_eq!(bundled, a, "Bundle of single vector should equal that vector");
     }
 
     /// Test: Bundle similarity to constituents
     #[test]
     fn test_bundle_similarity_properties() {
-        let a = HV16::random(400);
-        let b = HV16::random(401);
-        let c = HV16::random(402);
+        let a = BinaryHV::random(400);
+        let b = BinaryHV::random(401);
+        let c = BinaryHV::random(402);
 
-        let bundle = HV16::bundle(&[a, b, c]);
+        let bundle = BinaryHV::bundle(&[a, b, c]);
 
         // Bundle should be similar to all constituents (>0.5 for odd count)
         let sim_a = bundle.similarity(&a);
@@ -2018,20 +2118,20 @@ mod tests {
     /// Test: Permute is self-inverse with complementary amounts
     #[test]
     fn test_permute_inverse() {
-        let a = HV16::random(500);
+        let a = BinaryHV::random(500);
 
         // permute(n) followed by permute(DIM - n) should recover original
         for n in [1, 7, 100, 1000, 8192] {
             let permuted = a.permute(n);
-            let recovered = permuted.permute(HV16::DIM - n);
-            assert_eq!(recovered, a, "permute({}) then permute({}) should recover original", n, HV16::DIM - n);
+            let recovered = permuted.permute(BinaryHV::DIM - n);
+            assert_eq!(recovered, a, "permute({}) then permute({}) should recover original", n, BinaryHV::DIM - n);
         }
     }
 
     /// Test: Permute preserves Hamming weight (popcount)
     #[test]
     fn test_permute_preserves_popcount() {
-        let a = HV16::random(600);
+        let a = BinaryHV::random(600);
         let original_popcount = a.popcount();
 
         for n in [1, 7, 100, 1000, 8192] {
@@ -2046,7 +2146,7 @@ mod tests {
     /// Test: Invert is self-inverse
     #[test]
     fn test_invert_self_inverse() {
-        let a = HV16::random(700);
+        let a = BinaryHV::random(700);
         let double_inverted = a.invert().invert();
         assert_eq!(double_inverted, a, "Invert should be self-inverse");
     }
@@ -2064,22 +2164,22 @@ mod tests {
     /// k ⊗ (a ⊕ b) = k ⊕ a ⊕ b ≠ (k ⊕ a) ⊕ (k ⊕ b) = a ⊕ b
     #[test]
     fn test_bind_bundle_distributivity_majority() {
-        let a = HV16::random(800);
-        let b = HV16::random(801);
-        let c = HV16::random(803);
-        let k = HV16::random(802);
+        let a = BinaryHV::random(800);
+        let b = BinaryHV::random(801);
+        let c = BinaryHV::random(803);
+        let k = BinaryHV::random(802);
 
         // With 3 inputs (odd count), bundle uses majority vote
         // XOR distributes over majority: k ⊗ maj(a,b,c) = maj(k⊗a, k⊗b, k⊗c)
-        let left3 = k.bind(&HV16::bundle(&[a, b, c]));
-        let right3 = HV16::bundle(&[k.bind(&a), k.bind(&b), k.bind(&c)]);
+        let left3 = k.bind(&BinaryHV::bundle(&[a, b, c]));
+        let right3 = BinaryHV::bundle(&[k.bind(&a), k.bind(&b), k.bind(&c)]);
         assert_eq!(left3, right3, "Bind distributes over 3-element majority bundle");
 
         // Test with 5 elements too
-        let d = HV16::random(804);
-        let e = HV16::random(805);
-        let left5 = k.bind(&HV16::bundle(&[a, b, c, d, e]));
-        let right5 = HV16::bundle(&[k.bind(&a), k.bind(&b), k.bind(&c), k.bind(&d), k.bind(&e)]);
+        let d = BinaryHV::random(804);
+        let e = BinaryHV::random(805);
+        let left5 = k.bind(&BinaryHV::bundle(&[a, b, c, d, e]));
+        let right5 = BinaryHV::bundle(&[k.bind(&a), k.bind(&b), k.bind(&c), k.bind(&d), k.bind(&e)]);
         assert_eq!(left5, right5, "Bind distributes over 5-element majority bundle");
     }
 
@@ -2095,13 +2195,13 @@ mod tests {
     /// k ⊗ (a ∧ b) ≠ (k ⊗ a) ∧ (k ⊗ b) in general
     #[test]
     fn test_even_bundle_bind_non_distributivity() {
-        let a = HV16::random(810);
-        let b = HV16::random(811);
-        let k = HV16::random(812);
+        let a = BinaryHV::random(810);
+        let b = BinaryHV::random(811);
+        let k = BinaryHV::random(812);
 
         // 2-element bundle acts like AND (majority vote with 2 inputs)
-        let left = k.bind(&HV16::bundle(&[a, b]));
-        let right = HV16::bundle(&[k.bind(&a), k.bind(&b)]);
+        let left = k.bind(&BinaryHV::bundle(&[a, b]));
+        let right = BinaryHV::bundle(&[k.bind(&a), k.bind(&b)]);
 
         // XOR does NOT distribute over AND, so these should differ
         // (with high probability for random vectors)
@@ -2109,8 +2209,8 @@ mod tests {
 
         // Verify that 2-element bundle is indeed AND-like
         // bundle([a,b]) should have ~25% density (intersection of two ~50% vectors)
-        let bundle_ab = HV16::bundle(&[a, b]);
-        let density = bundle_ab.popcount() as f64 / HV16::DIM as f64;
+        let bundle_ab = BinaryHV::bundle(&[a, b]);
+        let density = bundle_ab.popcount() as f64 / BinaryHV::DIM as f64;
         assert!(density > 0.15 && density < 0.35,
             "2-element bundle density should be ~0.25 (AND-like), got {:.3}", density);
     }
@@ -2122,27 +2222,27 @@ mod tests {
     #[test]
     fn test_weighted_bundle_basic() {
         // Equal weights should match regular bundle
-        let a = HV16::random(1);
-        let b = HV16::random(2);
-        let c = HV16::random(3);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
+        let c = BinaryHV::random(3);
 
-        let regular = HV16::bundle(&[a, b, c]);
-        let weighted = HV16::weighted_bundle(&[a, b, c], &[1.0, 1.0, 1.0]);
+        let regular = BinaryHV::bundle(&[a, b, c]);
+        let weighted = BinaryHV::weighted_bundle(&[a, b, c], &[1.0, 1.0, 1.0]);
 
         assert_eq!(regular, weighted, "Equal weights should match regular bundle");
 
         // weighted_bundle_safe should also match
-        let weighted_safe = HV16::weighted_bundle_safe(&[a, b, c], &[1.0, 1.0, 1.0]);
+        let weighted_safe = BinaryHV::weighted_bundle_safe(&[a, b, c], &[1.0, 1.0, 1.0]);
         assert_eq!(regular, weighted_safe, "weighted_bundle_safe with equal weights should match bundle");
     }
 
     #[test]
     fn test_weighted_bundle_dominance() {
-        let a = HV16::random(10);
-        let b = HV16::random(11);
+        let a = BinaryHV::random(10);
+        let b = BinaryHV::random(11);
 
         // Give 'a' a very high weight so it dominates
-        let result = HV16::weighted_bundle(&[a, b], &[100.0, 1.0]);
+        let result = BinaryHV::weighted_bundle(&[a, b], &[100.0, 1.0]);
 
         let sim_a = result.similarity(&a);
         let sim_b = result.similarity(&b);
@@ -2153,8 +2253,8 @@ mod tests {
 
     #[test]
     fn test_intersection_basic() {
-        let a = HV16::random(20);
-        let b = HV16::random(21);
+        let a = BinaryHV::random(20);
+        let b = BinaryHV::random(21);
 
         let inter = a.intersection(&b);
         let density = inter.density();
@@ -2164,7 +2264,7 @@ mod tests {
                 "Intersection density should be ~0.25, got {:.4}", density);
 
         // Every set bit in the intersection must be set in both inputs
-        for i in 0..HV16::DIM {
+        for i in 0..BinaryHV::DIM {
             if inter.get_bit(i) == 1 {
                 assert_eq!(a.get_bit(i), 1, "Intersection bit {} set but not in a", i);
                 assert_eq!(b.get_bit(i), 1, "Intersection bit {} set but not in b", i);
@@ -2174,8 +2274,8 @@ mod tests {
 
     #[test]
     fn test_union_basic() {
-        let a = HV16::random(30);
-        let b = HV16::random(31);
+        let a = BinaryHV::random(30);
+        let b = BinaryHV::random(31);
 
         let uni = a.union(&b);
         let density = uni.density();
@@ -2185,7 +2285,7 @@ mod tests {
                 "Union density should be ~0.75, got {:.4}", density);
 
         // Every set bit in either input must be set in the union
-        for i in 0..HV16::DIM {
+        for i in 0..BinaryHV::DIM {
             if a.get_bit(i) == 1 || b.get_bit(i) == 1 {
                 assert_eq!(uni.get_bit(i), 1, "Union bit {} should be set", i);
             }
@@ -2194,7 +2294,7 @@ mod tests {
 
     #[test]
     fn test_cosine_similarity_range() {
-        let a = HV16::random(40);
+        let a = BinaryHV::random(40);
 
         // Identical: cosine = 1.0
         let cos_self = a.cosine_similarity(&a);
@@ -2206,14 +2306,14 @@ mod tests {
         assert!((cos_inv - (-1.0)).abs() < 1e-6, "Cosine with inverse should be -1.0, got {}", cos_inv);
 
         // Random: cosine ~ 0.0
-        let b = HV16::random(41);
+        let b = BinaryHV::random(41);
         let cos_random = a.cosine_similarity(&b);
         assert!(cos_random.abs() < 0.1, "Cosine of random vectors should be ~0.0, got {}", cos_random);
     }
 
     #[test]
     fn test_thin_density() {
-        let dense = HV16::random(50);
+        let dense = BinaryHV::random(50);
         assert!(dense.density() > 0.45);  // Starts ~50%
 
         let sparse = dense.thin(0.1, 99);
@@ -2226,7 +2326,7 @@ mod tests {
                 "Thin to 0.1 should produce density > 0.03, got {:.4}", density);
 
         // Thinned vector should be a subset of the original
-        for i in 0..HV16::DIM {
+        for i in 0..BinaryHV::DIM {
             if sparse.get_bit(i) == 1 {
                 assert_eq!(dense.get_bit(i), 1,
                            "Thin bit {} set but not in original", i);
@@ -2236,11 +2336,11 @@ mod tests {
 
     #[test]
     fn test_ngram_order_sensitive() {
-        let a = HV16::random(60);
-        let b = HV16::random(61);
+        let a = BinaryHV::random(60);
+        let b = BinaryHV::random(61);
 
-        let ab = HV16::ngram(&[a, b]);
-        let ba = HV16::ngram(&[b, a]);
+        let ab = BinaryHV::ngram(&[a, b]);
+        let ba = BinaryHV::ngram(&[b, a]);
 
         // Different orders should produce different results
         assert_ne!(ab, ba, "ngram([a,b]) should differ from ngram([b,a])");
@@ -2251,7 +2351,7 @@ mod tests {
 
     #[test]
     fn test_fractional_power_endpoints() {
-        let base = HV16::random(70);
+        let base = BinaryHV::random(70);
         let seed = 999u64;
 
         // exponent=0 should return self
@@ -2260,13 +2360,13 @@ mod tests {
 
         // exponent=1 should return the random target
         let at_one = base.fractional_power(1.0, seed);
-        let target = HV16::random(seed);
+        let target = BinaryHV::random(seed);
         assert_eq!(at_one, target, "fractional_power(1) should return the target");
     }
 
     #[test]
     fn test_fractional_power_monotonic() {
-        let base = HV16::random(80);
+        let base = BinaryHV::random(80);
         let seed = 888u64;
 
         let sim_025 = base.similarity(&base.fractional_power(0.25, seed));
@@ -2290,26 +2390,26 @@ mod tests {
             (4, 0.1),
         ];
 
-        let top3 = HV16::k_winners(&sims, 3);
+        let top3 = BinaryHV::k_winners(&sims, 3);
         assert_eq!(top3.len(), 3, "Should return exactly 3 winners");
         assert_eq!(top3[0].0, 0, "First winner should be index 0 (sim=0.9)");
         assert_eq!(top3[1].0, 2, "Second winner should be index 2 (sim=0.7)");
         assert_eq!(top3[2].0, 3, "Third winner should be index 3 (sim=0.5)");
 
         // k > len should return all
-        let top10 = HV16::k_winners(&sims, 10);
+        let top10 = BinaryHV::k_winners(&sims, 10);
         assert_eq!(top10.len(), 5, "k > len should return all entries");
 
         // k=1 should return just the best
-        let top1 = HV16::k_winners(&sims, 1);
+        let top1 = BinaryHV::k_winners(&sims, 1);
         assert_eq!(top1.len(), 1);
         assert_eq!(top1[0].0, 0);
     }
 
     #[test]
     fn test_bitand_trait() {
-        let a = HV16::random(90);
-        let b = HV16::random(91);
+        let a = BinaryHV::random(90);
+        let b = BinaryHV::random(91);
 
         let trait_result = a & b;
         let method_result = a.intersection(&b);
@@ -2323,8 +2423,8 @@ mod tests {
 
     #[test]
     fn test_bitor_trait() {
-        let a = HV16::random(92);
-        let b = HV16::random(93);
+        let a = BinaryHV::random(92);
+        let b = BinaryHV::random(93);
 
         let trait_result = a | b;
         let method_result = a.union(&b);
@@ -2335,4 +2435,117 @@ mod tests {
         let trait_ref_result = a | &b;
         assert_eq!(trait_ref_result, method_result, "a | &b should match a.union(&b)");
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Phase 1 tests: New batch methods and SIMD bundle dispatch
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_bind_inplace() {
+        let a = BinaryHV::random(300);
+        let b = BinaryHV::random(301);
+        let expected = a.bind(&b);
+
+        let mut a_mut = a;
+        a_mut.bind_inplace(&b);
+        assert_eq!(a_mut, expected, "bind_inplace should equal bind()");
+    }
+
+    #[test]
+    fn test_batch_similarity() {
+        let query = BinaryHV::random(400);
+        let targets: Vec<BinaryHV> = (1..50).map(|i| BinaryHV::random(400 + i)).collect();
+
+        let batch_sims = BinaryHV::batch_similarity(&query, &targets);
+
+        assert_eq!(batch_sims.len(), targets.len());
+        for (i, &sim) in batch_sims.iter().enumerate() {
+            let individual = query.similarity(&targets[i]);
+            assert!(
+                (sim - individual).abs() < 1e-6,
+                "batch_similarity[{}] = {} != individual {} ",
+                i, sim, individual
+            );
+        }
+    }
+
+    #[test]
+    fn test_find_similar() {
+        let query = BinaryHV::random(500);
+        let mut targets: Vec<BinaryHV> = (1..50).map(|i| BinaryHV::random(500 + i)).collect();
+        targets.push(query); // Add exact match at index 49
+
+        let matches = BinaryHV::find_similar(&query, &targets, 0.9);
+
+        // At minimum, the exact match should be found
+        assert!(
+            matches.iter().any(|&(idx, sim)| idx == 49 && sim == 1.0),
+            "find_similar should find the exact match"
+        );
+
+        // No match should be below threshold
+        for &(_idx, sim) in &matches {
+            assert!(sim >= 0.9, "All matches should be >= threshold");
+        }
+    }
+
+    #[test]
+    fn test_top_k_similar_in() {
+        let query = BinaryHV::random(600);
+        let mut targets: Vec<BinaryHV> = (1..50).map(|i| BinaryHV::random(600 + i)).collect();
+        // Add two exact matches
+        targets.push(query);
+        targets.push(query);
+
+        let top5 = BinaryHV::top_k_similar_in(&query, &targets, 5);
+
+        assert_eq!(top5.len(), 5);
+        // Top 2 should be perfect matches
+        assert_eq!(top5[0].1, 1.0, "First result should be exact match");
+        assert_eq!(top5[1].1, 1.0, "Second result should be exact match");
+        // Results should be sorted descending
+        for w in top5.windows(2) {
+            assert!(w[0].1 >= w[1].1, "Results should be sorted descending");
+        }
+    }
+
+    #[test]
+    fn test_batch_bind() {
+        let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(700 + i)).collect();
+        let operand = BinaryHV::random(799);
+
+        let batch = BinaryHV::batch_bind(&vectors, &operand);
+
+        assert_eq!(batch.len(), vectors.len());
+        for (i, bound) in batch.iter().enumerate() {
+            let expected = vectors[i].bind(&operand);
+            assert_eq!(*bound, expected, "batch_bind[{}] should match individual bind", i);
+        }
+    }
+
+    #[test]
+    fn test_bundle_simd_dispatch() {
+        // Verify bundle() still produces correct results after SIMD wiring
+        let a = BinaryHV::random(800);
+        let b = BinaryHV::random(801);
+        let c = BinaryHV::random(802);
+
+        let bundled = BinaryHV::bundle(&[a, b, c]);
+
+        // Bundle should be similar to all inputs
+        assert!(bundled.similarity(&a) > 0.5, "Bundle should be similar to A");
+        assert!(bundled.similarity(&b) > 0.5, "Bundle should be similar to B");
+        assert!(bundled.similarity(&c) > 0.5, "Bundle should be similar to C");
+
+        // Bundle of identical vectors should return that vector
+        let same_bundle = BinaryHV::bundle(&[a, a, a]);
+        assert_eq!(same_bundle, a, "Bundle of identical vectors should be that vector");
+
+        // Empty bundle should return zero
+        let empty = BinaryHV::bundle(&[]);
+        assert_eq!(empty, BinaryHV::zero(), "Bundle of empty slice should be zero");
+    }
 }
+
+/// Backward-compatible alias: `HV16` is now `BinaryHV`.
+pub type HV16 = BinaryHV;

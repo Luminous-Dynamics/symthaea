@@ -41,7 +41,7 @@
 //! 5. **Gradient learning** discovers optimal connectivity over time
 //! 6. **Temporal coherence** maintains continuous experience
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::spectral_connectivity::ConnectivityCalculator;
 use super::adaptive_topology::{AdaptiveTopology, CognitiveMode};
 use super::fractal_consciousness::{FractalConsciousness, FractalConfig};
@@ -251,7 +251,7 @@ impl UnifiedConsciousnessEngine {
     /// consciousness metric that considers all active processes.
     fn compute_unified_phi(&self) -> f64 {
         // Gather all process state representations from the adaptive topology
-        let representations: Vec<RealHV> = self.adaptive
+        let representations: Vec<ContinuousHV> = self.adaptive
             .organizer()
             .processes()
             .values()
@@ -263,7 +263,7 @@ impl UnifiedConsciousnessEngine {
     }
 
     /// Process an input and update consciousness state
-    pub fn process(&mut self, input: &RealHV) -> ConsciousnessUpdate {
+    pub fn process(&mut self, input: &ContinuousHV) -> ConsciousnessUpdate {
         self.step += 1;
 
         // 1. Activate adaptive topology
@@ -564,7 +564,7 @@ mod tests {
 
         println!("\nProcessing cycle:");
         for i in 0..10 {
-            let input = RealHV::random(1024, i as u64 * 100);
+            let input = ContinuousHV::random(1024, i as u64 * 100);
             let update = engine.process(&input);
             println!("  {}", update);
         }
@@ -594,7 +594,7 @@ mod tests {
             CognitiveMode::GlobalAwareness,
         ] {
             engine.set_mode(*mode);
-            let input = RealHV::random(1024, 42);
+            let input = ContinuousHV::random(1024, 42);
             let update = engine.process(&input);
 
             println!("  {:?}: Φ={:.4}, bridges={:.1}%",
@@ -609,7 +609,7 @@ mod tests {
 
         // Process some inputs
         for i in 0..5 {
-            let input = RealHV::random(2048, i);
+            let input = ContinuousHV::random(2048, i);
             engine.process(&input);
         }
 
@@ -617,7 +617,7 @@ mod tests {
         println!("Signature 1: {}", sig1);
 
         // Process more
-        let input = RealHV::random(2048, 999);
+        let input = ContinuousHV::random(2048, 999);
         engine.process(&input);
 
         let sig2 = engine.signature();
@@ -638,7 +638,7 @@ mod tests {
 
         // Fill buffer
         for i in 0..30 {
-            let input = RealHV::random(2048, i);
+            let input = ContinuousHV::random(2048, i);
             engine.process(&input);
         }
 

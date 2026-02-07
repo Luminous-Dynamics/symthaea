@@ -513,7 +513,7 @@ pub struct ComparisonResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::binary_hv::HV16;
+    use crate::hdc::binary_hv::BinaryHV;
 
     fn create_test_state(conscious: bool) -> ConsciousnessState {
         use crate::hdc::consciousness_integration::*;
@@ -530,7 +530,7 @@ mod tests {
             state.flow_stability = 0.7;
 
             state.conscious_contents.push(WorkspaceItem {
-                content: HV16::random(1),
+                content: BinaryHV::random(1),
                 activation: 0.9,
                 source: "Test".to_string(),
                 duration_ms: 100,
@@ -543,7 +543,7 @@ mod tests {
                 intensity: 0.9,
                 confidence: 0.8,
                 order: 2,
-                representation: HV16::random(2),
+                representation: BinaryHV::random(2),
             });
         }
 

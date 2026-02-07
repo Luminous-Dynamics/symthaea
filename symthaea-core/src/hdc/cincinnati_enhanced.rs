@@ -248,7 +248,7 @@ impl MultiScaleCincinnatiLTC {
         }
 
         // Adaptive weight update (reduce weight of branches with higher error)
-        if self.observations % 20 == 0 && self.observations > 50 {
+        if self.observations.is_multiple_of(20) && self.observations > 50 {
             self.update_weights();
         }
 
@@ -508,7 +508,7 @@ impl EnhancedCycleDetector {
         }
 
         // Recompute autocorrelation periodically
-        if self.history.len() >= 20 && self.history.len() % 10 == 0 {
+        if self.history.len() >= 20 && self.history.len().is_multiple_of(10) {
             self.compute_autocorrelation();
             self.detect_period_enhanced();
         }

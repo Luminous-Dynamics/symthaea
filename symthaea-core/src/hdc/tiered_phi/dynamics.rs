@@ -7,7 +7,7 @@
 //! - **Temporal Dynamics**: Track consciousness evolution over time, detect phase transitions
 //! - **Attractor Analysis**: Model consciousness as a dynamical system with attractor states
 
-// Note: HV16 and TieredPhi/ApproximationTier are available via super if needed
+// Note: BinaryHV and TieredPhi/ApproximationTier are available via super if needed
 
 /// Configuration for Φ dynamics tracking
 #[derive(Debug, Clone)]
@@ -313,7 +313,7 @@ impl PhiDynamics {
 
         PhiTrend {
             direction,
-            strength: r_squared.max(0.0).min(1.0),
+            strength: r_squared.clamp(0.0, 1.0),
             predicted_next,
         }
     }
@@ -864,11 +864,10 @@ impl PhiAttractor {
         for i in 1..trajectory.len() - 1 {
             let is_local_min = trajectory[i] < trajectory[i - 1] && trajectory[i] < trajectory[i + 1];
             let is_local_max = trajectory[i] > trajectory[i - 1] && trajectory[i] > trajectory[i + 1];
-            if is_local_min || is_local_max {
-                if (trajectory[i] - final_phi).abs() > tolerance {
+            if (is_local_min || is_local_max)
+                && (trajectory[i] - final_phi).abs() > tolerance {
                     neighbors.push(trajectory[i]);
                 }
-            }
         }
 
         neighbors.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -904,7 +903,7 @@ impl PhiAttractor {
             phi += gradient * self.config.time_step + noise;
 
             // Keep in valid range
-            phi = phi.max(0.0).min(1.0);
+            phi = phi.clamp(0.0, 1.0);
 
             // Check convergence
             if (phi - target_phi).abs() < self.config.convergence_threshold {

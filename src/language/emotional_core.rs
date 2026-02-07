@@ -6,7 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::binary_hv::HV16;
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
@@ -59,7 +59,7 @@ pub struct EmotionalAnalysis {
     /// All emotion scores
     pub emotion_scores: HashMap<String, f32>,
     /// Emotional embedding
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
 }
 
 /// Primitive grounding for emotions using NSM semantic primes
@@ -172,7 +172,7 @@ impl EmotionalAnalysis {
             arousal: 0.5,
             dominance: 0.5,
             emotion_scores: HashMap::new(),
-            embedding: RealHV::zero(dimension),
+            embedding: ContinuousHV::zero(dimension),
         }
     }
 }
@@ -187,7 +187,7 @@ pub struct EmotionalResponse {
     /// Achieved emotional intensity
     pub intensity: f32,
     /// Embedding of response
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
 }
 
 /// The emotional core system
@@ -195,8 +195,8 @@ pub struct EmotionalResponse {
 pub struct EmotionalCore {
     /// Configuration
     config: EmotionalCoreConfig,
-    /// Emotion embeddings (RealHV for continuous operations)
-    emotion_embeddings: HashMap<String, RealHV>,
+    /// Emotion embeddings (ContinuousHV for continuous operations)
+    emotion_embeddings: HashMap<String, ContinuousHV>,
     /// Primitive-grounded emotions (NSM semantic primes)
     primitive_groundings: HashMap<String, EmotionPrimitiveGrounding>,
     /// Emotional memory (recent states)
@@ -233,17 +233,17 @@ impl EmotionalCore {
         let mut emotion_embeddings = HashMap::new();
         for emotion in &config.categories {
             let embedding = if let Some(grounding) = primitive_groundings.get(emotion) {
-                // Use primitive encoding to seed the RealHV, ensuring grounding
+                // Use primitive encoding to seed the ContinuousHV, ensuring grounding
                 let seed = grounding.primitive_encoding.popcount() as u64;
-                RealHV::random(dim, 0xE0C0_0000 + seed)
+                ContinuousHV::random(dim, 0xE0C0_0000 + seed)
             } else {
                 // Fallback for unknown emotions
                 let seed = 0xE0C0_DEAD;
-                RealHV::random(dim, seed)
+                ContinuousHV::random(dim, seed)
             };
             emotion_embeddings.insert(emotion.clone(), embedding);
         }
-        emotion_embeddings.insert("neutral".to_string(), RealHV::zero(dim));
+        emotion_embeddings.insert("neutral".to_string(), ContinuousHV::zero(dim));
 
         Self {
             current_state: EmotionalAnalysis::neutral(dim),
@@ -328,7 +328,7 @@ impl EmotionalCore {
         let embedding = if let Some(emb) = self.emotion_embeddings.get(&primary_emotion) {
             emb.clone().scale(confidence.max(0.1))
         } else {
-            RealHV::zero(self.config.dimension)
+            ContinuousHV::zero(self.config.dimension)
         };
 
         let analysis = EmotionalAnalysis {
@@ -366,7 +366,7 @@ impl EmotionalCore {
         // Get emotion embedding
         let emotion_emb = self.emotion_embeddings.get(target_emotion)
             .cloned()
-            .unwrap_or_else(|| RealHV::random(self.config.dimension, 0xFA11_BACC));  // Fallback seed
+            .unwrap_or_else(|| ContinuousHV::random(self.config.dimension, 0xFA11_BACC));  // Fallback seed
 
         // Simple emotion modifiers
         let modifiers: HashMap<&str, Vec<&str>> = [
@@ -406,7 +406,7 @@ impl EmotionalCore {
     }
 
     /// Get emotion embedding
-    pub fn emotion_embedding(&self, emotion: &str) -> Option<&RealHV> {
+    pub fn emotion_embedding(&self, emotion: &str) -> Option<&ContinuousHV> {
         self.emotion_embeddings.get(emotion)
     }
 

@@ -1,6 +1,6 @@
 //! # HDC Compatibility Layer
 //!
-//! Provides interoperability between legacy HV16/RealHV types and
+//! Provides interoperability between legacy BinaryHV/ContinuousHV types and
 //! the new unified ContinuousHV/BinaryHV types.
 //!
 //! ## Purpose
@@ -22,18 +22,18 @@
 //!
 //! ```rust,ignore
 //! use symthaea::hdc::compat::HVCompat;
-//! use symthaea::hdc::{HV16, ContinuousHV};
+//! use symthaea::hdc::{BinaryHV, ContinuousHV};
 //!
-//! // Convert HV16 to ContinuousHV
-//! let binary = HV16::random(42);
+//! // Convert BinaryHV to ContinuousHV
+//! let binary = BinaryHV::random(42);
 //! let continuous = binary.to_continuous_hv();
 //!
 //! // Convert back
 //! let back = HVCompat::from_continuous(&continuous);
 //! ```
 
-use crate::hdc::binary_hv::HV16;
-use crate::hdc::unified_hv::{ContinuousHV, BinaryHV};
+use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::config::hdc_dim;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -42,12 +42,12 @@ use crate::hdc::config::hdc_dim;
 
 /// Trait for compatibility conversions between HV types
 ///
-/// Implemented by legacy types (HV16) for conversion to/from unified types.
+/// Implemented by legacy types (BinaryHV) for conversion to/from unified types.
 pub trait HVCompat: Sized {
     /// Convert to ContinuousHV (unified continuous type)
     fn to_continuous_hv(&self) -> ContinuousHV;
 
-    /// Convert to BinaryHV (unified binary type)
+    /// Convert to BinaryHV (binary type)
     fn to_binary_hv(&self) -> BinaryHV;
 
     /// Create from ContinuousHV
@@ -58,13 +58,13 @@ pub trait HVCompat: Sized {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HV16 COMPATIBILITY
+// BinaryHV COMPATIBILITY
 // ═══════════════════════════════════════════════════════════════════════════════
 
-impl HVCompat for HV16 {
+impl HVCompat for BinaryHV {
     fn to_continuous_hv(&self) -> ContinuousHV {
         let target_dim = hdc_dim();
-        let source_dim = HV16::DIM;
+        let source_dim = BinaryHV::DIM;
 
         if target_dim == source_dim {
             // Direct conversion: each bit → ±1.0
@@ -80,41 +80,31 @@ impl HVCompat for HV16 {
     }
 
     fn to_binary_hv(&self) -> BinaryHV {
-        // Direct conversion - HV16 and BinaryHV have same internal structure
-        BinaryHV::from_bytes(self.0.to_vec())
+        // Identity — already BinaryHV
+        *self
     }
 
     fn from_continuous(hv: &ContinuousHV) -> Self {
         let source_dim = hv.dim();
-        let target_dim = HV16::DIM;
+        let target_dim = BinaryHV::DIM;
 
         if source_dim == target_dim {
             // Direct conversion: threshold at 0
-            HV16::from_bipolar(&hv.values)
+            BinaryHV::from_bipolar(&hv.values)
         } else if source_dim > target_dim {
-            // Downsample to HV16 dimension
+            // Downsample to BinaryHV dimension
             let downsampled = downsample_continuous(hv, target_dim);
-            HV16::from_bipolar(&downsampled.values)
+            BinaryHV::from_bipolar(&downsampled.values)
         } else {
-            // Upsample to HV16 dimension
+            // Upsample to BinaryHV dimension
             let upsampled = upsample_continuous(hv, target_dim);
-            HV16::from_bipolar(&upsampled.values)
+            BinaryHV::from_bipolar(&upsampled.values)
         }
     }
 
     fn from_binary(hv: &BinaryHV) -> Self {
-        // Ensure dimension matches
-        if hv.dim() == HV16::DIM {
-            let mut bytes = [0u8; 2048];
-            let src = hv.as_bytes();
-            let copy_len = src.len().min(2048);
-            bytes[..copy_len].copy_from_slice(&src[..copy_len]);
-            HV16(bytes)
-        } else {
-            // Need to resize
-            let continuous = hv.to_continuous();
-            Self::from_continuous(&continuous)
-        }
+        // Identity — already BinaryHV
+        *hv
     }
 }
 
@@ -122,15 +112,15 @@ impl HVCompat for HV16 {
 // DIMENSION CONVERSION UTILITIES
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Expand HV16 to target dimension using bit replication + hashing
-fn expand_to_dimension(hv: &HV16, target_dim: usize) -> ContinuousHV {
-    let source_dim = HV16::DIM;
+/// Expand BinaryHV to target dimension using bit replication + hashing
+fn expand_to_dimension(hv: &BinaryHV, target_dim: usize) -> ContinuousHV {
+    let source_dim = BinaryHV::DIM;
     let expansion_factor = target_dim / source_dim;
     let remainder = target_dim % source_dim;
 
     let mut values = Vec::with_capacity(target_dim);
 
-    // Get bipolar values from HV16
+    // Get bipolar values from BinaryHV
     let bipolar = hv.to_bipolar();
 
     // Replicate each value `expansion_factor` times with slight variation
@@ -154,9 +144,9 @@ fn expand_to_dimension(hv: &HV16, target_dim: usize) -> ContinuousHV {
     ContinuousHV::from_vec(values).normalize()
 }
 
-/// Compress HV16 to target dimension using majority voting
-fn compress_to_dimension(hv: &HV16, target_dim: usize) -> ContinuousHV {
-    let source_dim = HV16::DIM;
+/// Compress BinaryHV to target dimension using majority voting
+fn compress_to_dimension(hv: &BinaryHV, target_dim: usize) -> ContinuousHV {
+    let source_dim = BinaryHV::DIM;
     let compression_factor = source_dim / target_dim;
 
     let mut values = Vec::with_capacity(target_dim);
@@ -241,18 +231,18 @@ fn hash_variation(bit_idx: usize, replica_idx: usize, seed: usize) -> f32 {
 // BRIDGE FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Bridge HV16 to ContinuousHV at the configured dimension
+/// Bridge BinaryHV to ContinuousHV at the configured dimension
 ///
 /// This is the primary function for STT → Core conversion.
-pub fn hv16_to_core(hv: &HV16) -> ContinuousHV {
+pub fn hv16_to_core(hv: &BinaryHV) -> ContinuousHV {
     hv.to_continuous_hv()
 }
 
-/// Bridge ContinuousHV to HV16 (lossy compression)
+/// Bridge ContinuousHV to BinaryHV (lossy compression)
 ///
 /// This is the primary function for Core → STT conversion.
-pub fn core_to_hv16(hv: &ContinuousHV) -> HV16 {
-    HV16::from_continuous(hv)
+pub fn core_to_hv16(hv: &ContinuousHV) -> BinaryHV {
+    BinaryHV::from_continuous(hv)
 }
 
 /// Bridge with similarity preservation check
@@ -285,9 +275,9 @@ mod tests {
 
     #[test]
     fn test_hv16_to_continuous_roundtrip() {
-        let original = HV16::random(42);
+        let original = BinaryHV::random(42);
         let continuous = original.to_continuous_hv();
-        let back = HV16::from_continuous(&continuous);
+        let back = BinaryHV::from_continuous(&continuous);
 
         // Should be identical (same dimension, threshold conversion)
         let original_bipolar = original.to_bipolar();
@@ -310,33 +300,21 @@ mod tests {
 
     #[test]
     fn test_hv16_to_binary_hv() {
-        let hv16 = HV16::random(42);
+        let hv16 = BinaryHV::random(42);
         let binary = hv16.to_binary_hv();
 
-        // Same dimension
-        assert_eq!(binary.dim(), HV16::DIM);
-
-        // Same bits
-        for i in 0..100 {
-            let hv16_bit = hv16.get_bit(i);
-            let binary_bit = if binary.get_bipolar(i) == 1 { 1 } else { 0 };
-            assert_eq!(
-                hv16_bit,
-                binary_bit,
-                "Mismatch at bit {}",
-                i
-            );
-        }
+        // Identity — should be the same BinaryHV
+        assert_eq!(hv16, binary);
     }
 
     #[test]
     fn test_continuous_similarity_preservation() {
-        let a = HV16::random(42);
-        let b = HV16::random(43);
+        let a = BinaryHV::random(42);
+        let b = BinaryHV::random(43);
 
-        // HV16::similarity returns matching_bits/total_bits in [0, 1] where 0.5 = orthogonal
+        // BinaryHV::similarity returns matching_bits/total_bits in [0, 1] where 0.5 = orthogonal
         // ContinuousHV::similarity returns cosine similarity in [-1, 1] where 0 = orthogonal
-        // Convert HV16 similarity to bipolar scale: sim_bipolar = 2*sim - 1
+        // Convert BinaryHV similarity to bipolar scale: sim_bipolar = 2*sim - 1
         let original_sim = a.similarity(&b);
         let original_bipolar = original_sim * 2.0 - 1.0;
 
@@ -349,7 +327,7 @@ mod tests {
         let diff = (original_bipolar - converted_sim).abs();
         assert!(
             diff < 0.2,
-            "Similarity changed too much: bipolar {} vs continuous {} (original HV16: {})",
+            "Similarity changed too much: bipolar {} vs continuous {} (original BinaryHV: {})",
             original_bipolar,
             converted_sim,
             original_sim
@@ -373,13 +351,13 @@ mod tests {
 
     #[test]
     fn test_bridge_functions() {
-        let hv16 = HV16::random(42);
+        let hv16 = BinaryHV::random(42);
 
         let core = hv16_to_core(&hv16);
         assert_eq!(core.dim(), hdc_dim());
 
         let back = core_to_hv16(&core);
-        assert_eq!(back.0.len() * 8, HV16::DIM);
+        assert_eq!(back.0.len() * 8, BinaryHV::DIM);
     }
 
     #[test]

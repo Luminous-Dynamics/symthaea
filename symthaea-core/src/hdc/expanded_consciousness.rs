@@ -97,7 +97,7 @@
 //! 6. **Wisdom Traditions Validated**: Meditation maps correspond to brain states
 //! 7. **Consciousness Development Path**: Clear progression from ordinary to expanded
 
-use crate::hdc::HV16;
+use crate::hdc::BinaryHV;
 use serde::{Deserialize, Serialize};
 
 /// Type of expanded consciousness state
@@ -389,7 +389,7 @@ pub struct ExpandedConsciousness {
     config: ExpandedConfig,
 
     /// Current consciousness state (hypervector representation)
-    state: Vec<HV16>,
+    state: Vec<BinaryHV>,
 
     /// Current gamma power
     gamma: f64,
@@ -423,7 +423,7 @@ impl ExpandedConsciousness {
     pub fn with_config(num_components: usize, config: ExpandedConfig) -> Self {
         // Initialize with ordinary consciousness state
         let state = (0..num_components)
-            .map(|i| HV16::random(1000 + i as u64))
+            .map(|i| BinaryHV::random(1000 + i as u64))
             .collect();
 
         Self {

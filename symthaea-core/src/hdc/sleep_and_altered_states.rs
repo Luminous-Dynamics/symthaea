@@ -45,7 +45,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::hdc::HV16;
+use crate::hdc::BinaryHV;
 
 // ============================================================================
 // Sleep Stages
@@ -645,7 +645,7 @@ pub struct AlteredStateAssessment {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DreamFragment {
     /// Semantic content (HDC-encoded concept)
-    pub content_hv: HV16,
+    pub content_hv: BinaryHV,
 
     /// Human-readable description of the fragment
     pub description: String,
@@ -763,7 +763,7 @@ pub enum DreamType {
 /// Uses HDC operations to create bizarre associations characteristic of dreams
 pub struct DreamGenerator {
     /// Base concepts for dream generation (semantic memory seeds)
-    concept_seeds: Vec<(String, HV16)>,
+    concept_seeds: Vec<(String, BinaryHV)>,
 
     /// Emotional state influences dream content
     emotional_bias: f64,
@@ -780,21 +780,21 @@ impl DreamGenerator {
     pub fn new(seed: u64) -> Self {
         // Pre-generate some universal dream concept seeds
         let concept_seeds = vec![
-            ("movement".to_string(), HV16::random(seed + 100)),
-            ("emotion".to_string(), HV16::random(seed + 101)),
-            ("person".to_string(), HV16::random(seed + 102)),
-            ("place".to_string(), HV16::random(seed + 103)),
-            ("object".to_string(), HV16::random(seed + 104)),
-            ("action".to_string(), HV16::random(seed + 105)),
-            ("transformation".to_string(), HV16::random(seed + 106)),
-            ("impossibility".to_string(), HV16::random(seed + 107)),
-            ("memory".to_string(), HV16::random(seed + 108)),
-            ("fear".to_string(), HV16::random(seed + 109)),
-            ("desire".to_string(), HV16::random(seed + 110)),
-            ("falling".to_string(), HV16::random(seed + 111)),
-            ("flying".to_string(), HV16::random(seed + 112)),
-            ("chasing".to_string(), HV16::random(seed + 113)),
-            ("lost".to_string(), HV16::random(seed + 114)),
+            ("movement".to_string(), BinaryHV::random(seed + 100)),
+            ("emotion".to_string(), BinaryHV::random(seed + 101)),
+            ("person".to_string(), BinaryHV::random(seed + 102)),
+            ("place".to_string(), BinaryHV::random(seed + 103)),
+            ("object".to_string(), BinaryHV::random(seed + 104)),
+            ("action".to_string(), BinaryHV::random(seed + 105)),
+            ("transformation".to_string(), BinaryHV::random(seed + 106)),
+            ("impossibility".to_string(), BinaryHV::random(seed + 107)),
+            ("memory".to_string(), BinaryHV::random(seed + 108)),
+            ("fear".to_string(), BinaryHV::random(seed + 109)),
+            ("desire".to_string(), BinaryHV::random(seed + 110)),
+            ("falling".to_string(), BinaryHV::random(seed + 111)),
+            ("flying".to_string(), BinaryHV::random(seed + 112)),
+            ("chasing".to_string(), BinaryHV::random(seed + 113)),
+            ("lost".to_string(), BinaryHV::random(seed + 114)),
         ];
 
         Self {
@@ -828,8 +828,8 @@ impl DreamGenerator {
         // Weak binding = more bizarre associations
         let combined_hv = if self.binding_strength < 0.5 {
             // Bizarre: XOR binding with noise
-            let noise = HV16::random(fragment_seed + 1000);
-            HV16::bundle(&[hv1.bind(hv2), noise])
+            let noise = BinaryHV::random(fragment_seed + 1000);
+            BinaryHV::bundle(&[hv1.bind(hv2), noise])
         } else {
             // More coherent binding
             hv1.bind(hv2)
@@ -850,7 +850,7 @@ impl DreamGenerator {
         // Determine source type
         let source = if bizarreness > 0.7 {
             DreamFragmentSource::BizarreBinding
-        } else if fragment_seed % 3 == 0 {
+        } else if fragment_seed.is_multiple_of(3) {
             DreamFragmentSource::MemoryReplay
         } else if fragment_seed % 3 == 1 {
             DreamFragmentSource::RandomActivation
@@ -965,12 +965,12 @@ impl DreamGenerator {
     }
 
     /// Add external memories to concept seeds for memory replay
-    pub fn add_memory_seed(&mut self, name: String, hv: HV16) {
+    pub fn add_memory_seed(&mut self, name: String, hv: BinaryHV) {
         self.concept_seeds.push((name, hv));
     }
 
     /// Add multiple memory seeds from recent experiences
-    pub fn add_memory_seeds(&mut self, memories: Vec<(String, HV16)>) {
+    pub fn add_memory_seeds(&mut self, memories: Vec<(String, BinaryHV)>) {
         self.concept_seeds.extend(memories);
     }
 }

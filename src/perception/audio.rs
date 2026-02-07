@@ -22,7 +22,7 @@
 //!          │ Phoneme sequence
 //!          ▼
 //! ┌─────────────────┐
-//! │ Bridge to Core  │ ← HV16 → RealHV conversion
+//! │ Bridge to Core  │ ← HV16 → ContinuousHV conversion
 //! │                 │
 //! └────────┬────────┘
 //!          │

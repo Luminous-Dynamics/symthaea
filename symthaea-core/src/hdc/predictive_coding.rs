@@ -15,14 +15,14 @@
 // - Continuous-valued prediction errors
 //
 // **Revolutionary HDC Approach**:
-// - Binary predictions and errors using HV16
+// - Binary predictions and errors using BinaryHV
 // - Similarity as "confidence" / inverse surprise
 // - Hierarchical layers with bundling
 // - Active inference via causal encoder integration
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -37,12 +37,12 @@ use std::collections::VecDeque;
 /// # Example
 /// ```ignore
 /// use symthaea::hdc::predictive_coding::PredictiveCoding;
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let mut predictor = PredictiveCoding::new(3); // 3 layers
 ///
 /// // Observe sensory input
-/// let observation = HV16::random(42);
+/// let observation = BinaryHV::random(42);
 /// let (prediction, error) = predictor.predict_and_update(&observation);
 ///
 /// // Prediction error should decrease over time
@@ -55,15 +55,15 @@ pub struct PredictiveCoding {
 
     /// Current representations at each layer
     /// layer[0] = sensory input, layer[N-1] = high-level concepts
-    layers: Vec<HV16>,
+    layers: Vec<BinaryHV>,
 
     /// Top-down predictions for each layer
     /// predictions[i] predicts layers[i]
-    predictions: Vec<HV16>,
+    predictions: Vec<BinaryHV>,
 
     /// Bottom-up prediction errors for each layer
     /// errors[i] = layers[i] - predictions[i]
-    errors: Vec<HV16>,
+    errors: Vec<BinaryHV>,
 
     /// Learning rate (how much to update based on error)
     learning_rate: f32,
@@ -95,13 +95,13 @@ impl PredictiveCoding {
         assert!(num_layers >= 2, "Need at least 2 layers");
 
         // Initialize random representations
-        let layers: Vec<HV16> = (0..num_layers)
-            .map(|i| HV16::random((1000 + i) as u64))
+        let layers: Vec<BinaryHV> = (0..num_layers)
+            .map(|i| BinaryHV::random((1000 + i) as u64))
             .collect();
 
         let predictions = layers.clone();
-        let errors: Vec<HV16> = (0..num_layers)
-            .map(|i| HV16::random((2000 + i) as u64))
+        let errors: Vec<BinaryHV> = (0..num_layers)
+            .map(|i| BinaryHV::random((2000 + i) as u64))
             .collect();
 
         // Default precision: higher layers more precise (more abstract = more confident)
@@ -130,7 +130,7 @@ impl PredictiveCoding {
     /// 2. Propagate error up hierarchy
     /// 3. Update representations to minimize error
     /// 4. Generate new predictions for next time
-    pub fn predict_and_update(&mut self, observation: &HV16) -> (HV16, f64) {
+    pub fn predict_and_update(&mut self, observation: &BinaryHV) -> (BinaryHV, f64) {
         // 1. Compute prediction error at layer 0 (sensory)
         self.errors[0] = self.compute_error(observation, &self.predictions[0]);
 
@@ -171,7 +171,7 @@ impl PredictiveCoding {
     ///
     /// In HDC: error = observation ⊕ prediction (XOR = difference)
     /// Similarity measures "confidence" - high sim = low error
-    fn compute_error(&self, observation: &HV16, prediction: &HV16) -> HV16 {
+    fn compute_error(&self, observation: &BinaryHV, prediction: &BinaryHV) -> BinaryHV {
         // XOR gives us the "difference" vector
         // High similarity = low surprise = low error
         observation.bind(prediction)
@@ -182,10 +182,10 @@ impl PredictiveCoding {
     /// Weighted combination of bottom-up input and top-down prediction
     fn update_representation(
         &self,
-        bottom_up: &HV16,
-        top_down: &HV16,
+        bottom_up: &BinaryHV,
+        top_down: &BinaryHV,
         layer: usize,
-    ) -> HV16 {
+    ) -> BinaryHV {
         let precision = self.precisions[layer];
 
         // Bundle bottom-up and top-down with precision weighting
@@ -210,13 +210,13 @@ impl PredictiveCoding {
         }
 
         // Bundle into consensus
-        HV16::bundle(&components)
+        BinaryHV::bundle(&components)
     }
 
     /// Generate top-down prediction from higher layer
     ///
     /// Higher-level representation generates expectation for lower level
-    fn generate_prediction(&self, higher_representation: &HV16, _target_layer: usize) -> HV16 {
+    fn generate_prediction(&self, higher_representation: &BinaryHV, _target_layer: usize) -> BinaryHV {
         // In simple model: higher layer representation IS the prediction
         // (Could add learned transformations here)
         *higher_representation
@@ -286,17 +286,17 @@ impl PredictiveCoding {
     }
 
     /// Get representation at specific layer
-    pub fn get_layer(&self, layer: usize) -> Option<&HV16> {
+    pub fn get_layer(&self, layer: usize) -> Option<&BinaryHV> {
         self.layers.get(layer)
     }
 
     /// Get prediction at specific layer
-    pub fn get_prediction(&self, layer: usize) -> Option<&HV16> {
+    pub fn get_prediction(&self, layer: usize) -> Option<&BinaryHV> {
         self.predictions.get(layer)
     }
 
     /// Get prediction error at specific layer
-    pub fn get_error(&self, layer: usize) -> Option<&HV16> {
+    pub fn get_error(&self, layer: usize) -> Option<&BinaryHV> {
         self.errors.get(layer)
     }
 
@@ -315,12 +315,12 @@ impl PredictiveCoding {
 /// # Example
 /// ```ignore
 /// use symthaea::hdc::predictive_coding::ActiveInference;
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let mut agent = ActiveInference::new(3);
 ///
 /// // Set goal state
-/// let goal = HV16::random(123);
+/// let goal = BinaryHV::random(123);
 /// agent.set_goal(&goal);
 ///
 /// // Select action to achieve goal
@@ -333,14 +333,14 @@ pub struct ActiveInference {
     predictor: PredictiveCoding,
 
     /// Goal state (desired sensory outcome)
-    goal: Option<HV16>,
+    goal: Option<BinaryHV>,
 
     /// Available actions (motor commands)
-    actions: Vec<HV16>,
+    actions: Vec<BinaryHV>,
 
     /// Expected outcomes for each action
     /// outcome_models[i] = predicted observation after actions[i]
-    outcome_models: Vec<HV16>,
+    outcome_models: Vec<BinaryHV>,
 
     /// History of selected actions
     action_history: VecDeque<usize>,
@@ -363,12 +363,12 @@ impl ActiveInference {
     }
 
     /// Set goal state (desired sensory outcome)
-    pub fn set_goal(&mut self, goal: &HV16) {
+    pub fn set_goal(&mut self, goal: &BinaryHV) {
         self.goal = Some(*goal);
     }
 
     /// Add possible action with expected outcome
-    pub fn add_action(&mut self, action: HV16, expected_outcome: HV16) {
+    pub fn add_action(&mut self, action: BinaryHV, expected_outcome: BinaryHV) {
         self.actions.push(action);
         self.outcome_models.push(expected_outcome);
     }
@@ -409,7 +409,7 @@ impl ActiveInference {
     }
 
     /// Process observation after action
-    pub fn observe(&mut self, observation: &HV16) -> f64 {
+    pub fn observe(&mut self, observation: &BinaryHV) -> f64 {
         let (_prediction, free_energy) = self.predictor.predict_and_update(observation);
         free_energy
     }
@@ -417,11 +417,11 @@ impl ActiveInference {
     /// Update outcome model based on experience
     ///
     /// After taking action[i] and observing result, update expected outcome
-    pub fn update_outcome_model(&mut self, action_idx: usize, observed_outcome: &HV16) {
+    pub fn update_outcome_model(&mut self, action_idx: usize, observed_outcome: &BinaryHV) {
         if action_idx < self.outcome_models.len() {
             // Simple update: blend old model with new observation
             let old_model = self.outcome_models[action_idx];
-            let updated = HV16::bundle(&[old_model, *observed_outcome]);
+            let updated = BinaryHV::bundle(&[old_model, *observed_outcome]);
             self.outcome_models[action_idx] = updated;
         }
     }
@@ -453,7 +453,7 @@ mod tests {
     #[test]
     fn test_predict_and_update() {
         let mut pc = PredictiveCoding::new(3);
-        let obs = HV16::random(42);
+        let obs = BinaryHV::random(42);
 
         let (prediction, energy) = pc.predict_and_update(&obs);
 
@@ -472,7 +472,7 @@ mod tests {
         let mut pc = PredictiveCoding::new(3);
 
         // Present same observation repeatedly
-        let obs = HV16::random(42);
+        let obs = BinaryHV::random(42);
 
         let mut energies = Vec::new();
         for _ in 0..20 {
@@ -496,7 +496,7 @@ mod tests {
     #[test]
     fn test_is_learning() {
         let mut pc = PredictiveCoding::new(3);
-        let obs = HV16::random(42);
+        let obs = BinaryHV::random(42);
 
         // Initially not learning (not enough history)
         assert!(!pc.is_learning());
@@ -551,7 +551,7 @@ mod tests {
     #[test]
     fn test_goal_setting() {
         let mut agent = ActiveInference::new(3);
-        let goal = HV16::random(123);
+        let goal = BinaryHV::random(123);
 
         agent.set_goal(&goal);
         assert!(agent.goal.is_some());
@@ -561,15 +561,15 @@ mod tests {
     #[test]
     fn test_action_selection() {
         let mut agent = ActiveInference::new(3);
-        let goal = HV16::random(123);
+        let goal = BinaryHV::random(123);
 
         agent.set_goal(&goal);
 
         // Add actions with different expected outcomes
-        let action1 = HV16::random(1);
-        let outcome1 = HV16::random(10); // Random outcome
+        let action1 = BinaryHV::random(1);
+        let outcome1 = BinaryHV::random(10); // Random outcome
 
-        let action2 = HV16::random(2);
+        let action2 = BinaryHV::random(2);
         let outcome2 = goal; // Outcome matches goal!
 
         agent.add_action(action1, outcome1);
@@ -586,13 +586,13 @@ mod tests {
     fn test_outcome_model_update() {
         let mut agent = ActiveInference::new(3);
 
-        let action = HV16::random(1);
-        let initial_outcome = HV16::random(10);
+        let action = BinaryHV::random(1);
+        let initial_outcome = BinaryHV::random(10);
 
         agent.add_action(action, initial_outcome);
 
         // Update outcome model based on observation
-        let observed = HV16::random(20);
+        let observed = BinaryHV::random(20);
         agent.update_outcome_model(0, &observed);
 
         // Model should be updated (not equal to initial)
@@ -602,7 +602,7 @@ mod tests {
     #[test]
     fn test_observe() {
         let mut agent = ActiveInference::new(3);
-        let obs = HV16::random(42);
+        let obs = BinaryHV::random(42);
 
         let energy = agent.observe(&obs);
 
@@ -613,11 +613,11 @@ mod tests {
     #[test]
     fn test_action_history() {
         let mut agent = ActiveInference::new(3);
-        let goal = HV16::random(123);
+        let goal = BinaryHV::random(123);
 
         agent.set_goal(&goal);
-        agent.add_action(HV16::random(1), HV16::random(10));
-        agent.add_action(HV16::random(2), HV16::random(20));
+        agent.add_action(BinaryHV::random(1), BinaryHV::random(10));
+        agent.add_action(BinaryHV::random(2), BinaryHV::random(20));
 
         // Select action multiple times
         for _ in 0..5 {
@@ -631,7 +631,7 @@ mod tests {
     #[test]
     fn test_free_energy_decreases_with_repeated_observation() {
         let mut pc = PredictiveCoding::new(4);
-        let obs = HV16::random(999);
+        let obs = BinaryHV::random(999);
 
         let mut measurements = Vec::new();
 

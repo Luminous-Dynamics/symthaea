@@ -6,7 +6,7 @@
 //! # Revolutionary Properties
 //!
 //! - **Quantitative consciousness**: Φ value measures integration
-//! - **Real-time computation**: HV16 makes Φ practical (<1ms with binary vectors)
+//! - **Real-time computation**: BinaryHV makes Φ practical (<1ms with binary vectors)
 //! - **Compositional**: Works with any HDC system structure
 //! - **Information-theoretic**: Rigorous mathematical foundation
 //! - **Experimentally validated**: Correlates with conscious states in neuroscience
@@ -45,24 +45,24 @@
 //! - Minimum information partition (MIP)
 //!
 //! Our HDC adaptation uses:
-//! - Hypervector states (continuous in space, but binary in HV16)
+//! - Hypervector states (continuous in space, but binary in BinaryHV)
 //! - Similarity-based partitioning
 //! - Efficient approximations for real-time computation
 //!
 //! # Examples
 //!
 //! ```ignore
-//! use symthaea::hdc::{HV16, IntegratedInformation};
+//! use symthaea::hdc::{BinaryHV, IntegratedInformation};
 //!
 //! // Create Φ calculator
 //! let mut phi = IntegratedInformation::new();
 //!
 //! // Define a system state (e.g., current consciousness state)
 //! let state = vec![
-//!     HV16::random(1), // Sensory input
-//!     HV16::random(2), // Working memory
-//!     HV16::random(3), // Attention
-//!     HV16::random(4), // Motor planning
+//!     BinaryHV::random(1), // Sensory input
+//!     BinaryHV::random(2), // Working memory
+//!     BinaryHV::random(3), // Attention
+//!     BinaryHV::random(4), // Motor planning
 //! ];
 //!
 //! // Compute Φ
@@ -75,7 +75,7 @@
 //! }
 //! ```
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use crate::observability::{SharedObserver, PhiComponents, PhiMeasurementEvent};
 
@@ -95,7 +95,7 @@ use crate::observability::{SharedObserver, PhiComponents, PhiMeasurementEvent};
 ///
 /// # Performance
 ///
-/// With HV16:
+/// With BinaryHV:
 /// - 4-component system: ~10 μs (debug), ~1 μs (release)
 /// - 8-component system: ~40 μs (debug), ~4 μs (release)
 /// - 16-component system: ~160 μs (debug), ~16 μs (release)
@@ -228,7 +228,7 @@ impl IntegratedInformation {
     fn compute_phi_components(
         &self,
         phi: f64,
-        components: &[HV16],
+        components: &[BinaryHV],
         system_info: f64,
         mip_info: f64,
     ) -> PhiComponents {
@@ -320,13 +320,13 @@ impl IntegratedInformation {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::{HV16, IntegratedInformation};
+    /// # use symthaea::hdc::{BinaryHV, IntegratedInformation};
     /// let mut phi = IntegratedInformation::new();
-    /// let state = vec![HV16::random(1), HV16::random(2), HV16::random(3)];
+    /// let state = vec![BinaryHV::random(1), BinaryHV::random(2), BinaryHV::random(3)];
     /// let phi_value = phi.compute_phi(&state);
     /// assert!(phi_value >= 0.0);
     /// ```
-    pub fn compute_phi(&mut self, components: &[HV16]) -> f64 {
+    pub fn compute_phi(&mut self, components: &[BinaryHV]) -> f64 {
         let _start_time = std::time::Instant::now();
 
         if components.len() < 2 {
@@ -420,13 +420,13 @@ impl IntegratedInformation {
     /// - Fast estimate correlates strongly (r > 0.9) with full IIT phi
     /// - May underestimate for highly integrated systems
     /// - Sufficient for relative comparisons and gradient tracking
-    pub fn compute_phi_fast(components: &[HV16]) -> f64 {
+    pub fn compute_phi_fast(components: &[BinaryHV]) -> f64 {
         if components.len() < 2 {
             return 0.0;
         }
 
-        // Bundle all components into system state using HV16::bundle
-        let bundled = HV16::bundle(components);
+        // Bundle all components into system state using BinaryHV::bundle
+        let bundled = BinaryHV::bundle(components);
 
         // Measure integration via distinctiveness
         // High integration = bundled state is distinct from parts
@@ -458,14 +458,14 @@ impl IntegratedInformation {
         // Normalize by component count (more components = potentially higher phi)
         let normalized = raw_phi * (components.len() as f64).sqrt() / 2.0;
 
-        normalized.min(1.0).max(0.0)
+        normalized.clamp(0.0, 1.0)
     }
 
     /// Compute information content of entire system
     ///
     /// Information = how much the current state constrains possibilities
     /// In HDC: measured by distinctiveness of the bundled state
-    fn system_information(&self, components: &[HV16]) -> f64 {
+    fn system_information(&self, components: &[BinaryHV]) -> f64 {
         if components.is_empty() {
             return 0.0;
         }
@@ -493,7 +493,7 @@ impl IntegratedInformation {
     ///
     /// For N components, there are 2^(N-1) - 1 non-trivial partitions.
     /// We use heuristic search for N > 8 to keep computation tractable.
-    fn find_mip(&mut self, components: &[HV16]) -> (Partition, f64) {
+    fn find_mip(&mut self, components: &[BinaryHV]) -> (Partition, f64) {
         let n = components.len();
 
         if n == 2 {
@@ -517,7 +517,7 @@ impl IntegratedInformation {
     }
 
     /// Exhaustive MIP search for small systems (N ≤ 8)
-    fn exhaustive_mip_search(&self, components: &[HV16]) -> (Partition, f64) {
+    fn exhaustive_mip_search(&self, components: &[BinaryHV]) -> (Partition, f64) {
         let n = components.len();
         let mut min_info = f64::MAX;
         let mut mip = Partition {
@@ -571,7 +571,7 @@ impl IntegratedInformation {
     /// Heuristic MIP search for large systems (N > 8)
     ///
     /// Uses similarity-based clustering to find likely partitions
-    fn heuristic_mip_search(&self, components: &[HV16]) -> (Partition, f64) {
+    fn heuristic_mip_search(&self, components: &[BinaryHV]) -> (Partition, f64) {
         let n = components.len();
 
         // Try a few heuristic partitions:
@@ -624,7 +624,7 @@ impl IntegratedInformation {
     }
 
     /// Partition components by similarity (clustering)
-    fn similarity_partition(&self, components: &[HV16]) -> (Vec<usize>, Vec<usize>) {
+    fn similarity_partition(&self, components: &[BinaryHV]) -> (Vec<usize>, Vec<usize>) {
         if components.len() < 2 {
             return (vec![0], vec![]);
         }
@@ -661,7 +661,7 @@ impl IntegratedInformation {
     ///
     /// This is the sum of information in each partition separately.
     /// The difference from total system information is the integration.
-    fn partition_information(&self, components: &[HV16], partition: &Partition) -> f64 {
+    fn partition_information(&self, components: &[BinaryHV], partition: &Partition) -> f64 {
         let mut part_a_components = Vec::new();
         let mut part_b_components = Vec::new();
 
@@ -688,12 +688,12 @@ impl IntegratedInformation {
     }
 
     /// Bundle multiple components into single state
-    fn bundle_components(&self, components: &[HV16]) -> HV16 {
+    fn bundle_components(&self, components: &[BinaryHV]) -> BinaryHV {
         if components.is_empty() {
-            return HV16::random(0);
+            return BinaryHV::random(0);
         }
 
-        HV16::bundle(components)
+        BinaryHV::bundle(components)
     }
 
     /// Classify consciousness state based on Φ value
@@ -777,7 +777,7 @@ mod tests {
     #[test]
     fn test_single_component_no_integration() {
         let mut phi_calc = IntegratedInformation::new();
-        let component = vec![HV16::random(1)];
+        let component = vec![BinaryHV::random(1)];
 
         let phi = phi_calc.compute_phi(&component);
         assert_eq!(phi, 0.0, "Single component should have Φ = 0");
@@ -786,7 +786,7 @@ mod tests {
     #[test]
     fn test_two_components_basic() {
         let mut phi_calc = IntegratedInformation::new();
-        let components = vec![HV16::random(1), HV16::random(2)];
+        let components = vec![BinaryHV::random(1), BinaryHV::random(2)];
 
         let phi = phi_calc.compute_phi(&components);
         assert!(phi >= 0.0, "Φ should be non-negative");
@@ -798,10 +798,10 @@ mod tests {
         let mut phi_calc = IntegratedInformation::new();
 
         // Create an integrated system (components that interact)
-        let base = HV16::random(1);
+        let base = BinaryHV::random(1);
         let comp1 = base;
-        let comp2 = base.bind(&HV16::random(2)); // Related to comp1
-        let comp3 = base.bind(&HV16::random(3)); // Related to comp1
+        let comp2 = base.bind(&BinaryHV::random(2)); // Related to comp1
+        let comp3 = base.bind(&BinaryHV::random(3)); // Related to comp1
 
         let components = vec![comp1, comp2, comp3];
         let phi = phi_calc.compute_phi(&components);
@@ -822,10 +822,10 @@ mod tests {
 
         // Create independent components (no interaction)
         let components = vec![
-            HV16::random(1),
-            HV16::random(2),
-            HV16::random(3),
-            HV16::random(4),
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+            BinaryHV::random(3),
+            BinaryHV::random(4),
         ];
 
         let phi = phi_calc.compute_phi(&components);
@@ -853,18 +853,18 @@ mod tests {
 
         // Test 1: Independent components
         let independent = vec![
-            HV16::random(1),
-            HV16::random(2),
-            HV16::random(3),
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+            BinaryHV::random(3),
         ];
         let phi_independent = phi_calc.compute_phi(&independent);
 
         // Test 2: Highly correlated components
-        let base = HV16::random(10);
+        let base = BinaryHV::random(10);
         let correlated = vec![
             base,
-            base.bind(&HV16::random(11)),
-            base.bind(&HV16::random(12)),
+            base.bind(&BinaryHV::random(11)),
+            base.bind(&BinaryHV::random(12)),
         ];
         let phi_correlated = phi_calc.compute_phi(&correlated);
 
@@ -885,7 +885,7 @@ mod tests {
         let mut phi_calc = IntegratedInformation::new();
 
         // 8-component system (tests exhaustive search)
-        let components: Vec<HV16> = (0..8).map(|i| HV16::random(i as u64)).collect();
+        let components: Vec<BinaryHV> = (0..8).map(|i| BinaryHV::random(i as u64)).collect();
 
         let phi = phi_calc.compute_phi(&components);
         println!("8-component system Φ = {:.3}", phi);
@@ -899,7 +899,7 @@ mod tests {
         let mut phi_calc = IntegratedInformation::new();
 
         // 16-component system (tests heuristic search)
-        let components: Vec<HV16> = (0..16).map(|i| HV16::random(i as u64)).collect();
+        let components: Vec<BinaryHV> = (0..16).map(|i| BinaryHV::random(i as u64)).collect();
 
         let phi = phi_calc.compute_phi(&components);
         println!("16-component system Φ = {:.3}", phi);
@@ -911,7 +911,7 @@ mod tests {
     fn test_history_tracking() {
         let mut phi_calc = IntegratedInformation::new();
 
-        let components = vec![HV16::random(1), HV16::random(2)];
+        let components = vec![BinaryHV::random(1), BinaryHV::random(2)];
 
         // Compute Φ multiple times
         phi_calc.compute_phi(&components);
@@ -932,7 +932,7 @@ mod tests {
         let mut phi_calc = IntegratedInformation::with_threshold(0.3);
 
         // Low integration
-        let low = vec![HV16::random(1), HV16::random(2)];
+        let low = vec![BinaryHV::random(1), BinaryHV::random(2)];
         phi_calc.compute_phi(&low);
 
         // Check if integrated
@@ -946,14 +946,14 @@ mod tests {
         use std::time::Instant;
 
         let mut phi_calc = IntegratedInformation::new();
-        let components: Vec<HV16> = (0..4).map(|i| HV16::random(i as u64)).collect();
+        let components: Vec<BinaryHV> = (0..4).map(|i| BinaryHV::random(i as u64)).collect();
 
         let start = Instant::now();
         let _phi = phi_calc.compute_phi(&components);
         let duration = start.elapsed();
 
         println!("4-component Φ computed in {:?}", duration);
-        // Should be very fast with HV16
+        // Should be very fast with BinaryHV
         assert!(duration.as_millis() < 100, "Should compute in <100ms (debug mode)");
     }
 
@@ -962,9 +962,9 @@ mod tests {
         let mut phi_calc = IntegratedInformation::new();
 
         let components = vec![
-            HV16::random(1),
-            HV16::random(2),
-            HV16::random(3),
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+            BinaryHV::random(3),
         ];
 
         phi_calc.compute_phi(&components);

@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Configuration for visual cortex
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,9 +35,9 @@ impl Default for VisualCortexConfig {
 #[derive(Debug, Clone)]
 pub struct FeatureExtractionResult {
     /// Extracted features per layer
-    pub layer_features: Vec<RealHV>,
+    pub layer_features: Vec<ContinuousHV>,
     /// Final aggregated features
-    pub final_features: RealHV,
+    pub final_features: ContinuousHV,
     /// Attention maps (if enabled)
     pub attention_maps: Option<Vec<Vec<f32>>>,
     /// Processing stats
@@ -50,7 +50,7 @@ pub struct VisualCortex {
     /// Configuration
     config: VisualCortexConfig,
     /// Layer filters
-    layer_filters: Vec<Vec<RealHV>>,
+    layer_filters: Vec<Vec<ContinuousHV>>,
     /// Attention weights
     attention_weights: Vec<f32>,
     /// Statistics
@@ -75,8 +75,8 @@ impl VisualCortex {
         let mut layer_filters = Vec::with_capacity(config.layers);
         for layer in 0..config.layers {
             let num_filters = 2usize.pow((layer + 2) as u32).min(64);
-            let filters: Vec<RealHV> = (0..num_filters)
-                .map(|i| RealHV::random(dim, (layer * 1000 + i) as u64))
+            let filters: Vec<ContinuousHV> = (0..num_filters)
+                .map(|i| ContinuousHV::random(dim, (layer * 1000 + i) as u64))
                 .collect();
             layer_filters.push(filters);
         }
@@ -104,10 +104,10 @@ impl VisualCortex {
         let mut layer_filters = Vec::with_capacity(config.layers);
         for _layer in 0..config.layers {
             let num_filters = 2usize.pow((_layer + 2) as u32).min(64);
-            let filters: Vec<RealHV> = (0..num_filters)
+            let filters: Vec<ContinuousHV> = (0..num_filters)
                 .map(|_| {
                     let seed: u64 = rand::Rng::gen(&mut rng);
-                    RealHV::random(dim, seed)
+                    ContinuousHV::random(dim, seed)
                 })
                 .collect();
             layer_filters.push(filters);
@@ -124,7 +124,7 @@ impl VisualCortex {
     }
 
     /// Process visual input through the cortex
-    pub fn process(&mut self, input: &RealHV) -> FeatureExtractionResult {
+    pub fn process(&mut self, input: &ContinuousHV) -> FeatureExtractionResult {
         let start = std::time::Instant::now();
         self.stats.total_operations += 1;
 
@@ -174,37 +174,37 @@ impl VisualCortex {
     }
 
     /// Process through a single layer
-    fn process_layer(&self, input: &RealHV, filters: &[RealHV], _layer_idx: usize) -> RealHV {
+    fn process_layer(&self, input: &ContinuousHV, filters: &[ContinuousHV], _layer_idx: usize) -> ContinuousHV {
         // Apply filters and aggregate
-        let filter_outputs: Vec<RealHV> = filters.iter()
+        let filter_outputs: Vec<ContinuousHV> = filters.iter()
             .map(|filter| input.bind(filter))
             .collect();
 
         if filter_outputs.is_empty() {
             input.clone()
         } else {
-            RealHV::bundle(&filter_outputs)
+            ContinuousHV::bundle_owned(&filter_outputs)
         }
     }
 
     /// Aggregate features from all layers
-    fn aggregate_features(&self, layer_features: &[RealHV]) -> RealHV {
+    fn aggregate_features(&self, layer_features: &[ContinuousHV]) -> ContinuousHV {
         if layer_features.is_empty() {
-            return RealHV::zeros(self.config.dimension);
+            return ContinuousHV::zeros(self.config.dimension);
         }
 
         // Weighted sum based on attention weights
-        let mut result = RealHV::zeros(self.config.dimension);
+        let mut result = ContinuousHV::zeros(self.config.dimension);
         for (feat, &weight) in layer_features.iter().zip(self.attention_weights.iter()) {
             let weighted = feat.scale(weight);
-            result = RealHV::bundle(&[result, weighted]);
+            result = ContinuousHV::bundle_owned(&[result, weighted]);
         }
 
         result
     }
 
     /// Generate attention maps
-    fn generate_attention_maps(&self, layer_features: &[RealHV]) -> Vec<Vec<f32>> {
+    fn generate_attention_maps(&self, layer_features: &[ContinuousHV]) -> Vec<Vec<f32>> {
         layer_features.iter()
             .map(|feat| {
                 // Simple attention based on feature magnitudes
@@ -244,7 +244,7 @@ pub struct VisualFeatureExtractor {
     /// Dimension
     dimension: usize,
     /// Feature bases
-    feature_bases: HashMap<String, RealHV>,
+    feature_bases: HashMap<String, ContinuousHV>,
 }
 
 impl VisualFeatureExtractor {
@@ -254,7 +254,7 @@ impl VisualFeatureExtractor {
 
         // Initialize bases for common visual features
         for feature in ["edge", "color", "texture", "shape", "motion", "depth"] {
-            feature_bases.insert(feature.to_string(), RealHV::random(dimension));
+            feature_bases.insert(feature.to_string(), ContinuousHV::random(dimension));
         }
 
         Self {
@@ -264,7 +264,7 @@ impl VisualFeatureExtractor {
     }
 
     /// Extract features from raw visual data
-    pub fn extract(&self, data: &[u8]) -> HashMap<String, RealHV> {
+    pub fn extract(&self, data: &[u8]) -> HashMap<String, ContinuousHV> {
         let mut features = HashMap::new();
 
         // Extract pseudo-features (would use real CV in production)
@@ -277,7 +277,7 @@ impl VisualFeatureExtractor {
     }
 
     /// Extract a specific feature type
-    fn extract_feature_type(&self, data: &[u8], basis: &RealHV) -> RealHV {
+    fn extract_feature_type(&self, data: &[u8], basis: &ContinuousHV) -> ContinuousHV {
         // Simple hash-based feature extraction
         let mut values = vec![0.0f32; self.dimension];
 
@@ -294,7 +294,7 @@ impl VisualFeatureExtractor {
             }
         }
 
-        let data_hv = RealHV::from_slice(&values);
+        let data_hv = ContinuousHV::from_slice(&values);
         data_hv.bind(basis)
     }
 }
@@ -311,11 +311,11 @@ pub struct VisualAttention {
     /// Dimension
     dimension: usize,
     /// Query transform
-    query_transform: RealHV,
+    query_transform: ContinuousHV,
     /// Key transform
-    key_transform: RealHV,
+    key_transform: ContinuousHV,
     /// Value transform
-    value_transform: RealHV,
+    value_transform: ContinuousHV,
 }
 
 impl VisualAttention {
@@ -323,14 +323,14 @@ impl VisualAttention {
     pub fn new(dimension: usize) -> Self {
         Self {
             dimension,
-            query_transform: RealHV::random(dimension),
-            key_transform: RealHV::random(dimension),
-            value_transform: RealHV::random(dimension),
+            query_transform: ContinuousHV::random(dimension),
+            key_transform: ContinuousHV::random(dimension),
+            value_transform: ContinuousHV::random(dimension),
         }
     }
 
     /// Apply attention to features
-    pub fn attend(&self, query: &RealHV, keys: &[RealHV], values: &[RealHV]) -> RealHV {
+    pub fn attend(&self, query: &ContinuousHV, keys: &[ContinuousHV], values: &[ContinuousHV]) -> ContinuousHV {
         if keys.is_empty() || values.is_empty() || keys.len() != values.len() {
             return query.clone();
         }
@@ -353,7 +353,7 @@ impl VisualAttention {
         let attention_weights: Vec<f32> = exp_scores.iter().map(|e| e / sum_exp).collect();
 
         // Weighted sum of values
-        let mut result = RealHV::zeros(self.dimension);
+        let mut result = ContinuousHV::zeros(self.dimension);
         for (v, &weight) in values.iter().zip(attention_weights.iter()) {
             let v_transformed = v.bind(&self.value_transform);
             let weighted = v_transformed.scale(weight);
@@ -364,7 +364,7 @@ impl VisualAttention {
     }
 
     /// Get attention weights for visualization
-    pub fn get_attention_weights(&self, query: &RealHV, keys: &[RealHV]) -> Vec<f32> {
+    pub fn get_attention_weights(&self, query: &ContinuousHV, keys: &[ContinuousHV]) -> Vec<f32> {
         if keys.is_empty() {
             return Vec::new();
         }
@@ -406,7 +406,7 @@ mod tests {
     #[test]
     fn test_visual_processing() {
         let mut cortex = VisualCortex::default();
-        let input = RealHV::random(512);
+        let input = ContinuousHV::random(512);
 
         let result = cortex.process(&input);
         assert!(!result.layer_features.is_empty());
@@ -426,9 +426,9 @@ mod tests {
     fn test_visual_attention() {
         let attention = VisualAttention::default();
 
-        let query = RealHV::random(512);
-        let keys = vec![RealHV::random(512), RealHV::random(512)];
-        let values = vec![RealHV::random(512), RealHV::random(512)];
+        let query = ContinuousHV::random(512);
+        let keys = vec![ContinuousHV::random(512), ContinuousHV::random(512)];
+        let values = vec![ContinuousHV::random(512), ContinuousHV::random(512)];
 
         let result = attention.attend(&query, &keys, &values);
         assert_eq!(result.dimension(), 512);
@@ -438,8 +438,8 @@ mod tests {
     fn test_attention_weights() {
         let attention = VisualAttention::default();
 
-        let query = RealHV::random(512);
-        let keys = vec![RealHV::random(512), RealHV::random(512), RealHV::random(512)];
+        let query = ContinuousHV::random(512);
+        let keys = vec![ContinuousHV::random(512), ContinuousHV::random(512), ContinuousHV::random(512)];
 
         let weights = attention.get_attention_weights(&query, &keys);
         assert_eq!(weights.len(), 3);

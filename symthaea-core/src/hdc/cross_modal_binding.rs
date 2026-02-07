@@ -38,7 +38,7 @@
 //! let bound = binder.bind_symmetric(&visual, &auditory, Modality::Visual, Modality::Auditory);
 //! ```
 
-use crate::hdc::real_hv::RealHV as ContinuousHV;
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -319,7 +319,7 @@ impl CrossModalBinder {
         let marked2 = proj2.bind(role2);
 
         // Bundle the marked vectors
-        let bound = ContinuousHV::bundle(&[marked1.clone(), marked2.clone()]);
+        let bound = ContinuousHV::bundle_owned(&[marked1.clone(), marked2.clone()]);
 
         let bound_hv = if self.config.normalize_intermediate {
             bound.normalize()
@@ -428,7 +428,7 @@ impl CrossModalBinder {
             .collect();
 
         // Bundle weighted vectors
-        let bound = ContinuousHV::bundle(&weighted_hvs);
+        let bound = ContinuousHV::bundle_owned(&weighted_hvs);
 
         let bound_hv = if self.config.normalize_intermediate {
             bound.normalize()
@@ -620,7 +620,7 @@ impl CrossModalBinder {
                 let role = &self.role_vectors[role_idx];
 
                 // Bundle children and bind with role
-                let bundled = ContinuousHV::bundle(&child_hvs);
+                let bundled = ContinuousHV::bundle_owned(&child_hvs);
                 bundled.bind(role)
             }
         }

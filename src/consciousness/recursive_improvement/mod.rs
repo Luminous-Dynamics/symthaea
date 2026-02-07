@@ -174,40 +174,21 @@ pub mod recursive_optimizer;
 #[cfg(feature = "full_consciousness")]
 pub mod safe_experiment;
 
-// TODO: These modules have broken dependencies and need a type refactor before
-// they can be re-enabled. See each module file for specific issues.
-//
-// benchmark_suite - depends on 7 advanced router types (CausalValidatedRouter,
-//   InformationGeometricRouter, etc.) that don't exist in routers.rs yet
-// #[cfg(feature = "full_consciousness")]
-// pub mod benchmark_suite;
-//
-// dream_mode - FIXED: Added WeaverActor and ConceptDiscovery to soul module,
-//   added dream(), pending_concepts, consciousness_level() to ConsciousnessWorldModel
+// Previously fixed modules
 #[cfg(feature = "full_consciousness")]
 pub mod dream_mode;
-//
-// naming_ceremony - FIXED: Added stub WeaverActor/ConceptDiscovery traits,
-//   CrystalizedConcept now has required fields, added name_concept to WorldModel
 #[cfg(feature = "full_consciousness")]
 pub mod naming_ceremony;
-//
-// routing_hub - references advanced router types that don't exist in routers.rs;
-//   references RoutingStrategy enum that doesn't exist; uses PrimitiveSystem::global()
-//   and AdaptivePrimitiveSelector APIs that may have changed
+#[cfg(feature = "full_consciousness")]
+pub mod semantic_bridge;
+
+// TODO: These 3 modules need significant type stubs before they can compile.
+// They depend on advanced router types, SemanticPrimitiveEncoder, and other
+// types that don't exist yet.
+// #[cfg(feature = "full_consciousness")]
+// pub mod benchmark_suite;
 // #[cfg(feature = "full_consciousness")]
 // pub mod routing_hub;
-//
-// semantic_bridge - uses ConsciousnessWorldModel.pending_concepts (doesn't exist),
-//   .observe() (should be .observe_transition()), .stats().consciousness_level
-//   (field doesn't exist); uses WorldModelConfig.min_training_samples (doesn't exist);
-//   builds ConsciousnessTransition with is_real field (should be surprise)
-// #[cfg(feature = "full_consciousness")]
-// pub mod semantic_bridge;
-//
-// primitive_semantic_bridge - references crate::hdc::semantic_primitive_encoder::
-//   SemanticPrimitiveEncoder which doesn't exist; uses HdcBridge::default() which
-//   may not be available; references qwen3 embedder types behind embeddings feature
 // #[cfg(feature = "full_consciousness")]
 // pub mod primitive_semantic_bridge;
 
@@ -232,3 +213,9 @@ pub use self_model::{SelfModel, SelfModelConfig};
 pub use meta_cognitive::{MetaCognitiveController, MetaCognitiveConfig};
 #[cfg(feature = "full_consciousness")]
 pub use intrinsic_motivation::{IntrinsicMotivationSystem, MotivationConfig};
+// semantic_bridge disabled - see module comment above
+// #[cfg(feature = "full_consciousness")]
+// pub use semantic_bridge::{
+//     SemanticBridge, SemanticBridgeConfig, SemanticBridgeStats,
+//     SemanticInput, ActionContext, ProcessingResult,
+// };

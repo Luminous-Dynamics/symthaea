@@ -72,7 +72,7 @@
 //    V(x) = dx/dt = F(x)
 //
 //    Where:
-//      x = consciousness state (HV16 vector)
+//      x = consciousness state (BinaryHV vector)
 //      V(x) = flow vector at state x
 //      F = dynamics function (could be ∇Φ, learned, etc.)
 //    ```
@@ -186,7 +186,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::consciousness_gradients::{GradientComputer, GradientConfig};
 use super::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -231,7 +231,7 @@ impl CriticalPointType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CriticalPoint {
     /// Location in state space
-    pub location: Vec<HV16>,
+    pub location: Vec<BinaryHV>,
 
     /// Type of critical point
     pub point_type: CriticalPointType,
@@ -280,7 +280,7 @@ pub struct FlowAssessment {
     pub flow_complexity: usize,
 
     /// Predicted next state (following flow)
-    pub predicted_trajectory: Vec<Vec<HV16>>,
+    pub predicted_trajectory: Vec<Vec<BinaryHV>>,
 
     /// Explanation
     pub explanation: String,
@@ -352,14 +352,14 @@ impl Default for FlowConfig {
 /// # Example
 /// ```
 /// use symthaea::hdc::consciousness_flow_fields::{ConsciousnessFlowField, FlowConfig};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = FlowConfig::default();
 /// let mut flow_field = ConsciousnessFlowField::new(4, config);
 ///
 /// // Add consciousness states to map flow
 /// for i in 0..30 {
-///     let state = vec![HV16::random((1000 + i) as u64); 4];
+///     let state = vec![BinaryHV::random((1000 + i) as u64); 4];
 ///     flow_field.add_state(state);
 /// }
 ///
@@ -379,7 +379,7 @@ pub struct ConsciousnessFlowField {
     config: FlowConfig,
 
     /// Sampled states (for flow field estimation)
-    states: Vec<Vec<HV16>>,
+    states: Vec<Vec<BinaryHV>>,
 
     /// Integrated information computer
     phi_computer: IntegratedInformation,
@@ -401,13 +401,13 @@ impl ConsciousnessFlowField {
     }
 
     /// Add consciousness state to sample
-    pub fn add_state(&mut self, state: Vec<HV16>) {
+    pub fn add_state(&mut self, state: Vec<BinaryHV>) {
         assert_eq!(state.len(), self.num_components);
         self.states.push(state);
     }
 
     /// Add multiple states
-    pub fn add_states(&mut self, states: &[Vec<HV16>]) {
+    pub fn add_states(&mut self, states: &[Vec<BinaryHV>]) {
         for state in states {
             self.add_state(state.clone());
         }
@@ -419,7 +419,7 @@ impl ConsciousnessFlowField {
     }
 
     /// Compute flow vector at state (returns per-component flow strength)
-    fn compute_flow_vector(&mut self, state: &[HV16]) -> Vec<f64> {
+    fn compute_flow_vector(&mut self, state: &[BinaryHV]) -> Vec<f64> {
         if self.config.use_gradient_flow {
             // Flow = gradient of Φ (gradient ascent)
             let gradient = self.gradient_computer.compute_gradient(state);
@@ -433,7 +433,7 @@ impl ConsciousnessFlowField {
     }
 
     /// Predict trajectory from initial state
-    fn predict_trajectory(&mut self, initial_state: &[HV16], num_steps: usize) -> Vec<Vec<HV16>> {
+    fn predict_trajectory(&mut self, initial_state: &[BinaryHV], num_steps: usize) -> Vec<Vec<BinaryHV>> {
         let mut trajectory = vec![initial_state.to_vec()];
         let mut current_state = initial_state.to_vec();
 
@@ -494,7 +494,7 @@ impl ConsciousnessFlowField {
     }
 
     /// Classify critical point type (attractor/repeller/saddle)
-    fn classify_critical_point(&mut self, state: &[HV16]) -> CriticalPointType {
+    fn classify_critical_point(&mut self, state: &[BinaryHV]) -> CriticalPointType {
         // Perturb in random direction
         let perturbed = state.to_vec();
         // Simplification: Use randomness to perturb
@@ -519,7 +519,7 @@ impl ConsciousnessFlowField {
     }
 
     /// Estimate basin of attraction size
-    fn estimate_basin_size(&self, _attractor: &[HV16]) -> f64 {
+    fn estimate_basin_size(&self, _attractor: &[BinaryHV]) -> f64 {
         // Simplification: Estimate based on nearby states
         // In reality, would sample state space and test convergence
         0.5  // Placeholder
@@ -754,8 +754,8 @@ mod tests {
     fn test_add_states() {
         let mut flow = ConsciousnessFlowField::default();
 
-        let state1 = vec![HV16::random(1000); 4];
-        let state2 = vec![HV16::random(2000); 4];
+        let state1 = vec![BinaryHV::random(1000); 4];
+        let state2 = vec![BinaryHV::random(2000); 4];
 
         flow.add_state(state1);
         flow.add_state(state2);
@@ -769,7 +769,7 @@ mod tests {
 
         // Add diverse states
         for i in 0..30 {
-            let state = vec![HV16::random((1000 + i * 100) as u64); 4];
+            let state = vec![BinaryHV::random((1000 + i * 100) as u64); 4];
             flow.add_state(state);
         }
 
@@ -786,7 +786,7 @@ mod tests {
 
         // Add states near potential attractor
         for i in 0..20 {
-            let state = vec![HV16::random(5000 + i); 4];  // Similar seeds
+            let state = vec![BinaryHV::random(5000 + i); 4];  // Similar seeds
             flow.add_state(state);
         }
 
@@ -801,7 +801,7 @@ mod tests {
         let mut flow = ConsciousnessFlowField::default();
 
         for i in 0..15 {
-            let state = vec![HV16::random((1000 + i) as u64); 4];
+            let state = vec![BinaryHV::random((1000 + i) as u64); 4];
             flow.add_state(state);
         }
 
@@ -817,13 +817,13 @@ mod tests {
 
         // Few states → not ergodic
         for i in 0..5 {
-            flow.add_state(vec![HV16::random(i as u64); 4]);
+            flow.add_state(vec![BinaryHV::random(i as u64); 4]);
         }
         assert!(!flow.analyze().is_ergodic);
 
         // Many states → ergodic
         for i in 5..30 {
-            flow.add_state(vec![HV16::random(i as u64); 4]);
+            flow.add_state(vec![BinaryHV::random(i as u64); 4]);
         }
         assert!(flow.analyze().is_ergodic);
     }
@@ -833,7 +833,7 @@ mod tests {
         let mut flow = ConsciousnessFlowField::default();
 
         for i in 0..25 {
-            let state = vec![HV16::random((1000 + i * 200) as u64); 4];
+            let state = vec![BinaryHV::random((1000 + i * 200) as u64); 4];
             flow.add_state(state);
         }
 
@@ -848,7 +848,7 @@ mod tests {
         let mut flow = ConsciousnessFlowField::default();
 
         for i in 0..10 {
-            flow.add_state(vec![HV16::random(i as u64); 4]);
+            flow.add_state(vec![BinaryHV::random(i as u64); 4]);
         }
         assert_eq!(flow.num_states(), 10);
 

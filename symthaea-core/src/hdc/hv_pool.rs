@@ -1,12 +1,12 @@
 //! Memory Pool for Hypervector Allocations
 //!
-//! This module provides thread-local object pools for HV16 and ContinuousHV types
+//! This module provides thread-local object pools for BinaryHV and ContinuousHV types
 //! to reduce allocation overhead in performance-critical code paths.
 //!
 //! # Motivation
 //!
 //! Hypervectors are frequently created and destroyed during HDC operations:
-//! - Each bind() creates a new 2KB HV16
+//! - Each bind() creates a new 2KB BinaryHV
 //! - Each bundle() creates temporary accumulators
 //! - Iterative algorithms may create millions of temporary vectors
 //!
@@ -15,10 +15,10 @@
 //! # Usage
 //!
 //! ```rust,ignore
-//! use symthaea::hdc::hv_pool::{HV16Pool, PooledHV16};
+//! use symthaea::hdc::hv_pool::{BinaryHVPool, PooledBinaryHV};
 //!
 //! // Get a vector from the pool (allocation-free if pool has capacity)
-//! let mut hv = HV16Pool::get();
+//! let mut hv = BinaryHVPool::get();
 //!
 //! // Use the vector
 //! hv.0.fill(0xFF);
@@ -39,45 +39,45 @@
 
 use std::cell::RefCell;
 use std::ops::{Deref, DerefMut};
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::unified_hv::ContinuousHV;
 
 // =============================================================================
 // CONFIGURATION
 // =============================================================================
 
-/// Default pool capacity for HV16 (2KB each, 64 = 128KB per thread)
+/// Default pool capacity for BinaryHV (2KB each, 64 = 128KB per thread)
 const HV16_POOL_CAPACITY: usize = 64;
 
 /// Default pool capacity for ContinuousHV (64KB each, 8 = 512KB per thread)
 const CONTINUOUS_HV_POOL_CAPACITY: usize = 8;
 
 // =============================================================================
-// HV16 POOL
+// BinaryHV POOL
 // =============================================================================
 
 thread_local! {
     static HV16_POOL: RefCell<Vec<Box<[u8; 2048]>>> = RefCell::new(Vec::with_capacity(HV16_POOL_CAPACITY));
 }
 
-/// A pooled HV16 that returns to the pool when dropped
+/// A pooled BinaryHV that returns to the pool when dropped
 ///
 /// # Example
 ///
 /// ```rust,ignore
-/// use symthaea::hdc::hv_pool::PooledHV16;
+/// use symthaea::hdc::hv_pool::PooledBinaryHV;
 ///
 /// {
-///     let mut hv = PooledHV16::new();  // Gets from pool or allocates
+///     let mut hv = PooledBinaryHV::new();  // Gets from pool or allocates
 ///     // Use hv.0 as [u8; 2048]
 /// }  // Automatically returned to pool
 /// ```
-pub struct PooledHV16 {
+pub struct PooledBinaryHV {
     data: Option<Box<[u8; 2048]>>,
 }
 
-impl PooledHV16 {
-    /// Get a new pooled HV16 (from pool if available, else allocate)
+impl PooledBinaryHV {
+    /// Get a new pooled BinaryHV (from pool if available, else allocate)
     #[inline]
     pub fn new() -> Self {
         let data = HV16_POOL.with(|pool| {
@@ -88,7 +88,7 @@ impl PooledHV16 {
         Self { data: Some(data) }
     }
 
-    /// Get a new pooled HV16 initialized to zero
+    /// Get a new pooled BinaryHV initialized to zero
     #[inline]
     pub fn zeroed() -> Self {
         let mut hv = Self::new();
@@ -96,19 +96,19 @@ impl PooledHV16 {
         hv
     }
 
-    /// Get a new pooled HV16 from an existing HV16
+    /// Get a new pooled BinaryHV from an existing BinaryHV
     #[inline]
-    pub fn from_hv16(hv: &HV16) -> Self {
+    pub fn from_hv16(hv: &BinaryHV) -> Self {
         let mut pooled = Self::new();
         pooled.data.as_mut().unwrap().copy_from_slice(&hv.0);
         pooled
     }
 
-    /// Convert to owned HV16 (removes from pool tracking)
+    /// Convert to owned BinaryHV (removes from pool tracking)
     #[inline]
-    pub fn into_hv16(mut self) -> HV16 {
+    pub fn into_hv16(mut self) -> BinaryHV {
         let data = self.data.take().unwrap();
-        HV16(*data)
+        BinaryHV(*data)
     }
 
     /// Get the inner data as a reference
@@ -124,13 +124,13 @@ impl PooledHV16 {
     }
 }
 
-impl Default for PooledHV16 {
+impl Default for PooledBinaryHV {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Deref for PooledHV16 {
+impl Deref for PooledBinaryHV {
     type Target = [u8; 2048];
 
     #[inline]
@@ -139,14 +139,14 @@ impl Deref for PooledHV16 {
     }
 }
 
-impl DerefMut for PooledHV16 {
+impl DerefMut for PooledBinaryHV {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.data.as_mut().unwrap()
     }
 }
 
-impl Drop for PooledHV16 {
+impl Drop for PooledBinaryHV {
     fn drop(&mut self) {
         if let Some(data) = self.data.take() {
             HV16_POOL.with(|pool| {
@@ -160,20 +160,20 @@ impl Drop for PooledHV16 {
     }
 }
 
-/// Public interface for HV16 pool
-pub struct HV16Pool;
+/// Public interface for BinaryHV pool
+pub struct BinaryHVPool;
 
-impl HV16Pool {
-    /// Get a pooled HV16
+impl BinaryHVPool {
+    /// Get a pooled BinaryHV
     #[inline]
-    pub fn get() -> PooledHV16 {
-        PooledHV16::new()
+    pub fn get() -> PooledBinaryHV {
+        PooledBinaryHV::new()
     }
 
-    /// Get a zeroed pooled HV16
+    /// Get a zeroed pooled BinaryHV
     #[inline]
-    pub fn get_zeroed() -> PooledHV16 {
-        PooledHV16::zeroed()
+    pub fn get_zeroed() -> PooledBinaryHV {
+        PooledBinaryHV::zeroed()
     }
 
     /// Get current pool size (for diagnostics)
@@ -376,8 +376,8 @@ impl ContinuousHVPool {
 
 /// Perform XOR bind using pooled allocations
 #[inline]
-pub fn pooled_bind(a: &HV16, b: &HV16) -> PooledHV16 {
-    let mut result = PooledHV16::new();
+pub fn pooled_bind(a: &BinaryHV, b: &BinaryHV) -> PooledBinaryHV {
+    let mut result = PooledBinaryHV::new();
     let r = result.as_bytes_mut();
     for i in 0..2048 {
         r[i] = a.0[i] ^ b.0[i];
@@ -387,7 +387,7 @@ pub fn pooled_bind(a: &HV16, b: &HV16) -> PooledHV16 {
 
 /// Perform similarity calculation (returns f32, no allocation needed)
 #[inline]
-pub fn pooled_similarity(a: &HV16, b: &HV16) -> f32 {
+pub fn pooled_similarity(a: &BinaryHV, b: &BinaryHV) -> f32 {
     // No pooling needed - just returns a number
     a.similarity(b)
 }
@@ -409,8 +409,8 @@ impl PoolStats {
     /// Get current pool statistics
     pub fn current() -> Self {
         Self {
-            hv16_pool_size: HV16Pool::pool_size(),
-            hv16_capacity: HV16Pool::capacity(),
+            hv16_pool_size: BinaryHVPool::pool_size(),
+            hv16_capacity: BinaryHVPool::capacity(),
             continuous_hv_pool_size: ContinuousHVPool::pool_size(),
             continuous_hv_capacity: ContinuousHVPool::capacity(),
         }
@@ -435,29 +435,29 @@ mod tests {
     #[test]
     fn test_hv16_pool_basic() {
         // Clear pool first
-        HV16Pool::clear();
+        BinaryHVPool::clear();
 
         // Get a pooled HV
-        let hv1 = HV16Pool::get();
+        let hv1 = BinaryHVPool::get();
         assert_eq!(hv1.len(), 2048);
 
         // Drop it
         drop(hv1);
 
         // Pool should now have 1 entry
-        assert_eq!(HV16Pool::pool_size(), 1);
+        assert_eq!(BinaryHVPool::pool_size(), 1);
 
         // Get another - should reuse
-        let hv2 = HV16Pool::get();
-        assert_eq!(HV16Pool::pool_size(), 0);
+        let hv2 = BinaryHVPool::get();
+        assert_eq!(BinaryHVPool::pool_size(), 0);
 
         drop(hv2);
-        assert_eq!(HV16Pool::pool_size(), 1);
+        assert_eq!(BinaryHVPool::pool_size(), 1);
     }
 
     #[test]
     fn test_hv16_pool_zeroed() {
-        let hv = HV16Pool::get_zeroed();
+        let hv = BinaryHVPool::get_zeroed();
         for byte in hv.iter() {
             assert_eq!(*byte, 0);
         }
@@ -465,16 +465,16 @@ mod tests {
 
     #[test]
     fn test_hv16_pool_from_hv16() {
-        let original = HV16::random(42);
-        let pooled = PooledHV16::from_hv16(&original);
+        let original = BinaryHV::random(42);
+        let pooled = PooledBinaryHV::from_hv16(&original);
 
         assert_eq!(pooled.as_bytes(), &original.0);
     }
 
     #[test]
     fn test_hv16_pool_into_hv16() {
-        let original = HV16::random(42);
-        let pooled = PooledHV16::from_hv16(&original);
+        let original = BinaryHV::random(42);
+        let pooled = PooledBinaryHV::from_hv16(&original);
         let converted = pooled.into_hv16();
 
         assert_eq!(converted, original);
@@ -482,28 +482,28 @@ mod tests {
 
     #[test]
     fn test_hv16_pool_capacity() {
-        HV16Pool::clear();
+        BinaryHVPool::clear();
 
         // Fill pool beyond capacity
         let mut hvs = Vec::new();
         for _ in 0..100 {
-            hvs.push(HV16Pool::get());
+            hvs.push(BinaryHVPool::get());
         }
 
         // Drop all
         drop(hvs);
 
         // Pool should be at capacity, not 100
-        assert!(HV16Pool::pool_size() <= HV16Pool::capacity());
+        assert!(BinaryHVPool::pool_size() <= BinaryHVPool::capacity());
     }
 
     #[test]
     fn test_hv16_pool_prewarm() {
-        HV16Pool::clear();
-        assert_eq!(HV16Pool::pool_size(), 0);
+        BinaryHVPool::clear();
+        assert_eq!(BinaryHVPool::pool_size(), 0);
 
-        HV16Pool::prewarm(10);
-        assert_eq!(HV16Pool::pool_size(), 10);
+        BinaryHVPool::prewarm(10);
+        assert_eq!(BinaryHVPool::pool_size(), 10);
     }
 
     #[test]
@@ -530,8 +530,8 @@ mod tests {
 
     #[test]
     fn test_pooled_bind() {
-        let a = HV16::random(1);
-        let b = HV16::random(2);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
 
         let result = pooled_bind(&a, &b);
         let expected = a.bind(&b);
@@ -541,10 +541,10 @@ mod tests {
 
     #[test]
     fn test_pool_stats() {
-        HV16Pool::clear();
+        BinaryHVPool::clear();
         ContinuousHVPool::clear();
 
-        HV16Pool::prewarm(5);
+        BinaryHVPool::prewarm(5);
         ContinuousHVPool::prewarm(2);
 
         let stats = PoolStats::current();
@@ -565,12 +565,12 @@ mod tests {
         let iterations = 100_000;
 
         // Prewarm pool
-        HV16Pool::prewarm(HV16Pool::capacity());
+        BinaryHVPool::prewarm(BinaryHVPool::capacity());
 
         // Benchmark pooled allocation
         let start = Instant::now();
         for _ in 0..iterations {
-            let hv = black_box(HV16Pool::get());
+            let hv = black_box(BinaryHVPool::get());
             black_box(hv);
         }
         let pooled_ns = start.elapsed().as_nanos() / iterations;
@@ -578,7 +578,7 @@ mod tests {
         // Benchmark regular allocation
         let start = Instant::now();
         for _ in 0..iterations {
-            let hv = black_box(HV16::zero());
+            let hv = black_box(BinaryHV::zero());
             black_box(hv);
         }
         let regular_ns = start.elapsed().as_nanos() / iterations;
@@ -589,3 +589,8 @@ mod tests {
         println!("  Speedup: {:.1}x", regular_ns as f64 / pooled_ns.max(1) as f64);
     }
 }
+
+/// Backward-compatible alias: `PooledHV16` is now `PooledBinaryHV`.
+pub type PooledHV16 = PooledBinaryHV;
+/// Backward-compatible alias: `HV16Pool` is now `BinaryHVPool`.
+pub type HV16Pool = BinaryHVPool;

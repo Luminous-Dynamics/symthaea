@@ -73,7 +73,7 @@
 //! Traditional systems bottleneck at module interfaces. Here, everything shares
 //! the same substrate, so information flows freely.
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::causal_encoder::CausalSpace;
 use super::causal_mind::{CausalMind, CausalDirection, CausalDiscoveryResult};
 use std::collections::HashMap;
@@ -124,7 +124,7 @@ impl Default for UniversalMindConfig {
 #[derive(Clone, Debug)]
 pub struct Thought {
     /// The hypervector encoding of this thought
-    pub vector: HV16,
+    pub vector: BinaryHV,
     /// Human-readable content
     pub content: String,
     /// Confidence in this thought
@@ -137,7 +137,7 @@ pub struct Thought {
 
 impl Thought {
     /// Create a new thought
-    pub fn new(content: String, vector: HV16, modality: ThoughtModality) -> Self {
+    pub fn new(content: String, vector: BinaryHV, modality: ThoughtModality) -> Self {
         Self {
             vector,
             content,
@@ -161,7 +161,7 @@ impl Thought {
 
     /// Bundle this thought with another (superposition)
     pub fn bundle(&self, other: &Thought) -> Thought {
-        let combined = HV16::bundle(&[self.vector.clone(), other.vector.clone()]);
+        let combined = BinaryHV::bundle(&[self.vector.clone(), other.vector.clone()]);
         Thought {
             vector: combined,
             content: format!("{} + {}", self.content, other.content),
@@ -212,7 +212,7 @@ pub struct UniversalMind {
     workspace: Vec<Thought>,
 
     /// Concept memory (long-term semantic knowledge)
-    concepts: HashMap<String, HV16>,
+    concepts: HashMap<String, BinaryHV>,
 
     /// Role markers for universal binding
     role_markers: UniversalRoleMarkers,
@@ -228,47 +228,47 @@ pub struct UniversalMind {
 #[derive(Clone, Debug)]
 pub struct UniversalRoleMarkers {
     // Causal roles
-    pub causes: HV16,
-    pub caused_by: HV16,
-    pub prevents: HV16,
+    pub causes: BinaryHV,
+    pub caused_by: BinaryHV,
+    pub prevents: BinaryHV,
 
     // Temporal roles
-    pub before: HV16,
-    pub after: HV16,
-    pub simultaneous: HV16,
+    pub before: BinaryHV,
+    pub after: BinaryHV,
+    pub simultaneous: BinaryHV,
 
     // Semantic roles
-    pub is_a: HV16,
-    pub has_property: HV16,
-    pub part_of: HV16,
+    pub is_a: BinaryHV,
+    pub has_property: BinaryHV,
+    pub part_of: BinaryHV,
 
     // Meta roles
-    pub question: HV16,
-    pub answer: HV16,
-    pub hypothesis: HV16,
-    pub evidence: HV16,
+    pub question: BinaryHV,
+    pub answer: BinaryHV,
+    pub hypothesis: BinaryHV,
+    pub evidence: BinaryHV,
 }
 
 impl UniversalRoleMarkers {
     fn new() -> Self {
         Self {
             // Causal
-            causes: HV16::random(2001),
-            caused_by: HV16::random(2002),
-            prevents: HV16::random(2003),
+            causes: BinaryHV::random(2001),
+            caused_by: BinaryHV::random(2002),
+            prevents: BinaryHV::random(2003),
             // Temporal
-            before: HV16::random(2004),
-            after: HV16::random(2005),
-            simultaneous: HV16::random(2006),
+            before: BinaryHV::random(2004),
+            after: BinaryHV::random(2005),
+            simultaneous: BinaryHV::random(2006),
             // Semantic
-            is_a: HV16::random(2007),
-            has_property: HV16::random(2008),
-            part_of: HV16::random(2009),
+            is_a: BinaryHV::random(2007),
+            has_property: BinaryHV::random(2008),
+            part_of: BinaryHV::random(2009),
             // Meta
-            question: HV16::random(2010),
-            answer: HV16::random(2011),
-            hypothesis: HV16::random(2012),
-            evidence: HV16::random(2013),
+            question: BinaryHV::random(2010),
+            answer: BinaryHV::random(2011),
+            hypothesis: BinaryHV::random(2012),
+            evidence: BinaryHV::random(2013),
         }
     }
 }
@@ -337,7 +337,7 @@ impl UniversalMind {
     }
 
     /// Get or create a concept hypervector
-    fn get_or_create_concept(&mut self, name: &str) -> HV16 {
+    fn get_or_create_concept(&mut self, name: &str) -> BinaryHV {
         if let Some(hv) = self.concepts.get(name) {
             return hv.clone();
         }
@@ -346,7 +346,7 @@ impl UniversalMind {
         let seed = name.bytes().fold(42u64, |acc, b| {
             acc.wrapping_add(b as u64).wrapping_mul(31)
         });
-        let hv = HV16::random(seed);
+        let hv = BinaryHV::random(seed);
         self.concepts.insert(name.to_string(), hv.clone());
         hv
     }
@@ -561,12 +561,12 @@ mod tests {
     fn test_thought_binding() {
         let t1 = Thought::new(
             "smoking".to_string(),
-            HV16::random(1),
+            BinaryHV::random(1),
             ThoughtModality::Semantic,
         );
         let t2 = Thought::new(
             "cancer".to_string(),
-            HV16::random(2),
+            BinaryHV::random(2),
             ThoughtModality::Semantic,
         );
 

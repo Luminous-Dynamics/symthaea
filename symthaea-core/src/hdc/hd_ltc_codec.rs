@@ -34,7 +34,7 @@
 //!
 //! This enables the LTC to "think" in HDC semantics and express through them.
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::HDC_DIMENSION;
 use crate::learnable_ltc::LearnableLTC;
 use serde::{Serialize, Deserialize};
@@ -173,7 +173,7 @@ impl HDLTCCodec {
     /// Encode HDC hypervector to LTC neural state
     ///
     /// This is the "inhale" - taking in semantic meaning and preparing for thought.
-    pub fn encode_to_ltc(&mut self, hv: &HV16) -> Vec<f32> {
+    pub fn encode_to_ltc(&mut self, hv: &BinaryHV) -> Vec<f32> {
         self.stats.total_encodings += 1;
 
         let n = self.config.ltc_neurons;
@@ -213,7 +213,7 @@ impl HDLTCCodec {
     /// Decode LTC neural state to HDC hypervector
     ///
     /// This is the "exhale" - crystallizing dynamic thought into semantic form.
-    pub fn decode_to_hv(&mut self, ltc_state: &[f32]) -> HV16 {
+    pub fn decode_to_hv(&mut self, ltc_state: &[f32]) -> BinaryHV {
         self.stats.total_decodings += 1;
 
         let n = self.config.ltc_neurons;
@@ -243,7 +243,7 @@ impl HDLTCCodec {
     }
 
     /// Round-trip encode-decode for testing reconstruction
-    pub fn round_trip(&mut self, hv: &HV16) -> (HV16, f32) {
+    pub fn round_trip(&mut self, hv: &BinaryHV) -> (BinaryHV, f32) {
         let ltc = self.encode_to_ltc(hv);
         let reconstructed = self.decode_to_hv(&ltc);
         let error = 1.0 - hv.similarity(&reconstructed);
@@ -261,7 +261,7 @@ impl HDLTCCodec {
     /// Train the codec on paired HV-LTC data
     ///
     /// Uses contrastive learning: similar HVs should produce similar LTC states
-    pub fn train_step(&mut self, hv: &HV16, target_ltc: &[f32]) -> f32 {
+    pub fn train_step(&mut self, hv: &BinaryHV, target_ltc: &[f32]) -> f32 {
         self.stats.training_iterations += 1;
 
         let n = self.config.ltc_neurons;
@@ -303,8 +303,8 @@ impl HDLTCCodec {
         mse
     }
 
-    /// Convert binary HV16 to float representation
-    fn hv_to_float(&self, hv: &HV16) -> Vec<f32> {
+    /// Convert binary BinaryHV to float representation
+    fn hv_to_float(&self, hv: &BinaryHV) -> Vec<f32> {
         let mut result = vec![0.0f32; HDC_DIMENSION];
         let bytes = &hv.0;
 
@@ -319,8 +319,8 @@ impl HDLTCCodec {
         result
     }
 
-    /// Convert float representation to binary HV16
-    fn float_to_hv(&self, float_vec: &[f32]) -> HV16 {
+    /// Convert float representation to binary BinaryHV
+    fn float_to_hv(&self, float_vec: &[f32]) -> BinaryHV {
         let mut bytes = [0u8; 2048];
 
         for byte_idx in 0..2048 {
@@ -332,7 +332,7 @@ impl HDLTCCodec {
             }
         }
 
-        HV16(bytes)
+        BinaryHV(bytes)
     }
 
     /// Normalize LTC state using running statistics
@@ -456,7 +456,7 @@ impl IntegratedLTCCodec {
     }
 
     /// Encode HV and run through LTC for temporal processing
-    pub fn process_thought(&mut self, hv: &HV16) -> anyhow::Result<(Vec<f32>, HV16)> {
+    pub fn process_thought(&mut self, hv: &BinaryHV) -> anyhow::Result<(Vec<f32>, BinaryHV)> {
         // Encode to LTC input
         let ltc_input = self.codec.encode_to_ltc(hv);
 
@@ -498,7 +498,7 @@ mod tests {
     #[test]
     fn test_encode_decode() {
         let mut codec = HDLTCCodec::default();
-        let hv = HV16::random(42);
+        let hv = BinaryHV::random(42);
 
         let ltc_state = codec.encode_to_ltc(&hv);
         assert_eq!(ltc_state.len(), DEFAULT_LTC_NEURONS);
@@ -513,7 +513,7 @@ mod tests {
     #[test]
     fn test_round_trip() {
         let mut codec = HDLTCCodec::default();
-        let hv = HV16::random(123);
+        let hv = BinaryHV::random(123);
 
         let (recovered, error) = codec.round_trip(&hv);
 
@@ -524,7 +524,7 @@ mod tests {
     #[test]
     fn test_training() {
         let mut codec = HDLTCCodec::default();
-        let hv = HV16::random(456);
+        let hv = BinaryHV::random(456);
 
         // Create target (just use encoded as target for autoencoder)
         let target = vec![0.5f32; DEFAULT_LTC_NEURONS];
@@ -542,7 +542,7 @@ mod tests {
 
         // Process several HVs to build context
         for seed in 0..5 {
-            let hv = HV16::random(seed * 1000);
+            let hv = BinaryHV::random(seed * 1000);
             let _ = codec.encode_to_ltc(&hv);
         }
 

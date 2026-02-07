@@ -4,10 +4,10 @@
 //! Perception is NOT passive reception - it is ACTIVE knowledge of how actions
 //! affect sensation (O'Regan & Noe, 2001).
 //!
-//! This module integrates with the existing HV16 hypervector infrastructure
+//! This module integrates with the existing BinaryHV hypervector infrastructure
 //! for efficient contingency encoding and lookup.
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
@@ -35,7 +35,7 @@ pub struct SensorimotorContingency {
     pub expected_change: SensoryChange,
 
     /// HDC encoding for efficient similarity-based lookup
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Confidence (0.0 to 1.0)
     pub confidence: f64,
@@ -129,7 +129,7 @@ pub struct ActionDescriptor {
     pub effectors: Vec<String>,
 
     /// HDC encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 }
 
 impl ActionDescriptor {
@@ -137,7 +137,7 @@ impl ActionDescriptor {
     pub fn new(action_type: ActionType) -> Self {
         // Generate encoding from action type
         let seed = action_type as u64 * 12345;
-        let encoding = HV16::random(seed);
+        let encoding = BinaryHV::random(seed);
 
         Self {
             action_type,
@@ -151,7 +151,7 @@ impl ActionDescriptor {
     pub fn with_parameter(mut self, key: &str, value: f64) -> Self {
         self.parameters.insert(key.to_string(), value);
         // Update encoding to incorporate parameter
-        let param_hv = HV16::random((value * 1000.0) as u64);
+        let param_hv = BinaryHV::random((value * 1000.0) as u64);
         self.encoding = self.encoding.bind(&param_hv);
         self
     }
@@ -229,7 +229,7 @@ pub struct ContextDescriptor {
     pub modality: SensoryModality,
 
     /// HDC encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 }
 
 impl ContextDescriptor {
@@ -246,7 +246,7 @@ impl ContextDescriptor {
             features: HashMap::new(),
             objects: Vec::new(),
             modality,
-            encoding: HV16::random(seed),
+            encoding: BinaryHV::random(seed),
         }
     }
 
@@ -303,8 +303,8 @@ pub struct SensoryChange {
     /// Modality
     pub modality: SensoryModality,
 
-    /// Change vector (encoded as HV16 for efficiency)
-    pub encoding: HV16,
+    /// Change vector (encoded as BinaryHV for efficiency)
+    pub encoding: BinaryHV,
 
     /// Scalar magnitude
     pub magnitude: f64,
@@ -324,7 +324,7 @@ impl SensoryChange {
     pub fn new(modality: SensoryModality) -> Self {
         Self {
             modality,
-            encoding: HV16::random(0),
+            encoding: BinaryHV::random(0),
             magnitude: 0.0,
             onset_delay_ms: 50,
             duration_ms: 200,
@@ -334,17 +334,17 @@ impl SensoryChange {
 
     /// Set encoding from change vector
     pub fn with_vector(mut self, vector: Vec<f64>) -> Self {
-        // Encode vector as HV16 by quantizing and combining position-encoded components
-        let mut components: Vec<HV16> = Vec::new();
+        // Encode vector as BinaryHV by quantizing and combining position-encoded components
+        let mut components: Vec<BinaryHV> = Vec::new();
         for (i, &val) in vector.iter().enumerate() {
-            let position_hv = HV16::random(i as u64 * 9999);
-            let value_hv = HV16::random((val * 10000.0) as u64);
+            let position_hv = BinaryHV::random(i as u64 * 9999);
+            let value_hv = BinaryHV::random((val * 10000.0) as u64);
             components.push(position_hv.bind(&value_hv));
         }
         self.encoding = if components.is_empty() {
-            HV16::random(0)
+            BinaryHV::random(0)
         } else {
-            HV16::bundle(&components)
+            BinaryHV::bundle(&components)
         };
         self.magnitude = vector.iter().map(|x| x * x).sum::<f64>().sqrt();
         self
@@ -372,7 +372,7 @@ impl SensoryChange {
         // Blend encodings using bundle
         if rate > 0.5 {
             // More weight to target - bundle both
-            self.encoding = HV16::bundle(&[target.encoding.clone(), self.encoding.clone()]);
+            self.encoding = BinaryHV::bundle(&[target.encoding, self.encoding]);
         }
         // For low rates, keep current encoding (no HV interpolation in binary)
 
@@ -539,7 +539,7 @@ impl ContingencyLearner {
     ) -> SensorimotorContingency {
         let contingencies = self.contingencies
             .entry(action.action_type)
-            .or_insert_with(Vec::new);
+            .or_default();
 
         // Find matching
         let matching = contingencies.iter_mut()

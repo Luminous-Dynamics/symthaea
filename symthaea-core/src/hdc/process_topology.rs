@@ -17,7 +17,7 @@
 //! - **Strategic bridges**: ~40-45% of connections cross module boundaries
 //! - **Skip connections**: Residual-like paths for fast integration
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::consciousness_topology_generators::ConsciousnessTopology;
 use super::spectral_connectivity::ConnectivityCalculator;
 use std::collections::HashMap;
@@ -30,7 +30,7 @@ pub struct TopologicalProcess {
     /// Process name
     pub name: String,
     /// Current state as hypervector
-    pub state: RealHV,
+    pub state: ContinuousHV,
     /// Activity level (0.0 - 1.0)
     pub activity: f64,
     /// Level in hierarchy (0=hub, 1=module, 2=processor, 3=leaf)
@@ -47,7 +47,7 @@ impl TopologicalProcess {
         Self {
             id,
             name: name.into(),
-            state: RealHV::random(dim, id as u64 * 12345),
+            state: ContinuousHV::random(dim, id as u64 * 12345),
             activity: 0.0,
             level,
             module,
@@ -56,7 +56,7 @@ impl TopologicalProcess {
     }
 
     /// Activate the process with input
-    pub fn activate(&mut self, input: &RealHV) {
+    pub fn activate(&mut self, input: &ContinuousHV) {
         self.state = self.state.bind(input);
         self.activity = 1.0;
     }
@@ -67,7 +67,7 @@ impl TopologicalProcess {
     }
 
     /// Update state based on connected processes
-    pub fn integrate(&mut self, connected_states: &[&RealHV]) {
+    pub fn integrate(&mut self, connected_states: &[&ContinuousHV]) {
         if connected_states.is_empty() {
             return;
         }
@@ -156,7 +156,7 @@ impl ProcessTopologyOrganizer {
                 (2, module, name)
             } else {
                 // Leaf processors
-                let leaves_per_module = (n - l3_start + 3) / 4;
+                let leaves_per_module = (n - l3_start).div_ceil(4);
                 let module = ((i - l3_start) / leaves_per_module.max(1)) % 4;
                 let leaf_id = (i - l3_start) % leaves_per_module.max(1);
                 let default_name = String::from("Unknown");
@@ -229,7 +229,7 @@ impl ProcessTopologyOrganizer {
     }
 
     /// Activate a module hub and propagate to connected processes
-    pub fn activate_module(&mut self, module: usize, input: &RealHV) {
+    pub fn activate_module(&mut self, module: usize, input: &ContinuousHV) {
         let module_hub_id = module + 1; // Module hubs are at indices 1-4
 
         // First activate the module hub
@@ -254,7 +254,7 @@ impl ProcessTopologyOrganizer {
     }
 
     /// Activate the global workspace hub
-    pub fn activate_global(&mut self, input: &RealHV) {
+    pub fn activate_global(&mut self, input: &ContinuousHV) {
         if let Some(hub) = self.processes.get_mut(&0) {
             hub.activate(input);
         }
@@ -271,14 +271,14 @@ impl ProcessTopologyOrganizer {
     /// Perform one integration step across all processes
     pub fn integrate_step(&mut self) {
         // Collect all states for integration
-        let states: HashMap<usize, RealHV> = self.processes
+        let states: HashMap<usize, ContinuousHV> = self.processes
             .iter()
             .map(|(&id, p)| (id, p.state.clone()))
             .collect();
 
         // Update each process based on its connections
         for (&_id, process) in self.processes.iter_mut() {
-            let connected_states: Vec<&RealHV> = process.connections
+            let connected_states: Vec<&ContinuousHV> = process.connections
                 .iter()
                 .filter_map(|&conn_id| states.get(&conn_id))
                 .collect();
@@ -291,7 +291,7 @@ impl ProcessTopologyOrganizer {
     /// Compute current Φ of the process network
     pub fn compute_phi(&self) -> f64 {
         // Get all active process states
-        let representations: Vec<RealHV> = self.processes
+        let representations: Vec<ContinuousHV> = self.processes
             .values()
             .filter(|p| p.activity > 0.1) // Only active processes
             .map(|p| p.state.clone())
@@ -299,7 +299,7 @@ impl ProcessTopologyOrganizer {
 
         if representations.len() < 2 {
             // Fall back to all processes if too few active
-            let all_reps: Vec<RealHV> = self.processes
+            let all_reps: Vec<ContinuousHV> = self.processes
                 .values()
                 .map(|p| p.state.clone())
                 .collect();
@@ -422,7 +422,7 @@ mod tests {
     #[test]
     fn test_activation_propagation() {
         let mut organizer = ProcessTopologyOrganizer::new(32, HDC_DIMENSION, 42);
-        let input = RealHV::random(HDC_DIMENSION, 123);
+        let input = ContinuousHV::random(HDC_DIMENSION, 123);
 
         organizer.activate_module(0, &input);
 
@@ -443,7 +443,7 @@ mod tests {
 
         // Activate all modules
         for module in 0..4 {
-            let input = RealHV::random(HDC_DIMENSION, module as u64 * 100);
+            let input = ContinuousHV::random(HDC_DIMENSION, module as u64 * 100);
             organizer.activate_module(module, &input);
         }
 
@@ -455,7 +455,7 @@ mod tests {
     #[test]
     fn test_integration_step() {
         let mut organizer = ProcessTopologyOrganizer::new(32, HDC_DIMENSION, 42);
-        let input = RealHV::random(HDC_DIMENSION, 999);
+        let input = ContinuousHV::random(HDC_DIMENSION, 999);
 
         organizer.activate_global(&input);
         let initial_phi = organizer.compute_phi();

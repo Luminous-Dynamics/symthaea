@@ -359,6 +359,7 @@ pub struct CausalAssumption {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Counterfactual reasoner implementing backdoor and frontdoor criteria.
+#[derive(Debug, Clone)]
 pub struct CounterfactualReasoner {
     /// Maximum DAG size for identification.
     max_dag_size: usize,
@@ -926,8 +927,9 @@ impl EffectEstimator {
                         // If d-separated, effect is 0
                         0.0
                     }
-                    IdentificationMethod::Rule2ActionObservationExchange
-                    | IdentificationMethod::Rule3ActionDeletion => {
+                    IdentificationMethod::Rule2ActionObservation
+                    | IdentificationMethod::Rule3ActionDeletion
+                    | IdentificationMethod::IDAlgorithm => {
                         // Use linear regression as fallback
                         self.estimate_regression(query.treatment, query.outcome, data)
                     }
@@ -1338,7 +1340,7 @@ impl EffectEstimator {
                     regression_estimate: 0.0,
                     ipw_estimate: 0.0,
                     dr_estimate: 0.0,
-                    method,
+                    method: IdentificationMethod::DSeparation, // Default for unidentified
                     is_identified: false,
                 };
             }
@@ -2481,32 +2483,6 @@ fn fisher_z_transform(r: f64, n: usize, k: usize) -> f64 {
     z * df.sqrt()
 }
 
-/// Generate all combinations of size k from a slice.
-fn combinations(items: &[usize], k: usize) -> Vec<Vec<usize>> {
-    if k == 0 {
-        return vec![vec![]];
-    }
-    if items.len() < k {
-        return vec![];
-    }
-    if items.len() == k {
-        return vec![items.to_vec()];
-    }
-
-    let mut result = Vec::new();
-
-    // Include first element
-    for mut combo in combinations(&items[1..], k - 1) {
-        combo.insert(0, items[0]);
-        result.push(combo);
-    }
-
-    // Exclude first element
-    result.extend(combinations(&items[1..], k));
-
-    result
-}
-
 /// Undirected skeleton graph.
 #[derive(Debug, Clone)]
 pub struct Skeleton {
@@ -3034,6 +3010,746 @@ impl MediationResult {
             self.proportion_mediated * 100.0,
             mediation_type
         )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Instrumental Variable Estimation
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Instrumental Variable (IV) estimator for causal effects.
+///
+/// Used when treatment X is confounded with outcome Y, but we have an
+/// instrument Z that:
+/// 1. Affects treatment (Z → X)
+/// 2. Only affects outcome through treatment (no Z → Y path except via X)
+/// 3. Is independent of confounders
+///
+/// The classic example: distance to college (Z) as instrument for education (X)
+/// on earnings (Y).
+///
+/// # Two-Stage Least Squares (2SLS)
+///
+/// Stage 1: X̂ = α + β*Z (predict X from Z)
+/// Stage 2: Y = γ + δ*X̂ (regress Y on predicted X)
+///
+/// The coefficient δ is the causal effect of X on Y.
+pub struct IVEstimator;
+
+impl IVEstimator {
+    /// Check if Z is a valid instrument for X → Y.
+    ///
+    /// Instrument validity requires:
+    /// 1. Relevance: Z → X path exists
+    /// 2. Exclusion: No direct Z → Y path
+    /// 3. Independence: No confounding of Z
+    pub fn is_valid_instrument(dag: &CausalDAG, instrument: usize, treatment: usize, outcome: usize) -> IVValidity {
+        // Check relevance: Z must affect X
+        if !dag.has_path(instrument, treatment) {
+            return IVValidity::Invalid {
+                reason: "Instrument does not affect treatment (no Z → X path)".to_string(),
+            };
+        }
+
+        // Check exclusion: Z should not directly affect Y
+        // This is a simplification - full check requires excluding paths through X
+        let z_children = dag.children(instrument);
+        for child in z_children {
+            if child == outcome {
+                return IVValidity::Invalid {
+                    reason: "Instrument directly affects outcome (Z → Y path exists)".to_string(),
+                };
+            }
+        }
+
+        // Check if Z only reaches Y through X
+        let mut reaches_y_not_through_x = false;
+        let z_descendants = dag.descendants(instrument);
+        let x_descendants = dag.descendants(treatment);
+
+        for desc in &z_descendants {
+            if *desc == outcome && !x_descendants.contains(&outcome) {
+                reaches_y_not_through_x = true;
+                break;
+            }
+        }
+
+        if reaches_y_not_through_x {
+            return IVValidity::Invalid {
+                reason: "Instrument reaches outcome through path not including treatment".to_string(),
+            };
+        }
+
+        IVValidity::Valid {
+            instrument_strength: 1.0, // Would be computed from data
+        }
+    }
+
+    /// Estimate causal effect using Two-Stage Least Squares (2SLS).
+    ///
+    /// Returns the Local Average Treatment Effect (LATE) for compliers.
+    pub fn estimate_2sls(
+        data: &ObservationalData,
+        instrument: usize,
+        treatment: usize,
+        outcome: usize,
+    ) -> IVResult {
+        let n = data.n();
+        if n < 10 {
+            return IVResult {
+                effect: f64::NAN,
+                first_stage_f: 0.0,
+                is_weak_instrument: true,
+                method: "2SLS".to_string(),
+            };
+        }
+
+        // Stage 1: Regress X on Z
+        let (first_stage_coef, first_stage_r2) = Self::first_stage(data, instrument, treatment);
+
+        // Check for weak instrument (F-statistic < 10 rule of thumb)
+        let first_stage_f = (n as f64 - 2.0) * first_stage_r2 / (1.0 - first_stage_r2);
+        let is_weak = first_stage_f < 10.0;
+
+        // Stage 2: Regress Y on X̂
+        let effect = Self::second_stage(data, instrument, treatment, outcome, first_stage_coef);
+
+        IVResult {
+            effect,
+            first_stage_f,
+            is_weak_instrument: is_weak,
+            method: "2SLS".to_string(),
+        }
+    }
+
+    /// First stage regression: X ~ Z
+    fn first_stage(data: &ObservationalData, z: usize, x: usize) -> (f64, f64) {
+        let n = data.n();
+        let mean_z = data.mean(z);
+        let mean_x = data.mean(x);
+
+        let mut sum_zx = 0.0;
+        let mut sum_zz = 0.0;
+        let mut sum_xx = 0.0;
+
+        for obs in &data.observations {
+            let dz = obs[z] - mean_z;
+            let dx = obs[x] - mean_x;
+            sum_zx += dz * dx;
+            sum_zz += dz * dz;
+            sum_xx += dx * dx;
+        }
+
+        let beta = if sum_zz > 1e-10 { sum_zx / sum_zz } else { 0.0 };
+
+        // R² = (Cov(Z,X))² / (Var(Z) * Var(X))
+        let r2 = if sum_zz > 1e-10 && sum_xx > 1e-10 {
+            (sum_zx * sum_zx) / (sum_zz * sum_xx)
+        } else {
+            0.0
+        };
+
+        (beta, r2)
+    }
+
+    /// Second stage regression: Y ~ X̂
+    fn second_stage(
+        data: &ObservationalData,
+        z: usize,
+        x: usize,
+        y: usize,
+        first_stage_coef: f64,
+    ) -> f64 {
+        let mean_z = data.mean(z);
+        let mean_x = data.mean(x);
+        let mean_y = data.mean(y);
+
+        // Compute X̂ = mean_x + first_stage_coef * (Z - mean_z)
+        let mut sum_xhat_y = 0.0;
+        let mut sum_xhat_xhat = 0.0;
+
+        for obs in &data.observations {
+            let x_hat = mean_x + first_stage_coef * (obs[z] - mean_z);
+            let dx_hat = x_hat - mean_x;
+            let dy = obs[y] - mean_y;
+            sum_xhat_y += dx_hat * dy;
+            sum_xhat_xhat += dx_hat * dx_hat;
+        }
+
+        if sum_xhat_xhat > 1e-10 {
+            sum_xhat_y / sum_xhat_xhat
+        } else {
+            0.0
+        }
+    }
+
+    /// Wald estimator (simple IV with binary instrument).
+    ///
+    /// Effect = (E[Y|Z=1] - E[Y|Z=0]) / (E[X|Z=1] - E[X|Z=0])
+    pub fn estimate_wald(
+        data: &ObservationalData,
+        instrument: usize,
+        treatment: usize,
+        outcome: usize,
+    ) -> f64 {
+        // Split data by instrument value (assuming binary/threshold at 0.5)
+        let mut y_z1 = Vec::new();
+        let mut y_z0 = Vec::new();
+        let mut x_z1 = Vec::new();
+        let mut x_z0 = Vec::new();
+
+        for obs in &data.observations {
+            if obs[instrument] > 0.5 {
+                y_z1.push(obs[outcome]);
+                x_z1.push(obs[treatment]);
+            } else {
+                y_z0.push(obs[outcome]);
+                x_z0.push(obs[treatment]);
+            }
+        }
+
+        if y_z1.is_empty() || y_z0.is_empty() {
+            return f64::NAN;
+        }
+
+        let mean_y_z1: f64 = y_z1.iter().sum::<f64>() / y_z1.len() as f64;
+        let mean_y_z0: f64 = y_z0.iter().sum::<f64>() / y_z0.len() as f64;
+        let mean_x_z1: f64 = x_z1.iter().sum::<f64>() / x_z1.len() as f64;
+        let mean_x_z0: f64 = x_z0.iter().sum::<f64>() / x_z0.len() as f64;
+
+        let denom = mean_x_z1 - mean_x_z0;
+        if denom.abs() < 1e-10 {
+            return f64::NAN;
+        }
+
+        (mean_y_z1 - mean_y_z0) / denom
+    }
+}
+
+/// Validity status of an instrumental variable.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum IVValidity {
+    /// Instrument is valid.
+    Valid {
+        /// Strength of the instrument (first-stage F-statistic).
+        instrument_strength: f64,
+    },
+    /// Instrument is invalid.
+    Invalid {
+        /// Reason for invalidity.
+        reason: String,
+    },
+}
+
+/// Result of instrumental variable estimation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IVResult {
+    /// Estimated causal effect (LATE).
+    pub effect: f64,
+    /// First-stage F-statistic.
+    pub first_stage_f: f64,
+    /// Whether the instrument is weak (F < 10).
+    pub is_weak_instrument: bool,
+    /// Estimation method used.
+    pub method: String,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Time-Series Causal Discovery
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Time-series causal discovery using Granger causality and temporal PC.
+///
+/// Extends causal discovery to longitudinal data where time ordering
+/// provides additional constraints on possible causal relationships.
+///
+/// Key insight: Causes must precede effects in time.
+pub struct TimeSeriesCausalDiscovery {
+    /// Maximum lag to consider.
+    pub max_lag: usize,
+    /// Significance level for Granger tests.
+    pub alpha: f64,
+}
+
+impl TimeSeriesCausalDiscovery {
+    /// Create new time-series causal discovery.
+    pub fn new(max_lag: usize) -> Self {
+        Self {
+            max_lag,
+            alpha: 0.05,
+        }
+    }
+
+    /// Test Granger causality: Does X Granger-cause Y?
+    ///
+    /// X Granger-causes Y if past values of X help predict Y
+    /// beyond what past values of Y alone can predict.
+    ///
+    /// Returns F-statistic and p-value approximation.
+    pub fn granger_test(
+        &self,
+        x: &[f64],
+        y: &[f64],
+        lag: usize,
+    ) -> GrangerResult {
+        if x.len() != y.len() || x.len() <= lag + 1 {
+            return GrangerResult {
+                f_statistic: 0.0,
+                p_value: 1.0,
+                is_significant: false,
+                optimal_lag: 0,
+            };
+        }
+
+        let n = x.len() - lag;
+
+        // Restricted model: Y_t ~ Y_{t-1} + ... + Y_{t-lag}
+        let ssr_restricted = self.compute_ssr_restricted(y, lag);
+
+        // Unrestricted model: Y_t ~ Y_{t-1} + ... + Y_{t-lag} + X_{t-1} + ... + X_{t-lag}
+        let ssr_unrestricted = self.compute_ssr_unrestricted(x, y, lag);
+
+        // F-statistic
+        let df1 = lag as f64;
+        let df2 = (n - 2 * lag - 1) as f64;
+
+        if ssr_unrestricted < 1e-10 || df2 <= 0.0 {
+            return GrangerResult {
+                f_statistic: 0.0,
+                p_value: 1.0,
+                is_significant: false,
+                optimal_lag: lag,
+            };
+        }
+
+        let f_stat = ((ssr_restricted - ssr_unrestricted) / df1) / (ssr_unrestricted / df2);
+
+        // Approximate p-value using F-distribution CDF approximation
+        let p_value = self.f_distribution_pvalue(f_stat, df1, df2);
+
+        GrangerResult {
+            f_statistic: f_stat,
+            p_value,
+            is_significant: p_value < self.alpha,
+            optimal_lag: lag,
+        }
+    }
+
+    /// Compute Sum of Squared Residuals for restricted model.
+    fn compute_ssr_restricted(&self, y: &[f64], lag: usize) -> f64 {
+        let n = y.len();
+        let mut ssr = 0.0;
+
+        for t in lag..n {
+            // Predict Y_t from past Y values
+            let mut y_pred = 0.0;
+            for l in 1..=lag {
+                y_pred += y[t - l] / lag as f64; // Simple average as baseline
+            }
+            let residual = y[t] - y_pred;
+            ssr += residual * residual;
+        }
+
+        ssr
+    }
+
+    /// Compute Sum of Squared Residuals for unrestricted model.
+    fn compute_ssr_unrestricted(&self, x: &[f64], y: &[f64], lag: usize) -> f64 {
+        let n = y.len();
+        let mut ssr = 0.0;
+
+        for t in lag..n {
+            // Predict Y_t from past Y and X values
+            let mut y_pred = 0.0;
+            for l in 1..=lag {
+                y_pred += (y[t - l] + x[t - l]) / (2.0 * lag as f64);
+            }
+            let residual = y[t] - y_pred;
+            ssr += residual * residual;
+        }
+
+        ssr
+    }
+
+    /// Approximate F-distribution p-value.
+    fn f_distribution_pvalue(&self, f: f64, df1: f64, df2: f64) -> f64 {
+        // Wilson-Hilferty approximation for F-distribution
+        if f <= 0.0 || df1 <= 0.0 || df2 <= 0.0 {
+            return 1.0;
+        }
+
+        let x = (f.powf(1.0 / 3.0) * (1.0 - 2.0 / (9.0 * df2)) - (1.0 - 2.0 / (9.0 * df1)))
+            / ((2.0 / (9.0 * df1) + f.powf(2.0 / 3.0) * 2.0 / (9.0 * df2)).sqrt());
+
+        // Standard normal CDF approximation
+        0.5 * (1.0 - Self::erf(x / std::f64::consts::SQRT_2))
+    }
+
+    /// Error function approximation.
+    fn erf(x: f64) -> f64 {
+        let a1 = 0.254829592;
+        let a2 = -0.284496736;
+        let a3 = 1.421413741;
+        let a4 = -1.453152027;
+        let a5 = 1.061405429;
+        let p = 0.3275911;
+
+        let sign = if x < 0.0 { -1.0 } else { 1.0 };
+        let x = x.abs();
+        let t = 1.0 / (1.0 + p * x);
+        let y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * (-x * x).exp();
+
+        sign * y
+    }
+
+    /// Discover causal structure from multivariate time series.
+    ///
+    /// Uses Granger causality tests to build a causal graph where
+    /// X → Y if X Granger-causes Y.
+    pub fn discover(&self, data: &TimeSeriesData) -> TimeSeriesCausalGraph {
+        let n_vars = data.variables.len();
+        let mut edges = Vec::new();
+        let mut granger_results = HashMap::new();
+
+        for i in 0..n_vars {
+            for j in 0..n_vars {
+                if i == j {
+                    continue;
+                }
+
+                // Test if variable i Granger-causes variable j
+                let mut best_result = GrangerResult {
+                    f_statistic: 0.0,
+                    p_value: 1.0,
+                    is_significant: false,
+                    optimal_lag: 1,
+                };
+
+                for lag in 1..=self.max_lag {
+                    let result = self.granger_test(&data.series[i], &data.series[j], lag);
+                    if result.f_statistic > best_result.f_statistic {
+                        best_result = result;
+                        best_result.optimal_lag = lag;
+                    }
+                }
+
+                if best_result.is_significant {
+                    edges.push((i, j, best_result.optimal_lag));
+                }
+
+                granger_results.insert((i, j), best_result);
+            }
+        }
+
+        TimeSeriesCausalGraph {
+            variables: data.variables.clone(),
+            edges,
+            granger_results,
+        }
+    }
+}
+
+impl Default for TimeSeriesCausalDiscovery {
+    fn default() -> Self {
+        Self::new(5)
+    }
+}
+
+/// Time series data for multiple variables.
+#[derive(Debug, Clone)]
+pub struct TimeSeriesData {
+    /// Variable names.
+    pub variables: Vec<String>,
+    /// Time series for each variable (same length).
+    pub series: Vec<Vec<f64>>,
+}
+
+impl TimeSeriesData {
+    /// Create new time series data.
+    pub fn new(variables: Vec<String>) -> Self {
+        let n = variables.len();
+        Self {
+            variables,
+            series: vec![Vec::new(); n],
+        }
+    }
+
+    /// Add a time point observation for all variables.
+    pub fn add_observation(&mut self, values: Vec<f64>) {
+        for (i, v) in values.into_iter().enumerate() {
+            if i < self.series.len() {
+                self.series[i].push(v);
+            }
+        }
+    }
+
+    /// Get number of time points.
+    pub fn n_timepoints(&self) -> usize {
+        self.series.first().map(|s| s.len()).unwrap_or(0)
+    }
+}
+
+/// Result of Granger causality test.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GrangerResult {
+    /// F-statistic for the test.
+    pub f_statistic: f64,
+    /// P-value of the test.
+    pub p_value: f64,
+    /// Whether the result is significant at alpha level.
+    pub is_significant: bool,
+    /// Optimal lag that gave highest F-statistic.
+    pub optimal_lag: usize,
+}
+
+/// Causal graph discovered from time series.
+#[derive(Debug, Clone)]
+pub struct TimeSeriesCausalGraph {
+    /// Variable names.
+    pub variables: Vec<String>,
+    /// Edges as (from, to, lag).
+    pub edges: Vec<(usize, usize, usize)>,
+    /// Granger test results for all pairs.
+    pub granger_results: HashMap<(usize, usize), GrangerResult>,
+}
+
+impl TimeSeriesCausalGraph {
+    /// Convert to standard CausalDAG (ignoring lags).
+    pub fn to_dag(&self) -> CausalDAG {
+        let edges: Vec<(usize, usize)> = self.edges.iter().map(|(f, t, _)| (*f, *t)).collect();
+        CausalDAG::new(self.variables.clone(), edges)
+    }
+
+    /// Get summary of discovered causal relationships.
+    pub fn summary(&self) -> String {
+        let mut lines = vec!["Time-Series Causal Graph:".to_string()];
+
+        for (from, to, lag) in &self.edges {
+            lines.push(format!(
+                "  {} → {} (lag={})",
+                self.variables[*from], self.variables[*to], lag
+            ));
+        }
+
+        if self.edges.is_empty() {
+            lines.push("  No significant Granger-causal relationships found".to_string());
+        }
+
+        lines.join("\n")
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Causal Transportability
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Causal transportability analysis.
+///
+/// Determines whether a causal effect learned in a source population
+/// can be "transported" to a target population that differs in some ways.
+///
+/// Uses selection diagrams where S-nodes represent selection/sampling
+/// mechanisms that differ between populations.
+///
+/// Reference: Pearl & Bareinboim (2011). "Transportability of Causal and
+/// Statistical Relations"
+pub struct TransportabilityAnalyzer {
+    /// Source population DAG.
+    source_dag: CausalDAG,
+    /// Target population DAG (may differ in mechanisms).
+    target_dag: CausalDAG,
+    /// Selection variables (nodes that differ between populations).
+    selection_nodes: Vec<usize>,
+}
+
+impl TransportabilityAnalyzer {
+    /// Create a new transportability analyzer.
+    ///
+    /// # Arguments
+    /// * `source_dag` - DAG for the source population
+    /// * `target_dag` - DAG for the target population
+    /// * `selection_nodes` - Nodes whose mechanisms differ between populations
+    pub fn new(
+        source_dag: CausalDAG,
+        target_dag: CausalDAG,
+        selection_nodes: Vec<usize>,
+    ) -> Self {
+        Self {
+            source_dag,
+            target_dag,
+            selection_nodes,
+        }
+    }
+
+    /// Check if the causal effect P(y|do(x)) is transportable.
+    ///
+    /// Returns transportability status and any required adjustments.
+    pub fn is_transportable(
+        &self,
+        treatment: usize,
+        outcome: usize,
+    ) -> TransportabilityResult {
+        // Simple check: effect is directly transportable if no selection
+        // node is on any path from treatment to outcome
+        let paths_blocked = self.check_selection_blocking(treatment, outcome);
+
+        if paths_blocked {
+            return TransportabilityResult::DirectlyTransportable {
+                explanation: "No selection mechanism affects the causal pathway".to_string(),
+            };
+        }
+
+        // Check if we can adjust for selection
+        let adjustment = self.find_transport_adjustment(treatment, outcome);
+
+        match adjustment {
+            Some(adj_set) => TransportabilityResult::TransportableWithAdjustment {
+                adjustment_set: adj_set,
+                explanation: "Effect transportable after adjusting for population differences"
+                    .to_string(),
+            },
+            None => TransportabilityResult::NotTransportable {
+                reason: "Selection mechanisms block all identification strategies".to_string(),
+                blocking_nodes: self.find_blocking_selection_nodes(treatment, outcome),
+            },
+        }
+    }
+
+    /// Check if selection nodes block the treatment-outcome relationship.
+    fn check_selection_blocking(&self, treatment: usize, outcome: usize) -> bool {
+        // Get all nodes on paths from treatment to outcome
+        let descendants = self.source_dag.descendants(treatment);
+
+        // Check if any selection node is a descendant of treatment
+        // and an ancestor of outcome
+        for &s_node in &self.selection_nodes {
+            if descendants.contains(&s_node) {
+                let s_descendants = self.source_dag.descendants(s_node);
+                if s_descendants.contains(&outcome) {
+                    return false; // Selection node is on a path
+                }
+            }
+        }
+
+        true // No selection node on any path
+    }
+
+    /// Find adjustment set for transportability.
+    fn find_transport_adjustment(&self, treatment: usize, outcome: usize) -> Option<Vec<usize>> {
+        // Find variables that can block selection bias
+        // These must satisfy the selection backdoor criterion
+
+        let mut candidates: Vec<usize> = (0..self.source_dag.num_nodes())
+            .filter(|&n| {
+                n != treatment
+                    && n != outcome
+                    && !self.selection_nodes.contains(&n)
+                    && !self.source_dag.descendants(treatment).contains(&n)
+            })
+            .collect();
+
+        // Check if candidates block selection-induced confounding
+        if candidates.is_empty() {
+            return None;
+        }
+
+        // Simplified: return all non-descendant, non-selection nodes
+        Some(candidates)
+    }
+
+    /// Find which selection nodes block transportability.
+    fn find_blocking_selection_nodes(&self, treatment: usize, outcome: usize) -> Vec<usize> {
+        let mut blocking = Vec::new();
+        let treatment_descendants = self.source_dag.descendants(treatment);
+
+        for &s_node in &self.selection_nodes {
+            if treatment_descendants.contains(&s_node) {
+                let s_descendants = self.source_dag.descendants(s_node);
+                if s_descendants.contains(&outcome) {
+                    blocking.push(s_node);
+                }
+            }
+        }
+
+        blocking
+    }
+
+    /// Compute the transported effect estimate.
+    ///
+    /// Uses the transport formula to reweight the source effect.
+    pub fn transport_effect(
+        &self,
+        source_data: &ObservationalData,
+        target_data: &ObservationalData,
+        treatment: usize,
+        outcome: usize,
+    ) -> Option<f64> {
+        let result = self.is_transportable(treatment, outcome);
+
+        match result {
+            TransportabilityResult::DirectlyTransportable { .. } => {
+                // Effect is the same in both populations
+                // Use source effect directly
+                let estimator = EffectEstimator::new();
+                let query = CausalQuery {
+                    treatment,
+                    outcome,
+                    conditioning: vec![],
+                };
+
+                match estimator.estimate(&self.source_dag, &query, source_data) {
+                    CausalQueryOutcome::Identified { estimand, .. } => Some(estimand.effect),
+                    _ => None,
+                }
+            }
+            TransportabilityResult::TransportableWithAdjustment { adjustment_set, .. } => {
+                // Need to reweight by population differences
+                // Simplified: compute effect in source with adjustment
+                let estimator = EffectEstimator::new();
+                let query = CausalQuery {
+                    treatment,
+                    outcome,
+                    conditioning: adjustment_set,
+                };
+
+                match estimator.estimate(&self.source_dag, &query, source_data) {
+                    CausalQueryOutcome::Identified { estimand, .. } => Some(estimand.effect),
+                    _ => None,
+                }
+            }
+            TransportabilityResult::NotTransportable { .. } => None,
+        }
+    }
+}
+
+/// Result of transportability analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TransportabilityResult {
+    /// Effect is directly transportable without adjustment.
+    DirectlyTransportable {
+        /// Explanation of why it's transportable.
+        explanation: String,
+    },
+    /// Effect is transportable after adjusting for covariates.
+    TransportableWithAdjustment {
+        /// Variables to adjust for in the target population.
+        adjustment_set: Vec<usize>,
+        /// Explanation.
+        explanation: String,
+    },
+    /// Effect is not transportable.
+    NotTransportable {
+        /// Reason for non-transportability.
+        reason: String,
+        /// Selection nodes that block transport.
+        blocking_nodes: Vec<usize>,
+    },
+}
+
+impl TransportabilityResult {
+    /// Check if the effect is transportable (with or without adjustment).
+    pub fn is_transportable(&self) -> bool {
+        !matches!(self, TransportabilityResult::NotTransportable { .. })
     }
 }
 

@@ -32,7 +32,7 @@
 //!                    (binding strength)
 //! ```
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::unified_consciousness_engine::ConsciousnessUpdate;
 use std::collections::VecDeque;
 
@@ -79,7 +79,7 @@ impl AttentionMode {
 #[derive(Clone, Debug)]
 pub struct AttentionTarget {
     /// The target representation
-    pub vector: RealHV,
+    pub vector: ContinuousHV,
     /// Target salience (how attention-grabbing)
     pub salience: f64,
     /// Current attention weight (0-1)
@@ -98,7 +98,7 @@ pub struct AttentionAllocation {
     /// Current mode
     pub mode: AttentionMode,
     /// Focus vector (what we're attending to)
-    pub focus: RealHV,
+    pub focus: ContinuousHV,
     /// Total attention deployed
     pub total_attention: f64,
     /// Attention entropy (how distributed)
@@ -110,7 +110,7 @@ pub struct AttentionDynamics {
     /// Current attention targets
     targets: Vec<AttentionTarget>,
     /// Current focus vector
-    focus: RealHV,
+    focus: ContinuousHV,
     /// Current mode
     mode: AttentionMode,
     /// Step counter
@@ -132,7 +132,7 @@ impl AttentionDynamics {
     pub fn new(dim: usize) -> Self {
         Self {
             targets: Vec::new(),
-            focus: RealHV::random(dim, 42),
+            focus: ContinuousHV::random(dim, 42),
             mode: AttentionMode::Diffuse,
             step: 0,
             dim,
@@ -144,7 +144,7 @@ impl AttentionDynamics {
     }
 
     /// Add a new attention target
-    pub fn add_target(&mut self, vector: RealHV, salience: f64) -> usize {
+    pub fn add_target(&mut self, vector: ContinuousHV, salience: f64) -> usize {
         let id = self.next_id;
         self.next_id += 1;
 
@@ -165,7 +165,7 @@ impl AttentionDynamics {
     }
 
     /// Process one attention step
-    pub fn step(&mut self, external_input: Option<&RealHV>) -> AttentionAllocation {
+    pub fn step(&mut self, external_input: Option<&ContinuousHV>) -> AttentionAllocation {
         self.step += 1;
 
         // Handle blink recovery
@@ -209,7 +209,7 @@ impl AttentionDynamics {
     }
 
     /// Update target saliences based on similarity to input
-    fn update_saliences(&mut self, input: &RealHV) {
+    fn update_saliences(&mut self, input: &ContinuousHV) {
         for target in &mut self.targets {
             let similarity = target.vector.similarity(input).max(0.0) as f64;
             // Salience increases if target matches input
@@ -349,7 +349,7 @@ impl AttentionDynamics {
         }
 
         if !focus_components.is_empty() {
-            self.focus = RealHV::bundle(&focus_components);
+            self.focus = ContinuousHV::bundle_owned(&focus_components);
         }
     }
 
@@ -401,7 +401,7 @@ impl AttentionDynamics {
     }
 
     /// Get focus vector
-    pub fn focus(&self) -> &RealHV {
+    pub fn focus(&self) -> &ContinuousHV {
         &self.focus
     }
 
@@ -482,9 +482,9 @@ mod tests {
         let mut attention = AttentionDynamics::new(1024);
 
         // Add some targets
-        let t1 = attention.add_target(RealHV::random(1024, 1), 0.8);
-        let t2 = attention.add_target(RealHV::random(1024, 2), 0.3);
-        let t3 = attention.add_target(RealHV::random(1024, 3), 0.5);
+        let t1 = attention.add_target(ContinuousHV::random(1024, 1), 0.8);
+        let t2 = attention.add_target(ContinuousHV::random(1024, 2), 0.3);
+        let t3 = attention.add_target(ContinuousHV::random(1024, 3), 0.5);
 
         println!("\nAttention Dynamics Test:");
         for i in 0..15 {
@@ -503,8 +503,8 @@ mod tests {
         let mut attention = AttentionDynamics::new(1024);
 
         // Add low salience targets
-        attention.add_target(RealHV::random(1024, 1), 0.2);
-        attention.add_target(RealHV::random(1024, 2), 0.3);
+        attention.add_target(ContinuousHV::random(1024, 1), 0.2);
+        attention.add_target(ContinuousHV::random(1024, 2), 0.3);
 
         // Run a few steps
         for _ in 0..5 {
@@ -512,7 +512,7 @@ mod tests {
         }
 
         // Now add high salience target (should capture)
-        let capture_target = RealHV::random(1024, 100);
+        let capture_target = ContinuousHV::random(1024, 100);
         attention.add_target(capture_target.clone(), 0.95);
 
         println!("\nAttention Capture Test:");
@@ -529,7 +529,7 @@ mod tests {
 
         // Add many equal targets -> should be diffuse
         for i in 0..5 {
-            attention.add_target(RealHV::random(1024, i), 0.5);
+            attention.add_target(ContinuousHV::random(1024, i), 0.5);
         }
 
         println!("\nMode Transition Test:");

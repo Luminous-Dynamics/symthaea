@@ -443,7 +443,7 @@ impl AnalogyEngine {
         } else if vectors.len() == 1 {
             Some(vectors[0].clone())
         } else {
-            let refs: Vec<_> = vectors.iter().map(|v| *v).collect();
+            let refs: Vec<_> = vectors.to_vec();
             Some(ContinuousHV::bundle(&refs))
         }
     }

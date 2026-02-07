@@ -29,7 +29,7 @@
 //! | Anticipation   | Joy + Fear + Excitement       | Eager uncertainty                  |
 //! | Ambivalence    | (A + inverted A)              | Conflicting feelings               |
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::primitive_system::PrimitiveSystem;
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -190,7 +190,7 @@ pub struct EmotionalBlend {
     pub components: Vec<WeightedComponent>,
 
     /// HDC encoding of the blended emotional state
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Computed overall valence
     pub valence: f64,
@@ -510,7 +510,7 @@ pub struct EmotionalEncoder {
     primitives: PrimitiveSystem,
 
     /// Cached component encodings
-    component_cache: HashMap<EmotionalComponent, HV16>,
+    component_cache: HashMap<EmotionalComponent, BinaryHV>,
 
     /// Seed for deterministic encoding
     seed: u64,
@@ -561,28 +561,28 @@ impl EmotionalEncoder {
     }
 
     /// Encode a single emotional component
-    fn encode_component(&self, component: EmotionalComponent) -> HV16 {
+    fn encode_component(&self, component: EmotionalComponent) -> BinaryHV {
         let name = component.primitive_name();
 
         // Try to get from primitive system first
         if let Some(prim) = self.primitives.get(name) {
-            return prim.encoding.clone();
+            return prim.encoding;
         }
 
         // Fallback: generate deterministic random HV
         let seed = self.seed ^ (name.as_bytes().iter().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(*b as u64)));
-        HV16::random(seed)
+        BinaryHV::random(seed)
     }
 
     /// Get cached encoding for a component
-    pub fn get_component(&self, component: EmotionalComponent) -> HV16 {
+    pub fn get_component(&self, component: EmotionalComponent) -> BinaryHV {
         self.component_cache.get(&component)
             .cloned()
-            .unwrap_or_else(|| HV16::random(self.seed))
+            .unwrap_or_else(|| BinaryHV::random(self.seed))
     }
 
     /// Encode a weighted component (with optional inversion)
-    fn encode_weighted(&self, wc: &WeightedComponent) -> HV16 {
+    fn encode_weighted(&self, wc: &WeightedComponent) -> BinaryHV {
         let base = self.get_component(wc.component);
 
         if wc.inverted {
@@ -593,9 +593,9 @@ impl EmotionalEncoder {
     }
 
     /// Encode a blend of weighted components using HDC bundling
-    pub fn encode_blend(&self, components: &[WeightedComponent]) -> HV16 {
+    pub fn encode_blend(&self, components: &[WeightedComponent]) -> BinaryHV {
         if components.is_empty() {
-            return HV16::random(self.seed);
+            return BinaryHV::random(self.seed);
         }
 
         if components.len() == 1 {
@@ -604,7 +604,7 @@ impl EmotionalEncoder {
 
         // Weighted bundling: superposition of component vectors
         // Weight affects how much each contributes to the final bundle
-        let weighted_hvs: Vec<(HV16, f64)> = components.iter()
+        let weighted_hvs: Vec<(BinaryHV, f64)> = components.iter()
             .map(|c| (self.encode_weighted(c), c.weight))
             .collect();
 
@@ -613,13 +613,13 @@ impl EmotionalEncoder {
     }
 
     /// Weighted bundle operation (HDC superposition with weights)
-    fn weighted_bundle(weighted_hvs: &[(HV16, f64)]) -> HV16 {
+    fn weighted_bundle(weighted_hvs: &[(BinaryHV, f64)]) -> BinaryHV {
         if weighted_hvs.is_empty() {
-            return HV16::random(42);
+            return BinaryHV::random(42);
         }
 
         // Accumulate weighted votes for each bit
-        // HV16 is 2048 bytes = 16384 bits
+        // BinaryHV is 2048 bytes = 16384 bits
         const DIMENSIONS: usize = 16384;
         let mut accumulator = vec![0.0f64; DIMENSIONS];
 
@@ -646,7 +646,7 @@ impl EmotionalEncoder {
             }
         }
 
-        HV16(result)
+        BinaryHV(result)
     }
 
     /// Encode a compound emotion
@@ -658,12 +658,12 @@ impl EmotionalEncoder {
 
     /// Create a contextualized emotion (emotion IN context)
     /// Uses HDC binding to associate emotion with context
-    pub fn contextualize(&self, emotion: &HV16, context: &HV16) -> HV16 {
+    pub fn contextualize(&self, emotion: &BinaryHV, context: &BinaryHV) -> BinaryHV {
         emotion.bind(context)
     }
 
     /// Compute similarity between two emotional states
-    pub fn similarity(&self, a: &HV16, b: &HV16) -> f64 {
+    pub fn similarity(&self, a: &BinaryHV, b: &BinaryHV) -> f64 {
         a.similarity(b) as f64
     }
 }
@@ -796,16 +796,16 @@ impl EmotionalTrajectory {
     }
 
     /// Encode entire trajectory as single HDC vector (temporal binding)
-    pub fn encode_trajectory(&self, window: usize) -> HV16 {
+    pub fn encode_trajectory(&self, window: usize) -> BinaryHV {
         let recent: Vec<_> = self.moments.iter().rev().take(window).collect();
         if recent.is_empty() {
-            return HV16::random(42);
+            return BinaryHV::random(42);
         }
 
         // Temporal binding: bind each moment with position vector, then bundle
         let time_base = self.encoder.get_component(EmotionalComponent::Temporal);
 
-        let temporal_hvs: Vec<(HV16, f64)> = recent.iter().enumerate()
+        let temporal_hvs: Vec<(BinaryHV, f64)> = recent.iter().enumerate()
             .map(|(i, moment)| {
                 // Create position vector by permuting time base
                 let position = time_base.permute(i);
@@ -928,7 +928,7 @@ impl EmotionalDepthSystem {
     }
 
     /// Get HDC encoding of current emotional trajectory
-    pub fn trajectory_encoding(&self) -> HV16 {
+    pub fn trajectory_encoding(&self) -> BinaryHV {
         self.trajectory.encode_trajectory(10)
     }
 

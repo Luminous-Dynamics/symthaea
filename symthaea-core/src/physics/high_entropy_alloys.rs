@@ -650,14 +650,13 @@ pub fn multi_seed_hea_search(
         for result in results.into_iter().take(top_n) {
             let name = result.alloy.name.clone();
             all_results.entry(name)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push((result, seed_idx));
         }
     }
 
     // Aggregate by alloy name
-    let mut consensus: Vec<HEAConsensusResult> = all_results.into_iter()
-        .map(|(_name, results)| {
+    let mut consensus: Vec<HEAConsensusResult> = all_results.into_values().map(|results| {
             let occurrence_count = results.len();
             let best_result = results.iter()
                 .max_by(|a, b| a.0.match_score.partial_cmp(&b.0.match_score).unwrap_or(std::cmp::Ordering::Equal))

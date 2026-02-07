@@ -16,7 +16,7 @@
 //! - Provides unified access through `AdvancedCognitionEngine`
 //! - Creates cross-system interactions (e.g., drives → attention → memory)
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::emotional_depth::EmotionalBlend;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -51,7 +51,7 @@ pub struct MotorCommand {
     /// Duration in simulated ms
     pub duration_ms: u32,
     /// Expected outcome HV
-    pub expected_outcome: HV16,
+    pub expected_outcome: BinaryHV,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -75,7 +75,7 @@ pub struct BodyState {
     /// Position of body parts (simplified 3D coords)
     pub positions: HashMap<String, (f64, f64, f64)>,
     /// Current posture encoding
-    pub posture_hv: HV16,
+    pub posture_hv: BinaryHV,
     /// Energy level (0.0-1.0)
     pub energy: f64,
     /// Tension level (0.0-1.0)
@@ -97,9 +97,9 @@ pub struct MotorProgram {
 #[derive(Debug, Clone)]
 pub struct MotorPredictionError {
     /// What was predicted
-    pub predicted: HV16,
+    pub predicted: BinaryHV,
     /// What happened
-    pub actual: HV16,
+    pub actual: BinaryHV,
     /// Error magnitude
     pub magnitude: f64,
     /// Which effector
@@ -117,7 +117,7 @@ impl MotorImagerySystem {
             imagined_sequence: VecDeque::new(),
             simulated_body_state: BodyState {
                 positions,
-                posture_hv: HV16::random(42),
+                posture_hv: BinaryHV::random(42),
                 energy: 0.8,
                 tension: 0.2,
             },
@@ -150,19 +150,19 @@ impl MotorImagerySystem {
     }
 
     /// Simulate a motor command and predict outcome
-    fn simulate_motor_command(&self, command: &MotorCommand) -> HV16 {
+    fn simulate_motor_command(&self, command: &MotorCommand) -> BinaryHV {
         // Use motor program if available, otherwise generate novel simulation
         if let Some(program) = self.motor_programs.get(&command.effector) {
             // Familiar action - use learned pattern
             program.commands.first()
-                .map(|c| c.expected_outcome.clone())
-                .unwrap_or_else(|| HV16::random(command.duration_ms as u64))
+                .map(|c| c.expected_outcome)
+                .unwrap_or_else(|| BinaryHV::random(command.duration_ms as u64))
         } else {
             // Novel action - combine effector, action, intensity
-            let effector_hv = HV16::random(hash_string(&command.effector));
-            let action_hv = HV16::random(command.action as u64);
-            let intensity_hv = HV16::random((command.intensity * 1000.0) as u64);
-            HV16::bundle(&[effector_hv, action_hv, intensity_hv])
+            let effector_hv = BinaryHV::random(hash_string(&command.effector));
+            let action_hv = BinaryHV::random(command.action as u64);
+            let intensity_hv = BinaryHV::random((command.intensity * 1000.0) as u64);
+            BinaryHV::bundle(&[effector_hv, action_hv, intensity_hv])
         }
     }
 
@@ -207,8 +207,8 @@ impl MotorImagerySystem {
     }
 
     /// Get body state encoding for cross-modal binding
-    pub fn body_state_hv(&self) -> HV16 {
-        self.simulated_body_state.posture_hv.clone()
+    pub fn body_state_hv(&self) -> BinaryHV {
+        self.simulated_body_state.posture_hv
     }
 
     /// Set imagery vividness
@@ -219,7 +219,7 @@ impl MotorImagerySystem {
 
 #[derive(Debug, Clone)]
 pub struct MotorImageryResult {
-    pub simulated_outcome: HV16,
+    pub simulated_outcome: BinaryHV,
     pub vividness: f64,
     pub match_quality: f64,
     pub energy_cost_estimate: f64,
@@ -245,7 +245,7 @@ pub struct TheoryOfMindEngine {
     /// Cache of recent mental state inferences
     inference_cache: VecDeque<MentalStateInference>,
     /// Shared knowledge base (common ground)
-    shared_knowledge: Vec<HV16>,
+    shared_knowledge: Vec<BinaryHV>,
 }
 
 #[derive(Debug, Clone)]
@@ -269,7 +269,7 @@ pub struct AgentMentalModel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Belief {
     /// Content of belief
-    pub content: HV16,
+    pub content: BinaryHV,
     /// Description for introspection
     pub description: String,
     /// Strength of belief (0.0-1.0)
@@ -281,7 +281,7 @@ pub struct Belief {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Desire {
     /// Content of desire
-    pub content: HV16,
+    pub content: BinaryHV,
     /// Description
     pub description: String,
     /// Urgency (0.0-1.0)
@@ -293,9 +293,9 @@ pub struct Desire {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Intention {
     /// Intended action
-    pub action: HV16,
+    pub action: BinaryHV,
     /// Target of action
-    pub target: Option<HV16>,
+    pub target: Option<BinaryHV>,
     /// Description
     pub description: String,
     /// Commitment strength (0.0-1.0)
@@ -316,7 +316,7 @@ pub struct MentalStateInference {
     /// What was inferred
     pub inference_type: InferenceType,
     /// Evidence used
-    pub evidence: Vec<HV16>,
+    pub evidence: Vec<BinaryHV>,
     /// Confidence
     pub confidence: f64,
     /// Timestamp
@@ -393,7 +393,7 @@ impl TheoryOfMindEngine {
     }
 
     /// Infer emotional state from behavioral cues
-    pub fn infer_emotion(&mut self, agent_id: &str, behavioral_cues: &[HV16]) -> CoreAffectEstimate {
+    pub fn infer_emotion(&mut self, agent_id: &str, behavioral_cues: &[BinaryHV]) -> CoreAffectEstimate {
         // Simple inference based on cue patterns
         let valence = if !behavioral_cues.is_empty() {
             // Use first bit pattern as rough valence estimate
@@ -418,22 +418,22 @@ impl TheoryOfMindEngine {
     }
 
     /// Perform perspective-taking: simulate agent's viewpoint
-    pub fn take_perspective(&self, agent_id: &str, situation: &HV16) -> PerspectiveResult {
+    pub fn take_perspective(&self, agent_id: &str, situation: &BinaryHV) -> PerspectiveResult {
         let model = match self.agent_models.get(agent_id) {
             Some(m) => m,
             None => return PerspectiveResult::unknown(),
         };
 
         // Combine agent's beliefs with situation
-        let mut perspective_hvs: Vec<HV16> = model.beliefs.iter()
-            .map(|b| b.content.clone())
+        let mut perspective_hvs: Vec<BinaryHV> = model.beliefs.iter()
+            .map(|b| b.content)
             .collect();
-        perspective_hvs.push(situation.clone());
+        perspective_hvs.push(*situation);
 
         let perspective = if perspective_hvs.is_empty() {
-            situation.clone()
+            *situation
         } else {
-            HV16::bundle(&perspective_hvs)
+            BinaryHV::bundle(&perspective_hvs)
         };
 
         // What would they perceive?
@@ -445,7 +445,7 @@ impl TheoryOfMindEngine {
             let desire_hv = &model.desires[0].content;
             perceived.bind(desire_hv)
         } else {
-            perceived.clone()
+            perceived
         };
 
         PerspectiveResult {
@@ -457,12 +457,12 @@ impl TheoryOfMindEngine {
     }
 
     /// Rotate HV to simulate different perspective
-    fn rotate_for_perspective(&self, hv: &HV16) -> HV16 {
+    fn rotate_for_perspective(&self, hv: &BinaryHV) -> BinaryHV {
         hv.permute(42) // Perspective shift through permutation
     }
 
     /// Detect if agent has a false belief
-    pub fn detect_false_belief(&self, agent_id: &str, reality: &HV16) -> Option<FalseBeliefDetection> {
+    pub fn detect_false_belief(&self, agent_id: &str, reality: &BinaryHV) -> Option<FalseBeliefDetection> {
         let model = self.agent_models.get(agent_id)?;
 
         for belief in &model.beliefs {
@@ -471,7 +471,7 @@ impl TheoryOfMindEngine {
                 return Some(FalseBeliefDetection {
                     agent_id: agent_id.to_string(),
                     false_belief: belief.clone(),
-                    reality: reality.clone(),
+                    reality: *reality,
                     divergence: 1.0 - similarity as f64,
                 });
             }
@@ -497,7 +497,7 @@ impl TheoryOfMindEngine {
         let predicted_action = if let Some(desire) = urgent_desire {
             strongest_intention.action.bind(&desire.content)
         } else {
-            strongest_intention.action.clone()
+            strongest_intention.action
         };
 
         Some(ActionPrediction {
@@ -508,7 +508,7 @@ impl TheoryOfMindEngine {
     }
 
     /// Add to shared knowledge (common ground)
-    pub fn add_shared_knowledge(&mut self, knowledge: HV16) {
+    pub fn add_shared_knowledge(&mut self, knowledge: BinaryHV) {
         self.shared_knowledge.push(knowledge);
     }
 
@@ -520,8 +520,8 @@ impl TheoryOfMindEngine {
 
 #[derive(Debug, Clone)]
 pub struct PerspectiveResult {
-    pub perceived_situation: HV16,
-    pub likely_conclusion: HV16,
+    pub perceived_situation: BinaryHV,
+    pub likely_conclusion: BinaryHV,
     pub emotional_response: CoreAffectEstimate,
     pub confidence: f64,
 }
@@ -529,8 +529,8 @@ pub struct PerspectiveResult {
 impl PerspectiveResult {
     fn unknown() -> Self {
         Self {
-            perceived_situation: HV16::random(0),
-            likely_conclusion: HV16::random(0),
+            perceived_situation: BinaryHV::random(0),
+            likely_conclusion: BinaryHV::random(0),
             emotional_response: CoreAffectEstimate {
                 valence: 0.0,
                 arousal: 0.5,
@@ -545,13 +545,13 @@ impl PerspectiveResult {
 pub struct FalseBeliefDetection {
     pub agent_id: String,
     pub false_belief: Belief,
-    pub reality: HV16,
+    pub reality: BinaryHV,
     pub divergence: f64,
 }
 
 #[derive(Debug, Clone)]
 pub struct ActionPrediction {
-    pub predicted_action: HV16,
+    pub predicted_action: BinaryHV,
     pub based_on_intention: String,
     pub confidence: f64,
 }
@@ -584,11 +584,11 @@ pub struct ImaginationEngine {
 #[derive(Debug, Clone)]
 pub struct ImaginaryConstruct {
     /// The imagined content
-    pub content: HV16,
+    pub content: BinaryHV,
     /// Description
     pub description: String,
     /// Source concepts (what was combined)
-    pub sources: Vec<HV16>,
+    pub sources: Vec<BinaryHV>,
     /// Novelty score (how different from known concepts)
     pub novelty: f64,
     /// Coherence score (how internally consistent)
@@ -600,23 +600,23 @@ pub struct ImaginaryConstruct {
 #[derive(Debug, Clone)]
 pub struct AnalogicalMapping {
     /// Source domain
-    pub source_domain: HV16,
+    pub source_domain: BinaryHV,
     pub source_label: String,
     /// Target domain
-    pub target_domain: HV16,
+    pub target_domain: BinaryHV,
     pub target_label: String,
     /// Mapping strength (structural similarity)
     pub strength: f64,
     /// Inferences made via this analogy
-    pub inferences: Vec<HV16>,
+    pub inferences: Vec<BinaryHV>,
 }
 
 #[derive(Debug, Clone)]
 pub struct CreativeCombination {
     /// Input concepts
-    pub inputs: Vec<HV16>,
+    pub inputs: Vec<BinaryHV>,
     /// Output creation
-    pub output: HV16,
+    pub output: BinaryHV,
     /// Combination method used
     pub method: CombinationMethod,
     /// Quality assessment
@@ -651,33 +651,33 @@ impl ImaginationEngine {
     }
 
     /// Imagine something new by combining concepts
-    pub fn imagine(&mut self, concepts: &[HV16], method: CombinationMethod) -> ImaginaryConstruct {
+    pub fn imagine(&mut self, concepts: &[BinaryHV], method: CombinationMethod) -> ImaginaryConstruct {
         let combined = match method {
             CombinationMethod::PropertyMerge => {
-                HV16::bundle(concepts)
+                BinaryHV::bundle(concepts)
             }
             CombinationMethod::StructuralTransfer => {
                 if concepts.len() >= 2 {
                     // Transfer structure from first to second
                     concepts[0].bind(&concepts[1])
                 } else {
-                    concepts.first().cloned().unwrap_or_else(|| HV16::random(42))
+                    concepts.first().cloned().unwrap_or_else(|| BinaryHV::random(42))
                 }
             }
             CombinationMethod::Negation => {
                 if let Some(first) = concepts.first() {
                     first.invert()
                 } else {
-                    HV16::random(42)
+                    BinaryHV::random(42)
                 }
             }
             CombinationMethod::RandomBlend => {
-                let base = HV16::bundle(concepts);
-                let noise = HV16::random(current_timestamp());
-                HV16::bundle(&[base, noise])
+                let base = BinaryHV::bundle(concepts);
+                let noise = BinaryHV::random(current_timestamp());
+                BinaryHV::bundle(&[base, noise])
             }
             CombinationMethod::ConstraintRelax => {
-                let base = HV16::bundle(concepts);
+                let base = BinaryHV::bundle(concepts);
                 base.add_noise(self.constraint_relaxation as f32, current_timestamp())
             }
             CombinationMethod::Counterfactual => {
@@ -685,12 +685,12 @@ impl ImaginationEngine {
                 if let Some(first) = concepts.first() {
                     let negated = first.invert();
                     if concepts.len() > 1 {
-                        negated.bind(&HV16::bundle(&concepts[1..]))
+                        negated.bind(&BinaryHV::bundle(&concepts[1..]))
                     } else {
                         negated
                     }
                 } else {
-                    HV16::random(42)
+                    BinaryHV::random(42)
                 }
             }
         };
@@ -723,7 +723,7 @@ impl ImaginationEngine {
         // Record combination
         self.combinations_history.push_back(CreativeCombination {
             inputs: concepts.to_vec(),
-            output: construct.content.clone(),
+            output: construct.content,
             method,
             quality: utility,
         });
@@ -743,9 +743,9 @@ impl ImaginationEngine {
     /// Create an analogy between two domains
     pub fn create_analogy(
         &mut self,
-        source: &HV16,
+        source: &BinaryHV,
         source_label: &str,
-        target: &HV16,
+        target: &BinaryHV,
         target_label: &str,
     ) -> AnalogicalMapping {
         let strength = source.similarity(target) as f64;
@@ -754,9 +754,9 @@ impl ImaginationEngine {
         let inference = source.bind(target);
 
         let mapping = AnalogicalMapping {
-            source_domain: source.clone(),
+            source_domain: *source,
             source_label: source_label.to_string(),
-            target_domain: target.clone(),
+            target_domain: *target,
             target_label: target_label.to_string(),
             strength,
             inferences: vec![inference],
@@ -767,7 +767,7 @@ impl ImaginationEngine {
     }
 
     /// Use analogy to infer about target domain
-    pub fn analogical_inference(&self, source_property: &HV16, analogy_index: usize) -> Option<HV16> {
+    pub fn analogical_inference(&self, source_property: &BinaryHV, analogy_index: usize) -> Option<BinaryHV> {
         let analogy = self.analogies.get(analogy_index)?;
 
         // Map source property to target domain
@@ -778,8 +778,8 @@ impl ImaginationEngine {
     }
 
     /// Simulate a scenario mentally
-    pub fn simulate_scenario(&mut self, initial_state: &HV16, steps: u32) -> Vec<HV16> {
-        let mut states = vec![initial_state.clone()];
+    pub fn simulate_scenario(&mut self, initial_state: &BinaryHV, steps: u32) -> Vec<BinaryHV> {
+        let mut states = vec![*initial_state];
 
         for i in 0..steps {
             let current = states.last().unwrap();
@@ -794,7 +794,7 @@ impl ImaginationEngine {
     }
 
     /// Generate novel concept by exploring semantic space
-    pub fn explore_semantic_space(&mut self, seed: &HV16, exploration_radius: f64) -> Vec<ImaginaryConstruct> {
+    pub fn explore_semantic_space(&mut self, seed: &BinaryHV, exploration_radius: f64) -> Vec<ImaginaryConstruct> {
         let mut explorations = Vec::new();
 
         // Generate variations through different methods
@@ -805,7 +805,7 @@ impl ImaginationEngine {
         ] {
             let noise_level = exploration_radius as f32;
             let varied = seed.add_noise(noise_level, current_timestamp() + *method as u64);
-            let construct = self.imagine(&[seed.clone(), varied], *method);
+            let construct = self.imagine(&[*seed, varied], *method);
             explorations.push(construct);
         }
 
@@ -856,9 +856,9 @@ pub struct PredictionLayer {
     /// Layer level (0 = sensory)
     pub level: u32,
     /// Current belief state
-    pub belief: HV16,
+    pub belief: BinaryHV,
     /// Prediction for level below
-    pub downward_prediction: HV16,
+    pub downward_prediction: BinaryHV,
     /// Precision (confidence)
     pub precision: f64,
     /// Learning rate
@@ -868,19 +868,19 @@ pub struct PredictionLayer {
 #[derive(Debug, Clone)]
 pub struct ActiveGoal {
     /// Goal state
-    pub target: HV16,
+    pub target: BinaryHV,
     /// Priority
     pub priority: f64,
     /// Expected path to goal
-    pub expected_path: Vec<HV16>,
+    pub expected_path: Vec<BinaryHV>,
 }
 
 #[derive(Debug, Clone)]
 pub struct WeightedError {
     /// Prediction
-    pub prediction: HV16,
+    pub prediction: BinaryHV,
     /// Actual
-    pub actual: HV16,
+    pub actual: BinaryHV,
     /// Raw error magnitude
     pub magnitude: f64,
     /// Precision-weighted error
@@ -903,8 +903,8 @@ impl PredictiveProcessor {
     pub fn new(num_layers: u32) -> Self {
         let layers = (0..num_layers).map(|i| PredictionLayer {
             level: i,
-            belief: HV16::random(i as u64),
-            downward_prediction: HV16::random(i as u64 + 1000),
+            belief: BinaryHV::random(i as u64),
+            downward_prediction: BinaryHV::random(i as u64 + 1000),
             precision: 0.8 - (i as f64 * 0.1),
             learning_rate: 0.1,
         }).collect();
@@ -922,8 +922,8 @@ impl PredictiveProcessor {
     }
 
     /// Process input through hierarchy
-    pub fn process(&mut self, sensory_input: &HV16) -> PredictionResult {
-        let mut current_signal = sensory_input.clone();
+    pub fn process(&mut self, sensory_input: &BinaryHV) -> PredictionResult {
+        let mut current_signal = *sensory_input;
         let mut total_error = 0.0;
         let mut layer_errors = Vec::new();
 
@@ -934,8 +934,8 @@ impl PredictiveProcessor {
             let weighted_error = error_magnitude * effective_precision;
 
             layer_errors.push(WeightedError {
-                prediction: layer.downward_prediction.clone(),
-                actual: current_signal.clone(),
+                prediction: layer.downward_prediction,
+                actual: current_signal,
                 magnitude: error_magnitude,
                 weighted: weighted_error,
                 layer: layer.level,
@@ -947,8 +947,8 @@ impl PredictiveProcessor {
             if weighted_error > 0.1 {
                 // Significant error - update belief
                 let update = current_signal.bind(&layer.belief);
-                layer.belief = HV16::bundle(&[
-                    layer.belief.clone(),
+                layer.belief = BinaryHV::bundle(&[
+                    layer.belief,
                     update,
                 ]);
             }
@@ -957,7 +957,7 @@ impl PredictiveProcessor {
             layer.downward_prediction = layer.belief.permute(layer.level as usize);
 
             // Pass belief up to next layer
-            current_signal = layer.belief.clone();
+            current_signal = layer.belief;
         }
 
         // Record errors
@@ -970,8 +970,8 @@ impl PredictiveProcessor {
 
         PredictionResult {
             integrated_belief: self.layers.last()
-                .map(|l| l.belief.clone())
-                .unwrap_or_else(|| sensory_input.clone()),
+                .map(|l| l.belief)
+                .unwrap_or_else(|| *sensory_input),
             total_prediction_error: total_error,
             layer_errors,
             surprise: total_error / self.layers.len() as f64,
@@ -979,7 +979,7 @@ impl PredictiveProcessor {
     }
 
     /// Set an active inference goal
-    pub fn set_goal(&mut self, target: HV16, priority: f64) {
+    pub fn set_goal(&mut self, target: BinaryHV, priority: f64) {
         self.goals.push(ActiveGoal {
             target,
             priority,
@@ -988,7 +988,7 @@ impl PredictiveProcessor {
     }
 
     /// Get action to minimize distance to goal (active inference)
-    pub fn get_active_inference_action(&self) -> Option<HV16> {
+    pub fn get_active_inference_action(&self) -> Option<BinaryHV> {
         let goal = self.goals.iter().max_by(|a, b|
             a.priority.partial_cmp(&b.priority).unwrap())?;
 
@@ -1023,7 +1023,7 @@ impl PredictiveProcessor {
 
 #[derive(Debug, Clone)]
 pub struct PredictionResult {
-    pub integrated_belief: HV16,
+    pub integrated_belief: BinaryHV,
     pub total_prediction_error: f64,
     pub layer_errors: Vec<WeightedError>,
     pub surprise: f64,
@@ -1073,9 +1073,9 @@ pub struct ConceptNode {
     /// Concept label
     pub label: String,
     /// HDC encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     /// Properties
-    pub properties: Vec<(String, HV16)>,
+    pub properties: Vec<(String, BinaryHV)>,
     /// Activation level
     pub activation: f64,
     /// Access count
@@ -1118,9 +1118,9 @@ pub struct ProceduralMemory {
 pub struct Skill {
     pub name: String,
     /// Skill encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     /// Component actions
-    pub actions: Vec<HV16>,
+    pub actions: Vec<BinaryHV>,
     /// Automaticity level (0=conscious, 1=automatic)
     pub automaticity: f64,
     /// Practice count
@@ -1131,8 +1131,8 @@ pub struct Skill {
 
 #[derive(Debug, Clone)]
 pub struct Habit {
-    pub trigger: HV16,
-    pub response: HV16,
+    pub trigger: BinaryHV,
+    pub response: BinaryHV,
     pub strength: f64,
     pub formation_count: u32,
 }
@@ -1142,9 +1142,9 @@ pub struct ActionChunk {
     /// Chunk ID
     pub id: u64,
     /// Actions in this chunk
-    pub actions: Vec<HV16>,
+    pub actions: Vec<BinaryHV>,
     /// Unified representation
-    pub unified: HV16,
+    pub unified: BinaryHV,
 }
 
 #[derive(Debug, Clone)]
@@ -1159,7 +1159,7 @@ pub struct ProspectiveMemory {
 pub struct FutureIntention {
     pub id: u64,
     /// What to do
-    pub action: HV16,
+    pub action: BinaryHV,
     pub description: String,
     /// When to do it (time-based or event-based)
     pub trigger: IntentionTrigger,
@@ -1176,9 +1176,9 @@ pub enum IntentionTrigger {
     /// At a specific time
     TimeBase { target_time: u64 },
     /// When event occurs
-    EventBased { event_pattern: HV16 },
+    EventBased { event_pattern: BinaryHV },
     /// When in specific context
-    ContextBased { context_pattern: HV16 },
+    ContextBased { context_pattern: BinaryHV },
 }
 
 #[derive(Debug, Clone)]
@@ -1197,12 +1197,12 @@ pub struct WorkingMemory {
     /// Focus of attention
     focus_index: Option<usize>,
     /// Rehearsal buffer
-    rehearsal_buffer: Vec<HV16>,
+    rehearsal_buffer: Vec<BinaryHV>,
 }
 
 #[derive(Debug, Clone)]
 pub struct WorkingMemoryItem {
-    pub content: HV16,
+    pub content: BinaryHV,
     pub label: String,
     pub activation: f64,
     pub added_at: u64,
@@ -1229,7 +1229,7 @@ impl SemanticMemory {
     }
 
     /// Store a concept
-    pub fn store_concept(&mut self, label: &str, encoding: HV16) {
+    pub fn store_concept(&mut self, label: &str, encoding: BinaryHV) {
         self.concepts.insert(label.to_string(), ConceptNode {
             label: label.to_string(),
             encoding,
@@ -1249,7 +1249,7 @@ impl SemanticMemory {
     }
 
     /// Find similar concepts
-    pub fn find_similar(&self, query: &HV16, threshold: f32) -> Vec<&ConceptNode> {
+    pub fn find_similar(&self, query: &BinaryHV, threshold: f32) -> Vec<&ConceptNode> {
         self.concepts.values()
             .filter(|c| c.encoding.similarity(query) > threshold)
             .collect()
@@ -1283,8 +1283,8 @@ impl ProceduralMemory {
     }
 
     /// Store a skill
-    pub fn store_skill(&mut self, name: &str, actions: Vec<HV16>) {
-        let encoding = HV16::bundle(&actions);
+    pub fn store_skill(&mut self, name: &str, actions: Vec<BinaryHV>) {
+        let encoding = BinaryHV::bundle(&actions);
         self.skills.insert(name.to_string(), Skill {
             name: name.to_string(),
             encoding,
@@ -1307,13 +1307,13 @@ impl ProceduralMemory {
     }
 
     /// Execute skill (returns actions)
-    pub fn execute_skill(&mut self, name: &str) -> Option<Vec<HV16>> {
+    pub fn execute_skill(&mut self, name: &str) -> Option<Vec<BinaryHV>> {
         self.practice_skill(name);
         self.skills.get(name).map(|s| s.actions.clone())
     }
 
     /// Form a habit (trigger-response pair)
-    pub fn form_habit(&mut self, trigger: HV16, response: HV16) {
+    pub fn form_habit(&mut self, trigger: BinaryHV, response: BinaryHV) {
         // Check if habit already exists
         if let Some(habit) = self.habits.iter_mut()
             .find(|h| h.trigger.similarity(&trigger) > 0.9)
@@ -1332,17 +1332,17 @@ impl ProceduralMemory {
     }
 
     /// Check if trigger activates a habit
-    pub fn check_habit(&self, trigger: &HV16) -> Option<(HV16, f64)> {
+    pub fn check_habit(&self, trigger: &BinaryHV) -> Option<(BinaryHV, f64)> {
         self.habits.iter()
             .filter(|h| h.trigger.similarity(trigger) > 0.8)
             .max_by(|a, b| a.strength.partial_cmp(&b.strength).unwrap())
-            .map(|h| (h.response.clone(), h.strength))
+            .map(|h| (h.response, h.strength))
     }
 
     /// Chunk actions together
-    pub fn chunk_actions(&mut self, actions: Vec<HV16>) -> u64 {
+    pub fn chunk_actions(&mut self, actions: Vec<BinaryHV>) -> u64 {
         let id = current_timestamp();
-        let unified = HV16::bundle(&actions);
+        let unified = BinaryHV::bundle(&actions);
         self.chunks.push(ActionChunk {
             id,
             actions,
@@ -1361,7 +1361,7 @@ impl ProspectiveMemory {
     }
 
     /// Create a future intention
-    pub fn create_intention(&mut self, action: HV16, description: &str, trigger: IntentionTrigger, importance: f64) -> u64 {
+    pub fn create_intention(&mut self, action: BinaryHV, description: &str, trigger: IntentionTrigger, importance: f64) -> u64 {
         let id = current_timestamp();
         self.intentions.push(FutureIntention {
             id,
@@ -1376,7 +1376,7 @@ impl ProspectiveMemory {
     }
 
     /// Check for triggered intentions
-    pub fn check_triggers(&mut self, current_time: u64, current_context: &HV16) -> Vec<&FutureIntention> {
+    pub fn check_triggers(&mut self, current_time: u64, current_context: &BinaryHV) -> Vec<&FutureIntention> {
         self.intentions.iter()
             .filter(|i| !i.executed)
             .filter(|i| match &i.trigger {
@@ -1413,7 +1413,7 @@ impl WorkingMemory {
     }
 
     /// Add item to working memory (may displace oldest)
-    pub fn add(&mut self, content: HV16, label: &str) -> bool {
+    pub fn add(&mut self, content: BinaryHV, label: &str) -> bool {
         if self.items.len() >= self.capacity {
             // Remove least activated item
             let min_idx = self.items.iter()
@@ -1720,13 +1720,13 @@ impl HomeostaticDriveSystem {
     }
 
     /// Get drive-based motivation vector
-    pub fn motivation_vector(&self) -> HV16 {
+    pub fn motivation_vector(&self) -> BinaryHV {
         // Encode drive states into HV
-        let curiosity_hv = HV16::random((self.curiosity.level * 1000.0) as u64);
-        let competence_hv = HV16::random((self.competence.level * 1000.0) as u64 + 1000);
-        let social_hv = HV16::random((self.social.level * 1000.0) as u64 + 2000);
+        let curiosity_hv = BinaryHV::random((self.curiosity.level * 1000.0) as u64);
+        let competence_hv = BinaryHV::random((self.competence.level * 1000.0) as u64 + 1000);
+        let social_hv = BinaryHV::random((self.social.level * 1000.0) as u64 + 2000);
 
-        HV16::bundle(&[curiosity_hv, competence_hv, social_hv])
+        BinaryHV::bundle(&[curiosity_hv, competence_hv, social_hv])
     }
 
     /// Check if lonely (social drive above threshold)
@@ -1832,18 +1832,18 @@ impl AdvancedCognitionEngine {
     }
 
     /// Run an integrated cognitive cycle
-    pub fn cognitive_cycle(&mut self, input: &HV16, emotional_state: &EmotionalBlend) -> CognitiveCycleResult {
+    pub fn cognitive_cycle(&mut self, input: &BinaryHV, emotional_state: &EmotionalBlend) -> CognitiveCycleResult {
         // 1. Predictive processing
         let prediction_result = self.predictive.process(input);
 
         // 2. Update working memory with salient content
         if prediction_result.surprise > 0.3 {
-            self.memory.working.add(input.clone(), "novel_input");
+            self.memory.working.add(*input, "novel_input");
         }
 
         // 3. Drive-based modulation
         self.predictive.modulate_precision(
-            emotional_state.arousal as f64,
+            emotional_state.arousal,
             1.0 - self.drives.wellbeing(),
         );
 
@@ -1883,7 +1883,7 @@ impl AdvancedCognitionEngine {
     }
 
     /// Model another agent's perspective
-    pub fn model_other_mind(&mut self, agent_id: &str, situation: &HV16) -> PerspectiveResult {
+    pub fn model_other_mind(&mut self, agent_id: &str, situation: &BinaryHV) -> PerspectiveResult {
         if self.theory_of_mind.get_model(agent_id).is_none() {
             self.theory_of_mind.register_agent(agent_id);
         }
@@ -1891,22 +1891,22 @@ impl AdvancedCognitionEngine {
     }
 
     /// Creative combination of concepts
-    pub fn creative_synthesis(&mut self, concepts: &[HV16]) -> ImaginaryConstruct {
+    pub fn creative_synthesis(&mut self, concepts: &[BinaryHV]) -> ImaginaryConstruct {
         self.imagination.imagine(concepts, CombinationMethod::PropertyMerge)
     }
 
     /// Store long-term semantic knowledge
-    pub fn learn_concept(&mut self, label: &str, encoding: HV16) {
+    pub fn learn_concept(&mut self, label: &str, encoding: BinaryHV) {
         self.memory.semantic.store_concept(label, encoding);
     }
 
     /// Learn a skill
-    pub fn learn_skill(&mut self, name: &str, actions: Vec<HV16>) {
+    pub fn learn_skill(&mut self, name: &str, actions: Vec<BinaryHV>) {
         self.memory.procedural.store_skill(name, actions);
     }
 
     /// Create future intention
-    pub fn intend_future(&mut self, action: HV16, description: &str, trigger: IntentionTrigger, importance: f64) -> u64 {
+    pub fn intend_future(&mut self, action: BinaryHV, description: &str, trigger: IntentionTrigger, importance: f64) -> u64 {
         self.memory.prospective.create_intention(action, description, trigger, importance)
     }
 
@@ -1983,7 +1983,7 @@ mod tests {
             action: MotorAction::Reach,
             intensity: 0.5,
             duration_ms: 500,
-            expected_outcome: HV16::random(42),
+            expected_outcome: BinaryHV::random(42),
         };
         let result = imagery.imagine_action(command);
         assert!(result.vividness > 0.0);
@@ -1994,7 +1994,7 @@ mod tests {
         let mut tom = TheoryOfMindEngine::new();
         tom.register_agent("alice");
         tom.attribute_belief("alice", Belief {
-            content: HV16::random(1),
+            content: BinaryHV::random(1),
             description: "Alice believes X".to_string(),
             strength: 0.8,
             is_false_belief: false,
@@ -2007,8 +2007,8 @@ mod tests {
     #[test]
     fn test_imagination() {
         let mut imagination = ImaginationEngine::new();
-        let concept1 = HV16::random(1);
-        let concept2 = HV16::random(2);
+        let concept1 = BinaryHV::random(1);
+        let concept2 = BinaryHV::random(2);
         let result = imagination.imagine(&[concept1, concept2], CombinationMethod::PropertyMerge);
         assert!(result.novelty > 0.0);
     }
@@ -2016,10 +2016,10 @@ mod tests {
     #[test]
     fn test_differentiated_memory() {
         let mut memory = DifferentiatedMemory::new();
-        memory.semantic.store_concept("dog", HV16::random(1));
-        memory.procedural.store_skill("walk", vec![HV16::random(2)]);
+        memory.semantic.store_concept("dog", BinaryHV::random(1));
+        memory.procedural.store_skill("walk", vec![BinaryHV::random(2)]);
         memory.prospective.create_intention(
-            HV16::random(3),
+            BinaryHV::random(3),
             "remind me",
             IntentionTrigger::TimeBase { target_time: 0 },
             0.5,
@@ -2048,7 +2048,7 @@ mod tests {
         use crate::hdc::emotional_depth::{EmotionalEncoder, EmotionalComponent, WeightedComponent};
 
         let mut engine = AdvancedCognitionEngine::new();
-        let input = HV16::random(42);
+        let input = BinaryHV::random(42);
 
         // Create a neutral emotional blend for testing
         let encoder = EmotionalEncoder::new();

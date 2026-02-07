@@ -24,7 +24,7 @@
 //!
 //! This is exactly transformer attention with ξₖ as keys/values!
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 
 /// Modern Hopfield Network with exponential capacity
@@ -35,14 +35,14 @@ use serde::{Deserialize, Serialize};
 /// # Examples
 ///
 /// ```ignore
-/// use symthaea::hdc::{HV16, ModernHopfieldNetwork};
+/// use symthaea::hdc::{BinaryHV, ModernHopfieldNetwork};
 ///
 /// let mut hopfield = ModernHopfieldNetwork::new(1.0);
 ///
 /// // Store patterns
-/// let cat = HV16::random(1);
-/// let dog = HV16::random(2);
-/// let bird = HV16::random(3);
+/// let cat = BinaryHV::random(1);
+/// let dog = BinaryHV::random(2);
+/// let bird = BinaryHV::random(3);
 ///
 /// hopfield.store(cat);
 /// hopfield.store(dog);
@@ -59,7 +59,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ModernHopfieldNetwork {
     /// Stored patterns (attractors)
-    patterns: Vec<HV16>,
+    patterns: Vec<BinaryHV>,
 
     /// Inverse temperature (β)
     /// - Higher β = sharper attention, faster convergence
@@ -121,17 +121,17 @@ impl ModernHopfieldNetwork {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::{HV16, ModernHopfieldNetwork};
+    /// # use symthaea::hdc::{BinaryHV, ModernHopfieldNetwork};
     /// let mut hopfield = ModernHopfieldNetwork::new(5.0);
-    /// let pattern = HV16::random(42);
+    /// let pattern = BinaryHV::random(42);
     /// hopfield.store(pattern);
     /// ```
-    pub fn store(&mut self, pattern: HV16) {
+    pub fn store(&mut self, pattern: BinaryHV) {
         self.store_with_label(pattern, None);
     }
 
     /// Store pattern with optional label
-    pub fn store_with_label(&mut self, pattern: HV16, label: Option<String>) {
+    pub fn store_with_label(&mut self, pattern: BinaryHV, label: Option<String>) {
         self.patterns.push(pattern);
         self.metadata.push(PatternMetadata {
             stored_at: std::time::Instant::now(),
@@ -156,9 +156,9 @@ impl ModernHopfieldNetwork {
     ///
     /// # Example
     /// ```ignore
-    /// # use symthaea::hdc::{HV16, ModernHopfieldNetwork};
+    /// # use symthaea::hdc::{BinaryHV, ModernHopfieldNetwork};
     /// let mut hopfield = ModernHopfieldNetwork::new(5.0);
-    /// let original = HV16::random(42);
+    /// let original = BinaryHV::random(42);
     /// hopfield.store(original);
     ///
     /// let noisy = original.add_noise(0.2, 123);
@@ -166,7 +166,7 @@ impl ModernHopfieldNetwork {
     ///
     /// assert!(recovered.similarity(&original) > 0.9);
     /// ```
-    pub fn retrieve(&mut self, query: &HV16, max_iterations: usize) -> HV16 {
+    pub fn retrieve(&mut self, query: &BinaryHV, max_iterations: usize) -> BinaryHV {
         if self.patterns.is_empty() {
             return *query; // No patterns stored, return input
         }
@@ -200,8 +200,8 @@ impl ModernHopfieldNetwork {
 
     /// Compute similarities to all stored patterns
     ///
-    /// For HV16, we use Hamming similarity
-    fn compute_similarities(&self, query: &HV16) -> Vec<f64> {
+    /// For BinaryHV, we use Hamming similarity
+    fn compute_similarities(&self, query: &BinaryHV) -> Vec<f64> {
         self.patterns
             .iter()
             .map(|pattern| query.similarity(pattern) as f64)
@@ -234,13 +234,13 @@ impl ModernHopfieldNetwork {
     ///
     /// This is the key modern Hopfield update rule.
     /// It's identical to transformer attention with patterns as keys/values.
-    fn attention_update(&self, attention: &[f64]) -> HV16 {
+    fn attention_update(&self, attention: &[f64]) -> BinaryHV {
         // For binary vectors, we need to:
         // 1. Convert to bipolar (-1, +1)
         // 2. Compute weighted sum
         // 3. Threshold back to binary
 
-        let mut result = vec![0.0f64; HV16::DIM];
+        let mut result = vec![0.0f64; BinaryHV::DIM];
 
         for (pattern, &weight) in self.patterns.iter().zip(attention.iter()) {
             let bipolar = pattern.to_bipolar();
@@ -254,11 +254,11 @@ impl ModernHopfieldNetwork {
             .iter()
             .map(|&x| if x > 0.0 { 1.0 } else { -1.0 })
             .collect();
-        HV16::from_bipolar(&bipolar_result)
+        BinaryHV::from_bipolar(&bipolar_result)
     }
 
     /// Find index of pattern most similar to query
-    fn find_best_match(&self, query: &HV16) -> Option<usize> {
+    fn find_best_match(&self, query: &BinaryHV) -> Option<usize> {
         if self.patterns.is_empty() {
             return None;
         }
@@ -294,7 +294,7 @@ impl ModernHopfieldNetwork {
     }
 
     /// Get pattern at index
-    pub fn get_pattern(&self, idx: usize) -> Option<&HV16> {
+    pub fn get_pattern(&self, idx: usize) -> Option<&BinaryHV> {
         self.patterns.get(idx)
     }
 
@@ -314,7 +314,7 @@ impl ModernHopfieldNetwork {
     /// Energy = -log Σₖ exp(β xᵀ ξₖ)
     ///
     /// Lower energy = closer to attractor
-    pub fn energy(&self, state: &HV16) -> f64 {
+    pub fn energy(&self, state: &BinaryHV) -> f64 {
         if self.patterns.is_empty() {
             return 0.0;
         }
@@ -335,7 +335,7 @@ impl ModernHopfieldNetwork {
     /// Check if state is at an attractor (energy minimum)
     ///
     /// State is at attractor if one additional iteration doesn't change it
-    pub fn is_at_attractor(&self, state: &HV16) -> bool {
+    pub fn is_at_attractor(&self, state: &BinaryHV) -> bool {
         if self.patterns.is_empty() {
             return true;
         }
@@ -386,7 +386,7 @@ impl HierarchicalHopfield {
     /// # Arguments
     /// * `fine_pattern` - Specific instance
     /// * `coarse_pattern` - Category this belongs to
-    pub fn store(&mut self, fine_pattern: HV16, coarse_pattern: HV16) {
+    pub fn store(&mut self, fine_pattern: BinaryHV, coarse_pattern: BinaryHV) {
         // Store coarse if not already present
         let coarse_idx = self.find_or_store_coarse(coarse_pattern);
 
@@ -396,7 +396,7 @@ impl HierarchicalHopfield {
     }
 
     /// Find coarse pattern index, or store if new
-    fn find_or_store_coarse(&mut self, pattern: HV16) -> usize {
+    fn find_or_store_coarse(&mut self, pattern: BinaryHV) -> usize {
         // Check if already stored
         for (idx, stored) in self.coarse.patterns.iter().enumerate() {
             if stored.similarity(&pattern) > 0.95 {
@@ -414,7 +414,7 @@ impl HierarchicalHopfield {
     ///
     /// 1. Retrieve coarse category
     /// 2. Retrieve fine instance (constrained to category)
-    pub fn retrieve(&mut self, query: &HV16, iterations: usize) -> HV16 {
+    pub fn retrieve(&mut self, query: &BinaryHV, iterations: usize) -> BinaryHV {
         // Stage 1: Retrieve coarse category
         let coarse_retrieved = self.coarse.retrieve(query, iterations);
 
@@ -432,10 +432,10 @@ impl HierarchicalHopfield {
     /// Retrieve fine instance constrained to category
     fn retrieve_fine_from_category(
         &mut self,
-        query: &HV16,
+        query: &BinaryHV,
         coarse_idx: usize,
         iterations: usize,
-    ) -> HV16 {
+    ) -> BinaryHV {
         // Filter fine patterns to only those in this category
         let candidate_indices: Vec<usize> = self
             .fine_to_coarse
@@ -488,7 +488,7 @@ mod tests {
     fn test_store_and_retrieve() {
         let mut hopfield = ModernHopfieldNetwork::new(5.0);
 
-        let pattern = HV16::random(42);
+        let pattern = BinaryHV::random(42);
         hopfield.store(pattern);
 
         // Exact pattern should retrieve perfectly
@@ -500,7 +500,7 @@ mod tests {
     fn test_noise_cleanup() {
         let mut hopfield = ModernHopfieldNetwork::new(5.0);
 
-        let original = HV16::random(42);
+        let original = BinaryHV::random(42);
         hopfield.store(original);
 
         // Add 20% noise
@@ -528,9 +528,9 @@ mod tests {
     fn test_multiple_patterns() {
         let mut hopfield = ModernHopfieldNetwork::new(5.0);
 
-        let cat = HV16::random(1);
-        let dog = HV16::random(2);
-        let bird = HV16::random(3);
+        let cat = BinaryHV::random(1);
+        let dog = BinaryHV::random(2);
+        let bird = BinaryHV::random(3);
 
         hopfield.store(cat);
         hopfield.store(dog);
@@ -550,8 +550,8 @@ mod tests {
     fn test_nearest_attractor() {
         let mut hopfield = ModernHopfieldNetwork::new(5.0);
 
-        let cat = HV16::random(1);
-        let dog = HV16::random(2);
+        let cat = BinaryHV::random(1);
+        let dog = BinaryHV::random(2);
 
         hopfield.store(cat);
         hopfield.store(dog);
@@ -572,7 +572,7 @@ mod tests {
     fn test_convergence() {
         let mut hopfield = ModernHopfieldNetwork::new(10.0); // High beta = fast convergence
 
-        let pattern = HV16::random(42);
+        let pattern = BinaryHV::random(42);
         hopfield.store(pattern);
 
         let noisy = pattern.add_noise(0.15, 123);
@@ -595,7 +595,7 @@ mod tests {
 
     #[test]
     fn test_beta_effect() {
-        let pattern = HV16::random(42);
+        let pattern = BinaryHV::random(42);
         let noisy = pattern.add_noise(0.2, 123);
 
         // Low beta (soft attention)
@@ -624,7 +624,7 @@ mod tests {
     fn test_energy_decreases() {
         let mut hopfield = ModernHopfieldNetwork::new(5.0);
 
-        let pattern = HV16::random(42);
+        let pattern = BinaryHV::random(42);
         hopfield.store(pattern);
 
         let noisy = pattern.add_noise(0.2, 123);
@@ -645,7 +645,7 @@ mod tests {
     fn test_attractor_detection() {
         let mut hopfield = ModernHopfieldNetwork::new(5.0);
 
-        let pattern = HV16::random(42);
+        let pattern = BinaryHV::random(42);
         hopfield.store(pattern);
 
         // Stored pattern is at attractor
@@ -672,7 +672,7 @@ mod tests {
         let mut patterns = Vec::new();
 
         for i in 0..num_patterns {
-            let pattern = HV16::random(i as u64);
+            let pattern = BinaryHV::random(i as u64);
             patterns.push(pattern);
             hopfield.store(pattern);
         }
@@ -727,18 +727,18 @@ mod tests {
         let mut hier = HierarchicalHopfield::new(5.0, 5.0);
 
         // Animals category - create base prototype
-        let animal_proto = HV16::random(100);
+        let animal_proto = BinaryHV::random(100);
         // Create fine patterns that are related to their category (bind with prototype + noise)
         // This gives fine patterns semantic relationship to their category
-        let cat_base = HV16::random(1);
-        let dog_base = HV16::random(2);
+        let cat_base = BinaryHV::random(1);
+        let dog_base = BinaryHV::random(2);
         let cat = animal_proto.bind(&cat_base);
         let dog = animal_proto.bind(&dog_base);
 
         // Vehicles category
-        let vehicle_proto = HV16::random(200);
-        let car_base = HV16::random(3);
-        let bike_base = HV16::random(4);
+        let vehicle_proto = BinaryHV::random(200);
+        let car_base = BinaryHV::random(3);
+        let bike_base = BinaryHV::random(4);
         let car = vehicle_proto.bind(&car_base);
         let bike = vehicle_proto.bind(&bike_base);
 
@@ -771,8 +771,8 @@ mod tests {
     fn test_metadata_tracking() {
         let mut hopfield = ModernHopfieldNetwork::new(5.0);
 
-        hopfield.store_with_label(HV16::random(1), Some("cat".to_string()));
-        hopfield.store_with_label(HV16::random(2), Some("dog".to_string()));
+        hopfield.store_with_label(BinaryHV::random(1), Some("cat".to_string()));
+        hopfield.store_with_label(BinaryHV::random(2), Some("dog".to_string()));
 
         // Retrieve cat multiple times
         let cat = hopfield.get_pattern(0).unwrap().clone();

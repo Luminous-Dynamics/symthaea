@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Configuration for social coherence
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,11 +43,11 @@ pub struct MentalModel {
     /// Agent identifier
     pub agent_id: String,
     /// Estimated beliefs (as embedding)
-    pub beliefs: RealHV,
+    pub beliefs: ContinuousHV,
     /// Estimated desires/goals
-    pub desires: RealHV,
+    pub desires: ContinuousHV,
     /// Estimated intentions
-    pub intentions: RealHV,
+    pub intentions: ContinuousHV,
     /// Estimated emotional state
     pub emotional_state: EmotionalState,
     /// Confidence in this model
@@ -129,7 +129,7 @@ pub struct Interaction {
     /// Outcome valence (-1 to 1)
     pub outcome: f32,
     /// Context embedding
-    pub context: RealHV,
+    pub context: ContinuousHV,
     /// Our action
     pub our_action: String,
     /// Their response
@@ -214,9 +214,9 @@ impl SocialCoherence {
         // Initialize self-model with deterministic seeds
         let self_model = MentalModel {
             agent_id: "self".to_string(),
-            beliefs: RealHV::random(dim, 0x5E1F_BE1F), // "SELF_BEL"
-            desires: RealHV::random(dim, 0x5E1F_DE51), // "SELF_DES"
-            intentions: RealHV::random(dim, 0x5E1F_1714), // "SELF_INT"
+            beliefs: ContinuousHV::random(dim, 0x5E1F_BE1F), // "SELF_BEL"
+            desires: ContinuousHV::random(dim, 0x5E1F_DE51), // "SELF_DES"
+            intentions: ContinuousHV::random(dim, 0x5E1F_1714), // "SELF_INT"
             emotional_state: EmotionalState::default(),
             confidence: 1.0,
             last_updated: 0,
@@ -237,8 +237,8 @@ impl SocialCoherence {
     pub fn observe_agent(
         &mut self,
         agent_id: &str,
-        observed_behavior: &RealHV,
-        context: &RealHV,
+        observed_behavior: &ContinuousHV,
+        context: &ContinuousHV,
     ) {
         self.timestamp += 1;
 
@@ -252,9 +252,9 @@ impl SocialCoherence {
         let model = self.mental_models.entry(agent_id.to_string()).or_insert_with(|| {
             MentalModel {
                 agent_id: agent_id.to_string(),
-                beliefs: RealHV::random(dim, seed),
-                desires: RealHV::random(dim, seed.wrapping_add(1)),
-                intentions: RealHV::random(dim, seed.wrapping_add(2)),
+                beliefs: ContinuousHV::random(dim, seed),
+                desires: ContinuousHV::random(dim, seed.wrapping_add(1)),
+                intentions: ContinuousHV::random(dim, seed.wrapping_add(2)),
                 emotional_state: EmotionalState::default(),
                 confidence: 0.1,
                 last_updated: ts,
@@ -263,8 +263,8 @@ impl SocialCoherence {
         });
 
         // Update model based on observation
-        model.intentions = RealHV::bundle(&[model.intentions.clone(), observed_behavior.clone().scale(0.3)]);
-        model.beliefs = RealHV::bundle(&[model.beliefs.clone(), context.clone().scale(0.1)]);
+        model.intentions = ContinuousHV::bundle_owned(&[model.intentions.clone(), observed_behavior.clone().scale(0.3)]);
+        model.beliefs = ContinuousHV::bundle_owned(&[model.beliefs.clone(), context.clone().scale(0.1)]);
         model.observation_count += 1;
         model.last_updated = self.timestamp;
 
@@ -281,7 +281,7 @@ impl SocialCoherence {
         agent_id: &str,
         interaction_type: InteractionType,
         outcome: f32,
-        context: RealHV,
+        context: ContinuousHV,
         our_action: impl Into<String>,
         their_response: impl Into<String>,
     ) {
@@ -379,7 +379,7 @@ impl SocialCoherence {
     pub fn predict_response(
         &self,
         agent_id: &str,
-        proposed_action: &RealHV,
+        proposed_action: &ContinuousHV,
     ) -> Option<SocialReasoningResult> {
         let model = self.mental_models.get(agent_id)?;
         let relationship = self.relationships.get(agent_id);
@@ -458,7 +458,7 @@ impl SocialCoherence {
     }
 
     /// Update self model
-    pub fn update_self_model(&mut self, beliefs: RealHV, desires: RealHV, intentions: RealHV) {
+    pub fn update_self_model(&mut self, beliefs: ContinuousHV, desires: ContinuousHV, intentions: ContinuousHV) {
         self.self_model.beliefs = beliefs;
         self.self_model.desires = desires;
         self.self_model.intentions = intentions;
@@ -505,8 +505,8 @@ mod tests {
     fn test_agent_observation() {
         let mut sc = SocialCoherence::default();
 
-        let behavior = RealHV::random(512, 0xBEEF_0001);
-        let context = RealHV::random(512, 0xBEEF_0002);
+        let behavior = ContinuousHV::random(512, 0xBEEF_0001);
+        let context = ContinuousHV::random(512, 0xBEEF_0002);
 
         sc.observe_agent("agent1", &behavior, &context);
 
@@ -521,7 +521,7 @@ mod tests {
             "agent1",
             InteractionType::Cooperation,
             0.8,
-            RealHV::random(512, 0xBEEF_0003),
+            ContinuousHV::random(512, 0xBEEF_0003),
             "helped",
             "thanked",
         );
@@ -541,7 +541,7 @@ mod tests {
                 "trusted_agent",
                 InteractionType::Cooperation,
                 0.9,
-                RealHV::random(512, 0xBEEF_0004 + i as u64),
+                ContinuousHV::random(512, 0xBEEF_0004 + i as u64),
                 "cooperated",
                 "cooperated back",
             );
@@ -555,7 +555,7 @@ mod tests {
                 "untrusted_agent",
                 InteractionType::Conflict,
                 -0.8,
-                RealHV::random(512, 0xBEEF_0010 + i as u64),
+                ContinuousHV::random(512, 0xBEEF_0010 + i as u64),
                 "offered",
                 "betrayed",
             );
@@ -574,7 +574,7 @@ mod tests {
                 "friend",
                 InteractionType::Help,
                 0.9,
-                RealHV::random(512, 0xBEEF_0020 + i as u64),
+                ContinuousHV::random(512, 0xBEEF_0020 + i as u64),
                 "helped",
                 "helped back",
             );

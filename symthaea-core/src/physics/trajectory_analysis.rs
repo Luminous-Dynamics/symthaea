@@ -40,7 +40,7 @@
 //! properties (coherence, stability, trend), not consciousness.
 
 use crate::genesis::GenesisSeed;
-use crate::hdc::real_hv::RealHV;
+use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::temporal_binding::{
     TemporalBindingConfig, TemporalBindingEngine, StreamHealth,
 };
@@ -142,7 +142,7 @@ impl TrajectoryMetrics {
 /// Binds a sequence of physics states into a unified trajectory representation
 /// that captures the design's evolution through operational space.
 pub struct TrajectoryAnalysisEngine {
-    /// Temporal binding engine (uses RealHV internally)
+    /// Temporal binding engine (uses ContinuousHV internally)
     temporal: TemporalBindingEngine,
     /// Design integration engine
     integration: DesignIntegrationEngine,
@@ -153,7 +153,7 @@ pub struct TrajectoryAnalysisEngine {
     /// Step counter
     step: usize,
     /// Running trajectory vector (accumulated)
-    trajectory_vector: RealHV,
+    trajectory_vector: ContinuousHV,
     /// Running sum for mean calculation
     integration_sum: f32,
     /// Running max integration
@@ -186,7 +186,7 @@ impl TrajectoryAnalysisEngine {
             history: VecDeque::new(),
             config,
             step: 0,
-            trajectory_vector: RealHV::zero(PHYSICS_DIM),
+            trajectory_vector: ContinuousHV::zero(PHYSICS_DIM),
             integration_sum: 0.0,
             integration_max: f32::NEG_INFINITY,
             integration_min: f32::INFINITY,
@@ -201,7 +201,7 @@ impl TrajectoryAnalysisEngine {
         let encoded = self.integration.encode_simulation(result);
         let metrics = self.integration.compute_metrics(result);
 
-        // Convert ContinuousHV to RealHV for temporal binding
+        // Convert ContinuousHV to ContinuousHV for temporal binding
         let state_vector = continuous_to_real(&encoded.unified_state);
 
         // Bind temporally
@@ -298,12 +298,12 @@ impl TrajectoryAnalysisEngine {
     }
 
     /// Get the unified trajectory vector
-    pub fn trajectory_vector(&self) -> &RealHV {
+    pub fn trajectory_vector(&self) -> &ContinuousHV {
         &self.trajectory_vector
     }
 
     /// Get the temporal narrative vector
-    pub fn narrative(&self) -> &RealHV {
+    pub fn narrative(&self) -> &ContinuousHV {
         self.temporal.narrative()
     }
 
@@ -339,14 +339,14 @@ impl TrajectoryAnalysisEngine {
             sum_xx += x * x;
         }
 
-        let slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
-        slope
+        
+        (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x)
     }
 }
 
-/// Convert ContinuousHV to RealHV (both are f32-based)
-fn continuous_to_real(continuous: &crate::hdc::unified_hv::ContinuousHV) -> RealHV {
-    RealHV::from_vec(continuous.values.clone())
+/// Convert ContinuousHV to ContinuousHV (both are f32-based)
+fn continuous_to_real(continuous: &crate::hdc::unified_hv::ContinuousHV) -> ContinuousHV {
+    ContinuousHV::from_vec(continuous.values.clone())
 }
 
 /// Trajectory comparison result

@@ -202,7 +202,7 @@ impl DiffNetwork {
             for i in 0..weights.len() {
                 for j in 0..weights[i].len() {
                     weights[i][j] += learning_rate * grads[i][j];
-                    weights[i][j] = weights[i][j].max(0.0).min(2.0);  // Clamp to valid range
+                    weights[i][j] = weights[i][j].clamp(0.0, 2.0);  // Clamp to valid range
                 }
             }
         }

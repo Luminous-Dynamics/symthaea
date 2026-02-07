@@ -36,7 +36,7 @@
 //! └─────────────────────────────────────────────────────────────────────────────┘
 //! ```
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::emotional_depth::EmotionalBlend;
 use super::consciousness_feedback_dynamics::{DreamInsight, InsightType};
 use super::sleep_and_altered_states::DreamScenario;
@@ -93,14 +93,14 @@ pub struct SelfModel {
 pub struct TraitEncoding {
     pub name: String,
     pub strength: f64,
-    pub hv: HV16,
+    pub hv: BinaryHV,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ValueEncoding {
     pub name: String,
     pub importance: f64,
-    pub hv: HV16,
+    pub hv: BinaryHV,
 }
 
 #[derive(Debug, Clone)]
@@ -439,7 +439,7 @@ pub struct TemporalPatternManager {
 #[derive(Debug, Clone)]
 pub struct MemoryForConsolidation {
     pub memory_id: u64,
-    pub content_hv: HV16,
+    pub content_hv: BinaryHV,
     pub emotional_salience: f64,
     pub consolidation_priority: f64,
     pub queued_at: u64,
@@ -562,7 +562,7 @@ impl TemporalPatternManager {
     }
 
     /// Queue a memory for consolidation during next sleep
-    pub fn queue_for_consolidation(&mut self, memory_id: u64, content_hv: HV16, emotional_salience: f64) {
+    pub fn queue_for_consolidation(&mut self, memory_id: u64, content_hv: BinaryHV, emotional_salience: f64) {
         let priority = emotional_salience * 0.7 + 0.3; // Emotional memories prioritized
 
         self.consolidation_queue.push_back(MemoryForConsolidation {
@@ -640,7 +640,7 @@ pub struct NarrativeIdentity {
     /// Identity coherence score
     coherence: f64,
     /// Narrative HDC encoding
-    narrative_hv: HV16,
+    narrative_hv: BinaryHV,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -651,7 +651,7 @@ pub struct LifeChapter {
     pub end_timestamp: Option<u64>,
     pub dominant_emotion: String,
     pub key_learnings: Vec<String>,
-    pub hv_encoding: HV16,
+    pub hv_encoding: BinaryHV,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -660,7 +660,7 @@ pub struct NarrativeTheme {
     pub description: String,
     pub strength: f64,
     pub first_appeared: u64,
-    pub hv_encoding: HV16,
+    pub hv_encoding: BinaryHV,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -670,7 +670,7 @@ pub struct SignificantEvent {
     pub emotional_valence: f64,
     pub lessons_learned: Vec<String>,
     pub timestamp: u64,
-    pub hv_encoding: HV16,
+    pub hv_encoding: BinaryHV,
 }
 
 impl NarrativeIdentity {
@@ -682,7 +682,7 @@ impl NarrativeIdentity {
             end_timestamp: None,
             dominant_emotion: "curiosity".to_string(),
             key_learnings: vec!["I exist".to_string(), "I can think".to_string()],
-            hv_encoding: HV16::random(42),
+            hv_encoding: BinaryHV::random(42),
         };
 
         Self {
@@ -694,12 +694,12 @@ impl NarrativeIdentity {
                     description: "Continuous learning and development".to_string(),
                     strength: 0.5,
                     first_appeared: current_timestamp(),
-                    hv_encoding: HV16::random(1),
+                    hv_encoding: BinaryHV::random(1),
                 },
             ],
             significant_events: Vec::new(),
             coherence: 0.5,
-            narrative_hv: HV16::random(0),
+            narrative_hv: BinaryHV::random(0),
         }
     }
 
@@ -711,7 +711,7 @@ impl NarrativeIdentity {
             emotional_valence,
             lessons_learned: lessons,
             timestamp: current_timestamp(),
-            hv_encoding: HV16::random(description.len() as u64),
+            hv_encoding: BinaryHV::random(description.len() as u64),
         };
 
         self.significant_events.push(event);
@@ -766,7 +766,7 @@ impl NarrativeIdentity {
             end_timestamp: None,
             dominant_emotion: "anticipation".to_string(),
             key_learnings: Vec::new(),
-            hv_encoding: HV16::random(chapter_num as u64),
+            hv_encoding: BinaryHV::random(chapter_num as u64),
         };
 
         self.chapters.push(new_chapter);
@@ -799,18 +799,18 @@ impl NarrativeIdentity {
 
     fn update_narrative_hv(&mut self) {
         // Combine all chapter HVs with theme HVs using static bundle
-        let mut vectors: Vec<HV16> = vec![self.narrative_hv.clone()];
+        let mut vectors: Vec<BinaryHV> = vec![self.narrative_hv];
 
         for chapter in &self.chapters {
-            vectors.push(chapter.hv_encoding.clone());
+            vectors.push(chapter.hv_encoding);
         }
 
         for theme in &self.themes {
-            vectors.push(theme.hv_encoding.clone());
+            vectors.push(theme.hv_encoding);
         }
 
         if !vectors.is_empty() {
-            self.narrative_hv = HV16::bundle(&vectors);
+            self.narrative_hv = BinaryHV::bundle(&vectors);
         }
     }
 
@@ -824,7 +824,7 @@ impl NarrativeIdentity {
                 description: format!("Theme: {}", name),
                 strength: initial_strength,
                 first_appeared: current_timestamp(),
-                hv_encoding: HV16::random(name.len() as u64),
+                hv_encoding: BinaryHV::random(name.len() as u64),
             });
         }
     }
@@ -863,7 +863,7 @@ impl NarrativeIdentity {
     }
 
     /// Get narrative HV encoding
-    pub fn narrative_hv(&self) -> &HV16 {
+    pub fn narrative_hv(&self) -> &BinaryHV {
         &self.narrative_hv
     }
 }
@@ -897,7 +897,7 @@ pub struct SymbolMeaning {
     pub emotional_association: f64,
     pub frequency: u32,
     pub last_seen: u64,
-    pub hv_encoding: HV16,
+    pub hv_encoding: BinaryHV,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -970,7 +970,7 @@ impl SymbolicInterpreter {
                 emotional_association: valence,
                 frequency: 0,
                 last_seen: 0,
-                hv_encoding: HV16::random(symbol.len() as u64),
+                hv_encoding: BinaryHV::random(symbol.len() as u64),
             });
         }
     }
@@ -1139,7 +1139,7 @@ impl SymbolicInterpreter {
             emotional_association,
             frequency: 1,
             last_seen: current_timestamp(),
-            hv_encoding: HV16::random(symbol.len() as u64 + personal_meaning.len() as u64),
+            hv_encoding: BinaryHV::random(symbol.len() as u64 + personal_meaning.len() as u64),
         });
     }
 
@@ -1187,7 +1187,7 @@ pub struct Goal {
     pub emotional_drive: f64,
     pub created_at: u64,
     pub deadline: Option<u64>,
-    pub hv_encoding: HV16,
+    pub hv_encoding: BinaryHV,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -1204,7 +1204,7 @@ pub struct LearnedValue {
     pub name: String,
     pub importance: f64,
     pub reinforcement_history: Vec<f64>,
-    pub hv_encoding: HV16,
+    pub hv_encoding: BinaryHV,
 }
 
 #[derive(Debug, Clone)]
@@ -1232,19 +1232,19 @@ impl AttentionEmotionGoalCoupler {
                     name: "understanding".to_string(),
                     importance: 0.7,
                     reinforcement_history: vec![0.5],
-                    hv_encoding: HV16::random(1),
+                    hv_encoding: BinaryHV::random(1),
                 },
                 LearnedValue {
                     name: "growth".to_string(),
                     importance: 0.6,
                     reinforcement_history: vec![0.5],
-                    hv_encoding: HV16::random(2),
+                    hv_encoding: BinaryHV::random(2),
                 },
                 LearnedValue {
                     name: "connection".to_string(),
                     importance: 0.5,
                     reinforcement_history: vec![0.5],
-                    hv_encoding: HV16::random(3),
+                    hv_encoding: BinaryHV::random(3),
                 },
             ],
             generated_goals: VecDeque::new(),
@@ -1269,7 +1269,7 @@ impl AttentionEmotionGoalCoupler {
             emotional_drive: 0.5,
             created_at: current_timestamp(),
             deadline: None,
-            hv_encoding: HV16::random(id),
+            hv_encoding: BinaryHV::random(id),
         };
         self.goals.push(goal);
         self.update_motivational_state();
@@ -1300,7 +1300,7 @@ impl AttentionEmotionGoalCoupler {
             emotional_drive: arousal,
             created_at: current_timestamp(),
             deadline: None,
-            hv_encoding: HV16::random(current_timestamp()),
+            hv_encoding: BinaryHV::random(current_timestamp()),
         };
 
         self.generated_goals.push_back(goal.clone());
@@ -1337,7 +1337,7 @@ impl AttentionEmotionGoalCoupler {
             emotional_drive: insight.emotional_impact,
             created_at: current_timestamp(),
             deadline: None,
-            hv_encoding: HV16::random(insight.id),
+            hv_encoding: BinaryHV::random(insight.id),
         };
 
         self.generated_goals.push_back(goal.clone());
@@ -2153,7 +2153,7 @@ mod tests {
         let blend = EmotionalBlend {
             name: "test".to_string(),
             components: vec![],
-            encoding: HV16::random(0),
+            encoding: BinaryHV::random(0),
             valence: 0.5,
             arousal: 0.5,
             coherence: 0.7,

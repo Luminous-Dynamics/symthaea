@@ -13,17 +13,17 @@
  * 5. **Performance Tests**: Verify O(n) complexity for HEURISTIC tier
  */
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
 
-/// Helper: Create deterministic HV16 from string (using hash as seed)
-fn hv_from_str(s: &str) -> HV16 {
+/// Helper: Create deterministic BinaryHV from string (using hash as seed)
+fn hv_from_str(s: &str) -> BinaryHV {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
     let mut hasher = DefaultHasher::new();
     s.hash(&mut hasher);
-    HV16::random(hasher.finish())
+    BinaryHV::random(hasher.finish())
 }
 
 #[cfg(test)]
@@ -219,7 +219,7 @@ mod phi_tier_unit_tests {
 
     #[test]
     fn test_empty_components() {
-        let components: Vec<HV16> = vec![];
+        let components: Vec<BinaryHV> = vec![];
         let mut calc = TieredPhi::new(ApproximationTier::SampledPartition);
         let phi = calc.compute(&components);
 
@@ -282,7 +282,7 @@ mod phi_tier_unit_tests {
     /// Each component is completely independent → ~0.5 pairwise similarity (random)
     /// This represents a "bag of unrelated parts" with minimal cross-component
     /// correlations - any partition loses minimal information.
-    fn create_low_integration_state(n: usize) -> Vec<HV16> {
+    fn create_low_integration_state(n: usize) -> Vec<BinaryHV> {
         (0..n)
             .map(|i| hv_from_str(&format!("independent_component_{}", i)))
             .collect()
@@ -294,9 +294,9 @@ mod phi_tier_unit_tests {
     /// - Component i shares a base with i-1 and i+1 (wrapping)
     /// - This creates cross-partition dependencies that resist clean cuts
     /// - Any partition will split some "pairs" that share structure
-    fn create_medium_integration_state(n: usize) -> Vec<HV16> {
+    fn create_medium_integration_state(n: usize) -> Vec<BinaryHV> {
         // Create n unique "edge" bases for ring connections
-        let edge_bases: Vec<HV16> = (0..n)
+        let edge_bases: Vec<BinaryHV> = (0..n)
             .map(|i| hv_from_str(&format!("medium_edge_{}", i)))
             .collect();
 
@@ -307,7 +307,7 @@ mod phi_tier_unit_tests {
                 let next_edge = edge_bases[(i + 1) % n].clone();
                 // Add some unique identity
                 let identity = hv_from_str(&format!("medium_identity_{}", i));
-                HV16::bundle(&[prev_edge, next_edge, identity])
+                BinaryHV::bundle(&[prev_edge, next_edge, identity])
             })
             .collect()
     }
@@ -321,19 +321,19 @@ mod phi_tier_unit_tests {
     ///
     /// The key insight: for high Φ we need correlations that SPECIFICALLY span
     /// the likely partition boundaries, not just local neighborhood density.
-    fn create_high_integration_state(n: usize) -> Vec<HV16> {
+    fn create_high_integration_state(n: usize) -> Vec<BinaryHV> {
         if n < 2 {
             return (0..n).map(|i| hv_from_str(&format!("solo_{}", i))).collect();
         }
 
         // Create pair bases - each pair (i, i+n/2) shares a unique base
         // This creates correlations that span the "natural" bisection
-        let pair_bases: Vec<HV16> = (0..n)
+        let pair_bases: Vec<BinaryHV> = (0..n)
             .map(|i| hv_from_str(&format!("high_pair_{}", i % (n / 2).max(1))))
             .collect();
 
         // Also keep ring structure for local correlations
-        let ring_bases: Vec<HV16> = (0..n)
+        let ring_bases: Vec<BinaryHV> = (0..n)
             .map(|i| hv_from_str(&format!("high_ring_{}", i)))
             .collect();
 
@@ -350,7 +350,7 @@ mod phi_tier_unit_tests {
                 let identity = hv_from_str(&format!("high_id_{}", i));
 
                 // Bundle: emphasize pair correlation (repeat it)
-                HV16::bundle(&[pair_base.clone(), pair_base, ring_prev, ring_next, identity])
+                BinaryHV::bundle(&[pair_base.clone(), pair_base, ring_prev, ring_next, identity])
             })
             .collect()
     }

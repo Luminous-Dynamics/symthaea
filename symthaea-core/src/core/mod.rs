@@ -29,7 +29,6 @@ pub use crate::phi_engine::{
 // HDC core types
 pub use crate::hdc::unified_hv::{
     ContinuousHV,
-    BinaryHV,
     HV,
     HDC_DIMENSION,
 };

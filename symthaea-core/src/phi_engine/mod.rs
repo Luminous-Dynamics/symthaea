@@ -53,11 +53,10 @@
 //! - [`crate::consciousness::consciousness_equation_v2`] - Master Consciousness Equation
 //! - [`crate::hdc::unified_hv`] - Unified hypervector types
 
-use crate::hdc::real_hv::RealHV;
 use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::phi_topology_validation::real_hv_to_hv16;
 use crate::hdc::phi_resonant::ResonantPhiCalculator;
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 
 mod calculator;
 mod result;
@@ -83,8 +82,9 @@ pub struct PhiEngine {
 
 /// Available Φ calculation methods
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum PhiMethod {
-    /// Spectral connectivity (RealHV-based, algebraic connectivity / λ₂).
+    /// Spectral connectivity (ContinuousHV-based, algebraic connectivity / λ₂).
     ///
     /// This computes the second-smallest eigenvalue of the Laplacian of the
     /// cosine-similarity graph — a measure of how connected the network is.
@@ -99,6 +99,7 @@ pub enum PhiMethod {
     Resonator,
 
     /// Auto-select based on topology size
+    #[default]
     Auto,
 }
 
@@ -108,11 +109,6 @@ impl PhiMethod {
     pub const CONTINUOUS: PhiMethod = PhiMethod::SpectralConnectivity;
 }
 
-impl Default for PhiMethod {
-    fn default() -> Self {
-        PhiMethod::Auto
-    }
-}
 
 impl PhiEngine {
     /// Create a new PhiEngine with specified method
@@ -189,10 +185,10 @@ impl PhiEngine {
     pub fn compute(&self, node_representations: &[ContinuousHV]) -> result::PhiResult {
         let n_nodes = node_representations.len();
 
-        // Convert ContinuousHV to RealHV for compatibility
-        let real_hvs: Vec<RealHV> = node_representations
+        // Convert ContinuousHV to ContinuousHV for compatibility
+        let real_hvs: Vec<ContinuousHV> = node_representations
             .iter()
-            .map(|chv| RealHV::from_vec(chv.values.clone()))
+            .map(|chv| ContinuousHV::from_vec(chv.values.clone()))
             .collect();
 
         // Determine effective method
@@ -209,15 +205,15 @@ impl PhiEngine {
                 let phi = calc.algebraic_connectivity(&real_hvs);
                 (phi, "SpectralConnectivity")
             }
-            // Tiered binary Φ using RealHV → HV16 conversion
+            // Tiered binary Φ using ContinuousHV → BinaryHV conversion
             PhiMethod::Tiered(tier) => {
-                // Convert RealHV → HV16 using the same helper used in topology validation
-                let components: Vec<HV16> = real_hvs.iter().map(|hv| real_hv_to_hv16(hv)).collect();
+                // Convert ContinuousHV → BinaryHV using the same helper used in topology validation
+                let components: Vec<BinaryHV> = real_hvs.iter().map(real_hv_to_hv16).collect();
                 let mut calc = TieredPhi::new(tier);
                 let phi = calc.compute(&components);
                 (phi, "Tiered")
             }
-            // Resonator-based Φ on RealHV representations
+            // Resonator-based Φ on ContinuousHV representations
             PhiMethod::Resonator => {
                 let calc = ResonantPhiCalculator::fast();
                 let result = calc.compute(&real_hvs);
@@ -281,9 +277,8 @@ impl Default for PhiEngine {
 mod tests {
     use super::*;
     use crate::hdc::unified_hv::ContinuousHV;
-    use crate::hdc::real_hv::RealHV;
     use crate::hdc::phi_topology_validation::real_hv_to_hv16;
-    use crate::hdc::binary_hv::HV16;
+    use crate::hdc::binary_hv::BinaryHV;
     use crate::hdc::phi_resonant::ResonantPhiCalculator;
 
     #[test]
@@ -336,10 +331,10 @@ mod tests {
         assert_eq!(result.n_nodes, hvs.len());
         assert!(result.phi >= 0.0 && result.phi <= 1.0);
 
-        // Compare with direct RealPhiCalculator on equivalent RealHV vectors
-        let real_hvs: Vec<RealHV> = hvs
+        // Compare with direct RealPhiCalculator on equivalent ContinuousHV vectors
+        let real_hvs: Vec<ContinuousHV> = hvs
             .iter()
-            .map(|hv| RealHV::from_vec(hv.values.clone()))
+            .map(|hv| ContinuousHV::from_vec(hv.values.clone()))
             .collect();
         let calc = ContinuousPhiCalculator::new();
         let direct_phi = calc.algebraic_connectivity(&real_hvs);
@@ -352,7 +347,7 @@ mod tests {
         );
     }
 
-    /// Ensure Tiered method uses TieredPhi on HV16 components
+    /// Ensure Tiered method uses TieredPhi on BinaryHV components
     #[test]
     fn test_compute_tiered_matches_tieredphi() {
         let dim = 128;
@@ -366,12 +361,12 @@ mod tests {
         assert_eq!(result.method, "Tiered");
         assert_eq!(result.n_nodes, hvs.len());
 
-        // RealHV → HV16 conversion must match TieredPhi usage
-        let real_hvs: Vec<RealHV> = hvs
+        // ContinuousHV → BinaryHV conversion must match TieredPhi usage
+        let real_hvs: Vec<ContinuousHV> = hvs
             .iter()
-            .map(|hv| RealHV::from_vec(hv.values.clone()))
+            .map(|hv| ContinuousHV::from_vec(hv.values.clone()))
             .collect();
-        let components: Vec<HV16> = real_hvs.iter().map(|hv| real_hv_to_hv16(hv)).collect();
+        let components: Vec<BinaryHV> = real_hvs.iter().map(|hv| real_hv_to_hv16(hv)).collect();
 
         let mut calc = TieredPhi::new(ApproximationTier::RandomBaseline);
         let direct_phi = calc.compute(&components);
@@ -398,9 +393,9 @@ mod tests {
         assert_eq!(result.method, "Resonator");
         assert_eq!(result.n_nodes, hvs.len());
 
-        let real_hvs: Vec<RealHV> = hvs
+        let real_hvs: Vec<ContinuousHV> = hvs
             .iter()
-            .map(|hv| RealHV::from_vec(hv.values.clone()))
+            .map(|hv| ContinuousHV::from_vec(hv.values.clone()))
             .collect();
         let calc = ResonantPhiCalculator::fast();
         let resonant_result = calc.compute(&real_hvs);
