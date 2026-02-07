@@ -44,6 +44,8 @@ mod molecular_biology;
 mod neuroscience;
 mod quantum_gravity;
 mod emergence_chain;
+mod true_phi;
+mod hdc_emergence_metrics;
 
 // Phase 2: Additional physics domains (pub mod to avoid glob conflicts)
 #[allow(dead_code)]
@@ -121,6 +123,8 @@ pub use molecular_biology::*;
 pub use neuroscience::*;
 pub use quantum_gravity::*;
 pub use emergence_chain::*;
+pub use true_phi::*;
+pub use hdc_emergence_metrics::*;
 
 // Phase 2: exports (non-conflicting only; access others via physics::module_name)
 pub use quantum_information::*;

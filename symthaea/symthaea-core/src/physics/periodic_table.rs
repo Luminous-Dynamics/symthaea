@@ -40,10 +40,10 @@ use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::hadrons::Hadrons;
 use super::standard_model::{StandardModel, PHYSICS_DIM};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 /// Element data (basic properties)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ElementData {
     pub symbol: &'static str,
     pub name: &'static str,
@@ -59,7 +59,7 @@ pub struct ElementData {
 ///
 /// These real atomic properties enable property-weighted HDC composition
 /// where vector similarity correlates with chemical behavior.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ElementDataExtended {
     /// Base element data
     pub base: ElementData,
