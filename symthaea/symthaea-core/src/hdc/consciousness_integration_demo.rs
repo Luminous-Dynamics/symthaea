@@ -50,7 +50,7 @@
 //! 5. **All → Streaming**: Every significant event is broadcast
 
 use super::unified_conscious_being::UnifiedConsciousBeing;
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 
 // ============================================================================
 // INTEGRATED CONSCIOUSNESS CYCLE
@@ -117,7 +117,7 @@ impl IntegratedConsciousnessDemo {
 
         // 2. Route attention across modalities
         let routing_result = self.being.multi_modal_comprehend(
-            semantic_hv.clone(),
+            semantic_hv,
             Some(emotional_hv),
             None, // No temporal context for this demo
         );
@@ -288,9 +288,9 @@ impl IntegratedConsciousnessDemo {
         for (label, question, intensity, valence) in &memories {
             self.being.add_counterfactual_memory_with_valence(
                 label,
-                HV16::random(self.cycle_count as u64),
+                BinaryHV::random(self.cycle_count as u64),
                 question,
-                HV16::random(self.cycle_count as u64 + 1000),
+                BinaryHV::random(self.cycle_count as u64 + 1000),
                 *intensity,
                 *valence,
             );
@@ -358,13 +358,13 @@ impl IntegratedConsciousnessDemo {
 
     // Helper methods
 
-    fn encode_semantic(&self, input: &str) -> HV16 {
+    fn encode_semantic(&self, input: &str) -> BinaryHV {
         // Simple hash-based encoding for demo
         let seed = input.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-        HV16::random(seed)
+        BinaryHV::random(seed)
     }
 
-    fn encode_emotional_context(&self, input: &str) -> HV16 {
+    fn encode_emotional_context(&self, input: &str) -> BinaryHV {
         // Detect emotional keywords and encode
         let input_lower = input.to_lowercase();
         let seed = if input_lower.contains("happy") || input_lower.contains("amazing") || input_lower.contains("great") {
@@ -374,10 +374,10 @@ impl IntegratedConsciousnessDemo {
         } else {
             3000 // Neutral seed
         };
-        HV16::random(seed + input.len() as u64)
+        BinaryHV::random(seed + input.len() as u64)
     }
 
-    fn generate_counterfactual(&self, original: &HV16) -> HV16 {
+    fn generate_counterfactual(&self, original: &BinaryHV) -> BinaryHV {
         // Create a counterfactual by permuting the original (shift by 1024 positions)
         original.permute(1024)
     }
@@ -416,7 +416,7 @@ pub fn self_improvement_attention_integration(being: &mut UnifiedConsciousBeing)
     match recommendation.improvement_type {
         super::self_improvement_integration::ImprovementType::IncreaseFocus => {
             // Set a focused context vector
-            being.set_attention_context(HV16::random(42)); // Would be task-specific
+            being.set_attention_context(BinaryHV::random(42)); // Would be task-specific
         }
         super::self_improvement_integration::ImprovementType::ResetAttention => {
             being.reset_attention();
@@ -436,7 +436,7 @@ pub fn comprehension_counterfactual_integration(
     // Only create counterfactual memories for significant events
     if comprehension_phi > 0.6 {
         let seed = input.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-        let actual_hv = HV16::random(seed);
+        let actual_hv = BinaryHV::random(seed);
         let counterfactual_hv = actual_hv.permute(1024);
 
         being.add_counterfactual_memory(

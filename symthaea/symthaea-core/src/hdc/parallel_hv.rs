@@ -23,37 +23,37 @@
 //!
 //! ```rust,ignore
 //! use symthaea::hdc::parallel_hv::*;
-//! use symthaea::hdc::binary_hv::HV16;
+//! use symthaea::hdc::binary_hv::BinaryHV;
 //!
-//! let queries: Vec<HV16> = (0..1000).map(|i| HV16::random(i)).collect();
-//! let key = HV16::random(999);
+//! let queries: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i)).collect();
+//! let key = BinaryHV::random(999);
 //!
 //! // Parallel bind - scales with cores!
 //! let results = parallel_batch_bind(&queries, &key);  // 7x faster on 8 cores
 //! ```
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::lsh_similarity::adaptive_batch_find_most_similar;  // Session 7C: Revolutionary batch-aware LSH
 use rayon::prelude::*;
 
-// Helper functions using HV16's native methods (replacement for incompatible simd_hv)
+// Helper functions using BinaryHV's native methods (replacement for incompatible simd_hv)
 #[inline]
-fn simd_bind(a: &HV16, b: &HV16) -> HV16 {
+fn simd_bind(a: &BinaryHV, b: &BinaryHV) -> BinaryHV {
     a.bind(b)
 }
 
 #[inline]
-fn simd_bundle(vectors: &[HV16]) -> HV16 {
-    HV16::bundle(vectors)
+fn simd_bundle(vectors: &[BinaryHV]) -> BinaryHV {
+    BinaryHV::bundle(vectors)
 }
 
 #[inline]
-fn simd_similarity(a: &HV16, b: &HV16) -> f32 {
+fn simd_similarity(a: &BinaryHV, b: &BinaryHV) -> f32 {
     a.similarity(b)
 }
 
 #[inline]
-fn simd_find_most_similar(query: &HV16, targets: &[HV16]) -> Option<(usize, f32)> {
+fn simd_find_most_similar(query: &BinaryHV, targets: &[BinaryHV]) -> Option<(usize, f32)> {
     if targets.is_empty() {
         return None;
     }
@@ -86,14 +86,14 @@ fn simd_find_most_similar(query: &HV16, targets: &[HV16]) -> Option<(usize, f32)
 /// # Example
 ///
 /// ```rust,ignore
-/// let vectors: Vec<HV16> = (0..1000).map(|i| HV16::random(i)).collect();
-/// let key = HV16::random(999);
+/// let vectors: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i)).collect();
+/// let key = BinaryHV::random(999);
 ///
 /// // Parallel execution across all CPU cores
 /// let bound = parallel_batch_bind(&vectors, &key);
 /// ```
 #[inline]
-pub fn parallel_batch_bind(vectors: &[HV16], key: &HV16) -> Vec<HV16> {
+pub fn parallel_batch_bind(vectors: &[BinaryHV], key: &BinaryHV) -> Vec<BinaryHV> {
     vectors.par_iter()
         .map(|v| simd_bind(v, key))
         .collect()
@@ -107,7 +107,7 @@ pub fn parallel_batch_bind(vectors: &[HV16], key: &HV16) -> Vec<HV16> {
 /// - Each (vector, key) pair processed in parallel
 /// - Near-perfect scalability
 #[inline]
-pub fn parallel_batch_bind_pairs(pairs: &[(&HV16, &HV16)]) -> Vec<HV16> {
+pub fn parallel_batch_bind_pairs(pairs: &[(&BinaryHV, &BinaryHV)]) -> Vec<BinaryHV> {
     pairs.par_iter()
         .map(|(a, b)| simd_bind(a, b))
         .collect()
@@ -132,14 +132,14 @@ pub fn parallel_batch_bind_pairs(pairs: &[(&HV16, &HV16)]) -> Vec<HV16> {
 /// # Example
 ///
 /// ```rust,ignore
-/// let query = HV16::random(42);
-/// let memory: Vec<HV16> = (0..10000).map(|i| HV16::random(i)).collect();
+/// let query = BinaryHV::random(42);
+/// let memory: Vec<BinaryHV> = (0..10000).map(|i| BinaryHV::random(i)).collect();
 ///
 /// // Parallel similarity across all memory
 /// let similarities = parallel_batch_similarity(&query, &memory);
 /// ```
 #[inline]
-pub fn parallel_batch_similarity(query: &HV16, targets: &[HV16]) -> Vec<f32> {
+pub fn parallel_batch_similarity(query: &BinaryHV, targets: &[BinaryHV]) -> Vec<f32> {
     targets.par_iter()
         .map(|t| simd_similarity(query, t))
         .collect()
@@ -155,7 +155,7 @@ pub fn parallel_batch_similarity(query: &HV16, targets: &[HV16]) -> Vec<f32> {
 /// - **Parallel**: O(n²/cores) × 12ns
 /// - **Use case**: Clustering, pattern discovery
 #[inline]
-pub fn parallel_all_pairs_similarity(vectors: &[HV16]) -> Vec<Vec<f32>> {
+pub fn parallel_all_pairs_similarity(vectors: &[BinaryHV]) -> Vec<Vec<f32>> {
     vectors.par_iter()
         .map(|v| {
             vectors.iter()
@@ -183,15 +183,15 @@ pub fn parallel_all_pairs_similarity(vectors: &[HV16]) -> Vec<Vec<f32>> {
 ///
 /// ```rust,ignore
 /// // 100 concepts, each with 10 examples
-/// let concept_sets: Vec<Vec<HV16>> = (0..100)
-///     .map(|_| (0..10).map(|i| HV16::random(i)).collect())
+/// let concept_sets: Vec<Vec<BinaryHV>> = (0..100)
+///     .map(|_| (0..10).map(|i| BinaryHV::random(i)).collect())
 ///     .collect();
 ///
 /// // Parallel bundling of all concepts
 /// let prototypes = parallel_batch_bundle(&concept_sets);
 /// ```
 #[inline]
-pub fn parallel_batch_bundle(vector_sets: &[Vec<HV16>]) -> Vec<HV16> {
+pub fn parallel_batch_bundle(vector_sets: &[Vec<BinaryHV>]) -> Vec<BinaryHV> {
     vector_sets.par_iter()
         .map(|set| simd_bundle(set))
         .collect()
@@ -199,7 +199,7 @@ pub fn parallel_batch_bundle(vector_sets: &[Vec<HV16>]) -> Vec<HV16> {
 
 /// Parallel bundling with slices (zero-copy)
 #[inline]
-pub fn parallel_batch_bundle_slices(vector_sets: &[&[HV16]]) -> Vec<HV16> {
+pub fn parallel_batch_bundle_slices(vector_sets: &[&[BinaryHV]]) -> Vec<BinaryHV> {
     vector_sets.par_iter()
         .map(|set| simd_bundle(set))
         .collect()
@@ -235,8 +235,8 @@ pub fn parallel_batch_bundle_slices(vector_sets: &[&[HV16]]) -> Vec<HV16> {
 /// # Example
 ///
 /// ```rust,ignore
-/// let queries: Vec<HV16> = (0..100).map(|i| HV16::random(i)).collect();
-/// let memory: Vec<HV16> = (0..1000).map(|i| HV16::random(i + 1000)).collect();
+/// let queries: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
+/// let memory: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i + 1000)).collect();
 ///
 /// // Build index once, query 100 times - MASSIVELY faster!
 /// let results = parallel_batch_find_most_similar(&queries, &memory);
@@ -252,8 +252,8 @@ pub fn parallel_batch_bundle_slices(vector_sets: &[&[HV16]]) -> Vec<HV16> {
 /// The speedup scales with query count - more queries = better amortization!
 #[inline]
 pub fn parallel_batch_find_most_similar(
-    queries: &[HV16],
-    memory: &[HV16],
+    queries: &[BinaryHV],
+    memory: &[BinaryHV],
 ) -> Vec<Option<(usize, f32)>> {
     // Session 7C: Revolutionary batch-aware LSH with index reuse
     // This is 10-81x faster than the old approach of building index per query!
@@ -265,8 +265,8 @@ pub fn parallel_batch_find_most_similar(
 /// Returns k most similar items for each query, sorted by similarity.
 #[inline]
 pub fn parallel_batch_find_top_k(
-    queries: &[HV16],
-    memory: &[HV16],
+    queries: &[BinaryHV],
+    memory: &[BinaryHV],
     k: usize,
 ) -> Vec<Vec<(usize, f32)>> {
     queries.par_iter()
@@ -308,7 +308,7 @@ pub fn parallel_batch_find_top_k(
 /// - 7-8x speedup on 8-core systems
 #[inline]
 pub fn parallel_find_similar_pairs(
-    vectors: &[HV16],
+    vectors: &[BinaryHV],
     similarity_threshold: f32,
 ) -> Vec<(usize, usize, f32)> {
     (0..vectors.len()).into_par_iter()
@@ -350,8 +350,8 @@ pub fn parallel_find_similar_pairs(
 /// - Enough parallelism (4096 chunks for 1M vectors)
 /// - Near-optimal for most workloads
 pub fn parallel_chunked_similarity(
-    query: &HV16,
-    targets: &[HV16],
+    query: &BinaryHV,
+    targets: &[BinaryHV],
     chunk_size: usize,
 ) -> Vec<f32> {
     targets.par_chunks(chunk_size)
@@ -379,7 +379,7 @@ pub fn parallel_chunked_similarity(
 ///
 /// This gives **best of both worlds**: no overhead for small ops, maximum
 /// speedup for large ops.
-pub fn adaptive_batch_similarity(query: &HV16, targets: &[HV16]) -> Vec<f32> {
+pub fn adaptive_batch_similarity(query: &BinaryHV, targets: &[BinaryHV]) -> Vec<f32> {
     const PARALLEL_THRESHOLD: usize = 100;
     const CHUNKED_THRESHOLD: usize = 10_000;
     const OPTIMAL_CHUNK_SIZE: usize = 256;
@@ -399,7 +399,7 @@ pub fn adaptive_batch_similarity(query: &HV16, targets: &[HV16]) -> Vec<f32> {
 }
 
 /// Adaptive batch bind
-pub fn adaptive_batch_bind(vectors: &[HV16], key: &HV16) -> Vec<HV16> {
+pub fn adaptive_batch_bind(vectors: &[BinaryHV], key: &BinaryHV) -> Vec<BinaryHV> {
     const PARALLEL_THRESHOLD: usize = 100;
 
     if vectors.len() < PARALLEL_THRESHOLD {
@@ -450,10 +450,10 @@ mod tests {
 
     #[test]
     fn test_parallel_bind_correctness() {
-        let vectors: Vec<HV16> = (0..100).map(|i| HV16::random(i)).collect();
-        let key = HV16::random(999);
+        let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
+        let key = BinaryHV::random(999);
 
-        let sequential: Vec<HV16> = vectors.iter().map(|v| simd_bind(v, &key)).collect();
+        let sequential: Vec<BinaryHV> = vectors.iter().map(|v| simd_bind(v, &key)).collect();
         let parallel = parallel_batch_bind(&vectors, &key);
 
         assert_eq!(sequential.len(), parallel.len());
@@ -464,8 +464,8 @@ mod tests {
 
     #[test]
     fn test_parallel_similarity_correctness() {
-        let query = HV16::random(42);
-        let targets: Vec<HV16> = (0..100).map(|i| HV16::random(i + 100)).collect();
+        let query = BinaryHV::random(42);
+        let targets: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i + 100)).collect();
 
         let sequential: Vec<f32> = targets.iter().map(|t| simd_similarity(&query, t)).collect();
         let parallel = parallel_batch_similarity(&query, &targets);
@@ -478,15 +478,15 @@ mod tests {
 
     #[test]
     fn test_adaptive_dispatch() {
-        let query = HV16::random(42);
+        let query = BinaryHV::random(42);
 
         // Small workload (should use sequential)
-        let small_targets: Vec<HV16> = (0..50).map(|i| HV16::random(i)).collect();
+        let small_targets: Vec<BinaryHV> = (0..50).map(|i| BinaryHV::random(i)).collect();
         let small_result = adaptive_batch_similarity(&query, &small_targets);
         assert_eq!(small_result.len(), 50);
 
         // Large workload (should use parallel)
-        let large_targets: Vec<HV16> = (0..1000).map(|i| HV16::random(i)).collect();
+        let large_targets: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i)).collect();
         let large_result = adaptive_batch_similarity(&query, &large_targets);
         assert_eq!(large_result.len(), 1000);
     }

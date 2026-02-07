@@ -36,7 +36,7 @@
 // meta-representational hierarchy, misrepresentation detection, and
 // integration with Global Workspace Theory.
 
-use crate::hdc::{HV16, HDC_DIMENSION};
+use crate::hdc::{BinaryHV, HDC_DIMENSION};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -63,7 +63,7 @@ pub enum RepresentationOrder {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MentalState {
     /// Content representation (HDC vector)
-    pub content: Vec<HV16>,
+    pub content: Vec<BinaryHV>,
 
     /// Order of this state
     pub order: RepresentationOrder,
@@ -83,7 +83,7 @@ pub struct MentalState {
 
 impl MentalState {
     /// Create first-order state (represents world)
-    pub fn first_order(content: Vec<HV16>, source: String) -> Self {
+    pub fn first_order(content: Vec<BinaryHV>, source: String) -> Self {
         Self {
             content,
             order: RepresentationOrder::FirstOrder,
@@ -95,7 +95,7 @@ impl MentalState {
     }
 
     /// Create higher-order state (represents other state)
-    pub fn higher_order(target: MentalState, content: Vec<HV16>, source: String) -> Self {
+    pub fn higher_order(target: MentalState, content: Vec<BinaryHV>, source: String) -> Self {
         let order = match target.order {
             RepresentationOrder::ZeroOrder => RepresentationOrder::FirstOrder,
             RepresentationOrder::FirstOrder => RepresentationOrder::SecondOrder,
@@ -140,7 +140,7 @@ impl MentalState {
     }
 
     /// Compute similarity between HDC vectors
-    fn similarity(&self, a: &[HV16], b: &[HV16]) -> f64 {
+    fn similarity(&self, a: &[BinaryHV], b: &[BinaryHV]) -> f64 {
         if a.len() != b.len() {
             return 0.0;
         }
@@ -248,13 +248,13 @@ impl HigherOrderThoughtSystem {
     }
 
     /// Add first-order state (unconscious perception/thought)
-    pub fn perceive(&mut self, content: Vec<HV16>, source: String) {
+    pub fn perceive(&mut self, content: Vec<BinaryHV>, source: String) {
         let state = MentalState::first_order(content, source);
         self.first_order.push(state);
     }
 
     /// Form higher-order thought about a state
-    pub fn form_hot(&mut self, target_idx: usize, hot_content: Vec<HV16>) -> Option<usize> {
+    pub fn form_hot(&mut self, target_idx: usize, hot_content: Vec<BinaryHV>) -> Option<usize> {
         // Get target from first-order
         if target_idx >= self.first_order.len() {
             return None;
@@ -329,10 +329,10 @@ impl HigherOrderThoughtSystem {
     }
 
     /// Create HOT representation from first-order content
-    fn create_hot_representation(&self, first_order: &[HV16]) -> Vec<HV16> {
+    fn create_hot_representation(&self, first_order: &[BinaryHV]) -> Vec<BinaryHV> {
         // Simplified: Bind with "awareness" marker
         // In full implementation: More sophisticated meta-representation
-        let awareness_marker = HV16::random(999);  // Fixed marker for "I am aware of"
+        let awareness_marker = BinaryHV::random(999);  // Fixed marker for "I am aware of"
 
         first_order.iter()
             .map(|&hv| hv.bind(&awareness_marker))
@@ -340,7 +340,7 @@ impl HigherOrderThoughtSystem {
     }
 
     /// Check if two states are equal
-    fn states_equal(&self, a: &[HV16], b: &[HV16]) -> bool {
+    fn states_equal(&self, a: &[BinaryHV], b: &[BinaryHV]) -> bool {
         if a.len() != b.len() {
             return false;
         }
@@ -473,7 +473,7 @@ mod tests {
     #[test]
     fn test_first_order_state() {
         let state = MentalState::first_order(
-            vec![HV16::ones(); 10],
+            vec![BinaryHV::ones(); 10],
             "perception".to_string(),
         );
         assert_eq!(state.order, RepresentationOrder::FirstOrder);
@@ -484,12 +484,12 @@ mod tests {
     #[test]
     fn test_higher_order_state() {
         let first = MentalState::first_order(
-            vec![HV16::ones(); 10],
+            vec![BinaryHV::ones(); 10],
             "perception".to_string(),
         );
         let second = MentalState::higher_order(
             first,
-            vec![HV16::zero(); 10],
+            vec![BinaryHV::zero(); 10],
             "introspection".to_string(),
         );
 
@@ -501,17 +501,17 @@ mod tests {
     #[test]
     fn test_third_order_meta_consciousness() {
         let first = MentalState::first_order(
-            vec![HV16::ones(); 10],
+            vec![BinaryHV::ones(); 10],
             "perception".to_string(),
         );
         let second = MentalState::higher_order(
             first,
-            vec![HV16::zero(); 10],
+            vec![BinaryHV::zero(); 10],
             "introspection".to_string(),
         );
         let third = MentalState::higher_order(
             second,
-            vec![HV16::random(1); 10],
+            vec![BinaryHV::random(1); 10],
             "reflection".to_string(),
         );
 
@@ -530,7 +530,7 @@ mod tests {
     #[test]
     fn test_perceive() {
         let mut system = HigherOrderThoughtSystem::new(HOTConfig::default());
-        system.perceive(vec![HV16::ones(); 10], "vision".to_string());
+        system.perceive(vec![BinaryHV::ones(); 10], "vision".to_string());
 
         assert_eq!(system.first_order.len(), 1);
         assert_eq!(system.second_order.len(), 0);  // No HOT yet
@@ -541,10 +541,10 @@ mod tests {
         let mut system = HigherOrderThoughtSystem::new(HOTConfig::default());
 
         // Add first-order state
-        system.perceive(vec![HV16::ones(); 10], "vision".to_string());
+        system.perceive(vec![BinaryHV::ones(); 10], "vision".to_string());
 
         // Form HOT about it
-        let hot_idx = system.form_hot(0, vec![HV16::zero(); 10]);
+        let hot_idx = system.form_hot(0, vec![BinaryHV::zero(); 10]);
 
         assert!(hot_idx.is_some());
         assert_eq!(system.second_order.len(), 1);
@@ -561,7 +561,7 @@ mod tests {
 
         // Add high-confidence first-order state
         let mut state = MentalState::first_order(
-            vec![HV16::ones(); 10],
+            vec![BinaryHV::ones(); 10],
             "vision".to_string(),
         );
         state.confidence = 0.9;  // Above threshold
@@ -579,9 +579,9 @@ mod tests {
         let mut system = HigherOrderThoughtSystem::new(HOTConfig::default());
 
         // Add 2 first-order, form HOT for 1
-        system.perceive(vec![HV16::ones(); 10], "vision".to_string());
-        system.perceive(vec![HV16::zero(); 10], "hearing".to_string());
-        system.form_hot(0, vec![HV16::random(1); 10]);
+        system.perceive(vec![BinaryHV::ones(); 10], "vision".to_string());
+        system.perceive(vec![BinaryHV::zero(); 10], "hearing".to_string());
+        system.form_hot(0, vec![BinaryHV::random(1); 10]);
 
         let assessment = system.assess();
 
@@ -595,10 +595,10 @@ mod tests {
         let mut system = HigherOrderThoughtSystem::new(HOTConfig::default());
 
         // Add first-order
-        system.perceive(vec![HV16::ones(); 10], "vision".to_string());
+        system.perceive(vec![BinaryHV::ones(); 10], "vision".to_string());
 
         // Form second-order HOT
-        system.form_hot(0, vec![HV16::zero(); 10]);
+        system.form_hot(0, vec![BinaryHV::zero(); 10]);
 
         // Not yet self-aware (no HOT about HOT)
         assert!(!system.is_self_aware());
@@ -607,7 +607,7 @@ mod tests {
         if let Some(second) = system.second_order.first().cloned() {
             let third = MentalState::higher_order(
                 second,
-                vec![HV16::random(2); 10],
+                vec![BinaryHV::random(2); 10],
                 "meta-reflection".to_string(),
             );
             system.higher_order.push(third);
@@ -620,14 +620,14 @@ mod tests {
     #[test]
     fn test_misrepresentation_detection() {
         let first = MentalState::first_order(
-            vec![HV16::ones(); 10],
+            vec![BinaryHV::ones(); 10],
             "perception".to_string(),
         );
 
         // HOT misrepresents (very different content)
         let mut hot = MentalState::higher_order(
             first,
-            vec![HV16::zero(); 10],  // Completely different
+            vec![BinaryHV::zero(); 10],  // Completely different
             "introspection".to_string(),
         );
 
@@ -639,8 +639,8 @@ mod tests {
     fn test_clear() {
         let mut system = HigherOrderThoughtSystem::new(HOTConfig::default());
 
-        system.perceive(vec![HV16::ones(); 10], "vision".to_string());
-        system.form_hot(0, vec![HV16::zero(); 10]);
+        system.perceive(vec![BinaryHV::ones(); 10], "vision".to_string());
+        system.form_hot(0, vec![BinaryHV::zero(); 10]);
 
         system.clear();
 

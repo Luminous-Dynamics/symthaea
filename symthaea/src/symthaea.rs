@@ -12,7 +12,7 @@
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridgeV2;
@@ -978,25 +978,25 @@ impl Symthaea {
         }
     }
 
-    /// Convert text to a RealHV embedding.
+    /// Convert text to a ContinuousHV embedding.
     ///
     /// When Neural Bridge v2 is available (feature `neural-bridge`), uses BGE-M3
     /// for high-quality semantic encoding (~380ms CPU, cached <1ms).
     /// Otherwise falls back to fast hash-based encoding (<1ms but lower quality).
-    fn text_to_hv(&mut self, text: &str) -> RealHV {
+    fn text_to_hv(&mut self, text: &str) -> ContinuousHV {
         // Try Neural Bridge v2 first (if available)
         #[cfg(feature = "neural-bridge")]
         if let Some(ref mut bridge) = self.neural_bridge {
             match bridge.encode_to_hdc(text) {
                 Ok(packed) => {
-                    // Convert PackedBipolar to RealHV
-                    // PackedBipolar is 16384-dim bipolar {-1, +1}, RealHV uses self.hdc_dim
+                    // Convert PackedBipolar to ContinuousHV
+                    // PackedBipolar is 16384-dim bipolar {-1, +1}, ContinuousHV uses self.hdc_dim
                     let bipolar = packed.to_bipolar();
                     let mut values = vec![0.0f32; self.hdc_dim];
                     for (i, &val) in bipolar.iter().take(self.hdc_dim).enumerate() {
                         values[i] = val as f32;
                     }
-                    return RealHV::from_values(values);
+                    return ContinuousHV::from_values(values);
                 }
                 Err(e) => {
                     tracing::warn!(
@@ -1021,7 +1021,7 @@ impl Symthaea {
                 *v /= magnitude;
             }
         }
-        RealHV::from_values(values)
+        ContinuousHV::from_values(values)
     }
 
     /// Check if Neural Bridge v2 is active (high-quality semantic encoding).
@@ -1118,20 +1118,20 @@ impl Symthaea {
     /// LUCID's semantic search and other consumers. It wraps the internal
     /// `text_to_hv` method to provide a stable interface.
     ///
-    /// Returns a `RealHV` hypervector of dimension `hdc_dim` (default 16,384).
+    /// Returns a `ContinuousHV` hypervector of dimension `hdc_dim` (default 16,384).
     ///
     /// ## Encoding Strategy
     ///
     /// When Neural Bridge v2 is available (feature `neural-bridge`), uses BGE-M3
     /// for high-quality semantic encoding. Otherwise falls back to hash-based
     /// encoding which is fast but lower quality.
-    pub fn embed(&mut self, text: &str) -> RealHV {
+    pub fn embed(&mut self, text: &str) -> ContinuousHV {
         self.text_to_hv(text)
     }
 
     /// Generate an HDC embedding and return as `Vec<f32>`.
     ///
-    /// Convenience method that extracts the raw values from the RealHV.
+    /// Convenience method that extracts the raw values from the ContinuousHV.
     pub fn embed_vec(&mut self, text: &str) -> Vec<f32> {
         self.text_to_hv(text).values
     }
@@ -1140,7 +1140,7 @@ impl Symthaea {
     ///
     /// More efficient than calling `embed` repeatedly as it can amortize
     /// initialization costs.
-    pub fn embed_batch(&mut self, texts: &[&str]) -> Vec<RealHV> {
+    pub fn embed_batch(&mut self, texts: &[&str]) -> Vec<ContinuousHV> {
         texts.iter().map(|t| self.text_to_hv(t)).collect()
     }
 

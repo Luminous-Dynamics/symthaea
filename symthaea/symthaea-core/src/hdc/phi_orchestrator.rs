@@ -38,7 +38,7 @@
 //! println!("Φ = {:.4} (via {:?})", result.phi, result.calculator_used);
 //! ```
 
-use crate::hdc::real_hv::RealHV;
+use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::spectral_connectivity::ConnectivityCalculator;
 use crate::hdc::phi_resonant::{ResonantPhiCalculator, ResonantConfig};
 use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
@@ -63,8 +63,10 @@ const CACHE_SIZE: usize = 16;
 
 /// Φ calculation mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum PhiMode {
     /// Automatically select best calculator based on n
+    #[default]
     Adaptive,
 
     /// Always use RealPhiCalculator (accurate, O(n³))
@@ -80,11 +82,6 @@ pub enum PhiMode {
     Balanced,
 }
 
-impl Default for PhiMode {
-    fn default() -> Self {
-        PhiMode::Adaptive
-    }
-}
 
 /// Result of Φ calculation with metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -180,7 +177,7 @@ impl PhiOrchestrator {
     }
 
     /// Compute hash of process components for cache lookup
-    fn compute_processes_hash(processes: &[RealHV]) -> u64 {
+    fn compute_processes_hash(processes: &[ContinuousHV]) -> u64 {
         let mut hasher = DefaultHasher::new();
         for (i, process) in processes.iter().enumerate() {
             i.hash(&mut hasher);
@@ -269,11 +266,11 @@ impl PhiOrchestrator {
         self.tiered_calculator = TieredPhi::new(tier);
     }
 
-    /// Compute Φ for a set of RealHV processes
+    /// Compute Φ for a set of ContinuousHV processes
     ///
     /// Automatically selects the optimal calculator based on mode and context.
     /// Results are cached for repeated computations with the same processes.
-    pub fn compute(&mut self, processes: &[RealHV]) -> PhiResult {
+    pub fn compute(&mut self, processes: &[ContinuousHV]) -> PhiResult {
         let n = processes.len();
 
         if n < 2 {
@@ -336,12 +333,12 @@ impl PhiOrchestrator {
     }
 
     /// Simple compute that just returns Φ value
-    pub fn compute_simple(&mut self, processes: &[RealHV]) -> f64 {
+    pub fn compute_simple(&mut self, processes: &[ContinuousHV]) -> f64 {
         self.compute(processes).phi
     }
 
     /// Adaptive computation: select best calculator based on n
-    fn compute_adaptive(&self, processes: &[RealHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
+    fn compute_adaptive(&self, processes: &[ContinuousHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
         let n = processes.len();
 
         if n <= 5 {
@@ -360,28 +357,28 @@ impl PhiOrchestrator {
     }
 
     /// Always use accurate (Real) calculator
-    fn compute_accurate(&self, processes: &[RealHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
+    fn compute_accurate(&self, processes: &[ContinuousHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
         let phi = self.real_calculator.algebraic_connectivity(processes);
         (phi, CalculatorType::Real, Some(true), None)
     }
 
     /// Always use fast (Resonant) calculator
-    fn compute_fast(&self, processes: &[RealHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
+    fn compute_fast(&self, processes: &[ContinuousHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
         let result = self.resonant_calculator.compute(processes);
         (result.phi, CalculatorType::Resonant, Some(result.converged), Some(result.iterations))
     }
 
     /// Use tiered calculator with specific tier
-    /// Note: TieredPhi uses HV16, so we fall back to real calculator for RealHV
-    fn compute_tiered(&mut self, processes: &[RealHV], tier: ApproximationTier) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
-        // TieredPhi works with HV16, not RealHV. For now, fall back to accurate calculation.
-        // Future: Convert RealHV to HV16 for tiered computation
+    /// Note: TieredPhi uses BinaryHV, so we fall back to real calculator for ContinuousHV
+    fn compute_tiered(&mut self, processes: &[ContinuousHV], tier: ApproximationTier) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
+        // TieredPhi works with BinaryHV, not ContinuousHV. For now, fall back to accurate calculation.
+        // Future: Convert ContinuousHV to BinaryHV for tiered computation
         let phi = self.real_calculator.algebraic_connectivity(processes);
         (phi, CalculatorType::Tiered(tier), Some(true), None)
     }
 
     /// Balanced: accurate for small, fast for large
-    fn compute_balanced(&self, processes: &[RealHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
+    fn compute_balanced(&self, processes: &[ContinuousHV]) -> (f64, CalculatorType, Option<bool>, Option<usize>) {
         let n = processes.len();
 
         if n <= 10 {
@@ -518,7 +515,7 @@ mod tests {
     #[test]
     fn test_single_process() {
         let mut orch = PhiOrchestrator::adaptive();
-        let hv = RealHV::random(256, 42);
+        let hv = ContinuousHV::random(256, 42);
         let result = orch.compute(&[hv]);
         assert_eq!(result.phi, 0.0);
         assert_eq!(result.process_count, 1);
@@ -527,8 +524,8 @@ mod tests {
     #[test]
     fn test_small_processes_uses_accurate() {
         let mut orch = PhiOrchestrator::adaptive();
-        let processes: Vec<RealHV> = (0..3)
-            .map(|i| RealHV::random(256, i as u64))
+        let processes: Vec<ContinuousHV> = (0..3)
+            .map(|i| ContinuousHV::random(256, i as u64))
             .collect();
 
         let result = orch.compute(&processes);
@@ -539,8 +536,8 @@ mod tests {
     #[test]
     fn test_stats_tracking() {
         let mut orch = PhiOrchestrator::adaptive();
-        let processes: Vec<RealHV> = (0..3)
-            .map(|i| RealHV::random(256, i as u64))
+        let processes: Vec<ContinuousHV> = (0..3)
+            .map(|i| ContinuousHV::random(256, i as u64))
             .collect();
 
         // Compute a few times
@@ -556,8 +553,8 @@ mod tests {
     #[test]
     fn test_confidence_calculation() {
         let mut orch = PhiOrchestrator::new(PhiMode::Accurate);
-        let processes: Vec<RealHV> = (0..3)
-            .map(|i| RealHV::random(256, i as u64))
+        let processes: Vec<ContinuousHV> = (0..3)
+            .map(|i| ContinuousHV::random(256, i as u64))
             .collect();
 
         let result = orch.compute(&processes);

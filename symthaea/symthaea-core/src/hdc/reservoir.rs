@@ -534,7 +534,7 @@ impl HybridEnsemblePredictor {
         self.steps += 1;
 
         // Periodic retraining and signal type detection
-        if self.steps % self.train_interval == 0 && self.steps > 200 {
+        if self.steps.is_multiple_of(self.train_interval) && self.steps > 200 {
             self.esn.train(0.001);
             self.detect_signal_type();
         }
@@ -657,7 +657,7 @@ impl EnsemblePredictor {
         self.steps += 1;
 
         // Periodic retraining
-        if self.steps % self.train_interval == 0 && self.steps > 200 {
+        if self.steps.is_multiple_of(self.train_interval) && self.steps > 200 {
             self.esn.train(0.001); // Small regularization
         }
     }

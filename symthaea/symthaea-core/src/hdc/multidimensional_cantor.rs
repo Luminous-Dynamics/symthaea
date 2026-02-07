@@ -32,7 +32,7 @@
 //! This creates a hypercube structure where each point in 4D space
 //! represents a fully integrated cognitive element.
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use std::f64::consts::PI;
 
 // =============================================================================
@@ -57,10 +57,10 @@ use std::f64::consts::PI;
 #[derive(Clone, Debug)]
 pub struct RadialCantorHV {
     /// The radial-structured hypervector
-    pub vector: HV16,
+    pub vector: BinaryHV,
 
     /// The base vector before radial structuring
-    pub base: HV16,
+    pub base: BinaryHV,
 
     /// Number of radial bands
     pub bands: usize,
@@ -74,7 +74,7 @@ impl RadialCantorHV {
     ///
     /// Dimensions are organized into concentric bands, with Cantor
     /// structure applied within each band.
-    pub fn new(base: HV16, num_bands: usize) -> Self {
+    pub fn new(base: BinaryHV, num_bands: usize) -> Self {
         let dim = base.dimension();
         let band_size = dim / num_bands;
         let mut result = base.clone();
@@ -105,7 +105,7 @@ impl RadialCantorHV {
     }
 
     /// Weight a vector's influence
-    fn weight_vector(v: &HV16, weight: f64) -> HV16 {
+    fn weight_vector(v: &BinaryHV, weight: f64) -> BinaryHV {
         if weight >= 1.0 {
             return v.clone();
         }
@@ -123,13 +123,13 @@ impl RadialCantorHV {
         }
 
         let arr: [u8; 2048] = new_bytes.try_into().expect("Vec should be exactly 2048 bytes");
-        HV16::from_bytes(&arr)
+        BinaryHV::from_bytes(&arr)
     }
 
     /// Query at specific radial depth
     ///
     /// Returns the vector focused on a specific radial band.
-    pub fn at_radius(&self, band: usize) -> Option<HV16> {
+    pub fn at_radius(&self, band: usize) -> Option<BinaryHV> {
         if band >= self.bands {
             return None;
         }
@@ -142,12 +142,12 @@ impl RadialCantorHV {
     }
 
     /// Core meaning (innermost band)
-    pub fn core(&self) -> HV16 {
+    pub fn core(&self) -> BinaryHV {
         self.at_radius(0).unwrap_or_else(|| self.base.clone())
     }
 
     /// Peripheral meaning (outermost band)
-    pub fn periphery(&self) -> HV16 {
+    pub fn periphery(&self) -> BinaryHV {
         self.at_radius(self.bands - 1).unwrap_or_else(|| self.base.clone())
     }
 
@@ -188,10 +188,10 @@ impl RadialCantorHV {
 #[derive(Clone, Debug)]
 pub struct Cantor3D_HV {
     /// The 3D-structured hypervector
-    pub vector: HV16,
+    pub vector: BinaryHV,
 
     /// Base vector
-    pub base: HV16,
+    pub base: BinaryHV,
 
     /// Dimensions per axis
     pub axis_size: usize,
@@ -202,7 +202,7 @@ pub struct Cantor3D_HV {
 
 impl Cantor3D_HV {
     /// Create a 3D Cantor dust hypervector
-    pub fn new(base: HV16, depth: usize) -> Self {
+    pub fn new(base: BinaryHV, depth: usize) -> Self {
         let dim = base.dimension();
         // Partition into 3 axes
         let axis_size = dim / 3;
@@ -234,7 +234,7 @@ impl Cantor3D_HV {
 
         // Bind all three axes together
         let xyz_binding = x_component.bind(&y_component).bind(&z_component);
-        result = HV16::bundle(&[result, xyz_binding]);
+        result = BinaryHV::bundle(&[result, xyz_binding]);
 
         Self {
             vector: result,
@@ -245,24 +245,24 @@ impl Cantor3D_HV {
     }
 
     /// Get semantic component (X axis)
-    pub fn semantic(&self) -> HV16 {
+    pub fn semantic(&self) -> BinaryHV {
         self.base.permute(0)
     }
 
     /// Get causal component (Y axis)
-    pub fn causal(&self) -> HV16 {
+    pub fn causal(&self) -> BinaryHV {
         self.base.permute(self.axis_size)
     }
 
     /// Get temporal component (Z axis)
-    pub fn temporal(&self) -> HV16 {
+    pub fn temporal(&self) -> BinaryHV {
         self.base.permute(2 * self.axis_size)
     }
 
     /// Query at 3D position
     ///
     /// x, y, z are normalized [0, 1] coordinates in the cognitive cube.
-    pub fn at_position(&self, x: f64, y: f64, z: f64) -> HV16 {
+    pub fn at_position(&self, x: f64, y: f64, z: f64) -> BinaryHV {
         let x_shift = (x * self.axis_size as f64) as usize;
         let y_shift = self.axis_size + (y * self.axis_size as f64) as usize;
         let z_shift = 2 * self.axis_size + (z * self.axis_size as f64) as usize;
@@ -342,10 +342,10 @@ impl Cantor3D_HV {
 #[derive(Clone, Debug)]
 pub struct Cantor4D_HV {
     /// The 4D-structured hypervector
-    pub vector: HV16,
+    pub vector: BinaryHV,
 
     /// Base vector
-    pub base: HV16,
+    pub base: BinaryHV,
 
     /// Dimensions per axis (4 axes)
     pub axis_size: usize,
@@ -359,12 +359,12 @@ pub struct Cantor4D_HV {
 
 impl Cantor4D_HV {
     /// Create a 4D Cantor tesseract hypervector
-    pub fn new(base: HV16, depth: usize) -> Self {
+    pub fn new(base: BinaryHV, depth: usize) -> Self {
         Self::with_consciousness(base, depth, 0.5) // Default: partially conscious
     }
 
     /// Create with specific consciousness level
-    pub fn with_consciousness(base: HV16, depth: usize, w: f64) -> Self {
+    pub fn with_consciousness(base: BinaryHV, depth: usize, w: f64) -> Self {
         let dim = base.dimension();
         // Partition into 4 axes
         let axis_size = dim / 4;
@@ -396,11 +396,11 @@ impl Cantor4D_HV {
 
         // Bind all four axes
         let xyzw = x.bind(&y).bind(&z).bind(&w_vec);
-        result = HV16::bundle(&[result, xyzw]);
+        result = BinaryHV::bundle(&[result, xyzw]);
 
         // Apply consciousness weighting
         let w_influence = Self::consciousness_weight(&base, w, axis_size);
-        result = HV16::bundle(&[result, w_influence]);
+        result = BinaryHV::bundle(&[result, w_influence]);
 
         Self {
             vector: result,
@@ -412,7 +412,7 @@ impl Cantor4D_HV {
     }
 
     /// Generate consciousness-weighted component
-    fn consciousness_weight(base: &HV16, w: f64, axis_size: usize) -> HV16 {
+    fn consciousness_weight(base: &BinaryHV, w: f64, axis_size: usize) -> BinaryHV {
         // W dimension encodes meta-awareness
         // Higher W = more self-referential structure
         let w_shift = 3 * axis_size + (w * axis_size as f64) as usize;
@@ -421,14 +421,14 @@ impl Cantor4D_HV {
         if w > 0.5 {
             // High consciousness: bind with self (self-reference!)
             let self_ref = w_component.bind(&w_component);
-            HV16::bundle(&[w_component, self_ref])
+            BinaryHV::bundle(&[w_component, self_ref])
         } else {
             w_component
         }
     }
 
     /// Get component at 4D position
-    pub fn at_position(&self, x: f64, y: f64, z: f64, w: f64) -> HV16 {
+    pub fn at_position(&self, x: f64, y: f64, z: f64, w: f64) -> BinaryHV {
         let x_shift = (x * self.axis_size as f64) as usize;
         let y_shift = self.axis_size + (y * self.axis_size as f64) as usize;
         let z_shift = 2 * self.axis_size + (z * self.axis_size as f64) as usize;
@@ -443,22 +443,22 @@ impl Cantor4D_HV {
     }
 
     /// Semantic component (X)
-    pub fn semantic(&self) -> HV16 {
+    pub fn semantic(&self) -> BinaryHV {
         self.base.permute(0)
     }
 
     /// Causal component (Y)
-    pub fn causal(&self) -> HV16 {
+    pub fn causal(&self) -> BinaryHV {
         self.base.permute(self.axis_size)
     }
 
     /// Temporal component (Z)
-    pub fn temporal(&self) -> HV16 {
+    pub fn temporal(&self) -> BinaryHV {
         self.base.permute(2 * self.axis_size)
     }
 
     /// Meta-conscious component (W)
-    pub fn meta(&self) -> HV16 {
+    pub fn meta(&self) -> BinaryHV {
         self.base.permute(3 * self.axis_size)
     }
 
@@ -526,10 +526,10 @@ impl Cantor4D_HV {
 #[derive(Clone, Debug)]
 pub struct SphericalCantorHV {
     /// The spherically-structured hypervector
-    pub vector: HV16,
+    pub vector: BinaryHV,
 
     /// Base vector
-    pub base: HV16,
+    pub base: BinaryHV,
 
     /// Number of radial shells
     pub shells: usize,
@@ -540,7 +540,7 @@ pub struct SphericalCantorHV {
 
 impl SphericalCantorHV {
     /// Create a spherical Cantor hypervector
-    pub fn new(base: HV16, shells: usize) -> Self {
+    pub fn new(base: BinaryHV, shells: usize) -> Self {
         let dim = base.dimension();
         let angular_resolution = 16; // 16 angular divisions
 
@@ -564,7 +564,7 @@ impl SphericalCantorHV {
                 if shell < shells / 2 {
                     result = result.bind(&angular_component);
                 } else {
-                    result = HV16::bundle(&[result, angular_component]);
+                    result = BinaryHV::bundle(&[result, angular_component]);
                 }
             }
         }
@@ -602,7 +602,7 @@ impl SphericalCantorHV {
     }
 
     /// Get component at spherical coordinates
-    pub fn at_spherical(&self, r: f64, theta: f64, phi: f64) -> HV16 {
+    pub fn at_spherical(&self, r: f64, theta: f64, phi: f64) -> BinaryHV {
         let dim = self.base.dimension();
 
         // Convert spherical to index
@@ -639,7 +639,7 @@ pub enum CantorManifold {
 
 impl CantorManifold {
     /// Get the unified vector regardless of structure
-    pub fn vector(&self) -> &HV16 {
+    pub fn vector(&self) -> &BinaryHV {
         match self {
             CantorManifold::Linear(c) => &c.vector,
             CantorManifold::Radial(c) => &c.vector,
@@ -676,7 +676,7 @@ mod tests {
 
     #[test]
     fn test_radial_cantor() {
-        let base = HV16::random(42);
+        let base = BinaryHV::random(42);
         let radial = RadialCantorHV::new(base, 5);
 
         assert_eq!(radial.bands, 5);
@@ -691,7 +691,7 @@ mod tests {
 
     #[test]
     fn test_3d_cantor() {
-        let base = HV16::random(42);
+        let base = BinaryHV::random(42);
         let dust = Cantor3D_HV::new(base, 3);
 
         let semantic = dust.semantic();
@@ -705,7 +705,7 @@ mod tests {
 
     #[test]
     fn test_4d_cantor_consciousness() {
-        let base = HV16::random(42);
+        let base = BinaryHV::random(42);
 
         let low_consciousness = Cantor4D_HV::with_consciousness(base.clone(), 3, 0.1);
         let high_consciousness = Cantor4D_HV::with_consciousness(base.clone(), 3, 0.9);
@@ -719,8 +719,8 @@ mod tests {
 
     #[test]
     fn test_consciousness_gradient() {
-        let base_a = HV16::random(42);
-        let base_b = HV16::random(43);
+        let base_a = BinaryHV::random(42);
+        let base_b = BinaryHV::random(43);
 
         let a = Cantor4D_HV::new(base_a, 3);
         let b = Cantor4D_HV::new(base_b, 3);
@@ -734,7 +734,7 @@ mod tests {
 
     #[test]
     fn test_spherical_cantor() {
-        let base = HV16::random(42);
+        let base = BinaryHV::random(42);
         let spherical = SphericalCantorHV::new(base, 4);
 
         // Sample at different spherical positions

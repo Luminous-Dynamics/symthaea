@@ -11,7 +11,7 @@
 //!     ↓ encode_entity()
 //! bind(role_hv, name_hv, position_hv)
 //!     ↓
-//! RealHV (16,384D)
+//! ContinuousHV (16,384D)
 //! ```
 //!
 //! # Key Insight
@@ -22,7 +22,7 @@
 
 use std::collections::HashMap;
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode, Relation, CodeRelation};
 
@@ -30,11 +30,11 @@ use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode, Relation,
 pub struct CodeHDEncoder {
     dim: usize,
     /// Role vectors: what kind of node
-    role_vectors: HashMap<EntityKind, RealHV>,
+    role_vectors: HashMap<EntityKind, ContinuousHV>,
     /// Relation vectors: how things connect
-    relation_vectors: HashMap<Relation, RealHV>,
+    relation_vectors: HashMap<Relation, ContinuousHV>,
     /// Position vectors for encoding sequence order
-    position_vectors: Vec<RealHV>,
+    position_vectors: Vec<ContinuousHV>,
     /// Maximum number of position vectors to pre-generate
     max_positions: usize,
 }
@@ -106,7 +106,7 @@ impl CodeHDEncoder {
         for (i, kind) in kinds.iter().enumerate() {
             // Deterministic seed: role index * large prime
             let seed = (i as u64 + 1) * 2_654_435_761;
-            self.role_vectors.insert(*kind, RealHV::random(self.dim, seed));
+            self.role_vectors.insert(*kind, ContinuousHV::random(self.dim, seed));
         }
     }
 
@@ -125,7 +125,7 @@ impl CodeHDEncoder {
 
         for (i, rel) in relations.iter().enumerate() {
             let seed = (i as u64 + 100) * 3_141_592_653;
-            self.relation_vectors.insert(*rel, RealHV::random(self.dim, seed));
+            self.relation_vectors.insert(*rel, ContinuousHV::random(self.dim, seed));
         }
     }
 
@@ -133,7 +133,7 @@ impl CodeHDEncoder {
     fn init_position_vectors(&mut self) {
         for i in 0..self.max_positions {
             let seed = (i as u64 + 1000) * 1_618_033_989;
-            self.position_vectors.push(RealHV::random(self.dim, seed));
+            self.position_vectors.push(ContinuousHV::random(self.dim, seed));
         }
     }
 
@@ -142,9 +142,9 @@ impl CodeHDEncoder {
     // ========================================================================
 
     /// Encode a symbol name into a hypervector using character n-gram hashing
-    pub fn encode_name(&self, name: &str) -> RealHV {
+    pub fn encode_name(&self, name: &str) -> ContinuousHV {
         if name.is_empty() {
-            return RealHV::zero(self.dim);
+            return ContinuousHV::zero(self.dim);
         }
 
         let mut values = vec![0.0f32; self.dim];
@@ -180,7 +180,7 @@ impl CodeHDEncoder {
             }
         }
 
-        RealHV::from_values(values)
+        ContinuousHV::from_values(values)
     }
 
     // ========================================================================
@@ -188,10 +188,10 @@ impl CodeHDEncoder {
     // ========================================================================
 
     /// Encode a single code entity: bind(role, name, position)
-    pub fn encode_entity(&self, entity: &CodeEntity) -> RealHV {
+    pub fn encode_entity(&self, entity: &CodeEntity) -> ContinuousHV {
         let role_hv = self.role_vectors.get(&entity.kind)
             .cloned()
-            .unwrap_or_else(|| RealHV::zero(self.dim));
+            .unwrap_or_else(|| ContinuousHV::zero(self.dim));
         let name_hv = self.encode_name(&entity.name);
 
         // bind(role, name)
@@ -206,7 +206,7 @@ impl CodeHDEncoder {
         }
 
         // Bundle children
-        let child_hvs: Vec<RealHV> = entity.children.iter()
+        let child_hvs: Vec<ContinuousHV> = entity.children.iter()
             .enumerate()
             .map(|(i, child)| {
                 let child_hv = self.encode_entity(child);
@@ -216,20 +216,20 @@ impl CodeHDEncoder {
             .collect();
 
         // Combine: entity = bound ⊕ annotations ⊕ children
-        let mut all: Vec<RealHV> = vec![bound.clone()];
+        let mut all: Vec<ContinuousHV> = vec![bound.clone()];
         all.extend(annotation_hvs.into_iter());
         all.extend(child_hvs.into_iter());
 
         if all.len() == 1 {
             bound
         } else {
-            RealHV::bundle(&all)
+            ContinuousHV::bundle_owned(&all)
         }
     }
 
     /// Encode a function entity with full semantic structure:
     /// bind(FUNCTION, name) ⊕ bundle([param_hvs]) ⊕ bind(RETURNS, return_type)
-    pub fn encode_function(&self, entity: &CodeEntity) -> RealHV {
+    pub fn encode_function(&self, entity: &CodeEntity) -> ContinuousHV {
         let base = self.encode_entity(entity);
 
         // Encode return type if present
@@ -238,24 +238,24 @@ impl CodeHDEncoder {
             let type_hv = self.encode_name(ret_type);
             returns_role.bind(&type_hv)
         } else {
-            RealHV::zero(self.dim)
+            ContinuousHV::zero(self.dim)
         };
 
         // Encode parameters if present
         let params_hv = if let Some(params) = entity.annotations.get("parameters") {
             self.encode_name(params)
         } else {
-            RealHV::zero(self.dim)
+            ContinuousHV::zero(self.dim)
         };
 
         // Encode visibility
         let vis_hv = if let Some(vis) = entity.annotations.get("visibility") {
             self.encode_name(vis)
         } else {
-            RealHV::zero(self.dim)
+            ContinuousHV::zero(self.dim)
         };
 
-        RealHV::bundle(&[base, return_hv, params_hv, vis_hv])
+        ContinuousHV::bundle_owned(&[base, return_hv, params_hv, vis_hv])
     }
 
     // ========================================================================
@@ -263,13 +263,13 @@ impl CodeHDEncoder {
     // ========================================================================
 
     /// Encode an entire parsed module as a single hypervector
-    pub fn encode_module(&self, parsed: &ParsedCode) -> RealHV {
+    pub fn encode_module(&self, parsed: &ParsedCode) -> ContinuousHV {
         if parsed.entities.is_empty() {
-            return RealHV::zero(self.dim);
+            return ContinuousHV::zero(self.dim);
         }
 
         // Encode each entity with position binding
-        let entity_hvs: Vec<RealHV> = parsed.entities.iter()
+        let entity_hvs: Vec<ContinuousHV> = parsed.entities.iter()
             .enumerate()
             .map(|(i, entity)| {
                 let entity_hv = match entity.kind {
@@ -283,34 +283,34 @@ impl CodeHDEncoder {
             .collect();
 
         // Bundle all entity HVs
-        let module_hv = RealHV::bundle(&entity_hvs);
+        let module_hv = ContinuousHV::bundle_owned(&entity_hvs);
 
         // Encode relationships
         let relation_hv = self.encode_relations(&parsed.structure.relations);
 
         // Combine module entities + relations
-        RealHV::bundle(&[module_hv, relation_hv])
+        ContinuousHV::bundle_owned(&[module_hv, relation_hv])
     }
 
     /// Encode a set of relationships
-    pub fn encode_relations(&self, relations: &[CodeRelation]) -> RealHV {
+    pub fn encode_relations(&self, relations: &[CodeRelation]) -> ContinuousHV {
         if relations.is_empty() {
-            return RealHV::zero(self.dim);
+            return ContinuousHV::zero(self.dim);
         }
 
-        let hvs: Vec<RealHV> = relations.iter()
+        let hvs: Vec<ContinuousHV> = relations.iter()
             .map(|rel| self.encode_relationship_triple(&rel.source, rel.relation, &rel.target))
             .collect();
 
-        RealHV::bundle(&hvs)
+        ContinuousHV::bundle_owned(&hvs)
     }
 
     /// Encode a single relationship triple: bind(source, relation, target)
-    pub fn encode_relationship_triple(&self, source: &str, relation: Relation, target: &str) -> RealHV {
+    pub fn encode_relationship_triple(&self, source: &str, relation: Relation, target: &str) -> ContinuousHV {
         let src_hv = self.encode_name(source);
         let rel_hv = self.relation_vectors.get(&relation)
             .cloned()
-            .unwrap_or_else(|| RealHV::zero(self.dim));
+            .unwrap_or_else(|| ContinuousHV::zero(self.dim));
         let tgt_hv = self.encode_name(target);
 
         // Triple: bind(bind(source, relation), target)
@@ -322,7 +322,7 @@ impl CodeHDEncoder {
     // ========================================================================
 
     /// Encode a diff between two code snapshots
-    pub fn encode_diff(&self, old: &ParsedCode, new: &ParsedCode) -> RealHV {
+    pub fn encode_diff(&self, old: &ParsedCode, new: &ParsedCode) -> ContinuousHV {
         let old_hv = self.encode_module(old);
         let new_hv = self.encode_module(new);
 
@@ -340,7 +340,7 @@ impl CodeHDEncoder {
             }
         }
 
-        RealHV::from_values(diff_values)
+        ContinuousHV::from_values(diff_values)
     }
 
     // ========================================================================
@@ -348,17 +348,17 @@ impl CodeHDEncoder {
     // ========================================================================
 
     /// Get position vector at index (wraps around if exceeds max)
-    fn position_vector(&self, index: usize) -> &RealHV {
+    fn position_vector(&self, index: usize) -> &ContinuousHV {
         &self.position_vectors[index % self.max_positions]
     }
 
     /// Get the role vector for an entity kind
-    pub fn role_vector(&self, kind: EntityKind) -> Option<&RealHV> {
+    pub fn role_vector(&self, kind: EntityKind) -> Option<&ContinuousHV> {
         self.role_vectors.get(&kind)
     }
 
     /// Get the relation vector for a relation type
-    pub fn relation_vector(&self, relation: Relation) -> Option<&RealHV> {
+    pub fn relation_vector(&self, relation: Relation) -> Option<&ContinuousHV> {
         self.relation_vectors.get(&relation)
     }
 }

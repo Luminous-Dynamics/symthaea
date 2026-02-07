@@ -6,14 +6,13 @@
 //! ## Why Unified HV?
 //!
 //! Previously, Symthaea had two separate types:
-//! - `RealHV` - f32 continuous values in [-1, 1]
-//! - `HV16` - 16,384 bits bipolar {-1, +1}
+//! - `ContinuousHV` - f32 continuous values in [-1, 1]
+//! - `BinaryHV` - 16,384 bits bipolar {-1, +1}
 //!
-//! The name "RealHV" was confusing (suggests "actual" vs "fake").
+//! The name "ContinuousHV" was confusing (suggests "actual" vs "fake").
 //! This module provides:
 //! - `ContinuousHV` - Clear name for f32 representation
-//! - `BinaryHV` - Clear name for bipolar representation
-//! - `HV` enum - Unified type for mixed operations
+//! - `HV` enum - Unified type wrapping ContinuousHV and BinaryHV
 //!
 //! ## Theoretical Basis
 //!
@@ -25,7 +24,8 @@
 //! ## Example Usage
 //!
 //! ```rust,ignore
-//! use symthaea::hdc::unified_hv::{ContinuousHV, BinaryHV, HV};
+//! use symthaea::hdc::unified_hv::{ContinuousHV, HV};
+//! use symthaea::hdc::binary_hv::BinaryHV;
 //!
 //! // Continuous operations
 //! let a = ContinuousHV::random(16384, 42);
@@ -38,7 +38,7 @@
 //! let x = BinaryHV::random(42);
 //! let y = BinaryHV::random(43);
 //! let bound = x.bind(&y);  // XOR
-//! let bundled = BinaryHV::bundle(&[x.clone(), y.clone()]);  // Majority vote
+//! let bundled = BinaryHV::bundle(&[x, y]);  // Majority vote
 //!
 //! // Unified interface
 //! let hv_a = HV::Continuous(a);
@@ -46,6 +46,7 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+pub use super::binary_hv::BinaryHV;
 
 /// Standard HDC dimension (2^14 = 16,384)
 /// This is SIMD-optimized and matches research consensus.
@@ -55,7 +56,7 @@ pub const HDC_DIMENSION: usize = 16_384;
 pub const BINARY_BYTES: usize = HDC_DIMENSION / 8;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// CONTINUOUS HYPERVECTOR (formerly RealHV)
+// CONTINUOUS HYPERVECTOR (formerly ContinuousHV)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Continuous-valued hypervector using f32 components in range [-1, 1].
@@ -434,6 +435,75 @@ impl ContinuousHV {
         }
     }
 
+    /// Bundle multiple vectors (owned version)
+    ///
+    /// Takes owned values instead of references. Useful when you have a Vec<ContinuousHV>
+    /// and don't want to build a reference slice.
+    pub fn bundle_owned(hvs: &[Self]) -> Self {
+        if hvs.is_empty() {
+            return Self::zero(HDC_DIMENSION);
+        }
+
+        let dim = hvs[0].values.len();
+        let inv_n = 1.0 / hvs.len() as f32;
+
+        let mut values = vec![0.0f32; dim];
+        for hv in hvs {
+            for (acc, &v) in values.iter_mut().zip(hv.values.iter()) {
+                *acc += v;
+            }
+        }
+        for v in values.iter_mut() {
+            *v *= inv_n;
+        }
+
+        Self { values }
+    }
+
+    /// Get a slice view of the internal values
+    #[inline]
+    pub fn as_slice(&self) -> &[f32] {
+        &self.values
+    }
+
+    /// Create a ContinuousHV from a slice
+    pub fn from_slice(slice: &[f32]) -> Self {
+        Self {
+            values: slice.to_vec(),
+        }
+    }
+
+    /// Perturb the hypervector by adding random noise
+    ///
+    /// The rate controls the magnitude of perturbation (0.0 = no change, 1.0 = significant change)
+    pub fn perturb(&self, rate: f32) -> Self {
+        use blake3::Hasher;
+
+        let mut hasher = Hasher::new();
+        for v in &self.values {
+            hasher.update(&v.to_le_bytes());
+        }
+        hasher.update(&(std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64).to_le_bytes());
+
+        let mut bytes = vec![0u8; self.values.len() * 4];
+        let mut xof = hasher.finalize_xof();
+        xof.fill(&mut bytes);
+
+        let values: Vec<f32> = self.values.iter()
+            .zip(bytes.chunks_exact(4))
+            .map(|(&val, chunk)| {
+                let bits = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+                let noise = (bits as f64 / u32::MAX as f64 * 2.0 - 1.0) as f32;
+                val + noise * rate
+            })
+            .collect();
+
+        Self { values }
+    }
+
     /// Permute elements (rotation)
     ///
     /// Useful for sequence encoding: P^n(A) represents A at position n.
@@ -457,27 +527,29 @@ impl ContinuousHV {
 
     /// Convert to binary representation using threshold
     pub fn to_binary(&self, threshold: f32) -> BinaryHV {
-        let mut bytes = vec![0u8; self.values.len() / 8];
+        let mut bytes = [0u8; 2048];
+        let len = self.values.len().min(16_384);
 
-        for (i, &val) in self.values.iter().enumerate() {
-            if val > threshold {
+        for i in 0..len {
+            if self.values[i] > threshold {
                 bytes[i / 8] |= 1 << (i % 8);
             }
         }
 
-        BinaryHV::from_bytes(bytes)
+        BinaryHV(bytes)
     }
 
     /// Convert to binary using probabilistic binarization
     ///
     /// Preserves heterogeneity better than threshold.
     pub fn to_binary_probabilistic(&self, seed: u64) -> BinaryHV {
-        let mut bytes = vec![0u8; self.values.len() / 8];
+        let mut bytes = [0u8; 2048];
         let mut state = seed;
+        let len = self.values.len().min(16_384);
 
-        for (i, &val) in self.values.iter().enumerate() {
+        for i in 0..len {
             // Sigmoid to probability
-            let prob = 1.0 / (1.0 + (-val * 5.0).exp());
+            let prob = 1.0 / (1.0 + (-self.values[i] * 5.0).exp());
 
             // Random threshold
             state ^= state << 13;
@@ -490,212 +562,13 @@ impl ContinuousHV {
             }
         }
 
-        BinaryHV::from_bytes(bytes)
+        BinaryHV(bytes)
     }
 }
 
 impl Default for ContinuousHV {
     fn default() -> Self {
         Self::zero(HDC_DIMENSION)
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// BINARY HYPERVECTOR (formerly HV16)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Binary (bipolar) hypervector using packed bits.
-///
-/// Each bit represents {-1, +1}: 0 = -1, 1 = +1
-///
-/// Use this when:
-/// - Memory efficiency is critical (2KB vs 64KB)
-/// - Hardware acceleration is available
-/// - Exact precision is not required
-///
-/// # Memory: 2KB per vector (16,384 bits / 8)
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct BinaryHV {
-    /// Packed bits (16,384 bits = 2,048 bytes)
-    bytes: Vec<u8>,
-}
-
-impl BinaryHV {
-    /// Create a zero vector (all -1 in bipolar interpretation)
-    pub fn zero() -> Self {
-        Self {
-            bytes: vec![0u8; BINARY_BYTES],
-        }
-    }
-
-    /// Create a ones vector (all +1 in bipolar interpretation)
-    pub fn ones() -> Self {
-        Self {
-            bytes: vec![0xFF; BINARY_BYTES],
-        }
-    }
-
-    /// Create a random bipolar vector with deterministic seed
-    pub fn random(seed: u64) -> Self {
-        let mut bytes = Vec::with_capacity(BINARY_BYTES);
-        let mut state = seed;
-
-        for _ in 0..BINARY_BYTES {
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            bytes.push((state & 0xFF) as u8);
-        }
-
-        Self { bytes }
-    }
-
-    /// Create from raw bytes
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        assert_eq!(bytes.len(), BINARY_BYTES, "Expected {} bytes", BINARY_BYTES);
-        Self { bytes }
-    }
-
-    /// Get dimension in bits
-    pub fn dim(&self) -> usize {
-        self.bytes.len() * 8
-    }
-
-    /// Get a specific bit as bipolar (-1 or +1)
-    pub fn get_bipolar(&self, index: usize) -> i8 {
-        let byte_idx = index / 8;
-        let bit_idx = index % 8;
-
-        if self.bytes[byte_idx] & (1 << bit_idx) != 0 {
-            1
-        } else {
-            -1
-        }
-    }
-
-    /// Count of 1 bits (population count)
-    pub fn popcount(&self) -> u32 {
-        self.bytes.iter().map(|b| b.count_ones()).sum()
-    }
-
-    /// Binding operation (XOR)
-    ///
-    /// In bipolar interpretation: (-1)×(-1)=1, (-1)×1=-1, 1×1=1
-    /// XOR achieves this: 0⊕0=0, 0⊕1=1, 1⊕1=0
-    pub fn bind(&self, other: &Self) -> Self {
-        assert_eq!(self.bytes.len(), other.bytes.len(), "Dimension mismatch");
-
-        let bytes: Vec<u8> = self.bytes
-            .iter()
-            .zip(other.bytes.iter())
-            .map(|(a, b)| a ^ b)
-            .collect();
-
-        Self { bytes }
-    }
-
-    /// Bundling operation (majority vote)
-    ///
-    /// For each bit position, output 1 if majority of inputs have 1.
-    /// For even-length inputs where ties occur (count == threshold),
-    /// uses alternating tie-breaking based on bit position to avoid
-    /// systematic bias toward -1 (bipolar).
-    pub fn bundle(hvs: &[Self]) -> Self {
-        if hvs.is_empty() {
-            return Self::zero();
-        }
-
-        let threshold = hvs.len() / 2;
-        let even_count = hvs.len() % 2 == 0;
-        let mut bytes = vec![0u8; BINARY_BYTES];
-
-        for byte_idx in 0..BINARY_BYTES {
-            for bit_idx in 0..8 {
-                let count: usize = hvs.iter()
-                    .filter(|hv| hv.bytes[byte_idx] & (1 << bit_idx) != 0)
-                    .count();
-
-                // Strict majority always wins.
-                // For ties (only possible with even-length input), alternate
-                // by bit position to avoid systematic bias.
-                let set_bit = count > threshold
-                    || (even_count && count == threshold && (byte_idx * 8 + bit_idx) % 2 == 0);
-
-                if set_bit {
-                    bytes[byte_idx] |= 1 << bit_idx;
-                }
-            }
-        }
-
-        Self { bytes }
-    }
-
-    /// Hamming distance (number of differing bits)
-    pub fn hamming_distance(&self, other: &Self) -> u32 {
-        self.bytes
-            .iter()
-            .zip(other.bytes.iter())
-            .map(|(a, b)| (a ^ b).count_ones())
-            .sum()
-    }
-
-    /// Similarity in range [0, 1]
-    ///
-    /// 1.0 = identical, 0.5 = random, 0.0 = opposite
-    pub fn similarity(&self, other: &Self) -> f32 {
-        let hamming = self.hamming_distance(other) as f32;
-        let dim = self.dim() as f32;
-
-        1.0 - (hamming / dim)
-    }
-
-    /// Bipolar similarity in range [-1, 1]
-    ///
-    /// Matches ContinuousHV similarity interpretation.
-    pub fn bipolar_similarity(&self, other: &Self) -> f32 {
-        self.similarity(other) * 2.0 - 1.0
-    }
-
-    /// Permute bits (rotation)
-    pub fn permute(&self, shift: usize) -> Self {
-        let dim = self.dim();
-        let shift = shift % dim;
-
-        let mut bytes = vec![0u8; BINARY_BYTES];
-
-        for i in 0..dim {
-            let src_byte = i / 8;
-            let src_bit = i % 8;
-            let dst_idx = (i + shift) % dim;
-            let dst_byte = dst_idx / 8;
-            let dst_bit = dst_idx % 8;
-
-            if self.bytes[src_byte] & (1 << src_bit) != 0 {
-                bytes[dst_byte] |= 1 << dst_bit;
-            }
-        }
-
-        Self { bytes }
-    }
-
-    /// Convert to continuous representation
-    pub fn to_continuous(&self) -> ContinuousHV {
-        let values: Vec<f32> = (0..self.dim())
-            .map(|i| self.get_bipolar(i) as f32)
-            .collect();
-
-        ContinuousHV { values }
-    }
-
-    /// Get raw bytes
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.bytes
-    }
-}
-
-impl Default for BinaryHV {
-    fn default() -> Self {
-        Self::zero()
     }
 }
 
@@ -721,7 +594,7 @@ impl HV {
     pub fn dim(&self) -> usize {
         match self {
             HV::Continuous(hv) => hv.dim(),
-            HV::Binary(hv) => hv.dim(),
+            HV::Binary(hv) => BinaryHV::DIM,
         }
     }
 
@@ -729,9 +602,18 @@ impl HV {
     pub fn similarity(&self, other: &HV) -> f32 {
         match (self, other) {
             (HV::Continuous(a), HV::Continuous(b)) => a.similarity(b),
-            (HV::Binary(a), HV::Binary(b)) => a.bipolar_similarity(b),
-            (HV::Continuous(a), HV::Binary(b)) => a.similarity(&b.to_continuous()),
-            (HV::Binary(a), HV::Continuous(b)) => a.to_continuous().similarity(b),
+            (HV::Binary(a), HV::Binary(b)) => {
+                // BinaryHV::similarity returns [0, 1], convert to bipolar [-1, 1]
+                a.similarity(b) * 2.0 - 1.0
+            }
+            (HV::Continuous(a), HV::Binary(b)) => {
+                let b_cont = ContinuousHV::from_vec(b.to_bipolar());
+                a.similarity(&b_cont)
+            }
+            (HV::Binary(a), HV::Continuous(b)) => {
+                let a_cont = ContinuousHV::from_vec(a.to_bipolar());
+                a_cont.similarity(b)
+            }
         }
     }
 
@@ -739,7 +621,7 @@ impl HV {
     pub fn to_continuous(&self) -> ContinuousHV {
         match self {
             HV::Continuous(hv) => hv.clone(),
-            HV::Binary(hv) => hv.to_continuous(),
+            HV::Binary(hv) => ContinuousHV::from_vec(hv.to_bipolar()),
         }
     }
 
@@ -747,7 +629,7 @@ impl HV {
     pub fn to_binary(&self, threshold: f32) -> BinaryHV {
         match self {
             HV::Continuous(hv) => hv.to_binary(threshold),
-            HV::Binary(hv) => hv.clone(),
+            HV::Binary(hv) => *hv,
         }
     }
 
@@ -761,18 +643,6 @@ impl HV {
         matches!(self, HV::Binary(_))
     }
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TYPE ALIASES FOR BACKWARDS COMPATIBILITY
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Alias for backwards compatibility (deprecated)
-#[deprecated(since = "0.2.0", note = "Use ContinuousHV instead")]
-pub type RealHV = ContinuousHV;
-
-/// Alias for backwards compatibility (deprecated)
-#[deprecated(since = "0.2.0", note = "Use BinaryHV instead")]
-pub type HV16 = BinaryHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TESTS
@@ -866,7 +736,7 @@ mod tests {
     fn test_continuous_to_binary_conversion() {
         let continuous = ContinuousHV::random(HDC_DIMENSION, 42);
         let binary = continuous.to_binary(0.0);
-        let back = binary.to_continuous();
+        let back = ContinuousHV::from_vec(binary.to_bipolar());
 
         // Should preserve structure (not exact values)
         let sim = continuous.similarity(&back);

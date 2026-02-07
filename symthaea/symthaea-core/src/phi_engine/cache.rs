@@ -35,7 +35,6 @@ use std::collections::hash_map::DefaultHasher;
 use std::time::{Instant, Duration};
 
 use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::real_hv::RealHV;
 use super::{PhiEngine, PhiMethod, PhiResult};
 
 /// Cache entry for Φ results
@@ -159,8 +158,8 @@ impl CachedPhiEngine {
         result
     }
 
-    /// Compute Φ for RealHV representations (legacy interface)
-    pub fn compute_from_real_hvs(&mut self, components: &[RealHV]) -> f64 {
+    /// Compute Φ for ContinuousHV representations (legacy interface)
+    pub fn compute_from_real_hvs(&mut self, components: &[ContinuousHV]) -> f64 {
         // Convert to ContinuousHV
         let continuous: Vec<ContinuousHV> = components
             .iter()

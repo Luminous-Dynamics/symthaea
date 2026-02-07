@@ -44,7 +44,7 @@
 //!   └─────────────────────────────────────────────────────────────┘
 //! ```
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::unified_consciousness_engine::{
     UnifiedConsciousnessEngine, ConsciousnessUpdate, EngineConfig,
 };
@@ -117,7 +117,7 @@ pub struct SelfAwareConsciousness {
     /// HDC dimension
     dim: usize,
     /// Self-representation vector (how system represents itself)
-    self_vector: RealHV,
+    self_vector: ContinuousHV,
 }
 
 impl SelfAwareConsciousness {
@@ -127,7 +127,7 @@ impl SelfAwareConsciousness {
         let engine = UnifiedConsciousnessEngine::new(config);
 
         // Initialize self-vector as random (will be learned)
-        let self_vector = RealHV::random(dim, 999999);
+        let self_vector = ContinuousHV::random(dim, 999999);
 
         Self {
             engine,
@@ -141,7 +141,7 @@ impl SelfAwareConsciousness {
     }
 
     /// Process input with self-awareness
-    pub fn process_aware(&mut self, input: &RealHV) -> SelfAwareUpdate {
+    pub fn process_aware(&mut self, input: &ContinuousHV) -> SelfAwareUpdate {
         self.step += 1;
 
         // 1. Make prediction about what we'll experience
@@ -364,13 +364,13 @@ impl SelfAwareConsciousness {
     }
 
     /// Convert consciousness state to HDC vector
-    fn state_to_vector(&self, update: &ConsciousnessUpdate) -> RealHV {
+    fn state_to_vector(&self, update: &ConsciousnessUpdate) -> ContinuousHV {
         // Create components
-        let phi_vec = RealHV::random(self.dim, (update.phi * 1000.0) as u64);
-        let mode_vec = RealHV::random(self.dim, update.mode as u64 * 1000);
+        let phi_vec = ContinuousHV::random(self.dim, (update.phi * 1000.0) as u64);
+        let mode_vec = ContinuousHV::random(self.dim, update.mode as u64 * 1000);
 
         // Bundle them
-        RealHV::bundle(&[phi_vec, mode_vec])
+        ContinuousHV::bundle_owned(&[phi_vec, mode_vec])
     }
 
     /// Compute overall self-awareness level
@@ -397,7 +397,7 @@ impl SelfAwareConsciousness {
     }
 
     /// Get self-representation vector
-    pub fn self_vector(&self) -> &RealHV {
+    pub fn self_vector(&self) -> &ContinuousHV {
         &self.self_vector
     }
 
@@ -503,7 +503,7 @@ mod tests {
 
         println!("\nSelf-aware processing:");
         for i in 0..15 {
-            let input = RealHV::random(1024, i * 100);
+            let input = ContinuousHV::random(1024, i * 100);
             let update = sac.process_aware(&input);
 
             if i % 3 == 0 {
@@ -528,7 +528,7 @@ mod tests {
         let mut late_errors = Vec::new();
 
         for i in 0..30 {
-            let input = RealHV::random(1024, i * 100);
+            let input = ContinuousHV::random(1024, i * 100);
             let update = sac.process_aware(&input);
 
             if i < 10 {

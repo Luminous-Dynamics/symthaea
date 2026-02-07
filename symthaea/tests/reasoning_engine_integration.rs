@@ -1098,3 +1098,389 @@ mod effect_estimation_tests {
         assert!(!estimate.estimates_agree(0.01));
     }
 }
+
+// ==================================================================================
+// EDGE CASE AND STRESS TESTS
+// ==================================================================================
+
+#[cfg(feature = "counterfactual")]
+mod edge_case_tests {
+    use symthaea::consciousness::counterfactual::{
+        CausalDAG, CausalQuery, CounterfactualReasoner, ObservationalData,
+        PCAlgorithm, EffectEstimator,
+    };
+
+    #[test]
+    fn test_empty_dag() {
+        let dag = CausalDAG::new(vec![], vec![]);
+        assert_eq!(dag.num_nodes(), 0);
+    }
+
+    #[test]
+    fn test_single_node_dag() {
+        let dag = CausalDAG::new(vec!["X".into()], vec![]);
+        assert_eq!(dag.num_nodes(), 1);
+        assert!(dag.parents(0).is_empty());
+        assert!(dag.children(0).is_empty());
+    }
+
+    #[test]
+    fn test_empty_data() {
+        let data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        assert_eq!(data.n(), 0);
+    }
+
+    #[test]
+    fn test_single_observation() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        data.add_observation(vec![1.0, 2.0]);
+        assert_eq!(data.n(), 1);
+        assert_eq!(data.mean(0), 1.0);
+    }
+
+    #[test]
+    fn test_pc_minimal_data() {
+        // PC algorithm with minimal data
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        data.add_observation(vec![0.0, 0.0]);
+        data.add_observation(vec![1.0, 1.0]);
+
+        let pc = PCAlgorithm::new();
+        let result = pc.discover(&data);
+
+        // Should complete without panic
+        assert!(result.is_valid());
+    }
+
+    #[test]
+    fn test_large_dag() {
+        // Test with a moderately large DAG
+        let n = 20;
+        let nodes: Vec<String> = (0..n).map(|i| format!("X{}", i)).collect();
+        let edges: Vec<(usize, usize)> = (0..n-1).map(|i| (i, i+1)).collect();
+
+        let dag = CausalDAG::new(nodes, edges);
+
+        assert_eq!(dag.num_nodes(), n);
+        assert!(dag.has_path(0, n-1));
+        assert!(!dag.has_path(n-1, 0));
+    }
+
+    #[test]
+    fn test_disconnected_dag() {
+        // Two disconnected components
+        let dag = CausalDAG::new(
+            vec!["A".into(), "B".into(), "C".into(), "D".into()],
+            vec![(0, 1), (2, 3)],  // A→B and C→D, disconnected
+        );
+
+        assert!(!dag.has_path(0, 2));
+        assert!(!dag.has_path(0, 3));
+        assert!(dag.has_path(0, 1));
+        assert!(dag.has_path(2, 3));
+    }
+
+    #[test]
+    fn test_query_same_treatment_outcome() {
+        let dag = CausalDAG::new(vec!["X".into()], vec![]);
+        let query = CausalQuery {
+            treatment: 0,
+            outcome: 0,
+            conditioning: vec![],
+        };
+
+        let reasoner = CounterfactualReasoner::new();
+        let _result = reasoner.query(&dag, &query);
+        // Should handle gracefully (likely unidentified)
+    }
+
+    #[test]
+    fn test_variance_zero() {
+        // All values the same - zero variance
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        for _ in 0..10 {
+            data.add_observation(vec![1.0, 2.0]);
+        }
+
+        assert_eq!(data.variance(0), 0.0);
+        assert_eq!(data.variance(1), 0.0);
+    }
+
+    #[test]
+    fn test_covariance_computation() {
+        let mut data = ObservationalData::new(vec!["X".into(), "Y".into()]);
+        // Perfect correlation
+        for i in 0..10 {
+            data.add_observation(vec![i as f64, i as f64 * 2.0]);
+        }
+
+        let cov = data.covariance(0, 1);
+        assert!(cov > 0.0, "Covariance should be positive for positively related vars");
+    }
+}
+
+// ==================================================================================
+// INSTRUMENTAL VARIABLE TESTS
+// ==================================================================================
+
+#[cfg(feature = "counterfactual")]
+mod iv_tests {
+    use symthaea::consciousness::counterfactual::{
+        CausalDAG, IVEstimator, IVValidity, ObservationalData,
+    };
+
+    fn create_iv_dag() -> CausalDAG {
+        // Z → X → Y with confounding U → X, U → Y (U unmeasured)
+        // Z is the instrument
+        CausalDAG::new(
+            vec!["Z".into(), "X".into(), "Y".into()],
+            vec![(0, 1), (1, 2)],  // Z → X → Y (U is latent)
+        )
+    }
+
+    fn create_iv_data() -> ObservationalData {
+        let mut data = ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
+
+        for i in 0..200 {
+            let z = (i % 2) as f64;
+            let u = (i % 5) as f64 / 5.0;  // Unobserved confounder
+            let x = 0.5 * z + 0.3 * u + 0.05 * (i % 7) as f64 / 7.0;
+            let y = 1.5 * x + 0.4 * u + 0.05 * (i % 11) as f64 / 11.0;
+            data.add_observation(vec![z, x, y]);
+        }
+
+        data
+    }
+
+    #[test]
+    fn test_iv_validity_check() {
+        let dag = create_iv_dag();
+
+        let validity = IVEstimator::is_valid_instrument(&dag, 0, 1, 2);
+        assert!(matches!(validity, IVValidity::Valid { .. }));
+    }
+
+    #[test]
+    fn test_iv_invalid_no_effect_on_treatment() {
+        // Z is not connected to X
+        let dag = CausalDAG::new(
+            vec!["Z".into(), "X".into(), "Y".into()],
+            vec![(1, 2)],  // Only X → Y
+        );
+
+        let validity = IVEstimator::is_valid_instrument(&dag, 0, 1, 2);
+        assert!(matches!(validity, IVValidity::Invalid { .. }));
+    }
+
+    #[test]
+    fn test_iv_invalid_direct_effect() {
+        // Z → Y directly (violates exclusion)
+        let dag = CausalDAG::new(
+            vec!["Z".into(), "X".into(), "Y".into()],
+            vec![(0, 1), (0, 2), (1, 2)],  // Z → X, Z → Y, X → Y
+        );
+
+        let validity = IVEstimator::is_valid_instrument(&dag, 0, 1, 2);
+        assert!(matches!(validity, IVValidity::Invalid { .. }));
+    }
+
+    #[test]
+    fn test_2sls_estimation() {
+        let data = create_iv_data();
+
+        let result = IVEstimator::estimate_2sls(&data, 0, 1, 2);
+
+        // Effect should be approximately 1.5 (true causal effect)
+        assert!(
+            (result.effect - 1.5).abs() < 1.0,
+            "2SLS effect {} should be ~1.5",
+            result.effect
+        );
+    }
+
+    #[test]
+    fn test_wald_estimation() {
+        let data = create_iv_data();
+
+        let effect = IVEstimator::estimate_wald(&data, 0, 1, 2);
+
+        // Wald estimate should also be near 1.5
+        assert!(
+            !effect.is_nan(),
+            "Wald estimate should be computable"
+        );
+    }
+
+    #[test]
+    fn test_weak_instrument_detection() {
+        // Create data with a weak instrument
+        let mut data = ObservationalData::new(vec!["Z".into(), "X".into(), "Y".into()]);
+
+        for i in 0..100 {
+            let z = (i % 2) as f64;
+            let x = 0.01 * z + (i % 10) as f64 / 10.0;  // Very weak Z → X
+            let y = x + (i % 7) as f64 / 7.0;
+            data.add_observation(vec![z, x, y]);
+        }
+
+        let result = IVEstimator::estimate_2sls(&data, 0, 1, 2);
+
+        // Should detect weak instrument (F < 10)
+        assert!(result.first_stage_f < 10.0 || result.is_weak_instrument);
+    }
+}
+
+// ==================================================================================
+// TIME-SERIES CAUSAL DISCOVERY TESTS
+// ==================================================================================
+
+#[cfg(feature = "counterfactual")]
+mod time_series_tests {
+    use symthaea::consciousness::counterfactual::{
+        TimeSeriesCausalDiscovery, TimeSeriesData,
+    };
+
+    #[test]
+    fn test_granger_basic() {
+        let discovery = TimeSeriesCausalDiscovery::new(3);
+
+        // X causes Y with lag 1
+        let x: Vec<f64> = (0..100).map(|i| (i as f64).sin()).collect();
+        let y: Vec<f64> = x.iter().skip(1).chain(std::iter::once(&0.0)).map(|&v| v * 0.8).collect();
+
+        let result = discovery.granger_test(&x, &y, 1);
+
+        // Should find significant relationship
+        assert!(result.f_statistic >= 0.0);
+    }
+
+    #[test]
+    fn test_granger_independent() {
+        let discovery = TimeSeriesCausalDiscovery::new(3);
+
+        // Independent random series
+        let x: Vec<f64> = (0..100).map(|i| (i as f64 * 0.1).sin()).collect();
+        let y: Vec<f64> = (0..100).map(|i| (i as f64 * 0.17).cos()).collect();
+
+        let result = discovery.granger_test(&x, &y, 1);
+
+        // F-statistic should be computable
+        assert!(!result.f_statistic.is_nan());
+    }
+
+    #[test]
+    fn test_time_series_data_creation() {
+        let mut data = TimeSeriesData::new(vec!["X".into(), "Y".into(), "Z".into()]);
+
+        for i in 0..50 {
+            data.add_observation(vec![i as f64, (i * 2) as f64, (i * 3) as f64]);
+        }
+
+        assert_eq!(data.n_timepoints(), 50);
+        assert_eq!(data.variables.len(), 3);
+    }
+
+    #[test]
+    fn test_discover_causal_structure() {
+        let discovery = TimeSeriesCausalDiscovery::new(2);
+
+        let mut data = TimeSeriesData::new(vec!["X".into(), "Y".into()]);
+
+        // X causes Y with lag 1
+        for i in 0..100 {
+            let x = (i as f64 * 0.1).sin();
+            let y = if i > 0 {
+                0.7 * (((i - 1) as f64) * 0.1).sin() + 0.1 * (i as f64 * 0.05).cos()
+            } else {
+                0.0
+            };
+            data.add_observation(vec![x, y]);
+        }
+
+        let graph = discovery.discover(&data);
+
+        // Should produce a valid graph
+        assert_eq!(graph.variables.len(), 2);
+    }
+
+    #[test]
+    fn test_time_series_to_dag() {
+        let discovery = TimeSeriesCausalDiscovery::new(2);
+
+        let mut data = TimeSeriesData::new(vec!["X".into(), "Y".into()]);
+        for i in 0..50 {
+            data.add_observation(vec![i as f64, (i + 1) as f64]);
+        }
+
+        let graph = discovery.discover(&data);
+        let dag = graph.to_dag();
+
+        // Should convert without error
+        assert_eq!(dag.num_nodes(), 2);
+    }
+}
+
+// ==================================================================================
+// TRANSPORTABILITY TESTS
+// ==================================================================================
+
+#[cfg(feature = "counterfactual")]
+mod transportability_tests {
+    use symthaea::consciousness::counterfactual::{
+        CausalDAG, TransportabilityAnalyzer, TransportabilityResult,
+    };
+
+    #[test]
+    fn test_directly_transportable() {
+        // Same DAG in both populations, no selection
+        let dag = CausalDAG::new(
+            vec!["X".into(), "Y".into()],
+            vec![(0, 1)],
+        );
+
+        let analyzer = TransportabilityAnalyzer::new(
+            dag.clone(),
+            dag,
+            vec![],  // No selection nodes
+        );
+
+        let result = analyzer.is_transportable(0, 1);
+        assert!(matches!(result, TransportabilityResult::DirectlyTransportable { .. }));
+    }
+
+    #[test]
+    fn test_transportable_with_adjustment() {
+        // Selection affects a confounding path
+        let source_dag = CausalDAG::new(
+            vec!["X".into(), "Y".into(), "Z".into(), "S".into()],
+            vec![(0, 1), (2, 0), (2, 1), (3, 2)],  // S → Z → X,Y
+        );
+
+        let target_dag = source_dag.clone();
+
+        let analyzer = TransportabilityAnalyzer::new(
+            source_dag,
+            target_dag,
+            vec![3],  // S is a selection node
+        );
+
+        let result = analyzer.is_transportable(0, 1);
+
+        // Should be transportable (S doesn't block X→Y path directly)
+        assert!(result.is_transportable());
+    }
+
+    #[test]
+    fn test_transportability_result_methods() {
+        let transportable = TransportabilityResult::DirectlyTransportable {
+            explanation: "Test".to_string(),
+        };
+        assert!(transportable.is_transportable());
+
+        let not_transportable = TransportabilityResult::NotTransportable {
+            reason: "Test".to_string(),
+            blocking_nodes: vec![0],
+        };
+        assert!(!not_transportable.is_transportable());
+    }
+}

@@ -34,7 +34,7 @@
 //!
 //! These aren't separate fields - they're BOUND into one holographic vector.
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::causal_mind::{CausalDirection, LearnedCausalDiscovery};
 use super::hdc_ltc_neuron::{HdcLtcNetwork, HdcLtcNetworkConfig};
 use super::unified_hv::ContinuousHV;
@@ -53,52 +53,52 @@ use std::collections::HashMap;
 pub struct CognitiveMarkers {
     // === Causal Markers ===
     /// Marks "X causes Y" relationship
-    pub causes: HV16,
+    pub causes: BinaryHV,
     /// Marks "X is caused by Y" relationship
-    pub caused_by: HV16,
+    pub caused_by: BinaryHV,
     /// Marks "X prevents Y" relationship
-    pub prevents: HV16,
+    pub prevents: BinaryHV,
     /// Marks "X enables Y" relationship
-    pub enables: HV16,
+    pub enables: BinaryHV,
     /// Marks interventional context (do-calculus)
-    pub intervention: HV16,
+    pub intervention: BinaryHV,
 
     // === Temporal Markers ===
     /// Marks "before" in sequence
-    pub before: HV16,
+    pub before: BinaryHV,
     /// Marks "after" in sequence
-    pub after: HV16,
+    pub after: BinaryHV,
     /// Marks "simultaneous with"
-    pub simultaneous: HV16,
+    pub simultaneous: BinaryHV,
     /// Marks "duration of"
-    pub duration: HV16,
+    pub duration: BinaryHV,
     /// Temporal position encodings (circular, like hours on clock)
-    pub temporal_positions: Vec<HV16>,
+    pub temporal_positions: Vec<BinaryHV>,
 
     // === Semantic Markers ===
     /// Marks "is a type of"
-    pub is_a: HV16,
+    pub is_a: BinaryHV,
     /// Marks "has property"
-    pub has_property: HV16,
+    pub has_property: BinaryHV,
     /// Marks "part of"
-    pub part_of: HV16,
+    pub part_of: BinaryHV,
     /// Marks "similar to"
-    pub similar_to: HV16,
+    pub similar_to: BinaryHV,
 
     // === Meta Markers ===
     /// Marks confidence level
-    pub confidence: HV16,
+    pub confidence: BinaryHV,
     /// Marks salience/importance
-    pub salience: HV16,
+    pub salience: BinaryHV,
     /// Marks "this is about myself" (self-reference)
-    pub self_reference: HV16,
+    pub self_reference: BinaryHV,
     /// Marks "this is uncertain/hypothetical"
-    pub hypothetical: HV16,
+    pub hypothetical: BinaryHV,
 
     // === Strength Modifiers ===
-    pub strength_high: HV16,
-    pub strength_medium: HV16,
-    pub strength_low: HV16,
+    pub strength_high: BinaryHV,
+    pub strength_medium: BinaryHV,
+    pub strength_low: BinaryHV,
 }
 
 impl CognitiveMarkers {
@@ -107,46 +107,46 @@ impl CognitiveMarkers {
     /// These use fixed seeds for reproducibility across sessions
     pub fn new() -> Self {
         // Temporal positions (24 for hours, reusable for other cycles)
-        let temporal_positions: Vec<HV16> = (0..24)
-            .map(|i| HV16::random(5000 + i as u64))
+        let temporal_positions: Vec<BinaryHV> = (0..24)
+            .map(|i| BinaryHV::random(5000 + i as u64))
             .collect();
 
         Self {
             // Causal (seeds 1000-1099)
-            causes: HV16::random(1000),
-            caused_by: HV16::random(1001),
-            prevents: HV16::random(1002),
-            enables: HV16::random(1003),
-            intervention: HV16::random(1004),
+            causes: BinaryHV::random(1000),
+            caused_by: BinaryHV::random(1001),
+            prevents: BinaryHV::random(1002),
+            enables: BinaryHV::random(1003),
+            intervention: BinaryHV::random(1004),
 
             // Temporal (seeds 1100-1199)
-            before: HV16::random(1100),
-            after: HV16::random(1101),
-            simultaneous: HV16::random(1102),
-            duration: HV16::random(1103),
+            before: BinaryHV::random(1100),
+            after: BinaryHV::random(1101),
+            simultaneous: BinaryHV::random(1102),
+            duration: BinaryHV::random(1103),
             temporal_positions,
 
             // Semantic (seeds 1200-1299)
-            is_a: HV16::random(1200),
-            has_property: HV16::random(1201),
-            part_of: HV16::random(1202),
-            similar_to: HV16::random(1203),
+            is_a: BinaryHV::random(1200),
+            has_property: BinaryHV::random(1201),
+            part_of: BinaryHV::random(1202),
+            similar_to: BinaryHV::random(1203),
 
             // Meta (seeds 1300-1399)
-            confidence: HV16::random(1300),
-            salience: HV16::random(1301),
-            self_reference: HV16::random(1302),
-            hypothetical: HV16::random(1303),
+            confidence: BinaryHV::random(1300),
+            salience: BinaryHV::random(1301),
+            self_reference: BinaryHV::random(1302),
+            hypothetical: BinaryHV::random(1303),
 
             // Strength (seeds 1400-1499)
-            strength_high: HV16::random(1400),
-            strength_medium: HV16::random(1401),
-            strength_low: HV16::random(1402),
+            strength_high: BinaryHV::random(1400),
+            strength_medium: BinaryHV::random(1401),
+            strength_low: BinaryHV::random(1402),
         }
     }
 
     /// Get strength marker for a given value [0, 1]
-    pub fn strength_marker(&self, strength: f64) -> &HV16 {
+    pub fn strength_marker(&self, strength: f64) -> &BinaryHV {
         if strength > 0.7 {
             &self.strength_high
         } else if strength > 0.3 {
@@ -157,7 +157,7 @@ impl CognitiveMarkers {
     }
 
     /// Get temporal position marker (circular encoding)
-    pub fn temporal_position(&self, position: usize) -> &HV16 {
+    pub fn temporal_position(&self, position: usize) -> &BinaryHV {
         &self.temporal_positions[position % self.temporal_positions.len()]
     }
 }
@@ -196,7 +196,7 @@ impl Default for CognitiveMarkers {
 #[derive(Clone)]
 pub struct UnifiedCognitiveElement {
     /// The unified hypervector encoding all aspects
-    pub vector: HV16,
+    pub vector: BinaryHV,
 
     /// Human-readable label
     pub label: String,
@@ -213,7 +213,7 @@ pub struct UnifiedCognitiveElement {
 
 impl UnifiedCognitiveElement {
     /// Create a new UCE from a base semantic vector
-    pub fn new(label: String, semantic: HV16, timestamp: u64) -> Self {
+    pub fn new(label: String, semantic: BinaryHV, timestamp: u64) -> Self {
         Self {
             vector: semantic,
             label,
@@ -224,78 +224,78 @@ impl UnifiedCognitiveElement {
     }
 
     /// Add causal information: this UCE CAUSES the effect
-    pub fn add_cause(&mut self, effect: &HV16, strength: f64, markers: &CognitiveMarkers) {
+    pub fn add_cause(&mut self, effect: &BinaryHV, strength: f64, markers: &CognitiveMarkers) {
         let causal_binding = markers.causes
             .bind(effect)
             .bind(markers.strength_marker(strength));
-        self.vector = HV16::bundle(&[self.vector.clone(), causal_binding]);
+        self.vector = BinaryHV::bundle(&[self.vector, causal_binding]);
     }
 
     /// Add causal information: this UCE IS CAUSED BY the cause
-    pub fn add_effect_of(&mut self, cause: &HV16, strength: f64, markers: &CognitiveMarkers) {
+    pub fn add_effect_of(&mut self, cause: &BinaryHV, strength: f64, markers: &CognitiveMarkers) {
         let causal_binding = markers.caused_by
             .bind(cause)
             .bind(markers.strength_marker(strength));
-        self.vector = HV16::bundle(&[self.vector.clone(), causal_binding]);
+        self.vector = BinaryHV::bundle(&[self.vector, causal_binding]);
     }
 
     /// Add temporal information: this UCE comes BEFORE the successor
-    pub fn add_before(&mut self, successor: &HV16, markers: &CognitiveMarkers) {
+    pub fn add_before(&mut self, successor: &BinaryHV, markers: &CognitiveMarkers) {
         let temporal_binding = markers.before.bind(successor);
-        self.vector = HV16::bundle(&[self.vector.clone(), temporal_binding]);
+        self.vector = BinaryHV::bundle(&[self.vector, temporal_binding]);
     }
 
     /// Add temporal information: this UCE comes AFTER the predecessor
-    pub fn add_after(&mut self, predecessor: &HV16, markers: &CognitiveMarkers) {
+    pub fn add_after(&mut self, predecessor: &BinaryHV, markers: &CognitiveMarkers) {
         let temporal_binding = markers.after.bind(predecessor);
-        self.vector = HV16::bundle(&[self.vector.clone(), temporal_binding]);
+        self.vector = BinaryHV::bundle(&[self.vector, temporal_binding]);
     }
 
     /// Add temporal position (e.g., hour of day, position in sequence)
     pub fn add_temporal_position(&mut self, position: usize, markers: &CognitiveMarkers) {
         let pos_marker = markers.temporal_position(position);
-        self.vector = HV16::bundle(&[self.vector.clone(), pos_marker.clone()]);
+        self.vector = BinaryHV::bundle(&[self.vector, *pos_marker]);
     }
 
     /// Add semantic relation: this UCE IS A type of the category
-    pub fn add_is_a(&mut self, category: &HV16, markers: &CognitiveMarkers) {
+    pub fn add_is_a(&mut self, category: &BinaryHV, markers: &CognitiveMarkers) {
         let semantic_binding = markers.is_a.bind(category);
-        self.vector = HV16::bundle(&[self.vector.clone(), semantic_binding]);
+        self.vector = BinaryHV::bundle(&[self.vector, semantic_binding]);
     }
 
     /// Add semantic relation: this UCE HAS PROPERTY
-    pub fn add_property(&mut self, property: &HV16, markers: &CognitiveMarkers) {
+    pub fn add_property(&mut self, property: &BinaryHV, markers: &CognitiveMarkers) {
         let semantic_binding = markers.has_property.bind(property);
-        self.vector = HV16::bundle(&[self.vector.clone(), semantic_binding]);
+        self.vector = BinaryHV::bundle(&[self.vector, semantic_binding]);
     }
 
     /// Mark as self-referential (about the system itself)
     pub fn mark_self_referential(&mut self, markers: &CognitiveMarkers) {
-        self.vector = HV16::bundle(&[self.vector.clone(), markers.self_reference.clone()]);
+        self.vector = BinaryHV::bundle(&[self.vector, markers.self_reference]);
     }
 
     /// Mark as hypothetical/uncertain
     pub fn mark_hypothetical(&mut self, markers: &CognitiveMarkers) {
-        self.vector = HV16::bundle(&[self.vector.clone(), markers.hypothetical.clone()]);
+        self.vector = BinaryHV::bundle(&[self.vector, markers.hypothetical]);
     }
 
     /// Query: What does this UCE cause? (unbind CAUSES marker)
-    pub fn query_effects(&self, markers: &CognitiveMarkers) -> HV16 {
+    pub fn query_effects(&self, markers: &CognitiveMarkers) -> BinaryHV {
         self.vector.bind(&markers.causes) // Unbinding = binding with same vector
     }
 
     /// Query: What causes this UCE? (unbind CAUSED_BY marker)
-    pub fn query_causes(&self, markers: &CognitiveMarkers) -> HV16 {
+    pub fn query_causes(&self, markers: &CognitiveMarkers) -> BinaryHV {
         self.vector.bind(&markers.caused_by)
     }
 
     /// Query: What comes before this UCE?
-    pub fn query_predecessors(&self, markers: &CognitiveMarkers) -> HV16 {
+    pub fn query_predecessors(&self, markers: &CognitiveMarkers) -> BinaryHV {
         self.vector.bind(&markers.after) // If I'm AFTER X, then X is my predecessor
     }
 
     /// Query: What comes after this UCE?
-    pub fn query_successors(&self, markers: &CognitiveMarkers) -> HV16 {
+    pub fn query_successors(&self, markers: &CognitiveMarkers) -> BinaryHV {
         self.vector.bind(&markers.before) // If I'm BEFORE Y, then Y is my successor
     }
 
@@ -374,7 +374,7 @@ impl UnifiedCognitiveCore {
             let seed = label.bytes().fold(42u64, |acc, b| {
                 acc.wrapping_add(b as u64).wrapping_mul(31)
             });
-            let semantic = HV16::random(seed);
+            let semantic = BinaryHV::random(seed);
             let uce = UnifiedCognitiveElement::new(
                 label.to_string(),
                 semantic,
@@ -407,14 +407,14 @@ impl UnifiedCognitiveCore {
             acc.wrapping_add(b as u64).wrapping_mul(31)
         });
 
-        let cause_semantic = HV16::random(cause_seed);
-        let effect_semantic = HV16::random(effect_seed);
+        let cause_semantic = BinaryHV::random(cause_seed);
+        let effect_semantic = BinaryHV::random(effect_seed);
 
         // Create if not exists
         if !self.elements.contains_key(cause_label) {
             let uce = UnifiedCognitiveElement::new(
                 cause_label.to_string(),
-                cause_semantic.clone(),
+                cause_semantic,
                 self.current_time,
             );
             self.elements.insert(cause_label.to_string(), uce);
@@ -422,7 +422,7 @@ impl UnifiedCognitiveCore {
         if !self.elements.contains_key(effect_label) {
             let uce = UnifiedCognitiveElement::new(
                 effect_label.to_string(),
-                effect_semantic.clone(),
+                effect_semantic,
                 self.current_time,
             );
             self.elements.insert(effect_label.to_string(), uce);
@@ -450,14 +450,14 @@ impl UnifiedCognitiveCore {
             acc.wrapping_add(b as u64).wrapping_mul(31)
         });
 
-        let pred_semantic = HV16::random(pred_seed);
-        let succ_semantic = HV16::random(succ_seed);
+        let pred_semantic = BinaryHV::random(pred_seed);
+        let succ_semantic = BinaryHV::random(succ_seed);
 
         // Create if not exists
         if !self.elements.contains_key(predecessor_label) {
             let uce = UnifiedCognitiveElement::new(
                 predecessor_label.to_string(),
-                pred_semantic.clone(),
+                pred_semantic,
                 self.current_time,
             );
             self.elements.insert(predecessor_label.to_string(), uce);
@@ -465,7 +465,7 @@ impl UnifiedCognitiveCore {
         if !self.elements.contains_key(successor_label) {
             let uce = UnifiedCognitiveElement::new(
                 successor_label.to_string(),
-                succ_semantic.clone(),
+                succ_semantic,
                 self.current_time,
             );
             self.elements.insert(successor_label.to_string(), uce);
@@ -487,7 +487,7 @@ impl UnifiedCognitiveCore {
         let cat_seed = category_label.bytes().fold(42u64, |acc, b| {
             acc.wrapping_add(b as u64).wrapping_mul(31)
         });
-        let category_semantic = HV16::random(cat_seed);
+        let category_semantic = BinaryHV::random(cat_seed);
 
         // Create entity if not exists
         if !self.elements.contains_key(entity_label) {
@@ -496,7 +496,7 @@ impl UnifiedCognitiveCore {
             });
             let uce = UnifiedCognitiveElement::new(
                 entity_label.to_string(),
-                HV16::random(seed),
+                BinaryHV::random(seed),
                 self.current_time,
             );
             self.elements.insert(entity_label.to_string(), uce);
@@ -704,9 +704,9 @@ impl UnifiedCognitiveCore {
     }
 
     /// Step the temporal dynamics (if network is configured)
-    pub fn step_dynamics(&mut self, dt: f64, input: Option<&HV16>) {
+    pub fn step_dynamics(&mut self, dt: f64, input: Option<&BinaryHV>) {
         if let Some(ref mut network) = self.temporal_network {
-            // Convert HV16 (binary) to ContinuousHV (f32) if provided
+            // Convert BinaryHV (binary) to ContinuousHV (f32) if provided
             // Use to_bipolar to convert binary bits to -1/+1 values
             let input_hv = input.map(|hv| {
                 let bipolar = hv.to_bipolar();
@@ -842,7 +842,7 @@ mod tests {
         let predecessors = core.query_successors("clouds");
 
         // The queries work because all info is bound into the vector
-        // HV16 is always 256 bytes (16,384 bits / 8)
+        // BinaryHV is always 256 bytes (16,384 bits / 8)
         assert!(causes.len() > 0 || predecessors.len() > 0 || rain.vector.popcount() > 0);
     }
 }

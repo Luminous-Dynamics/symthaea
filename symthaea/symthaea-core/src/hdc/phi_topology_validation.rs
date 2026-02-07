@@ -1,6 +1,6 @@
 //! Φ (Integrated Information) Validation for Consciousness Topologies
 //!
-//! This module integrates RealHV topology generators with TieredPhi calculation
+//! This module integrates ContinuousHV topology generators with TieredPhi calculation
 //! to validate that different network topologies produce different Φ values.
 //!
 //! # The Validation Hypothesis
@@ -13,7 +13,7 @@
 //! # Methodology
 //!
 //! 1. Generate multiple instances of each topology type (Random vs Star)
-//! 2. Convert RealHV representations to binary HV16 format
+//! 2. Convert ContinuousHV representations to binary BinaryHV format
 //! 3. Compute Φ using TieredPhi with Spectral tier (O(n²) accuracy)
 //! 4. Statistical analysis: t-test for Φ_star > Φ_random
 //! 5. Success criterion: p < 0.05 with effect size > 0.5
@@ -31,11 +31,11 @@
 //! }
 //! ```
 
-use crate::hdc::real_hv::RealHV;
+use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
-use crate::hdc::spectral_connectivity::ConnectivityCalculator;  // ✨ NEW: Direct RealHV Φ calculation
+use crate::hdc::spectral_connectivity::ConnectivityCalculator;  // ✨ NEW: Direct ContinuousHV Φ calculation
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use thiserror::Error;
@@ -53,17 +53,17 @@ pub enum PhiValidationError {
 }
 
 // ============================================================================
-// REALHV ↔ HV16 CONVERSION
+// REALHV ↔ BinaryHV CONVERSION
 // ============================================================================
 
-/// Convert RealHV to binary HV16 using threshold-based binarization
+/// Convert ContinuousHV to binary BinaryHV using threshold-based binarization
 ///
 /// **Strategy**: Binarize by comparing each element to the mean.
 /// - Above mean → bit 1
 /// - Below mean → bit 0
 ///
 /// This preserves the essential structure while converting to binary format.
-pub fn real_hv_to_hv16(real_hv: &RealHV) -> HV16 {
+pub fn real_hv_to_hv16(real_hv: &ContinuousHV) -> BinaryHV {
     let values = &real_hv.values;
     let n = values.len();
 
@@ -72,12 +72,12 @@ pub fn real_hv_to_hv16(real_hv: &RealHV) -> HV16 {
     let mean = sum / n as f32;
 
     // Create binary representation
-    // HV16 is 16,384 bits = 2048 bytes
+    // BinaryHV is 16,384 bits = 2048 bytes
     let mut bytes = [0u8; 2048];
 
     for (i, &val) in values.iter().enumerate() {
         if i >= 16_384 {
-            break; // HV16 is exactly 16,384 bits
+            break; // BinaryHV is exactly 16,384 bits
         }
 
         // Set bit to 1 if value > mean
@@ -88,21 +88,21 @@ pub fn real_hv_to_hv16(real_hv: &RealHV) -> HV16 {
         }
     }
 
-    HV16(bytes)
+    BinaryHV(bytes)
 }
 
-/// Convert RealHV to HV16 using **median threshold** (more robust to outliers)
+/// Convert ContinuousHV to BinaryHV using **median threshold** (more robust to outliers)
 ///
 /// Median is more robust than mean when dealing with extreme values.
 /// This should better preserve heterogeneity for high-variance vectors.
-pub fn real_hv_to_hv16_median(real_hv: &RealHV) -> HV16 {
+pub fn real_hv_to_hv16_median(real_hv: &ContinuousHV) -> BinaryHV {
     let values = &real_hv.values;
     let n = values.len();
 
     // Compute median for threshold
-    let mut sorted_values: Vec<f32> = values.iter().copied().collect();
+    let mut sorted_values: Vec<f32> = values.to_vec();
     sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let median = if n % 2 == 0 {
+    let median = if n.is_multiple_of(2) {
         (sorted_values[n / 2 - 1] + sorted_values[n / 2]) / 2.0
     } else {
         sorted_values[n / 2]
@@ -123,10 +123,10 @@ pub fn real_hv_to_hv16_median(real_hv: &RealHV) -> HV16 {
         }
     }
 
-    HV16(bytes)
+    BinaryHV(bytes)
 }
 
-/// Convert RealHV to HV16 using **probabilistic binarization**
+/// Convert ContinuousHV to BinaryHV using **probabilistic binarization**
 ///
 /// Each value is converted to a probability using sigmoid, then randomly
 /// binarized. This preserves more information from the original distribution.
@@ -134,7 +134,7 @@ pub fn real_hv_to_hv16_median(real_hv: &RealHV) -> HV16 {
 /// # Arguments
 /// * `real_hv` - Input real-valued hypervector
 /// * `seed` - Random seed for reproducibility
-pub fn real_hv_to_hv16_probabilistic(real_hv: &RealHV, seed: u64) -> HV16 {
+pub fn real_hv_to_hv16_probabilistic(real_hv: &ContinuousHV, seed: u64) -> BinaryHV {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
 
@@ -170,10 +170,10 @@ pub fn real_hv_to_hv16_probabilistic(real_hv: &RealHV, seed: u64) -> HV16 {
         }
     }
 
-    HV16(bytes)
+    BinaryHV(bytes)
 }
 
-/// Convert RealHV to HV16 using **quantile-based threshold** (percentile)
+/// Convert ContinuousHV to BinaryHV using **quantile-based threshold** (percentile)
 ///
 /// Uses a specific percentile as the threshold. 50th percentile = median.
 /// Can use other percentiles like 25th or 75th for skewed distributions.
@@ -181,12 +181,12 @@ pub fn real_hv_to_hv16_probabilistic(real_hv: &RealHV, seed: u64) -> HV16 {
 /// # Arguments
 /// * `real_hv` - Input real-valued hypervector
 /// * `percentile` - Threshold percentile (0.0 - 100.0), typically 50.0
-pub fn real_hv_to_hv16_quantile(real_hv: &RealHV, percentile: f32) -> HV16 {
+pub fn real_hv_to_hv16_quantile(real_hv: &ContinuousHV, percentile: f32) -> BinaryHV {
     let values = &real_hv.values;
     let n = values.len();
 
     // Compute percentile threshold
-    let mut sorted_values: Vec<f32> = values.iter().copied().collect();
+    let mut sorted_values: Vec<f32> = values.to_vec();
     sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     let index = ((percentile / 100.0) * (n - 1) as f32) as usize;
@@ -207,14 +207,14 @@ pub fn real_hv_to_hv16_quantile(real_hv: &RealHV, percentile: f32) -> HV16 {
         }
     }
 
-    HV16(bytes)
+    BinaryHV(bytes)
 }
 
-/// Convert ConsciousnessTopology node representations to HV16 vector
+/// Convert ConsciousnessTopology node representations to BinaryHV vector
 ///
 /// Takes all node representations from a topology and converts them to
 /// binary format suitable for Φ calculation.
-pub fn topology_to_hv16_components(topology: &ConsciousnessTopology) -> Vec<HV16> {
+pub fn topology_to_hv16_components(topology: &ConsciousnessTopology) -> Vec<BinaryHV> {
     topology.node_representations
         .iter()
         .map(real_hv_to_hv16)
@@ -446,7 +446,7 @@ impl MinimalPhiValidation {
     /// Run the validation using **ConnectivityCalculator** (no binarization)
     ///
     /// This uses the RealPhi calculator directly on continuous data,
-    /// avoiding the lossy RealHV to HV16 conversion that can destroy structure.
+    /// avoiding the lossy ContinuousHV to BinaryHV conversion that can destroy structure.
     ///
     /// # Returns
     ///
@@ -508,7 +508,7 @@ impl MinimalPhiValidation {
 
     /// Compute Φ using ConnectivityCalculator for multiple instances of a topology type
     ///
-    /// ✨ This computes Φ directly on RealHV without converting to HV16
+    /// ✨ This computes Φ directly on ContinuousHV without converting to BinaryHV
     ///
     /// # Errors
     ///
@@ -533,7 +533,7 @@ impl MinimalPhiValidation {
                 _ => unreachable!(),
             };
 
-            // Get RealHV components directly (no conversion!)
+            // Get ContinuousHV components directly (no conversion!)
             let components = &topology.node_representations;
 
             // DEBUG: Print cosine similarities for first sample
@@ -550,7 +550,7 @@ impl MinimalPhiValidation {
             }
 
             // Compute Φ using ConnectivityCalculator (no binarization!)
-            let phi = real_phi_calc.algebraic_connectivity(&components);
+            let phi = real_phi_calc.algebraic_connectivity(components);
 
             // DEBUG: Print Φ value for each sample
             if i < 5 {  // First 5 samples only
@@ -595,7 +595,7 @@ impl MinimalPhiValidation {
                 _ => unreachable!(),
             };
 
-            // Convert to HV16 components
+            // Convert to BinaryHV components
             let components = topology_to_hv16_components(&topology);
 
             // DEBUG: Print Hamming distances for first sample
@@ -737,10 +737,10 @@ mod tests {
 
     #[test]
     fn test_real_hv_to_hv16_conversion() {
-        // Create a simple RealHV
-        let real_hv = RealHV::random(2048, 42);
+        // Create a simple ContinuousHV
+        let real_hv = ContinuousHV::random(2048, 42);
 
-        // Convert to HV16
+        // Convert to BinaryHV
         let hv16 = real_hv_to_hv16(&real_hv);
 
         // Verify it's valid (not all zeros, not all ones)
@@ -748,8 +748,8 @@ mod tests {
         let all_zeros = bytes.iter().all(|&b| b == 0);
         let all_ones = bytes.iter().all(|&b| b == 0xFF);
 
-        assert!(!all_zeros, "Converted HV16 shouldn't be all zeros");
-        assert!(!all_ones, "Converted HV16 shouldn't be all ones");
+        assert!(!all_zeros, "Converted BinaryHV shouldn't be all zeros");
+        assert!(!all_ones, "Converted BinaryHV shouldn't be all ones");
     }
 
     #[test]
@@ -759,16 +759,16 @@ mod tests {
         // Create a small star topology with standard HDC dimension
         let topology = ConsciousnessTopology::star(5, HDC_DIMENSION, 42);
 
-        // Convert to HV16 components
+        // Convert to BinaryHV components
         let components = topology_to_hv16_components(&topology);
 
         // Should have 5 components (one per node)
         assert_eq!(components.len(), 5);
 
-        // Each should be valid HV16 (16,384 bits = 2048 bytes)
+        // Each should be valid BinaryHV (16,384 bits = 2048 bytes)
         for comp in &components {
             let bytes = &comp.0;
-            assert_eq!(bytes.len(), 2048, "HV16 should be 2048 bytes (16,384 bits)");
+            assert_eq!(bytes.len(), 2048, "BinaryHV should be 2048 bytes (16,384 bits)");
         }
     }
 

@@ -28,7 +28,7 @@
 //!
 //! This is biologically inspired by predictive coding in the cortex.
 
-use crate::hdc::real_hv::RealHV;
+use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 use crate::hdc::text_encoder::{TextEncoder, TextEncoderConfig};
 use crate::hdc::HDC_DIMENSION;
@@ -83,7 +83,7 @@ impl Default for PredictiveEncoderConfig {
 #[derive(Debug, Clone)]
 pub struct EncodingResult {
     /// The encoded HDV (attention-modulated)
-    pub hdv: RealHV,
+    pub hdv: ContinuousHV,
 
     /// Prediction error from this cycle
     pub prediction_error: f32,
@@ -258,8 +258,8 @@ impl PredictiveHdcEncoder {
 
     // ========== Internal Methods ==========
 
-    /// Convert bipolar encoding to RealHV
-    fn bipolar_to_real(&self, bipolar: &[i8]) -> RealHV {
+    /// Convert bipolar encoding to ContinuousHV
+    fn bipolar_to_real(&self, bipolar: &[i8]) -> ContinuousHV {
         let values: Vec<f32> = bipolar.iter()
             .map(|&b| b as f32)
             .collect();
@@ -269,7 +269,7 @@ impl PredictiveHdcEncoder {
         let len = values.len().min(self.config.dimension);
         result[..len].copy_from_slice(&values[..len]);
 
-        RealHV { values: result }
+        ContinuousHV { values: result }
     }
 
     /// Detect which primitives are relevant to the input
@@ -332,7 +332,7 @@ impl PredictiveHdcEncoder {
     }
 
     /// Apply attention weights to HDV
-    fn apply_attention(&self, base_hdv: &RealHV, detected_primitives: &[String]) -> RealHV {
+    fn apply_attention(&self, base_hdv: &ContinuousHV, detected_primitives: &[String]) -> ContinuousHV {
         if detected_primitives.is_empty() {
             return base_hdv.clone();
         }
@@ -356,7 +356,7 @@ impl PredictiveHdcEncoder {
     ///
     /// IMPORTANT: Comparison happens in the COMPRESSED space (LTC output dimension)
     /// to ensure we're comparing apples to apples.
-    fn compute_prediction_error(&self, current_hdv: &RealHV) -> f32 {
+    fn compute_prediction_error(&self, current_hdv: &ContinuousHV) -> f32 {
         match &self.predicted_hdv {
             Some(predicted) => {
                 // Compress current HDV to same dimension as prediction (NOT expand prediction!)
@@ -481,7 +481,7 @@ impl PredictiveHdcEncoder {
     }
 
     /// Get compressed representation for LTC input
-    pub fn compress_for_ltc(&self, hdv: &RealHV, output_dim: usize) -> Vec<f32> {
+    pub fn compress_for_ltc(&self, hdv: &ContinuousHV, output_dim: usize) -> Vec<f32> {
         // Downsample by taking evenly spaced values
         let step = hdv.values.len() / output_dim;
         hdv.values.iter()

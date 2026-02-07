@@ -16,7 +16,7 @@
 //!
 //! ```rust,ignore
 //! use symthaea::causal::CausalLoopEnhancer;
-//! use symthaea_core::hdc::real_hv::RealHV;
+//! use symthaea_core::hdc::ContinuousHV;
 //!
 //! let mut enhancer = CausalLoopEnhancer::new(42);
 //!
@@ -34,7 +34,7 @@
 //! ```
 
 use std::collections::{HashMap, VecDeque};
-use symthaea_core::hdc::real_hv::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::HDC_DIMENSION;
 use crate::intelligence::{
     CausalDiscoveryEngine, CausalDirection, CausalAttention,
@@ -266,7 +266,7 @@ impl CausalLoopEnhancer {
     }
 
     /// Subsample an HV to the configured number of dimensions
-    fn subsample_hv(&self, hv: &RealHV) -> Vec<f64> {
+    fn subsample_hv(&self, hv: &ContinuousHV) -> Vec<f64> {
         self.subsample_indices.iter()
             .map(|&i| hv.values.get(i).copied().unwrap_or(0.0) as f64)
             .collect()
@@ -276,7 +276,7 @@ impl CausalLoopEnhancer {
     ///
     /// This is called every cognitive loop cycle to accumulate
     /// data for causal discovery.
-    pub fn record_cycle(&mut self, input: &RealHV, output: &RealHV) {
+    pub fn record_cycle(&mut self, input: &ContinuousHV, output: &ContinuousHV) {
         self.current_cycle += 1;
         self.stats.total_cycles += 1;
 
@@ -329,7 +329,7 @@ impl CausalLoopEnhancer {
     /// 1. Extracts variables (each subsampled dimension as a time series)
     /// 2. Runs bivariate causal discovery between input and output dimensions
     /// 3. Builds a causal graph
-    pub fn detect_causal_structure(&mut self, history: &[(RealHV, RealHV)]) -> CausalGraph {
+    pub fn detect_causal_structure(&mut self, history: &[(ContinuousHV, ContinuousHV)]) -> CausalGraph {
         // Convert to internal format
         let pairs: Vec<CyclePair> = history.iter()
             .enumerate()
@@ -840,8 +840,8 @@ mod tests {
             ..Default::default()
         });
 
-        let input = RealHV::random(HDC_DIMENSION, 1);
-        let output = RealHV::random(HDC_DIMENSION, 2);
+        let input = ContinuousHV::random(HDC_DIMENSION, 1);
+        let output = ContinuousHV::random(HDC_DIMENSION, 2);
 
         // Record more than max_history
         for _ in 0..15 {

@@ -73,7 +73,7 @@ use super::consciousness_metacognition::{
 };
 use super::consciousness_advanced_cognition::AdvancedCognitionEngine;
 use super::adaptive_topology::CognitiveMode;
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use std::collections::{HashMap, VecDeque};
 
 // =============================================================================
@@ -512,21 +512,21 @@ impl ConsciousDialogueGenerator {
         {
             SpeechAct::Question => {
                 reasoning.push("Responding to question".to_string());
-                self.answer_question(&context, &generation_depth)
+                self.answer_question(context, &generation_depth)
             }
             SpeechAct::Express => {
                 reasoning.push("Responding to emotional expression".to_string());
-                self.acknowledge_emotion(&context)
+                self.acknowledge_emotion(context)
             }
             SpeechAct::Assert => {
                 reasoning.push("Responding to assertion".to_string());
-                self.respond_to_assertion(&context, &generation_depth)
+                self.respond_to_assertion(context, &generation_depth)
             }
             SpeechAct::Command => {
                 reasoning.push("Responding to request".to_string());
-                self.respond_to_request(&context)
+                self.respond_to_request(context)
             }
-            _ => self.generic_response(&context),
+            _ => self.generic_response(context),
         };
         response_parts.push(core);
 
@@ -1193,7 +1193,7 @@ pub struct SharedConsciousnessState {
     /// Memory count
     pub memory_count: u64,
     /// Summary hypervector (consciousness fingerprint)
-    pub consciousness_fingerprint: HV16,
+    pub consciousness_fingerprint: BinaryHV,
     /// Timestamp (Unix millis)
     pub timestamp: u64,
 }
@@ -1217,14 +1217,14 @@ impl UnifiedConsciousBeing {
         let fingerprint = {
             let seed = self.phi_history.iter()
                 .fold(42u64, |acc, &p| acc.wrapping_add((p * 1000.0) as u64));
-            HV16::random(seed)
+            BinaryHV::random(seed)
         };
 
         SharedConsciousnessState {
             phi: self.stats.avg_phi,
             cognitive_mode: "Balanced".to_string(), // Would come from adaptive topology
             flow_state: self.flow_state,
-            causal_edges: self.stats.causal_edges as usize,
+            causal_edges: self.stats.causal_edges,
             memory_count: self.stats.memories_stored,
             consciousness_fingerprint: fingerprint,
             timestamp,
@@ -1382,7 +1382,7 @@ impl UnifiedConsciousBeing {
     /// - Emotional memory retrieval
     /// - Mood-based content generation
     /// - Cross-agent emotional synchronization
-    pub fn emotional_trajectory_hv(&self) -> HV16 {
+    pub fn emotional_trajectory_hv(&self) -> BinaryHV {
         self.emotional_depth.trajectory_encoding()
     }
 
@@ -1450,14 +1450,14 @@ impl UnifiedConsciousBeing {
     /// Set attention routing context
     ///
     /// The context vector biases attention toward modalities with similar representations.
-    pub fn set_attention_context(&mut self, context: HV16) {
+    pub fn set_attention_context(&mut self, context: BinaryHV) {
         self.attention_router.set_context(context);
     }
 
     /// Set attention routing goal
     ///
     /// The goal vector biases attention toward goal-relevant modalities.
-    pub fn set_attention_goal(&mut self, goal: HV16) {
+    pub fn set_attention_goal(&mut self, goal: BinaryHV) {
         self.attention_router.set_goal(goal);
     }
 
@@ -1476,9 +1476,9 @@ impl UnifiedConsciousBeing {
     /// This is the high-level integration of cross-modal routing with comprehension.
     pub fn multi_modal_comprehend(
         &mut self,
-        semantic_hv: HV16,
-        emotional_hv: Option<HV16>,
-        temporal_hv: Option<HV16>,
+        semantic_hv: BinaryHV,
+        emotional_hv: Option<BinaryHV>,
+        temporal_hv: Option<BinaryHV>,
     ) -> RoutingResult {
         let mut inputs = vec![
             ModalityInput::new(Modality::Semantic, semantic_hv, 0.8),
@@ -1631,9 +1631,9 @@ impl UnifiedConsciousBeing {
     pub fn add_counterfactual_memory(
         &mut self,
         label: &str,
-        actual: HV16,
+        actual: BinaryHV,
         question: &str,
-        counterfactual: HV16,
+        counterfactual: BinaryHV,
         intensity: f64,
     ) -> u64 {
         self.counterfactual_dreams.add_memory_with_counterfactual(
@@ -1649,9 +1649,9 @@ impl UnifiedConsciousBeing {
     pub fn add_counterfactual_memory_with_valence(
         &mut self,
         label: &str,
-        actual: HV16,
+        actual: BinaryHV,
         question: &str,
-        counterfactual: HV16,
+        counterfactual: BinaryHV,
         intensity: f64,
         valence: f64,
     ) -> u64 {
@@ -1846,10 +1846,7 @@ impl UnifiedConsciousBeing {
 
     /// Get causal discoveries from dream exploration
     pub fn causal_discoveries_from_dreams(&self, count: usize) -> Vec<CausalDiscovery> {
-        self.feedback_dynamics.causal_dreams.recent_discoveries(count)
-            .into_iter()
-            .cloned()
-            .collect()
+        self.feedback_dynamics.causal_dreams.recent_discoveries(count).to_vec()
     }
 
     /// Integrate dream discoveries back into CausalMind
@@ -2019,7 +2016,7 @@ impl UnifiedConsciousBeing {
     }
 
     /// Queue a memory for consolidation during sleep
-    pub fn queue_memory_consolidation(&mut self, memory_id: u64, content_hv: HV16, emotional_salience: f64) {
+    pub fn queue_memory_consolidation(&mut self, memory_id: u64, content_hv: BinaryHV, emotional_salience: f64) {
         self.metacognition.temporal.queue_for_consolidation(memory_id, content_hv, emotional_salience);
     }
 
@@ -2216,7 +2213,7 @@ impl UnifiedConsciousBeing {
 
         // Update consciousness state
         // Map to evaluate_transition(fatigue, focus, stress, relaxation)
-        let arousal = blend.arousal as f64;
+        let arousal = blend.arousal;
         let fatigue = self.metacognition.temporal.get_sleep_pressure();
         let focus = phi;  // Higher phi = better focus
         let stress = arousal.max(0.0);  // Use positive arousal as stress indicator
@@ -2225,8 +2222,8 @@ impl UnifiedConsciousBeing {
 
         // Queue memory consolidation if important interaction
         if phi > 0.6 {
-            let emotional_weight = blend.valence.abs() as f64;
-            let memory_hv = HV16::random((phi * 1000.0) as u64);
+            let emotional_weight = blend.valence.abs();
+            let memory_hv = BinaryHV::random((phi * 1000.0) as u64);
             let memory_id = (phi * 10000.0) as u64;
             self.metacognition.temporal.queue_for_consolidation(memory_id, memory_hv, emotional_weight);
         }

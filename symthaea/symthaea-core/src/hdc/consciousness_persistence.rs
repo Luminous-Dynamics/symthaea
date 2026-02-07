@@ -44,7 +44,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::sleep_and_altered_states::{DreamScenario, SleepAndAlteredStates};
 
 // =============================================================================
@@ -164,7 +164,7 @@ pub fn decompress_rle(data: &[u8]) -> Vec<u8> {
         if data[i] == 0xFF && i + 2 < data.len() {
             let count = data[i + 1] as usize;
             let value = data[i + 2];
-            result.extend(std::iter::repeat(value).take(count));
+            result.extend(std::iter::repeat_n(value, count));
             i += 3;
         } else {
             result.push(data[i]);
@@ -274,8 +274,8 @@ impl ConsciousnessSnapshot {
         self
     }
 
-    /// Set core hypervector from HV16
-    pub fn with_core_hv(mut self, hv: &HV16) -> Self {
+    /// Set core hypervector from BinaryHV
+    pub fn with_core_hv(mut self, hv: &BinaryHV) -> Self {
         self.core_hv = hv.0.to_vec();
         self
     }

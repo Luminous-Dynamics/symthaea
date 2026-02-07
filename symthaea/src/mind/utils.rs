@@ -1,6 +1,6 @@
 //! Utility functions for the mind system.
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Epsilon for floating-point comparisons.
 /// Used to avoid direct equality comparisons on f32/f64 values.
@@ -43,11 +43,11 @@ pub fn is_nonzero_f32(v: f32) -> bool {
     v.abs() >= EPSILON_F32
 }
 
-/// Permute (circular shift) a RealHV vector to create variation.
+/// Permute (circular shift) a ContinuousHV vector to create variation.
 ///
 /// Used in dream processing to generate creative insights
 /// by rotating the vector's dimensions.
-pub(crate) fn permute_hv(hv: &RealHV, shift: usize) -> RealHV {
+pub(crate) fn permute_hv(hv: &ContinuousHV, shift: usize) -> ContinuousHV {
     let n = hv.values.len();
     if n == 0 || shift == 0 {
         return hv.clone();
@@ -57,5 +57,5 @@ pub(crate) fn permute_hv(hv: &RealHV, shift: usize) -> RealHV {
     for i in 0..n {
         new_values[(i + effective_shift) % n] = hv.values[i];
     }
-    RealHV::from_values(new_values)
+    ContinuousHV::from_values(new_values)
 }

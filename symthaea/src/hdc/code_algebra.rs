@@ -12,7 +12,7 @@
 //! - **semantic_diff**: What changed between code versions?
 //! - **abstract_pattern**: Extract common pattern from examples
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use super::code_encoder::CodeHDEncoder;
 use crate::language::code_parser::ParsedCode;
@@ -30,7 +30,7 @@ pub struct SimilarityMatch {
 #[derive(Debug, Clone)]
 pub struct CodeDiff {
     /// The diff vector in HDC space
-    pub diff_hv: RealHV,
+    pub diff_hv: ContinuousHV,
     /// Magnitude of change (0.0 = identical, higher = more different)
     pub change_magnitude: f32,
     /// Cosine similarity between old and new (1.0 = identical, 0.0 = orthogonal)
@@ -65,8 +65,8 @@ impl CodeAlgebra {
     /// Find the top-k most similar vectors to a query
     pub fn find_similar(
         &self,
-        query: &RealHV,
-        candidates: &[RealHV],
+        query: &ContinuousHV,
+        candidates: &[ContinuousHV],
         top_k: usize,
     ) -> Vec<SimilarityMatch> {
         let mut matches: Vec<SimilarityMatch> = candidates
@@ -87,7 +87,7 @@ impl CodeAlgebra {
     /// Find similar entities in a parsed codebase
     pub fn find_similar_in_code(
         &self,
-        query: &RealHV,
+        query: &ContinuousHV,
         parsed_files: &[(String, ParsedCode)],
         top_k: usize,
     ) -> Vec<(String, String, f32)> {
@@ -117,10 +117,10 @@ impl CodeAlgebra {
     /// D = C ⊕ unbind(A, B) ≈ C + (B - A) in the linear approximation
     pub fn analogy(
         &self,
-        a: &RealHV,
-        b: &RealHV,
-        c: &RealHV,
-        candidates: &[RealHV],
+        a: &ContinuousHV,
+        b: &ContinuousHV,
+        c: &ContinuousHV,
+        candidates: &[ContinuousHV],
     ) -> Vec<SimilarityMatch> {
         // Compute the relationship vector: what transforms A into B?
         // In real-valued HDC: relationship ≈ B * A^(-1) ≈ element-wise B/A
@@ -139,7 +139,7 @@ impl CodeAlgebra {
             }
         }
 
-        let target = RealHV::from_values(target_values);
+        let target = ContinuousHV::from_values(target_values);
         self.find_similar(&target, candidates, 5)
     }
 
@@ -151,17 +151,17 @@ impl CodeAlgebra {
     ///
     /// The result is a vector that is similar to both inputs,
     /// representing their combination.
-    pub fn compose(&self, a: &RealHV, b: &RealHV) -> RealHV {
-        RealHV::bundle(&[a.clone(), b.clone()])
+    pub fn compose(&self, a: &ContinuousHV, b: &ContinuousHV) -> ContinuousHV {
+        ContinuousHV::bundle_owned(&[a.clone(), b.clone()])
     }
 
     /// Compose multiple code patterns
-    pub fn compose_many(&self, patterns: &[&RealHV]) -> RealHV {
+    pub fn compose_many(&self, patterns: &[&ContinuousHV]) -> ContinuousHV {
         if patterns.is_empty() {
-            return RealHV::zero(self.encoder.dim());
+            return ContinuousHV::zero(self.encoder.dim());
         }
-        let owned: Vec<RealHV> = patterns.iter().map(|p| (*p).clone()).collect();
-        RealHV::bundle(&owned)
+        let owned: Vec<ContinuousHV> = patterns.iter().map(|p| (*p).clone()).collect();
+        ContinuousHV::bundle_owned(&owned)
     }
 
     // ========================================================================
@@ -192,14 +192,14 @@ impl CodeAlgebra {
         }
 
         CodeDiff {
-            diff_hv: RealHV::from_values(diff_values),
+            diff_hv: ContinuousHV::from_values(diff_values),
             change_magnitude,
             similarity,
         }
     }
 
     /// Compute semantic diff between two pre-encoded vectors
-    pub fn semantic_diff_hvs(&self, old_hv: &RealHV, new_hv: &RealHV) -> CodeDiff {
+    pub fn semantic_diff_hvs(&self, old_hv: &ContinuousHV, new_hv: &ContinuousHV) -> CodeDiff {
         let similarity = old_hv.similarity(new_hv);
 
         let dim = old_hv.values.len();
@@ -217,7 +217,7 @@ impl CodeAlgebra {
         }
 
         CodeDiff {
-            diff_hv: RealHV::from_values(diff_values),
+            diff_hv: ContinuousHV::from_values(diff_values),
             change_magnitude,
             similarity,
         }
@@ -231,17 +231,17 @@ impl CodeAlgebra {
     ///
     /// The abstract pattern is the centroid (bundled average) of all examples.
     /// It captures what all examples share, filtering out implementation-specific details.
-    pub fn abstract_pattern(&self, examples: &[RealHV]) -> RealHV {
+    pub fn abstract_pattern(&self, examples: &[ContinuousHV]) -> ContinuousHV {
         if examples.is_empty() {
-            return RealHV::zero(self.encoder.dim());
+            return ContinuousHV::zero(self.encoder.dim());
         }
 
-        RealHV::bundle(examples)
+        ContinuousHV::bundle_owned(examples)
     }
 
     /// Measure how coherent a set of code patterns are
     /// (how similar they all are to each other)
-    pub fn measure_coherence(&self, patterns: &[RealHV]) -> f32 {
+    pub fn measure_coherence(&self, patterns: &[ContinuousHV]) -> f32 {
         if patterns.len() < 2 {
             return 1.0;
         }
@@ -285,7 +285,7 @@ mod tests {
     fn test_find_similar() {
         let algebra = make_algebra();
         let query = algebra.encoder().encode_name("sort");
-        let candidates: Vec<RealHV> = ["sort_list", "bubble_sort", "hash_map", "binary_tree"]
+        let candidates: Vec<ContinuousHV> = ["sort_list", "bubble_sort", "hash_map", "binary_tree"]
             .iter()
             .map(|name| algebra.encoder().encode_name(name))
             .collect();
@@ -334,7 +334,7 @@ mod tests {
         let algebra = make_algebra();
 
         // Several "sort" functions should abstract to a sort-like pattern
-        let examples: Vec<RealHV> = ["bubble_sort", "quick_sort", "merge_sort"]
+        let examples: Vec<ContinuousHV> = ["bubble_sort", "quick_sort", "merge_sort"]
             .iter()
             .map(|name| algebra.encoder().encode_name(name))
             .collect();
@@ -354,12 +354,12 @@ mod tests {
         let algebra = make_algebra();
 
         // Similar patterns should have high coherence
-        let similar: Vec<RealHV> = ["sort_a", "sort_b", "sort_c"]
+        let similar: Vec<ContinuousHV> = ["sort_a", "sort_b", "sort_c"]
             .iter()
             .map(|n| algebra.encoder().encode_name(n))
             .collect();
 
-        let diverse: Vec<RealHV> = ["sort", "database", "network"]
+        let diverse: Vec<ContinuousHV> = ["sort", "database", "network"]
             .iter()
             .map(|n| algebra.encoder().encode_name(n))
             .collect();
@@ -380,7 +380,7 @@ mod tests {
         let vec = algebra.encoder().encode_name("Vec");
         let hashmap = algebra.encoder().encode_name("HashMap");
 
-        let candidates: Vec<RealHV> = ["get", "sort", "insert", "contains"]
+        let candidates: Vec<ContinuousHV> = ["get", "sort", "insert", "contains"]
             .iter()
             .map(|n| algebra.encoder().encode_name(n))
             .collect();

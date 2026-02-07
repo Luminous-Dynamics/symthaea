@@ -30,7 +30,7 @@
 //! - WormWiring.org - Official connectome database
 
 use super::consciousness_topology_generators::{ConsciousnessTopology, TopologyType};
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::spectral_connectivity::ConnectivityCalculator;
 use std::collections::{HashMap, HashSet};
 
@@ -414,9 +414,9 @@ impl CElegansConnectome {
             .collect();
 
         // Create node identities (orthogonal basis vectors with small noise)
-        let node_identities: Vec<RealHV> = (0..n)
+        let node_identities: Vec<ContinuousHV> = (0..n)
             .map(|i| {
-                let mut hv = RealHV::random(dim, i as u64 * 1000 + 42);
+                let mut hv = ContinuousHV::random(dim, i as u64 * 1000 + 42);
                 // Normalize to unit vector
                 let norm: f64 = (hv.values.iter().map(|x| x * x).sum::<f32>() as f64).sqrt();
                 if norm > 0.0 {
@@ -429,7 +429,7 @@ impl CElegansConnectome {
             .collect();
 
         // Create node representations by binding with connected neurons
-        let node_representations: Vec<RealHV> = self
+        let node_representations: Vec<ContinuousHV> = self
             .neurons
             .iter()
             .enumerate()
@@ -465,7 +465,7 @@ impl CElegansConnectome {
                     // Weighted combination of connected neuron identities
                     let total_weight: f64 = connections.iter().map(|(_, w)| w).sum();
 
-                    let mut result = RealHV::zero(dim);
+                    let mut result = ContinuousHV::zero(dim);
                     for (target_idx, weight) in &connections {
                         let scaled = node_identities[*target_idx].scale((*weight / total_weight) as f32);
                         result = result.add(&scaled);

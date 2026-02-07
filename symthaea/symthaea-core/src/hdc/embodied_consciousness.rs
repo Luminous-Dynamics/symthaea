@@ -223,7 +223,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::consciousness_spectrum::{ConsciousnessSpectrum, SpectrumConfig};
 use serde::{Deserialize, Serialize};
@@ -328,7 +328,7 @@ pub struct Sensor {
     pub modality: SensorModality,
 
     /// Encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Current reading
     pub current_reading: f64,
@@ -342,7 +342,7 @@ impl Sensor {
     pub fn new(modality: SensorModality, seed: u64) -> Self {
         Self {
             modality,
-            encoding: HV16::random(seed),
+            encoding: BinaryHV::random(seed),
             current_reading: 0.0,
             history: Vec::new(),
         }
@@ -379,7 +379,7 @@ pub struct Actuator {
     pub actuator_type: ActuatorType,
 
     /// Encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Current command
     pub current_command: f64,
@@ -393,7 +393,7 @@ impl Actuator {
     pub fn new(actuator_type: ActuatorType, seed: u64) -> Self {
         Self {
             actuator_type,
-            encoding: HV16::random(seed),
+            encoding: BinaryHV::random(seed),
             current_command: 0.0,
             history: Vec::new(),
         }
@@ -610,7 +610,7 @@ pub struct EmbodiedConsciousness {
     body_schema: BodySchema,
 
     /// Current neural state
-    neural_state: Vec<HV16>,
+    neural_state: Vec<BinaryHV>,
 
     /// Cycle count
     cycle_count: usize,
@@ -621,7 +621,7 @@ impl EmbodiedConsciousness {
     pub fn new(num_components: usize, config: EmbodimentConfig) -> Self {
         let mut neural_state = Vec::new();
         for i in 0..num_components {
-            neural_state.push(HV16::random(i as u64 * 1000));
+            neural_state.push(BinaryHV::random(i as u64 * 1000));
         }
 
         Self {

@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Configuration for semantic vision
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -38,9 +38,9 @@ impl Default for VisionConfig {
 #[derive(Debug, Clone)]
 pub struct ImageEmbedding {
     /// Embedding vector
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
     /// Spatial features (if available)
-    pub spatial_features: Option<Vec<RealHV>>,
+    pub spatial_features: Option<Vec<ContinuousHV>>,
     /// Global features
     pub global_features: Vec<f32>,
     /// Confidence
@@ -51,7 +51,7 @@ pub struct ImageEmbedding {
 
 impl ImageEmbedding {
     /// Create a new image embedding
-    pub fn new(embedding: RealHV) -> Self {
+    pub fn new(embedding: ContinuousHV) -> Self {
         Self {
             embedding,
             spatial_features: None,
@@ -62,7 +62,7 @@ impl ImageEmbedding {
     }
 
     /// With spatial features
-    pub fn with_spatial(mut self, features: Vec<RealHV>) -> Self {
+    pub fn with_spatial(mut self, features: Vec<ContinuousHV>) -> Self {
         self.spatial_features = Some(features);
         self
     }
@@ -177,7 +177,7 @@ pub struct OcrSystem {
     /// Configuration
     dimension: usize,
     /// Character embeddings
-    char_embeddings: HashMap<char, RealHV>,
+    char_embeddings: HashMap<char, ContinuousHV>,
     /// Statistics
     stats: OcrStats,
     /// Optional genesis-seeded RNG for deterministic confidence jitter
@@ -214,11 +214,11 @@ impl OcrSystem {
         // Initialize character embeddings
         let mut char_embeddings = HashMap::new();
         for (i, c) in ('a'..='z').chain('A'..='Z').chain('0'..='9').enumerate() {
-            char_embeddings.insert(c, RealHV::random(dimension, i as u64));
+            char_embeddings.insert(c, ContinuousHV::random(dimension, i as u64));
         }
         // Add common punctuation
         for (i, c) in [' ', '.', ',', '!', '?', '-', ':', ';', '\'', '"'].iter().enumerate() {
-            char_embeddings.insert(*c, RealHV::random(dimension, (1000 + i) as u64));
+            char_embeddings.insert(*c, ContinuousHV::random(dimension, (1000 + i) as u64));
         }
 
         Self {
@@ -284,7 +284,7 @@ impl OcrSystem {
     }
 
     /// Get character embedding
-    pub fn char_embedding(&self, c: char) -> Option<&RealHV> {
+    pub fn char_embedding(&self, c: char) -> Option<&ContinuousHV> {
         self.char_embeddings.get(&c)
     }
 
@@ -308,7 +308,7 @@ pub struct SemanticVision {
     /// OCR system
     ocr: OcrSystem,
     /// Visual concept embeddings
-    concept_embeddings: HashMap<String, RealHV>,
+    concept_embeddings: HashMap<String, ContinuousHV>,
     /// Statistics
     stats: VisionStats,
 }
@@ -332,7 +332,7 @@ impl SemanticVision {
         // Initialize common concept embeddings
         let mut concept_embeddings = HashMap::new();
         for (i, concept) in ["person", "animal", "vehicle", "building", "nature", "object", "text"].iter().enumerate() {
-            concept_embeddings.insert(concept.to_string(), RealHV::random(dim, (2000 + i) as u64));
+            concept_embeddings.insert(concept.to_string(), ContinuousHV::random(dim, (2000 + i) as u64));
         }
 
         Self {
@@ -355,7 +355,7 @@ impl SemanticVision {
         let mut rng = genesis.domain(&format!("{label}::vision::concepts"));
         for concept in ["person", "animal", "vehicle", "building", "nature", "object", "text"] {
             let seed: u64 = rand::Rng::gen(&mut rng);
-            concept_embeddings.insert(concept.to_string(), RealHV::random(dim, seed));
+            concept_embeddings.insert(concept.to_string(), ContinuousHV::random(dim, seed));
         }
 
         Self {
@@ -412,7 +412,7 @@ impl SemanticVision {
     }
 
     /// Convert features to embedding
-    fn features_to_embedding(&self, features: &VisualFeatures) -> RealHV {
+    fn features_to_embedding(&self, features: &VisualFeatures) -> ContinuousHV {
         let mut values = vec![0.0f32; self.config.dimension];
 
         // Map color histogram to embedding
@@ -429,7 +429,7 @@ impl SemanticVision {
             }
         }
 
-        RealHV::from_slice(&values)
+        ContinuousHV::from_slice(&values)
     }
 
     /// Generate caption for image

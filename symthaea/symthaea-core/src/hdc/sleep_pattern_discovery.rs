@@ -25,7 +25,7 @@
 //!
 //! ```rust,ignore
 //! use symthaea_core::hdc::sleep_pattern_discovery::{PatternDiscoveryEngine, DiscoveryConfig};
-//! use symthaea_core::hdc::RealHV;
+//! use symthaea_core::hdc::ContinuousHV;
 //!
 //! let mut engine = PatternDiscoveryEngine::new(DiscoveryConfig::default());
 //!
@@ -41,7 +41,7 @@
 //! }
 //! ```
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::resonator::{ResonatorNetwork, ResonatorConfig, Constraint};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -121,7 +121,7 @@ pub struct MemoryEntry {
     /// Unique identifier
     pub id: String,
     /// HDC representation of the memory
-    pub vector: RealHV,
+    pub vector: ContinuousHV,
     /// Emotional strength (affects consolidation priority)
     pub emotional_strength: f32,
     /// Timestamp (relative, higher = more recent)
@@ -136,7 +136,7 @@ pub struct MemoryEntry {
 
 impl MemoryEntry {
     /// Create new memory entry
-    pub fn new(id: impl Into<String>, vector: RealHV, emotional_strength: f32) -> Self {
+    pub fn new(id: impl Into<String>, vector: ContinuousHV, emotional_strength: f32) -> Self {
         Self {
             id: id.into(),
             vector,
@@ -204,9 +204,9 @@ pub struct DiscoveredPattern {
 }
 
 impl DiscoveredPattern {
-    /// Get the pattern as RealHV
-    pub fn as_hv(&self) -> RealHV {
-        RealHV::from_slice(&self.vector)
+    /// Get the pattern as ContinuousHV
+    pub fn as_hv(&self) -> ContinuousHV {
+        ContinuousHV::from_slice(&self.vector)
     }
 }
 
@@ -262,7 +262,7 @@ impl PatternDiscoveryEngine {
     }
 
     /// Add a memory to the discovery engine
-    pub fn add_memory(&mut self, id: impl Into<String>, vector: RealHV, emotional_strength: f32) {
+    pub fn add_memory(&mut self, id: impl Into<String>, vector: ContinuousHV, emotional_strength: f32) {
         let id = id.into();
         let memory = MemoryEntry::new(id.clone(), vector, emotional_strength);
         self.memories.insert(id, memory);
@@ -303,7 +303,7 @@ impl PatternDiscoveryEngine {
             }
 
             // Get memory vectors for this cluster
-            let cluster_vectors: Vec<RealHV> = cluster_memory_ids.iter()
+            let cluster_vectors: Vec<ContinuousHV> = cluster_memory_ids.iter()
                 .filter_map(|id| self.memories.get(id).map(|m| m.vector.clone()))
                 .collect();
 
@@ -404,7 +404,7 @@ impl PatternDiscoveryEngine {
     /// Use resonator network to find pattern attractor from cluster
     fn find_pattern_via_resonator(
         &mut self,
-        vectors: &[RealHV],
+        vectors: &[ContinuousHV],
         memory_ids: &[String],
         cluster_idx: usize,
         sleep_intensity: f32,
@@ -460,7 +460,7 @@ impl PatternDiscoveryEngine {
         };
 
         // Compute pattern metrics
-        let pattern_hv = RealHV::from_slice(&solution.vector);
+        let pattern_hv = ContinuousHV::from_slice(&solution.vector);
         let mut total_similarity = 0.0;
         for vec in vectors {
             total_similarity += pattern_hv.similarity(vec);
@@ -505,9 +505,9 @@ impl PatternDiscoveryEngine {
     }
 
     /// Compute centroid (average) of vectors
-    fn compute_centroid(&self, vectors: &[RealHV]) -> RealHV {
+    fn compute_centroid(&self, vectors: &[ContinuousHV]) -> ContinuousHV {
         if vectors.is_empty() {
-            return RealHV::zero(1024);
+            return ContinuousHV::zero(1024);
         }
 
         let dim = vectors[0].dim();
@@ -532,7 +532,7 @@ impl PatternDiscoveryEngine {
             }
         }
 
-        RealHV::from_slice(&sum)
+        ContinuousHV::from_slice(&sum)
     }
 
     /// Get all discovered patterns
@@ -541,10 +541,10 @@ impl PatternDiscoveryEngine {
     }
 
     /// Get patterns that match a query vector
-    pub fn find_matching_patterns(&self, query: &RealHV, min_similarity: f32) -> Vec<&DiscoveredPattern> {
+    pub fn find_matching_patterns(&self, query: &ContinuousHV, min_similarity: f32) -> Vec<&DiscoveredPattern> {
         self.discovered_patterns.iter()
             .filter(|p| {
-                let pattern_hv = RealHV::from_slice(&p.vector);
+                let pattern_hv = ContinuousHV::from_slice(&p.vector);
                 pattern_hv.similarity(query) >= min_similarity
             })
             .collect()
@@ -591,7 +591,7 @@ impl Default for PatternDiscoveryEngine {
 mod tests {
     use super::*;
 
-    fn random_hv(dim: usize, seed: u64) -> RealHV {
+    fn random_hv(dim: usize, seed: u64) -> ContinuousHV {
         // Deterministic pseudo-random for reproducibility
         let values: Vec<f32> = (0..dim)
             .map(|i| {
@@ -599,7 +599,7 @@ mod tests {
                 (x * 2.0 - 1.0) as f32
             })
             .collect();
-        let mut hv = RealHV::from_slice(&values);
+        let mut hv = ContinuousHV::from_slice(&values);
         // Normalize
         let norm: f32 = hv.values.iter().map(|x| x * x).sum::<f32>().sqrt();
         if norm > 0.0 {
@@ -610,13 +610,13 @@ mod tests {
         hv
     }
 
-    fn similar_hv(base: &RealHV, noise: f32, seed: u64) -> RealHV {
+    fn similar_hv(base: &ContinuousHV, noise: f32, seed: u64) -> ContinuousHV {
         let noise_hv = random_hv(base.dim(), seed);
         let values: Vec<f32> = base.values.iter()
             .zip(noise_hv.values.iter())
             .map(|(&b, &n)| b * (1.0 - noise) + n * noise)
             .collect();
-        let mut hv = RealHV::from_slice(&values);
+        let mut hv = ContinuousHV::from_slice(&values);
         // Normalize
         let norm: f32 = hv.values.iter().map(|x| x * x).sum::<f32>().sqrt();
         if norm > 0.0 {

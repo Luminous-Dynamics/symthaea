@@ -35,7 +35,7 @@
 // First HDC implementation of Global Workspace Theory with competitive dynamics,
 // broadcasting mechanism, and integration with Free Energy Principle.
 
-use crate::hdc::HV16;
+use crate::hdc::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -43,7 +43,7 @@ use std::collections::VecDeque;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceContent {
     /// Content representation (HDC vector)
-    pub representation: Vec<HV16>,
+    pub representation: Vec<BinaryHV>,
 
     /// Activation strength (competition currency)
     pub activation: f64,
@@ -60,7 +60,7 @@ pub struct WorkspaceContent {
 
 impl WorkspaceContent {
     /// Create new workspace content
-    pub fn new(representation: Vec<HV16>, activation: f64, source: String) -> Self {
+    pub fn new(representation: Vec<BinaryHV>, activation: f64, source: String) -> Self {
         Self {
             representation,
             activation,
@@ -97,7 +97,7 @@ pub enum AccessState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BroadcastEvent {
     /// Content being broadcast
-    pub content: Vec<HV16>,
+    pub content: Vec<BinaryHV>,
 
     /// Strength of broadcast
     pub strength: f64,
@@ -263,11 +263,7 @@ impl GlobalWorkspace {
         let capacity = self.compute_capacity_metrics();
 
         // 6. Detect winner
-        let winner = if let Some(c) = self.workspace.first() {
-            Some(c.source.clone())
-        } else {
-            None
-        };
+        let winner = self.workspace.first().map(|c| c.source.clone());
 
         // 7. Generate explanation
         let explanation = self.generate_explanation(&capacity, ignition);
@@ -432,14 +428,14 @@ impl GlobalWorkspace {
     }
 
     /// Check if content is conscious
-    pub fn is_conscious(&self, content: &[HV16]) -> bool {
+    pub fn is_conscious(&self, content: &[BinaryHV]) -> bool {
         self.workspace.iter().any(|c| {
             self.similarity(&c.representation, content) > 0.9
         })
     }
 
     /// Compute similarity between HDC vectors using Hamming-based similarity
-    fn similarity(&self, a: &[HV16], b: &[HV16]) -> f64 {
+    fn similarity(&self, a: &[BinaryHV], b: &[BinaryHV]) -> f64 {
         if a.len() != b.len() || a.is_empty() {
             return 0.0;
         }
@@ -476,7 +472,7 @@ mod tests {
     fn test_submit_content() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig::default());
         let content = WorkspaceContent::new(
-            vec![HV16::ones(); 10],
+            vec![BinaryHV::ones(); 10],
             0.8,
             "perception".to_string(),
         );
@@ -493,7 +489,7 @@ mod tests {
 
         // High activation content should enter
         let high_activation = WorkspaceContent::new(
-            vec![HV16::ones(); 10],
+            vec![BinaryHV::ones(); 10],
             0.9,
             "perception".to_string(),
         );
@@ -512,7 +508,7 @@ mod tests {
 
         // Low activation content should not enter
         let low_activation = WorkspaceContent::new(
-            vec![HV16::zero(); 10],
+            vec![BinaryHV::zero(); 10],
             0.3,
             "perception".to_string(),
         );
@@ -533,7 +529,7 @@ mod tests {
         // Submit 5 high-activation contents
         for i in 0..5 {
             let content = WorkspaceContent::new(
-                vec![HV16::random(i as u64); 10],
+                vec![BinaryHV::random(i as u64); 10],
                 0.9,
                 format!("module{}", i),
             );
@@ -554,7 +550,7 @@ mod tests {
         });
 
         let content = WorkspaceContent::new(
-            vec![HV16::ones(); 10],
+            vec![BinaryHV::ones(); 10],
             0.9,
             "perception".to_string(),
         );
@@ -582,7 +578,7 @@ mod tests {
         });
 
         let content = WorkspaceContent::new(
-            vec![HV16::ones(); 10],
+            vec![BinaryHV::ones(); 10],
             0.9,
             "perception".to_string(),
         );
@@ -598,7 +594,7 @@ mod tests {
 
         // Very high activation should trigger ignition
         let content = WorkspaceContent::new(
-            vec![HV16::ones(); 10],
+            vec![BinaryHV::ones(); 10],
             0.95,
             "perception".to_string(),
         );
@@ -619,7 +615,7 @@ mod tests {
         // Submit multiple contents
         for i in 0..3 {
             let content = WorkspaceContent::new(
-                vec![HV16::random(i as u64); 10],
+                vec![BinaryHV::random(i as u64); 10],
                 0.7 + i as f64 * 0.1,
                 format!("module{}", i),
             );
@@ -640,7 +636,7 @@ mod tests {
             ..Default::default()
         });
 
-        let content_vec = vec![HV16::ones(); 10];
+        let content_vec = vec![BinaryHV::ones(); 10];
         let content = WorkspaceContent::new(
             content_vec.clone(),
             0.9,
@@ -659,8 +655,8 @@ mod tests {
             ..Default::default()
         });
 
-        // Use the same HV16 vectors for content
-        let shared_vec = vec![HV16::ones(); 10];
+        // Use the same BinaryHV vectors for content
+        let shared_vec = vec![BinaryHV::ones(); 10];
         let content = WorkspaceContent::new(
             shared_vec.clone(),
             0.9,
@@ -673,7 +669,7 @@ mod tests {
         assert!(ws.is_conscious(&shared_vec));
 
         // Completely different content should NOT be detected
-        let different_vec = vec![HV16::zero(); 10];
+        let different_vec = vec![BinaryHV::zero(); 10];
         assert!(!ws.is_conscious(&different_vec));
     }
 
@@ -681,7 +677,7 @@ mod tests {
     fn test_clear() {
         let mut ws = GlobalWorkspace::new(WorkspaceConfig::default());
         let content = WorkspaceContent::new(
-            vec![HV16::ones(); 10],
+            vec![BinaryHV::ones(); 10],
             0.9,
             "perception".to_string(),
         );

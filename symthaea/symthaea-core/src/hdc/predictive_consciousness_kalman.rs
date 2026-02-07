@@ -162,7 +162,7 @@ impl ConsciousnessState {
 
     /// Create from component vector
     pub fn from_vec(components: &[f64]) -> Self {
-        let phi = components.get(0).copied().unwrap_or(0.0);
+        let phi = components.first().copied().unwrap_or(0.0);
         let binding = components.get(1).copied().unwrap_or(0.0);
         let workspace = components.get(2).copied().unwrap_or(0.0);
         let attention = components.get(3).copied().unwrap_or(0.0);
@@ -212,7 +212,7 @@ pub struct StateUncertainty {
 impl StateUncertainty {
     /// Create from covariance matrix diagonal
     pub fn from_diagonal(diag: &[f64]) -> Self {
-        let phi_std = diag.get(0).map(|&v| v.sqrt()).unwrap_or(0.0);
+        let phi_std = diag.first().map(|&v| v.sqrt()).unwrap_or(0.0);
         let binding_std = diag.get(1).map(|&v| v.sqrt()).unwrap_or(0.0);
         let workspace_std = diag.get(2).map(|&v| v.sqrt()).unwrap_or(0.0);
         let attention_std = diag.get(3).map(|&v| v.sqrt()).unwrap_or(0.0);
@@ -599,7 +599,7 @@ impl PredictiveConsciousness {
         // Composite transition risk
         // High autocorrelation + high variance ratio = approaching transition
         let ac_risk = (autocorrelation - 0.5).max(0.0) * 2.0; // AC > 0.5 is risky
-        let var_risk = (variance_ratio - 1.0).max(0.0).min(1.0); // Var ratio > 1 is risky
+        let var_risk = (variance_ratio - 1.0).clamp(0.0, 1.0); // Var ratio > 1 is risky
 
         let transition_risk = ((ac_risk + var_risk) / 2.0).min(1.0);
 

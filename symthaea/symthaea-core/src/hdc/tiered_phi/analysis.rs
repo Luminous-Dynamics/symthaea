@@ -7,7 +7,7 @@
 //! - **Multi-Scale Pyramid**: Compute Φ at multiple spatial scales to find optimal consciousness granularity
 //! - **Entropy Analysis**: Measure complexity, predictability, and information richness of consciousness states
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use super::core::{TieredPhi, ApproximationTier};
 use std::time::Instant;
 use rayon::prelude::*;
@@ -194,7 +194,7 @@ impl PhiPyramid {
     /// # Returns
     ///
     /// PhiPyramidResult with Φ at each scale and analysis
-    pub fn compute(&mut self, components: &[HV16]) -> PhiPyramidResult {
+    pub fn compute(&mut self, components: &[BinaryHV]) -> PhiPyramidResult {
         let start_time = Instant::now();
         let n = components.len();
 
@@ -289,7 +289,7 @@ impl PhiPyramid {
 
     /// Compute Φ at a specific scale
     /// Returns (average_phi, components_per_cluster, num_clusters)
-    fn compute_scale(&self, components: &[HV16], cluster_size: usize) -> (f64, usize, usize) {
+    fn compute_scale(&self, components: &[BinaryHV], cluster_size: usize) -> (f64, usize, usize) {
         let n = components.len();
 
         if cluster_size >= n {
@@ -300,7 +300,7 @@ impl PhiPyramid {
         }
 
         // Partition into clusters and compute average Φ
-        let num_clusters = (n + cluster_size - 1) / cluster_size; // Ceiling division
+        let num_clusters = n.div_ceil(cluster_size); // Ceiling division
         let mut total_phi = 0.0;
         let mut valid_clusters = 0;
 
@@ -376,12 +376,12 @@ impl Default for PhiPyramid {
 }
 
 /// Convenience function: compute multi-scale Φ
-pub fn multi_scale_phi(components: &[HV16]) -> PhiPyramidResult {
+pub fn multi_scale_phi(components: &[BinaryHV]) -> PhiPyramidResult {
     PhiPyramid::new().compute(components)
 }
 
 /// Convenience function: find optimal consciousness scale
-pub fn optimal_scale(components: &[HV16]) -> (usize, f64) {
+pub fn optimal_scale(components: &[BinaryHV]) -> (usize, f64) {
     let result = PhiPyramid::new().compute(components);
     (result.peak_scale, result.peak_phi)
 }
@@ -617,9 +617,7 @@ impl PhiEntropyAnalyzer {
 
         // 5. Complexity Index (geometric mean of entropy measures)
         let complexity_index = (normalized_shannon * sample_ent.max(0.01) * normalized_lz)
-            .powf(1.0 / 3.0)
-            .min(1.0)
-            .max(0.0);
+            .powf(1.0 / 3.0).clamp(0.0, 1.0);
 
         // 6. Integrated Complexity (novel metric)
         let phi_mean = mean_phi.unwrap_or_else(|| {
@@ -688,7 +686,7 @@ impl PhiEntropyAnalyzer {
             0.0
         };
 
-        (entropy, normalized.min(1.0).max(0.0))
+        (entropy, normalized.clamp(0.0, 1.0))
     }
 
     /// Compute Sample Entropy (SampEn)
@@ -801,7 +799,7 @@ impl PhiEntropyAnalyzer {
             0.0
         };
 
-        (complexity, normalized.min(1.0).max(0.0))
+        (complexity, normalized.clamp(0.0, 1.0))
     }
 
     /// Compute multi-scale entropy
@@ -847,7 +845,7 @@ impl PhiEntropyAnalyzer {
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
         let n = sorted.len();
-        if n % 2 == 0 {
+        if n.is_multiple_of(2) {
             (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0
         } else {
             sorted[n / 2]

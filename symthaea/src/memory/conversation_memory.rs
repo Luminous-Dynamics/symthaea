@@ -32,7 +32,7 @@
 //! let turns = memory.resume_session(&session_id)?;
 //! ```
 
-use symthaea_core::hdc::real_hv::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
@@ -247,7 +247,7 @@ impl ConversationMemory {
         role: &str,
         content: &str,
         phi: f32,
-        embedding: Option<&RealHV>,
+        embedding: Option<&ContinuousHV>,
     ) -> Result<()> {
         let conv_id = self
             .current_conversation_id
@@ -316,7 +316,7 @@ impl ConversationMemory {
     /// Compares the query embedding against stored conversation embeddings
     pub fn find_similar(
         &self,
-        query_embedding: &RealHV,
+        query_embedding: &ContinuousHV,
         limit: usize,
     ) -> Result<Vec<(String, f32)>> {
         let mut stmt = self.conn.prepare(
@@ -332,7 +332,7 @@ impl ConversationMemory {
             .filter_map(|r| r.ok())
             .filter_map(|(id, blob)| {
                 let values: Vec<f32> = bincode::deserialize(&blob).ok()?;
-                let hv = RealHV { values };
+                let hv = ContinuousHV { values };
                 let sim = query_embedding.similarity(&hv);
                 Some((id, sim))
             })
@@ -489,7 +489,7 @@ impl ConversationMemory {
     pub fn set_conversation_embedding(
         &self,
         conversation_id: &str,
-        embedding: &RealHV,
+        embedding: &ContinuousHV,
     ) -> Result<()> {
         let blob = bincode::serialize(&embedding.values)?;
         self.conn.execute(
@@ -622,7 +622,7 @@ mod tests {
         let session_id = memory.start_session().unwrap();
 
         // Set conversation embedding
-        let embedding = RealHV::random(HDC_DIMENSION, 42);
+        let embedding = ContinuousHV::random(HDC_DIMENSION, 42);
         memory.set_conversation_embedding(&session_id, &embedding).unwrap();
 
         // Search for similar

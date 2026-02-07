@@ -139,7 +139,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::meta_consciousness::MetaConsciousness;
 use serde::{Deserialize, Serialize};
@@ -267,14 +267,14 @@ impl SpectrumAssessment {
 /// # Example
 /// ```
 /// use symthaea::hdc::consciousness_spectrum::{ConsciousnessSpectrum, SpectrumConfig};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = SpectrumConfig::default();
 /// let mut spectrum = ConsciousnessSpectrum::new(4, config);
 ///
 /// let state = vec![
-///     HV16::random(1000), HV16::random(1001),
-///     HV16::random(1002), HV16::random(1003),
+///     BinaryHV::random(1000), BinaryHV::random(1001),
+///     BinaryHV::random(1002), BinaryHV::random(1003),
 /// ];
 ///
 /// // Assess full spectrum
@@ -374,7 +374,7 @@ impl ConsciousnessSpectrum {
     }
 
     /// Assess consciousness spectrum
-    pub fn assess(&mut self, state: &[HV16]) -> SpectrumAssessment {
+    pub fn assess(&mut self, state: &[BinaryHV]) -> SpectrumAssessment {
         // 1. Compute total integrated information (Φ_total)
         let phi_total = self.iit.compute_phi(state);
 
@@ -461,7 +461,7 @@ impl ConsciousnessSpectrum {
     }
 
     /// Update component activity levels
-    fn update_activity_levels(&mut self, state: &[HV16]) {
+    fn update_activity_levels(&mut self, state: &[BinaryHV]) {
         for (i, hv) in state.iter().enumerate() {
             if i < self.activity_levels.len() {
                 // Activity = bit density (popcount / total bits)
@@ -494,7 +494,7 @@ impl ConsciousnessSpectrum {
     /// Compute phenomenal consciousness
     ///
     /// Integration of activity = unified experience
-    fn compute_phenomenal_consciousness(&self, state: &[HV16]) -> f64 {
+    fn compute_phenomenal_consciousness(&self, state: &[BinaryHV]) -> f64 {
         if state.len() < 2 {
             return 0.0;
         }
@@ -628,10 +628,10 @@ mod tests {
         let mut spectrum = ConsciousnessSpectrum::new(4, SpectrumConfig::default());
 
         let state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let assessment = spectrum.assess(&state);
@@ -647,7 +647,7 @@ mod tests {
     fn test_conscious_unconscious_partition() {
         let mut spectrum = ConsciousnessSpectrum::new(4, SpectrumConfig::default());
 
-        let state = vec![HV16::random(1000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
         let assessment = spectrum.assess(&state);
 
         // Φ_total should equal Φ_conscious + Φ_unconscious (approximately)
@@ -659,7 +659,7 @@ mod tests {
     fn test_access_consciousness() {
         let mut spectrum = ConsciousnessSpectrum::new(4, SpectrumConfig::default());
 
-        let state = vec![HV16::random(1000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
         let assessment = spectrum.assess(&state);
 
         assert!(assessment.access >= 0.0 && assessment.access <= 1.0);
@@ -669,7 +669,7 @@ mod tests {
     fn test_phenomenal_consciousness() {
         let mut spectrum = ConsciousnessSpectrum::new(4, SpectrumConfig::default());
 
-        let state = vec![HV16::random(1000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
         let assessment = spectrum.assess(&state);
 
         assert!(assessment.phenomenal >= 0.0 && assessment.phenomenal <= 1.0);
@@ -683,7 +683,7 @@ mod tests {
         };
         let mut spectrum = ConsciousnessSpectrum::new(4, config);
 
-        let state = vec![HV16::random(1000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
         let assessment = spectrum.assess(&state);
 
         // Flow state: low consciousness ratio
@@ -696,7 +696,7 @@ mod tests {
     fn test_level_determination() {
         let mut spectrum = ConsciousnessSpectrum::new(4, SpectrumConfig::default());
 
-        let state = vec![HV16::random(1000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
         let assessment = spectrum.assess(&state);
 
         // Level should be one of the enum values

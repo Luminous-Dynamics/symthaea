@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Types of sensory modalities
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -75,7 +75,7 @@ pub struct PerceptionInput {
     /// Raw data (as bytes)
     pub data: Vec<u8>,
     /// Pre-computed embedding (if available)
-    pub embedding: Option<RealHV>,
+    pub embedding: Option<ContinuousHV>,
     /// Timestamp
     pub timestamp: u64,
     /// Confidence/quality score
@@ -102,7 +102,7 @@ impl PerceptionInput {
     }
 
     /// Create with pre-computed embedding
-    pub fn with_embedding(mut self, embedding: RealHV) -> Self {
+    pub fn with_embedding(mut self, embedding: ContinuousHV) -> Self {
         self.embedding = Some(embedding);
         self
     }
@@ -120,7 +120,7 @@ pub struct PerceptionOutput {
     /// Output identifier
     pub id: String,
     /// Integrated embedding
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
     /// Contributing modalities
     pub modalities: Vec<ModalityType>,
     /// Confidence scores per modality
@@ -152,7 +152,7 @@ pub struct MultiModalPerception {
     /// Configuration
     config: MultiModalConfig,
     /// Per-modality encoders (embeddings)
-    modality_encoders: HashMap<ModalityType, RealHV>,
+    modality_encoders: HashMap<ModalityType, ContinuousHV>,
     /// Current inputs buffer
     input_buffer: Vec<PerceptionInput>,
     /// Statistics
@@ -188,7 +188,7 @@ impl MultiModalPerception {
             ModalityType::Temporal,
             ModalityType::Spatial,
         ] {
-            modality_encoders.insert(modality, RealHV::random(dim));
+            modality_encoders.insert(modality, ContinuousHV::random(dim));
         }
 
         Self {
@@ -200,7 +200,7 @@ impl MultiModalPerception {
     }
 
     /// Process a single input
-    pub fn process_input(&mut self, input: PerceptionInput) -> RealHV {
+    pub fn process_input(&mut self, input: PerceptionInput) -> ContinuousHV {
         self.stats.inputs_processed += 1;
         *self.stats.modality_counts.entry(input.modality).or_insert(0) += 1;
 
@@ -216,10 +216,10 @@ impl MultiModalPerception {
     }
 
     /// Encode raw input to embedding
-    fn encode(&self, input: &PerceptionInput) -> RealHV {
+    fn encode(&self, input: &PerceptionInput) -> ContinuousHV {
         let modality_basis = self.modality_encoders.get(&input.modality)
             .cloned()
-            .unwrap_or_else(|| RealHV::random(self.config.dimension));
+            .unwrap_or_else(|| ContinuousHV::random(self.config.dimension));
 
         // Simple encoding: hash data and combine with modality basis
         let data_hv = self.data_to_hv(&input.data);
@@ -227,7 +227,7 @@ impl MultiModalPerception {
     }
 
     /// Convert raw data to hypervector
-    fn data_to_hv(&self, data: &[u8]) -> RealHV {
+    fn data_to_hv(&self, data: &[u8]) -> ContinuousHV {
         let mut values = vec![0.0f32; self.config.dimension];
 
         for (i, &byte) in data.iter().enumerate() {
@@ -243,7 +243,7 @@ impl MultiModalPerception {
             }
         }
 
-        RealHV::from_slice(&values)
+        ContinuousHV::from_slice(&values)
     }
 
     /// Integrate all buffered inputs
@@ -259,7 +259,7 @@ impl MultiModalPerception {
             .collect();
 
         let mut modality_confidences = HashMap::new();
-        let embeddings: Vec<RealHV> = self.input_buffer.iter()
+        let embeddings: Vec<ContinuousHV> = self.input_buffer.iter()
             .map(|input| {
                 modality_confidences.insert(input.modality, input.confidence);
                 input.embedding.clone().unwrap_or_else(|| self.encode(input))
@@ -298,9 +298,9 @@ impl MultiModalPerception {
     }
 
     /// Fuse multiple embeddings
-    fn fuse_embeddings(&self, embeddings: &[RealHV]) -> RealHV {
+    fn fuse_embeddings(&self, embeddings: &[ContinuousHV]) -> ContinuousHV {
         if embeddings.is_empty() {
-            return RealHV::random(self.config.dimension);
+            return ContinuousHV::random(self.config.dimension);
         }
         if embeddings.len() == 1 {
             return embeddings[0].clone();

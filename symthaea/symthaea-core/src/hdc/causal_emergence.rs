@@ -36,7 +36,7 @@
 //! println!("Is emergent: {}", result.is_emergent);
 //! ```
 
-use crate::hdc::real_hv::RealHV;
+use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
 use crate::hdc::phi_real::RealPhiCalculator;
 use serde::{Deserialize, Serialize};
@@ -106,7 +106,7 @@ pub struct Partition {
     pub node_indices: Vec<usize>,
 
     /// Node representations
-    pub representations: Vec<RealHV>,
+    pub representations: Vec<ContinuousHV>,
 
     /// Φ value for this partition
     pub phi: f64,
@@ -224,7 +224,7 @@ impl CausalEmergenceDetector {
 
         for community in communities {
             if community.len() >= self.config.min_partition_size {
-                let representations: Vec<RealHV> = community.iter()
+                let representations: Vec<ContinuousHV> = community.iter()
                     .map(|&i| topology.node_representations[i].clone())
                     .collect();
 
@@ -335,7 +335,7 @@ impl CausalEmergenceDetector {
             };
 
             let node_indices: Vec<usize> = (start..end).collect();
-            let representations: Vec<RealHV> = node_indices.iter()
+            let representations: Vec<ContinuousHV> = node_indices.iter()
                 .map(|&i| topology.node_representations[i].clone())
                 .collect();
 
@@ -451,7 +451,7 @@ mod tests {
     use crate::hdc::HDC_DIMENSION;
 
     fn create_test_topology(n: usize) -> ConsciousnessTopology {
-        // Use the canonical ring topology generator with correct RealHV types
+        // Use the canonical ring topology generator with correct ContinuousHV types
         ConsciousnessTopology::ring(n, HDC_DIMENSION, 42)
     }
 

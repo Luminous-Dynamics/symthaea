@@ -176,7 +176,7 @@ impl<P: TemporalPredictor> PredictabilityAnalyzer<P> {
         PredictabilityMetrics {
             accuracy,
             predictable_bits,
-            error_entropy: error_entropy.max(0.0).min(1.0),
+            error_entropy: error_entropy.clamp(0.0, 1.0),
             sample_count: self.total_count,
             signal_type: SignalType::Unknown, // Would need to cast predictor to get this
         }

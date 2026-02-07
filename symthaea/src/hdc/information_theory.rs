@@ -20,13 +20,13 @@
 //!
 //! ## Implementation Strategy
 //!
-//! Both binary hypervectors ([`HV16`]) and real-valued hypervectors ([`RealHV`])
+//! Both binary hypervectors ([`HV16`]) and real-valued hypervectors ([`ContinuousHV`])
 //! are converted to discrete probability distributions before applying
 //! information-theoretic formulae:
 //!
 //! - **HV16**: Windowed bit-pattern histograms (e.g., 4-bit windows over the
 //!   16,384-bit vector yield pattern frequencies across 16 possible symbols).
-//! - **RealHV**: Uniform histogram binning over the value range, with
+//! - **ContinuousHV**: Uniform histogram binning over the value range, with
 //!   configurable bin count.
 //!
 //! All quantities are in **bits** (log base 2).
@@ -35,7 +35,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 use crate::hdc::HV16;
-use crate::hdc::RealHV;
+use crate::hdc::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Configuration
@@ -277,13 +277,13 @@ pub fn hv16_joint_distribution(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// RealHV → Distribution Conversion
+// ContinuousHV → Distribution Conversion
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Convert a real-valued hypervector to a discrete distribution via histogram
 /// binning. Values are placed into `num_bins` equal-width bins spanning
 /// [min_val, max_val] of the vector.
-pub fn real_hv_to_distribution(hv: &RealHV, config: &InformationTheoryConfig) -> Vec<f64> {
+pub fn real_hv_to_distribution(hv: &ContinuousHV, config: &InformationTheoryConfig) -> Vec<f64> {
     let num_bins = config.num_bins.max(2);
     let values = &hv.values;
 
@@ -316,8 +316,8 @@ pub fn real_hv_to_distribution(hv: &RealHV, config: &InformationTheoryConfig) ->
 /// Build a joint distribution from two real-valued hypervectors via 2D
 /// histogram binning.
 pub fn real_hv_joint_distribution(
-    a: &RealHV,
-    b: &RealHV,
+    a: &ContinuousHV,
+    b: &ContinuousHV,
     config: &InformationTheoryConfig,
 ) -> (Vec<f64>, usize) {
     let num_bins = config.num_bins.max(2);
@@ -371,7 +371,7 @@ pub fn entropy_hv16(hv: &HV16, config: &InformationTheoryConfig) -> f64 {
 }
 
 /// Compute Shannon entropy of a real-valued hypervector's histogram distribution.
-pub fn entropy_real_hv(hv: &RealHV, config: &InformationTheoryConfig) -> f64 {
+pub fn entropy_real_hv(hv: &ContinuousHV, config: &InformationTheoryConfig) -> f64 {
     let dist = real_hv_to_distribution(hv, config);
     shannon_entropy(&dist, config.epsilon)
 }
@@ -383,7 +383,7 @@ pub fn mi_hv16(a: &HV16, b: &HV16, config: &InformationTheoryConfig) -> f64 {
 }
 
 /// Compute mutual information between two real-valued hypervectors.
-pub fn mi_real_hv(a: &RealHV, b: &RealHV, config: &InformationTheoryConfig) -> f64 {
+pub fn mi_real_hv(a: &ContinuousHV, b: &ContinuousHV, config: &InformationTheoryConfig) -> f64 {
     let (joint, ny) = real_hv_joint_distribution(a, b, config);
     mutual_information(&joint, ny, config.epsilon)
 }
@@ -395,7 +395,7 @@ pub fn nmi_hv16(a: &HV16, b: &HV16, config: &InformationTheoryConfig) -> f64 {
 }
 
 /// Compute normalised mutual information between two real-valued hypervectors.
-pub fn nmi_real_hv(a: &RealHV, b: &RealHV, config: &InformationTheoryConfig) -> f64 {
+pub fn nmi_real_hv(a: &ContinuousHV, b: &ContinuousHV, config: &InformationTheoryConfig) -> f64 {
     let (joint, ny) = real_hv_joint_distribution(a, b, config);
     normalised_mutual_information(&joint, ny, config.epsilon)
 }
@@ -412,7 +412,7 @@ pub fn nmi_real_hv(a: &RealHV, b: &RealHV, config: &InformationTheoryConfig) -> 
 ///   TE(X→Y) = H(Y_t | Y_{t-1}^k) - H(Y_t | Y_{t-1}^k, X_{t-1}^l)
 ///
 /// Internally, each HDC state is projected to a scalar summary (density for
-/// HV16, mean for RealHV) and then discretised into histogram bins. This makes
+/// HV16, mean for ContinuousHV) and then discretised into histogram bins. This makes
 /// estimation tractable even for 16,384-dimensional vectors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferEntropyEstimator {
@@ -454,7 +454,7 @@ impl TransferEntropyEstimator {
     }
 
     /// Record a new pair of real-valued hypervector observations at time t.
-    pub fn observe_real_hv(&mut self, x: &RealHV, y: &RealHV) {
+    pub fn observe_real_hv(&mut self, x: &ContinuousHV, y: &ContinuousHV) {
         let sx = mean_f32(&x.values);
         let sy = mean_f32(&y.values);
         self.push_scalars(sx, sy);
@@ -939,58 +939,58 @@ mod tests {
         );
     }
 
-    // ── RealHV Distribution Tests ───────────────────────────────────────────
+    // ── ContinuousHV Distribution Tests ───────────────────────────────────────────
 
     #[test]
     fn real_hv_uniform_has_high_entropy() {
         let config = InformationTheoryConfig { num_bins: 16, ..Default::default() };
-        // Construct a "uniform-like" RealHV by spanning [-1, 1] evenly
+        // Construct a "uniform-like" ContinuousHV by spanning [-1, 1] evenly
         let dim = 1024;
         let values: Vec<f32> = (0..dim)
             .map(|i| -1.0 + 2.0 * (i as f32) / (dim as f32 - 1.0))
             .collect();
-        let hv = RealHV::from_values(values);
+        let hv = ContinuousHV::from_values(values);
         let h = entropy_real_hv(&hv, &config);
         let max_h = (16.0_f64).log2(); // 4 bits
         assert!(
             h > max_h * 0.9,
-            "Uniform-like RealHV should have near-max entropy: {h:.4} vs max {max_h:.4}"
+            "Uniform-like ContinuousHV should have near-max entropy: {h:.4} vs max {max_h:.4}"
         );
     }
 
     #[test]
     fn real_hv_constant_has_zero_entropy() {
         let config = InformationTheoryConfig::default();
-        let hv = RealHV::from_values(vec![0.5; 512]);
+        let hv = ContinuousHV::from_values(vec![0.5; 512]);
         let h = entropy_real_hv(&hv, &config);
         assert!(
             h.abs() < 1e-9,
-            "Constant RealHV should have zero entropy, got {h:.6}"
+            "Constant ContinuousHV should have zero entropy, got {h:.6}"
         );
     }
 
     #[test]
     fn real_hv_mi_identical_equals_entropy() {
         let config = InformationTheoryConfig { num_bins: 16, ..Default::default() };
-        let hv = RealHV::random(512, 42);
+        let hv = ContinuousHV::random(512, 42);
         let h = entropy_real_hv(&hv, &config);
         let mi = mi_real_hv(&hv, &hv, &config);
         assert!(
             (mi - h).abs() < 1e-6,
-            "MI(X,X) should equal H(X) for RealHV: {mi:.6} vs {h:.6}"
+            "MI(X,X) should equal H(X) for ContinuousHV: {mi:.6} vs {h:.6}"
         );
     }
 
     #[test]
     fn real_hv_mi_symmetry() {
         let config = InformationTheoryConfig { num_bins: 16, ..Default::default() };
-        let a = RealHV::random(256, 10);
-        let b = RealHV::random(256, 20);
+        let a = ContinuousHV::random(256, 10);
+        let b = ContinuousHV::random(256, 20);
         let mi_ab = mi_real_hv(&a, &b, &config);
         let mi_ba = mi_real_hv(&b, &a, &config);
         assert!(
             (mi_ab - mi_ba).abs() < 1e-9,
-            "MI should be symmetric for RealHV: {mi_ab:.6} vs {mi_ba:.6}"
+            "MI should be symmetric for ContinuousHV: {mi_ab:.6} vs {mi_ba:.6}"
         );
     }
 

@@ -26,7 +26,7 @@
 //!                            Direction decoder + Φ confidence
 //! ```
 
-use symthaea_core::hdc::{RealHV, HDC_DIMENSION};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 use crate::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig, CantorLtcNode};
 use super::{CausalDirection, CausalDiscoveryResult};
 
@@ -49,7 +49,7 @@ pub struct CausalFeatureEncoder {
     projection_forward: Vec<f32>,
     projection_backward: Vec<f32>,
     /// Position encodings for quantile bins
-    quantile_positions: Vec<RealHV>,
+    quantile_positions: Vec<ContinuousHV>,
     /// Feature importance weights (learned during training)
     feature_weights: Vec<f32>,
 }
@@ -69,8 +69,8 @@ impl CausalFeatureEncoder {
         }
 
         // Quantile position encodings (10 bins)
-        let quantile_positions: Vec<RealHV> = (0..10)
-            .map(|i| RealHV::random(dim, (i * 12345) as u64))
+        let quantile_positions: Vec<ContinuousHV> = (0..10)
+            .map(|i| ContinuousHV::random(dim, (i * 12345) as u64))
             .collect();
 
         // Initial feature weights (uniform)
@@ -340,7 +340,7 @@ impl CausalFeatureEncoder {
     }
 
     /// Encode features as a hypervector
-    pub fn encode(&self, x: &[f64], y: &[f64]) -> RealHV {
+    pub fn encode(&self, x: &[f64], y: &[f64]) -> ContinuousHV {
         let features = self.extract_features(x, y);
 
         // Project features to hypervector space
@@ -366,11 +366,11 @@ impl CausalFeatureEncoder {
             }
         }
 
-        RealHV::from_values(hv_values)
+        ContinuousHV::from_values(hv_values)
     }
 
     /// Encode with direction hint (for creating direction-specific representations)
-    pub fn encode_with_direction(&self, x: &[f64], y: &[f64], forward: bool) -> RealHV {
+    pub fn encode_with_direction(&self, x: &[f64], y: &[f64], forward: bool) -> ContinuousHV {
         let features = self.extract_features(x, y);
         let proj = if forward { &self.projection_forward } else { &self.projection_backward };
 
@@ -395,7 +395,7 @@ impl CausalFeatureEncoder {
             }
         }
 
-        RealHV::from_values(hv_values)
+        ContinuousHV::from_values(hv_values)
     }
 }
 
@@ -414,8 +414,8 @@ pub struct CausalCantorNetwork {
     /// Feature encoder
     encoder: CausalFeatureEncoder,
     /// Direction prototypes (learned representations of X→Y and Y→X)
-    forward_prototype: RealHV,
-    backward_prototype: RealHV,
+    forward_prototype: ContinuousHV,
+    backward_prototype: ContinuousHV,
     /// Decision threshold (similarity required for confident prediction)
     decision_threshold: f32,
     /// Number of integration steps
@@ -429,7 +429,7 @@ pub struct CausalCantorNetwork {
 /// A training example for the causal network
 #[allow(dead_code)] // Fields reserved for training pipeline
 struct TrainingPair {
-    features: RealHV,
+    features: ContinuousHV,
     direction: CausalDirection,
 }
 
@@ -449,8 +449,8 @@ impl CausalCantorNetwork {
         let encoder = CausalFeatureEncoder::new(HDC_DIMENSION);
 
         // Initialize prototypes with random vectors
-        let forward_prototype = RealHV::random(HDC_DIMENSION, 42);
-        let backward_prototype = RealHV::random(HDC_DIMENSION, 43);
+        let forward_prototype = ContinuousHV::random(HDC_DIMENSION, 42);
+        let backward_prototype = ContinuousHV::random(HDC_DIMENSION, 43);
 
         Self {
             network,
@@ -481,8 +481,8 @@ impl CausalCantorNetwork {
         Self {
             network,
             encoder,
-            forward_prototype: RealHV::random(HDC_DIMENSION, 42),
-            backward_prototype: RealHV::random(HDC_DIMENSION, 43),
+            forward_prototype: ContinuousHV::random(HDC_DIMENSION, 42),
+            backward_prototype: ContinuousHV::random(HDC_DIMENSION, 43),
             decision_threshold: 0.1,
             integration_steps,
             dt: 1.0,
@@ -512,13 +512,13 @@ impl CausalCantorNetwork {
 
         // Update prototypes as centroid of examples
         if !forward_examples.is_empty() {
-            let bundle_refs: Vec<RealHV> = forward_examples;
-            self.forward_prototype = RealHV::bundle(&bundle_refs);
+            let bundle_refs: Vec<ContinuousHV> = forward_examples;
+            self.forward_prototype = ContinuousHV::bundle_owned(&bundle_refs);
         }
 
         if !backward_examples.is_empty() {
-            let bundle_refs: Vec<RealHV> = backward_examples;
-            self.backward_prototype = RealHV::bundle(&bundle_refs);
+            let bundle_refs: Vec<ContinuousHV> = backward_examples;
+            self.backward_prototype = ContinuousHV::bundle_owned(&bundle_refs);
         }
 
         // Inject training signals into the network
@@ -641,7 +641,7 @@ impl Default for CausalCantorNetwork {
 fn reset_node_states_recursive(node: &mut CantorLtcNode) {
     // Reset to small random state
     let seed = (node.level * 1000 + node.index) as u64;
-    node.state = RealHV::random(node.state.values.len(), seed).scale(0.1);
+    node.state = ContinuousHV::random(node.state.values.len(), seed).scale(0.1);
     node.history.clear();
 
     if let Some((ref mut left, ref mut right)) = node.children {

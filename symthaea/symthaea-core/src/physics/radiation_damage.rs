@@ -485,7 +485,7 @@ impl FusionReaction {
         // and solid angle effects
         let geometric_factor = 0.5;
 
-        (escape_prob * geometric_factor).max(0.001).min(1.0)
+        (escape_prob * geometric_factor).clamp(0.001, 1.0)
     }
 }
 

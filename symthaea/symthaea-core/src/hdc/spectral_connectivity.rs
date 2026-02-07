@@ -1,4 +1,4 @@
-//! Algebraic Connectivity (Spectral Graph Metric) for RealHV
+//! Algebraic Connectivity (Spectral Graph Metric) for ContinuousHV
 //!
 //! # Purpose
 //!
@@ -16,7 +16,7 @@
 //!
 //! # Algorithm
 //!
-//! 1. Compute pairwise cosine similarities between all RealHV components
+//! 1. Compute pairwise cosine similarities between all ContinuousHV components
 //! 2. Build weighted similarity matrix (adjacency matrix)
 //! 3. Construct normalized graph Laplacian: L = I - D^(-1/2) A D^(-1/2)
 //! 4. Compute eigenvalues using `nalgebra::SymmetricEigen` (QR algorithm)
@@ -48,14 +48,14 @@
 //!
 //! ```rust,ignore
 //! use symthaea::hdc::{
-//!     real_hv::RealHV,
+//!     ContinuousHV,
 //!     spectral_connectivity::ConnectivityCalculator,
 //! };
 //!
 //! let components = vec![
-//!     RealHV::random(RealHV::DEFAULT_DIM, 1),
-//!     RealHV::random(RealHV::DEFAULT_DIM, 2),
-//!     RealHV::random(RealHV::DEFAULT_DIM, 3),
+//!     ContinuousHV::random(ContinuousHV::DEFAULT_DIM, 1),
+//!     ContinuousHV::random(ContinuousHV::DEFAULT_DIM, 2),
+//!     ContinuousHV::random(ContinuousHV::DEFAULT_DIM, 3),
 //! ];
 //!
 //! let calculator = ConnectivityCalculator::new();
@@ -63,7 +63,7 @@
 //! println!("λ₂ = {:.4}", lambda2);
 //! ```
 
-use crate::hdc::real_hv::RealHV;
+use crate::hdc::unified_hv::ContinuousHV;
 use nalgebra::DMatrix;
 
 /// Spectral connectivity calculator using algebraic connectivity (λ₂)
@@ -106,10 +106,10 @@ impl ConnectivityCalculator {
         }
     }
 
-    /// Compute algebraic connectivity (λ₂) for a set of RealHV components
+    /// Compute algebraic connectivity (λ₂) for a set of ContinuousHV components
     ///
     /// # Arguments
-    /// * `components` - Vector of RealHV representations (nodes in graph topology)
+    /// * `components` - Vector of ContinuousHV representations (nodes in graph topology)
     ///
     /// # Returns
     /// λ₂ value normalized to range [0, 1], where:
@@ -118,7 +118,7 @@ impl ConnectivityCalculator {
     ///
     /// # Note
     /// This measures **spectral connectivity**, NOT IIT integrated information.
-    pub fn algebraic_connectivity(&self, components: &[RealHV]) -> f64 {
+    pub fn algebraic_connectivity(&self, components: &[ContinuousHV]) -> f64 {
         let n = components.len();
 
         if n < 2 {
@@ -133,9 +133,9 @@ impl ConnectivityCalculator {
 
         // Step 3: Normalize to [0, 1]
         // With normalized Laplacian, eigenvalues are bounded [0, 2]
-        let normalized = (lambda2 / self.max_connectivity).clamp(0.0, 1.0);
+        
 
-        normalized
+        (lambda2 / self.max_connectivity).clamp(0.0, 1.0)
     }
 
     /// Deprecated: Use `algebraic_connectivity()` instead
@@ -144,7 +144,7 @@ impl ConnectivityCalculator {
     /// in a future version. The name "compute" was misleading as it implied
     /// IIT Φ calculation, which this does NOT perform.
     #[deprecated(since = "0.5.0", note = "Use algebraic_connectivity() instead - this measures λ₂, NOT IIT Φ")]
-    pub fn compute(&self, components: &[RealHV]) -> f64 {
+    pub fn compute(&self, components: &[ContinuousHV]) -> f64 {
         self.algebraic_connectivity(components)
     }
 
@@ -155,7 +155,7 @@ impl ConnectivityCalculator {
     ///
     /// Optimization: Since similarity(i,j) = similarity(j,i), we only compute
     /// n(n-1)/2 similarities instead of n², reducing computation by ~50%.
-    pub fn build_similarity_matrix(&self, components: &[RealHV]) -> Vec<Vec<f64>> {
+    pub fn build_similarity_matrix(&self, components: &[ContinuousHV]) -> Vec<Vec<f64>> {
         let n = components.len();
         let mut matrix = vec![vec![0.0_f64; n]; n];
 
@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn test_single_component() {
         let calc = ConnectivityCalculator::new();
-        let components = vec![RealHV::random(256, 42)];
+        let components = vec![ContinuousHV::random(256, 42)];
         let lambda2 = calc.algebraic_connectivity(&components);
         assert_eq!(lambda2, 0.0, "Single component should have λ₂ = 0");
     }
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn test_two_identical_components() {
         let calc = ConnectivityCalculator::new();
-        let hv = RealHV::random(256, 42);
+        let hv = ContinuousHV::random(256, 42);
         let components = vec![hv.clone(), hv.clone()];
 
         let lambda2 = calc.algebraic_connectivity(&components);
@@ -301,9 +301,9 @@ mod tests {
         let calc = ConnectivityCalculator::new();
 
         let components = vec![
-            RealHV::basis(0, 256),
-            RealHV::basis(1, 256),
-            RealHV::basis(2, 256),
+            ContinuousHV::basis(0, 256),
+            ContinuousHV::basis(1, 256),
+            ContinuousHV::basis(2, 256),
         ];
 
         let lambda2 = calc.algebraic_connectivity(&components);
@@ -317,8 +317,8 @@ mod tests {
         let calc = ConnectivityCalculator::new();
 
         let components = vec![
-            RealHV::random(128, 1),
-            RealHV::random(128, 2),
+            ContinuousHV::random(128, 1),
+            ContinuousHV::random(128, 2),
         ];
 
         let matrix = calc.build_similarity_matrix(&components);
@@ -372,8 +372,8 @@ mod tests {
     fn test_backward_compatibility() {
         let calc: RealPhiCalculator = RealPhiCalculator::new();
         let components = vec![
-            RealHV::random(128, 1),
-            RealHV::random(128, 2),
+            ContinuousHV::random(128, 1),
+            ContinuousHV::random(128, 2),
         ];
 
         let result = calc.compute(&components);

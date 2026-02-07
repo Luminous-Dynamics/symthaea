@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::hdc::code_algebra::CodeAlgebra;
@@ -113,7 +113,7 @@ impl SelfAnalyzer {
     /// Higher score = more integrated (analogous to higher Phi).
     pub fn consciousness_map(&self) -> HashMap<PathBuf, f32> {
         let mut scores = HashMap::new();
-        let module_hvs: Vec<(&Path, &RealHV)> = self.memory.module_paths()
+        let module_hvs: Vec<(&Path, &ContinuousHV)> = self.memory.module_paths()
             .into_iter()
             .filter_map(|p| self.memory.module_hv(p).map(|hv| (p, hv)))
             .collect();

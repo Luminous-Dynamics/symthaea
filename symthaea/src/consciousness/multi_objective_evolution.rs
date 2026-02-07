@@ -83,7 +83,7 @@ impl PrimitiveWithProfile {
 
 /// Multi-objective evolution engine
 pub struct MultiObjectiveEvolution {
-    tier: PrimitiveTier,
+    _tier: PrimitiveTier,
     config: EvolutionConfig,
     population: Vec<PrimitiveWithProfile>,
     generation: usize,
@@ -92,7 +92,7 @@ pub struct MultiObjectiveEvolution {
 impl MultiObjectiveEvolution {
     pub fn new(config: EvolutionConfig) -> Result<Self> {
         Ok(Self {
-            tier: config.tier,
+            _tier: config.tier,
             config,
             population: Vec::new(),
             generation: 0,

@@ -49,7 +49,7 @@ use super::consciousness_streaming::{
 };
 use super::cross_modal_attention_router::CrossModalAttentionRouter;
 use super::causal_mind::CausalMind;
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH, Duration};
@@ -639,7 +639,7 @@ pub struct CausalHypothesis {
     /// Prior belief (0.0 to 1.0)
     pub prior: f64,
     /// HDC encoding of the relationship
-    pub hv_encoding: Option<HV16>,
+    pub hv_encoding: Option<BinaryHV>,
     /// Priority for dream exploration
     pub priority: f64,
 }
@@ -1096,7 +1096,7 @@ impl AdaptiveDreamScheduler {
 
         self.effectiveness_history
             .entry(dream_type)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(record);
 
         // Keep only last 50 records per type
@@ -1360,7 +1360,7 @@ mod tests {
             let state = EmotionalBlend {
                 name: "test".to_string(),
                 components: vec![],
-                encoding: HV16::random(i as u64),
+                encoding: BinaryHV::random(i as u64),
                 valence: 0.5 + i as f64 * 0.03,
                 arousal: 0.5,
                 coherence: 0.8,

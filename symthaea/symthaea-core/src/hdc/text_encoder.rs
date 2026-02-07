@@ -197,7 +197,7 @@ impl TextEncoder {
         for i in 512..dimension {
             let mut h = DefaultHasher::new();
             (base_hash, i).hash(&mut h);
-            result[i] = if h.finish() % 2 == 0 { 1 } else { -1 };
+            result[i] = if h.finish().is_multiple_of(2) { 1 } else { -1 };
         }
 
         result
@@ -300,7 +300,7 @@ impl TextEncoder {
     /// Encode text using primitive system when available
     ///
     /// This is the **recommended** encoding method when primitives are available.
-    /// It uses canonical HV16 encodings for recognized primitives (ZERO, ONE, CAUSE, etc.)
+    /// It uses canonical BinaryHV encodings for recognized primitives (ZERO, ONE, CAUSE, etc.)
     /// and falls back to n-gram encoding for unknown words.
     ///
     /// # Example
@@ -329,7 +329,7 @@ impl TextEncoder {
             // Try primitive first (canonical encoding)
             let word_vec = if let Some(prim) = primitives.get(&normalized) {
                 primitive_hits += 1;
-                // Convert HV16 (f32 bipolar) to i8 bipolar
+                // Convert BinaryHV (f32 bipolar) to i8 bipolar
                 let f32_vec = prim.encoding.to_bipolar();
                 f32_vec.iter().map(|&x| if x > 0.0 { 1i8 } else { -1i8 }).collect()
             } else {

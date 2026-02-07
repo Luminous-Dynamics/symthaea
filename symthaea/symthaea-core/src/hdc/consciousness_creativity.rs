@@ -74,7 +74,7 @@
 //! 4. **Creative Education**: Train creative thinking
 //! 5. **Art & Science**: Model creative process in both domains
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -135,7 +135,7 @@ pub struct Concept {
     /// Concept name
     pub name: String,
     /// HDC representation
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     /// Semantic domain (art, science, everyday, etc.)
     pub domain: String,
     /// Activation level in workspace
@@ -149,7 +149,7 @@ impl Concept {
     pub fn new(name: &str, domain: &str, seed: u64) -> Self {
         Self {
             name: name.to_string(),
-            encoding: HV16::random(seed),
+            encoding: BinaryHV::random(seed),
             domain: domain.to_string(),
             activation: 0.0,
             access_frequency: 1.0,
@@ -172,7 +172,7 @@ pub struct CreativeIdea {
     /// Source concepts that were combined
     pub sources: Vec<String>,
     /// Combined representation
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     /// How novel is this combination? (0-1)
     pub novelty: f64,
     /// How valuable/useful? (0-1, requires external evaluation)
@@ -418,7 +418,7 @@ impl ConsciousnessCreativity {
     }
 
     /// Compute novelty of a new encoding
-    fn compute_novelty(&self, encoding: &HV16) -> f64 {
+    fn compute_novelty(&self, encoding: &BinaryHV) -> f64 {
         if self.ideas.is_empty() {
             return 1.0; // First idea is maximally novel
         }
@@ -840,7 +840,7 @@ mod tests {
         let idea = CreativeIdea {
             id: "idea_0".to_string(),
             sources: vec!["a".to_string(), "b".to_string()],
-            encoding: HV16::random(42),
+            encoding: BinaryHV::random(42),
             novelty: 0.8,
             value: 0.0,
             surprise: 0.5,
@@ -864,7 +864,7 @@ mod tests {
         let mut idea = CreativeIdea {
             id: "test".to_string(),
             sources: vec![],
-            encoding: HV16::random(42),
+            encoding: BinaryHV::random(42),
             novelty: 0.8,
             value: 0.7,
             surprise: 0.6,
@@ -915,7 +915,7 @@ mod tests {
         let idea = CreativeIdea {
             id: "insight_idea".to_string(),
             sources: vec!["a".to_string(), "b".to_string()],
-            encoding: HV16::random(42),
+            encoding: BinaryHV::random(42),
             novelty: 0.9,
             value: 0.8,
             surprise: 0.95,

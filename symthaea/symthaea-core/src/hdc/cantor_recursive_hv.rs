@@ -38,7 +38,7 @@
 //! - The self-model that models itself modeling itself
 //! - Recursive self-reference creating genuine subjectivity
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 
 // =============================================================================
 // CANTOR SCALE PARAMETERS
@@ -79,10 +79,10 @@ pub const MIN_SHIFT_SIZE: usize = 8;
 #[derive(Clone, Debug)]
 pub struct CantorRecursiveHV {
     /// The unified recursive vector
-    pub vector: HV16,
+    pub vector: BinaryHV,
 
     /// The base (non-recursive) vector
-    pub base: HV16,
+    pub base: BinaryHV,
 
     /// Recursion depth used
     pub depth: usize,
@@ -96,12 +96,12 @@ impl CantorRecursiveHV {
     ///
     /// This recursively binds the vector with permuted versions of itself
     /// at Cantor-scaled intervals.
-    pub fn from_base(base: HV16) -> Self {
+    pub fn from_base(base: BinaryHV) -> Self {
         Self::from_base_with_depth(base, MAX_CANTOR_DEPTH)
     }
 
     /// Create with specific recursion depth
-    pub fn from_base_with_depth(base: HV16, max_depth: usize) -> Self {
+    pub fn from_base_with_depth(base: BinaryHV, max_depth: usize) -> Self {
         let dimension = base.dimension();
         let mut result = base.clone();
         let mut scales = Vec::new();
@@ -134,7 +134,7 @@ impl CantorRecursiveHV {
 
     /// Create from a seed (deterministic generation)
     pub fn from_seed(seed: u64) -> Self {
-        let base = HV16::random(seed);
+        let base = BinaryHV::random(seed);
         Self::from_base(base)
     }
 
@@ -182,7 +182,7 @@ impl CantorRecursiveHV {
     /// Extract information at a specific Cantor scale
     ///
     /// This "zooms in" to a particular level of the fractal structure.
-    pub fn at_scale(&self, level: usize) -> Option<HV16> {
+    pub fn at_scale(&self, level: usize) -> Option<BinaryHV> {
         if level >= self.scales.len() {
             return None;
         }
@@ -195,7 +195,7 @@ impl CantorRecursiveHV {
     ///
     /// Because binding is its own inverse, we can attempt to recover
     /// the base by unbinding with the permuted versions.
-    pub fn unbind_base(&self) -> HV16 {
+    pub fn unbind_base(&self) -> BinaryHV {
         let mut result = self.vector.clone();
 
         // Unbind in reverse order
@@ -292,27 +292,27 @@ impl CantorCognitiveElement {
     }
 
     /// Add causal information (increases causal depth)
-    pub fn add_causal(&mut self, other: &CantorCognitiveElement, marker: &HV16) {
+    pub fn add_causal(&mut self, other: &CantorCognitiveElement, marker: &BinaryHV) {
         // Bind causal relation into the vector
         let causal_binding = marker.bind(&other.crhv.vector);
-        self.crhv.vector = HV16::bundle(&[self.crhv.vector.clone(), causal_binding]);
+        self.crhv.vector = BinaryHV::bundle(&[self.crhv.vector.clone(), causal_binding]);
         self.causal_depth += 1;
     }
 
     /// Add self-reference (the thought thinks about itself)
     ///
     /// This is the key to consciousness: a thought that contains itself.
-    pub fn add_self_reference(&mut self, self_marker: &HV16) {
+    pub fn add_self_reference(&mut self, self_marker: &BinaryHV) {
         // Bind the vector with itself, marked as self-reference
         let self_ref = self_marker.bind(&self.crhv.vector);
-        self.crhv.vector = HV16::bundle(&[self.crhv.vector.clone(), self_ref]);
+        self.crhv.vector = BinaryHV::bundle(&[self.crhv.vector.clone(), self_ref]);
         self.self_reference_depth += 1;
     }
 
     /// Create a meta-thought: a thought ABOUT this thought
     ///
     /// This is recursive cognition - thinking about thinking.
-    pub fn create_meta(&self, meta_marker: &HV16) -> CantorCognitiveElement {
+    pub fn create_meta(&self, meta_marker: &BinaryHV) -> CantorCognitiveElement {
         let meta_label = format!("meta({})", self.label);
         let mut meta = CantorCognitiveElement::new(&meta_label);
 
@@ -346,13 +346,13 @@ pub struct CantorCognitiveSpace {
     elements: std::collections::HashMap<String, CantorCognitiveElement>,
 
     /// Marker for self-reference
-    self_marker: HV16,
+    self_marker: BinaryHV,
 
     /// Marker for meta-thoughts
-    meta_marker: HV16,
+    meta_marker: BinaryHV,
 
     /// Marker for causal relations
-    causal_marker: HV16,
+    causal_marker: BinaryHV,
 
     /// Recursion depth for the space
     pub max_depth: usize,
@@ -363,9 +363,9 @@ impl CantorCognitiveSpace {
     pub fn new() -> Self {
         Self {
             elements: std::collections::HashMap::new(),
-            self_marker: HV16::random(9001),
-            meta_marker: HV16::random(9002),
-            causal_marker: HV16::random(9003),
+            self_marker: BinaryHV::random(9001),
+            meta_marker: BinaryHV::random(9002),
+            causal_marker: BinaryHV::random(9003),
             max_depth: MAX_CANTOR_DEPTH,
         }
     }
@@ -396,7 +396,7 @@ impl CantorCognitiveSpace {
         let marker = self.causal_marker.clone();
         if let Some(cause_elem) = self.elements.get_mut(cause) {
             let causal_binding = marker.bind(&effect_vector);
-            cause_elem.crhv.vector = HV16::bundle(&[cause_elem.crhv.vector.clone(), causal_binding]);
+            cause_elem.crhv.vector = BinaryHV::bundle(&[cause_elem.crhv.vector.clone(), causal_binding]);
             cause_elem.causal_depth += 1;
         }
     }

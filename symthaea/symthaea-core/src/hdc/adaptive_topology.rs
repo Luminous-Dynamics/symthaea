@@ -20,7 +20,7 @@
 //! The system maintains a pool of potential bridge connections that can be
 //! dynamically activated/deactivated based on the current cognitive mode.
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::spectral_connectivity::ConnectivityCalculator;
 use super::process_topology::{ProcessTopologyOrganizer, TopologyMetrics};
 use std::collections::HashSet;
@@ -175,7 +175,7 @@ impl CognitiveMode {
         }
 
         // Late night (sleep time) → Dreaming
-        if time_of_day_normalized < 0.1 || time_of_day_normalized > 0.9 {
+        if !(0.1..=0.9).contains(&time_of_day_normalized) {
             return CognitiveMode::Dreaming;
         }
 
@@ -284,12 +284,11 @@ impl AdaptiveTopology {
         // Create potential bridges between all cross-module pairs not already connected
         for (i, pi) in processes.iter() {
             for (j, pj) in processes.iter() {
-                if i < j && pi.module != pj.module {
-                    if !existing_edges.contains(&(*i, *j)) {
+                if i < j && pi.module != pj.module
+                    && !existing_edges.contains(&(*i, *j)) {
                         let bridge = PotentialBridge::new(*i, *j, pi.module, pj.module);
                         bridge_pool.push(bridge);
                     }
-                }
             }
         }
 
@@ -440,11 +439,10 @@ impl AdaptiveTopology {
                     if rand_f64(idx as u64) < self.learning_rate {
                         self.active_bridges.insert(idx);
                     }
-                } else if bridge.phi_contribution < -0.01 && self.active_bridges.contains(&idx) {
-                    if rand_f64(idx as u64 + 1000) < self.learning_rate {
+                } else if bridge.phi_contribution < -0.01 && self.active_bridges.contains(&idx)
+                    && rand_f64(idx as u64 + 1000) < self.learning_rate {
                         self.active_bridges.remove(&idx);
                     }
-                }
             }
         }
     }
@@ -452,7 +450,7 @@ impl AdaptiveTopology {
     /// Compute current Φ considering active bridges
     pub fn compute_phi(&self) -> f64 {
         // Get all process states
-        let representations: Vec<RealHV> = self.organizer
+        let representations: Vec<ContinuousHV> = self.organizer
             .processes()
             .values()
             .map(|p| p.state.clone())
@@ -506,8 +504,8 @@ impl AdaptiveTopology {
         let sum_xy: f64 = recent.iter().enumerate().map(|(i, &y)| i as f64 * y).sum();
         let sum_xx: f64 = (0..recent.len()).map(|i| (i * i) as f64).sum();
 
-        let slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x);
-        slope
+        
+        (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x)
     }
 
     /// Get the underlying organizer
@@ -521,7 +519,7 @@ impl AdaptiveTopology {
     }
 
     /// Activate a module in the underlying organizer
-    pub fn activate_module(&mut self, module: usize, input: &RealHV) {
+    pub fn activate_module(&mut self, module: usize, input: &ContinuousHV) {
         self.organizer.activate_module(module, input);
     }
 

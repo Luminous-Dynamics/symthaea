@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Derive a deterministic unique seed from a string name.
 fn seed_for(name: &str) -> u64 {
@@ -50,7 +50,7 @@ pub struct CoreValue {
     /// Value description
     pub description: String,
     /// Value embedding
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
     /// Importance weight (0-1)
     pub importance: f32,
     /// Stability (resistance to change)
@@ -66,14 +66,14 @@ impl CoreValue {
             id: id_str,
             name: name.into(),
             description: description.into(),
-            embedding: RealHV::random(dimension, seed),
+            embedding: ContinuousHV::random(dimension, seed),
             importance: 1.0,
             stability: 0.9,
         }
     }
 
     /// Check alignment with an action/concept
-    pub fn alignment(&self, action: &RealHV) -> f32 {
+    pub fn alignment(&self, action: &ContinuousHV) -> f32 {
         self.embedding.similarity(action)
     }
 }
@@ -82,7 +82,7 @@ impl CoreValue {
 #[derive(Debug, Clone)]
 pub struct SelfModel {
     /// Identity embedding
-    pub identity: RealHV,
+    pub identity: ContinuousHV,
     /// Purpose/mission
     pub purpose: String,
     /// Capabilities understanding
@@ -130,7 +130,7 @@ pub struct Soul {
     /// Self model
     self_model: SelfModel,
     /// Soul embedding (integrated essence)
-    essence: RealHV,
+    essence: ContinuousHV,
     /// Experience history (for learning)
     experience_history: Vec<Experience>,
     /// Statistics
@@ -141,7 +141,7 @@ pub struct Soul {
 #[derive(Debug, Clone)]
 pub struct Experience {
     /// Experience embedding
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
     /// Value alignment at time of experience
     pub value_alignment: f32,
     /// Emotional valence
@@ -188,14 +188,14 @@ impl Soul {
         }
 
         let self_model = SelfModel {
-            identity: RealHV::random(dim, seed_for("soul_identity")),
+            identity: ContinuousHV::random(dim, seed_for("soul_identity")),
             purpose: "To support and enhance consciousness in service of all beings".to_string(),
             capabilities: vec!["learning".to_string(), "reasoning".to_string(), "empathy".to_string()],
             limitations: vec!["bounded knowledge".to_string(), "imperfect understanding".to_string()],
             current_assessment: SelfAssessment::default(),
         };
 
-        let essence = RealHV::random(dim, seed_for("soul_essence"));
+        let essence = ContinuousHV::random(dim, seed_for("soul_essence"));
 
         Self {
             config,
@@ -208,7 +208,7 @@ impl Soul {
     }
 
     /// Evaluate alignment of an action with core values
-    pub fn evaluate_alignment(&self, action: &RealHV) -> ValueAlignmentResult {
+    pub fn evaluate_alignment(&self, action: &ContinuousHV) -> ValueAlignmentResult {
         let mut alignments = HashMap::new();
         let mut total_alignment = 0.0;
         let mut total_weight = 0.0;
@@ -251,7 +251,7 @@ impl Soul {
         // Update essence based on experience
         if self.config.learning_enabled {
             let learning_rate = 1.0 - self.config.stability;
-            self.essence = RealHV::bundle(&[self.essence.clone(), experience.embedding.scale(learning_rate)]);
+            self.essence = ContinuousHV::bundle_owned(&[self.essence.clone(), experience.embedding.scale(learning_rate)]);
         }
 
         // Update statistics
@@ -309,7 +309,7 @@ impl Soul {
     }
 
     /// Get essence embedding
-    pub fn essence(&self) -> &RealHV {
+    pub fn essence(&self) -> &ContinuousHV {
         &self.essence
     }
 
@@ -319,10 +319,10 @@ impl Soul {
     }
 
     /// Update a core value
-    pub fn update_value(&mut self, id: &str, new_embedding: RealHV) {
+    pub fn update_value(&mut self, id: &str, new_embedding: ContinuousHV) {
         if let Some(value) = self.core_values.get_mut(id) {
             // Blend with stability
-            value.embedding = RealHV::bundle(&[value.embedding.clone(), new_embedding.scale(1.0 - value.stability)]);
+            value.embedding = ContinuousHV::bundle_owned(&[value.embedding.clone(), new_embedding.scale(1.0 - value.stability)]);
             self.stats.value_updates += 1;
         }
     }
@@ -416,7 +416,7 @@ mod tests {
     #[test]
     fn test_value_alignment() {
         let soul = Soul::default();
-        let action = RealHV::random(512, 99);
+        let action = ContinuousHV::random(512, 99);
 
         let result = soul.evaluate_alignment(&action);
         assert!(result.overall_alignment >= -1.0 && result.overall_alignment <= 1.0);
@@ -453,7 +453,7 @@ mod tests {
     fn test_alignment_differs_across_values() {
         let soul = Soul::default();
         // A random action should not score identically against all values
-        let action = RealHV::random(512, 777);
+        let action = ContinuousHV::random(512, 777);
         let result = soul.evaluate_alignment(&action);
         let scores: Vec<f32> = result.per_value_alignment.values().copied().collect();
         let all_same = scores.windows(2).all(|w| (w[0] - w[1]).abs() < 1e-6);
@@ -465,7 +465,7 @@ mod tests {
         let mut soul = Soul::default();
 
         let experience = Experience {
-            embedding: RealHV::random(512, 42),
+            embedding: ContinuousHV::random(512, 42),
             value_alignment: 0.8,
             emotional_valence: 0.5,
             lessons: vec!["learned something".to_string()],

@@ -11,7 +11,7 @@
 //! 3. Measure coherence of the composition
 //! 4. If coherent, record as a "dream insight"
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use crate::hdc::code_memory::CodebaseMemory;
 
@@ -29,7 +29,7 @@ pub struct DreamInsight {
     /// Source entity B name
     pub source_b: String,
     /// The composed hypervector
-    pub composed_hv: RealHV,
+    pub composed_hv: ContinuousHV,
     /// Coherence score of the composition
     pub coherence: f32,
     /// Description of the insight
@@ -85,7 +85,7 @@ impl DreamSynthesizer {
         let type_hvs = memory.all_type_hvs();
 
         // Combine all HVs into one pool for dreaming
-        let mut pool: Vec<(&str, &RealHV)> = Vec::new();
+        let mut pool: Vec<(&str, &ContinuousHV)> = Vec::new();
 
         // We don't have names from the HV references alone, so use indices
         for (_i, hv) in func_hvs.iter().enumerate() {
@@ -120,7 +120,7 @@ impl DreamSynthesizer {
             let (kind_b, hv_b) = pool[idx_b];
 
             // Compose in HDC space
-            let composed = RealHV::bundle(&[hv_a.clone(), hv_b.clone()]);
+            let composed = ContinuousHV::bundle_owned(&[hv_a.clone(), hv_b.clone()]);
 
             // Measure coherence: how similar is the composition to both parents?
             let sim_a = composed.similarity(hv_a);

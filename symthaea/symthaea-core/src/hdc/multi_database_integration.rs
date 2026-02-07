@@ -62,7 +62,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::hdc::HV16;
+use crate::hdc::BinaryHV;
 
 // ============================================================================
 // Error Types
@@ -101,7 +101,7 @@ pub type DatabaseResult<T> = Result<T, DatabaseError>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DatabaseRole {
     /// Qdrant: Sensory Cortex - ultra-fast vector similarity search
-    /// Computational need: <10ms vector search for 16,384-bit HV16
+    /// Computational need: <10ms vector search for 16,384-bit BinaryHV
     /// Access pattern: High-frequency reads (100s/sec), moderate writes
     SensoryCortex,
 
@@ -143,7 +143,7 @@ impl DatabaseRole {
     /// Primary computational capability
     pub fn primary_capability(&self) -> &str {
         match self {
-            DatabaseRole::SensoryCortex => "Ultra-fast Hamming distance search (2048-bit HV16)",
+            DatabaseRole::SensoryCortex => "Ultra-fast Hamming distance search (2048-bit BinaryHV)",
             DatabaseRole::PrefrontalCortex => "Recursive Datalog for meta-consciousness and causal reasoning",
             DatabaseRole::LongTermMemory => "Massive local-first storage for multimodal life records",
             DatabaseRole::EpistemicAuditor => "Statistical analysis of knowledge quality (K-Index, Φ metrics)",
@@ -189,13 +189,13 @@ impl ImprovementMapping {
     /// Get all mappings for the 29 improvements
     pub fn all_mappings() -> Vec<Self> {
         vec![
-            // #1: Binary Hypervector (HV16) Foundation
+            // #1: Binary Hypervector (BinaryHV) Foundation
             Self {
                 improvement_number: 1,
-                improvement_name: "Binary Hypervector (HV16)".to_string(),
+                improvement_name: "Binary Hypervector (BinaryHV)".to_string(),
                 primary_database: DatabaseRole::SensoryCortex,
                 secondary_databases: vec![DatabaseRole::LongTermMemory],
-                rationale: "Qdrant stores HV16 vectors for fast similarity. LanceDB for persistent vector storage.".to_string(),
+                rationale: "Qdrant stores BinaryHV vectors for fast similarity. LanceDB for persistent vector storage.".to_string(),
             },
 
             // #2: Integrated Information (Φ)
@@ -477,7 +477,7 @@ impl ImprovementMapping {
 pub struct QdrantConfig {
     pub url: String,
     pub collection_name: String,
-    pub vector_dim: usize,           // 2048 for HV16
+    pub vector_dim: usize,           // 2048 for BinaryHV
     pub distance_metric: String,     // "Cosine" or "Dot"
     pub shard_count: usize,          // For scaling
 }
@@ -487,7 +487,7 @@ impl QdrantConfig {
         Self {
             url: "http://localhost:6333".to_string(),
             collection_name: "symthaea_sensory".to_string(),
-            vector_dim: 2048,  // HV16::DIM
+            vector_dim: 2048,  // BinaryHV::DIM
             distance_metric: "Cosine".to_string(),
             shard_count: 4,
         }
@@ -517,7 +517,7 @@ impl CozoDbConfig {
 pub struct LanceDbConfig {
     pub data_dir: String,
     pub table_name: String,
-    pub vector_dim: usize,           // 2048 for HV16
+    pub vector_dim: usize,           // 2048 for BinaryHV
     pub enable_multimodal: bool,     // Images, audio, text
 }
 
@@ -856,7 +856,7 @@ impl QdrantClientWrapper {
 
     /// Search for similar vectors (episodic memory retrieval)
     #[cfg(feature = "qdrant")]
-    pub async fn search_similar(&self, query: &HV16, limit: usize) -> DatabaseResult<Vec<(HV16, f32)>> {
+    pub async fn search_similar(&self, query: &BinaryHV, limit: usize) -> DatabaseResult<Vec<(BinaryHV, f32)>> {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("Qdrant".to_string()));
         }
@@ -865,13 +865,13 @@ impl QdrantClientWrapper {
     }
 
     #[cfg(not(feature = "qdrant"))]
-    pub async fn search_similar(&self, _query: &HV16, _limit: usize) -> DatabaseResult<Vec<(HV16, f32)>> {
+    pub async fn search_similar(&self, _query: &BinaryHV, _limit: usize) -> DatabaseResult<Vec<(BinaryHV, f32)>> {
         Err(DatabaseError::FeatureNotEnabled("qdrant".to_string()))
     }
 
     /// Store a vector in episodic memory
     #[cfg(feature = "qdrant")]
-    pub async fn store(&self, id: &str, vector: &HV16, metadata: HashMap<String, String>) -> DatabaseResult<()> {
+    pub async fn store(&self, id: &str, vector: &BinaryHV, metadata: HashMap<String, String>) -> DatabaseResult<()> {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("Qdrant".to_string()));
         }
@@ -881,7 +881,7 @@ impl QdrantClientWrapper {
     }
 
     #[cfg(not(feature = "qdrant"))]
-    pub async fn store(&self, _id: &str, _vector: &HV16, _metadata: HashMap<String, String>) -> DatabaseResult<()> {
+    pub async fn store(&self, _id: &str, _vector: &BinaryHV, _metadata: HashMap<String, String>) -> DatabaseResult<()> {
         Err(DatabaseError::FeatureNotEnabled("qdrant".to_string()))
     }
 }
@@ -1051,7 +1051,7 @@ impl LanceClientWrapper {
 
     /// Store an experience (episodic memory)
     #[cfg(feature = "lance")]
-    pub async fn store_experience(&self, id: &str, vector: &HV16, experience_type: &str, content: &str) -> DatabaseResult<()> {
+    pub async fn store_experience(&self, id: &str, vector: &BinaryHV, experience_type: &str, content: &str) -> DatabaseResult<()> {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("LanceDB".to_string()));
         }
@@ -1060,13 +1060,13 @@ impl LanceClientWrapper {
     }
 
     #[cfg(not(feature = "lance"))]
-    pub async fn store_experience(&self, _id: &str, _vector: &HV16, _experience_type: &str, _content: &str) -> DatabaseResult<()> {
+    pub async fn store_experience(&self, _id: &str, _vector: &BinaryHV, _experience_type: &str, _content: &str) -> DatabaseResult<()> {
         Err(DatabaseError::FeatureNotEnabled("lance".to_string()))
     }
 
     /// Retrieve experiences by similarity
     #[cfg(feature = "lance")]
-    pub async fn retrieve_experiences(&self, query: &HV16, limit: usize) -> DatabaseResult<Vec<(String, HV16, f32)>> {
+    pub async fn retrieve_experiences(&self, query: &BinaryHV, limit: usize) -> DatabaseResult<Vec<(String, BinaryHV, f32)>> {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("LanceDB".to_string()));
         }
@@ -1075,7 +1075,7 @@ impl LanceClientWrapper {
     }
 
     #[cfg(not(feature = "lance"))]
-    pub async fn retrieve_experiences(&self, _query: &HV16, _limit: usize) -> DatabaseResult<Vec<(String, HV16, f32)>> {
+    pub async fn retrieve_experiences(&self, _query: &BinaryHV, _limit: usize) -> DatabaseResult<Vec<(String, BinaryHV, f32)>> {
         Err(DatabaseError::FeatureNotEnabled("lance".to_string()))
     }
 }
@@ -1343,13 +1343,13 @@ pub struct PhiStatistics {
 #[derive(Debug, Default)]
 pub struct InMemoryFallback {
     /// Vector storage (simulates Qdrant)
-    pub vectors: parking_lot::RwLock<HashMap<String, (HV16, HashMap<String, String>)>>,
+    pub vectors: parking_lot::RwLock<HashMap<String, (BinaryHV, HashMap<String, String>)>>,
 
     /// Relational facts (simulates CozoDB)
     pub facts: parking_lot::RwLock<HashMap<String, Vec<Vec<serde_json::Value>>>>,
 
     /// Experiences (simulates LanceDB)
-    pub experiences: parking_lot::RwLock<Vec<(String, HV16, String, String)>>,
+    pub experiences: parking_lot::RwLock<Vec<(String, BinaryHV, String, String)>>,
 
     /// Metrics (simulates DuckDB)
     pub metrics: parking_lot::RwLock<Vec<(f64, u64)>>,  // (phi, timestamp)
@@ -1361,12 +1361,12 @@ impl InMemoryFallback {
     }
 
     /// Store vector for similarity search
-    pub fn store_vector(&self, id: &str, vector: &HV16, metadata: HashMap<String, String>) {
+    pub fn store_vector(&self, id: &str, vector: &BinaryHV, metadata: HashMap<String, String>) {
         self.vectors.write().insert(id.to_string(), (*vector, metadata));
     }
 
     /// Search for similar vectors (brute force)
-    pub fn search_similar(&self, query: &HV16, limit: usize) -> Vec<(HV16, f32)> {
+    pub fn search_similar(&self, query: &BinaryHV, limit: usize) -> Vec<(BinaryHV, f32)> {
         let vectors = self.vectors.read();
         let mut results: Vec<_> = vectors
             .values()
@@ -1386,7 +1386,7 @@ impl InMemoryFallback {
     }
 
     /// Store an experience
-    pub fn store_experience(&self, id: &str, vector: &HV16, exp_type: &str, content: &str) {
+    pub fn store_experience(&self, id: &str, vector: &BinaryHV, exp_type: &str, content: &str) {
         self.experiences.write().push((
             id.to_string(),
             *vector,
@@ -1482,10 +1482,10 @@ pub struct ConsciousnessLoopState {
     pub current_phi: f64,
 
     /// Last perception vector
-    pub last_perception: Option<HV16>,
+    pub last_perception: Option<BinaryHV>,
 
     /// Active workspace content
-    pub workspace: Vec<HV16>,
+    pub workspace: Vec<BinaryHV>,
 
     /// Current consciousness level (0.0 - 1.0)
     pub consciousness_level: f64,
@@ -1589,7 +1589,7 @@ impl SymthaeaMind {
     // ========================================================================
 
     /// Store perception vector (with graceful degradation)
-    pub async fn store_perception(&self, id: &str, vector: &HV16, metadata: HashMap<String, String>) -> DatabaseResult<()> {
+    pub async fn store_perception(&self, id: &str, vector: &BinaryHV, metadata: HashMap<String, String>) -> DatabaseResult<()> {
         // Try Qdrant first
         #[cfg(feature = "qdrant")]
         {
@@ -1615,7 +1615,7 @@ impl SymthaeaMind {
     }
 
     /// Search for similar perceptions (with graceful degradation)
-    pub async fn search_perceptions(&self, query: &HV16, limit: usize) -> DatabaseResult<Vec<(HV16, f32)>> {
+    pub async fn search_perceptions(&self, query: &BinaryHV, limit: usize) -> DatabaseResult<Vec<(BinaryHV, f32)>> {
         // Try Qdrant first
         #[cfg(feature = "qdrant")]
         {
@@ -1662,7 +1662,7 @@ impl SymthaeaMind {
     }
 
     /// Store experience (with graceful degradation)
-    pub async fn store_experience(&self, id: &str, vector: &HV16, exp_type: &str, content: &str) -> DatabaseResult<()> {
+    pub async fn store_experience(&self, id: &str, vector: &BinaryHV, exp_type: &str, content: &str) -> DatabaseResult<()> {
         // Try LanceDB first
         #[cfg(feature = "lance")]
         {
@@ -1737,7 +1737,7 @@ impl SymthaeaMind {
     /// 2. Reasoning (CozoDB) - apply causal inference and meta-consciousness
     /// 3. Memory (LanceDB) - consolidate experiences into long-term storage
     /// 4. Reflection (DuckDB) - analyze consciousness metrics
-    pub async fn consciousness_cycle(&self, input: &HV16) -> DatabaseResult<ConsciousnessLoopState> {
+    pub async fn consciousness_cycle(&self, input: &BinaryHV) -> DatabaseResult<ConsciousnessLoopState> {
         let start = Instant::now();
 
         // Update iteration
@@ -1792,23 +1792,23 @@ impl SymthaeaMind {
     }
 
     /// Compute instantaneous Phi based on current perception
-    fn compute_instantaneous_phi(&self, vector: &HV16) -> f64 {
+    fn compute_instantaneous_phi(&self, vector: &BinaryHV) -> f64 {
         // Simple Phi approximation based on bit entropy
         let ones = vector.0.iter().map(|b| b.count_ones() as usize).sum::<usize>();
-        let total = HV16::DIM;
+        let total = BinaryHV::DIM;
         let p = ones as f64 / total as f64;
 
         // Shannon entropy normalized
         if p == 0.0 || p == 1.0 {
             0.0
         } else {
-            let entropy = -(p * p.log2() + (1.0 - p) * (1.0 - p).log2());
-            entropy // Max 1.0 when p = 0.5
+            
+            -(p * p.log2() + (1.0 - p) * (1.0 - p).log2()) // Max 1.0 when p = 0.5
         }
     }
 
     /// Compute workspace coherence (how similar are workspace items)
-    fn compute_workspace_coherence(&self, workspace: &[HV16]) -> f64 {
+    fn compute_workspace_coherence(&self, workspace: &[BinaryHV]) -> f64 {
         if workspace.len() < 2 {
             return 1.0;
         }
@@ -2027,7 +2027,7 @@ mod tests {
     #[test]
     fn test_qdrant_config() {
         let config = QdrantConfig::default_config();
-        assert_eq!(config.vector_dim, 2048);  // HV16::DIM
+        assert_eq!(config.vector_dim, 2048);  // BinaryHV::DIM
         assert_eq!(config.distance_metric, "Cosine");
         assert!(config.url.contains("6333"));  // Default Qdrant port
     }
@@ -2245,9 +2245,9 @@ mod tests {
     fn test_in_memory_fallback_vectors() {
         let fallback = InMemoryFallback::new();
 
-        let v1 = HV16::random(42);
-        let v2 = HV16::random(43);
-        let v3 = HV16::random(44);
+        let v1 = BinaryHV::random(42);
+        let v2 = BinaryHV::random(43);
+        let v3 = BinaryHV::random(44);
 
         fallback.store_vector("v1", &v1, HashMap::new());
         fallback.store_vector("v2", &v2, HashMap::new());
@@ -2282,7 +2282,7 @@ mod tests {
     fn test_in_memory_fallback_experiences() {
         let fallback = InMemoryFallback::new();
 
-        let v = HV16::random(42);
+        let v = BinaryHV::random(42);
         fallback.store_experience("exp_1", &v, "perception", "saw a cat");
 
         let experiences = fallback.experiences.read();
@@ -2359,7 +2359,7 @@ mod tests {
         let mind = SymthaeaMind::for_testing();
 
         // Run a consciousness cycle with a random input
-        let input = HV16::random(42);
+        let input = BinaryHV::random(42);
         let state = mind.consciousness_cycle(&input).await.unwrap();
 
         assert_eq!(state.iteration, 1);
@@ -2378,7 +2378,7 @@ mod tests {
 
         // Run multiple cycles
         for i in 0..5 {
-            let input = HV16::random(i as u64);
+            let input = BinaryHV::random(i as u64);
             let state = mind.consciousness_cycle(&input).await.unwrap();
             assert_eq!(state.iteration, (i + 1) as u64);
         }
@@ -2394,8 +2394,8 @@ mod tests {
     async fn test_perception_storage_and_retrieval() {
         let mind = SymthaeaMind::for_testing();
 
-        let v1 = HV16::random(100);
-        let v2 = HV16::random(101);
+        let v1 = BinaryHV::random(100);
+        let v2 = BinaryHV::random(101);
 
         // Store perceptions
         mind.store_perception("p1", &v1, HashMap::new()).await.unwrap();
@@ -2410,7 +2410,7 @@ mod tests {
     async fn test_experience_storage() {
         let mind = SymthaeaMind::for_testing();
 
-        let v = HV16::random(200);
+        let v = BinaryHV::random(200);
         mind.store_experience("test_exp", &v, "episodic", "test content").await.unwrap();
 
         // Check fallback storage
@@ -2466,7 +2466,7 @@ mod tests {
 
             // Run some cycles
             for i in 0..3 {
-                let input = HV16::random(i as u64);
+                let input = BinaryHV::random(i as u64);
                 mind.consciousness_cycle(&input).await.unwrap();
             }
 
@@ -2486,7 +2486,7 @@ mod tests {
             let mind = SymthaeaMind::for_testing();
 
             // Start consciousness loop
-            let input = HV16::random(42);
+            let input = BinaryHV::random(42);
             mind.consciousness_cycle(&input).await.unwrap();
             assert!(mind.loop_state().running);
 
@@ -2584,7 +2584,7 @@ mod tests {
         let mind = SymthaeaMind::for_testing();
 
         // Random vector should have high entropy (Phi close to 1.0)
-        let random_v = HV16::random(42);
+        let random_v = BinaryHV::random(42);
         let phi = mind.compute_instantaneous_phi(&random_v);
         assert!(phi > 0.9, "Random vector should have high Phi, got {}", phi);
     }
@@ -2594,7 +2594,7 @@ mod tests {
         let mind = SymthaeaMind::for_testing();
 
         // All-zero vector (all -1 in bipolar) has minimal entropy
-        let zero_v = HV16::zero();
+        let zero_v = BinaryHV::zero();
         let phi = mind.compute_instantaneous_phi(&zero_v);
         assert!(phi < 0.1, "Zero vector should have low Phi, got {}", phi);
     }
@@ -2604,7 +2604,7 @@ mod tests {
         let mind = SymthaeaMind::for_testing();
 
         // All-ones vector (all +1 in bipolar) has minimal entropy
-        let ones_v = HV16::ones();
+        let ones_v = BinaryHV::ones();
         let phi = mind.compute_instantaneous_phi(&ones_v);
         assert!(phi < 0.1, "Ones vector should have low Phi, got {}", phi);
     }
@@ -2613,7 +2613,7 @@ mod tests {
     fn test_workspace_coherence_single_vector() {
         let mind = SymthaeaMind::for_testing();
 
-        let workspace = vec![HV16::random(42)];
+        let workspace = vec![BinaryHV::random(42)];
         let coherence = mind.compute_workspace_coherence(&workspace);
         assert_eq!(coherence, 1.0, "Single vector workspace should have coherence 1.0");
     }
@@ -2622,7 +2622,7 @@ mod tests {
     fn test_workspace_coherence_identical_vectors() {
         let mind = SymthaeaMind::for_testing();
 
-        let v = HV16::random(42);
+        let v = BinaryHV::random(42);
         let workspace = vec![v, v, v];
         let coherence = mind.compute_workspace_coherence(&workspace);
         assert!((coherence - 1.0).abs() < 0.001, "Identical vectors should have coherence ~1.0");
@@ -2632,7 +2632,7 @@ mod tests {
     fn test_workspace_coherence_random_vectors() {
         let mind = SymthaeaMind::for_testing();
 
-        let workspace: Vec<HV16> = (0..5).map(|i| HV16::random(i as u64)).collect();
+        let workspace: Vec<BinaryHV> = (0..5).map(|i| BinaryHV::random(i as u64)).collect();
         let coherence = mind.compute_workspace_coherence(&workspace);
 
         // Random vectors should have coherence around 0.5
@@ -2661,7 +2661,7 @@ mod integration_tests {
 
         // Run consciousness cycles
         for i in 0..10 {
-            let input = HV16::random(i as u64);
+            let input = BinaryHV::random(i as u64);
             let state = mind.consciousness_cycle(&input).await.unwrap();
             println!("Cycle {}: Phi={:.4}, Level={:.2}%",
                      state.iteration, state.current_phi, state.consciousness_level * 100.0);

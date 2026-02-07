@@ -57,7 +57,7 @@ impl ChaosDetector {
         }
 
         // Update Lyapunov estimate periodically
-        if self.history.len() >= 50 && self.history.len() % 20 == 0 {
+        if self.history.len() >= 50 && self.history.len().is_multiple_of(20) {
             // Estimate embedding first so time_delay is available for Lyapunov
             self.estimate_optimal_embedding();
             self.estimate_lyapunov();

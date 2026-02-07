@@ -34,7 +34,7 @@
 //!
 //! This enables the LTC to "think" in HDC semantics and express through them.
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::{HV16, BinaryHV};
 use symthaea_core::hdc::HDC_DIMENSION;
 use crate::learnable_ltc::LearnableLTC;
 use serde::{Serialize, Deserialize};
@@ -376,7 +376,7 @@ impl HDLTCCodec {
             }
         }
 
-        HV16(bytes)
+        BinaryHV(bytes)
     }
 
     /// Normalize LTC state using running statistics
@@ -598,7 +598,7 @@ mod tests {
 #[cfg(test)]
 mod semantic_preservation_tests {
     use super::*;
-    use symthaea_core::hdc::binary_hv::HV16;
+    use symthaea_core::hdc::binary_hv::{HV16, BinaryHV};
 
     #[test]
     fn test_semantic_preservation_through_cfc_roundtrip() {

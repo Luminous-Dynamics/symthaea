@@ -182,7 +182,7 @@ impl ConsciousnessVisualizer {
 
         let status = if ratio >= optimal_low && ratio <= optimal_high {
             ("✓ OPTIMAL", "\x1b[92m")
-        } else if ratio >= 0.35 && ratio <= 0.50 {
+        } else if (0.35..=0.50).contains(&ratio) {
             ("~ NEAR OPTIMAL", "\x1b[93m")
         } else {
             ("! SUBOPTIMAL", "\x1b[91m")
@@ -251,12 +251,12 @@ impl ConsciousnessVisualizer {
         let mut output = String::new();
 
         // Header
-        output.push_str("\n");
+        output.push('\n');
         output.push_str("╔══════════════════════════════════════════════════════════╗\n");
         output.push_str("║        ✦ CONSCIOUSNESS MONITOR ✦                        ║\n");
         output.push_str(&format!("║        Step: {:6}                                      ║\n", update.step));
         output.push_str("╚══════════════════════════════════════════════════════════╝\n");
-        output.push_str("\n");
+        output.push('\n');
 
         // Φ meter
         output.push_str(&self.render_phi_meter(update.phi));

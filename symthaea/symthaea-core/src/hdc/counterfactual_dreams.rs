@@ -63,7 +63,7 @@
 //! println!("Dream explored: {}", dream.counterfactual_theme);
 //! ```
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::sleep_and_altered_states::{DreamFragment, DreamScenario, DreamFragmentSource};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -80,11 +80,11 @@ pub struct CounterfactualMemory {
     /// Label/description of the memory
     pub label: String,
     /// HDC representation of actual outcome
-    pub actual_hv: HV16,
+    pub actual_hv: BinaryHV,
     /// Description of the counterfactual scenario
     pub counterfactual_question: String,
     /// HDC representation of counterfactual outcome
-    pub counterfactual_hv: HV16,
+    pub counterfactual_hv: BinaryHV,
     /// Emotional intensity (affects dream probability)
     pub emotional_intensity: f64,
     /// Valence of the counterfactual (-1 = regret, +1 = hope)
@@ -99,9 +99,9 @@ impl CounterfactualMemory {
     pub fn new(
         id: u64,
         label: &str,
-        actual: HV16,
+        actual: BinaryHV,
         question: &str,
-        counterfactual: HV16,
+        counterfactual: BinaryHV,
         intensity: f64,
     ) -> Self {
         Self {
@@ -225,9 +225,9 @@ impl CounterfactualDreamEngine {
     pub fn add_memory_with_counterfactual(
         &mut self,
         label: &str,
-        actual: HV16,
+        actual: BinaryHV,
         question: &str,
-        counterfactual: HV16,
+        counterfactual: BinaryHV,
         emotional_intensity: f64,
     ) -> u64 {
         let id = self.next_id;
@@ -245,9 +245,9 @@ impl CounterfactualDreamEngine {
     pub fn add_memory_with_valence(
         &mut self,
         label: &str,
-        actual: HV16,
+        actual: BinaryHV,
         question: &str,
-        counterfactual: HV16,
+        counterfactual: BinaryHV,
         emotional_intensity: f64,
         valence: f64,
     ) -> u64 {
@@ -475,22 +475,22 @@ impl CounterfactualDreamEngine {
     }
 
     /// Generate bizarre blend of HV (dream distortion)
-    fn generate_bizarre_blend(&self, hv: &HV16, seed: u64) -> HV16 {
+    fn generate_bizarre_blend(&self, hv: &BinaryHV, seed: u64) -> BinaryHV {
         if self.bizarreness < 0.1 {
-            return hv.clone();
+            return *hv;
         }
 
         // Create a random HV for blending
-        let noise = HV16::random(seed);
+        let noise = BinaryHV::random(seed);
 
         // Blend based on bizarreness
-        Self::weighted_bundle(&[(hv.clone(), 1.0 - self.bizarreness), (noise, self.bizarreness)])
+        Self::weighted_bundle(&[(*hv, 1.0 - self.bizarreness), (noise, self.bizarreness)])
     }
 
     /// Weighted bundle operation
-    fn weighted_bundle(weighted_hvs: &[(HV16, f64)]) -> HV16 {
+    fn weighted_bundle(weighted_hvs: &[(BinaryHV, f64)]) -> BinaryHV {
         if weighted_hvs.is_empty() {
-            return HV16::random(42);
+            return BinaryHV::random(42);
         }
 
         const DIMENSIONS: usize = 16384;
@@ -517,7 +517,7 @@ impl CounterfactualDreamEngine {
             }
         }
 
-        HV16(result)
+        BinaryHV(result)
     }
 
     /// Determine how the dream resolves
@@ -654,9 +654,9 @@ mod tests {
 
         let id = engine.add_memory_with_counterfactual(
             "test_memory",
-            HV16::random(1),
+            BinaryHV::random(1),
             "What if I had done X?",
-            HV16::random(2),
+            BinaryHV::random(2),
             0.7,
         );
 
@@ -670,9 +670,9 @@ mod tests {
 
         engine.add_memory_with_counterfactual(
             "decision",
-            HV16::random(1),
+            BinaryHV::random(1),
             "What if I had chosen differently?",
-            HV16::random(2),
+            BinaryHV::random(2),
             0.8,
         );
 
@@ -688,9 +688,9 @@ mod tests {
 
         let id = engine.add_memory_with_counterfactual(
             "test",
-            HV16::random(1),
+            BinaryHV::random(1),
             "What if?",
-            HV16::random(2),
+            BinaryHV::random(2),
             0.5,
         );
 
@@ -704,9 +704,9 @@ mod tests {
         let memory = CounterfactualMemory::new(
             1,
             "test",
-            HV16::random(1),
+            BinaryHV::random(1),
             "What if?",
-            HV16::random(2),
+            BinaryHV::random(2),
             0.9,
         );
 
@@ -719,9 +719,9 @@ mod tests {
 
         engine.add_memory_with_counterfactual(
             "memory1",
-            HV16::random(1),
+            BinaryHV::random(1),
             "What if 1?",
-            HV16::random(2),
+            BinaryHV::random(2),
             0.5,
         );
 

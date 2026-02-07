@@ -1,6 +1,6 @@
 //! Locality-Sensitive Hashing (LSH) Index for Fast Approximate Similarity Search
 //!
-//! This module implements LSH for binary hyperdimensional vectors (HV16),
+//! This module implements LSH for binary hyperdimensional vectors (BinaryHV),
 //! providing 100-1000x speedup for similarity search with 90-99% accuracy.
 //!
 //! # Overview
@@ -25,20 +25,20 @@
 //!
 //! ```rust,ignore
 //! use symthaea::hdc::lsh_index::{LshIndex, LshConfig};
-//! use symthaea::hdc::binary_hv::HV16;
+//! use symthaea::hdc::binary_hv::BinaryHV;
 //!
 //! // Create index with 10-bit hashes (1024 buckets) and 10 tables
 //! let config = LshConfig::default();
 //! let mut index = LshIndex::new(config);
 //!
 //! // Insert vectors
-//! let vectors: Vec<HV16> = (0..100000)
-//!     .map(|i| HV16::random(i as u64))
+//! let vectors: Vec<BinaryHV> = (0..100000)
+//!     .map(|i| BinaryHV::random(i as u64))
 //!     .collect();
 //! index.insert_batch(&vectors);
 //!
 //! // Query for top-10 most similar
-//! let query = HV16::random(99999);
+//! let query = BinaryHV::random(99999);
 //! let results = index.query_approximate(&query, 10, &vectors);
 //!
 //! // Results: Vec<(vector_id, similarity_score)>
@@ -47,7 +47,7 @@
 //! }
 //! ```
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use ordered_float::OrderedFloat;
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashSet};
@@ -136,14 +136,14 @@ impl LshConfig {
 #[derive(Debug, Clone)]
 pub struct LshHashFunction {
     /// Random projection vector (defines hyperplane)
-    projection: HV16,
+    projection: BinaryHV,
 }
 
 impl LshHashFunction {
     /// Create a new random hash function
     pub fn new(seed: u64) -> Self {
         LshHashFunction {
-            projection: HV16::random(seed),
+            projection: BinaryHV::random(seed),
         }
     }
 
@@ -151,7 +151,7 @@ impl LshHashFunction {
     ///
     /// Returns true if vector is on "positive" side of hyperplane,
     /// false if on "negative" side.
-    pub fn hash(&self, vector: &HV16) -> bool {
+    pub fn hash(&self, vector: &BinaryHV) -> bool {
         // XOR with projection vector
         let xor = vector.bind(&self.projection);
 
@@ -165,7 +165,7 @@ impl LshHashFunction {
 
 /// Count ones in a binary hyperdimensional vector
 #[inline]
-fn count_ones(hv: &HV16) -> usize {
+fn count_ones(hv: &BinaryHV) -> usize {
     let data = &hv.0;
     let mut count = 0;
     for &byte in data {
@@ -217,7 +217,7 @@ impl LshTable {
     /// Compute multi-bit hash for a vector
     ///
     /// Combines multiple single-bit hashes into a single integer.
-    pub fn hash(&self, vector: &HV16) -> usize {
+    pub fn hash(&self, vector: &BinaryHV) -> usize {
         let mut hash_value = 0;
 
         for (i, hash_fn) in self.hash_functions.iter().enumerate() {
@@ -230,13 +230,13 @@ impl LshTable {
     }
 
     /// Insert a vector into the table
-    pub fn insert(&mut self, vector_id: usize, vector: &HV16) {
+    pub fn insert(&mut self, vector_id: usize, vector: &BinaryHV) {
         let bucket_id = self.hash(vector);
         self.buckets[bucket_id].push(vector_id);
     }
 
     /// Query for candidate vectors in the same bucket
-    pub fn query(&self, vector: &HV16) -> &[usize] {
+    pub fn query(&self, vector: &BinaryHV) -> &[usize] {
         let bucket_id = self.hash(vector);
         &self.buckets[bucket_id]
     }
@@ -318,7 +318,7 @@ impl LshIndex {
     /// Insert a batch of vectors
     ///
     /// This is more efficient than inserting one at a time.
-    pub fn insert_batch(&mut self, vectors: &[HV16]) {
+    pub fn insert_batch(&mut self, vectors: &[BinaryHV]) {
         for (id, vector) in vectors.iter().enumerate() {
             for table in &mut self.tables {
                 table.insert(id, vector);
@@ -339,9 +339,9 @@ impl LshIndex {
     ///    (avoids O(n log n) full sort when k << n)
     pub fn query_approximate(
         &self,
-        query: &HV16,
+        query: &BinaryHV,
         k: usize,
-        vectors: &[HV16],
+        vectors: &[BinaryHV],
     ) -> Vec<(usize, f32)> {
         // Step 1: Collect candidates from all tables
         let mut candidates = HashSet::new();
@@ -395,9 +395,9 @@ impl LshIndex {
     /// This ensures we always return k results.
     pub fn query_with_fallback(
         &self,
-        query: &HV16,
+        query: &BinaryHV,
         k: usize,
-        vectors: &[HV16],
+        vectors: &[BinaryHV],
         min_candidates: usize,
     ) -> Vec<(usize, f32)> {
         // Try LSH first
@@ -413,7 +413,7 @@ impl LshIndex {
     }
 
     /// Get count of candidates without computing similarities
-    fn get_candidate_count(&self, query: &HV16) -> usize {
+    fn get_candidate_count(&self, query: &BinaryHV) -> usize {
         let mut candidates = HashSet::new();
         for table in &self.tables {
             for &vector_id in table.query(query) {
@@ -428,9 +428,9 @@ impl LshIndex {
     /// Uses heap-based top-k selection for O(n log k) complexity instead of O(n log n) full sort.
     pub fn query_brute_force(
         &self,
-        query: &HV16,
+        query: &BinaryHV,
         k: usize,
-        vectors: &[HV16],
+        vectors: &[BinaryHV],
     ) -> Vec<(usize, f32)> {
         // Use min-heap to keep only top-k results during iteration
         let mut heap: BinaryHeap<Reverse<(OrderedFloat<f32>, usize)>> =
@@ -529,7 +529,7 @@ mod tests {
     #[test]
     fn test_hash_function_deterministic() {
         let hash_fn = LshHashFunction::new(42);
-        let vector = HV16::random(123);
+        let vector = BinaryHV::random(123);
 
         let hash1 = hash_fn.hash(&vector);
         let hash2 = hash_fn.hash(&vector);
@@ -541,8 +541,8 @@ mod tests {
     fn test_hash_table_basic() {
         let mut table = LshTable::new(8, 42);  // 8 bits = 256 buckets
 
-        let vectors: Vec<HV16> = (0..100)
-            .map(|i| HV16::random(i as u64))
+        let vectors: Vec<BinaryHV> = (0..100)
+            .map(|i| BinaryHV::random(i as u64))
             .collect();
 
         for (id, vector) in vectors.iter().enumerate() {
@@ -550,7 +550,7 @@ mod tests {
         }
 
         // Query should return some candidates
-        let query = HV16::random(999);
+        let query = BinaryHV::random(999);
         let candidates = table.query(&query);
 
         // Should have some candidates (not all 100, not 0)
@@ -563,13 +563,13 @@ mod tests {
         let config = LshConfig::fast();  // 5 tables for speed
         let mut index = LshIndex::new(config);
 
-        let vectors: Vec<HV16> = (0..1000)
-            .map(|i| HV16::random(i as u64))
+        let vectors: Vec<BinaryHV> = (0..1000)
+            .map(|i| BinaryHV::random(i as u64))
             .collect();
 
         index.insert_batch(&vectors);
 
-        let query = HV16::random(9999);
+        let query = BinaryHV::random(9999);
         let results = index.query_approximate(&query, 10, &vectors);
 
         assert_eq!(results.len(), 10, "Should return top-10");
@@ -588,13 +588,13 @@ mod tests {
         let config = LshConfig::balanced();
         let mut index = LshIndex::new(config);
 
-        let vectors: Vec<HV16> = (0..100)
-            .map(|i| HV16::random(i as u64))
+        let vectors: Vec<BinaryHV> = (0..100)
+            .map(|i| BinaryHV::random(i as u64))
             .collect();
 
         index.insert_batch(&vectors);
 
-        let query = HV16::random(9999);
+        let query = BinaryHV::random(9999);
 
         let lsh_results = index.query_approximate(&query, 10, &vectors);
         let brute_results = index.query_brute_force(&query, 10, &vectors);
@@ -621,13 +621,13 @@ mod tests {
         let config = LshConfig::balanced();
         let mut index = LshIndex::new(config);
 
-        let vectors: Vec<HV16> = (0..1000)
-            .map(|i| HV16::random(i as u64))
+        let vectors: Vec<BinaryHV> = (0..1000)
+            .map(|i| BinaryHV::random(i as u64))
             .collect();
 
         index.insert_batch(&vectors);
 
-        let query = HV16::random(99999);
+        let query = BinaryHV::random(99999);
 
         // Test with various k values
         for k in [1, 5, 10, 50, 100] {
@@ -670,13 +670,13 @@ mod tests {
         let config = LshConfig::fast();
         let mut index = LshIndex::new(config);
 
-        let vectors: Vec<HV16> = (0..100)
-            .map(|i| HV16::random(i as u64))
+        let vectors: Vec<BinaryHV> = (0..100)
+            .map(|i| BinaryHV::random(i as u64))
             .collect();
 
         index.insert_batch(&vectors);
 
-        let query = HV16::random(99999);
+        let query = BinaryHV::random(99999);
 
         // k larger than dataset
         let results = index.query_brute_force(&query, 1000, &vectors);

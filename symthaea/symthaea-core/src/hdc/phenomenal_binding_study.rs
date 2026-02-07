@@ -50,8 +50,8 @@
 //!     concept_a: "red".to_string(),
 //!     concept_b: "apple".to_string(),
 //!     pair_type: PairType::Unified,
-//!     hv_a: HV16::random(1),
-//!     hv_b: HV16::random(2),
+//!     hv_a: BinaryHV::random(1),
+//!     hv_b: BinaryHV::random(2),
 //! };
 //!
 //! // Compare bind vs bundle
@@ -67,7 +67,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::consciousness_topology::{
     BettiNumbers, ConsciousnessTopology, TopologicalAssessment, TopologyConfig,
 };
@@ -114,9 +114,9 @@ pub struct ConceptPairWithVectors {
     /// The concept pair
     pub pair: ConceptPair,
     /// HDC vector for concept A
-    pub hv_a: HV16,
+    pub hv_a: BinaryHV,
     /// HDC vector for concept B
-    pub hv_b: HV16,
+    pub hv_b: BinaryHV,
 }
 
 /// Result of comparing bind vs bundle for one pair
@@ -256,8 +256,8 @@ impl Default for BindingStudyConfig {
 pub struct PhenomenalBindingStudy {
     /// Configuration
     config: BindingStudyConfig,
-    /// Concept vocabulary (word -> HV16)
-    vocabulary: HashMap<String, HV16>,
+    /// Concept vocabulary (word -> BinaryHV)
+    vocabulary: HashMap<String, BinaryHV>,
     /// Seed for deterministic random generation
     seed_counter: u64,
 }
@@ -304,7 +304,7 @@ impl PhenomenalBindingStudy {
     }
 
     /// Get or create HDC vector for a concept
-    pub fn get_or_create_vector(&mut self, concept: &str) -> HV16 {
+    pub fn get_or_create_vector(&mut self, concept: &str) -> BinaryHV {
         if let Some(hv) = self.vocabulary.get(concept) {
             return *hv;
         }
@@ -318,7 +318,7 @@ impl PhenomenalBindingStudy {
             acc.wrapping_mul(31).wrapping_add(b as u64)
         });
 
-        let hv = HV16::random(seed.wrapping_add(concept_hash));
+        let hv = BinaryHV::random(seed.wrapping_add(concept_hash));
         self.vocabulary.insert(concept.to_string(), hv);
         hv
     }
@@ -345,7 +345,7 @@ impl PhenomenalBindingStudy {
         let bound = pair.hv_a.bind(&pair.hv_b);
 
         // Compute bundled representation (majority vote)
-        let bundled = HV16::bundle(&[pair.hv_a, pair.hv_b]);
+        let bundled = BinaryHV::bundle(&[pair.hv_a, pair.hv_b]);
 
         // Analyze topology for both
         let bind_assessment = self.analyze_topology(&bound);
@@ -365,7 +365,7 @@ impl PhenomenalBindingStudy {
     }
 
     /// Analyze topology for an HDC vector
-    fn analyze_topology(&self, hv: &HV16) -> TopologicalAssessment {
+    fn analyze_topology(&self, hv: &BinaryHV) -> TopologicalAssessment {
         let mut topology = ConsciousnessTopology::new(self.config.topology_config.clone());
 
         // Add the main vector
@@ -514,9 +514,7 @@ impl PhenomenalBindingStudy {
 
         // Cell means
         report.push_str("Cell Means (Unity Score):\n");
-        report.push_str(&format!(
-            "                 Unified    Separate\n"
-        ));
+        report.push_str("                 Unified    Separate\n");
         report.push_str(&format!(
             "  Bind:          {:.4}      {:.4}\n",
             anova.cell_means.bind_unified, anova.cell_means.bind_separate
@@ -661,8 +659,8 @@ mod tests {
                 pair_type: PairType::Unified,
                 description: "Test pair".to_string(),
             },
-            hv_a: HV16::random(1),
-            hv_b: HV16::random(2),
+            hv_a: BinaryHV::random(1),
+            hv_b: BinaryHV::random(2),
         };
 
         let result = study.compare_operations(&pair);

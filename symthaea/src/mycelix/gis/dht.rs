@@ -51,7 +51,7 @@ use super::GISError;
 use super::zk_proofs::{ZKTopicCommitment, ZKEIGRangeProof};
 
 // HDC imports for semantic encoding
-use symthaea_core::hdc::{RealHV, HDC_DIMENSION};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 // ============================================================================
 // HDC Semantic Encoder - Real semantic similarity using hyperdimensional computing
@@ -59,7 +59,7 @@ use symthaea_core::hdc::{RealHV, HDC_DIMENSION};
 
 /// HDC-based semantic encoder for privacy-preserving semantic matching
 ///
-/// Uses real-valued hyperdimensional vectors (RealHV) to encode text semantically.
+/// Uses real-valued hyperdimensional vectors (ContinuousHV) to encode text semantically.
 /// Word-wise bundling ensures that semantically similar queries have high cosine similarity.
 ///
 /// This is the bridge between the Dark Spot DHT and the core HDC infrastructure.
@@ -80,7 +80,7 @@ impl HdcSemanticEncoder {
         }
     }
 
-    /// Encode text into a RealHV using word-wise bundling
+    /// Encode text into a ContinuousHV using word-wise bundling
     ///
     /// Each word gets a deterministic random vector based on BLAKE3 hash of the word.
     /// The final encoding is the normalized average (bundle) of all word vectors.
@@ -89,7 +89,7 @@ impl HdcSemanticEncoder {
     /// - Determinism: Same text always produces same encoding
     /// - Semantic overlap: Texts sharing words have proportionally higher similarity
     /// - Privacy: Hard to reverse engineer original text from encoding
-    pub fn encode(&self, text: &str) -> RealHV {
+    pub fn encode(&self, text: &str) -> ContinuousHV {
         use blake3::Hasher;
 
         // Normalize and split into words
@@ -101,7 +101,7 @@ impl HdcSemanticEncoder {
 
         if words.is_empty() {
             // Return zero vector for empty input
-            return RealHV::ones(self.dimension).scale(0.0_f32);
+            return ContinuousHV::ones(self.dimension).scale(0.0_f32);
         }
 
         // Accumulate word vectors
@@ -115,7 +115,7 @@ impl HdcSemanticEncoder {
             let word_seed = u64::from_le_bytes(hash.as_bytes()[0..8].try_into().unwrap());
 
             // Generate word vector (deterministic from seed)
-            let word_hv = RealHV::random(self.dimension, word_seed);
+            let word_hv = ContinuousHV::random(self.dimension, word_seed);
 
             // Add to accumulator
             for (i, v) in word_hv.values.iter().enumerate() {
@@ -129,18 +129,18 @@ impl HdcSemanticEncoder {
             *v /= n;
         }
 
-        RealHV::from_vec(accumulated)
+        ContinuousHV::from_vec(accumulated)
     }
 
     /// Compute cosine similarity between two encodings
-    pub fn similarity(&self, a: &RealHV, b: &RealHV) -> f32 {
+    pub fn similarity(&self, a: &ContinuousHV, b: &ContinuousHV) -> f32 {
         a.similarity(b)
     }
 
     /// Encode with category weighting
     ///
     /// Adds category-specific bias to the encoding for better category-level matching.
-    pub fn encode_with_category(&self, text: &str, category: &str) -> RealHV {
+    pub fn encode_with_category(&self, text: &str, category: &str) -> ContinuousHV {
         let text_encoding = self.encode(text);
         let category_encoding = self.encode(category);
 
@@ -152,7 +152,7 @@ impl HdcSemanticEncoder {
     /// Create a compressed embedding for network transmission
     ///
     /// Reduces dimension while preserving semantic similarity (via random projection).
-    pub fn compress(&self, hv: &RealHV, target_dim: usize) -> Vec<f32> {
+    pub fn compress(&self, hv: &ContinuousHV, target_dim: usize) -> Vec<f32> {
         if target_dim >= self.dimension {
             return hv.values.clone();
         }
@@ -173,7 +173,7 @@ impl HdcSemanticEncoder {
     }
 
     /// Decompress (approximate reconstruction)
-    pub fn decompress(&self, compressed: &[f32]) -> RealHV {
+    pub fn decompress(&self, compressed: &[f32]) -> ContinuousHV {
         let target_dim = compressed.len();
         let stride = self.dimension / target_dim;
 
@@ -188,7 +188,7 @@ impl HdcSemanticEncoder {
             }
         }
 
-        RealHV::from_vec(expanded)
+        ContinuousHV::from_vec(expanded)
     }
 }
 

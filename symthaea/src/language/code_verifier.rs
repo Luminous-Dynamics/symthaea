@@ -15,7 +15,7 @@
 //! VerificationResult
 //! ```
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use super::code_parser::{ParsedCode, CodeDiagnostic, DiagnosticSeverity};
 use crate::hdc::code_encoder::CodeHDEncoder;
@@ -106,7 +106,7 @@ impl CodeVerifier {
     pub fn verify_against_intent(
         &self,
         parsed: &ParsedCode,
-        intent_hv: &RealHV,
+        intent_hv: &ContinuousHV,
     ) -> VerificationResult {
         // Check syntax
         let syntax_errors: Vec<CodeDiagnostic> = parsed.diagnostics.iter()

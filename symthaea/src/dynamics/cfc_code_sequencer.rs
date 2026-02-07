@@ -17,7 +17,7 @@
 //! Code generation plan
 //! ```
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 
 /// Maximum number of planning steps before forcing completion
@@ -194,7 +194,7 @@ impl CfCCodeSequencer {
     }
 
     /// Project an HDC vector into the hidden state space
-    fn project_to_hidden(&self, hv: &RealHV) -> Vec<f32> {
+    fn project_to_hidden(&self, hv: &ContinuousHV) -> Vec<f32> {
         let hdc_dim = self.config.hdc_dim;
         let hidden_dim = self.config.hidden_dim;
         let mut hidden = vec![0.0f32; hidden_dim];
@@ -254,8 +254,8 @@ impl CfCCodeSequencer {
     /// Plan code structure given an intent and context
     pub fn plan_structure(
         &self,
-        intent_hv: &RealHV,
-        context_hvs: &[&RealHV],
+        intent_hv: &ContinuousHV,
+        context_hvs: &[&ContinuousHV],
     ) -> Vec<CodePlanStep> {
         // Project intent into hidden space
         let mut state = self.project_to_hidden(intent_hv);
@@ -346,7 +346,7 @@ mod tests {
     #[test]
     fn test_plan_produces_steps() {
         let sequencer = CfCCodeSequencer::default();
-        let intent = RealHV::random(512, 42);
+        let intent = ContinuousHV::random(512, 42);
 
         let plan = sequencer.plan_structure(&intent, &[]);
         assert!(!plan.is_empty());
@@ -360,9 +360,9 @@ mod tests {
     #[test]
     fn test_plan_with_context() {
         let sequencer = CfCCodeSequencer::default();
-        let intent = RealHV::random(512, 42);
-        let ctx1 = RealHV::random(512, 43);
-        let ctx2 = RealHV::random(512, 44);
+        let intent = ContinuousHV::random(512, 42);
+        let ctx1 = ContinuousHV::random(512, 43);
+        let ctx2 = ContinuousHV::random(512, 44);
 
         let plan = sequencer.plan_structure(&intent, &[&ctx1, &ctx2]);
         assert!(!plan.is_empty());
@@ -371,7 +371,7 @@ mod tests {
     #[test]
     fn test_no_consecutive_duplicates() {
         let sequencer = CfCCodeSequencer::default();
-        let intent = RealHV::random(512, 42);
+        let intent = ContinuousHV::random(512, 42);
 
         let plan = sequencer.plan_structure(&intent, &[]);
         for i in 1..plan.len() {

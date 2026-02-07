@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 use super::seven_harmonies::Harmony;
 
@@ -39,11 +39,11 @@ pub struct ValueEmbeddedConcept {
     /// Concept identifier
     pub id: String,
     /// Original semantic embedding
-    pub semantic_embedding: RealHV,
+    pub semantic_embedding: ContinuousHV,
     /// Value embedding
-    pub value_embedding: RealHV,
+    pub value_embedding: ContinuousHV,
     /// Combined embedding
-    pub combined_embedding: RealHV,
+    pub combined_embedding: ContinuousHV,
     /// Value alignment scores
     pub value_scores: HashMap<Harmony, f32>,
     /// Concept metadata
@@ -52,7 +52,7 @@ pub struct ValueEmbeddedConcept {
 
 impl ValueEmbeddedConcept {
     /// Get the primary embedding (combined)
-    pub fn embedding(&self) -> &RealHV {
+    pub fn embedding(&self) -> &ContinuousHV {
         &self.combined_embedding
     }
 
@@ -80,7 +80,7 @@ pub struct SemanticValueEmbedder {
     /// Configuration
     config: EmbedderConfig,
     /// Harmony basis vectors
-    harmony_bases: HashMap<Harmony, RealHV>,
+    harmony_bases: HashMap<Harmony, ContinuousHV>,
     /// Concept cache
     cache: HashMap<String, ValueEmbeddedConcept>,
     /// Statistics
@@ -120,7 +120,7 @@ impl SemanticValueEmbedder {
     ///
     /// Maps each of the 7 Harmonies to a primitive tier, then creates
     /// a basis vector by bundling the tier's primitive encodings.
-    fn build_primitive_grounded_bases(dim: usize, system: &PrimitiveSystem) -> HashMap<Harmony, RealHV> {
+    fn build_primitive_grounded_bases(dim: usize, system: &PrimitiveSystem) -> HashMap<Harmony, ContinuousHV> {
         let mut bases = HashMap::new();
 
         // Mapping of Harmonies to Primitive Tiers:
@@ -147,20 +147,20 @@ impl SemanticValueEmbedder {
 
             if primitives.is_empty() {
                 // Fallback to random if tier is empty (e.g., NSM)
-                bases.insert(harmony, RealHV::random(dim, harmony as u64 + 42));
+                bases.insert(harmony, ContinuousHV::random(dim, harmony as u64 + 42));
             } else {
-                // Bundle primitive encodings (HV16 → RealHV conversion)
-                // Convert binary HV16 bits to bipolar RealHV values (-1.0/+1.0)
-                let real_hvs: Vec<RealHV> = primitives
+                // Bundle primitive encodings (HV16 → ContinuousHV conversion)
+                // Convert binary HV16 bits to bipolar ContinuousHV values (-1.0/+1.0)
+                let real_hvs: Vec<ContinuousHV> = primitives
                     .iter()
                     .take(16) // Limit to avoid over-bundling
                     .map(|p| Self::hv16_to_real(&p.encoding, dim))
                     .collect();
 
                 if real_hvs.is_empty() {
-                    bases.insert(harmony, RealHV::random(dim, harmony as u64 + 42));
+                    bases.insert(harmony, ContinuousHV::random(dim, harmony as u64 + 42));
                 } else {
-                    bases.insert(harmony, RealHV::bundle(&real_hvs));
+                    bases.insert(harmony, ContinuousHV::bundle_owned(&real_hvs));
                 }
             }
         }
@@ -168,15 +168,15 @@ impl SemanticValueEmbedder {
         bases
     }
 
-    /// Convert HV16 to RealHV with specified dimension
+    /// Convert HV16 to ContinuousHV with specified dimension
     ///
     /// Maps binary bits to bipolar values: 0 → -1.0, 1 → +1.0
     /// Uses HV16::to_bipolar() then resamples to target dimension
-    fn hv16_to_real(hv: &symthaea_core::hdc::binary_hv::HV16, dim: usize) -> RealHV {
+    fn hv16_to_real(hv: &symthaea_core::hdc::binary_hv::HV16, dim: usize) -> ContinuousHV {
         let bipolar = hv.to_bipolar(); // Returns Vec<f32> with ±1.0 values
 
         if dim == bipolar.len() {
-            RealHV::from_values(bipolar)
+            ContinuousHV::from_values(bipolar)
         } else {
             // Resample to target dimension
             let mut values = Vec::with_capacity(dim);
@@ -184,12 +184,12 @@ impl SemanticValueEmbedder {
                 let idx = i % bipolar.len();
                 values.push(bipolar[idx]);
             }
-            RealHV::from_values(values)
+            ContinuousHV::from_values(values)
         }
     }
 
     /// Embed a concept with value alignment
-    pub fn embed(&mut self, id: impl Into<String>, semantic: RealHV) -> ValueEmbeddedConcept {
+    pub fn embed(&mut self, id: impl Into<String>, semantic: ContinuousHV) -> ValueEmbeddedConcept {
         let id = id.into();
 
         // Check cache
@@ -211,15 +211,15 @@ impl SemanticValueEmbedder {
 
         // Create value embedding by combining harmony components
         let value_embedding = if value_components.is_empty() {
-            RealHV::random(self.config.dimension, 42)
+            ContinuousHV::random(self.config.dimension, 42)
         } else {
-            RealHV::bundle(&value_components)
+            ContinuousHV::bundle_owned(&value_components)
         };
 
         // Create combined embedding
         let semantic_scaled = semantic.clone().scale(self.config.semantic_weight);
         let value_scaled = value_embedding.clone().scale(self.config.value_weight);
-        let combined_embedding = RealHV::bundle(&[semantic_scaled, value_scaled]);
+        let combined_embedding = ContinuousHV::bundle_owned(&[semantic_scaled, value_scaled]);
 
         let concept = ValueEmbeddedConcept {
             id: id.clone(),
@@ -247,7 +247,7 @@ impl SemanticValueEmbedder {
     }
 
     /// Convert text to hypervector (simplified hash-based method)
-    fn text_to_hv(&self, text: &str) -> RealHV {
+    fn text_to_hv(&self, text: &str) -> ContinuousHV {
         let mut values = vec![0.0f32; self.config.dimension];
 
         // Simple character-based embedding (production would use real model)
@@ -264,7 +264,7 @@ impl SemanticValueEmbedder {
             }
         }
 
-        RealHV::from_slice(&values)
+        ContinuousHV::from_slice(&values)
     }
 
     /// Find most similar concepts
@@ -287,10 +287,10 @@ impl SemanticValueEmbedder {
     }
 
     /// Update harmony basis based on feedback
-    pub fn update_harmony_basis(&mut self, harmony: Harmony, adjustment: &RealHV, rate: f32) {
+    pub fn update_harmony_basis(&mut self, harmony: Harmony, adjustment: &ContinuousHV, rate: f32) {
         if let Some(basis) = self.harmony_bases.get_mut(&harmony) {
             let scaled = adjustment.clone().scale(rate);
-            *basis = RealHV::bundle(&[basis.clone(), scaled]);
+            *basis = ContinuousHV::bundle_owned(&[basis.clone(), scaled]);
         }
     }
 
@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn test_embedding() {
         let mut embedder = SemanticValueEmbedder::default();
-        let semantic = RealHV::random(512, 42);
+        let semantic = ContinuousHV::random(512, 42);
         let concept = embedder.embed("test", semantic);
 
         assert_eq!(concept.id, "test");
@@ -353,8 +353,8 @@ mod tests {
     fn test_similarity() {
         let mut embedder = SemanticValueEmbedder::default();
 
-        let c1 = embedder.embed("c1", RealHV::random(512, 42));
-        let c2 = embedder.embed("c2", RealHV::random(512, 42));
+        let c1 = embedder.embed("c1", ContinuousHV::random(512, 42));
+        let c2 = embedder.embed("c2", ContinuousHV::random(512, 42));
 
         let sim = c1.similarity(&c2, 0.3);
         assert!(sim >= -1.0 && sim <= 1.0);
@@ -365,11 +365,11 @@ mod tests {
         let mut embedder = SemanticValueEmbedder::default();
 
         // First embed creates new
-        let _ = embedder.embed("test", RealHV::random(512, 42));
+        let _ = embedder.embed("test", ContinuousHV::random(512, 42));
         assert_eq!(embedder.stats.cache_misses, 1);
 
         // Second embed uses cache
-        let _ = embedder.embed("test", RealHV::random(512, 42));
+        let _ = embedder.embed("test", ContinuousHV::random(512, 42));
         assert_eq!(embedder.stats.cache_hits, 1);
     }
 }

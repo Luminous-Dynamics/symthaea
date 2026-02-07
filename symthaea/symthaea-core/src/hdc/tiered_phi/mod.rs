@@ -79,8 +79,8 @@ mod tests;
 // =============================================================================
 
 // HDC types needed by tests and users
-pub use crate::hdc::binary_hv::HV16;
-pub use crate::hdc::real_hv::RealHV;
+pub use crate::hdc::binary_hv::BinaryHV;
+pub use crate::hdc::unified_hv::ContinuousHV;
 
 // Core types (most commonly used)
 pub use core::{

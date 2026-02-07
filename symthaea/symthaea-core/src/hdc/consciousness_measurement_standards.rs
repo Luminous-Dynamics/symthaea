@@ -55,7 +55,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 
 /// Categories of consciousness measurement
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -140,7 +140,7 @@ pub struct DimensionMeasurement {
     /// Timestamp of measurement
     pub timestamp: Instant,
     /// Optional hypervector representation
-    pub hv_encoding: Option<HV16>,
+    pub hv_encoding: Option<BinaryHV>,
 }
 
 impl DimensionMeasurement {
@@ -175,7 +175,7 @@ impl DimensionMeasurement {
     }
 
     /// With hypervector encoding
-    pub fn with_hv(mut self, hv: HV16) -> Self {
+    pub fn with_hv(mut self, hv: BinaryHV) -> Self {
         self.hv_encoding = Some(hv);
         self
     }

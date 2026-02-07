@@ -63,11 +63,11 @@ fn main() {
 
     let n_shots = 200;  // Tokamak shots (some disruptive, some stable)
     let steps_per_shot = 50;
-    let lr = 0.005;
+    let lr = 0.02;  // Higher LR for BPTT with Adam
 
     let mut epoch_losses = Vec::new();
 
-    for epoch in 0..5 {
+    for epoch in 0..10 {
         let mut total_loss = 0.0f32;
         let mut count = 0;
 
@@ -79,12 +79,11 @@ fn main() {
 
             network.reset();
 
-            for i in 0..inputs.len() {
-                let loss = network.train_step(&inputs[i], &targets[i], dts[i], lr)
-                    .unwrap_or(1.0);
-                total_loss += loss;
-                count += 1;
-            }
+            // Train with full sequence for proper BPTT through temporal dynamics
+            let loss = network.train_step_bptt_optimized(&inputs, &targets, &dts, lr)
+                .unwrap_or(1.0);
+            total_loss += loss;
+            count += 1;
         }
 
         let avg_loss = total_loss / count as f32;

@@ -7,11 +7,11 @@ use super::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::binary_hv::HV16;
-    use crate::hdc::real_hv::RealHV;
+    use crate::hdc::binary_hv::BinaryHV;
+    use crate::hdc::unified_hv::ContinuousHV;
 
-    fn create_test_components(n: usize) -> Vec<HV16> {
-        (0..n).map(|i| HV16::random(i as u64)).collect()
+    fn create_test_components(n: usize) -> Vec<BinaryHV> {
+        (0..n).map(|i| BinaryHV::random(i as u64)).collect()
     }
 
     #[test]
@@ -67,8 +67,8 @@ mod tests {
 
         // Test 1: Modular/Homogeneous (all very similar - low Φ expected)
         // In IIT, homogeneous systems have LOW Φ because they're redundant, not integrated
-        let base = HV16::random(42);
-        let homogeneous: Vec<HV16> = (0..10)
+        let base = BinaryHV::random(42);
+        let homogeneous: Vec<BinaryHV> = (0..10)
             .map(|i| {
                 let mut variant = base.clone();
                 // Flip just one bit - creates redundant/homogeneous system
@@ -83,8 +83,8 @@ mod tests {
         // Group A: components 0-4 (similar to each other)
         // Group B: components 5-9 (similar to each other)
         // But A and B have some correlation too
-        let group_a_base = HV16::random(100);
-        let group_b_base = HV16::random(200);
+        let group_a_base = BinaryHV::random(100);
+        let group_b_base = BinaryHV::random(200);
 
         let mut integrated = Vec::new();
         // Group A: similar to group_a_base
@@ -108,8 +108,8 @@ mod tests {
         let phi_integrated = phi_calc.compute(&integrated);
 
         // Test 3: Random/Modular (uncorrelated - low-medium Φ)
-        let random: Vec<HV16> = (0..10)
-            .map(|i| HV16::random((i * 1000) as u64))
+        let random: Vec<BinaryHV> = (0..10)
+            .map(|i| BinaryHV::random((i * 1000) as u64))
             .collect();
         let phi_random = phi_calc.compute(&random);
 
@@ -292,8 +292,8 @@ mod tests {
         let initial_stats = global_phi_stats();
 
         // Create unique components each time (different seeds)
-        let components1: Vec<_> = (0..5).map(|i| HV16::random(i as u64 * 12345)).collect();
-        let components2: Vec<_> = (0..7).map(|i| HV16::random((i + 100) as u64 * 67890)).collect();
+        let components1: Vec<_> = (0..5).map(|i| BinaryHV::random(i as u64 * 12345)).collect();
+        let components2: Vec<_> = (0..7).map(|i| BinaryHV::random((i + 100) as u64 * 67890)).collect();
 
         global_phi(&components1);
         global_phi(&components2);
@@ -439,7 +439,7 @@ mod tests {
         let _phi1 = phi.compute_incremental(&components);
 
         // Change one component
-        components[0] = HV16::random(99999);
+        components[0] = BinaryHV::random(99999);
 
         // Second computation
         let phi2 = phi.compute_incremental(&components);
@@ -464,7 +464,7 @@ mod tests {
 
         // Change 5 components (less than half)
         for i in 0..5 {
-            components[i] = HV16::random((i + 1000) as u64);
+            components[i] = BinaryHV::random((i + 1000) as u64);
         }
 
         // Second computation
@@ -489,7 +489,7 @@ mod tests {
 
         // Change more than half (11 out of 20)
         for i in 0..11 {
-            components[i] = HV16::random((i + 2000) as u64);
+            components[i] = BinaryHV::random((i + 2000) as u64);
         }
 
         // Second computation
@@ -518,7 +518,7 @@ mod tests {
         // Benchmark incremental updates
         let start_incremental = Instant::now();
         for i in 0..10 {
-            components[0] = HV16::random((i * 1000) as u64);
+            components[0] = BinaryHV::random((i * 1000) as u64);
             let _ = phi.compute_incremental(&components);
         }
         let incremental_time = start_incremental.elapsed();
@@ -527,7 +527,7 @@ mod tests {
         let mut phi2 = TieredPhi::new(ApproximationTier::SpectralConnectivity);
         let start_full = Instant::now();
         for i in 0..10 {
-            components[0] = HV16::random((i * 1000 + 500) as u64);
+            components[0] = BinaryHV::random((i * 1000 + 500) as u64);
             let _ = phi2.compute(&components); // Full computation
         }
         let full_time = start_full.elapsed();
@@ -568,14 +568,14 @@ mod tests {
         let mut phi = TieredPhi::new(ApproximationTier::SpectralConnectivity);
 
         // Empty components
-        let empty: Vec<HV16> = vec![];
+        let empty: Vec<BinaryHV> = vec![];
         let h = phi.compute_hierarchical(&empty);
         assert_eq!(h.num_clusters, 0);
         assert_eq!(h.micro_phi, 0.0);
         assert_eq!(h.emergence_ratio, 1.0);
 
         // Single component
-        let single = vec![HV16::random(0)];
+        let single = vec![BinaryHV::random(0)];
         let h = phi.compute_hierarchical(&single);
         assert_eq!(h.num_clusters, 1);
         assert_eq!(h.macro_phi, 0.0);
@@ -605,7 +605,7 @@ mod tests {
         let mut phi = TieredPhi::new(ApproximationTier::SpectralConnectivity);
 
         // Components that are very similar should cluster together
-        let base = HV16::random(42);
+        let base = BinaryHV::random(42);
         let mut components = vec![];
         for i in 0..10 {
             // Create slight variations by XORing with sparse vectors
@@ -633,12 +633,12 @@ mod tests {
 
         // Cluster 1: Components derived from seed 100
         for i in 0..5 {
-            components.push(HV16::random(100 + i));
+            components.push(BinaryHV::random(100 + i));
         }
 
         // Cluster 2: Components derived from seed 200
         for i in 0..5 {
-            components.push(HV16::random(200 + i));
+            components.push(BinaryHV::random(200 + i));
         }
 
         let h = phi.compute_hierarchical(&components);
@@ -709,7 +709,7 @@ mod tests {
     #[test]
     fn test_attribution_empty_components() {
         let mut phi = TieredPhi::new(ApproximationTier::SampledPartition);
-        let components: Vec<HV16> = vec![];
+        let components: Vec<BinaryHV> = vec![];
 
         let attr = phi.compute_attribution(&components);
 
@@ -724,7 +724,7 @@ mod tests {
     #[test]
     fn test_attribution_single_component() {
         let mut phi = TieredPhi::new(ApproximationTier::SampledPartition);
-        let components = vec![HV16::random(42)];
+        let components = vec![BinaryHV::random(42)];
 
         let attr = phi.compute_attribution(&components);
 
@@ -770,16 +770,16 @@ mod tests {
         let mut phi = TieredPhi::new(ApproximationTier::SampledPartition);
 
         // Create hub with specific seed, spokes with similar seeds
-        let hub = HV16::random(1000);
+        let hub = BinaryHV::random(1000);
         let mut components = vec![hub.clone()];
 
         // Create spokes that are all similar to hub but not each other
         for i in 1..6 {
             // Mix hub with unique component
-            let unique = HV16::random(i as u64);
+            let unique = BinaryHV::random(i as u64);
             // Create spoke by bundling hub pattern with unique pattern
             // This makes spokes connected to hub but less to each other
-            let spoke = HV16::bundle(&[hub.clone(), unique]);
+            let spoke = BinaryHV::bundle(&[hub.clone(), unique]);
             components.push(spoke);
         }
 
@@ -827,8 +827,8 @@ mod tests {
         let mut phi = TieredPhi::new(ApproximationTier::SampledPartition);
 
         // All identical components - should have uniform attribution
-        let base = HV16::random(999);
-        let components: Vec<HV16> = (0..5).map(|_| base.clone()).collect();
+        let base = BinaryHV::random(999);
+        let components: Vec<BinaryHV> = (0..5).map(|_| base.clone()).collect();
 
         let attr = phi.compute_attribution(&components);
 
@@ -878,14 +878,14 @@ mod tests {
 
         // Create systems with different integration patterns
         // System 1: Diverse components (should have distributed importance)
-        let diverse: Vec<HV16> = (0..6).map(|i| HV16::random(i as u64 * 1000)).collect();
+        let diverse: Vec<BinaryHV> = (0..6).map(|i| BinaryHV::random(i as u64 * 1000)).collect();
         let attr_diverse = phi.compute_attribution(&diverse);
 
         // System 2: Mostly similar components (may have more concentrated importance)
-        let base = HV16::random(42);
-        let similar: Vec<HV16> = (0..6).map(|i| {
-            let noise = HV16::random(i as u64);
-            HV16::bundle(&[base.clone(), base.clone(), base.clone(), noise])
+        let base = BinaryHV::random(42);
+        let similar: Vec<BinaryHV> = (0..6).map(|i| {
+            let noise = BinaryHV::random(i as u64);
+            BinaryHV::bundle(&[base.clone(), base.clone(), base.clone(), noise])
         }).collect();
         let attr_similar = phi.compute_attribution(&similar);
 
@@ -1182,7 +1182,7 @@ mod tests {
     #[test]
     fn test_pyramid_empty_components() {
         let mut pyramid = PhiPyramid::new();
-        let components: Vec<HV16> = vec![];
+        let components: Vec<BinaryHV> = vec![];
 
         let result = pyramid.compute(&components);
 
@@ -1734,8 +1734,8 @@ mod tests {
     // REVOLUTIONARY #96: CROSS-TOPOLOGY Φ TRANSFER TESTS
     // ============================================================================
 
-    fn create_test_realvh_components(n: usize, dim: usize, seed: u64) -> Vec<RealHV> {
-        (0..n).map(|i| RealHV::random(dim, seed + i as u64 * 1000)).collect()
+    fn create_test_realvh_components(n: usize, dim: usize, seed: u64) -> Vec<ContinuousHV> {
+        (0..n).map(|i| ContinuousHV::random(dim, seed + i as u64 * 1000)).collect()
     }
 
     #[test]
@@ -1871,7 +1871,7 @@ mod tests {
     #[test]
     fn test_transfer_empty_components() {
         let transfer = PhiTransfer::new();
-        let empty: Vec<RealHV> = vec![];
+        let empty: Vec<ContinuousHV> = vec![];
         let single = create_test_realvh_components(1, 256, 42);
 
         // Should handle edge cases gracefully
@@ -2312,7 +2312,7 @@ mod tests {
     #[test]
     fn test_causal_intervention_empty() {
         let analyzer = PhiCausalAnalyzer::new();
-        let empty: Vec<RealHV> = vec![];
+        let empty: Vec<ContinuousHV> = vec![];
 
         let result = analyzer.analyze(&empty);
 
@@ -2327,7 +2327,7 @@ mod tests {
     #[test]
     fn test_causal_intervention_single_node() {
         let analyzer = PhiCausalAnalyzer::new();
-        let single = vec![RealHV::random(128, 42)];
+        let single = vec![ContinuousHV::random(128, 42)];
 
         let result = analyzer.analyze(&single);
 
@@ -2343,8 +2343,8 @@ mod tests {
         let analyzer = PhiCausalAnalyzer::new();
 
         // Create a simple 4-node network
-        let nodes: Vec<RealHV> = (0..4)
-            .map(|i| RealHV::random(128, i as u64 * 100))
+        let nodes: Vec<ContinuousHV> = (0..4)
+            .map(|i| ContinuousHV::random(128, i as u64 * 100))
             .collect();
 
         let result = analyzer.analyze(&nodes);
@@ -2493,14 +2493,14 @@ mod tests {
         let analyzer = PhiCausalAnalyzer::new();
 
         // Create a hub topology: node 0 is similar to all others
-        let hub = RealHV::random(128, 42);
+        let hub = ContinuousHV::random(128, 42);
         let mut nodes = vec![hub.clone()];
 
         // Add spokes that are similar to hub but not to each other
         for i in 1..5 {
-            let noise = RealHV::random(128, (i * 1000) as u64);
+            let noise = ContinuousHV::random(128, (i * 1000) as u64);
             // Blend hub with noise (70% hub, 30% noise)
-            let spoke = RealHV::bundle(&[hub.clone(), hub.clone(), noise]);
+            let spoke = ContinuousHV::bundle_owned(&[hub.clone(), hub.clone(), noise]);
             nodes.push(spoke);
         }
 
@@ -2519,8 +2519,8 @@ mod tests {
         let analyzer = PhiCausalAnalyzer::new();
 
         // Create 8-node network
-        let nodes: Vec<RealHV> = (0..8)
-            .map(|i| RealHV::random(128, i as u64 * 50))
+        let nodes: Vec<ContinuousHV> = (0..8)
+            .map(|i| ContinuousHV::random(128, i as u64 * 50))
             .collect();
 
         // Find nodes controlling 80% of causal power
@@ -2539,8 +2539,8 @@ mod tests {
     fn test_causal_analyze_subset() {
         let analyzer = PhiCausalAnalyzer::new();
 
-        let nodes: Vec<RealHV> = (0..6)
-            .map(|i| RealHV::random(128, i as u64 * 77))
+        let nodes: Vec<ContinuousHV> = (0..6)
+            .map(|i| ContinuousHV::random(128, i as u64 * 77))
             .collect();
 
         // Analyze only nodes 0, 2, 4
@@ -2560,8 +2560,8 @@ mod tests {
 
     #[test]
     fn test_causal_convenience_functions() {
-        let nodes: Vec<RealHV> = (0..4)
-            .map(|i| RealHV::random(128, i as u64 * 123))
+        let nodes: Vec<ContinuousHV> = (0..4)
+            .map(|i| ContinuousHV::random(128, i as u64 * 123))
             .collect();
 
         // Test analyze_causal_interventions
@@ -2586,17 +2586,17 @@ mod tests {
         let analyzer = PhiCausalAnalyzer::new();
 
         // Create a "fragile" network (hub-spoke)
-        let hub = RealHV::random(128, 1);
-        let fragile: Vec<RealHV> = std::iter::once(hub.clone())
+        let hub = ContinuousHV::random(128, 1);
+        let fragile: Vec<ContinuousHV> = std::iter::once(hub.clone())
             .chain((1..5).map(|i| {
-                let noise = RealHV::random(128, (i * 100) as u64);
-                RealHV::bundle(&[hub.clone(), noise])
+                let noise = ContinuousHV::random(128, (i * 100) as u64);
+                ContinuousHV::bundle_owned(&[hub.clone(), noise])
             }))
             .collect();
 
         // Create a "robust" network (uniform random)
-        let robust: Vec<RealHV> = (0..5)
-            .map(|i| RealHV::random(128, (i * 500) as u64))
+        let robust: Vec<ContinuousHV> = (0..5)
+            .map(|i| ContinuousHV::random(128, (i * 500) as u64))
             .collect();
 
         let fragile_result = analyzer.analyze(&fragile);
@@ -2616,10 +2616,10 @@ mod tests {
         let analyzer = PhiCausalAnalyzer::new();
 
         // Create correlated network
-        let base = RealHV::random(128, 42);
-        let nodes: Vec<RealHV> = (0..4)
+        let base = ContinuousHV::random(128, 42);
+        let nodes: Vec<ContinuousHV> = (0..4)
             .map(|i| {
-                let noise = RealHV::random(128, (i * 200) as u64).scale(0.2);
+                let noise = ContinuousHV::random(128, (i * 200) as u64).scale(0.2);
                 base.add(&noise)
             })
             .collect();
@@ -2643,7 +2643,7 @@ mod tests {
 
     #[test]
     fn test_modularity_empty_network() {
-        let nodes: Vec<RealHV> = vec![];
+        let nodes: Vec<ContinuousHV> = vec![];
         let result = PhiModularityAnalyzer::new().analyze(&nodes);
 
         assert_eq!(result.num_modules(), 0);
@@ -2653,7 +2653,7 @@ mod tests {
 
     #[test]
     fn test_modularity_single_node() {
-        let nodes = vec![RealHV::random(256, 42)];
+        let nodes = vec![ContinuousHV::random(256, 42)];
         let result = PhiModularityAnalyzer::new().analyze(&nodes);
 
         assert_eq!(result.total_phi, 0.0); // Single node has no integration
@@ -2661,7 +2661,7 @@ mod tests {
 
     #[test]
     fn test_modularity_two_nodes() {
-        let nodes = vec![RealHV::random(256, 1), RealHV::random(256, 2)];
+        let nodes = vec![ContinuousHV::random(256, 1), ContinuousHV::random(256, 2)];
         let result = PhiModularityAnalyzer::new().analyze(&nodes);
 
         assert!(result.total_phi >= 0.0);
@@ -2723,16 +2723,16 @@ mod tests {
         let mut nodes = Vec::new();
 
         // Module 1: similar nodes
-        let base1 = RealHV::random(dim, 100);
+        let base1 = ContinuousHV::random(dim, 100);
         for i in 0..3 {
-            let noise = RealHV::random(dim, 1000 + i);
+            let noise = ContinuousHV::random(dim, 1000 + i);
             nodes.push(base1.add(&noise.scale(0.1)));
         }
 
         // Module 2: different similar nodes
-        let base2 = RealHV::random(dim, 200);
+        let base2 = ContinuousHV::random(dim, 200);
         for i in 0..3 {
-            let noise = RealHV::random(dim, 2000 + i);
+            let noise = ContinuousHV::random(dim, 2000 + i);
             nodes.push(base2.add(&noise.scale(0.1)));
         }
 
@@ -2756,16 +2756,16 @@ mod tests {
 
         // Create two clearly separated clusters
         // Cluster A: nodes with positive bias
-        let cluster_a_base = RealHV::random(dim, 42);
+        let cluster_a_base = ContinuousHV::random(dim, 42);
         for i in 0..4 {
-            let variation = RealHV::random(dim, 100 + i);
+            let variation = ContinuousHV::random(dim, 100 + i);
             nodes.push(cluster_a_base.add(&variation.scale(0.05)));
         }
 
         // Cluster B: nodes with different base (orthogonal)
-        let cluster_b_base = RealHV::random(dim, 999);
+        let cluster_b_base = ContinuousHV::random(dim, 999);
         for i in 0..4 {
-            let variation = RealHV::random(dim, 200 + i);
+            let variation = ContinuousHV::random(dim, 200 + i);
             nodes.push(cluster_b_base.add(&variation.scale(0.05)));
         }
 
@@ -2788,8 +2788,8 @@ mod tests {
     #[test]
     fn test_spectral_clustering() {
         let dim = 256;
-        let nodes: Vec<RealHV> = (0..6)
-            .map(|i| RealHV::random(dim, i as u64 * 1000))
+        let nodes: Vec<ContinuousHV> = (0..6)
+            .map(|i| ContinuousHV::random(dim, i as u64 * 1000))
             .collect();
 
         let config = ModularityConfig {
@@ -2805,8 +2805,8 @@ mod tests {
     #[test]
     fn test_greedy_modularity() {
         let dim = 256;
-        let nodes: Vec<RealHV> = (0..6)
-            .map(|i| RealHV::random(dim, i as u64 * 500))
+        let nodes: Vec<ContinuousHV> = (0..6)
+            .map(|i| ContinuousHV::random(dim, i as u64 * 500))
             .collect();
 
         let config = ModularityConfig {
@@ -2821,8 +2821,8 @@ mod tests {
     #[test]
     fn test_kmeans_clustering() {
         let dim = 256;
-        let nodes: Vec<RealHV> = (0..8)
-            .map(|i| RealHV::random(dim, i as u64 * 700))
+        let nodes: Vec<ContinuousHV> = (0..8)
+            .map(|i| ContinuousHV::random(dim, i as u64 * 700))
             .collect();
 
         let config = ModularityConfig {
@@ -2842,10 +2842,10 @@ mod tests {
 
         // Two modules with a connecting node
         for i in 0..3 {
-            nodes.push(RealHV::random(dim, i as u64));
+            nodes.push(ContinuousHV::random(dim, i as u64));
         }
         for i in 3..6 {
-            nodes.push(RealHV::random(dim, i as u64 * 1000));
+            nodes.push(ContinuousHV::random(dim, i as u64 * 1000));
         }
 
         let result = PhiModularityAnalyzer::new().analyze(&nodes);
@@ -2862,8 +2862,8 @@ mod tests {
     #[test]
     fn test_node_classification() {
         let dim = 256;
-        let nodes: Vec<RealHV> = (0..8)
-            .map(|i| RealHV::random(dim, i as u64 * 123))
+        let nodes: Vec<ContinuousHV> = (0..8)
+            .map(|i| ContinuousHV::random(dim, i as u64 * 123))
             .collect();
 
         let result = PhiModularityAnalyzer::new().analyze(&nodes);
@@ -2882,8 +2882,8 @@ mod tests {
     #[test]
     fn test_hierarchical_modularity() {
         let dim = 256;
-        let nodes: Vec<RealHV> = (0..10)
-            .map(|i| RealHV::random(dim, i as u64 * 42))
+        let nodes: Vec<ContinuousHV> = (0..10)
+            .map(|i| ContinuousHV::random(dim, i as u64 * 42))
             .collect();
 
         let result = PhiModularityAnalyzer::new().analyze(&nodes);
@@ -2898,8 +2898,8 @@ mod tests {
     #[test]
     fn test_convenience_functions() {
         let dim = 256;
-        let nodes: Vec<RealHV> = (0..6)
-            .map(|i| RealHV::random(dim, i as u64 * 55))
+        let nodes: Vec<ContinuousHV> = (0..6)
+            .map(|i| ContinuousHV::random(dim, i as u64 * 55))
             .collect();
 
         let result = analyze_network_modularity(&nodes);
@@ -2917,12 +2917,12 @@ mod tests {
     fn test_hub_and_spoke_modularity() {
         // Create hub-and-spoke topology (star with central hub)
         let dim = 256;
-        let hub = RealHV::random(dim, 0);
+        let hub = ContinuousHV::random(dim, 0);
         let mut nodes = vec![hub.clone()];
 
         // Create spokes
         for i in 1..=6 {
-            let spoke = RealHV::random(dim, i as u64 * 100);
+            let spoke = ContinuousHV::random(dim, i as u64 * 100);
             // Mix spoke with hub to create connection
             let connected = hub.bind(&spoke);
             nodes.push(connected);

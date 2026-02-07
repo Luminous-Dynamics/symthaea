@@ -37,7 +37,7 @@
 //    - Similarity: LIKE (as)
 //
 // 2. **Hyperdimensional Semantic Composition**:
-//    Each primitive → distinct Hypervector (HV16)
+//    Each primitive → distinct Hypervector (BinaryHV)
 //
 //    **Binding**: Combine concepts while preserving structure
 //    ```
@@ -133,7 +133,7 @@
 //
 // ```rust
 // struct UniversalSemantics {
-//     primitives: HashMap<SemanticPrime, HV16>,  // 65 base concepts
+//     primitives: HashMap<SemanticPrime, BinaryHV>,  // 65 base concepts
 //     complex: HashMap<String, ComplexConcept>,  // Composed meanings
 //     language_maps: HashMap<Language, PrimeMapping>,  // Language → primes
 // }
@@ -152,7 +152,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -555,7 +555,7 @@ pub struct ComplexConcept {
     pub name: String,
 
     /// Composed hypervector
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Component primes used
     pub components: Vec<SemanticPrime>,
@@ -594,7 +594,7 @@ pub struct ComplexConcept {
 #[derive(Debug)]
 pub struct UniversalSemantics {
     /// Primitive encodings (65 universal concepts)
-    primitives: HashMap<SemanticPrime, HV16>,
+    primitives: HashMap<SemanticPrime, BinaryHV>,
 
     /// Complex concept library
     concepts: HashMap<String, ComplexConcept>,
@@ -608,7 +608,7 @@ impl UniversalSemantics {
         // Initialize all 65 primes with distinct hypervectors
         for (idx, prime) in SemanticPrime::all().iter().enumerate() {
             // Each prime gets unique random encoding
-            let encoding = HV16::random((1000 + idx * 100) as u64);
+            let encoding = BinaryHV::random((1000 + idx * 100) as u64);
             primitives.insert(*prime, encoding);
         }
 
@@ -619,7 +619,7 @@ impl UniversalSemantics {
     }
 
     /// Get primitive encoding
-    pub fn get_prime(&self, prime: SemanticPrime) -> &HV16 {
+    pub fn get_prime(&self, prime: SemanticPrime) -> &BinaryHV {
         self.primitives.get(&prime)
             .expect("All primes should be initialized")
     }
@@ -635,14 +635,14 @@ impl UniversalSemantics {
         let structure = structure.into();
 
         // Encode by bundling component primes
-        let vectors: Vec<HV16> = components.iter()
+        let vectors: Vec<BinaryHV> = components.iter()
             .map(|p| *self.get_prime(*p))
             .collect();
 
         let encoding = if vectors.len() == 1 {
             vectors[0]
         } else {
-            HV16::bundle(&vectors)
+            BinaryHV::bundle(&vectors)
         };
 
         let complexity = components.len();
@@ -660,13 +660,13 @@ impl UniversalSemantics {
     }
 
     /// Bind two concepts (preserves structure)
-    pub fn bind(&self, a: &HV16, b: &HV16) -> HV16 {
+    pub fn bind(&self, a: &BinaryHV, b: &BinaryHV) -> BinaryHV {
         a.bind(b)
     }
 
     /// Bundle concepts (superposition)
-    pub fn bundle(&self, concepts: &[HV16]) -> HV16 {
-        HV16::bundle(concepts)
+    pub fn bundle(&self, concepts: &[BinaryHV]) -> BinaryHV {
+        BinaryHV::bundle(concepts)
     }
 
     /// Get concept by name
@@ -675,7 +675,7 @@ impl UniversalSemantics {
     }
 
     /// Measure similarity between concepts
-    pub fn similarity(&self, a: &HV16, b: &HV16) -> f64 {
+    pub fn similarity(&self, a: &BinaryHV, b: &BinaryHV) -> f64 {
         a.similarity(b) as f64
     }
 

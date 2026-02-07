@@ -349,6 +349,11 @@ impl EmergenceChain {
     ///
     /// NOTE: This is the legacy method using hardcoded level weights.
     /// For rigorous computation, use `phenomenal_index_rigorous()` instead.
+    #[deprecated(
+        since = "0.6.0",
+        note = "Use phenomenal_index_rigorous() for entropy-based computation. \
+                This method uses circular hardcoded level weights."
+    )]
     pub fn phenomenal_index(&self, vector: &ContinuousHV, level: EmergenceLevel) -> f64 {
         // Higher levels have more phenomenal character
         let level_weight = (level as usize) as f64 / 9.0;
@@ -539,6 +544,7 @@ impl EmergenceChain {
     }
 
     /// Get phenomenal profile across all levels for a concept
+    #[allow(deprecated)]
     pub fn phenomenal_profile(&self, concept: &ContinuousHV) -> Vec<(EmergenceLevel, f64)> {
         EmergenceLevel::all()
             .iter()
@@ -555,6 +561,7 @@ impl EmergenceChain {
     }
 
     /// Trace the full emergence path from quarks to a given concept
+    #[allow(deprecated)]
     pub fn trace_emergence(&self, concept: &ContinuousHV) -> Vec<EmergenceStep> {
         EmergenceLevel::all()
             .iter()
@@ -572,6 +579,7 @@ impl EmergenceChain {
     }
 
     /// Create a complete emergence trace from hydrogen to consciousness
+    #[allow(deprecated)]
     pub fn hydrogen_to_consciousness(&self) -> Vec<EmergenceStep> {
         let mut steps = Vec::new();
 

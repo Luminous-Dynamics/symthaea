@@ -25,7 +25,7 @@
 //! - **Verifiable**: Every result has a traceable proof
 //! - **Compositional**: Complex math emerges from simple primitives
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use crate::hdc::integrated_information::IntegratedInformation;
 use serde::{Serialize, Deserialize};
@@ -45,7 +45,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HdcNumber {
     /// The hypervector encoding of this number
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// The numeric value (for verification and display)
     pub value: u64,
@@ -64,7 +64,7 @@ impl HdcNumber {
             .expect("ZERO primitive must exist");
 
         Self {
-            encoding: zero_prim.encoding.clone(),
+            encoding: zero_prim.encoding,
             value: 0,
             construction: vec!["ZERO".to_string()],
             construction_phi: 0.0,
@@ -81,7 +81,7 @@ impl HdcNumber {
         let succ_prim = primitives.get("SUCCESSOR")
             .expect("SUCCESSOR primitive must exist");
 
-        let mut encoding = zero_prim.encoding.clone();
+        let mut encoding = zero_prim.encoding;
         let mut construction = vec!["ZERO".to_string()];
         let mut total_phi = 0.0;
 
@@ -107,9 +107,9 @@ impl HdcNumber {
     }
 
     /// Measure Φ contribution of a construction step
-    fn measure_step_phi(before: &HV16, after: &HV16) -> f64 {
+    fn measure_step_phi(before: &BinaryHV, after: &BinaryHV) -> f64 {
         let mut phi_calc = IntegratedInformation::new();
-        let components = vec![before.clone(), after.clone()];
+        let components = vec![*before, *after];
         phi_calc.compute_phi(&components)
     }
 
@@ -205,7 +205,7 @@ pub struct ProofStep {
     pub phi: f64,
 
     /// Intermediate result encoding
-    pub intermediate: HV16,
+    pub intermediate: BinaryHV,
 }
 
 /// The Hyperdimensional Arithmetic Engine
@@ -293,20 +293,20 @@ impl ArithmeticEngine {
 
         // Start with a
         let num_a = self.number(a);
-        let mut result_encoding = num_a.encoding.clone();
+        let mut result_encoding = num_a.encoding;
 
         proof.push(ProofStep {
             description: format!("Start with {} (base case)", a),
             primitives_used: vec!["NUMBER".to_string()],
             transformation: "identity".to_string(),
             phi: num_a.construction_phi,
-            intermediate: result_encoding.clone(),
+            intermediate: result_encoding,
         });
         total_phi += num_a.construction_phi;
 
         // Apply successor b times (a + b = S^b(a))
         for i in 0..b {
-            let prev_encoding = result_encoding.clone();
+            let prev_encoding = result_encoding;
 
             // S(current) = SUCCESSOR ⊗ current
             result_encoding = succ_prim.encoding.bind(&result_encoding);
@@ -320,7 +320,7 @@ impl ArithmeticEngine {
                 primitives_used: vec!["SUCCESSOR".to_string()],
                 transformation: "bind".to_string(),
                 phi: step_phi,
-                intermediate: result_encoding.clone(),
+                intermediate: result_encoding,
             });
         }
 
@@ -334,7 +334,7 @@ impl ArithmeticEngine {
             primitives_used: vec!["ADDITION".to_string()],
             transformation: "bind".to_string(),
             phi: final_phi,
-            intermediate: final_encoding.clone(),
+            intermediate: final_encoding,
         });
 
         // Create result number
@@ -399,7 +399,7 @@ impl ArithmeticEngine {
         // Start with 0 (a × 0 = 0)
         let zero = self.number(0);
         let num_a = self.number(a);
-        let mut result_encoding = zero.encoding.clone();
+        let mut result_encoding = zero.encoding;
         let mut running_value = 0u64;
 
         proof.push(ProofStep {
@@ -407,12 +407,12 @@ impl ArithmeticEngine {
             primitives_used: vec!["ZERO".to_string()],
             transformation: "identity".to_string(),
             phi: 0.0,
-            intermediate: result_encoding.clone(),
+            intermediate: result_encoding,
         });
 
         // Apply: a × S(k) = a × k + a, for k = 0 to b-1
         for i in 0..b {
-            let prev_encoding = result_encoding.clone();
+            let prev_encoding = result_encoding;
 
             // Add a to running total (via binding)
             // result = result + a
@@ -432,7 +432,7 @@ impl ArithmeticEngine {
                 primitives_used: vec!["ADDITION".to_string()],
                 transformation: "bind".to_string(),
                 phi: step_phi,
-                intermediate: result_encoding.clone(),
+                intermediate: result_encoding,
             });
         }
 
@@ -446,7 +446,7 @@ impl ArithmeticEngine {
             primitives_used: vec!["MULTIPLICATION".to_string()],
             transformation: "bind".to_string(),
             phi: final_phi,
-            intermediate: final_encoding.clone(),
+            intermediate: final_encoding,
         });
 
         // Create result number
@@ -508,7 +508,7 @@ impl ArithmeticEngine {
             primitives_used: vec!["SUBTRACTION".to_string()],
             transformation: "inverse".to_string(),
             phi: result.construction_phi,
-            intermediate: result.encoding.clone(),
+            intermediate: result.encoding,
         });
 
         // Verify: b + c should resonate with a
@@ -521,7 +521,7 @@ impl ArithmeticEngine {
             primitives_used: vec!["ADDITION".to_string()],
             transformation: "verification".to_string(),
             phi: verification.total_phi,
-            intermediate: verification.result.encoding.clone(),
+            intermediate: verification.result.encoding,
         });
 
         let total_phi = result.construction_phi + verification.total_phi;
@@ -569,7 +569,7 @@ impl ArithmeticEngine {
             primitives_used: vec!["ONE".to_string()],
             transformation: "identity".to_string(),
             phi: result.construction_phi,
-            intermediate: result.encoding.clone(),
+            intermediate: result.encoding,
         });
         total_phi += result.construction_phi;
 
@@ -584,7 +584,7 @@ impl ArithmeticEngine {
                 primitives_used: vec!["MULTIPLICATION".to_string()],
                 transformation: "bind".to_string(),
                 phi: mul_result.total_phi,
-                intermediate: mul_result.result.encoding.clone(),
+                intermediate: mul_result.result.encoding,
             });
 
             result = mul_result.result;
@@ -637,7 +637,7 @@ impl ArithmeticEngine {
             primitives_used: vec!["ONE".to_string()],
             transformation: "identity".to_string(),
             phi: result.construction_phi,
-            intermediate: result.encoding.clone(),
+            intermediate: result.encoding,
         });
         total_phi += result.construction_phi;
 
@@ -652,7 +652,7 @@ impl ArithmeticEngine {
                 primitives_used: vec!["MULTIPLICATION".to_string()],
                 transformation: "bind".to_string(),
                 phi: mul_result.total_phi,
-                intermediate: mul_result.result.encoding.clone(),
+                intermediate: mul_result.result.encoding,
             });
 
             result = mul_result.result;
@@ -915,7 +915,7 @@ pub struct HybridResult {
     pub phi_is_exact: bool,
 
     /// HDC encoding of the result (for integration with other systems)
-    pub encoding: Option<HV16>,
+    pub encoding: Option<BinaryHV>,
 }
 
 /// Which computation path was taken
@@ -1126,7 +1126,7 @@ impl HybridArithmeticEngine {
                     "Exponentiation {}^{} via {} multiplications by {}",
                     a, b, b, a
                 ),
-                estimated_peano_steps: (a as u64).saturating_pow(b as u32),
+                estimated_peano_steps: a.saturating_pow(b as u32),
                 axiom_references: vec![
                     "Definition: a^0 = 1".to_string(),
                     "Definition: a^S(b) = a^b × a".to_string(),
@@ -1230,7 +1230,7 @@ impl HybridArithmeticEngine {
                     format!(
                         "By induction on exponent: {}^{} = {}^{} × {} = {} × {} = {}",
                         a, b, a, b - 1, a,
-                        (a as u64).pow((b - 1) as u32), a, result
+                        a.pow((b - 1) as u32), a, result
                     )
                 },
                 justification: vec![
@@ -1878,7 +1878,7 @@ impl HybridArithmeticEngine {
         if n == 2 {
             return self.primality_result(n, true, "2 is the smallest prime");
         }
-        if n % 2 == 0 {
+        if n.is_multiple_of(2) {
             return self.primality_result(n, false, &format!("{} is even (divisible by 2)", n));
         }
 
@@ -1887,7 +1887,7 @@ impl HybridArithmeticEngine {
         let mut divisor_found = None;
 
         for d in (3..=sqrt_n).step_by(2) {
-            if n % d == 0 {
+            if n.is_multiple_of(d) {
                 divisor_found = Some(d);
                 break;
             }
@@ -2050,9 +2050,7 @@ impl MathDiscovery {
                     base_cases: vec![
                         "Base: a + 0 = 0 + a = a".to_string(),
                     ],
-                    inductive_step: format!(
-                        "Assume a + k = k + a. Then a + S(k) = S(a + k) = S(k + a) = S(k) + a"
-                    ),
+                    inductive_step: "Assume a + k = k + a. Then a + S(k) = S(a + k) = S(k + a) = S(k) + a".to_string(),
                     justification: vec![
                         "PA5: a + S(b) = S(a + b)".to_string(),
                         "Induction hypothesis".to_string(),
@@ -4094,7 +4092,7 @@ pub struct SymbolicExpr {
     /// The symbolic structure of this expression
     pub term_type: TermType,
     /// HDC encoding capturing semantic meaning
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     /// Φ accumulated during construction
     pub phi: f64,
     /// Human-readable form
@@ -4143,7 +4141,7 @@ impl SymbolicExpr {
             .map(|(i, b)| (b as u64) << (i % 8))
             .fold(0, |acc, x| acc.wrapping_add(x));
 
-        let var_hv = HV16::random(name_seed);
+        let var_hv = BinaryHV::random(name_seed);
         let encoding = var_prim.encoding.bind(&var_hv);
 
         Self {
@@ -4161,7 +4159,7 @@ impl SymbolicExpr {
             .expect("ADDITION primitive required");
 
         // Combine encodings: ADD ⊗ (left ⊕ right)
-        let combined = HV16::bundle(&[self.encoding.clone(), other.encoding.clone()]);
+        let combined = BinaryHV::bundle(&[self.encoding, other.encoding]);
         let encoding = add_prim.encoding.bind(&combined);
 
         let phi = self.phi + other.phi + Self::measure_composition_phi(&self.encoding, &other.encoding);
@@ -4184,7 +4182,7 @@ impl SymbolicExpr {
             .or_else(|| primitives.get("ADD"))
             .expect("SUBTRACT or ADD primitive required");
 
-        let combined = HV16::bundle(&[self.encoding.clone(), other.encoding.clone()]);
+        let combined = BinaryHV::bundle(&[self.encoding, other.encoding]);
         let encoding = sub_prim.encoding.bind(&combined);
 
         let phi = self.phi + other.phi + Self::measure_composition_phi(&self.encoding, &other.encoding);
@@ -4288,9 +4286,9 @@ impl SymbolicExpr {
     }
 
     /// Measure Φ contribution of composing two expressions
-    fn measure_composition_phi(a: &HV16, b: &HV16) -> f64 {
+    fn measure_composition_phi(a: &BinaryHV, b: &BinaryHV) -> f64 {
         let mut phi_calc = IntegratedInformation::new();
-        let components = vec![a.clone(), b.clone()];
+        let components = vec![*a, *b];
         phi_calc.compute_phi(&components)
     }
 
@@ -4347,7 +4345,7 @@ impl SymbolicExpr {
     }
 
     /// Create SymbolicExpr from TermType (helper for evaluation)
-    fn from_term_type(term: TermType, encoding: &HV16) -> Self {
+    fn from_term_type(term: TermType, encoding: &BinaryHV) -> Self {
         let display = match &term {
             TermType::Constant(v) => v.to_string(),
             TermType::Variable(n) => n.clone(),
@@ -4364,7 +4362,7 @@ impl SymbolicExpr {
 
         Self {
             term_type: term,
-            encoding: encoding.clone(),
+            encoding: *encoding,
             phi: 0.0,
             display,
         }
@@ -4420,7 +4418,7 @@ pub struct Polynomial {
     /// Variable name
     variable: String,
     /// HDC encoding of the polynomial
-    encoding: HV16,
+    encoding: BinaryHV,
     /// Accumulated Φ
     phi: f64,
 }
@@ -4443,7 +4441,7 @@ impl Polynomial {
         let var_encoding = SymbolicExpr::variable(variable, primitives).encoding;
 
         // Encode each term and bundle
-        let term_encodings: Vec<HV16> = coeffs.iter()
+        let term_encodings: Vec<BinaryHV> = coeffs.iter()
             .enumerate()
             .filter(|(_, &c)| c != 0)
             .map(|(degree, &coeff)| {
@@ -4455,9 +4453,9 @@ impl Polynomial {
             .collect();
 
         let encoding = if term_encodings.is_empty() {
-            poly_prim.encoding.clone()
+            poly_prim.encoding
         } else {
-            poly_prim.encoding.bind(&HV16::bundle(&term_encodings))
+            poly_prim.encoding.bind(&BinaryHV::bundle(&term_encodings))
         };
 
         let phi = coeffs.len() as f64 * 0.1;
@@ -4498,10 +4496,8 @@ impl Polynomial {
 
             if coeff >= 0 {
                 result = engine.add(result, term.value).value;
-            } else {
-                if let Some(sub) = engine.subtract(result, term.value) {
-                    result = sub.value;
-                }
+            } else if let Some(sub) = engine.subtract(result, term.value) {
+                result = sub.value;
             }
         }
 
@@ -4585,14 +4581,12 @@ impl std::fmt::Display for Polynomial {
                 } else {
                     format!("{}{}", coeff, self.variable)
                 }
+            } else if coeff == 1 {
+                format!("{}^{}", self.variable, i)
+            } else if coeff == -1 {
+                format!("-{}^{}", self.variable, i)
             } else {
-                if coeff == 1 {
-                    format!("{}^{}", self.variable, i)
-                } else if coeff == -1 {
-                    format!("-{}^{}", self.variable, i)
-                } else {
-                    format!("{}{}^{}", coeff, self.variable, i)
-                }
+                format!("{}{}^{}", coeff, self.variable, i)
             };
             terms.push(term);
         }
@@ -4977,7 +4971,7 @@ impl SymbolicAlgebra {
         self.stats.equations_solved += 1;
 
         let a = p.coefficients.get(1).copied().unwrap_or(0);
-        let b = p.coefficients.get(0).copied().unwrap_or(0);
+        let b = p.coefficients.first().copied().unwrap_or(0);
 
         if a == 0 {
             return None;
@@ -5002,7 +4996,7 @@ impl SymbolicAlgebra {
 
         let a = p.coefficients.get(2).copied().unwrap_or(0) as f64;
         let b = p.coefficients.get(1).copied().unwrap_or(0) as f64;
-        let c = p.coefficients.get(0).copied().unwrap_or(0) as f64;
+        let c = p.coefficients.first().copied().unwrap_or(0) as f64;
 
         if a.abs() < 1e-10 {
             return Vec::new();
@@ -5031,7 +5025,7 @@ impl SymbolicAlgebra {
 
         self.stats.equations_solved += 1;
 
-        let constant = p.coefficients.get(0).copied().unwrap_or(0);
+        let constant = p.coefficients.first().copied().unwrap_or(0);
         let leading = p.leading_coefficient();
 
         if constant == 0 {

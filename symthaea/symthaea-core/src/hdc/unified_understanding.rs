@@ -61,7 +61,7 @@ use super::grounded_understanding::{
     EmbodiedGrounding, CausalRelation,
 };
 use super::predictive_coding::PredictiveCoding;
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::universal_semantics::SemanticPrime;
 use std::collections::{HashMap, VecDeque};
 
@@ -161,7 +161,7 @@ pub struct TrackedEntity {
     /// Entity identifier
     pub name: String,
     /// Semantic representation
-    pub semantic_hv: HV16,
+    pub semantic_hv: BinaryHV,
     /// Role in narrative (agent, patient, etc.)
     pub role: EntityRole,
     /// Emotional valence associated with entity
@@ -605,7 +605,7 @@ impl UnifiedUnderstandingPipeline {
                     } else {
                         let new_entity = TrackedEntity {
                             name: word_lower.clone(),
-                            semantic_hv: grounded.semantic_hv.clone(),
+                            semantic_hv: grounded.semantic_hv,
                             role: EntityRole::Agent, // Default
                             valence: grounded.embodied.valence,
                             mention_count: 1,

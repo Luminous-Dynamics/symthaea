@@ -62,7 +62,7 @@
 //!
 //! # Module Organization
 //!
-//! - **Core types**: [`HV16`], [`ContinuousHV`], [`BinaryHV`], [`RealHV`]
+//! - **Core types**: [`HV16`], [`ContinuousHV`], [`BinaryHV`]
 //! - **Operations**: [`simd_ops`] for accelerated computation
 //! - **Encoding**: [`text_encoder`], [`semantic_encoder`], [`semantic_decoder`]
 //! - **Consciousness**: [`tiered_phi`], [`phi`], [`consciousness`] submodules
@@ -121,7 +121,7 @@ pub use symthaea_core::hdc::{
     // Unified hypervector types
     unified_hv::{ContinuousHV, BinaryHV, HV, HDC_DIMENSION},
     // Real-valued hypervectors
-    real_hv::RealHV,
+    // RealHV alias available via real_hv module
     // LTC neuron count constants
     LTC_NEURONS,
     // Primitive system
@@ -170,7 +170,7 @@ pub use symthaea_core::hdc::unified_cognitive_core;
 pub use symthaea_core::hdc::collective_consciousness;
 pub use symthaea_core::hdc::grounded_understanding;
 pub use symthaea_core::hdc::predictive_coding;
-pub use symthaea_core::hdc::simd_hv16;
+// simd_hv16 removed — all methods absorbed into BinaryHV
 pub use symthaea_core::hdc::binary_hv;
 pub use symthaea_core::hdc::unified_hv;
 pub use symthaea_core::hdc::real_hv;

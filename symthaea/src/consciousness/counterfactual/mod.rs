@@ -31,6 +31,12 @@ pub use identification::{
     PCAlgorithm, PCResult, Skeleton, CPDAG,
     // Mediation Analysis
     MediationAnalysis, MediationResult, MediationIdentification,
+    // Instrumental Variables
+    IVEstimator, IVValidity, IVResult,
+    // Time-Series Causal Discovery
+    TimeSeriesCausalDiscovery, TimeSeriesData, GrangerResult, TimeSeriesCausalGraph,
+    // Transportability
+    TransportabilityAnalyzer, TransportabilityResult,
 };
 
 // Note: IdentificationMethod now includes:

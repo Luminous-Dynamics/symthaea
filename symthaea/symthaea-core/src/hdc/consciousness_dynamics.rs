@@ -36,7 +36,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::consciousness_gradients::{GradientComputer, GradientConfig};
 use serde::{Deserialize, Serialize};
@@ -48,10 +48,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhasePoint {
     /// Current state
-    pub state: Vec<HV16>,
+    pub state: Vec<BinaryHV>,
 
     /// Velocity (ds/dt) - rate of state change
-    pub velocity: Vec<HV16>,
+    pub velocity: Vec<BinaryHV>,
 
     /// Consciousness level at this point
     pub phi: f64,
@@ -92,7 +92,7 @@ impl FlowField {
     /// Compute flow at given phase point
     ///
     /// Returns (state_velocity, acceleration)
-    pub fn compute_flow(&mut self, point: &PhasePoint) -> (Vec<HV16>, Vec<HV16>) {
+    pub fn compute_flow(&mut self, point: &PhasePoint) -> (Vec<BinaryHV>, Vec<BinaryHV>) {
         // State velocity is just the velocity
         let state_velocity = point.velocity.clone();
 
@@ -100,9 +100,9 @@ impl FlowField {
         let gradient = self.gradient_computer.compute_gradient(&point.state);
 
         // Acceleration = forcing * ∇Φ - damping * velocity
-        let acceleration: Vec<HV16> = point.state.iter().enumerate().map(|(i, component)| {
+        let acceleration: Vec<BinaryHV> = point.state.iter().enumerate().map(|(i, component)| {
             // Force from gradient (toward high Φ)
-            let force = gradient.direction.clone();
+            let force = gradient.direction;
 
             // Damping (opposes motion)
             let damped = point.velocity[i].bind(&force);
@@ -126,7 +126,7 @@ impl FlowField {
         let (velocity, acceleration) = self.compute_flow(point);
 
         // Update velocity: v' = v + a*dt
-        let new_velocity: Vec<HV16> = point.velocity.iter().zip(&acceleration)
+        let new_velocity: Vec<BinaryHV> = point.velocity.iter().zip(&acceleration)
             .map(|(v, a)| {
                 let scaled = a.permute((dt * 10.0) as usize);
                 v.bind(&scaled)
@@ -134,7 +134,7 @@ impl FlowField {
             .collect();
 
         // Update position: s' = s + v*dt
-        let new_state: Vec<HV16> = point.state.iter().zip(&velocity)
+        let new_state: Vec<BinaryHV> = point.state.iter().zip(&velocity)
             .map(|(s, v)| {
                 let scaled = v.permute((dt * 10.0) as usize);
                 s.bind(&scaled)
@@ -168,7 +168,7 @@ pub struct ConsciousnessTrajectory {
     pub stable: bool,
 
     /// Attractor reached (if any)
-    pub attractor: Option<Vec<HV16>>,
+    pub attractor: Option<Vec<BinaryHV>>,
 
     /// Lyapunov exponent (measures chaos)
     pub lyapunov_exponent: f64,
@@ -255,17 +255,17 @@ fn variance(values: &[f64]) -> f64 {
 /// # Example
 /// ```ignore
 /// use symthaea::hdc::consciousness_dynamics::{ConsciousnessDynamics, DynamicsConfig};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = DynamicsConfig::default();
 /// let mut dynamics = ConsciousnessDynamics::new(4, config);
 ///
 /// // Initial state
 /// let initial_state = vec![
-///     HV16::random(1000),
-///     HV16::random(1001),
-///     HV16::random(1002),
-///     HV16::random(1003),
+///     BinaryHV::random(1000),
+///     BinaryHV::random(1001),
+///     BinaryHV::random(1002),
+///     BinaryHV::random(1003),
 /// ];
 ///
 /// // Simulate consciousness evolution
@@ -290,7 +290,7 @@ pub struct ConsciousnessDynamics {
     trajectories: Vec<ConsciousnessTrajectory>,
 
     /// Discovered attractors
-    attractors: Vec<Vec<HV16>>,
+    attractors: Vec<Vec<BinaryHV>>,
 }
 
 /// Configuration for dynamics simulation
@@ -341,7 +341,7 @@ impl ConsciousnessDynamics {
     /// Simulate consciousness evolution from initial state
     ///
     /// Returns complete trajectory showing how consciousness evolves.
-    pub fn simulate(&mut self, initial_state: &[HV16], num_steps: usize, dt: f64) -> ConsciousnessTrajectory {
+    pub fn simulate(&mut self, initial_state: &[BinaryHV], num_steps: usize, dt: f64) -> ConsciousnessTrajectory {
         let mut trajectory = ConsciousnessTrajectory::new();
 
         // Create initial phase point (zero velocity)
@@ -350,7 +350,7 @@ impl ConsciousnessDynamics {
 
         let mut point = PhasePoint {
             state: initial_state.to_vec(),
-            velocity: vec![HV16::zero(); self.num_components],
+            velocity: vec![BinaryHV::zero(); self.num_components],
             phi: initial_phi,
             phi_dot: 0.0,
             time: 0.0,
@@ -365,26 +365,25 @@ impl ConsciousnessDynamics {
             trajectory.add_point(point.clone());
 
             // Check convergence
-            if step % self.config.convergence_window == 0 && step > self.config.convergence_window * 2 {
-                if trajectory.is_converging(self.config.convergence_window) {
+            if step % self.config.convergence_window == 0 && step > self.config.convergence_window * 2
+                && trajectory.is_converging(self.config.convergence_window) {
                     trajectory.stable = true;
                     trajectory.attractor = Some(point.state.clone());
                     break;
                 }
-            }
         }
 
         trajectory
     }
 
     /// Find all attractors by sampling initial conditions
-    pub fn find_attractors(&mut self, num_samples: usize, num_steps: usize) -> Vec<Vec<HV16>> {
+    pub fn find_attractors(&mut self, num_samples: usize, num_steps: usize) -> Vec<Vec<BinaryHV>> {
         self.attractors.clear();
 
         for sample in 0..num_samples {
             // Random initial state
-            let initial_state: Vec<HV16> = (0..self.num_components)
-                .map(|i| HV16::random((sample * 100 + i) as u64))
+            let initial_state: Vec<BinaryHV> = (0..self.num_components)
+                .map(|i| BinaryHV::random((sample * 100 + i) as u64))
                 .collect();
 
             // Simulate
@@ -405,7 +404,7 @@ impl ConsciousnessDynamics {
     }
 
     /// Check if attractor is duplicate
-    fn is_duplicate_attractor(&self, candidate: &[HV16]) -> bool {
+    fn is_duplicate_attractor(&self, candidate: &[BinaryHV]) -> bool {
         for attractor in &self.attractors {
             let similarity = self.attractor_similarity(candidate, attractor);
             if similarity > 0.95 {
@@ -416,7 +415,7 @@ impl ConsciousnessDynamics {
     }
 
     /// Compute similarity between attractors
-    fn attractor_similarity(&self, a: &[HV16], b: &[HV16]) -> f32 {
+    fn attractor_similarity(&self, a: &[BinaryHV], b: &[BinaryHV]) -> f32 {
         a.iter().zip(b.iter())
             .map(|(ai, bi)| ai.similarity(bi))
             .sum::<f32>() / a.len() as f32
@@ -463,14 +462,14 @@ impl ConsciousnessDynamics {
     }
 
     /// Check if system is at equilibrium (dΦ/dt ≈ 0)
-    pub fn is_at_equilibrium(&mut self, state: &[HV16], threshold: f64) -> bool {
+    pub fn is_at_equilibrium(&mut self, state: &[BinaryHV], threshold: f64) -> bool {
         // Create phase point
         let mut phi_calc = IntegratedInformation::new();
         let phi = phi_calc.compute_phi(state);
 
         let point = PhasePoint {
             state: state.to_vec(),
-            velocity: vec![HV16::zero(); self.num_components],
+            velocity: vec![BinaryHV::zero(); self.num_components],
             phi,
             phi_dot: 0.0,
             time: 0.0,
@@ -488,7 +487,7 @@ impl ConsciousnessDynamics {
     }
 
     /// Predict future state at time t
-    pub fn predict(&mut self, current_state: &[HV16], t: f64) -> Vec<HV16> {
+    pub fn predict(&mut self, current_state: &[BinaryHV], t: f64) -> Vec<BinaryHV> {
         let num_steps = (t / self.config.dt) as usize;
         let trajectory = self.simulate(current_state, num_steps, self.config.dt);
 
@@ -578,8 +577,8 @@ mod tests {
 
     #[test]
     fn test_phase_point_creation() {
-        let state = vec![HV16::random(1000), HV16::random(1001)];
-        let velocity = vec![HV16::zero(), HV16::zero()];
+        let state = vec![BinaryHV::random(1000), BinaryHV::random(1001)];
+        let velocity = vec![BinaryHV::zero(), BinaryHV::zero()];
 
         let point = PhasePoint {
             state,
@@ -612,8 +611,8 @@ mod tests {
         let mut trajectory = ConsciousnessTrajectory::new();
 
         let point = PhasePoint {
-            state: vec![HV16::random(1000)],
-            velocity: vec![HV16::zero()],
+            state: vec![BinaryHV::random(1000)],
+            velocity: vec![BinaryHV::zero()],
             phi: 0.5,
             phi_dot: 0.0,
             time: 0.0,
@@ -636,10 +635,10 @@ mod tests {
         let mut dynamics = ConsciousnessDynamics::new(4, config);
 
         let initial_state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let trajectory = dynamics.simulate(&initial_state, 50, 0.01);
@@ -655,8 +654,8 @@ mod tests {
 
         for i in 0..10 {
             let point = PhasePoint {
-                state: vec![HV16::random(i)],
-                velocity: vec![HV16::zero()],
+                state: vec![BinaryHV::random(i)],
+                velocity: vec![BinaryHV::zero()],
                 phi: 0.5 + i as f64 * 0.01,
                 phi_dot: 0.01,
                 time: i as f64 * 0.01,
@@ -693,10 +692,10 @@ mod tests {
         let mut dynamics = ConsciousnessDynamics::new(4, config);
 
         let state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let at_equilibrium = dynamics.is_at_equilibrium(&state, 0.1);
@@ -710,10 +709,10 @@ mod tests {
         let mut dynamics = ConsciousnessDynamics::new(4, config);
 
         let initial_state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let predicted = dynamics.predict(&initial_state, 0.1);
@@ -746,8 +745,8 @@ mod tests {
 
         for i in 0..20 {
             let point = PhasePoint {
-                state: vec![HV16::random(i)],
-                velocity: vec![HV16::zero()],
+                state: vec![BinaryHV::random(i)],
+                velocity: vec![BinaryHV::zero()],
                 phi: 0.5,
                 phi_dot: 0.01,
                 time: i as f64 * 0.01,

@@ -535,7 +535,7 @@ impl Greet for Person {
         let code = r#"
 use std::collections::HashMap;
 use std::io::{self, Read};
-pub use crate::hdc::RealHV;
+pub use crate::hdc::ContinuousHV;
 
 fn main() {}
 "#;

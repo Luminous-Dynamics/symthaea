@@ -30,7 +30,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 
 /// Necessary conditions for consciousness (from 28 improvements)
 /// ALL must be met for consciousness possibility
@@ -284,8 +284,8 @@ pub struct ConsciousnessComponent {
     pub id: usize,
     /// Component type
     pub component_type: String,
-    /// Current state (HV16 representation)
-    pub state: HV16,
+    /// Current state (BinaryHV representation)
+    pub state: BinaryHV,
     /// Activation level (0-1)
     pub activation: f64,
     /// Connections to other components
@@ -302,7 +302,7 @@ impl ConsciousnessComponent {
         ConsciousnessComponent {
             id,
             component_type: component_type.to_string(),
-            state: HV16::random(id as u64),
+            state: BinaryHV::random(id as u64),
             activation: 0.5,
             connections: Vec::new(),
             is_recurrent: false,
@@ -321,13 +321,13 @@ impl ConsciousnessComponent {
     }
 
     /// Update state based on inputs
-    pub fn update(&mut self, inputs: &[HV16]) {
+    pub fn update(&mut self, inputs: &[BinaryHV]) {
         if inputs.is_empty() {
             return;
         }
 
         // Bundle inputs using static method
-        let combined = HV16::bundle(inputs);
+        let combined = BinaryHV::bundle(inputs);
 
         // Update state (combine with current)
         self.state = self.state.bind(&combined);

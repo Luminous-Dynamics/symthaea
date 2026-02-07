@@ -30,7 +30,7 @@
 //!
 //! All operations use `f64` for numerical stability in the algebraic
 //! computations (tensor contraction, geometric products). Integration with
-//! Symthaea's `RealHV` (which uses `f32`) is provided via explicit
+//! Symthaea's `ContinuousHV` (which uses `f32`) is provided via explicit
 //! conversion methods (`to_hdc`, `from_real_hv`).
 //!
 //! No external dependencies are added -- all linear algebra is implemented
@@ -38,7 +38,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::hdc::RealHV;
+use crate::hdc::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Tensor
@@ -1114,26 +1114,26 @@ impl Default for TensorNetwork {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// RealHV integration
+// ContinuousHV integration
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// Convert a `RealHV` (f32) to an f64 slice for tensor operations.
-pub fn real_hv_to_f64(hv: &RealHV) -> Vec<f64> {
+/// Convert a `ContinuousHV` (f32) to an f64 slice for tensor operations.
+pub fn real_hv_to_f64(hv: &ContinuousHV) -> Vec<f64> {
     hv.values.iter().map(|&v| v as f64).collect()
 }
 
-/// Convert an f64 slice back to a `RealHV` (f32).
-pub fn f64_to_real_hv(data: &[f64]) -> RealHV {
-    RealHV::from_values(data.iter().map(|&v| v as f32).collect())
+/// Convert an f64 slice back to a `ContinuousHV` (f32).
+pub fn f64_to_real_hv(data: &[f64]) -> ContinuousHV {
+    ContinuousHV::from_values(data.iter().map(|&v| v as f32).collect())
 }
 
-/// Compute the tensor product of two `RealHV` vectors and project back
+/// Compute the tensor product of two `ContinuousHV` vectors and project back
 /// to HDC dimension using Johnson-Lindenstrauss random projection.
 ///
 /// This encodes a relational binding between two concepts in HDC space
 /// that preserves more structure than element-wise multiplication (bind),
 /// at the cost of a lossy projection step.
-pub fn hdc_tensor_product(a: &RealHV, b: &RealHV, seed: u64) -> RealHV {
+pub fn hdc_tensor_product(a: &ContinuousHV, b: &ContinuousHV, seed: u64) -> ContinuousHV {
     let a64 = real_hv_to_f64(a);
     let b64 = real_hv_to_f64(b);
     let outer = Tensor::outer_product(&a64, &b64);
@@ -1598,8 +1598,8 @@ mod tests {
 
     #[test]
     fn test_hdc_tensor_product_dimensions() {
-        let a = RealHV::random(64, 1);
-        let b = RealHV::random(64, 2);
+        let a = ContinuousHV::random(64, 1);
+        let b = ContinuousHV::random(64, 2);
 
         let result = hdc_tensor_product(&a, &b, 99);
         assert_eq!(
@@ -1611,8 +1611,8 @@ mod tests {
 
     #[test]
     fn test_hdc_tensor_product_deterministic() {
-        let a = RealHV::random(32, 10);
-        let b = RealHV::random(32, 20);
+        let a = ContinuousHV::random(32, 10);
+        let b = ContinuousHV::random(32, 20);
 
         let r1 = hdc_tensor_product(&a, &b, 42);
         let r2 = hdc_tensor_product(&a, &b, 42);

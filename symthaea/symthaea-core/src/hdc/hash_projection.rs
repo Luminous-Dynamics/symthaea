@@ -1,4 +1,4 @@
-//! Deterministic hash-based projection to bit-packed hypervectors (HV16)
+//! Deterministic hash-based projection to bit-packed hypervectors (BinaryHV)
 //!
 //! This follows the v1.2 design: any byte sequence is projected via BLAKE3
 //! into a stable 2048-bit vector. Same input → same vector across runs and
@@ -6,7 +6,7 @@
 
 use blake3::Hasher;
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 
 /// Content-addressed specification for deterministic encoding.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -33,15 +33,15 @@ impl ContentSpec {
     }
 }
 
-/// Project any byte sequence to a bit-packed HV16 using BLAKE3 XOF.
-pub fn project_to_hv(bytes: &[u8]) -> HV16 {
+/// Project any byte sequence to a bit-packed BinaryHV using BLAKE3 XOF.
+pub fn project_to_hv(bytes: &[u8]) -> BinaryHV {
     let seed = blake3::hash(bytes);
     expand_hash_to_hv(seed.as_bytes())
 }
 
 /// Expand a 32-byte hash to a 2048-bit hypervector.
-pub fn expand_hash_to_hv(seed: &[u8; 32]) -> HV16 {
-    let mut result = [0u8; HV16::BYTES];
+pub fn expand_hash_to_hv(seed: &[u8; 32]) -> BinaryHV {
+    let mut result = [0u8; BinaryHV::BYTES];
 
     // Use extendable output to fill the full 256 bytes.
     let mut hasher = Hasher::new();
@@ -49,14 +49,14 @@ pub fn expand_hash_to_hv(seed: &[u8; 32]) -> HV16 {
     let mut output = hasher.finalize_xof();
     output.fill(&mut result);
 
-    HV16(result)
+    BinaryHV(result)
 }
 
-/// Deterministically encode text into a sequence of HV16 vectors (one per token).
+/// Deterministically encode text into a sequence of BinaryHV vectors (one per token).
 ///
 /// Splits on ASCII whitespace; each token is hashed independently so identical
 /// tokens across runs map to the same hypervector without storing state.
-pub fn encode_text_to_hv16s(text: &str) -> Vec<HV16> {
+pub fn encode_text_to_hv16s(text: &str) -> Vec<BinaryHV> {
     text.split_whitespace()
         .map(|tok| project_to_hv(tok.as_bytes()))
         .collect()

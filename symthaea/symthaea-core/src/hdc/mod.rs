@@ -76,8 +76,10 @@ pub const HDC_DIMENSION_64K: usize = 65_536;
 /// assert_eq!(ultra_custom.dimension(), 131_072);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default)]
 pub enum HdcDimensionality {
     /// Standard 16,384 dimensions (2^14) - good balance of accuracy and memory
+    #[default]
     Standard,
     /// Extended 32,768 dimensions (2^15) - higher semantic capacity
     Extended,
@@ -133,11 +135,6 @@ impl HdcDimensionality {
     }
 }
 
-impl Default for HdcDimensionality {
-    fn default() -> Self {
-        Self::Standard
-    }
-}
 
 impl From<usize> for HdcDimensionality {
     fn from(dim: usize) -> Self {
@@ -187,8 +184,10 @@ pub const LTC_NEURONS_4K: usize = 4_096;
 /// - **Ultra (4K)**: Maximum precision
 /// - **Custom**: Any count (should be power of 2)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default)]
 pub enum LtcNeuronCount {
     /// Standard 1,024 neurons (2^10) - good balance
+    #[default]
     Standard,
     /// Extended 2,048 neurons (2^11) - higher capacity
     Extended,
@@ -226,11 +225,6 @@ impl LtcNeuronCount {
     }
 }
 
-impl Default for LtcNeuronCount {
-    fn default() -> Self {
-        Self::Standard
-    }
-}
 
 impl From<usize> for LtcNeuronCount {
     fn from(n: usize) -> Self {
@@ -269,7 +263,7 @@ pub mod semantic_decoder;  // HV → Primitive sequence (generative direction) -
 pub mod unified_hv;     // Unified hypervector types (ContinuousHV)
 pub mod config;         // Centralized HDC configuration (runtime dimension management)
 pub mod projection;     // Learned projection layers for dimension conversion
-pub mod compat;         // Compatibility layer for HV16 ↔ ContinuousHV migration
+pub mod compat;         // Compatibility layer for BinaryHV ↔ ContinuousHV migration
 
 // Global Workspace Theory (conscious access, competition, broadcasting)
 pub mod global_workspace;                  // GWT implementation with competitive dynamics
@@ -281,17 +275,17 @@ pub mod consciousness_topology_generators; // 8 topology generators (Random, Sta
 pub mod tiered_phi;                        // Multi-tier Φ (integrated information) approximation
 #[cfg(test)]
 mod phi_tier_tests;                        // Unit tests for Φ tier implementations
-pub mod phi_topology_validation;           // RealHV-TieredPhi integration for topology validation
-pub mod phi_real;                          // RealHV Φ calculator (no binarization) using cosine similarity
+pub mod phi_topology_validation;           // ContinuousHV-TieredPhi integration for topology validation
+pub mod phi_real;                          // ContinuousHV Φ calculator (no binarization) using cosine similarity
 pub mod spectral_connectivity;             // Algebraic connectivity (λ₂) calculator - NOT IIT Φ!
 pub mod phi_resonant;                      // Resonator-based Φ calculator (O(n log N) dynamics)
 pub mod phi_orchestrator;                  // Adaptive Φ calculator orchestrator (Phase 5E)
-pub mod binary_hv;                         // Binary hypervector operations (HV16)
-pub mod simd_hv16;                         // SIMD-optimized binary hypervectors (8x faster)
-pub mod simd_ops;                          // SIMD intrinsics for HV16 (AVX2/SSE4.1)
+pub mod binary_hv;                         // Binary hypervector operations (BinaryHV)
+// simd_hv16 removed — all methods absorbed into BinaryHV
+pub mod simd_ops;                          // SIMD intrinsics for BinaryHV (AVX2/SSE4.1)
 pub mod simd_continuous;                   // SIMD intrinsics for ContinuousHV (AVX2/FMA/SSE4.1)
-// NOTE: simd_hv and optimized_hv are INCOMPATIBLE with 16,384-bit HV16 (they use 256-byte arrays)
-// Use HV16::bind(), HV16::bundle(), HV16::similarity() directly instead
+// NOTE: simd_hv and optimized_hv are INCOMPATIBLE with 16,384-bit BinaryHV (they use 256-byte arrays)
+// Use BinaryHV::bind(), BinaryHV::bundle(), BinaryHV::similarity() directly instead
 pub mod hdc_trait;                         // Unified HyperdimensionalVector trait interface
 // Performance optimization modules:
 pub mod incremental_hv;                    // O(k) incremental bundling (10-100x faster for updates)
@@ -308,7 +302,7 @@ pub mod arithmetic;                          // Modular arithmetic (re-exports a
 pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
 pub mod native_similarity;                 // O(1) XOR+popcount similarity search (consciousness-native)
 pub mod sparse_hv;                         // Sparse HDC for memory-efficient low-density vectors
-pub mod hv_pool;                           // Thread-local memory pools for HV16/ContinuousHV (10-100x faster allocation)
+pub mod hv_pool;                           // Thread-local memory pools for BinaryHV/ContinuousHV (10-100x faster allocation)
 
 // Property-based tests for HDC invariants
 #[cfg(test)]
@@ -377,12 +371,13 @@ pub mod topology_synergy;                  // Topology-consciousness synergy
 pub mod consciousness_visualizer;          // Consciousness visualization tools
 pub mod deep_integration;                   // Deep integration bridge for Φ-guided processing
 
-// Re-export HV16 at module level for convenience (used by language/nix_* modules)
+// Re-export BinaryHV at module level for convenience (used by language/nix_* modules)
+pub use binary_hv::BinaryHV;
 pub use binary_hv::HV16;
-pub use real_hv::RealHV;
+// Backward compat: RealHV alias is still available via real_hv module
 
 // Re-export unified HV types
-pub use unified_hv::{ContinuousHV, BinaryHV, HV};
+pub use unified_hv::{ContinuousHV, HV};
 
 // Re-export configuration types (dimension unification)
 pub use config::{
@@ -712,12 +707,13 @@ pub use sensorimotor_contingencies::{
 
 // Re-export HV memory pool types (10-100x faster allocation for hot paths)
 pub use hv_pool::{
-    HV16Pool, PooledHV16,
+    BinaryHVPool, PooledBinaryHV,
     ContinuousHVPool, PooledContinuousHV,
     PoolStats as HVPoolStats,
     pooled_bind, pooled_similarity,
 };
 
+pub use hv_pool::{PooledHV16, HV16Pool};
 // Re-export SIMD continuous HV operations (4x+ speedup for 16K-dim vectors)
 pub use simd_continuous::{
     dot_product_simd as continuous_dot_product_simd,

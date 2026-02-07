@@ -45,7 +45,7 @@ use std::sync::mpsc::{Sender, Receiver, channel};
 use rayon::prelude::*;
 
 use super::core::{TieredPhi, ApproximationTier};
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 
 // =============================================================================
 // CONFIGURATION
@@ -53,20 +53,17 @@ use crate::hdc::binary_hv::HV16;
 
 /// Gradient computation precision levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum GradientPrecision {
     /// O(n): Fast centrality-based approximation
     Fast,
     /// O(n²): Medium precision using cached similarity matrix
+    #[default]
     Medium,
     /// O(n³): High precision using leave-one-out on similarity
     High,
 }
 
-impl Default for GradientPrecision {
-    fn default() -> Self {
-        GradientPrecision::Medium
-    }
-}
 
 /// Configuration for streaming gradients
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -267,7 +264,7 @@ impl StreamingPhiGradient {
     }
 
     /// Compute gradient for current components
-    pub fn compute_gradient(&mut self, components: &[HV16]) -> PhiGradient {
+    pub fn compute_gradient(&mut self, components: &[BinaryHV]) -> PhiGradient {
         let start = Instant::now();
         let n = components.len();
 
@@ -348,7 +345,7 @@ impl StreamingPhiGradient {
     }
 
     /// Fast gradient: O(n) using degree centrality from similarity matrix
-    fn compute_gradient_fast(&self, components: &[HV16], base_phi: f64) -> Vec<f64> {
+    fn compute_gradient_fast(&self, components: &[BinaryHV], base_phi: f64) -> Vec<f64> {
         let n = components.len();
         if n < 2 {
             return vec![0.0; n];
@@ -390,7 +387,7 @@ impl StreamingPhiGradient {
     }
 
     /// Medium gradient: O(n²) using cached similarity matrix perturbation
-    fn compute_gradient_medium(&self, components: &[HV16], base_phi: f64) -> Vec<f64> {
+    fn compute_gradient_medium(&self, components: &[BinaryHV], base_phi: f64) -> Vec<f64> {
         let n = components.len();
         if n < 2 {
             return vec![0.0; n];
@@ -424,7 +421,7 @@ impl StreamingPhiGradient {
     }
 
     /// High gradient: O(n³) using numerical differentiation on Phi
-    fn compute_gradient_high(&mut self, components: &[HV16], base_phi: f64) -> Vec<f64> {
+    fn compute_gradient_high(&mut self, components: &[BinaryHV], base_phi: f64) -> Vec<f64> {
         let n = components.len();
         if n < 2 {
             return vec![0.0; n];
@@ -433,10 +430,10 @@ impl StreamingPhiGradient {
         // For each component, estimate gradient by computing Φ without it
         let gradients: Vec<f64> = (0..n).into_par_iter().map(|i| {
             // Create component list without i
-            let remaining: Vec<HV16> = components.iter()
+            let remaining: Vec<BinaryHV> = components.iter()
                 .enumerate()
                 .filter(|(j, _)| *j != i)
-                .map(|(_, c)| c.clone())
+                .map(|(_, c)| *c)
                 .collect();
 
             // Use fresh calculator to avoid state contamination
@@ -510,13 +507,13 @@ impl StreamingPhiGradient {
 // =============================================================================
 
 /// Compute gradient with default settings
-pub fn compute_phi_gradient(components: &[HV16]) -> PhiGradient {
+pub fn compute_phi_gradient(components: &[BinaryHV]) -> PhiGradient {
     let mut streamer = StreamingPhiGradient::new(GradientConfig::default());
     streamer.compute_gradient(components)
 }
 
 /// Compute fast gradient for real-time use
-pub fn compute_phi_gradient_fast(components: &[HV16]) -> PhiGradient {
+pub fn compute_phi_gradient_fast(components: &[BinaryHV]) -> PhiGradient {
     let config = GradientConfig {
         precision: GradientPrecision::Fast,
         ..Default::default()
@@ -533,8 +530,8 @@ pub fn compute_phi_gradient_fast(components: &[HV16]) -> PhiGradient {
 mod tests {
     use super::*;
 
-    fn create_test_components(n: usize) -> Vec<HV16> {
-        (0..n).map(|i| HV16::random(i as u64)).collect()
+    fn create_test_components(n: usize) -> Vec<BinaryHV> {
+        (0..n).map(|i| BinaryHV::random(i as u64)).collect()
     }
 
     #[test]

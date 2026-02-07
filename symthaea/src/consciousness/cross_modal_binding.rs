@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::binary_hv::HV16;
 use crate::hdc::primitive_system::PrimitiveSystem;
 
@@ -345,7 +345,7 @@ pub struct ModalRepresentation {
     /// The modality
     pub modality: Modality,
     /// Hypervector representation
-    pub hv: RealHV,
+    pub hv: ContinuousHV,
     /// Confidence in this representation
     pub confidence: f32,
     /// Timestamp
@@ -358,7 +358,7 @@ pub struct ModalRepresentation {
 
 impl ModalRepresentation {
     /// Create a new modal representation
-    pub fn new(modality: Modality, hv: RealHV, confidence: f32, source: impl Into<String>) -> Self {
+    pub fn new(modality: Modality, hv: ContinuousHV, confidence: f32, source: impl Into<String>) -> Self {
         Self {
             modality,
             hv,
@@ -402,7 +402,7 @@ pub struct CrossModalBinder {
     /// Current modal representations per modality
     representations: HashMap<Modality, Vec<ModalRepresentation>>,
     /// Current bound state
-    current_binding: Option<RealHV>,
+    current_binding: Option<ContinuousHV>,
     /// Binding history
     binding_history: Vec<BindingResult>,
     /// Statistics
@@ -485,8 +485,8 @@ impl CrossModalBinder {
         let bound_hv = if weighted_hvs.len() == 1 {
             weighted_hvs[0].0.clone()
         } else {
-            let hvs: Vec<&RealHV> = weighted_hvs.iter().map(|(hv, _)| hv).collect();
-            RealHV::bundle_refs(&hvs)
+            let hvs: Vec<&ContinuousHV> = weighted_hvs.iter().map(|(hv, _)| hv).collect();
+            ContinuousHV::bundle(&hvs)
         };
 
         // Calculate binding strength (average pairwise similarity)
@@ -517,7 +517,7 @@ impl CrossModalBinder {
     }
 
     /// Calculate binding strength
-    fn calculate_binding_strength(&self, weighted_hvs: &[(RealHV, f32)]) -> f32 {
+    fn calculate_binding_strength(&self, weighted_hvs: &[(ContinuousHV, f32)]) -> f32 {
         if weighted_hvs.len() < 2 {
             return 1.0;
         }
@@ -541,7 +541,7 @@ impl CrossModalBinder {
     }
 
     /// Calculate coherence measure
-    fn calculate_coherence(&self, weighted_hvs: &[(RealHV, f32)]) -> f32 {
+    fn calculate_coherence(&self, weighted_hvs: &[(ContinuousHV, f32)]) -> f32 {
         if weighted_hvs.is_empty() {
             return 0.0;
         }
@@ -559,14 +559,14 @@ impl CrossModalBinder {
     }
 
     /// Query current binding against a probe
-    pub fn query(&self, probe: &RealHV) -> Option<f32> {
+    pub fn query(&self, probe: &ContinuousHV) -> Option<f32> {
         self.current_binding.as_ref().map(|binding| {
             binding.similarity(probe)
         })
     }
 
     /// Unbind a specific modality from current binding
-    pub fn unbind(&mut self, modality: Modality) -> Option<RealHV> {
+    pub fn unbind(&mut self, modality: Modality) -> Option<ContinuousHV> {
         let current = self.current_binding.as_ref()?;
         let modal_rep = self.representations.get(&modality)?.last()?;
 
@@ -589,7 +589,7 @@ impl CrossModalBinder {
     }
 
     /// Get current bound state
-    pub fn current_binding(&self) -> Option<&RealHV> {
+    pub fn current_binding(&self) -> Option<&ContinuousHV> {
         self.current_binding.as_ref()
     }
 
@@ -892,7 +892,7 @@ mod tests {
 
     #[test]
     fn test_modal_representation() {
-        let hv = RealHV::random(512, 42);
+        let hv = ContinuousHV::random(512, 42);
         let repr = ModalRepresentation::new(Modality::Visual, hv, 0.9, "camera");
         assert_eq!(repr.modality, Modality::Visual);
         assert_eq!(repr.confidence, 0.9);
@@ -904,13 +904,13 @@ mod tests {
 
         let visual = ModalRepresentation::new(
             Modality::Visual,
-            RealHV::random(512, 42),
+            ContinuousHV::random(512, 42),
             0.9,
             "camera"
         );
         let audio = ModalRepresentation::new(
             Modality::Auditory,
-            RealHV::random(512, 42),
+            ContinuousHV::random(512, 42),
             0.8,
             "microphone"
         );

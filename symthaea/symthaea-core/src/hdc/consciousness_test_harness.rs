@@ -39,7 +39,7 @@
 //! }
 //! ```
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::tiered_phi::{TieredPhi, TieredPhiConfig, ApproximationTier};
 use super::test_oracle::{TestOracle, ConsciousnessLevel};
 use std::sync::Mutex;
@@ -168,7 +168,7 @@ impl TestHarness {
     }
 
     /// Compute Φ for components using configured mode
-    pub fn compute_phi(&mut self, components: &[HV16]) -> f64 {
+    pub fn compute_phi(&mut self, components: &[BinaryHV]) -> f64 {
         match self.config.mode {
             TestMode::Mock => {
                 // Use oracle for deterministic value
@@ -186,7 +186,7 @@ impl TestHarness {
     }
 
     /// Get consciousness level
-    pub fn consciousness_level(&mut self, components: &[HV16]) -> ConsciousnessLevel {
+    pub fn consciousness_level(&mut self, components: &[BinaryHV]) -> ConsciousnessLevel {
         let phi = self.compute_phi(components);
         if phi < 0.2 {
             ConsciousnessLevel::Unconscious
@@ -202,7 +202,7 @@ impl TestHarness {
     }
 
     /// Compute free energy (inversely related to Φ)
-    pub fn compute_free_energy(&mut self, components: &[HV16]) -> f64 {
+    pub fn compute_free_energy(&mut self, components: &[BinaryHV]) -> f64 {
         match self.config.mode {
             TestMode::Mock => {
                 self.oracle.free_energy(components.len())
@@ -251,17 +251,17 @@ static GLOBAL_HARNESS: Lazy<Mutex<TestHarness>> = Lazy::new(|| {
 });
 
 /// Compute Φ using global harness
-pub fn test_phi(components: &[HV16]) -> f64 {
+pub fn test_phi(components: &[BinaryHV]) -> f64 {
     GLOBAL_HARNESS.lock().expect("lock poisoned").compute_phi(components)
 }
 
 /// Get consciousness level using global harness
-pub fn test_consciousness_level(components: &[HV16]) -> ConsciousnessLevel {
+pub fn test_consciousness_level(components: &[BinaryHV]) -> ConsciousnessLevel {
     GLOBAL_HARNESS.lock().expect("lock poisoned").consciousness_level(components)
 }
 
 /// Compute free energy using global harness
-pub fn test_free_energy(components: &[HV16]) -> f64 {
+pub fn test_free_energy(components: &[BinaryHV]) -> f64 {
     GLOBAL_HARNESS.lock().expect("lock poisoned").compute_free_energy(components)
 }
 
@@ -279,9 +279,9 @@ pub fn set_global_mode(mode: TestMode) {
 // TEST UTILITIES
 // ============================================================================
 
-/// Create N random HV16 components for testing
-pub fn create_test_components(n: usize, seed: u64) -> Vec<HV16> {
-    (0..n).map(|i| HV16::random(seed + i as u64)).collect()
+/// Create N random BinaryHV components for testing
+pub fn create_test_components(n: usize, seed: u64) -> Vec<BinaryHV> {
+    (0..n).map(|i| BinaryHV::random(seed + i as u64)).collect()
 }
 
 /// Assert Φ is in expected range

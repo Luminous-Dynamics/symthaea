@@ -1,7 +1,7 @@
 /// Consciousness Topology Generators using Real-Valued Hypervectors
 ///
 /// This module generates 33 different network topologies representing different
-/// levels of integrated information (Φ) for validating the RealHV-based Φ measurement.
+/// levels of integrated information (Φ) for validating the ContinuousHV-based Φ measurement.
 ///
 /// Topology counts by tier:
 /// - Tier 1 (Original 8): Random, Star, Ring, Line, BinaryTree, DenseNetwork, Modular, Lattice
@@ -12,11 +12,11 @@
 ///                        BowTie, Attention, Residual, PetersenGraph, CompleteBipartite
 ///
 /// Each topology is represented as a set of node vectors, where each node's
-/// representation encodes its connections to other nodes via RealHV operations.
+/// representation encodes its connections to other nodes via ContinuousHV operations.
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 
-/// A consciousness topology represented with RealHV
+/// A consciousness topology represented with ContinuousHV
 #[derive(Clone, Debug)]
 pub struct ConsciousnessTopology {
     /// Number of nodes in the topology
@@ -26,10 +26,10 @@ pub struct ConsciousnessTopology {
     pub dim: usize,
 
     /// Node representations (each encodes its connections)
-    pub node_representations: Vec<RealHV>,
+    pub node_representations: Vec<ContinuousHV>,
 
     /// Node identities (basis vectors)
-    pub node_identities: Vec<RealHV>,
+    pub node_identities: Vec<ContinuousHV>,
 
     /// Topology type
     pub topology_type: TopologyType,
@@ -92,14 +92,14 @@ impl ConsciousnessTopology {
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
         // Create unique basis vectors for each node
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         // For random topology, each node representation is just a random vector
         // This creates uniform similarity structure
-        let node_representations: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::random(dim, seed + (i as u64 * 1000)))
+        let node_representations: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::random(dim, seed + (i as u64 * 1000)))
             .collect();
 
         // Random edges: connect ~50% of possible edges randomly
@@ -143,11 +143,11 @@ impl ConsciousnessTopology {
 
         // Create unique basis vectors for each node with seed-based variation
         // This ensures different seeds produce different Star topologies
-        let node_identities: Vec<RealHV> = (0..n_nodes)
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let base = RealHV::basis(i, dim);
+                let base = ContinuousHV::basis(i, dim);
                 // Add 5% random noise based on seed to create variation
-                let noise = RealHV::random(dim, seed + (i as u64 * 1000)).scale(0.05_f32);
+                let noise = ContinuousHV::random(dim, seed + (i as u64 * 1000)).scale(0.05_f32);
                 base.add(&noise)
             })
             .collect();
@@ -160,14 +160,14 @@ impl ConsciousnessTopology {
 
         // Hub representation = bundle of all spoke connections
         // hub ⊗ spoke1, hub ⊗ spoke2, ..., hub ⊗ spokeN
-        let hub_connections: Vec<RealHV> = spoke_ids
+        let hub_connections: Vec<ContinuousHV> = spoke_ids
             .iter()
             .map(|spoke_id| hub_id.bind(spoke_id))
             .collect();
 
         // Add seed-based variation to hub to ensure different samples
-        let hub_base = RealHV::bundle(&hub_connections);
-        let hub_noise = RealHV::random(dim, seed + 999999).scale(0.05_f32);
+        let hub_base = ContinuousHV::bundle_owned(&hub_connections);
+        let hub_noise = ContinuousHV::random(dim, seed + 999999).scale(0.05_f32);
         let hub_repr = hub_base.add(&hub_noise);
         node_representations.push(hub_repr);
 
@@ -176,7 +176,7 @@ impl ConsciousnessTopology {
         for (i, spoke_id) in spoke_ids.iter().enumerate() {
             let spoke_base = spoke_id.bind(hub_id);
             // Add 5% noise to each spoke (different for each spoke)
-            let spoke_noise = RealHV::random(dim, seed + ((i + 1) as u64 * 100000)).scale(0.05_f32);
+            let spoke_noise = ContinuousHV::random(dim, seed + ((i + 1) as u64 * 100000)).scale(0.05_f32);
             let spoke_repr = spoke_base.add(&spoke_noise);
             node_representations.push(spoke_repr);
         }
@@ -209,8 +209,8 @@ impl ConsciousnessTopology {
         assert!(n_nodes >= 3, "Ring needs at least 3 nodes");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
@@ -223,7 +223,7 @@ impl ConsciousnessTopology {
             let conn1 = node_identities[i].bind(&node_identities[prev]);
             let conn2 = node_identities[i].bind(&node_identities[next]);
 
-            let repr = RealHV::bundle(&[conn1, conn2]);
+            let repr = ContinuousHV::bundle_owned(&[conn1, conn2]);
             node_representations.push(repr);
         }
 
@@ -255,8 +255,8 @@ impl ConsciousnessTopology {
         assert!(n_nodes >= 2, "Line needs at least 2 nodes");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
@@ -278,7 +278,7 @@ impl ConsciousnessTopology {
                 // Isolated node (shouldn't happen with n >= 2)
                 node_identities[i].clone()
             } else {
-                RealHV::bundle(&connections)
+                ContinuousHV::bundle_owned(&connections)
             };
 
             node_representations.push(repr);
@@ -313,8 +313,8 @@ impl ConsciousnessTopology {
         assert!(n_nodes >= 1, "Tree needs at least 1 node");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
@@ -344,7 +344,7 @@ impl ConsciousnessTopology {
                 // Root node with no children (n=1 case)
                 node_identities[i].clone()
             } else {
-                RealHV::bundle(&connections)
+                ContinuousHV::bundle_owned(&connections)
             };
 
             node_representations.push(repr);
@@ -391,8 +391,8 @@ impl ConsciousnessTopology {
         // k=None means complete graph (all-to-all connections), otherwise use specified k
         let k = k.map(|k| k.min(n_nodes - 1)).unwrap_or(n_nodes - 1);
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
@@ -413,7 +413,7 @@ impl ConsciousnessTopology {
                 }
             }
 
-            let repr = RealHV::bundle(&connections);
+            let repr = ContinuousHV::bundle_owned(&connections);
             node_representations.push(repr);
         }
 
@@ -454,8 +454,8 @@ impl ConsciousnessTopology {
         assert!(n_modules >= 2, "Need at least 2 modules for meaningful modularity");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let nodes_per_module = n_nodes / n_modules;
@@ -487,7 +487,7 @@ impl ConsciousnessTopology {
             let repr = if connections.is_empty() {
                 node_identities[i].clone()
             } else {
-                RealHV::bundle(&connections)
+                ContinuousHV::bundle_owned(&connections)
             };
 
             node_representations.push(repr);
@@ -539,10 +539,10 @@ impl ConsciousnessTopology {
         let n_nodes = 12; // Icosahedron has 12 vertices
 
         // Create basis vectors with seed variation
-        let node_identities: Vec<RealHV> = (0..n_nodes)
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let base = RealHV::basis(i, dim);
-                let noise = RealHV::random(dim, seed + (i as u64 * 1000)).scale(0.05);
+                let base = ContinuousHV::basis(i, dim);
+                let noise = ContinuousHV::random(dim, seed + (i as u64 * 1000)).scale(0.05);
                 base.add(&noise)
             })
             .collect();
@@ -581,7 +581,7 @@ impl ConsciousnessTopology {
             let repr = if connections.is_empty() {
                 node_identities[i].clone()
             } else {
-                RealHV::bundle(&connections)
+                ContinuousHV::bundle_owned(&connections)
             };
 
             node_representations.push(repr);
@@ -614,10 +614,10 @@ impl ConsciousnessTopology {
 
         let n_nodes = n * m;
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let base = RealHV::basis(i, dim);
-                let noise = RealHV::random(dim, seed + (i as u64 * 1000)).scale(0.05);
+                let base = ContinuousHV::basis(i, dim);
+                let noise = ContinuousHV::random(dim, seed + (i as u64 * 1000)).scale(0.05);
                 base.add(&noise)
             })
             .collect();
@@ -645,7 +645,7 @@ impl ConsciousnessTopology {
                 edges.push((idx.min(down), idx.max(down)));
                 edges.push((idx.min(right), idx.max(right)));
 
-                let repr = RealHV::bundle(&connections);
+                let repr = ContinuousHV::bundle_owned(&connections);
                 node_representations.push(repr);
             }
         }
@@ -681,10 +681,10 @@ impl ConsciousnessTopology {
 
         let n_nodes = n * m;
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let base = RealHV::basis(i, dim);
-                let noise = RealHV::random(dim, seed + (i as u64 * 1000)).scale(0.05);
+                let base = ContinuousHV::basis(i, dim);
+                let noise = ContinuousHV::random(dim, seed + (i as u64 * 1000)).scale(0.05);
                 base.add(&noise)
             })
             .collect();
@@ -726,7 +726,7 @@ impl ConsciousnessTopology {
                 edges.push((idx.min(down), idx.max(down)));
                 edges.push((idx.min(right), idx.max(right)));
 
-                let repr = RealHV::bundle(&connections);
+                let repr = ContinuousHV::bundle_owned(&connections);
                 node_representations.push(repr);
             }
         }
@@ -763,8 +763,8 @@ impl ConsciousnessTopology {
         let grid_size = (n_nodes as f64).sqrt().ceil() as usize;
         let actual_n_nodes = grid_size * grid_size;
 
-        let node_identities: Vec<RealHV> = (0..actual_n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..actual_n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut node_representations = Vec::with_capacity(actual_n_nodes);
@@ -802,7 +802,7 @@ impl ConsciousnessTopology {
                 // Shouldn't happen with grid_size >= 2
                 node_identities[i].clone()
             } else {
-                RealHV::bundle(&connections)
+                ContinuousHV::bundle_owned(&connections)
             };
 
             node_representations.push(repr);
@@ -852,14 +852,14 @@ impl ConsciousnessTopology {
     /// * `p` - Rewiring probability [0.0, 1.0] (typical: 0.1)
     /// * `seed` - Random seed for reproducibility
     pub fn small_world(n_nodes: usize, dim: usize, k: usize, p: f64, seed: u64) -> Self {
-        assert!(n_nodes >= k + 1, "Need n_nodes >= k+1 for small-world");
-        assert!(k % 2 == 0, "k must be even for symmetric ring lattice");
+        assert!(n_nodes > k, "Need n_nodes >= k+1 for small-world");
+        assert!(k.is_multiple_of(2), "k must be even for symmetric ring lattice");
         assert!(k >= 2, "Need at least k=2 neighbors");
         assert!((0.0..=1.0).contains(&p), "Rewiring probability p must be in [0, 1]");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         // Build initial k-regular ring lattice edges
@@ -907,7 +907,7 @@ impl ConsciousnessTopology {
         // Generate node representations from adjacency
         let mut node_representations = Vec::with_capacity(n_nodes);
         for i in 0..n_nodes {
-            let connections: Vec<RealHV> = adjacency[i]
+            let connections: Vec<ContinuousHV> = adjacency[i]
                 .iter()
                 .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                 .collect();
@@ -915,7 +915,7 @@ impl ConsciousnessTopology {
             let repr = if connections.is_empty() {
                 node_identities[i].clone()
             } else {
-                RealHV::bundle(&connections)
+                ContinuousHV::bundle_owned(&connections)
             };
 
             node_representations.push(repr);
@@ -945,11 +945,11 @@ impl ConsciousnessTopology {
     /// * `seed` - Random seed for reproducibility
     pub fn mobius_strip(n_nodes: usize, dim: usize, _seed: u64) -> Self {
         assert!(n_nodes >= 4, "Möbius strip needs at least 4 nodes");
-        assert!(n_nodes % 2 == 0, "Möbius strip needs even number of nodes for twist");
+        assert!(n_nodes.is_multiple_of(2), "Möbius strip needs even number of nodes for twist");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
@@ -974,13 +974,13 @@ impl ConsciousnessTopology {
                 // First half: normal binding (like regular ring)
                 let conn1 = node_identities[i].bind(&node_identities[prev]);
                 let conn2 = node_identities[i].bind(&node_identities[next]);
-                let repr = RealHV::bundle(&[conn1, conn2]);
+                let repr = ContinuousHV::bundle_owned(&[conn1, conn2]);
                 node_representations.push(repr);
             } else {
                 // Second half: invert the "next" connection (the twist!)
                 let conn1 = node_identities[i].bind(&node_identities[prev]);
                 let conn2_inverted = node_identities[i].bind(&node_identities[next].scale(-1.0));
-                let repr = RealHV::bundle(&[conn1, conn2_inverted]);
+                let repr = ContinuousHV::bundle_owned(&[conn1, conn2_inverted]);
                 node_representations.push(repr);
             }
         }
@@ -1015,8 +1015,8 @@ impl ConsciousnessTopology {
 
         let n_nodes = grid_size * grid_size;
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
@@ -1042,7 +1042,7 @@ impl ConsciousnessTopology {
             let conn_left = node_identities[i].bind(&node_identities[left]);
             let conn_right = node_identities[i].bind(&node_identities[right]);
 
-            let repr = RealHV::bundle(&[conn_up, conn_down, conn_left, conn_right]);
+            let repr = ContinuousHV::bundle_owned(&[conn_up, conn_down, conn_left, conn_right]);
             node_representations.push(repr);
         }
 
@@ -1078,8 +1078,8 @@ impl ConsciousnessTopology {
 
         let n_nodes = grid_size * grid_size;
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut node_representations = Vec::with_capacity(n_nodes);
@@ -1106,7 +1106,7 @@ impl ConsciousnessTopology {
             let right = if col == grid_size - 1 {
                 // Wraparound to left edge, with row flip
                 let flipped_row = grid_size - 1 - row;
-                flipped_row * grid_size + 0
+                flipped_row * grid_size
             } else {
                 row * grid_size + (col + 1)
             };
@@ -1121,7 +1121,7 @@ impl ConsciousnessTopology {
             let conn_left = node_identities[i].bind(&node_identities[left]);
             let conn_right = node_identities[i].bind(&node_identities[right]);
 
-            let repr = RealHV::bundle(&[conn_up, conn_down, conn_left, conn_right]);
+            let repr = ContinuousHV::bundle_owned(&[conn_up, conn_down, conn_left, conn_right]);
             node_representations.push(repr);
         }
 
@@ -1155,8 +1155,8 @@ impl ConsciousnessTopology {
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
         // Build a tree structure with lateral connections at each level
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         // Build adjacency list
@@ -1203,11 +1203,11 @@ impl ConsciousnessTopology {
             if adjacency[i].is_empty() {
                 node_representations.push(node_identities[i].clone());
             } else {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
-                node_representations.push(RealHV::bundle(&connections));
+                node_representations.push(ContinuousHV::bundle_owned(&connections));
             }
         }
 
@@ -1245,7 +1245,7 @@ impl ConsciousnessTopology {
     /// * `m` - Number of edges to attach per new node (typical: 2-5)
     /// * `seed` - Random seed for reproducibility
     pub fn scale_free(n_nodes: usize, dim: usize, m: usize, seed: u64) -> Self {
-        assert!(n_nodes >= m + 1, "Need n_nodes > m for scale-free network");
+        assert!(n_nodes > m, "Need n_nodes > m for scale-free network");
         assert!(m >= 1, "m must be >= 1");
         assert!(dim >= 256, "Dimension should be >= 256 for good separation");
 
@@ -1253,8 +1253,8 @@ impl ConsciousnessTopology {
         use rand::rngs::StdRng;
         let mut rng = StdRng::seed_from_u64(seed);
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         // Build adjacency list
@@ -1320,11 +1320,11 @@ impl ConsciousnessTopology {
             if adjacency[i].is_empty() {
                 node_representations.push(node_identities[i].clone());
             } else {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
-                node_representations.push(RealHV::bundle(&connections));
+                node_representations.push(ContinuousHV::bundle_owned(&connections));
             }
         }
 
@@ -1368,10 +1368,10 @@ impl ConsciousnessTopology {
     /// * `seed` - Random seed for reproducibility
     pub fn fractal(n_nodes: usize, dim: usize, seed: u64) -> Self {
         // Create node identities with slight variation
-        let node_identities: Vec<RealHV> = (0..n_nodes)
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let base = RealHV::basis(i, dim);
-                let noise = RealHV::random(dim, seed + i as u64 * 1000).scale(0.05);
+                let base = ContinuousHV::basis(i, dim);
+                let noise = ContinuousHV::random(dim, seed + i as u64 * 1000).scale(0.05);
                 base.add(&noise)
             })
             .collect();
@@ -1437,11 +1437,11 @@ impl ConsciousnessTopology {
                 unique_neighbors.sort_unstable();
                 unique_neighbors.dedup();
 
-                let connections: Vec<RealHV> = unique_neighbors
+                let connections: Vec<ContinuousHV> = unique_neighbors
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
-                node_representations.push(RealHV::bundle(&connections));
+                node_representations.push(ContinuousHV::bundle_owned(&connections));
             }
         }
 
@@ -1487,10 +1487,10 @@ impl ConsciousnessTopology {
         let n_nodes = 2_usize.pow(dimensions as u32);
 
         // Create node identities
-        let node_identities: Vec<RealHV> = (0..n_nodes)
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let base = RealHV::basis(i, hv_dim);
-                let noise = RealHV::random(hv_dim, seed + i as u64 * 1000).scale(0.05);
+                let base = ContinuousHV::basis(i, hv_dim);
+                let noise = ContinuousHV::random(hv_dim, seed + i as u64 * 1000).scale(0.05);
                 base.add(&noise)
             })
             .collect();
@@ -1516,11 +1516,11 @@ impl ConsciousnessTopology {
         // Generate representations from adjacency
         let mut node_representations = Vec::with_capacity(n_nodes);
         for i in 0..n_nodes {
-            let connections: Vec<RealHV> = adjacency[i]
+            let connections: Vec<ContinuousHV> = adjacency[i]
                 .iter()
                 .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                 .collect();
-            node_representations.push(RealHV::bundle(&connections));
+            node_representations.push(ContinuousHV::bundle_owned(&connections));
         }
 
         // Extract edges from adjacency (only i < j to avoid duplicates)
@@ -1581,10 +1581,10 @@ impl ConsciousnessTopology {
         };
 
         // Create node identities with variation
-        let node_identities: Vec<RealHV> = (0..n_nodes)
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let base = RealHV::basis(i, dim);
-                let noise = RealHV::random(dim, seed + i as u64 * 1000).scale(0.05);
+                let base = ContinuousHV::basis(i, dim);
+                let noise = ContinuousHV::random(dim, seed + i as u64 * 1000).scale(0.05);
                 base.add(&noise)
             })
             .collect();
@@ -1653,11 +1653,11 @@ impl ConsciousnessTopology {
                 unique_neighbors.sort_unstable();
                 unique_neighbors.dedup();
 
-                let connections: Vec<RealHV> = unique_neighbors
+                let connections: Vec<ContinuousHV> = unique_neighbors
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
-                node_representations.push(RealHV::bundle(&connections));
+                node_representations.push(ContinuousHV::bundle_owned(&connections));
             }
         }
 
@@ -1727,10 +1727,10 @@ impl ConsciousnessTopology {
         );
 
         // Create node identities with variation
-        let node_identities: Vec<RealHV> = (0..n_nodes)
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let base = RealHV::basis(i, dim);
-                let noise = RealHV::random(dim, seed + i as u64 * 1000).scale(0.05);
+                let base = ContinuousHV::basis(i, dim);
+                let noise = ContinuousHV::random(dim, seed + i as u64 * 1000).scale(0.05);
                 base.add(&noise)
             })
             .collect();
@@ -1781,11 +1781,11 @@ impl ConsciousnessTopology {
                 unique_neighbors.sort_unstable();
                 unique_neighbors.dedup();
 
-                let connections: Vec<RealHV> = unique_neighbors
+                let connections: Vec<ContinuousHV> = unique_neighbors
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
-                node_representations.push(RealHV::bundle(&connections));
+                node_representations.push(ContinuousHV::bundle_owned(&connections));
             }
         }
 
@@ -1845,10 +1845,10 @@ impl ConsciousnessTopology {
         let n_nodes = 3 * 4_usize.pow(depth as u32);
 
         // Create node identities with seed-based variation
-        let node_identities: Vec<RealHV> = (0..n_nodes)
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let base = RealHV::basis(i % dim, dim);
-                let noise = RealHV::random(dim, seed + i as u64 * 1000).scale(0.05);
+                let base = ContinuousHV::basis(i % dim, dim);
+                let noise = ContinuousHV::random(dim, seed + i as u64 * 1000).scale(0.05);
                 base.add(&noise)
             })
             .collect();
@@ -1911,11 +1911,11 @@ impl ConsciousnessTopology {
                 unique_neighbors.sort_unstable();
                 unique_neighbors.dedup();
 
-                let connections: Vec<RealHV> = unique_neighbors
+                let connections: Vec<ContinuousHV> = unique_neighbors
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
-                node_representations.push(RealHV::bundle(&connections));
+                node_representations.push(ContinuousHV::bundle_owned(&connections));
             }
         }
 
@@ -2093,8 +2093,8 @@ impl ConsciousnessTopology {
         let n_layers = 6;
         let n_nodes = neurons_per_layer * n_layers;
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut edges = Vec::new();
@@ -2116,7 +2116,7 @@ impl ConsciousnessTopology {
         for i in 0..neurons_per_layer {
             // L4 → L2/3 (feedforward)
             let l4_neuron = 3 * neurons_per_layer + i;
-            let l23_neuron = 1 * neurons_per_layer + (i % neurons_per_layer);
+            let l23_neuron = neurons_per_layer + (i % neurons_per_layer);
             edges.push((l4_neuron.min(l23_neuron), l4_neuron.max(l23_neuron)));
 
             // L2/3 → L5 (feedforward)
@@ -2144,16 +2144,16 @@ impl ConsciousnessTopology {
             adjacency[*j].push(*i);
         }
 
-        let node_representations: Vec<RealHV> = (0..n_nodes)
+        let node_representations: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
                 if connections.is_empty() {
                     node_identities[i].clone()
                 } else {
-                    RealHV::bundle(&connections)
+                    ContinuousHV::bundle_owned(&connections)
                 }
             })
             .collect();
@@ -2180,8 +2180,8 @@ impl ConsciousnessTopology {
     pub fn feedforward(layers: &[usize], dim: usize, _seed: u64) -> Self {
         let n_nodes: usize = layers.iter().sum();
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut edges = Vec::new();
@@ -2209,16 +2209,16 @@ impl ConsciousnessTopology {
             adjacency[*j].push(*i);
         }
 
-        let node_representations: Vec<RealHV> = (0..n_nodes)
+        let node_representations: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
                 if connections.is_empty() {
                     node_identities[i].clone()
                 } else {
-                    RealHV::bundle(&connections)
+                    ContinuousHV::bundle_owned(&connections)
                 }
             })
             .collect();
@@ -2240,8 +2240,8 @@ impl ConsciousnessTopology {
     pub fn recurrent(layers: &[usize], dim: usize, _seed: u64) -> Self {
         let n_nodes: usize = layers.iter().sum();
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut edges = Vec::new();
@@ -2282,16 +2282,16 @@ impl ConsciousnessTopology {
             adjacency[*j].push(*i);
         }
 
-        let node_representations: Vec<RealHV> = (0..n_nodes)
+        let node_representations: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
                 if connections.is_empty() {
                     node_identities[i].clone()
                 } else {
-                    RealHV::bundle(&connections)
+                    ContinuousHV::bundle_owned(&connections)
                 }
             })
             .collect();
@@ -2313,8 +2313,8 @@ impl ConsciousnessTopology {
     pub fn bipartite(n_left: usize, n_right: usize, connection_prob: f64, dim: usize, seed: u64) -> Self {
         let n_nodes = n_left + n_right;
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut edges = Vec::new();
@@ -2335,16 +2335,16 @@ impl ConsciousnessTopology {
             adjacency[*j].push(*i);
         }
 
-        let node_representations: Vec<RealHV> = (0..n_nodes)
+        let node_representations: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
                 if connections.is_empty() {
                     node_identities[i].clone()
                 } else {
-                    RealHV::bundle(&connections)
+                    ContinuousHV::bundle_owned(&connections)
                 }
             })
             .collect();
@@ -2366,8 +2366,8 @@ impl ConsciousnessTopology {
     pub fn core_periphery(core_size: usize, periphery_size: usize, dim: usize, _seed: u64) -> Self {
         let n_nodes = core_size + periphery_size;
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut edges = Vec::new();
@@ -2401,16 +2401,16 @@ impl ConsciousnessTopology {
             adjacency[*j].push(*i);
         }
 
-        let node_representations: Vec<RealHV> = (0..n_nodes)
+        let node_representations: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
                 if connections.is_empty() {
                     node_identities[i].clone()
                 } else {
-                    RealHV::bundle(&connections)
+                    ContinuousHV::bundle_owned(&connections)
                 }
             })
             .collect();
@@ -2433,8 +2433,8 @@ impl ConsciousnessTopology {
     pub fn bow_tie(n_in: usize, n_core: usize, n_out: usize, dim: usize, _seed: u64) -> Self {
         let n_nodes = n_in + n_core + n_out;
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut edges = Vec::new();
@@ -2466,16 +2466,16 @@ impl ConsciousnessTopology {
             adjacency[*j].push(*i);
         }
 
-        let node_representations: Vec<RealHV> = (0..n_nodes)
+        let node_representations: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
                 if connections.is_empty() {
                     node_identities[i].clone()
                 } else {
-                    RealHV::bundle(&connections)
+                    ContinuousHV::bundle_owned(&connections)
                 }
             })
             .collect();
@@ -2497,8 +2497,8 @@ impl ConsciousnessTopology {
     pub fn attention(n_queries: usize, n_keys: usize, n_values: usize, dim: usize, _seed: u64) -> Self {
         let n_nodes = n_queries + n_keys + n_values;
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut edges = Vec::new();
@@ -2531,16 +2531,16 @@ impl ConsciousnessTopology {
             adjacency[*j].push(*i);
         }
 
-        let node_representations: Vec<RealHV> = (0..n_nodes)
+        let node_representations: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
                 if connections.is_empty() {
                     node_identities[i].clone()
                 } else {
-                    RealHV::bundle(&connections)
+                    ContinuousHV::bundle_owned(&connections)
                 }
             })
             .collect();
@@ -2562,8 +2562,8 @@ impl ConsciousnessTopology {
     pub fn residual(layers: &[usize], dim: usize, _seed: u64) -> Self {
         let n_nodes: usize = layers.iter().sum();
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut edges = Vec::new();
@@ -2609,16 +2609,16 @@ impl ConsciousnessTopology {
             adjacency[*j].push(*i);
         }
 
-        let node_representations: Vec<RealHV> = (0..n_nodes)
+        let node_representations: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
                 if connections.is_empty() {
                     node_identities[i].clone()
                 } else {
-                    RealHV::bundle(&connections)
+                    ContinuousHV::bundle_owned(&connections)
                 }
             })
             .collect();
@@ -2643,8 +2643,8 @@ impl ConsciousnessTopology {
     pub fn petersen_graph(dim: usize, _seed: u64) -> Self {
         let n_nodes = 10;
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         // Petersen graph edges (fixed structure)
@@ -2666,13 +2666,13 @@ impl ConsciousnessTopology {
             adjacency[*j].push(*i);
         }
 
-        let node_representations: Vec<RealHV> = (0..n_nodes)
+        let node_representations: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
-                RealHV::bundle(&connections)
+                ContinuousHV::bundle_owned(&connections)
             })
             .collect();
 
@@ -2693,8 +2693,8 @@ impl ConsciousnessTopology {
     pub fn complete_bipartite(n: usize, m: usize, dim: usize, _seed: u64) -> Self {
         let n_nodes = n + m;
 
-        let node_identities: Vec<RealHV> = (0..n_nodes)
-            .map(|i| RealHV::basis(i, dim))
+        let node_identities: Vec<ContinuousHV> = (0..n_nodes)
+            .map(|i| ContinuousHV::basis(i, dim))
             .collect();
 
         let mut edges = Vec::new();
@@ -2712,16 +2712,16 @@ impl ConsciousnessTopology {
             adjacency[*j].push(*i);
         }
 
-        let node_representations: Vec<RealHV> = (0..n_nodes)
+        let node_representations: Vec<ContinuousHV> = (0..n_nodes)
             .map(|i| {
-                let connections: Vec<RealHV> = adjacency[i]
+                let connections: Vec<ContinuousHV> = adjacency[i]
                     .iter()
                     .map(|&neighbor| node_identities[i].bind(&node_identities[neighbor]))
                     .collect();
                 if connections.is_empty() {
                     node_identities[i].clone()
                 } else {
-                    RealHV::bundle(&connections)
+                    ContinuousHV::bundle_owned(&connections)
                 }
             })
             .collect();

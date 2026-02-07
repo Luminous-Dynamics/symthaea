@@ -70,7 +70,7 @@
 //! | Consciousness | None | Φ-integrated |
 
 use super::universal_semantics::{UniversalSemantics, SemanticPrime};
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use std::collections::HashMap;
 
 // =============================================================================
@@ -499,7 +499,7 @@ pub struct UnderstoodMeaning {
     pub primes: Vec<SemanticPrime>,
 
     /// Compositional structure (HDC representation)
-    pub semantic_hv: HV16,
+    pub semantic_hv: BinaryHV,
 
     /// Causal structure (if detected)
     pub causal_structure: Option<CausalStructure>,
@@ -522,11 +522,11 @@ pub struct UnderstoodMeaning {
 pub struct CausalStructure {
     /// The cause component
     pub cause: String,
-    pub cause_hv: HV16,
+    pub cause_hv: BinaryHV,
 
     /// The effect component
     pub effect: String,
-    pub effect_hv: HV16,
+    pub effect_hv: BinaryHV,
 
     /// Type of causal relation
     pub relation: CausalRelation,
@@ -684,18 +684,18 @@ impl GroundedUnderstanding {
     }
 
     /// Compose primes into unified meaning vector
-    fn compose_meaning(&self, primes: &[SemanticPrime]) -> HV16 {
+    fn compose_meaning(&self, primes: &[SemanticPrime]) -> BinaryHV {
         if primes.is_empty() {
-            return HV16::random(0);
+            return BinaryHV::random(0);
         }
 
         // Get HV for each prime
-        let hvs: Vec<HV16> = primes.iter()
+        let hvs: Vec<BinaryHV> = primes.iter()
             .map(|p| *self.semantics.get_prime(*p))
             .collect();
 
         // Bundle all primes together
-        HV16::bundle(&hvs)
+        BinaryHV::bundle(&hvs)
     }
 
     /// Extract causal structure from text
@@ -790,7 +790,7 @@ impl GroundedUnderstanding {
     }
 
     /// Estimate integration (simplified Φ)
-    fn estimate_integration(&self, primes: &[SemanticPrime], semantic_hv: &HV16) -> f64 {
+    fn estimate_integration(&self, primes: &[SemanticPrime], semantic_hv: &BinaryHV) -> f64 {
         // More diverse primes = higher integration
         let unique_primes: std::collections::HashSet<_> = primes.iter().collect();
         let diversity = unique_primes.len() as f64 / 65.0; // 65 total primes

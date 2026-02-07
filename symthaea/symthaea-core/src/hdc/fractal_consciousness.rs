@@ -37,7 +37,7 @@
 //! If bridge ratio ~40-45% optimizes Φ at one scale, the same principle
 //! should apply at every scale. This creates a fractal of optimal integration.
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::spectral_connectivity::ConnectivityCalculator;
 use std::collections::HashMap;
 
@@ -81,7 +81,7 @@ pub struct FractalNode {
     /// Module assignment at this scale
     pub module: usize,
     /// HDC state representation
-    pub state: RealHV,
+    pub state: ContinuousHV,
     /// Activity level
     pub activity: f64,
     /// Sub-topology (fractal children) - None at finest scale
@@ -97,7 +97,7 @@ impl FractalNode {
             id,
             scale: 0,
             module,
-            state: RealHV::random(dim, seed),
+            state: ContinuousHV::random(dim, seed),
             activity: 0.0,
             children: None,
             connections: Vec::new(),
@@ -110,7 +110,7 @@ impl FractalNode {
             id,
             scale,
             module,
-            state: RealHV::random(dim, seed),
+            state: ContinuousHV::random(dim, seed),
             activity: 0.0,
             children: Some(Box::new(sub)),
             connections: Vec::new(),
@@ -121,12 +121,12 @@ impl FractalNode {
     pub fn integrate_from_children(&mut self) {
         if let Some(ref children) = self.children {
             // Bundle all child states to create this node's state
-            let child_states: Vec<RealHV> = children.nodes.values()
+            let child_states: Vec<ContinuousHV> = children.nodes.values()
                 .map(|n| n.state.clone())
                 .collect();
 
             if !child_states.is_empty() {
-                self.state = RealHV::bundle(&child_states);
+                self.state = ContinuousHV::bundle_owned(&child_states);
             }
 
             // Activity is average of child activities
@@ -150,7 +150,7 @@ impl FractalNode {
     /// Compute local Φ (for this node's sub-topology)
     pub fn local_phi(&self, phi_calc: &ConnectivityCalculator) -> f64 {
         if let Some(ref children) = self.children {
-            let child_states: Vec<RealHV> = children.nodes.values()
+            let child_states: Vec<ContinuousHV> = children.nodes.values()
                 .map(|n| n.state.clone())
                 .collect();
             phi_calc.algebraic_connectivity(&child_states)
@@ -245,7 +245,7 @@ impl FractalSubTopology {
 
     /// Compute Φ for this topology level
     pub fn compute_phi(&self, phi_calc: &ConnectivityCalculator) -> f64 {
-        let states: Vec<RealHV> = self.nodes.values()
+        let states: Vec<ContinuousHV> = self.nodes.values()
             .map(|n| n.state.clone())
             .collect();
         phi_calc.algebraic_connectivity(&states)
@@ -313,7 +313,7 @@ impl FractalConsciousness {
         let top_scale = self.config.n_scales - 1;
         let n_nodes = self.config.nodes_per_scale;
         // Use 4 modules by default, but ensure at least 2 nodes per module for intra-module edges
-        let n_modules = (n_nodes / 2).max(1).min(4);
+        let n_modules = (n_nodes / 2).clamp(1, 4);
 
         // Create top-level nodes, assigning multiple nodes to same module
         for i in 0..n_nodes {
@@ -512,7 +512,7 @@ impl FractalConsciousness {
     }
 
     /// Activate a top-level module
-    pub fn activate_module(&mut self, module: usize, input: &RealHV) {
+    pub fn activate_module(&mut self, module: usize, input: &ContinuousHV) {
         for node in self.root.nodes.values_mut() {
             if node.module == module {
                 node.state = node.state.bind(input);

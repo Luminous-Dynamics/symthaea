@@ -11,7 +11,7 @@
 
 use symthaea::Symthaea;
 use symthaea::mind::{ContinuousMind, MindConfig};
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::real_hv::RealHV;
 
 // ---------------------------------------------------------------------------
 // Full pipeline tests (async, require Symthaea::new)

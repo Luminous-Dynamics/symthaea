@@ -19,7 +19,7 @@ pub use knowledge::{DomainKnowledge, KnowledgeEntry, SeedingResult};
 pub use structured_thought::*;
 
 use std::collections::HashMap;
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 /// The continuous mind system
 pub struct ContinuousMind {
@@ -28,7 +28,7 @@ pub struct ContinuousMind {
     /// Current state
     pub(crate) state: MindState,
     /// Working memory
-    pub(crate) working_memory: Vec<RealHV>,
+    pub(crate) working_memory: Vec<ContinuousHV>,
     /// Goal stack
     pub(crate) goals: Vec<Goal>,
     /// Input queue
@@ -62,7 +62,7 @@ impl ContinuousMind {
             intent_classifier: IntentClassifier::new(dim),
             config,
             state: MindState {
-                current_thought: RealHV::zero(dim),
+                current_thought: ContinuousHV::zero(dim),
                 ..Default::default()
             },
             working_memory: Vec::new(),
@@ -96,7 +96,7 @@ impl ContinuousMind {
     }
 
     /// Add a perception input
-    pub fn perceive(&mut self, content: RealHV) {
+    pub fn perceive(&mut self, content: ContinuousHV) {
         self.input(MindInput {
             input_type: InputType::Perception,
             content,
@@ -115,13 +115,13 @@ impl ContinuousMind {
     /// Perceive with text context for better classification.
     ///
     /// Combines HDC encoding with text-based intent classification.
-    pub fn perceive_text(&mut self, text: &str, embedding: RealHV) {
+    pub fn perceive_text(&mut self, text: &str, embedding: ContinuousHV) {
         self.last_input_text = Some(text.to_string());
         self.perceive(embedding);
     }
 
     /// Set a goal
-    pub fn set_goal(&mut self, description: impl Into<String>, embedding: RealHV, priority: f32) {
+    pub fn set_goal(&mut self, description: impl Into<String>, embedding: ContinuousHV, priority: f32) {
         let mut metadata = HashMap::new();
         metadata.insert("description".to_string(), description.into());
 
@@ -159,7 +159,7 @@ impl ContinuousMind {
     }
 
     /// Get working memory contents
-    pub fn working_memory(&self) -> &[RealHV] {
+    pub fn working_memory(&self) -> &[ContinuousHV] {
         &self.working_memory
     }
 
@@ -302,7 +302,7 @@ impl ContinuousMind {
     ///
     /// Uses the same encoding as text perception to ensure alignment
     /// between seeded knowledge and runtime inputs.
-    fn encode_knowledge_entry(&self, entry: &knowledge::KnowledgeEntry) -> RealHV {
+    fn encode_knowledge_entry(&self, entry: &knowledge::KnowledgeEntry) -> ContinuousHV {
         // Combine label and content for richer encoding
         let combined = format!("{} {}", entry.label.replace('_', " "), entry.content);
 
@@ -324,7 +324,7 @@ impl ContinuousMind {
             }
         }
 
-        RealHV::from_values(values)
+        ContinuousHV::from_values(values)
     }
 
     /// Check if memory has been seeded
@@ -676,7 +676,7 @@ mod tests {
     #[test]
     fn test_perception() {
         let mut mind = ContinuousMind::default();
-        mind.perceive(RealHV::random(512, 42));
+        mind.perceive(ContinuousHV::random(512, 42));
         mind.tick();
         assert_eq!(mind.working_memory.len(), 1);
     }
@@ -684,7 +684,7 @@ mod tests {
     #[test]
     fn test_goal_setting() {
         let mut mind = ContinuousMind::default();
-        mind.set_goal("Test goal", RealHV::random(512, 42), 1.0);
+        mind.set_goal("Test goal", ContinuousHV::random(512, 42), 1.0);
         mind.tick();
         assert!(!mind.active_goals().is_empty());
     }
@@ -694,7 +694,7 @@ mod tests {
         let mut mind = ContinuousMind::default();
 
         for i in 0..5 {
-            mind.perceive(RealHV::random(512, 42 + i as u64));
+            mind.perceive(ContinuousHV::random(512, 42 + i as u64));
         }
 
         for _ in 0..5 {

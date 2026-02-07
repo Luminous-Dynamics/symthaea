@@ -26,40 +26,40 @@
 //!
 //! ```rust,ignore
 //! use symthaea::hdc::incremental_hv::*;
-//! use symthaea::hdc::binary_hv::HV16;
+//! use symthaea::hdc::binary_hv::BinaryHV;
 //!
 //! // Create incremental bundle tracker
 //! let mut bundle = IncrementalBundle::new();
 //!
 //! // Add initial vectors
-//! bundle.add(vec![HV16::random(0), HV16::random(1), HV16::random(2)]);
+//! bundle.add(vec![BinaryHV::random(0), BinaryHV::random(1), BinaryHV::random(2)]);
 //!
 //! // Get bundled result - O(n) first time
 //! let result1 = bundle.get_bundle();
 //!
 //! // Update one vector - O(1) incremental update!
-//! bundle.update(1, HV16::random(10));
+//! bundle.update(1, BinaryHV::random(10));
 //!
 //! // Get updated bundle - O(k) where k=1, not O(n)!
 //! let result2 = bundle.get_bundle();  // ~100x faster for n=100!
 //! ```
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use std::collections::HashMap;
 
-// Helper functions using HV16's native methods (replacement for incompatible simd_hv)
+// Helper functions using BinaryHV's native methods (replacement for incompatible simd_hv)
 #[inline]
-fn simd_bind(a: &HV16, b: &HV16) -> HV16 {
+fn simd_bind(a: &BinaryHV, b: &BinaryHV) -> BinaryHV {
     a.bind(b)
 }
 
 #[inline]
-fn simd_bundle(vectors: &[HV16]) -> HV16 {
-    HV16::bundle(vectors)
+fn simd_bundle(vectors: &[BinaryHV]) -> BinaryHV {
+    BinaryHV::bundle(vectors)
 }
 
 #[inline]
-fn simd_similarity(a: &HV16, b: &HV16) -> f32 {
+fn simd_similarity(a: &BinaryHV, b: &BinaryHV) -> f32 {
     a.similarity(b)
 }
 
@@ -90,21 +90,21 @@ fn simd_similarity(a: &HV16, b: &HV16) -> f32 {
 /// For n=1000, k=10 changes: **100x faster** than full rebundle!
 pub struct IncrementalBundle {
     /// Current vectors in the bundle
-    vectors: Vec<HV16>,
+    vectors: Vec<BinaryHV>,
 
     /// Cached bit counts: bit_counts[byte_idx][bit_idx] = count
     /// Positive = more 1s, negative = more 0s
-    /// HV16 is 2048 bytes (16,384 bits), so we need 2048 byte positions
+    /// BinaryHV is 2048 bytes (16,384 bits), so we need 2048 byte positions
     bit_counts: Vec<[i32; 8]>,
 
     /// Cached bundle result (invalidated on updates)
-    cached_bundle: Option<HV16>,
+    cached_bundle: Option<BinaryHV>,
 
     /// Dirty flag - true if counts changed since last bundle
     dirty: bool,
 }
 
-/// HV16 byte size (2048 bytes = 16,384 bits)
+/// BinaryHV byte size (2048 bytes = 16,384 bits)
 const HV16_BYTES: usize = 2048;
 
 impl IncrementalBundle {
@@ -119,7 +119,7 @@ impl IncrementalBundle {
     }
 
     /// Add vectors to the bundle - O(n) for n new vectors
-    pub fn add(&mut self, new_vectors: Vec<HV16>) {
+    pub fn add(&mut self, new_vectors: Vec<BinaryHV>) {
         for vector in &new_vectors {
             self.increment_counts(vector);
         }
@@ -130,14 +130,14 @@ impl IncrementalBundle {
     /// Update single vector - O(1) incremental update!
     ///
     /// This is the REVOLUTIONARY part: change ONE vector without rebundling ALL!
-    pub fn update(&mut self, index: usize, new_vector: HV16) {
+    pub fn update(&mut self, index: usize, new_vector: BinaryHV) {
         if index >= self.vectors.len() {
             return;
         }
 
         // Clone old vector to avoid borrow conflict
-        // (HV16 is 2048 bytes - small enough that clone is fine)
-        let old_vector = self.vectors[index].clone();
+        // (BinaryHV is 2048 bytes - small enough that clone is fine)
+        let old_vector = self.vectors[index];
 
         // Decrement old vector's contribution
         self.decrement_counts(&old_vector);
@@ -151,7 +151,7 @@ impl IncrementalBundle {
     }
 
     /// Remove vector - O(1) incremental update
-    pub fn remove(&mut self, index: usize) -> Option<HV16> {
+    pub fn remove(&mut self, index: usize) -> Option<BinaryHV> {
         if index >= self.vectors.len() {
             return None;
         }
@@ -165,10 +165,10 @@ impl IncrementalBundle {
     /// Get current bundled result - O(1) if cached, O(2048) if dirty
     ///
     /// Much faster than O(n) rebundling!
-    pub fn get_bundle(&mut self) -> HV16 {
+    pub fn get_bundle(&mut self) -> BinaryHV {
         if !self.dirty {
             if let Some(cached) = &self.cached_bundle {
-                return cached.clone();
+                return *cached;
             }
         }
 
@@ -184,14 +184,14 @@ impl IncrementalBundle {
             result[byte_idx] = byte_val;
         }
 
-        let bundle = HV16(result);
-        self.cached_bundle = Some(bundle.clone());
+        let bundle = BinaryHV(result);
+        self.cached_bundle = Some(bundle);
         self.dirty = false;
         bundle
     }
 
     /// Get current vectors
-    pub fn vectors(&self) -> &[HV16] {
+    pub fn vectors(&self) -> &[BinaryHV] {
         &self.vectors
     }
 
@@ -207,7 +207,7 @@ impl IncrementalBundle {
 
     // Helper: Increment bit counts for a vector
     #[inline]
-    fn increment_counts(&mut self, vector: &HV16) {
+    fn increment_counts(&mut self, vector: &BinaryHV) {
         for byte_idx in 0..HV16_BYTES {
             let byte = vector.0[byte_idx];
             for bit_idx in 0..8 {
@@ -222,7 +222,7 @@ impl IncrementalBundle {
 
     // Helper: Decrement bit counts for a vector
     #[inline]
-    fn decrement_counts(&mut self, vector: &HV16) {
+    fn decrement_counts(&mut self, vector: &BinaryHV) {
         for byte_idx in 0..HV16_BYTES {
             let byte = vector.0[byte_idx];
             for bit_idx in 0..8 {
@@ -267,8 +267,8 @@ impl Default for IncrementalBundle {
 ///
 /// ```rust,ignore
 /// let mut cache = SimilarityCache::new();
-/// let query = HV16::random(42);
-/// let memory = vec![HV16::random(1), HV16::random(2)];
+/// let query = BinaryHV::random(42);
+/// let memory = vec![BinaryHV::random(1), BinaryHV::random(2)];
 ///
 /// // First call - O(m) compute and cache
 /// let sim1 = cache.get_similarity(&query, 0, &memory[0]);
@@ -281,7 +281,7 @@ pub struct SimilarityCache {
     cache: HashMap<(u64, u64), f32>,
 
     /// Query vectors: query_id -> vector
-    queries: HashMap<u64, HV16>,
+    queries: HashMap<u64, BinaryHV>,
 
     /// Next query ID
     next_id: u64,
@@ -304,7 +304,7 @@ impl SimilarityCache {
     }
 
     /// Register a query vector, returns query_id for future lookups
-    pub fn register_query(&mut self, query: HV16) -> u64 {
+    pub fn register_query(&mut self, query: BinaryHV) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
         self.queries.insert(id, query);
@@ -312,7 +312,7 @@ impl SimilarityCache {
     }
 
     /// Get similarity with caching - O(1) on cache hit!
-    pub fn get_similarity(&mut self, query_id: u64, target_id: u64, target: &HV16) -> f32 {
+    pub fn get_similarity(&mut self, query_id: u64, target_id: u64, target: &BinaryHV) -> f32 {
         let key = (query_id, target_id);
 
         if let Some(&similarity) = self.cache.get(&key) {
@@ -393,13 +393,13 @@ pub struct CacheStats {
 /// - **Speedup**: n/k (e.g., 100x for k=1, n=100)
 pub struct IncrementalBind {
     /// Current queries
-    queries: Vec<HV16>,
+    queries: Vec<BinaryHV>,
 
     /// Current key
-    key: HV16,
+    key: BinaryHV,
 
     /// Cached bound results: query_idx -> bound vector
-    cached_results: HashMap<usize, HV16>,
+    cached_results: HashMap<usize, BinaryHV>,
 
     /// Dirty flags: which queries changed since last bind
     dirty: Vec<bool>,
@@ -407,7 +407,7 @@ pub struct IncrementalBind {
 
 impl IncrementalBind {
     /// Create new incremental bind tracker
-    pub fn new(initial_key: HV16) -> Self {
+    pub fn new(initial_key: BinaryHV) -> Self {
         Self {
             queries: Vec::new(),
             key: initial_key,
@@ -417,7 +417,7 @@ impl IncrementalBind {
     }
 
     /// Add queries
-    pub fn add_queries(&mut self, queries: Vec<HV16>) {
+    pub fn add_queries(&mut self, queries: Vec<BinaryHV>) {
         let start_idx = self.queries.len();
         self.queries.extend(queries);
         self.dirty.resize(self.queries.len(), true);
@@ -429,7 +429,7 @@ impl IncrementalBind {
     }
 
     /// Update single query - marks as dirty
-    pub fn update_query(&mut self, index: usize, new_query: HV16) {
+    pub fn update_query(&mut self, index: usize, new_query: BinaryHV) {
         if index < self.queries.len() {
             self.queries[index] = new_query;
             self.dirty[index] = true;
@@ -438,7 +438,7 @@ impl IncrementalBind {
     }
 
     /// Update key - marks ALL as dirty
-    pub fn update_key(&mut self, new_key: HV16) {
+    pub fn update_key(&mut self, new_key: BinaryHV) {
         self.key = new_key;
         for dirty_flag in &mut self.dirty {
             *dirty_flag = true;
@@ -447,7 +447,7 @@ impl IncrementalBind {
     }
 
     /// Get bound results - O(k) for k dirty queries
-    pub fn get_bound_results(&mut self) -> Vec<HV16> {
+    pub fn get_bound_results(&mut self) -> Vec<BinaryHV> {
         // Bind dirty queries only
         for (idx, is_dirty) in self.dirty.iter().enumerate() {
             if *is_dirty {
@@ -461,7 +461,7 @@ impl IncrementalBind {
 
         // Return cached results in order
         (0..self.queries.len())
-            .map(|idx| self.cached_results.get(&idx).unwrap().clone())
+            .map(|idx| *self.cached_results.get(&idx).unwrap())
             .collect()
     }
 
@@ -487,9 +487,9 @@ mod tests {
     #[test]
     fn test_incremental_bundle_correctness() {
         let vectors = vec![
-            HV16::random(0),
-            HV16::random(1),
-            HV16::random(2),
+            BinaryHV::random(0),
+            BinaryHV::random(1),
+            BinaryHV::random(2),
         ];
 
         let mut inc_bundle = IncrementalBundle::new();
@@ -504,12 +504,12 @@ mod tests {
     #[test]
     fn test_incremental_bundle_update() {
         let mut bundle = IncrementalBundle::new();
-        bundle.add(vec![HV16::random(0), HV16::random(1), HV16::random(2)]);
+        bundle.add(vec![BinaryHV::random(0), BinaryHV::random(1), BinaryHV::random(2)]);
 
         let before = bundle.get_bundle();
 
         // Update one vector
-        bundle.update(1, HV16::random(10));
+        bundle.update(1, BinaryHV::random(10));
 
         let after = bundle.get_bundle();
 
@@ -525,8 +525,8 @@ mod tests {
     fn test_similarity_cache() {
         let mut cache = SimilarityCache::new();
 
-        let query = HV16::random(42);
-        let target = HV16::random(43);
+        let query = BinaryHV::random(42);
+        let target = BinaryHV::random(43);
 
         let qid = cache.register_query(query.clone());
 
@@ -546,8 +546,8 @@ mod tests {
 
     #[test]
     fn test_incremental_bind() {
-        let queries = vec![HV16::random(0), HV16::random(1), HV16::random(2)];
-        let key = HV16::random(999);
+        let queries = vec![BinaryHV::random(0), BinaryHV::random(1), BinaryHV::random(2)];
+        let key = BinaryHV::random(999);
 
         let mut inc_bind = IncrementalBind::new(key.clone());
         inc_bind.add_queries(queries.clone());

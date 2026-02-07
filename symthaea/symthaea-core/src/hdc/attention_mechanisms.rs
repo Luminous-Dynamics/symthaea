@@ -41,7 +41,7 @@
 // integrated with binding (#25), workspace (#23), and FEP (#22). Attention is the
 // missing link between feature detection and conscious access!
 
-use crate::hdc::{HV16, HDC_DIMENSION};
+use crate::hdc::{BinaryHV, HDC_DIMENSION};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -77,8 +77,8 @@ pub enum AttentionSource {
 /// Attention target (what receives attention)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttentionTarget {
-    /// Target representation (HV16)
-    pub representation: HV16,
+    /// Target representation (BinaryHV)
+    pub representation: BinaryHV,
 
     /// Attention strength [0,1]
     pub strength: f64,
@@ -96,7 +96,7 @@ pub struct AttentionTarget {
 impl AttentionTarget {
     /// Create new attention target
     pub fn new(
-        representation: HV16,
+        representation: BinaryHV,
         strength: f64,
         attention_type: AttentionType,
         source: AttentionSource,
@@ -165,7 +165,7 @@ impl AttentionalState {
     }
 
     /// Get attention strength on target
-    pub fn attention_on(&self, target: &HV16) -> f64 {
+    pub fn attention_on(&self, target: &BinaryHV) -> f64 {
         if let Some(ref focus) = self.focus {
             // Similarity to focus × gain
             let similarity = focus.representation.similarity(target) as f64;
@@ -248,7 +248,7 @@ pub struct AttentionSystem {
     state: AttentionalState,
 
     /// Goal representations (top-down attention)
-    goals: Vec<HV16>,
+    goals: Vec<BinaryHV>,
 
     /// Salience map (bottom-up attention)
     salience_map: HashMap<String, f64>,
@@ -266,7 +266,7 @@ impl AttentionSystem {
     }
 
     /// Set goal (top-down attention)
-    pub fn set_goal(&mut self, goal: HV16) {
+    pub fn set_goal(&mut self, goal: BinaryHV) {
         self.goals.push(goal);
     }
 
@@ -283,7 +283,7 @@ impl AttentionSystem {
     /// Add attention candidate
     pub fn add_candidate(
         &mut self,
-        representation: HV16,
+        representation: BinaryHV,
         attention_type: AttentionType,
         source: AttentionSource,
     ) {
@@ -301,7 +301,7 @@ impl AttentionSystem {
     }
 
     /// Compute attention strength for representation
-    fn compute_strength(&self, representation: &HV16, source: AttentionSource) -> f64 {
+    fn compute_strength(&self, representation: &BinaryHV, source: AttentionSource) -> f64 {
         match source {
             AttentionSource::BottomUp => {
                 // Bottom-up: Use salience (default 0.5 if not specified)
@@ -380,7 +380,7 @@ impl AttentionSystem {
     }
 
     /// Apply attention to representation (gain modulation)
-    pub fn apply_gain(&self, representation: &HV16) -> HV16 {
+    pub fn apply_gain(&self, representation: &BinaryHV) -> BinaryHV {
         if !self.state.is_focused() {
             return *representation;
         }
@@ -398,7 +398,7 @@ impl AttentionSystem {
     }
 
     /// Get current gain for representation
-    pub fn get_gain(&self, representation: &HV16) -> f64 {
+    pub fn get_gain(&self, representation: &BinaryHV) -> f64 {
         self.state.attention_on(representation)
     }
 
@@ -474,7 +474,7 @@ mod tests {
     #[test]
     fn test_attention_target_creation() {
         let target = AttentionTarget::new(
-            HV16::ones(),
+            BinaryHV::ones(),
             0.8,
             AttentionType::Spatial,
             AttentionSource::BottomUp,
@@ -488,7 +488,7 @@ mod tests {
     #[test]
     fn test_priority_update() {
         let mut target = AttentionTarget::new(
-            HV16::ones(),
+            BinaryHV::ones(),
             0.5,
             AttentionType::FeatureBased,
             AttentionSource::Combined,
@@ -516,7 +516,7 @@ mod tests {
     #[test]
     fn test_set_goal() {
         let mut system = AttentionSystem::new(AttentionConfig::default());
-        let goal = HV16::random(42);
+        let goal = BinaryHV::random(42);
 
         system.set_goal(goal);
         assert_eq!(system.goals.len(), 1);
@@ -527,7 +527,7 @@ mod tests {
         let mut system = AttentionSystem::new(AttentionConfig::default());
 
         system.add_candidate(
-            HV16::ones(),
+            BinaryHV::ones(),
             AttentionType::Spatial,
             AttentionSource::BottomUp,
         );
@@ -541,7 +541,7 @@ mod tests {
 
         // Add high-priority candidate (will win)
         let mut strong = AttentionTarget::new(
-            HV16::ones(),
+            BinaryHV::ones(),
             0.9,
             AttentionType::Spatial,
             AttentionSource::BottomUp,
@@ -551,7 +551,7 @@ mod tests {
 
         // Add low-priority candidate (will lose)
         let mut weak = AttentionTarget::new(
-            HV16::zero(),
+            BinaryHV::zero(),
             0.3,
             AttentionType::FeatureBased,
             AttentionSource::BottomUp,
@@ -571,7 +571,7 @@ mod tests {
 
         // Add low-priority candidate (below threshold)
         let mut weak = AttentionTarget::new(
-            HV16::ones(),
+            BinaryHV::ones(),
             0.3,
             AttentionType::Spatial,
             AttentionSource::BottomUp,
@@ -590,7 +590,7 @@ mod tests {
         let mut system = AttentionSystem::new(AttentionConfig::default());
 
         // Set focus
-        let focus_repr = HV16::ones();
+        let focus_repr = BinaryHV::ones();
         let mut target = AttentionTarget::new(
             focus_repr,
             0.9,
@@ -606,7 +606,7 @@ mod tests {
         assert!(gain > 1.0);  // Enhanced
 
         // Get gain on different representation
-        let other = HV16::zero();
+        let other = BinaryHV::zero();
         let gain_other = system.get_gain(&other);
         assert!(gain_other < gain);  // Suppressed
     }
@@ -618,7 +618,7 @@ mod tests {
         // Add 10 candidates (exceeds capacity of 4)
         for i in 0..10 {
             let mut target = AttentionTarget::new(
-                HV16::random(i as u64),
+                BinaryHV::random(i as u64),
                 0.8,
                 AttentionType::Spatial,
                 AttentionSource::BottomUp,
@@ -637,8 +637,8 @@ mod tests {
     fn test_clear() {
         let mut system = AttentionSystem::new(AttentionConfig::default());
 
-        system.set_goal(HV16::ones());
-        system.add_candidate(HV16::zero(), AttentionType::Spatial, AttentionSource::BottomUp);
+        system.set_goal(BinaryHV::ones());
+        system.add_candidate(BinaryHV::zero(), AttentionType::Spatial, AttentionSource::BottomUp);
 
         system.clear();
 

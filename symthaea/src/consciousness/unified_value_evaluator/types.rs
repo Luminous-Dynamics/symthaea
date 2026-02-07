@@ -140,18 +140,8 @@ impl AffectiveSystemsState {
     }
 }
 
-/// Type of action being evaluated
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ActionType {
-    /// Basic action (default threshold)
-    Basic,
-    /// Governance proposal (higher threshold)
-    Governance,
-    /// Voting on proposal (higher threshold)
-    Voting,
-    /// Constitutional change (highest threshold)
-    Constitutional,
-}
+/// Type of action being evaluated (re-exported from contextual_weights)
+pub use super::super::contextual_weights::ActionType;
 
 /// The decision outcome
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

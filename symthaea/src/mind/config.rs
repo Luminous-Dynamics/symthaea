@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use crate::chronobiology::Biorhythm;
 
 /// Configuration for the continuous mind
@@ -58,7 +58,7 @@ pub struct MindState {
     /// Active goals
     pub active_goals: Vec<String>,
     /// Current thought embedding
-    pub current_thought: RealHV,
+    pub current_thought: ContinuousHV,
     /// Is the mind active
     pub is_active: bool,
     /// Whether the mind considers itself conscious
@@ -90,7 +90,7 @@ impl Default for MindState {
             arousal: 0.5,
             attention_focus: None,
             active_goals: Vec::new(),
-            current_thought: RealHV::zero(512),
+            current_thought: ContinuousHV::zero(512),
             is_active: false,
             is_conscious: false,
             tick: 0,
@@ -110,7 +110,7 @@ pub struct MindInput {
     /// Input type
     pub input_type: InputType,
     /// Content embedding
-    pub content: RealHV,
+    pub content: ContinuousHV,
     /// Priority
     pub priority: f32,
     /// Metadata
@@ -142,7 +142,7 @@ pub struct MindOutput {
     /// Content
     pub content: String,
     /// Embedding representation
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
     /// Confidence
     pub confidence: f32,
     /// Associated emotion
@@ -172,7 +172,7 @@ pub struct Goal {
     /// Goal description
     pub description: String,
     /// Goal embedding
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
     /// Priority
     pub priority: f32,
     /// Progress (0-1)

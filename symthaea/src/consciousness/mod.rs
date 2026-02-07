@@ -33,6 +33,7 @@ pub mod primitive_discovery;
 pub mod primitive_evolution;
 pub mod primitive_lattice;
 pub mod primitive_reasoning;
+pub mod code_primitives;
 pub mod semantic_value_embedder;
 pub mod seven_harmonies;
 pub mod value_feedback_loop;
@@ -52,7 +53,7 @@ pub mod neuro_bridge;
 // ============================================================================
 
 // Contextual weights for harmony evaluation based on action type and domain.
-// Now defines its own ActionType locally to avoid circular dependency with unified_value_evaluator.
+// Defines canonical ActionType, re-exported by unified_value_evaluator::types.
 pub mod contextual_weights;
 
 // Evolution bridge - connects primitive evolution with recursive self-improvement
@@ -328,8 +329,7 @@ pub mod unified_intelligence;
 #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 pub mod recursive_improvement;
 
-/// Unified value evaluator — needs ValueFeedbackLoop + AlignmentResult + SemanticValueEmbedder API alignment
-#[cfg(feature = "full_perception")]
+/// Unified value evaluator — consciousness-guided decision making with Seven Harmonies
 pub mod unified_value_evaluator;
 
 // Re-export key types
@@ -504,8 +504,7 @@ pub mod consciousness_guided_discovery;
 #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 pub mod meta_meta_learning;
 
-/// Multi-objective evolution — needs CandidatePrimitive API alignment (encoding, recombine, mutate)
-#[cfg(feature = "full_consciousness")]
+/// Multi-objective evolution — NSGA-II-inspired Pareto frontier optimization
 pub mod multi_objective_evolution;
 
 // Re-exports from consciousness_equation_v2 (needed by differentiable.rs)

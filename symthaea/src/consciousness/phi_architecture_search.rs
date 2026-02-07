@@ -49,7 +49,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use symthaea_core::hdc::{RealHV, HDC_DIMENSION};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 use symthaea_core::phi_engine::PhiEngine;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -547,7 +547,7 @@ impl ArchitectureGenome {
 #[derive(Debug, Clone)]
 pub struct DecodedArchitecture {
     /// Node hypervector representations
-    pub nodes: Vec<RealHV>,
+    pub nodes: Vec<ContinuousHV>,
 
     /// Adjacency list (node index -> list of (neighbor, weight))
     pub adjacency: Vec<Vec<(usize, f32)>>,
@@ -581,8 +581,8 @@ impl DecodedArchitecture {
         };
 
         // Generate node hypervectors
-        let nodes: Vec<RealHV> = (0..n)
-            .map(|i| RealHV::random(dim, genome.seed + i as u64 * 1000))
+        let nodes: Vec<ContinuousHV> = (0..n)
+            .map(|i| ContinuousHV::random(dim, genome.seed + i as u64 * 1000))
             .collect();
 
         // Assign modules
@@ -904,7 +904,7 @@ impl DecodedArchitecture {
     }
 
     /// Convert to node representations for Phi calculation
-    pub fn to_node_representations(&self) -> Vec<RealHV> {
+    pub fn to_node_representations(&self) -> Vec<ContinuousHV> {
         self.nodes.iter()
             .enumerate()
             .map(|(i, node)| {
@@ -913,11 +913,11 @@ impl DecodedArchitecture {
                     node.clone()
                 } else {
                     // Bind node with weighted bundle of neighbors
-                    let neighbor_hvs: Vec<RealHV> = neighbors.iter()
+                    let neighbor_hvs: Vec<ContinuousHV> = neighbors.iter()
                         .map(|(j, w)| self.nodes[*j].scale(*w))
                         .collect();
 
-                    let bundle = RealHV::bundle(&neighbor_hvs);
+                    let bundle = ContinuousHV::bundle_owned(&neighbor_hvs);
                     node.bind(&bundle)
                 }
             })
@@ -929,7 +929,7 @@ impl DecodedArchitecture {
         let representations = self.to_node_representations();
         let engine = PhiEngine::auto();
 
-        // Convert RealHV to ContinuousHV for PhiEngine
+        // Convert ContinuousHV to ContinuousHV for PhiEngine
         let continuous_hvs: Vec<symthaea_core::hdc::unified_hv::ContinuousHV> = representations
             .iter()
             .map(|hv| symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(hv.values.clone()))

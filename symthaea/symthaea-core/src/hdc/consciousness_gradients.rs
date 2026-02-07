@@ -31,7 +31,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -40,13 +40,13 @@ use std::collections::HashMap;
 ///
 /// Represents the direction and magnitude of consciousness increase.
 /// Since HDC uses binary vectors, gradient is represented as:
-/// - Direction: HV16 indicating which bits should flip
+/// - Direction: BinaryHV indicating which bits should flip
 /// - Magnitude: f64 indicating strength of gradient
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsciousnessGradient {
     /// Gradient direction (binary hypervector)
     /// High bits = flipping this bit increases Φ
-    pub direction: HV16,
+    pub direction: BinaryHV,
 
     /// Gradient magnitude (how steep is consciousness increase)
     pub magnitude: f64,
@@ -93,17 +93,17 @@ impl Default for GradientConfig {
 /// # Example
 /// ```ignore
 /// use symthaea::hdc::consciousness_gradients::{GradientComputer, GradientConfig};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = GradientConfig::default();
 /// let mut computer = GradientComputer::new(4, config);
 ///
 /// // Compute gradient at current state
 /// let neural_state = vec![
-///     HV16::random(1000),
-///     HV16::random(1001),
-///     HV16::random(1002),
-///     HV16::random(1003),
+///     BinaryHV::random(1000),
+///     BinaryHV::random(1001),
+///     BinaryHV::random(1002),
+///     BinaryHV::random(1003),
 /// ];
 ///
 /// let gradient = computer.compute_gradient(&neural_state);
@@ -152,8 +152,8 @@ impl GradientComputer {
     /// Uses finite differences and directional derivatives to approximate
     /// the gradient of Φ with respect to the neural state.
     ///
-    /// Returns gradient direction (as HV16) and magnitude.
-    pub fn compute_gradient(&mut self, neural_state: &[HV16]) -> ConsciousnessGradient {
+    /// Returns gradient direction (as BinaryHV) and magnitude.
+    pub fn compute_gradient(&mut self, neural_state: &[BinaryHV]) -> ConsciousnessGradient {
         // 1. Compute current Φ
         let current_phi = self.phi_calculator.compute_phi(neural_state);
 
@@ -187,7 +187,7 @@ impl GradientComputer {
     /// Compute per-component gradients via finite differences
     ///
     /// For each neural component, perturb it and measure Δ Φ.
-    fn compute_component_gradients(&mut self, neural_state: &[HV16], current_phi: f64) -> Vec<f64> {
+    fn compute_component_gradients(&mut self, neural_state: &[BinaryHV], current_phi: f64) -> Vec<f64> {
         // Use the minimum of num_components and actual state length to avoid out-of-bounds
         let actual_components = self.num_components.min(neural_state.len());
         let mut gradients = Vec::with_capacity(actual_components);
@@ -211,17 +211,17 @@ impl GradientComputer {
     /// Compute directional derivatives by sampling random directions
     ///
     /// Returns vector of (direction, derivative) pairs.
-    fn compute_directional_derivatives(&mut self, neural_state: &[HV16], current_phi: f64)
-        -> Vec<(HV16, f64)>
+    fn compute_directional_derivatives(&mut self, neural_state: &[BinaryHV], current_phi: f64)
+        -> Vec<(BinaryHV, f64)>
     {
         let mut derivatives = Vec::with_capacity(self.config.num_samples);
 
         for sample in 0..self.config.num_samples {
             // Random direction in HDC space
-            let direction = HV16::random((5000 + sample) as u64);
+            let direction = BinaryHV::random((5000 + sample) as u64);
 
             // Move state in this direction
-            let moved_state: Vec<HV16> = neural_state.iter().map(|component| {
+            let moved_state: Vec<BinaryHV> = neural_state.iter().map(|component| {
                 // Bind with direction to move in that direction
                 let moved = component.bind(&direction);
                 // Add small noise to explore neighborhood
@@ -241,7 +241,7 @@ impl GradientComputer {
     }
 
     /// Find best direction (steepest ascent)
-    fn find_best_direction(&self, derivatives: &[(HV16, f64)]) -> (HV16, f64) {
+    fn find_best_direction(&self, derivatives: &[(BinaryHV, f64)]) -> (BinaryHV, f64) {
         // Sort by derivative (descending)
         let mut sorted = derivatives.to_vec();
         sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
@@ -250,8 +250,8 @@ impl GradientComputer {
         let top_k = sorted.iter().take(self.config.top_k);
 
         // Bundle top directions (weighted by derivative)
-        let directions: Vec<HV16> = top_k.clone().map(|(dir, _)| dir.clone()).collect();
-        let best_direction = HV16::bundle(&directions);
+        let directions: Vec<BinaryHV> = top_k.clone().map(|(dir, _)| *dir).collect();
+        let best_direction = BinaryHV::bundle(&directions);
 
         // Average derivative
         let avg_derivative: f64 = top_k.map(|(_, deriv)| deriv).sum::<f64>()
@@ -264,7 +264,7 @@ impl GradientComputer {
     ///
     /// Natural gradient accounts for the geometry of HDC space,
     /// weighting directions by component importance.
-    fn apply_natural_gradient(&self, direction: &HV16, component_gradients: &[f64]) -> HV16 {
+    fn apply_natural_gradient(&self, direction: &BinaryHV, component_gradients: &[f64]) -> BinaryHV {
         // Find most important components (largest gradients)
         let mut importance: Vec<(usize, f64)> = component_gradients.iter()
             .enumerate()
@@ -274,7 +274,7 @@ impl GradientComputer {
 
         // Weight direction by component importance
         // (In practice, this is approximated by permuting more in important dimensions)
-        let mut natural_direction = direction.clone();
+        let mut natural_direction = *direction;
         for (i, weight) in importance.iter().take(self.num_components / 2) {
             // Permute proportional to importance
             let shift = (weight * 10.0) as usize;
@@ -291,7 +291,7 @@ impl GradientComputer {
     /// * `step_size` - Learning rate (α)
     ///
     /// Returns new neural state after gradient step.
-    pub fn gradient_step(&mut self, neural_state: &[HV16], step_size: f32) -> Vec<HV16> {
+    pub fn gradient_step(&mut self, neural_state: &[BinaryHV], step_size: f32) -> Vec<BinaryHV> {
         // Compute gradient
         let gradient = self.compute_gradient(neural_state);
 
@@ -319,9 +319,9 @@ impl GradientComputer {
     ///
     /// Returns (final_state, phi_trajectory)
     pub fn gradient_ascent(&mut self,
-                          neural_state: &[HV16],
+                          neural_state: &[BinaryHV],
                           num_steps: usize,
-                          step_size: f32) -> (Vec<HV16>, Vec<f64>)
+                          step_size: f32) -> (Vec<BinaryHV>, Vec<f64>)
     {
         let mut state = neural_state.to_vec();
         let mut trajectory = Vec::with_capacity(num_steps);
@@ -347,7 +347,7 @@ impl GradientComputer {
     ///
     /// Attractors are states where ∇Φ ≈ 0 (gradient vanishes).
     /// These are stable consciousness states the system naturally settles into.
-    pub fn find_attractor(&mut self, initial_state: &[HV16], max_steps: usize) -> Vec<HV16> {
+    pub fn find_attractor(&mut self, initial_state: &[BinaryHV], max_steps: usize) -> Vec<BinaryHV> {
         let (attractor, _trajectory) = self.gradient_ascent(initial_state, max_steps, 0.1);
         attractor
     }
@@ -355,19 +355,19 @@ impl GradientComputer {
     /// Detect if system is at a consciousness attractor
     ///
     /// Returns true if gradient magnitude is very small (∇Φ ≈ 0).
-    pub fn is_at_attractor(&mut self, neural_state: &[HV16], threshold: f64) -> bool {
+    pub fn is_at_attractor(&mut self, neural_state: &[BinaryHV], threshold: f64) -> bool {
         let gradient = self.compute_gradient(neural_state);
         gradient.magnitude < threshold
     }
 
     /// Get gradient magnitude at current state
-    pub fn gradient_magnitude(&mut self, neural_state: &[HV16]) -> f64 {
+    pub fn gradient_magnitude(&mut self, neural_state: &[BinaryHV]) -> f64 {
         let gradient = self.compute_gradient(neural_state);
         gradient.magnitude
     }
 
     /// Get component importance (which components affect Φ most)
-    pub fn component_importance(&mut self, neural_state: &[HV16]) -> Vec<(usize, f64)> {
+    pub fn component_importance(&mut self, neural_state: &[BinaryHV]) -> Vec<(usize, f64)> {
         let gradient = self.compute_gradient(neural_state);
         gradient.component_gradients.iter()
             .enumerate()
@@ -389,13 +389,13 @@ pub struct ConsciousnessLandscape {
     gradient_computer: GradientComputer,
 
     /// Discovered attractors (high-Φ stable states)
-    pub attractors: Vec<Vec<HV16>>,
+    pub attractors: Vec<Vec<BinaryHV>>,
 
     /// Φ values at attractors
     pub attractor_phis: Vec<f64>,
 
     /// Critical points (phase transitions)
-    pub critical_points: Vec<Vec<HV16>>,
+    pub critical_points: Vec<Vec<BinaryHV>>,
 }
 
 impl ConsciousnessLandscape {
@@ -421,8 +421,8 @@ impl ConsciousnessLandscape {
 
         for sample in 0..num_samples {
             // Random initial state
-            let initial_state: Vec<HV16> = (0..self.num_components)
-                .map(|i| HV16::random((sample * 100 + i) as u64))
+            let initial_state: Vec<BinaryHV> = (0..self.num_components)
+                .map(|i| BinaryHV::random((sample * 100 + i) as u64))
                 .collect();
 
             // Find attractor from this initial state
@@ -441,7 +441,7 @@ impl ConsciousnessLandscape {
     }
 
     /// Check if attractor is duplicate (too similar to existing)
-    fn is_duplicate_attractor(&self, candidate: &[HV16]) -> bool {
+    fn is_duplicate_attractor(&self, candidate: &[BinaryHV]) -> bool {
         for attractor in &self.attractors {
             let similarity = self.attractor_similarity(candidate, attractor);
             if similarity > 0.95 {
@@ -452,7 +452,7 @@ impl ConsciousnessLandscape {
     }
 
     /// Compute similarity between two attractors
-    fn attractor_similarity(&self, a: &[HV16], b: &[HV16]) -> f32 {
+    fn attractor_similarity(&self, a: &[BinaryHV], b: &[BinaryHV]) -> f32 {
         let avg_similarity: f32 = a.iter().zip(b.iter())
             .map(|(ai, bi)| ai.similarity(bi))
             .sum::<f32>() / a.len() as f32;
@@ -465,7 +465,7 @@ impl ConsciousnessLandscape {
     }
 
     /// Get highest-Φ attractor
-    pub fn highest_phi_attractor(&self) -> Option<(&Vec<HV16>, f64)> {
+    pub fn highest_phi_attractor(&self) -> Option<(&Vec<BinaryHV>, f64)> {
         if self.attractors.is_empty() {
             return None;
         }
@@ -495,10 +495,10 @@ mod tests {
         let mut computer = GradientComputer::new(4, config);
 
         let neural_state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let gradient = computer.compute_gradient(&neural_state);
@@ -516,10 +516,10 @@ mod tests {
         let mut computer = GradientComputer::new(4, config);
 
         let initial_state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let new_state = computer.gradient_step(&initial_state, 0.1);
@@ -542,10 +542,10 @@ mod tests {
         let mut computer = GradientComputer::new(4, config);
 
         let initial_state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let (final_state, trajectory) = computer.gradient_ascent(&initial_state, 10, 0.1);
@@ -564,10 +564,10 @@ mod tests {
         let mut computer = GradientComputer::new(4, config);
 
         let neural_state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let importance = computer.component_importance(&neural_state);
@@ -590,10 +590,10 @@ mod tests {
         let mut computer = GradientComputer::new(4, config);
 
         let initial_state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let attractor = computer.find_attractor(&initial_state, 20);
@@ -608,10 +608,10 @@ mod tests {
         let mut computer = GradientComputer::new(4, config);
 
         let neural_state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         // Random state unlikely to be at attractor
@@ -626,10 +626,10 @@ mod tests {
         let mut computer = GradientComputer::new(4, config);
 
         let neural_state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let magnitude = computer.gradient_magnitude(&neural_state);
@@ -682,10 +682,10 @@ mod tests {
         let mut computer = GradientComputer::new(4, config);
 
         let neural_state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let gradient = computer.compute_gradient(&neural_state);

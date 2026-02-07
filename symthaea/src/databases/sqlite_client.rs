@@ -66,7 +66,7 @@
 //! reads efficiently.
 
 use super::{ConsciousnessDatabase, DbResult, DatabaseError, DatabaseStats, MemoryRecord, MemoryType, SearchResult};
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::{HV16, BinaryHV};
 use async_trait::async_trait;
 use rusqlite::{Connection, params};
 use std::sync::Mutex;
@@ -237,7 +237,7 @@ impl SqliteMemory {
         if bytes.len() >= HV16::BYTES {
             let mut arr = [0u8; HV16::BYTES];
             arr.copy_from_slice(&bytes[..HV16::BYTES]);
-            HV16(arr)
+            BinaryHV(arr)
         } else {
             HV16::zero()
         }

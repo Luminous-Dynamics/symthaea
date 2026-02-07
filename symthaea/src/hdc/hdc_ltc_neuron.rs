@@ -3,7 +3,7 @@
 //! Combines hyperdimensional computing with Liquid Time-Constant dynamics
 //! for neurons that process information in continuous time.
 
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for HDC-LTC neuron
@@ -37,7 +37,7 @@ impl Default for HdcLtcNeuronConfig {
 #[derive(Debug, Clone)]
 pub struct HdcLtcNeuronState {
     /// Hidden state vector
-    pub hidden: RealHV,
+    pub hidden: ContinuousHV,
     /// Time constant
     pub tau: f32,
     /// Activation level
@@ -51,11 +51,11 @@ pub struct HdcLtcNeuronState {
 pub struct HdcLtcNeuron {
     config: HdcLtcNeuronConfig,
     /// Input weight matrix (as HDC projection)
-    input_weight: RealHV,
+    input_weight: ContinuousHV,
     /// Recurrent weight matrix (as HDC binding)
-    recurrent_weight: RealHV,
+    recurrent_weight: ContinuousHV,
     /// Time constant modulation vector
-    tau_modulator: RealHV,
+    tau_modulator: ContinuousHV,
     /// Current state
     state: HdcLtcNeuronState,
     /// Seed counter for deterministic random init
@@ -68,11 +68,11 @@ impl HdcLtcNeuron {
     pub fn new(config: HdcLtcNeuronConfig) -> Self {
         let dim = config.dimension;
         Self {
-            input_weight: RealHV::random(dim, 1),
-            recurrent_weight: RealHV::random(dim, 2),
-            tau_modulator: RealHV::random(dim, 3),
+            input_weight: ContinuousHV::random(dim, 1),
+            recurrent_weight: ContinuousHV::random(dim, 2),
+            tau_modulator: ContinuousHV::random(dim, 3),
             state: HdcLtcNeuronState {
-                hidden: RealHV::zero(dim),
+                hidden: ContinuousHV::zero(dim),
                 tau: config.tau_base,
                 activation: 0.0,
                 error_acc: 0.0,
@@ -83,7 +83,7 @@ impl HdcLtcNeuron {
     }
 
     /// Process input and advance state
-    pub fn step(&mut self, input: &RealHV, dt: f32) -> RealHV {
+    pub fn step(&mut self, input: &ContinuousHV, dt: f32) -> ContinuousHV {
         // Compute input contribution
         let input_contrib = input.bind(&self.input_weight);
 
@@ -96,16 +96,16 @@ impl HdcLtcNeuron {
             .clamp(self.config.tau_min, self.config.tau_max);
 
         // LTC dynamics: dh/dt = (-h + input_contrib + recurrent_contrib) / tau
-        let combined = RealHV::bundle(&[input_contrib, recurrent_contrib]);
+        let combined = ContinuousHV::bundle_owned(&[input_contrib, recurrent_contrib]);
         let neg_hidden = self.state.hidden.scale(-1.0);
-        let delta = RealHV::bundle(&[combined, neg_hidden]);
+        let delta = ContinuousHV::bundle_owned(&[combined, neg_hidden]);
 
         // Euler integration
         let scale_factor = dt / adjusted_tau;
         let delta_scaled = delta.scale(scale_factor);
 
         // Update hidden state
-        self.state.hidden = RealHV::bundle(&[self.state.hidden.clone(), delta_scaled]);
+        self.state.hidden = ContinuousHV::bundle_owned(&[self.state.hidden.clone(), delta_scaled]);
 
         // Normalize to prevent explosion
         self.state.hidden = self.state.hidden.normalize();
@@ -122,10 +122,10 @@ impl HdcLtcNeuron {
 
     /// CfC closed-form prediction: h(t) = A + (h₀ - A) · exp(-t/τ)
     /// Pure function — does not mutate state.
-    pub fn predict_forward(&self, input: &RealHV, horizon: f32) -> RealHV {
+    pub fn predict_forward(&self, input: &ContinuousHV, horizon: f32) -> ContinuousHV {
         let input_contrib = input.bind(&self.input_weight);
         let recurrent_contrib = self.state.hidden.bind(&self.recurrent_weight);
-        let attractor = RealHV::bundle(&[input_contrib, recurrent_contrib]).normalize();
+        let attractor = ContinuousHV::bundle_owned(&[input_contrib, recurrent_contrib]).normalize();
 
         let tau_adjustment = input.similarity(&self.tau_modulator);
         let tau = (self.config.tau_base * (1.0 + tau_adjustment))
@@ -141,7 +141,7 @@ impl HdcLtcNeuron {
             let h0 = self.state.hidden.values[i];
             result.push(a + (h0 - a) * decay);
         }
-        RealHV::from_vec(result).normalize()
+        ContinuousHV::from_vec(result).normalize()
     }
 
     /// Get current state
@@ -151,24 +151,24 @@ impl HdcLtcNeuron {
 
     /// Reset state
     pub fn reset(&mut self) {
-        self.state.hidden = RealHV::zero(self.config.dimension);
+        self.state.hidden = ContinuousHV::zero(self.config.dimension);
         self.state.tau = self.config.tau_base;
         self.state.activation = 0.0;
         self.state.error_acc = 0.0;
     }
 
     /// Apply learning update
-    pub fn learn(&mut self, error_signal: &RealHV) {
+    pub fn learn(&mut self, error_signal: &ContinuousHV) {
         // Update input weights using HDC correlation
         let correlation = self.state.hidden.bind(error_signal);
         let scaled_corr = correlation.scale(self.config.learning_rate);
-        self.input_weight = RealHV::bundle(&[self.input_weight.clone(), scaled_corr]);
+        self.input_weight = ContinuousHV::bundle_owned(&[self.input_weight.clone(), scaled_corr]);
 
         // Update recurrent weights
         let recurrent_correlation = self.state.hidden.bind(&self.state.hidden);
         let recurrent_error = recurrent_correlation.bind(error_signal);
         let scaled_recurrent = recurrent_error.scale(self.config.learning_rate * 0.5);
-        self.recurrent_weight = RealHV::bundle(&[self.recurrent_weight.clone(), scaled_recurrent]);
+        self.recurrent_weight = ContinuousHV::bundle_owned(&[self.recurrent_weight.clone(), scaled_recurrent]);
 
         // Accumulate error for monitoring
         self.state.error_acc = 0.9 * self.state.error_acc +
@@ -188,7 +188,7 @@ pub struct HdcLtcLayer {
     /// Neurons in this layer
     neurons: Vec<HdcLtcNeuron>,
     /// Layer output
-    output: RealHV,
+    output: ContinuousHV,
     /// Layer dimension
     dimension: usize,
 }
@@ -207,36 +207,36 @@ impl HdcLtcLayer {
 
         Self {
             neurons,
-            output: RealHV::zero(dimension),
+            output: ContinuousHV::zero(dimension),
             dimension,
         }
     }
 
     /// Process input through layer
-    pub fn forward(&mut self, input: &RealHV, dt: f32) -> RealHV {
-        let outputs: Vec<RealHV> = self.neurons.iter_mut()
+    pub fn forward(&mut self, input: &ContinuousHV, dt: f32) -> ContinuousHV {
+        let outputs: Vec<ContinuousHV> = self.neurons.iter_mut()
             .map(|n| n.step(input, dt))
             .collect();
 
         // Bundle all neuron outputs
         self.output = if outputs.is_empty() {
-            RealHV::zero(self.dimension)
+            ContinuousHV::zero(self.dimension)
         } else {
-            RealHV::bundle(&outputs)
+            ContinuousHV::bundle_owned(&outputs)
         };
 
         self.output.clone()
     }
 
     /// CfC closed-form prediction across all neurons in the layer
-    pub fn predict_forward(&self, input: &RealHV, horizon: f32) -> RealHV {
-        let predictions: Vec<RealHV> = self.neurons.iter()
+    pub fn predict_forward(&self, input: &ContinuousHV, horizon: f32) -> ContinuousHV {
+        let predictions: Vec<ContinuousHV> = self.neurons.iter()
             .map(|n| n.predict_forward(input, horizon))
             .collect();
         if predictions.is_empty() {
-            RealHV::zero(self.dimension)
+            ContinuousHV::zero(self.dimension)
         } else {
-            RealHV::bundle(&predictions)
+            ContinuousHV::bundle_owned(&predictions)
         }
     }
 
@@ -255,7 +255,7 @@ impl HdcLtcLayer {
         for neuron in &mut self.neurons {
             neuron.reset();
         }
-        self.output = RealHV::zero(self.dimension);
+        self.output = ContinuousHV::zero(self.dimension);
     }
 }
 
@@ -264,7 +264,7 @@ pub struct HdcLtcNetwork {
     /// Layers
     layers: Vec<HdcLtcLayer>,
     /// Final output
-    output: RealHV,
+    output: ContinuousHV,
 }
 
 impl HdcLtcNetwork {
@@ -276,12 +276,12 @@ impl HdcLtcNetwork {
 
         Self {
             layers,
-            output: RealHV::zero(dimension),
+            output: ContinuousHV::zero(dimension),
         }
     }
 
     /// Forward pass
-    pub fn forward(&mut self, input: &RealHV, dt: f32) -> RealHV {
+    pub fn forward(&mut self, input: &ContinuousHV, dt: f32) -> ContinuousHV {
         let mut current = input.clone();
 
         for layer in &mut self.layers {
@@ -312,7 +312,7 @@ mod tests {
     #[test]
     fn test_hdc_ltc_neuron() {
         let mut neuron = HdcLtcNeuron::default();
-        let input = RealHV::random(512, 42);
+        let input = ContinuousHV::random(512, 42);
 
         let output = neuron.step(&input, 0.1);
         assert_eq!(output.dim(), 512);
@@ -321,7 +321,7 @@ mod tests {
     #[test]
     fn test_hdc_ltc_layer() {
         let mut layer = HdcLtcLayer::new(4, 512);
-        let input = RealHV::random(512, 42);
+        let input = ContinuousHV::random(512, 42);
 
         let output = layer.forward(&input, 0.1);
         assert_eq!(output.dim(), 512);
@@ -330,7 +330,7 @@ mod tests {
     #[test]
     fn test_predict_forward_zero_horizon() {
         let mut neuron = HdcLtcNeuron::default();
-        let input = RealHV::random(512, 42);
+        let input = ContinuousHV::random(512, 42);
         // Step once to populate hidden state
         neuron.step(&input, 0.1);
 
@@ -343,7 +343,7 @@ mod tests {
     #[test]
     fn test_predict_forward_convergence() {
         let mut neuron = HdcLtcNeuron::default();
-        let input = RealHV::random(512, 42);
+        let input = ContinuousHV::random(512, 42);
         neuron.step(&input, 0.1);
 
         let near = neuron.predict_forward(&input, 1.0);
@@ -360,7 +360,7 @@ mod tests {
     #[test]
     fn test_hdc_ltc_network() {
         let mut network = HdcLtcNetwork::new(&[4, 4, 2], 512);
-        let input = RealHV::random(512, 42);
+        let input = ContinuousHV::random(512, 42);
 
         let output = network.forward(&input, 0.1);
         assert_eq!(output.dim(), 512);

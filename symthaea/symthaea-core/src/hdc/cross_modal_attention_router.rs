@@ -32,7 +32,7 @@
 //! 4. **Temporal Dynamics**: Attention shifts smoothly over time
 //! 5. **Binding Integration**: Routes through CrossModalBinder for fusion
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::cross_modal_binding::{CrossModalBinder, Modality, CrossModalConfig};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -46,8 +46,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub struct ModalityInput {
     /// The modality this input comes from
     pub modality: Modality,
-    /// The HDC representation (HV16)
-    pub hv: HV16,
+    /// The HDC representation (BinaryHV)
+    pub hv: BinaryHV,
     /// Raw salience score (0.0 to 1.0)
     pub salience: f64,
     /// Confidence in this input
@@ -59,7 +59,7 @@ pub struct ModalityInput {
 }
 
 impl ModalityInput {
-    pub fn new(modality: Modality, hv: HV16, salience: f64) -> Self {
+    pub fn new(modality: Modality, hv: BinaryHV, salience: f64) -> Self {
         Self {
             modality,
             hv,
@@ -163,7 +163,7 @@ impl Default for ModalityAttention {
 #[derive(Debug, Clone)]
 pub struct RoutingResult {
     /// Final unified representation
-    pub unified_hv: HV16,
+    pub unified_hv: BinaryHV,
 
     /// Attention weights per modality
     pub attention_weights: HashMap<Modality, f64>,
@@ -221,10 +221,10 @@ pub struct CrossModalAttentionRouter {
     attention_state: HashMap<Modality, ModalityAttention>,
 
     /// Current context vector (influences attention)
-    context_hv: Option<HV16>,
+    context_hv: Option<BinaryHV>,
 
     /// Current goal vector (influences attention)
-    goal_hv: Option<HV16>,
+    goal_hv: Option<BinaryHV>,
 
     /// History of routing results
     history: Vec<RoutingResult>,
@@ -243,7 +243,7 @@ impl CrossModalAttentionRouter {
 
     pub fn with_config(config: RouterConfig) -> Self {
         let binder_config = CrossModalConfig {
-            dimension: HV16::DIM,
+            dimension: BinaryHV::DIM,
             base_seed: 42,
             learn_alignment: true,
             alignment_lr: 0.01,
@@ -264,12 +264,12 @@ impl CrossModalAttentionRouter {
     }
 
     /// Set current context (influences attention allocation)
-    pub fn set_context(&mut self, context: HV16) {
+    pub fn set_context(&mut self, context: BinaryHV) {
         self.context_hv = Some(context);
     }
 
     /// Set current goal (influences attention allocation)
-    pub fn set_goal(&mut self, goal: HV16) {
+    pub fn set_goal(&mut self, goal: BinaryHV) {
         self.goal_hv = Some(goal);
     }
 
@@ -493,36 +493,36 @@ impl CrossModalAttentionRouter {
         inputs: &[ModalityInput],
         weights: &HashMap<Modality, f64>,
         modalities_to_bind: &[Modality],
-    ) -> HV16 {
+    ) -> BinaryHV {
         if modalities_to_bind.is_empty() {
-            return HV16::random(42);
+            return BinaryHV::random(42);
         }
 
         if modalities_to_bind.len() == 1 {
             // Single modality: just return that input
             for input in inputs {
                 if input.modality == modalities_to_bind[0] {
-                    return input.hv.clone();
+                    return input.hv;
                 }
             }
-            return HV16::random(42);
+            return BinaryHV::random(42);
         }
 
         // Multiple modalities: use weighted bundling
-        // Convert HV16 to weighted inputs for binding
+        // Convert BinaryHV to weighted inputs for binding
         let selected_inputs: Vec<_> = inputs.iter()
             .filter(|i| modalities_to_bind.contains(&i.modality))
             .collect();
 
         if selected_inputs.is_empty() {
-            return HV16::random(42);
+            return BinaryHV::random(42);
         }
 
         // Weighted bundle
-        let weighted_hvs: Vec<(HV16, f64)> = selected_inputs.iter()
+        let weighted_hvs: Vec<(BinaryHV, f64)> = selected_inputs.iter()
             .map(|i| {
                 let weight = *weights.get(&i.modality).unwrap_or(&0.0);
-                (i.hv.clone(), weight)
+                (i.hv, weight)
             })
             .collect();
 
@@ -530,13 +530,13 @@ impl CrossModalAttentionRouter {
     }
 
     /// Weighted bundle operation (similar to emotional_depth)
-    fn weighted_bundle(weighted_hvs: &[(HV16, f64)]) -> HV16 {
+    fn weighted_bundle(weighted_hvs: &[(BinaryHV, f64)]) -> BinaryHV {
         if weighted_hvs.is_empty() {
-            return HV16::random(42);
+            return BinaryHV::random(42);
         }
 
         if weighted_hvs.len() == 1 {
-            return weighted_hvs[0].0.clone();
+            return weighted_hvs[0].0;
         }
 
         const DIMENSIONS: usize = 16384;
@@ -564,7 +564,7 @@ impl CrossModalAttentionRouter {
             }
         }
 
-        HV16(result)
+        BinaryHV(result)
     }
 
     /// Compute routing quality
@@ -606,7 +606,7 @@ impl CrossModalAttentionRouter {
     /// Create empty result
     fn empty_result(&self, phi: f64) -> RoutingResult {
         RoutingResult {
-            unified_hv: HV16::random(42),
+            unified_hv: BinaryHV::random(42),
             attention_weights: HashMap::new(),
             bound_modalities: Vec::new(),
             effective_phi: phi,
@@ -685,7 +685,7 @@ mod tests {
     fn test_single_modality_routing() {
         let mut router = CrossModalAttentionRouter::new();
 
-        let input = ModalityInput::new(Modality::Visual, HV16::random(42), 0.8);
+        let input = ModalityInput::new(Modality::Visual, BinaryHV::random(42), 0.8);
         let result = router.route(&[input], 0.5);
 
         assert!(result.attention_weights.contains_key(&Modality::Visual));
@@ -698,9 +698,9 @@ mod tests {
         let mut router = CrossModalAttentionRouter::new();
 
         let inputs = vec![
-            ModalityInput::new(Modality::Visual, HV16::random(1), 0.8),
-            ModalityInput::new(Modality::Auditory, HV16::random(2), 0.6),
-            ModalityInput::new(Modality::Semantic, HV16::random(3), 0.4),
+            ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.8),
+            ModalityInput::new(Modality::Auditory, BinaryHV::random(2), 0.6),
+            ModalityInput::new(Modality::Semantic, BinaryHV::random(3), 0.4),
         ];
 
         let result = router.route(&inputs, 0.7);
@@ -714,8 +714,8 @@ mod tests {
         let mut router = CrossModalAttentionRouter::new();
 
         let inputs = vec![
-            ModalityInput::new(Modality::Visual, HV16::random(1), 0.8),
-            ModalityInput::new(Modality::Auditory, HV16::random(2), 0.6),
+            ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.8),
+            ModalityInput::new(Modality::Auditory, BinaryHV::random(2), 0.6),
         ];
 
         // Low Φ should result in single modality focus
@@ -730,9 +730,9 @@ mod tests {
         let mut router = CrossModalAttentionRouter::new();
 
         let inputs = vec![
-            ModalityInput::new(Modality::Visual, HV16::random(1), 0.5),
-            ModalityInput::new(Modality::Auditory, HV16::random(2), 0.5),
-            ModalityInput::new(Modality::Semantic, HV16::random(3), 0.5),
+            ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.5),
+            ModalityInput::new(Modality::Auditory, BinaryHV::random(2), 0.5),
+            ModalityInput::new(Modality::Semantic, BinaryHV::random(3), 0.5),
         ];
 
         let result = router.route(&inputs, 0.6);
@@ -746,12 +746,12 @@ mod tests {
         let mut router = CrossModalAttentionRouter::new();
 
         // Create a context that's similar to visual input
-        let visual_hv = HV16::random(42);
+        let visual_hv = BinaryHV::random(42);
         router.set_context(visual_hv.clone());
 
         let inputs = vec![
             ModalityInput::new(Modality::Visual, visual_hv, 0.5),
-            ModalityInput::new(Modality::Auditory, HV16::random(99), 0.5),
+            ModalityInput::new(Modality::Auditory, BinaryHV::random(99), 0.5),
         ];
 
         let result = router.route(&inputs, 0.6);
@@ -769,7 +769,7 @@ mod tests {
     fn test_attention_stability() {
         let mut router = CrossModalAttentionRouter::new();
 
-        let input = ModalityInput::new(Modality::Visual, HV16::random(42), 0.9);
+        let input = ModalityInput::new(Modality::Visual, BinaryHV::random(42), 0.9);
 
         // Route same input multiple times
         for _ in 0..5 {

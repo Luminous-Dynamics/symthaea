@@ -36,7 +36,7 @@
 //! ```
 
 use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
-use crate::hdc::real_hv::RealHV;
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for differentiable Φ calculation
@@ -254,7 +254,7 @@ impl DifferentiablePhiCalculator {
     }
 
     /// Compute similarity matrix with gradients
-    fn compute_similarity_matrix(&self, nodes: &[RealHV]) -> (Vec<Vec<f64>>, Vec<Vec<Vec<f64>>>) {
+    fn compute_similarity_matrix(&self, nodes: &[ContinuousHV]) -> (Vec<Vec<f64>>, Vec<Vec<Vec<f64>>>) {
         let n = nodes.len();
         let dim = nodes[0].dim();
 
@@ -402,7 +402,7 @@ impl DifferentiablePhiCalculator {
     /// Compute gradients via chain rule
     fn compute_gradients(
         &self,
-        nodes: &[RealHV],
+        nodes: &[ContinuousHV],
         similarity: &[Vec<f64>],
         sim_gradients: &[Vec<Vec<f64>>],
         partition_weights: &[Vec<f64>],
@@ -554,7 +554,7 @@ impl PhiOptimizer {
         let dim = topology.node_representations[0].dim();
 
         // Initialize velocity if needed
-        if self.velocity.len() != n || (self.velocity.len() > 0 && self.velocity[0].len() != dim) {
+        if self.velocity.len() != n || (!self.velocity.is_empty() && self.velocity[0].len() != dim) {
             self.init_velocity(n, dim);
         }
 

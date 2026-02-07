@@ -401,13 +401,13 @@ impl LookaheadEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_core::hdc::{RealHV, HDC_DIMENSION};
+    use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
     use super::super::objective::Difficulty;
 
     fn create_test_consciousness_state() -> Vec<ContinuousHV> {
         (0..8)
             .map(|i| {
-                let hv = RealHV::random(HDC_DIMENSION, 42 + i as u64);
+                let hv = ContinuousHV::random(HDC_DIMENSION, 42 + i as u64);
                 ContinuousHV::from_vec(hv.values)
             })
             .collect()

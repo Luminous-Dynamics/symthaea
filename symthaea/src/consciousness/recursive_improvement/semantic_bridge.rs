@@ -40,9 +40,9 @@
 //!
 //! This transforms consciousness from pattern-matching to genuine understanding.
 
-use super::{
+use super::world_model::{
     ConsciousnessWorldModel, WorldModelConfig,
-    ConsciousnessTransition, ConsciousnessAction, LatentConsciousnessState,
+    ConsciousnessTransition, ConsciousnessAction, LatentConsciousnessState, ActionType,
 };
 use crate::embeddings::{HdcBridge, BridgeConfig};
 use std::collections::VecDeque;
@@ -84,12 +84,12 @@ impl ActionContext {
     /// Map to consciousness action
     fn to_consciousness_action(&self) -> ConsciousnessAction {
         match self {
-            ActionContext::Query => ConsciousnessAction::ExplorePatterns,
-            ActionContext::Response => ConsciousnessAction::Consolidate,
-            ActionContext::Error => ConsciousnessAction::FocusIntegration,
-            ActionContext::Thought => ConsciousnessAction::ExplorePatterns,
-            ActionContext::Memory => ConsciousnessAction::Consolidate,
-            ActionContext::Goal => ConsciousnessAction::FocusIntegration,
+            ActionContext::Query => ConsciousnessAction::new("explore", ActionType::Generate),
+            ActionContext::Response => ConsciousnessAction::new("consolidate", ActionType::Integrate),
+            ActionContext::Error => ConsciousnessAction::new("focus", ActionType::Attend),
+            ActionContext::Thought => ConsciousnessAction::new("explore", ActionType::Generate),
+            ActionContext::Memory => ConsciousnessAction::new("consolidate", ActionType::Recall),
+            ActionContext::Goal => ConsciousnessAction::new("focus", ActionType::Attend),
         }
     }
 }
@@ -117,10 +117,7 @@ impl Default for SemanticBridgeConfig {
     fn default() -> Self {
         Self {
             hdc_config: BridgeConfig::default(),
-            world_model_config: WorldModelConfig {
-                min_training_samples: 1,
-                ..Default::default()
-            },
+            world_model_config: WorldModelConfig::default(),
             embedding_dim: 1024, // Qwen3 default
             max_embedding_history: 50,
             use_simulated: true, // Safe default for testing
@@ -222,13 +219,17 @@ impl SemanticBridge {
 
             let transition = ConsciousnessTransition {
                 from_state: prev.clone(),
-                action: input.action_context.to_consciousness_action(),
                 to_state: current_state.clone(),
+                action: input.action_context.to_consciousness_action(),
+                timestamp: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64,
                 reward,
-                is_real: true,
+                surprise: 0.0,
             };
 
-            self.world_model.observe(transition);
+            self.world_model.observe_transition(transition);
         }
 
         self.prev_state = Some(current_state.clone());

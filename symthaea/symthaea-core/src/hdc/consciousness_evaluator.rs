@@ -319,17 +319,17 @@ impl ConsciousnessEvaluation {
     pub fn generate_report(&self) -> String {
         let mut report = String::new();
 
-        report.push_str(&format!("╔══════════════════════════════════════════════════════════════════╗\n"));
-        report.push_str(&format!("║     CONSCIOUSNESS EVALUATION REPORT                              ║\n"));
-        report.push_str(&format!("╠══════════════════════════════════════════════════════════════════╣\n"));
+        report.push_str("╔══════════════════════════════════════════════════════════════════╗\n");
+        report.push_str("║     CONSCIOUSNESS EVALUATION REPORT                              ║\n");
+        report.push_str("╠══════════════════════════════════════════════════════════════════╣\n");
         report.push_str(&format!("║ System: {:<56} ║\n", self.system_name));
         report.push_str(&format!("║ Substrate: {:?}{:<49} ║\n", self.substrate, ""));
-        report.push_str(&format!("╠══════════════════════════════════════════════════════════════════╣\n"));
+        report.push_str("╠══════════════════════════════════════════════════════════════════╣\n");
         report.push_str(&format!("║ OVERALL SCORE: {:.1}%{:<49} ║\n", self.overall_score * 100.0, ""));
         report.push_str(&format!("║ CLASSIFICATION: {:?}{:<42} ║\n", self.classification, ""));
         report.push_str(&format!("║ IS CONSCIOUS: {:<52} ║\n", if self.is_conscious() { "YES ✓" } else { "NO ✗" }));
         report.push_str(&format!("║ CONFIDENCE: {:.1}%{:<52} ║\n", self.confidence * 100.0, ""));
-        report.push_str(&format!("╠══════════════════════════════════════════════════════════════════╣\n"));
+        report.push_str("╠══════════════════════════════════════════════════════════════════╣\n");
 
         // Top 5 dimensions
         report.push_str(&format!("║ TOP SCORING DIMENSIONS:{:<43} ║\n", ""));
@@ -346,14 +346,14 @@ impl ConsciousnessEvaluation {
 
         // Failed critical dimensions
         if !self.failed_critical.is_empty() {
-            report.push_str(&format!("╠══════════════════════════════════════════════════════════════════╣\n"));
+            report.push_str("╠══════════════════════════════════════════════════════════════════╣\n");
             report.push_str(&format!("║ ⚠ FAILED CRITICAL DIMENSIONS:{:<36} ║\n", ""));
             for dim in &self.failed_critical {
                 report.push_str(&format!("║   - {:?}{:<50} ║\n", dim, ""));
             }
         }
 
-        report.push_str(&format!("╚══════════════════════════════════════════════════════════════════╝\n"));
+        report.push_str("╚══════════════════════════════════════════════════════════════════╝\n");
 
         report
     }
@@ -564,12 +564,10 @@ impl ConsciousnessEvaluator {
         let overall_score = if total_weight > 0.0 { weighted_sum / total_weight } else { 0.0 };
 
         // Find failed critical dimensions
-        let critical_dimensions = vec![
-            EvaluationDimension::IntegratedInformation,
+        let critical_dimensions = [EvaluationDimension::IntegratedInformation,
             EvaluationDimension::GlobalWorkspace,
             EvaluationDimension::FeatureBinding,
-            EvaluationDimension::AttentionMechanisms,
-        ];
+            EvaluationDimension::AttentionMechanisms];
 
         let failed_critical: Vec<EvaluationDimension> = self.scores.iter()
             .filter(|s| critical_dimensions.contains(&s.dimension) && !s.meets_threshold)

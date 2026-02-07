@@ -5,8 +5,8 @@
 //! - Causal Intervention Analysis (#98): Analyze causal effects of node interventions
 //! - Network Modularity Analysis (#99): Detect consciousness modules and their relationships
 
-use crate::hdc::real_hv::RealHV;
-// Note: HV16 and TieredPhi/ApproximationTier are available via super if needed
+use crate::hdc::unified_hv::ContinuousHV;
+// Note: BinaryHV and TieredPhi/ApproximationTier are available via super if needed
 
 #[derive(Debug, Clone)]
 pub struct PhiTransferConfig {
@@ -197,7 +197,7 @@ impl PhiTransfer {
     /// Extract Φ signature from a topology's component representations
     pub fn extract_signature(
         &self,
-        components: &[RealHV],
+        components: &[ContinuousHV],
         phi: f64,
         topology_type: Option<&str>,
     ) -> PhiSignature {
@@ -223,7 +223,7 @@ impl PhiTransfer {
     }
 
     /// Extract similarity distribution features
-    fn extract_similarity_features(&self, components: &[RealHV]) -> Vec<f64> {
+    fn extract_similarity_features(&self, components: &[ContinuousHV]) -> Vec<f64> {
         let n = components.len();
         if n < 2 {
             return vec![0.0; self.config.signature_dims / 3];
@@ -277,7 +277,7 @@ impl PhiTransfer {
     }
 
     /// Extract connectivity pattern features
-    fn extract_connectivity_features(&self, components: &[RealHV]) -> Vec<f64> {
+    fn extract_connectivity_features(&self, components: &[ContinuousHV]) -> Vec<f64> {
         let n = components.len();
         let num_features = self.config.signature_dims / 3;
         let mut features = Vec::with_capacity(num_features);
@@ -349,7 +349,7 @@ impl PhiTransfer {
     }
 
     /// Extract spectral (eigenvalue-like) features
-    fn extract_spectral_features(&self, components: &[RealHV]) -> Vec<f64> {
+    fn extract_spectral_features(&self, components: &[ContinuousHV]) -> Vec<f64> {
         let n = components.len();
         let num_features = self.config.signature_dims / 3;
         let mut features = Vec::with_capacity(num_features);
@@ -512,8 +512,8 @@ impl PhiTransfer {
     /// Transfer consciousness patterns from source to target topology
     pub fn transfer(
         &self,
-        source_components: &[RealHV],
-        target_components: &[RealHV],
+        source_components: &[ContinuousHV],
+        target_components: &[ContinuousHV],
         source_phi: f64,
         target_phi: f64,
         source_type: &str,
@@ -547,7 +547,7 @@ impl PhiTransfer {
 
         // Transfer effectiveness: how much of source Φ can be transferred
         // Based on signature similarity
-        let transfer_efficiency = cosine_sim.max(0.0).min(1.0);
+        let transfer_efficiency = cosine_sim.clamp(0.0, 1.0);
         let phi_gap = source_phi - target_phi;
         let transferred_phi = phi_gap * transfer_efficiency;
         let enhanced_phi = target_phi + transferred_phi;
@@ -574,8 +574,8 @@ impl PhiTransfer {
     /// can be transferred from source to target.
     pub fn transfer_potential(
         &self,
-        source_components: &[RealHV],
-        target_components: &[RealHV],
+        source_components: &[ContinuousHV],
+        target_components: &[ContinuousHV],
         source_phi: f64,
         target_phi: f64,
     ) -> f64 {
@@ -610,7 +610,7 @@ impl Default for PhiTransfer {
 }
 
 /// Convenience function: quick transfer from Ring to target
-pub fn transfer_from_ring(target_components: &[RealHV], target_phi: f64) -> PhiTransferResult {
+pub fn transfer_from_ring(target_components: &[ContinuousHV], target_phi: f64) -> PhiTransferResult {
     use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
     use crate::hdc::spectral_connectivity::ConnectivityCalculator;
     use crate::hdc::HDC_DIMENSION;
@@ -639,7 +639,7 @@ pub fn transfer_from_ring(target_components: &[RealHV], target_phi: f64) -> PhiT
 
 /// Convenience function: compute transfer matrix between topology types
 pub fn compute_transfer_matrix(
-    topologies: &[(String, Vec<RealHV>, f64)],
+    topologies: &[(String, Vec<ContinuousHV>, f64)],
 ) -> Vec<Vec<f64>> {
     let n = topologies.len();
     let mut matrix = vec![vec![0.0; n]; n];
@@ -947,7 +947,7 @@ impl PhiCausalAnalyzer {
     ///
     /// Tests knockout, amplify, and dampen interventions on each node
     /// and computes causal power scores.
-    pub fn analyze(&self, node_representations: &[RealHV]) -> CausalAnalysisResult {
+    pub fn analyze(&self, node_representations: &[ContinuousHV]) -> CausalAnalysisResult {
         let n = node_representations.len();
         if n == 0 {
             return CausalAnalysisResult {
@@ -1074,7 +1074,7 @@ impl PhiCausalAnalyzer {
     /// Test a single intervention on a node
     fn test_intervention(
         &self,
-        nodes: &[RealHV],
+        nodes: &[ContinuousHV],
         node_idx: usize,
         intervention: InterventionType,
         baseline_phi: f64,
@@ -1108,10 +1108,10 @@ impl PhiCausalAnalyzer {
     /// Apply intervention to create modified node set
     fn apply_intervention(
         &self,
-        nodes: &[RealHV],
+        nodes: &[ContinuousHV],
         node_idx: usize,
         intervention: InterventionType,
-    ) -> Vec<RealHV> {
+    ) -> Vec<ContinuousHV> {
         let mut modified = nodes.to_vec();
 
         match intervention {
@@ -1134,13 +1134,13 @@ impl PhiCausalAnalyzer {
             InterventionType::Noise => {
                 if node_idx < modified.len() {
                     let dim = modified[node_idx].values.len();
-                    modified[node_idx] = RealHV::random(dim, self.config.seed + node_idx as u64);
+                    modified[node_idx] = ContinuousHV::random(dim, self.config.seed + node_idx as u64);
                 }
             }
             InterventionType::Clamp(value) => {
                 if node_idx < modified.len() {
                     let dim = modified[node_idx].values.len();
-                    modified[node_idx] = RealHV {
+                    modified[node_idx] = ContinuousHV {
                         values: vec![value as f32; dim],
                     };
                 }
@@ -1152,7 +1152,7 @@ impl PhiCausalAnalyzer {
 
     /// Compute Φ for a set of node representations
     /// Uses cosine similarity-based integration measure
-    fn compute_phi(&self, nodes: &[RealHV]) -> f64 {
+    fn compute_phi(&self, nodes: &[ContinuousHV]) -> f64 {
         let n = nodes.len();
         if n < 2 {
             return 0.0;
@@ -1181,7 +1181,7 @@ impl PhiCausalAnalyzer {
     /// Analyze intervention effects on a subset of nodes
     pub fn analyze_subset(
         &self,
-        nodes: &[RealHV],
+        nodes: &[ContinuousHV],
         target_indices: &[usize],
     ) -> Vec<NodeInterventionResult> {
         let baseline_phi = self.compute_phi(nodes);
@@ -1201,7 +1201,7 @@ impl PhiCausalAnalyzer {
     }
 
     /// Find the minimum dominating set (nodes that control most of Φ)
-    pub fn find_dominating_set(&self, nodes: &[RealHV], threshold: f64) -> Vec<usize> {
+    pub fn find_dominating_set(&self, nodes: &[ContinuousHV], threshold: f64) -> Vec<usize> {
         let analysis = self.analyze(nodes);
 
         let mut dominating = Vec::new();
@@ -1232,17 +1232,17 @@ impl Default for PhiCausalAnalyzer {
 }
 
 /// Convenience function: analyze causal interventions
-pub fn analyze_causal_interventions(node_representations: &[RealHV]) -> CausalAnalysisResult {
+pub fn analyze_causal_interventions(node_representations: &[ContinuousHV]) -> CausalAnalysisResult {
     PhiCausalAnalyzer::new().analyze(node_representations)
 }
 
 /// Convenience function: find critical nodes
-pub fn find_critical_nodes(node_representations: &[RealHV]) -> Vec<usize> {
+pub fn find_critical_nodes(node_representations: &[ContinuousHV]) -> Vec<usize> {
     PhiCausalAnalyzer::new().analyze(node_representations).critical_nodes
 }
 
 /// Convenience function: compute causal power scores
-pub fn compute_causal_power(node_representations: &[RealHV]) -> Vec<f64> {
+pub fn compute_causal_power(node_representations: &[ContinuousHV]) -> Vec<f64> {
     PhiCausalAnalyzer::new().analyze(node_representations).causal_power
 }
 
@@ -1364,7 +1364,7 @@ pub struct ConsciousnessModule {
     /// Isolation score (1 - avg external connections)
     pub isolation_score: f64,
     /// Centroid representation (average of node representations)
-    pub centroid: Option<RealHV>,
+    pub centroid: Option<ContinuousHV>,
 }
 
 impl ConsciousnessModule {
@@ -1551,7 +1551,7 @@ impl PhiModularityAnalyzer {
     }
 
     /// Perform full modularity analysis
-    pub fn analyze(&self, node_representations: &[RealHV]) -> NetworkModularityResult {
+    pub fn analyze(&self, node_representations: &[ContinuousHV]) -> NetworkModularityResult {
         let n = node_representations.len();
 
         if n == 0 {
@@ -1628,7 +1628,7 @@ impl PhiModularityAnalyzer {
     }
 
     /// Compute similarity matrix between all nodes
-    fn compute_similarity_matrix(&self, node_representations: &[RealHV]) -> Vec<Vec<f64>> {
+    fn compute_similarity_matrix(&self, node_representations: &[ContinuousHV]) -> Vec<Vec<f64>> {
         let n = node_representations.len();
         let mut matrix = vec![vec![0.0f64; n]; n];
 
@@ -1645,12 +1645,12 @@ impl PhiModularityAnalyzer {
     }
 
     /// Compute Φ for a set of representations
-    fn compute_phi(&self, representations: &[RealHV]) -> f64 {
+    fn compute_phi(&self, representations: &[ContinuousHV]) -> f64 {
         if representations.len() < 2 {
             return 0.0;
         }
 
-        let bundle = RealHV::bundle(representations);
+        let bundle = ContinuousHV::bundle_owned(representations);
         let mut total_info = 0.0f64;
 
         for rep in representations {
@@ -1731,7 +1731,7 @@ impl PhiModularityAnalyzer {
             let mut sorted: Vec<(usize, f64)> = fiedler.iter().copied().enumerate().collect();
             sorted.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
-            let chunk_size = (n + k - 1) / k;
+            let chunk_size = n.div_ceil(k);
             for (rank, (idx, _)) in sorted.iter().enumerate() {
                 assignments[*idx] = rank / chunk_size;
             }
@@ -2079,7 +2079,7 @@ impl PhiModularityAnalyzer {
     /// Build module structures from assignments
     fn build_modules(
         &self,
-        node_representations: &[RealHV],
+        node_representations: &[ContinuousHV],
         assignments: &[usize],
         sim_matrix: &[Vec<f64>],
     ) -> Vec<ConsciousnessModule> {
@@ -2118,7 +2118,7 @@ impl PhiModularityAnalyzer {
             };
 
             // Internal Φ
-            let module_reps: Vec<RealHV> = node_indices
+            let module_reps: Vec<ContinuousHV> = node_indices
                 .iter()
                 .map(|&i| node_representations[i].clone())
                 .collect();
@@ -2149,7 +2149,7 @@ impl PhiModularityAnalyzer {
 
             // Centroid
             let centroid = if !module_reps.is_empty() {
-                Some(RealHV::bundle(&module_reps))
+                Some(ContinuousHV::bundle_owned(&module_reps))
             } else {
                 None
             };
@@ -2207,7 +2207,7 @@ impl PhiModularityAnalyzer {
     /// Analyze inter-module relations
     fn analyze_inter_module(
         &self,
-        _node_representations: &[RealHV],
+        _node_representations: &[ContinuousHV],
         modules: &[ConsciousnessModule],
         sim_matrix: &[Vec<f64>],
     ) -> Vec<InterModuleRelation> {
@@ -2500,7 +2500,7 @@ impl PhiModularityAnalyzer {
             0.0
         };
 
-        (segregation.max(0.0).min(1.0), integration.max(0.0).min(1.0))
+        (segregation.clamp(0.0, 1.0), integration.clamp(0.0, 1.0))
     }
 
     /// Compute hierarchical modularity at different scales
@@ -2529,18 +2529,18 @@ impl PhiModularityAnalyzer {
 }
 
 /// Convenience function: analyze network modularity
-pub fn analyze_network_modularity(node_representations: &[RealHV]) -> NetworkModularityResult {
+pub fn analyze_network_modularity(node_representations: &[ContinuousHV]) -> NetworkModularityResult {
     PhiModularityAnalyzer::new().analyze(node_representations)
 }
 
 /// Convenience function: detect number of natural modules
-pub fn detect_module_count(node_representations: &[RealHV]) -> usize {
+pub fn detect_module_count(node_representations: &[ContinuousHV]) -> usize {
     let result = PhiModularityAnalyzer::new().analyze(node_representations);
     result.num_modules()
 }
 
 /// Convenience function: get modularity Q score
-pub fn compute_modularity_score(node_representations: &[RealHV]) -> f64 {
+pub fn compute_modularity_score(node_representations: &[ContinuousHV]) -> f64 {
     PhiModularityAnalyzer::new().analyze(node_representations).modularity_score
 }
 

@@ -337,7 +337,7 @@ impl SelfImprovementSystem {
         }
 
         // Check if we should generate new recommendations
-        if self.step % self.config.check_interval == 0 {
+        if self.step.is_multiple_of(self.config.check_interval) {
             self.generate_recommendations();
         }
     }

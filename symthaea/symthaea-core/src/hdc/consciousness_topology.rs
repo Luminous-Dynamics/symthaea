@@ -162,7 +162,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 
 /// Topological feature type
@@ -355,14 +355,14 @@ impl Default for TopologyConfig {
 /// # Example
 /// ```ignore
 /// use symthaea::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = TopologyConfig::default();
 /// let mut topology = ConsciousnessTopology::new(config);
 ///
 /// // Add consciousness states
 /// for i in 0..20 {
-///     let state = HV16::random((1000 + i) as u64);
+///     let state = BinaryHV::random((1000 + i) as u64);
 ///     topology.add_state(state);
 /// }
 ///
@@ -381,7 +381,7 @@ pub struct ConsciousnessTopology {
     config: TopologyConfig,
 
     /// Consciousness states (point cloud)
-    states: Vec<HV16>,
+    states: Vec<BinaryHV>,
 }
 
 impl ConsciousnessTopology {
@@ -394,12 +394,12 @@ impl ConsciousnessTopology {
     }
 
     /// Add consciousness state
-    pub fn add_state(&mut self, state: HV16) {
+    pub fn add_state(&mut self, state: BinaryHV) {
         self.states.push(state);
     }
 
     /// Add multiple states
-    pub fn add_states(&mut self, states: &[HV16]) {
+    pub fn add_states(&mut self, states: &[BinaryHV]) {
         self.states.extend_from_slice(states);
     }
 
@@ -754,8 +754,8 @@ mod tests {
     fn test_add_states() {
         let mut topology = ConsciousnessTopology::default();
 
-        let state1 = HV16::random(1000);
-        let state2 = HV16::random(2000);
+        let state1 = BinaryHV::random(1000);
+        let state2 = BinaryHV::random(2000);
 
         topology.add_state(state1);
         topology.add_state(state2);
@@ -769,7 +769,7 @@ mod tests {
 
         // Add similar states (should form one component)
         for i in 0..10 {
-            let state = HV16::random((1000 + i) as u64);
+            let state = BinaryHV::random((1000 + i) as u64);
             topology.add_state(state);
         }
 
@@ -786,7 +786,7 @@ mod tests {
 
         // Add very different states (should form multiple components)
         for i in 0..10 {
-            let state = HV16::random((1000 + i * 1000) as u64);  // Very different seeds
+            let state = BinaryHV::random((1000 + i * 1000) as u64);  // Very different seeds
             topology.add_state(state);
         }
 
@@ -801,7 +801,7 @@ mod tests {
         let mut topology = ConsciousnessTopology::default();
 
         for i in 0..15 {
-            let state = HV16::random((1000 + i) as u64);
+            let state = BinaryHV::random((1000 + i) as u64);
             topology.add_state(state);
         }
 
@@ -819,7 +819,7 @@ mod tests {
         let mut topology = ConsciousnessTopology::default();
 
         for i in 0..20 {
-            let state = HV16::random((1000 + i) as u64);
+            let state = BinaryHV::random((1000 + i) as u64);
             topology.add_state(state);
         }
 
@@ -840,7 +840,7 @@ mod tests {
         let mut topology = ConsciousnessTopology::default();
 
         for i in 0..10 {
-            topology.add_state(HV16::random(i as u64));
+            topology.add_state(BinaryHV::random(i as u64));
         }
 
         assert_eq!(topology.num_states(), 10);
@@ -869,10 +869,10 @@ mod tests {
         use std::collections::hash_map::DefaultHasher;
 
         // Helper to create deterministic HV from concept string
-        fn concept_to_hv(concept: &str) -> HV16 {
+        fn concept_to_hv(concept: &str) -> BinaryHV {
             let mut hasher = DefaultHasher::new();
             concept.hash(&mut hasher);
-            HV16::random(hasher.finish())
+            BinaryHV::random(hasher.finish())
         }
 
         // Phenomenal concepts (experiential, qualia-related) - 50+ concepts
@@ -1068,10 +1068,10 @@ mod tests {
         use std::collections::hash_map::DefaultHasher;
 
         // Helper to create deterministic HV from concept string
-        fn concept_to_hv(concept: &str) -> HV16 {
+        fn concept_to_hv(concept: &str) -> BinaryHV {
             let mut hasher = DefaultHasher::new();
             concept.hash(&mut hasher);
-            HV16::random(hasher.finish())
+            BinaryHV::random(hasher.finish())
         }
 
         println!("\n========================================");
@@ -1217,7 +1217,7 @@ mod tests {
             let bound = hv_a.bind(&hv_b);
 
             // Bundle (majority vote) - creates superposition
-            let bundled = HV16::bundle(&[hv_a.clone(), hv_b.clone()]);
+            let bundled = BinaryHV::bundle(&[hv_a.clone(), hv_b.clone()]);
 
             // Analyze topology of each
             let mut bind_topo = ConsciousnessTopology::default();
@@ -1247,7 +1247,7 @@ mod tests {
             let hv_b = concept_to_hv(b);
 
             let bound = hv_a.bind(&hv_b);
-            let bundled = HV16::bundle(&[hv_a.clone(), hv_b.clone()]);
+            let bundled = BinaryHV::bundle(&[hv_a.clone(), hv_b.clone()]);
 
             let mut bind_topo = ConsciousnessTopology::default();
             bind_topo.add_state(hv_a.clone());
@@ -1319,10 +1319,10 @@ mod tests {
 
         const K: usize = 5; // 5-fold cross-validation
 
-        fn concept_to_hv(concept: &str) -> HV16 {
+        fn concept_to_hv(concept: &str) -> BinaryHV {
             let mut hasher = DefaultHasher::new();
             concept.hash(&mut hasher);
-            HV16::random(hasher.finish())
+            BinaryHV::random(hasher.finish())
         }
 
         println!("\n════════════════════════════════════════");
@@ -1444,10 +1444,10 @@ mod tests {
 
         const K: usize = 5; // 5-fold cross-validation
 
-        fn concept_to_hv(concept: &str) -> HV16 {
+        fn concept_to_hv(concept: &str) -> BinaryHV {
             let mut hasher = DefaultHasher::new();
             concept.hash(&mut hasher);
-            HV16::random(hasher.finish())
+            BinaryHV::random(hasher.finish())
         }
 
         fn compute_interaction(pairs: &[(&str, &str)], pair_type: &str) -> (f64, f64) {
@@ -1459,7 +1459,7 @@ mod tests {
                 let hv_b = concept_to_hv(b);
 
                 let bound = hv_a.bind(&hv_b);
-                let bundled = HV16::bundle(&[hv_a.clone(), hv_b.clone()]);
+                let bundled = BinaryHV::bundle(&[hv_a.clone(), hv_b.clone()]);
 
                 let mut bind_topo = ConsciousnessTopology::default();
                 bind_topo.add_state(hv_a.clone());

@@ -38,7 +38,7 @@
 //!
 //! This enables HDC+LTC to "think" in primitives and then express through language.
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 use std::collections::{HashMap, BinaryHeap};
 use std::cmp::Ordering;
@@ -185,11 +185,11 @@ pub struct VectorStats {
 /// The Semantic Decoder - HDC's "mouth"
 pub struct SemanticDecoder {
     /// Cached primitive encodings for fast lookup
-    primitive_cache: HashMap<String, HV16>,
+    primitive_cache: HashMap<String, BinaryHV>,
     /// Position vectors for sequence recovery
-    position_vectors: Vec<HV16>,
+    position_vectors: Vec<BinaryHV>,
     /// Compositional operator encodings
-    composition_operators: HashMap<CompositionOp, HV16>,
+    composition_operators: HashMap<CompositionOp, BinaryHV>,
     /// Statistics
     decode_count: u64,
     avg_confidence: f32,
@@ -219,7 +219,7 @@ impl SemanticDecoder {
         for i in 0..max_length {
             // Each position gets a deterministic random vector
             let seed = 0xDEAD_BEEF_0000 + i as u64;
-            self.position_vectors.push(HV16::random(seed));
+            self.position_vectors.push(BinaryHV::random(seed));
         }
     }
 
@@ -234,7 +234,7 @@ impl SemanticDecoder {
         ];
 
         for (op, seed) in ops {
-            self.composition_operators.insert(op, HV16::random(seed));
+            self.composition_operators.insert(op, BinaryHV::random(seed));
         }
     }
 
@@ -242,12 +242,12 @@ impl SemanticDecoder {
     fn cache_primitives(&mut self) {
         let system = PrimitiveSystem::global();
         for primitive in system.all_primitives() {
-            self.primitive_cache.insert(primitive.name.clone(), primitive.encoding.clone());
+            self.primitive_cache.insert(primitive.name.clone(), primitive.encoding);
         }
     }
 
     /// Decode an HDC vector into a primitive expression
-    pub fn decode(&mut self, vector: &HV16) -> DecodedExpression {
+    pub fn decode(&mut self, vector: &BinaryHV) -> DecodedExpression {
         self.decode_count += 1;
 
         // Step 1: Find activated primitives
@@ -285,7 +285,7 @@ impl SemanticDecoder {
     }
 
     /// Find all primitives activated by this vector
-    fn find_activated_primitives(&self, vector: &HV16) -> Vec<ActivatedPrimitive> {
+    fn find_activated_primitives(&self, vector: &BinaryHV) -> Vec<ActivatedPrimitive> {
         let system = PrimitiveSystem::global();
         let mut heap: BinaryHeap<ActivatedPrimitive> = BinaryHeap::new();
 
@@ -315,7 +315,7 @@ impl SemanticDecoder {
     }
 
     /// Detect which composition operators are active
-    fn detect_operators(&self, vector: &HV16) -> Vec<CompositionOp> {
+    fn detect_operators(&self, vector: &BinaryHV) -> Vec<CompositionOp> {
         let mut detected = Vec::new();
 
         for (op, op_vec) in &self.composition_operators {
@@ -331,14 +331,14 @@ impl SemanticDecoder {
     /// Recover sequence ordering from bound vectors
     fn recover_sequence_order(
         &self,
-        vector: &HV16,
+        vector: &BinaryHV,
         primitives: &[ActivatedPrimitive],
     ) -> Vec<ActivatedPrimitive> {
         let mut ordered = Vec::with_capacity(primitives.len());
 
         for prim in primitives {
             // Try to recover position by unbinding position vectors
-            // Note: For binary HV16, unbind = bind (XOR is self-inverse)
+            // Note: For binary BinaryHV, unbind = bind (XOR is self-inverse)
             let prim_encoding = self.primitive_cache.get(&prim.name);
 
             let mut best_pos = None;
@@ -432,14 +432,14 @@ impl SemanticDecoder {
     }
 
     /// Compute statistics about the input vector
-    fn compute_vector_stats(&self, vector: &HV16) -> VectorStats {
-        // HV16 stores bits packed in bytes
+    fn compute_vector_stats(&self, vector: &BinaryHV) -> VectorStats {
+        // BinaryHV stores bits packed in bytes
         // Count 1s and 0s across all bits
         let bytes = &vector.0;
-        let total_bits = HV16::DIM as f32;
+        let total_bits = BinaryHV::DIM as f32;
 
         let ones_count = bytes.iter()
-            .map(|b| b.count_ones() as u32)
+            .map(|b| b.count_ones())
             .sum::<u32>() as f32;
         let zeros_count = total_bits - ones_count;
 
@@ -463,13 +463,13 @@ impl SemanticDecoder {
     }
 
     /// Decode to a flat list of primitive names (simplified interface)
-    pub fn decode_to_names(&mut self, vector: &HV16) -> Vec<String> {
+    pub fn decode_to_names(&mut self, vector: &BinaryHV) -> Vec<String> {
         let decoded = self.decode(vector);
         decoded.primitives.iter().map(|p| p.name.clone()).collect()
     }
 
     /// Decode to string representation
-    pub fn decode_to_string(&mut self, vector: &HV16) -> String {
+    pub fn decode_to_string(&mut self, vector: &BinaryHV) -> String {
         let decoded = self.decode(vector);
         decoded.tree.to_string_repr()
     }
@@ -492,7 +492,7 @@ impl SemanticDecoder {
     ///
     /// The weight function should return a multiplier (0.5 - 2.0 typical range)
     /// for each primitive name.
-    pub fn decode_with_harmonics<F>(&mut self, vector: &HV16, weight_fn: F) -> DecodedExpression
+    pub fn decode_with_harmonics<F>(&mut self, vector: &BinaryHV, weight_fn: F) -> DecodedExpression
     where
         F: Fn(&str) -> f32,
     {
@@ -533,7 +533,7 @@ impl SemanticDecoder {
     }
 
     /// Find activated primitives with harmonic weight modulation
-    fn find_activated_primitives_weighted<F>(&self, vector: &HV16, weight_fn: &F) -> Vec<ActivatedPrimitive>
+    fn find_activated_primitives_weighted<F>(&self, vector: &BinaryHV, weight_fn: &F) -> Vec<ActivatedPrimitive>
     where
         F: Fn(&str) -> f32,
     {
@@ -571,7 +571,7 @@ impl SemanticDecoder {
     }
 
     /// Decode to names with harmonic weighting
-    pub fn decode_to_names_with_harmonics<F>(&mut self, vector: &HV16, weight_fn: F) -> Vec<String>
+    pub fn decode_to_names_with_harmonics<F>(&mut self, vector: &BinaryHV, weight_fn: F) -> Vec<String>
     where
         F: Fn(&str) -> f32,
     {
@@ -810,7 +810,7 @@ mod tests {
     #[test]
     fn test_decode_random_vector() {
         let mut decoder = SemanticDecoder::new();
-        let random_vec = HV16::random(12345);
+        let random_vec = BinaryHV::random(12345);
 
         let decoded = decoder.decode(&random_vec);
 
@@ -867,7 +867,7 @@ mod tests {
     #[test]
     fn test_harmonic_guided_primitive_selection() {
         let mut decoder = SemanticDecoder::new();
-        let random_vec = HV16::random(12345);
+        let random_vec = BinaryHV::random(12345);
 
         // First decode without weighting (neutral = 1.0)
         let neutral_decoded = decoder.decode_with_harmonics(&random_vec, |_| 1.0);
@@ -915,7 +915,7 @@ mod tests {
     #[test]
     fn test_harmonic_weights_affect_ordering() {
         let mut decoder = SemanticDecoder::new();
-        let random_vec = HV16::random(99999);
+        let random_vec = BinaryHV::random(99999);
 
         // Strong boost for a specific primitive type
         let extreme_boost = |name: &str| -> f32 {

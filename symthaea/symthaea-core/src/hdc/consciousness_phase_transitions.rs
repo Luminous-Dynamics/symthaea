@@ -19,7 +19,7 @@
 // - Correlation length: ξ diverges at criticality (explains binding!)
 // - Critical slowing down: Relaxation time diverges (early warning!)
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 
 /// Phase of consciousness (like solid/liquid/gas)
@@ -127,8 +127,8 @@ impl CriticalExponents {
     /// Check hyperscaling relation: 2 - α = d*ν (d=3 for brain)
     pub fn check_hyperscaling(&self, d: f64) -> f64 {
         let alpha = 2.0 - self.gamma - 2.0 * self.beta; // Rushbrooke: α + 2β + γ = 2
-        let violation = (2.0 - alpha - d * self.nu).abs();
-        violation
+        
+        (2.0 - alpha - d * self.nu).abs()
     }
 }
 
@@ -150,11 +150,11 @@ pub struct SystemState {
     /// Current phase
     pub phase: ConsciousnessPhase,
     /// HDC state representation
-    pub state: Vec<HV16>,
+    pub state: Vec<BinaryHV>,
 }
 
 impl SystemState {
-    pub fn new(integration: f64, state: Vec<HV16>) -> Self {
+    pub fn new(integration: f64, state: Vec<BinaryHV>) -> Self {
         let mut s = Self {
             integration,
             complexity: 0.0,
@@ -334,7 +334,7 @@ impl ConsciousnessPhaseTransitions {
     }
 
     /// Add a state observation
-    pub fn observe(&mut self, integration: f64, state: Vec<HV16>) {
+    pub fn observe(&mut self, integration: f64, state: Vec<BinaryHV>) {
         let mut sys_state = SystemState::new(integration, state);
         sys_state.update_derived_quantities(self.config.critical_point);
 
@@ -441,7 +441,7 @@ impl ConsciousnessPhaseTransitions {
     }
 
     /// Compute order parameter from HDC state
-    pub fn compute_order_parameter(&self, state: &[HV16]) -> f64 {
+    pub fn compute_order_parameter(&self, state: &[BinaryHV]) -> f64 {
         if state.is_empty() {
             return 0.0;
         }
@@ -457,7 +457,7 @@ impl ConsciousnessPhaseTransitions {
 
         for i in 0..n {
             for j in (i + 1)..n {
-                let sim = HV16::similarity(&state[i], &state[j]) as f64;
+                let sim = BinaryHV::similarity(&state[i], &state[j]) as f64;
                 total_sim += sim.abs();
                 count += 1;
             }
@@ -471,7 +471,7 @@ impl ConsciousnessPhaseTransitions {
     }
 
     /// Compute correlation function G(r)
-    pub fn compute_correlation_function(&self, state: &[HV16], max_distance: usize) -> Vec<f64> {
+    pub fn compute_correlation_function(&self, state: &[BinaryHV], max_distance: usize) -> Vec<f64> {
         let n = state.len();
         if n < 2 {
             return vec![1.0];
@@ -484,7 +484,7 @@ impl ConsciousnessPhaseTransitions {
         for i in 0..n {
             for r in 1..max_r {
                 let j = (i + r) % n;
-                let sim = HV16::similarity(&state[i], &state[j]) as f64;
+                let sim = BinaryHV::similarity(&state[i], &state[j]) as f64;
                 correlations[r] += sim;
                 counts[r] += 1;
             }
@@ -590,8 +590,8 @@ impl ConsciousnessPhaseTransitions {
         for i in 0..=steps {
             let tau = tau_min + i as f64 * step_size;
             // Generate state with integration-dependent coherence
-            let state: Vec<HV16> = (0..self.config.system_size)
-                .map(|j| HV16::random((i * self.config.system_size + j) as u64))
+            let state: Vec<BinaryHV> = (0..self.config.system_size)
+                .map(|j| BinaryHV::random((i * self.config.system_size + j) as u64))
                 .collect();
             self.observe(tau, state);
         }
@@ -796,7 +796,7 @@ mod tests {
     #[test]
     fn test_system_state_phases() {
         // Test unconscious state (low integration)
-        let state: Vec<HV16> = (0..10).map(|i| HV16::random(i as u64)).collect();
+        let state: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i as u64)).collect();
         let mut sys = SystemState::new(0.1, state.clone());
         sys.update_derived_quantities(0.5);
         assert_eq!(sys.phase, ConsciousnessPhase::Unconscious);
@@ -825,7 +825,7 @@ mod tests {
         let config = PhaseTransitionConfig::default();
         let mut pt = ConsciousnessPhaseTransitions::new(config);
 
-        let state: Vec<HV16> = (0..100).map(|i| HV16::random(i as u64)).collect();
+        let state: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i as u64)).collect();
         pt.observe(0.3, state);
 
         assert_eq!(pt.num_observations(), 1);
@@ -840,7 +840,7 @@ mod tests {
         // Sweep from unconscious to supercritical
         for i in 0..20 {
             let tau = 0.1 + i as f64 * 0.05; // 0.1 to 1.05
-            let state: Vec<HV16> = (0..50).map(|j| HV16::random((i * 50 + j) as u64)).collect();
+            let state: Vec<BinaryHV> = (0..50).map(|j| BinaryHV::random((i * 50 + j) as u64)).collect();
             pt.observe(tau, state);
         }
 
@@ -857,7 +857,7 @@ mod tests {
         let mut pt = ConsciousnessPhaseTransitions::new(config);
 
         // Observe at exactly critical point
-        let state: Vec<HV16> = (0..50).map(|i| HV16::random(i as u64)).collect();
+        let state: Vec<BinaryHV> = (0..50).map(|i| BinaryHV::random(i as u64)).collect();
         pt.observe(0.5, state);
 
         assert!(pt.is_at_criticality());
@@ -869,12 +869,12 @@ mod tests {
         let pt = ConsciousnessPhaseTransitions::new(config);
 
         // Highly coherent state (same vector repeated)
-        let base = HV16::random(42);
-        let coherent: Vec<HV16> = vec![base.clone(); 10];
+        let base = BinaryHV::random(42);
+        let coherent: Vec<BinaryHV> = vec![base.clone(); 10];
         let op_coherent = pt.compute_order_parameter(&coherent);
 
         // Random state (different vectors)
-        let random: Vec<HV16> = (0..10).map(|i| HV16::random(i as u64)).collect();
+        let random: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i as u64)).collect();
         let op_random = pt.compute_order_parameter(&random);
 
         // Coherent should have higher order parameter
@@ -887,7 +887,7 @@ mod tests {
         let config = PhaseTransitionConfig::default();
         let pt = ConsciousnessPhaseTransitions::new(config);
 
-        let state: Vec<HV16> = (0..20).map(|i| HV16::random(i as u64)).collect();
+        let state: Vec<BinaryHV> = (0..20).map(|i| BinaryHV::random(i as u64)).collect();
         let correlations = pt.compute_correlation_function(&state, 10);
 
         // G(0) should be 1
@@ -901,7 +901,7 @@ mod tests {
         let config = PhaseTransitionConfig::default();
         let mut pt = ConsciousnessPhaseTransitions::new(config);
 
-        let state: Vec<HV16> = (0..50).map(|i| HV16::random(i as u64)).collect();
+        let state: Vec<BinaryHV> = (0..50).map(|i| BinaryHV::random(i as u64)).collect();
         pt.observe(0.6, state); // Supercritical
 
         let assessment = pt.assess();
@@ -963,7 +963,7 @@ mod tests {
         let config = PhaseTransitionConfig::default();
         let mut pt = ConsciousnessPhaseTransitions::new(config);
 
-        let state: Vec<HV16> = (0..10).map(|i| HV16::random(i as u64)).collect();
+        let state: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i as u64)).collect();
         pt.observe(0.5, state);
         assert_eq!(pt.num_observations(), 1);
 

@@ -35,7 +35,7 @@
 // Consciousness as Bayesian inference over HDC manifold, with active inference
 // for action selection. Unifies perception, action, learning, and consciousness.
 
-use super::HV16;
+use super::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -95,7 +95,7 @@ pub struct Prediction {
     pub level: PredictiveLevel,
 
     /// Predicted state (HDC vector)
-    pub predicted_state: Vec<HV16>,
+    pub predicted_state: Vec<BinaryHV>,
 
     /// Precision (inverse variance) - attention gain control
     pub precision: f64,
@@ -154,16 +154,16 @@ impl GenerativeModel {
     }
 
     /// Generate prediction from internal state
-    pub fn predict(&self, state: &[HV16]) -> Vec<HV16> {
+    pub fn predict(&self, state: &[BinaryHV]) -> Vec<BinaryHV> {
         // Simplified: linear transformation
         // In full implementation, would use neural network
 
-        // Convert HV16 to float representation (popcount-based)
+        // Convert BinaryHV to float representation (popcount-based)
         let state_floats: Vec<f64> = state.iter()
             .map(|hv| {
                 // Count number of 1-bits (positive values in bipolar encoding)
                 let ones = hv.0.iter().map(|&byte| byte.count_ones() as u64).sum::<u64>();
-                let total_bits = HV16::DIM as f64;
+                let total_bits = BinaryHV::DIM as f64;
                 // Map [0, 2048] bits -> [-1, 1]
                 (2.0 * ones as f64 / total_bits) - 1.0
             })
@@ -176,11 +176,11 @@ impl GenerativeModel {
                     .map(|(w, s)| w * s)
                     .sum();
 
-                // Return HV16 based on activation sign
+                // Return BinaryHV based on activation sign
                 if activation > 0.0 {
-                    HV16::ones()  // All +1
+                    BinaryHV::ones()  // All +1
                 } else {
-                    HV16::zero()  // All -1
+                    BinaryHV::zero()  // All -1
                 }
             })
             .collect()
@@ -188,12 +188,12 @@ impl GenerativeModel {
 
     /// Update model via prediction error
     /// Gradient descent: w ← w - α × error × state
-    pub fn learn(&mut self, state: &[HV16], error: &[f64]) {
-        // Convert HV16 to float representation
+    pub fn learn(&mut self, state: &[BinaryHV], error: &[f64]) {
+        // Convert BinaryHV to float representation
         let state_floats: Vec<f64> = state.iter()
             .map(|hv| {
                 let ones = hv.0.iter().map(|&byte| byte.count_ones() as u64).sum::<u64>();
-                let total_bits = HV16::DIM as f64;
+                let total_bits = BinaryHV::DIM as f64;
                 (2.0 * ones as f64 / total_bits) - 1.0
             })
             .collect();
@@ -214,7 +214,7 @@ impl GenerativeModel {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InferredAction {
     /// Action vector (HDC representation of action)
-    pub action: Vec<HV16>,
+    pub action: Vec<BinaryHV>,
 
     /// Expected free energy if this action is taken
     pub expected_free_energy: f64,
@@ -318,10 +318,10 @@ pub struct PredictiveConsciousness {
     models: Vec<GenerativeModel>,
 
     /// Current internal states at each level
-    states: Vec<Vec<HV16>>,
+    states: Vec<Vec<BinaryHV>>,
 
     /// Observation history
-    observations: VecDeque<Vec<HV16>>,
+    observations: VecDeque<Vec<BinaryHV>>,
 
     /// Prediction error history
     error_history: VecDeque<f64>,
@@ -340,12 +340,12 @@ impl PredictiveConsciousness {
             .map(|&level| GenerativeModel::new(level, num_components, num_components))
             .collect();
 
-        // Initialize states (random HV16 vectors)
+        // Initialize states (random BinaryHV vectors)
         let states = levels.iter()
             .enumerate()
             .map(|(i, _)| {
                 (0..num_components)
-                    .map(|j| HV16::random((i * num_components + j) as u64))
+                    .map(|j| BinaryHV::random((i * num_components + j) as u64))
                     .collect()
             })
             .collect();
@@ -361,7 +361,7 @@ impl PredictiveConsciousness {
     }
 
     /// Observe new sensory input
-    pub fn observe(&mut self, observation: Vec<HV16>) {
+    pub fn observe(&mut self, observation: Vec<BinaryHV>) {
         self.observations.push_back(observation);
 
         // Limit history size
@@ -409,7 +409,7 @@ impl PredictiveConsciousness {
     }
 
     /// Compute prediction errors
-    fn compute_errors(&self, predictions: &[Prediction], observation: &[HV16]) -> Vec<PredictionError> {
+    fn compute_errors(&self, predictions: &[Prediction], observation: &[BinaryHV]) -> Vec<PredictionError> {
         predictions.iter()
             .map(|pred| {
                 // Error magnitude: L2 norm of (actual - predicted)
@@ -501,15 +501,15 @@ impl PredictiveConsciousness {
 
         for sample_idx in 0..self.config.num_action_samples {
             // Sample random action
-            let action: Vec<HV16> = (0..self.num_components)
-                .map(|i| HV16::random((sample_idx * self.num_components + i) as u64))
+            let action: Vec<BinaryHV> = (0..self.num_components)
+                .map(|i| BinaryHV::random((sample_idx * self.num_components + i) as u64))
                 .collect();
 
             // Predict future state if action taken
             // Simplified: action modifies first level state
             let mut future_state = self.states[0].clone();
             for (i, act) in action.iter().enumerate().take(future_state.len()) {
-                future_state[i] = *act;  // HV16 is Copy, so we can assign directly
+                future_state[i] = *act;  // BinaryHV is Copy, so we can assign directly
             }
 
             // Compute expected free energy
@@ -668,7 +668,7 @@ impl PredictiveConsciousness {
     }
 
     /// Compute L2 distance between two HDC vectors
-    fn compute_l2_distance(&self, a: &[HV16], b: &[HV16]) -> f64 {
+    fn compute_l2_distance(&self, a: &[BinaryHV], b: &[BinaryHV]) -> f64 {
         let mut sum = 0.0;
         let len = a.len().min(b.len());
 
@@ -748,7 +748,7 @@ mod tests {
     #[test]
     fn test_generative_model() {
         let model = GenerativeModel::new(PredictiveLevel::Sensory, 10, 10);
-        let state: Vec<HV16> = (0..10).map(|i| HV16::random(i as u64)).collect();
+        let state: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i as u64)).collect();
         let prediction = model.predict(&state);
         assert_eq!(prediction.len(), 10);
     }
@@ -762,7 +762,7 @@ mod tests {
     #[test]
     fn test_observe() {
         let mut pc = PredictiveConsciousness::new(100, PredictiveConfig::default());
-        let obs: Vec<HV16> = (0..100).map(|i| HV16::random(i as u64)).collect();
+        let obs: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i as u64)).collect();
         pc.observe(obs);
         assert_eq!(pc.num_observations(), 1);
     }
@@ -773,7 +773,7 @@ mod tests {
 
         // Add observations
         for i in 0..10 {
-            let obs: Vec<HV16> = (0..100).map(|j| HV16::random((i * 100 + j) as u64)).collect();
+            let obs: Vec<BinaryHV> = (0..100).map(|j| BinaryHV::random((i * 100 + j) as u64)).collect();
             pc.observe(obs);
         }
 
@@ -786,7 +786,7 @@ mod tests {
     #[test]
     fn test_hierarchical_predictions() {
         let mut pc = PredictiveConsciousness::new(100, PredictiveConfig::default());
-        let obs: Vec<HV16> = (0..100).map(|i| HV16::ones()).collect(); // All ones
+        let obs: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::ones()).collect(); // All ones
         pc.observe(obs);
 
         let assessment = pc.process();
@@ -796,7 +796,7 @@ mod tests {
     #[test]
     fn test_active_inference() {
         let mut pc = PredictiveConsciousness::new(100, PredictiveConfig::default());
-        let obs: Vec<HV16> = (0..100).map(|_| HV16::ones()).collect();
+        let obs: Vec<BinaryHV> = (0..100).map(|_| BinaryHV::ones()).collect();
         pc.observe(obs);
 
         let assessment = pc.process();
@@ -806,7 +806,7 @@ mod tests {
     #[test]
     fn test_free_energy_decomposition() {
         let mut pc = PredictiveConsciousness::new(100, PredictiveConfig::default());
-        let obs: Vec<HV16> = (0..100).map(|_| HV16::ones()).collect();
+        let obs: Vec<BinaryHV> = (0..100).map(|_| BinaryHV::ones()).collect();
         pc.observe(obs);
 
         let assessment = pc.process();
@@ -822,7 +822,7 @@ mod tests {
         let mut pc = PredictiveConsciousness::new(100, PredictiveConfig::default());
 
         // Repeated observation should show learning (error changes)
-        let obs: Vec<HV16> = (0..100).map(|_| HV16::ones()).collect();
+        let obs: Vec<BinaryHV> = (0..100).map(|_| BinaryHV::ones()).collect();
 
         let mut errors = Vec::new();
         for _ in 0..20 {
@@ -844,7 +844,7 @@ mod tests {
     #[test]
     fn test_clear() {
         let mut pc = PredictiveConsciousness::new(100, PredictiveConfig::default());
-        let obs: Vec<HV16> = (0..100).map(|_| HV16::ones()).collect();
+        let obs: Vec<BinaryHV> = (0..100).map(|_| BinaryHV::ones()).collect();
         pc.observe(obs);
         assert_eq!(pc.num_observations(), 1);
 

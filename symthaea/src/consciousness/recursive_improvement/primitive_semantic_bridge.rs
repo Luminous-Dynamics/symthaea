@@ -58,15 +58,72 @@
 
 use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier, Primitive};
 use symthaea_core::hdc::binary_hv::HV16;
-use crate::hdc::semantic_primitive_encoder::SemanticPrimitiveEncoder;
 use crate::embeddings::HdcBridge;
+
+// Stub for SemanticPrimitiveEncoder until it's properly implemented
+struct SemanticPrimitiveEncoder {
+    primitives: Vec<AlignedPrimitive>,
+}
+
+#[derive(Clone)]
+struct AlignedPrimitive {
+    name: String,
+    tier: PrimitiveTier,
+    hv16: HV16,
+}
+
+impl SemanticPrimitiveEncoder {
+    fn global_instance() -> &'static Self {
+        use std::sync::OnceLock;
+        static INSTANCE: OnceLock<SemanticPrimitiveEncoder> = OnceLock::new();
+        INSTANCE.get_or_init(|| {
+            let prim_system = PrimitiveSystem::global_instance();
+            let primitives = prim_system.all_primitives()
+                .iter()
+                .map(|p| AlignedPrimitive {
+                    name: p.name.clone(),
+                    tier: p.tier,
+                    hv16: p.encoding.clone(),
+                })
+                .collect();
+            Self { primitives }
+        })
+    }
+
+    fn global() -> &'static Self {
+        Self::global_instance()
+    }
+
+    fn project_embedding(&self, embedding: &[f32]) -> HV16 {
+        // Simple projection: hash the embedding
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        for &v in embedding {
+            v.to_bits().hash(&mut hasher);
+        }
+        HV16::random(hasher.finish())
+    }
+
+    fn all_primitives(&self) -> &[AlignedPrimitive] {
+        &self.primitives
+    }
+}
 #[cfg(feature = "embeddings")]
 use crate::embeddings::qwen3::{Qwen3Embedder, Qwen3Config, QWEN3_FULL_DIMENSION};
-use super::{
-    SemanticBridge, SemanticBridgeConfig, SemanticInput, ActionContext,
-    ConsciousnessWorldModel, WorldModelConfig,
+use super::world_model::{
     ConsciousnessTransition, ConsciousnessAction, LatentConsciousnessState,
 };
+
+// ActionContext definition (used in this module)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ActionContext {
+    Query,
+    Response,
+    Error,
+    Thought,
+    Memory,
+    Goal,
+}
 use crate::dynamics::CrystalizedConcept;
 use std::collections::VecDeque;
 

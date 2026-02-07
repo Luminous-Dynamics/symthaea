@@ -1,6 +1,6 @@
-//! Optimized HV16 Operations - Revolutionary Performance Improvements
+//! Optimized BinaryHV Operations - Revolutionary Performance Improvements
 //!
-//! This module provides optimized versions of HV16 operations that achieve
+//! This module provides optimized versions of BinaryHV operations that achieve
 //! 10-100x speedup over the baseline implementation through:
 //!
 //! 1. Byte-level operations instead of bit-by-bit
@@ -13,7 +13,7 @@
 //! - permute: 100x faster (byte rotation vs bit-by-bit)
 //! - similarity: Uses hardware popcount (already fast)
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 
 /// Optimized bundle using byte-level popcount
 ///
@@ -32,9 +32,9 @@ use super::binary_hv::HV16;
 /// - New: O(N × 256) byte operations = O(N × 256)
 /// - Improvement: ~8x theoretical, 50-200x measured (due to cache effects)
 #[inline]
-pub fn bundle_optimized(vectors: &[HV16]) -> HV16 {
+pub fn bundle_optimized(vectors: &[BinaryHV]) -> BinaryHV {
     if vectors.is_empty() {
-        return HV16::zero();
+        return BinaryHV::zero();
     }
 
     if vectors.len() == 1 {
@@ -74,7 +74,7 @@ pub fn bundle_optimized(vectors: &[HV16]) -> HV16 {
         result[byte_idx] = result_byte;
     }
 
-    HV16(result)
+    BinaryHV(result)
 }
 
 /// Optimized permute using byte rotation with bit fixup
@@ -94,8 +94,8 @@ pub fn bundle_optimized(vectors: &[HV16]) -> HV16 {
 /// - New: O(256) byte operations + O(256) bit shifts
 /// - Improvement: ~8x for non-aligned, ~2048x for aligned shifts
 #[inline]
-pub fn permute_optimized(hv: &HV16, shift: usize) -> HV16 {
-    let shift = shift % HV16::DIM;
+pub fn permute_optimized(hv: &BinaryHV, shift: usize) -> BinaryHV {
+    let shift = shift % BinaryHV::DIM;
 
     if shift == 0 {
         return *hv;
@@ -136,7 +136,7 @@ pub fn permute_optimized(hv: &HV16, shift: usize) -> HV16 {
         }
     }
 
-    HV16(result)
+    BinaryHV(result)
 }
 
 /// Optimized similarity using explicit SIMD-friendly pattern
@@ -144,7 +144,7 @@ pub fn permute_optimized(hv: &HV16, shift: usize) -> HV16 {
 /// This version uses a pattern that compilers can auto-vectorize well.
 /// On x86-64, this compiles to POPCNT instructions.
 #[inline]
-pub fn similarity_optimized(a: &HV16, b: &HV16) -> f32 {
+pub fn similarity_optimized(a: &BinaryHV, b: &BinaryHV) -> f32 {
     // XOR to find differing bits, then count matching (inverse)
     let mut matching: u32 = 0;
 
@@ -166,7 +166,7 @@ pub fn similarity_optimized(a: &HV16, b: &HV16) -> f32 {
         matching += chunk_match;
     }
 
-    matching as f32 / HV16::DIM as f32
+    matching as f32 / BinaryHV::DIM as f32
 }
 
 /// Optimized bind using explicit unrolling
@@ -174,7 +174,7 @@ pub fn similarity_optimized(a: &HV16, b: &HV16) -> f32 {
 /// While the compiler usually auto-vectorizes XOR loops,
 /// explicit unrolling can help in some cases.
 #[inline]
-pub fn bind_optimized(a: &HV16, b: &HV16) -> HV16 {
+pub fn bind_optimized(a: &BinaryHV, b: &BinaryHV) -> BinaryHV {
     let mut result = [0u8; 256];
 
     // Process 8 bytes at a time
@@ -190,7 +190,7 @@ pub fn bind_optimized(a: &HV16, b: &HV16) -> HV16 {
         result[base + 7] = a.0[base + 7] ^ b.0[base + 7];
     }
 
-    HV16(result)
+    BinaryHV(result)
 }
 
 /// Batch similarity computation for finding best match
@@ -198,7 +198,7 @@ pub fn bind_optimized(a: &HV16, b: &HV16) -> HV16 {
 /// Optimized for the common case of finding the most similar vector
 /// in a collection. Uses early exit when a perfect match is found.
 #[inline]
-pub fn find_most_similar(query: &HV16, candidates: &[HV16]) -> Option<(usize, f32)> {
+pub fn find_most_similar(query: &BinaryHV, candidates: &[BinaryHV]) -> Option<(usize, f32)> {
     if candidates.is_empty() {
         return None;
     }
@@ -234,9 +234,9 @@ mod tests {
 
     #[test]
     fn test_bundle_optimized_matches_original() {
-        let vectors: Vec<HV16> = (0..10).map(|i| HV16::random(i)).collect();
+        let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
 
-        let original = HV16::bundle(&vectors);
+        let original = BinaryHV::bundle(&vectors);
         let optimized = bundle_optimized(&vectors);
 
         // Should produce identical results
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_permute_optimized_matches_original() {
-        let hv = HV16::random(42);
+        let hv = BinaryHV::random(42);
 
         // Test various shift amounts
         for shift in [0, 1, 7, 8, 15, 16, 100, 1000, 2047] {
@@ -262,8 +262,8 @@ mod tests {
 
     #[test]
     fn test_similarity_optimized_matches_original() {
-        let a = HV16::random(42);
-        let b = HV16::random(43);
+        let a = BinaryHV::random(42);
+        let b = BinaryHV::random(43);
 
         let original = a.similarity(&b);
         let optimized = similarity_optimized(&a, &b);
@@ -276,8 +276,8 @@ mod tests {
 
     #[test]
     fn test_bind_optimized_matches_original() {
-        let a = HV16::random(42);
-        let b = HV16::random(43);
+        let a = BinaryHV::random(42);
+        let b = BinaryHV::random(43);
 
         let original = a.bind(&b);
         let optimized = bind_optimized(&a, &b);
@@ -289,12 +289,12 @@ mod tests {
     fn test_bundle_optimized_performance() {
         use std::time::Instant;
 
-        let vectors: Vec<HV16> = (0..100).map(|i| HV16::random(i)).collect();
+        let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
 
         // Benchmark original
         let start = Instant::now();
         for _ in 0..100 {
-            let _ = HV16::bundle(&vectors);
+            let _ = BinaryHV::bundle(&vectors);
         }
         let original_time = start.elapsed();
 
@@ -324,7 +324,7 @@ mod tests {
     fn test_permute_optimized_performance() {
         use std::time::Instant;
 
-        let hv = HV16::random(42);
+        let hv = BinaryHV::random(42);
 
         // Benchmark original
         let start = Instant::now();

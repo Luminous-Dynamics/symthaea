@@ -598,7 +598,7 @@ impl PrototypeSpecification {
         // Header
         output.push_str(&"═".repeat(70));
         output.push('\n');
-        output.push_str(&format!("  SPARK ENGINE PROTOTYPE SPECIFICATION\n"));
+        output.push_str("  SPARK ENGINE PROTOTYPE SPECIFICATION\n");
         output.push_str(&format!("  Model: {}  Rev: {}  Date: {}\n",
                                  self.model.full_name(), self.revision, self.date));
         output.push_str(&"═".repeat(70));
@@ -622,7 +622,7 @@ impl PrototypeSpecification {
                                  self.operating_temp_range_k.0, self.operating_temp_range_k.1));
         output.push_str(&format!("  Design Lifetime:   {:.0} years\n", self.design_lifetime_years));
         output.push_str(&format!("  Predicted Life:    {:.1} years\n", self.predicted_lifetime_years));
-        output.push_str("\n");
+        output.push('\n');
 
         // Dimensions
         output.push_str("DIMENSIONAL SPECIFICATIONS\n");
@@ -634,7 +634,7 @@ impl PrototypeSpecification {
             output.push_str(&format!("{:30} {:>10.1} mm {:>8.1} mm {:>10.1} µm\n",
                                      dim.component, dim.nominal_mm, dim.tolerance_mm, dim.surface_finish_um));
         }
-        output.push_str("\n");
+        output.push('\n');
 
         // BOM
         output.push_str("BILL OF MATERIALS\n");
@@ -654,7 +654,7 @@ impl PrototypeSpecification {
                                  "Est. Labor", "", self.estimated_labor_cost_usd));
         output.push_str(&format!("{:34} {:>10} {:>12.0}\n",
                                  "EST. TOTAL", "", self.estimated_total_cost_usd));
-        output.push_str("\n");
+        output.push('\n');
 
         // Safety
         output.push_str("SAFETY ANALYSIS\n");
@@ -667,7 +667,7 @@ impl PrototypeSpecification {
                                      entry.hazard));
             output.push_str(&format!("    Mitigation: {}\n", entry.mitigation));
         }
-        output.push_str("\n");
+        output.push('\n');
 
         // Manufacturing
         output.push_str("MANUFACTURING PROCESS\n");
@@ -677,7 +677,7 @@ impl PrototypeSpecification {
             output.push_str(&format!("Step {}: {}\n", note.step, note.process));
             output.push_str(&format!("  {}\n", note.description));
         }
-        output.push_str("\n");
+        output.push('\n');
 
         // Regulatory
         output.push_str("REGULATORY COMPLIANCE\n");
@@ -687,7 +687,7 @@ impl PrototypeSpecification {
             output.push_str(&format!("• {}\n", note));
         }
 
-        output.push_str("\n");
+        output.push('\n');
         output.push_str(&"═".repeat(70));
         output.push_str("\n  END OF SPECIFICATION\n");
         output.push_str(&"═".repeat(70));

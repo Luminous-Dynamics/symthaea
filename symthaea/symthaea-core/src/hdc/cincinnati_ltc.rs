@@ -193,7 +193,7 @@ impl CincinnatiEstimator {
         };
 
         // Combine factors
-        (length_factor * 0.3 + accuracy_factor * 0.7).min(1.0).max(0.0)
+        (length_factor * 0.3 + accuracy_factor * 0.7).clamp(0.0, 1.0)
     }
 
     /// Get the delta signal for HDC binding
@@ -682,9 +682,7 @@ impl PoGMetrics {
         let accuracy_score = self.accuracy;
 
         // Weighted combination
-        (energy_score * 0.2 + storage_score * 0.2 + latency_score * 0.2 + accuracy_score * 0.4)
-            .min(1.0)
-            .max(0.0)
+        (energy_score * 0.2 + storage_score * 0.2 + latency_score * 0.2 + accuracy_score * 0.4).clamp(0.0, 1.0)
     }
 }
 

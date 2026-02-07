@@ -45,7 +45,7 @@ pub use signals::{PrincipledSignals, SignalComputer};
 pub use kosmic_state::{KosmicSong, SevenHarmonies, HarmonicState, MoralUncertainty, GisState, GisType};
 pub use memory::{EpisodicMemory, ThoughtTrace, UserEpistemicMirror};
 
-use symthaea_core::hdc::real_hv::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use crate::wisdom::WisdomState;
 
 /// The central experience integration bus
@@ -246,7 +246,7 @@ impl ExperienceBus {
     pub fn generate_with_experience(
         &mut self,
         _input: &str,
-        input_hdv: &RealHV,
+        input_hdv: &ContinuousHV,
         user_context: Option<&str>,
     ) -> ExperiencedThought {
         let start = std::time::Instant::now();
@@ -311,7 +311,7 @@ impl ExperienceBus {
     }
 
     /// Retrieve similar experiences from memory/database
-    fn retrieve_similar_experiences(&self, input_hdv: &RealHV) -> Vec<(&EpisodicMemory, f32)> {
+    fn retrieve_similar_experiences(&self, input_hdv: &ContinuousHV) -> Vec<(&EpisodicMemory, f32)> {
         let mut results = Vec::new();
 
         for exp in &self.memory_cache.experiences {
@@ -331,7 +331,7 @@ impl ExperienceBus {
     }
 
     /// Compute similarity between two HDVs
-    fn compute_similarity(&self, a: &RealHV, b: &[f32]) -> f32 {
+    fn compute_similarity(&self, a: &ContinuousHV, b: &[f32]) -> f32 {
         if a.values.len() != b.len() {
             return 0.0;
         }
@@ -350,7 +350,7 @@ impl ExperienceBus {
     /// Compute principled signals from context
     fn compute_signals(
         &self,
-        input_hdv: &RealHV,
+        input_hdv: &ContinuousHV,
         similar_experiences: &[(&EpisodicMemory, f32)],
     ) -> PrincipledSignals {
         // Prediction Error: How different is this from expected?
@@ -433,7 +433,7 @@ impl ExperienceBus {
     }
 
     /// Compute salience (goal relevance)
-    fn compute_salience(&self, _input_hdv: &RealHV) -> f32 {
+    fn compute_salience(&self, _input_hdv: &ContinuousHV) -> f32 {
         // For now, use harmonic activation as proxy for salience
         // Higher harmony activation = more salient
         self.kosmic_state.harmonies.max_activation()
@@ -708,7 +708,7 @@ mod tests {
         let bus = ExperienceBus::with_defaults();
 
         // With no experiences, prediction error should be high
-        let hdv = RealHV::random(16384, 42);
+        let hdv = ContinuousHV::random(16384, 42);
         let similar = bus.retrieve_similar_experiences(&hdv);
         let signals = bus.compute_signals(&hdv, &similar);
 
@@ -723,7 +723,7 @@ mod tests {
         bus.update_gis(GisType::UnknownUnknown, 0.9);
 
         // Recompute signals
-        let hdv = RealHV::random(16384, 42);
+        let hdv = ContinuousHV::random(16384, 42);
         let _ = bus.generate_with_experience("test", &hdv, None);
 
         // Check that CLARIFY was selected

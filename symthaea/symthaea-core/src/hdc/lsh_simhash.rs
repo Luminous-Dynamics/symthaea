@@ -7,7 +7,7 @@
 // - Similar vectors (low Hamming distance) → high probability of same hash
 // - Dissimilar vectors (high Hamming distance) → low probability of same hash
 
-use super::HV16;
+use super::BinaryHV;
 use std::collections::{HashMap, HashSet};
 
 /// SimHash configuration for binary vectors
@@ -122,7 +122,7 @@ impl SimHashTable {
     ///
     /// For each bit position in bit_positions, extract that bit from the vector
     /// and pack them into a single u64 hash value.
-    pub fn hash(&self, vector: &HV16) -> u64 {
+    pub fn hash(&self, vector: &BinaryHV) -> u64 {
         let mut hash_value = 0u64;
 
         for (i, &(byte_idx, bit_idx)) in self.bit_positions.iter().enumerate() {
@@ -140,18 +140,17 @@ impl SimHashTable {
     }
 
     /// Insert a vector into the hash table
-    pub fn insert(&mut self, vector_id: usize, vector: &HV16) {
+    pub fn insert(&mut self, vector_id: usize, vector: &BinaryHV) {
         let hash_value = self.hash(vector);
-        self.buckets.entry(hash_value).or_insert_with(Vec::new).push(vector_id);
+        self.buckets.entry(hash_value).or_default().push(vector_id);
     }
 
     /// Query the hash table for candidate similar vectors
-    pub fn query(&self, vector: &HV16) -> Vec<usize> {
+    pub fn query(&self, vector: &BinaryHV) -> Vec<usize> {
         let hash_value = self.hash(vector);
 
-        self.buckets.get(&hash_value)
-            .map(|ids| ids.clone())
-            .unwrap_or_else(Vec::new)
+        self.buckets.get(&hash_value).cloned()
+            .unwrap_or_default()
     }
 
     /// Get statistics about bucket distribution
@@ -217,7 +216,7 @@ impl SimHashIndex {
     }
 
     /// Insert a batch of vectors into the index
-    pub fn insert_batch(&mut self, vectors: &[HV16]) {
+    pub fn insert_batch(&mut self, vectors: &[BinaryHV]) {
         for (id, vector) in vectors.iter().enumerate() {
             for table in &mut self.tables {
                 table.insert(id, vector);
@@ -232,9 +231,9 @@ impl SimHashIndex {
     /// similarity to all vectors.
     pub fn query_approximate(
         &self,
-        query: &HV16,
+        query: &BinaryHV,
         k: usize,
-        vectors: &[HV16],
+        vectors: &[BinaryHV],
     ) -> Vec<(usize, f32)> {
         // Step 1: Collect candidate vectors from all tables
         let mut candidates = HashSet::new();
@@ -262,7 +261,7 @@ impl SimHashIndex {
     }
 
     /// Get number of candidates that would be examined for a query
-    pub fn count_candidates(&self, query: &HV16) -> usize {
+    pub fn count_candidates(&self, query: &BinaryHV) -> usize {
         let mut candidates = HashSet::new();
 
         for table in &self.tables {
@@ -313,7 +312,7 @@ mod tests {
     #[test]
     fn test_simhash_deterministic() {
         let table = SimHashTable::new(10, 42);
-        let v1 = HV16::random(1);
+        let v1 = BinaryHV::random(1);
 
         let hash1 = table.hash(&v1);
         let hash2 = table.hash(&v1);
@@ -325,7 +324,7 @@ mod tests {
     fn test_simhash_different_seeds() {
         let table1 = SimHashTable::new(10, 42);
         let table2 = SimHashTable::new(10, 43);
-        let v1 = HV16::random(1);
+        let v1 = BinaryHV::random(1);
 
         let hash1 = table1.hash(&v1);
         let hash2 = table2.hash(&v1);
@@ -340,7 +339,7 @@ mod tests {
         let table = SimHashTable::new(10, 42);
 
         // Create a vector and a very similar one (flip 1 bit)
-        let v1 = HV16::random(1);
+        let v1 = BinaryHV::random(1);
         let mut v2 = v1.clone();
         v2.0[0] ^= 0b00000001;  // Flip one bit
 
@@ -357,10 +356,10 @@ mod tests {
         let config = SimHashConfig::balanced();
         let mut index = SimHashIndex::new(config);
 
-        let vectors: Vec<HV16> = (0..1000).map(|i| HV16::random(i as u64)).collect();
+        let vectors: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i as u64)).collect();
         index.insert_batch(&vectors);
 
-        let query = HV16::random(99999);
+        let query = BinaryHV::random(99999);
         let results = index.query_approximate(&query, 10, &vectors);
 
         assert_eq!(results.len(), 10, "Should return 10 results");
@@ -376,7 +375,7 @@ mod tests {
         let config = SimHashConfig::balanced();
         let mut index = SimHashIndex::new(config);
 
-        let vectors: Vec<HV16> = (0..1000).map(|i| HV16::random(i as u64)).collect();
+        let vectors: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i as u64)).collect();
         index.insert_batch(&vectors);
 
         let stats = index.index_stats();
@@ -393,10 +392,10 @@ mod tests {
         let config = SimHashConfig::balanced();
         let mut index = SimHashIndex::new(config);
 
-        let vectors: Vec<HV16> = (0..10000).map(|i| HV16::random(i as u64)).collect();
+        let vectors: Vec<BinaryHV> = (0..10000).map(|i| BinaryHV::random(i as u64)).collect();
         index.insert_batch(&vectors);
 
-        let query = HV16::random(99999);
+        let query = BinaryHV::random(99999);
         let num_candidates = index.count_candidates(&query);
 
         println!("Candidates: {} out of {} ({}%)",
@@ -413,7 +412,7 @@ mod tests {
         println!("\n=== Testing SimHash with SIMILAR vectors ===\n");
 
         // Create a base vector
-        let base = HV16::random(42);
+        let base = BinaryHV::random(42);
 
         // Create 1000 vectors that are SIMILAR to base (flip only 10 bits each = ~0.5% different)
         let mut vectors = vec![base.clone()];

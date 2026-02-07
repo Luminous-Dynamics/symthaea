@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use super::seven_harmonies::Harmony;
 
 /// Configuration for the value feedback loop
@@ -132,7 +132,7 @@ pub struct ValueEstimate {
     /// Pattern identifier
     pub pattern_id: String,
     /// Pattern embedding
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
     /// Current value estimate
     pub value: f32,
     /// Uncertainty (variance)
@@ -158,7 +158,12 @@ pub struct ValueFeedbackLoop {
     momentum: HashMap<String, f32>,
     /// Statistics
     stats: FeedbackLoopStats,
+    /// Per-harmony importance adjustments (learned from feedback)
+    importance_adjustments: HashMap<String, f64>,
 }
+
+/// Summary of feedback loop learning (alias for stats)
+pub type FeedbackLoopSummary = FeedbackLoopStats;
 
 /// Statistics for the feedback loop
 #[derive(Debug, Clone, Default)]
@@ -185,11 +190,12 @@ impl ValueFeedbackLoop {
             next_id: 1,
             momentum: HashMap::new(),
             stats: FeedbackLoopStats::default(),
+            importance_adjustments: HashMap::new(),
         }
     }
 
     /// Register a pattern for value estimation
-    pub fn register_pattern(&mut self, pattern_id: impl Into<String>, embedding: RealHV) {
+    pub fn register_pattern(&mut self, pattern_id: impl Into<String>, embedding: ContinuousHV) {
         let id = pattern_id.into();
         let estimate = ValueEstimate {
             pattern_id: id.clone(),
@@ -345,6 +351,80 @@ impl ValueFeedbackLoop {
     pub fn clear_history(&mut self) {
         self.history.clear();
     }
+
+    /// Record user feedback on a value decision (high-level interface)
+    ///
+    /// Accepts any eval_result and decision types to avoid circular dependencies.
+    /// The feedback loop primarily uses the rating to adjust importance weights.
+    pub fn record_user_feedback<E, D>(
+        &mut self,
+        action: &str,
+        _eval_result: &E,
+        _decision: &D,
+        rating: f64,
+        _phi: f64,
+        _comment: Option<String>,
+    ) {
+        let signal = self.create_signal(action, FeedbackType::Explicit, rating as f32);
+        self.process_feedback(signal);
+
+        // Update per-harmony importance based on feedback
+        let adjustment_delta = (rating - 0.5) * 2.0 * self.config.learning_rate as f64;
+        for harmony in Harmony::all() {
+            let name = harmony.name().to_string();
+            let current = self.importance_adjustments.get(&name).copied().unwrap_or(1.0);
+            let new_val = (current + adjustment_delta).clamp(0.5, 2.0);
+            self.importance_adjustments.insert(name, new_val);
+        }
+    }
+
+    /// Record self-reflection feedback from meta-cognition
+    pub fn record_self_reflection<E, D>(
+        &mut self,
+        action: &str,
+        _eval_result: &E,
+        _decision: &D,
+        phi_change: f64,
+        coherence_change: f64,
+        _phi: f64,
+    ) {
+        let value = (phi_change + coherence_change) / 2.0;
+        let signal = self.create_signal(action, FeedbackType::SelfAssessment, value as f32);
+        self.process_feedback(signal);
+    }
+
+    /// Get learned importance adjustment for a harmony
+    ///
+    /// Returns a multiplier: 1.0 = no adjustment, >1.0 = more important, <1.0 = less important
+    pub fn get_importance_adjustment(&self, harmony: &Harmony) -> f64 {
+        self.importance_adjustments
+            .get(harmony.name())
+            .copied()
+            .unwrap_or(1.0)
+    }
+
+    /// Get all learned importance adjustments (keyed by harmony name)
+    pub fn get_all_adjustments(&self) -> &HashMap<String, f64> {
+        &self.importance_adjustments
+    }
+
+    /// Get number of learning data points
+    pub fn learning_data_count(&self) -> u64 {
+        self.stats.updates_applied
+    }
+
+    /// Get summary of feedback loop learning
+    pub fn summary(&self) -> FeedbackLoopSummary {
+        self.stats.clone()
+    }
+
+    /// Apply decay to learned adjustments, moving them toward 1.0 (neutral)
+    pub fn apply_decay(&mut self) {
+        let decay = self.config.discount_factor as f64;
+        for val in self.importance_adjustments.values_mut() {
+            *val = 1.0 + (*val - 1.0) * decay;
+        }
+    }
 }
 
 impl Default for ValueFeedbackLoop {
@@ -366,14 +446,14 @@ mod tests {
     #[test]
     fn test_pattern_registration() {
         let mut loop_ = ValueFeedbackLoop::default();
-        loop_.register_pattern("action1", RealHV::random(512, 42));
+        loop_.register_pattern("action1", ContinuousHV::random(512, 42));
         assert!(loop_.get_estimate("action1").is_some());
     }
 
     #[test]
     fn test_feedback_processing() {
         let mut loop_ = ValueFeedbackLoop::default();
-        loop_.register_pattern("action1", RealHV::random(512, 42));
+        loop_.register_pattern("action1", ContinuousHV::random(512, 42));
 
         let signal = loop_.create_signal("action1", FeedbackType::Explicit, 0.8);
         let result = loop_.process_feedback(signal);
@@ -385,8 +465,8 @@ mod tests {
     #[test]
     fn test_temporal_difference() {
         let mut loop_ = ValueFeedbackLoop::default();
-        loop_.register_pattern("state1", RealHV::random(512, 42));
-        loop_.register_pattern("state2", RealHV::random(512, 42));
+        loop_.register_pattern("state1", ContinuousHV::random(512, 42));
+        loop_.register_pattern("state2", ContinuousHV::random(512, 42));
 
         let td_error = loop_.temporal_difference_update("state1", "state2", 1.0);
         // TD error is always a valid float (assertion always passes but kept for documentation)

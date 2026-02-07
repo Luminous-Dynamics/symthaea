@@ -47,7 +47,7 @@
 //! - Embodiment → Φ amplification (#17)
 //! - Causal efficacy → measurable effects (#14)
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 
 /// Integration test configuration
@@ -85,8 +85,8 @@ impl Default for IntegrationConfig {
 pub struct Stimulus {
     /// Unique identifier
     pub id: String,
-    /// Feature representations (one HV16 per feature dimension)
-    pub features: Vec<HV16>,
+    /// Feature representations (one BinaryHV per feature dimension)
+    pub features: Vec<BinaryHV>,
     /// Feature phases for binding (radians)
     pub phases: Vec<f64>,
     /// Salience (bottom-up attention strength)
@@ -98,8 +98,8 @@ pub struct Stimulus {
 impl Stimulus {
     /// Create a new stimulus with random features
     pub fn new(id: &str, num_features: usize, salience: f64, relevance: f64, seed: u64) -> Self {
-        let features: Vec<HV16> = (0..num_features)
-            .map(|i| HV16::random(seed + i as u64))
+        let features: Vec<BinaryHV> = (0..num_features)
+            .map(|i| BinaryHV::random(seed + i as u64))
             .collect();
 
         // Synchronized phases (high binding potential)
@@ -118,8 +118,8 @@ impl Stimulus {
 
     /// Create a desynchronized stimulus (low binding potential)
     pub fn new_desynchronized(id: &str, num_features: usize, seed: u64) -> Self {
-        let features: Vec<HV16> = (0..num_features)
-            .map(|i| HV16::random(seed + i as u64))
+        let features: Vec<BinaryHV> = (0..num_features)
+            .map(|i| BinaryHV::random(seed + i as u64))
             .collect();
 
         // Desynchronized phases (low binding potential)
@@ -238,7 +238,7 @@ pub struct ProcessingResult {
     /// Metrics at each stage
     pub stage_metrics: Vec<(ProcessingStage, StageMetrics)>,
     /// Final combined representation
-    pub final_representation: Option<HV16>,
+    pub final_representation: Option<BinaryHV>,
     /// Processing time (simulated cycles)
     pub processing_cycles: usize,
     /// Explanation of outcome
@@ -251,9 +251,9 @@ pub struct ConsciousnessIntegration {
     /// Configuration
     pub config: IntegrationConfig,
     /// Current goal representation (for top-down attention)
-    pub current_goal: Option<HV16>,
+    pub current_goal: Option<BinaryHV>,
     /// Working memory contents (conscious items)
-    pub working_memory: Vec<HV16>,
+    pub working_memory: Vec<BinaryHV>,
     /// Processing history
     pub history: Vec<ProcessingResult>,
     /// Current simulated substrate
@@ -276,7 +276,7 @@ impl ConsciousnessIntegration {
     }
 
     /// Set current goal for top-down attention
-    pub fn set_goal(&mut self, goal: HV16) {
+    pub fn set_goal(&mut self, goal: BinaryHV) {
         self.current_goal = Some(goal);
     }
 
@@ -872,7 +872,7 @@ mod tests {
 
         let stimulus = Stimulus::new("test", 4, 0.9, 0.9, 42);
         system.process(&stimulus);
-        system.set_goal(HV16::random(999));
+        system.set_goal(BinaryHV::random(999));
 
         assert!(!system.working_memory.is_empty());
         assert!(!system.history.is_empty());

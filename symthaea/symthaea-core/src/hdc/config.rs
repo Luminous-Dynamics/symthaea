@@ -306,7 +306,7 @@ impl DimensionMapping {
 // STT DIMENSION CONSTANTS (for symthaea-stt interop)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// STT dimension: 2,048 bits (legacy HV16)
+/// STT dimension: 2,048 bits (legacy BinaryHV)
 ///
 /// This is the dimension used by symthaea-stt for speech recognition.
 /// The projection layer bridges this to the core dimension.

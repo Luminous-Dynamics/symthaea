@@ -721,9 +721,7 @@ impl EconomicEngine {
 
             if increasing {
                 if lcoe_mid > target { hi = mid; } else { lo = mid; }
-            } else {
-                if lcoe_mid > target { lo = mid; } else { hi = mid; }
-            }
+            } else if lcoe_mid > target { lo = mid; } else { hi = mid; }
         }
 
         (lo + hi) / 2.0

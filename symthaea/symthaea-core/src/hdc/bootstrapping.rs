@@ -18,7 +18,7 @@
 //!                           ConsciousnessGraph (Φ measurement)
 //! ```
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use std::collections::HashMap;
 
@@ -104,7 +104,7 @@ pub struct PrimitiveBootstrapper {
     /// Reference to the global primitive system
     system: &'static PrimitiveSystem,
     /// Cached primitive HVs by category
-    category_cache: HashMap<ReasoningCategory, Vec<(String, HV16)>>,
+    category_cache: HashMap<ReasoningCategory, Vec<(String, BinaryHV)>>,
 }
 
 impl PrimitiveBootstrapper {
@@ -237,17 +237,17 @@ impl PrimitiveBootstrapper {
     }
 
     /// Get primitive by name as (name, hv) tuple
-    fn get_primitive(&self, name: &str) -> Option<(String, HV16)> {
-        self.system.get(name).map(|p| (p.name.clone(), p.encoding.clone()))
+    fn get_primitive(&self, name: &str) -> Option<(String, BinaryHV)> {
+        self.system.get(name).map(|p| (p.name.clone(), p.encoding))
     }
 
     /// Get primitives for a reasoning category
-    pub fn primitives_for_category(&self, category: ReasoningCategory) -> &[(String, HV16)] {
+    pub fn primitives_for_category(&self, category: ReasoningCategory) -> &[(String, BinaryHV)] {
         self.category_cache.get(&category).map(|v| v.as_slice()).unwrap_or(&[])
     }
 
     /// Get all primitives relevant to an MMLU subject
-    pub fn primitives_for_subject(&self, subject: &str) -> Vec<(String, HV16)> {
+    pub fn primitives_for_subject(&self, subject: &str) -> Vec<(String, BinaryHV)> {
         let categories = ReasoningCategory::for_subject(subject);
         let mut primitives = Vec::new();
         let mut seen = std::collections::HashSet::new();
@@ -256,7 +256,7 @@ impl PrimitiveBootstrapper {
             for (name, hv) in self.primitives_for_category(category) {
                 if !seen.contains(name) {
                     seen.insert(name.clone());
-                    primitives.push((name.clone(), hv.clone()));
+                    primitives.push((name.clone(), *hv));
                 }
             }
         }
@@ -266,20 +266,20 @@ impl PrimitiveBootstrapper {
 
     /// Create an initial working memory HV for a reasoning task
     /// by bundling relevant primitives
-    pub fn bootstrap_working_memory(&self, subject: &str, question_hv: &HV16) -> HV16 {
+    pub fn bootstrap_working_memory(&self, subject: &str, question_hv: &BinaryHV) -> BinaryHV {
         let primitives = self.primitives_for_subject(subject);
 
         if primitives.is_empty() {
-            return question_hv.clone();
+            return *question_hv;
         }
 
         // Bundle question with relevant primitive encodings
-        let mut hvs: Vec<HV16> = vec![question_hv.clone()];
+        let mut hvs: Vec<BinaryHV> = vec![*question_hv];
         for (_, hv) in primitives.iter().take(10) { // Limit to top 10 most relevant
-            hvs.push(hv.clone());
+            hvs.push(*hv);
         }
 
-        HV16::bundle(&hvs)
+        BinaryHV::bundle(&hvs)
     }
 
     /// Get the total number of primitives available
@@ -357,7 +357,7 @@ mod tests {
     #[test]
     fn test_bootstrap_working_memory() {
         let bootstrapper = PrimitiveBootstrapper::new();
-        let question_hv = HV16::random(42);
+        let question_hv = BinaryHV::random(42);
 
         let bootstrapped = bootstrapper.bootstrap_working_memory("mathematics", &question_hv);
 

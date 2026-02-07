@@ -1,23 +1,19 @@
 //! Unified Hyperdimensional Computing Trait
 //!
 //! This module provides a common interface for all hypervector implementations:
-//! - `HV16`: Binary hypervectors (byte-packed)
-//! - `SimdHV16`: SIMD-optimized binary hypervectors (u64-packed)
-//! - `RealHV`: Real-valued hypervectors (f32)
+//! - `BinaryHV`: Binary hypervectors (byte-packed, SIMD-accelerated)
+//! - `ContinuousHV`: Real-valued hypervectors (f32)
 //!
 //! # Example
 //! ```ignore
-//! use symthaea::hdc::{HyperdimensionalVector, HV16, SimdHV16};
+//! use symthaea::hdc::{HyperdimensionalVector, BinaryHV};
 //!
 //! fn process_any_hv<H: HyperdimensionalVector>(hv: &H) -> f32 {
 //!     hv.density()
 //! }
 //!
-//! let binary = HV16::random(42);
-//! let simd = SimdHV16::random(42);
-//!
+//! let binary = BinaryHV::random(42);
 //! println!("Binary density: {}", process_any_hv(&binary));
-//! println!("SIMD density: {}", process_any_hv(&simd));
 //! ```
 
 use super::HDC_DIMENSION;
@@ -72,9 +68,8 @@ pub trait Permutable: HyperdimensionalVector {
     fn permute(&self, shift: usize) -> Self;
 }
 
-#[allow(deprecated)]
-/// Implement the traits for SimdHV16
-impl HyperdimensionalVector for super::simd_hv16::SimdHV16 {
+/// Implement the traits for BinaryHV
+impl HyperdimensionalVector for super::binary_hv::BinaryHV {
     fn random(seed: u64) -> Self {
         Self::random(seed)
     }
@@ -100,54 +95,13 @@ impl HyperdimensionalVector for super::simd_hv16::SimdHV16 {
     }
 }
 
-#[allow(deprecated)]
-impl Bundleable for super::simd_hv16::SimdHV16 {
+impl Bundleable for super::binary_hv::BinaryHV {
     fn bundle(vectors: &[Self]) -> Self {
         Self::bundle(vectors)
     }
 }
 
-#[allow(deprecated)]
-impl Permutable for super::simd_hv16::SimdHV16 {
-    fn permute(&self, shift: usize) -> Self {
-        Self::permute(self, shift)
-    }
-}
-
-/// Implement the traits for HV16
-impl HyperdimensionalVector for super::binary_hv::HV16 {
-    fn random(seed: u64) -> Self {
-        Self::random(seed)
-    }
-
-    fn zero() -> Self {
-        Self::zero()
-    }
-
-    fn bind(&self, other: &Self) -> Self {
-        Self::bind(self, other)
-    }
-
-    fn similarity(&self, other: &Self) -> f32 {
-        Self::similarity(self, other)
-    }
-
-    fn density(&self) -> f32 {
-        self.popcount() as f32 / Self::DIM as f32
-    }
-
-    fn hamming_distance(&self, other: &Self) -> u32 {
-        Self::hamming_distance(self, other)
-    }
-}
-
-impl Bundleable for super::binary_hv::HV16 {
-    fn bundle(vectors: &[Self]) -> Self {
-        Self::bundle(vectors)
-    }
-}
-
-impl Permutable for super::binary_hv::HV16 {
+impl Permutable for super::binary_hv::BinaryHV {
     fn permute(&self, shift: usize) -> Self {
         Self::permute(self, shift)
     }
@@ -205,36 +159,24 @@ pub fn similar_vectors<H: HyperdimensionalVector>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::{binary_hv::HV16, simd_hv16::SimdHV16};
+    use crate::hdc::binary_hv::BinaryHV;
 
     #[test]
-    fn test_generic_algorithm_with_hv16() {
-        let a = HV16::random(1);
-        let b = HV16::random(2);
-        let c = HV16::random(3);
+    fn test_generic_algorithm_with_binary_hv() {
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
+        let c = BinaryHV::random(3);
 
         let encoded = encode_sequence(&[a.clone(), b.clone(), c.clone()]);
 
-        // Encoded should be a valid HV16
-        assert!(encoded.density() > 0.4 && encoded.density() < 0.6);
-    }
-
-    #[test]
-    fn test_generic_algorithm_with_simd() {
-        let a = SimdHV16::random(1);
-        let b = SimdHV16::random(2);
-        let c = SimdHV16::random(3);
-
-        let encoded = encode_sequence(&[a.clone(), b.clone(), c.clone()]);
-
-        // Encoded should be a valid SimdHV16
+        // Encoded should be a valid BinaryHV
         assert!(encoded.density() > 0.4 && encoded.density() < 0.6);
     }
 
     #[test]
     fn test_nearest_neighbor() {
-        let query = SimdHV16::random(0);
-        let candidates: Vec<_> = (1..10).map(|i| SimdHV16::random(i)).collect();
+        let query = BinaryHV::random(0);
+        let candidates: Vec<_> = (1..10).map(|i| BinaryHV::random(i)).collect();
 
         let result = nearest_neighbor(&query, &candidates);
         assert!(result.is_some());
@@ -245,16 +187,9 @@ mod tests {
     }
 
     #[test]
-    fn test_trait_consistency() {
-        // Same seed should give same random vector properties
-        let hv = HV16::random(42);
-        let simd = SimdHV16::random(42);
-
-        // Both should have ~0.5 density (statistical property)
-        let hv_density = <HV16 as HyperdimensionalVector>::density(&hv);
-        let simd_density = <SimdHV16 as HyperdimensionalVector>::density(&simd);
-
-        assert!((hv_density - 0.5).abs() < 0.05);
-        assert!((simd_density - 0.5).abs() < 0.05);
+    fn test_density_property() {
+        let hv = BinaryHV::random(42);
+        let density = <BinaryHV as HyperdimensionalVector>::density(&hv);
+        assert!((density - 0.5).abs() < 0.05);
     }
 }

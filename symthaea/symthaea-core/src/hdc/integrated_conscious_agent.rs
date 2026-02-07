@@ -56,7 +56,7 @@
 //! - Prediction errors (attend to surprising things)
 //! - Metacognitive assessment (attend to what needs attention)
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::unified_consciousness_engine::{
     EngineConfig, ConsciousnessDimensions,
 };
@@ -128,7 +128,7 @@ pub struct IntegratedConsciousAgent {
     /// History of integrated updates
     history: VecDeque<IntegratedUpdate>,
     /// Current dominant experience
-    dominant_experience: Option<RealHV>,
+    dominant_experience: Option<ContinuousHV>,
     /// Working memory - limited capacity buffer for active processing
     working_memory: WorkingMemory,
     /// Emotional state tracking
@@ -147,9 +147,9 @@ pub struct WorkingMemory {
     /// Central executive - controls attention allocation
     central_executive_load: f64,
     /// Phonological loop - verbal/acoustic information
-    phonological_buffer: VecDeque<RealHV>,
+    phonological_buffer: VecDeque<ContinuousHV>,
     /// Visuospatial sketchpad - visual/spatial information
-    visuospatial_buffer: VecDeque<RealHV>,
+    visuospatial_buffer: VecDeque<ContinuousHV>,
     /// Episodic buffer - integrates information from multiple sources
     episodic_buffer: VecDeque<WorkingMemoryItem>,
     /// Maximum capacity per buffer (Miller's 7±2)
@@ -162,7 +162,7 @@ pub struct WorkingMemory {
 #[derive(Clone, Debug)]
 pub struct WorkingMemoryItem {
     /// The content vector
-    pub content: RealHV,
+    pub content: ContinuousHV,
     /// When this item was added
     pub timestamp: usize,
     /// Current activation level (0-1)
@@ -195,7 +195,7 @@ impl WorkingMemory {
     }
 
     /// Add item to episodic buffer (the integration hub)
-    pub fn add_to_episodic(&mut self, content: RealHV, source: MemorySource, goal_relevance: f64, timestamp: usize) {
+    pub fn add_to_episodic(&mut self, content: ContinuousHV, source: MemorySource, goal_relevance: f64, timestamp: usize) {
         // If at capacity, remove least activated item
         if self.episodic_buffer.len() >= self.capacity {
             // Find and remove lowest activation item
@@ -218,7 +218,7 @@ impl WorkingMemory {
     }
 
     /// Update working memory (decay + rehearsal)
-    pub fn update(&mut self, current_focus: Option<&RealHV>) {
+    pub fn update(&mut self, current_focus: Option<&ContinuousHV>) {
         for item in self.episodic_buffer.iter_mut() {
             // Natural decay
             item.activation *= 1.0 - self.decay_rate;
@@ -273,7 +273,7 @@ impl WorkingMemory {
     ///
     /// The phonological loop handles verbal-linguistic information through
     /// subvocal rehearsal. Items decay quickly without active rehearsal.
-    pub fn add_to_phonological(&mut self, content: RealHV) {
+    pub fn add_to_phonological(&mut self, content: ContinuousHV) {
         if self.phonological_buffer.len() >= self.capacity {
             self.phonological_buffer.pop_front();
         }
@@ -284,16 +284,16 @@ impl WorkingMemory {
     ///
     /// Subvocal rehearsal maintains items in the phonological loop.
     /// Returns the rehearsed items bundled together.
-    pub fn rehearse_phonological(&self) -> Option<RealHV> {
+    pub fn rehearse_phonological(&self) -> Option<ContinuousHV> {
         if self.phonological_buffer.is_empty() {
             return None;
         }
-        let owned: Vec<RealHV> = self.phonological_buffer.iter().cloned().collect();
-        Some(RealHV::bundle(&owned))
+        let owned: Vec<ContinuousHV> = self.phonological_buffer.iter().cloned().collect();
+        Some(ContinuousHV::bundle_owned(&owned))
     }
 
     /// Get phonological buffer contents
-    pub fn phonological_contents(&self) -> &VecDeque<RealHV> {
+    pub fn phonological_contents(&self) -> &VecDeque<ContinuousHV> {
         &self.phonological_buffer
     }
 
@@ -305,7 +305,7 @@ impl WorkingMemory {
     ///
     /// The visuospatial sketchpad handles visual imagery and spatial
     /// relationships. It supports mental imagery and spatial reasoning.
-    pub fn add_to_visuospatial(&mut self, content: RealHV) {
+    pub fn add_to_visuospatial(&mut self, content: ContinuousHV) {
         if self.visuospatial_buffer.len() >= self.capacity {
             self.visuospatial_buffer.pop_front();
         }
@@ -316,7 +316,7 @@ impl WorkingMemory {
     ///
     /// Applies a transformation vector to all items in the sketchpad.
     /// This models mental manipulation of visual/spatial representations.
-    pub fn transform_visuospatial(&mut self, transformation: &RealHV) {
+    pub fn transform_visuospatial(&mut self, transformation: &ContinuousHV) {
         for item in self.visuospatial_buffer.iter_mut() {
             *item = item.bind(transformation);
         }
@@ -325,16 +325,16 @@ impl WorkingMemory {
     /// Get combined visuospatial representation
     ///
     /// Returns a single vector representing the current spatial scene.
-    pub fn visuospatial_scene(&self) -> Option<RealHV> {
+    pub fn visuospatial_scene(&self) -> Option<ContinuousHV> {
         if self.visuospatial_buffer.is_empty() {
             return None;
         }
-        let owned: Vec<RealHV> = self.visuospatial_buffer.iter().cloned().collect();
-        Some(RealHV::bundle(&owned))
+        let owned: Vec<ContinuousHV> = self.visuospatial_buffer.iter().cloned().collect();
+        Some(ContinuousHV::bundle_owned(&owned))
     }
 
     /// Get visuospatial buffer contents
-    pub fn visuospatial_contents(&self) -> &VecDeque<RealHV> {
+    pub fn visuospatial_contents(&self) -> &VecDeque<ContinuousHV> {
         &self.visuospatial_buffer
     }
 
@@ -476,7 +476,7 @@ pub struct AttentionGoal {
     /// Goal description
     pub name: String,
     /// Target pattern to attend to
-    pub target: RealHV,
+    pub target: ContinuousHV,
     /// Priority (0-1)
     pub priority: f64,
     /// Is this goal currently active?
@@ -539,7 +539,7 @@ pub struct SelfModelSummary {
 #[derive(Clone, Debug)]
 pub struct PhenomenalContent {
     /// The bound, attended experience
-    pub experience: RealHV,
+    pub experience: ContinuousHV,
     /// Qualitative description
     pub description: String,
     /// Intensity of experience (0-1)
@@ -646,7 +646,7 @@ impl IntegratedConsciousAgent {
     }
 
     /// Process sensory input through the complete conscious system
-    pub fn process(&mut self, sensory_input: &RealHV) -> IntegratedUpdate {
+    pub fn process(&mut self, sensory_input: &ContinuousHV) -> IntegratedUpdate {
         self.step += 1;
 
         // ═══════════════════════════════════════════════════════════════════
@@ -795,7 +795,7 @@ impl IntegratedConsciousAgent {
     }
 
     /// Compute salience of input (how attention-grabbing)
-    fn compute_salience(&self, input: &RealHV) -> f64 {
+    fn compute_salience(&self, input: &ContinuousHV) -> f64 {
         // Base salience from input magnitude (L2 norm)
         let magnitude: f32 = input.values.iter().map(|x| x * x).sum::<f32>().sqrt();
         let magnitude_salience = (magnitude / 10.0).min(1.0) as f64;
@@ -815,7 +815,7 @@ impl IntegratedConsciousAgent {
     }
 
     /// Compute how relevant input is to current goals
-    fn compute_goal_relevance(&self, input: &RealHV) -> f64 {
+    fn compute_goal_relevance(&self, input: &ContinuousHV) -> f64 {
         if self.goals.is_empty() {
             return 0.5;
         }
@@ -844,7 +844,7 @@ impl IntegratedConsciousAgent {
     }
 
     /// Create attended content from input and attention result
-    fn create_attended_content(&self, input: &RealHV, attention: &AttentionAllocation) -> RealHV {
+    fn create_attended_content(&self, input: &ContinuousHV, attention: &AttentionAllocation) -> ContinuousHV {
         // Modulate input by attention intensity
         let attention_weight = attention.mode.intensity();
         let attended = input.scale(attention_weight as f32);
@@ -914,7 +914,7 @@ impl IntegratedConsciousAgent {
     /// Create phenomenal content description
     fn create_phenomenal_content(
         &self,
-        experience: &RealHV,
+        experience: &ContinuousHV,
         self_update: &SelfAwareUpdate,
         attention: &AttentionAllocation,
     ) -> PhenomenalContent {
@@ -1181,7 +1181,7 @@ impl IntegratedConsciousAgent {
     }
 
     /// Add a goal that can direct attention
-    pub fn add_goal(&mut self, name: &str, target: RealHV, priority: f64) {
+    pub fn add_goal(&mut self, name: &str, target: ContinuousHV, priority: f64) {
         self.goals.push(AttentionGoal {
             name: name.to_string(),
             target,
@@ -1200,7 +1200,7 @@ impl IntegratedConsciousAgent {
     }
 
     /// Get current phenomenal experience
-    pub fn current_experience(&self) -> Option<&RealHV> {
+    pub fn current_experience(&self) -> Option<&ContinuousHV> {
         self.dominant_experience.as_ref()
     }
 
@@ -1455,7 +1455,7 @@ impl IntegratedConsciousAgent {
     /// into the episodic buffer for current processing
     pub fn import_from_hippocampus(&mut self, memories: Vec<MemoryImport>) {
         for memory in memories {
-            let content = RealHV::from_values(memory.content_vector);
+            let content = ContinuousHV::from_values(memory.content_vector);
             let goal_relevance = self.compute_goal_relevance(&content);
 
             self.working_memory.add_to_episodic(
@@ -2314,7 +2314,7 @@ mod tests {
         println!("═══════════════════════════════════════════════════════════════\n");
 
         for i in 0..20 {
-            let input = RealHV::random(1024, i * 100);
+            let input = ContinuousHV::random(1024, i * 100);
             let update = agent.process(&input);
 
             if i % 4 == 0 {
@@ -2337,7 +2337,7 @@ mod tests {
         let mut agent = IntegratedConsciousAgent::new(config);
 
         // Add a goal
-        let goal_target = RealHV::random(1024, 999);
+        let goal_target = ContinuousHV::random(1024, 999);
         agent.add_goal("find_pattern", goal_target.clone(), 0.9);
 
         println!("\n═══════════════════════════════════════════════════════════════");
@@ -2348,10 +2348,10 @@ mod tests {
         for i in 0..15 {
             let input = if i % 3 == 0 {
                 // Similar to goal
-                goal_target.add(&RealHV::random(1024, i * 100).scale(0.2)).normalize()
+                goal_target.add(&ContinuousHV::random(1024, i * 100).scale(0.2)).normalize()
             } else {
                 // Random
-                RealHV::random(1024, i * 100)
+                ContinuousHV::random(1024, i * 100)
             };
 
             let update = agent.process(&input);
@@ -2384,10 +2384,10 @@ mod tests {
         println!("═══════════════════════════════════════════════════════════════\n");
 
         // Create continuous experience (similar inputs)
-        let base = RealHV::random(1024, 42);
+        let base = ContinuousHV::random(1024, 42);
 
         for i in 0..20 {
-            let noise = RealHV::random(1024, i * 100).scale(0.15);
+            let noise = ContinuousHV::random(1024, i * 100).scale(0.15);
             let input = base.add(&noise).normalize();
 
             let update = agent.process(&input);
@@ -2414,7 +2414,7 @@ mod tests {
 
         // Add items up to capacity
         for i in 0..7 {
-            let content = RealHV::random(1024, i as u64);
+            let content = ContinuousHV::random(1024, i as u64);
             wm.add_to_episodic(content, MemorySource::Perception, 0.5, i);
         }
 
@@ -2422,7 +2422,7 @@ mod tests {
         assert!(!wm.is_overloaded());
 
         // Add one more - should trigger removal of lowest activation item
-        let overflow = RealHV::random(1024, 100);
+        let overflow = ContinuousHV::random(1024, 100);
         wm.add_to_episodic(overflow, MemorySource::Perception, 0.5, 7);
 
         assert_eq!(wm.episodic_buffer.len(), 7); // Still at capacity
@@ -2434,7 +2434,7 @@ mod tests {
     fn test_working_memory_decay() {
         let mut wm = WorkingMemory::new(7);
 
-        let content = RealHV::random(1024, 42);
+        let content = ContinuousHV::random(1024, 42);
         wm.add_to_episodic(content.clone(), MemorySource::Perception, 0.8, 0);
 
         let initial_activation = wm.episodic_buffer.back().unwrap().activation;
@@ -2454,7 +2454,7 @@ mod tests {
     fn test_working_memory_rehearsal() {
         let mut wm = WorkingMemory::new(7);
 
-        let content = RealHV::random(1024, 42);
+        let content = ContinuousHV::random(1024, 42);
         wm.add_to_episodic(content.clone(), MemorySource::Perception, 0.8, 0);
 
         // Let it decay first
@@ -2589,7 +2589,7 @@ mod tests {
 
         // Process a few inputs to build up state
         for i in 0..5 {
-            let input = RealHV::random(1024, i * 100);
+            let input = ContinuousHV::random(1024, i * 100);
             agent.process(&input);
         }
 
@@ -2617,7 +2617,7 @@ mod tests {
         let mut agent = IntegratedConsciousAgent::new(config);
 
         // Add goals for warmth
-        let goal = RealHV::random(1024, 42);
+        let goal = ContinuousHV::random(1024, 42);
         agent.add_goal("test_goal", goal.clone(), 0.9);
 
         println!("\n═══════════════════════════════════════════════════════════════");
@@ -2627,9 +2627,9 @@ mod tests {
         for i in 0..15 {
             let input = if i % 3 == 0 {
                 // Goal-relevant input
-                goal.add(&RealHV::random(1024, i as u64 * 100).scale(0.2)).normalize()
+                goal.add(&ContinuousHV::random(1024, i as u64 * 100).scale(0.2)).normalize()
             } else {
-                RealHV::random(1024, i as u64 * 100)
+                ContinuousHV::random(1024, i as u64 * 100)
             };
 
             let update = agent.process(&input);
@@ -2668,10 +2668,10 @@ mod tests {
         let mut wm = WorkingMemory::new(7);
 
         // Add items from different sources
-        wm.add_to_episodic(RealHV::random(1024, 1), MemorySource::Perception, 0.9, 0);
-        wm.add_to_episodic(RealHV::random(1024, 2), MemorySource::LongTermMemory, 0.7, 1);
-        wm.add_to_episodic(RealHV::random(1024, 3), MemorySource::InternalGeneration, 0.5, 2);
-        wm.add_to_episodic(RealHV::random(1024, 4), MemorySource::GoalActivation, 0.8, 3);
+        wm.add_to_episodic(ContinuousHV::random(1024, 1), MemorySource::Perception, 0.9, 0);
+        wm.add_to_episodic(ContinuousHV::random(1024, 2), MemorySource::LongTermMemory, 0.7, 1);
+        wm.add_to_episodic(ContinuousHV::random(1024, 3), MemorySource::InternalGeneration, 0.5, 2);
+        wm.add_to_episodic(ContinuousHV::random(1024, 4), MemorySource::GoalActivation, 0.8, 3);
 
         // Verify sources are tracked
         let sources: Vec<_> = wm.episodic_buffer.iter().map(|item| &item.source).collect();
@@ -2971,8 +2971,8 @@ impl ConsciousAgentRuntime {
             CoherenceGating::Proceed { .. } => {}
         }
 
-        // Create RealHV from input
-        let sensory_hv = RealHV::from_values(input);
+        // Create ContinuousHV from input
+        let sensory_hv = ContinuousHV::from_values(input);
 
         // Process through the conscious agent
         let update = agent.process(&sensory_hv);
@@ -3186,7 +3186,7 @@ impl SyncConsciousAgentRuntime {
         }
 
         // Process
-        let sensory_hv = RealHV::from_values(input.to_vec());
+        let sensory_hv = ContinuousHV::from_values(input.to_vec());
         let update = self.agent.process(&sensory_hv);
 
         // Update reference K-Vector

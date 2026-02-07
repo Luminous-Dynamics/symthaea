@@ -17,7 +17,7 @@
 // 2. Tulving's Episodic vs Semantic Memory (1972)
 //    - Episodic: Personal experiences with context ("I remember when...")
 //    - Semantic: General knowledge without context ("I know that...")
-//    - Both stored as HV16 vectors, retrieved by similarity
+//    - Both stored as BinaryHV vectors, retrieved by similarity
 //
 // 3. Consolidation Theory (McGaugh 2000)
 //    - Memories strengthen over time through consolidation
@@ -58,7 +58,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::hdc::HV16;
+use crate::hdc::BinaryHV;
 
 // ============================================================================
 // Memory Types
@@ -112,14 +112,14 @@ pub struct Experience {
     /// Memory type
     pub memory_type: MemoryType,
 
-    /// Content representation (HV16 hypervector encoding the experience)
-    pub content: Vec<HV16>,
+    /// Content representation (BinaryHV hypervector encoding the experience)
+    pub content: Vec<BinaryHV>,
 
     /// When it happened (Unix timestamp)
     pub timestamp: f64,
 
     /// Where it happened (spatial context, optional)
-    pub location: Option<Vec<HV16>>,
+    pub location: Option<Vec<BinaryHV>>,
 
     /// Emotional valence [-1, 1]: negative to positive
     pub emotional_valence: f64,
@@ -128,7 +128,7 @@ pub struct Experience {
     pub emotional_arousal: f64,
 
     /// Context (what else was happening)
-    pub context: Vec<HV16>,
+    pub context: Vec<BinaryHV>,
 
     /// Initial encoding strength [0, 1]
     pub encoding_strength: f64,
@@ -148,7 +148,7 @@ impl Experience {
     pub fn new(
         id: String,
         memory_type: MemoryType,
-        content: Vec<HV16>,
+        content: Vec<BinaryHV>,
         timestamp: f64,
         emotional_valence: f64,
         emotional_arousal: f64,
@@ -170,13 +170,13 @@ impl Experience {
     }
 
     /// Set location context
-    pub fn with_location(mut self, location: Vec<HV16>) -> Self {
+    pub fn with_location(mut self, location: Vec<BinaryHV>) -> Self {
         self.location = Some(location);
         self
     }
 
     /// Set context
-    pub fn with_context(mut self, context: Vec<HV16>) -> Self {
+    pub fn with_context(mut self, context: Vec<BinaryHV>) -> Self {
         self.context = context;
         self
     }
@@ -228,13 +228,13 @@ impl Experience {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetrievalCue {
     /// Content cue (what we're looking for)
-    pub content: Vec<HV16>,
+    pub content: Vec<BinaryHV>,
 
     /// Context cue (what context we're in)
-    pub context: Option<Vec<HV16>>,
+    pub context: Option<Vec<BinaryHV>>,
 
     /// Location cue (where we are)
-    pub location: Option<Vec<HV16>>,
+    pub location: Option<Vec<BinaryHV>>,
 
     /// Temporal cue (when - relative to now)
     pub temporal_proximity: Option<f64>, // Recent memories weighted higher
@@ -245,7 +245,7 @@ pub struct RetrievalCue {
 
 impl RetrievalCue {
     /// Create content-based cue
-    pub fn content(content: Vec<HV16>) -> Self {
+    pub fn content(content: Vec<BinaryHV>) -> Self {
         Self {
             content,
             context: None,
@@ -256,7 +256,7 @@ impl RetrievalCue {
     }
 
     /// Add context
-    pub fn with_context(mut self, context: Vec<HV16>) -> Self {
+    pub fn with_context(mut self, context: Vec<BinaryHV>) -> Self {
         self.context = Some(context);
         self
     }
@@ -447,7 +447,7 @@ impl LongTermMemory {
     }
 
     /// Compute similarity between two sets of hypervectors (static version)
-    fn compute_similarity_static(a: &[HV16], b: &[HV16]) -> f64 {
+    fn compute_similarity_static(a: &[BinaryHV], b: &[BinaryHV]) -> f64 {
         if a.is_empty() || b.is_empty() {
             return 0.0;
         }
@@ -458,7 +458,7 @@ impl LongTermMemory {
 
         for hv_a in a {
             for hv_b in b {
-                total_similarity += HV16::similarity(hv_a, hv_b) as f64;
+                total_similarity += BinaryHV::similarity(hv_a, hv_b) as f64;
                 count += 1;
             }
         }
@@ -471,7 +471,7 @@ impl LongTermMemory {
     }
 
     /// Compute similarity between two sets of hypervectors (instance method for backward compatibility)
-    fn compute_similarity(&self, a: &[HV16], b: &[HV16]) -> f64 {
+    fn compute_similarity(&self, a: &[BinaryHV], b: &[BinaryHV]) -> f64 {
         Self::compute_similarity_static(a, b)
     }
 
@@ -538,7 +538,7 @@ impl Default for LongTermMemory {
 // Revolutionary Enhancement: Persistent consciousness memory via Qdrant vector database
 //
 // This integration enables:
-// 1. Long-term storage of HDC hypervectors (16,384-dimensional HV16)
+// 1. Long-term storage of HDC hypervectors (16,384-dimensional BinaryHV)
 // 2. Semantic similarity search using cosine distance
 // 3. Experience retrieval with metadata filtering
 // 4. Graceful connection handling with retry logic
@@ -602,7 +602,7 @@ pub struct QdrantConfig {
     /// Collection name for experiences
     pub collection_name: String,
 
-    /// Vector dimension (HV16::DIM = 16,384 for full hypervectors)
+    /// Vector dimension (BinaryHV::DIM = 16,384 for full hypervectors)
     /// Note: We use bipolar representation converted to f32
     pub vector_dim: usize,
 
@@ -640,7 +640,7 @@ impl QdrantConfig {
         Self {
             url: "http://localhost:6334".to_string(), // gRPC port
             collection_name: "symthaea_memories".to_string(),
-            vector_dim: HV16::DIM, // 16,384 dimensions
+            vector_dim: BinaryHV::DIM, // 16,384 dimensions
             distance_metric: "Cosine".to_string(),
             api_key: None,
             connection_timeout_ms: 5000,
@@ -656,7 +656,7 @@ impl QdrantConfig {
         Self {
             url,
             collection_name,
-            vector_dim: HV16::DIM,
+            vector_dim: BinaryHV::DIM,
             distance_metric: "Cosine".to_string(),
             api_key: Some(api_key),
             connection_timeout_ms: 10000,
@@ -906,7 +906,7 @@ impl QdrantMemoryStore {
     /// Vector of experiences with similarity scores, ordered by similarity (highest first)
     pub async fn retrieve_similar(
         &self,
-        query: &[HV16],
+        query: &[BinaryHV],
         limit: usize,
     ) -> Result<Vec<ScoredExperience>, QdrantMemoryError> {
         use qdrant_client::qdrant::SearchPointsBuilder;
@@ -949,7 +949,7 @@ impl QdrantMemoryStore {
     /// * `max_timestamp` - Optional maximum timestamp filter
     pub async fn retrieve_similar_filtered(
         &self,
-        query: &[HV16],
+        query: &[BinaryHV],
         limit: usize,
         memory_type: Option<MemoryType>,
         min_timestamp: Option<f64>,
@@ -1251,21 +1251,21 @@ impl QdrantMemoryStore {
             .unwrap_or(0.0);
 
         // Deserialize content from JSON
-        let content: Vec<HV16> = payload
+        let content: Vec<BinaryHV> = payload
             .get("content_json")
             .and_then(|v| v.as_str())
             .and_then(|s| serde_json::from_str(s.as_str()).ok())
             .unwrap_or_default();
 
         // Deserialize location from JSON
-        let location: Option<Vec<HV16>> = payload
+        let location: Option<Vec<BinaryHV>> = payload
             .get("location_json")
             .and_then(|v| v.as_str())
             .filter(|s| !s.is_empty())
             .and_then(|s| serde_json::from_str(s.as_str()).ok());
 
         // Deserialize context from JSON
-        let context: Vec<HV16> = payload
+        let context: Vec<BinaryHV> = payload
             .get("context_json")
             .and_then(|v| v.as_str())
             .and_then(|s| serde_json::from_str(s.as_str()).ok())
@@ -1292,10 +1292,10 @@ impl QdrantMemoryStore {
         })
     }
 
-    /// Bundle multiple HV16 vectors into a single f32 vector for Qdrant
+    /// Bundle multiple BinaryHV vectors into a single f32 vector for Qdrant
     ///
-    /// Strategy: Convert each HV16 to bipolar f32 and average them
-    fn bundle_to_f32_vector(&self, hvs: &[HV16]) -> Vec<f32> {
+    /// Strategy: Convert each BinaryHV to bipolar f32 and average them
+    fn bundle_to_f32_vector(&self, hvs: &[BinaryHV]) -> Vec<f32> {
         if hvs.is_empty() {
             return vec![0.0; self.config.vector_dim];
         }
@@ -1368,7 +1368,7 @@ impl QdrantMemoryStore {
     }
 
     /// Retrieve similar (stub - returns error without qdrant feature)
-    pub fn retrieve_similar(&self, _query: &[HV16], _limit: usize) -> Result<Vec<Experience>, String> {
+    pub fn retrieve_similar(&self, _query: &[BinaryHV], _limit: usize) -> Result<Vec<Experience>, String> {
         Err("Qdrant feature not enabled. Add 'qdrant' to features in Cargo.toml".to_string())
     }
 
@@ -1465,7 +1465,7 @@ impl MockQdrantMemoryStore {
     /// Retrieve similar experiences (using simple similarity calculation)
     pub async fn retrieve_similar(
         &self,
-        query: &[HV16],
+        query: &[BinaryHV],
         limit: usize,
     ) -> Result<Vec<ScoredExperience>, QdrantMemoryError> {
         if !self.is_connected() {
@@ -1548,7 +1548,7 @@ impl MockQdrantMemoryStore {
     }
 
     /// Compute similarity between two sets of hypervectors
-    fn compute_similarity(a: &[HV16], b: &[HV16]) -> f32 {
+    fn compute_similarity(a: &[BinaryHV], b: &[BinaryHV]) -> f32 {
         if a.is_empty() || b.is_empty() {
             return 0.0;
         }
@@ -1558,7 +1558,7 @@ impl MockQdrantMemoryStore {
 
         for hv_a in a {
             for hv_b in b {
-                total += HV16::similarity(hv_a, hv_b);
+                total += BinaryHV::similarity(hv_a, hv_b);
                 count += 1;
             }
         }
@@ -1591,7 +1591,7 @@ mod tests {
 
     #[test]
     fn test_experience_creation() {
-        let content = vec![HV16::random(1), HV16::random(2)];
+        let content = vec![BinaryHV::random(1), BinaryHV::random(2)];
         let exp = Experience::new(
             "exp1".to_string(),
             MemoryType::Episodic,
@@ -1611,9 +1611,9 @@ mod tests {
 
     #[test]
     fn test_experience_with_context() {
-        let content = vec![HV16::random(1)];
-        let location = vec![HV16::random(100)];
-        let context = vec![HV16::random(200)];
+        let content = vec![BinaryHV::random(1)];
+        let location = vec![BinaryHV::random(100)];
+        let context = vec![BinaryHV::random(200)];
 
         let exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5)
             .with_location(location.clone())
@@ -1625,7 +1625,7 @@ mod tests {
 
     #[test]
     fn test_forgetting_curve() {
-        let content = vec![HV16::random(1)];
+        let content = vec![BinaryHV::random(1)];
         // Use 0.0 emotional arousal for simple test (no emotional bonus)
         let exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.0, 0.0)
             .with_encoding_strength(1.0);
@@ -1644,7 +1644,7 @@ mod tests {
 
     #[test]
     fn test_consolidation_strengthens_memory() {
-        let content = vec![HV16::random(1)];
+        let content = vec![BinaryHV::random(1)];
         let mut exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5)
             .with_encoding_strength(0.5);
 
@@ -1664,7 +1664,7 @@ mod tests {
 
     #[test]
     fn test_retrieval_strengthens_memory() {
-        let content = vec![HV16::random(1)];
+        let content = vec![BinaryHV::random(1)];
         let mut exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
 
         let one_year = 86400.0 * 365.0;
@@ -1685,7 +1685,7 @@ mod tests {
 
     #[test]
     fn test_emotional_memories_last_longer() {
-        let content = vec![HV16::random(1)];
+        let content = vec![BinaryHV::random(1)];
 
         // Neutral emotion
         let exp_neutral = Experience::new("exp1".to_string(), MemoryType::Episodic, content.clone(), 1000.0, 0.0, 0.0);
@@ -1714,7 +1714,7 @@ mod tests {
     fn test_store_and_retrieve() {
         let mut ltm = LongTermMemory::new();
 
-        let content = vec![HV16::random(1), HV16::random(2)];
+        let content = vec![BinaryHV::random(1), BinaryHV::random(2)];
         let exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content.clone(), 1000.0, 0.5, 0.5);
 
         ltm.store(exp);
@@ -1723,7 +1723,7 @@ mod tests {
         assert_eq!(ltm.total_stored, 1);
 
         // Retrieve by content similarity
-        let cue = RetrievalCue::content(vec![HV16::random(1)]); // Similar to stored
+        let cue = RetrievalCue::content(vec![BinaryHV::random(1)]); // Similar to stored
         let retrieved = ltm.retrieve(&cue, 1100.0, 5);
 
         assert_eq!(retrieved.len(), 1);
@@ -1736,19 +1736,19 @@ mod tests {
         let mut ltm = LongTermMemory::new();
 
         // Store episodic
-        let content1 = vec![HV16::random(1)];
+        let content1 = vec![BinaryHV::random(1)];
         let exp1 = Experience::new("episodic".to_string(), MemoryType::Episodic, content1, 1000.0, 0.5, 0.5);
         ltm.store(exp1);
 
         // Store semantic
-        let content2 = vec![HV16::random(2)];
+        let content2 = vec![BinaryHV::random(2)];
         let exp2 = Experience::new("semantic".to_string(), MemoryType::Semantic, content2, 1000.0, 0.5, 0.5);
         ltm.store(exp2);
 
         assert_eq!(ltm.total_memories(), 2);
 
         // Retrieve only episodic
-        let cue = RetrievalCue::content(vec![HV16::random(3)])
+        let cue = RetrievalCue::content(vec![BinaryHV::random(3)])
             .with_type(MemoryType::Episodic);
         let retrieved = ltm.retrieve(&cue, 1100.0, 10);
 
@@ -1760,7 +1760,7 @@ mod tests {
     fn test_consolidation_during_sleep() {
         let mut ltm = LongTermMemory::new();
 
-        let content = vec![HV16::random(1)];
+        let content = vec![BinaryHV::random(1)];
         let exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
         ltm.store(exp);
 
@@ -1794,14 +1794,14 @@ mod tests {
 
         // Store 2 episodic
         for i in 0..2 {
-            let content = vec![HV16::random(i)];
+            let content = vec![BinaryHV::random(i)];
             let exp = Experience::new(format!("episodic_{}", i), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
             ltm.store(exp);
         }
 
         // Store 3 semantic
         for i in 0..3 {
-            let content = vec![HV16::random(100 + i)];
+            let content = vec![BinaryHV::random(100 + i)];
             let exp = Experience::new(format!("semantic_{}", i), MemoryType::Semantic, content, 1000.0, 0.5, 0.5);
             ltm.store(exp);
         }
@@ -1815,7 +1815,7 @@ mod tests {
     fn test_qdrant_config() {
         let config = QdrantConfig::default_config();
         assert_eq!(config.collection_name, "symthaea_memories");
-        assert_eq!(config.vector_dim, HV16::DIM); // 16,384 dimensions
+        assert_eq!(config.vector_dim, BinaryHV::DIM); // 16,384 dimensions
         assert_eq!(config.distance_metric, "Cosine");
         assert_eq!(config.max_retries, 3);
         assert_eq!(config.batch_size, 100);
@@ -1855,7 +1855,7 @@ mod tests {
     fn test_clear() {
         let mut ltm = LongTermMemory::new();
 
-        let content = vec![HV16::random(1)];
+        let content = vec![BinaryHV::random(1)];
         let exp = Experience::new("exp1".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
         ltm.store(exp);
 
@@ -1881,7 +1881,7 @@ mod tests {
 
     #[test]
     fn test_scored_experience() {
-        let content = vec![HV16::random(1)];
+        let content = vec![BinaryHV::random(1)];
         let exp = Experience::new("test".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
 
         let scored = ScoredExperience {
@@ -1912,7 +1912,7 @@ mod tests {
     #[tokio::test]
     async fn test_mock_store_requires_connection() {
         let store = MockQdrantMemoryStore::new();
-        let content = vec![HV16::random(1)];
+        let content = vec![BinaryHV::random(1)];
         let exp = Experience::new("test".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
 
         // Should fail without connection
@@ -1932,10 +1932,10 @@ mod tests {
         store.connect().await.unwrap();
 
         // Create and store experiences with different content
-        let content1 = vec![HV16::random(1)];
+        let content1 = vec![BinaryHV::random(1)];
         let exp1 = Experience::new("exp1".to_string(), MemoryType::Episodic, content1.clone(), 1000.0, 0.8, 0.7);
 
-        let content2 = vec![HV16::random(2)];
+        let content2 = vec![BinaryHV::random(2)];
         let exp2 = Experience::new("exp2".to_string(), MemoryType::Semantic, content2.clone(), 2000.0, 0.3, 0.2);
 
         store.store_experience(&exp1).await.unwrap();
@@ -1961,7 +1961,7 @@ mod tests {
         // Create batch of experiences
         let experiences: Vec<Experience> = (0..10)
             .map(|i| {
-                let content = vec![HV16::random(i as u64)];
+                let content = vec![BinaryHV::random(i as u64)];
                 Experience::new(
                     format!("exp_{}", i),
                     MemoryType::Episodic,
@@ -1988,7 +1988,7 @@ mod tests {
         let store = MockQdrantMemoryStore::new();
         store.connect().await.unwrap();
 
-        let content = vec![HV16::random(42)];
+        let content = vec![BinaryHV::random(42)];
         let exp = Experience::new("unique_id".to_string(), MemoryType::Semantic, content, 1500.0, 0.6, 0.4);
 
         store.store_experience(&exp).await.unwrap();
@@ -2011,7 +2011,7 @@ mod tests {
         let store = MockQdrantMemoryStore::new();
         store.connect().await.unwrap();
 
-        let content = vec![HV16::random(1)];
+        let content = vec![BinaryHV::random(1)];
         let exp = Experience::new("to_delete".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
 
         store.store_experience(&exp).await.unwrap();
@@ -2031,7 +2031,7 @@ mod tests {
 
         // Store multiple experiences
         for i in 0..5 {
-            let content = vec![HV16::random(i as u64)];
+            let content = vec![BinaryHV::random(i as u64)];
             let exp = Experience::new(format!("exp_{}", i), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
             store.store_experience(&exp).await.unwrap();
         }
@@ -2048,7 +2048,7 @@ mod tests {
         store.connect().await.unwrap();
 
         // Create a specific content vector
-        let target_content = vec![HV16::random(100)];
+        let target_content = vec![BinaryHV::random(100)];
 
         // Store experiences with varying similarity to target
         // Experience with same content should rank highest
@@ -2062,7 +2062,7 @@ mod tests {
         );
 
         // Experience with different content should rank lower
-        let different_content = vec![HV16::random(200)];
+        let different_content = vec![BinaryHV::random(200)];
         let exp_different = Experience::new(
             "different".to_string(),
             MemoryType::Episodic,
@@ -2112,7 +2112,7 @@ mod tests {
         let store = MockQdrantMemoryStore::new();
         store.connect().await.unwrap();
 
-        let content = vec![HV16::random(1)];
+        let content = vec![BinaryHV::random(1)];
         let mut exp = Experience::new("update_me".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
 
         store.store_experience(&exp).await.unwrap();
@@ -2136,7 +2136,7 @@ mod tests {
         let store = MockQdrantMemoryStore::new();
         store.connect().await.unwrap();
 
-        let content = vec![HV16::random(1)];
+        let content = vec![BinaryHV::random(1)];
         let exp = Experience::new("test".to_string(), MemoryType::Episodic, content, 1000.0, 0.5, 0.5);
         store.store_experience(&exp).await.unwrap();
 

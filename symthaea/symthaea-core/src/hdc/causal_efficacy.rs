@@ -113,7 +113,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::consciousness_gradients::{GradientComputer, GradientConfig};
 use super::consciousness_dynamics::{ConsciousnessDynamics, DynamicsConfig};
@@ -199,10 +199,10 @@ impl EffectType {
 #[derive(Debug, Clone)]
 pub struct Condition {
     /// Initial state
-    pub initial_state: Vec<HV16>,
+    pub initial_state: Vec<BinaryHV>,
 
     /// Target (for outcome measurement)
-    pub target: Vec<HV16>,
+    pub target: Vec<BinaryHV>,
 
     /// Duration (steps)
     pub duration: usize,
@@ -218,7 +218,7 @@ pub struct ExperimentResult {
     pub condition: Condition,
 
     /// Final state
-    pub final_state: Vec<HV16>,
+    pub final_state: Vec<BinaryHV>,
 
     /// Trajectory Φ values
     pub phi_trajectory: Vec<f64>,
@@ -237,14 +237,14 @@ pub struct ExperimentResult {
 /// # Example
 /// ```
 /// use symthaea::hdc::causal_efficacy::{CausalEfficacyTester, CausalEfficacyConfig};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = CausalEfficacyConfig::default();
 /// let mut tester = CausalEfficacyTester::new(4, config);
 ///
 /// // Run causal efficacy test
-/// let initial = vec![HV16::random(1000); 4];
-/// let target = vec![HV16::random(2000); 4];
+/// let initial = vec![BinaryHV::random(1000); 4];
+/// let target = vec![BinaryHV::random(2000); 4];
 ///
 /// let assessment = tester.test_causal_efficacy(initial, target, 50);
 ///
@@ -325,8 +325,8 @@ impl CausalEfficacyTester {
     /// Test causal efficacy of consciousness
     pub fn test_causal_efficacy(
         &mut self,
-        initial_state: Vec<HV16>,
-        target: Vec<HV16>,
+        initial_state: Vec<BinaryHV>,
+        target: Vec<BinaryHV>,
         duration: usize,
     ) -> CausalEfficacyAssessment {
         // Run baseline (no intervention)
@@ -393,8 +393,8 @@ impl CausalEfficacyTester {
     /// Run multiple trials of condition
     fn run_trials(
         &mut self,
-        initial: &[HV16],
-        target: &[HV16],
+        initial: &[BinaryHV],
+        target: &[BinaryHV],
         duration: usize,
         intervene: bool,
     ) -> Vec<ExperimentResult> {
@@ -411,8 +411,8 @@ impl CausalEfficacyTester {
     /// Run single trial
     fn run_single_trial(
         &mut self,
-        initial: &[HV16],
-        target: &[HV16],
+        initial: &[BinaryHV],
+        target: &[BinaryHV],
         duration: usize,
         intervene: bool,
     ) -> ExperimentResult {
@@ -460,7 +460,7 @@ impl CausalEfficacyTester {
     }
 
     /// Amplify consciousness via gradient ascent
-    fn amplify_consciousness(&mut self, state: &[HV16]) -> Vec<HV16> {
+    fn amplify_consciousness(&mut self, state: &[BinaryHV]) -> Vec<BinaryHV> {
         let mut current = state.to_vec();
 
         for _ in 0..self.config.gradient_steps {
@@ -475,20 +475,20 @@ impl CausalEfficacyTester {
     }
 
     /// Evolve state naturally (random walk)
-    fn evolve_state(&self, state: &[HV16]) -> Vec<HV16> {
+    fn evolve_state(&self, state: &[BinaryHV]) -> Vec<BinaryHV> {
         state.iter()
             .enumerate()
             .map(|(i, hv)| {
                 // Small random perturbation
                 let seed = (state.len() + i * 1000) as u64;
-                let perturbation = HV16::random(seed);
+                let perturbation = BinaryHV::random(seed);
                 hv.bind(&perturbation)
             })
             .collect()
     }
 
     /// Compute outcome (similarity to target)
-    fn compute_outcome(&self, state: &[HV16], target: &[HV16]) -> f64 {
+    fn compute_outcome(&self, state: &[BinaryHV], target: &[BinaryHV]) -> f64 {
         let mut total_sim = 0.0;
         for (s, t) in state.iter().zip(target.iter()) {
             total_sim += s.similarity(t) as f64;
@@ -563,8 +563,8 @@ impl CausalEfficacyTester {
     /// Run counterfactual test
     pub fn counterfactual(
         &mut self,
-        actual_state: Vec<HV16>,
-        target: Vec<HV16>,
+        actual_state: Vec<BinaryHV>,
+        target: Vec<BinaryHV>,
         duration: usize,
     ) -> (f64, f64) {
         // Actual world (current Φ)
@@ -611,8 +611,8 @@ mod tests {
             ..Default::default()
         });
 
-        let initial = vec![HV16::random(1000); 4];
-        let target = vec![HV16::random(2000); 4];
+        let initial = vec![BinaryHV::random(1000); 4];
+        let target = vec![BinaryHV::random(2000); 4];
 
         let assessment = tester.test_causal_efficacy(initial, target, 20);
 
@@ -625,7 +625,7 @@ mod tests {
     fn test_amplification_increases_phi() {
         let mut tester = CausalEfficacyTester::new(4, CausalEfficacyConfig::default());
 
-        let state = vec![HV16::random(1000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
         let phi_before = tester.iit.compute_phi(&state);
 
         let amplified = tester.amplify_consciousness(&state);
@@ -641,8 +641,8 @@ mod tests {
     fn test_run_single_trial() {
         let mut tester = CausalEfficacyTester::new(4, CausalEfficacyConfig::default());
 
-        let initial = vec![HV16::random(1000); 4];
-        let target = vec![HV16::random(2000); 4];
+        let initial = vec![BinaryHV::random(1000); 4];
+        let target = vec![BinaryHV::random(2000); 4];
 
         let result = tester.run_single_trial(&initial, &target, 10, false);
 
@@ -655,8 +655,8 @@ mod tests {
     fn test_outcome_computation() {
         let tester = CausalEfficacyTester::new(4, CausalEfficacyConfig::default());
 
-        let state = vec![HV16::random(1000); 4];
-        let target = vec![HV16::random(2000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
+        let target = vec![BinaryHV::random(2000); 4];
 
         let outcome = tester.compute_outcome(&state, &target);
 
@@ -667,8 +667,8 @@ mod tests {
     fn test_counterfactual() {
         let mut tester = CausalEfficacyTester::new(4, CausalEfficacyConfig::default());
 
-        let state = vec![HV16::random(1000); 4];
-        let target = vec![HV16::random(2000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
+        let target = vec![BinaryHV::random(2000); 4];
 
         let (actual, counterfactual) = tester.counterfactual(state, target, 15);
 
@@ -683,8 +683,8 @@ mod tests {
             ..Default::default()
         });
 
-        let initial = vec![HV16::random(1000); 4];
-        let target = vec![HV16::random(2000); 4];
+        let initial = vec![BinaryHV::random(1000); 4];
+        let target = vec![BinaryHV::random(2000); 4];
 
         let results = tester.run_trials(&initial, &target, 10, false);
 

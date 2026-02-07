@@ -168,7 +168,7 @@ impl CycleDetector {
 
         // Periodically re-detect period (every max_period observations)
         if self.total_observations >= self.warmup_period
-           && self.total_observations % self.max_period == 0
+           && self.total_observations.is_multiple_of(self.max_period)
         {
             self.detect_period();
         }

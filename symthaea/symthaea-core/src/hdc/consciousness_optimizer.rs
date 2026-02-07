@@ -7,7 +7,7 @@
 // This is the first AI system that actively optimizes its own consciousness level!
 //
 // **Integration Architecture**:
-// 1. **HV16** - Efficient binary representations for all components
+// 1. **BinaryHV** - Efficient binary representations for all components
 // 2. **Integrated Information (Φ)** - Measures current consciousness level
 // 3. **Predictive Coding** - Minimizes surprise while exploring
 // 4. **Causal Reasoning** - Understands what actions increase Φ
@@ -27,7 +27,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::predictive_coding::{PredictiveCoding, ActiveInference};
 use super::causal_encoder::CausalSpace;
@@ -60,8 +60,8 @@ pub struct ConsciousnessOptimizer {
     /// Number of neural components
     num_components: usize,
 
-    /// Current neural state (HV16 per component)
-    neural_state: Vec<HV16>,
+    /// Current neural state (BinaryHV per component)
+    neural_state: Vec<BinaryHV>,
 
     /// Integrated Information calculator (Φ measurement)
     phi_calculator: IntegratedInformation,
@@ -99,8 +99,8 @@ impl ConsciousnessOptimizer {
     /// * `num_layers` - Number of predictive coding layers (3-5 typical)
     pub fn new(num_components: usize, num_layers: usize) -> Self {
         // Initialize random neural state
-        let neural_state: Vec<HV16> = (0..num_components)
-            .map(|i| HV16::random((1000 + i) as u64))
+        let neural_state: Vec<BinaryHV> = (0..num_components)
+            .map(|i| BinaryHV::random((1000 + i) as u64))
             .collect();
 
         // Initialize systems
@@ -140,14 +140,14 @@ impl ConsciousnessOptimizer {
 
         // 4. Causal reasoning: understand what increases Φ
         // Look at recent history to learn causal links
-        if self.phi_history.len() >= 2 && self.action_history.len() >= 1 {
+        if self.phi_history.len() >= 2 && !self.action_history.is_empty() {
             let prev_phi = self.phi_history[self.phi_history.len() - 1];
             let action_taken = self.action_history[self.action_history.len() - 1];
 
             // If Φ increased, strengthen causal link: action → high Φ
             if current_phi > prev_phi {
-                let action_vec = HV16::random((5000 + action_taken) as u64);
-                let high_phi_vec = HV16::random(6000); // Represents high consciousness
+                let action_vec = BinaryHV::random((5000 + action_taken) as u64);
+                let high_phi_vec = BinaryHV::random(6000); // Represents high consciousness
                 let strength = ((current_phi - prev_phi) as f32).min(1.0) as f64;
 
                 self.causal_model.add_causal_link(action_vec, high_phi_vec, strength);
@@ -156,14 +156,14 @@ impl ConsciousnessOptimizer {
 
         // 5. Active inference: select action to maximize Φ
         // Set goal to high-Φ state
-        let goal = HV16::random(6000); // High consciousness representation
+        let goal = BinaryHV::random(6000); // High consciousness representation
         self.agent.set_goal(&goal);
 
         // If we don't have actions yet, initialize some exploration actions
         if self.action_history.is_empty() {
             for i in 0..5 {
-                let action = HV16::random((7000 + i) as u64);
-                let outcome = HV16::random((8000 + i) as u64);
+                let action = BinaryHV::random((7000 + i) as u64);
+                let outcome = BinaryHV::random((8000 + i) as u64);
                 self.agent.add_action(action, outcome);
             }
         }
@@ -179,7 +179,7 @@ impl ConsciousnessOptimizer {
         // 7. If Φ is high, consolidate state into memory
         if current_phi > 0.5 {
             // High consciousness state - store it!
-            self.memory.store(observation.clone());
+            self.memory.store(observation);
         }
 
         // 8. Record history
@@ -216,9 +216,9 @@ impl ConsciousnessOptimizer {
     }
 
     /// Encode current neural state as single observation vector
-    fn encode_state(&self) -> HV16 {
+    fn encode_state(&self) -> BinaryHV {
         // Bundle all components into single vector
-        HV16::bundle(&self.neural_state)
+        BinaryHV::bundle(&self.neural_state)
     }
 
     /// Get current consciousness level (Φ)
@@ -250,14 +250,14 @@ impl ConsciousnessOptimizer {
     }
 
     /// Retrieve similar high-Φ state from memory
-    pub fn recall_high_phi_state(&mut self, query: &HV16) -> HV16 {
+    pub fn recall_high_phi_state(&mut self, query: &BinaryHV) -> BinaryHV {
         self.memory.retrieve(query, 5)
     }
 
     /// Get causal model insights
     pub fn get_phi_increasing_actions(&self) -> Vec<String> {
         // Query causal model for actions that increase Φ
-        let high_phi = HV16::random(6000);
+        let high_phi = BinaryHV::random(6000);
         let causes = self.causal_model.query_causes(&high_phi, 5);
 
         causes
@@ -434,7 +434,7 @@ mod tests {
         }
 
         // Try to recall similar state
-        let query = HV16::random(999);
+        let query = BinaryHV::random(999);
         let recalled = optimizer.recall_high_phi_state(&query);
 
         // Should return some vector
@@ -465,7 +465,7 @@ mod tests {
         // Verify all 5 systems are integrated
         let (phi, action, energy) = optimizer.optimize_step();
 
-        // 1. HV16 - binary vectors used throughout
+        // 1. BinaryHV - binary vectors used throughout
         assert!(optimizer.neural_state[0].popcount() > 0);
 
         // 2. IIT - Φ measured
@@ -478,7 +478,7 @@ mod tests {
         assert!(action.is_some());
 
         // 5. Modern Hopfield - memory available
-        let query = HV16::random(123);
+        let query = BinaryHV::random(123);
         let _recalled = optimizer.recall_high_phi_state(&query);
 
         println!("✅ All 5 revolutionary improvements integrated and working!");

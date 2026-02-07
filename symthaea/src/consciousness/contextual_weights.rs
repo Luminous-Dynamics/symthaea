@@ -36,9 +36,7 @@ use std::collections::HashMap;
 
 /// Type of action being evaluated.
 ///
-/// This enum is defined locally to avoid circular dependencies with
-/// `unified_value_evaluator`, which also defines an `ActionType`.
-/// The types are semantically equivalent and can be converted between each other.
+/// Canonical action type enum, re-exported by `unified_value_evaluator::types`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ActionType {
     /// Basic action (default threshold)

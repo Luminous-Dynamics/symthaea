@@ -59,7 +59,7 @@
 //
 // ==================================================================================
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
 use super::predictive_coding::PredictiveCoding;
 use super::meta_consciousness::{MetaConsciousness, MetaConsciousnessState};
@@ -209,14 +209,14 @@ impl KIndexAssessment {
 /// # Example
 /// ```ignore
 /// use symthaea::hdc::epistemic_consciousness::{EpistemicConsciousness, EpistemicConfig};
-/// use symthaea::hdc::binary_hv::HV16;
+/// use symthaea::hdc::binary_hv::BinaryHV;
 ///
 /// let config = EpistemicConfig::default();
 /// let mut epistemic = EpistemicConsciousness::new(4, config);
 ///
 /// let state = vec![
-///     HV16::random(1000), HV16::random(1001),
-///     HV16::random(1002), HV16::random(1003),
+///     BinaryHV::random(1000), BinaryHV::random(1001),
+///     BinaryHV::random(1002), BinaryHV::random(1003),
 /// ];
 ///
 /// // Complete epistemic assessment
@@ -319,7 +319,7 @@ impl EpistemicConsciousness {
     }
 
     /// Assess consciousness using full epistemic framework
-    pub fn assess(&mut self, state: &[HV16]) -> KIndexAssessment {
+    pub fn assess(&mut self, state: &[BinaryHV]) -> KIndexAssessment {
         // 1. Compute theory-specific scores
         let mut assessments = Vec::new();
 
@@ -498,7 +498,7 @@ impl EpistemicConsciousness {
     }
 
     /// Compute FEP score (free energy / prediction error)
-    fn compute_fep_score(&mut self, state: &[HV16]) -> f64 {
+    fn compute_fep_score(&mut self, state: &[BinaryHV]) -> f64 {
         // Free energy = Σ precision × (1 - similarity)
         // Low free energy = good predictions = consciousness
 
@@ -514,7 +514,7 @@ impl EpistemicConsciousness {
     }
 
     /// Approximate GWT (Global Workspace Theory)
-    fn approximate_gwt(&self, state: &[HV16]) -> f64 {
+    fn approximate_gwt(&self, state: &[BinaryHV]) -> f64 {
         // GWT: Consciousness requires global broadcast
         // Approximation: High similarity across all components = global broadcast
 
@@ -540,7 +540,7 @@ impl EpistemicConsciousness {
     }
 
     /// Approximate HOT (Higher-Order Thought)
-    fn approximate_hot(&self, _state: &[HV16]) -> f64 {
+    fn approximate_hot(&self, _state: &[BinaryHV]) -> f64 {
         // HOT: Consciousness requires thought about thoughts
         // Approximation: Meta-consciousness level
 
@@ -556,7 +556,7 @@ impl EpistemicConsciousness {
     }
 
     /// Approximate AST (Attention Schema Theory)
-    fn approximate_ast(&self, state: &[HV16]) -> f64 {
+    fn approximate_ast(&self, state: &[BinaryHV]) -> f64 {
         // AST: Consciousness = model of attention
         // Approximation: Variance in activation (attention selection)
 
@@ -564,7 +564,7 @@ impl EpistemicConsciousness {
             return 0.5;
         }
 
-        // Compute "activation" as bit density (HV16 is 2048 bits)
+        // Compute "activation" as bit density (BinaryHV is 2048 bits)
         let activations: Vec<f64> = state.iter()
             .map(|hv| hv.popcount() as f64 / 2048.0)
             .collect();
@@ -579,7 +579,7 @@ impl EpistemicConsciousness {
     }
 
     /// Approximate RPT (Recurrent Processing Theory)
-    fn approximate_rpt(&self, state: &[HV16]) -> f64 {
+    fn approximate_rpt(&self, state: &[BinaryHV]) -> f64 {
         // RPT: Consciousness requires recurrent processing
         // Approximation: Temporal consistency (if we had history)
 
@@ -683,10 +683,10 @@ mod tests {
         let mut epistemic = EpistemicConsciousness::new(4, config);
 
         let state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let assessment = epistemic.assess(&state);
@@ -703,10 +703,10 @@ mod tests {
         let mut epistemic = EpistemicConsciousness::new(4, config);
 
         let state = vec![
-            HV16::random(1000),
-            HV16::random(1001),
-            HV16::random(1002),
-            HV16::random(1003),
+            BinaryHV::random(1000),
+            BinaryHV::random(1001),
+            BinaryHV::random(1002),
+            BinaryHV::random(1003),
         ];
 
         let assessment = epistemic.assess(&state);
@@ -726,7 +726,7 @@ mod tests {
         let config = EpistemicConfig::default();
         let mut epistemic = EpistemicConsciousness::new(4, config);
 
-        let state = vec![HV16::random(1000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
         let assessment = epistemic.assess(&state);
 
         // AST and HOT should have corrections
@@ -746,7 +746,7 @@ mod tests {
         };
         let mut epistemic = EpistemicConsciousness::new(4, config);
 
-        let state = vec![HV16::random(1000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
 
         let initial_baseline = epistemic.get_baseline();
 
@@ -770,7 +770,7 @@ mod tests {
         };
         let mut epistemic = EpistemicConsciousness::new(4, config);
 
-        let state = vec![HV16::random(1000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
         let assessment = epistemic.assess(&state);
 
         // All theories should have uncertainty estimates
@@ -786,7 +786,7 @@ mod tests {
         let config = EpistemicConfig::default();
         let mut epistemic = EpistemicConsciousness::new(4, config);
 
-        let state = vec![HV16::random(1000); 4];
+        let state = vec![BinaryHV::random(1000); 4];
         let assessment = epistemic.assess(&state);
 
         let agreement = assessment.theory_agreement();

@@ -689,7 +689,7 @@ impl TriggerSystemLibrary {
         let conversion_score = (sys.physics.conversion_efficiency.log10() + 12.0) / 12.0;
 
         // Phonon efficiency: higher is better for LCF
-        let phonon_score = sys.physics.phonon_efficiency as f64;
+        let phonon_score = sys.physics.phonon_efficiency;
 
         // Weighted sum
         weights.trl * trl_score
@@ -854,7 +854,7 @@ pub fn estimate_fusion_yield(
     // Base rate from conversion efficiency, enhanced by screening
     let base_prob = sys.physics.conversion_efficiency;
     let screening_enhancement = sys.physics.screening_factor;
-    let phonon_factor = 1.0 + sys.physics.phonon_efficiency as f64 * 10.0;
+    let phonon_factor = 1.0 + sys.physics.phonon_efficiency * 10.0;
 
     let fusion_prob = base_prob * screening_enhancement * phonon_factor;
 
@@ -1079,7 +1079,7 @@ impl LcfPhysicsConstants {
         let enhancement = prefactor * exponent.exp();
 
         // Cap at physically reasonable values
-        enhancement.max(1.0).min(1e6)
+        enhancement.clamp(1.0, 1e6)
     }
 
     // === Electron Stopping Powers (NIST ESTAR) ===
@@ -1488,7 +1488,7 @@ impl LcfPhysicsConstants {
         let tritium_production_g_s = proton_rate * 3.016 * amu_to_g;
 
         DDChannelResult {
-            total_reaction_rate_s: total_reaction_rate_s,
+            total_reaction_rate_s,
             total_thermal_power_w: total_power,
             neutron_production_rate_s: neutron_rate,
             tritium_production_rate_g_s: tritium_production_g_s,

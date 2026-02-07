@@ -11,7 +11,7 @@
 
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::hdc::code_memory::CodebaseMemory;
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 use std::collections::HashMap;
 
 // ============================================================================
@@ -85,11 +85,11 @@ pub struct ContextRef {
 #[derive(Debug, Clone)]
 pub struct IntuitiveIntent {
     /// The intent as a hypervector (composable, algebraically queryable)
-    pub intent_hv: RealHV,
+    pub intent_hv: ContinuousHV,
     /// Trajectory HV from CfC (encodes conversation history)
-    pub trajectory_hv: RealHV,
+    pub trajectory_hv: ContinuousHV,
     /// Algebraic intent: what change is implied? (goal - current)
-    pub delta_hv: RealHV,
+    pub delta_hv: ContinuousHV,
     /// Similar past intents from memory
     pub similar_intents: Vec<(String, f32)>,
     /// Confidence based on codebase familiarity
@@ -188,8 +188,8 @@ pub struct TriuneIntentIntegrator {
     cfc_state: CfCTemporalState,
 
     // Action prototype vectors for encoding symbolic plans
-    action_prototypes: HashMap<IntentAction, RealHV>,
-    target_prototypes: HashMap<TargetKind, RealHV>,
+    action_prototypes: HashMap<IntentAction, ContinuousHV>,
+    target_prototypes: HashMap<TargetKind, ContinuousHV>,
 }
 
 impl TriuneIntentIntegrator {
@@ -221,7 +221,7 @@ impl TriuneIntentIntegrator {
     }
 
     /// Initialize HDC prototypes for actions
-    fn init_action_prototypes(dim: usize) -> HashMap<IntentAction, RealHV> {
+    fn init_action_prototypes(dim: usize) -> HashMap<IntentAction, ContinuousHV> {
         let mut map = HashMap::new();
 
         // Each action gets a random but fixed prototype
@@ -237,14 +237,14 @@ impl TriuneIntentIntegrator {
         ];
 
         for (i, action) in actions.iter().enumerate() {
-            map.insert(*action, RealHV::random(dim, 0xAC710000 + i as u64));
+            map.insert(*action, ContinuousHV::random(dim, 0xAC710000 + i as u64));
         }
 
         map
     }
 
     /// Initialize HDC prototypes for targets
-    fn init_target_prototypes(dim: usize) -> HashMap<TargetKind, RealHV> {
+    fn init_target_prototypes(dim: usize) -> HashMap<TargetKind, ContinuousHV> {
         let mut map = HashMap::new();
 
         let targets = [
@@ -257,7 +257,7 @@ impl TriuneIntentIntegrator {
         ];
 
         for (i, target) in targets.iter().enumerate() {
-            map.insert(*target, RealHV::random(dim, 0x7A860000 + i as u64));
+            map.insert(*target, ContinuousHV::random(dim, 0x7A860000 + i as u64));
         }
 
         map
@@ -328,7 +328,7 @@ impl TriuneIntentIntegrator {
         // delta = trajectory ⊖ current_state (unbind operation)
         let current_state_hv = codebase.codebase_hv()
             .cloned()
-            .unwrap_or_else(|| RealHV::zero(self.config.hdc_dim));
+            .unwrap_or_else(|| ContinuousHV::zero(self.config.hdc_dim));
         // unbind = bind with inverse
         let delta_hv = trajectory_hv.bind(&current_state_hv.inverse());
 
@@ -351,7 +351,7 @@ impl TriuneIntentIntegrator {
         }
     }
 
-    fn find_similar_intents(&self, input_hv: &RealHV, codebase: &CodebaseMemory) -> Vec<(String, f32)> {
+    fn find_similar_intents(&self, input_hv: &ContinuousHV, codebase: &CodebaseMemory) -> Vec<(String, f32)> {
         // Query codebase memory for similar patterns
         let matches = codebase.query(input_hv, 5);
         matches.iter()
@@ -433,7 +433,7 @@ impl TriuneIntentIntegrator {
     }
 
     /// Encode symbolic intent as HDC for comparison
-    fn encode_symbolic_intent(&self, symbolic: &SymbolicIntent) -> RealHV {
+    fn encode_symbolic_intent(&self, symbolic: &SymbolicIntent) -> ContinuousHV {
         let dim = self.config.hdc_dim;
         let mut components = Vec::new();
 
@@ -462,9 +462,9 @@ impl TriuneIntentIntegrator {
         }
 
         if components.is_empty() {
-            RealHV::zero(dim)
+            ContinuousHV::zero(dim)
         } else {
-            RealHV::bundle(&components)
+            ContinuousHV::bundle_owned(&components)
         }
     }
 
@@ -520,7 +520,7 @@ impl TriuneIntentIntegrator {
     }
 
     /// Get current trajectory (for debugging/visualization)
-    pub fn current_trajectory(&self) -> &RealHV {
+    pub fn current_trajectory(&self) -> &ContinuousHV {
         self.cfc_state.trajectory()
     }
 }
@@ -659,7 +659,7 @@ pub struct CfCTemporalState {
     /// Current hidden state
     hidden: Vec<f32>,
     /// Accumulated trajectory as HDC
-    trajectory: RealHV,
+    trajectory: ContinuousHV,
     /// Step counter
     step_count: usize,
 }
@@ -670,18 +670,18 @@ impl CfCTemporalState {
             hidden_dim,
             tau,
             hidden: vec![0.0; hidden_dim],
-            trajectory: RealHV::zero(4096), // Will be resized on first step
+            trajectory: ContinuousHV::zero(4096), // Will be resized on first step
             step_count: 0,
         }
     }
 
     /// Process one step of input, update state, return trajectory HV
-    pub fn step(&mut self, input_hv: &RealHV) -> RealHV {
+    pub fn step(&mut self, input_hv: &ContinuousHV) -> ContinuousHV {
         let dim = input_hv.values.len();
 
         // Resize trajectory if needed
         if self.trajectory.values.len() != dim {
-            self.trajectory = RealHV::zero(dim);
+            self.trajectory = ContinuousHV::zero(dim);
         }
 
         // Simple CfC-inspired update:
@@ -725,12 +725,12 @@ impl CfCTemporalState {
     /// Reset to initial state
     pub fn reset(&mut self) {
         self.hidden.fill(0.0);
-        self.trajectory = RealHV::zero(self.trajectory.values.len());
+        self.trajectory = ContinuousHV::zero(self.trajectory.values.len());
         self.step_count = 0;
     }
 
     /// Get current trajectory
-    pub fn trajectory(&self) -> &RealHV {
+    pub fn trajectory(&self) -> &ContinuousHV {
         &self.trajectory
     }
 
@@ -784,8 +784,8 @@ mod tests {
     #[test]
     fn test_cfc_temporal_accumulation() {
         let mut cfc = CfCTemporalState::new(64, 2.0);
-        let input1 = RealHV::random(256, 1);
-        let input2 = RealHV::random(256, 2);
+        let input1 = ContinuousHV::random(256, 1);
+        let input2 = ContinuousHV::random(256, 2);
 
         let traj1 = cfc.step(&input1);
         let traj2 = cfc.step(&input2);

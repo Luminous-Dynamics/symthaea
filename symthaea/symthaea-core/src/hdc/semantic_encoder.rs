@@ -8,7 +8,7 @@
 //! ## Architecture
 //!
 //! ```text
-//! Text → Sentence Embedding (384-dim) → Random Projection → RealHV (16,384-dim)
+//! Text → Sentence Embedding (384-dim) → Random Projection → ContinuousHV (16,384-dim)
 //! ```
 //!
 //! ## Why Random Projection Works
@@ -31,7 +31,7 @@
 //! let hv = encoder.encode("I helped an old lady cross the street");
 //! ```
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use super::HDC_DIMENSION;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -45,10 +45,10 @@ use std::sync::RwLock;
 /// Universal semantic encoding trait
 pub trait SemanticEncoder: Send + Sync {
     /// Encode text to semantically-meaningful hypervector
-    fn encode(&self, text: &str) -> RealHV;
+    fn encode(&self, text: &str) -> ContinuousHV;
 
     /// Batch encoding (more efficient for multiple texts)
-    fn encode_batch(&self, texts: &[&str]) -> Vec<RealHV> {
+    fn encode_batch(&self, texts: &[&str]) -> Vec<ContinuousHV> {
         texts.iter().map(|t| self.encode(t)).collect()
     }
 
@@ -97,7 +97,7 @@ impl RandomProjection {
                 let hash = hasher.finish();
 
                 // Use hash to determine sign
-                matrix[i][j] = if hash % 2 == 0 { scale } else { -scale };
+                matrix[i][j] = if hash.is_multiple_of(2) { scale } else { -scale };
             }
         }
 
@@ -145,15 +145,15 @@ impl CharNgramEncoder {
         }
     }
 
-    fn char_to_hv(&self, c: char) -> RealHV {
-        RealHV::random(self.dim, self.seed + c as u64)
+    fn char_to_hv(&self, c: char) -> ContinuousHV {
+        ContinuousHV::random(self.dim, self.seed + c as u64)
     }
 }
 
 impl SemanticEncoder for CharNgramEncoder {
-    fn encode(&self, text: &str) -> RealHV {
+    fn encode(&self, text: &str) -> ContinuousHV {
         let chars: Vec<char> = text.to_lowercase().chars().collect();
-        let mut result = RealHV::zero(self.dim);
+        let mut result = ContinuousHV::zero(self.dim);
 
         // Bind trigrams
         for window in chars.windows(3) {
@@ -263,14 +263,14 @@ impl CachedSemanticEncoder {
 }
 
 impl SemanticEncoder for CachedSemanticEncoder {
-    fn encode(&self, text: &str) -> RealHV {
+    fn encode(&self, text: &str) -> ContinuousHV {
         let hash = Self::hash_text(text);
 
         // Try cache first
         if let Some(embedding) = self.cache.read().unwrap().get(&hash) {
             // Project from embedding space to HDC space
             let projected = self.projection.project(embedding);
-            return RealHV::from_values(projected).normalize();
+            return ContinuousHV::from_values(projected).normalize();
         }
 
         // Fall back to character n-grams
@@ -375,7 +375,7 @@ impl WordEmbeddingEncoder {
 }
 
 impl SemanticEncoder for WordEmbeddingEncoder {
-    fn encode(&self, text: &str) -> RealHV {
+    fn encode(&self, text: &str) -> ContinuousHV {
         // Tokenize (simple whitespace + punctuation removal)
         let lowercase = text.to_lowercase();
         let words: Vec<&str> = lowercase
@@ -398,7 +398,7 @@ impl SemanticEncoder for WordEmbeddingEncoder {
         let aggregated = self.aggregate_embeddings(&embeddings);
         let projected = self.projection.project(&aggregated);
 
-        RealHV::from_values(projected).normalize()
+        ContinuousHV::from_values(projected).normalize()
     }
 
     fn name(&self) -> &'static str {
@@ -420,11 +420,11 @@ impl SemanticEncoder for WordEmbeddingEncoder {
 /// without requiring any external dependencies or model downloads.
 pub struct MoralSemanticEncoder {
     /// Category -> base hypervector (each category has a unique random HV)
-    category_bases: HashMap<&'static str, RealHV>,
+    category_bases: HashMap<&'static str, ContinuousHV>,
     /// Word -> (category, valence) mapping
     moral_vocabulary: HashMap<&'static str, (&'static str, f32)>,
     /// Position encoding for word order
-    position_bases: Vec<RealHV>,
+    position_bases: Vec<ContinuousHV>,
     /// Dimension
     dim: usize,
     seed: u64,
@@ -453,7 +453,7 @@ impl MoralSemanticEncoder {
         // Create base vectors for each category
         let mut category_bases = HashMap::new();
         for (i, cat) in categories.iter().enumerate() {
-            category_bases.insert(*cat, RealHV::random(dim, seed + i as u64 * 1000));
+            category_bases.insert(*cat, ContinuousHV::random(dim, seed + i as u64 * 1000));
         }
 
         // Build moral vocabulary with categories and valence (-1 to +1)
@@ -569,8 +569,8 @@ impl MoralSemanticEncoder {
         }
 
         // Create position encoding vectors (up to 50 positions)
-        let position_bases: Vec<RealHV> = (0..50)
-            .map(|i| RealHV::random(dim, seed + 10000 + i as u64 * 100))
+        let position_bases: Vec<ContinuousHV> = (0..50)
+            .map(|i| ContinuousHV::random(dim, seed + 10000 + i as u64 * 100))
             .collect();
 
         Self {
@@ -592,7 +592,7 @@ impl MoralSemanticEncoder {
     }
 
     /// Get the base vector for a word's category
-    fn word_to_category_hv(&self, word: &str) -> Option<(&'static str, f32, RealHV)> {
+    fn word_to_category_hv(&self, word: &str) -> Option<(&'static str, f32, ContinuousHV)> {
         self.moral_vocabulary.get(word).map(|(cat, valence)| {
             let base = self.category_bases.get(cat).unwrap().clone();
             (*cat, *valence, base)
@@ -601,11 +601,11 @@ impl MoralSemanticEncoder {
 }
 
 impl SemanticEncoder for MoralSemanticEncoder {
-    fn encode(&self, text: &str) -> RealHV {
+    fn encode(&self, text: &str) -> ContinuousHV {
         let words = self.tokenize(text);
 
         if words.is_empty() {
-            return RealHV::zero(self.dim);
+            return ContinuousHV::zero(self.dim);
         }
 
         let mut components = Vec::new();
@@ -634,7 +634,7 @@ impl SemanticEncoder for MoralSemanticEncoder {
                 let mut hasher = std::collections::hash_map::DefaultHasher::new();
                 use std::hash::{Hash, Hasher};
                 word.hash(&mut hasher);
-                let word_hv = RealHV::random(self.dim, hasher.finish());
+                let word_hv = ContinuousHV::random(self.dim, hasher.finish());
 
                 // Position-encode unknown words too
                 let pos_hv = &self.position_bases[pos.min(49)];
@@ -643,11 +643,11 @@ impl SemanticEncoder for MoralSemanticEncoder {
         }
 
         if components.is_empty() {
-            return RealHV::zero(self.dim);
+            return ContinuousHV::zero(self.dim);
         }
 
         // Bundle all components
-        let bundled = RealHV::bundle(&components);
+        let bundled = ContinuousHV::bundle_owned(&components);
 
         // Add category distribution as a "signature" vector
         // This captures the overall moral profile of the text
@@ -665,14 +665,14 @@ impl SemanticEncoder for MoralSemanticEncoder {
         } else {
             0.0
         };
-        let valence_indicator = RealHV::random(self.dim, self.seed + 99999).scale(avg_valence * 0.3);
+        let valence_indicator = ContinuousHV::random(self.dim, self.seed + 99999).scale(avg_valence * 0.3);
         signature_components.push(valence_indicator);
 
         // Combine bundled content with signature
         let signature = if !signature_components.is_empty() {
-            RealHV::bundle(&signature_components)
+            ContinuousHV::bundle_owned(&signature_components)
         } else {
-            RealHV::zero(self.dim)
+            ContinuousHV::zero(self.dim)
         };
 
         // Final encoding: content + signature
@@ -827,11 +827,11 @@ pub mod onnx {
     }
 
     impl SemanticEncoder for OnnxSemanticEncoder {
-        fn encode(&self, text: &str) -> RealHV {
+        fn encode(&self, text: &str) -> ContinuousHV {
             match self.encode_to_embedding(text) {
                 Ok(embedding) => {
                     let projected = self.projection.project(&embedding);
-                    RealHV::from_values(projected).normalize()
+                    ContinuousHV::from_values(projected).normalize()
                 }
                 Err(_e) => {
                     // Fall back to char n-gram on error

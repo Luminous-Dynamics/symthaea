@@ -40,7 +40,7 @@ state(t+1) = normalize(∑ⱼ similarity(i,j) × state_j(t))
 
 */
 
-use super::real_hv::RealHV;
+use super::unified_hv::ContinuousHV;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
@@ -153,7 +153,7 @@ pub struct ResonantPhiResult {
     pub energy_history: Vec<f64>,
 
     /// Stable state representations
-    pub stable_state: Vec<RealHV>,
+    pub stable_state: Vec<ContinuousHV>,
 }
 
 /// Configuration for resonant Φ calculation
@@ -281,7 +281,7 @@ impl ResonantPhiCalculator {
     /// # Returns
     ///
     /// ResonantPhiResult with Φ value, convergence info, and stable state
-    pub fn compute(&self, components: &[RealHV]) -> ResonantPhiResult {
+    pub fn compute(&self, components: &[ContinuousHV]) -> ResonantPhiResult {
         let start_time = Instant::now();
         let n = components.len();
 
@@ -301,7 +301,7 @@ impl ResonantPhiCalculator {
         let similarity_matrix = self.build_similarity_matrix(components);
 
         // 2. Initialize resonator states
-        let mut current_state: Vec<RealHV> = components.to_vec();
+        let mut current_state: Vec<ContinuousHV> = components.to_vec();
         let mut energy_history = Vec::new();
 
         let mut prev_energy = self.compute_energy(&current_state, &similarity_matrix);
@@ -353,7 +353,7 @@ impl ResonantPhiCalculator {
     /// Build pairwise similarity matrix (coupling strengths)
     ///
     /// Uses parallel computation for large topologies (n >= parallel_threshold)
-    fn build_similarity_matrix(&self, components: &[RealHV]) -> Vec<Vec<f64>> {
+    fn build_similarity_matrix(&self, components: &[ContinuousHV]) -> Vec<Vec<f64>> {
         let n = components.len();
         let use_parallel = self.config.parallel && n >= self.config.parallel_threshold;
 
@@ -365,7 +365,7 @@ impl ResonantPhiCalculator {
     }
 
     /// Sequential similarity matrix construction
-    fn build_similarity_matrix_sequential(&self, components: &[RealHV]) -> Vec<Vec<f64>> {
+    fn build_similarity_matrix_sequential(&self, components: &[ContinuousHV]) -> Vec<Vec<f64>> {
         let n = components.len();
         let mut matrix = vec![vec![0.0; n]; n];
 
@@ -375,7 +375,7 @@ impl ResonantPhiCalculator {
                     matrix[i][j] = self.config.self_coupling;
                 } else {
                     let sim = components[i].similarity(&components[j]);
-                    matrix[i][j] = ((sim as f64 + 1.0) / 2.0).max(0.0).min(1.0);
+                    matrix[i][j] = ((sim as f64 + 1.0) / 2.0).clamp(0.0, 1.0);
                 }
             }
         }
@@ -386,7 +386,7 @@ impl ResonantPhiCalculator {
     /// Parallel similarity matrix construction using rayon
     ///
     /// Parallelizes row computation - each row is computed independently
-    fn build_similarity_matrix_parallel(&self, components: &[RealHV]) -> Vec<Vec<f64>> {
+    fn build_similarity_matrix_parallel(&self, components: &[ContinuousHV]) -> Vec<Vec<f64>> {
         let n = components.len();
         let self_coupling = self.config.self_coupling;
 
@@ -399,7 +399,7 @@ impl ResonantPhiCalculator {
                         row[j] = self_coupling;
                     } else {
                         let sim = components[i].similarity(&components[j]);
-                        row[j] = ((sim as f64 + 1.0) / 2.0).max(0.0).min(1.0);
+                        row[j] = ((sim as f64 + 1.0) / 2.0).clamp(0.0, 1.0);
                     }
                 }
                 row
@@ -411,7 +411,7 @@ impl ResonantPhiCalculator {
     ///
     /// Each resonator i updates as:
     /// new_i = damping × old_i + (1-damping) × Σⱼ similarity(i,j) × old_j
-    fn resonance_step(&self, current_state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> Vec<RealHV> {
+    fn resonance_step(&self, current_state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> Vec<ContinuousHV> {
         let n = current_state.len();
         let use_parallel = self.config.parallel && n >= self.config.parallel_threshold;
 
@@ -423,7 +423,7 @@ impl ResonantPhiCalculator {
     }
 
     /// Sequential resonance step
-    fn resonance_step_sequential(&self, current_state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> Vec<RealHV> {
+    fn resonance_step_sequential(&self, current_state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> Vec<ContinuousHV> {
         let damping = self.config.damping;
         let normalize = self.config.normalize;
 
@@ -439,7 +439,7 @@ impl ResonantPhiCalculator {
     /// Parallel resonance step using rayon
     ///
     /// Each node update is independent and can be computed in parallel
-    fn resonance_step_parallel(&self, current_state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> Vec<RealHV> {
+    fn resonance_step_parallel(&self, current_state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> Vec<ContinuousHV> {
         let damping = self.config.damping;
         let normalize = self.config.normalize;
 
@@ -459,12 +459,12 @@ impl ResonantPhiCalculator {
     fn update_single_resonator(
         &self,
         i: usize,
-        current_hv: &RealHV,
-        current_state: &[RealHV],
+        current_hv: &ContinuousHV,
+        current_state: &[ContinuousHV],
         similarity_matrix: &[Vec<f64>],
         damping: f64,
         normalize: bool,
-    ) -> RealHV {
+    ) -> ContinuousHV {
         let dim = current_hv.dim();
 
         // Pre-allocate output buffer (avoid repeated allocations)
@@ -497,14 +497,14 @@ impl ResonantPhiCalculator {
             simd_normalize_inplace(&mut result);
         }
 
-        RealHV::from_values(result)
+        ContinuousHV::from_values(result)
     }
 
     /// Compute system energy (measures stability)
     ///
     /// Lower energy = more stable configuration
     /// Energy = -Σᵢⱼ similarity(i,j) × similarity(state_i, state_j)
-    fn compute_energy(&self, state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> f64 {
+    fn compute_energy(&self, state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> f64 {
         let n = state.len();
         let use_parallel = self.config.parallel && n >= self.config.parallel_threshold;
 
@@ -516,7 +516,7 @@ impl ResonantPhiCalculator {
     }
 
     /// Sequential energy computation
-    fn compute_energy_sequential(&self, state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> f64 {
+    fn compute_energy_sequential(&self, state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> f64 {
         let n = state.len();
         let mut energy = 0.0;
 
@@ -534,7 +534,7 @@ impl ResonantPhiCalculator {
     /// Parallel energy computation using rayon
     ///
     /// Parallelizes over rows, each row computes its contribution to energy
-    fn compute_energy_parallel(&self, state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> f64 {
+    fn compute_energy_parallel(&self, state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> f64 {
         let n = state.len();
 
         // Compute partial sums in parallel (one per row)
@@ -567,7 +567,7 @@ impl ResonantPhiCalculator {
     /// - Build Laplacian-like matrix from similarity weights
     /// - Measure spectral gap (λ₂) via power iteration
     /// - Higher spectral gap = better integration = higher Φ
-    fn measure_integration(&self, _state: &[RealHV], similarity_matrix: &[Vec<f64>]) -> f64 {
+    fn measure_integration(&self, _state: &[ContinuousHV], similarity_matrix: &[Vec<f64>]) -> f64 {
         let n = similarity_matrix.len();
 
         if n < 2 {
@@ -672,7 +672,7 @@ impl ResonantPhiCalculator {
         // Spectral gap is in [0, 2] for normalized Laplacian
         // But practical range is [0, 1] for connected graphs
         // Use clamping and scaling
-        (spectral_gap / 2.0).max(0.0).min(1.0)
+        (spectral_gap / 2.0).clamp(0.0, 1.0)
     }
 
     /// Compute total similarity (sum of upper triangle of similarity matrix)

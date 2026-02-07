@@ -8,7 +8,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 use crate::mind::StructuredThought;
 
@@ -102,7 +102,7 @@ pub struct ConversationMessage {
     pub timestamp: u64,
     /// Embedding representation
     #[serde(skip)]
-    pub embedding: Option<RealHV>,
+    pub embedding: Option<ContinuousHV>,
 }
 
 /// Role in conversation
@@ -160,7 +160,7 @@ pub struct LLMGenerationResult {
     /// Generation time (ms)
     pub generation_time_ms: f64,
     /// Embedding of generated text
-    pub embedding: RealHV,
+    pub embedding: ContinuousHV,
     /// Finish reason
     pub finish_reason: FinishReason,
 }
@@ -234,7 +234,7 @@ pub struct LLMOrgan {
     /// Conversation history
     conversation_history: VecDeque<ConversationMessage>,
     /// Text embeddings cache
-    embedding_cache: HashMap<String, RealHV>,
+    embedding_cache: HashMap<String, ContinuousHV>,
     /// Statistics
     stats: LLMOrganStats,
     /// Optional LLM backend for real generation
@@ -505,7 +505,7 @@ impl LLMOrgan {
     }
 
     /// Convert text to embedding
-    fn text_to_embedding(&mut self, text: &str) -> RealHV {
+    fn text_to_embedding(&mut self, text: &str) -> ContinuousHV {
         // Check cache
         if let Some(cached) = self.embedding_cache.get(text) {
             self.stats.cache_hits += 1;
@@ -528,7 +528,7 @@ impl LLMOrgan {
             }
         }
 
-        let embedding = RealHV::from_slice(&values);
+        let embedding = ContinuousHV::from_slice(&values);
 
         // Cache
         if self.embedding_cache.len() < 1000 {

@@ -1,7 +1,7 @@
 //! Revolutionary SIMD-Accelerated Hypervector Operations
 //!
 //! This module implements explicit SIMD (Single Instruction Multiple Data)
-//! operations for HV16, achieving near-theoretical-maximum performance.
+//! operations for BinaryHV, achieving near-theoretical-maximum performance.
 //!
 //! # Architecture Support
 //!
@@ -21,7 +21,7 @@
 //! # Safety
 //!
 //! SIMD operations use `unsafe` blocks but are memory-safe because:
-//! 1. HV16 is always 256 bytes (aligned to 32 bytes)
+//! 1. BinaryHV is always 256 bytes (aligned to 32 bytes)
 //! 2. We never read/write outside the array bounds
 //! 3. CPU feature detection ensures correct instruction usage
 //!
@@ -30,15 +30,15 @@
 //! ```rust
 //! use symthaea::hdc::simd_hv::*;
 //!
-//! let a = HV16::random();
-//! let b = HV16::random();
+//! let a = BinaryHV::random();
+//! let b = BinaryHV::random();
 //!
 //! // Automatic SIMD dispatch
 //! let result = simd_bind(&a, &b);  // ~10ns on AVX2
 //! let sim = simd_similarity(&a, &b);  // ~25ns on AVX2
 //! ```
 
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 
 // ============================================================================
 // COMPILE-TIME FEATURE DETECTION
@@ -106,10 +106,10 @@ pub fn has_sse2() -> bool {
 /// # Safety
 ///
 /// Uses unsafe SIMD intrinsics but is memory-safe because:
-/// - HV16 is always exactly 256 bytes
+/// - BinaryHV is always exactly 256 bytes
 /// - We process exactly 256 bytes, no more, no less
 #[inline]
-pub fn simd_bind(a: &HV16, b: &HV16) -> HV16 {
+pub fn simd_bind(a: &BinaryHV, b: &BinaryHV) -> BinaryHV {
     #[cfg(target_arch = "x86_64")]
     {
         if has_avx2() {
@@ -128,7 +128,7 @@ pub fn simd_bind(a: &HV16, b: &HV16) -> HV16 {
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 #[inline]
-unsafe fn simd_bind_avx2(a: &HV16, b: &HV16) -> HV16 {
+unsafe fn simd_bind_avx2(a: &BinaryHV, b: &BinaryHV) -> BinaryHV {
     use std::arch::x86_64::*;
 
     let mut result = [0u8; 256];
@@ -148,14 +148,14 @@ unsafe fn simd_bind_avx2(a: &HV16, b: &HV16) -> HV16 {
         _mm256_storeu_si256(result.as_mut_ptr().add(offset) as *mut __m256i, vr);
     }
 
-    HV16(result)
+    BinaryHV(result)
 }
 
 /// SSE2 implementation: Process 16 bytes at once (128 bits)
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "sse2")]
 #[inline]
-unsafe fn simd_bind_sse2(a: &HV16, b: &HV16) -> HV16 {
+unsafe fn simd_bind_sse2(a: &BinaryHV, b: &BinaryHV) -> BinaryHV {
     use std::arch::x86_64::*;
 
     let mut result = [0u8; 256];
@@ -175,12 +175,12 @@ unsafe fn simd_bind_sse2(a: &HV16, b: &HV16) -> HV16 {
         _mm_storeu_si128(result.as_mut_ptr().add(offset) as *mut __m128i, vr);
     }
 
-    HV16(result)
+    BinaryHV(result)
 }
 
 /// Scalar fallback with loop unrolling for better ILP
 #[inline]
-fn simd_bind_scalar(a: &HV16, b: &HV16) -> HV16 {
+fn simd_bind_scalar(a: &BinaryHV, b: &BinaryHV) -> BinaryHV {
     let mut result = [0u8; 256];
 
     // Process 8 bytes at a time for better instruction-level parallelism
@@ -195,7 +195,7 @@ fn simd_bind_scalar(a: &HV16, b: &HV16) -> HV16 {
         result[i + 7] = a.0[i + 7] ^ b.0[i + 7];
     }
 
-    HV16(result)
+    BinaryHV(result)
 }
 
 // ============================================================================
@@ -212,14 +212,14 @@ fn simd_bind_scalar(a: &HV16, b: &HV16) -> HV16 {
 /// - **Scalar**: ~800ns (256 XOR + 2048 bit extractions)
 /// - **AVX2 + POPCNT**: ~25-50ns
 #[inline]
-pub fn simd_similarity(a: &HV16, b: &HV16) -> f32 {
+pub fn simd_similarity(a: &BinaryHV, b: &BinaryHV) -> f32 {
     let hamming = simd_hamming_distance(a, b);
-    1.0 - (hamming as f32 / HV16::DIM as f32)
+    1.0 - (hamming as f32 / BinaryHV::DIM as f32)
 }
 
 /// SIMD-accelerated Hamming distance
 #[inline]
-pub fn simd_hamming_distance(a: &HV16, b: &HV16) -> u32 {
+pub fn simd_hamming_distance(a: &BinaryHV, b: &BinaryHV) -> u32 {
     #[cfg(target_arch = "x86_64")]
     {
         if has_avx2() {
@@ -238,7 +238,7 @@ pub fn simd_hamming_distance(a: &HV16, b: &HV16) -> u32 {
 #[target_feature(enable = "avx2")]
 #[target_feature(enable = "popcnt")]
 #[inline]
-unsafe fn simd_hamming_avx2(a: &HV16, b: &HV16) -> u32 {
+unsafe fn simd_hamming_avx2(a: &BinaryHV, b: &BinaryHV) -> u32 {
     use std::arch::x86_64::*;
 
     let mut total: u64 = 0;
@@ -272,7 +272,7 @@ unsafe fn simd_hamming_avx2(a: &HV16, b: &HV16) -> u32 {
 #[target_feature(enable = "sse2")]
 #[target_feature(enable = "popcnt")]
 #[inline]
-unsafe fn simd_hamming_sse2(a: &HV16, b: &HV16) -> u32 {
+unsafe fn simd_hamming_sse2(a: &BinaryHV, b: &BinaryHV) -> u32 {
     use std::arch::x86_64::*;
 
     let mut total: u64 = 0;
@@ -299,7 +299,7 @@ unsafe fn simd_hamming_sse2(a: &HV16, b: &HV16) -> u32 {
 
 /// Scalar Hamming distance with lookup table
 #[inline]
-fn simd_hamming_scalar(a: &HV16, b: &HV16) -> u32 {
+fn simd_hamming_scalar(a: &BinaryHV, b: &BinaryHV) -> u32 {
     // Precomputed popcount table for bytes
     const POPCOUNT_TABLE: [u8; 256] = {
         let mut table = [0u8; 256];
@@ -342,9 +342,9 @@ fn simd_hamming_scalar(a: &HV16, b: &HV16) -> u32 {
 /// 2. Use vertical addition for bit counting
 /// 3. Threshold comparison in parallel
 #[inline]
-pub fn simd_bundle(vectors: &[HV16]) -> HV16 {
+pub fn simd_bundle(vectors: &[BinaryHV]) -> BinaryHV {
     if vectors.is_empty() {
-        return HV16::zero();
+        return BinaryHV::zero();
     }
     if vectors.len() == 1 {
         return vectors[0];
@@ -364,7 +364,7 @@ pub fn simd_bundle(vectors: &[HV16]) -> HV16 {
 #[cfg(target_arch = "x86_64")]
 #[target_feature(enable = "avx2")]
 #[inline]
-unsafe fn simd_bundle_avx2(vectors: &[HV16]) -> HV16 {
+unsafe fn simd_bundle_avx2(vectors: &[BinaryHV]) -> BinaryHV {
     use std::arch::x86_64::*;
 
     let n = vectors.len();
@@ -399,12 +399,12 @@ unsafe fn simd_bundle_avx2(vectors: &[HV16]) -> HV16 {
         result[byte_idx] = result_byte;
     }
 
-    HV16(result)
+    BinaryHV(result)
 }
 
 /// Scalar bundle with unrolled loops
 #[inline]
-fn simd_bundle_scalar(vectors: &[HV16]) -> HV16 {
+fn simd_bundle_scalar(vectors: &[BinaryHV]) -> BinaryHV {
     let n = vectors.len();
     let threshold = (n / 2) as i16;
     let mut result = [0u8; 256];
@@ -433,7 +433,7 @@ fn simd_bundle_scalar(vectors: &[HV16]) -> HV16 {
         result[byte_idx] = result_byte;
     }
 
-    HV16(result)
+    BinaryHV(result)
 }
 
 // ============================================================================
@@ -452,7 +452,7 @@ pub use super::optimized_hv::permute_optimized as simd_permute;
 ///
 /// Processes multiple bind operations in parallel for better cache utilization.
 #[inline]
-pub fn simd_bind_batch(pairs: &[(&HV16, &HV16)]) -> Vec<HV16> {
+pub fn simd_bind_batch(pairs: &[(&BinaryHV, &BinaryHV)]) -> Vec<BinaryHV> {
     pairs.iter().map(|(a, b)| simd_bind(a, b)).collect()
 }
 
@@ -460,7 +460,7 @@ pub fn simd_bind_batch(pairs: &[(&HV16, &HV16)]) -> Vec<HV16> {
 ///
 /// Returns similarities in the same order as targets.
 #[inline]
-pub fn simd_similarity_batch(query: &HV16, targets: &[HV16]) -> Vec<f32> {
+pub fn simd_similarity_batch(query: &BinaryHV, targets: &[BinaryHV]) -> Vec<f32> {
     targets.iter().map(|t| simd_similarity(query, t)).collect()
 }
 
@@ -468,7 +468,7 @@ pub fn simd_similarity_batch(query: &HV16, targets: &[HV16]) -> Vec<f32> {
 ///
 /// Returns (index, similarity) of the best match.
 #[inline]
-pub fn simd_find_most_similar(query: &HV16, targets: &[HV16]) -> Option<(usize, f32)> {
+pub fn simd_find_most_similar(query: &BinaryHV, targets: &[BinaryHV]) -> Option<(usize, f32)> {
     if targets.is_empty() {
         return None;
     }
@@ -491,7 +491,7 @@ pub fn simd_find_most_similar(query: &HV16, targets: &[HV16]) -> Option<(usize, 
 ///
 /// Returns Vec of (index, similarity) sorted by similarity descending.
 #[inline]
-pub fn simd_find_top_k(query: &HV16, targets: &[HV16], k: usize) -> Vec<(usize, f32)> {
+pub fn simd_find_top_k(query: &BinaryHV, targets: &[BinaryHV], k: usize) -> Vec<(usize, f32)> {
     if targets.is_empty() {
         return Vec::new();
     }
@@ -554,8 +554,8 @@ mod tests {
 
     #[test]
     fn test_simd_bind_correctness() {
-        let a = HV16::random(1);
-        let b = HV16::random(2);
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
 
         // Compare SIMD result with scalar
         let simd_result = simd_bind(&a, &b);
@@ -567,8 +567,8 @@ mod tests {
 
     #[test]
     fn test_simd_similarity_correctness() {
-        let a = HV16::random(3);
-        let b = HV16::random(4);
+        let a = BinaryHV::random(3);
+        let b = BinaryHV::random(4);
 
         let simd_sim = simd_similarity(&a, &b);
         let scalar_sim = a.similarity(&b);
@@ -579,10 +579,10 @@ mod tests {
 
     #[test]
     fn test_simd_bundle_correctness() {
-        let vectors: Vec<HV16> = (0..10).map(|i| HV16::random(i + 10)).collect();
+        let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i + 10)).collect();
 
         let simd_result = simd_bundle(&vectors);
-        let scalar_result = HV16::bundle(&vectors);
+        let scalar_result = BinaryHV::bundle(&vectors);
 
         // Bundle may have ties resolved differently, so check similarity
         let sim = simd_similarity(&simd_result, &scalar_result);
@@ -592,8 +592,8 @@ mod tests {
 
     #[test]
     fn test_simd_hamming_distance() {
-        let a = HV16::zero();
-        let b = HV16::random(20);
+        let a = BinaryHV::zero();
+        let b = BinaryHV::random(20);
 
         // Hamming distance from zero = number of 1 bits in b
         let expected: u32 = b.0.iter().map(|byte| byte.count_ones()).sum();
@@ -615,8 +615,8 @@ mod tests {
 
     #[test]
     fn test_simd_find_most_similar() {
-        let query = HV16::random(100);
-        let targets: Vec<HV16> = (0..100).map(|i| HV16::random(i + 200)).collect();
+        let query = BinaryHV::random(100);
+        let targets: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i + 200)).collect();
 
         // Add query itself to targets
         let mut targets_with_query = targets.clone();
@@ -632,8 +632,8 @@ mod tests {
 
     #[test]
     fn test_simd_find_top_k() {
-        let query = HV16::random(300);
-        let targets: Vec<HV16> = (0..100).map(|i| HV16::random(i + 400)).collect();
+        let query = BinaryHV::random(300);
+        let targets: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i + 400)).collect();
 
         let top5 = simd_find_top_k(&query, &targets, 5);
 
@@ -650,8 +650,8 @@ mod tests {
     fn test_simd_bind_performance() {
         use std::time::Instant;
 
-        let a = HV16::random(500);
-        let b = HV16::random(501);
+        let a = BinaryHV::random(500);
+        let b = BinaryHV::random(501);
 
         // Warmup
         for _ in 0..1000 {
