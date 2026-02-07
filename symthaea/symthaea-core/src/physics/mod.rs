@@ -59,11 +59,26 @@ pub mod plasma_physics;
 mod cosmology;
 
 // Phase 3: Laws derivation, classical mechanics, and more domains
+#[allow(dead_code)]
 mod derived_laws;
+#[allow(dead_code)]
 mod classical_mechanics;
+#[allow(dead_code)]
 mod statistical_mechanics;
+#[allow(dead_code)]
 mod chemical_kinetics;
+#[allow(dead_code)]
 mod acoustics;
+
+// Phase 4: Specialized domains and analogy discovery
+#[allow(dead_code)]
+mod optics;
+#[allow(dead_code)]
+mod biophysics;
+#[allow(dead_code)]
+mod geophysics;
+#[allow(dead_code)]
+mod analogy_engine;
 
 pub use standard_model::*;
 pub use hadrons::*;
@@ -108,9 +123,16 @@ pub use quantum_information::*;
 pub use fluid_dynamics::*;
 pub use cosmology::*;
 
-// Phase 3: exports
+// Phase 3: exports (statistical_mechanics and chemical_kinetics have
+// conflicting names with thermodynamics and chemistry - access via physics::module_name)
 pub use derived_laws::*;
 pub use classical_mechanics::*;
-pub use statistical_mechanics::*;
-pub use chemical_kinetics::*;
+// Note: statistical_mechanics conflicts with thermodynamics (K_BOLTZMANN, Ensemble)
+// Note: chemical_kinetics conflicts with chemistry (ReactionType, Reaction)
 pub use acoustics::*;
+
+// Phase 4: exports
+pub use optics::*;
+pub use biophysics::*;
+pub use geophysics::*;
+pub use analogy_engine::*;
