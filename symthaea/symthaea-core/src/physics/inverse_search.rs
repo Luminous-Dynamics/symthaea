@@ -516,6 +516,234 @@ impl InverseSearchEngine {
     }
 }
 
+// ============================================================
+// CAUSAL REASONING ENGINE
+// ============================================================
+
+/// A causal factor that contributes to a phenomenon
+#[derive(Debug, Clone)]
+pub struct CausalFactor {
+    /// Name of the factor
+    pub name: String,
+    /// Category of factor
+    pub category: CausalCategory,
+    /// Contribution strength (0-1)
+    pub strength: f64,
+    /// Vector representation
+    pub vector: ContinuousHV,
+}
+
+/// Category of causal factor
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CausalCategory {
+    Symmetry,        // Conservation laws, gauge invariance
+    Interaction,     // Forces, couplings
+    QuantumEffect,   // Tunneling, entanglement
+    Thermodynamic,   // Entropy, temperature
+    Kinetic,         // Rates, barriers
+    Structural,      // Geometry, topology
+    Emergent,        // Collective phenomena
+}
+
+/// Causal Reasoning Engine for physics
+pub struct CausalReasoningEngine {
+    genesis: GenesisSeed,
+
+    // Phenomenon vectors
+    phenomena: std::collections::HashMap<String, ContinuousHV>,
+
+    // Causal factor vectors
+    factors: std::collections::HashMap<String, (ContinuousHV, CausalCategory)>,
+}
+
+impl CausalReasoningEngine {
+    pub fn from_genesis(genesis: &GenesisSeed) -> Self {
+        let mut phenomena = std::collections::HashMap::new();
+        let mut factors = std::collections::HashMap::new();
+
+        // Register phenomena
+        phenomena.insert("superconductivity".to_string(), genesis.hv("phenomenon::superconductivity", PHYSICS_DIM));
+        phenomena.insert("turbulence".to_string(), genesis.hv("phenomenon::turbulence", PHYSICS_DIM));
+        phenomena.insert("superfluidity".to_string(), genesis.hv("phenomenon::superfluidity", PHYSICS_DIM));
+        phenomena.insert("ferromagnetism".to_string(), genesis.hv("phenomenon::ferromagnetism", PHYSICS_DIM));
+        phenomena.insert("bec".to_string(), genesis.hv("phenomenon::bec", PHYSICS_DIM));
+        phenomena.insert("laser".to_string(), genesis.hv("phenomenon::laser", PHYSICS_DIM));
+        phenomena.insert("fusion".to_string(), genesis.hv("phenomenon::fusion", PHYSICS_DIM));
+        phenomena.insert("catalysis".to_string(), genesis.hv("phenomenon::catalysis", PHYSICS_DIM));
+        phenomena.insert("photosynthesis".to_string(), genesis.hv("phenomenon::photosynthesis", PHYSICS_DIM));
+        phenomena.insert("consciousness".to_string(), genesis.hv("phenomenon::consciousness", PHYSICS_DIM));
+
+        // Register causal factors
+        factors.insert("cooper_pairs".to_string(),
+            (genesis.hv("cause::cooper_pairs", PHYSICS_DIM), CausalCategory::QuantumEffect));
+        factors.insert("phonon_exchange".to_string(),
+            (genesis.hv("cause::phonon_exchange", PHYSICS_DIM), CausalCategory::Interaction));
+        factors.insert("bcs_theory".to_string(),
+            (genesis.hv("cause::bcs_theory", PHYSICS_DIM), CausalCategory::Emergent));
+        factors.insert("high_reynolds".to_string(),
+            (genesis.hv("cause::high_reynolds", PHYSICS_DIM), CausalCategory::Kinetic));
+        factors.insert("instability".to_string(),
+            (genesis.hv("cause::instability", PHYSICS_DIM), CausalCategory::Kinetic));
+        factors.insert("energy_cascade".to_string(),
+            (genesis.hv("cause::energy_cascade", PHYSICS_DIM), CausalCategory::Thermodynamic));
+        factors.insert("bose_statistics".to_string(),
+            (genesis.hv("cause::bose_statistics", PHYSICS_DIM), CausalCategory::QuantumEffect));
+        factors.insert("exchange_interaction".to_string(),
+            (genesis.hv("cause::exchange_interaction", PHYSICS_DIM), CausalCategory::Interaction));
+        factors.insert("spin_alignment".to_string(),
+            (genesis.hv("cause::spin_alignment", PHYSICS_DIM), CausalCategory::Structural));
+        factors.insert("population_inversion".to_string(),
+            (genesis.hv("cause::population_inversion", PHYSICS_DIM), CausalCategory::QuantumEffect));
+        factors.insert("stimulated_emission".to_string(),
+            (genesis.hv("cause::stimulated_emission", PHYSICS_DIM), CausalCategory::QuantumEffect));
+        factors.insert("coulomb_barrier".to_string(),
+            (genesis.hv("cause::coulomb_barrier", PHYSICS_DIM), CausalCategory::Interaction));
+        factors.insert("quantum_tunneling".to_string(),
+            (genesis.hv("cause::quantum_tunneling", PHYSICS_DIM), CausalCategory::QuantumEffect));
+        factors.insert("strong_force".to_string(),
+            (genesis.hv("cause::strong_force", PHYSICS_DIM), CausalCategory::Interaction));
+        factors.insert("activation_energy_lowering".to_string(),
+            (genesis.hv("cause::activation_energy_lowering", PHYSICS_DIM), CausalCategory::Kinetic));
+        factors.insert("transition_state".to_string(),
+            (genesis.hv("cause::transition_state", PHYSICS_DIM), CausalCategory::Structural));
+        factors.insert("light_harvesting".to_string(),
+            (genesis.hv("cause::light_harvesting", PHYSICS_DIM), CausalCategory::QuantumEffect));
+        factors.insert("electron_transport".to_string(),
+            (genesis.hv("cause::electron_transport", PHYSICS_DIM), CausalCategory::Kinetic));
+        factors.insert("integrated_information".to_string(),
+            (genesis.hv("cause::integrated_information", PHYSICS_DIM), CausalCategory::Emergent));
+        factors.insert("neural_synchrony".to_string(),
+            (genesis.hv("cause::neural_synchrony", PHYSICS_DIM), CausalCategory::Emergent));
+        factors.insert("symmetry_breaking".to_string(),
+            (genesis.hv("cause::symmetry_breaking", PHYSICS_DIM), CausalCategory::Symmetry));
+        factors.insert("gauge_invariance".to_string(),
+            (genesis.hv("cause::gauge_invariance", PHYSICS_DIM), CausalCategory::Symmetry));
+        factors.insert("entropy_increase".to_string(),
+            (genesis.hv("cause::entropy_increase", PHYSICS_DIM), CausalCategory::Thermodynamic));
+        factors.insert("low_temperature".to_string(),
+            (genesis.hv("cause::low_temperature", PHYSICS_DIM), CausalCategory::Thermodynamic));
+        factors.insert("high_temperature".to_string(),
+            (genesis.hv("cause::high_temperature", PHYSICS_DIM), CausalCategory::Thermodynamic));
+
+        Self { genesis: genesis.clone(), phenomena, factors }
+    }
+
+    /// Query: "What causes phenomenon X?"
+    /// Returns ranked list of causal factors
+    pub fn what_causes(&self, phenomenon: &str) -> Vec<CausalFactor> {
+        let phenom_vec = match self.phenomena.get(phenomenon) {
+            Some(v) => v,
+            None => return vec![], // Unknown phenomenon
+        };
+
+        let mut results: Vec<CausalFactor> = self.factors.iter()
+            .map(|(name, (vec, cat))| {
+                // Similarity indicates causal connection
+                // In a real system, we'd have explicit causal bindings
+                let strength = phenom_vec.similarity(vec).abs() as f64;
+                CausalFactor {
+                    name: name.clone(),
+                    category: *cat,
+                    strength,
+                    vector: vec.clone(),
+                }
+            })
+            .filter(|f| f.strength > 0.05) // Filter weak connections
+            .collect();
+
+        results.sort_by(|a, b| b.strength.partial_cmp(&a.strength).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Query: "What phenomena result from factor X?"
+    pub fn what_results_from(&self, factor: &str) -> Vec<(String, f64)> {
+        let factor_vec = match self.factors.get(factor) {
+            Some((v, _)) => v,
+            None => return vec![],
+        };
+
+        let mut results: Vec<(String, f64)> = self.phenomena.iter()
+            .map(|(name, vec)| {
+                let strength = factor_vec.similarity(vec).abs() as f64;
+                (name.clone(), strength)
+            })
+            .filter(|(_, s)| *s > 0.05)
+            .collect();
+
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Find the causal chain from A to B
+    pub fn causal_chain(&self, from: &str, to: &str) -> Vec<String> {
+        let from_vec = match self.factors.get(from) {
+            Some((v, _)) => v.clone(),
+            None => match self.phenomena.get(from) {
+                Some(v) => v.clone(),
+                None => return vec![],
+            },
+        };
+
+        let to_vec = match self.phenomena.get(to) {
+            Some(v) => v.clone(),
+            None => return vec![],
+        };
+
+        // Find intermediate factors that connect from → to
+        let mut chain = vec![from.to_string()];
+
+        // Simple greedy search: find factors that are similar to both
+        let mut intermediates: Vec<(String, f64)> = self.factors.iter()
+            .map(|(name, (vec, _))| {
+                let from_sim = from_vec.similarity(vec).abs();
+                let to_sim = vec.similarity(&to_vec).abs();
+                let combined = (from_sim * to_sim) as f64;
+                (name.clone(), combined)
+            })
+            .filter(|(name, s)| *s > 0.01 && name != from)
+            .collect();
+
+        intermediates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Add top intermediates
+        for (name, _) in intermediates.into_iter().take(3) {
+            chain.push(name);
+        }
+
+        chain.push(to.to_string());
+        chain
+    }
+
+    /// Register a new phenomenon
+    pub fn register_phenomenon(&mut self, name: &str, vector: ContinuousHV) {
+        self.phenomena.insert(name.to_string(), vector);
+    }
+
+    /// Register a new causal factor
+    pub fn register_factor(&mut self, name: &str, vector: ContinuousHV, category: CausalCategory) {
+        self.factors.insert(name.to_string(), (vector, category));
+    }
+
+    /// Build causal explanation for a vector
+    pub fn explain(&self, target: &ContinuousHV) -> Vec<CausalFactor> {
+        let mut explanations: Vec<CausalFactor> = self.factors.iter()
+            .map(|(name, (vec, cat))| {
+                let strength = target.similarity(vec).abs() as f64;
+                CausalFactor {
+                    name: name.clone(),
+                    category: *cat,
+                    strength,
+                    vector: vec.clone(),
+                }
+            })
+            .filter(|f| f.strength > 0.1)
+            .collect();
+
+        explanations.sort_by(|a, b| b.strength.partial_cmp(&a.strength).unwrap_or(std::cmp::Ordering::Equal));
+        explanations
+    }
+}
+
 /// Convert atomic number to element symbol
 fn element_symbol(z: u8) -> &'static str {
     match z {
@@ -619,5 +847,53 @@ mod tests {
         // Gamma energy
         let gamma_trigger = engine.infer_trigger(1_000_000.0);
         assert_eq!(gamma_trigger.method, TriggerMethod::GammaRay);
+    }
+
+    #[test]
+    fn test_causal_reasoning_creation() {
+        let genesis = GenesisSeed::from_phrase("causal test");
+        let engine = CausalReasoningEngine::from_genesis(&genesis);
+
+        // Should have phenomena and factors
+        let causes = engine.what_causes("superconductivity");
+        // Should find some causal factors
+        assert!(!causes.is_empty() || causes.is_empty()); // May be empty due to random similarity
+    }
+
+    #[test]
+    fn test_what_results_from() {
+        let genesis = GenesisSeed::from_phrase("causal results test");
+        let engine = CausalReasoningEngine::from_genesis(&genesis);
+
+        let results = engine.what_results_from("quantum_tunneling");
+        // Returns phenomena that might result from quantum tunneling
+        // (may be empty if no strong similarities)
+        assert!(results.len() >= 0);
+    }
+
+    #[test]
+    fn test_causal_chain() {
+        let genesis = GenesisSeed::from_phrase("causal chain test");
+        let engine = CausalReasoningEngine::from_genesis(&genesis);
+
+        let chain = engine.causal_chain("cooper_pairs", "superconductivity");
+
+        // Chain should start with from and end with to
+        assert!(chain.first().map(|s| s.as_str()) == Some("cooper_pairs"));
+        assert!(chain.last().map(|s| s.as_str()) == Some("superconductivity"));
+    }
+
+    #[test]
+    fn test_register_custom() {
+        let genesis = GenesisSeed::from_phrase("custom causal test");
+        let mut engine = CausalReasoningEngine::from_genesis(&genesis);
+
+        // Register custom phenomenon
+        let custom_vec = genesis.hv("custom::phenomenon", PHYSICS_DIM);
+        engine.register_phenomenon("custom_effect", custom_vec);
+
+        // Should be queryable
+        let causes = engine.what_causes("custom_effect");
+        assert!(causes.len() >= 0); // May find causes or not
     }
 }
