@@ -67,7 +67,7 @@ impl EpistemicCode {
 /// Epistemic-aware code generator wrapper
 pub struct EpistemicCodeGenerator {
     generator: CodeGenerator,
-    intent_classifier: CodeIntentClassifier,
+    _intent_classifier: CodeIntentClassifier,
 }
 
 impl EpistemicCodeGenerator {
@@ -75,7 +75,7 @@ impl EpistemicCodeGenerator {
     pub fn new(generator: CodeGenerator, dim: usize) -> Self {
         Self {
             generator,
-            intent_classifier: CodeIntentClassifier::new(dim),
+            _intent_classifier: CodeIntentClassifier::new(dim),
         }
     }
 

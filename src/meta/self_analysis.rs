@@ -18,7 +18,7 @@ use symthaea_core::hdc::RealHV;
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::hdc::code_algebra::CodeAlgebra;
 use crate::hdc::code_memory::{CodebaseMemory, CodeMatch};
-use crate::language::code_parser::{ParsedCode, EntityKind};
+use crate::language::code_parser::{EntityKind, ParsedCode};
 
 /// A self-model of the codebase
 #[derive(Debug)]
@@ -40,7 +40,7 @@ pub struct SelfModel {
 /// Self-analysis engine
 pub struct SelfAnalyzer {
     memory: CodebaseMemory,
-    algebra: CodeAlgebra,
+    _algebra: CodeAlgebra,
 }
 
 impl SelfAnalyzer {
@@ -50,7 +50,7 @@ impl SelfAnalyzer {
         let algebra = CodeAlgebra::new(CodeHDEncoder::new(dim));
         Self {
             memory: CodebaseMemory::new(encoder),
-            algebra,
+            _algebra: algebra,
         }
     }
 

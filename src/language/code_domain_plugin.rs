@@ -11,7 +11,6 @@
 //! - ProgrammingPlugin: handles discussion about programming concepts
 //! - CodeDomainPlugin: handles actual code snippets, generation requests
 
-use std::collections::HashMap;
 
 use super::domain_plugin::{
     DomainPlugin, DomainPrompts, Entity, IntentPrototypes, ValidationResult,

@@ -271,6 +271,29 @@ pub mod hd_ltc_codec;
 /// LTC generative core: generative thought engine using HD-LTC codec.
 pub mod ltc_generative_core;
 
+/// True IIT 3.0 exact computation: TPM, EMD, cause-effect repertoires, MIP, temporal Phi.
+pub mod iit_exact;
+
+/// Information-theoretic measures (Shannon entropy, mutual information, transfer
+/// entropy) for HDC states. These underpin Phi measurement and causal analysis.
+pub mod information_theory;
+
+/// Geometric operations on the hypervector manifold (hypersphere S^{d-1}).
+/// Provides geodesic distance, SLERP, exp/log maps, parallel transport,
+/// Frechet mean, Riemannian gradient, and Principal Geodesic Analysis.
+pub mod geometric_ops;
+
+/// Probabilistic HDC: extends hypervectors with explicit uncertainty (mean + variance).
+/// Enables Bayesian belief updating, confidence-weighted similarity, and
+/// information-theoretic introspection --- the mathematical substrate for
+/// Active Inference in hyperdimensional space.
+pub mod probabilistic_hdc;
+
+/// Tensor operations and geometric (Clifford) algebra for structured HDC.
+/// Tensor products encode multi-way concept relationships; geometric algebra
+/// provides rotation-invariant processing for spatial and attentional reasoning.
+pub mod tensor_algebra;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL MODULES - Code Understanding (Consciousness-Aware Code)
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -286,6 +309,17 @@ pub mod code_algebra;
 /// Project-level HDC memory for codebase indexing and retrieval.
 #[cfg(feature = "code_understanding")]
 pub mod code_memory;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOCAL MODULES - Moral Reasoning
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Moral algebra for compositional ethical reasoning via HDC.
+///
+/// Defines 7 moral primitives (AGENT, PATIENT, ACTION, INTENT, CONSENT,
+/// OBLIGATION, MAGNITUDE) and 5 operators (CAUSES, VIOLATES, SATISFIES,
+/// PROPORTIONAL, NEGATES) for algebraic moral reasoning.
+pub mod moral_algebra;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL MODULES - Testing

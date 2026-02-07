@@ -85,6 +85,7 @@ fn main() {
         tau_base: 100.0,
         enable_adaptive_thresholds: true,
         steps_per_epoch: 100, // Reduced for faster benchmarking
+        use_spectral_analysis: true, // Use Welch PSD for band powers
         ..SleepSentinelConfig::default()
     };
 
@@ -302,6 +303,7 @@ fn run_synthetic_benchmark() {
         tau_base: 100.0,
         enable_adaptive_thresholds: true,
         steps_per_epoch: 500, // Reduced from 3000 for faster benchmark
+        use_spectral_analysis: true, // Use Welch PSD for band powers
         ..SleepSentinelConfig::default()
     };
 

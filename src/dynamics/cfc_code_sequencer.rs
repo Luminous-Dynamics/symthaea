@@ -19,8 +19,6 @@
 
 use symthaea_core::hdc::RealHV;
 
-use crate::hdc::code_encoder::CodeHDEncoder;
-use crate::language::code_parser::EntityKind;
 
 /// Maximum number of planning steps before forcing completion
 const MAX_PLAN_STEPS: usize = 32;

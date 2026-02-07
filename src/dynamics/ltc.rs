@@ -23,6 +23,20 @@ use ndarray::Array1;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
+use super::ode_solvers::rk4_step_fn;
+
+/// Integration method for LTC dynamics.
+///
+/// Euler is the classic first-order method (fast, lower accuracy).
+/// RK4 is fourth-order (4x more computation per step, ~10-100x lower error).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IntegrationMethod {
+    /// Forward Euler (1st order). Default for backward compatibility.
+    Euler,
+    /// Classical Runge-Kutta (4th order). Higher accuracy per step.
+    RK4,
+}
+
 // =============================================================================
 // COMPRESSED SPARSE ROW (CSR) MATRIX
 // =============================================================================
@@ -302,6 +316,14 @@ pub struct LiquidNetwork {
 
     /// Connectivity ratio (for diagnostics)
     connectivity: f32,
+
+    /// Integration method (Euler or RK4)
+    #[serde(default = "default_integration_method")]
+    pub integration_method: IntegrationMethod,
+}
+
+fn default_integration_method() -> IntegrationMethod {
+    IntegrationMethod::Euler
 }
 
 /// Configuration for LiquidNetwork
@@ -319,6 +341,8 @@ pub struct LiquidNetworkConfig {
     pub bias_range: (f32, f32),
     /// Weight range (min, max)
     pub weight_range: (f32, f32),
+    /// Integration method (Euler or RK4)
+    pub integration_method: IntegrationMethod,
 }
 
 impl Default for LiquidNetworkConfig {
@@ -330,6 +354,7 @@ impl Default for LiquidNetworkConfig {
             tau_range: (0.5, 2.0),  // Time constants
             bias_range: (-0.5, 0.5),
             weight_range: (-1.0, 1.0),
+            integration_method: IntegrationMethod::Euler,
         }
     }
 }
@@ -377,6 +402,7 @@ impl LiquidNetwork {
             dt: config.dt,
             steps: 0,
             connectivity: config.connectivity,
+            integration_method: config.integration_method,
         })
     }
 
@@ -431,13 +457,41 @@ impl LiquidNetwork {
         let mut sigmoid_output = vec![0.0f32; self.num_neurons];
         fast_sigmoid_vec(&weighted_input, &mut sigmoid_output);
 
-        // Continuous-time update: dx = (-x/τ + σ(Wx + b)) * dt
-        // Integrate: x += dx
-        // Clip to [0, 1] range
-        // All in one pass for cache efficiency
-        for i in 0..self.num_neurons {
-            let dx = (sigmoid_output[i] - self.state[i] / self.tau[i]) * self.dt;
-            self.state[i] = (self.state[i] + dx).clamp(0.0, 1.0);
+        match self.integration_method {
+            IntegrationMethod::Euler => {
+                // Continuous-time update: dx = (-x/τ + σ(Wx + b)) * dt
+                // Integrate: x += dx
+                // Clip to [0, 1] range
+                // All in one pass for cache efficiency
+                for i in 0..self.num_neurons {
+                    let dx = (sigmoid_output[i] - self.state[i] / self.tau[i]) * self.dt;
+                    self.state[i] = (self.state[i] + dx).clamp(0.0, 1.0);
+                }
+            }
+            IntegrationMethod::RK4 => {
+                // RK4 integration: higher accuracy (O(h^4) vs O(h)) at 4x compute cost.
+                // Cast f32 state to f64 for RK4, then back.
+                let n = self.num_neurons;
+                let h = self.dt as f64;
+                let y: Vec<f64> = (0..n).map(|i| self.state[i] as f64).collect();
+                let mut y_out = vec![0.0f64; n];
+
+                // Capture sigmoid_output and tau for the closure.
+                // The derivative is: dx_i/dt = sigmoid_output[i] - x[i] / tau[i]
+                // Note: sigmoid_output is computed once from the current state (operator
+                // splitting). This matches the Euler branch semantics.
+                let tau = &self.tau;
+                let sig = &sigmoid_output;
+                rk4_step_fn(0.0, &y, h, |_t, state, dydt| {
+                    for i in 0..n {
+                        dydt[i] = sig[i] as f64 - state[i] / tau[i] as f64;
+                    }
+                }, &mut y_out);
+
+                for i in 0..n {
+                    self.state[i] = (y_out[i] as f32).clamp(0.0, 1.0);
+                }
+            }
         }
 
         self.steps += 1;
@@ -641,6 +695,7 @@ mod tests {
             tau_range: (1.0, 3.0),
             bias_range: (-1.0, 1.0),
             weight_range: (-2.0, 2.0),
+            integration_method: IntegrationMethod::Euler,
         };
 
         let network = LiquidNetwork::with_config(config).unwrap();
@@ -661,5 +716,77 @@ mod tests {
         network.step_n(100).unwrap();
 
         assert_eq!(network.steps, 100);
+    }
+
+    #[test]
+    fn test_ltc_rk4_accuracy() {
+        // Compare Euler vs RK4 on the same network.
+        // RK4 should produce lower cumulative integration error.
+        //
+        // Strategy: Run two identical networks (same initial state, weights, etc.)
+        // with Euler and RK4. Since RK4 is O(h^4) vs Euler O(h), the two should
+        // diverge, and RK4 should be closer to a "ground truth" computed with a
+        // very small Euler step.
+
+        // Ground truth: Euler with dt=0.0001 (100x smaller)
+        let config_truth = LiquidNetworkConfig {
+            num_neurons: 16,
+            connectivity: 0.3,
+            dt: 0.0001,
+            tau_range: (0.5, 2.0),
+            bias_range: (-0.5, 0.5),
+            weight_range: (-1.0, 1.0),
+            integration_method: IntegrationMethod::Euler,
+        };
+        let mut net_truth = LiquidNetwork::with_config(config_truth).unwrap();
+
+        // Euler with dt=0.01
+        let mut net_euler = net_truth.clone();
+        net_euler.dt = 0.01;
+        net_euler.integration_method = IntegrationMethod::Euler;
+
+        // RK4 with dt=0.01
+        let mut net_rk4 = net_truth.clone();
+        net_rk4.dt = 0.01;
+        net_rk4.integration_method = IntegrationMethod::RK4;
+
+        // Inject same input
+        let input: Vec<f32> = (0..16).map(|i| (i as f32) / 16.0).collect();
+        net_truth.inject(&input).unwrap();
+        net_euler.inject(&input).unwrap();
+        net_rk4.inject(&input).unwrap();
+
+        // Evolve: truth takes 100 steps of 0.0001 = same total time as 1 step of 0.01
+        let num_coarse_steps = 50;
+        for _ in 0..num_coarse_steps {
+            // Truth: 100 fine steps per coarse step
+            for _ in 0..100 {
+                net_truth.step().unwrap();
+            }
+            net_euler.step().unwrap();
+            net_rk4.step().unwrap();
+        }
+
+        // Compute L2 error vs truth
+        let truth_state = net_truth.neuron_states();
+        let euler_state = net_euler.neuron_states();
+        let rk4_state = net_rk4.neuron_states();
+
+        let euler_error: f32 = truth_state.iter().zip(euler_state.iter())
+            .map(|(t, e)| (t - e).powi(2))
+            .sum::<f32>()
+            .sqrt();
+
+        let rk4_error: f32 = truth_state.iter().zip(rk4_state.iter())
+            .map(|(t, r)| (t - r).powi(2))
+            .sum::<f32>()
+            .sqrt();
+
+        // RK4 should have significantly lower error than Euler at the same dt
+        assert!(
+            rk4_error < euler_error,
+            "RK4 error ({:.6}) should be less than Euler error ({:.6})",
+            rk4_error, euler_error
+        );
     }
 }

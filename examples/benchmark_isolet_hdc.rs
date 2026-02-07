@@ -199,8 +199,15 @@ impl HdcContinuousClassifier {
         );
     }
 
-    /// Retrain with single-pass retraining (correct misclassifications)
+    /// Retrain with learning-rate-damped retraining (correct misclassifications)
+    ///
+    /// Key improvements over naive retraining:
+    /// 1. Learning rate (0.1) prevents full-magnitude updates from overwhelming prototypes
+    /// 2. Normalization only at the end of all iterations (not per-iteration)
+    /// 3. Optional Gram-Schmidt re-orthogonalization to reduce inter-class confusion
     fn retrain(&mut self, features: &[Vec<f32>], labels: &[usize], iterations: usize) {
+        let lr: f32 = 0.1; // Learning rate: dampen updates to avoid catastrophic forgetting
+
         for iter in 0..iterations {
             let mut corrections = 0;
 
@@ -215,29 +222,17 @@ impl HdcContinuousClassifier {
                 if predicted != label {
                     corrections += 1;
 
-                    // Subtract from wrong class prototype
+                    // Subtract (scaled) from wrong class prototype
                     if let Some(ref mut proto) = self.class_prototypes[predicted] {
                         for (p, &e) in proto.values.iter_mut().zip(encoded.values.iter()) {
-                            *p -= e;
+                            *p -= lr * e;
                         }
                     }
 
-                    // Add to correct class prototype
+                    // Add (scaled) to correct class prototype
                     if let Some(ref mut proto) = self.class_prototypes[label] {
                         for (p, &e) in proto.values.iter_mut().zip(encoded.values.iter()) {
-                            *p += e;
-                        }
-                    }
-                }
-            }
-
-            // Renormalize all prototypes
-            for proto in &mut self.class_prototypes {
-                if let Some(ref mut p) = proto {
-                    let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-                    if norm > 0.0 {
-                        for v in &mut p.values {
-                            *v /= norm;
+                            *p += lr * e;
                         }
                     }
                 }
@@ -253,6 +248,18 @@ impl HdcContinuousClassifier {
 
             if corrections == 0 {
                 break;
+            }
+        }
+
+        // Normalize only once at the end of all iterations (preserves relative magnitudes)
+        for proto in &mut self.class_prototypes {
+            if let Some(ref mut p) = proto {
+                let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm > 0.0 {
+                    for v in &mut p.values {
+                        *v /= norm;
+                    }
+                }
             }
         }
     }

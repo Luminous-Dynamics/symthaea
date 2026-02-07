@@ -2335,6 +2335,137 @@ impl CfCNetwork {
             (Array1::zeros(self.config.output_dim), vec![])
         }
     }
+
+    /// Diagnose the current dynamics of the CfC network.
+    ///
+    /// Computes a numerical Jacobian at the current state via finite differences,
+    /// then extracts eigenvalue-related diagnostics:
+    /// - **max_eigenvalue_real**: Largest real part of eigenvalues. If < 0, system
+    ///   is at a stable fixed point (all modes are decaying). If ~0, system is at a
+    ///   marginally stable attractor. If > 0, system is unstable/diverging.
+    /// - **condition_number**: Ratio of largest to smallest eigenvalue magnitude.
+    ///   Large values (>100) indicate ill-conditioning (some modes much faster than
+    ///   others, causing stiff dynamics and tiny gradients).
+    /// - **collapsed**: True if all eigenvalue real parts are negative and small,
+    ///   indicating the dynamics have collapsed to a stable attractor.
+    pub fn diagnose_dynamics(&mut self, input: &Array1<f32>, dt: f32) -> DynamicsDiagnostic {
+        let epsilon = 1e-4f32;
+        let dim = self.config.hidden_dim;
+
+        // Save current state
+        let saved_states: Vec<Array1<f32>> = self.cells.iter().map(|c| c.state().clone()).collect();
+
+        // Get baseline output from forward pass
+        let baseline_output = self.forward(input, dt);
+        let baseline: Vec<f32> = baseline_output.to_vec();
+
+        // Restore state
+        for (cell, state) in self.cells.iter_mut().zip(saved_states.iter()) {
+            cell.set_state(state.clone());
+        }
+
+        // Compute numerical Jacobian: J[i][j] = d(output_i)/d(state_j)
+        // We perturb the first cell's state since that's what drives the network
+        let state_dim = dim.min(baseline.len());
+        let output_dim = baseline.len().min(32); // Cap for performance
+        let perturb_dim = state_dim.min(32); // Cap for performance
+
+        let mut jacobian = vec![vec![0.0f64; perturb_dim]; output_dim];
+
+        for j in 0..perturb_dim {
+            // Perturb state dimension j
+            let mut perturbed_state = saved_states[0].clone();
+            perturbed_state[j] += epsilon;
+
+            // Set perturbed state
+            self.cells[0].set_state(perturbed_state);
+            for (idx, state) in saved_states.iter().enumerate().skip(1) {
+                self.cells[idx].set_state(state.clone());
+            }
+
+            let perturbed_output = self.forward(input, dt);
+
+            for i in 0..output_dim {
+                jacobian[i][j] = (perturbed_output[i] - baseline[i]) as f64 / epsilon as f64;
+            }
+
+            // Restore state
+            for (cell, state) in self.cells.iter_mut().zip(saved_states.iter()) {
+                cell.set_state(state.clone());
+            }
+        }
+
+        // Estimate eigenvalues via the Gershgorin circle theorem
+        // For the actual eigenvalues we'd need a full eigensolver, but
+        // Gershgorin discs give useful bounds.
+        let n = output_dim.min(perturb_dim);
+        let mut max_real = f64::NEG_INFINITY;
+        let mut min_abs = f64::INFINITY;
+        let mut max_abs = 0.0f64;
+
+        for i in 0..n {
+            // Diagonal element is the "center" of the Gershgorin disc
+            let diag = if i < jacobian.len() && i < jacobian[i].len() {
+                jacobian[i][i]
+            } else {
+                0.0
+            };
+
+            // Radius = sum of off-diagonal absolute values in row i
+            let radius: f64 = (0..n)
+                .filter(|&j| j != i)
+                .map(|j| {
+                    if i < jacobian.len() && j < jacobian[i].len() {
+                        jacobian[i][j].abs()
+                    } else {
+                        0.0
+                    }
+                })
+                .sum();
+
+            // The eigenvalue's real part is bounded by [diag - radius, diag + radius]
+            // Use the center as our estimate
+            max_real = max_real.max(diag);
+            let abs_val = diag.abs();
+            if abs_val > 1e-12 {
+                min_abs = min_abs.min(abs_val);
+            }
+            max_abs = max_abs.max(abs_val + radius);
+        }
+
+        if min_abs == f64::INFINITY {
+            min_abs = 1e-12;
+        }
+
+        let condition_number = max_abs / min_abs.max(1e-12);
+
+        // System is "collapsed" if all eigenvalue estimates are negative and small
+        let collapsed = max_real < -0.01 && max_abs < 1.0;
+
+        DynamicsDiagnostic {
+            max_eigenvalue_real: max_real,
+            condition_number,
+            collapsed,
+            state_norm: saved_states.iter()
+                .map(|s| s.iter().map(|x| x * x).sum::<f32>().sqrt())
+                .sum::<f32>() / saved_states.len() as f32,
+        }
+    }
+}
+
+/// Diagnostic information about CfC network dynamics at the current state.
+#[derive(Debug, Clone)]
+pub struct DynamicsDiagnostic {
+    /// Largest estimated real part of the Jacobian eigenvalues.
+    /// Negative = stable, zero = marginal, positive = unstable.
+    pub max_eigenvalue_real: f64,
+    /// Condition number (ratio of largest to smallest eigenvalue magnitude).
+    /// Large values (>100) indicate stiff dynamics that produce tiny gradients.
+    pub condition_number: f64,
+    /// Whether the dynamics appear collapsed to a stable attractor.
+    pub collapsed: bool,
+    /// Average L2 norm of cell states.
+    pub state_norm: f32,
 }
 
 // =============================================================================
@@ -2977,5 +3108,40 @@ mod tests {
 
         assert!((result[0] - 0.75).abs() < 1e-5);
         assert!((result[1] - 0.25).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_cfc_dynamics_diagnostic() {
+        // Create a small CfC network and run diagnostics
+        let config = CfCNetworkConfig {
+            input_dim: 4,
+            hidden_dim: 8,
+            num_layers: 1,
+            output_dim: 4,
+            ..Default::default()
+        };
+        let mut network = CfCNetwork::new(config);
+
+        let input = Array1::from_vec(vec![0.5, 0.3, -0.2, 0.1]);
+
+        // Run a few steps to let the dynamics settle
+        for _ in 0..10 {
+            network.step(&input, 0.1).unwrap();
+        }
+
+        // Now diagnose
+        let diag = network.diagnose_dynamics(&input, 0.1);
+
+        // Condition number should be positive
+        assert!(diag.condition_number > 0.0,
+            "Condition number should be positive: {}", diag.condition_number);
+
+        // State norm should be non-negative
+        assert!(diag.state_norm >= 0.0,
+            "State norm should be non-negative: {}", diag.state_norm);
+
+        // max_eigenvalue_real is a Gershgorin estimate, should be finite
+        assert!(diag.max_eigenvalue_real.is_finite(),
+            "Max eigenvalue should be finite: {}", diag.max_eigenvalue_real);
     }
 }

@@ -80,6 +80,10 @@ mod geophysics;
 #[allow(dead_code)]
 mod analogy_engine;
 
+// Demonstration module
+#[cfg(test)]
+mod demo;
+
 pub use standard_model::*;
 pub use hadrons::*;
 pub use periodic_table::*;

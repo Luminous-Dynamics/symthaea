@@ -3,7 +3,6 @@
 //! Implements `CodeParser` for Python source code, extracting functions, classes,
 //! decorators, imports, type hints, comprehensions, and match statements.
 
-use std::collections::HashMap;
 use tree_sitter::Parser;
 
 use super::code_parser::*;

@@ -18,6 +18,7 @@ use std::cell::RefCell;
 // Thread-local buffer for bundle operations - prevents 65KB stack allocation
 thread_local! {
     static BUNDLE_COUNTS: RefCell<Vec<i16>> = RefCell::new(vec![0i16; 16_384]);
+    static WEIGHTED_COUNTS: RefCell<Vec<f32>> = RefCell::new(vec![0.0f32; 16_384]);
 }
 
 /// 16,384-bit hypervector (2048 bytes = 2 KB)
@@ -290,6 +291,111 @@ impl HV16 {
         })
     }
 
+    /// Weighted bundle: majority vote with per-vector weights
+    ///
+    /// Each vector's contribution is scaled by its weight. Positive weights
+    /// vote for the vector's bit values; negative weights vote against.
+    ///
+    /// # Arguments
+    /// - `vectors`: Slice of hypervectors to bundle
+    /// - `weights`: Slice of weights (must be same length as `vectors`)
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::HV16;
+    /// let a = HV16::random(1);
+    /// let b = HV16::random(2);
+    /// let result = HV16::weighted_bundle(&[a, b], &[3.0, 1.0]);
+    /// // a dominates the result due to higher weight
+    /// assert!(result.similarity(&a) > result.similarity(&b));
+    /// ```
+    pub fn weighted_bundle(vectors: &[Self], weights: &[f32]) -> Self {
+        assert_eq!(vectors.len(), weights.len(), "vectors and weights must have same length");
+
+        if vectors.is_empty() {
+            return Self::zero();
+        }
+
+        let mut counts = [0.0f32; 16_384];
+
+        for (vec, &weight) in vectors.iter().zip(weights.iter()) {
+            for byte_idx in 0..2048 {
+                let byte = vec.0[byte_idx];
+                for bit_idx in 0..8 {
+                    let pos = byte_idx * 8 + bit_idx;
+                    if (byte >> bit_idx) & 1 == 1 {
+                        counts[pos] += weight;
+                    } else {
+                        counts[pos] -= weight;
+                    }
+                }
+            }
+        }
+
+        let mut result = [0u8; 2048];
+        for byte_idx in 0..2048 {
+            for bit_idx in 0..8 {
+                let pos = byte_idx * 8 + bit_idx;
+                if counts[pos] > 0.0 {
+                    result[byte_idx] |= 1 << bit_idx;
+                }
+            }
+        }
+
+        Self(result)
+    }
+
+    /// Weighted bundle using heap-allocated thread-local buffer (stack-safe!)
+    ///
+    /// Same as [`weighted_bundle`] but uses a thread-local buffer to avoid
+    /// the 64KB stack allocation.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::HV16;
+    /// let vectors: Vec<HV16> = (0..100).map(|i| HV16::random(i)).collect();
+    /// let weights: Vec<f32> = (0..100).map(|i| i as f32).collect();
+    /// let result = HV16::weighted_bundle_safe(&vectors, &weights);
+    /// ```
+    pub fn weighted_bundle_safe(vectors: &[Self], weights: &[f32]) -> Self {
+        assert_eq!(vectors.len(), weights.len(), "vectors and weights must have same length");
+
+        if vectors.is_empty() {
+            return Self::zero();
+        }
+
+        WEIGHTED_COUNTS.with(|buf| {
+            let mut counts = buf.borrow_mut();
+            counts.fill(0.0);
+
+            for (vec, &weight) in vectors.iter().zip(weights.iter()) {
+                for byte_idx in 0..2048 {
+                    let byte = vec.0[byte_idx];
+                    for bit_idx in 0..8 {
+                        let pos = byte_idx * 8 + bit_idx;
+                        if (byte >> bit_idx) & 1 == 1 {
+                            counts[pos] += weight;
+                        } else {
+                            counts[pos] -= weight;
+                        }
+                    }
+                }
+            }
+
+            let mut result = [0u8; 2048];
+            for byte_idx in 0..2048 {
+                for bit_idx in 0..8 {
+                    let pos = byte_idx * 8 + bit_idx;
+                    if counts[pos] > 0.0 {
+                        result[byte_idx] |= 1 << bit_idx;
+                    }
+                }
+            }
+
+            Self(result)
+        })
+    }
+
     /// Calculate density (proportion of 1-bits)
     ///
     /// Returns value in [0.0, 1.0]:
@@ -518,6 +624,124 @@ impl HV16 {
         self.permute(shift)
     }
 
+    /// N-gram sequence encoding
+    ///
+    /// Encodes an ordered sequence of vectors using the standard HDC n-gram:
+    /// `permute(v[0], n-1) ⊗ permute(v[1], n-2) ⊗ ... ⊗ v[n-1]`
+    ///
+    /// Each vector is permuted by its position distance from the end,
+    /// then all are bound (XOR) together. This creates order-sensitive
+    /// representations: ngram([a, b]) != ngram([b, a]).
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::HV16;
+    /// let a = HV16::random(1);
+    /// let b = HV16::random(2);
+    /// let c = HV16::random(3);
+    ///
+    /// let abc = HV16::ngram(&[a, b, c]);
+    /// let cba = HV16::ngram(&[c, b, a]);
+    /// assert!(abc.similarity(&cba) < 0.55);  // Different orders
+    /// ```
+    pub fn ngram(vectors: &[Self]) -> Self {
+        if vectors.is_empty() {
+            return Self::zero();
+        }
+
+        let n = vectors.len();
+        let mut result = vectors[0].permute(n - 1);
+
+        for i in 1..n {
+            let permuted = vectors[i].permute(n - 1 - i);
+            result = result.bind(&permuted);
+        }
+
+        result
+    }
+
+    /// Fractional power: continuous interpolation between self and a random target
+    ///
+    /// Enables encoding continuous scalar values in HDC space:
+    /// - exponent = 0.0 → returns self (identity)
+    /// - exponent = 1.0 → returns a deterministic random target (from seed)
+    /// - intermediate values → interpolates by flipping bits with probability
+    ///   proportional to the exponent
+    ///
+    /// Uses the XOR between self and the target as a flip mask, then
+    /// selectively applies flips based on the exponent.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::HV16;
+    /// let base = HV16::random(1);
+    /// let half = base.fractional_power(0.5, 99);
+    /// assert!(base.similarity(&half) > 0.2 && base.similarity(&half) < 0.8);
+    /// ```
+    pub fn fractional_power(&self, exponent: f32, seed: u64) -> Self {
+        if exponent <= 0.0 {
+            return *self;
+        }
+
+        let target = Self::random(seed);
+
+        if exponent >= 1.0 {
+            return target;
+        }
+
+        // XOR gives us the bits that differ between self and target
+        let diff = self.bind(&target);
+        // Generate a noise mask to select which differing bits to flip
+        // Use a combined seed for determinism
+        let noise = Self::random(seed.wrapping_mul(0x517cc1b727220a95).wrapping_add(1));
+
+        let threshold = (exponent * 255.0) as u8;
+        let mut result = *self;
+
+        for byte_idx in 0..2048 {
+            for bit_idx in 0..8 {
+                // Only consider bits that differ between self and target
+                let diff_bit = (diff.0[byte_idx] >> bit_idx) & 1;
+                if diff_bit == 1 {
+                    let rand_val = noise.0[(byte_idx.wrapping_add(bit_idx * 251)) % 2048];
+                    if rand_val < threshold {
+                        result.0[byte_idx] ^= 1 << bit_idx;
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Return the top-K entries by similarity score
+    ///
+    /// Uses partial sort for efficiency — only the top K items are fully sorted.
+    ///
+    /// # Arguments
+    /// - `similarities`: Slice of (index, similarity) pairs
+    /// - `k`: Number of top entries to return
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::HV16;
+    /// let sims = vec![(0, 0.9), (1, 0.3), (2, 0.7), (3, 0.5)];
+    /// let top2 = HV16::k_winners(&sims, 2);
+    /// assert_eq!(top2[0].0, 0);  // highest similarity
+    /// assert_eq!(top2[1].0, 2);  // second highest
+    /// ```
+    pub fn k_winners(similarities: &[(usize, f32)], k: usize) -> Vec<(usize, f32)> {
+        let mut sorted: Vec<(usize, f32)> = similarities.to_vec();
+        // Partial sort: only need top-k
+        let k = k.min(sorted.len());
+        sorted.select_nth_unstable_by(k.saturating_sub(1), |a, b| {
+            b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        sorted.truncate(k);
+        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        sorted
+    }
+
     /// Hamming similarity (0.0 = opposite, 1.0 = identical)
     ///
     /// Counts matching bits and normalizes to [0, 1].
@@ -564,6 +788,33 @@ impl HV16 {
             .sum();
 
         matching_bits as f32 / Self::DIM as f32
+    }
+
+    /// Bipolar cosine similarity in [-1, 1] range
+    ///
+    /// Maps Hamming similarity from [0, 1] to bipolar [-1, 1]:
+    /// - 1.0 = identical vectors
+    /// - 0.0 = orthogonal/unrelated (random expectation)
+    /// - -1.0 = opposite vectors (bitwise NOT)
+    ///
+    /// This is the standard similarity metric used in many HDC papers.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::HV16;
+    /// let a = HV16::random(42);
+    /// assert_eq!(a.cosine_similarity(&a), 1.0);
+    ///
+    /// let inv = a.invert();
+    /// assert_eq!(a.cosine_similarity(&inv), -1.0);
+    ///
+    /// let b = HV16::random(43);
+    /// let sim = a.cosine_similarity(&b);
+    /// assert!(sim.abs() < 0.1);  // Random vectors ~0.0
+    /// ```
+    #[inline]
+    pub fn cosine_similarity(&self, other: &Self) -> f32 {
+        2.0 * self.similarity(other) - 1.0
     }
 
     /// Hamming distance (number of differing bits)
@@ -620,6 +871,54 @@ impl HV16 {
         let mut result = [0u8; 2048];
         for i in 0..2048 {
             result[i] = !self.0[i];
+        }
+        Self(result)
+    }
+
+    /// Intersection (bitwise AND)
+    ///
+    /// Returns a vector with bits set only where both inputs have 1.
+    /// Represents "strict agreement" or set intersection in HDC.
+    ///
+    /// For two random ~50% density vectors, the result has ~25% density.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::HV16;
+    /// let a = HV16::random(1);
+    /// let b = HV16::random(2);
+    /// let inter = a.intersection(&b);
+    /// assert!(inter.density() < 0.35);  // ~25% for random vectors
+    /// ```
+    #[inline]
+    pub fn intersection(&self, other: &Self) -> Self {
+        let mut result = [0u8; 2048];
+        for i in 0..2048 {
+            result[i] = self.0[i] & other.0[i];
+        }
+        Self(result)
+    }
+
+    /// Union (bitwise OR)
+    ///
+    /// Returns a vector with bits set where either input has 1.
+    /// Represents "any agreement" or set union in HDC.
+    ///
+    /// For two random ~50% density vectors, the result has ~75% density.
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::HV16;
+    /// let a = HV16::random(1);
+    /// let b = HV16::random(2);
+    /// let uni = a.union(&b);
+    /// assert!(uni.density() > 0.65);  // ~75% for random vectors
+    /// ```
+    #[inline]
+    pub fn union(&self, other: &Self) -> Self {
+        let mut result = [0u8; 2048];
+        for i in 0..2048 {
+            result[i] = self.0[i] | other.0[i];
         }
         Self(result)
     }
@@ -720,6 +1019,52 @@ impl HV16 {
 
         result
     }
+    /// Sparsify: randomly zero out bits to reach a target density
+    ///
+    /// Useful for sparse distributed representations and memory efficiency.
+    /// Uses a deterministic seed for reproducibility.
+    ///
+    /// # Arguments
+    /// - `target_density`: Desired proportion of 1-bits in [0.0, 1.0]
+    /// - `seed`: Deterministic seed for reproducibility
+    ///
+    /// # Example
+    /// ```ignore
+    /// # use symthaea_core::hdc::binary_hv::HV16;
+    /// let dense = HV16::random(42);
+    /// let sparse = dense.thin(0.1, 99);
+    /// assert!(sparse.density() < 0.15);  // Close to target 10%
+    /// ```
+    pub fn thin(&self, target_density: f32, seed: u64) -> Self {
+        let current_density = self.density();
+
+        if current_density <= target_density {
+            return *self;
+        }
+
+        // Generate a noise mask — keep bits where noise is 1 AND below threshold
+        let noise = Self::random(seed);
+        // We need to keep a fraction of the set bits
+        // keep_ratio = target_density / current_density
+        let keep_ratio = target_density / current_density;
+        let threshold = (keep_ratio * 255.0) as u8;
+
+        let mut result = [0u8; 2048];
+        for byte_idx in 0..2048 {
+            for bit_idx in 0..8 {
+                let bit = (self.0[byte_idx] >> bit_idx) & 1;
+                if bit == 1 {
+                    // Keep this bit only if noise value is below threshold
+                    let rand_val = noise.0[(byte_idx.wrapping_add(bit_idx * 131)) % 2048];
+                    if rand_val < threshold {
+                        result[byte_idx] |= 1 << bit_idx;
+                    }
+                }
+            }
+        }
+
+        Self(result)
+    }
 }
 
 // Custom serde implementation for [u8; 2048] arrays
@@ -759,6 +1104,42 @@ impl std::fmt::Debug for HV16 {
 impl Default for HV16 {
     fn default() -> Self {
         Self::zero()
+    }
+}
+
+impl std::ops::BitAnd for HV16 {
+    type Output = Self;
+
+    #[inline]
+    fn bitand(self, rhs: Self) -> Self {
+        self.intersection(&rhs)
+    }
+}
+
+impl std::ops::BitAnd<&HV16> for HV16 {
+    type Output = Self;
+
+    #[inline]
+    fn bitand(self, rhs: &HV16) -> Self {
+        self.intersection(rhs)
+    }
+}
+
+impl std::ops::BitOr for HV16 {
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, rhs: Self) -> Self {
+        self.union(&rhs)
+    }
+}
+
+impl std::ops::BitOr<&HV16> for HV16 {
+    type Output = Self;
+
+    #[inline]
+    fn bitor(self, rhs: &HV16) -> Self {
+        self.union(rhs)
     }
 }
 
@@ -1718,5 +2099,226 @@ mod tests {
         let density = bundle_ab.popcount() as f64 / HV16::DIM as f64;
         assert!(density > 0.15 && density < 0.35,
             "2-element bundle density should be ~0.25 (AND-like), got {:.3}", density);
+    }
+
+    // =========================================================================
+    // Tests for new math primitives
+    // =========================================================================
+
+    #[test]
+    fn test_weighted_bundle_basic() {
+        // Equal weights should match regular bundle
+        let a = HV16::random(1);
+        let b = HV16::random(2);
+        let c = HV16::random(3);
+
+        let regular = HV16::bundle(&[a, b, c]);
+        let weighted = HV16::weighted_bundle(&[a, b, c], &[1.0, 1.0, 1.0]);
+
+        assert_eq!(regular, weighted, "Equal weights should match regular bundle");
+
+        // weighted_bundle_safe should also match
+        let weighted_safe = HV16::weighted_bundle_safe(&[a, b, c], &[1.0, 1.0, 1.0]);
+        assert_eq!(regular, weighted_safe, "weighted_bundle_safe with equal weights should match bundle");
+    }
+
+    #[test]
+    fn test_weighted_bundle_dominance() {
+        let a = HV16::random(10);
+        let b = HV16::random(11);
+
+        // Give 'a' a very high weight so it dominates
+        let result = HV16::weighted_bundle(&[a, b], &[100.0, 1.0]);
+
+        let sim_a = result.similarity(&a);
+        let sim_b = result.similarity(&b);
+
+        assert!(sim_a > 0.95, "High-weight vector should dominate, sim_a={:.4}", sim_a);
+        assert!(sim_a > sim_b, "High-weight vector should be more similar than low-weight");
+    }
+
+    #[test]
+    fn test_intersection_basic() {
+        let a = HV16::random(20);
+        let b = HV16::random(21);
+
+        let inter = a.intersection(&b);
+        let density = inter.density();
+
+        // AND of two ~50% density vectors should give ~25%
+        assert!(density > 0.20 && density < 0.30,
+                "Intersection density should be ~0.25, got {:.4}", density);
+
+        // Every set bit in the intersection must be set in both inputs
+        for i in 0..HV16::DIM {
+            if inter.get_bit(i) == 1 {
+                assert_eq!(a.get_bit(i), 1, "Intersection bit {} set but not in a", i);
+                assert_eq!(b.get_bit(i), 1, "Intersection bit {} set but not in b", i);
+            }
+        }
+    }
+
+    #[test]
+    fn test_union_basic() {
+        let a = HV16::random(30);
+        let b = HV16::random(31);
+
+        let uni = a.union(&b);
+        let density = uni.density();
+
+        // OR of two ~50% density vectors should give ~75%
+        assert!(density > 0.70 && density < 0.80,
+                "Union density should be ~0.75, got {:.4}", density);
+
+        // Every set bit in either input must be set in the union
+        for i in 0..HV16::DIM {
+            if a.get_bit(i) == 1 || b.get_bit(i) == 1 {
+                assert_eq!(uni.get_bit(i), 1, "Union bit {} should be set", i);
+            }
+        }
+    }
+
+    #[test]
+    fn test_cosine_similarity_range() {
+        let a = HV16::random(40);
+
+        // Identical: cosine = 1.0
+        let cos_self = a.cosine_similarity(&a);
+        assert!((cos_self - 1.0).abs() < 1e-6, "Cosine self-similarity should be 1.0, got {}", cos_self);
+
+        // Inverse: cosine = -1.0
+        let inv = a.invert();
+        let cos_inv = a.cosine_similarity(&inv);
+        assert!((cos_inv - (-1.0)).abs() < 1e-6, "Cosine with inverse should be -1.0, got {}", cos_inv);
+
+        // Random: cosine ~ 0.0
+        let b = HV16::random(41);
+        let cos_random = a.cosine_similarity(&b);
+        assert!(cos_random.abs() < 0.1, "Cosine of random vectors should be ~0.0, got {}", cos_random);
+    }
+
+    #[test]
+    fn test_thin_density() {
+        let dense = HV16::random(50);
+        assert!(dense.density() > 0.45);  // Starts ~50%
+
+        let sparse = dense.thin(0.1, 99);
+        let density = sparse.density();
+
+        // Should be approximately at target density (within reasonable tolerance)
+        assert!(density < 0.18,
+                "Thin to 0.1 should produce density < 0.18, got {:.4}", density);
+        assert!(density > 0.03,
+                "Thin to 0.1 should produce density > 0.03, got {:.4}", density);
+
+        // Thinned vector should be a subset of the original
+        for i in 0..HV16::DIM {
+            if sparse.get_bit(i) == 1 {
+                assert_eq!(dense.get_bit(i), 1,
+                           "Thin bit {} set but not in original", i);
+            }
+        }
+    }
+
+    #[test]
+    fn test_ngram_order_sensitive() {
+        let a = HV16::random(60);
+        let b = HV16::random(61);
+
+        let ab = HV16::ngram(&[a, b]);
+        let ba = HV16::ngram(&[b, a]);
+
+        // Different orders should produce different results
+        assert_ne!(ab, ba, "ngram([a,b]) should differ from ngram([b,a])");
+
+        let sim = ab.similarity(&ba);
+        assert!(sim < 0.55, "Different n-gram orders should have low similarity, got {:.4}", sim);
+    }
+
+    #[test]
+    fn test_fractional_power_endpoints() {
+        let base = HV16::random(70);
+        let seed = 999u64;
+
+        // exponent=0 should return self
+        let at_zero = base.fractional_power(0.0, seed);
+        assert_eq!(at_zero, base, "fractional_power(0) should return self");
+
+        // exponent=1 should return the random target
+        let at_one = base.fractional_power(1.0, seed);
+        let target = HV16::random(seed);
+        assert_eq!(at_one, target, "fractional_power(1) should return the target");
+    }
+
+    #[test]
+    fn test_fractional_power_monotonic() {
+        let base = HV16::random(80);
+        let seed = 888u64;
+
+        let sim_025 = base.similarity(&base.fractional_power(0.25, seed));
+        let sim_050 = base.similarity(&base.fractional_power(0.50, seed));
+        let sim_075 = base.similarity(&base.fractional_power(0.75, seed));
+
+        // Similarity should decrease as exponent increases
+        assert!(sim_025 > sim_050,
+                "sim at 0.25 ({:.4}) should > sim at 0.50 ({:.4})", sim_025, sim_050);
+        assert!(sim_050 > sim_075,
+                "sim at 0.50 ({:.4}) should > sim at 0.75 ({:.4})", sim_050, sim_075);
+    }
+
+    #[test]
+    fn test_k_winners() {
+        let sims = vec![
+            (0, 0.9f32),
+            (1, 0.3),
+            (2, 0.7),
+            (3, 0.5),
+            (4, 0.1),
+        ];
+
+        let top3 = HV16::k_winners(&sims, 3);
+        assert_eq!(top3.len(), 3, "Should return exactly 3 winners");
+        assert_eq!(top3[0].0, 0, "First winner should be index 0 (sim=0.9)");
+        assert_eq!(top3[1].0, 2, "Second winner should be index 2 (sim=0.7)");
+        assert_eq!(top3[2].0, 3, "Third winner should be index 3 (sim=0.5)");
+
+        // k > len should return all
+        let top10 = HV16::k_winners(&sims, 10);
+        assert_eq!(top10.len(), 5, "k > len should return all entries");
+
+        // k=1 should return just the best
+        let top1 = HV16::k_winners(&sims, 1);
+        assert_eq!(top1.len(), 1);
+        assert_eq!(top1[0].0, 0);
+    }
+
+    #[test]
+    fn test_bitand_trait() {
+        let a = HV16::random(90);
+        let b = HV16::random(91);
+
+        let trait_result = a & b;
+        let method_result = a.intersection(&b);
+
+        assert_eq!(trait_result, method_result, "a & b should match a.intersection(&b)");
+
+        // Also test reference variant
+        let trait_ref_result = a & &b;
+        assert_eq!(trait_ref_result, method_result, "a & &b should match a.intersection(&b)");
+    }
+
+    #[test]
+    fn test_bitor_trait() {
+        let a = HV16::random(92);
+        let b = HV16::random(93);
+
+        let trait_result = a | b;
+        let method_result = a.union(&b);
+
+        assert_eq!(trait_result, method_result, "a | b should match a.union(&b)");
+
+        // Also test reference variant
+        let trait_ref_result = a | &b;
+        assert_eq!(trait_ref_result, method_result, "a | &b should match a.union(&b)");
     }
 }
