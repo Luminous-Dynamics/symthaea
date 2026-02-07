@@ -316,30 +316,38 @@ impl HV16 {
             return Self::zero();
         }
 
-        let mut counts = [0.0f32; 16_384];
+        // Byte-level unrolled accumulation: [f32; 8] per byte avoids
+        // the inner bit_idx loop and improves cache locality.
+        let mut counts = [[0.0f32; 8]; 2048];
 
         for (vec, &weight) in vectors.iter().zip(weights.iter()) {
             for byte_idx in 0..2048 {
                 let byte = vec.0[byte_idx];
-                for bit_idx in 0..8 {
-                    let pos = byte_idx * 8 + bit_idx;
-                    if (byte >> bit_idx) & 1 == 1 {
-                        counts[pos] += weight;
-                    } else {
-                        counts[pos] -= weight;
-                    }
-                }
+                let nw = -weight;
+                counts[byte_idx][0] += if (byte      ) & 1 == 1 { weight } else { nw };
+                counts[byte_idx][1] += if (byte >> 1) & 1 == 1 { weight } else { nw };
+                counts[byte_idx][2] += if (byte >> 2) & 1 == 1 { weight } else { nw };
+                counts[byte_idx][3] += if (byte >> 3) & 1 == 1 { weight } else { nw };
+                counts[byte_idx][4] += if (byte >> 4) & 1 == 1 { weight } else { nw };
+                counts[byte_idx][5] += if (byte >> 5) & 1 == 1 { weight } else { nw };
+                counts[byte_idx][6] += if (byte >> 6) & 1 == 1 { weight } else { nw };
+                counts[byte_idx][7] += if (byte >> 7) & 1 == 1 { weight } else { nw };
             }
         }
 
         let mut result = [0u8; 2048];
         for byte_idx in 0..2048 {
-            for bit_idx in 0..8 {
-                let pos = byte_idx * 8 + bit_idx;
-                if counts[pos] > 0.0 {
-                    result[byte_idx] |= 1 << bit_idx;
-                }
-            }
+            let c = &counts[byte_idx];
+            let mut byte = 0u8;
+            if c[0] > 0.0 { byte |= 1; }
+            if c[1] > 0.0 { byte |= 2; }
+            if c[2] > 0.0 { byte |= 4; }
+            if c[3] > 0.0 { byte |= 8; }
+            if c[4] > 0.0 { byte |= 16; }
+            if c[5] > 0.0 { byte |= 32; }
+            if c[6] > 0.0 { byte |= 64; }
+            if c[7] > 0.0 { byte |= 128; }
+            result[byte_idx] = byte;
         }
 
         Self(result)
@@ -368,28 +376,36 @@ impl HV16 {
             let mut counts = buf.borrow_mut();
             counts.fill(0.0);
 
+            // Byte-level unrolled accumulation (same optimization as weighted_bundle)
             for (vec, &weight) in vectors.iter().zip(weights.iter()) {
+                let nw = -weight;
                 for byte_idx in 0..2048 {
                     let byte = vec.0[byte_idx];
-                    for bit_idx in 0..8 {
-                        let pos = byte_idx * 8 + bit_idx;
-                        if (byte >> bit_idx) & 1 == 1 {
-                            counts[pos] += weight;
-                        } else {
-                            counts[pos] -= weight;
-                        }
-                    }
+                    let base = byte_idx * 8;
+                    counts[base    ] += if (byte      ) & 1 == 1 { weight } else { nw };
+                    counts[base + 1] += if (byte >> 1) & 1 == 1 { weight } else { nw };
+                    counts[base + 2] += if (byte >> 2) & 1 == 1 { weight } else { nw };
+                    counts[base + 3] += if (byte >> 3) & 1 == 1 { weight } else { nw };
+                    counts[base + 4] += if (byte >> 4) & 1 == 1 { weight } else { nw };
+                    counts[base + 5] += if (byte >> 5) & 1 == 1 { weight } else { nw };
+                    counts[base + 6] += if (byte >> 6) & 1 == 1 { weight } else { nw };
+                    counts[base + 7] += if (byte >> 7) & 1 == 1 { weight } else { nw };
                 }
             }
 
             let mut result = [0u8; 2048];
             for byte_idx in 0..2048 {
-                for bit_idx in 0..8 {
-                    let pos = byte_idx * 8 + bit_idx;
-                    if counts[pos] > 0.0 {
-                        result[byte_idx] |= 1 << bit_idx;
-                    }
-                }
+                let base = byte_idx * 8;
+                let mut byte = 0u8;
+                if counts[base    ] > 0.0 { byte |= 1; }
+                if counts[base + 1] > 0.0 { byte |= 2; }
+                if counts[base + 2] > 0.0 { byte |= 4; }
+                if counts[base + 3] > 0.0 { byte |= 8; }
+                if counts[base + 4] > 0.0 { byte |= 16; }
+                if counts[base + 5] > 0.0 { byte |= 32; }
+                if counts[base + 6] > 0.0 { byte |= 64; }
+                if counts[base + 7] > 0.0 { byte |= 128; }
+                result[byte_idx] = byte;
             }
 
             Self(result)
@@ -654,7 +670,10 @@ impl HV16 {
 
         for i in 1..n {
             let permuted = vectors[i].permute(n - 1 - i);
-            result = result.bind(&permuted);
+            // In-place XOR avoids allocating a new HV16 per iteration
+            for j in 0..2048 {
+                result.0[j] ^= permuted.0[j];
+            }
         }
 
         result
@@ -890,21 +909,20 @@ impl HV16 {
     /// let inter = a.intersection(&b);
     /// assert!(inter.density() < 0.35);  // ~25% for random vectors
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn intersection(&self, other: &Self) -> Self {
-        let mut result = [0u8; 2048];
-        for i in 0..2048 {
-            result[i] = self.0[i] & other.0[i];
-        }
-        Self(result)
+        Self(super::simd_ops::intersection_simd(&self.0, &other.0))
     }
 
-    /// Union (bitwise OR)
+    /// Union (bitwise OR) — SIMD-accelerated
     ///
     /// Returns a vector with bits set where either input has 1.
     /// Represents "any agreement" or set union in HDC.
     ///
     /// For two random ~50% density vectors, the result has ~75% density.
+    ///
+    /// # Performance
+    /// - ~5-10ns with SIMD (AVX2), ~80ns scalar
     ///
     /// # Example
     /// ```ignore
@@ -914,13 +932,9 @@ impl HV16 {
     /// let uni = a.union(&b);
     /// assert!(uni.density() > 0.65);  // ~75% for random vectors
     /// ```
-    #[inline]
+    #[inline(always)]
     pub fn union(&self, other: &Self) -> Self {
-        let mut result = [0u8; 2048];
-        for i in 0..2048 {
-            result[i] = self.0[i] | other.0[i];
-        }
-        Self(result)
+        Self(super::simd_ops::union_simd(&self.0, &other.0))
     }
 
     /// Get bit at position (0 or 1)

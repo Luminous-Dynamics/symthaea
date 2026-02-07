@@ -720,35 +720,47 @@ impl<'de> Deserialize<'de> for SimdHV16 {
 // Both are now dimension-compatible after the HDC_DIMENSION migration.
 
 impl From<HV16> for SimdHV16 {
-    /// Convert HV16 (byte layout) to SimdHV16 (u64 layout)
+    /// Convert HV16 (byte layout) to SimdHV16 (u64 layout).
     ///
-    /// Zero-copy reinterpretation when alignment permits,
-    /// otherwise performs byte-to-u64 conversion.
+    /// Zero-copy transmute: both types are 2048 bytes with compatible
+    /// little-endian memory layout (`[u8; 2048]` ↔ `[u64; 256]`).
     #[inline]
     fn from(hv: HV16) -> Self {
-        Self::from_bytes(&hv.0)
+        // SAFETY: HV16 is [u8; 2048] and SimdHV16.data is [u64; 256].
+        // Both are 2048 bytes. On little-endian (x86_64), the byte
+        // representation is identical. transmute is a compile-time no-op.
+        unsafe { std::mem::transmute(hv.0) }
     }
 }
 
 impl From<&HV16> for SimdHV16 {
     #[inline]
     fn from(hv: &HV16) -> Self {
-        Self::from_bytes(&hv.0)
+        // SAFETY: Same layout reasoning as From<HV16>.
+        // We copy the 2048 bytes and reinterpret as [u64; 256].
+        let data: [u64; 256] = unsafe { std::mem::transmute(hv.0) };
+        Self { data }
     }
 }
 
 impl From<SimdHV16> for HV16 {
-    /// Convert SimdHV16 (u64 layout) to HV16 (byte layout)
+    /// Convert SimdHV16 (u64 layout) to HV16 (byte layout).
+    ///
+    /// Zero-copy transmute (see `From<HV16> for SimdHV16`).
     #[inline]
     fn from(simd: SimdHV16) -> Self {
-        HV16(simd.to_bytes())
+        // SAFETY: [u64; 256] and [u8; 2048] are both 2048 bytes
+        // with identical little-endian memory layout.
+        HV16(unsafe { std::mem::transmute(simd.data) })
     }
 }
 
 impl From<&SimdHV16> for HV16 {
     #[inline]
     fn from(simd: &SimdHV16) -> Self {
-        HV16(simd.to_bytes())
+        // SAFETY: Same layout reasoning. Copies 2048 bytes.
+        let bytes: [u8; 2048] = unsafe { std::mem::transmute(simd.data) };
+        HV16(bytes)
     }
 }
 
