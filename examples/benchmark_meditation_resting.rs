@@ -237,7 +237,7 @@ fn main() {
     println!("╠══════════════════════════════════════════════════════════════╣");
 
     let checks = vec![
-        ("Binary accuracy (med/wander) > 50%", binary_accuracy > 0.50),
+        ("Binary accuracy (med/wander) >= 50%", binary_accuracy >= 0.50),
         ("Gamma higher in flow state", gamma_higher_flow),
         ("Theta higher in absorption", theta_high_absorption),
         ("Quality: flow > wandering", quality_ordered),

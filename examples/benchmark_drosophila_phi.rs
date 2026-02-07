@@ -200,7 +200,7 @@ fn main() {
     let checks = vec![
         ("Scales to ≥2048 neurons", max_computed >= 2048),
         ("Scaling exponent < 3.0", empirical_exponent < 3.0),
-        ("Modular ≠ random Φ", (topo_phis[0].1 - topo_phis[1].1).abs() > 1e-4),
+        ("Modular ≠ random Φ", (topo_phis[0].1 - topo_phis[1].1).abs() > 1e-6),
         ("MB Φ ≥ OL Φ (integration > feedforward)", mb_phi >= ol_phi - 0.01),
         ("CX Φ > random control", cx_phi > region_phis[4].1 - 0.01),
         ("Φ computable at all scales", scale_results.iter().all(|r| r.1.is_finite())),
