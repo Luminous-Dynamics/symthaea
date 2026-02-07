@@ -16,7 +16,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: -D warnings
 
 jobs:
   check:
@@ -46,10 +45,12 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - name: Check compilation (0 warnings enforced)
-        run: cargo check --lib 2>&1
+        run: cargo check --lib
+        env:
+          RUSTFLAGS: -D warnings
 
-      - name: Run clippy
-        run: cargo clippy -p symthaea --lib -- -D warnings
+      - name: Run clippy (symthaea crate only)
+        run: cargo clippy -p symthaea --no-deps --lib -- -D warnings
 
       - name: Run lib tests
         run: cargo test --lib
