@@ -328,7 +328,7 @@ pub mod unified_intelligence;
 #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 pub mod recursive_improvement;
 
-// Needs: perception::SemanticEncoder
+/// Unified value evaluator — needs ValueFeedbackLoop + AlignmentResult + SemanticValueEmbedder API alignment
 #[cfg(feature = "full_perception")]
 pub mod unified_value_evaluator;
 
@@ -480,19 +480,19 @@ pub mod meta_learning_byzantine;
 #[cfg(feature = "full_consciousness")]
 pub mod causal_byzantine;
 
-/// Gated: depends on observability (gated behind observability_module)
+/// GWT integration — needs API alignment with current observability module
 #[cfg(feature = "observability_module")]
 pub mod gwt_integration;
 
-/// Gated: depends on gwt_integration + unified_value_evaluator (gated)
+/// Narrative + GWT integration — needs gwt_integration + unified_value_evaluator
 #[cfg(all(feature = "observability_module", feature = "full_perception"))]
 pub mod narrative_gwt_integration;
 
-/// Gated: depends on unified_value_evaluator (gated behind full_perception)
+/// Mycelix bridge — needs AlignmentResult API alignment
 #[cfg(feature = "full_perception")]
 pub mod mycelix_bridge;
 
-/// Gated: depends on mycelix_bridge (gated)
+/// Value system tests — depends on mycelix_bridge
 #[cfg(feature = "full_perception")]
 pub mod value_system_tests;
 
@@ -504,7 +504,7 @@ pub mod consciousness_guided_discovery;
 #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 pub mod meta_meta_learning;
 
-/// Gated: depends on consciousness_profile (gated behind full_consciousness)
+/// Multi-objective evolution — needs CandidatePrimitive API alignment (encoding, recombine, mutate)
 #[cfg(feature = "full_consciousness")]
 pub mod multi_objective_evolution;
 

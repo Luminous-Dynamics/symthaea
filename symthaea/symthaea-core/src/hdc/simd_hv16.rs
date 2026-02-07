@@ -1,6 +1,6 @@
 //! SIMD-Optimized Binary Hypervectors
 //!
-//! Revolutionary improvement: SIMD-accelerated HV16 operations
+//! Revolutionary improvement: SIMD-accelerated BinaryHV operations
 //!
 //! Performance targets:
 //! - bind(): 400ns → 50ns (8x improvement with AVX2)
@@ -20,10 +20,12 @@
 //!
 //! Enable with `RUSTFLAGS="-C target-cpu=native"` for best performance.
 
+#![allow(deprecated)] // Module uses its own deprecated SimdHV16 internally
+
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::ops::{BitXor, BitAnd, BitOr, Not};
-use super::binary_hv::HV16;
+use super::binary_hv::BinaryHV;
 
 // Thread-local buffer for bundle operations - prevents 32KB stack allocation
 thread_local! {
@@ -125,6 +127,7 @@ unsafe fn avx2_popcount_256_runtime(data: &[u64; 256]) -> u64 {
 /// - Enables 8-byte-at-a-time processing
 /// - Auto-vectorizable by LLVM
 /// - Matches HDC_DIMENSION standard (2^14)
+#[deprecated(since = "0.7.0", note = "Use BinaryHV (formerly BinaryHV) instead. All SimdHV16 methods have been absorbed into BinaryHV.")]
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(align(64))]  // Cache-line aligned
 pub struct SimdHV16 {
@@ -151,7 +154,7 @@ impl SimdHV16 {
         Self { data: [u64::MAX; 256] }
     }
 
-    /// Create from bytes (converting from HV16)
+    /// Create from bytes (converting from BinaryHV)
     #[inline]
     pub fn from_bytes(bytes: &[u8; 2048]) -> Self {
         let mut data = [0u64; 256];
@@ -171,7 +174,7 @@ impl SimdHV16 {
         Self { data }
     }
 
-    /// Convert to bytes (for HV16 compatibility)
+    /// Convert to bytes (for BinaryHV compatibility)
     #[inline]
     pub fn to_bytes(&self) -> [u8; 2048] {
         let mut bytes = [0u8; 2048];
@@ -711,69 +714,69 @@ impl<'de> Deserialize<'de> for SimdHV16 {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// CONVERSION FROM/TO HV16
+// CONVERSION FROM/TO BinaryHV
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// SimdHV16 and HV16 both represent 16,384-bit hypervectors (2048 bytes).
+// SimdHV16 and BinaryHV both represent 16,384-bit hypervectors (2048 bytes).
 // SimdHV16 uses 256 × u64 layout for SIMD-optimized operations,
-// HV16 uses 2048 × u8 layout for byte-level operations.
+// BinaryHV uses 2048 × u8 layout for byte-level operations.
 // Both are now dimension-compatible after the HDC_DIMENSION migration.
 
-impl From<HV16> for SimdHV16 {
-    /// Convert HV16 (byte layout) to SimdHV16 (u64 layout).
+impl From<BinaryHV> for SimdHV16 {
+    /// Convert BinaryHV (byte layout) to SimdHV16 (u64 layout).
     ///
     /// Zero-copy transmute: both types are 2048 bytes with compatible
     /// little-endian memory layout (`[u8; 2048]` ↔ `[u64; 256]`).
     #[inline]
-    fn from(hv: HV16) -> Self {
-        // SAFETY: HV16 is [u8; 2048] and SimdHV16.data is [u64; 256].
+    fn from(hv: BinaryHV) -> Self {
+        // SAFETY: BinaryHV is [u8; 2048] and SimdHV16.data is [u64; 256].
         // Both are 2048 bytes. On little-endian (x86_64), the byte
         // representation is identical. transmute is a compile-time no-op.
         unsafe { std::mem::transmute(hv.0) }
     }
 }
 
-impl From<&HV16> for SimdHV16 {
+impl From<&BinaryHV> for SimdHV16 {
     #[inline]
-    fn from(hv: &HV16) -> Self {
-        // SAFETY: Same layout reasoning as From<HV16>.
+    fn from(hv: &BinaryHV) -> Self {
+        // SAFETY: Same layout reasoning as From<BinaryHV>.
         // We copy the 2048 bytes and reinterpret as [u64; 256].
         let data: [u64; 256] = unsafe { std::mem::transmute(hv.0) };
         Self { data }
     }
 }
 
-impl From<SimdHV16> for HV16 {
-    /// Convert SimdHV16 (u64 layout) to HV16 (byte layout).
+impl From<SimdHV16> for BinaryHV {
+    /// Convert SimdHV16 (u64 layout) to BinaryHV (byte layout).
     ///
-    /// Zero-copy transmute (see `From<HV16> for SimdHV16`).
+    /// Zero-copy transmute (see `From<BinaryHV> for SimdHV16`).
     #[inline]
     fn from(simd: SimdHV16) -> Self {
         // SAFETY: [u64; 256] and [u8; 2048] are both 2048 bytes
         // with identical little-endian memory layout.
-        HV16(unsafe { std::mem::transmute(simd.data) })
+        BinaryHV(unsafe { std::mem::transmute(simd.data) })
     }
 }
 
-impl From<&SimdHV16> for HV16 {
+impl From<&SimdHV16> for BinaryHV {
     #[inline]
     fn from(simd: &SimdHV16) -> Self {
         // SAFETY: Same layout reasoning. Copies 2048 bytes.
         let bytes: [u8; 2048] = unsafe { std::mem::transmute(simd.data) };
-        HV16(bytes)
+        BinaryHV(bytes)
     }
 }
 
 impl SimdHV16 {
-    /// Convert to HV16 for compatibility with non-SIMD code
+    /// Convert to BinaryHV for compatibility with non-SIMD code
     #[inline]
-    pub fn to_hv16(&self) -> HV16 {
-        HV16::from(self)
+    pub fn to_hv16(&self) -> BinaryHV {
+        BinaryHV::from(self)
     }
 
-    /// Create from HV16 for SIMD-accelerated operations
+    /// Create from BinaryHV for SIMD-accelerated operations
     #[inline]
-    pub fn from_hv16(hv: &HV16) -> Self {
+    pub fn from_hv16(hv: &BinaryHV) -> Self {
         Self::from(hv)
     }
 }
@@ -841,18 +844,18 @@ pub fn find_similar(query: &SimdHV16, targets: &[SimdHV16], threshold: f32) -> V
         .collect()
 }
 
-/// Batch conversion from HV16 slice to SimdHV16 vector
+/// Batch conversion from BinaryHV slice to SimdHV16 vector
 ///
 /// Useful for bulk conversion when switching to SIMD operations
-pub fn batch_from_hv16(vectors: &[HV16]) -> Vec<SimdHV16> {
+pub fn batch_from_hv16(vectors: &[BinaryHV]) -> Vec<SimdHV16> {
     vectors.iter().map(SimdHV16::from).collect()
 }
 
-/// Batch conversion from SimdHV16 slice to HV16 vector
+/// Batch conversion from SimdHV16 slice to BinaryHV vector
 ///
 /// Useful for storing results or interfacing with non-SIMD code
-pub fn batch_to_hv16(vectors: &[SimdHV16]) -> Vec<HV16> {
-    vectors.iter().map(HV16::from).collect()
+pub fn batch_to_hv16(vectors: &[SimdHV16]) -> Vec<BinaryHV> {
+    vectors.iter().map(BinaryHV::from).collect()
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -918,20 +921,20 @@ mod tests {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // HV16 ↔ SimdHV16 CONVERSION TESTS
+    // BinaryHV ↔ SimdHV16 CONVERSION TESTS
     // ═══════════════════════════════════════════════════════════════════════
 
     #[test]
     fn test_hv16_to_simd_roundtrip() {
-        // Create random HV16
-        let hv = HV16::random(12345);
+        // Create random BinaryHV
+        let hv = BinaryHV::random(12345);
 
         // Convert to SimdHV16 and back
         let simd: SimdHV16 = SimdHV16::from(&hv);
-        let recovered: HV16 = HV16::from(&simd);
+        let recovered: BinaryHV = BinaryHV::from(&simd);
 
         // Should be identical
-        assert_eq!(hv, recovered, "HV16 → SimdHV16 → HV16 roundtrip failed");
+        assert_eq!(hv, recovered, "BinaryHV → SimdHV16 → BinaryHV roundtrip failed");
     }
 
     #[test]
@@ -939,20 +942,20 @@ mod tests {
         // Create random SimdHV16
         let simd = SimdHV16::random(67890);
 
-        // Convert to HV16 and back
-        let hv: HV16 = simd.to_hv16();
+        // Convert to BinaryHV and back
+        let hv: BinaryHV = simd.to_hv16();
         let recovered = SimdHV16::from_hv16(&hv);
 
         // Should be identical
-        assert_eq!(simd, recovered, "SimdHV16 → HV16 → SimdHV16 roundtrip failed");
+        assert_eq!(simd, recovered, "SimdHV16 → BinaryHV → SimdHV16 roundtrip failed");
     }
 
     #[test]
     fn test_conversion_preserves_similarity() {
-        let a = HV16::random(100);
-        let b = HV16::random(101);
+        let a = BinaryHV::random(100);
+        let b = BinaryHV::random(101);
 
-        // Compute similarity in HV16 space
+        // Compute similarity in BinaryHV space
         let hv_sim = a.similarity(&b);
 
         // Convert to SimdHV16 and compute
@@ -962,15 +965,15 @@ mod tests {
 
         // Should be identical (within floating point tolerance)
         assert!((hv_sim - simd_sim).abs() < 0.0001,
-            "Similarity mismatch: HV16={}, SimdHV16={}", hv_sim, simd_sim);
+            "Similarity mismatch: BinaryHV={}, SimdHV16={}", hv_sim, simd_sim);
     }
 
     #[test]
     fn test_conversion_preserves_bind() {
-        let a = HV16::random(200);
-        let b = HV16::random(201);
+        let a = BinaryHV::random(200);
+        let b = BinaryHV::random(201);
 
-        // Bind in HV16 space
+        // Bind in BinaryHV space
         let hv_bound = a.bind(&b);
 
         // Bind in SimdHV16 space
@@ -979,13 +982,13 @@ mod tests {
         let simd_bound = simd_a.bind(&simd_b);
 
         // Convert back and compare
-        let recovered: HV16 = simd_bound.to_hv16();
-        assert_eq!(hv_bound, recovered, "Bind operation differs between HV16 and SimdHV16");
+        let recovered: BinaryHV = simd_bound.to_hv16();
+        assert_eq!(hv_bound, recovered, "Bind operation differs between BinaryHV and SimdHV16");
     }
 
     #[test]
     fn test_batch_conversion() {
-        let hvs: Vec<HV16> = (0..10).map(|i| HV16::random(i)).collect();
+        let hvs: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
 
         // Batch convert to SimdHV16
         let simds = batch_from_hv16(&hvs);
