@@ -58,6 +58,13 @@ mod fluid_dynamics;
 pub mod plasma_physics;
 mod cosmology;
 
+// Phase 3: Laws derivation, classical mechanics, and more domains
+mod derived_laws;
+mod classical_mechanics;
+mod statistical_mechanics;
+mod chemical_kinetics;
+mod acoustics;
+
 pub use standard_model::*;
 pub use hadrons::*;
 pub use periodic_table::*;
@@ -100,3 +107,10 @@ pub use emergence_chain::*;
 pub use quantum_information::*;
 pub use fluid_dynamics::*;
 pub use cosmology::*;
+
+// Phase 3: exports
+pub use derived_laws::*;
+pub use classical_mechanics::*;
+pub use statistical_mechanics::*;
+pub use chemical_kinetics::*;
+pub use acoustics::*;
