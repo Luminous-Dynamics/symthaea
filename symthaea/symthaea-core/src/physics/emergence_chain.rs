@@ -42,7 +42,6 @@ use super::consciousness_bridge::PhysicsConsciousnessBridge;
 use super::true_phi::{TruePhiCalculator, TruePhiResult, EntropyConfig};
 use super::hdc_emergence_metrics::{
     EmergenceMetrics, EmergenceAnalysis, CompositionNode,
-    BindingDepthAnalyzer, RecoverabilityAnalyzer, BindingCoherenceAnalyzer,
     TreeRecoverabilityResult, TreeCoherenceResult,
 };
 use serde::{Deserialize, Serialize};
