@@ -340,6 +340,7 @@ impl DesignIntegrationEngine {
         let state = self.encode_simulation(result);
 
         // Coupling index: measures similarity pattern to concept vectors
+        #[allow(deprecated)]
         let coupling_index = self.bridge.phenomenal_index(&state.unified_state);
 
         // Design integration: internal consistency

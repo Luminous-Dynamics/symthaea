@@ -781,6 +781,7 @@ impl NeuroEncoder {
         let connectivity = circuit.connectivity.len() as f64 / (n * n);
 
         // Phenomenal index of circuit activity
+        #[allow(deprecated)]
         let phenomenal = bridge.phenomenal_index(&circuit.vector);
 
         // Φ estimate: integration × phenomenal × complexity
