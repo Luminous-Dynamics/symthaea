@@ -58,7 +58,8 @@ fn test_create_backend_auto_detects_openai_key() {
     let prev_openai = std::env::var("OPENAI_API_KEY").ok();
     let prev_anthropic = std::env::var("ANTHROPIC_API_KEY").ok();
 
-    std::env::remove_var("SYMTHAEA_LLM_PROVIDER");
+    // Use explicit provider to avoid env var race conditions in parallel tests
+    std::env::set_var("SYMTHAEA_LLM_PROVIDER", "openai");
     std::env::set_var("OPENAI_API_KEY", "sk-test-key");
     std::env::remove_var("ANTHROPIC_API_KEY");
 
