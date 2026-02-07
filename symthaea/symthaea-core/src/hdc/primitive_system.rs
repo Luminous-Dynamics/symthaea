@@ -141,6 +141,11 @@ pub enum PrimitiveTier {
     /// - QUALE, PHENOMENAL_BINDING, ATTEND, SALIENCE, REMEMBER, CONSOLIDATE, INTEND
     /// Enables reasoning about subjective experience and conscious states!
     Consciousness,
+    /// Tier 9: Code & Symbol Manipulation Primitives
+    /// Enables consciousness-aware code understanding, generation, and transformation.
+    /// - PARSE, ENTITY, ENCODE, GENERATE, COMPOSE, BRANCH, LOOP, DEBUG, VERIFY
+    /// Code operations flow through the same primitive routing as all other cognitive tasks!
+    Code,
 }
 
 /// Domain manifold - a rotation in HV16 space for domain isolation
@@ -5050,6 +5055,7 @@ fn tier_color(tier: PrimitiveTier) -> &'static str {
         PrimitiveTier::Temporal => "#FFF8E1",     // Light amber
         PrimitiveTier::Compositional => "#F1F8E9", // Light lime
         PrimitiveTier::Consciousness => "#FCE4EC", // Light pink
+        PrimitiveTier::Code => "#E8EAF6",          // Light indigo
     }
 }
 
