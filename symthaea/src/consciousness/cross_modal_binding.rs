@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::RealHV;
 use symthaea_core::hdc::binary_hv::HV16;
+use crate::hdc::primitive_system::PrimitiveSystem;
 
 /// Types of sensory modalities
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -613,6 +614,270 @@ impl Default for CrossModalBinder {
     fn default() -> Self {
         Self::new(BindingConfig::default())
     }
+}
+
+// ==============================================================================
+// NSM PRIMITIVE GROUNDING (Wierzbicka's Natural Semantic Metalanguage)
+// ==============================================================================
+
+/// NSM grounding for sensory modalities
+#[derive(Debug, Clone)]
+pub struct ModalityPrimitiveGrounding {
+    /// The modality being grounded
+    pub modality: Modality,
+    /// NSM primitive composition
+    pub nsm_primitives: Vec<String>,
+    /// HDC encoding via primitive binding
+    pub primitive_encoding: HV16,
+    /// Whether this is a sensory input modality
+    pub is_sensory: bool,
+    /// Whether this involves body awareness
+    pub is_embodied: bool,
+}
+
+impl ModalityPrimitiveGrounding {
+    pub fn new(modality: Modality, system: &PrimitiveSystem) -> Self {
+        let (primitives, sensory, embodied) = Self::nsm_mapping(modality);
+        let encoding = encode_primitives(&primitives, system);
+
+        Self {
+            modality,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            is_sensory: sensory,
+            is_embodied: embodied,
+        }
+    }
+
+    fn nsm_mapping(modality: Modality) -> (Vec<String>, bool, bool) {
+        match modality {
+            // Visual: seeing things
+            Modality::Visual => (
+                vec!["SEE".into(), "THING".into(), "BECAUSE".into(), "LOOK".into()],
+                true,
+                false,
+            ),
+            // Auditory: hearing sounds
+            Modality::Auditory => (
+                vec!["HEAR".into(), "SOMETHING".into(), "BECAUSE".into()],
+                true,
+                false,
+            ),
+            // Textual/Linguistic: language and words
+            Modality::Textual | Modality::Linguistic => (
+                vec!["SAY".into(), "WORDS".into(), "KNOW".into(), "THINK".into()],
+                false,
+                false,
+            ),
+            // Proprioceptive: body position sense
+            Modality::Proprioceptive => (
+                vec!["FEEL".into(), "BODY".into(), "WHERE".into(), "MOVE".into()],
+                true,
+                true,
+            ),
+            // Somatosensory: touch and physical sensation
+            Modality::Somatosensory => (
+                vec!["FEEL".into(), "TOUCH".into(), "BODY".into(), "SOMETHING".into()],
+                true,
+                true,
+            ),
+            // Motor: movement and action
+            Modality::Motor => (
+                vec!["DO".into(), "MOVE".into(), "BODY".into(), "WANT".into()],
+                false,
+                true,
+            ),
+            // Temporal: time and sequence
+            Modality::Temporal => (
+                vec!["TIME".into(), "BEFORE".into(), "AFTER".into(), "NOW".into()],
+                false,
+                false,
+            ),
+            // Spatial: space and location
+            Modality::Spatial => (
+                vec!["WHERE".into(), "PLACE".into(), "NEAR".into(), "FAR".into()],
+                false,
+                false,
+            ),
+            // Affective/Emotional: feelings and emotions
+            Modality::Affective | Modality::Emotional => (
+                vec!["FEEL".into(), "GOOD".into(), "BAD".into(), "BECAUSE".into()],
+                false,
+                true,
+            ),
+            // Interoceptive: internal body states
+            Modality::Interoceptive => (
+                vec!["FEEL".into(), "INSIDE".into(), "BODY".into(), "SOMETHING".into()],
+                true,
+                true,
+            ),
+            // Abstract: conceptual thinking
+            Modality::Abstract => (
+                vec!["THINK".into(), "SOMETHING".into(), "NOT".into(), "SEE".into()],
+                false,
+                false,
+            ),
+        }
+    }
+}
+
+/// NSM grounding for convergence levels (integration hierarchy)
+#[derive(Debug, Clone)]
+pub struct ConvergenceLevelPrimitiveGrounding {
+    /// The convergence level being grounded
+    pub level: ConvergenceLevel,
+    /// NSM primitive composition
+    pub nsm_primitives: Vec<String>,
+    /// HDC encoding via primitive binding
+    pub primitive_encoding: HV16,
+    /// Integration breadth (how many modalities)
+    pub integration_breadth: u8,
+}
+
+impl ConvergenceLevelPrimitiveGrounding {
+    pub fn new(level: ConvergenceLevel, system: &PrimitiveSystem) -> Self {
+        let (primitives, breadth) = Self::nsm_mapping(level);
+        let encoding = encode_primitives(&primitives, system);
+
+        Self {
+            level,
+            nsm_primitives: primitives,
+            primitive_encoding: encoding,
+            integration_breadth: breadth,
+        }
+    }
+
+    fn nsm_mapping(level: ConvergenceLevel) -> (Vec<String>, u8) {
+        match level {
+            // Primary: single modality only
+            ConvergenceLevel::Primary => (
+                vec!["ONE".into(), "KIND".into(), "ONLY".into()],
+                1,
+            ),
+            // Secondary: two modalities combined
+            ConvergenceLevel::Secondary => (
+                vec!["TWO".into(), "KIND".into(), "TOGETHER".into()],
+                2,
+            ),
+            // Tertiary: three modalities combined
+            ConvergenceLevel::Tertiary => (
+                vec!["SOME".into(), "KIND".into(), "TOGETHER".into(), "MORE".into()],
+                3,
+            ),
+            // Amodal: all modalities unified
+            ConvergenceLevel::Amodal => (
+                vec!["ALL".into(), "KIND".into(), "ONE".into(), "SAME".into()],
+                255, // represents "all"
+            ),
+        }
+    }
+}
+
+/// Unified NSM grounding system for cross-modal binding
+#[derive(Debug)]
+pub struct CrossModalNSMGrounding {
+    /// Modality groundings
+    pub modalities: HashMap<Modality, ModalityPrimitiveGrounding>,
+    /// Convergence level groundings
+    pub convergence_levels: HashMap<ConvergenceLevel, ConvergenceLevelPrimitiveGrounding>,
+}
+
+impl CrossModalNSMGrounding {
+    /// Create complete grounding system from primitive system
+    pub fn new(system: &PrimitiveSystem) -> Self {
+        let mut modalities = HashMap::new();
+        let mut convergence_levels = HashMap::new();
+
+        // Ground all modalities
+        for modality in &[
+            Modality::Visual, Modality::Auditory, Modality::Textual,
+            Modality::Linguistic, Modality::Proprioceptive, Modality::Somatosensory,
+            Modality::Motor, Modality::Temporal, Modality::Spatial,
+            Modality::Affective, Modality::Emotional, Modality::Interoceptive,
+            Modality::Abstract,
+        ] {
+            modalities.insert(*modality, ModalityPrimitiveGrounding::new(*modality, system));
+        }
+
+        // Ground all convergence levels
+        for level in &[
+            ConvergenceLevel::Primary,
+            ConvergenceLevel::Secondary,
+            ConvergenceLevel::Tertiary,
+            ConvergenceLevel::Amodal,
+        ] {
+            convergence_levels.insert(*level, ConvergenceLevelPrimitiveGrounding::new(*level, system));
+        }
+
+        Self { modalities, convergence_levels }
+    }
+
+    /// Query modalities by semantic similarity
+    pub fn query_modalities(&self, query: &HV16, threshold: f32) -> Vec<(&Modality, f32)> {
+        let mut results: Vec<_> = self.modalities.iter()
+            .map(|(m, g)| (m, g.primitive_encoding.similarity(query)))
+            .filter(|(_, sim)| *sim >= threshold)
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Query convergence levels by semantic similarity
+    pub fn query_levels(&self, query: &HV16, threshold: f32) -> Vec<(&ConvergenceLevel, f32)> {
+        let mut results: Vec<_> = self.convergence_levels.iter()
+            .map(|(l, g)| (l, g.primitive_encoding.similarity(query)))
+            .filter(|(_, sim)| *sim >= threshold)
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+
+    /// Get sensory modalities
+    pub fn sensory_modalities(&self) -> Vec<&Modality> {
+        self.modalities.iter()
+            .filter(|(_, g)| g.is_sensory)
+            .map(|(m, _)| m)
+            .collect()
+    }
+
+    /// Get embodied modalities (involving body awareness)
+    pub fn embodied_modalities(&self) -> Vec<&Modality> {
+        self.modalities.iter()
+            .filter(|(_, g)| g.is_embodied)
+            .map(|(m, _)| m)
+            .collect()
+    }
+}
+
+/// Encode NSM primitives into HDC vector via sequential binding
+fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
+    let vectors: Vec<HV16> = primitives
+        .iter()
+        .map(|name| {
+            if let Some(p) = system.get(name) {
+                p.encoding.clone()
+            } else if let Some(p) = system.get(&name.to_lowercase()) {
+                p.encoding.clone()
+            } else {
+                // Fallback: deterministic random for unknown primitives
+                let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                HV16::random(seed)
+            }
+        })
+        .collect();
+
+    if vectors.is_empty() {
+        return HV16::random(0);
+    }
+
+    // Bind sequentially with position encoding for order preservation
+    let mut result = vectors[0].clone();
+    for (i, v) in vectors.iter().enumerate().skip(1) {
+        let position_hv = HV16::random(i as u64 * 1000);
+        let positioned = v.bind(&position_hv);
+        result = result.bind(&positioned);
+    }
+    result
 }
 
 #[cfg(test)]
