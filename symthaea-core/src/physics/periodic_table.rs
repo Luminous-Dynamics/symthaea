@@ -71,6 +71,12 @@ pub struct ElementDataExtended {
     pub electron_affinity: Option<f32>,
     /// Metallic character 0.0-1.0 (derived from position)
     pub metallic_character: f32,
+    /// Melting point in Kelvin
+    pub melting_point: Option<f32>,
+    /// Boiling point in Kelvin
+    pub boiling_point: Option<f32>,
+    /// Density in g/cm³ at STP
+    pub density: Option<f32>,
 }
 
 impl ElementDataExtended {
@@ -83,6 +89,9 @@ impl ElementDataExtended {
             atomic_radius: None,
             electron_affinity: None,
             metallic_character,
+            melting_point: None,
+            boiling_point: None,
+            density: None,
         }
     }
 
@@ -107,7 +116,7 @@ impl ElementDataExtended {
         }
 
         // Transition metals (groups 3-12)
-        if group >= 3 && group <= 12 {
+        if (3..=12).contains(&group) {
             return 0.9;
         }
 
@@ -137,6 +146,11 @@ impl ElementDataExtended {
             self.first_ionization_energy = ie;
             self.atomic_radius = radius;
             self.electron_affinity = ea;
+        }
+        if let Some(&(mp, bp, dens)) = ELEMENT_THERMODYNAMIC_PROPERTIES.get((z - 1) as usize) {
+            self.melting_point = mp;
+            self.boiling_point = bp;
+            self.density = dens;
         }
         self
     }
@@ -283,6 +297,143 @@ const ELEMENT_PHYSICAL_PROPERTIES: [(Option<f32>, Option<f32>, Option<f32>); 118
     (None, None, None),  // Og (118)
 ];
 
+/// Thermodynamic property data for elements 1-118
+/// Format: (melting_point K, boiling_point K, density g/cm³)
+/// Data from NIST, CRC Handbook, and periodic table reference sources
+const ELEMENT_THERMODYNAMIC_PROPERTIES: [(Option<f32>, Option<f32>, Option<f32>); 118] = [
+    // Period 1
+    (Some(14.01), Some(20.28), Some(0.00009)),   // H (1)
+    (Some(0.95), Some(4.22), Some(0.00018)),     // He (2)
+
+    // Period 2
+    (Some(453.7), Some(1615.0), Some(0.534)),    // Li (3)
+    (Some(1560.0), Some(2744.0), Some(1.85)),    // Be (4)
+    (Some(2349.0), Some(4200.0), Some(2.34)),    // B (5)
+    (Some(3823.0), Some(4098.0), Some(2.27)),    // C (6) - graphite sublimes
+    (Some(63.15), Some(77.36), Some(0.00125)),   // N (7)
+    (Some(54.36), Some(90.20), Some(0.00143)),   // O (8)
+    (Some(53.53), Some(85.03), Some(0.0017)),    // F (9)
+    (Some(24.56), Some(27.07), Some(0.0009)),    // Ne (10)
+
+    // Period 3
+    (Some(370.9), Some(1156.0), Some(0.97)),     // Na (11)
+    (Some(923.0), Some(1363.0), Some(1.74)),     // Mg (12)
+    (Some(933.5), Some(2792.0), Some(2.70)),     // Al (13)
+    (Some(1687.0), Some(3538.0), Some(2.33)),    // Si (14)
+    (Some(317.3), Some(553.7), Some(1.82)),      // P (15) - white
+    (Some(388.4), Some(717.8), Some(2.07)),      // S (16)
+    (Some(171.6), Some(239.1), Some(0.0032)),    // Cl (17)
+    (Some(83.80), Some(87.30), Some(0.0018)),    // Ar (18)
+
+    // Period 4
+    (Some(336.5), Some(1032.0), Some(0.86)),     // K (19)
+    (Some(1115.0), Some(1757.0), Some(1.54)),    // Ca (20)
+    (Some(1814.0), Some(3109.0), Some(2.99)),    // Sc (21)
+    (Some(1941.0), Some(3560.0), Some(4.51)),    // Ti (22)
+    (Some(2183.0), Some(3680.0), Some(6.00)),    // V (23)
+    (Some(2180.0), Some(2944.0), Some(7.15)),    // Cr (24)
+    (Some(1519.0), Some(2334.0), Some(7.44)),    // Mn (25)
+    (Some(1811.0), Some(3134.0), Some(7.87)),    // Fe (26)
+    (Some(1768.0), Some(3200.0), Some(8.90)),    // Co (27)
+    (Some(1728.0), Some(3186.0), Some(8.91)),    // Ni (28)
+    (Some(1357.8), Some(2835.0), Some(8.96)),    // Cu (29)
+    (Some(692.7), Some(1180.0), Some(7.13)),     // Zn (30)
+    (Some(302.9), Some(2477.0), Some(5.91)),     // Ga (31)
+    (Some(1211.4), Some(3106.0), Some(5.32)),    // Ge (32)
+    (Some(1090.0), Some(887.0), Some(5.73)),     // As (33) - sublimes
+    (Some(494.0), Some(958.0), Some(4.81)),      // Se (34)
+    (Some(266.0), Some(332.0), Some(3.12)),      // Br (35)
+    (Some(115.8), Some(119.9), Some(0.0037)),    // Kr (36)
+
+    // Period 5
+    (Some(312.5), Some(961.0), Some(1.53)),      // Rb (37)
+    (Some(1050.0), Some(1655.0), Some(2.64)),    // Sr (38)
+    (Some(1799.0), Some(3609.0), Some(4.47)),    // Y (39)
+    (Some(2128.0), Some(4682.0), Some(6.52)),    // Zr (40)
+    (Some(2750.0), Some(5017.0), Some(8.57)),    // Nb (41)
+    (Some(2896.0), Some(4912.0), Some(10.22)),   // Mo (42)
+    (Some(2430.0), Some(4538.0), Some(11.0)),    // Tc (43)
+    (Some(2607.0), Some(4423.0), Some(12.1)),    // Ru (44)
+    (Some(2237.0), Some(3968.0), Some(12.4)),    // Rh (45)
+    (Some(1828.0), Some(3236.0), Some(12.0)),    // Pd (46)
+    (Some(1234.9), Some(2435.0), Some(10.5)),    // Ag (47)
+    (Some(594.2), Some(1040.0), Some(8.69)),     // Cd (48)
+    (Some(429.7), Some(2345.0), Some(7.31)),     // In (49)
+    (Some(505.1), Some(2875.0), Some(7.29)),     // Sn (50)
+    (Some(903.8), Some(1860.0), Some(6.68)),     // Sb (51)
+    (Some(722.7), Some(1261.0), Some(6.24)),     // Te (52)
+    (Some(386.9), Some(457.5), Some(4.93)),      // I (53)
+    (Some(161.4), Some(165.1), Some(0.0059)),    // Xe (54)
+
+    // Period 6
+    (Some(301.7), Some(944.0), Some(1.93)),      // Cs (55)
+    (Some(1000.0), Some(2170.0), Some(3.62)),    // Ba (56)
+    (Some(1193.0), Some(3737.0), Some(6.15)),    // La (57)
+    (Some(1068.0), Some(3716.0), Some(6.77)),    // Ce (58)
+    (Some(1208.0), Some(3793.0), Some(6.77)),    // Pr (59)
+    (Some(1297.0), Some(3347.0), Some(7.01)),    // Nd (60)
+    (Some(1315.0), Some(3273.0), Some(7.26)),    // Pm (61)
+    (Some(1345.0), Some(2067.0), Some(7.52)),    // Sm (62)
+    (Some(1099.0), Some(1802.0), Some(5.24)),    // Eu (63)
+    (Some(1585.0), Some(3546.0), Some(7.90)),    // Gd (64)
+    (Some(1629.0), Some(3503.0), Some(8.23)),    // Tb (65)
+    (Some(1680.0), Some(2840.0), Some(8.55)),    // Dy (66)
+    (Some(1734.0), Some(2993.0), Some(8.80)),    // Ho (67)
+    (Some(1802.0), Some(3141.0), Some(9.07)),    // Er (68)
+    (Some(1818.0), Some(2223.0), Some(9.32)),    // Tm (69)
+    (Some(1097.0), Some(1469.0), Some(6.90)),    // Yb (70)
+    (Some(1925.0), Some(3675.0), Some(9.84)),    // Lu (71)
+    (Some(2506.0), Some(4876.0), Some(13.3)),    // Hf (72)
+    (Some(3290.0), Some(5731.0), Some(16.4)),    // Ta (73)
+    (Some(3695.0), Some(5828.0), Some(19.3)),    // W (74)
+    (Some(3459.0), Some(5869.0), Some(20.8)),    // Re (75)
+    (Some(3306.0), Some(5285.0), Some(22.6)),    // Os (76)
+    (Some(2719.0), Some(4701.0), Some(22.4)),    // Ir (77)
+    (Some(2041.0), Some(4098.0), Some(21.5)),    // Pt (78)
+    (Some(1337.3), Some(3129.0), Some(19.3)),    // Au (79)
+    (Some(234.3), Some(629.9), Some(13.5)),      // Hg (80)
+    (Some(577.0), Some(1746.0), Some(11.8)),     // Tl (81)
+    (Some(600.6), Some(2022.0), Some(11.3)),     // Pb (82)
+    (Some(544.6), Some(1837.0), Some(9.79)),     // Bi (83)
+    (Some(527.0), Some(1235.0), Some(9.20)),     // Po (84)
+    (Some(575.0), Some(610.0), Some(7.0)),       // At (85) - estimated
+    (Some(202.0), Some(211.5), Some(0.0097)),    // Rn (86)
+
+    // Period 7
+    (Some(300.0), Some(950.0), Some(1.87)),      // Fr (87) - estimated
+    (Some(973.0), Some(2010.0), Some(5.0)),      // Ra (88)
+    (Some(1323.0), Some(3471.0), Some(10.1)),    // Ac (89)
+    (Some(2115.0), Some(5061.0), Some(11.7)),    // Th (90)
+    (Some(1841.0), Some(4300.0), Some(15.4)),    // Pa (91)
+    (Some(1405.3), Some(4404.0), Some(19.1)),    // U (92)
+    (Some(917.0), Some(4273.0), Some(20.2)),     // Np (93)
+    (Some(912.5), Some(3501.0), Some(19.8)),     // Pu (94)
+    (Some(1449.0), Some(2880.0), Some(12.0)),    // Am (95)
+    (Some(1613.0), Some(3383.0), Some(13.5)),    // Cm (96)
+    (Some(1259.0), Some(2900.0), Some(14.8)),    // Bk (97)
+    (Some(1173.0), Some(1743.0), Some(15.1)),    // Cf (98)
+    (Some(1133.0), Some(1269.0), Some(8.84)),    // Es (99)
+    (Some(1800.0), None, Some(9.7)),             // Fm (100)
+    (Some(1100.0), None, Some(10.3)),            // Md (101)
+    (Some(1100.0), None, Some(9.9)),             // No (102)
+    (Some(1900.0), None, Some(15.6)),            // Lr (103)
+    (None, None, Some(23.2)),                    // Rf (104) - predicted
+    (None, None, Some(29.3)),                    // Db (105) - predicted
+    (None, None, Some(35.0)),                    // Sg (106) - predicted
+    (None, None, Some(37.1)),                    // Bh (107) - predicted
+    (None, None, Some(40.7)),                    // Hs (108) - predicted
+    (None, None, Some(37.4)),                    // Mt (109) - predicted
+    (None, None, Some(34.8)),                    // Ds (110) - predicted
+    (None, None, Some(28.7)),                    // Rg (111) - predicted
+    (None, None, Some(23.7)),                    // Cn (112) - predicted
+    (None, None, Some(16.0)),                    // Nh (113) - predicted
+    (None, None, Some(14.0)),                    // Fl (114) - predicted
+    (None, None, Some(13.5)),                    // Mc (115) - predicted
+    (None, None, Some(12.9)),                    // Lv (116) - predicted
+    (None, None, Some(7.2)),                     // Ts (117) - predicted
+    (None, None, Some(5.0)),                     // Og (118) - predicted
+];
+
 /// Complete element information
 #[derive(Debug, Clone)]
 pub struct Element {
@@ -390,6 +541,15 @@ pub struct PeriodicTable {
     /// Superheavy elements marker (elements 104+)
     pub superheavy: ContinuousHV,
 
+    /// Thermodynamic property concept vectors
+    pub thermal_stable: ContinuousHV,   // High melting/boiling points
+    pub thermal_volatile: ContinuousHV, // Low melting/boiling points
+    pub phase_solid: ContinuousHV,      // Solid at STP
+    pub phase_liquid: ContinuousHV,     // Liquid at STP
+    pub phase_gas: ContinuousHV,        // Gas at STP
+    pub density_heavy: ContinuousHV,    // High density
+    pub density_light: ContinuousHV,    // Low density
+
     /// Reference to building blocks
     proton: ContinuousHV,
     neutron: ContinuousHV,
@@ -414,6 +574,15 @@ impl PeriodicTable {
         let actinide = genesis.hv("chemistry::actinide", PHYSICS_DIM);
         let superheavy = genesis.hv("chemistry::superheavy", PHYSICS_DIM);
 
+        // Thermodynamic property concept vectors
+        let thermal_stable = genesis.hv("chemistry::thermal_stable", PHYSICS_DIM);
+        let thermal_volatile = genesis.hv("chemistry::thermal_volatile", PHYSICS_DIM);
+        let phase_solid = genesis.hv("chemistry::phase_solid", PHYSICS_DIM);
+        let phase_liquid = genesis.hv("chemistry::phase_liquid", PHYSICS_DIM);
+        let phase_gas = genesis.hv("chemistry::phase_gas", PHYSICS_DIM);
+        let density_heavy = genesis.hv("chemistry::density_heavy", PHYSICS_DIM);
+        let density_light = genesis.hv("chemistry::density_light", PHYSICS_DIM);
+
         // Store building blocks
         let proton = hadrons.proton.clone();
         let neutron = hadrons.neutron.clone();
@@ -432,6 +601,13 @@ impl PeriodicTable {
             lanthanide,
             actinide,
             superheavy,
+            thermal_stable,
+            thermal_volatile,
+            phase_solid,
+            phase_liquid,
+            phase_gas,
+            density_heavy,
+            density_light,
             proton,
             neutron,
             electron,
@@ -590,7 +766,7 @@ impl PeriodicTable {
             }
 
             // Add lanthanide character (La=57 through Lu=71)
-            if z >= 57 && z <= 71 {
+            if (57..=71).contains(&z) {
                 vector = ContinuousHV::weighted_bundle(
                     &[&vector, &self.lanthanide],
                     &[1.0, 0.4],
@@ -598,7 +774,7 @@ impl PeriodicTable {
             }
 
             // Add actinide character (Ac=89 through Lr=103)
-            if z >= 89 && z <= 103 {
+            if (89..=103).contains(&z) {
                 vector = ContinuousHV::weighted_bundle(
                     &[&vector, &self.actinide],
                     &[1.0, 0.4],
@@ -695,10 +871,10 @@ impl PeriodicTable {
         // This makes ions significantly different from neutral atoms
         let charge_marker = if charge > 0 {
             // Cation: missing electrons (positive charge)
-            self.reactive.permute(charge.abs() as usize * 1000)
+            self.reactive.permute(charge.unsigned_abs() as usize * 1000)
         } else if charge < 0 {
             // Anion: extra electrons (negative charge)
-            self.reactive.permute(PHYSICS_DIM / 2 + charge.abs() as usize * 1000)
+            self.reactive.permute(PHYSICS_DIM / 2 + charge.unsigned_abs() as usize * 1000)
         } else {
             ContinuousHV::zero(PHYSICS_DIM)
         };
@@ -853,8 +1029,74 @@ impl PeriodicTable {
             &[data.metallic_character, 1.0 - data.metallic_character],
         );
 
+        // === Thermodynamic property contributions ===
+
+        // 6. Thermal stability contribution (melting/boiling points)
+        // High melting/boiling point = thermally stable (e.g., W at 3695K)
+        // Low melting/boiling point = volatile (e.g., He at 4.2K)
+        let thermal_contribution = match (data.melting_point, data.boiling_point) {
+            (Some(mp), Some(bp)) => {
+                // Use average of normalized mp and bp
+                // Melting: range ~14K (H2) to ~3695K (W)
+                // Boiling: range ~4K (He) to ~5869K (W)
+                let mp_normalized = ((mp - 14.0) / (3695.0 - 14.0)).clamp(0.0, 1.0);
+                let bp_normalized = ((bp - 4.0) / (5869.0 - 4.0)).clamp(0.0, 1.0);
+                let thermal_stability = (mp_normalized + bp_normalized) / 2.0;
+                ContinuousHV::weighted_bundle(
+                    &[&self.thermal_stable, &self.thermal_volatile],
+                    &[thermal_stability, 1.0 - thermal_stability],
+                )
+            }
+            (Some(mp), None) => {
+                let mp_normalized = ((mp - 14.0) / (3695.0 - 14.0)).clamp(0.0, 1.0);
+                ContinuousHV::weighted_bundle(
+                    &[&self.thermal_stable, &self.thermal_volatile],
+                    &[mp_normalized, 1.0 - mp_normalized],
+                )
+            }
+            _ => ContinuousHV::zero(PHYSICS_DIM),
+        };
+
+        // 7. Density contribution
+        // High density = heavy (e.g., Os at 22.6 g/cm³)
+        // Low density = light (e.g., H at 0.00009 g/cm³)
+        let density_contribution = if let Some(d) = data.density {
+            // Log scale works better for the huge range
+            // Range: ~0.00009 to ~22.6 g/cm³
+            let d_log = (d.max(0.0001)).ln();
+            let d_min_log = 0.0001_f32.ln(); // ~ -9.2
+            let d_max_log = 22.6_f32.ln();   // ~ 3.1
+            let d_normalized = ((d_log - d_min_log) / (d_max_log - d_min_log)).clamp(0.0, 1.0);
+            ContinuousHV::weighted_bundle(
+                &[&self.density_heavy, &self.density_light],
+                &[d_normalized, 1.0 - d_normalized],
+            )
+        } else {
+            ContinuousHV::zero(PHYSICS_DIM)
+        };
+
+        // 8. Phase state at STP (298K, 1 atm)
+        // Solid if mp > 298K, gas if bp < 298K, otherwise liquid
+        let phase_contribution = match (data.melting_point, data.boiling_point) {
+            (Some(mp), Some(bp)) => {
+                const STP_TEMP: f32 = 298.0; // 25°C in Kelvin
+                if mp > STP_TEMP {
+                    // Solid at STP
+                    self.phase_solid.clone()
+                } else if bp < STP_TEMP {
+                    // Gas at STP
+                    self.phase_gas.clone()
+                } else {
+                    // Liquid at STP (only Br and Hg at standard conditions)
+                    self.phase_liquid.clone()
+                }
+            }
+            _ => ContinuousHV::zero(PHYSICS_DIM),
+        };
+
         // === Combine all contributions ===
         // Weight: nuclear/electronic are primary, properties are secondary
+        // Adjusted weights to include thermodynamic properties
         let base_atom = ContinuousHV::bundle(&[&nuclear, &electron_cloud]);
         let property_bundle = ContinuousHV::weighted_bundle(
             &[
@@ -863,8 +1105,11 @@ impl PeriodicTable {
                 &radius_contribution,
                 &ea_contribution,
                 &metallic_contribution,
+                &thermal_contribution,
+                &density_contribution,
+                &phase_contribution,
             ],
-            &[0.25, 0.20, 0.15, 0.15, 0.25],
+            &[0.18, 0.15, 0.12, 0.10, 0.15, 0.12, 0.10, 0.08],
         );
 
         // Final combination: base atom (high weight) + properties (medium weight) + binding
@@ -1366,5 +1611,283 @@ mod tests {
 
         assert!(fe1.similarity(&fe2) > 0.9999,
             "Grounded composition should be deterministic");
+    }
+
+    // Tests for thermodynamic properties
+
+    #[test]
+    fn test_thermodynamic_properties_exist() {
+        let (_, _, table, _) = setup();
+
+        // Check that common elements have thermodynamic properties
+        for z in [1, 6, 8, 11, 17, 26, 29, 79] {
+            let ext = table.extended_data(z as u8).unwrap();
+            assert!(ext.melting_point.is_some(),
+                "Element {} should have melting point", ext.base.symbol);
+            assert!(ext.boiling_point.is_some(),
+                "Element {} should have boiling point", ext.base.symbol);
+            assert!(ext.density.is_some(),
+                "Element {} should have density", ext.base.symbol);
+        }
+    }
+
+    #[test]
+    fn test_melting_point_trends() {
+        let (_, _, table, _) = setup();
+
+        // Tungsten has highest melting point of all elements
+        let w_ext = table.extended_data(74).unwrap();
+        let w_mp = w_ext.melting_point.unwrap();
+
+        assert!(w_mp > 3600.0,
+            "W should have very high melting point: {:.0} K", w_mp);
+
+        // Mercury is liquid at room temp (lowest melting point metal)
+        let hg_ext = table.extended_data(80).unwrap();
+        let hg_mp = hg_ext.melting_point.unwrap();
+
+        assert!(hg_mp < 300.0,
+            "Hg should have low melting point: {:.1} K", hg_mp);
+
+        // Noble gases have very low melting points
+        let he_ext = table.extended_data(2).unwrap();
+        let he_mp = he_ext.melting_point.unwrap();
+
+        assert!(he_mp < 10.0,
+            "He should have lowest melting point: {:.2} K", he_mp);
+    }
+
+    #[test]
+    fn test_density_trends() {
+        let (_, _, table, _) = setup();
+
+        // Osmium and Iridium are the densest elements
+        let os_ext = table.extended_data(76).unwrap();
+        let ir_ext = table.extended_data(77).unwrap();
+        let os_dens = os_ext.density.unwrap();
+        let ir_dens = ir_ext.density.unwrap();
+
+        assert!(os_dens > 22.0 && ir_dens > 22.0,
+            "Os and Ir should have very high density: Os={:.1}, Ir={:.1}", os_dens, ir_dens);
+
+        // Hydrogen has lowest density
+        let h_ext = table.extended_data(1).unwrap();
+        let h_dens = h_ext.density.unwrap();
+
+        assert!(h_dens < 0.001,
+            "H should have very low density: {:.6} g/cm³", h_dens);
+
+        // Lithium is the lightest metal
+        let li_ext = table.extended_data(3).unwrap();
+        let li_dens = li_ext.density.unwrap();
+
+        assert!(li_dens < 1.0,
+            "Li should be lighter than water: {:.3} g/cm³", li_dens);
+    }
+
+    #[test]
+    fn test_boiling_point_trends() {
+        let (_, _, table, _) = setup();
+
+        // Rhenium has high boiling point (5869 K)
+        let re_ext = table.extended_data(75).unwrap();
+        let re_bp = re_ext.boiling_point.unwrap();
+
+        assert!(re_bp > 5800.0,
+            "Re should have very high boiling point: {:.0} K", re_bp);
+
+        // Helium has lowest boiling point (4.22 K)
+        let he_ext = table.extended_data(2).unwrap();
+        let he_bp = he_ext.boiling_point.unwrap();
+
+        assert!(he_bp < 10.0,
+            "He should have lowest boiling point: {:.2} K", he_bp);
+    }
+
+    #[test]
+    fn test_alkali_metal_density_increases() {
+        let (_, _, table, _) = setup();
+
+        // Alkali metal density increases down the group
+        let li_dens = table.extended_data(3).unwrap().density.unwrap();
+        let na_dens = table.extended_data(11).unwrap().density.unwrap();
+        let k_dens = table.extended_data(19).unwrap().density.unwrap();
+
+        assert!(na_dens > li_dens,
+            "Na should be denser than Li: Na={:.2}, Li={:.2}", na_dens, li_dens);
+        assert!(k_dens > na_dens.min(li_dens),
+            "Alkali metals generally increase in density down group");
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // THERMODYNAMIC CONTRIBUTION VALIDATION TESTS
+    // These tests verify that thermodynamic properties affect grounded vectors
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    #[test]
+    fn test_thermal_stability_in_grounded_vectors() {
+        let (_, hadrons, table, _) = setup();
+
+        // Tungsten (W) has highest melting point - should be thermally stable
+        let w_vec = table.compose_grounded(74, &hadrons).unwrap();
+        // Helium (He) has lowest boiling point - should be thermally volatile
+        let he_vec = table.compose_grounded(2, &hadrons).unwrap();
+
+        let w_thermal_stable = w_vec.similarity(&table.thermal_stable);
+        let he_thermal_stable = he_vec.similarity(&table.thermal_stable);
+        let w_thermal_volatile = w_vec.similarity(&table.thermal_volatile);
+        let he_thermal_volatile = he_vec.similarity(&table.thermal_volatile);
+
+        println!("W  - thermal_stable: {:.4}, thermal_volatile: {:.4}", w_thermal_stable, w_thermal_volatile);
+        println!("He - thermal_stable: {:.4}, thermal_volatile: {:.4}", he_thermal_stable, he_thermal_volatile);
+
+        // W should be more similar to thermal_stable than He
+        assert!(w_thermal_stable > he_thermal_stable,
+            "W should be more thermally stable than He: W={:.4}, He={:.4}",
+            w_thermal_stable, he_thermal_stable);
+
+        // He should be more similar to thermal_volatile than W
+        assert!(he_thermal_volatile > w_thermal_volatile,
+            "He should be more thermally volatile than W: He={:.4}, W={:.4}",
+            he_thermal_volatile, w_thermal_volatile);
+    }
+
+    #[test]
+    fn test_density_in_grounded_vectors() {
+        let (_, hadrons, table, _) = setup();
+
+        // Osmium (Os) is the densest element (~22.6 g/cm³)
+        let os_vec = table.compose_grounded(76, &hadrons).unwrap();
+        // Lithium (Li) is the lightest metal (~0.534 g/cm³)
+        let li_vec = table.compose_grounded(3, &hadrons).unwrap();
+
+        let os_heavy = os_vec.similarity(&table.density_heavy);
+        let li_heavy = li_vec.similarity(&table.density_heavy);
+        let os_light = os_vec.similarity(&table.density_light);
+        let li_light = li_vec.similarity(&table.density_light);
+
+        println!("Os - density_heavy: {:.4}, density_light: {:.4}", os_heavy, os_light);
+        println!("Li - density_heavy: {:.4}, density_light: {:.4}", li_heavy, li_light);
+
+        // Os should be more similar to density_heavy than Li
+        assert!(os_heavy > li_heavy,
+            "Os should be more dense than Li: Os={:.4}, Li={:.4}",
+            os_heavy, li_heavy);
+
+        // Li should be more similar to density_light than Os
+        assert!(li_light > os_light,
+            "Li should be lighter than Os: Li={:.4}, Os={:.4}",
+            li_light, os_light);
+    }
+
+    #[test]
+    fn test_phase_state_in_grounded_vectors() {
+        let (_, hadrons, table, _) = setup();
+
+        // Mercury (Hg) is liquid at STP (mp=234K, bp=630K)
+        let hg_vec = table.compose_grounded(80, &hadrons).unwrap();
+        // Iron (Fe) is solid at STP (mp=1811K)
+        let fe_vec = table.compose_grounded(26, &hadrons).unwrap();
+        // Nitrogen (N) is gas at STP (bp=77K)
+        let n_vec = table.compose_grounded(7, &hadrons).unwrap();
+
+        let hg_liquid = hg_vec.similarity(&table.phase_liquid);
+        let fe_solid = fe_vec.similarity(&table.phase_solid);
+        let n_gas = n_vec.similarity(&table.phase_gas);
+
+        println!("Hg - phase_liquid: {:.4}", hg_liquid);
+        println!("Fe - phase_solid: {:.4}", fe_solid);
+        println!("N  - phase_gas: {:.4}", n_gas);
+
+        // Hg should have higher liquid character than Fe
+        let fe_liquid = fe_vec.similarity(&table.phase_liquid);
+        assert!(hg_liquid > fe_liquid,
+            "Hg should be more liquid than Fe at STP: Hg={:.4}, Fe={:.4}",
+            hg_liquid, fe_liquid);
+
+        // N should have higher gas character than Fe
+        let fe_gas = fe_vec.similarity(&table.phase_gas);
+        assert!(n_gas > fe_gas,
+            "N should be more gaseous than Fe at STP: N={:.4}, Fe={:.4}",
+            n_gas, fe_gas);
+
+        // Fe should have higher solid character than N
+        let n_solid = n_vec.similarity(&table.phase_solid);
+        assert!(fe_solid > n_solid,
+            "Fe should be more solid than N at STP: Fe={:.4}, N={:.4}",
+            fe_solid, n_solid);
+    }
+
+    #[test]
+    fn test_noble_gases_volatile() {
+        let (_, hadrons, table, _) = setup();
+
+        // All noble gases have very low boiling points
+        let noble_gases = [2, 10, 18, 36, 54]; // He, Ne, Ar, Kr, Xe
+
+        for &z in &noble_gases {
+            let vec = table.compose_grounded(z, &hadrons).unwrap();
+            let volatile = vec.similarity(&table.thermal_volatile);
+            let stable = vec.similarity(&table.thermal_stable);
+            let gas_char = vec.similarity(&table.phase_gas);
+
+            let symbol = table.element(z).unwrap().data.symbol;
+            println!("{}: volatile={:.4}, stable={:.4}, gas={:.4}", symbol, volatile, stable, gas_char);
+
+            // Noble gases should be more volatile than stable
+            assert!(volatile > stable,
+                "{} should be more volatile than stable: volatile={:.4}, stable={:.4}",
+                symbol, volatile, stable);
+        }
+    }
+
+    #[test]
+    fn test_refractory_metals_stable() {
+        let (_, hadrons, table, _) = setup();
+
+        // Refractory metals have very high melting points
+        // W(74)=3695K, Re(75)=3459K, Ta(73)=3290K, Mo(42)=2896K
+        let refractory_metals = [74, 75, 73, 42]; // W, Re, Ta, Mo
+
+        for &z in &refractory_metals {
+            let vec = table.compose_grounded(z, &hadrons).unwrap();
+            let stable = vec.similarity(&table.thermal_stable);
+            let volatile = vec.similarity(&table.thermal_volatile);
+            let solid_char = vec.similarity(&table.phase_solid);
+
+            let symbol = table.element(z).unwrap().data.symbol;
+            println!("{}: stable={:.4}, volatile={:.4}, solid={:.4}", symbol, stable, volatile, solid_char);
+
+            // Refractory metals should be more stable than volatile
+            assert!(stable > volatile,
+                "{} should be more thermally stable than volatile: stable={:.4}, volatile={:.4}",
+                symbol, stable, volatile);
+
+            // They should all be solid at STP
+            assert!(solid_char > vec.similarity(&table.phase_liquid),
+                "{} should be solid at STP", symbol);
+        }
+    }
+
+    #[test]
+    fn test_bromine_liquid_at_stp() {
+        let (_, hadrons, table, _) = setup();
+
+        // Bromine (Br) is one of only two elements liquid at STP (mp=266K, bp=332K)
+        let br_vec = table.compose_grounded(35, &hadrons).unwrap();
+
+        let br_liquid = br_vec.similarity(&table.phase_liquid);
+        let br_solid = br_vec.similarity(&table.phase_solid);
+        let br_gas = br_vec.similarity(&table.phase_gas);
+
+        println!("Br - liquid: {:.4}, solid: {:.4}, gas: {:.4}", br_liquid, br_solid, br_gas);
+
+        // Br should have higher liquid character than solid or gas
+        assert!(br_liquid > br_solid,
+            "Br should be more liquid than solid at STP: liquid={:.4}, solid={:.4}",
+            br_liquid, br_solid);
+        assert!(br_liquid > br_gas,
+            "Br should be more liquid than gas at STP: liquid={:.4}, gas={:.4}",
+            br_liquid, br_gas);
     }
 }

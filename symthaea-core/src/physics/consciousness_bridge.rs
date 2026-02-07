@@ -122,6 +122,15 @@ impl PhysicsConsciousnessBridge {
     /// Measure phenomenal character of a vector
     ///
     /// How similar is this vector to phenomenal vs functional concepts?
+    ///
+    /// Note: This measures similarity to labeled concept vectors (qualia, awareness, etc.)
+    /// which is somewhat circular. For a more rigorous measure based on Shannon entropy
+    /// and information integration, use `EmergenceChain::phenomenal_index_rigorous()`.
+    #[deprecated(
+        since = "0.6.0",
+        note = "Use EmergenceChain::phenomenal_index_rigorous() for entropy-based computation. \
+                This method relies on concept vector similarity which may be circular."
+    )]
     pub fn phenomenal_index(&self, vector: &ContinuousHV) -> f32 {
         let phenomenal_sim = (
             vector.similarity(&self.qualia)
@@ -186,31 +195,134 @@ impl PhysicsConsciousnessBridge {
         table: &PeriodicTable,
         chemistry: &Chemistry,
     ) -> CompositionalAnalysis {
-        // Level 0: Fundamental particles
-        let quark_phenomenal = self.phenomenal_index(&model.up_quark);
-        let electron_phenomenal = self.phenomenal_index(&model.electron);
+        use super::true_phi::TruePhiCalculator;
+        let calc = TruePhiCalculator::new();
+
+        // Helper to normalize phi to [0, 1] range
+        let normalize_phi = |components: &[ContinuousHV]| -> f32 {
+            let result = calc.compute_true_phi(components);
+            let n = components.len();
+            let max_pairs = if n > 1 { (n * (n - 1)) / 2 } else { 1 };
+            let max_phi = (max_pairs as f64) * 4.0;
+            (result.phi / max_phi).min(1.0) as f32
+        };
+
+        // Level 0: Fundamental particles (quarks and electron)
+        let quark_components = vec![model.up_quark.clone(), model.electron.clone()];
+        let level_0 = normalize_phi(&quark_components);
 
         // Level 1: Hadrons (composed from quarks)
-        let proton_phenomenal = self.phenomenal_index(&hadrons.proton);
-        let neutron_phenomenal = self.phenomenal_index(&hadrons.neutron);
+        let hadron_components = vec![hadrons.proton.clone(), hadrons.neutron.clone()];
+        let level_1 = normalize_phi(&hadron_components);
 
         // Level 2: Atoms (composed from hadrons + electrons)
-        let hydrogen_phenomenal = table.element(1)
-            .map(|e| self.phenomenal_index(&e.vector))
-            .unwrap_or(0.0);
-        let carbon_phenomenal = table.element(6)
-            .map(|e| self.phenomenal_index(&e.vector))
-            .unwrap_or(0.0);
+        let mut atom_components = Vec::new();
+        if let Some(h) = table.element(1) {
+            atom_components.push(h.vector.clone());
+        }
+        if let Some(c) = table.element(6) {
+            atom_components.push(c.vector.clone());
+        }
+        let level_2 = if atom_components.len() >= 2 {
+            normalize_phi(&atom_components)
+        } else {
+            0.0
+        };
 
         // Level 3: Molecules (composed from atoms)
         let water = chemistry.water(table);
-        let water_phenomenal = self.phenomenal_index(&water.vector);
+        let h_elem = table.element(1).map(|e| e.vector.clone());
+        let o_elem = table.element(8).map(|e| e.vector.clone());
+        let level_3 = if let (Some(h), Some(o)) = (h_elem, o_elem) {
+            let mol_components = vec![water.vector.clone(), h.clone(), h, o];
+            normalize_phi(&mol_components)
+        } else {
+            0.0
+        };
 
         CompositionalAnalysis {
-            level_0_quarks: (quark_phenomenal + electron_phenomenal) / 2.0,
-            level_1_hadrons: (proton_phenomenal + neutron_phenomenal) / 2.0,
-            level_2_atoms: (hydrogen_phenomenal + carbon_phenomenal) / 2.0,
-            level_3_molecules: water_phenomenal,
+            level_0_quarks: level_0,
+            level_1_hadrons: level_1,
+            level_2_atoms: level_2,
+            level_3_molecules: level_3,
+        }
+    }
+
+    /// Analyze compositional hierarchy using rigorous entropy-based measures
+    ///
+    /// This is the recommended replacement for `compositional_phenomenal_analysis`.
+    /// Instead of using similarity to concept vectors, it uses true Φ (integrated information)
+    /// to measure how much information is integrated at each level.
+    ///
+    /// Returns Φ values for each level of composition.
+    pub fn compositional_phi_analysis(
+        &self,
+        model: &StandardModel,
+        hadrons: &Hadrons,
+        table: &PeriodicTable,
+        chemistry: &Chemistry,
+    ) -> CompositionalPhiAnalysis {
+        use super::true_phi::TruePhiCalculator;
+        let calc = TruePhiCalculator::new();
+
+        // Level 0: Fundamental particles (quarks and electron)
+        // Φ measures how much information is integrated in the quark triplet
+        let quarks = vec![model.up_quark.clone(), model.down_quark.clone()];
+        let quark_phi = calc.compute_true_phi(&quarks);
+
+        // Level 1: Hadrons (proton, neutron) - composed from quarks
+        let hadron_components = vec![hadrons.proton.clone(), hadrons.neutron.clone()];
+        let hadron_phi = calc.compute_true_phi(&hadron_components);
+
+        // Level 2: Atoms - hydrogen and carbon
+        let mut atom_components = Vec::new();
+        if let Some(h) = table.element(1) {
+            atom_components.push(h.vector.clone());
+        }
+        if let Some(c) = table.element(6) {
+            atom_components.push(c.vector.clone());
+        }
+        let atom_phi = if atom_components.len() >= 2 {
+            calc.compute_true_phi(&atom_components)
+        } else {
+            super::true_phi::TruePhiResult {
+                phi: 0.0,
+                system_ei: 0.0,
+                mip_ei: 0.0,
+                mip: super::true_phi::TruePartition { part_a: vec![], part_b: vec![] },
+                component_entropies: vec![],
+                mutual_information_matrix: vec![],
+            }
+        };
+
+        // Level 3: Molecule (water) - composed from atoms
+        let water = chemistry.water(table);
+        let h_elem = table.element(1).map(|e| e.vector.clone());
+        let o_elem = table.element(8).map(|e| e.vector.clone());
+        let molecule_phi = if let (Some(h), Some(o)) = (h_elem, o_elem) {
+            let mol_components = vec![water.vector.clone(), h.clone(), h, o];
+            calc.compute_true_phi(&mol_components)
+        } else {
+            super::true_phi::TruePhiResult {
+                phi: 0.0,
+                system_ei: 0.0,
+                mip_ei: 0.0,
+                mip: super::true_phi::TruePartition { part_a: vec![], part_b: vec![] },
+                component_entropies: vec![],
+                mutual_information_matrix: vec![],
+            }
+        };
+
+        CompositionalPhiAnalysis {
+            level_0_quarks_phi: quark_phi.phi,
+            level_1_hadrons_phi: hadron_phi.phi,
+            level_2_atoms_phi: atom_phi.phi,
+            level_3_molecules_phi: molecule_phi.phi,
+            // EI values for detailed analysis
+            level_0_quarks_ei: quark_phi.system_ei,
+            level_1_hadrons_ei: hadron_phi.system_ei,
+            level_2_atoms_ei: atom_phi.system_ei,
+            level_3_molecules_ei: molecule_phi.system_ei,
         }
     }
 
@@ -317,6 +429,61 @@ impl CompositionalAnalysis {
             gradient += levels[i] - levels[i - 1];
         }
         gradient / (levels.len() - 1) as f32
+    }
+}
+
+/// Compositional Φ analysis result using rigorous entropy-based measures
+///
+/// This replaces `CompositionalAnalysis` with true integrated information (Φ)
+/// at each level of physical composition.
+#[derive(Debug, Clone)]
+pub struct CompositionalPhiAnalysis {
+    /// Integrated information at quark level
+    pub level_0_quarks_phi: f64,
+    /// Integrated information at hadron level
+    pub level_1_hadrons_phi: f64,
+    /// Integrated information at atom level
+    pub level_2_atoms_phi: f64,
+    /// Integrated information at molecule level
+    pub level_3_molecules_phi: f64,
+    /// Effective information at quark level
+    pub level_0_quarks_ei: f64,
+    /// Effective information at hadron level
+    pub level_1_hadrons_ei: f64,
+    /// Effective information at atom level
+    pub level_2_atoms_ei: f64,
+    /// Effective information at molecule level
+    pub level_3_molecules_ei: f64,
+}
+
+impl CompositionalPhiAnalysis {
+    /// Does Φ increase with composition level?
+    pub fn shows_emergence(&self) -> bool {
+        self.level_3_molecules_phi > self.level_0_quarks_phi
+    }
+
+    /// Compute gradient of Φ across levels
+    pub fn phi_gradient(&self) -> f64 {
+        let levels = [
+            self.level_0_quarks_phi,
+            self.level_1_hadrons_phi,
+            self.level_2_atoms_phi,
+            self.level_3_molecules_phi,
+        ];
+
+        let mut gradient = 0.0;
+        for i in 1..levels.len() {
+            gradient += levels[i] - levels[i - 1];
+        }
+        gradient / (levels.len() - 1) as f64
+    }
+
+    /// Total integrated information across all levels
+    pub fn total_phi(&self) -> f64 {
+        self.level_0_quarks_phi
+            + self.level_1_hadrons_phi
+            + self.level_2_atoms_phi
+            + self.level_3_molecules_phi
     }
 }
 
@@ -444,5 +611,60 @@ mod tests {
             "Should have positive discrimination: {}",
             fisher
         );
+    }
+
+    #[test]
+    fn test_compositional_phi_analysis() {
+        let (model, hadrons, table, chemistry, bridge, _) = setup();
+
+        let analysis = bridge.compositional_phi_analysis(
+            &model, &hadrons, &table, &chemistry
+        );
+
+        // All levels should have non-negative Φ
+        assert!(analysis.level_0_quarks_phi >= 0.0,
+            "Quark Φ should be non-negative: {:.4}", analysis.level_0_quarks_phi);
+        assert!(analysis.level_1_hadrons_phi >= 0.0,
+            "Hadron Φ should be non-negative: {:.4}", analysis.level_1_hadrons_phi);
+        assert!(analysis.level_2_atoms_phi >= 0.0,
+            "Atom Φ should be non-negative: {:.4}", analysis.level_2_atoms_phi);
+        assert!(analysis.level_3_molecules_phi >= 0.0,
+            "Molecule Φ should be non-negative: {:.4}", analysis.level_3_molecules_phi);
+
+        // EI should be non-negative
+        assert!(analysis.level_0_quarks_ei >= 0.0,
+            "Quark EI should be non-negative: {:.4}", analysis.level_0_quarks_ei);
+
+        // Compute gradient
+        let gradient = analysis.phi_gradient();
+        println!(
+            "Rigorous Φ analysis: quarks={:.4}, hadrons={:.4}, atoms={:.4}, molecules={:.4}, gradient={:.4}",
+            analysis.level_0_quarks_phi,
+            analysis.level_1_hadrons_phi,
+            analysis.level_2_atoms_phi,
+            analysis.level_3_molecules_phi,
+            gradient
+        );
+    }
+
+    #[test]
+    fn test_compositional_phi_vs_legacy() {
+        let (model, hadrons, table, chemistry, bridge, _) = setup();
+
+        // Both methods should complete without error
+        let legacy = bridge.compositional_phenomenal_analysis(
+            &model, &hadrons, &table, &chemistry
+        );
+        let rigorous = bridge.compositional_phi_analysis(
+            &model, &hadrons, &table, &chemistry
+        );
+
+        // They measure different things but should both be valid
+        assert!(!legacy.level_0_quarks.is_nan());
+        assert!(rigorous.level_0_quarks_phi >= 0.0);
+
+        // Rigorous should have meaningful total Φ
+        let total = rigorous.total_phi();
+        assert!(total >= 0.0, "Total Φ should be non-negative: {:.4}", total);
     }
 }
