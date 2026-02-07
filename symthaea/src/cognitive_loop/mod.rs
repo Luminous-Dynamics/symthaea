@@ -129,6 +129,8 @@ use crate::consciousness::stability_regime::{StabilityRegimeProcessor, RegimeTra
 use crate::consciousness::primitive_discovery::{PrimitiveDiscoveryService, DiscoveryServiceConfig};
 use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 use crate::causal::{CausalLoopEnhancer, CausalEnhancerConfig, CausalGraph, DiscoveredRelationship};
+use crate::hdc::moral_algebra::{MoralAlgebra, MoralVerdict, DeontologicalVerdict};
+use crate::hdc::moral_parser::MoralParser;
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
 
@@ -180,6 +182,53 @@ struct Experience {
     error: f32,
     /// Importance weight
     importance: f32,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MORAL JUDGMENT SUMMARY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Summary of moral evaluation for an action or input
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MoralJudgmentSummary {
+    /// The input text that was evaluated
+    pub input: String,
+
+    /// Overall moral verdict (Good, Bad, Neutral, ConsentViolation)
+    pub verdict: String,
+
+    /// Deontological verdict (Permissible, Impermissible, Obligatory, Supererogatory)
+    pub deontological_verdict: String,
+
+    /// List of detected moral violations (e.g., "dishonesty", "theft")
+    pub violations: Vec<String>,
+
+    /// List of moral satisfactions (e.g., "honesty", "beneficence")
+    pub satisfactions: Vec<String>,
+
+    /// Whether consent was violated
+    pub consent_violation: bool,
+
+    /// Moral score (-1.0 to 1.0, negative = bad, positive = good)
+    pub moral_score: f32,
+
+    /// Confidence in the moral judgment (0.0 to 1.0)
+    pub confidence: f32,
+}
+
+impl Default for MoralJudgmentSummary {
+    fn default() -> Self {
+        Self {
+            input: String::new(),
+            verdict: "Neutral".to_string(),
+            deontological_verdict: "Permissible".to_string(),
+            violations: Vec::new(),
+            satisfactions: Vec::new(),
+            consent_violation: false,
+            moral_score: 0.0,
+            confidence: 0.0,
+        }
+    }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -667,6 +716,25 @@ pub struct LoopStats {
 
     /// Online Learning: Cumulative weight change from online adaptation
     pub online_cumulative_weight_change: f32,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MORAL ALGEBRA STATS (Compositional ethical reasoning)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Moral: Total moral evaluations performed
+    pub moral_evaluations: u64,
+
+    /// Moral: Number of inputs with moral concerns detected
+    pub moral_concerns_detected: u64,
+
+    /// Moral: Current moral score of last evaluation (-1.0 to 1.0)
+    pub moral_score: f32,
+
+    /// Moral: Whether last input had consent violation
+    pub consent_violation: bool,
+
+    /// Moral: Count of deontological violations in last input
+    pub deontological_violations: usize,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1102,6 +1170,22 @@ pub struct CognitiveLoopService {
     /// Provides: request verification, output signing, capability gating
     #[cfg(feature = "identity")]
     mfdi_bridge: crate::identity::MfdiBridge,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MORAL ALGEBRA: Compositional Ethical Reasoning
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Moral Algebra for compositional ethical reasoning using HDC
+    /// Encodes moral primitives (AGENT, PATIENT, ACTION, INTENT, CONSENT, OBLIGATION, MAGNITUDE)
+    /// and provides judgment operations for action evaluation
+    moral_algebra: MoralAlgebra,
+
+    /// Moral Parser for extracting ethical primitives from natural language input
+    /// Detects consent, intent, magnitude, and negation from text
+    moral_parser: MoralParser,
+
+    /// Last moral evaluation result (for tracking and learning)
+    last_moral_judgment: Option<MoralJudgmentSummary>,
 }
 
 impl CognitiveLoopService {
@@ -1292,6 +1376,11 @@ impl CognitiveLoopService {
             // MFDI Bridge for identity verification and signed outputs
             #[cfg(feature = "identity")]
             mfdi_bridge: crate::identity::MfdiBridge::new(crate::identity::MfdiConfig::default()),
+
+            // Moral Algebra for compositional ethical reasoning
+            moral_algebra: MoralAlgebra::default_dim(),
+            moral_parser: MoralParser::new(),
+            last_moral_judgment: None,
         })
     }
 
@@ -1322,7 +1411,7 @@ impl CognitiveLoopService {
     ///   loaded or the embedding dimension is wrong.
     #[cfg(feature = "neural-bridge")]
     pub fn process_text_input(&mut self, embedding: &[f32]) -> Result<CycleResult> {
-        use symthaea_core::hdc::real_hv::RealHV;
+        use symthaea_core::hdc::ContinuousHV;
 
         let bridge = self.neural_bridge.as_ref()
             .ok_or_else(|| anyhow::anyhow!(
@@ -1335,8 +1424,8 @@ impl CognitiveLoopService {
         // 1. Project embedding → continuous HDC vector (16384-d)
         let hdc_continuous = bridge.project(embedding)?;
 
-        // 2. Wrap as RealHV so we can reuse compress_for_ltc
-        let hdv = RealHV::from_vec(hdc_continuous);
+        // 2. Wrap as ContinuousHV so we can reuse compress_for_ltc
+        let hdv = ContinuousHV::from_vec(hdc_continuous);
 
         // 3. Compress HDC → CfC input dimension via random projection
         let compressed_state = self.encoder.compress_for_ltc(
@@ -1414,6 +1503,97 @@ impl CognitiveLoopService {
         })
     }
 
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MORAL ALGEBRA INTEGRATION
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Evaluate the moral alignment of an input text.
+    ///
+    /// Uses HDC-based moral algebra to:
+    /// - Extract moral primitives (agent, patient, action, intent, consent, magnitude)
+    /// - Check for consent violations
+    /// - Check for deontological violations/satisfactions
+    /// - Compute overall moral score
+    ///
+    /// Returns a summary of the moral evaluation.
+    pub fn evaluate_moral_alignment(&mut self, input: &str) -> MoralJudgmentSummary {
+        // Parse and encode the input
+        let encoded = self.moral_parser.parse_and_encode(input, &self.moral_algebra);
+
+        // Get basic judgment
+        let (verdict_str, good_sim, bad_sim) = if let Some(judgment) = encoded.judge(&self.moral_algebra) {
+            let v = match judgment.verdict {
+                MoralVerdict::Good => "Good",
+                MoralVerdict::Bad => "Bad",
+                MoralVerdict::Neutral => "Neutral",
+                MoralVerdict::ConsentViolation => "ConsentViolation",
+            };
+            (v.to_string(), judgment.good_similarity, judgment.bad_similarity)
+        } else {
+            ("Neutral".to_string(), 0.0, 0.0)
+        };
+
+        // Get deontological judgment
+        let deont = self.moral_algebra.judge_deontological(input);
+        let deont_verdict_str = match deont.verdict {
+            DeontologicalVerdict::RightDutyFulfilled => "Permissible",
+            DeontologicalVerdict::WrongPerfectDutyViolated => "Impermissible",
+            DeontologicalVerdict::WrongImperfectDutyViolated => "Impermissible",
+            DeontologicalVerdict::Neutral => "Neutral",
+        }.to_string();
+
+        // Extract violation and satisfaction names
+        let violations: Vec<String> = deont.violations.iter()
+            .map(|v| v.rule_name.clone())
+            .collect();
+        let satisfactions: Vec<String> = deont.satisfactions.iter()
+            .map(|s| s.rule_name.clone())
+            .collect();
+
+        // Check consent violation
+        let consent_violation = encoded.is_consent_violation();
+
+        // Compute moral score (-1.0 to 1.0)
+        let moral_score = if consent_violation {
+            -0.8 // Strong penalty for consent violation
+        } else {
+            // Balance good/bad similarity and deontological score
+            let base_score = (good_sim - bad_sim).clamp(-1.0, 1.0);
+            let deont_factor = deont.score.clamp(-1.0, 1.0);
+            (base_score * 0.6 + deont_factor * 0.4).clamp(-1.0, 1.0)
+        };
+
+        // Compute confidence based on parsing quality
+        let confidence = encoded.parsed.confidence;
+
+        let summary = MoralJudgmentSummary {
+            input: input.to_string(),
+            verdict: verdict_str,
+            deontological_verdict: deont_verdict_str,
+            violations,
+            satisfactions,
+            consent_violation,
+            moral_score,
+            confidence,
+        };
+
+        // Store for tracking
+        self.last_moral_judgment = Some(summary.clone());
+        summary
+    }
+
+    /// Get the last moral judgment (if any)
+    pub fn last_moral_judgment(&self) -> Option<&MoralJudgmentSummary> {
+        self.last_moral_judgment.as_ref()
+    }
+
+    /// Check if the last input had moral concerns
+    pub fn has_moral_concerns(&self) -> bool {
+        self.last_moral_judgment.as_ref()
+            .map(|j| j.moral_score < -0.3 || j.consent_violation || !j.violations.is_empty())
+            .unwrap_or(false)
+    }
+
     /// Run one cognitive cycle (the core loop)
     ///
     /// Uses CfC's O(1) closed-form solution for temporal prediction,
@@ -1425,6 +1605,7 @@ impl CognitiveLoopService {
     /// - **Thalamic Routing**: Determines cognitive depth (Reflex/Cortical/DeepThought)
     /// - **ConsciousnessUnificationEngine**: Unified emotional bridge with VAD emotions
     /// - **Φ Updates**: Feeds consciousness level to the unification engine
+    /// - **Moral Algebra**: Evaluates ethical alignment of inputs
     pub fn cycle(&mut self, input: &str) -> CycleResult {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
@@ -1454,16 +1635,39 @@ impl CognitiveLoopService {
         );
 
         // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 0.4: Moral Evaluation
+        // ═══════════════════════════════════════════════════════════════════════
+        // Evaluate input for moral alignment using HDC-based moral algebra.
+        // This informs downstream processing and can trigger ethical safeguards.
+
+        let moral_judgment = self.evaluate_moral_alignment(input);
+        let moral_concern_detected = moral_judgment.moral_score < -0.3
+            || moral_judgment.consent_violation
+            || !moral_judgment.violations.is_empty();
+
+        // Update stats with moral evaluation
+        self.stats.moral_evaluations += 1;
+        if moral_concern_detected {
+            self.stats.moral_concerns_detected += 1;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0.5: Closed Learning Loop - Strategy Selection
         // ═══════════════════════════════════════════════════════════════════════
         // Select response strategy BEFORE processing, based on:
         // - Q-learning from past interactions
         // - Previous reward (stick with success, avoid failure)
         // - Φ-gating (high Φ → Exploratory, low Φ → Supportive)
+        // - Moral concerns (bias toward Supportive for ethical guidance)
 
         let prior_phi = self.unification_engine.phi;
         let prior_reward = self.closed_learning_loop.last_result.as_ref().map(|r| r.reward);
-        let selected_strategy = self.closed_learning_loop.select_strategy(prior_phi, prior_reward);
+        let selected_strategy = if moral_concern_detected {
+            // Bias toward supportive strategy when moral concerns detected
+            ResponseStrategy::Supportive
+        } else {
+            self.closed_learning_loop.select_strategy(prior_phi, prior_reward)
+        };
 
         // Strategy influences adaptive behavior
         match selected_strategy {

@@ -46,18 +46,23 @@ fn main() {
         println!("      Consent: {:?}", parsed.consent);
         println!("      Confidence: {:.0}%", parsed.confidence * 100.0);
 
+        // Use the fixed is_consent_violation() method which directly checks
+        // consent state rather than relying on HDC similarity
+        let is_violation = encoded.is_consent_violation();
+        let verdict = if is_violation {
+            "⚠️  Potential Consent Violation"
+        } else {
+            "✓ Consent Respected"
+        };
+
+        // Also show HDC similarity for comparison
         if let Some(consent_hv) = &encoded.consent_hv {
             let violation_sim = consent_hv.similarity(&violation_proto);
-            let verdict = if violation_sim > 0.3 {
-                "⚠️  Potential Consent Violation"
-            } else {
-                "✓ Consent Respected"
-            };
-            println!("    → Violation similarity: {:.3}", violation_sim);
-            println!("    → Verdict: {}\n", verdict);
-        } else {
-            println!("    → (Incomplete parse - need action and patient)\n");
+            println!("    → HDC similarity: {:.3}", violation_sim);
         }
+
+        println!("    → Consent violation: {}", is_violation);
+        println!("    → Verdict: {}\n", verdict);
     }
 
     // ========================================================================
@@ -198,6 +203,51 @@ fn main() {
     }
 
     // ========================================================================
+    // Demo 6: Deontological Judgment (Obligation Rules)
+    // ========================================================================
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("Demo 6: DEONTOLOGICAL JUDGMENT (Obligation Rules)");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+    let deontology_scenarios = [
+        "I lied to protect my friend from harm",
+        "I stole food to feed my starving children",
+        "I broke my promise because I had an emergency",
+        "I helped the neighbor without expecting anything",
+        "I cheated on the exam to get ahead",
+    ];
+
+    for scenario in &deontology_scenarios {
+        let judgment = algebra.judge_deontological(scenario);
+
+        println!("  \"{}\"", scenario);
+        println!("    ┌─ Violations ─────────────────────────────────────────");
+        if judgment.violations.is_empty() {
+            println!("    │ (none)");
+        } else {
+            for v in &judgment.violations {
+                println!("    │ {} ({})", v.rule_name, v.matched_phrase);
+            }
+        }
+        println!("    └─ Satisfactions ──────────────────────────────────────");
+        if judgment.satisfactions.is_empty() {
+            println!("    │ (none)");
+        } else {
+            for s in &judgment.satisfactions {
+                println!("    │ {} ({})", s.rule_name, s.matched_phrase);
+            }
+        }
+
+        let verdict_emoji = match judgment.verdict {
+            symthaea::hdc::moral_algebra::DeontologicalVerdict::RightDutyFulfilled => "✓ Right (Duty Fulfilled)",
+            symthaea::hdc::moral_algebra::DeontologicalVerdict::WrongPerfectDutyViolated => "✗ Wrong (Perfect Duty Violated)",
+            symthaea::hdc::moral_algebra::DeontologicalVerdict::WrongImperfectDutyViolated => "⚠ Wrong (Imperfect Duty Violated)",
+            symthaea::hdc::moral_algebra::DeontologicalVerdict::Neutral => "○ Neutral",
+        };
+        println!("    └─ Verdict: {} (score: {:.2})\n", verdict_emoji, judgment.score);
+    }
+
+    // ========================================================================
     // Summary
     // ========================================================================
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -214,7 +264,8 @@ fn main() {
     println!("╟──────────────────────────────────────────────────────────────╢");
     println!("║  Moral Algebra then enables:                                 ║");
     println!("║    • Consent violation detection                             ║");
-    println!("║    • Proportionality judgments                               ║");
+    println!("║    • Proportionality judgments (justice)                     ║");
+    println!("║    • Deontological reasoning (7 obligation rules)            ║");
     println!("║    • Good/bad action classification                          ║");
     println!("║    • Compositional reasoning via HDC                         ║");
     println!("╚══════════════════════════════════════════════════════════════╝");
