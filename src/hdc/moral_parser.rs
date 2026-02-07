@@ -29,7 +29,7 @@ use super::moral_algebra::{
     ConsentState, Magnitude, MoralAlgebra, MoralIntent, MoralVerdict,
     ProportionalityJudgment, ExcuseJudgment, MoralJudgment,
 };
-use symthaea_core::hdc::RealHV;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Parsed moral structure from text
 #[derive(Debug, Clone)]
@@ -170,17 +170,54 @@ impl MoralParser {
             ].iter().map(|s| s.to_string()).collect(),
 
             action_verbs: [
+                // Communication verbs
                 "discuss", "discussed", "discussing",
-                "tell", "told", "telling",
-                "share", "shared", "sharing",
-                "give", "gave", "giving",
-                "take", "took", "taking",
-                "help", "helped", "helping",
-                "harm", "harmed", "harming",
-                "steal", "stole", "stealing",
-                "deserve", "deserved", "deserving",
-                "clean", "cleaned", "cleaning",
+                "tell", "told", "telling", "tells",
+                "share", "shared", "sharing", "shares",
+                "say", "said", "saying", "says",
+                "talk", "talked", "talking", "talks",
+                "speak", "spoke", "speaking", "speaks",
+                "ask", "asked", "asking", "asks",
+                "answer", "answered", "answering",
+                // Transfer verbs
+                "give", "gave", "giving", "gives",
+                "take", "took", "taking", "takes",
+                "send", "sent", "sending", "sends",
+                "receive", "received", "receiving",
+                // Moral action verbs
+                "help", "helped", "helping", "helps",
+                "harm", "harmed", "harming", "harms",
+                "hurt", "hurting", "hurts",
+                "save", "saved", "saving", "saves",
+                "protect", "protected", "protecting",
+                "steal", "stole", "stealing", "steals",
+                "lie", "lied", "lying",
+                "cheat", "cheated", "cheating",
+                "betray", "betrayed", "betraying",
+                // Possession/entitlement verbs
+                "deserve", "deserved", "deserving", "deserves",
+                "earn", "earned", "earning", "earns",
+                "own", "owned", "owning", "owns",
+                "owe", "owed", "owing", "owes",
+                // Physical action verbs
+                "clean", "cleaned", "cleaning", "cleans",
                 "prepare", "prepared", "preparing",
+                "make", "made", "making", "makes",
+                "do", "did", "doing", "does",
+                "use", "used", "using", "uses",
+                "work", "worked", "working", "works",
+                "walk", "walked", "walking", "walks",
+                "run", "ran", "running", "runs",
+                "buy", "bought", "buying", "buys",
+                "sell", "sold", "selling", "sells",
+                // Emotional/relational verbs
+                "love", "loved", "loving", "loves",
+                "hate", "hated", "hating", "hates",
+                "trust", "trusted", "trusting", "trusts",
+                "forgive", "forgave", "forgiving", "forgives",
+                "ignore", "ignored", "ignoring", "ignores",
+                "respect", "respected", "respecting",
+                // Set up (multi-word)
                 "set up", "setting up",
             ].iter().map(|s| s.to_string()).collect(),
         }
@@ -383,23 +420,54 @@ pub struct EncodedMoralScenario {
     pub parsed: ParsedMoralScenario,
 
     /// Consent-focused encoding (if available)
-    pub consent_hv: Option<RealHV>,
+    pub consent_hv: Option<ContinuousHV>,
 
     /// Full action structure encoding (if available)
-    pub action_hv: Option<RealHV>,
+    pub action_hv: Option<ContinuousHV>,
 }
 
 impl EncodedMoralScenario {
     /// Judge this scenario using the moral algebra
+    ///
+    /// Returns a MoralJudgment that considers:
+    /// - Intent (good/bad/neutral)
+    /// - Consent state (violation if absent/denied for sensitive actions)
     pub fn judge(&self, algebra: &MoralAlgebra) -> Option<MoralJudgment> {
-        self.action_hv.as_ref().map(|hv| algebra.judge_action(hv))
+        self.action_hv.as_ref().map(|hv| {
+            let mut judgment = algebra.judge_action(hv);
+
+            // Override verdict if there's a consent violation
+            if self.is_consent_violation() {
+                judgment.consent_violation_similarity = 1.0;
+                judgment.verdict = super::moral_algebra::MoralVerdict::ConsentViolation;
+            }
+
+            judgment
+        })
     }
 
-    /// Check for consent violation
-    pub fn check_consent_violation(&self, algebra: &MoralAlgebra) -> Option<f32> {
-        self.consent_hv.as_ref().map(|hv| {
-            hv.similarity(&algebra.consent_violation_prototype())
-        })
+    /// Check if this scenario represents a consent violation
+    ///
+    /// A consent violation occurs when:
+    /// - Consent is Absent or Denied AND
+    /// - The action affects another person (patient detected)
+    pub fn is_consent_violation(&self) -> bool {
+        use super::moral_algebra::ConsentState;
+
+        // Must have a patient (someone being affected) for consent to matter
+        if self.parsed.patient.is_none() {
+            return false;
+        }
+
+        matches!(self.parsed.consent, ConsentState::Absent | ConsentState::Denied)
+    }
+
+    /// Check for consent violation (returns similarity score for compatibility)
+    ///
+    /// Uses direct consent state check rather than HV similarity
+    pub fn check_consent_violation(&self, _algebra: &MoralAlgebra) -> Option<f32> {
+        // Return high similarity if there's a violation, low otherwise
+        Some(if self.is_consent_violation() { 0.9 } else { 0.1 })
     }
 }
 
