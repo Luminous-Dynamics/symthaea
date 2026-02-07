@@ -35,8 +35,11 @@
 //! └─────────────────────────────────────────────────────────────────────────────┘
 //! ```
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
+
+use crate::hdc::binary_hv::HV16;
+use crate::hdc::primitive_system::PrimitiveSystem;
 
 // ============================================================================
 // 1. CANONICAL Φ PROVIDER - Single Source of Truth
@@ -91,7 +94,7 @@ pub enum PhiSource {
 }
 
 /// Method used to compute Φ
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PhiMethod {
     /// Direct IIT computation via topology
     IntegratedInformationTheory,
@@ -508,7 +511,7 @@ impl EmotionalBridge {
 }
 
 /// Detected emotional pattern
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum EmotionalPattern {
     Stable,
     Escalating,
@@ -569,7 +572,7 @@ pub struct CausalStep {
 }
 
 /// Type of causal relation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CausalRelation {
     Causes,
     CausedBy,
@@ -782,7 +785,7 @@ pub struct DialogueResponse {
 }
 
 /// Depth of consciousness in dialogue
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DialogueDepth {
     /// Quick, pattern-matched response
     Reactive,
@@ -1025,6 +1028,289 @@ pub struct UnifiedConsciousnessResult {
     pub response: DialogueResponse,
     /// Whether grounded in reality
     pub reality_grounded: bool,
+}
+
+// ============================================================================
+// NSM PRIMITIVE GROUNDING (Wierzbicka's Natural Semantic Metalanguage)
+// ============================================================================
+
+/// NSM grounding for Φ computation methods
+#[derive(Debug, Clone)]
+pub struct PhiMethodPrimitiveGrounding {
+    pub method: PhiMethod,
+    pub nsm_primitives: Vec<String>,
+    pub primitive_encoding: HV16,
+    pub computational_rigor: f64,
+}
+
+impl PhiMethodPrimitiveGrounding {
+    pub fn new(method: PhiMethod, system: &PrimitiveSystem) -> Self {
+        let (primitives, rigor) = Self::nsm_mapping(method);
+        let encoding = encode_primitives(&primitives, system);
+        Self { method, nsm_primitives: primitives, primitive_encoding: encoding, computational_rigor: rigor }
+    }
+
+    fn nsm_mapping(method: PhiMethod) -> (Vec<String>, f64) {
+        match method {
+            PhiMethod::IntegratedInformationTheory => (
+                vec!["ALL".into(), "TOGETHER".into(), "ONE".into(), "KNOW".into(), "TRUE".into()],
+                1.0,
+            ),
+            PhiMethod::WeightedGeometricMean => (
+                vec!["ALL".into(), "SOME".into(), "MORE".into(), "LESS".into()],
+                0.7,
+            ),
+            PhiMethod::SimilarityApproximation => (
+                vec!["LIKE".into(), "SAME".into(), "NEAR".into(), "MAYBE".into()],
+                0.5,
+            ),
+            PhiMethod::MultiSourceComposite => (
+                vec!["MANY".into(), "PLACE".into(), "TOGETHER".into(), "ONE".into()],
+                0.8,
+            ),
+            PhiMethod::TheoryVotingAggregate => (
+                vec!["MANY".into(), "THINK".into(), "SAME".into(), "GOOD".into()],
+                0.6,
+            ),
+        }
+    }
+}
+
+/// NSM grounding for unified emotions
+#[derive(Debug, Clone)]
+pub struct UnifiedEmotionPrimitiveGrounding {
+    pub emotion: UnifiedEmotion,
+    pub nsm_primitives: Vec<String>,
+    pub primitive_encoding: HV16,
+    pub valence_polarity: i8,
+}
+
+impl UnifiedEmotionPrimitiveGrounding {
+    pub fn new(emotion: UnifiedEmotion, system: &PrimitiveSystem) -> Self {
+        let (primitives, polarity) = Self::nsm_mapping(emotion);
+        let encoding = encode_primitives(&primitives, system);
+        Self { emotion, nsm_primitives: primitives, primitive_encoding: encoding, valence_polarity: polarity }
+    }
+
+    fn nsm_mapping(emotion: UnifiedEmotion) -> (Vec<String>, i8) {
+        match emotion {
+            UnifiedEmotion::Joy => (vec!["FEEL".into(), "GOOD".into(), "VERY".into()], 1),
+            UnifiedEmotion::Sadness => (vec!["FEEL".into(), "BAD".into(), "BECAUSE".into(), "NOT".into(), "HAVE".into()], -1),
+            UnifiedEmotion::Anger => (vec!["FEEL".into(), "BAD".into(), "WANT".into(), "DO".into(), "SOMETHING".into()], -1),
+            UnifiedEmotion::Fear => (vec!["FEEL".into(), "BAD".into(), "SOMETHING".into(), "HAPPEN".into(), "NOT".into(), "WANT".into()], -1),
+            UnifiedEmotion::Surprise => (vec!["NOT".into(), "KNOW".into(), "BEFORE".into(), "NOW".into(), "KNOW".into()], 0),
+            UnifiedEmotion::Disgust => (vec!["FEEL".into(), "BAD".into(), "NOT".into(), "WANT".into(), "NEAR".into()], -1),
+            UnifiedEmotion::Trust => (vec!["THINK".into(), "GOOD".into(), "SOMEONE".into(), "DO".into(), "GOOD".into()], 1),
+            UnifiedEmotion::Anticipation => (vec!["THINK".into(), "SOMETHING".into(), "HAPPEN".into(), "AFTER".into()], 0),
+            UnifiedEmotion::Love => (vec!["FEEL".into(), "VERY".into(), "GOOD".into(), "BECAUSE".into(), "SOMEONE".into()], 1),
+            UnifiedEmotion::Peace => (vec!["FEEL".into(), "GOOD".into(), "NOT".into(), "WANT".into(), "MORE".into()], 1),
+            UnifiedEmotion::Curiosity => (vec!["WANT".into(), "KNOW".into(), "MORE".into(), "SOMETHING".into()], 1),
+            UnifiedEmotion::Gratitude => (vec!["FEEL".into(), "GOOD".into(), "BECAUSE".into(), "SOMEONE".into(), "DO".into(), "GOOD".into()], 1),
+            UnifiedEmotion::Seeking => (vec!["WANT".into(), "SOMETHING".into(), "DO".into(), "MOVE".into()], 1),
+            UnifiedEmotion::Rage => (vec!["FEEL".into(), "VERY".into(), "BAD".into(), "WANT".into(), "DO".into(), "BAD".into()], -1),
+            UnifiedEmotion::Lust => (vec!["WANT".into(), "VERY".into(), "BODY".into(), "SOMEONE".into()], 1),
+            UnifiedEmotion::Care => (vec!["WANT".into(), "DO".into(), "GOOD".into(), "SOMEONE".into()], 1),
+            UnifiedEmotion::Panic => (vec!["FEEL".into(), "VERY".into(), "BAD".into(), "NOT".into(), "CAN".into(), "DO".into()], -1),
+            UnifiedEmotion::Play => (vec!["FEEL".into(), "GOOD".into(), "DO".into(), "BECAUSE".into(), "WANT".into()], 1),
+            UnifiedEmotion::Neutral => (vec!["NOT".into(), "FEEL".into(), "GOOD".into(), "NOT".into(), "FEEL".into(), "BAD".into()], 0),
+        }
+    }
+}
+
+/// NSM grounding for emotional patterns
+#[derive(Debug, Clone)]
+pub struct EmotionalPatternPrimitiveGrounding {
+    pub pattern: EmotionalPattern,
+    pub nsm_primitives: Vec<String>,
+    pub primitive_encoding: HV16,
+}
+
+impl EmotionalPatternPrimitiveGrounding {
+    pub fn new(pattern: EmotionalPattern, system: &PrimitiveSystem) -> Self {
+        let primitives = Self::nsm_mapping(pattern);
+        let encoding = encode_primitives(&primitives, system);
+        Self { pattern, nsm_primitives: primitives, primitive_encoding: encoding }
+    }
+
+    fn nsm_mapping(pattern: EmotionalPattern) -> Vec<String> {
+        match pattern {
+            EmotionalPattern::Stable => vec!["SAME".into(), "TIME".into(), "NOT".into(), "CHANGE".into()],
+            EmotionalPattern::Escalating => vec!["MORE".into(), "TIME".into(), "AFTER".into()],
+            EmotionalPattern::Calming => vec!["LESS".into(), "TIME".into(), "AFTER".into()],
+            EmotionalPattern::Volatile => vec!["CHANGE".into(), "MUCH".into(), "TIME".into()],
+        }
+    }
+}
+
+/// NSM grounding for causal relations
+#[derive(Debug, Clone)]
+pub struct CausalRelationPrimitiveGrounding {
+    pub relation: CausalRelation,
+    pub nsm_primitives: Vec<String>,
+    pub primitive_encoding: HV16,
+}
+
+impl CausalRelationPrimitiveGrounding {
+    pub fn new(relation: CausalRelation, system: &PrimitiveSystem) -> Self {
+        let primitives = Self::nsm_mapping(relation);
+        let encoding = encode_primitives(&primitives, system);
+        Self { relation, nsm_primitives: primitives, primitive_encoding: encoding }
+    }
+
+    fn nsm_mapping(relation: CausalRelation) -> Vec<String> {
+        match relation {
+            CausalRelation::Causes => vec!["BECAUSE".into(), "THIS".into(), "HAPPEN".into()],
+            CausalRelation::CausedBy => vec!["HAPPEN".into(), "BECAUSE".into(), "OTHER".into()],
+            CausalRelation::Prevents => vec!["BECAUSE".into(), "THIS".into(), "NOT".into(), "HAPPEN".into()],
+            CausalRelation::Enables => vec!["BECAUSE".into(), "THIS".into(), "CAN".into(), "HAPPEN".into()],
+            CausalRelation::Correlates => vec!["WHEN".into(), "THIS".into(), "ALSO".into(), "OTHER".into()],
+        }
+    }
+}
+
+/// NSM grounding for dialogue depth
+#[derive(Debug, Clone)]
+pub struct DialogueDepthPrimitiveGrounding {
+    pub depth: DialogueDepth,
+    pub nsm_primitives: Vec<String>,
+    pub primitive_encoding: HV16,
+    pub processing_depth: u8,
+}
+
+impl DialogueDepthPrimitiveGrounding {
+    pub fn new(depth: DialogueDepth, system: &PrimitiveSystem) -> Self {
+        let (primitives, proc_depth) = Self::nsm_mapping(depth);
+        let encoding = encode_primitives(&primitives, system);
+        Self { depth, nsm_primitives: primitives, primitive_encoding: encoding, processing_depth: proc_depth }
+    }
+
+    fn nsm_mapping(depth: DialogueDepth) -> (Vec<String>, u8) {
+        match depth {
+            DialogueDepth::Reactive => (vec!["DO".into(), "NOW".into(), "BECAUSE".into(), "BEFORE".into()], 1),
+            DialogueDepth::Reflective => (vec!["THINK".into(), "BEFORE".into(), "KNOW".into(), "DO".into()], 2),
+            DialogueDepth::Integrative => (vec!["THINK".into(), "ALL".into(), "TOGETHER".into(), "KNOW".into(), "DO".into()], 3),
+        }
+    }
+}
+
+/// Unified NSM grounding system for consciousness unification
+#[derive(Debug)]
+pub struct ConsciousnessUnificationNSMGrounding {
+    pub phi_methods: HashMap<PhiMethod, PhiMethodPrimitiveGrounding>,
+    pub emotions: HashMap<UnifiedEmotion, UnifiedEmotionPrimitiveGrounding>,
+    pub emotional_patterns: HashMap<EmotionalPattern, EmotionalPatternPrimitiveGrounding>,
+    pub causal_relations: HashMap<CausalRelation, CausalRelationPrimitiveGrounding>,
+    pub dialogue_depths: HashMap<DialogueDepth, DialogueDepthPrimitiveGrounding>,
+}
+
+impl ConsciousnessUnificationNSMGrounding {
+    pub fn new(system: &PrimitiveSystem) -> Self {
+        let mut phi_methods = HashMap::new();
+        let mut emotions = HashMap::new();
+        let mut emotional_patterns = HashMap::new();
+        let mut causal_relations = HashMap::new();
+        let mut dialogue_depths = HashMap::new();
+
+        // Ground phi methods
+        for method in &[
+            PhiMethod::IntegratedInformationTheory, PhiMethod::WeightedGeometricMean,
+            PhiMethod::SimilarityApproximation, PhiMethod::MultiSourceComposite,
+            PhiMethod::TheoryVotingAggregate,
+        ] {
+            phi_methods.insert(*method, PhiMethodPrimitiveGrounding::new(*method, system));
+        }
+
+        // Ground emotions
+        for emotion in &[
+            UnifiedEmotion::Joy, UnifiedEmotion::Sadness, UnifiedEmotion::Anger,
+            UnifiedEmotion::Fear, UnifiedEmotion::Surprise, UnifiedEmotion::Disgust,
+            UnifiedEmotion::Trust, UnifiedEmotion::Anticipation, UnifiedEmotion::Love,
+            UnifiedEmotion::Peace, UnifiedEmotion::Curiosity, UnifiedEmotion::Gratitude,
+            UnifiedEmotion::Seeking, UnifiedEmotion::Rage, UnifiedEmotion::Lust,
+            UnifiedEmotion::Care, UnifiedEmotion::Panic, UnifiedEmotion::Play,
+            UnifiedEmotion::Neutral,
+        ] {
+            emotions.insert(*emotion, UnifiedEmotionPrimitiveGrounding::new(*emotion, system));
+        }
+
+        // Ground patterns
+        for pattern in &[
+            EmotionalPattern::Stable, EmotionalPattern::Escalating,
+            EmotionalPattern::Calming, EmotionalPattern::Volatile,
+        ] {
+            emotional_patterns.insert(*pattern, EmotionalPatternPrimitiveGrounding::new(*pattern, system));
+        }
+
+        // Ground causal relations
+        for relation in &[
+            CausalRelation::Causes, CausalRelation::CausedBy, CausalRelation::Prevents,
+            CausalRelation::Enables, CausalRelation::Correlates,
+        ] {
+            causal_relations.insert(*relation, CausalRelationPrimitiveGrounding::new(*relation, system));
+        }
+
+        // Ground dialogue depths
+        for depth in &[DialogueDepth::Reactive, DialogueDepth::Reflective, DialogueDepth::Integrative] {
+            dialogue_depths.insert(*depth, DialogueDepthPrimitiveGrounding::new(*depth, system));
+        }
+
+        Self { phi_methods, emotions, emotional_patterns, causal_relations, dialogue_depths }
+    }
+
+    /// Get positive-valence emotions
+    pub fn positive_emotions(&self) -> Vec<&UnifiedEmotion> {
+        self.emotions.iter()
+            .filter(|(_, g)| g.valence_polarity > 0)
+            .map(|(e, _)| e)
+            .collect()
+    }
+
+    /// Get negative-valence emotions
+    pub fn negative_emotions(&self) -> Vec<&UnifiedEmotion> {
+        self.emotions.iter()
+            .filter(|(_, g)| g.valence_polarity < 0)
+            .map(|(e, _)| e)
+            .collect()
+    }
+
+    /// Query emotions by semantic similarity
+    pub fn query_emotions(&self, query: &HV16, threshold: f32) -> Vec<(&UnifiedEmotion, f32)> {
+        let mut results: Vec<_> = self.emotions.iter()
+            .map(|(e, g)| (e, g.primitive_encoding.similarity(query)))
+            .filter(|(_, sim)| *sim >= threshold)
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }
+}
+
+/// Encode NSM primitives into HDC vector via sequential binding
+fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
+    let vectors: Vec<HV16> = primitives
+        .iter()
+        .map(|name| {
+            if let Some(p) = system.get(name) {
+                p.encoding.clone()
+            } else if let Some(p) = system.get(&name.to_lowercase()) {
+                p.encoding.clone()
+            } else {
+                let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                HV16::random(seed)
+            }
+        })
+        .collect();
+
+    if vectors.is_empty() {
+        return HV16::random(0);
+    }
+
+    let mut result = vectors[0].clone();
+    for (i, v) in vectors.iter().enumerate().skip(1) {
+        let position_hv = HV16::random(i as u64 * 1000);
+        let positioned = v.bind(&position_hv);
+        result = result.bind(&positioned);
+    }
+    result
 }
 
 // ============================================================================
