@@ -72,6 +72,7 @@ pub trait Permutable: HyperdimensionalVector {
     fn permute(&self, shift: usize) -> Self;
 }
 
+#[allow(deprecated)]
 /// Implement the traits for SimdHV16
 impl HyperdimensionalVector for super::simd_hv16::SimdHV16 {
     fn random(seed: u64) -> Self {
@@ -99,12 +100,14 @@ impl HyperdimensionalVector for super::simd_hv16::SimdHV16 {
     }
 }
 
+#[allow(deprecated)]
 impl Bundleable for super::simd_hv16::SimdHV16 {
     fn bundle(vectors: &[Self]) -> Self {
         Self::bundle(vectors)
     }
 }
 
+#[allow(deprecated)]
 impl Permutable for super::simd_hv16::SimdHV16 {
     fn permute(&self, shift: usize) -> Self {
         Self::permute(self, shift)
