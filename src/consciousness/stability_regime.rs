@@ -80,7 +80,8 @@ impl StabilityRegimeType {
             | PrimitiveTier::Temporal => StabilityRegimeType::Plastic,
 
             PrimitiveTier::Compositional
-            | PrimitiveTier::Consciousness => StabilityRegimeType::Fluid,
+            | PrimitiveTier::Consciousness
+            | PrimitiveTier::Code => StabilityRegimeType::Fluid,
         }
     }
 }

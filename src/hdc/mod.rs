@@ -321,6 +321,13 @@ pub mod code_memory;
 /// PROPORTIONAL, NEGATES) for algebraic moral reasoning.
 pub mod moral_algebra;
 
+/// Moral semantic parser for extracting ethical primitives from text.
+///
+/// Lightweight parser that extracts AGENT, ACTION, PATIENT, INTENT, CONSENT,
+/// and MAGNITUDE from natural language scenarios. Uses pattern matching and
+/// keyword analysis optimized for the ETHICS benchmark format.
+pub mod moral_parser;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL MODULES - Testing
 // ═══════════════════════════════════════════════════════════════════════════════

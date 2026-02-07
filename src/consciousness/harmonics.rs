@@ -726,6 +726,12 @@ impl HarmonicField {
                 self.adjust_level(FiduciaryHarmonic::ResonantCoherence, 0.10);
                 self.adjust_level(FiduciaryHarmonic::PanSentientFlourishing, 0.08);
             }
+            PrimitiveTier::Code => {
+                // Code understanding → wisdom (understanding code), coherence (structured reasoning)
+                self.adjust_level(FiduciaryHarmonic::IntegralWisdom, 0.12);
+                self.adjust_level(FiduciaryHarmonic::ResonantCoherence, 0.08);
+                self.adjust_level(FiduciaryHarmonic::EvolutionaryProgression, 0.06);
+            }
         }
     }
 
