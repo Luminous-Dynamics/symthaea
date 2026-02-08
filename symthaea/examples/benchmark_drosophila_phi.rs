@@ -55,7 +55,7 @@ fn main() {
     let mut scale_results = Vec::new();
 
     for &n in &sizes {
-        let hvs = generate_modular_network(n, HDC_DIM, 0.3, 4, 42);
+        let hvs = generate_modular_network_v2(n, HDC_DIM, 0.3, 0.1, 4, 42);
 
         let t = Instant::now();
         let phi_result = phi_engine.compute(&hvs);
@@ -99,8 +99,8 @@ fn main() {
     let n = 128;
     let topologies = vec![
         ("Random (uniform)", generate_random_network(n, HDC_DIM, 0.3, 42)),
-        ("Modular (4 modules)", generate_modular_network(n, HDC_DIM, 0.3, 4, 42)),
-        ("Modular (8 modules)", generate_modular_network(n, HDC_DIM, 0.3, 8, 42)),
+        ("Modular (4 modules)", generate_modular_network_v2(n, HDC_DIM, 0.3, 0.1, 4, 42)),
+        ("Modular (8 modules)", generate_modular_network_v2(n, HDC_DIM, 0.3, 0.1, 8, 42)),
         ("Small-world", generate_small_world_network(n, HDC_DIM, 6, 0.1, 42)),
         ("Scale-free (hub)", generate_scale_free_network(n, HDC_DIM, 3, 42)),
     ];
@@ -125,26 +125,28 @@ fn main() {
     println!("Test 3: Simulated Brain Regions");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-    let regions = vec![
+    // (name, n, intra_density, inter_density, modules)
+    // Recurrent regions: high inter-module coupling = global integration = high Phi
+    // Feedforward regions: low inter-module coupling = isolated layers = low Phi
+    let regions: Vec<(&str, usize, f32, f32, usize)> = vec![
         // Mushroom Body: highly interconnected parallel fibers, dense recurrence
-        ("Mushroom Body (MB)", 256, 0.45, 8, true),
+        // High inter-module = global integration across Kenyon cell clusters
+        ("Mushroom Body (MB)", 256, 0.50, 0.30, 8),
         // Central Complex: navigation circuits, structured connectivity
-        ("Central Complex (CX)", 128, 0.35, 4, true),
-        // Optic Lobe: feed-forward processing, low recurrence
-        ("Optic Lobe (OL)", 256, 0.15, 16, false),
-        // Antennal Lobe: olfactory, moderate integration
-        ("Antennal Lobe (AL)", 64, 0.30, 2, true),
-        // Random control
-        ("Random Control", 128, 0.25, 1, false),
+        ("Central Complex (CX)", 128, 0.50, 0.25, 4),
+        // Optic Lobe: feed-forward columns, very low lateral coupling
+        ("Optic Lobe (OL)", 256, 0.30, 0.02, 16),
+        // Antennal Lobe: olfactory glomeruli, moderate lateral inhibition
+        ("Antennal Lobe (AL)", 64, 0.45, 0.20, 2),
+        // Random control: moderate uniform connectivity (no modular structure)
+        ("Random Control", 128, 0.15, 0.15, 1),
     ];
 
     let mut region_phis = Vec::new();
-    for (idx, (name, n, density, modules, recurrent)) in regions.iter().enumerate() {
+    for (idx, (name, n, intra_density, inter_density, modules)) in regions.iter().enumerate() {
         // Use region index as seed offset so each region gets unique connectivity
         let seed = 42 + idx as u64 * 1000;
-        // Recurrent regions get higher intra-module coupling (density * 1.2)
-        let effective_density = if *recurrent { *density * 1.2 } else { *density };
-        let hvs = generate_modular_network(*n, HDC_DIM, effective_density, *modules, seed);
+        let hvs = generate_modular_network_v2(*n, HDC_DIM, *intra_density, *inter_density, *modules, seed);
 
         let t = Instant::now();
         let phi_result = phi_engine.compute(&hvs);
@@ -175,7 +177,7 @@ fn main() {
 
     for &n in &large_sizes {
         let t = Instant::now();
-        let hvs = generate_modular_network(n, HDC_DIM, 0.1, 8, 42);
+        let hvs = generate_modular_network_v2(n, HDC_DIM, 0.1, 0.03, 8, 42);
         let gen_time = t.elapsed().as_secs_f64();
 
         let t = Instant::now();
@@ -274,11 +276,12 @@ fn generate_random_network(
     normalize_hvs(result)
 }
 
-/// Generate a modular network (brain-like connectivity)
-fn generate_modular_network(
+/// Generate a modular network with explicit intra/inter-module coupling
+fn generate_modular_network_v2(
     n: usize,
     dim: usize,
-    density: f32,
+    intra_density: f32,
+    inter_density: f32,
     n_modules: usize,
     seed: u64,
 ) -> Vec<ContinuousHV> {
@@ -306,9 +309,9 @@ fn generate_modular_network(
                 }
                 let module_j = j / module_size.max(1);
                 let prob = if module_i == module_j {
-                    density * 3.0 // Intra-module: 3x denser
+                    intra_density
                 } else {
-                    density * 0.3 // Inter-module: sparse bridges
+                    inter_density
                 };
                 if rand_f32() < prob.min(1.0) {
                     val += base_hvs[j].values[d] * 0.15;
