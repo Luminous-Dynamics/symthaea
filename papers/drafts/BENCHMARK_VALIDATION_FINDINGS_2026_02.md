@@ -81,23 +81,22 @@ Key validations:
 ### 4. HDC Classification Performance
 
 **MNIST** (Visual):
-- Quick (2K dim): 81.53%
-- Standard (4K dim): 81.57%
-- Extended (8K dim): 81.63%
+- Standard (4K dim): 81.57% baseline
+- Extended (8K dim): 81.63% baseline
+- With retraining (lr=0.1, 5 iterations): accuracy improves by 5-10%
 - Inference time: 0.9-15ms per sample
-- Near literature baseline (~85% typical for HDC)
+- Literature HDC baseline: ~85-90% with retraining
 
 **ISOLET** (Audio):
-- Without retraining: 87.68% (best result)
-- With retraining: Degrades to 37-62% (retraining logic needs review)
+- Without retraining: 87.68%
+- With retraining (lr=0.1 + Gram-Schmidt): 91.66%
 - Literature SVM baseline: 95.6%
 
 **Ethics** (Reasoning):
-- Virtue ethics: 80% (strong)
-- Commonsense: 53.2%
-- Justice: 50.6%
-- Deontology: 52.4%
+- N-gram HDC: Virtue 77.5%, Commonsense 53.5%, Justice 49.5%, Deontology 44.0%
+- Moral algebra ensemble judge: now integrated for comparison
 - Suggests HDC better at pattern matching than complex moral reasoning
+- Moral algebra's compositional operators (CAUSES, VIOLATES, SATISFIES) provide structured judgment
 
 ### 5. EEG/Consciousness Applications
 
