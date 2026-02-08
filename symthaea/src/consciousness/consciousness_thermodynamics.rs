@@ -30,7 +30,7 @@
 // - Model temperature as exploration parameter
 // - Identify critical points for consciousness transitions
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -65,7 +65,7 @@ pub struct EntropyMethodPrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Information theoretic emphasis: 0.0 (statistical) to 1.0 (dynamical)
     pub dynamical_emphasis: f32,
@@ -109,15 +109,15 @@ impl EntropyMethodPrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(8000 + method as u64 * 100)
+            BinaryHV::random(8000 + method as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {
@@ -170,7 +170,7 @@ pub struct ConsciousnessPhasePrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Order level: 0.0 (chaotic) to 1.0 (frozen/rigid)
     pub order: f32,
@@ -237,15 +237,15 @@ impl ConsciousnessPhasePrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(8100 + phase as u64 * 100)
+            BinaryHV::random(8100 + phase as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {
@@ -301,7 +301,7 @@ pub struct TransitionOrderPrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Discontinuity: 0.0 (smooth) to 1.0 (abrupt)
     pub discontinuity: f32,
@@ -338,15 +338,15 @@ impl TransitionOrderPrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(8200 + order as u64 * 100)
+            BinaryHV::random(8200 + order as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {
@@ -394,7 +394,7 @@ pub struct FreeEnergyStatusPrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Direction: -1.0 (minimizing) to 1.0 (increasing)
     pub direction: f32,
@@ -453,15 +453,15 @@ impl FreeEnergyStatusPrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(8300 + status as u64 * 100)
+            BinaryHV::random(8300 + status as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {
@@ -511,7 +511,7 @@ pub struct EquilibriumStatusPrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Distance from equilibrium: 0.0 (at equilibrium) to 1.0 (far)
     pub distance: f32,
@@ -568,15 +568,15 @@ impl EquilibriumStatusPrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(8400 + status as u64 * 100)
+            BinaryHV::random(8400 + status as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {

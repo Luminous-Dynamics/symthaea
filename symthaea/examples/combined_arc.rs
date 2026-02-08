@@ -18,7 +18,7 @@ use anyhow::Result;
 use symthaea::perception::ConsciousnessProbeV2;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HV16, consciousness_topology::{ConsciousnessTopology, TopologyConfig}};
+use symthaea_core::hdc::{BinaryHV, consciousness_topology::{ConsciousnessTopology, TopologyConfig}};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]

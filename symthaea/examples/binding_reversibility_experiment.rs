@@ -44,7 +44,7 @@ use anyhow::Result;
 use symthaea::hdc::binding_reversibility_study::{
     PairCategory, ReversibilityConfig, ReversibilityStudy,
 };
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 fn main() -> Result<()> {
     println!();
@@ -227,12 +227,12 @@ fn demonstrate_reversibility_property() {
     println!();
 
     // Create test vectors
-    let a = HV16::random(42);
-    let b = HV16::random(43);
+    let a = BinaryHV::random(42);
+    let b = BinaryHV::random(43);
 
     println!("Creating test vectors:");
-    println!("  A = HV16::random(42)");
-    println!("  B = HV16::random(43)");
+    println!("  A = BinaryHV::random(42)");
+    println!("  B = BinaryHV::random(43)");
     println!();
 
     // Baseline similarity
@@ -269,7 +269,7 @@ fn demonstrate_reversibility_property() {
     println!();
 
     // Bundling
-    let bundled = HV16::bundle(&[a, b]);
+    let bundled = BinaryHV::bundle(&[a, b]);
     println!("BUNDLING (Majority Vote):");
     println!("  bundled = bundle([A, B])");
     println!("  similarity(A, bundled) = {:.4}", a.similarity(&bundled));

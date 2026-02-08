@@ -34,7 +34,7 @@ use anyhow::Result;
 use symthaea::perception::bge_m3::{BgeM3, BGE_M3_DIM};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::HV16};
+use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -94,7 +94,7 @@ fn run_training() -> Result<()> {
         .enumerate()
         .map(|(i, concept)| {
             let seed = hash_concept(concept) + i as u64;
-            let hv = HV16::random(seed);
+            let hv = BinaryHV::random(seed);
             hv_to_f32(&hv)
         })
         .collect();
@@ -254,7 +254,7 @@ fn hash_concept(text: &str) -> u64 {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn hv_to_f32(hv: &HV16) -> Vec<f32> {
+fn hv_to_f32(hv: &BinaryHV) -> Vec<f32> {
     let bipolar = hv.to_bipolar();
     bipolar.iter().map(|&b| b as f32).collect()
 }

@@ -8,7 +8,7 @@
 //! - Structural coupling: Interaction with environment while maintaining identity
 //! - Self-referential dynamics: The system observes and modifies itself
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -40,7 +40,7 @@ pub struct AutopoieticPhasePrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Self-directedness: 0.0 (external) to 1.0 (internal)
     pub self_directedness: f32,
@@ -107,15 +107,15 @@ impl AutopoieticPhasePrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(8500 + phase as u64 * 100)
+            BinaryHV::random(8500 + phase as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {
@@ -175,7 +175,7 @@ pub struct ComponentTypePrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Internal vs external focus: 0.0 (external) to 1.0 (internal)
     pub internal_focus: f32,
@@ -235,15 +235,15 @@ impl ComponentTypePrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(8600 + component_type as u64 * 100)
+            BinaryHV::random(8600 + component_type as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {

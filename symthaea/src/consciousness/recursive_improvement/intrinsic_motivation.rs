@@ -33,7 +33,7 @@ use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 
 use super::types::{calculate_trend, instant_now};
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
 /// Type of intrinsic drive
@@ -95,8 +95,8 @@ impl DriveType {
 pub struct DrivePrimitiveGrounding {
     /// NSM primitives that compose this drive
     pub nsm_primitives: Vec<String>,
-    /// Binary HV16 encoding from primitives
-    pub primitive_encoding: HV16,
+    /// Binary BinaryHV encoding from primitives
+    pub primitive_encoding: BinaryHV,
     /// Base strength of the drive (0 to 1)
     pub base_strength: f32,
     /// Whether this drive is approach (positive) or avoidance (negative)
@@ -109,7 +109,7 @@ impl DrivePrimitiveGrounding {
         let system = PrimitiveSystem::global();
 
         // Compose drive encoding by binding primitives together
-        let mut encoding = HV16::random(0xD41V_E000); // Drive base seed
+        let mut encoding = BinaryHV::random(0xD41V_E000); // Drive base seed
         for name in primitives {
             if let Some(prim) = system.get(name) {
                 encoding = encoding.bind(&prim.encoding);
@@ -1013,10 +1013,10 @@ impl IntrinsicMotivationSystem {
 
     /// Get the combined primitive encoding for all active drives weighted by tension
     ///
-    /// This creates a single HV16 that represents the current motivational state
+    /// This creates a single BinaryHV that represents the current motivational state
     /// by bundling all drive encodings weighted by their tension.
-    pub fn motivation_encoding(&self) -> HV16 {
-        let mut combined = HV16::zero();
+    pub fn motivation_encoding(&self) -> BinaryHV {
+        let mut combined = BinaryHV::zero();
         let mut total_weight = 0.0;
 
         for (drive_type, drive_state) in &self.drives {
@@ -1468,7 +1468,7 @@ mod tests {
         let system = IntrinsicMotivationSystem::new(MotivationConfig::default());
 
         let encoding = system.motivation_encoding();
-        // Should produce a valid HV16
+        // Should produce a valid BinaryHV
         assert!(encoding.popcount() > 0);
     }
 

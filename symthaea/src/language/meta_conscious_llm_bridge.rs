@@ -34,7 +34,7 @@ pub struct MetaConsciousLlmBridge {
 
 impl MetaConsciousLlmBridge {
     /// Create a new bridge with default configs and the given number
-    /// of HV16 components for meta-reflection.
+    /// of BinaryHV components for meta-reflection.
     pub fn new(num_components: usize) -> Result<Self> {
         Ok(Self {
             core: MetaConversationCore::new(num_components)?,

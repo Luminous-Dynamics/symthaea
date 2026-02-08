@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 
 /// Types of sensory modalities
@@ -75,11 +75,11 @@ pub struct ModalityChannel {
     /// The modality this channel processes
     pub modality: Modality,
     /// Current feature representation
-    pub features: HV16,
+    pub features: BinaryHV,
     /// Attention weight for this channel (0.0-1.0)
     pub attention: f64,
     /// Temporal buffer for coherence computation
-    pub temporal_buffer: VecDeque<HV16>,
+    pub temporal_buffer: VecDeque<BinaryHV>,
     /// Maximum buffer size
     buffer_capacity: usize,
 }
@@ -89,7 +89,7 @@ impl ModalityChannel {
     pub fn new(modality: Modality) -> Self {
         Self {
             modality,
-            features: HV16::zero(),
+            features: BinaryHV::zero(),
             attention: 0.5,
             temporal_buffer: VecDeque::with_capacity(8),
             buffer_capacity: 8,
@@ -97,7 +97,7 @@ impl ModalityChannel {
     }
 
     /// Update channel with new features
-    pub fn update(&mut self, features: HV16) {
+    pub fn update(&mut self, features: BinaryHV) {
         // Add to temporal buffer
         if self.temporal_buffer.len() >= self.buffer_capacity {
             self.temporal_buffer.pop_front();
@@ -107,7 +107,7 @@ impl ModalityChannel {
     }
 
     /// Get attended representation (features scaled by attention)
-    pub fn attended(&self) -> HV16 {
+    pub fn attended(&self) -> BinaryHV {
         // For binary HV, attention modulates by probabilistic bit flipping
         // Higher attention = less noise, lower = more noise
         if self.attention >= 0.99 {
@@ -166,7 +166,7 @@ pub struct ConvergenceZone {
     /// Source modalities
     pub source_modalities: Vec<Modality>,
     /// Current integrated representation
-    pub integrated: HV16,
+    pub integrated: BinaryHV,
     /// Binding strength (0.0-1.0)
     pub binding_strength: f64,
     /// Activation level (0.0-1.0)
@@ -188,7 +188,7 @@ impl ConvergenceZone {
         Self {
             id,
             source_modalities,
-            integrated: HV16::zero(),
+            integrated: BinaryHV::zero(),
             binding_strength: 0.0,
             activation: 0.0,
             level,
@@ -196,7 +196,7 @@ impl ConvergenceZone {
     }
 
     /// Integrate inputs from source modalities
-    pub fn integrate(&mut self, inputs: &HashMap<Modality, HV16>) {
+    pub fn integrate(&mut self, inputs: &HashMap<Modality, BinaryHV>) {
         let mut vectors = Vec::new();
         let mut found_count = 0;
 
@@ -213,7 +213,7 @@ impl ConvergenceZone {
         }
 
         // Integrate via bundling
-        self.integrated = HV16::bundle(&vectors);
+        self.integrated = BinaryHV::bundle(&vectors);
 
         // Compute binding strength (average pairwise similarity)
         self.binding_strength = self.compute_binding_strength(&vectors);
@@ -223,7 +223,7 @@ impl ConvergenceZone {
     }
 
     /// Compute binding strength from input vectors
-    fn compute_binding_strength(&self, vectors: &[HV16]) -> f64 {
+    fn compute_binding_strength(&self, vectors: &[BinaryHV]) -> f64 {
         if vectors.len() < 2 {
             return 1.0;
         }
@@ -257,7 +257,7 @@ pub struct EpisodicBuffer {
     /// Buffer capacity (Miller's number ~7)
     capacity: usize,
     /// Stored chunks (most recent at back)
-    chunks: VecDeque<HV16>,
+    chunks: VecDeque<BinaryHV>,
 }
 
 impl EpisodicBuffer {
@@ -270,7 +270,7 @@ impl EpisodicBuffer {
     }
 
     /// Add a chunk to the buffer
-    pub fn add_chunk(&mut self, chunk: HV16) {
+    pub fn add_chunk(&mut self, chunk: BinaryHV) {
         if self.chunks.len() >= self.capacity {
             self.chunks.pop_front();
         }
@@ -278,22 +278,22 @@ impl EpisodicBuffer {
     }
 
     /// Get all chunks
-    pub fn chunks(&self) -> &VecDeque<HV16> {
+    pub fn chunks(&self) -> &VecDeque<BinaryHV> {
         &self.chunks
     }
 
     /// Get the most recent chunk
-    pub fn most_recent(&self) -> Option<&HV16> {
+    pub fn most_recent(&self) -> Option<&BinaryHV> {
         self.chunks.back()
     }
 
     /// Compute a bundled representation of buffer contents
-    pub fn bundled(&self) -> HV16 {
+    pub fn bundled(&self) -> BinaryHV {
         if self.chunks.is_empty() {
-            return HV16::zero();
+            return BinaryHV::zero();
         }
-        let vec: Vec<HV16> = self.chunks.iter().cloned().collect();
-        HV16::bundle(&vec)
+        let vec: Vec<BinaryHV> = self.chunks.iter().cloned().collect();
+        BinaryHV::bundle(&vec)
     }
 
     /// Check if buffer is empty
@@ -608,6 +608,51 @@ impl CrossModalBinder {
         self.representations.clear();
         self.current_binding = None;
     }
+
+    /// Update a modality with a new BinaryHV representation.
+    ///
+    /// Converts BinaryHV to ContinuousHV (bipolar) and adds/replaces the representation.
+    pub fn update_modality(&mut self, modality: Modality, hv: BinaryHV) {
+        let bipolar = hv.to_bipolar();
+        let continuous = ContinuousHV::from_vec(bipolar);
+        let repr = ModalRepresentation::new(modality, continuous, 1.0, "update_modality");
+        self.add_representation(repr);
+    }
+
+    /// Set attention weight for all representations of a modality.
+    pub fn set_attention(&mut self, modality: Modality, attention: f32) {
+        if let Some(reps) = self.representations.get_mut(&modality) {
+            for rep in reps.iter_mut() {
+                rep.attention = attention.clamp(0.0, 1.0);
+            }
+        }
+    }
+
+    /// Compute a cross-modal integration metric (analogous to Φ).
+    ///
+    /// Measures how much information is integrated across modalities by computing
+    /// average pairwise similarity of modal representations in the bound space.
+    pub fn cross_modal_phi(&self) -> f64 {
+        let modality_hvs: Vec<&ContinuousHV> = self.representations.values()
+            .filter_map(|reps| reps.last().map(|r| &r.hv))
+            .collect();
+
+        if modality_hvs.len() < 2 {
+            return 0.0;
+        }
+
+        // Average pairwise similarity as integration proxy
+        let mut total_sim = 0.0;
+        let mut count = 0;
+        for i in 0..modality_hvs.len() {
+            for j in (i + 1)..modality_hvs.len() {
+                total_sim += modality_hvs[i].similarity(modality_hvs[j]).abs() as f64;
+                count += 1;
+            }
+        }
+
+        if count > 0 { total_sim / count as f64 } else { 0.0 }
+    }
 }
 
 impl Default for CrossModalBinder {
@@ -628,7 +673,7 @@ pub struct ModalityPrimitiveGrounding {
     /// NSM primitive composition
     pub nsm_primitives: Vec<String>,
     /// HDC encoding via primitive binding
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     /// Whether this is a sensory input modality
     pub is_sensory: bool,
     /// Whether this involves body awareness
@@ -729,7 +774,7 @@ pub struct ConvergenceLevelPrimitiveGrounding {
     /// NSM primitive composition
     pub nsm_primitives: Vec<String>,
     /// HDC encoding via primitive binding
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     /// Integration breadth (how many modalities)
     pub integration_breadth: u8,
 }
@@ -813,7 +858,7 @@ impl CrossModalNSMGrounding {
     }
 
     /// Query modalities by semantic similarity
-    pub fn query_modalities(&self, query: &HV16, threshold: f32) -> Vec<(&Modality, f32)> {
+    pub fn query_modalities(&self, query: &BinaryHV, threshold: f32) -> Vec<(&Modality, f32)> {
         let mut results: Vec<_> = self.modalities.iter()
             .map(|(m, g)| (m, g.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
@@ -823,7 +868,7 @@ impl CrossModalNSMGrounding {
     }
 
     /// Query convergence levels by semantic similarity
-    pub fn query_levels(&self, query: &HV16, threshold: f32) -> Vec<(&ConvergenceLevel, f32)> {
+    pub fn query_levels(&self, query: &BinaryHV, threshold: f32) -> Vec<(&ConvergenceLevel, f32)> {
         let mut results: Vec<_> = self.convergence_levels.iter()
             .map(|(l, g)| (l, g.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
@@ -850,8 +895,8 @@ impl CrossModalNSMGrounding {
 }
 
 /// Encode NSM primitives into HDC vector via sequential binding
-fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
-    let vectors: Vec<HV16> = primitives
+fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
+    let vectors: Vec<BinaryHV> = primitives
         .iter()
         .map(|name| {
             if let Some(p) = system.get(name) {
@@ -861,19 +906,19 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
             } else {
                 // Fallback: deterministic random for unknown primitives
                 let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-                HV16::random(seed)
+                BinaryHV::random(seed)
             }
         })
         .collect();
 
     if vectors.is_empty() {
-        return HV16::random(0);
+        return BinaryHV::random(0);
     }
 
     // Bind sequentially with position encoding for order preservation
     let mut result = vectors[0].clone();
     for (i, v) in vectors.iter().enumerate().skip(1) {
-        let position_hv = HV16::random(i as u64 * 1000);
+        let position_hv = BinaryHV::random(i as u64 * 1000);
         let positioned = v.bind(&position_hv);
         result = result.bind(&positioned);
     }
@@ -959,7 +1004,7 @@ mod tests {
     #[test]
     fn test_modality_channel_update() {
         let mut channel = ModalityChannel::new(Modality::Auditory);
-        let features = HV16::random(42);
+        let features = BinaryHV::random(42);
 
         channel.update(features.clone());
 
@@ -972,12 +1017,12 @@ mod tests {
         let mut channel = ModalityChannel::new(Modality::Visual);
 
         // Single item should have coherence 1.0
-        channel.update(HV16::random(1));
+        channel.update(BinaryHV::random(1));
         assert_eq!(channel.temporal_coherence(), 1.0);
 
         // Add more items
-        channel.update(HV16::random(2));
-        channel.update(HV16::random(3));
+        channel.update(BinaryHV::random(2));
+        channel.update(BinaryHV::random(3));
 
         // Should have valid coherence
         let coherence = channel.temporal_coherence();
@@ -1004,8 +1049,8 @@ mod tests {
         let mut zone = ConvergenceZone::new(0, vec![Modality::Visual, Modality::Auditory]);
 
         let mut inputs = HashMap::new();
-        inputs.insert(Modality::Visual, HV16::random(1));
-        inputs.insert(Modality::Auditory, HV16::random(2));
+        inputs.insert(Modality::Visual, BinaryHV::random(1));
+        inputs.insert(Modality::Auditory, BinaryHV::random(2));
 
         zone.integrate(&inputs);
 
@@ -1018,7 +1063,7 @@ mod tests {
         let mut zone = ConvergenceZone::new(0, vec![Modality::Visual, Modality::Auditory]);
 
         let mut inputs = HashMap::new();
-        inputs.insert(Modality::Visual, HV16::random(1));
+        inputs.insert(Modality::Visual, BinaryHV::random(1));
         // Only one modality provided
 
         zone.integrate(&inputs);
@@ -1038,15 +1083,15 @@ mod tests {
     fn test_episodic_buffer_add_chunk() {
         let mut buffer = EpisodicBuffer::new(3);
 
-        buffer.add_chunk(HV16::random(1));
+        buffer.add_chunk(BinaryHV::random(1));
         assert_eq!(buffer.len(), 1);
 
-        buffer.add_chunk(HV16::random(2));
-        buffer.add_chunk(HV16::random(3));
+        buffer.add_chunk(BinaryHV::random(2));
+        buffer.add_chunk(BinaryHV::random(3));
         assert_eq!(buffer.len(), 3);
 
         // Should evict oldest when over capacity
-        buffer.add_chunk(HV16::random(4));
+        buffer.add_chunk(BinaryHV::random(4));
         assert_eq!(buffer.len(), 3);
     }
 
@@ -1054,9 +1099,9 @@ mod tests {
     fn test_episodic_buffer_bundled() {
         let mut buffer = EpisodicBuffer::new(5);
 
-        buffer.add_chunk(HV16::random(1));
-        buffer.add_chunk(HV16::random(2));
-        buffer.add_chunk(HV16::random(3));
+        buffer.add_chunk(BinaryHV::random(1));
+        buffer.add_chunk(BinaryHV::random(2));
+        buffer.add_chunk(BinaryHV::random(3));
 
         let bundled = buffer.bundled();
         // Bundled should be similar to all inputs
@@ -1069,8 +1114,8 @@ mod tests {
     #[test]
     fn test_episodic_buffer_clear() {
         let mut buffer = EpisodicBuffer::new(5);
-        buffer.add_chunk(HV16::random(1));
-        buffer.add_chunk(HV16::random(2));
+        buffer.add_chunk(BinaryHV::random(1));
+        buffer.add_chunk(BinaryHV::random(2));
 
         buffer.clear();
 

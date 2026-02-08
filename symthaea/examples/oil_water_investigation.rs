@@ -36,7 +36,7 @@ use anyhow::Result;
 use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::HV16};
+use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -83,8 +83,8 @@ fn run_experiment() -> Result<()> {
     let layer = 22;
 
     print!("Extracting representations at Layer {}... ", layer);
-    let mut phen_hvs: Vec<HV16> = Vec::new();
-    let mut func_hvs: Vec<HV16> = Vec::new();
+    let mut phen_hvs: Vec<BinaryHV> = Vec::new();
+    let mut func_hvs: Vec<BinaryHV> = Vec::new();
     let mut phen_acts: Vec<Vec<f32>> = Vec::new();
     let mut func_acts: Vec<Vec<f32>> = Vec::new();
 
@@ -329,7 +329,7 @@ fn run_experiment() -> Result<()> {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn hamming_distance(a: &HV16, b: &HV16) -> f64 {
+fn hamming_distance(a: &BinaryHV, b: &BinaryHV) -> f64 {
     let xor = a.bind(b);
     xor.popcount() as f64 / HDC_DIMENSION as f64
 }
@@ -366,7 +366,7 @@ fn load_corpus(path: &str) -> Result<Vec<String>> {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn activation_to_hv16(activation: &[f32]) -> HV16 {
+fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
     let mut expanded = Vec::with_capacity(HDC_DIMENSION);
     let tiles = HDC_DIMENSION / activation.len();
     let remainder = HDC_DIMENSION % activation.len();
@@ -382,11 +382,11 @@ fn activation_to_hv16(activation: &[f32]) -> HV16 {
         expanded.push(activation[i]);
     }
 
-    HV16::from_bipolar(&expanded)
+    BinaryHV::from_bipolar(&expanded)
 }
 
 #[cfg(feature = "neural-bridge")]
-fn analyze_topology(hv: &HV16, config: &TopologyConfig) -> symthaea_core::hdc::consciousness_topology::TopologicalAssessment {
+fn analyze_topology(hv: &BinaryHV, config: &TopologyConfig) -> symthaea_core::hdc::consciousness_topology::TopologicalAssessment {
     let mut topology = ConsciousnessTopology::new(config.clone());
 
     topology.add_state(*hv);

@@ -99,7 +99,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::Instant;
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
 
 // =============================================================================
@@ -451,11 +451,11 @@ pub struct PlasmaHdcEncoder {
     /// Configuration
     config: PlasmaEncoderConfig,
     /// Base vectors for each sensor type (deterministic)
-    base_vectors: Vec<(PlasmaSensorType, HV16)>,
+    base_vectors: Vec<(PlasmaSensorType, BinaryHV)>,
     /// Level vectors for magnitude encoding (deterministic)
-    level_vectors: Vec<HV16>,
+    level_vectors: Vec<BinaryHV>,
     /// Phase vectors for temporal encoding (deterministic)
-    phase_vectors: Vec<HV16>,
+    phase_vectors: Vec<BinaryHV>,
     /// Previous state for derivative computation
     prev_state: Option<PlasmaState>,
 }
@@ -469,23 +469,23 @@ impl PlasmaHdcEncoder {
     /// Create with full configuration
     pub fn with_config(config: PlasmaEncoderConfig) -> Self {
         // Generate base vectors for each sensor type
-        let base_vectors: Vec<(PlasmaSensorType, HV16)> = PlasmaSensorType::all()
+        let base_vectors: Vec<(PlasmaSensorType, BinaryHV)> = PlasmaSensorType::all()
             .map(|sensor| {
                 let sensor_seed = config.seed ^ sensor.seed();
-                (sensor, HV16::random(sensor_seed))
+                (sensor, BinaryHV::random(sensor_seed))
             })
             .collect();
 
         // Generate level vectors for magnitude encoding
         // Level i has seed = config.seed + 1_000_000 + i
-        let level_vectors: Vec<HV16> = (0..config.num_levels)
-            .map(|i| HV16::random(config.seed.wrapping_add(1_000_000).wrapping_add(i as u64)))
+        let level_vectors: Vec<BinaryHV> = (0..config.num_levels)
+            .map(|i| BinaryHV::random(config.seed.wrapping_add(1_000_000).wrapping_add(i as u64)))
             .collect();
 
         // Generate phase vectors for temporal encoding (32 phases for circular time)
         let num_phases = 32;
-        let phase_vectors: Vec<HV16> = (0..num_phases)
-            .map(|i| HV16::random(config.seed.wrapping_add(2_000_000).wrapping_add(i as u64)))
+        let phase_vectors: Vec<BinaryHV> = (0..num_phases)
+            .map(|i| BinaryHV::random(config.seed.wrapping_add(2_000_000).wrapping_add(i as u64)))
             .collect();
 
         Self {
@@ -498,7 +498,7 @@ impl PlasmaHdcEncoder {
     }
 
     /// Get the base vector for a sensor type
-    pub fn base_vector(&self, sensor: PlasmaSensorType) -> &HV16 {
+    pub fn base_vector(&self, sensor: PlasmaSensorType) -> &BinaryHV {
         self.base_vectors
             .iter()
             .find(|(s, _)| *s == sensor)
@@ -509,7 +509,7 @@ impl PlasmaHdcEncoder {
     /// Encode a normalized value [0, 1] using level encoding
     ///
     /// Uses thermometer coding: bundle levels 0..k where k = floor(value * num_levels)
-    fn encode_magnitude(&self, normalized_value: f64) -> HV16 {
+    fn encode_magnitude(&self, normalized_value: f64) -> BinaryHV {
         let level = ((normalized_value * self.config.num_levels as f64) as usize)
             .min(self.config.num_levels - 1);
 
@@ -517,14 +517,14 @@ impl PlasmaHdcEncoder {
             self.level_vectors[0]
         } else {
             // Bundle all levels up to and including the current level
-            HV16::bundle_safe(&self.level_vectors[0..=level])
+            BinaryHV::bundle_safe(&self.level_vectors[0..=level])
         }
     }
 
     /// Encode temporal phase using circular encoding
     ///
     /// Maps time to phase angle, then bundles nearby phase vectors
-    fn encode_phase(&self, timestamp: f64) -> HV16 {
+    fn encode_phase(&self, timestamp: f64) -> BinaryHV {
         let num_phases = self.phase_vectors.len();
         let phase = (timestamp / self.config.time_scale_seconds) % 1.0;
         let phase_idx = (phase * num_phases as f64) as usize % num_phases;
@@ -533,7 +533,7 @@ impl PlasmaHdcEncoder {
         let prev_idx = (phase_idx + num_phases - 1) % num_phases;
         let next_idx = (phase_idx + 1) % num_phases;
 
-        HV16::bundle_safe(&[
+        BinaryHV::bundle_safe(&[
             self.phase_vectors[prev_idx],
             self.phase_vectors[phase_idx],
             self.phase_vectors[phase_idx], // Double weight for center
@@ -544,7 +544,7 @@ impl PlasmaHdcEncoder {
     /// Encode a single plasma reading
     ///
     /// Result = Base(sensor) XOR Magnitude(value) XOR Phase(time)
-    pub fn encode_sample(&self, reading: &PlasmaReading) -> HV16 {
+    pub fn encode_sample(&self, reading: &PlasmaReading) -> BinaryHV {
         let base = self.base_vector(reading.sensor);
         let magnitude = self.encode_magnitude(reading.normalized());
         let phase = self.encode_phase(reading.timestamp);
@@ -556,18 +556,18 @@ impl PlasmaHdcEncoder {
     /// Encode a complete plasma state
     ///
     /// Bundles all sensor readings into a unified state vector
-    pub fn encode_state(&mut self, state: &PlasmaState) -> HV16 {
+    pub fn encode_state(&mut self, state: &PlasmaState) -> BinaryHV {
         let readings = state.to_readings();
-        let encoded: Vec<HV16> = readings.iter().map(|r| self.encode_sample(r)).collect();
+        let encoded: Vec<BinaryHV> = readings.iter().map(|r| self.encode_sample(r)).collect();
 
-        let state_hv = HV16::bundle_safe(&encoded);
+        let state_hv = BinaryHV::bundle_safe(&encoded);
 
         // Optionally add derivative encoding
         if self.config.encode_derivatives {
             if let Some(ref prev) = self.prev_state {
                 let derivative_hv = self.encode_derivatives(prev, state);
                 // Weighted bundle of state and derivatives
-                let weighted = HV16::bundle_safe(&[
+                let weighted = BinaryHV::bundle_safe(&[
                     state_hv,
                     state_hv,  // 2x weight for state
                     derivative_hv,
@@ -582,7 +582,7 @@ impl PlasmaHdcEncoder {
     }
 
     /// Encode rate-of-change (derivatives) between two states
-    fn encode_derivatives(&self, prev: &PlasmaState, curr: &PlasmaState) -> HV16 {
+    fn encode_derivatives(&self, prev: &PlasmaState, curr: &PlasmaState) -> BinaryHV {
         let dt = (curr.timestamp - prev.timestamp).max(1e-6);
 
         let mut derivative_hvs = Vec::new();
@@ -599,25 +599,25 @@ impl PlasmaHdcEncoder {
             let deriv_mag = self.encode_magnitude(norm_deriv);
 
             // Use a special "derivative marker" binding
-            let deriv_marker = HV16::random(self.config.seed.wrapping_add(3_000_000));
+            let deriv_marker = BinaryHV::random(self.config.seed.wrapping_add(3_000_000));
             derivative_hvs.push(base.bind(&deriv_mag).bind(&deriv_marker));
         }
 
-        HV16::bundle_safe(&derivative_hvs)
+        BinaryHV::bundle_safe(&derivative_hvs)
     }
 
     /// Encode a sliding window of states
     ///
     /// Useful for capturing temporal patterns preceding disruptions
-    pub fn encode_window(&mut self, states: &[PlasmaState]) -> HV16 {
+    pub fn encode_window(&mut self, states: &[PlasmaState]) -> BinaryHV {
         if states.is_empty() {
-            return HV16::zero();
+            return BinaryHV::zero();
         }
 
-        let encoded: Vec<HV16> = states.iter().map(|s| {
+        let encoded: Vec<BinaryHV> = states.iter().map(|s| {
             let readings = s.to_readings();
-            let sensor_hvs: Vec<HV16> = readings.iter().map(|r| self.encode_sample(r)).collect();
-            HV16::bundle_safe(&sensor_hvs)
+            let sensor_hvs: Vec<BinaryHV> = readings.iter().map(|r| self.encode_sample(r)).collect();
+            BinaryHV::bundle_safe(&sensor_hvs)
         }).collect();
 
         // Temporal weighting: more recent states get more weight
@@ -630,7 +630,7 @@ impl PlasmaHdcEncoder {
             }
         }
 
-        HV16::bundle_safe(&weighted)
+        BinaryHV::bundle_safe(&weighted)
     }
 
     /// Reset derivative tracking (call at start of new shot)
@@ -658,7 +658,7 @@ pub struct PlasmaStateBuffer {
     /// Encoder for HDC encoding
     encoder: PlasmaHdcEncoder,
     /// Cached encoded states
-    encoded_cache: VecDeque<HV16>,
+    encoded_cache: VecDeque<BinaryHV>,
 }
 
 impl PlasmaStateBuffer {
@@ -692,13 +692,13 @@ impl PlasmaStateBuffer {
     }
 
     /// Get encoded window
-    pub fn encoded_window(&self) -> HV16 {
+    pub fn encoded_window(&self) -> BinaryHV {
         if self.encoded_cache.is_empty() {
-            return HV16::zero();
+            return BinaryHV::zero();
         }
 
-        let hvs: Vec<HV16> = self.encoded_cache.iter().copied().collect();
-        HV16::bundle_safe(&hvs)
+        let hvs: Vec<BinaryHV> = self.encoded_cache.iter().copied().collect();
+        BinaryHV::bundle_safe(&hvs)
     }
 
     /// Get most recent state
@@ -707,7 +707,7 @@ impl PlasmaStateBuffer {
     }
 
     /// Get most recent encoded state
-    pub fn latest_encoded(&self) -> Option<HV16> {
+    pub fn latest_encoded(&self) -> Option<BinaryHV> {
         self.encoded_cache.back().copied()
     }
 
@@ -855,7 +855,7 @@ impl PlasmaPhiMonitor {
 
         // Encode state and get component HVs
         let readings = state.to_readings();
-        let components: Vec<HV16> = readings.iter().map(|r| encoder.encode_sample(r)).collect();
+        let components: Vec<BinaryHV> = readings.iter().map(|r| encoder.encode_sample(r)).collect();
 
         // Compute phi
         let phi = self.phi_calc.compute(&components);
@@ -1094,7 +1094,7 @@ mod tests {
         // Stable state
         let stable = PlasmaState::default();
         let stable_readings = stable.to_readings();
-        let stable_hvs: Vec<HV16> = stable_readings.iter()
+        let stable_hvs: Vec<BinaryHV> = stable_readings.iter()
             .map(|r| encoder.encode_sample(r))
             .collect();
         let phi_stable = phi_calc.compute(&stable_hvs);
@@ -1114,7 +1114,7 @@ mod tests {
             beta: 4.0,    // Critical
         };
         let disruption_readings = disruption.to_readings();
-        let disruption_hvs: Vec<HV16> = disruption_readings.iter()
+        let disruption_hvs: Vec<BinaryHV> = disruption_readings.iter()
             .map(|r| encoder.encode_sample(r))
             .collect();
         let phi_disruption = phi_calc.compute(&disruption_hvs);

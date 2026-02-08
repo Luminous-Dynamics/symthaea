@@ -37,7 +37,7 @@
 //! let sleep_state = generator.generate_state(&StateType::DeepSleep);
 //! ```
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -152,7 +152,7 @@ pub struct StateTypePrimitiveGrounding {
     /// NSM primitives that define this state (Wierzbicka's 65 primes)
     pub nsm_primitives: Vec<String>,
     /// HDC encoding of the primitive composition
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     /// Consciousness level (0.0 = unconscious, 1.0 = peak consciousness)
     pub consciousness_level: f64,
     /// Integration capacity (how much information integration is possible)
@@ -274,13 +274,13 @@ impl StateTypePrimitiveGrounding {
     }
 
     /// Encode primitives as HDC vector using binding composition
-    fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
+    fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
         if primitives.is_empty() {
-            return HV16::zero();
+            return BinaryHV::zero();
         }
 
         // Look up or create vectors for each primitive
-        let vectors: Vec<HV16> = primitives
+        let vectors: Vec<BinaryHV> = primitives
             .iter()
             .map(|name| {
                 // Try to get primitive from system by name
@@ -293,19 +293,19 @@ impl StateTypePrimitiveGrounding {
                     let seed = name
                         .bytes()
                         .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-                    HV16::random(seed)
+                    BinaryHV::random(seed)
                 }
             })
             .collect();
 
         if vectors.is_empty() {
-            return HV16::zero();
+            return BinaryHV::zero();
         }
 
         // Compose through sequential binding (order-preserving)
         let mut result = vectors[0].clone();
         for v in &vectors[1..] {
-            result = HV16::bind(&result, v);
+            result = BinaryHV::bind(&result, v);
         }
         result
     }
@@ -348,7 +348,7 @@ impl SyntheticStatesNSMGrounding {
     }
 
     /// Find states semantically similar to a query vector
-    pub fn find_similar(&self, query: &HV16, threshold: f64) -> Vec<(&StateType, f64)> {
+    pub fn find_similar(&self, query: &BinaryHV, threshold: f64) -> Vec<(&StateType, f64)> {
         let mut similar: Vec<_> = self
             .state_groundings
             .iter()
@@ -383,7 +383,7 @@ impl SyntheticStatesNSMGrounding {
 
 /// Generates synthetic system states for validation
 ///
-/// Creates HDC system states (vectors of HV16) that represent different
+/// Creates HDC system states (vectors of BinaryHV) that represent different
 /// levels of consciousness, from deep anesthesia to alert focus.
 ///
 /// # State Generation Strategy
@@ -428,7 +428,7 @@ impl SyntheticStateGenerator {
     }
 
     /// Generate state matching specified consciousness level
-    pub fn generate_state(&mut self, state_type: &StateType) -> Vec<HV16> {
+    pub fn generate_state(&mut self, state_type: &StateType) -> Vec<BinaryHV> {
         match state_type {
             StateType::AlertFocused => self.generate_high_integration(),
             StateType::Awake => self.generate_moderate_high_integration(),
@@ -456,8 +456,8 @@ impl SyntheticStateGenerator {
     /// - Cross-partition (hub-spoke) correlations are HIGH
     /// - Within-partition (spoke-spoke) correlations are LOW
     /// - Partitioning LOSES information → HIGH Φ ✅
-    fn generate_high_integration(&mut self) -> Vec<HV16> {
-        let hub_pattern = HV16::random(self.next_seed());
+    fn generate_high_integration(&mut self) -> Vec<BinaryHV> {
+        let hub_pattern = BinaryHV::random(self.next_seed());
 
         let mut components = Vec::new();
 
@@ -466,9 +466,9 @@ impl SyntheticStateGenerator {
 
         // Remaining components are spokes bound to hub
         for _ in 1..self.num_components {
-            let spoke_unique = HV16::random(self.next_seed());
+            let spoke_unique = BinaryHV::random(self.next_seed());
             // BIND creates correlation: spoke is related to hub but unique
-            components.push(HV16::bind(&hub_pattern, &spoke_unique));
+            components.push(BinaryHV::bind(&hub_pattern, &spoke_unique));
         }
 
         components
@@ -479,20 +479,20 @@ impl SyntheticStateGenerator {
     /// **V3 FIX (Dec 26 Evening)**: Two hubs with BIND operations
     /// **Structure**: Two clusters with inter-cluster connections
     /// **Encoding**: Alternating binding to two hub patterns
-    fn generate_moderate_high_integration(&mut self) -> Vec<HV16> {
-        let hub1 = HV16::random(self.next_seed());
-        let hub2 = HV16::random(self.next_seed());
+    fn generate_moderate_high_integration(&mut self) -> Vec<BinaryHV> {
+        let hub1 = BinaryHV::random(self.next_seed());
+        let hub2 = BinaryHV::random(self.next_seed());
 
         let mut components = Vec::new();
 
         for i in 0..self.num_components {
-            let spoke = HV16::random(self.next_seed());
+            let spoke = BinaryHV::random(self.next_seed());
             if i % 2 == 0 {
                 // Even indices: bound to hub1
-                components.push(HV16::bind(&hub1, &spoke));
+                components.push(BinaryHV::bind(&hub1, &spoke));
             } else {
                 // Odd indices: bound to hub2
-                components.push(HV16::bind(&hub2, &spoke));
+                components.push(BinaryHV::bind(&hub2, &spoke));
             }
         }
 
@@ -504,9 +504,9 @@ impl SyntheticStateGenerator {
     /// **V3 FIX (Dec 26 Evening)**: Ring topology with shortcuts
     /// **Structure**: Sequential connections + long-range shortcuts
     /// **Encoding**: Sequential BIND + periodic cross-ring bindings
-    fn generate_moderate_integration(&mut self) -> Vec<HV16> {
+    fn generate_moderate_integration(&mut self) -> Vec<BinaryHV> {
         let n = self.num_components;
-        let node_patterns: Vec<HV16> = (0..n).map(|_| HV16::random(self.next_seed())).collect();
+        let node_patterns: Vec<BinaryHV> = (0..n).map(|_| BinaryHV::random(self.next_seed())).collect();
 
         let mut components = Vec::new();
 
@@ -515,12 +515,12 @@ impl SyntheticStateGenerator {
             let next = node_patterns[(i + 1) % n].clone();
 
             // Create ring connection
-            let mut component = HV16::bind(&curr, &next);
+            let mut component = BinaryHV::bind(&curr, &next);
 
             // Add shortcut every 2 nodes
             if i % 2 == 0 && n > 3 {
                 let shortcut = node_patterns[(i + n / 2) % n].clone();
-                component = HV16::bind(&component, &shortcut);
+                component = BinaryHV::bind(&component, &shortcut);
             }
 
             components.push(component);
@@ -534,9 +534,9 @@ impl SyntheticStateGenerator {
     /// **V3 FIX (Dec 26 Evening)**: Pure ring structure
     /// **Structure**: Circular chain (each node connected to next)
     /// **Encoding**: Sequential BIND operations
-    fn generate_moderate_low_integration(&mut self) -> Vec<HV16> {
+    fn generate_moderate_low_integration(&mut self) -> Vec<BinaryHV> {
         let n = self.num_components;
-        let node_patterns: Vec<HV16> = (0..n).map(|_| HV16::random(self.next_seed())).collect();
+        let node_patterns: Vec<BinaryHV> = (0..n).map(|_| BinaryHV::random(self.next_seed())).collect();
 
         let mut components = Vec::new();
 
@@ -544,7 +544,7 @@ impl SyntheticStateGenerator {
             let curr = node_patterns[i].clone();
             let next = node_patterns[(i + 1) % n].clone();
             // Bind current node to next in ring
-            components.push(HV16::bind(&curr, &next));
+            components.push(BinaryHV::bind(&curr, &next));
         }
 
         components
@@ -555,10 +555,10 @@ impl SyntheticStateGenerator {
     /// **V3 FIX (Dec 26 Evening)**: Multiple small modules
     /// **Structure**: Several small integrated clusters
     /// **Encoding**: Multiple hub patterns with local bindings
-    fn generate_low_integration(&mut self) -> Vec<HV16> {
+    fn generate_low_integration(&mut self) -> Vec<BinaryHV> {
         let num_modules = (self.num_components / 2).max(2);
-        let module_hubs: Vec<HV16> = (0..num_modules)
-            .map(|_| HV16::random(self.next_seed()))
+        let module_hubs: Vec<BinaryHV> = (0..num_modules)
+            .map(|_| BinaryHV::random(self.next_seed()))
             .collect();
 
         let mut components = Vec::new();
@@ -566,9 +566,9 @@ impl SyntheticStateGenerator {
         for i in 0..self.num_components {
             let module_idx = i % num_modules;
             let hub = module_hubs[module_idx].clone();
-            let spoke = HV16::random(self.next_seed());
+            let spoke = BinaryHV::random(self.next_seed());
             // Bind to local module hub
-            components.push(HV16::bind(&hub, &spoke));
+            components.push(BinaryHV::bind(&hub, &spoke));
         }
 
         components
@@ -579,19 +579,19 @@ impl SyntheticStateGenerator {
     /// **V3 FIX (Dec 26 Evening)**: Isolated pairs
     /// **Structure**: Pairs bound together, but pairs independent
     /// **Encoding**: Within-pair binding, no cross-pair correlation
-    fn generate_isolated_state(&mut self) -> Vec<HV16> {
+    fn generate_isolated_state(&mut self) -> Vec<BinaryHV> {
         let mut components = Vec::new();
 
         for i in 0..self.num_components {
             if i % 2 == 0 {
                 // Even: create new pair pattern
-                let pair_pattern = HV16::random(self.next_seed());
+                let pair_pattern = BinaryHV::random(self.next_seed());
                 components.push(pair_pattern);
             } else {
                 // Odd: bind to previous (creating pair)
                 let prev = components[i - 1].clone();
-                let unique = HV16::random(self.next_seed());
-                components.push(HV16::bind(&prev, &unique));
+                let unique = BinaryHV::random(self.next_seed());
+                components.push(BinaryHV::bind(&prev, &unique));
             }
         }
 
@@ -603,23 +603,23 @@ impl SyntheticStateGenerator {
     /// **V3 FIX (Dec 26 Evening)**: Completely independent pairs
     /// **Structure**: Each pair uses different base pattern
     /// **Encoding**: Minimal integration, only local pair correlations
-    fn generate_fragmented_state(&mut self) -> Vec<HV16> {
+    fn generate_fragmented_state(&mut self) -> Vec<BinaryHV> {
         let mut components = Vec::new();
 
         // Create completely independent pairs
         for _ in 0..(self.num_components / 2) {
-            let base = HV16::random(self.next_seed());
-            let variation = HV16::random(self.next_seed());
+            let base = BinaryHV::random(self.next_seed());
+            let variation = BinaryHV::random(self.next_seed());
 
             // First element of pair
             components.push(base.clone());
             // Second element bound to first
-            components.push(HV16::bind(&base, &variation));
+            components.push(BinaryHV::bind(&base, &variation));
         }
 
         // Handle odd number of components
         if self.num_components % 2 == 1 {
-            components.push(HV16::random(self.next_seed()));
+            components.push(BinaryHV::random(self.next_seed()));
         }
 
         components
@@ -632,12 +632,12 @@ impl SyntheticStateGenerator {
     /// **Expected Φ**: 0.00-0.05 (near-zero integration)
     ///
     /// Strategy: Purely random independent components
-    fn generate_random_state(&mut self) -> Vec<HV16> {
+    fn generate_random_state(&mut self) -> Vec<BinaryHV> {
         // Completely independent random vectors
         // Expected pairwise similarity: ~0.5 (HDV baseline)
         // Φ should be minimal - just the random correlation baseline
         (0..self.num_components)
-            .map(|_| HV16::random(self.next_seed()))
+            .map(|_| BinaryHV::random(self.next_seed()))
             .collect()
     }
 
@@ -725,7 +725,7 @@ mod tests {
                 generator.num_components
             );
 
-            // HV16 has fixed dimension of 16384 bits (2048 bytes * 8 bits)
+            // BinaryHV has fixed dimension of 16384 bits (2048 bytes * 8 bits)
             // Just verify we have the right number of components
             assert!(
                 !state.is_empty(),

@@ -30,7 +30,7 @@
 //! - Provides richer understanding
 //! - Finds primitives that excel in different dimensions
 
-use crate::hdc::{HV16, integrated_information::IntegratedInformation};
+use crate::hdc::{BinaryHV, integrated_information::IntegratedInformation};
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
 
@@ -58,7 +58,7 @@ pub struct ConsciousnessProfile {
 
 impl ConsciousnessProfile {
     /// Create profile from hypervector components
-    pub fn from_components(components: &[HV16]) -> Self {
+    pub fn from_components(components: &[BinaryHV]) -> Self {
         let mut phi_computer = IntegratedInformation::new();
 
         let phi = phi_computer.compute_phi(components);
@@ -84,7 +84,7 @@ impl ConsciousnessProfile {
     ///
     /// Measures the rate of change in integrated information,
     /// indicating how dynamically consciousness evolves.
-    fn compute_gradient(components: &[HV16], phi_computer: &mut IntegratedInformation) -> f64 {
+    fn compute_gradient(components: &[BinaryHV], phi_computer: &mut IntegratedInformation) -> f64 {
         if components.len() < 2 {
             return 0.0;
         }
@@ -112,13 +112,13 @@ impl ConsciousnessProfile {
     /// Lower entropy = more uniform, simpler experience
     ///
     /// Uses Shannon entropy over component activity patterns.
-    fn compute_entropy(components: &[HV16]) -> f64 {
+    fn compute_entropy(components: &[BinaryHV]) -> f64 {
         if components.is_empty() {
             return 0.0;
         }
 
         // Count active bits across all components
-        let total_bits = components.len() * 16384;  // HV16 dimensionality
+        let total_bits = components.len() * 16384;  // BinaryHV dimensionality
         let mut active_bits = 0;
 
         for hv in components {
@@ -146,7 +146,7 @@ impl ConsciousnessProfile {
     /// - Number of components (basic complexity)
     /// - Component diversity (structural variety)
     /// - Interaction patterns (relational complexity)
-    fn compute_complexity(components: &[HV16]) -> f64 {
+    fn compute_complexity(components: &[BinaryHV]) -> f64 {
         if components.is_empty() {
             return 0.0;
         }
@@ -164,7 +164,7 @@ impl ConsciousnessProfile {
     }
 
     /// Compute component diversity - how different components are from each other
-    fn compute_component_diversity(components: &[HV16]) -> f64 {
+    fn compute_component_diversity(components: &[BinaryHV]) -> f64 {
         if components.len() < 2 {
             return 0.0;
         }
@@ -195,7 +195,7 @@ impl ConsciousnessProfile {
     /// Lower coherence = more chaotic, unpredictable consciousness
     ///
     /// In absence of temporal data, we measure internal consistency.
-    fn compute_coherence(components: &[HV16]) -> f64 {
+    fn compute_coherence(components: &[BinaryHV]) -> f64 {
         if components.is_empty() {
             return 1.0;  // Perfect coherence (trivial)
         }
@@ -412,9 +412,9 @@ mod tests {
     #[test]
     fn test_profile_computation() {
         let components = vec![
-            HV16::random(1),
-            HV16::random(2),
-            HV16::random(3),
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+            BinaryHV::random(3),
         ];
 
         let profile = ConsciousnessProfile::from_components(&components);

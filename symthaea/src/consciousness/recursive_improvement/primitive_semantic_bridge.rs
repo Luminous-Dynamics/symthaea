@@ -27,7 +27,7 @@
 //! │           │                                                              │
 //! │           ▼                                                              │
 //! │  ┌──────────────────────────────┐                                        │
-//! │  │ Build Concept HV from        │ ← HV16::bundle(primitive_encodings)   │
+//! │  │ Build Concept HV from        │ ← BinaryHV::bundle(primitive_encodings)   │
 //! │  │ Primitive Bundle             │                                        │
 //! │  └────────┬─────────────────────┘                                        │
 //! │           │                                                              │
@@ -57,7 +57,7 @@
 //! This means decomposition becomes TRIVIAL - just read the birth certificate!
 
 use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier, Primitive};
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use crate::embeddings::HdcBridge;
 
 // Stub for SemanticPrimitiveEncoder until it's properly implemented
@@ -69,7 +69,7 @@ struct SemanticPrimitiveEncoder {
 struct AlignedPrimitive {
     name: String,
     tier: PrimitiveTier,
-    hv16: HV16,
+    binary_hv: BinaryHV,
 }
 
 impl SemanticPrimitiveEncoder {
@@ -83,7 +83,7 @@ impl SemanticPrimitiveEncoder {
                 .map(|p| AlignedPrimitive {
                     name: p.name.clone(),
                     tier: p.tier,
-                    hv16: p.encoding.clone(),
+                    binary_hv: p.encoding.clone(),
                 })
                 .collect();
             Self { primitives }
@@ -94,14 +94,14 @@ impl SemanticPrimitiveEncoder {
         Self::global_instance()
     }
 
-    fn project_embedding(&self, embedding: &[f32]) -> HV16 {
+    fn project_embedding(&self, embedding: &[f32]) -> BinaryHV {
         // Simple projection: hash the embedding
         use std::hash::{Hash, Hasher};
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         for &v in embedding {
             v.to_bits().hash(&mut hasher);
         }
-        HV16::random(hasher.finish())
+        BinaryHV::random(hasher.finish())
     }
 
     fn all_primitives(&self) -> &[AlignedPrimitive] {
@@ -200,7 +200,7 @@ pub struct ActivePrimitive {
     pub activation: f32,
 
     /// The primitive's encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 }
 
 /// Result of primitive decomposition
@@ -210,7 +210,7 @@ pub struct PrimitiveDecomposition {
     pub primitives: Vec<ActivePrimitive>,
 
     /// Combined hypervector (bundle of active primitives)
-    pub combined_hv: Option<HV16>,
+    pub combined_hv: Option<BinaryHV>,
 
     /// Dominant tier
     pub dominant_tier: Option<PrimitiveTier>,
@@ -316,14 +316,14 @@ impl PrimitiveSemanticBridge {
 
             // Compare against aligned primitive HV16s
             for prim in encoder.all_primitives() {
-                let similarity = embedding_hv.similarity(&prim.hv16);
+                let similarity = embedding_hv.similarity(&prim.binary_hv);
 
                 if similarity > self.config.activation_threshold {
                     active.push(ActivePrimitive {
                         name: prim.name.clone(),
                         tier: prim.tier,
                         activation: similarity,
-                        encoding: prim.hv16.clone(),
+                        encoding: prim.binary_hv.clone(),
                     });
 
                     if similarity > self.stats.peak_primitive_activation {
@@ -362,10 +362,10 @@ impl PrimitiveSemanticBridge {
 
         // Compute combined HV if we have primitives
         let combined_hv = if !active.is_empty() && self.config.use_primitive_hypervectors {
-            let encodings: Vec<HV16> = active.iter()
+            let encodings: Vec<BinaryHV> = active.iter()
                 .map(|p| p.encoding.clone())
                 .collect();
-            Some(HV16::bundle(&encodings))
+            Some(BinaryHV::bundle(&encodings))
         } else {
             None
         };
@@ -391,12 +391,12 @@ impl PrimitiveSemanticBridge {
         }
     }
 
-    /// Convert embedding to HV16
+    /// Convert embedding to BinaryHV
     ///
     /// Projects a dense embedding into binary hypervector space.
-    fn embedding_to_hv16(&self, embedding: &[f32]) -> HV16 {
+    fn embedding_to_hv16(&self, embedding: &[f32]) -> BinaryHV {
         // Use deterministic projection based on embedding content
-        // Hash the embedding to get a seed, then generate HV16
+        // Hash the embedding to get a seed, then generate BinaryHV
         use std::hash::{Hash, Hasher};
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
 
@@ -407,7 +407,7 @@ impl PrimitiveSemanticBridge {
         let seed = hasher.finish();
 
         // Generate base HV from seed
-        let mut hv = HV16::random(seed);
+        let mut hv = BinaryHV::random(seed);
 
         // Modulate by embedding features
         // Use first few dimensions to flip specific bits
@@ -415,8 +415,8 @@ impl PrimitiveSemanticBridge {
         for i in 0..dim {
             if embedding[i] > 0.0 {
                 // XOR with a feature-specific pattern
-                let feature_hv = HV16::random(seed.wrapping_add(i as u64));
-                hv = HV16::bind(&hv, &feature_hv);
+                let feature_hv = BinaryHV::random(seed.wrapping_add(i as u64));
+                hv = BinaryHV::bind(&hv, &feature_hv);
             }
         }
 

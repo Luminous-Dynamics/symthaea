@@ -735,6 +735,9 @@ pub struct LoopStats {
 
     /// Moral: Count of deontological violations in last input
     pub deontological_violations: usize,
+
+    /// Moral: Whether current action needs ethical review
+    pub moral_review_needed: bool,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1877,6 +1880,36 @@ impl CognitiveLoopService {
             _ => {}
         }
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // 10d.7 Moral Modulation of Active Inference
+        // ═══════════════════════════════════════════════════════════════════════
+        // Apply moral constraints to FEP-selected actions:
+        // - Negative moral score → reduce exploration, increase caution
+        // - Consent violation → strong ethical override
+        // - Deontological violations → trigger reflective pause
+
+        if moral_concern_detected {
+            // Reduce exploration when facing moral concerns
+            self.curiosity_drive.exploration_urge *= 0.5;
+
+            // Increase trust threshold (be more cautious)
+            self.self_reflection.trust_threshold =
+                (self.self_reflection.trust_threshold * 1.2).clamp(0.1, 0.95);
+
+            // Boost reflective processing (take time to consider ethics)
+            self.adaptive_behavior.pause_multiplier *= 1.5;
+
+            // If severe moral violation (perfect duty or consent), flag for review
+            if moral_judgment.consent_violation ||
+               moral_judgment.violations.iter().any(|v| v.contains("perfect") || v.contains("harm")) {
+                self.stats.moral_review_needed = true;
+            }
+        } else if moral_judgment.moral_score > 0.5 {
+            // Positive moral alignment boosts confidence slightly
+            self.prediction_confidence =
+                (self.prediction_confidence * 1.05).clamp(0.0, 1.0);
+        }
+
         // Surprise-gated learning rate boost: when FEP detects surprise, accelerate adaptation
         if is_surprised {
             let surprise_boost = (self.fep_agent.current_free_energy() as f32 / 3.0).clamp(0.1, 0.5);
@@ -2176,7 +2209,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // STABILITY REGIME: Update primitive CfC dynamics
         // ═══════════════════════════════════════════════════════════════════════
-        // Convert the HDC encoding to HV16 and run through stability regime processor.
+        // Convert the HDC encoding to BinaryHV and run through stability regime processor.
         // Frequently-used primitives crystallize, rarely-used stay fluid.
         {
             let hv16_input = real_hv_to_hv16(&encoding_result.hdv);

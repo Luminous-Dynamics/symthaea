@@ -40,7 +40,7 @@ Symthaea implements a novel cognitive architecture where:
 │                                                                             │
 │  HDC (symthaea_core)    LTC (unified_ltc)      FEP (consciousness)         │
 │  ─────────────────────  ─────────────────────  ─────────────────────        │
-│  • HV16 (binary)        • Euler integration   • Active Inference           │
+│  • BinaryHV (binary)        • Euler integration   • Active Inference           │
 │  • ContinuousHV (f32)   • RK4 integration     • Motor Commands             │
 │  • Bind (⊗)             • Closed-form O(1)    • TD Learning                │
 │  • Bundle (⊕)           • Hebbian learning    • Precision Gating           │
@@ -57,7 +57,7 @@ Symthaea implements a novel cognitive architecture where:
 
 ## Core Concepts
 
-### HV16 and ContinuousHV
+### BinaryHV and ContinuousHV
 
 Hypervectors are high-dimensional vectors (16,384D) with special algebraic properties:
 

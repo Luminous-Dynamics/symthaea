@@ -49,7 +49,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::hdc::{HV16, ContinuousHV};
+use crate::hdc::{BinaryHV, ContinuousHV};
 
 // ============================================================================
 // Configuration
@@ -156,12 +156,12 @@ impl ProbabilisticHV {
         }
     }
 
-    /// Convert a binary hypervector (HV16) to a probabilistic one.
+    /// Convert a binary hypervector (BinaryHV) to a probabilistic one.
     ///
     /// Each bit maps to mean +1.0 (bit=1) or -1.0 (bit=0), with zero
     /// variance: a binary vector is a maximally certain belief.
-    pub fn from_hv16(hv: &HV16) -> Self {
-        let dim = HV16::DIM; // 16,384
+    pub fn from_hv16(hv: &BinaryHV) -> Self {
+        let dim = BinaryHV::DIM; // 16,384
         let mut mean = Vec::with_capacity(dim);
         for i in 0..dim {
             let bit = hv.get_bit(i);
@@ -720,20 +720,20 @@ mod tests {
 
     #[test]
     fn test_phv_from_hv16_has_zero_variance() {
-        let hv = HV16::random(42);
+        let hv = BinaryHV::random(42);
         let phv = ProbabilisticHV::from_hv16(&hv);
 
-        assert_eq!(phv.dim, HV16::DIM);
+        assert_eq!(phv.dim, BinaryHV::DIM);
         for i in 0..phv.dim {
             assert_eq!(
                 phv.variance[i], 0.0,
-                "PHV from HV16 should have zero variance at dim {}",
+                "PHV from BinaryHV should have zero variance at dim {}",
                 i
             );
             // Mean should be +1 or -1
             assert!(
                 (phv.mean[i] - 1.0).abs() < 1e-10 || (phv.mean[i] + 1.0).abs() < 1e-10,
-                "PHV from HV16 should have mean +/-1, got {} at dim {}",
+                "PHV from BinaryHV should have mean +/-1, got {} at dim {}",
                 phv.mean[i], i
             );
         }

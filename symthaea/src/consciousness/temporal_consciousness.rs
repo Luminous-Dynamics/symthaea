@@ -85,7 +85,7 @@
 //! └─────────────────────────────────────────────────────────────────────────┘
 //! ```
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::consciousness::temporal_primitives::{
     AllenRelation, TemporalReasoner, TemporalConfig as TemporalPrimitivesConfig
 };
@@ -259,7 +259,7 @@ impl PhiTrajectory {
 #[derive(Debug, Clone)]
 pub struct ConsciousnessContinuity {
     /// Recent state representations for continuity checking
-    recent_states: VecDeque<HV16>,
+    recent_states: VecDeque<BinaryHV>,
 
     /// Continuity score (0-1, higher = more continuous)
     pub score: f64,
@@ -317,7 +317,7 @@ impl ConsciousnessContinuity {
     }
 
     /// Add a new consciousness state
-    pub fn observe(&mut self, state: &HV16, phi: f64, phi_prev: f64) {
+    pub fn observe(&mut self, state: &BinaryHV, phi: f64, phi_prev: f64) {
         // Check for discontinuity
         if let Some(prev_state) = self.recent_states.back() {
             let similarity = state.similarity(prev_state) as f64;
@@ -393,13 +393,13 @@ impl ConsciousnessContinuity {
 #[derive(Debug, Clone)]
 pub struct TemporalIdentityCoherence {
     /// Past self representation (from narrative)
-    past_self: Option<HV16>,
+    past_self: Option<BinaryHV>,
 
     /// Present self representation (from current state)
-    present_self: Option<HV16>,
+    present_self: Option<BinaryHV>,
 
     /// Future self representation (from predictions)
-    future_self: Option<HV16>,
+    future_self: Option<BinaryHV>,
 
     /// Overall coherence score
     pub coherence: f64,
@@ -435,7 +435,7 @@ impl TemporalIdentityCoherence {
     pub fn update(
         &mut self,
         narrative: &NarrativeSelfModel,
-        present_state: &HV16,
+        present_state: &BinaryHV,
         _predictive: &PredictiveSelfModel,
     ) {
         // Get past self from narrative
@@ -454,9 +454,9 @@ impl TemporalIdentityCoherence {
     /// Update with explicit representations
     pub fn update_explicit(
         &mut self,
-        past: &HV16,
-        present: &HV16,
-        future: &HV16,
+        past: &BinaryHV,
+        present: &BinaryHV,
+        future: &BinaryHV,
     ) {
         self.past_self = Some(past.clone());
         self.present_self = Some(present.clone());
@@ -506,13 +506,13 @@ impl TemporalIdentityCoherence {
 #[derive(Debug, Clone)]
 pub struct HusserlianAnalysis {
     /// Retention: Traces of just-past experiences
-    pub retention: VecDeque<(Instant, HV16, f64)>,
+    pub retention: VecDeque<(Instant, BinaryHV, f64)>,
 
     /// Primal Impression: The absolute now-point
-    pub primal_impression: Option<(HV16, f64)>,
+    pub primal_impression: Option<(BinaryHV, f64)>,
 
     /// Protention: Anticipations of what's coming
-    pub protention: VecDeque<(HV16, f64)>,
+    pub protention: VecDeque<(BinaryHV, f64)>,
 
     /// Retention depth (how much past is retained)
     pub retention_depth: usize,
@@ -537,7 +537,7 @@ impl HusserlianAnalysis {
     }
 
     /// Update with new primal impression (what's happening NOW)
-    pub fn update_primal(&mut self, state: HV16, phi: f64) {
+    pub fn update_primal(&mut self, state: BinaryHV, phi: f64) {
         // Move current primal to retention
         if let Some((old_state, old_phi)) = self.primal_impression.take() {
             self.retention.push_back((Instant::now(), old_state, old_phi));
@@ -552,7 +552,7 @@ impl HusserlianAnalysis {
     }
 
     /// Update protentions (what we anticipate)
-    pub fn update_protentions(&mut self, predictions: Vec<(HV16, f64)>) {
+    pub fn update_protentions(&mut self, predictions: Vec<(BinaryHV, f64)>) {
         self.protention.clear();
         for pred in predictions.into_iter().take(5) {
             self.protention.push_back(pred);
@@ -753,7 +753,7 @@ impl TemporalConsciousnessAnalyzer {
     /// Full observation: update all temporal analyses
     pub fn observe(
         &mut self,
-        state: &HV16,
+        state: &BinaryHV,
         phi: f64,
         narrative: Option<&NarrativeSelfModel>,
         predictive: Option<&PredictiveSelfModel>,
@@ -796,7 +796,7 @@ impl TemporalConsciousnessAnalyzer {
     }
 
     /// Add protentions (future predictions) to Husserlian analysis
-    pub fn add_protentions(&mut self, predictions: Vec<(HV16, f64)>) {
+    pub fn add_protentions(&mut self, predictions: Vec<(BinaryHV, f64)>) {
         self.husserlian.update_protentions(predictions);
     }
 
@@ -1018,7 +1018,7 @@ mod tests {
         let mut continuity = ConsciousnessContinuity::new(10, 0.5);
 
         // Similar states should be continuous
-        let state1 = HV16::random(1);
+        let state1 = BinaryHV::random(1);
         let state2 = state1.clone(); // Very similar
 
         continuity.observe(&state1, 0.5, 0.5);
@@ -1032,8 +1032,8 @@ mod tests {
         let mut continuity = ConsciousnessContinuity::new(10, 0.5);
 
         // Very different states should trigger discontinuity
-        let state1 = HV16::random(1);
-        let state2 = HV16::random(1000); // Very different
+        let state1 = BinaryHV::random(1);
+        let state2 = BinaryHV::random(1000); // Very different
 
         continuity.observe(&state1, 0.5, 0.5);
         continuity.observe(&state2, 0.5, 0.5);
@@ -1049,7 +1049,7 @@ mod tests {
         let mut coherence = TemporalIdentityCoherence::new(config);
 
         // Identical selves should be fully coherent
-        let self_vec = HV16::random(42);
+        let self_vec = BinaryHV::random(42);
         coherence.update_explicit(&self_vec, &self_vec, &self_vec);
 
         assert!(coherence.coherence > 0.95, "Identical selves should be coherent");
@@ -1062,7 +1062,7 @@ mod tests {
 
         // Add primal impressions
         for i in 0..5 {
-            let state = HV16::random(i as u64);
+            let state = BinaryHV::random(i as u64);
             husserlian.update_primal(state, 0.5 + i as f64 * 0.05);
         }
 
@@ -1076,7 +1076,7 @@ mod tests {
 
         // Simulate consciousness over time
         for i in 0..10 {
-            let state = HV16::random(i as u64);
+            let state = BinaryHV::random(i as u64);
             let phi = 0.4 + i as f64 * 0.03;
 
             analyzer.observe(&state, phi, None, None);
@@ -1120,10 +1120,10 @@ mod tests {
         let mut analyzer = TemporalConsciousnessAnalyzer::default_config();
 
         // Build up history
-        let base_state = HV16::random(42);
+        let base_state = BinaryHV::random(42);
         for i in 0..20 {
             // Slight variations
-            let state = if i % 2 == 0 { base_state.clone() } else { HV16::random(i as u64) };
+            let state = if i % 2 == 0 { base_state.clone() } else { BinaryHV::random(i as u64) };
             analyzer.observe(&state, 0.5, None, None);
         }
 

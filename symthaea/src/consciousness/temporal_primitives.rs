@@ -37,7 +37,7 @@
 //!
 //! ## Integration with HDC
 //!
-//! Each interval relation gets an HV16 encoding, enabling:
+//! Each interval relation gets an BinaryHV encoding, enabling:
 //! - Semantic temporal reasoning via hypervector operations
 //! - Compositional temporal inference (if A precedes B, B precedes C → A precedes C)
 //! - Soft temporal matching (approximate relations)
@@ -47,7 +47,7 @@
 //! Allen, J. F. (1983). "Maintaining knowledge about temporal intervals"
 //! Communications of the ACM, 26(11), 832-843.
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -84,7 +84,7 @@ pub struct AllenRelationPrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Temporal directionality: -1.0 (before), 0.0 (same), +1.0 (after)
     pub directionality: f32,
@@ -217,16 +217,16 @@ impl AllenRelationPrimitiveGrounding {
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
         // Bundle the primitive encodings
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
             // Fallback: deterministic encoding based on relation
-            HV16::random(8000 + relation as u64 * 100)
+            BinaryHV::random(8000 + relation as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {
@@ -282,7 +282,7 @@ pub struct TemporalInterval {
     pub phi: Option<f64>,
 
     /// HDC encoding of this interval (for semantic operations)
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 }
 
 impl TemporalInterval {
@@ -316,7 +316,7 @@ impl TemporalInterval {
             end,
             state_id: None,
             phi: None,
-            encoding: HV16::random(seed),
+            encoding: BinaryHV::random(seed),
         })
     }
 
@@ -537,7 +537,7 @@ pub struct TemporalReasoner {
     relations: HashMap<(String, String), AllenRelation>,
 
     /// HDC encodings for each Allen relation
-    relation_encodings: HashMap<AllenRelation, HV16>,
+    relation_encodings: HashMap<AllenRelation, BinaryHV>,
 
     /// Composition table (pre-computed transitivity)
     composition_table: HashMap<(AllenRelation, AllenRelation), Vec<AllenRelation>>,
@@ -596,13 +596,13 @@ impl TemporalReasoner {
     }
 
     /// Initialize HDC encodings for each Allen relation
-    fn init_relation_encodings() -> HashMap<AllenRelation, HV16> {
+    fn init_relation_encodings() -> HashMap<AllenRelation, BinaryHV> {
         let mut encodings = HashMap::new();
 
         for (i, relation) in AllenRelation::all().iter().enumerate() {
             // Each relation gets a unique, deterministic encoding
             let seed = 7000 + i as u64 * 100;
-            encodings.insert(*relation, HV16::random(seed));
+            encodings.insert(*relation, BinaryHV::random(seed));
         }
 
         encodings
@@ -837,17 +837,17 @@ impl TemporalReasoner {
     }
 
     /// Get HDC encoding for an Allen relation
-    pub fn encode_relation(&self, relation: AllenRelation) -> HV16 {
+    pub fn encode_relation(&self, relation: AllenRelation) -> BinaryHV {
         self.relation_encodings[&relation].clone()
     }
 
-    /// Encode a temporal statement "A relation B" as an HV16
+    /// Encode a temporal statement "A relation B" as an BinaryHV
     pub fn encode_statement(
         &self,
         a: &TemporalInterval,
         relation: AllenRelation,
         b: &TemporalInterval,
-    ) -> HV16 {
+    ) -> BinaryHV {
         // Bind A's encoding with relation encoding with B's encoding
         // (A ⊗ R ⊗ B)
         let relation_hv = self.encode_relation(relation);
@@ -925,7 +925,7 @@ impl TemporalReasoner {
         &self,
         relation: AllenRelation,
         primitive_system: &PrimitiveSystem,
-    ) -> HV16 {
+    ) -> BinaryHV {
         AllenRelationPrimitiveGrounding::for_relation(relation, primitive_system).primitive_encoding
     }
 }
@@ -959,7 +959,7 @@ pub struct ConsciousInterval {
     pub causal_efficacy: f64,
 
     /// Associated content (what was the conscious experience about?)
-    pub content: Option<HV16>,
+    pub content: Option<BinaryHV>,
 }
 
 /// Phi trend during an interval
@@ -1253,7 +1253,7 @@ pub struct TemporalPrimitive {
     pub relation: AllenRelation,
 
     /// HDC encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Tier (always Temporal)
     pub tier: TemporalTier,
@@ -1284,7 +1284,7 @@ pub struct TemporalPrimitiveSystem {
     pub relation_primitives: HashMap<AllenRelation, TemporalPrimitive>,
 
     /// Domain manifold for temporal primitives
-    pub domain_rotation: HV16,
+    pub domain_rotation: BinaryHV,
 
     /// Temporal patterns (composed relations)
     pub patterns: Vec<TemporalPattern>,
@@ -1303,18 +1303,18 @@ pub struct TemporalPattern {
     pub meaning: String,
 
     /// Encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 }
 
 impl TemporalPrimitiveSystem {
     /// Create the complete temporal primitive system
     pub fn new() -> Self {
-        let domain_rotation = HV16::random(6000);
+        let domain_rotation = BinaryHV::random(6000);
         let mut relation_primitives = HashMap::new();
 
         for (i, relation) in AllenRelation::all().iter().enumerate() {
-            let local_encoding = HV16::random(6001 + i as u64);
-            let encoding = HV16::bundle(&[domain_rotation.clone(), local_encoding]);
+            let local_encoding = BinaryHV::random(6001 + i as u64);
+            let encoding = BinaryHV::bundle(&[domain_rotation.clone(), local_encoding]);
 
             relation_primitives.insert(
                 *relation,
@@ -1333,31 +1333,31 @@ impl TemporalPrimitiveSystem {
                 name: "Sequence".to_string(),
                 relations: vec![AllenRelation::Precedes, AllenRelation::Precedes],
                 meaning: "A happens, then B, then C".to_string(),
-                encoding: HV16::random(6100),
+                encoding: BinaryHV::random(6100),
             },
             TemporalPattern {
                 name: "Overlap_Chain".to_string(),
                 relations: vec![AllenRelation::Overlaps, AllenRelation::Overlaps],
                 meaning: "Events cascade with overlap".to_string(),
-                encoding: HV16::random(6101),
+                encoding: BinaryHV::random(6101),
             },
             TemporalPattern {
                 name: "Containment".to_string(),
                 relations: vec![AllenRelation::Contains],
                 meaning: "One event fully contains another".to_string(),
-                encoding: HV16::random(6102),
+                encoding: BinaryHV::random(6102),
             },
             TemporalPattern {
                 name: "Simultaneity".to_string(),
                 relations: vec![AllenRelation::Equals],
                 meaning: "Events occur at same time".to_string(),
-                encoding: HV16::random(6103),
+                encoding: BinaryHV::random(6103),
             },
             TemporalPattern {
                 name: "Causal_Immediacy".to_string(),
                 relations: vec![AllenRelation::Meets],
                 meaning: "Effect immediately follows cause".to_string(),
-                encoding: HV16::random(6104),
+                encoding: BinaryHV::random(6104),
             },
             TemporalPattern {
                 name: "Binding_Window".to_string(),
@@ -1367,7 +1367,7 @@ impl TemporalPrimitiveSystem {
                     AllenRelation::During,
                 ],
                 meaning: "Events within 25ms binding window".to_string(),
-                encoding: HV16::random(6105),
+                encoding: BinaryHV::random(6105),
             },
         ];
 
@@ -1383,7 +1383,7 @@ impl TemporalPrimitiveSystem {
     /// This version uses the primitive system to ground each Allen relation
     /// in NSM primitives, enabling cross-domain semantic reasoning.
     pub fn with_nsm_grounding(primitive_system: &PrimitiveSystem) -> Self {
-        let domain_rotation = HV16::random(6000);
+        let domain_rotation = BinaryHV::random(6000);
         let mut relation_primitives = HashMap::new();
 
         // Use NSM groundings for encoding
@@ -1391,7 +1391,7 @@ impl TemporalPrimitiveSystem {
 
         for (relation, grounding) in &all_groundings {
             // Combine domain rotation with NSM-grounded encoding
-            let encoding = HV16::bundle(&[
+            let encoding = BinaryHV::bundle(&[
                 domain_rotation.clone(),
                 grounding.primitive_encoding.clone(),
             ]);
@@ -1483,7 +1483,7 @@ impl TemporalPrimitiveSystem {
                     AllenRelation::During,
                 ],
                 meaning: "Events within 25ms binding window".to_string(),
-                encoding: HV16::bundle(&[
+                encoding: BinaryHV::bundle(&[
                     overlaps.primitive_encoding.clone(),
                     starts.primitive_encoding.clone(),
                     during.primitive_encoding.clone(),
@@ -1537,14 +1537,14 @@ impl TemporalPrimitiveSystem {
     }
 
     /// Encode a temporal relation
-    pub fn encode(&self, relation: AllenRelation) -> HV16 {
+    pub fn encode(&self, relation: AllenRelation) -> BinaryHV {
         self.relation_primitives[&relation].encoding.clone()
     }
 
     /// Encode a sequence of relations (temporal pattern)
-    pub fn encode_sequence(&self, relations: &[AllenRelation]) -> HV16 {
+    pub fn encode_sequence(&self, relations: &[AllenRelation]) -> BinaryHV {
         if relations.is_empty() {
-            return HV16::zero();
+            return BinaryHV::zero();
         }
 
         // Bind relations in sequence with positional permutation

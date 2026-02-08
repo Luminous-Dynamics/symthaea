@@ -24,6 +24,7 @@ use symthaea_core::hdc::ContinuousHV;
 use super::code_intent::{CodeIntent, CodeSpec, CodeTarget, CodeChange};
 use super::code_parser::EntityKind;
 use super::emitters::{CodeEmitter, RustEmitter, PythonEmitter, NixEmitter};
+use crate::consciousness::code_primitives::{CodePrimitiveExecutor, CodeOperation, CodeExecutionResult};
 use crate::dynamics::cfc_code_sequencer::{CfCCodeSequencer, CodePlanStep};
 use crate::hdc::code_algebra::CodeAlgebra;
 use crate::hdc::code_encoder::CodeHDEncoder;
@@ -45,6 +46,10 @@ pub struct GeneratedCode {
     pub intent_similarity: f32,
     /// Notes or warnings about the generation
     pub notes: Vec<String>,
+    /// Phi score from primitive execution (consciousness integration measure)
+    pub phi_score: f32,
+    /// Primitives that were composed for this generation
+    pub primitives_used: Vec<String>,
 }
 
 /// Context provided to the code generator
@@ -75,18 +80,22 @@ pub struct CodeGenerator {
     rust_emitter: RustEmitter,
     python_emitter: PythonEmitter,
     nix_emitter: NixEmitter,
+    /// Primitive executor for consciousness-aware code operations
+    primitive_executor: CodePrimitiveExecutor,
 }
 
 impl CodeGenerator {
     /// Create a new code generator
     pub fn new(encoder: CodeHDEncoder) -> Self {
-        let algebra = CodeAlgebra::new(CodeHDEncoder::new(encoder.dim()));
+        let dim = encoder.dim();
+        let algebra = CodeAlgebra::new(CodeHDEncoder::new(dim));
         let sequencer = CfCCodeSequencer::new(
             crate::dynamics::cfc_code_sequencer::CfCCodeSequencerConfig {
-                hdc_dim: encoder.dim(),
+                hdc_dim: dim,
                 ..Default::default()
             },
         );
+        let primitive_executor = CodePrimitiveExecutor::new(dim);
 
         Self {
             encoder,
@@ -95,7 +104,26 @@ impl CodeGenerator {
             rust_emitter: RustEmitter,
             python_emitter: PythonEmitter,
             nix_emitter: NixEmitter,
+            primitive_executor,
         }
+    }
+
+    /// Map a CodeIntent to the appropriate CodeOperation for primitive selection
+    fn intent_to_operation(intent: &CodeIntent) -> CodeOperation {
+        match intent {
+            CodeIntent::Create { .. } => CodeOperation::Generate,
+            CodeIntent::Modify { .. } => CodeOperation::Modify,
+            CodeIntent::Explain { .. } => CodeOperation::Explain,
+            CodeIntent::Find { .. } => CodeOperation::FindSimilar,
+            CodeIntent::Refactor { .. } => CodeOperation::Refactor,
+            CodeIntent::Debug { .. } => CodeOperation::Debug,
+        }
+    }
+
+    /// Execute primitives for a code operation and return the result
+    fn execute_primitives(&self, intent: &CodeIntent) -> CodeExecutionResult {
+        let op = Self::intent_to_operation(intent);
+        self.primitive_executor.execute(op)
     }
 
     /// Create with default dimension
@@ -109,15 +137,39 @@ impl CodeGenerator {
     }
 
     /// Generate code from an intent
+    ///
+    /// This is the main entry point for consciousness-aware code generation.
+    /// Primitives are executed first to measure integration (Phi), then the
+    /// specific generation path is taken.
     pub fn generate(&self, intent: &CodeIntent, context: &CodeContext) -> GeneratedCode {
+        // Execute primitives first - this gives us Phi and the composed primitive HV
+        let primitive_result = self.execute_primitives(intent);
+
         match intent {
-            CodeIntent::Create { target, spec } => self.generate_create(target, spec, context),
-            CodeIntent::Modify { target, changes } => self.generate_modify(target, changes, context),
-            CodeIntent::Explain { target, depth } => self.generate_explanation(target, *depth, context),
-            CodeIntent::Find { pattern_hv, scope } => self.generate_search_result(pattern_hv, scope, context),
-            CodeIntent::Refactor { target, strategy } => self.generate_refactor(target, strategy, context),
-            CodeIntent::Debug { target, symptoms } => self.generate_debug(target, symptoms, context),
+            CodeIntent::Create { target, spec } => {
+                self.generate_create(target, spec, context, &primitive_result)
+            }
+            CodeIntent::Modify { target, changes } => {
+                self.generate_modify(target, changes, context, &primitive_result)
+            }
+            CodeIntent::Explain { target, depth } => {
+                self.generate_explanation(target, *depth, context, &primitive_result)
+            }
+            CodeIntent::Find { pattern_hv, scope } => {
+                self.generate_search_result(pattern_hv, scope, context, &primitive_result)
+            }
+            CodeIntent::Refactor { target, strategy } => {
+                self.generate_refactor(target, strategy, context, &primitive_result)
+            }
+            CodeIntent::Debug { target, symptoms } => {
+                self.generate_debug(target, symptoms, context, &primitive_result)
+            }
         }
+    }
+
+    /// Get the primitive executor for direct access
+    pub fn primitive_executor(&self) -> &CodePrimitiveExecutor {
+        &self.primitive_executor
     }
 
     /// Generate new code from a specification
@@ -126,6 +178,7 @@ impl CodeGenerator {
         _target: &CodeTarget,
         spec: &CodeSpec,
         context: &CodeContext,
+        primitive_result: &CodeExecutionResult,
     ) -> GeneratedCode {
         // 1. Encode intent as HDC
         let intent_hv = self.encode_spec(spec);
@@ -134,17 +187,17 @@ impl CodeGenerator {
         let similar_hvs = self.find_similar_context(&intent_hv, context);
         let similar_refs: Vec<&ContinuousHV> = similar_hvs.iter().collect();
 
-        // 3. CfC plan
+        // 3. CfC plan (informed by primitive composition)
         let plan = self.sequencer.plan_structure(&intent_hv, &similar_refs);
 
         // 4. Emit code using language-specific emitter
         let source = self.emit_from_plan(&plan, spec, &spec.language);
 
-        // 5. Compute intent similarity (how close is the result to what we wanted)
+        // 5. Compute intent similarity (combine plan coverage + primitive phi)
         let intent_similarity = if !source.is_empty() {
-            // Simple heuristic: check if plan steps cover expected structure
-            let coverage = plan.len() as f32 / 5.0; // normalized by typical plan length
-            coverage.min(1.0)
+            let coverage = plan.len() as f32 / 5.0;
+            // Weight: 70% plan coverage, 30% primitive phi (measures integration)
+            (coverage * 0.7 + primitive_result.phi * 0.3).min(1.0)
         } else {
             0.0
         };
@@ -156,6 +209,8 @@ impl CodeGenerator {
             epistemic_status: spec.epistemic_status,
             intent_similarity,
             notes: Vec::new(),
+            phi_score: primitive_result.phi,
+            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
         }
     }
 
@@ -165,6 +220,7 @@ impl CodeGenerator {
         target: &CodeTarget,
         changes: &[CodeChange],
         _context: &CodeContext,
+        primitive_result: &CodeExecutionResult,
     ) -> GeneratedCode {
         let mut notes = Vec::new();
 
@@ -205,6 +261,8 @@ impl CodeGenerator {
             epistemic_status: EpistemicStatus::Probable,
             intent_similarity: 0.5,
             notes,
+            phi_score: primitive_result.phi,
+            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
         }
     }
 
@@ -214,6 +272,7 @@ impl CodeGenerator {
         target: &CodeTarget,
         depth: super::code_intent::ExplanationDepth,
         _context: &CodeContext,
+        primitive_result: &CodeExecutionResult,
     ) -> GeneratedCode {
         let explanation = match depth {
             super::code_intent::ExplanationDepth::Brief => {
@@ -245,6 +304,8 @@ impl CodeGenerator {
             epistemic_status: EpistemicStatus::Probable,
             intent_similarity: 0.7,
             notes: vec!["Explanation skeleton — full translation requires LLM organ".to_string()],
+            phi_score: primitive_result.phi,
+            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
         }
     }
 
@@ -254,6 +315,7 @@ impl CodeGenerator {
         pattern_hv: &ContinuousHV,
         _scope: &super::code_intent::SearchScope,
         context: &CodeContext,
+        primitive_result: &CodeExecutionResult,
     ) -> GeneratedCode {
         let mut results = Vec::new();
 
@@ -281,6 +343,8 @@ impl CodeGenerator {
             epistemic_status: EpistemicStatus::Probable,
             intent_similarity: 0.6,
             notes: Vec::new(),
+            phi_score: primitive_result.phi,
+            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
         }
     }
 
@@ -290,6 +354,7 @@ impl CodeGenerator {
         target: &CodeTarget,
         strategy: &super::code_intent::RefactorStrategy,
         _context: &CodeContext,
+        primitive_result: &CodeExecutionResult,
     ) -> GeneratedCode {
         let suggestion = match strategy {
             super::code_intent::RefactorStrategy::ExtractFunction { name } => {
@@ -319,6 +384,8 @@ impl CodeGenerator {
             epistemic_status: EpistemicStatus::Uncertain,
             intent_similarity: 0.5,
             notes: vec!["Refactoring skeleton — needs verification".to_string()],
+            phi_score: primitive_result.phi,
+            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
         }
     }
 
@@ -328,6 +395,7 @@ impl CodeGenerator {
         target: &CodeTarget,
         symptoms: &[String],
         _context: &CodeContext,
+        primitive_result: &CodeExecutionResult,
     ) -> GeneratedCode {
         let mut analysis = vec![
             format!("// Debug analysis for `{}`", target.name),
@@ -346,6 +414,8 @@ impl CodeGenerator {
             epistemic_status: EpistemicStatus::Uncertain,
             intent_similarity: 0.4,
             notes: vec!["Debug skeleton — requires LLM organ for full analysis".to_string()],
+            phi_score: primitive_result.phi,
+            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
         }
     }
 

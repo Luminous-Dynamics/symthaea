@@ -32,7 +32,7 @@
 //! │                                                                 │
 //! │  ┌─────────────────┐   ┌─────────────────┐   ┌──────────────┐  │
 //! │  │  Focus Content  │   │   Self Model    │   │  Prediction  │  │
-//! │  │     (HV16)      │   │ (AttentionModel)│   │   (States)   │  │
+//! │  │     (BinaryHV)      │   │ (AttentionModel)│   │   (States)   │  │
 //! │  └────────┬────────┘   └────────┬────────┘   └──────┬───────┘  │
 //! │           │                     │                   │          │
 //! │           └─────────────────────┴───────────────────┘          │
@@ -56,7 +56,7 @@
 //! - Graziano, M.S.A. (2019). "Rethinking Consciousness"
 //! - Webb, T.W., & Graziano, M.S.A. (2015). "The attention schema theory"
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -71,7 +71,7 @@ use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttentionState {
     /// The object or content of attention (semantic representation)
-    pub focus_target: HV16,
+    pub focus_target: BinaryHV,
 
     /// Attention intensity (0.0 = none, 1.0 = maximal)
     pub intensity: f32,
@@ -159,7 +159,7 @@ pub enum AttentionChannel {
 #[derive(Debug, Clone)]
 pub struct AttentionPrimitiveGrounding {
     /// Attention mode primitive composition
-    pub mode_encoding: HV16,
+    pub mode_encoding: BinaryHV,
     /// Salience level (0.0 - 1.0)
     pub salience: f32,
     /// Primitives that compose this attention state
@@ -172,7 +172,7 @@ impl AttentionPrimitiveGrounding {
         let system = PrimitiveSystem::global();
 
         // Compose attention encoding by binding primitives
-        let mut encoding = HV16::random(0xA77E_0DDD); // Attention seed
+        let mut encoding = BinaryHV::random(0xA77E_0DDD); // Attention seed
         for name in primitives {
             if let Some(prim) = system.get(name) {
                 encoding = encoding.bind(&prim.encoding);
@@ -436,7 +436,7 @@ impl Default for AttentionSchemaConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttentionSchema {
     /// Current focus content (what is attended)
-    pub focus_content: HV16,
+    pub focus_content: BinaryHV,
 
     /// The attention model (schema of what attention is)
     pub self_model: AttentionModel,
@@ -491,7 +491,7 @@ impl AttentionSchema {
     /// Create with custom configuration
     pub fn with_config(config: AttentionSchemaConfig) -> Self {
         let initial_state = AttentionState {
-            focus_target: HV16::zero(),
+            focus_target: BinaryHV::zero(),
             intensity: 0.5,
             mode: AttentionMode::Diffuse,
             active_channels: vec![AttentionChannel::Semantic],
@@ -499,7 +499,7 @@ impl AttentionSchema {
         };
 
         Self {
-            focus_content: HV16::zero(),
+            focus_content: BinaryHV::zero(),
             self_model: AttentionModel {
                 subjective_character: SubjectiveCharacter::default(),
                 capabilities: AttentionCapabilities::default(),
@@ -545,7 +545,7 @@ impl AttentionSchema {
     ///
     /// Returns: focus_target ⊗ mode_encoding
     /// This creates a "attended-to" representation that combines what and how
-    pub fn attended_encoding(&self) -> HV16 {
+    pub fn attended_encoding(&self) -> BinaryHV {
         let mode_enc = self.current_mode_grounding().mode_encoding;
         self.current_state.focus_target.bind(&mode_enc)
     }
@@ -562,7 +562,7 @@ impl AttentionSchema {
     /// 3. Update the attention model
     /// 4. Generate predictions
     /// 5. Compute control signal for GWT
-    pub fn update(&mut self, new_target: HV16, salience: f32) -> AttentionUpdate {
+    pub fn update(&mut self, new_target: BinaryHV, salience: f32) -> AttentionUpdate {
         self.stats.total_updates += 1;
 
         // Detect shift vs maintenance
@@ -653,8 +653,8 @@ impl AttentionSchema {
     }
 
     /// Infer active attention channels from content
-    fn infer_channels(&self, _target: &HV16) -> Vec<AttentionChannel> {
-        // In a full implementation, we'd analyze the HV16 content
+    fn infer_channels(&self, _target: &BinaryHV) -> Vec<AttentionChannel> {
+        // In a full implementation, we'd analyze the BinaryHV content
         // For now, return semantic + executive as defaults
         vec![AttentionChannel::Semantic, AttentionChannel::Executive]
     }
@@ -739,7 +739,7 @@ impl AttentionSchema {
         // Predict possible shift (if intensity drops too low)
         if predicted_intensity < 0.4 {
             self.attention_prediction.push(AttentionState {
-                focus_target: HV16::random(0x5741), // Placeholder for "next target"
+                focus_target: BinaryHV::random(0x5741), // Placeholder for "next target"
                 intensity: 0.6,
                 mode: AttentionMode::Scanning,
                 active_channels: vec![AttentionChannel::Semantic],
@@ -864,7 +864,7 @@ impl AttentionSchema {
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Voluntarily shift attention to a new target
-    pub fn shift_focus(&mut self, new_target: HV16) -> Result<AttentionUpdate> {
+    pub fn shift_focus(&mut self, new_target: BinaryHV) -> Result<AttentionUpdate> {
         // Check if shift is possible
         if self.self_model.subjective_character.controllability < 0.2 {
             anyhow::bail!("Attention too captured to shift voluntarily");
@@ -895,7 +895,7 @@ impl AttentionSchema {
     }
 
     /// Divide attention across multiple targets
-    pub fn divide_attention(&mut self, targets: Vec<HV16>) -> Result<Vec<f32>> {
+    pub fn divide_attention(&mut self, targets: Vec<BinaryHV>) -> Result<Vec<f32>> {
         let n = targets.len();
         if n > self.self_model.capabilities.capacity_items {
             anyhow::bail!("Exceeds attention capacity ({} > {})",
@@ -927,14 +927,14 @@ impl AttentionSchema {
     /// Returns a modifier that can be applied to workspace competition:
     /// - Positive = boost content similar to current focus
     /// - Negative = suppress content dissimilar to focus
-    pub fn get_competition_bias(&self, content: &HV16) -> f32 {
+    pub fn get_competition_bias(&self, content: &BinaryHV) -> f32 {
         let similarity = self.focus_content.similarity(content);
         let bias = (similarity - 0.5) * 2.0 * self.control_signal;
         bias * self.config.gwt_integration_weight
     }
 
     /// Check if content is aligned with current attention
-    pub fn is_attended(&self, content: &HV16, threshold: f32) -> bool {
+    pub fn is_attended(&self, content: &BinaryHV, threshold: f32) -> bool {
         let similarity = self.focus_content.similarity(content);
         similarity > threshold && self.current_state.intensity > self.config.min_intensity
     }
@@ -1033,7 +1033,7 @@ mod tests {
     #[test]
     fn test_attention_update() {
         let mut schema = AttentionSchema::new();
-        let target = HV16::random(42);
+        let target = BinaryHV::random(42);
 
         let update = schema.update(target.clone(), 0.8);
 
@@ -1046,11 +1046,11 @@ mod tests {
         let mut schema = AttentionSchema::new();
 
         // First update
-        let target1 = HV16::random(1);
+        let target1 = BinaryHV::random(1);
         schema.update(target1, 0.7);
 
         // Very different target
-        let target2 = HV16::random(999);
+        let target2 = BinaryHV::random(999);
         let update = schema.update(target2, 0.7);
 
         // Should detect as shift (different random seeds = orthogonal)
@@ -1062,7 +1062,7 @@ mod tests {
         let mut schema = AttentionSchema::new();
 
         // Same target twice
-        let target = HV16::random(42);
+        let target = BinaryHV::random(42);
         schema.update(target.clone(), 0.7);
         let update = schema.update(target.clone(), 0.7);
 
@@ -1073,7 +1073,7 @@ mod tests {
     #[test]
     fn test_introspection() {
         let mut schema = AttentionSchema::new();
-        let target = HV16::random(42);
+        let target = BinaryHV::random(42);
         schema.update(target, 0.9);
 
         let introspection = schema.introspect();
@@ -1087,7 +1087,7 @@ mod tests {
         let mut schema = AttentionSchema::new();
 
         // Focus on a target
-        let focus = HV16::random(42);
+        let focus = BinaryHV::random(42);
         schema.update(focus.clone(), 0.9);
 
         // Similar content should get positive bias
@@ -1095,7 +1095,7 @@ mod tests {
         let bias_similar = schema.get_competition_bias(&similar);
 
         // Different content should get negative or low bias
-        let different = HV16::random(999);
+        let different = BinaryHV::random(999);
         let bias_different = schema.get_competition_bias(&different);
 
         assert!(bias_similar > bias_different);
@@ -1106,9 +1106,9 @@ mod tests {
         let mut schema = AttentionSchema::new();
 
         let targets = vec![
-            HV16::random(1),
-            HV16::random(2),
-            HV16::random(3),
+            BinaryHV::random(1),
+            BinaryHV::random(2),
+            BinaryHV::random(3),
         ];
 
         let result = schema.divide_attention(targets);
@@ -1127,7 +1127,7 @@ mod tests {
         let mut schema = AttentionSchema::new();
 
         // Try to exceed capacity
-        let targets: Vec<HV16> = (0..10).map(|i| HV16::random(i)).collect();
+        let targets: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
 
         let result = schema.divide_attention(targets);
 

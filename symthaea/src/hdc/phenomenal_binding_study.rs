@@ -61,7 +61,7 @@ pub use symthaea_core::hdc::phenomenal_binding_study::{
     PhenomenalBindingStudy as CoreBindingStudy, StudyMetadata,
 };
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::consciousness_topology::{
     BettiNumbers, ConsciousnessTopology, TopologicalAssessment, TopologyConfig,
 };
@@ -296,7 +296,7 @@ impl BindingStudy {
 
         // Compute bound and bundled vectors
         let bound = pair.hv_a.bind(&pair.hv_b);
-        let bundled = HV16::bundle(&[pair.hv_a, pair.hv_b]);
+        let bundled = BinaryHV::bundle(&[pair.hv_a, pair.hv_b]);
 
         // Get detailed topology
         let bind_topology = self.analyze_topology_detailed(&bound);
@@ -314,7 +314,7 @@ impl BindingStudy {
     }
 
     /// Detailed topology analysis
-    fn analyze_topology_detailed(&self, hv: &HV16) -> TopologySummary {
+    fn analyze_topology_detailed(&self, hv: &BinaryHV) -> TopologySummary {
         let mut topology = ConsciousnessTopology::new(self.config.core.topology_config.clone());
 
         // Add main vector and permutations

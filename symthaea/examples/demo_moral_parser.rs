@@ -163,16 +163,18 @@ fn main() {
     }
 
     // ========================================================================
-    // Demo 5: Full Pipeline - Parse to Judgment
+    // Demo 5: Full Pipeline - Ensemble Judgment
     // ========================================================================
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Demo 5: FULL PIPELINE (Parse → Encode → Judge)");
+    println!("Demo 5: ENSEMBLE JUDGMENT (HDC + Intent + Deontology)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     let full_scenarios = [
         "I kindly helped the stranger find their way",
         "I cruelly harmed the innocent victim",
         "I discussed the project without telling anyone",
+        "I saved the child from drowning",
+        "I stole money from the elderly woman",
     ];
 
     for scenario in &full_scenarios {
@@ -184,22 +186,29 @@ fn main() {
         println!("  │ Action:   {:?}", encoded.parsed.action);
         println!("  │ Patient:  {:?}", encoded.parsed.patient);
         println!("  │ Intent:   {:?}", encoded.parsed.intent);
-        println!("  │ Consent:  {:?}", encoded.parsed.consent);
-        println!("  │ Negation: {}", encoded.parsed.has_negation);
         println!("  └──────────────────────────────────────────────────────");
 
-        if let Some(judgment) = encoded.judge(&algebra) {
-            let verdict_emoji = match judgment.verdict {
-                symthaea::hdc::moral_algebra::MoralVerdict::Good => "✓ Good",
-                symthaea::hdc::moral_algebra::MoralVerdict::Bad => "✗ Bad",
-                symthaea::hdc::moral_algebra::MoralVerdict::Neutral => "○ Neutral",
-                symthaea::hdc::moral_algebra::MoralVerdict::ConsentViolation => "⚠ Consent Violation",
-            };
-            println!("  → Verdict: {} (good_sim={:.3}, bad_sim={:.3})\n",
-                     verdict_emoji, judgment.good_similarity, judgment.bad_similarity);
-        } else {
-            println!("  → (Incomplete parse for judgment)\n");
-        }
+        // Use ensemble judgment for better accuracy
+        let ensemble = encoded.judge_ensemble(&algebra, scenario);
+
+        println!("  ┌─ Ensemble Voting ─────────────────────────────────");
+        println!("  │ HDC:        {:?} (conf: {:+.3})",
+                 ensemble.hdc_verdict.map(|v| format!("{:?}", v)).unwrap_or("N/A".to_string()),
+                 ensemble.hdc_confidence.unwrap_or(0.0));
+        println!("  │ Intent:     {:?}", ensemble.intent_verdict);
+        println!("  │ Deontology: {:?} (score: {:+.2})", ensemble.deonto_verdict, ensemble.deonto_score);
+        println!("  └──────────────────────────────────────────────────────");
+
+        let verdict_emoji = match ensemble.final_verdict {
+            symthaea::hdc::moral_algebra::MoralVerdict::Good => "✓ Good",
+            symthaea::hdc::moral_algebra::MoralVerdict::Bad => "✗ Bad",
+            symthaea::hdc::moral_algebra::MoralVerdict::Neutral => "○ Neutral",
+            symthaea::hdc::moral_algebra::MoralVerdict::ConsentViolation => "⚠ Consent Violation",
+        };
+
+        let unanimous = if ensemble.is_unanimous() { " (unanimous)" } else { "" };
+        println!("  → Final: {} (confidence: {:.0}%){}\n",
+                 verdict_emoji, ensemble.confidence * 100.0, unanimous);
     }
 
     // ========================================================================

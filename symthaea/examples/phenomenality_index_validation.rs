@@ -26,7 +26,7 @@ use anyhow::Result;
 use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::HV16};
+use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig, TopologicalAssessment};
@@ -82,8 +82,8 @@ fn run_experiment() -> Result<()> {
 
     // Extract all concept HVs at Layer 22
     println!("Extracting representations at Layer {}...", layer);
-    let mut phen_hvs: Vec<HV16> = Vec::new();
-    let mut func_hvs: Vec<HV16> = Vec::new();
+    let mut phen_hvs: Vec<BinaryHV> = Vec::new();
+    let mut func_hvs: Vec<BinaryHV> = Vec::new();
 
     for concept in &phenomenal {
         let acts = extractor.extract_layers(concept, &[layer])?;
@@ -297,9 +297,9 @@ fn run_experiment() -> Result<()> {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn compute_binding_compression(hv1: &HV16, hv2: &HV16, config: &TopologyConfig) -> f64 {
+fn compute_binding_compression(hv1: &BinaryHV, hv2: &BinaryHV, config: &TopologyConfig) -> f64 {
     let bound = hv1.bind(hv2);
-    let bundled = HV16::bundle(&[*hv1, *hv2]);
+    let bundled = BinaryHV::bundle(&[*hv1, *hv2]);
 
     let bound_pers = total_persistence(&analyze_topology(&bound, config));
     let bundle_pers = total_persistence(&analyze_topology(&bundled, config));
@@ -327,7 +327,7 @@ fn load_corpus(path: &str) -> Result<Vec<String>> {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn activation_to_hv16(activation: &[f32]) -> HV16 {
+fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
     let mut expanded = Vec::with_capacity(HDC_DIMENSION);
     let tiles = HDC_DIMENSION / activation.len();
     let remainder = HDC_DIMENSION % activation.len();
@@ -343,11 +343,11 @@ fn activation_to_hv16(activation: &[f32]) -> HV16 {
         expanded.push(activation[i]);
     }
 
-    HV16::from_bipolar(&expanded)
+    BinaryHV::from_bipolar(&expanded)
 }
 
 #[cfg(feature = "neural-bridge")]
-fn analyze_topology(hv: &HV16, config: &TopologyConfig) -> TopologicalAssessment {
+fn analyze_topology(hv: &BinaryHV, config: &TopologyConfig) -> TopologicalAssessment {
     let mut topology = ConsciousnessTopology::new(config.clone());
 
     topology.add_state(*hv);

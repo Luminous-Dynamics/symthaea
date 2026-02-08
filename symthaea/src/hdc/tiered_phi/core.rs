@@ -11,7 +11,7 @@
 //!
 //! For comprehensive documentation, see the parent [`super`] module.
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 use rayon::prelude::*;
@@ -321,7 +321,7 @@ impl TieredPhi {
     }
 
     /// Compute Φ for a set of components
-    pub fn compute(&mut self, components: &[HV16]) -> f64 {
+    pub fn compute(&mut self, components: &[BinaryHV]) -> f64 {
         let start = Instant::now();
 
         // Handle trivial cases
@@ -361,7 +361,7 @@ impl TieredPhi {
     }
 
     /// Compute with a specific tier (ignoring config)
-    pub fn compute_with_tier(&mut self, components: &[HV16], tier: ApproximationTier) -> f64 {
+    pub fn compute_with_tier(&mut self, components: &[BinaryHV], tier: ApproximationTier) -> f64 {
         if components.len() < 2 {
             return 0.0;
         }
@@ -393,7 +393,7 @@ impl TieredPhi {
     /// let phi = tiered_phi.compute_phi(&components);
     /// ```
     #[inline]
-    pub fn compute_phi(&mut self, components: &[HV16]) -> f64 {
+    pub fn compute_phi(&mut self, components: &[BinaryHV]) -> f64 {
         self.compute(components)
     }
 
@@ -444,7 +444,7 @@ impl TieredPhi {
     /// // Second call: incremental O(n) since only 1 component changed
     /// let phi2 = phi_calc.compute_incremental(&components);
     /// ```
-    pub fn compute_incremental(&mut self, components: &[HV16]) -> f64 {
+    pub fn compute_incremental(&mut self, components: &[BinaryHV]) -> f64 {
         let n = components.len();
         if n < 2 {
             return 0.0;
@@ -483,7 +483,7 @@ impl TieredPhi {
     }
 
     /// Initialize incremental state with full computation
-    fn initialize_incremental_state(&mut self, components: &[HV16], hashes: &[u64]) -> f64 {
+    fn initialize_incremental_state(&mut self, components: &[BinaryHV], hashes: &[u64]) -> f64 {
         let n = components.len();
 
         // Build full similarity matrix
@@ -525,7 +525,7 @@ impl TieredPhi {
     /// Perform incremental update for changed components - O(k×n)
     fn update_incremental(
         &mut self,
-        components: &[HV16],
+        components: &[BinaryHV],
         new_hashes: &[u64],
         changed_indices: &[usize],
     ) -> f64 {
@@ -592,7 +592,7 @@ impl TieredPhi {
     }
 
     /// Hash a single component for change detection
-    fn hash_single_component(&self, component: &HV16) -> u64 {
+    fn hash_single_component(&self, component: &BinaryHV) -> u64 {
         use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
 
@@ -629,7 +629,7 @@ impl TieredPhi {
     /// 3. Compute meso Φ between clusters
     /// 4. Compute macro Φ globally
     /// 5. Analyze emergence and bottlenecks
-    pub fn compute_hierarchical(&mut self, components: &[HV16]) -> HierarchicalPhi {
+    pub fn compute_hierarchical(&mut self, components: &[BinaryHV]) -> HierarchicalPhi {
         let n = components.len();
 
         // Trivial cases
@@ -810,7 +810,7 @@ impl TieredPhi {
     ///
     /// Returns predictable values based solely on component count.
     /// Formula: φ = min(0.1 × n + 0.2, 0.95)
-    fn compute_mock(&self, components: &[HV16]) -> f64 {
+    fn compute_mock(&self, components: &[BinaryHV]) -> f64 {
         let n = components.len() as f64;
         // Linear relationship with component count, capped at 0.95
         (0.1 * n + 0.2).min(0.95)
@@ -833,7 +833,7 @@ impl TieredPhi {
     ///
     /// **Validation**: This implementation should produce Φ values that
     /// correlate strongly (r > 0.85) with consciousness state integration levels.
-    fn compute_heuristic(&self, components: &[HV16]) -> f64 {
+    fn compute_heuristic(&self, components: &[BinaryHV]) -> f64 {
         let n = components.len();
         if n < 2 {
             return 0.0;
@@ -995,7 +995,7 @@ impl TieredPhi {
     ///
     /// Creates partitions that group similar components together,
     /// as these are likely to have low partition information.
-    fn generate_intelligent_partitions(&self, components: &[HV16], num_partitions: usize) -> Vec<(Vec<usize>, Vec<usize>)> {
+    fn generate_intelligent_partitions(&self, components: &[BinaryHV], num_partitions: usize) -> Vec<(Vec<usize>, Vec<usize>)> {
         let n = components.len();
         let mut partitions = Vec::new();
 
@@ -1068,7 +1068,7 @@ impl TieredPhi {
     ///
     /// Intuition: A highly connected system (high Φ) will have high
     /// algebraic connectivity (hard to partition).
-    fn compute_spectral(&self, components: &[HV16]) -> f64 {
+    fn compute_spectral(&self, components: &[BinaryHV]) -> f64 {
         let n = components.len();
         if n < 2 {
             return 0.0;
@@ -1108,7 +1108,7 @@ impl TieredPhi {
 
     /// Build similarity matrix in parallel using Rayon
     /// Revolutionary #89: O(n²) similarity with ~linear parallelization
-    pub fn build_similarity_matrix_parallel(&self, components: &[HV16]) -> Vec<Vec<f64>> {
+    pub fn build_similarity_matrix_parallel(&self, components: &[BinaryHV]) -> Vec<Vec<f64>> {
         let n = components.len();
 
         // Compute upper triangle in parallel, then mirror
@@ -1136,7 +1136,7 @@ impl TieredPhi {
     }
 
     /// Build similarity matrix sequentially (for small n)
-    pub fn build_similarity_matrix_sequential(&self, components: &[HV16]) -> Vec<Vec<f64>> {
+    pub fn build_similarity_matrix_sequential(&self, components: &[BinaryHV]) -> Vec<Vec<f64>> {
         let n = components.len();
         let mut matrix = vec![vec![0.0f64; n]; n];
 
@@ -1186,7 +1186,7 @@ impl TieredPhi {
     /// O(2^n) exact MIP calculation
     ///
     /// WARNING: Only use for small systems (n ≤ 12)!
-    fn compute_exact(&self, components: &[HV16]) -> f64 {
+    fn compute_exact(&self, components: &[BinaryHV]) -> f64 {
         let n = components.len();
         if n < 2 {
             return 0.0;
@@ -1247,13 +1247,13 @@ impl TieredPhi {
     // ========================================================================
 
     /// Bundle components into a single hypervector
-    fn bundle(&self, components: &[HV16]) -> HV16 {
+    fn bundle(&self, components: &[BinaryHV]) -> BinaryHV {
         if components.is_empty() {
-            return HV16::zero();
+            return BinaryHV::zero();
         }
 
-        // Use the static bundle function from HV16
-        HV16::bundle(components)
+        // Use the static bundle function from BinaryHV
+        BinaryHV::bundle(components)
     }
 
     /// Compute system information using pairwise mutual information
@@ -1264,7 +1264,7 @@ impl TieredPhi {
     /// - The bundle captures the integrated state
     ///
     /// We approximate I(components) using average pairwise similarity
-    fn compute_system_info(&self, _bundled: &HV16, components: &[HV16]) -> f64 {
+    fn compute_system_info(&self, _bundled: &BinaryHV, components: &[BinaryHV]) -> f64 {
         let n = components.len();
         if n < 2 {
             return 0.0;
@@ -1303,7 +1303,7 @@ impl TieredPhi {
     /// partition_info = within_part_A_correlations + within_part_B_correlations
     /// system_info = ALL pairwise correlations (including cross-partition)
     /// Φ = system_info - partition_info = CROSS-PARTITION correlations (what we lose)
-    fn compute_partition_info(&self, components: &[HV16], part_a: &[usize], part_b: &[usize]) -> f64 {
+    fn compute_partition_info(&self, components: &[BinaryHV], part_a: &[usize], part_b: &[usize]) -> f64 {
         let n = components.len();
         if n < 2 {
             return 0.0;
@@ -1348,7 +1348,7 @@ impl TieredPhi {
     }
 
     /// Check cache for precomputed value (with LRU touch)
-    fn check_cache(&mut self, components: &[HV16]) -> Option<f64> {
+    fn check_cache(&mut self, components: &[BinaryHV]) -> Option<f64> {
         if components.is_empty() {
             return Some(0.0);
         }
@@ -1377,7 +1377,7 @@ impl TieredPhi {
     }
 
     /// Update cache with new value (LRU eviction)
-    fn update_cache(&mut self, components: &[HV16], phi: f64) {
+    fn update_cache(&mut self, components: &[BinaryHV], phi: f64) {
         let n = components.len();
         let hash = self.hash_components(components);
 
@@ -1391,7 +1391,7 @@ impl TieredPhi {
     }
 
     /// Simple hash of component array
-    fn hash_components(&self, components: &[HV16]) -> u64 {
+    fn hash_components(&self, components: &[BinaryHV]) -> u64 {
         let mut hash = 0u64;
         for (i, component) in components.iter().enumerate() {
             // XOR first few bytes with position-based scrambling
@@ -1449,7 +1449,7 @@ impl TieredPhi {
     /// let attr = phi.compute_attribution(&components);
     /// println!("Most critical component: {}", attr.importance_ranking[0]);
     /// ```
-    pub fn compute_attribution(&mut self, components: &[HV16]) -> PhiAttribution {
+    pub fn compute_attribution(&mut self, components: &[BinaryHV]) -> PhiAttribution {
         let n = components.len();
 
         // Edge cases
@@ -1483,7 +1483,7 @@ impl TieredPhi {
 
         for exclude_idx in 0..n {
             // Create component list without the excluded one
-            let remaining: Vec<HV16> = components
+            let remaining: Vec<BinaryHV> = components
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| *i != exclude_idx)
@@ -1547,7 +1547,7 @@ impl TieredPhi {
     /// - Large systems (n > 100)
     /// - Real-time analysis
     /// - Initial screening before detailed attribution
-    pub fn compute_attribution_fast(&mut self, components: &[HV16]) -> PhiAttribution {
+    pub fn compute_attribution_fast(&mut self, components: &[BinaryHV]) -> PhiAttribution {
         let n = components.len();
 
         // Edge cases
@@ -1745,7 +1745,7 @@ static GLOBAL_PHI: Lazy<FastMutex<TieredPhi>> = Lazy::new(|| {
 ///
 /// Thread-safe, cached, with O(n²) spectral approximation by default.
 /// Use this for one-off calculations when you don't need control over the calculator.
-pub fn global_phi(components: &[HV16]) -> f64 {
+pub fn global_phi(components: &[BinaryHV]) -> f64 {
     GLOBAL_PHI.lock().compute(components)
 }
 
@@ -1758,7 +1758,7 @@ pub fn global_phi(components: &[HV16]) -> f64 {
 /// - 8 < n ≤ 50: Spectral approximation (accurate, O(n²))
 /// - 50 < n ≤ 500: Heuristic (fast, O(n))
 /// - n > 500: Mock (instant, O(1))
-pub fn auto_phi(components: &[HV16]) -> f64 {
+pub fn auto_phi(components: &[BinaryHV]) -> f64 {
     let n = components.len();
     let tier = auto_tier(n);
     GLOBAL_PHI.lock().compute_with_tier(components, tier)

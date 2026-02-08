@@ -5,7 +5,7 @@
 //! - Compute interventional distributions via do-calculus in HDC
 //! - Round-trip verified: unbind(bind(x)) ≈ x
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 /// Graph surgery operations on causal spaces.
 pub struct GraphSurgery;
@@ -17,7 +17,7 @@ impl GraphSurgery {
     /// In HDC: unbind the treatment's cause vector to "disconnect" it.
     ///
     /// Returns the "intervened" causal vector.
-    pub fn remove_incoming(causal_vector: &HV16, cause: &HV16) -> HV16 {
+    pub fn remove_incoming(causal_vector: &BinaryHV, cause: &BinaryHV) -> BinaryHV {
         // Unbind: causal_vector ⊗ cause = effect
         // This "removes" the cause from the causal relationship
         causal_vector.bind(cause)
@@ -28,19 +28,19 @@ impl GraphSurgery {
     /// Given C = cause ⊗ effect, unbinding with cause recovers effect:
     /// C ⊗ cause = (cause ⊗ effect) ⊗ cause = effect
     /// (because XOR is self-inverse)
-    pub fn recover_effect(causal_vector: &HV16, cause: &HV16) -> HV16 {
+    pub fn recover_effect(causal_vector: &BinaryHV, cause: &BinaryHV) -> BinaryHV {
         causal_vector.bind(cause)
     }
 
     /// Reconstruct the cause after removing an effect.
-    pub fn recover_cause(causal_vector: &HV16, effect: &HV16) -> HV16 {
+    pub fn recover_cause(causal_vector: &BinaryHV, effect: &BinaryHV) -> BinaryHV {
         causal_vector.bind(effect)
     }
 
     /// Verify round-trip: bind then unbind should recover the original.
     ///
     /// Returns similarity between recovered and original (should be ~1.0).
-    pub fn verify_roundtrip(original: &HV16, binding_partner: &HV16) -> f32 {
+    pub fn verify_roundtrip(original: &BinaryHV, binding_partner: &BinaryHV) -> f32 {
         let bound = original.bind(binding_partner);
         let recovered = bound.bind(binding_partner);
         recovered.similarity(original)
@@ -51,10 +51,10 @@ impl GraphSurgery {
     /// Given a set of causal vectors (cause_i ⊗ effect) where effect is the
     /// treatment node, remove them all to simulate do(treatment = value).
     pub fn do_surgery(
-        causal_vectors: &[HV16],
-        causes: &[HV16],
-        treatment: &HV16,
-    ) -> Vec<HV16> {
+        causal_vectors: &[BinaryHV],
+        causes: &[BinaryHV],
+        treatment: &BinaryHV,
+    ) -> Vec<BinaryHV> {
         causal_vectors
             .iter()
             .zip(causes.iter())
@@ -65,7 +65,7 @@ impl GraphSurgery {
 
                 if is_into_treatment {
                     // Remove this edge (return zero-like vector)
-                    HV16::zero()
+                    BinaryHV::zero()
                 } else {
                     // Keep this edge
                     cv.clone()
@@ -81,8 +81,8 @@ mod tests {
 
     #[test]
     fn test_roundtrip_unbind() {
-        let cause = HV16::random(1);
-        let effect = HV16::random(2);
+        let cause = BinaryHV::random(1);
+        let effect = BinaryHV::random(2);
 
         let similarity = GraphSurgery::verify_roundtrip(&cause, &effect);
         assert!(
@@ -94,8 +94,8 @@ mod tests {
 
     #[test]
     fn test_recover_effect() {
-        let cause = HV16::random(10);
-        let effect = HV16::random(20);
+        let cause = BinaryHV::random(10);
+        let effect = BinaryHV::random(20);
         let causal_vector = cause.bind(&effect);
 
         let recovered = GraphSurgery::recover_effect(&causal_vector, &cause);
@@ -109,8 +109,8 @@ mod tests {
 
     #[test]
     fn test_recover_cause() {
-        let cause = HV16::random(30);
-        let effect = HV16::random(40);
+        let cause = BinaryHV::random(30);
+        let effect = BinaryHV::random(40);
         let causal_vector = cause.bind(&effect);
 
         let recovered = GraphSurgery::recover_cause(&causal_vector, &effect);
@@ -124,10 +124,10 @@ mod tests {
 
     #[test]
     fn test_surgery_removes_edge() {
-        let cause1 = HV16::random(1);
-        let cause2 = HV16::random(2);
-        let treatment = HV16::random(3);
-        let other = HV16::random(4);
+        let cause1 = BinaryHV::random(1);
+        let cause2 = BinaryHV::random(2);
+        let treatment = BinaryHV::random(3);
+        let other = BinaryHV::random(4);
 
         // Create causal vectors: cause1→treatment, cause2→other
         let cv1 = cause1.bind(&treatment);
@@ -140,8 +140,8 @@ mod tests {
         );
 
         // First edge (into treatment) should be removed (zero vector)
-        assert_eq!(result[0], HV16::zero(), "Edge into treatment should be removed");
+        assert_eq!(result[0], BinaryHV::zero(), "Edge into treatment should be removed");
         // Second edge (not into treatment) should be kept
-        assert_ne!(result[1], HV16::zero(), "Edge not into treatment should be kept");
+        assert_ne!(result[1], BinaryHV::zero(), "Edge not into treatment should be kept");
     }
 }

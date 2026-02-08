@@ -480,20 +480,16 @@ pub mod meta_learning_byzantine;
 #[cfg(feature = "full_consciousness")]
 pub mod causal_byzantine;
 
-/// GWT integration — needs API alignment with current observability module
-#[cfg(feature = "observability_module")]
+/// GWT integration — Global Workspace Theory processor (observability is optional)
 pub mod gwt_integration;
 
-/// Narrative + GWT integration — needs gwt_integration + unified_value_evaluator
-#[cfg(all(feature = "observability_module", feature = "full_perception"))]
+/// Narrative + GWT integration — narrative self as standing coalition
 pub mod narrative_gwt_integration;
 
-/// Mycelix bridge — needs AlignmentResult API alignment
-#[cfg(feature = "full_perception")]
+/// Mycelix bridge — consciousness-gated governance
 pub mod mycelix_bridge;
 
-/// Value system tests — depends on mycelix_bridge
-#[cfg(feature = "full_perception")]
+/// Value system tests — calibration and validation
 pub mod value_system_tests;
 
 /// Gated: depends on consciousness_driven_evolution (gated)

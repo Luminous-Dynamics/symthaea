@@ -4,7 +4,7 @@
 //! These provide consistent, reproducible test data across all integration tests.
 
 use symthaea::databases::{MemoryRecord, MemoryType};
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 
 // ============================================================================
 // Memory Record Builder
@@ -110,7 +110,7 @@ impl MemoryRecordBuilder {
     pub fn build(self) -> MemoryRecord {
         MemoryRecord {
             id: self.id,
-            encoding: HV16::random(self.seed),
+            encoding: BinaryHV::random(self.seed),
             timestamp_ms: self.timestamp_ms,
             memory_type: self.memory_type,
             content: self.content,

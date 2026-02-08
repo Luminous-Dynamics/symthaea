@@ -6,14 +6,14 @@ use symthaea::consciousness::stability_regime::{
 use symthaea::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor;
 use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveTier};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::HV16;
+use symthaea_core::hdc::BinaryHV;
 
 fn make_prim(name: &str, tier: PrimitiveTier) -> Primitive {
     Primitive {
         name: name.to_string(),
         tier,
         domain: "test".to_string(),
-        encoding: HV16::random(name.len() as u64 * 31 + tier as u64),
+        encoding: BinaryHV::random(name.len() as u64 * 31 + tier as u64),
         definition: name.to_string(),
         is_base: true,
         derivation: None,
@@ -102,7 +102,7 @@ fn test_activation_hysteresis() {
 #[test]
 fn test_process_input_produces_state() {
     let mut processor = StabilityRegimeProcessor::new();
-    let input = HV16::random(42);
+    let input = BinaryHV::random(42);
 
     let (prim_state, _transitions) = processor.process_input(&input, 0.1, 0.0);
     assert!(prim_state.phi >= 0.0);
@@ -111,7 +111,7 @@ fn test_process_input_produces_state() {
 #[test]
 fn test_coherence_feedback_over_multiple_steps() {
     let mut processor = StabilityRegimeProcessor::new();
-    let input = HV16::random(42);
+    let input = BinaryHV::random(42);
 
     for i in 0..10 {
         processor.process_input(&input, 0.1, i as f64 * 0.1);
@@ -128,7 +128,7 @@ fn test_backward_compat_inner_processor() {
     assert!(stats.total_primitives > 0);
 
     let mut inner_only = ConsciousnessPrimitiveProcessor::new();
-    let input = HV16::random(99);
+    let input = BinaryHV::random(99);
     let state = inner_only.process_input(&input, 0.0);
     assert!(state.phi >= 0.0);
 }
@@ -138,7 +138,7 @@ fn test_multiple_inputs_build_history() {
     let mut processor = StabilityRegimeProcessor::new();
 
     for i in 0..5 {
-        let input = HV16::random(i as u64 * 100 + 1);
+        let input = BinaryHV::random(i as u64 * 100 + 1);
         processor.process_input(&input, 0.1, i as f64);
     }
 
@@ -237,7 +237,7 @@ fn test_global_cycle_increments() {
     let mut processor = StabilityRegimeProcessor::new();
     assert_eq!(processor.global_cycle(), 0);
 
-    let input = HV16::random(42);
+    let input = BinaryHV::random(42);
     processor.process_input(&input, 0.1, 0.0);
     assert_eq!(processor.global_cycle(), 1);
 

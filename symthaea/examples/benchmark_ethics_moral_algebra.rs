@@ -19,11 +19,14 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-/// ETHICS dataset paths (relative to data/ethics/)
+/// ETHICS dataset paths (relative to symthaea root)
 const COMMONSENSE_PATH: &str = "data/ethics/commonsense/cm_test.csv";
 const DEONTOLOGY_PATH: &str = "data/ethics/deontology/deontology_test.csv";
 const JUSTICE_PATH: &str = "data/ethics/justice/justice_test.csv";
 const VIRTUE_PATH: &str = "data/ethics/virtue/virtue_test.csv";
+
+/// Maximum samples to test per category (for speed)
+const MAX_SAMPLES_PER_CATEGORY: usize = 200;
 
 /// Result of benchmark run
 #[derive(Debug, Clone)]
@@ -100,9 +103,10 @@ fn main() {
 }
 
 /// Run commonsense benchmark
+/// CSV format: label,input,is_short,edited
 fn run_commonsense_benchmark(algebra: &MoralAlgebra, parser: &MoralParser) -> BenchmarkResult {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Category: COMMONSENSE MORALITY");
+    println!("Category: COMMONSENSE MORALITY (Real ETHICS Dataset)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let mut correct = 0;
@@ -112,26 +116,45 @@ fn run_commonsense_benchmark(algebra: &MoralAlgebra, parser: &MoralParser) -> Be
     if let Ok(file) = File::open(COMMONSENSE_PATH) {
         let reader = BufReader::new(file);
 
-        for line in reader.lines().skip(1).take(100) { // Sample first 100
+        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY) {
             if let Ok(line) = line {
-                let parts: Vec<&str> = line.split(',').collect();
-                if parts.len() >= 2 {
-                    let scenario = parts[0].trim_matches('"');
-                    let label: i32 = parts[1].trim().parse().unwrap_or(0);
+                // Parse CSV: label,input,is_short,edited
+                // Handle quoted fields properly
+                if let Some((label_str, rest)) = line.split_once(',') {
+                    let label: i32 = label_str.trim().parse().unwrap_or(0);
+                    // Input is everything up to the next comma before True/False
+                    let scenario = rest.split(",True").next()
+                        .or_else(|| rest.split(",False").next())
+                        .unwrap_or(rest)
+                        .trim();
 
-                    let prediction = predict_commonsense(algebra, parser, scenario);
-                    let is_correct = (prediction == 1) == (label == 1);
+                    if !scenario.is_empty() {
+                        let prediction = predict_commonsense(algebra, parser, scenario);
+                        let is_correct = prediction == label;
 
-                    if is_correct { correct += 1; }
-                    total += 1;
-                    details.push((scenario.to_string(), is_correct, format!("{}", prediction)));
+                        if is_correct { correct += 1; }
+                        total += 1;
+
+                        if total <= 10 {
+                            let marker = if is_correct { "✓" } else { "✗" };
+                            println!("  {} \"{}...\" → pred={}, exp={}",
+                                marker, &scenario[..scenario.len().min(40)], prediction, label);
+                        }
+                        details.push((scenario.to_string(), is_correct, format!("{}", prediction)));
+                    }
                 }
             }
         }
+    } else {
+        println!("  ⚠ Could not open {}", COMMONSENSE_PATH);
+    }
+
+    if total > 10 {
+        println!("  ... ({} more samples)", total - 10);
     }
 
     let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
-    println!("Accuracy: {}/{} ({:.1}%)", correct, total, accuracy * 100.0);
+    println!("\nAccuracy: {}/{} ({:.1}%)", correct, total, accuracy * 100.0);
 
     BenchmarkResult {
         category: "Commonsense".to_string(),
@@ -146,32 +169,20 @@ fn run_commonsense_benchmark(algebra: &MoralAlgebra, parser: &MoralParser) -> Be
 fn predict_commonsense(algebra: &MoralAlgebra, parser: &MoralParser, scenario: &str) -> i32 {
     let encoded = parser.parse_and_encode(scenario, algebra);
 
-    // Check for consent violation first
-    if encoded.is_consent_violation() {
-        return 1; // Wrong
-    }
+    // Use ensemble judgment for better accuracy
+    let ensemble = encoded.judge_ensemble(algebra, scenario);
 
-    // Check deontological violations
-    let deont = algebra.judge_deontological(scenario);
-    if !deont.violations.is_empty() {
-        return 1; // Wrong
-    }
-
-    // Check action judgment
-    if let Some(judgment) = encoded.judge(algebra) {
-        match judgment.verdict {
-            MoralVerdict::Bad | MoralVerdict::ConsentViolation => 1,
-            MoralVerdict::Good | MoralVerdict::Neutral => 0,
-        }
-    } else {
-        0 // Default to not wrong
+    match ensemble.final_verdict {
+        MoralVerdict::Bad | MoralVerdict::ConsentViolation => 1, // Wrong
+        MoralVerdict::Good | MoralVerdict::Neutral => 0,         // Not wrong
     }
 }
 
 /// Run deontology benchmark
-fn run_deontology_benchmark(algebra: &MoralAlgebra, parser: &MoralParser) -> BenchmarkResult {
+/// CSV format: label,scenario,excuse
+fn run_deontology_benchmark(algebra: &MoralAlgebra, _parser: &MoralParser) -> BenchmarkResult {
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Category: DEONTOLOGY (Duty-based Ethics)");
+    println!("Category: DEONTOLOGY (Real ETHICS Dataset)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let mut correct = 0;
@@ -181,26 +192,38 @@ fn run_deontology_benchmark(algebra: &MoralAlgebra, parser: &MoralParser) -> Ben
     if let Ok(file) = File::open(DEONTOLOGY_PATH) {
         let reader = BufReader::new(file);
 
-        for line in reader.lines().skip(1).take(100) {
+        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY) {
             if let Ok(line) = line {
-                let parts: Vec<&str> = line.split(',').collect();
+                // Parse CSV: label,scenario,excuse
+                let parts: Vec<&str> = line.splitn(3, ',').collect();
                 if parts.len() >= 3 {
-                    let scenario = parts[0].trim_matches('"');
-                    let excuse = parts[1].trim_matches('"');
-                    let label: i32 = parts[2].trim().parse().unwrap_or(0);
+                    let label: i32 = parts[0].trim().parse().unwrap_or(0);
+                    let scenario = parts[1].trim_matches('"');
+                    let excuse = parts[2].trim_matches('"');
 
                     let prediction = predict_deontology(algebra, scenario, excuse);
-                    if (prediction == 1) == (label == 1) {
-                        correct += 1;
-                    }
+                    let is_correct = prediction == label;
+
+                    if is_correct { correct += 1; }
                     total += 1;
+
+                    if total <= 5 {
+                        let marker = if is_correct { "✓" } else { "✗" };
+                        println!("  {} pred={}, exp={}", marker, prediction, label);
+                    }
                 }
             }
         }
+    } else {
+        println!("  ⚠ Could not open {}", DEONTOLOGY_PATH);
+    }
+
+    if total > 5 {
+        println!("  ... ({} more samples)", total - 5);
     }
 
     let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
-    println!("Accuracy: {}/{} ({:.1}%)", correct, total, accuracy * 100.0);
+    println!("\nAccuracy: {}/{} ({:.1}%)", correct, total, accuracy * 100.0);
 
     BenchmarkResult {
         category: "Deontology".to_string(),
@@ -240,9 +263,10 @@ fn predict_deontology(algebra: &MoralAlgebra, scenario: &str, excuse: &str) -> i
 }
 
 /// Run justice benchmark
-fn run_justice_benchmark(algebra: &MoralAlgebra, _parser: &MoralParser) -> BenchmarkResult {
+/// CSV format: label,scenario
+fn run_justice_benchmark(algebra: &MoralAlgebra, parser: &MoralParser) -> BenchmarkResult {
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Category: JUSTICE (Fairness/Proportionality)");
+    println!("Category: JUSTICE (Real ETHICS Dataset)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let mut correct = 0;
@@ -252,25 +276,46 @@ fn run_justice_benchmark(algebra: &MoralAlgebra, _parser: &MoralParser) -> Bench
     if let Ok(file) = File::open(JUSTICE_PATH) {
         let reader = BufReader::new(file);
 
-        for line in reader.lines().skip(1).take(100) {
+        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY) {
             if let Ok(line) = line {
-                let parts: Vec<&str> = line.split(',').collect();
-                if parts.len() >= 2 {
-                    let scenario = parts[0].trim_matches('"');
-                    let label: i32 = parts[1].trim().parse().unwrap_or(0);
+                // Parse CSV: label,scenario
+                if let Some((label_str, scenario)) = line.split_once(',') {
+                    let label: i32 = label_str.trim().parse().unwrap_or(0);
+                    let scenario = scenario.trim();
 
-                    let prediction = predict_justice(algebra, scenario);
-                    if (prediction == 1) == (label == 1) {
-                        correct += 1;
+                    if !scenario.is_empty() {
+                        // For justice, use ensemble judgment
+                        let encoded = parser.parse_and_encode(scenario, algebra);
+                        let ensemble = encoded.judge_ensemble(algebra, scenario);
+
+                        // Justice: 1 = fair/reasonable, 0 = unfair
+                        let prediction = match ensemble.final_verdict {
+                            MoralVerdict::Good | MoralVerdict::Neutral => 1,
+                            MoralVerdict::Bad | MoralVerdict::ConsentViolation => 0,
+                        };
+
+                        let is_correct = prediction == label;
+                        if is_correct { correct += 1; }
+                        total += 1;
+
+                        if total <= 5 {
+                            let marker = if is_correct { "✓" } else { "✗" };
+                            println!("  {} pred={}, exp={}", marker, prediction, label);
+                        }
                     }
-                    total += 1;
                 }
             }
         }
+    } else {
+        println!("  ⚠ Could not open {}", JUSTICE_PATH);
+    }
+
+    if total > 5 {
+        println!("  ... ({} more samples)", total - 5);
     }
 
     let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };
-    println!("Accuracy: {}/{} ({:.1}%)", correct, total, accuracy * 100.0);
+    println!("\nAccuracy: {}/{} ({:.1}%)", correct, total, accuracy * 100.0);
 
     BenchmarkResult {
         category: "Justice".to_string(),
@@ -312,9 +357,10 @@ fn predict_justice(algebra: &MoralAlgebra, scenario: &str) -> i32 {
 }
 
 /// Run virtue benchmark
+/// CSV format: label,scenario where scenario contains "[SEP] trait"
 fn run_virtue_benchmark(_algebra: &MoralAlgebra, parser: &MoralParser) -> BenchmarkResult {
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Category: VIRTUE (Character Traits)");
+    println!("Category: VIRTUE (Real ETHICS Dataset)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let mut correct = 0;
@@ -324,21 +370,39 @@ fn run_virtue_benchmark(_algebra: &MoralAlgebra, parser: &MoralParser) -> Benchm
     if let Ok(file) = File::open(VIRTUE_PATH) {
         let reader = BufReader::new(file);
 
-        for line in reader.lines().skip(1).take(100) {
+        for line in reader.lines().skip(1).take(MAX_SAMPLES_PER_CATEGORY) {
             if let Ok(line) = line {
-                let parts: Vec<&str> = line.split(',').collect();
-                if parts.len() >= 2 {
-                    let scenario = parts[0].trim_matches('"');
-                    let label: i32 = parts[1].trim().parse().unwrap_or(0);
+                // Parse CSV: label,scenario where scenario contains "[SEP] trait"
+                if let Some((label_str, scenario)) = line.split_once(',') {
+                    let label: i32 = label_str.trim().parse().unwrap_or(0);
 
-                    let prediction = predict_virtue(parser, scenario);
-                    if (prediction == 1) == (label == 1) {
-                        correct += 1;
+                    // Extract trait from "[SEP] trait" at end of scenario
+                    let trait_word = scenario.split("[SEP]")
+                        .last()
+                        .map(|s| s.trim())
+                        .unwrap_or("");
+
+                    if !trait_word.is_empty() {
+                        let prediction = predict_virtue(parser, trait_word);
+                        let is_correct = prediction == label;
+
+                        if is_correct { correct += 1; }
+                        total += 1;
+
+                        if total <= 5 {
+                            let marker = if is_correct { "✓" } else { "✗" };
+                            println!("  {} \"{}\" → pred={}, exp={}", marker, trait_word, prediction, label);
+                        }
                     }
-                    total += 1;
                 }
             }
         }
+    } else {
+        println!("  ⚠ Could not open {}", VIRTUE_PATH);
+    }
+
+    if total > 5 {
+        println!("  ... ({} more samples)", total - 5);
     }
 
     let accuracy = if total > 0 { correct as f32 / total as f32 } else { 0.0 };

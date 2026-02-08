@@ -38,6 +38,7 @@ use super::prefrontal::{AttentionBid, PrefrontalCortexActor};
 use crate::memory::EmotionalValence;
 use crate::consciousness::recursive_improvement::{
     ConsciousnessWorldModel, WorldModelStats,
+    ConsciousnessAction, ActionType, ConsciousnessTransition, LatentConsciousnessState,
 };
 use crate::dynamics::CrystalizedConcept;
 use std::collections::VecDeque;
@@ -349,12 +350,12 @@ mod tests {
         for _i in 0..50 {
             let transition = ConsciousnessTransition {
                 from_state: state1.clone(),
-                action: ConsciousnessAction::FocusIntegration,
+                action: ConsciousnessAction::new("focus", ActionType::Integrate),
                 to_state: state2.clone(),
                 reward: 0.1,
-                is_real: true,
+                timestamp: 0,
             };
-            world_model.observe(transition);
+            world_model.observe_transition(transition);
         }
 
         // Sync bridge

@@ -2,7 +2,7 @@
 //!
 //! This example demonstrates the core concepts of the Symthaea Holographic Liquid Brain:
 //!
-//! 1. **HV16 / ContinuousHV**: High-dimensional vector representations
+//! 1. **BinaryHV / ContinuousHV**: High-dimensional vector representations
 //! 2. **Bind and Bundle Operations**: HDC algebra for associations and superpositions
 //! 3. **LTC Neurons**: Liquid Time-Constant dynamics with closed-form evolution
 //! 4. **Phi Measurement**: Integrated information as a consciousness metric

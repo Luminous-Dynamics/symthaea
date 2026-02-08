@@ -958,6 +958,14 @@ impl BinaryHV {
         result
     }
 
+    /// Convert to a [`ContinuousHV`](super::unified_hv::ContinuousHV)
+    ///
+    /// Each bit maps to ±1.0 in the continuous representation.
+    /// This is the standard conversion for interfacing binary and continuous HDC code.
+    pub fn to_continuous(&self) -> super::unified_hv::ContinuousHV {
+        super::unified_hv::ContinuousHV::from_vec(self.to_bipolar())
+    }
+
     /// Create from bipolar representation
     ///
     /// Values > 0 → bit 1, values ≤ 0 → bit 0

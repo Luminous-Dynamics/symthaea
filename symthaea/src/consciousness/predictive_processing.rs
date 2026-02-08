@@ -26,13 +26,13 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 
 /// A prediction at any level of the hierarchy
 #[derive(Debug, Clone)]
 pub struct Prediction {
     /// What is being predicted (encoded content)
-    pub content: HV16,
+    pub content: BinaryHV,
 
     /// Precision (confidence/certainty) of this prediction (0-1)
     pub precision: f64,
@@ -47,17 +47,17 @@ pub struct Prediction {
     pub level: u32,
 
     /// Source context (what generated this prediction)
-    pub context: HV16,
+    pub context: BinaryHV,
 }
 
 /// Prediction error signal
 #[derive(Debug, Clone)]
 pub struct PredictionError {
     /// The prediction that was made
-    pub prediction: HV16,
+    pub prediction: BinaryHV,
 
     /// What actually happened
-    pub actual: HV16,
+    pub actual: BinaryHV,
 
     /// Magnitude of error (0-1)
     pub magnitude: f64,
@@ -87,7 +87,7 @@ pub struct PredictiveLayer {
     pub level: u32,
 
     /// Current state belief
-    pub belief: HV16,
+    pub belief: BinaryHV,
 
     /// Precision of this layer's predictions
     pub precision: f64,
@@ -112,7 +112,7 @@ pub struct PredictiveLayer {
 #[derive(Debug, Clone)]
 struct GenerativeModel {
     /// Learned associations for generation
-    associations: Vec<(HV16, HV16, f64)>,  // (cause, effect, strength)
+    associations: Vec<(BinaryHV, BinaryHV, f64)>,  // (cause, effect, strength)
     capacity: usize,
 }
 
@@ -120,7 +120,7 @@ struct GenerativeModel {
 #[derive(Debug, Clone)]
 struct RecognitionModel {
     /// Learned inferences
-    inferences: Vec<(HV16, HV16, f64)>,  // (observation, cause, strength)
+    inferences: Vec<(BinaryHV, BinaryHV, f64)>,  // (observation, cause, strength)
     capacity: usize,
 }
 
@@ -132,8 +132,8 @@ impl GenerativeModel {
         }
     }
 
-    fn predict(&self, cause: &HV16) -> Option<(HV16, f64)> {
-        let mut best_match: Option<(f64, &HV16, f64)> = None;
+    fn predict(&self, cause: &BinaryHV) -> Option<(BinaryHV, f64)> {
+        let mut best_match: Option<(f64, &BinaryHV, f64)> = None;
 
         for (c, effect, strength) in &self.associations {
             let similarity = cause.similarity(c) as f64;
@@ -148,7 +148,7 @@ impl GenerativeModel {
         best_match.map(|(_, effect, confidence)| (effect.clone(), confidence))
     }
 
-    fn learn(&mut self, cause: HV16, effect: HV16, strength: f64) {
+    fn learn(&mut self, cause: BinaryHV, effect: BinaryHV, strength: f64) {
         // Check for existing association
         for (c, e, s) in &mut self.associations {
             if cause.similarity(c) as f64 > 0.8 && effect.similarity(e) as f64 > 0.8 {
@@ -180,8 +180,8 @@ impl RecognitionModel {
         }
     }
 
-    fn infer(&self, observation: &HV16) -> Option<(HV16, f64)> {
-        let mut best_match: Option<(f64, &HV16, f64)> = None;
+    fn infer(&self, observation: &BinaryHV) -> Option<(BinaryHV, f64)> {
+        let mut best_match: Option<(f64, &BinaryHV, f64)> = None;
 
         for (obs, cause, strength) in &self.inferences {
             let similarity = observation.similarity(obs) as f64;
@@ -196,7 +196,7 @@ impl RecognitionModel {
         best_match.map(|(_, cause, confidence)| (cause.clone(), confidence))
     }
 
-    fn learn(&mut self, observation: HV16, cause: HV16, strength: f64) {
+    fn learn(&mut self, observation: BinaryHV, cause: BinaryHV, strength: f64) {
         for (o, c, s) in &mut self.inferences {
             if observation.similarity(o) as f64 > 0.8 && cause.similarity(c) as f64 > 0.8 {
                 *s = (*s * 0.9 + strength * 0.1).min(1.0);
@@ -221,7 +221,7 @@ impl PredictiveLayer {
     pub fn new(level: u32, model_capacity: usize) -> Self {
         Self {
             level,
-            belief: HV16::random(100),
+            belief: BinaryHV::random(100),
             precision: 0.5,
             learning_rate: 0.1,
             bottom_up_errors: VecDeque::with_capacity(10),
@@ -285,12 +285,12 @@ impl PredictiveLayer {
     }
 
     /// Learn association between cause and effect
-    pub fn learn_association(&mut self, cause: HV16, effect: HV16, success: f64) {
+    pub fn learn_association(&mut self, cause: BinaryHV, effect: BinaryHV, success: f64) {
         self.generative_weights.learn(cause.clone(), effect.clone(), success);
         self.recognition_weights.learn(effect, cause, success);
     }
 
-    fn blend_beliefs(&self, a: &HV16, b: &HV16, factor: f64) -> HV16 {
+    fn blend_beliefs(&self, a: &BinaryHV, b: &BinaryHV, factor: f64) -> BinaryHV {
         // Simple blending: XOR introduces variation, similarity-based selection
         if factor > 0.5 {
             b.clone()
@@ -374,7 +374,7 @@ impl PredictiveHierarchy {
     }
 
     /// Process sensory input through the hierarchy
-    pub fn process_sensory_input(&mut self, input: &HV16) -> PredictionResult {
+    pub fn process_sensory_input(&mut self, input: &BinaryHV) -> PredictionResult {
         let mut current_signal = input.clone();
         let mut total_error = 0.0;
         let mut errors = Vec::new();
@@ -392,7 +392,7 @@ impl PredictiveHierarchy {
                     timestamp: Instant::now(),
                     horizon: 0,
                     level: 0,
-                    context: HV16::random(100),
+                    context: BinaryHV::random(100),
                 }
             };
 
@@ -458,7 +458,7 @@ impl PredictiveHierarchy {
     }
 
     /// Learn from action outcome
-    pub fn learn_from_action(&mut self, action: &HV16, outcome: &HV16, success: bool) {
+    pub fn learn_from_action(&mut self, action: &BinaryHV, outcome: &BinaryHV, success: bool) {
         // Strengthen associations at all levels
         let success_score = if success { 0.9 } else { 0.3 };
 
@@ -489,8 +489,8 @@ impl PredictiveHierarchy {
     }
 
     /// Get the highest level belief (closest to "conscious" content)
-    pub fn highest_level_belief(&self) -> HV16 {
-        self.layers.last().map(|l| l.belief.clone()).unwrap_or_else(|| HV16::random(100))
+    pub fn highest_level_belief(&self) -> BinaryHV {
+        self.layers.last().map(|l| l.belief.clone()).unwrap_or_else(|| BinaryHV::random(100))
     }
 
     /// Get accuracy statistics
@@ -549,7 +549,7 @@ pub struct PredictionResult {
     pub suggested_action: Option<ActionSuggestion>,
 
     /// What we're "conscious" of (highest level belief)
-    pub conscious_content: HV16,
+    pub conscious_content: BinaryHV,
 
     /// How surprised we are (0-1)
     pub surprise: f64,
@@ -562,7 +562,7 @@ pub struct ActionSuggestion {
     pub urgency: f64,
 
     /// What we predict will happen if we act
-    pub predicted_effect: HV16,
+    pub predicted_effect: BinaryHV,
 
     /// How confident we are
     pub confidence: f64,
@@ -592,7 +592,7 @@ pub struct ActiveInferenceEngine {
 #[derive(Debug, Clone)]
 pub struct DesiredState {
     /// The desired outcome
-    pub state: HV16,
+    pub state: BinaryHV,
 
     /// How much we want it (precision)
     pub precision: f64,
@@ -608,10 +608,10 @@ pub struct ActionTemplate {
     pub id: u32,
 
     /// Motor command encoding
-    pub motor_command: HV16,
+    pub motor_command: BinaryHV,
 
     /// Expected proprioceptive outcome
-    pub expected_outcome: HV16,
+    pub expected_outcome: BinaryHV,
 
     /// Past success rate
     pub success_rate: f64,
@@ -633,7 +633,7 @@ impl ActiveInferenceEngine {
     }
 
     /// Add a goal (desired state)
-    pub fn add_goal(&mut self, state: HV16, importance: f64, horizon: u32) {
+    pub fn add_goal(&mut self, state: BinaryHV, importance: f64, horizon: u32) {
         self.desired_states.push(DesiredState {
             state,
             precision: importance,
@@ -642,7 +642,7 @@ impl ActiveInferenceEngine {
     }
 
     /// Add action to repertoire
-    pub fn add_action(&mut self, motor_command: HV16, expected_outcome: HV16) {
+    pub fn add_action(&mut self, motor_command: BinaryHV, expected_outcome: BinaryHV) {
         let id = self.action_repertoire.len() as u32;
         self.action_repertoire.push(ActionTemplate {
             id,
@@ -653,7 +653,7 @@ impl ActiveInferenceEngine {
     }
 
     /// Select best action using expected free energy
-    pub fn select_action(&mut self, current_state: &HV16) -> Option<&ActionTemplate> {
+    pub fn select_action(&mut self, current_state: &BinaryHV) -> Option<&ActionTemplate> {
         if self.action_repertoire.is_empty() || self.desired_states.is_empty() {
             return None;
         }
@@ -675,7 +675,7 @@ impl ActiveInferenceEngine {
 
     /// Calculate Expected Free Energy (EFE) for an action
     /// EFE = Epistemic value + Pragmatic value
-    fn calculate_expected_free_energy(&self, action: &ActionTemplate, current_state: &HV16) -> f64 {
+    fn calculate_expected_free_energy(&self, action: &ActionTemplate, current_state: &BinaryHV) -> f64 {
         // Epistemic value: How much would this action reduce uncertainty?
         let epistemic_value = 1.0 - action.success_rate;  // Higher for novel actions
 
@@ -696,7 +696,7 @@ impl ActiveInferenceEngine {
     }
 
     /// Learn from action outcome
-    pub fn learn_outcome(&mut self, action_id: u32, actual_outcome: &HV16, success: bool) {
+    pub fn learn_outcome(&mut self, action_id: u32, actual_outcome: &BinaryHV, success: bool) {
         if let Some(action) = self.action_repertoire.iter_mut().find(|a| a.id == action_id) {
             // Update success rate
             action.success_rate = action.success_rate * 0.9 + (if success { 1.0 } else { 0.0 }) * 0.1;
@@ -711,7 +711,7 @@ impl ActiveInferenceEngine {
         self.motor_hierarchy.learn_from_action(
             &self.action_repertoire.get(action_id as usize)
                 .map(|a| a.motor_command.clone())
-                .unwrap_or_else(|| HV16::random(100)),
+                .unwrap_or_else(|| BinaryHV::random(100)),
             actual_outcome,
             success
         );
@@ -862,7 +862,7 @@ impl PredictiveMind {
     }
 
     /// Full processing cycle
-    pub fn process(&mut self, sensory_input: &HV16) -> MindState {
+    pub fn process(&mut self, sensory_input: &BinaryHV) -> MindState {
         // Perceptual inference
         let perception_result = self.perception.process_sensory_input(sensory_input);
 
@@ -922,7 +922,7 @@ impl PredictiveMind {
 #[derive(Debug)]
 pub struct MindState {
     /// What we're conscious of
-    pub conscious_content: HV16,
+    pub conscious_content: BinaryHV,
 
     /// How surprised we are
     pub free_energy: f64,
@@ -977,7 +977,7 @@ mod tests {
         let config = PredictiveConfig::default();
         let mut hierarchy = PredictiveHierarchy::new(config);
 
-        let input = HV16::random(100);
+        let input = BinaryHV::random(100);
         let result = hierarchy.process_sensory_input(&input);
 
         assert!(!result.errors.is_empty());
@@ -991,7 +991,7 @@ mod tests {
         let mut hierarchy = PredictiveHierarchy::new(config);
 
         // Create consistent input pattern
-        let pattern = HV16::random(100);
+        let pattern = BinaryHV::random(100);
 
         // Process multiple times
         for _ in 0..20 {
@@ -1008,8 +1008,8 @@ mod tests {
         let mut layer = PredictiveLayer::new(1, 100);
 
         let error = PredictionError {
-            prediction: HV16::random(100),
-            actual: HV16::random(100),
+            prediction: BinaryHV::random(100),
+            actual: BinaryHV::random(100),
             magnitude: 0.5,
             weighted_error: 0.3,
             level: 0,
@@ -1025,15 +1025,15 @@ mod tests {
         let mut engine = ActiveInferenceEngine::new();
 
         // Add goal
-        engine.add_goal(HV16::random(100), 0.9, 5);
+        engine.add_goal(BinaryHV::random(100), 0.9, 5);
 
         // Add actions
         let outcome1 = engine.desired_states[0].state.clone();
-        engine.add_action(HV16::random(100), outcome1);
-        engine.add_action(HV16::random(100), HV16::random(100));
+        engine.add_action(BinaryHV::random(100), outcome1);
+        engine.add_action(BinaryHV::random(100), BinaryHV::random(100));
 
         // Select action
-        let current = HV16::random(100);
+        let current = BinaryHV::random(100);
         let selected = engine.select_action(&current);
 
         assert!(selected.is_some());
@@ -1077,7 +1077,7 @@ mod tests {
         let config = PredictiveConfig::default();
         let mut mind = PredictiveMind::new(config);
 
-        let input = HV16::random(100);
+        let input = BinaryHV::random(100);
         let state = mind.process(&input);
 
         assert!(state.free_energy >= 0.0);
@@ -1090,7 +1090,7 @@ mod tests {
         let mut mind = PredictiveMind::new(config);
 
         // Train on consistent pattern
-        let pattern = HV16::random(100);
+        let pattern = BinaryHV::random(100);
         for _ in 0..10 {
             mind.process(&pattern);
         }
@@ -1104,8 +1104,8 @@ mod tests {
     fn test_generative_model_learning() {
         let mut model = GenerativeModel::new(50);
 
-        let cause = HV16::random(100);
-        let effect = HV16::random(100);
+        let cause = BinaryHV::random(100);
+        let effect = BinaryHV::random(100);
 
         model.learn(cause.clone(), effect.clone(), 0.9);
 
@@ -1118,13 +1118,13 @@ mod tests {
         let mut engine = ActiveInferenceEngine::new();
 
         // Add action
-        engine.add_action(HV16::random(100), HV16::random(100));
+        engine.add_action(BinaryHV::random(100), BinaryHV::random(100));
 
         // Successful outcomes should increase success rate
         let initial_rate = engine.action_repertoire[0].success_rate;
 
         for _ in 0..5 {
-            engine.learn_outcome(0, &HV16::random(100), true);
+            engine.learn_outcome(0, &BinaryHV::random(100), true);
         }
 
         assert!(engine.action_repertoire[0].success_rate > initial_rate);

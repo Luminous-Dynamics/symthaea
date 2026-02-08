@@ -36,7 +36,7 @@ use std::path::Path;
 use anyhow::Result;
 use serde::Deserialize;
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
 use symthaea_core::hdc::phenomenal_binding_study::PairType;
 
@@ -60,8 +60,8 @@ struct ConceptPairJson {
 struct ConceptPairWithVectors {
     id: String,
     pair_type: PairType,
-    hv_a: HV16,
-    hv_b: HV16,
+    hv_a: BinaryHV,
+    hv_b: BinaryHV,
 }
 
 /// Result of comparing bind vs bundle
@@ -207,16 +207,16 @@ fn load_or_create_pairs(path: &str) -> Result<Vec<ConceptPairWithVectors>> {
             pairs.push(ConceptPairWithVectors {
                 id: p.id.clone(),
                 pair_type: PairType::Unified,
-                hv_a: HV16::random(1000 + i as u64 * 2),
-                hv_b: HV16::random(1001 + i as u64 * 2),
+                hv_a: BinaryHV::random(1000 + i as u64 * 2),
+                hv_b: BinaryHV::random(1001 + i as u64 * 2),
             });
         }
         for (i, p) in data.separate_pairs.iter().enumerate() {
             pairs.push(ConceptPairWithVectors {
                 id: p.id.clone(),
                 pair_type: PairType::Separate,
-                hv_a: HV16::random(2000 + i as u64 * 2),
-                hv_b: HV16::random(2001 + i as u64 * 2),
+                hv_a: BinaryHV::random(2000 + i as u64 * 2),
+                hv_b: BinaryHV::random(2001 + i as u64 * 2),
             });
         }
         Ok(pairs)
@@ -235,8 +235,8 @@ fn create_synthetic_pairs() -> Vec<ConceptPairWithVectors> {
         pairs.push(ConceptPairWithVectors {
             id: format!("unified_{:03}", i + 1),
             pair_type: PairType::Unified,
-            hv_a: HV16::random(1000 + i * 2),
-            hv_b: HV16::random(1001 + i * 2),
+            hv_a: BinaryHV::random(1000 + i * 2),
+            hv_b: BinaryHV::random(1001 + i * 2),
         });
     }
 
@@ -245,8 +245,8 @@ fn create_synthetic_pairs() -> Vec<ConceptPairWithVectors> {
         pairs.push(ConceptPairWithVectors {
             id: format!("separate_{:03}", i + 1),
             pair_type: PairType::Separate,
-            hv_a: HV16::random(2000 + i * 2),
-            hv_b: HV16::random(2001 + i * 2),
+            hv_a: BinaryHV::random(2000 + i * 2),
+            hv_b: BinaryHV::random(2001 + i * 2),
         });
     }
 
@@ -256,7 +256,7 @@ fn create_synthetic_pairs() -> Vec<ConceptPairWithVectors> {
 /// Compare bind vs bundle for a pair
 fn compare_operations(pair: &ConceptPairWithVectors) -> ComparisonResult {
     let bound = pair.hv_a.bind(&pair.hv_b);
-    let bundled = HV16::bundle(&[pair.hv_a, pair.hv_b]);
+    let bundled = BinaryHV::bundle(&[pair.hv_a, pair.hv_b]);
 
     let bind_unity = analyze_topology(&bound);
     let bundle_unity = analyze_topology(&bundled);
@@ -271,7 +271,7 @@ fn compare_operations(pair: &ConceptPairWithVectors) -> ComparisonResult {
 }
 
 /// Analyze topology for an HDC vector
-fn analyze_topology(hv: &HV16) -> f64 {
+fn analyze_topology(hv: &BinaryHV) -> f64 {
     let config = TopologyConfig::default();
     let mut topology = ConsciousnessTopology::new(config);
 

@@ -9,7 +9,7 @@
 //! Run with: `cargo test --test database_persistence`
 
 use symthaea::databases::{ConsciousnessDatabase, MemoryRecord, MemoryType, SqliteMemory};
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
@@ -22,7 +22,7 @@ use tempfile::TempDir;
 fn create_memory(id: &str, seed: u64, memory_type: MemoryType, content: &str) -> MemoryRecord {
     MemoryRecord {
         id: id.to_string(),
-        encoding: HV16::random(seed),
+        encoding: BinaryHV::random(seed),
         timestamp_ms: 1700000000000 + seed,
         memory_type,
         content: content.to_string(),
@@ -74,7 +74,7 @@ mod roundtrip_tests {
 
         // Test with specific seed to ensure deterministic encoding
         let seed = 12345u64;
-        let original_encoding = HV16::random(seed);
+        let original_encoding = BinaryHV::random(seed);
         let record = MemoryRecord {
             id: "encoding-test".to_string(),
             encoding: original_encoding.clone(),
@@ -195,7 +195,7 @@ mod roundtrip_tests {
 
         let record = MemoryRecord {
             id: "extreme-values".to_string(),
-            encoding: HV16::random(0),
+            encoding: BinaryHV::random(0),
             timestamp_ms: u64::MAX,
             memory_type: MemoryType::Working,
             content: "".to_string(), // Empty content
@@ -407,7 +407,7 @@ mod concurrent_tests {
             let db_clone = Arc::clone(&db);
             handles.push(tokio::spawn(async move {
                 for _ in 0..100 {
-                    let query = HV16::random(42);
+                    let query = BinaryHV::random(42);
                     let _ = db_clone.search_similar(&query, 5).await;
                 }
             }));
@@ -498,7 +498,7 @@ mod recovery_tests {
         assert_eq!(count, 0);
 
         // Search on empty
-        let query = HV16::random(42);
+        let query = BinaryHV::random(42);
         let results = db.search_similar(&query, 10).await.expect("Search failed");
         assert!(results.is_empty());
 
@@ -518,7 +518,7 @@ mod recovery_tests {
         }
 
         // Search with very different encoding
-        let query = HV16::random(99999);
+        let query = BinaryHV::random(99999);
         let results = db.search_similar(&query, 3).await.expect("Search failed");
 
         // Should return results (even if not very similar)
@@ -671,7 +671,7 @@ mod performance_tests {
         // Time searches
         let start = Instant::now();
         for i in 0..100 {
-            let query = HV16::random(i);
+            let query = BinaryHV::random(i);
             let _ = db.search_similar(&query, 10).await.expect("Search failed");
         }
         let elapsed = start.elapsed();

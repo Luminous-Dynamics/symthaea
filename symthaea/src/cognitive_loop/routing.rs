@@ -289,6 +289,121 @@ impl ThalamicRouter {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CODE TASK DETECTION - Identify when primitives should route through Code tier
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Detected task type for primitive routing
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DetectedTaskType {
+    /// General conversation or reasoning
+    General,
+    /// Code understanding, generation, or manipulation
+    Code,
+    /// Mathematical or formal reasoning
+    Mathematical,
+    /// Temporal sequence processing
+    Temporal,
+}
+
+/// Code task detector - determines when input should route through Code tier primitives
+#[derive(Debug, Clone)]
+pub struct CodeTaskDetector {
+    /// Keywords that strongly indicate code tasks
+    code_keywords: Vec<&'static str>,
+    /// File extension patterns
+    code_extensions: Vec<&'static str>,
+    /// Threshold for keyword match ratio
+    keyword_threshold: f32,
+}
+
+impl Default for CodeTaskDetector {
+    fn default() -> Self {
+        Self {
+            code_keywords: vec![
+                "function", "class", "struct", "impl", "def", "fn",
+                "parse", "compile", "syntax", "ast", "code", "source",
+                "refactor", "debug", "optimize", "generate", "implement",
+                "bug", "fix", "error", "test", "api", "module", "import",
+                "variable", "type", "return", "parameter", "argument",
+                "rust", "python", "nix", "javascript", "typescript",
+            ],
+            code_extensions: vec![
+                ".rs", ".py", ".nix", ".js", ".ts", ".go", ".java",
+                ".c", ".cpp", ".h", ".hpp", ".rb", ".ex", ".hs",
+            ],
+            keyword_threshold: 0.15, // 15% of words must be code-related
+        }
+    }
+}
+
+impl CodeTaskDetector {
+    /// Create a new code task detector
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Detect if input is a code task
+    ///
+    /// Returns (is_code_task, confidence)
+    pub fn detect(&self, input: &str) -> (bool, f32) {
+        let lower = input.to_lowercase();
+        let words: Vec<&str> = lower.split_whitespace().collect();
+
+        if words.is_empty() {
+            return (false, 0.0);
+        }
+
+        // Check for file extensions
+        let has_extension = self.code_extensions.iter()
+            .any(|ext| lower.contains(ext));
+
+        // Check for code block markers
+        let has_code_block = input.contains("```") || input.contains("fn ") || input.contains("def ");
+
+        // Count keyword matches
+        let keyword_matches: usize = words.iter()
+            .filter(|w| self.code_keywords.iter().any(|kw| w.contains(kw)))
+            .count();
+
+        let keyword_ratio = keyword_matches as f32 / words.len() as f32;
+
+        // Compute confidence
+        let mut confidence = 0.0f32;
+
+        if has_code_block {
+            confidence += 0.5;
+        }
+        if has_extension {
+            confidence += 0.3;
+        }
+        confidence += keyword_ratio * 0.5;
+
+        let is_code = confidence >= self.keyword_threshold || has_code_block;
+
+        (is_code, confidence.min(1.0))
+    }
+
+    /// Detect task type from input
+    pub fn detect_task_type(&self, input: &str) -> DetectedTaskType {
+        let (is_code, _confidence) = self.detect(input);
+
+        if is_code {
+            DetectedTaskType::Code
+        } else if input.contains("integral") || input.contains("derivative")
+            || input.contains("equation") || input.contains("calculate")
+        {
+            DetectedTaskType::Mathematical
+        } else if input.contains("sequence") || input.contains("next")
+            || input.contains("predict") || input.contains("forecast")
+        {
+            DetectedTaskType::Temporal
+        } else {
+            DetectedTaskType::General
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // ACTIVE INFERENCE BRIDGE - Precision-Weighted Prediction Tracking
 // ═══════════════════════════════════════════════════════════════════════════════
 

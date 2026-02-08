@@ -23,7 +23,7 @@ use anyhow::Result;
 use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::HV16};
+use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig, TopologicalAssessment};
@@ -118,7 +118,7 @@ fn run_experiment() -> Result<()> {
             let hv_b = activation_to_hv16(&acts_b[0].activation);
 
             let bound = hv_a.bind(&hv_b);
-            let bundled = HV16::bundle(&[hv_a, hv_b]);
+            let bundled = BinaryHV::bundle(&[hv_a, hv_b]);
 
             let bound_topo = analyze_topology(&bound, &topology_config);
             let bundle_topo = analyze_topology(&bundled, &topology_config);
@@ -138,7 +138,7 @@ fn run_experiment() -> Result<()> {
             let hv_b = activation_to_hv16(&acts_b[0].activation);
 
             let bound = hv_a.bind(&hv_b);
-            let bundled = HV16::bundle(&[hv_a, hv_b]);
+            let bundled = BinaryHV::bundle(&[hv_a, hv_b]);
 
             let bound_topo = analyze_topology(&bound, &topology_config);
             let bundle_topo = analyze_topology(&bundled, &topology_config);
@@ -220,7 +220,7 @@ fn run_experiment() -> Result<()> {
         let hv_b = activation_to_hv16(&acts_b[0].activation);
 
         let bound = hv_a.bind(&hv_b);
-        let bundled = HV16::bundle(&[hv_a, hv_b]);
+        let bundled = BinaryHV::bundle(&[hv_a, hv_b]);
 
         // Compute norms and variances
         phen_bind_norms.push(hv_norm(&bound));
@@ -237,7 +237,7 @@ fn run_experiment() -> Result<()> {
         let hv_b = activation_to_hv16(&acts_b[0].activation);
 
         let bound = hv_a.bind(&hv_b);
-        let bundled = HV16::bundle(&[hv_a, hv_b]);
+        let bundled = BinaryHV::bundle(&[hv_a, hv_b]);
 
         func_bind_norms.push(hv_norm(&bound));
         func_bundle_norms.push(hv_norm(&bundled));
@@ -312,7 +312,7 @@ fn load_corpus(path: &str) -> Result<Vec<String>> {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn activation_to_hv16(activation: &[f32]) -> HV16 {
+fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
     let mut expanded = Vec::with_capacity(HDC_DIMENSION);
     let tiles = HDC_DIMENSION / activation.len();
     let remainder = HDC_DIMENSION % activation.len();
@@ -328,11 +328,11 @@ fn activation_to_hv16(activation: &[f32]) -> HV16 {
         expanded.push(activation[i]);
     }
 
-    HV16::from_bipolar(&expanded)
+    BinaryHV::from_bipolar(&expanded)
 }
 
 #[cfg(feature = "neural-bridge")]
-fn analyze_topology(hv: &HV16, config: &TopologyConfig) -> TopologicalAssessment {
+fn analyze_topology(hv: &BinaryHV, config: &TopologyConfig) -> TopologicalAssessment {
     let mut topology = ConsciousnessTopology::new(config.clone());
 
     topology.add_state(*hv);
@@ -349,13 +349,13 @@ fn total_persistence(assessment: &TopologicalAssessment) -> f64 {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn hv_norm(hv: &HV16) -> f64 {
+fn hv_norm(hv: &BinaryHV) -> f64 {
     // Use popcount as a measure of density
     hv.popcount() as f64
 }
 
 #[cfg(feature = "neural-bridge")]
-fn hv_variance(hv: &HV16) -> f64 {
+fn hv_variance(hv: &BinaryHV) -> f64 {
     // Variance of the bipolar interpretation
     let bipolar = hv.to_bipolar();
     let mean_val: f64 = bipolar.iter().map(|&x| x as f64).sum::<f64>() / bipolar.len() as f64;

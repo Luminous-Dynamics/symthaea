@@ -24,7 +24,7 @@ use anyhow::Result;
 use symthaea::perception::ConsciousnessProbeV2;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HV16, consciousness_topology::{ConsciousnessTopology, TopologyConfig}};
+use symthaea_core::hdc::{BinaryHV, consciousness_topology::{ConsciousnessTopology, TopologyConfig}};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -127,7 +127,7 @@ fn run_h2_experiment() -> Result<()> {
     };
 
     // Helper to analyze a single HV's topology
-    let analyze_hv = |hv: &HV16| -> f64 {
+    let analyze_hv = |hv: &BinaryHV| -> f64 {
         let mut topology = ConsciousnessTopology::new(topo_config.clone());
         topology.add_state(*hv);
         // Add permuted variations to create point cloud
@@ -157,7 +157,7 @@ fn run_h2_experiment() -> Result<()> {
         unified_bind_unity.push(analyze_hv(&bound));
 
         // Bundling (majority vote) - creates superposition
-        let bundled = HV16::bundle(&[hv_a.clone(), hv_b.clone()]);
+        let bundled = BinaryHV::bundle(&[hv_a.clone(), hv_b.clone()]);
         unified_bundle_unity.push(analyze_hv(&bundled));
     }
     println!("  Completed in {:.2}s\n", unified_start.elapsed().as_secs_f64());
@@ -172,7 +172,7 @@ fn run_h2_experiment() -> Result<()> {
         let bound = hv_a.bind(&hv_b);
         separate_bind_unity.push(analyze_hv(&bound));
 
-        let bundled = HV16::bundle(&[hv_a.clone(), hv_b.clone()]);
+        let bundled = BinaryHV::bundle(&[hv_a.clone(), hv_b.clone()]);
         separate_bundle_unity.push(analyze_hv(&bundled));
     }
     println!("  Completed in {:.2}s\n", separate_start.elapsed().as_secs_f64());

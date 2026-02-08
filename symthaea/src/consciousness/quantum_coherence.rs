@@ -35,13 +35,13 @@
  * use symthaea::consciousness::quantum_coherence::{
  *     QuantumCoherenceAnalyzer, CoherenceConfig
  * };
- * use symthaea::hdc::binary_hv::HV16;
+ * use symthaea::hdc::binary_hv::BinaryHV;
  *
  * let mut analyzer = QuantumCoherenceAnalyzer::new(CoherenceConfig::default());
  *
  * // Track consciousness state evolution
- * let state1 = HV16::random();
- * let state2 = HV16::random();
+ * let state1 = BinaryHV::random();
+ * let state2 = BinaryHV::random();
  * analyzer.observe(&state1, 0.85); // State with Φ=0.85
  * analyzer.observe(&state2, 0.82);
  *
@@ -58,7 +58,7 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 
 // ============================================================================
 // CONFIGURATION
@@ -111,7 +111,7 @@ impl Default for CoherenceConfig {
 #[derive(Debug, Clone)]
 pub struct StateObservation {
     /// The consciousness state (HDC vector)
-    pub state: HV16,
+    pub state: BinaryHV,
 
     /// Associated Φ (integrated information)
     pub phi: f64,
@@ -120,7 +120,7 @@ pub struct StateObservation {
     pub timestamp: Instant,
 
     /// Optional component states for entanglement tracking
-    pub components: Option<Vec<HV16>>,
+    pub components: Option<Vec<BinaryHV>>,
 }
 
 /// Decoherence event - when superposition collapses
@@ -256,16 +256,16 @@ impl QuantumCoherenceAnalyzer {
     }
 
     /// Observe a new consciousness state
-    pub fn observe(&mut self, state: &HV16, phi: f64) {
+    pub fn observe(&mut self, state: &BinaryHV, phi: f64) {
         self.observe_with_components(state, phi, None);
     }
 
     /// Observe with optional component states for entanglement tracking
     pub fn observe_with_components(
         &mut self,
-        state: &HV16,
+        state: &BinaryHV,
         phi: f64,
-        components: Option<Vec<HV16>>,
+        components: Option<Vec<BinaryHV>>,
     ) {
         let observation = StateObservation {
             state: state.clone(),
@@ -332,10 +332,10 @@ impl QuantumCoherenceAnalyzer {
     ///
     /// Higher richness = more concepts in superposition
     /// Based on HDC bit distribution entropy
-    fn estimate_superposition_richness(&self, state: &HV16) -> f64 {
+    fn estimate_superposition_richness(&self, state: &BinaryHV) -> f64 {
         // Count set bits
         let set_bits = state.popcount();
-        let total_bits = HV16::DIM;
+        let total_bits = BinaryHV::DIM;
 
         // Perfect superposition = 50% bits set
         // Lower/higher = more "collapsed" to specific state
@@ -435,7 +435,7 @@ impl QuantumCoherenceAnalyzer {
         let past_state = &self.history[self.history.len() - window_back];
 
         // Interference = combination of current and past using bundle
-        let combined = HV16::bundle(&[current.state.clone(), past_state.state.clone()]);
+        let combined = BinaryHV::bundle(&[current.state.clone(), past_state.state.clone()]);
         let combined_phi = (current.phi + past_state.phi) / 2.0;
 
         // Measure interference visibility using popcount
@@ -479,7 +479,7 @@ impl QuantumCoherenceAnalyzer {
     }
 
     /// Estimate entanglement between consciousness components
-    fn estimate_entanglement(&self, components: &[HV16]) -> EntanglementMeasure {
+    fn estimate_entanglement(&self, components: &[BinaryHV]) -> EntanglementMeasure {
         if components.len() < 2 {
             return EntanglementMeasure {
                 entropy: 0.0,
@@ -515,7 +515,7 @@ impl QuantumCoherenceAnalyzer {
             .map(|c| (c.popcount() as f64 - avg_popcount).powi(2))
             .sum::<f64>()
             / components.len() as f64;
-        let entropy = (1.0 + variance / (HV16::DIM as f64 * 0.25)).ln();
+        let entropy = (1.0 + variance / (BinaryHV::DIM as f64 * 0.25)).ln();
 
         // Mutual information estimate
         let mutual_information = correlation * entropy;
@@ -753,8 +753,8 @@ mod tests {
         // Random states with good seed should have reasonable richness
         // Due to deterministic hashing, test that richness is in valid range (0-1)
         // and that different seeds produce different richness values
-        let state1 = HV16::random(42);
-        let state2 = HV16::random(12345);
+        let state1 = BinaryHV::random(42);
+        let state2 = BinaryHV::random(12345);
         let richness1 = analyzer.estimate_superposition_richness(&state1);
         let richness2 = analyzer.estimate_superposition_richness(&state2);
 
@@ -770,8 +770,8 @@ mod tests {
     fn test_observation_tracking() {
         let mut analyzer = QuantumCoherenceAnalyzer::new(CoherenceConfig::default());
 
-        let state1 = HV16::random(100);
-        let state2 = HV16::random(200);
+        let state1 = BinaryHV::random(100);
+        let state2 = BinaryHV::random(200);
 
         analyzer.observe(&state1, 0.8);
         assert_eq!(analyzer.stats.observations, 1);
@@ -784,7 +784,7 @@ mod tests {
     fn test_coherence_with_similar_states() {
         let mut analyzer = QuantumCoherenceAnalyzer::new(CoherenceConfig::default());
 
-        let base = HV16::random(300);
+        let base = BinaryHV::random(300);
 
         // Observe same state multiple times
         for _ in 0..10 {
@@ -799,7 +799,7 @@ mod tests {
     fn test_decoherence_detection() {
         let mut analyzer = QuantumCoherenceAnalyzer::new(CoherenceConfig::default());
 
-        let state1 = HV16::random(400);
+        let state1 = BinaryHV::random(400);
         let state2 = state1.invert(); // Opposite state using invert method
 
         analyzer.observe(&state1, 0.8);
@@ -812,7 +812,7 @@ mod tests {
     fn test_coherence_length() {
         let mut analyzer = QuantumCoherenceAnalyzer::new(CoherenceConfig::default());
 
-        let base = HV16::random(500);
+        let base = BinaryHV::random(500);
 
         // Observe same state 20 times
         for _ in 0..20 {
@@ -829,7 +829,7 @@ mod tests {
 
         // Create sequence of states with different seeds
         for i in 0..20 {
-            let state = HV16::random(600 + i as u64);
+            let state = BinaryHV::random(600 + i as u64);
             analyzer.observe(&state, 0.5 + 0.3 * (i as f64 / 20.0).sin());
         }
 
@@ -842,9 +842,9 @@ mod tests {
         let analyzer = QuantumCoherenceAnalyzer::new(CoherenceConfig::default());
 
         // Create correlated components
-        let base = HV16::random(700);
+        let base = BinaryHV::random(700);
         let correlated = base.clone();
-        let uncorrelated = HV16::random(800);
+        let uncorrelated = BinaryHV::random(800);
 
         let high_entanglement = analyzer.estimate_entanglement(&[base.clone(), correlated]);
         let low_entanglement = analyzer.estimate_entanglement(&[base, uncorrelated]);
@@ -857,7 +857,7 @@ mod tests {
         let mut analyzer = QuantumCoherenceAnalyzer::new(CoherenceConfig::default());
 
         for i in 0..15 {
-            let state = HV16::random(900 + i as u64);
+            let state = BinaryHV::random(900 + i as u64);
             analyzer.observe(&state, 0.7);
         }
 
@@ -871,7 +871,7 @@ mod tests {
     fn test_quantum_coherent_state() {
         let mut analyzer = QuantumCoherenceAnalyzer::new(CoherenceConfig::default());
 
-        let base = HV16::random(1000);
+        let base = BinaryHV::random(1000);
 
         // Maintain stable state
         for _ in 0..20 {
@@ -888,7 +888,7 @@ mod tests {
     fn test_recommendations() {
         let mut analyzer = QuantumCoherenceAnalyzer::new(CoherenceConfig::default());
 
-        let state1 = HV16::random(1100);
+        let state1 = BinaryHV::random(1100);
         let state2 = state1.invert(); // Opposite state using invert method
 
         // Create chaotic sequence

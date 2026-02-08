@@ -24,7 +24,7 @@
 //! - **Integration**: Connects to existing modules (coherence, social, causal, etc.)
 
 use crate::consciousness::primitive_reasoning::{ReasoningChain, TransformationType};
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -57,7 +57,7 @@ pub struct FiduciaryHarmonicPrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Love dimension: 0.0 (neutral) to 1.0 (pure love)
     pub love_dimension: f32,
@@ -138,15 +138,15 @@ impl FiduciaryHarmonicPrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(8700 + harmonic as u64 * 100)
+            BinaryHV::random(8700 + harmonic as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {
@@ -205,7 +205,7 @@ pub struct ResolutionStrategyPrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Conservativeness: 0.0 (disruptive) to 1.0 (conservative)
     pub conservativeness: f32,
@@ -267,15 +267,15 @@ impl ResolutionStrategyPrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(8800 + strategy as u64 * 100)
+            BinaryHV::random(8800 + strategy as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {

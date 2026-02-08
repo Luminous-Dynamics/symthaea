@@ -37,7 +37,7 @@
 //! println!("Unified Φ: {:.3}", result.integrated_phi);
 //! ```
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use crate::consciousness::cross_modal_binding::{
     Modality, ModalityChannel, ConvergenceZone, EpisodicBuffer, ConvergenceLevel,
 };
@@ -91,7 +91,7 @@ pub struct ModalInput {
     /// The modality
     pub modality: Modality,
     /// Feature encoding
-    pub features: HV16,
+    pub features: BinaryHV,
     /// Confidence in this input (0.0-1.0)
     pub confidence: f64,
     /// Timestamp
@@ -102,7 +102,7 @@ pub struct ModalInput {
 
 impl ModalInput {
     /// Create a new modal input
-    pub fn new(modality: Modality, features: HV16, confidence: f64) -> Self {
+    pub fn new(modality: Modality, features: BinaryHV, confidence: f64) -> Self {
         Self {
             modality,
             features,
@@ -129,7 +129,7 @@ impl ModalInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntegrationResult {
     /// Unified representation across all modalities
-    pub unified_representation: HV16,
+    pub unified_representation: BinaryHV,
     /// Integrated Phi (consciousness measure)
     pub integrated_phi: f64,
     /// Binding coherence across modalities
@@ -202,7 +202,7 @@ pub struct MultiModalIntegrator {
     /// Episodic buffer
     episodic_buffer: EpisodicBuffer,
     /// Current unified representation
-    unified: HV16,
+    unified: BinaryHV,
     /// Current integrated Phi
     current_phi: f64,
     /// Event sender
@@ -247,7 +247,7 @@ impl MultiModalIntegrator {
             channels,
             convergence_zones,
             episodic_buffer: EpisodicBuffer::new(config.buffer_capacity),
-            unified: HV16::zero(),
+            unified: BinaryHV::zero(),
             current_phi: 0.0,
             event_sender: None,
             stats: IntegrationStats::default(),
@@ -317,7 +317,7 @@ impl MultiModalIntegrator {
         self.emit_event(IntegrationEventType::ModalInput, None);
 
         // Collect current channel representations
-        let channel_inputs: HashMap<Modality, HV16> = self.channels
+        let channel_inputs: HashMap<Modality, BinaryHV> = self.channels
             .iter()
             .map(|(m, c)| (*m, c.attended()))
             .collect();
@@ -336,10 +336,10 @@ impl MultiModalIntegrator {
             .collect();
 
         if !amodal_zones.is_empty() {
-            let zone_vectors: Vec<HV16> = amodal_zones.iter()
+            let zone_vectors: Vec<BinaryHV> = amodal_zones.iter()
                 .map(|z| z.integrated)
                 .collect();
-            self.unified = HV16::bundle(&zone_vectors);
+            self.unified = BinaryHV::bundle(&zone_vectors);
         }
 
         // Add to episodic buffer
@@ -473,7 +473,7 @@ impl MultiModalIntegrator {
     }
 
     /// Get current unified representation
-    pub fn unified_representation(&self) -> &HV16 {
+    pub fn unified_representation(&self) -> &BinaryHV {
         &self.unified
     }
 
@@ -507,11 +507,11 @@ impl MultiModalIntegrator {
     /// Reset all channels
     pub fn reset(&mut self) {
         for channel in self.channels.values_mut() {
-            channel.features = HV16::zero();
+            channel.features = BinaryHV::zero();
             channel.attention = 0.5;
             channel.temporal_buffer.clear();
         }
-        self.unified = HV16::zero();
+        self.unified = BinaryHV::zero();
         self.current_phi = 0.0;
     }
 }
@@ -521,19 +521,19 @@ impl MultiModalIntegrator {
 // =============================================================================
 
 /// Create a visual input
-pub fn visual_input(features: HV16, confidence: f64) -> ModalInput {
+pub fn visual_input(features: BinaryHV, confidence: f64) -> ModalInput {
     ModalInput::new(Modality::Visual, features, confidence)
         .with_source("visual_perception")
 }
 
 /// Create an auditory input
-pub fn auditory_input(features: HV16, confidence: f64) -> ModalInput {
+pub fn auditory_input(features: BinaryHV, confidence: f64) -> ModalInput {
     ModalInput::new(Modality::Auditory, features, confidence)
         .with_source("auditory_perception")
 }
 
 /// Create a linguistic input
-pub fn linguistic_input(features: HV16, confidence: f64) -> ModalInput {
+pub fn linguistic_input(features: BinaryHV, confidence: f64) -> ModalInput {
     ModalInput::new(Modality::Linguistic, features, confidence)
         .with_source("language_processing")
 }
@@ -548,7 +548,7 @@ mod tests {
 
     #[test]
     fn test_modal_input_creation() {
-        let features = HV16::random(42);
+        let features = BinaryHV::random(42);
         let input = ModalInput::new(Modality::Visual, features.clone(), 0.9)
             .with_source("test");
 
@@ -569,9 +569,9 @@ mod tests {
         let mut integrator = MultiModalIntegrator::new(IntegrationConfig::default());
 
         let inputs = vec![
-            visual_input(HV16::random(1), 0.8),
-            auditory_input(HV16::random(2), 0.7),
-            linguistic_input(HV16::random(3), 0.9),
+            visual_input(BinaryHV::random(1), 0.8),
+            auditory_input(BinaryHV::random(2), 0.7),
+            linguistic_input(BinaryHV::random(3), 0.9),
         ];
 
         let result = integrator.integrate(&inputs);
@@ -587,7 +587,7 @@ mod tests {
         let mut integrator = MultiModalIntegrator::new(IntegrationConfig::default());
 
         // Same input multiple times should increase coherence
-        let features = HV16::random(42);
+        let features = BinaryHV::random(42);
         for _ in 0..5 {
             let inputs = vec![
                 visual_input(features.clone(), 0.9),
@@ -612,7 +612,7 @@ mod tests {
         let mut integrator = MultiModalIntegrator::new(IntegrationConfig::default());
         let receiver = integrator.enable_streaming();
 
-        let inputs = vec![visual_input(HV16::random(1), 0.8)];
+        let inputs = vec![visual_input(BinaryHV::random(1), 0.8)];
         let _ = integrator.integrate(&inputs);
 
         // Should have received events
@@ -628,7 +628,7 @@ mod tests {
     fn test_reset() {
         let mut integrator = MultiModalIntegrator::new(IntegrationConfig::default());
 
-        let inputs = vec![visual_input(HV16::random(1), 0.8)];
+        let inputs = vec![visual_input(BinaryHV::random(1), 0.8)];
         let _ = integrator.integrate(&inputs);
 
         integrator.reset();

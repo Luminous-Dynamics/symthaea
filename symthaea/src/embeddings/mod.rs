@@ -1,7 +1,7 @@
 //! # Embeddings Module: Semantic Bridge to HDC Space
 //!
 //! This module provides semantic embedding capabilities and projections
-//! from high-dimensional embedding space (e.g., 1024D Qwen3) to HDC space (16,384D HV16).
+//! from high-dimensional embedding space (e.g., 1024D Qwen3) to HDC space (16,384D BinaryHV).
 //!
 //! ## Architecture
 //!
@@ -25,7 +25,7 @@
 //! │            │                                                       │
 //! │            ▼                                                       │
 //! │   ┌──────────────────┐                                             │
-//! │   │      HV16        │ → 16,384D binary hypervector                │
+//! │   │      BinaryHV        │ → 16,384D binary hypervector                │
 //! │   │  (HDC space)     │                                             │
 //! │   └──────────────────┘                                             │
 //! └────────────────────────────────────────────────────────────────────┘
@@ -39,7 +39,7 @@
 
 pub mod qwen3;
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
@@ -60,7 +60,7 @@ pub struct BridgeConfig {
     /// Input embedding dimension (default: 1024 for Qwen3)
     pub input_dim: usize,
 
-    /// Output HDC dimension (default: 16384 for HV16)
+    /// Output HDC dimension (default: 16384 for BinaryHV)
     pub output_dim: usize,
 
     /// Random seed for reproducible projections
@@ -181,11 +181,11 @@ impl HdcBridge {
         matrix
     }
 
-    /// Project an embedding to HDC space (HV16)
+    /// Project an embedding to HDC space (BinaryHV)
     ///
     /// The projection preserves similarity: embeddings that are similar
-    /// in the original space will have similar HV16 vectors.
-    pub fn project(&self, embedding: &[f32]) -> HV16 {
+    /// in the original space will have similar BinaryHV vectors.
+    pub fn project(&self, embedding: &[f32]) -> BinaryHV {
         let input_dim = self.config.input_dim;
         let output_dim = self.config.output_dim;
 
@@ -244,19 +244,19 @@ impl HdcBridge {
             projected.push(sum);
         }
 
-        // Convert to binary HV16 by sign thresholding
+        // Convert to binary BinaryHV by sign thresholding
         Self::to_hv16(&projected)
     }
 
     /// Project multiple embeddings in batch (more efficient)
-    pub fn project_batch(&self, embeddings: &[Vec<f32>]) -> Vec<HV16> {
+    pub fn project_batch(&self, embeddings: &[Vec<f32>]) -> Vec<BinaryHV> {
         embeddings.iter().map(|e| self.project(e)).collect()
     }
 
-    /// Convert projected floats to HV16 binary vector
-    fn to_hv16(projected: &[f32]) -> HV16 {
+    /// Convert projected floats to BinaryHV binary vector
+    fn to_hv16(projected: &[f32]) -> BinaryHV {
         // Sign threshold: positive -> 1, negative -> 0
-        // Then pack into HV16 format
+        // Then pack into BinaryHV format
         let mut bits = vec![0u64; projected.len().div_ceil(64)];
 
         for (i, &val) in projected.iter().enumerate() {
@@ -269,7 +269,7 @@ impl HdcBridge {
             }
         }
 
-        HV16::from_bits(&bits)
+        BinaryHV::from_bits(&bits)
     }
 
     /// Compute cosine similarity between two embeddings in projected space
@@ -407,8 +407,8 @@ mod tests {
         let embedding = vec![0.1f32; QWEN3_DIMENSION];
         let hv = bridge.project(&embedding);
 
-        // HV16 should have the correct dimension (compile-time constant)
-        assert_eq!(HV16::DIM, 16384);
+        // BinaryHV should have the correct dimension (compile-time constant)
+        assert_eq!(BinaryHV::DIM, 16384);
         // Verify hv is valid by checking it was created
         let _ = hv;
     }
@@ -458,7 +458,7 @@ mod tests {
         let embedding = vec![0.1f32; QWEN3_DIMENSION];
         let hv = bridge.project(&embedding);
 
-        assert_eq!(HV16::DIM, 16384);
+        assert_eq!(BinaryHV::DIM, 16384);
         let _ = hv; // Ensure hv was created successfully
     }
 

@@ -19,22 +19,22 @@ use symthaea::consciousness::recursive_improvement::{
     DreamMode, DreamConfig,
 };
 use symthaea::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier, Primitive};
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 use symthaea_dynamics::CrystalizedConcept;
 
 /// Decompose a crystallized concept into its constituent primitives
 fn decompose_concept(concept: &CrystalizedConcept) -> Vec<(String, PrimitiveTier, f32)> {
     let primitive_system = PrimitiveSystem::global();
 
-    // Convert concept hypervector to HV16
+    // Convert concept hypervector to BinaryHV
     // The concept hypervector is 16,384 dimensions in bipolar {-1, +1} format
-    if concept.hypervector.len() != HV16::DIM {
+    if concept.hypervector.len() != BinaryHV::DIM {
         println!("  Warning: Concept hypervector has {} dims, expected {}",
-            concept.hypervector.len(), HV16::DIM);
+            concept.hypervector.len(), BinaryHV::DIM);
         return Vec::new();
     }
 
-    let concept_hv = HV16::from_bipolar(&concept.hypervector);
+    let concept_hv = BinaryHV::from_bipolar(&concept.hypervector);
 
     // Compare against all primitives
     let mut activations: Vec<(String, PrimitiveTier, f32)> = Vec::new();

@@ -10,7 +10,7 @@
 //! │  ┌──────────────┐     ┌─────────────────┐     ┌──────────────────┐     │
 //! │  │   Sensory    │ ──► │   Oscillatory   │ ──► │   Hierarchical   │     │
 //! │  │   HDC Encode │     │   Binding       │     │   LTC Dynamics   │     │
-//! │  │  (HV16)  │     │  (40Hz Gamma)   │     │  (16 Circuits)   │     │
+//! │  │  (BinaryHV)  │     │  (40Hz Gamma)   │     │  (16 Circuits)   │     │
 //! │  └──────────────┘     └─────────────────┘     └────────┬─────────┘     │
 //! │                                                         │               │
 //! │                                                         ▼               │
@@ -44,7 +44,7 @@ use anyhow::Result;
 use std::collections::VecDeque;
 use std::f64::consts::PI;
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::consciousness::hierarchical_ltc::{HierarchicalLTC, HierarchicalConfig};
 use crate::consciousness::consciousness_equation_v2::{
     ConsciousnessEquationV2, ConsciousnessStateV2, CoreComponent
@@ -334,7 +334,7 @@ pub struct UnifiedConsciousnessPipeline {
     config: PipelineConfig,
 
     /// Semantic encoder (HDC)
-    semantic_memory: Vec<HV16>,
+    semantic_memory: Vec<BinaryHV>,
 
     /// Oscillatory binding network
     binding_network: OscillatoryBinding,
@@ -411,19 +411,19 @@ impl UnifiedConsciousnessPipeline {
     }
 
     /// Encode sensory input into HDC representation
-    pub fn encode_sensory(&mut self, input: &[f64]) -> HV16 {
+    pub fn encode_sensory(&mut self, input: &[f64]) -> BinaryHV {
         // Create hypervector from input features
-        let mut result = HV16::zero();
+        let mut result = BinaryHV::zero();
 
         for (i, &value) in input.iter().enumerate() {
             if value.abs() > 0.01 {
                 // Bind feature index with feature value encoding
-                let index_hv = HV16::random(i as u64);
-                let value_hv = HV16::random((value * 1000.0) as u64);
+                let index_hv = BinaryHV::random(i as u64);
+                let value_hv = BinaryHV::random((value * 1000.0) as u64);
                 let feature_hv = index_hv.bind(&value_hv);
 
                 // Bundle into result
-                result = HV16::bundle(&[result, feature_hv]);
+                result = BinaryHV::bundle(&[result, feature_hv]);
             }
         }
 

@@ -43,6 +43,10 @@ use crate::hdc::config::hdc_dim;
 /// Trait for compatibility conversions between HV types
 ///
 /// Implemented by legacy types (BinaryHV) for conversion to/from unified types.
+///
+/// Prefer using `BinaryHV::to_continuous()` and `BinaryHV::from_bipolar()` directly.
+/// This trait adds dimension-interpolation support for non-standard HDC dimensions.
+#[deprecated(since = "0.6.0", note = "Use BinaryHV::to_continuous() and BinaryHV::from_bipolar() directly")]
 pub trait HVCompat: Sized {
     /// Convert to ContinuousHV (unified continuous type)
     fn to_continuous_hv(&self) -> ContinuousHV;
@@ -61,6 +65,7 @@ pub trait HVCompat: Sized {
 // BinaryHV COMPATIBILITY
 // ═══════════════════════════════════════════════════════════════════════════════
 
+#[allow(deprecated)]
 impl HVCompat for BinaryHV {
     fn to_continuous_hv(&self) -> ContinuousHV {
         let target_dim = hdc_dim();
@@ -234,6 +239,8 @@ fn hash_variation(bit_idx: usize, replica_idx: usize, seed: usize) -> f32 {
 /// Bridge BinaryHV to ContinuousHV at the configured dimension
 ///
 /// This is the primary function for STT → Core conversion.
+/// Prefer `BinaryHV::to_continuous()` for direct conversion.
+#[allow(deprecated)]
 pub fn hv16_to_core(hv: &BinaryHV) -> ContinuousHV {
     hv.to_continuous_hv()
 }
@@ -241,6 +248,8 @@ pub fn hv16_to_core(hv: &BinaryHV) -> ContinuousHV {
 /// Bridge ContinuousHV to BinaryHV (lossy compression)
 ///
 /// This is the primary function for Core → STT conversion.
+/// Prefer `BinaryHV::from_bipolar()` for direct conversion.
+#[allow(deprecated)]
 pub fn core_to_hv16(hv: &ContinuousHV) -> BinaryHV {
     BinaryHV::from_continuous(hv)
 }
@@ -248,6 +257,7 @@ pub fn core_to_hv16(hv: &ContinuousHV) -> BinaryHV {
 /// Bridge with similarity preservation check
 ///
 /// Returns the converted HV and the similarity loss incurred.
+#[allow(deprecated)]
 pub fn convert_with_similarity_check<T: HVCompat + Clone>(
     hv: &T,
     target: &ContinuousHV,
@@ -270,6 +280,7 @@ pub fn convert_with_similarity_check<T: HVCompat + Clone>(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
 

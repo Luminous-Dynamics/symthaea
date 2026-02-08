@@ -79,7 +79,7 @@ mod tests;
 // =============================================================================
 
 // HDC types needed by tests and users
-pub use symthaea_core::hdc::binary_hv::HV16;
+pub use symthaea_core::hdc::binary_hv::BinaryHV;
 pub use symthaea_core::hdc::ContinuousHV;
 
 // Core types (most commonly used)

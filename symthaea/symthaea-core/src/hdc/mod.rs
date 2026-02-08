@@ -1,19 +1,46 @@
 /*!
-Hyperdimensional Computing (HDC) Semantic Space
+# Hyperdimensional Computing (HDC) Semantic Space
 
-16,384D holographic vectors for consciousness (2^14 - SIMD-optimized)
-Memory IS computation - no separate storage needed!
+16,384D holographic vectors for consciousness (2^14 — SIMD-optimized).
+Memory IS computation — no separate storage needed!
+
+## Core Types
+
+- [`BinaryHV`] — 16,384-bit binary hypervector (`[u8; 2048]`, `Copy`, SIMD-accelerated).
+  The workhorse type for fast binding, bundling, and similarity search.
+- [`ContinuousHV`] — Continuous f32 hypervector (`Vec<f32>`, configurable dimension).
+  Used for gradient-based learning, Φ computation, and smooth transformations.
+- [`HV`] — Unified enum wrapping both representations for polymorphic APIs.
+
+Backward-compatible aliases: `HV16 = BinaryHV`, `RealHV = ContinuousHV`.
+
+## Key Submodules
+
+| Module | Purpose |
+|--------|---------|
+| `binary_hv` | `BinaryHV` type, SIMD ops, batch similarity, binding |
+| `unified_hv` | `ContinuousHV`, `HV` enum, normalize/scale/permute |
+| `simd_ops` | Low-level SIMD kernels (popcount, bundle, XOR) |
+| `compat` | `BinaryHV` ↔ `ContinuousHV` conversion with dimension interpolation |
+| `hv_pool` | Arena-based pooling for zero-allocation HV reuse |
+| `integrated_information` | IIT Φ measurement over HV ensembles |
+| `consciousness_topology` | Topology-aware Φ with graph structure |
+| `tiered_phi/` | Multi-tier Φ (micro/meso/macro) computation |
+| `semantic_encoder` | Text/concept → HV encoding |
+| `long_term_memory` | Associative HV memory with forgetting |
+| `predictive_coding` | Hierarchical predictive processing |
+| `global_workspace` | Global Workspace Theory implementation |
+
+## Operations
+
+All HV types support the core HDC algebra:
+- **Bind** (XOR / elementwise multiply) — creates associations
+- **Bundle** (majority vote / elementwise add) — creates superpositions
+- **Permute** (cyclic shift) — encodes sequence order
+- **Similarity** (Hamming / cosine) — measures relatedness
 */
 
 #![allow(dead_code, unused_variables, unused_assignments)]
-
-/*!
-Module Structure:
-- mod.rs: Core SemanticSpace and HdcContext (arena-based operations)
-- temporal_encoder.rs: Week 17 circular time encoding
-- statistical_retrieval.rs: Week 17 Critical Fix #1 (z-score + margin + unbind)
-- sequence_encoder.rs: Week 17 Critical Fix #2 (permutation-based order preservation)
-*/
 
 // =============================================================================
 // CENTRAL HDC CONFIGURATION - Single Source of Truth
@@ -399,12 +426,10 @@ pub use projection::{
     RandomProjection,
 };
 
-// Re-export compatibility utilities
-pub use compat::{
-    HVCompat,
-    hv16_to_core,
-    core_to_hv16,
-};
+// Re-export compatibility utilities (deprecated — prefer BinaryHV::to_continuous())
+#[allow(deprecated)]
+pub use compat::HVCompat;
+pub use compat::{hv16_to_core, core_to_hv16};
 
 // Re-export key types for convenience
 pub use statistical_retrieval::{

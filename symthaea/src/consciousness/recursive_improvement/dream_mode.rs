@@ -31,7 +31,7 @@
 
 use super::world_model::{
     ConsciousnessWorldModel, ConsciousnessAction, ConsciousnessTransition,
-    LatentConsciousnessState, WorldModelConfig,
+    LatentConsciousnessState, WorldModelConfig, ActionType,
 };
 use crate::soul::{WeaverActor, ConceptDiscovery};
 use crate::dynamics::CrystalizedConcept;
@@ -244,12 +244,19 @@ impl DreamMode {
         let start_state = LatentConsciousnessState::from_observables(0.5, 0.5, 0.5, 0.5);
         let mut current_state = start_state;
 
+        // All possible action types for exploration
+        const ACTION_TYPES: [ActionType; 8] = [
+            ActionType::Attend, ActionType::Integrate, ActionType::Generate,
+            ActionType::Recall, ActionType::Store, ActionType::Evaluate,
+            ActionType::Transform, ActionType::Rest,
+        ];
+
         for _ in 0..self.config.steps_per_cycle {
             // Generate exploratory action using simple LCG PRNG
             self.action_rng_state = self.action_rng_state.wrapping_mul(6364136223846793005)
                 .wrapping_add(1442695040888963407);
-            let action_idx = (self.action_rng_state >> 32) as usize % ConsciousnessAction::all().len();
-            let action = ConsciousnessAction::all()[action_idx];
+            let action_idx = (self.action_rng_state >> 32) as usize % ACTION_TYPES.len();
+            let action = ConsciousnessAction::new("dream_explore", ACTION_TYPES[action_idx]);
 
             // Simulate step
             let next_state = world_model.predict(&current_state, action);
@@ -259,7 +266,7 @@ impl DreamMode {
                 action,
                 to_state: next_state.clone(),
                 reward: next_state.phi - current_state.phi,
-                is_real: false,
+                timestamp: 0, // Dream transitions use 0 timestamp
             };
 
             trajectory.push(transition);

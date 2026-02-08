@@ -65,7 +65,7 @@ use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 
 // ============================================================================
 // CONFIGURATION
@@ -187,7 +187,7 @@ pub struct DimensionObservation {
     /// Timestamp
     pub timestamp: Instant,
     /// Optional HDC representation
-    pub hdc_state: Option<HV16>,
+    pub hdc_state: Option<BinaryHV>,
 }
 
 /// Coherence between two dimensions
@@ -332,7 +332,7 @@ impl TemporalSynchronizationAnalyzer {
         &mut self,
         dimension: ConsciousnessDimension,
         value: f64,
-        _hdc_state: Option<&HV16>,
+        _hdc_state: Option<&BinaryHV>,
     ) {
         let now = Instant::now();
         self.stats.observations += 1;

@@ -7,11 +7,11 @@ use super::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_core::hdc::binary_hv::HV16;
+    use symthaea_core::hdc::binary_hv::BinaryHV;
     use symthaea_core::hdc::ContinuousHV;
 
-    fn create_test_components(n: usize) -> Vec<HV16> {
-        (0..n).map(|i| HV16::random(i as u64)).collect()
+    fn create_test_components(n: usize) -> Vec<BinaryHV> {
+        (0..n).map(|i| BinaryHV::random(i as u64)).collect()
     }
 
     #[test]
@@ -67,8 +67,8 @@ mod tests {
 
         // Test 1: Modular/Homogeneous (all very similar - low Φ expected)
         // In IIT, homogeneous systems have LOW Φ because they're redundant, not integrated
-        let base = HV16::random(42);
-        let homogeneous: Vec<HV16> = (0..10)
+        let base = BinaryHV::random(42);
+        let homogeneous: Vec<BinaryHV> = (0..10)
             .map(|i| {
                 let mut variant = base.clone();
                 // Flip just one bit - creates redundant/homogeneous system
@@ -83,8 +83,8 @@ mod tests {
         // Group A: components 0-4 (similar to each other)
         // Group B: components 5-9 (similar to each other)
         // But A and B have some correlation too
-        let group_a_base = HV16::random(100);
-        let group_b_base = HV16::random(200);
+        let group_a_base = BinaryHV::random(100);
+        let group_b_base = BinaryHV::random(200);
 
         let mut integrated = Vec::new();
         // Group A: similar to group_a_base
@@ -108,8 +108,8 @@ mod tests {
         let phi_integrated = phi_calc.compute(&integrated);
 
         // Test 3: Random/Modular (uncorrelated - low-medium Φ)
-        let random: Vec<HV16> = (0..10)
-            .map(|i| HV16::random((i * 1000) as u64))
+        let random: Vec<BinaryHV> = (0..10)
+            .map(|i| BinaryHV::random((i * 1000) as u64))
             .collect();
         let phi_random = phi_calc.compute(&random);
 
@@ -292,8 +292,8 @@ mod tests {
         let initial_stats = global_phi_stats();
 
         // Create unique components each time (different seeds)
-        let components1: Vec<_> = (0..5).map(|i| HV16::random(i as u64 * 12345)).collect();
-        let components2: Vec<_> = (0..7).map(|i| HV16::random((i + 100) as u64 * 67890)).collect();
+        let components1: Vec<_> = (0..5).map(|i| BinaryHV::random(i as u64 * 12345)).collect();
+        let components2: Vec<_> = (0..7).map(|i| BinaryHV::random((i + 100) as u64 * 67890)).collect();
 
         global_phi(&components1);
         global_phi(&components2);
@@ -439,7 +439,7 @@ mod tests {
         let _phi1 = phi.compute_incremental(&components);
 
         // Change one component
-        components[0] = HV16::random(99999);
+        components[0] = BinaryHV::random(99999);
 
         // Second computation
         let phi2 = phi.compute_incremental(&components);
@@ -464,7 +464,7 @@ mod tests {
 
         // Change 5 components (less than half)
         for i in 0..5 {
-            components[i] = HV16::random((i + 1000) as u64);
+            components[i] = BinaryHV::random((i + 1000) as u64);
         }
 
         // Second computation
@@ -489,7 +489,7 @@ mod tests {
 
         // Change more than half (11 out of 20)
         for i in 0..11 {
-            components[i] = HV16::random((i + 2000) as u64);
+            components[i] = BinaryHV::random((i + 2000) as u64);
         }
 
         // Second computation
@@ -518,7 +518,7 @@ mod tests {
         // Benchmark incremental updates
         let start_incremental = Instant::now();
         for i in 0..10 {
-            components[0] = HV16::random((i * 1000) as u64);
+            components[0] = BinaryHV::random((i * 1000) as u64);
             let _ = phi.compute_incremental(&components);
         }
         let incremental_time = start_incremental.elapsed();
@@ -527,7 +527,7 @@ mod tests {
         let mut phi2 = TieredPhi::new(ApproximationTier::SpectralConnectivity);
         let start_full = Instant::now();
         for i in 0..10 {
-            components[0] = HV16::random((i * 1000 + 500) as u64);
+            components[0] = BinaryHV::random((i * 1000 + 500) as u64);
             let _ = phi2.compute(&components); // Full computation
         }
         let full_time = start_full.elapsed();
@@ -568,14 +568,14 @@ mod tests {
         let mut phi = TieredPhi::new(ApproximationTier::SpectralConnectivity);
 
         // Empty components
-        let empty: Vec<HV16> = vec![];
+        let empty: Vec<BinaryHV> = vec![];
         let h = phi.compute_hierarchical(&empty);
         assert_eq!(h.num_clusters, 0);
         assert_eq!(h.micro_phi, 0.0);
         assert_eq!(h.emergence_ratio, 1.0);
 
         // Single component
-        let single = vec![HV16::random(0)];
+        let single = vec![BinaryHV::random(0)];
         let h = phi.compute_hierarchical(&single);
         assert_eq!(h.num_clusters, 1);
         assert_eq!(h.macro_phi, 0.0);
@@ -605,7 +605,7 @@ mod tests {
         let mut phi = TieredPhi::new(ApproximationTier::SpectralConnectivity);
 
         // Components that are very similar should cluster together
-        let base = HV16::random(42);
+        let base = BinaryHV::random(42);
         let mut components = vec![];
         for i in 0..10 {
             // Create slight variations by XORing with sparse vectors
@@ -633,12 +633,12 @@ mod tests {
 
         // Cluster 1: Components derived from seed 100
         for i in 0..5 {
-            components.push(HV16::random(100 + i));
+            components.push(BinaryHV::random(100 + i));
         }
 
         // Cluster 2: Components derived from seed 200
         for i in 0..5 {
-            components.push(HV16::random(200 + i));
+            components.push(BinaryHV::random(200 + i));
         }
 
         let h = phi.compute_hierarchical(&components);
@@ -709,7 +709,7 @@ mod tests {
     #[test]
     fn test_attribution_empty_components() {
         let mut phi = TieredPhi::new(ApproximationTier::SampledPartition);
-        let components: Vec<HV16> = vec![];
+        let components: Vec<BinaryHV> = vec![];
 
         let attr = phi.compute_attribution(&components);
 
@@ -724,7 +724,7 @@ mod tests {
     #[test]
     fn test_attribution_single_component() {
         let mut phi = TieredPhi::new(ApproximationTier::SampledPartition);
-        let components = vec![HV16::random(42)];
+        let components = vec![BinaryHV::random(42)];
 
         let attr = phi.compute_attribution(&components);
 
@@ -770,16 +770,16 @@ mod tests {
         let mut phi = TieredPhi::new(ApproximationTier::SampledPartition);
 
         // Create hub with specific seed, spokes with similar seeds
-        let hub = HV16::random(1000);
+        let hub = BinaryHV::random(1000);
         let mut components = vec![hub.clone()];
 
         // Create spokes that are all similar to hub but not each other
         for i in 1..6 {
             // Mix hub with unique component
-            let unique = HV16::random(i as u64);
+            let unique = BinaryHV::random(i as u64);
             // Create spoke by bundling hub pattern with unique pattern
             // This makes spokes connected to hub but less to each other
-            let spoke = HV16::bundle(&[hub.clone(), unique]);
+            let spoke = BinaryHV::bundle(&[hub.clone(), unique]);
             components.push(spoke);
         }
 
@@ -827,8 +827,8 @@ mod tests {
         let mut phi = TieredPhi::new(ApproximationTier::SampledPartition);
 
         // All identical components - should have uniform attribution
-        let base = HV16::random(999);
-        let components: Vec<HV16> = (0..5).map(|_| base.clone()).collect();
+        let base = BinaryHV::random(999);
+        let components: Vec<BinaryHV> = (0..5).map(|_| base.clone()).collect();
 
         let attr = phi.compute_attribution(&components);
 
@@ -878,14 +878,14 @@ mod tests {
 
         // Create systems with different integration patterns
         // System 1: Diverse components (should have distributed importance)
-        let diverse: Vec<HV16> = (0..6).map(|i| HV16::random(i as u64 * 1000)).collect();
+        let diverse: Vec<BinaryHV> = (0..6).map(|i| BinaryHV::random(i as u64 * 1000)).collect();
         let attr_diverse = phi.compute_attribution(&diverse);
 
         // System 2: Mostly similar components (may have more concentrated importance)
-        let base = HV16::random(42);
-        let similar: Vec<HV16> = (0..6).map(|i| {
-            let noise = HV16::random(i as u64);
-            HV16::bundle(&[base.clone(), base.clone(), base.clone(), noise])
+        let base = BinaryHV::random(42);
+        let similar: Vec<BinaryHV> = (0..6).map(|i| {
+            let noise = BinaryHV::random(i as u64);
+            BinaryHV::bundle(&[base.clone(), base.clone(), base.clone(), noise])
         }).collect();
         let attr_similar = phi.compute_attribution(&similar);
 
@@ -1182,7 +1182,7 @@ mod tests {
     #[test]
     fn test_pyramid_empty_components() {
         let mut pyramid = PhiPyramid::new();
-        let components: Vec<HV16> = vec![];
+        let components: Vec<BinaryHV> = vec![];
 
         let result = pyramid.compute(&components);
 

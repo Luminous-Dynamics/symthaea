@@ -32,7 +32,7 @@ use anyhow::Result;
 use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::HV16};
+use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig, TopologicalAssessment};
@@ -436,7 +436,7 @@ fn load_corpus(path: &str) -> Result<Vec<String>> {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn activation_to_hv16(activation: &[f32]) -> HV16 {
+fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
     let mut expanded = Vec::with_capacity(HDC_DIMENSION);
     let tiles = HDC_DIMENSION / activation.len();
     let remainder = HDC_DIMENSION % activation.len();
@@ -452,11 +452,11 @@ fn activation_to_hv16(activation: &[f32]) -> HV16 {
         expanded.push(activation[i]);
     }
 
-    HV16::from_bipolar(&expanded)
+    BinaryHV::from_bipolar(&expanded)
 }
 
 #[cfg(feature = "neural-bridge")]
-fn analyze_topology(hv: &HV16, config: &TopologyConfig) -> TopologicalAssessment {
+fn analyze_topology(hv: &BinaryHV, config: &TopologyConfig) -> TopologicalAssessment {
     let mut topology = ConsciousnessTopology::new(config.clone());
 
     topology.add_state(*hv);

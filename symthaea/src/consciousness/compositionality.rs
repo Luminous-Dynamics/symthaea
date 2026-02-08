@@ -53,7 +53,7 @@
 //! This transforms the primitive system from a toolkit to a **generative grammar**
 //! for reasoning.
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::{PrimitiveTier, Primitive, PrimitiveSystem};
 use anyhow::{Result, Context};
 use serde::{Deserialize, Serialize};
@@ -63,12 +63,12 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::fmt;
 
-/// Helper: Convert text to HV16 using deterministic hash-based encoding
-fn text_to_hv16(text: &str) -> HV16 {
+/// Helper: Convert text to BinaryHV using deterministic hash-based encoding
+fn text_to_hv16(text: &str) -> BinaryHV {
     let mut hasher = DefaultHasher::new();
     text.hash(&mut hasher);
     let seed = hasher.finish();
-    HV16::random(seed)
+    BinaryHV::random(seed)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -129,7 +129,7 @@ pub struct ComposedPrimitive {
     pub operand_b: Option<String>,
 
     /// HDC encoding of this composed primitive
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Metadata about expected behavior
     pub metadata: CompositionMetadata,
@@ -167,7 +167,7 @@ pub struct CompositionalityEngine {
     composed_primitives: HashMap<String, ComposedPrimitive>,
 
     /// HDC encodings for composition operators
-    operator_encodings: HashMap<CompositionType, HV16>,
+    operator_encodings: HashMap<CompositionType, BinaryHV>,
 
     /// Reference to base primitive system
     #[allow(dead_code)]
@@ -286,7 +286,7 @@ impl CompositionalityEngine {
                     confidence_threshold: 0
                 },
             };
-            self.operator_encodings.insert(key, HV16::random(seed));
+            self.operator_encodings.insert(key, BinaryHV::random(seed));
         }
     }
 
@@ -359,7 +359,7 @@ impl CompositionalityEngine {
             .context("Missing parallel operator encoding")?;
 
         // Compose: bind(op, bundle([f, g]))
-        let bundled = HV16::bundle(&[f_enc, g_enc]);
+        let bundled = BinaryHV::bundle(&[f_enc, g_enc]);
         let encoding = op_enc.bind(&bundled);
 
         let f_depth = self.get_depth(f_id);
@@ -412,7 +412,7 @@ impl CompositionalityEngine {
 
         // Compose: bind(op, bundle([f, g, pattern]))
         // The pattern is included so similarity checks can be done
-        let components = HV16::bundle(&[f_enc, g_enc, pattern_enc]);
+        let components = BinaryHV::bundle(&[f_enc, g_enc, pattern_enc]);
         let encoding = op_enc.bind(&components);
 
         let composed = ComposedPrimitive {
@@ -468,7 +468,7 @@ impl CompositionalityEngine {
         for i in 0..max_iter.min(10) {
             iterations.push(f_enc.permute(i));
         }
-        let iterated = HV16::bundle(&iterations);
+        let iterated = BinaryHV::bundle(&iterations);
         let encoding = op_enc.bind(&iterated);
 
         let composed = ComposedPrimitive {
@@ -557,7 +557,7 @@ impl CompositionalityEngine {
 
         // Fallback uses weighted bundle - primary is weighted higher
         // We simulate this by bundling primary twice
-        let weighted = HV16::bundle(&[p_enc, p_enc, f_enc]);
+        let weighted = BinaryHV::bundle(&[p_enc, p_enc, f_enc]);
         let encoding = op_enc.bind(&weighted);
 
         let composed = ComposedPrimitive {
@@ -591,7 +591,7 @@ impl CompositionalityEngine {
     /// Execute a composed primitive on input
     ///
     /// **Core Algorithm**: Recursively unpack and execute compositions
-    pub fn execute(&self, composition_id: &str, input: &HV16) -> Result<CompositionResult> {
+    pub fn execute(&self, composition_id: &str, input: &BinaryHV) -> Result<CompositionResult> {
         let start = std::time::Instant::now();
 
         // Check if it's a base primitive
@@ -635,7 +635,7 @@ impl CompositionalityEngine {
                 let f_result = self.execute(&composed.operand_a, input)?;
                 let g_result = self.execute(g_id, input)?;
 
-                let output = HV16::bundle(&[f_result.output, g_result.output]);
+                let output = BinaryHV::bundle(&[f_result.output, g_result.output]);
                 let mut path = f_result.execution_path;
                 path.extend(g_result.execution_path);
 
@@ -738,7 +738,7 @@ impl CompositionalityEngine {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Get encoding for a primitive (base or composed)
-    fn get_encoding(&self, id: &str) -> Result<HV16> {
+    fn get_encoding(&self, id: &str) -> Result<BinaryHV> {
         // Check composed first
         if let Some(composed) = self.composed_primitives.get(id) {
             return Ok(composed.encoding);
@@ -852,7 +852,7 @@ impl CompositionalityEngine {
 #[derive(Debug, Clone)]
 pub struct CompositionResult {
     /// The output hypervector
-    pub output: HV16,
+    pub output: BinaryHV,
 
     /// Confidence in the result (0.0-1.0)
     pub confidence: f32,
@@ -881,7 +881,7 @@ impl CompositionDiscovery {
     /// Find compositions that improve Φ on given test cases
     pub fn discover_beneficial_compositions(
         &self,
-        _test_inputs: &[HV16],
+        _test_inputs: &[BinaryHV],
         _base_primitive_ids: &[String],
         _max_compositions: usize,
     ) -> Vec<ComposedPrimitive> {
@@ -1008,7 +1008,7 @@ mod tests {
 
         // Create and execute a sequential composition
         let composed = engine.compose_sequential("encode", "transform").unwrap();
-        let input = HV16::random(42);
+        let input = BinaryHV::random(42);
 
         let result = engine.execute(&composed.id, &input).unwrap();
 
@@ -1023,7 +1023,7 @@ mod tests {
         let mut engine = create_test_engine();
 
         let composed = engine.compose_fixed_point("refine", Some(10), Some(0.99)).unwrap();
-        let input = HV16::random(42);
+        let input = BinaryHV::random(42);
 
         let result = engine.execute(&composed.id, &input).unwrap();
 

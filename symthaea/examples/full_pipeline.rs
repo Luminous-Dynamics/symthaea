@@ -19,7 +19,7 @@ use symthaea::consciousness::{
     CompositionalityEngine, CompositionalityConfig,
 };
 use symthaea::hdc::primitive_system::PrimitiveSystem;
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -122,7 +122,7 @@ fn main() {
     );
 
     // Execute the nested composition
-    let test_input = HV16::random(12345);
+    let test_input = BinaryHV::random(12345);
     let exec_result = comp.execute(&nested.id, &test_input)
         .expect("execution failed");
     println!(

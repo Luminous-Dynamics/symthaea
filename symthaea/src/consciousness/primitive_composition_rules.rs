@@ -4,7 +4,7 @@
 //! domains require different composition operators to preserve semantic
 //! structure through binding operations.
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::PrimitiveTier;
 
 /// A rule that defines how two primitives should be composed
@@ -12,7 +12,7 @@ pub trait CompositionRule: Send + Sync {
     /// Check if this rule applies to the given tier pair
     fn applies(&self, tier1: PrimitiveTier, tier2: PrimitiveTier) -> bool;
     /// Compose two hypervectors according to this rule
-    fn compose(&self, hv1: &HV16, hv2: &HV16, tier1: PrimitiveTier, tier2: PrimitiveTier) -> HV16;
+    fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, tier1: PrimitiveTier, tier2: PrimitiveTier) -> BinaryHV;
     /// Rule name for debugging
     fn name(&self) -> &'static str;
 }
@@ -30,7 +30,7 @@ impl CompositionRule for TemporalPhysicalRule {
         )
     }
 
-    fn compose(&self, hv1: &HV16, hv2: &HV16, _tier1: PrimitiveTier, _tier2: PrimitiveTier) -> HV16 {
+    fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, _tier1: PrimitiveTier, _tier2: PrimitiveTier) -> BinaryHV {
         // Permute hv1 to encode ordering, then bind
         let permuted = hv1.permute(1);
         permuted.bind(hv2)
@@ -50,7 +50,7 @@ impl CompositionRule for MathematicalRule {
             || matches!(tier2, PrimitiveTier::Mathematical)
     }
 
-    fn compose(&self, hv1: &HV16, hv2: &HV16, _tier1: PrimitiveTier, _tier2: PrimitiveTier) -> HV16 {
+    fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, _tier1: PrimitiveTier, _tier2: PrimitiveTier) -> BinaryHV {
         hv1.bind(hv2)
     }
 
@@ -68,9 +68,9 @@ impl CompositionRule for ConsciousnessRule {
             || matches!(tier2, PrimitiveTier::Consciousness | PrimitiveTier::MetaCognitive)
     }
 
-    fn compose(&self, hv1: &HV16, hv2: &HV16, _tier1: PrimitiveTier, _tier2: PrimitiveTier) -> HV16 {
+    fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, _tier1: PrimitiveTier, _tier2: PrimitiveTier) -> BinaryHV {
         // Bundle first (majority vote preserves both), then bind for uniqueness
-        let bundled = HV16::bundle(&[*hv1, *hv2]);
+        let bundled = BinaryHV::bundle(&[*hv1, *hv2]);
         bundled.bind(&hv1.bind(hv2))
     }
 
@@ -96,7 +96,7 @@ impl CompositionRule for CrossTierRule {
         tier1 != tier2
     }
 
-    fn compose(&self, hv1: &HV16, hv2: &HV16, tier1: PrimitiveTier, tier2: PrimitiveTier) -> HV16 {
+    fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, tier1: PrimitiveTier, tier2: PrimitiveTier) -> BinaryHV {
         let distance = Self::tier_distance(tier1, tier2) as usize;
         // Permute by tier distance to encode structural relationship
         let permuted = hv1.permute(distance.max(1));
@@ -127,7 +127,7 @@ impl CompositionRuleEngine {
     }
 
     /// Compose two HVs using the best matching rule
-    pub fn compose(&self, hv1: &HV16, hv2: &HV16, tier1: PrimitiveTier, tier2: PrimitiveTier) -> HV16 {
+    pub fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, tier1: PrimitiveTier, tier2: PrimitiveTier) -> BinaryHV {
         for rule in &self.rules {
             if rule.applies(tier1, tier2) {
                 return rule.compose(hv1, hv2, tier1, tier2);
@@ -183,8 +183,8 @@ mod tests {
     #[test]
     fn test_composition_produces_valid_hvs() {
         let engine = CompositionRuleEngine::new();
-        let hv1 = HV16::random(42);
-        let hv2 = HV16::random(99);
+        let hv1 = BinaryHV::random(42);
+        let hv2 = BinaryHV::random(99);
 
         let result = engine.compose(&hv1, &hv2, PrimitiveTier::Temporal, PrimitiveTier::Physical);
         // Result should be different from both inputs
@@ -198,8 +198,8 @@ mod tests {
     #[test]
     fn test_consciousness_rule_preserves_parents() {
         let rule = ConsciousnessRule;
-        let hv1 = HV16::random(42);
-        let hv2 = HV16::random(99);
+        let hv1 = BinaryHV::random(42);
+        let hv2 = BinaryHV::random(99);
         let composed = rule.compose(&hv1, &hv2, PrimitiveTier::Consciousness, PrimitiveTier::Physical);
 
         // Consciousness rule uses bundle+bind, result should exist

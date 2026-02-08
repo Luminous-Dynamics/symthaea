@@ -20,8 +20,7 @@ use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
-use symthaea_core::hdc::compat::HVCompat;
-use symthaea_core::hdc::HV16;
+use symthaea_core::hdc::BinaryHV;
 
 use crate::dynamics::cfc_coherence::{CfCCoherenceBridge, CoherenceConfig};
 use crate::consciousness::primitive_consciousness::{
@@ -39,7 +38,7 @@ pub enum RegimeTransition {
     /// Primitive has crystallized (Plastic -> Crystallized)
     Crystallized {
         primitive_name: String,
-        encoding: HV16,
+        encoding: BinaryHV,
     },
     /// Primitive has decrystallized (Crystallized -> Plastic)
     Decrystallized {
@@ -220,7 +219,7 @@ impl CfCPrimitive {
         let mut neuron = HdcLtcUnifiedNeuron::new(unified_config, seed);
 
         // Convert primitive encoding to continuous space as the attractor
-        let attractor = primitive.encoding.to_continuous_hv();
+        let attractor = primitive.encoding.to_continuous();
 
         // Initialize neuron state to the attractor
         neuron.set_state(attractor.clone());
@@ -440,12 +439,12 @@ impl StabilityRegimeProcessor {
     /// 6. Update coherence bridge
     pub fn process_input(
         &mut self,
-        input: &HV16,
+        input: &BinaryHV,
         dt: f32,
         timestamp: f64,
     ) -> (PrimitiveConsciousnessState, Vec<RegimeTransition>) {
         // 1. Convert input to continuous space
-        let continuous_input = input.to_continuous_hv();
+        let continuous_input = input.to_continuous();
 
         // Advance global cycle
         self.global_cycle += 1;
@@ -652,7 +651,7 @@ mod tests {
             name: name.to_string(),
             tier,
             domain: "test".to_string(),
-            encoding: HV16::random(name.len() as u64 * 31 + tier as u64),
+            encoding: BinaryHV::random(name.len() as u64 * 31 + tier as u64),
             definition: name.to_string(),
             is_base: true,
             derivation: None,
@@ -812,7 +811,7 @@ mod tests {
     #[test]
     fn test_process_input_basic() {
         let mut processor = StabilityRegimeProcessor::new();
-        let input = HV16::random(42);
+        let input = BinaryHV::random(42);
 
         let (state, _transitions) = processor.process_input(&input, 0.1, 0.0);
         // Should produce a valid state with phi >= 0
@@ -822,7 +821,7 @@ mod tests {
     #[test]
     fn test_coherence_feedback() {
         let mut processor = StabilityRegimeProcessor::new();
-        let input = HV16::random(42);
+        let input = BinaryHV::random(42);
 
         // Run multiple steps
         for i in 0..10 {

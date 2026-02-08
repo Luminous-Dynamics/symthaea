@@ -45,18 +45,18 @@ use crate::consciousness::primitive_reasoning::{
     PrimitiveReasoner, ReasonerConfig, ReasoningChain, TransformationType,
 };
 use crate::hdc::primitive_system::{Primitive, PrimitiveTier};
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 
 /// Get a standard set of primitives for adaptive reasoning
 fn get_standard_primitives() -> Vec<Primitive> {
     // Create basic primitives for reasoning operations
     vec![
-        Primitive::base("identity", PrimitiveTier::NSM, "logic", HV16::random(100), "x -> x"),
-        Primitive::base("transform", PrimitiveTier::NSM, "logic", HV16::random(101), "x -> f(x)"),
-        Primitive::base("compose", PrimitiveTier::Mathematical, "logic", HV16::random(102), "(f,g) -> f∘g"),
-        Primitive::base("abstract", PrimitiveTier::Physical, "logic", HV16::random(103), "x -> [x]"),
-        Primitive::base("ground", PrimitiveTier::Physical, "logic", HV16::random(104), "[x] -> x"),
-        Primitive::base("resonate", PrimitiveTier::Mathematical, "logic", HV16::random(105), "(x,y) -> x⊕y"),
+        Primitive::base("identity", PrimitiveTier::NSM, "logic", BinaryHV::random(100), "x -> x"),
+        Primitive::base("transform", PrimitiveTier::NSM, "logic", BinaryHV::random(101), "x -> f(x)"),
+        Primitive::base("compose", PrimitiveTier::Mathematical, "logic", BinaryHV::random(102), "(f,g) -> f∘g"),
+        Primitive::base("abstract", PrimitiveTier::Physical, "logic", BinaryHV::random(103), "x -> [x]"),
+        Primitive::base("ground", PrimitiveTier::Physical, "logic", BinaryHV::random(104), "[x] -> x"),
+        Primitive::base("resonate", PrimitiveTier::Mathematical, "logic", BinaryHV::random(105), "(x,y) -> x⊕y"),
     ]
 }
 use anyhow::Result;
@@ -103,7 +103,7 @@ impl ReasoningState {
     }
 
     /// Extract feature vector from HV
-    fn extract_features(hv: &HV16) -> Vec<f64> {
+    fn extract_features(hv: &BinaryHV) -> Vec<f64> {
         // Simple features: popcount, chunks of active bits
         let popcount = hv.popcount() as f64 / 16384.0;
 
@@ -382,7 +382,7 @@ impl AdaptiveReasoner {
     }
 
     /// Reason with RL-guided primitive selection
-    pub fn reason_adaptive(&mut self, question: HV16, max_steps: usize) -> Result<ReasoningChain> {
+    pub fn reason_adaptive(&mut self, question: BinaryHV, max_steps: usize) -> Result<ReasoningChain> {
         let mut chain = crate::consciousness::primitive_reasoning::ReasoningChain::new(question);
 
         // Get available primitives from standard tier set
@@ -501,7 +501,7 @@ mod tests {
 
     #[test]
     fn test_state_representation() {
-        let question = HV16::random(42);
+        let question = BinaryHV::random(42);
         let chain = crate::consciousness::primitive_reasoning::ReasoningChain::new(question);
         let state = ReasoningState::from_chain(&chain);
 
@@ -513,7 +513,7 @@ mod tests {
     fn test_experience_replay() {
         let mut agent = QLearningAgent::new(0.1, 0.9, 0.3);
 
-        let question = HV16::random(42);
+        let question = BinaryHV::random(42);
         let chain = crate::consciousness::primitive_reasoning::ReasoningChain::new(question.clone());
 
         let state = ReasoningState::from_chain(&chain);

@@ -20,7 +20,7 @@ use anyhow::Result;
 use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -74,7 +74,7 @@ fn run_experiment() -> Result<()> {
     println!("================================================================\n");
 
     println!("Extracting phenomenal...");
-    let mut phen_hvs: Vec<HV16> = Vec::new();
+    let mut phen_hvs: Vec<BinaryHV> = Vec::new();
     for (i, concept) in phenomenal.iter().enumerate() {
         if i % 20 == 0 { print!("  {}/{}\\r", i, phenomenal.len()); }
         let acts = extractor.extract_layers(concept, &[21])?;
@@ -83,7 +83,7 @@ fn run_experiment() -> Result<()> {
     println!("  Done                    ");
 
     println!("Extracting functional...");
-    let mut func_hvs: Vec<HV16> = Vec::new();
+    let mut func_hvs: Vec<BinaryHV> = Vec::new();
     for (i, concept) in functional.iter().enumerate() {
         if i % 20 == 0 { print!("  {}/{}\\r", i, functional.len()); }
         let acts = extractor.extract_layers(concept, &[21])?;
@@ -263,7 +263,7 @@ fn load_corpus(path: &str) -> Result<Vec<String>> {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn activation_to_hv16(activation: &[f32]) -> HV16 {
+fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
     use symthaea_core::hdc::HDC_DIMENSION;
 
     let mut expanded = Vec::with_capacity(HDC_DIMENSION);
@@ -281,11 +281,11 @@ fn activation_to_hv16(activation: &[f32]) -> HV16 {
         expanded.push(activation[i]);
     }
 
-    HV16::from_bipolar(&expanded)
+    BinaryHV::from_bipolar(&expanded)
 }
 
 #[cfg(feature = "neural-bridge")]
-fn compute_unity(hv: &HV16, config: &TopologyConfig) -> f64 {
+fn compute_unity(hv: &BinaryHV, config: &TopologyConfig) -> f64 {
     let mut topology = ConsciousnessTopology::new(config.clone());
 
     topology.add_state(*hv);

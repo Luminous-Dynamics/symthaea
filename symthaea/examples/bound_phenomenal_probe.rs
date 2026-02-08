@@ -23,7 +23,7 @@ use symthaea::perception::{
 };
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::HV16;
+use symthaea_core::hdc::BinaryHV;
 
 /// Phenomenal concept pairs that humans report as unified experiences
 const UNIFIED_PHENOMENAL_PAIRS: &[(&str, &str)] = &[
@@ -112,7 +112,7 @@ fn main() -> Result<()> {
         let packed_a = probe.bridge_mut().encode_to_hdc(a)?;
         let packed_b = probe.bridge_mut().encode_to_hdc(b)?;
 
-        // Convert to HV16
+        // Convert to BinaryHV
         let hv_a = packed_to_hv16(&packed_a);
         let hv_b = packed_to_hv16(&packed_b);
 
@@ -271,12 +271,12 @@ fn main() -> Result<()> {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn packed_to_hv16(packed: &symthaea_core::hdc::PackedBipolar) -> HV16 {
-    // Convert PackedBipolar to HV16
+fn packed_to_hv16(packed: &symthaea_core::hdc::PackedBipolar) -> BinaryHV {
+    // Convert PackedBipolar to BinaryHV
     let bipolar = packed.to_bipolar();
     // Convert i8 to f32 for from_bipolar
     let bipolar_f32: Vec<f32> = bipolar.iter().map(|&v| v as f32).collect();
-    HV16::from_bipolar(&bipolar_f32)
+    BinaryHV::from_bipolar(&bipolar_f32)
 }
 
 #[cfg(not(feature = "neural-bridge"))]

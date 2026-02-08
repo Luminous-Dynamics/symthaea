@@ -149,8 +149,8 @@ impl SemanticValueEmbedder {
                 // Fallback to random if tier is empty (e.g., NSM)
                 bases.insert(harmony, ContinuousHV::random(dim, harmony as u64 + 42));
             } else {
-                // Bundle primitive encodings (HV16 → ContinuousHV conversion)
-                // Convert binary HV16 bits to bipolar ContinuousHV values (-1.0/+1.0)
+                // Bundle primitive encodings (BinaryHV → ContinuousHV conversion)
+                // Convert binary BinaryHV bits to bipolar ContinuousHV values (-1.0/+1.0)
                 let real_hvs: Vec<ContinuousHV> = primitives
                     .iter()
                     .take(16) // Limit to avoid over-bundling
@@ -168,11 +168,11 @@ impl SemanticValueEmbedder {
         bases
     }
 
-    /// Convert HV16 to ContinuousHV with specified dimension
+    /// Convert BinaryHV to ContinuousHV with specified dimension
     ///
     /// Maps binary bits to bipolar values: 0 → -1.0, 1 → +1.0
-    /// Uses HV16::to_bipolar() then resamples to target dimension
-    fn hv16_to_real(hv: &symthaea_core::hdc::binary_hv::HV16, dim: usize) -> ContinuousHV {
+    /// Uses BinaryHV::to_bipolar() then resamples to target dimension
+    fn hv16_to_real(hv: &symthaea_core::hdc::binary_hv::BinaryHV, dim: usize) -> ContinuousHV {
         let bipolar = hv.to_bipolar(); // Returns Vec<f32> with ±1.0 values
 
         if dim == bipolar.len() {

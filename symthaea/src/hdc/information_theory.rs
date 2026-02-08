@@ -20,11 +20,11 @@
 //!
 //! ## Implementation Strategy
 //!
-//! Both binary hypervectors ([`HV16`]) and real-valued hypervectors ([`ContinuousHV`])
+//! Both binary hypervectors ([`BinaryHV`]) and real-valued hypervectors ([`ContinuousHV`])
 //! are converted to discrete probability distributions before applying
 //! information-theoretic formulae:
 //!
-//! - **HV16**: Windowed bit-pattern histograms (e.g., 4-bit windows over the
+//! - **BinaryHV**: Windowed bit-pattern histograms (e.g., 4-bit windows over the
 //!   16,384-bit vector yield pattern frequencies across 16 possible symbols).
 //! - **ContinuousHV**: Uniform histogram binning over the value range, with
 //!   configurable bin count.
@@ -34,7 +34,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
-use crate::hdc::HV16;
+use crate::hdc::BinaryHV;
 use crate::hdc::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -56,7 +56,7 @@ pub struct InformationTheoryConfig {
     /// Small constant added inside logarithms to avoid log(0). Must be > 0.
     pub epsilon: f64,
 
-    /// Window size (in bits) for extracting discrete symbols from HV16.
+    /// Window size (in bits) for extracting discrete symbols from BinaryHV.
     /// Must divide 8 evenly (1, 2, 4, or 8). Determines the alphabet size
     /// as 2^window_bits.
     pub window_bits: usize,
@@ -211,7 +211,7 @@ fn marginal_column(joint: &[f64], ny: usize) -> Vec<f64> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// HV16 → Distribution Conversion
+// BinaryHV → Distribution Conversion
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Extract a discrete probability distribution from a binary hypervector by
@@ -219,7 +219,7 @@ fn marginal_column(joint: &[f64], ny: usize) -> Vec<f64> {
 ///
 /// With `window_bits = 4`, each byte yields two 4-bit symbols (0..15). The
 /// histogram over these symbols is normalised to form a distribution.
-pub fn hv16_to_distribution(hv: &HV16, config: &InformationTheoryConfig) -> Vec<f64> {
+pub fn hv16_to_distribution(hv: &BinaryHV, config: &InformationTheoryConfig) -> Vec<f64> {
     let window_bits = config.window_bits.clamp(1, 8);
     let symbols_per_byte = 8 / window_bits;
     let alphabet_size = 1_usize << window_bits;
@@ -243,11 +243,11 @@ pub fn hv16_to_distribution(hv: &HV16, config: &InformationTheoryConfig) -> Vec<
     counts.iter().map(|&c| c as f64 / total as f64).collect()
 }
 
-/// Build a joint distribution from two HV16 vectors by pairing their
+/// Build a joint distribution from two BinaryHV vectors by pairing their
 /// windowed symbols at each position.
 pub fn hv16_joint_distribution(
-    a: &HV16,
-    b: &HV16,
+    a: &BinaryHV,
+    b: &BinaryHV,
     config: &InformationTheoryConfig,
 ) -> (Vec<f64>, usize) {
     let window_bits = config.window_bits.clamp(1, 8);
@@ -365,7 +365,7 @@ pub fn real_hv_joint_distribution(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Compute Shannon entropy of a binary hypervector's bit-pattern distribution.
-pub fn entropy_hv16(hv: &HV16, config: &InformationTheoryConfig) -> f64 {
+pub fn entropy_hv16(hv: &BinaryHV, config: &InformationTheoryConfig) -> f64 {
     let dist = hv16_to_distribution(hv, config);
     shannon_entropy(&dist, config.epsilon)
 }
@@ -377,7 +377,7 @@ pub fn entropy_real_hv(hv: &ContinuousHV, config: &InformationTheoryConfig) -> f
 }
 
 /// Compute mutual information between two binary hypervectors.
-pub fn mi_hv16(a: &HV16, b: &HV16, config: &InformationTheoryConfig) -> f64 {
+pub fn mi_hv16(a: &BinaryHV, b: &BinaryHV, config: &InformationTheoryConfig) -> f64 {
     let (joint, ny) = hv16_joint_distribution(a, b, config);
     mutual_information(&joint, ny, config.epsilon)
 }
@@ -389,7 +389,7 @@ pub fn mi_real_hv(a: &ContinuousHV, b: &ContinuousHV, config: &InformationTheory
 }
 
 /// Compute normalised mutual information between two binary hypervectors.
-pub fn nmi_hv16(a: &HV16, b: &HV16, config: &InformationTheoryConfig) -> f64 {
+pub fn nmi_hv16(a: &BinaryHV, b: &BinaryHV, config: &InformationTheoryConfig) -> f64 {
     let (joint, ny) = hv16_joint_distribution(a, b, config);
     normalised_mutual_information(&joint, ny, config.epsilon)
 }
@@ -412,7 +412,7 @@ pub fn nmi_real_hv(a: &ContinuousHV, b: &ContinuousHV, config: &InformationTheor
 ///   TE(X→Y) = H(Y_t | Y_{t-1}^k) - H(Y_t | Y_{t-1}^k, X_{t-1}^l)
 ///
 /// Internally, each HDC state is projected to a scalar summary (density for
-/// HV16, mean for ContinuousHV) and then discretised into histogram bins. This makes
+/// BinaryHV, mean for ContinuousHV) and then discretised into histogram bins. This makes
 /// estimation tractable even for 16,384-dimensional vectors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferEntropyEstimator {
@@ -449,7 +449,7 @@ impl TransferEntropyEstimator {
     }
 
     /// Record a new pair of binary hypervector observations at time t.
-    pub fn observe_hv16(&mut self, x: &HV16, y: &HV16) {
+    pub fn observe_hv16(&mut self, x: &BinaryHV, y: &BinaryHV) {
         self.push_scalars(x.density() as f64, y.density() as f64);
     }
 
@@ -884,12 +884,12 @@ mod tests {
         );
     }
 
-    // ── HV16 Distribution Tests ─────────────────────────────────────────────
+    // ── BinaryHV Distribution Tests ─────────────────────────────────────────────
 
     #[test]
     fn hv16_ones_has_deterministic_pattern() {
         let config = InformationTheoryConfig::default();
-        let hv = HV16::ones();
+        let hv = BinaryHV::ones();
         let dist = hv16_to_distribution(&hv, &config);
         // All bytes are 0xFF. With window_bits=4, both nibbles are 0xF = 15.
         // So all probability mass should be on symbol 15.
@@ -903,8 +903,8 @@ mod tests {
     #[test]
     fn hv16_entropy_increases_with_randomness() {
         let config = InformationTheoryConfig::default();
-        let zeros = HV16::zero();
-        let random = HV16::random(42);
+        let zeros = BinaryHV::zero();
+        let random = BinaryHV::random(42);
         let h_zeros = entropy_hv16(&zeros, &config);
         let h_random = entropy_hv16(&random, &config);
         // Random HV should have higher entropy than constant
@@ -917,7 +917,7 @@ mod tests {
     #[test]
     fn hv16_mi_identical_equals_entropy() {
         let config = InformationTheoryConfig::default();
-        let hv = HV16::random(99);
+        let hv = BinaryHV::random(99);
         let h = entropy_hv16(&hv, &config);
         let mi = mi_hv16(&hv, &hv, &config);
         assert!(
@@ -929,13 +929,13 @@ mod tests {
     #[test]
     fn hv16_mi_symmetry() {
         let config = InformationTheoryConfig::default();
-        let a = HV16::random(100);
-        let b = HV16::random(200);
+        let a = BinaryHV::random(100);
+        let b = BinaryHV::random(200);
         let mi_ab = mi_hv16(&a, &b, &config);
         let mi_ba = mi_hv16(&b, &a, &config);
         assert!(
             (mi_ab - mi_ba).abs() < 1e-9,
-            "MI should be symmetric for HV16: {mi_ab:.6} vs {mi_ba:.6}"
+            "MI should be symmetric for BinaryHV: {mi_ab:.6} vs {mi_ba:.6}"
         );
     }
 

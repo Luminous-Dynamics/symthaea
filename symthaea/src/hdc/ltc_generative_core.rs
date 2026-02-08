@@ -39,7 +39,7 @@
 //!
 //! The LLM then translates primitive sequences to natural language.
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 use symthaea_core::hdc::semantic_decoder::{SemanticDecoder, DecodedExpression};
 use crate::hdc::hd_ltc_codec::HDLTCCodec;
@@ -141,10 +141,10 @@ pub struct LTCGenerativeCore {
     decoder: SemanticDecoder,
 
     /// Primitive embeddings cache (name → HV)
-    primitive_embeddings: HashMap<String, HV16>,
+    primitive_embeddings: HashMap<String, BinaryHV>,
 
     /// Context: recent primitive HVs
-    context: VecDeque<HV16>,
+    context: VecDeque<BinaryHV>,
 
     /// Recurrent state (accumulated thought)
     recurrent_state: Vec<f32>,
@@ -190,7 +190,7 @@ impl LTCGenerativeCore {
     }
 
     /// Generate a thought starting from a seed HV
-    pub fn generate(&mut self, seed: &HV16, current_phi: f32) -> GeneratedThought {
+    pub fn generate(&mut self, seed: &BinaryHV, current_phi: f32) -> GeneratedThought {
         self.total_generations += 1;
 
         let mut primitives = Vec::new();
@@ -314,9 +314,9 @@ impl LTCGenerativeCore {
     }
 
     /// Compute weighted context embedding
-    fn compute_context_embedding(&self) -> HV16 {
+    fn compute_context_embedding(&self) -> BinaryHV {
         if self.context.is_empty() {
-            return HV16::random(0);
+            return BinaryHV::random(0);
         }
 
         // Recent items get higher weight
@@ -329,11 +329,11 @@ impl LTCGenerativeCore {
         for (i, hv) in self.context.iter().enumerate() {
             // Bind with position vector (rotate by index)
             let pos_seed = 0xB0510000 + i as u64;  // Position encoding seed
-            let pos_vec = HV16::random(pos_seed);
+            let pos_vec = BinaryHV::random(pos_seed);
             bundled_hvs.push(hv.bind(&pos_vec));
         }
 
-        HV16::bundle(&bundled_hvs)
+        BinaryHV::bundle(&bundled_hvs)
     }
 
     /// Sample from primitive distribution with temperature
@@ -513,7 +513,7 @@ impl LTCGenerativeCore {
         // Generate continuation
         let continuation_seed = self.context.back()
             .cloned()
-            .unwrap_or_else(|| HV16::random(0));
+            .unwrap_or_else(|| BinaryHV::random(0));
 
         // Generate more
         let continued = self.generate(&continuation_seed, current_phi);
@@ -556,7 +556,7 @@ impl LTCGenerativeCore {
     /// ```
     pub fn generate_with_harmonics<F>(
         &mut self,
-        seed: &HV16,
+        seed: &BinaryHV,
         current_phi: f32,
         harmonic_weight: F,
     ) -> GeneratedThought
@@ -699,7 +699,7 @@ mod tests {
     #[test]
     fn test_basic_generation() {
         let mut core = LTCGenerativeCore::default();
-        let seed = HV16::random(42);
+        let seed = BinaryHV::random(42);
 
         let thought = core.generate(&seed, 0.5);
 
@@ -713,7 +713,7 @@ mod tests {
     #[test]
     fn test_phi_guided_generation() {
         let mut core = LTCGenerativeCore::default();
-        let seed = HV16::random(123);
+        let seed = BinaryHV::random(123);
 
         // High Φ should influence generation
         let high_phi_thought = core.generate(&seed, 0.8);
@@ -731,7 +731,7 @@ mod tests {
     #[test]
     fn test_continuation() {
         let mut core = LTCGenerativeCore::default();
-        let seed = HV16::random(456);
+        let seed = BinaryHV::random(456);
 
         let initial = core.generate(&seed, 0.5);
         println!("Initial: {}", initial.to_string());
@@ -746,7 +746,7 @@ mod tests {
     #[test]
     fn test_harmonic_guided_generation() {
         let mut core = LTCGenerativeCore::default();
-        let seed = HV16::random(789);
+        let seed = BinaryHV::random(789);
 
         // Define harmonic weight functions for different harmonies
 
@@ -803,7 +803,7 @@ mod tests {
     #[test]
     fn test_harmonic_weights_affect_primitive_selection() {
         let mut core = LTCGenerativeCore::default();
-        let seed = HV16::random(999);
+        let seed = BinaryHV::random(999);
 
         // Extreme weight for KNOW-related primitives
         let know_boost = |name: &str| -> f32 {

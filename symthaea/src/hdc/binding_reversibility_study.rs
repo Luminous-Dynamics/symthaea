@@ -50,7 +50,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 /// Configuration for the reversibility study
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -364,12 +364,12 @@ impl ReversibilityStudy {
         let seed_a = self.hash_concept(&pair.concept_a);
         let seed_b = self.hash_concept(&pair.concept_b);
 
-        let hv_a = HV16::random(seed_a);
-        let hv_b = HV16::random(seed_b);
+        let hv_a = BinaryHV::random(seed_a);
+        let hv_b = BinaryHV::random(seed_b);
 
         // Compute binding and bundling
         let bound = hv_a.bind(&hv_b);
-        let bundled = HV16::bundle(&[hv_a, hv_b]);
+        let bundled = BinaryHV::bundle(&[hv_a, hv_b]);
 
         // === Reversibility Tests ===
 
@@ -943,8 +943,8 @@ mod tests {
     #[test]
     fn test_xor_reversibility() {
         // This is the core mathematical property we're testing
-        let a = HV16::random(100);
-        let b = HV16::random(200);
+        let a = BinaryHV::random(100);
+        let b = BinaryHV::random(200);
 
         let bound = a.bind(&b);
         let recovered_a = bound.bind(&b);
@@ -965,10 +965,10 @@ mod tests {
 
     #[test]
     fn test_bundle_non_reversibility() {
-        let a = HV16::random(100);
-        let b = HV16::random(200);
+        let a = BinaryHV::random(100);
+        let b = BinaryHV::random(200);
 
-        let bundled = HV16::bundle(&[a, b]);
+        let bundled = BinaryHV::bundle(&[a, b]);
 
         // Try to "recover" A by XORing with B (the best heuristic available)
         let attempt_a = bundled.bind(&b);
@@ -993,11 +993,11 @@ mod tests {
 
     #[test]
     fn test_component_preservation_properties() {
-        let a = HV16::random(100);
-        let b = HV16::random(200);
+        let a = BinaryHV::random(100);
+        let b = BinaryHV::random(200);
 
         let bound = a.bind(&b);
-        let bundled = HV16::bundle(&[a, b]);
+        let bundled = BinaryHV::bundle(&[a, b]);
 
         // Binding: result is orthogonal to both components (~0.5 similarity)
         let bind_sim_a = a.similarity(&bound);

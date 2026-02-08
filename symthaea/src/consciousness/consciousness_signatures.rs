@@ -87,7 +87,7 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 
 /// Configuration for consciousness signature generation
 #[derive(Debug, Clone)]
@@ -176,7 +176,7 @@ pub struct ConsciousnessSnapshot {
     /// Temporal position (normalized time)
     pub temporal_position: f64,
     /// Raw HDC state for fine-grained comparison
-    pub hdc_state: Option<HV16>,
+    pub hdc_state: Option<BinaryHV>,
 }
 
 /// A consciousness signature - unique fingerprint of conscious state

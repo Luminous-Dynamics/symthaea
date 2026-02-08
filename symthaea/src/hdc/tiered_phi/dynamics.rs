@@ -7,7 +7,7 @@
 //! - **Temporal Dynamics**: Track consciousness evolution over time, detect phase transitions
 //! - **Attractor Analysis**: Model consciousness as a dynamical system with attractor states
 
-// Note: HV16 and TieredPhi/ApproximationTier are available via super if needed
+// Note: BinaryHV and TieredPhi/ApproximationTier are available via super if needed
 
 /// Configuration for Φ dynamics tracking
 #[derive(Debug, Clone)]

@@ -38,7 +38,7 @@
 use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, Instant};
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 
 // ============================================================================
@@ -1039,7 +1039,7 @@ pub struct UnifiedConsciousnessResult {
 pub struct PhiMethodPrimitiveGrounding {
     pub method: PhiMethod,
     pub nsm_primitives: Vec<String>,
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     pub computational_rigor: f64,
 }
 
@@ -1081,7 +1081,7 @@ impl PhiMethodPrimitiveGrounding {
 pub struct UnifiedEmotionPrimitiveGrounding {
     pub emotion: UnifiedEmotion,
     pub nsm_primitives: Vec<String>,
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     pub valence_polarity: i8,
 }
 
@@ -1122,7 +1122,7 @@ impl UnifiedEmotionPrimitiveGrounding {
 pub struct EmotionalPatternPrimitiveGrounding {
     pub pattern: EmotionalPattern,
     pub nsm_primitives: Vec<String>,
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 }
 
 impl EmotionalPatternPrimitiveGrounding {
@@ -1147,7 +1147,7 @@ impl EmotionalPatternPrimitiveGrounding {
 pub struct CausalRelationPrimitiveGrounding {
     pub relation: CausalRelation,
     pub nsm_primitives: Vec<String>,
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 }
 
 impl CausalRelationPrimitiveGrounding {
@@ -1173,7 +1173,7 @@ impl CausalRelationPrimitiveGrounding {
 pub struct DialogueDepthPrimitiveGrounding {
     pub depth: DialogueDepth,
     pub nsm_primitives: Vec<String>,
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     pub processing_depth: u8,
 }
 
@@ -1274,7 +1274,7 @@ impl ConsciousnessUnificationNSMGrounding {
     }
 
     /// Query emotions by semantic similarity
-    pub fn query_emotions(&self, query: &HV16, threshold: f32) -> Vec<(&UnifiedEmotion, f32)> {
+    pub fn query_emotions(&self, query: &BinaryHV, threshold: f32) -> Vec<(&UnifiedEmotion, f32)> {
         let mut results: Vec<_> = self.emotions.iter()
             .map(|(e, g)| (e, g.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
@@ -1285,8 +1285,8 @@ impl ConsciousnessUnificationNSMGrounding {
 }
 
 /// Encode NSM primitives into HDC vector via sequential binding
-fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
-    let vectors: Vec<HV16> = primitives
+fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
+    let vectors: Vec<BinaryHV> = primitives
         .iter()
         .map(|name| {
             if let Some(p) = system.get(name) {
@@ -1295,18 +1295,18 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
                 p.encoding.clone()
             } else {
                 let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-                HV16::random(seed)
+                BinaryHV::random(seed)
             }
         })
         .collect();
 
     if vectors.is_empty() {
-        return HV16::random(0);
+        return BinaryHV::random(0);
     }
 
     let mut result = vectors[0].clone();
     for (i, v) in vectors.iter().enumerate().skip(1) {
-        let position_hv = HV16::random(i as u64 * 1000);
+        let position_hv = BinaryHV::random(i as u64 * 1000);
         let positioned = v.bind(&position_hv);
         result = result.bind(&positioned);
     }

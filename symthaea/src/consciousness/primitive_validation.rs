@@ -521,7 +521,7 @@ impl PrimitiveValidationExperiment {
     ///
     /// Measures real integrated information for reasoning without primitive structure.
     fn measure_phi_without_primitives(&mut self, task: &ReasoningTask) -> Result<f64> {
-        use crate::hdc::HV16;
+        use crate::hdc::BinaryHV;
 
         // Create a reasoning state without primitives
         // The reasoning is more fragmented - just raw components without structure
@@ -534,7 +534,7 @@ impl PrimitiveValidationExperiment {
             ReasoningTask::Custom { complexity, .. } => 200 + (*complexity as u64 % 100),
         };
 
-        let task_hv = HV16::random(task_seed);
+        let task_hv = BinaryHV::random(task_seed);
 
         // 2. Create reasoning components based on task complexity
         let complexity = task.complexity() as usize;
@@ -542,7 +542,7 @@ impl PrimitiveValidationExperiment {
 
         let mut components = vec![task_hv];
         for i in 1..num_components {
-            components.push(HV16::random(task_seed + i as u64));
+            components.push(BinaryHV::random(task_seed + i as u64));
         }
 
         // 3. Measure Φ WITHOUT primitive structure
@@ -559,7 +559,7 @@ impl PrimitiveValidationExperiment {
     /// Measures real integrated information for reasoning WITH primitive structure.
     /// Primitives create higher integration through structured, hierarchical composition.
     fn measure_phi_with_primitives(&mut self, task: &ReasoningTask) -> Result<(f64, usize)> {
-        use crate::hdc::HV16;
+        use crate::hdc::BinaryHV;
 
         // Identify which primitives would be used for this task
         let primitives_used = match task {
@@ -587,7 +587,7 @@ impl PrimitiveValidationExperiment {
             ReasoningTask::Custom { complexity, .. } => 200 + (*complexity as u64 % 100),
         };
 
-        let task_hv = HV16::random(task_seed);
+        let task_hv = BinaryHV::random(task_seed);
 
         // 2. Create reasoning components WITH primitive structure
         let complexity = task.complexity() as usize;
@@ -601,7 +601,7 @@ impl PrimitiveValidationExperiment {
 
         for i in 1..num_components {
             // Each component is structured using a primitive
-            let base_component = HV16::random(task_seed + i as u64);
+            let base_component = BinaryHV::random(task_seed + i as u64);
 
             if i <= primitives_used && i - 1 < tier_primitives.len() {
                 // Bind with primitive to create structured reasoning

@@ -36,7 +36,7 @@ use crate::consciousness::primitive_evolution::{
 use crate::consciousness::primitive_reasoning::ReasoningChain;
 use crate::physiology::social_coherence::CollectivePrimitiveEvolution;
 use crate::hdc::primitive_system::PrimitiveTier;
-use crate::hdc::HV16;
+use crate::hdc::BinaryHV;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -294,7 +294,7 @@ impl UnifiedIntelligence {
         )?;
 
         // Step 3: Perform meta-cognitive reasoning
-        let mut chain = ReasoningChain::new(HV16::random(self.stats.total_episodes as u64));
+        let mut chain = ReasoningChain::new(BinaryHV::random(self.stats.total_episodes as u64));
         let meta_result = meta_reasoner.meta_reason(query, primitives.clone(), &mut chain)?;
 
         // Step 4: Contribute successful primitives to collective
