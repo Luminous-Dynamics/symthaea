@@ -155,6 +155,7 @@ impl HierarchicalCfC {
                 tau_range: (tau_min, tau_max),
                 dropout: 0.0,
                 online_learning: None,
+                gradient_clip: 1.0,
             };
 
             let net_config = CfCNetworkConfig {

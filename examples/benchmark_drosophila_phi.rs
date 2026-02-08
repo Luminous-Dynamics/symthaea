@@ -139,8 +139,12 @@ fn main() {
     ];
 
     let mut region_phis = Vec::new();
-    for (name, n, density, modules, _recurrent) in &regions {
-        let hvs = generate_modular_network(*n, HDC_DIM, *density, *modules, 42);
+    for (idx, (name, n, density, modules, recurrent)) in regions.iter().enumerate() {
+        // Use region index as seed offset so each region gets unique connectivity
+        let seed = 42 + idx as u64 * 1000;
+        // Recurrent regions get higher intra-module coupling (density * 1.2)
+        let effective_density = if *recurrent { *density * 1.2 } else { *density };
+        let hvs = generate_modular_network(*n, HDC_DIM, effective_density, *modules, seed);
 
         let t = Instant::now();
         let phi_result = phi_engine.compute(&hvs);

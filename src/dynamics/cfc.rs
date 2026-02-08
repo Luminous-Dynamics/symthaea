@@ -108,6 +108,9 @@ pub struct CfCConfig {
     /// Dropout rate (0.0 = no dropout)
     pub dropout: f32,
 
+    /// Gradient clip threshold (default 1.0; use higher values like 5.0 for classification tasks)
+    pub gradient_clip: f32,
+
     /// Online learning configuration (for inference-time adaptation)
     pub online_learning: Option<OnlineLearningConfig>,
 }
@@ -123,6 +126,7 @@ impl Default for CfCConfig {
             activation: ActivationType::SiLU,
             tau_range: (0.1, 10.0),
             dropout: 0.1,
+            gradient_clip: 1.0,
             online_learning: None,
         }
     }
@@ -725,10 +729,11 @@ impl CfCCell {
         adam.t += 1;
         let t = adam.t as f32;
 
-        // Conservative gradient clipping at 0.5 to stabilize cyclic pattern learning.
-        // This prevents weight oscillation when gradients point in conflicting
-        // directions across consecutive training steps (e.g., A->B->C->D->A cycle).
-        let clip = |g: f32| g.clamp(-0.5, 0.5);
+        // Gradient clipping to stabilize training.
+        // Default 1.0; use higher values (e.g., 5.0) for classification tasks
+        // where stronger gradients are needed to find decision boundaries.
+        let clip_val = self.config.gradient_clip;
+        let clip = |g: f32| g.clamp(-clip_val, clip_val);
 
         let hidden_dim = self.config.hidden_dim;
         let effective_input_dim = self.w_in.ncols();
@@ -1638,8 +1643,9 @@ impl CfCNetwork {
 
         let mut total_loss = 0.0f32;
 
-        // Reduced gradient clip for stability with rapid context switches
-        let clip = |g: f32| g.clamp(-0.5, 0.5);
+        // Gradient clipping (configurable via config.gradient_clip)
+        let clip_val = self.cells[0].config.gradient_clip;
+        let clip = |g: f32| g.clamp(-clip_val, clip_val);
 
         for ((_input, target), dt) in inputs.iter().zip(targets.iter()).zip(dts.iter()) {
             // Forward through all cells, saving each cell's input
@@ -1856,8 +1862,10 @@ impl CfCNetwork {
                 if cell_idx > 0 {
                     let decay = &cell_caches[cell_idx].decay;
                     let one_minus_decay: Array1<f32> = decay.mapv(|d| 1.0 - d);
-                    let _attenuation = one_minus_decay.mean().unwrap_or(0.5);
-                    dh = dh * _attenuation;
+                    // Floor attenuation at 0.3 to prevent complete gradient vanishing
+                    // through stacked layers (small dt/tau → tiny one_minus_decay)
+                    let attenuation = one_minus_decay.mean().unwrap_or(0.5).max(0.3);
+                    dh = dh * attenuation;
 
                     // Resize if dimensions differ between cells
                     if dh.len() != self.cells[cell_idx - 1].config.hidden_dim {

@@ -104,15 +104,64 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let n_test = 50;
+
+    // Calibration pass: collect final-step predictions to find adaptive threshold
+    let mut disruptive_scores = Vec::new();
+    let mut stable_scores = Vec::new();
+
+    for shot in 0..n_test {
+        let is_disruptive = shot % 2 != 0;
+        let (inputs, _targets, dts) = generate_plasma_shot(
+            1000 + shot as u64, is_disruptive, steps_per_shot, input_dim,
+        );
+
+        network.reset();
+        let mut max_prob = f32::NEG_INFINITY;
+        for i in 0..inputs.len() {
+            let output = network.forward(&inputs[i], dts[i]);
+            let prob = output[0].clamp(0.0, 1.0);
+            if prob > max_prob { max_prob = prob; }
+        }
+
+        if is_disruptive {
+            disruptive_scores.push(max_prob);
+        } else {
+            stable_scores.push(max_prob);
+        }
+    }
+
+    // Adaptive threshold: Youden's J statistic (maximize sensitivity + specificity - 1)
+    let mut all_scores: Vec<f32> = disruptive_scores.iter().chain(stable_scores.iter()).copied().collect();
+    all_scores.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    all_scores.dedup();
+
+    let mut best_threshold = 0.5f32;
+    let mut best_j = f32::NEG_INFINITY;
+    for &candidate in &all_scores {
+        let tp = disruptive_scores.iter().filter(|&&s| s > candidate).count() as f32;
+        let fn_ = disruptive_scores.iter().filter(|&&s| s <= candidate).count() as f32;
+        let tn = stable_scores.iter().filter(|&&s| s <= candidate).count() as f32;
+        let fp = stable_scores.iter().filter(|&&s| s > candidate).count() as f32;
+        let sens = tp / (tp + fn_).max(1.0);
+        let spec = tn / (tn + fp).max(1.0);
+        let j = sens + spec - 1.0;
+        if j > best_j {
+            best_j = j;
+            best_threshold = candidate;
+        }
+    }
+    let threshold = best_threshold;
+    println!("  Adaptive threshold (Youden's J): {:.4} (J={:.3})", threshold, best_j);
+
+    // Evaluation pass with calibrated threshold
     let mut true_positives = 0;
     let mut false_positives = 0;
     let mut true_negatives = 0;
     let mut false_negatives = 0;
     let mut early_warnings = 0;
-    let threshold = 0.5;
 
     for shot in 0..n_test {
-        let is_disruptive = shot % 2 != 0; // 50% disruptive (balanced classes)
+        let is_disruptive = shot % 2 != 0;
         let (inputs, _targets, dts) = generate_plasma_shot(
             1000 + shot as u64, is_disruptive, steps_per_shot, input_dim,
         );
