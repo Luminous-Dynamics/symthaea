@@ -89,7 +89,9 @@ mod demo;
 pub use standard_model::*;
 pub use hadrons::*;
 pub use periodic_table::*;
-pub use chemistry::*;
+// Note: chemistry::ReactionType conflicts with periodic_table::ReactionType.
+// Access chemistry types via physics::chemistry:: prefix.
+// pub use chemistry::*;
 pub use nuclear::*;
 pub use consciousness_bridge::*;
 pub use electron_nuclear_coupling::*;
