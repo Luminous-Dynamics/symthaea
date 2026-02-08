@@ -29,6 +29,9 @@ integrity:
     - name: education_integrity
       path: "../target/wasm32-unknown-unknown/release/education_integrity.wasm"
 
+    - name: mfa_integrity
+      path: "../target/wasm32-unknown-unknown/release/mfa_integrity.wasm"
+
 coordinator:
   zomes:
     - name: did_registry
@@ -76,3 +79,9 @@ coordinator:
       path: "../target/wasm32-unknown-unknown/release/education_coordinator.wasm"
       dependencies:
         - name: education_integrity
+
+    - name: mfa
+      path: "../target/wasm32-unknown-unknown/release/mfa_coordinator.wasm"
+      dependencies:
+        - name: mfa_integrity
+        - name: did_registry_integrity

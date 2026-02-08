@@ -655,3 +655,487 @@ mod lifecycle_tests {
         assert!(matl_score > 0.0, "MATL score should be positive after reputation report");
     }
 }
+
+// ============================================================================
+// MFA (Multi-Factor Authentication) Tests
+// ============================================================================
+
+#[cfg(test)]
+mod mfa_tests {
+    use super::*;
+
+    /// Mirror of mfa_integrity::FactorType
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
+    pub enum FactorType {
+        PrimaryKeyPair,
+        HardwareKey,
+        Biometric,
+        SocialRecovery,
+        ReputationAttestation,
+        GitcoinPassport,
+        VerifiableCredential,
+        RecoveryPhrase,
+        SecurityQuestions,
+    }
+
+    /// Mirror of mfa_integrity::AssuranceLevel
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, PartialOrd)]
+    pub enum AssuranceLevel {
+        Anonymous,
+        Basic,
+        Verified,
+        HighlyAssured,
+        ConstitutionallyCritical,
+    }
+
+    /// Mirror of mfa_coordinator::CreateMfaStateInput
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub struct CreateMfaStateInput {
+        pub did: String,
+        pub primary_key_hash: String,
+    }
+
+    /// Mirror of mfa_coordinator::EnrollFactorInput
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub struct EnrollFactorInput {
+        pub did: String,
+        pub factor_type: FactorType,
+        pub factor_id: String,
+        pub metadata: String,
+        pub reason: String,
+    }
+
+    /// Mirror of mfa_coordinator::RevokeFactorInput
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub struct RevokeFactorInput {
+        pub did: String,
+        pub factor_id: String,
+        pub reason: String,
+    }
+
+    /// Mirror of mfa_coordinator::VerifyFactorInput
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub struct VerifyFactorInput {
+        pub did: String,
+        pub factor_id: String,
+    }
+
+    /// Mirror of mfa_coordinator::AssuranceOutput
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub struct AssuranceOutput {
+        pub level: AssuranceLevel,
+        pub score: f64,
+        pub effective_strength: f32,
+        pub category_count: u8,
+        pub stale_factors: Vec<String>,
+    }
+
+    /// Mirror of mfa_coordinator::MfaStateOutput
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub struct MfaStateOutput {
+        pub state: MfaState,
+        pub action_hash: ActionHash,
+        pub assurance: AssuranceOutput,
+    }
+
+    /// Mirror of mfa_integrity::MfaState
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub struct MfaState {
+        pub did: String,
+        pub owner: AgentPubKey,
+        pub factors: Vec<EnrolledFactor>,
+        pub assurance_level: AssuranceLevel,
+        pub effective_strength: f32,
+        pub category_count: u8,
+        pub created: Timestamp,
+        pub updated: Timestamp,
+        pub version: u32,
+    }
+
+    /// Mirror of mfa_integrity::EnrolledFactor
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub struct EnrolledFactor {
+        pub factor_type: FactorType,
+        pub factor_id: String,
+        pub enrolled_at: Timestamp,
+        pub last_verified: Timestamp,
+        pub metadata: String,
+        pub effective_strength: f32,
+        pub active: bool,
+    }
+
+    /// Mirror of mfa_coordinator::FlEligibilityResult
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    pub struct FlEligibilityResult {
+        pub eligible: bool,
+        pub assurance_level: AssuranceLevel,
+        pub effective_strength: f32,
+        pub denial_reasons: Vec<String>,
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_create_mfa_state() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID first
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        let did = format!("did:mycelix:{}", agent);
+        let primary_key_hash = format!("sha256:{}", hex::encode(&agent.get_raw_39()[..32]));
+
+        // Create MFA state
+        let input = CreateMfaStateInput {
+            did: did.clone(),
+            primary_key_hash: primary_key_hash.clone(),
+        };
+
+        let output: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "create_mfa_state", input)
+            .await;
+
+        assert_eq!(output.state.did, did, "DID must match");
+        assert_eq!(output.state.owner, agent, "Owner must be creating agent");
+        assert_eq!(output.state.factors.len(), 1, "Should have one factor (primary key)");
+        assert_eq!(
+            output.state.factors[0].factor_type,
+            FactorType::PrimaryKeyPair,
+            "First factor must be PrimaryKeyPair"
+        );
+        assert_eq!(output.state.version, 1, "Initial version must be 1");
+        assert_eq!(
+            output.assurance.level,
+            AssuranceLevel::Basic,
+            "Initial level should be Basic"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_enroll_multiple_factors() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        let did = format!("did:mycelix:{}", agent);
+
+        // Create MFA state
+        let create_input = CreateMfaStateInput {
+            did: did.clone(),
+            primary_key_hash: "primary-key-hash".to_string(),
+        };
+
+        let _: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "create_mfa_state", create_input)
+            .await;
+
+        // Enroll hardware key
+        let hw_input = EnrollFactorInput {
+            did: did.clone(),
+            factor_type: FactorType::HardwareKey,
+            factor_id: "yubikey-serial-12345".to_string(),
+            metadata: r#"{"model":"YubiKey 5 NFC"}"#.to_string(),
+            reason: "Added hardware security key".to_string(),
+        };
+
+        let after_hw: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "enroll_factor", hw_input)
+            .await;
+
+        assert_eq!(after_hw.state.factors.len(), 2, "Should have 2 factors");
+        assert_eq!(after_hw.state.version, 2, "Version should increment");
+
+        // Enroll Gitcoin Passport
+        let gp_input = EnrollFactorInput {
+            did: did.clone(),
+            factor_type: FactorType::GitcoinPassport,
+            factor_id: "passport-0x1234567890".to_string(),
+            metadata: r#"{"score":42.5,"stamps":15}"#.to_string(),
+            reason: "Verified via Gitcoin Passport".to_string(),
+        };
+
+        let after_gp: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "enroll_factor", gp_input)
+            .await;
+
+        assert_eq!(after_gp.state.factors.len(), 3, "Should have 3 factors");
+        assert!(
+            after_gp.assurance.level >= AssuranceLevel::Verified,
+            "With 3 factors from different categories, should be at least Verified"
+        );
+        assert!(
+            after_gp.assurance.category_count >= 2,
+            "Should have factors from multiple categories"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_revoke_factor() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID and MFA state
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        let did = format!("did:mycelix:{}", agent);
+
+        let create_input = CreateMfaStateInput {
+            did: did.clone(),
+            primary_key_hash: "primary-key-hash".to_string(),
+        };
+
+        let _: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "create_mfa_state", create_input)
+            .await;
+
+        // Enroll a factor
+        let enroll_input = EnrollFactorInput {
+            did: did.clone(),
+            factor_type: FactorType::RecoveryPhrase,
+            factor_id: "bip39-phrase-hash".to_string(),
+            metadata: "{}".to_string(),
+            reason: "Added recovery phrase".to_string(),
+        };
+
+        let _: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "enroll_factor", enroll_input)
+            .await;
+
+        // Revoke it
+        let revoke_input = RevokeFactorInput {
+            did: did.clone(),
+            factor_id: "bip39-phrase-hash".to_string(),
+            reason: "No longer needed".to_string(),
+        };
+
+        let after_revoke: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "revoke_factor", revoke_input)
+            .await;
+
+        assert_eq!(
+            after_revoke.state.factors.len(),
+            1,
+            "Should be back to 1 factor"
+        );
+        assert_eq!(
+            after_revoke.state.factors[0].factor_type,
+            FactorType::PrimaryKeyPair,
+            "Only primary key should remain"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_cannot_revoke_last_factor() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID and MFA state
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        let did = format!("did:mycelix:{}", agent);
+
+        let create_input = CreateMfaStateInput {
+            did: did.clone(),
+            primary_key_hash: "primary-key-hash".to_string(),
+        };
+
+        let initial: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "create_mfa_state", create_input)
+            .await;
+
+        // Try to revoke the only factor - should fail
+        let revoke_input = RevokeFactorInput {
+            did: did.clone(),
+            factor_id: initial.state.factors[0].factor_id.clone(),
+            reason: "Trying to revoke primary key".to_string(),
+        };
+
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "revoke_factor", revoke_input)
+            .await;
+
+        assert!(result.is_err(), "Should not be able to revoke last factor");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_fl_eligibility_requirements() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID and MFA state
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        let did = format!("did:mycelix:{}", agent);
+
+        let create_input = CreateMfaStateInput {
+            did: did.clone(),
+            primary_key_hash: "primary-key-hash".to_string(),
+        };
+
+        let _: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "create_mfa_state", create_input)
+            .await;
+
+        // Check eligibility with only primary key - should fail
+        let basic_eligibility: FlEligibilityResult = conductor
+            .call(&cell.zome("mfa"), "check_fl_eligibility", did.clone())
+            .await;
+
+        assert!(
+            !basic_eligibility.eligible,
+            "Should not be FL eligible with only primary key"
+        );
+        assert!(
+            !basic_eligibility.denial_reasons.is_empty(),
+            "Should have denial reasons"
+        );
+
+        // Enroll ExternalVerification factor (Gitcoin Passport)
+        let gp_input = EnrollFactorInput {
+            did: did.clone(),
+            factor_type: FactorType::GitcoinPassport,
+            factor_id: "passport-verified".to_string(),
+            metadata: r#"{"score":50}"#.to_string(),
+            reason: "Gitcoin Passport verification".to_string(),
+        };
+
+        let _: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "enroll_factor", gp_input)
+            .await;
+
+        // Add another factor for category diversity
+        let hw_input = EnrollFactorInput {
+            did: did.clone(),
+            factor_type: FactorType::HardwareKey,
+            factor_id: "yubikey-for-fl".to_string(),
+            metadata: "{}".to_string(),
+            reason: "Added for FL participation".to_string(),
+        };
+
+        let _: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "enroll_factor", hw_input)
+            .await;
+
+        // Now check eligibility - should be eligible
+        let full_eligibility: FlEligibilityResult = conductor
+            .call(&cell.zome("mfa"), "check_fl_eligibility", did.clone())
+            .await;
+
+        assert!(
+            full_eligibility.eligible,
+            "Should be FL eligible with Cryptographic + ExternalVerification factors"
+        );
+        assert!(
+            full_eligibility.denial_reasons.is_empty(),
+            "Should have no denial reasons when eligible"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_assurance_level_calculation() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create DID and MFA state
+        let _: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+
+        let did = format!("did:mycelix:{}", agent);
+
+        let create_input = CreateMfaStateInput {
+            did: did.clone(),
+            primary_key_hash: "primary-key-hash".to_string(),
+        };
+
+        // E1: Basic (1 factor)
+        let e1: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "create_mfa_state", create_input)
+            .await;
+        assert_eq!(e1.assurance.level, AssuranceLevel::Basic);
+
+        // Add factors from different categories
+        let factors = vec![
+            EnrollFactorInput {
+                did: did.clone(),
+                factor_type: FactorType::GitcoinPassport,
+                factor_id: "gp-1".to_string(),
+                metadata: "{}".to_string(),
+                reason: "test".to_string(),
+            },
+            EnrollFactorInput {
+                did: did.clone(),
+                factor_type: FactorType::Biometric,
+                factor_id: "bio-1".to_string(),
+                metadata: "{}".to_string(),
+                reason: "test".to_string(),
+            },
+            EnrollFactorInput {
+                did: did.clone(),
+                factor_type: FactorType::RecoveryPhrase,
+                factor_id: "recovery-1".to_string(),
+                metadata: "{}".to_string(),
+                reason: "test".to_string(),
+            },
+            EnrollFactorInput {
+                did: did.clone(),
+                factor_type: FactorType::SocialRecovery,
+                factor_id: "social-1".to_string(),
+                metadata: "{}".to_string(),
+                reason: "test".to_string(),
+            },
+        ];
+
+        let mut last_output = e1;
+        for factor in factors {
+            last_output = conductor
+                .call(&cell.zome("mfa"), "enroll_factor", factor)
+                .await;
+        }
+
+        // With 5 factors from 5 categories, should be HighlyAssured or ConstitutionallyCritical
+        assert!(
+            last_output.assurance.level >= AssuranceLevel::HighlyAssured,
+            "With 5 factors from 5 categories, should be at least HighlyAssured"
+        );
+        assert!(
+            last_output.assurance.category_count >= 4,
+            "Should have 4+ categories"
+        );
+    }
+}

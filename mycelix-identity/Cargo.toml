@@ -20,6 +20,9 @@ members = [
     # Legacy Bridge: Academic Credentials
     "zomes/education/integrity",
     "zomes/education/coordinator",
+    # MFDI v1.0 - Multi-Factor Authentication
+    "zomes/mfa/integrity",
+    "zomes/mfa/coordinator",
 ]
 
 [workspace.dependencies]
