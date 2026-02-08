@@ -21,13 +21,8 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
+use super::constants::{C, G};
 use serde::{Deserialize, Serialize};
-
-/// Speed of light in m/s
-pub const C: f64 = 299_792_458.0;
-
-/// Gravitational constant in m³/(kg·s²)
-pub const G: f64 = 6.67430e-11;
 
 /// Spacetime signature
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

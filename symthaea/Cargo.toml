@@ -5,13 +5,6 @@ members = [
     "symthaea-core",
     "crates/symthaea-stt",
     "crates/symthaea-sentinel",
-    # "crates/symthaea-consciousness",   # Blocked: depends on removed symthaea-math
-    # "crates/symthaea-perception",      # Blocked: depends on removed symthaea-math
-    # "crates/symthaea-dynamics",        # Blocked: depends on removed symthaea-math
-    # "crates/symthaea-gym",             # Archived 2026-02-06: superseded by src/swarm/
-    # "crates/symthaea-math",            # Archived 2026-02-06: superseded by symthaea-core::hdc::real_hv
-    # "rust-sentinels",                  # Excluded: pyo3 ^0.22 conflicts with root pyo3 ^0.24 (links = "python")
-    # "tools/clinical_validation",       # Standalone tool, no workspace deps
 ]
 
 [workspace.dependencies]
@@ -228,11 +221,15 @@ webcam = []  # Live webcam capture for video perception
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub", "safetensors", "half"]
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
-# Database backends (deferred - compile guards only)
-qdrant = []   # Vector database for large-scale memory
-datalog = []  # Datalog reasoning engine
-lance = []    # LanceDB vector storage
-duck = []     # DuckDB analytical queries
+# Database backends (compile guards only - DuckDB active via duckdb crate, others deferred)
+# qdrant: blocked (no viable crate without lzma conflict)
+# datalog/cozo: blocked (graph_builder 0.4.1 rayon compat)
+# lance: blocked (lancedb xz2 conflicts with burn-ndarray liblzma-sys)
+# duck: active via duckdb dep, flag kept for conditional compilation
+qdrant = []
+datalog = []
+lance = []
+duck = []
 # Data loading (deferred - requires system HDF5 library)
 hdf5 = []     # HDF5 file loading for C-Mod plasma data (add hdf5 crate when ready)
 # Swarm Intelligence - Hybrid Iroh + Holochain
@@ -339,6 +336,14 @@ required-features = ["demo"]
 # They won't be built by default until the required modules are fixed
 
 # Examples needing cfg-gated modules
+[[example]]
+name = "demo_self_analysis"
+required-features = ["code_generation"]
+
+[[example]]
+name = "benchmark_code_primitives"
+required-features = ["code_generation"]
+
 [[example]]
 name = "causal_tower_test"
 required-features = ["benchmarks_module"]

@@ -465,6 +465,110 @@ impl CollectiveLearning {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Collective Primitive Evolution
+// ─────────────────────────────────────────────────────────────────────────────
+
+use crate::consciousness::primitive_evolution::CandidatePrimitive;
+use crate::hdc::primitive_system::PrimitiveTier;
+
+/// Collective primitive sharing and evolution across system instances
+///
+/// This struct manages a shared pool of evolved primitives that can be
+/// contributed to and queried by multiple reasoning instances.
+#[derive(Debug, Clone)]
+pub struct CollectivePrimitiveEvolution {
+    /// System identifier
+    pub system_id: String,
+    /// Shared primitives in the collective pool
+    primitives: Vec<(CandidatePrimitive, f32)>, // (primitive, score)
+    /// Total contributions count
+    contributions: usize,
+    /// Successful applications
+    successes: usize,
+}
+
+impl CollectivePrimitiveEvolution {
+    /// Create a new collective primitive evolution system
+    pub fn new(system_id: impl Into<String>) -> Self {
+        Self {
+            system_id: system_id.into(),
+            primitives: Vec::new(),
+            contributions: 0,
+            successes: 0,
+        }
+    }
+
+    /// Contribute a primitive to the collective pool
+    pub fn contribute_primitive(
+        &mut self,
+        primitive: CandidatePrimitive,
+        success: bool,
+        phi_improvement: f32,
+        harmonic_score: f32,
+        epistemic_score: f32,
+    ) {
+        // Calculate overall score for ranking
+        let score = if success {
+            0.4 * phi_improvement.max(0.0) + 0.3 * harmonic_score + 0.3 * epistemic_score
+        } else {
+            0.1 * harmonic_score + 0.1 * epistemic_score
+        };
+
+        self.primitives.push((primitive, score));
+        self.contributions += 1;
+        if success {
+            self.successes += 1;
+        }
+
+        // Keep pool manageable (top 1000 by score)
+        if self.primitives.len() > 1000 {
+            self.primitives.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            self.primitives.truncate(1000);
+        }
+    }
+
+    /// Query top primitives of a given tier
+    pub fn query_top_primitives(&self, tier: PrimitiveTier, count: usize) -> Vec<CandidatePrimitive> {
+        let mut matching: Vec<_> = self.primitives
+            .iter()
+            .filter(|(p, _)| p.tier == tier)
+            .collect();
+
+        matching.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        matching.into_iter()
+            .take(count)
+            .map(|(p, _)| p.clone())
+            .collect()
+    }
+
+    /// Merge knowledge from another collective
+    pub fn merge_knowledge(&mut self, other: &CollectivePrimitiveEvolution) {
+        for (prim, score) in &other.primitives {
+            self.primitives.push((prim.clone(), *score));
+        }
+        self.contributions += other.contributions;
+        self.successes += other.successes;
+
+        // Deduplicate and keep top
+        if self.primitives.len() > 1000 {
+            self.primitives.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            self.primitives.truncate(1000);
+        }
+    }
+
+    /// Get statistics: (success_rate, primitive_count, contribution_count)
+    pub fn get_stats(&self) -> (f64, usize, usize) {
+        let success_rate = if self.contributions > 0 {
+            self.successes as f64 / self.contributions as f64
+        } else {
+            0.0
+        };
+        (success_rate, self.primitives.len(), self.contributions)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

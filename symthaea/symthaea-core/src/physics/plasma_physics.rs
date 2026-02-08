@@ -23,19 +23,11 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
+use super::constants::{E_CHARGE, M_ELECTRON, EPSILON_0, K_BOLTZMANN};
 use serde::{Deserialize, Serialize};
 
-/// Electron charge (C)
-pub const E_CHARGE: f64 = 1.602176634e-19;
-
-/// Electron mass (kg)
-pub const M_ELECTRON: f64 = 9.1093837015e-31;
-
-/// Vacuum permittivity (F/m)
-pub const EPSILON_0: f64 = 8.854187817e-12;
-
-/// Boltzmann constant (J/K)
-pub const K_B: f64 = 1.380649e-23;
+/// Alias for backward compatibility
+pub const K_B: f64 = K_BOLTZMANN;
 
 /// Plasma confinement scheme
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

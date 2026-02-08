@@ -10,6 +10,7 @@ use symthaea_core::genesis::{GenesisSeed, ShakeRng};
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::primitive_system::PrimitiveTier;
 use crate::hdc::BinaryHV;
+use crate::consciousness::epistemic_tiers::EpistemicCoordinate;
 use anyhow::Result;
 
 /// Configuration for the primitive evolver
@@ -541,11 +542,20 @@ pub struct CandidatePrimitive {
     /// Tier this primitive belongs to
     pub tier: PrimitiveTier,
 
+    /// Semantic definition of this primitive
+    pub definition: String,
+
     /// Fitness score (Φ improvement)
     pub fitness: f64,
 
     /// HDC encoding of this primitive's phenotype
     pub encoding: BinaryHV,
+
+    /// Epistemic grounding coordinate (Phase 2.2)
+    pub epistemic_coordinate: EpistemicCoordinate,
+
+    /// Harmonic alignment score (0.0-1.0, Phase 2.2)
+    pub harmonic_alignment: f64,
 }
 
 impl CandidatePrimitive {
@@ -557,8 +567,11 @@ impl CandidatePrimitive {
         Self {
             name: format!("{}_mut_g{}", self.name, generation),
             tier: self.tier,
+            definition: self.definition.clone(),
             fitness: 0.0,
             encoding,
+            epistemic_coordinate: self.epistemic_coordinate.clone(),
+            harmonic_alignment: self.harmonic_alignment,
         }
     }
 
@@ -573,8 +586,11 @@ impl CandidatePrimitive {
         Self {
             name: format!("cross_g{}", generation),
             tier: parent1.tier,
+            definition: parent1.definition.clone(),
             fitness: 0.0,
             encoding: BinaryHV(child_bytes),
+            epistemic_coordinate: parent1.epistemic_coordinate.clone(),
+            harmonic_alignment: (parent1.harmonic_alignment + parent2.harmonic_alignment) / 2.0,
         }
     }
 }
@@ -647,7 +663,7 @@ impl PrimitiveEvolution {
     }
 
     /// Initialize population with random candidates
-    fn initialize_population(&mut self) {
+    pub fn initialize_population(&mut self) {
         for i in 0..self.config.population_size {
             let seed = (self.config.tier as u64)
                 .wrapping_mul(1000)
@@ -655,8 +671,11 @@ impl PrimitiveEvolution {
             self.population.push(CandidatePrimitive {
                 name: format!("evolved_{}_{}", self.config.tier as u8, i),
                 tier: self.config.tier,
+                definition: format!("Evolved primitive for tier {:?}", self.config.tier),
                 fitness: 0.0,
                 encoding: BinaryHV::random(seed),
+                epistemic_coordinate: EpistemicCoordinate::default(),
+                harmonic_alignment: 0.5, // Start with neutral alignment
             });
         }
     }

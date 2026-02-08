@@ -1,17 +1,17 @@
 //! HDC Core Operations Benchmark Suite
 //!
 //! Comprehensive benchmarks for Hyperdimensional Computing (HDC) operations
-//! using binary hypervectors (HV16).
+//! using binary hypervectors (BinaryHV).
 //!
 //! ## Operations Benchmarked
 //!
-//! - `HV16::random()` - Deterministic random vector generation (BLAKE3-based)
-//! - `HV16::bind()` - XOR binding operation (concept composition)
-//! - `HV16::similarity()` - Hamming similarity calculation
-//! - `HV16::hamming_distance()` - Hamming distance measurement
-//! - `HV16::bundle()` - Majority vote bundling
-//! - `HV16::permute()` - Bit rotation for sequence encoding
-//! - `HV16::invert()` - Bitwise NOT operation
+//! - `BinaryHV::random()` - Deterministic random vector generation (BLAKE3-based)
+//! - `BinaryHV::bind()` - XOR binding operation (concept composition)
+//! - `BinaryHV::similarity()` - Hamming similarity calculation
+//! - `BinaryHV::hamming_distance()` - Hamming distance measurement
+//! - `BinaryHV::bundle()` - Majority vote bundling
+//! - `BinaryHV::permute()` - Bit rotation for sequence encoding
+//! - `BinaryHV::invert()` - Bitwise NOT operation
 //!
 //! ## Usage
 //!
@@ -39,10 +39,10 @@
 //! | invert()       | <20ns    | SIMD NOT                         |
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 // =============================================================================
-// HV16::random() GENERATION BENCHMARKS
+// BinaryHV::random() GENERATION BENCHMARKS
 // =============================================================================
 
 fn bench_random_generation(c: &mut Criterion) {
@@ -54,7 +54,7 @@ fn bench_random_generation(c: &mut Criterion) {
         let mut seed = 0u64;
         b.iter(|| {
             seed = seed.wrapping_add(1);
-            black_box(HV16::random(seed))
+            black_box(BinaryHV::random(seed))
         })
     });
 
@@ -62,7 +62,7 @@ fn bench_random_generation(c: &mut Criterion) {
     for count in [10, 100, 1000] {
         group.bench_with_input(BenchmarkId::new("batch", count), &count, |b, &n| {
             b.iter(|| {
-                let vectors: Vec<HV16> = (0..n).map(|i| HV16::random(i as u64)).collect();
+                let vectors: Vec<BinaryHV> = (0..n).map(|i| BinaryHV::random(i as u64)).collect();
                 black_box(vectors)
             })
         });
@@ -73,7 +73,7 @@ fn bench_random_generation(c: &mut Criterion) {
         let mut idx = 0usize;
         b.iter(|| {
             idx = idx.wrapping_add(1);
-            black_box(HV16::basis(idx))
+            black_box(BinaryHV::basis(idx))
         })
     });
 
@@ -81,15 +81,15 @@ fn bench_random_generation(c: &mut Criterion) {
 }
 
 // =============================================================================
-// HV16::bind() OPERATION BENCHMARKS
+// BinaryHV::bind() OPERATION BENCHMARKS
 // =============================================================================
 
 fn bench_bind_operation(c: &mut Criterion) {
     let mut group = c.benchmark_group("hdc_bind");
     group.throughput(Throughput::Elements(1));
 
-    let hv1 = HV16::random(42);
-    let hv2 = HV16::random(43);
+    let hv1 = BinaryHV::random(42);
+    let hv2 = BinaryHV::random(43);
 
     // Single bind operation (SIMD)
     group.bench_function("simd", |b| {
@@ -102,8 +102,8 @@ fn bench_bind_operation(c: &mut Criterion) {
     });
 
     // Chained binding (A bind B bind C bind D)
-    let hv3 = HV16::random(44);
-    let hv4 = HV16::random(45);
+    let hv3 = BinaryHV::random(44);
+    let hv4 = BinaryHV::random(45);
     group.bench_function("chain_4", |b| {
         b.iter(|| black_box(hv1.bind(&hv2).bind(&hv3).bind(&hv4)))
     });
@@ -123,15 +123,15 @@ fn bench_bind_operation(c: &mut Criterion) {
 }
 
 // =============================================================================
-// HV16::similarity() CALCULATION BENCHMARKS
+// BinaryHV::similarity() CALCULATION BENCHMARKS
 // =============================================================================
 
 fn bench_similarity_calculation(c: &mut Criterion) {
     let mut group = c.benchmark_group("hdc_similarity");
     group.throughput(Throughput::Elements(1));
 
-    let hv1 = HV16::random(42);
-    let hv2 = HV16::random(43);
+    let hv1 = BinaryHV::random(42);
+    let hv2 = BinaryHV::random(43);
 
     // Single similarity calculation (SIMD)
     group.bench_function("simd", |b| {
@@ -155,7 +155,7 @@ fn bench_similarity_calculation(c: &mut Criterion) {
     });
 
     // Batch similarity (query against codebook)
-    let codebook: Vec<HV16> = (0..100).map(|i| HV16::random(i)).collect();
+    let codebook: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
     group.bench_function("batch_100", |b| {
         b.iter(|| {
             let sims: Vec<f32> = codebook.iter().map(|v| hv1.similarity(v)).collect();
@@ -180,15 +180,15 @@ fn bench_similarity_calculation(c: &mut Criterion) {
 }
 
 // =============================================================================
-// HV16::hamming_distance() BENCHMARKS
+// BinaryHV::hamming_distance() BENCHMARKS
 // =============================================================================
 
 fn bench_hamming_distance(c: &mut Criterion) {
     let mut group = c.benchmark_group("hdc_hamming");
     group.throughput(Throughput::Elements(1));
 
-    let hv1 = HV16::random(42);
-    let hv2 = HV16::random(43);
+    let hv1 = BinaryHV::random(42);
+    let hv2 = BinaryHV::random(43);
 
     // Single hamming distance (SIMD)
     group.bench_function("simd", |b| {
@@ -212,7 +212,7 @@ fn bench_hamming_distance(c: &mut Criterion) {
     });
 
     // Pairwise distances in small set
-    let vectors: Vec<HV16> = (0..10).map(|i| HV16::random(i)).collect();
+    let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
     group.bench_function("pairwise_10", |b| {
         b.iter(|| {
             let mut total = 0u32;
@@ -229,7 +229,7 @@ fn bench_hamming_distance(c: &mut Criterion) {
 }
 
 // =============================================================================
-// HV16::bundle() OPERATION BENCHMARKS
+// BinaryHV::bundle() OPERATION BENCHMARKS
 // =============================================================================
 
 fn bench_bundle_operation(c: &mut Criterion) {
@@ -237,46 +237,46 @@ fn bench_bundle_operation(c: &mut Criterion) {
 
     // Bundle with varying number of vectors
     for count in [3, 5, 10, 50, 100] {
-        let vectors: Vec<HV16> = (0..count).map(|i| HV16::random(i as u64)).collect();
+        let vectors: Vec<BinaryHV> = (0..count).map(|i| BinaryHV::random(i as u64)).collect();
 
         group.throughput(Throughput::Elements(count as u64));
 
         group.bench_with_input(BenchmarkId::new("standard", count), &vectors, |b, vecs| {
-            b.iter(|| black_box(HV16::bundle(vecs)))
+            b.iter(|| black_box(BinaryHV::bundle(vecs)))
         });
 
         group.bench_with_input(BenchmarkId::new("safe", count), &vectors, |b, vecs| {
-            b.iter(|| black_box(HV16::bundle_safe(vecs)))
+            b.iter(|| black_box(BinaryHV::bundle_safe(vecs)))
         });
 
         group.bench_with_input(BenchmarkId::new("normalized", count), &vectors, |b, vecs| {
-            b.iter(|| black_box(HV16::bundle_normalized(vecs)))
+            b.iter(|| black_box(BinaryHV::bundle_normalized(vecs)))
         });
     }
 
     // Empty bundle (edge case)
     group.bench_function("empty", |b| {
-        b.iter(|| black_box(HV16::bundle(&[])))
+        b.iter(|| black_box(BinaryHV::bundle(&[])))
     });
 
     // Single vector bundle (should return same vector)
-    let single = HV16::random(42);
+    let single = BinaryHV::random(42);
     group.bench_function("single", |b| {
-        b.iter(|| black_box(HV16::bundle(&[single])))
+        b.iter(|| black_box(BinaryHV::bundle(&[single])))
     });
 
     group.finish();
 }
 
 // =============================================================================
-// HV16::permute() OPERATION BENCHMARKS
+// BinaryHV::permute() OPERATION BENCHMARKS
 // =============================================================================
 
 fn bench_permute_operation(c: &mut Criterion) {
     let mut group = c.benchmark_group("hdc_permute");
     group.throughput(Throughput::Elements(1));
 
-    let hv = HV16::random(42);
+    let hv = BinaryHV::random(42);
 
     // Various shift amounts
     for shift in [1, 8, 64, 128, 1024, 8192] {
@@ -296,12 +296,12 @@ fn bench_permute_operation(c: &mut Criterion) {
 
     // Full cycle (shift by DIM)
     group.bench_function("full_cycle", |b| {
-        b.iter(|| black_box(hv.permute(HV16::DIM)))
+        b.iter(|| black_box(hv.permute(BinaryHV::DIM)))
     });
 
     // Sequence encoding pattern (common use case)
-    let hv2 = HV16::random(43);
-    let hv3 = HV16::random(44);
+    let hv2 = BinaryHV::random(43);
+    let hv3 = BinaryHV::random(44);
     group.bench_function("sequence_3", |b| {
         b.iter(|| {
             // Encode sequence: hv1 at position 0, hv2 at position 1, hv3 at position 2
@@ -314,14 +314,14 @@ fn bench_permute_operation(c: &mut Criterion) {
 }
 
 // =============================================================================
-// HV16::invert() OPERATION BENCHMARKS
+// BinaryHV::invert() OPERATION BENCHMARKS
 // =============================================================================
 
 fn bench_invert_operation(c: &mut Criterion) {
     let mut group = c.benchmark_group("hdc_invert");
     group.throughput(Throughput::Elements(1));
 
-    let hv = HV16::random(42);
+    let hv = BinaryHV::random(42);
 
     // Single invert (SIMD)
     group.bench_function("simd", |b| {
@@ -348,7 +348,7 @@ fn bench_invert_operation(c: &mut Criterion) {
 fn bench_auxiliary_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("hdc_auxiliary");
 
-    let hv = HV16::random(42);
+    let hv = BinaryHV::random(42);
 
     // Popcount
     group.bench_function("popcount", |b| {
@@ -364,7 +364,7 @@ fn bench_auxiliary_operations(c: &mut Criterion) {
     group.bench_function("get_bit", |b| {
         let mut pos = 0usize;
         b.iter(|| {
-            pos = (pos + 1) % HV16::DIM;
+            pos = (pos + 1) % BinaryHV::DIM;
             black_box(hv.get_bit(pos))
         })
     });
@@ -377,11 +377,11 @@ fn bench_auxiliary_operations(c: &mut Criterion) {
     // From bipolar conversion
     let bipolar = hv.to_bipolar();
     group.bench_function("from_bipolar", |b| {
-        b.iter(|| black_box(HV16::from_bipolar(&bipolar)))
+        b.iter(|| black_box(BinaryHV::from_bipolar(&bipolar)))
     });
 
     // Ensure density (rebalancing)
-    let saturated = HV16::ones();
+    let saturated = BinaryHV::ones();
     group.bench_function("ensure_density", |b| {
         b.iter(|| black_box(saturated.ensure_density(0.4, 0.6)))
     });
@@ -402,34 +402,34 @@ fn bench_memory_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("hdc_memory");
 
     // Clone operation
-    let hv = HV16::random(42);
+    let hv = BinaryHV::random(42);
     group.bench_function("clone", |b| {
         b.iter(|| black_box(hv.clone()))
     });
 
     // Default (zero) creation
     group.bench_function("default", |b| {
-        b.iter(|| black_box(HV16::default()))
+        b.iter(|| black_box(BinaryHV::default()))
     });
 
     // Zero creation (const)
     group.bench_function("zero", |b| {
-        b.iter(|| black_box(HV16::zero()))
+        b.iter(|| black_box(BinaryHV::zero()))
     });
 
     // Ones creation (const)
     group.bench_function("ones", |b| {
-        b.iter(|| black_box(HV16::ones()))
+        b.iter(|| black_box(BinaryHV::ones()))
     });
 
     // From bits
     let bits = vec![0xFFFFFFFFFFFFFFFFu64; 256];
     group.bench_function("from_bits", |b| {
-        b.iter(|| black_box(HV16::from_bits(&bits)))
+        b.iter(|| black_box(BinaryHV::from_bits(&bits)))
     });
 
     // Equality check
-    let hv2 = HV16::random(42);
+    let hv2 = BinaryHV::random(42);
     group.bench_function("equality", |b| {
         b.iter(|| black_box(hv == hv2))
     });
@@ -456,8 +456,8 @@ fn bench_set_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("hdc_set_ops");
     group.throughput(Throughput::Elements(1));
 
-    let hv1 = HV16::random(42);
-    let hv2 = HV16::random(43);
+    let hv1 = BinaryHV::random(42);
+    let hv2 = BinaryHV::random(43);
 
     // Intersection (SIMD AND)
     group.bench_function("intersection", |b| {
@@ -495,17 +495,17 @@ fn bench_weighted_bundle(c: &mut Criterion) {
     let mut group = c.benchmark_group("hdc_weighted_bundle");
 
     for count in [3, 10, 50, 100] {
-        let vectors: Vec<HV16> = (0..count).map(|i| HV16::random(i as u64)).collect();
+        let vectors: Vec<BinaryHV> = (0..count).map(|i| BinaryHV::random(i as u64)).collect();
         let weights: Vec<f32> = (0..count).map(|i| (i as f32 + 1.0)).collect();
 
         group.throughput(Throughput::Elements(count as u64));
 
         group.bench_with_input(BenchmarkId::new("stack", count), &(vectors.clone(), weights.clone()), |b, (vecs, ws)| {
-            b.iter(|| black_box(HV16::weighted_bundle(vecs, ws)))
+            b.iter(|| black_box(BinaryHV::weighted_bundle(vecs, ws)))
         });
 
         group.bench_with_input(BenchmarkId::new("safe", count), &(vectors, weights), |b, (vecs, ws)| {
-            b.iter(|| black_box(HV16::weighted_bundle_safe(vecs, ws)))
+            b.iter(|| black_box(BinaryHV::weighted_bundle_safe(vecs, ws)))
         });
     }
 
@@ -519,13 +519,13 @@ fn bench_weighted_bundle(c: &mut Criterion) {
 fn bench_new_primitives(c: &mut Criterion) {
     let mut group = c.benchmark_group("hdc_new_primitives");
 
-    let hv = HV16::random(42);
+    let hv = BinaryHV::random(42);
 
     // N-gram encoding
     for n in [2, 3, 5, 8] {
-        let vectors: Vec<HV16> = (0..n).map(|i| HV16::random(i as u64 + 100)).collect();
+        let vectors: Vec<BinaryHV> = (0..n).map(|i| BinaryHV::random(i as u64 + 100)).collect();
         group.bench_with_input(BenchmarkId::new("ngram", n), &vectors, |b, vecs| {
-            b.iter(|| black_box(HV16::ngram(vecs)))
+            b.iter(|| black_box(BinaryHV::ngram(vecs)))
         });
     }
 
@@ -548,15 +548,15 @@ fn bench_new_primitives(c: &mut Criterion) {
     }
 
     // k_winners
-    let codebook: Vec<HV16> = (0..100).map(|i| HV16::random(i)).collect();
+    let codebook: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
     let sims: Vec<(usize, f32)> = codebook
         .iter()
         .enumerate()
         .map(|(i, v)| (i, hv.similarity(v)))
         .collect();
     for k in [1, 5, 10] {
-        group.bench_with_input(BenchmarkId::new("k_winners", k), &(sims.clone(), k), |b, (s, &k_val)| {
-            b.iter(|| black_box(HV16::k_winners(s, k_val)))
+        group.bench_with_input(BenchmarkId::new("k_winners", k), &(sims.clone(), k), |b, (s, k_val)| {
+            b.iter(|| black_box(BinaryHV::k_winners(s, *k_val)))
         });
     }
 

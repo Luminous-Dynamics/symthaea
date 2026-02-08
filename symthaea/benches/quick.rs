@@ -20,8 +20,9 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::RealPhiCalculator,
-    HV16, HDC_DIMENSION,
+    spectral_connectivity::ConnectivityCalculator,
+    binary_hv::BinaryHV,
+    HDC_DIMENSION,
 };
 
 // =============================================================================
@@ -32,8 +33,8 @@ fn bench_hdc_quick(c: &mut Criterion) {
     let mut group = c.benchmark_group("quick_hdc");
     group.sample_size(50);
 
-    let hv1 = HV16::random(42);
-    let hv2 = HV16::random(43);
+    let hv1 = BinaryHV::random(42);
+    let hv2 = BinaryHV::random(43);
 
     // Core operations only
     group.bench_function("bind", |b| {
@@ -44,9 +45,9 @@ fn bench_hdc_quick(c: &mut Criterion) {
         b.iter(|| black_box(hv1.similarity(&hv2)))
     });
 
-    let hvs: Vec<HV16> = (0..5).map(|i| HV16::random(i)).collect();
+    let hvs: Vec<BinaryHV> = (0..5).map(|i| BinaryHV::random(i)).collect();
     group.bench_function("bundle_5", |b| {
-        b.iter(|| black_box(HV16::bundle(&hvs)))
+        b.iter(|| black_box(BinaryHV::bundle(&hvs)))
     });
 
     group.finish();
@@ -60,7 +61,7 @@ fn bench_phi_quick(c: &mut Criterion) {
     let mut group = c.benchmark_group("quick_phi");
     group.sample_size(30);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
     let n_nodes = 8;
 
     // Star topology (low Φ baseline)
@@ -92,7 +93,7 @@ fn bench_phi_values(c: &mut Criterion) {
     let mut group = c.benchmark_group("quick_phi_validation");
     group.sample_size(20);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     // Validate that topology rankings are preserved
     // Expected: Ring > Random > Star (by Φ value)
@@ -122,7 +123,7 @@ fn bench_hypercube_quick(c: &mut Criterion) {
     let mut group = c.benchmark_group("quick_hypercube");
     group.sample_size(20);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     // 4D Hypercube (Tesseract) - the Φ champion
     group.bench_function("tesseract_4d", |b| {

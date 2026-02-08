@@ -24,7 +24,8 @@ use symthaea::school::{
     School, SchoolConfig, Curriculum, CurriculumType,
     LearningObjective, Difficulty, Domain,
 };
-use symthaea::hdc::{RealHV, HDC_DIMENSION};
+use symthaea::hdc::real_hv::RealHV;
+use symthaea::hdc::HDC_DIMENSION;
 use symthaea::hdc::unified_hv::ContinuousHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════

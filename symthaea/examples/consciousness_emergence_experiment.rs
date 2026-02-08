@@ -31,9 +31,10 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    StandardModel, Hadrons, PeriodicTable, Chemistry,
+    StandardModel, Hadrons, PeriodicTable,
     PhysicsConsciousnessBridge,
 };
+use symthaea_core::physics::chemistry::Chemistry;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
 
 fn main() {

@@ -199,7 +199,7 @@ impl ArchitecturalCausalGraph {
 
         for (id, name, description) in components {
             let node = ComponentNode {
-                id,
+                id: id.clone(),
                 name: name.to_string(),
                 description: description.to_string(),
                 current_phi_contribution: 0.0,
@@ -303,7 +303,7 @@ impl ArchitecturalCausalGraph {
             .sum::<f64>() / outgoing_edges.len().max(1) as f64;
 
         let impact = PerformanceImpact {
-            component,
+            component: component.clone(),
             phi_impact,
             latency_impact,
             accuracy_impact,
@@ -311,11 +311,11 @@ impl ArchitecturalCausalGraph {
             bottleneck_severity: 0.0, // Will be updated when analyzing bottlenecks
         };
 
-        self.performance_impact.insert(component, impact);
+        self.performance_impact.insert(component.clone(), impact);
 
         // Update most impactful component
-        if let Some(current_max) = self.stats.most_impactful_component {
-            if let Some(current_impact) = self.performance_impact.get(&current_max) {
+        if let Some(ref current_max) = self.stats.most_impactful_component {
+            if let Some(current_impact) = self.performance_impact.get(current_max) {
                 if importance > current_impact.importance {
                     self.stats.most_impactful_component = Some(component);
                 }
@@ -334,8 +334,8 @@ impl ArchitecturalCausalGraph {
     /// Returns an error if the causal chain is empty (should not happen in practice
     /// since we always start with the bottleneck component).
     pub fn analyze_bottleneck(&mut self, bottleneck: &Bottleneck) -> Result<CausalChain> {
-        let mut chain = vec![bottleneck.component];
-        let mut current = bottleneck.component;
+        let mut chain = vec![bottleneck.component.clone()];
+        let mut current = bottleneck.component.clone();
         let mut explanation_parts = vec![
             format!("Symptom: {} in {:?}", bottleneck.description, bottleneck.component)
         ];
@@ -363,7 +363,7 @@ impl ArchitecturalCausalGraph {
             };
 
             // Add to chain
-            chain.push(strongest.from);
+            chain.push(strongest.from.clone());
             explanation_parts.push(format!(
                 "<- BECAUSE: {:?} {} {:?}",
                 strongest.from,
@@ -377,7 +377,7 @@ impl ArchitecturalCausalGraph {
                 current
             ));
 
-            current = strongest.from;
+            current = strongest.from.clone();
 
             // Check if this component has a known bottleneck
             if let Some(impact) = self.performance_impact.get(&current) {
@@ -395,7 +395,7 @@ impl ArchitecturalCausalGraph {
         // Safe extraction of root cause - chain always has at least one element (bottleneck.component)
         let root_cause = chain
             .last()
-            .copied()
+            .cloned()
             .ok_or_else(|| anyhow::anyhow!("Causal chain unexpectedly empty"))?;
         let confidence = 0.7 + (chain.len() as f64 * 0.05).min(0.25); // Higher confidence for shorter chains
 
@@ -429,7 +429,7 @@ impl ArchitecturalCausalGraph {
     pub fn get_downstream_components(&self, component: ComponentId) -> Vec<ComponentId> {
         self.edges.iter()
             .filter(|e| e.from == component)
-            .map(|e| e.to)
+            .map(|e| e.to.clone())
             .collect()
     }
 
@@ -437,7 +437,7 @@ impl ArchitecturalCausalGraph {
     pub fn get_upstream_components(&self, component: ComponentId) -> Vec<ComponentId> {
         self.edges.iter()
             .filter(|e| e.to == component)
-            .map(|e| e.from)
+            .map(|e| e.from.clone())
             .collect()
     }
 

@@ -6,14 +6,14 @@ use symthaea::consciousness::stability_regime::{
 use symthaea::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor;
 use symthaea_core::hdc::primitive_system::PrimitiveTier;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 fn make_primitive(name: &str, tier: PrimitiveTier) -> symthaea_core::hdc::primitive_system::Primitive {
     symthaea_core::hdc::primitive_system::Primitive {
         name: name.to_string(),
         tier,
         domain: "bench".to_string(),
-        encoding: HV16::random(name.len() as u64 * 31),
+        encoding: BinaryHV::random(name.len() as u64 * 31),
         definition: name.to_string(),
         is_base: true,
         derivation: None,
@@ -58,7 +58,7 @@ fn bench_evolve_fluid(c: &mut Criterion) {
 
 fn bench_process_input(c: &mut Criterion) {
     let mut processor = StabilityRegimeProcessor::new();
-    let input = HV16::random(42);
+    let input = BinaryHV::random(42);
 
     c.bench_function("process_input_stability_regime", |b| {
         b.iter(|| processor.process_input(&input, 0.1, 0.0))
@@ -67,7 +67,7 @@ fn bench_process_input(c: &mut Criterion) {
 
 fn bench_static_baseline(c: &mut Criterion) {
     let mut processor = ConsciousnessPrimitiveProcessor::new();
-    let input = HV16::random(42);
+    let input = BinaryHV::random(42);
 
     c.bench_function("process_input_static_baseline", |b| {
         b.iter(|| processor.process_input(&input, 0.0))

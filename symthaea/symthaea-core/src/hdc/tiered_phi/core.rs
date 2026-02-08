@@ -1830,3 +1830,170 @@ pub fn set_global_tier(tier: ApproximationTier) {
 pub fn global_phi_stats() -> TieredPhiStats {
     GLOBAL_PHI.lock().expect("lock poisoned").stats.clone()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hdc::BinaryHV;
+
+    /// Helper: create n random BinaryHV components with distinct seeds.
+    fn make_components(n: usize) -> Vec<BinaryHV> {
+        (0..n).map(|i| BinaryHV::random(i as u64 + 1000)).collect()
+    }
+
+    // ------------------------------------------------------------------
+    // 1. Constructor / factory tests
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_tiered_phi_constructors() {
+        let t1 = TieredPhi::for_testing();
+        assert_eq!(t1.tier(), ApproximationTier::RandomBaseline);
+
+        let t2 = TieredPhi::for_production();
+        assert_eq!(t2.tier(), ApproximationTier::SpectralConnectivity);
+
+        let t3 = TieredPhi::for_research();
+        assert_eq!(t3.tier(), ApproximationTier::ExhaustivePartition);
+
+        let t4 = TieredPhi::new(ApproximationTier::SampledPartition);
+        assert_eq!(t4.tier(), ApproximationTier::SampledPartition);
+    }
+
+    #[test]
+    fn test_tiered_phi_config_defaults() {
+        let cfg = TieredPhiConfig::default();
+        assert_eq!(cfg.tier, ApproximationTier::SampledPartition);
+        assert!(cfg.auto_downgrade);
+        assert!(cfg.enable_cache);
+        assert!(cfg.cache_size > 0);
+    }
+
+    // ------------------------------------------------------------------
+    // 2. Edge cases: empty and single-component inputs
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_compute_empty_returns_zero() {
+        let mut phi = TieredPhi::for_testing();
+        assert_eq!(phi.compute(&[]), 0.0);
+
+        let mut phi2 = TieredPhi::for_production();
+        assert_eq!(phi2.compute(&[]), 0.0);
+    }
+
+    #[test]
+    fn test_compute_single_component_returns_zero() {
+        let single = vec![BinaryHV::random(42)];
+
+        let mut phi_mock = TieredPhi::for_testing();
+        assert_eq!(phi_mock.compute(&single), 0.0);
+
+        let mut phi_spectral = TieredPhi::for_production();
+        assert_eq!(phi_spectral.compute(&single), 0.0);
+    }
+
+    // ------------------------------------------------------------------
+    // 3. Basic computation: phi >= 0 and phi <= 1 across tiers
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_mock_tier_phi_in_valid_range() {
+        let mut phi = TieredPhi::for_testing();
+        for n in 2..=8 {
+            let components = make_components(n);
+            let val = phi.compute(&components);
+            assert!(val >= 0.0, "Mock phi must be >= 0 for n={n}");
+            assert!(val <= 1.0, "Mock phi must be <= 1 for n={n}");
+        }
+    }
+
+    #[test]
+    fn test_spectral_tier_phi_non_negative() {
+        let mut phi = TieredPhi::new(ApproximationTier::SpectralConnectivity);
+        let components = make_components(5);
+        let val = phi.compute(&components);
+        assert!(val >= 0.0, "Spectral phi must be non-negative");
+        assert!(val <= 1.0, "Spectral phi must be <= 1");
+    }
+
+    #[test]
+    fn test_exact_tier_phi_non_negative() {
+        let mut phi = TieredPhi::for_research();
+        let components = make_components(4);
+        let val = phi.compute(&components);
+        assert!(val >= 0.0, "Exact phi must be non-negative");
+        assert!(val <= 1.0, "Exact phi must be <= 1");
+    }
+
+    // ------------------------------------------------------------------
+    // 4. Mock tier is deterministic and monotone in n
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_mock_deterministic_and_monotone() {
+        let mut phi = TieredPhi::for_testing();
+        let c5 = make_components(5);
+
+        let v1 = phi.compute(&c5);
+        let v2 = phi.compute(&c5);
+        assert_eq!(v1, v2, "Mock must be deterministic");
+
+        // Monotone: more components => higher phi (for mock: 0.1*n + 0.2)
+        let v3 = phi.compute(&make_components(3));
+        assert!(v1 > v3, "Mock phi should increase with component count");
+    }
+
+    // ------------------------------------------------------------------
+    // 5. ApproximationTier helper methods
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_approximation_tier_suitability() {
+        assert!(ApproximationTier::RandomBaseline.is_suitable_for(10000));
+        assert!(ApproximationTier::SampledPartition.is_suitable_for(10000));
+        assert!(!ApproximationTier::SpectralConnectivity.is_suitable_for(5000));
+        assert!(!ApproximationTier::ExhaustivePartition.is_suitable_for(20));
+        assert!(ApproximationTier::ExhaustivePartition.is_suitable_for(12));
+    }
+
+    #[test]
+    fn test_auto_tier_selection() {
+        assert_eq!(auto_tier(4), ApproximationTier::ExhaustivePartition);
+        assert_eq!(auto_tier(30), ApproximationTier::SpectralConnectivity);
+        assert_eq!(auto_tier(200), ApproximationTier::SampledPartition);
+        assert_eq!(auto_tier(1000), ApproximationTier::RandomBaseline);
+    }
+
+    // ------------------------------------------------------------------
+    // 6. Hierarchical phi edge case
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_hierarchical_phi_single_component() {
+        let mut phi = TieredPhi::for_production();
+        let single = vec![BinaryHV::random(99)];
+        let h = phi.compute_hierarchical(&single);
+        assert_eq!(h.micro_phi, 0.0);
+        assert_eq!(h.meso_phi, 0.0);
+        assert_eq!(h.macro_phi, 0.0);
+        assert_eq!(h.num_clusters, 1);
+    }
+
+    // ------------------------------------------------------------------
+    // 7. Attribution on empty / single component
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_attribution_edge_cases() {
+        let mut phi = TieredPhi::for_testing();
+
+        let attr_empty = phi.compute_attribution(&[]);
+        assert_eq!(attr_empty.baseline_phi, 0.0);
+        assert!(attr_empty.component_scores.is_empty());
+
+        let attr_one = phi.compute_attribution(&[BinaryHV::random(7)]);
+        assert_eq!(attr_one.baseline_phi, 0.0);
+        assert_eq!(attr_one.component_scores.len(), 1);
+    }
+}

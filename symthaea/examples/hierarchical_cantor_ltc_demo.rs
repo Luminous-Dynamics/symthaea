@@ -9,7 +9,8 @@
 //! Run with: cargo run --example hierarchical_cantor_ltc_demo --release
 
 use symthaea::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig};
-use symthaea::hdc::{RealHV, HDC_DIMENSION};
+use symthaea::hdc::real_hv::RealHV;
+use symthaea::hdc::HDC_DIMENSION;
 use std::time::Instant;
 
 fn main() {

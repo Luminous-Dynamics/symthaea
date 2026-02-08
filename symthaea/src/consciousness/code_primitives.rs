@@ -424,6 +424,96 @@ impl CodePrimitiveExecutor {
     pub fn get_primitives(&self, operation: CodeOperation) -> Vec<Primitive> {
         self.router.select_primitives(operation)
     }
+
+    /// Execute with cross-tier composition
+    ///
+    /// Combines Code tier primitives with another tier for enhanced reasoning.
+    /// For example: Code + Metacognitive for self-modification analysis.
+    pub fn execute_cross_tier(
+        &self,
+        code_op: CodeOperation,
+        other_tier_primitives: &[Primitive],
+    ) -> CrossTierResult {
+        // Get Code tier primitives
+        let code_primitives = self.router.select_primitives(code_op);
+
+        // Compose code primitives
+        let code_hv = self.router.compose_primitives(&code_primitives);
+
+        // Compose other tier primitives
+        let other_hv = self.router.compose_primitives(other_tier_primitives);
+
+        // Cross-tier binding: bundle the two compositions
+        let cross_hv = ContinuousHV::bundle(&[&code_hv, &other_hv]);
+
+        // Compute integration metrics
+        let code_phi = self.estimate_phi(&code_primitives);
+        let cross_similarity = code_hv.similarity(&other_hv);
+
+        // Cross-tier Phi: how well do the tiers integrate?
+        // Moderate similarity is good (not too similar, not too different)
+        let cross_phi = 1.0 - (cross_similarity - 0.3).abs() * 1.5;
+
+        CrossTierResult {
+            code_primitives,
+            other_primitives: other_tier_primitives.to_vec(),
+            composed_hv: cross_hv,
+            code_phi,
+            cross_phi: cross_phi.clamp(0.0, 1.0),
+            combined_phi: (code_phi + cross_phi.clamp(0.0, 1.0)) / 2.0,
+        }
+    }
+
+    /// Execute Code + Consciousness tier composition
+    ///
+    /// For intentionality analysis, understanding code purpose.
+    pub fn execute_with_consciousness(&self, code_op: CodeOperation) -> CrossTierResult {
+        use symthaea_core::hdc::{PrimitiveSystem, PrimitiveTier};
+
+        // Get Consciousness tier primitives
+        let system = PrimitiveSystem::new();
+        let consciousness_prims: Vec<Primitive> = system.get_tier(PrimitiveTier::Consciousness)
+            .into_iter()
+            .take(3) // Top 3 consciousness primitives
+            .cloned()
+            .collect();
+
+        self.execute_cross_tier(code_op, &consciousness_prims)
+    }
+
+    /// Execute Code + Metacognitive tier composition
+    ///
+    /// For self-modification, understanding how code changes itself.
+    pub fn execute_with_metacognitive(&self, code_op: CodeOperation) -> CrossTierResult {
+        use symthaea_core::hdc::{PrimitiveSystem, PrimitiveTier};
+
+        // Get Metacognitive tier primitives
+        let system = PrimitiveSystem::new();
+        let meta_prims: Vec<Primitive> = system.get_tier(PrimitiveTier::MetaCognitive)
+            .into_iter()
+            .take(3)
+            .cloned()
+            .collect();
+
+        self.execute_cross_tier(code_op, &meta_prims)
+    }
+}
+
+/// Result of cross-tier primitive composition
+#[derive(Debug, Clone)]
+pub struct CrossTierResult {
+    /// Code tier primitives used
+    pub code_primitives: Vec<Primitive>,
+    /// Other tier primitives used
+    pub other_primitives: Vec<Primitive>,
+    /// Combined hypervector
+    pub composed_hv: ContinuousHV,
+    /// Phi score for code primitives alone
+    pub code_phi: f32,
+    /// Phi score for cross-tier integration
+    pub cross_phi: f32,
+    /// Combined Phi (average)
+    pub combined_phi: f32,
 }
 
 #[cfg(test)]

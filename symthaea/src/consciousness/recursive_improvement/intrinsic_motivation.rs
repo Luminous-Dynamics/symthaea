@@ -109,7 +109,7 @@ impl DrivePrimitiveGrounding {
         let system = PrimitiveSystem::global();
 
         // Compose drive encoding by binding primitives together
-        let mut encoding = BinaryHV::random(0xD41V_E000); // Drive base seed
+        let mut encoding = BinaryHV::random(0xD41E_E000); // Drive base seed
         for name in primitives {
             if let Some(prim) = system.get(name) {
                 encoding = encoding.bind(&prim.encoding);
@@ -1024,7 +1024,7 @@ impl IntrinsicMotivationSystem {
                 let weight = drive_state.tension * drive_state.importance;
                 if weight > 0.01 {
                     // Bundle with weight (approximate via repeated bundling)
-                    combined = combined.bundle(&grounding.primitive_encoding);
+                    combined = BinaryHV::bundle(&[combined, grounding.primitive_encoding.clone()]);
                     total_weight += weight;
                 }
             }

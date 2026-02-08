@@ -24,10 +24,8 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
+use super::constants::K_BOLTZMANN;
 use serde::{Deserialize, Serialize};
-
-/// Boltzmann constant in J/K
-pub const K_BOLTZMANN: f64 = 1.380649e-23;
 
 /// Thermodynamic state
 #[derive(Debug, Clone)]

@@ -31,7 +31,7 @@ use crate::consciousness::meta_reasoning::{
     MetaCognitiveReasoner, MetaReasoningConfig, MetaReasoningResult,
 };
 use crate::consciousness::primitive_evolution::{
-    CandidatePrimitive, EvolutionConfig, PrimitiveEvolution, EvolutionResult,
+    CandidatePrimitive, EvolutionConfig, PrimitiveEvolution, PrimitiveEvolutionResult,
 };
 use crate::consciousness::primitive_reasoning::ReasoningChain;
 use crate::physiology::social_coherence::CollectivePrimitiveEvolution;
@@ -192,11 +192,11 @@ impl UnifiedIntelligence {
     pub fn evolve_local_primitives(
         &mut self,
         instance_id: &str,
-        initial_primitives: Vec<CandidatePrimitive>,
-    ) -> Result<EvolutionResult> {
+        _initial_primitives: Vec<CandidatePrimitive>,
+    ) -> Result<PrimitiveEvolutionResult> {
         // Evolve primitives
         let mut evolution = PrimitiveEvolution::new(self.evolution_config.clone())?;
-        evolution.initialize_population(initial_primitives);
+        evolution.initialize_population();
         let result = evolution.evolve()?;
 
         // Store in instance

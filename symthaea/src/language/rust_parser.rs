@@ -442,6 +442,102 @@ impl CodeParser for RustParser {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// Primitive-Aware Parsing Extension
+// ═══════════════════════════════════════════════════════════════════════════════
+
+use crate::consciousness::code_primitives::{CodePrimitiveExecutor, CodeOperation, CodeExecutionResult};
+
+/// Extended parsing result with primitive analysis
+#[derive(Debug)]
+pub struct PrimitiveAwareParsed {
+    /// Standard parsed code
+    pub parsed: ParsedCode,
+    /// Primitive execution result for parsing
+    pub primitive_result: CodeExecutionResult,
+    /// HDC encoding of the parsed module
+    pub module_hv: Option<symthaea_core::hdc::ContinuousHV>,
+}
+
+impl RustParser {
+    /// Parse with primitive awareness
+    ///
+    /// Uses Code tier primitives to guide parsing and provide integration metrics.
+    pub fn parse_with_primitives(&mut self, source: &str, dim: usize) -> Result<PrimitiveAwareParsed, CodeDiagnostic> {
+        // Execute Parse primitives first
+        let executor = CodePrimitiveExecutor::new(dim);
+        let primitive_result = executor.execute(CodeOperation::Parse);
+
+        // Parse the source
+        let parsed = self.parse(source)?;
+
+        // Encode the module using HDC
+        let module_hv = if !parsed.entities.is_empty() {
+            use crate::hdc::code_encoder::CodeHDEncoder;
+            let encoder = CodeHDEncoder::new(dim);
+            Some(encoder.encode_module(&parsed))
+        } else {
+            None
+        };
+
+        Ok(PrimitiveAwareParsed {
+            parsed,
+            primitive_result,
+            module_hv,
+        })
+    }
+
+    /// Parse and analyze with cross-tier composition
+    ///
+    /// Uses Code + Consciousness primitives for understanding code purpose.
+    pub fn parse_with_consciousness(&mut self, source: &str, dim: usize) -> Result<PrimitiveAwareParsed, CodeDiagnostic> {
+        let executor = CodePrimitiveExecutor::new(dim);
+
+        // Cross-tier: Code + Consciousness
+        let cross_result = executor.execute_with_consciousness(CodeOperation::Parse);
+
+        // Parse the source
+        let parsed = self.parse(source)?;
+
+        // Encode the module
+        let module_hv = if !parsed.entities.is_empty() {
+            use crate::hdc::code_encoder::CodeHDEncoder;
+            let encoder = CodeHDEncoder::new(dim);
+            Some(encoder.encode_module(&parsed))
+        } else {
+            None
+        };
+
+        // Convert CrossTierResult to CodeExecutionResult
+        let primitive_result = CodeExecutionResult {
+            success: true,
+            primitives: cross_result.code_primitives.iter()
+                .map(|p| crate::consciousness::primitive_reasoning::PrimitiveExecution {
+                    primitive: p.clone(),
+                    input: symthaea_core::hdc::BinaryHV::zero(),
+                    output: symthaea_core::hdc::BinaryHV::zero(),
+                    transformation: crate::consciousness::primitive_reasoning::TransformationType::Bind,
+                    phi_contribution: cross_result.combined_phi as f64,
+                    timestamp: 0.0,
+                })
+                .collect(),
+            result_hv: cross_result.composed_hv.clone(),
+            phi: cross_result.combined_phi,
+            generated_code: None,
+            diagnostics: vec![
+                format!("Cross-tier Phi: {:.3}", cross_result.cross_phi),
+                format!("Combined Phi: {:.3}", cross_result.combined_phi),
+            ],
+        };
+
+        Ok(PrimitiveAwareParsed {
+            parsed,
+            primitive_result,
+            module_hv,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

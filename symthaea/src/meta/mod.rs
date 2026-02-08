@@ -17,3 +17,6 @@ pub mod code_explorer;
 
 #[cfg(feature = "code_generation")]
 pub mod dream_synthesis;
+
+#[cfg(feature = "code_generation")]
+pub mod code_health;

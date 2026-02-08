@@ -40,6 +40,12 @@ All HV types support the core HDC algebra:
 - **Similarity** (Hamming / cosine) — measures relatedness
 */
 
+// Blanket allow kept intentionally: as of 2026-02-08, removing it surfaces 95
+// individual warnings (37 unused_variables, ~20 unused_assignments, ~38
+// dead_code) spread across 40+ submodules. Many are parameters/fields reserved
+// for future use in this rapidly-evolving research codebase. Targeted
+// suppression would require touching 40+ files for marginal benefit; revisit
+// when the module stabilizes.
 #![allow(dead_code, unused_variables, unused_assignments)]
 
 // =============================================================================
@@ -326,6 +332,13 @@ pub mod bootstrapping;                     // Cognitive bootstrapping - primitiv
 pub mod primitive_dashboard;               // Real-time primitive usage monitoring
 pub mod arithmetic_engine;                   // Revolutionary: True mathematical cognition via HDC
 pub mod arithmetic;                          // Modular arithmetic (re-exports arithmetic_engine)
+pub mod integer;                             // Integer arithmetic (ℤ) - extends natural numbers with sign
+pub mod rational;
+pub mod algebraic_structures;
+pub mod calculus;
+pub mod real_arithmetic;
+pub mod number_theory;
+pub mod foundations;
 pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
 pub mod native_similarity;                 // O(1) XOR+popcount similarity search (consciousness-native)
 pub mod sparse_hv;                         // Sparse HDC for memory-efficient low-density vectors

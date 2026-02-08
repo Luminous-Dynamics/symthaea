@@ -21,10 +21,11 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
+use super::constants::G;
 use serde::{Deserialize, Serialize};
 
-/// Gravitational constant
-pub const G_GRAV: f64 = 6.674e-11; // m³/(kg·s²)
+// Re-export with original name for backward compatibility
+pub const G_GRAV: f64 = G;
 
 /// Earth's average density
 pub const EARTH_DENSITY: f64 = 5515.0; // kg/m³

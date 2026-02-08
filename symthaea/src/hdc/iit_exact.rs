@@ -1522,8 +1522,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Exact Phi computation returns 0.0 for adjacency-matrix inputs;
-              // needs proper TPM construction (known validation gap)
+    #[ignore] // Known limitation: exact Phi returns 0.0 for adjacency-matrix inputs
+              // because MIP trivially partitions continuous-weight systems.
+              // Proper fix requires converting adjacency → stochastic TPM first.
+              // See MEMORY.md: "Lambda2 validation" section for details.
+              // Run with: cargo test -- --ignored test_phi_proxy_validation
     fn test_phi_proxy_validation() {
         // Test that validate_phi_proxy produces meaningful results on small systems.
         // Highly connected systems should have higher Phi than weakly connected ones.

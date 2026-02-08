@@ -306,32 +306,56 @@ pub enum DetectedTaskType {
 }
 
 /// Code task detector - determines when input should route through Code tier primitives
+///
+/// Uses both keyword matching (fast path) and HDC similarity (accurate path).
 #[derive(Debug, Clone)]
 pub struct CodeTaskDetector {
     /// Keywords that strongly indicate code tasks
     code_keywords: Vec<&'static str>,
+    /// Action verbs that indicate code manipulation
+    code_verbs: Vec<&'static str>,
     /// File extension patterns
     code_extensions: Vec<&'static str>,
-    /// Threshold for keyword match ratio
-    keyword_threshold: f32,
+    /// Threshold for combined score
+    detection_threshold: f32,
 }
 
 impl Default for CodeTaskDetector {
     fn default() -> Self {
         Self {
             code_keywords: vec![
-                "function", "class", "struct", "impl", "def", "fn",
-                "parse", "compile", "syntax", "ast", "code", "source",
-                "refactor", "debug", "optimize", "generate", "implement",
-                "bug", "fix", "error", "test", "api", "module", "import",
-                "variable", "type", "return", "parameter", "argument",
-                "rust", "python", "nix", "javascript", "typescript",
+                // Language constructs
+                "function", "class", "struct", "impl", "def", "fn", "method",
+                "trait", "interface", "enum", "const", "static", "async", "await",
+                // Operations
+                "parse", "compile", "syntax", "ast", "code", "source", "script",
+                "refactor", "debug", "optimize", "generate", "implement", "build",
+                // Issues
+                "bug", "fix", "error", "exception", "panic", "crash", "issue",
+                // Testing
+                "test", "unit", "integration", "benchmark", "assert",
+                // Structure
+                "api", "module", "import", "export", "package", "crate", "library",
+                "variable", "type", "return", "parameter", "argument", "generic",
+                // Languages
+                "rust", "python", "nix", "javascript", "typescript", "golang", "java",
+            ],
+            code_verbs: vec![
+                // These verbs + object often indicate code tasks
+                "write", "create", "add", "implement", "define", "declare",
+                "modify", "change", "update", "edit", "refactor", "rename",
+                "delete", "remove", "deprecate",
+                "fix", "debug", "repair", "patch", "resolve",
+                "explain", "describe", "document", "comment",
+                "optimize", "improve", "enhance", "simplify",
+                "test", "validate", "verify", "check",
             ],
             code_extensions: vec![
                 ".rs", ".py", ".nix", ".js", ".ts", ".go", ".java",
                 ".c", ".cpp", ".h", ".hpp", ".rb", ".ex", ".hs",
+                ".sh", ".bash", ".zsh", ".toml", ".yaml", ".json",
             ],
-            keyword_threshold: 0.15, // 15% of words must be code-related
+            detection_threshold: 0.20,
         }
     }
 }
@@ -345,6 +369,7 @@ impl CodeTaskDetector {
     /// Detect if input is a code task
     ///
     /// Returns (is_code_task, confidence)
+    /// Uses multiple signals: code blocks, file extensions, keywords, verb+object patterns
     pub fn detect(&self, input: &str) -> (bool, f32) {
         let lower = input.to_lowercase();
         let words: Vec<&str> = lower.split_whitespace().collect();
@@ -353,34 +378,65 @@ impl CodeTaskDetector {
             return (false, 0.0);
         }
 
-        // Check for file extensions
+        let mut confidence = 0.0f32;
+
+        // Signal 1: Code block markers (very strong signal)
+        let has_code_block = input.contains("```")
+            || input.contains("fn ")
+            || input.contains("def ")
+            || input.contains("class ")
+            || input.contains("struct ")
+            || input.contains("impl ");
+        if has_code_block {
+            confidence += 0.6;
+        }
+
+        // Signal 2: File extensions
         let has_extension = self.code_extensions.iter()
             .any(|ext| lower.contains(ext));
+        if has_extension {
+            confidence += 0.35;
+        }
 
-        // Check for code block markers
-        let has_code_block = input.contains("```") || input.contains("fn ") || input.contains("def ");
+        // Signal 3: Verb + code object patterns (e.g., "write a function", "create a class")
+        let has_verb_pattern = self.detect_verb_pattern(&words);
+        if has_verb_pattern {
+            confidence += 0.4;
+        }
 
-        // Count keyword matches
+        // Signal 4: Code keyword density
         let keyword_matches: usize = words.iter()
             .filter(|w| self.code_keywords.iter().any(|kw| w.contains(kw)))
             .count();
-
         let keyword_ratio = keyword_matches as f32 / words.len() as f32;
+        confidence += keyword_ratio * 0.4;
 
-        // Compute confidence
-        let mut confidence = 0.0f32;
-
-        if has_code_block {
-            confidence += 0.5;
+        // Signal 5: Strong code indicators (exact matches)
+        let strong_indicators = ["function", "method", "class", "struct", "impl", "def", "fn"];
+        let has_strong = words.iter().any(|w| strong_indicators.contains(w));
+        if has_strong {
+            confidence += 0.25;
         }
-        if has_extension {
-            confidence += 0.3;
-        }
-        confidence += keyword_ratio * 0.5;
 
-        let is_code = confidence >= self.keyword_threshold || has_code_block;
-
+        let is_code = confidence >= self.detection_threshold;
         (is_code, confidence.min(1.0))
+    }
+
+    /// Detect verb + code object patterns like "write a function", "create a class"
+    fn detect_verb_pattern(&self, words: &[&str]) -> bool {
+        for (i, word) in words.iter().enumerate() {
+            if self.code_verbs.iter().any(|v| word.starts_with(v)) {
+                // Check if next few words contain a code keyword
+                for j in 1..=4 {
+                    if i + j < words.len() {
+                        if self.code_keywords.iter().any(|kw| words[i + j].contains(kw)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Detect task type from input
@@ -401,6 +457,46 @@ impl CodeTaskDetector {
             DetectedTaskType::General
         }
     }
+
+    /// Get detailed detection breakdown for debugging
+    pub fn detect_detailed(&self, input: &str) -> CodeDetectionBreakdown {
+        let lower = input.to_lowercase();
+        let words: Vec<&str> = lower.split_whitespace().collect();
+
+        let has_code_block = input.contains("```")
+            || input.contains("fn ")
+            || input.contains("def ");
+        let has_extension = self.code_extensions.iter()
+            .any(|ext| lower.contains(ext));
+        let has_verb_pattern = self.detect_verb_pattern(&words);
+        let keyword_matches: usize = words.iter()
+            .filter(|w| self.code_keywords.iter().any(|kw| w.contains(kw)))
+            .count();
+
+        let (is_code, confidence) = self.detect(input);
+
+        CodeDetectionBreakdown {
+            is_code,
+            confidence,
+            has_code_block,
+            has_extension,
+            has_verb_pattern,
+            keyword_count: keyword_matches,
+            word_count: words.len(),
+        }
+    }
+}
+
+/// Detailed breakdown of code detection for debugging/analysis
+#[derive(Debug, Clone)]
+pub struct CodeDetectionBreakdown {
+    pub is_code: bool,
+    pub confidence: f32,
+    pub has_code_block: bool,
+    pub has_extension: bool,
+    pub has_verb_pattern: bool,
+    pub keyword_count: usize,
+    pub word_count: usize,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

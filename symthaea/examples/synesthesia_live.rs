@@ -18,7 +18,8 @@
 use std::time::Duration;
 use std::f32::consts::PI;
 use symthaea::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig};
-use symthaea::hdc::{RealHV, HDC_DIMENSION};
+use symthaea::hdc::real_hv::RealHV;
+use symthaea::hdc::HDC_DIMENSION;
 use symthaea::voice::LTCPacing; // Import the pacing logic
 
 // --- CONFIGURATION ---
@@ -96,14 +97,14 @@ fn main() {
 
         // B. INJECTION
         let root_vec = RealHV::random(2048, 1).scale(bass_signal);
-        brain.root.state = RealHV::bundle(&[brain.root.state.clone(), root_vec]);
+        brain.root.state = RealHV::bundle(&[&brain.root.state.clone(), &root_vec]);
 
         let mut leaf = &mut brain.root;
         while let Some((left, _)) = &mut leaf.children {
             leaf = left;
         }
         let leaf_vec = RealHV::random(2048, 2).scale(rhythm_signal);
-        leaf.state = RealHV::bundle(&[leaf.state.clone(), leaf_vec]);
+        leaf.state = RealHV::bundle(&[&leaf.state.clone(), &leaf_vec]);
 
         brain.step(SIM_DT);
         t += SIM_DT;
