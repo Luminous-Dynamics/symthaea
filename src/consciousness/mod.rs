@@ -456,8 +456,8 @@ pub mod context_aware_evolution;
 pub mod temporal_consciousness;
 pub mod unified_consciousness_pipeline;
 
-/// Gated: depends on recursive_improvement (feature-gated)
-#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+/// Gated: depends on recursive_optimizer and gradient_optimizer (require full_consciousness)
+#[cfg(feature = "full_consciousness")]
 pub mod consciousness_driven_evolution;
 
 /// Gated: depends on autopoietic_consciousness::LifeState (not in src version)
@@ -492,12 +492,12 @@ pub mod mycelix_bridge;
 /// Value system tests — calibration and validation
 pub mod value_system_tests;
 
-/// Gated: depends on consciousness_driven_evolution (gated)
-#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+/// Gated: depends on consciousness_driven_evolution (requires full_consciousness)
+#[cfg(feature = "full_consciousness")]
 pub mod consciousness_guided_discovery;
 
-/// Gated: depends on consciousness_guided_discovery (gated)
-#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+/// Gated: depends on consciousness_guided_discovery (requires full_consciousness)
+#[cfg(feature = "full_consciousness")]
 pub mod meta_meta_learning;
 
 /// Multi-objective evolution — NSGA-II-inspired Pareto frontier optimization

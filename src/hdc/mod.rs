@@ -294,6 +294,10 @@ pub mod probabilistic_hdc;
 /// provides rotation-invariant processing for spatial and attentional reasoning.
 pub mod tensor_algebra;
 
+/// Learned HDC encodings: adaptive level hypervectors, feature weighting,
+/// spatial context, and prototype-based classification with iterative refinement.
+pub mod learned_encoding;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL MODULES - Code Understanding (Consciousness-Aware Code)
 // ═══════════════════════════════════════════════════════════════════════════════

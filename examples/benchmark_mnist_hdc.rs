@@ -93,23 +93,32 @@ impl HdcMnistClassifier {
         println!("  Initializing HDC classifier: dim={}, levels={}", dim, n_levels);
         let t = Instant::now();
 
-        // Generate level HVs using thermometer-like encoding
-        // Each level is a smooth interpolation between two random endpoints
+        // Generate level HVs using progressive random-flip encoding
+        // Level 0 starts as a random HV. Each subsequent level flips
+        // dim/n_levels random dimensions from the previous level.
+        // This preserves ordinal similarity (adjacent levels are similar)
+        // while ensuring distant levels are nearly orthogonal.
         let base_hv = ContinuousHV::random(dim, 1000);
-        let end_hv = ContinuousHV::random(dim, 2000);
+        let flips_per_level = dim / n_levels.max(1);
 
-        let level_hvs: Vec<ContinuousHV> = (0..n_levels)
-            .map(|l| {
-                let alpha = l as f32 / (n_levels - 1).max(1) as f32;
-                let values: Vec<f32> = base_hv
-                    .values
-                    .iter()
-                    .zip(end_hv.values.iter())
-                    .map(|(&a, &b)| a * (1.0 - alpha) + b * alpha)
-                    .collect();
-                ContinuousHV::from_vec(values)
-            })
-            .collect();
+        let mut level_hvs: Vec<ContinuousHV> = Vec::with_capacity(n_levels);
+        level_hvs.push(base_hv);
+
+        // Simple deterministic PRNG for flip index selection
+        let mut flip_seed: u64 = 3000;
+        for l in 1..n_levels {
+            let prev = &level_hvs[l - 1];
+            let mut new_values = prev.values.clone();
+
+            // Flip flips_per_level dimensions by negating them
+            for _f in 0..flips_per_level {
+                flip_seed = flip_seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                let idx = (flip_seed >> 33) as usize % dim;
+                new_values[idx] = -new_values[idx];
+            }
+
+            level_hvs.push(ContinuousHV::from_vec(new_values));
+        }
 
         // Generate position HVs (one per pixel)
         let position_hvs: Vec<ContinuousHV> = (0..784)
@@ -286,6 +295,74 @@ impl HdcMnistClassifier {
         }
     }
 
+    /// Apply Gram-Schmidt orthogonalization to class prototypes.
+    /// This reduces inter-class interference by making prototypes more orthogonal.
+    /// Uses a soft version: each prototype has a fraction of its projection onto
+    /// prior prototypes removed, controlled by `strength` (0.0=none, 1.0=full).
+    fn orthogonalize_prototypes(&mut self, strength: f32) {
+        let n_classes = self.class_prototypes.len();
+
+        // Collect all prototype vectors
+        let mut vectors: Vec<Vec<f32>> = Vec::new();
+        let mut indices: Vec<usize> = Vec::new();
+        for (i, proto) in self.class_prototypes.iter().enumerate() {
+            if let Some(ref p) = proto {
+                vectors.push(p.values.clone());
+                indices.push(i);
+            }
+        }
+
+        if vectors.len() < 2 {
+            return;
+        }
+
+        // Modified Gram-Schmidt: subtract projection onto previous vectors
+        for i in 1..vectors.len() {
+            for j in 0..i {
+                // Compute projection coefficient: <v_i, v_j> / <v_j, v_j>
+                let dot: f32 = vectors[i].iter().zip(vectors[j].iter())
+                    .map(|(&a, &b)| a * b).sum();
+                let norm_sq: f32 = vectors[j].iter().map(|x| x * x).sum();
+                if norm_sq > 1e-10 {
+                    let coeff = dot / norm_sq * strength;
+                    let vj_copy: Vec<f32> = vectors[j].clone();
+                    for (vi, &vj) in vectors[i].iter_mut().zip(vj_copy.iter()) {
+                        *vi -= coeff * vj;
+                    }
+                }
+            }
+        }
+
+        // Normalize and write back
+        for (idx, vec) in indices.iter().zip(vectors.iter()) {
+            let norm: f32 = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                let normalized: Vec<f32> = vec.iter().map(|v| v / norm).collect();
+                self.class_prototypes[*idx] = Some(ContinuousHV::from_vec(normalized));
+            }
+        }
+
+        // Report inter-class similarity after orthogonalization
+        let mut max_sim = f32::NEG_INFINITY;
+        let mut avg_sim = 0.0f32;
+        let mut count = 0;
+        for i in 0..n_classes {
+            for j in (i+1)..n_classes {
+                if let (Some(ref a), Some(ref b)) = (&self.class_prototypes[i], &self.class_prototypes[j]) {
+                    let sim = a.similarity(b);
+                    avg_sim += sim;
+                    count += 1;
+                    if sim > max_sim { max_sim = sim; }
+                }
+            }
+        }
+        if count > 0 {
+            avg_sim /= count as f32;
+        }
+        println!("  Orthogonalization (strength={:.1}): avg inter-class sim={:.4}, max={:.4}",
+            strength, avg_sim, max_sim);
+    }
+
     /// Classify a single image
     fn classify(&self, pixels: &[u8]) -> (usize, f32) {
         let encoded = self.encode(pixels);
@@ -380,17 +457,20 @@ fn main() {
     println!();
 
     // Run benchmark at multiple dimensions
-    // (dim, levels, retrain_iters, label)
-    let configs: Vec<(usize, usize, usize, &str)> = vec![
-        (4096, 32, 0, "Standard (4K dim, 32 levels)"),
-        (4096, 32, 5, "Standard+Retrain (4K, 5 iters)"),
-        (8192, 32, 0, "Extended (8K dim, 32 levels)"),
-        (8192, 32, 5, "Extended+Retrain (8K, 5 iters)"),
+    // (dim, levels, retrain_iters, orthogonalize_strength, label)
+    let configs: Vec<(usize, usize, usize, f32, &str)> = vec![
+        (4096, 32, 0, 0.0, "Standard (4K dim, 32 levels)"),
+        (4096, 32, 5, 0.0, "Standard+Retrain (4K, 5 iters)"),
+        (8192, 32, 0, 0.0, "Extended (8K dim, 32 levels)"),
+        (8192, 32, 5, 0.0, "Extended+Retrain (8K, 5 iters)"),
+        (8192, 32, 5, 0.5, "Extended+Retrain+GS (8K, GS=0.5)"),
+        (8192, 64, 10, 0.5, "Extended (8K, 64L, 10i, GS=0.5)"),
+        (16384, 64, 10, 0.5, "Full (16K, 64L, 10i, GS=0.5)"),
     ];
 
     let mut results = Vec::new();
 
-    for (dim, levels, retrain_iters, label) in &configs {
+    for (dim, levels, retrain_iters, gs_strength, label) in &configs {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         println!("Configuration: {}", label);
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -409,6 +489,12 @@ fn main() {
             classifier.retrain(&train_images, &train_labels, 0.1, *retrain_iters);
         }
 
+        // Apply Gram-Schmidt orthogonalization if configured
+        if *gs_strength > 0.0 {
+            println!("\nOrthogonalizing prototypes...");
+            classifier.orthogonalize_prototypes(*gs_strength);
+        }
+
         // Test
         println!("\nTesting...");
         let result = classifier.test(&test_images, &test_labels);
@@ -425,24 +511,24 @@ fn main() {
             println!("    Digit {}: {:.1}%", digit, acc * 100.0);
         }
 
-        results.push((*dim, *levels, *retrain_iters, label, result));
+        results.push((*dim, *levels, *retrain_iters, *gs_strength, label, result));
         println!();
     }
 
     // Summary table
-    println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║                    RESULTS SUMMARY                         ║");
-    println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║ {:30} │ {:>8} │ {:>10} ║", "Configuration", "Accuracy", "Infer/ms");
-    println!("╟────────────────────────────────┼──────────┼────────────╢");
+    println!("╔═══════════════════════════════════════════════════════════════════════╗");
+    println!("║                         RESULTS SUMMARY                             ║");
+    println!("╠═══════════════════════════════════════════════════════════════════════╣");
+    println!("║ {:35} │ {:>8} │ {:>10} ║", "Configuration", "Accuracy", "Infer/ms");
+    println!("╟─────────────────────────────────────┼──────────┼────────────╢");
 
-    for (_dim, _levels, _retrain, label, result) in results.iter() {
+    for (_dim, _levels, _retrain, _gs, label, result) in results.iter() {
         println!(
-            "║ {:30} │ {:>7.2}% │ {:>9.3} ║",
+            "║ {:35} │ {:>7.2}% │ {:>9.3} ║",
             label, result.accuracy * 100.0, result.inference_time_ms
         );
     }
-    println!("╚══════════════════════════════════════════════════════════════╝\n");
+    println!("╚═══════════════════════════════════════════════════════════════════════╝\n");
 
     // Validation thresholds
     println!("VALIDATION THRESHOLDS");
@@ -450,7 +536,7 @@ fn main() {
 
     let best_accuracy = results
         .iter()
-        .map(|(_, _, _, _, r)| r.accuracy)
+        .map(|(_, _, _, _, _, r)| r.accuracy)
         .fold(f64::NEG_INFINITY, f64::max);
 
     let checks = vec![
@@ -473,12 +559,13 @@ fn main() {
     let result_json = serde_json::json!({
         "benchmark": "MNIST HDC Classification",
         "timestamp": chrono::Utc::now().to_rfc3339(),
-        "results": results.iter().map(|(dim, levels, retrain, label, r)| {
+        "results": results.iter().map(|(dim, levels, retrain, gs, label, r)| {
             serde_json::json!({
                 "config": *label,
                 "dim": *dim,
                 "levels": *levels,
                 "retrain_iterations": *retrain,
+                "gram_schmidt_strength": *gs,
                 "accuracy": r.accuracy,
                 "correct": r.correct,
                 "total": r.total,

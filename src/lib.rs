@@ -402,6 +402,10 @@ pub use mind::{ContinuousMind, MindConfig, MindState};
 // Re-export symthaea-core for direct access to HDC primitives
 pub use symthaea_core;
 
+// Re-export symthaea-nix for conscious NixOS mind
+#[cfg(feature = "nix-mind")]
+pub use symthaea_nix;
+
 // Re-export phi_engine for consciousness calculations
 pub use symthaea_core::phi_engine;
 

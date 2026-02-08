@@ -90,6 +90,10 @@ mod tensor_algebra;
 mod chaos_dynamics;
 mod nonequilibrium;
 
+// Integration examples showing cross-module usage
+#[cfg(test)]
+mod physics_integration_examples;
+
 // Demonstration module
 #[cfg(test)]
 mod demo;

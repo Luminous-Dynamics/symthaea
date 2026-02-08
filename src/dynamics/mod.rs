@@ -43,6 +43,17 @@ pub mod spectral_analysis;
 // Stochastic differential equations for neural noise modeling
 pub mod stochastic_dynamics;
 
+// Hidden Markov Model for temporal state sequence classification
+// (Forward-Backward, Viterbi, Baum-Welch EM)
+pub mod hmm;
+
+// Wavelet analysis: DWT (Mallat), CWT (Morlet), spindle/burst detection
+pub mod wavelet;
+
+// Phase-Amplitude Coupling: cross-frequency neural coupling analysis
+// (Modulation Index, Mean Vector Length, comodulogram)
+pub mod phase_amplitude_coupling;
+
 // Code understanding dynamics (Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]
 pub mod cfc_code_sequencer;
