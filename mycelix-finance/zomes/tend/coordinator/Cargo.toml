@@ -12,5 +12,4 @@ name = "tend"
 holochain_serialized_bytes = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
 tend_integrity = { path = "../integrity" }

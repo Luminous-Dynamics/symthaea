@@ -1,7 +1,7 @@
 //! Staking Coordinator Zome
 //!
-//! Business logic for tri-asset staking with cryptographic verification:
-//! - Stake creation with cross-chain proof verification
+//! Business logic for SAP-based collateral staking with MYCEL weighting:
+//! - Stake creation with SAP collateral and MYCEL score
 //! - Slashing with cryptographic evidence
 //! - Escrow with multiple release conditions
 //! - Reward distribution with Merkle proofs
@@ -61,66 +61,46 @@ fn compute_bytes_hash(data: &[u8]) -> Vec<u8> {
 }
 
 // =============================================================================
-// Tri-Asset Staking
+// Collateral Staking (SAP + MYCEL)
 // =============================================================================
 
-/// Input for creating a tri-asset stake
+/// Input for creating a collateral stake
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateStakeInput {
     pub staker_did: String,
-    pub myc_amount: u128,
-    pub eth_amount: u128,
-    pub usdc_amount: u128,
-    /// K-Vector trust score (0.0-1.0)
-    pub kvector_trust_score: f32,
-    /// Cross-chain proof of MYC lock
-    pub myc_lock_proof: Vec<u8>,
-    /// Cross-chain proof of ETH lock
-    pub eth_lock_proof: Vec<u8>,
-    /// Cross-chain proof of USDC lock
-    pub usdc_lock_proof: Vec<u8>,
+    pub sap_amount: u64,
+    pub mycel_score: f32,
 }
 
-/// Create a new tri-asset stake
+/// Create a new collateral stake
 ///
-/// Requires cross-chain proofs for all three assets.
-/// Stake weight is calculated based on K-Vector trust score.
+/// SAP collateral with MYCEL-weighted influence.
+/// Stake weight = 1.0 + mycel_score (range: 1.0-2.0).
 #[hdk_extern]
 pub fn create_stake(input: CreateStakeInput) -> ExternResult<Record> {
     let now = sys_time()?;
     let stake_id = format!("stake:{}:{}", input.staker_did, now.as_micros());
 
-    // Calculate stake weight based on K-Vector
-    // Weight formula: 1.0 + trust_score (range: 1.0 - 2.0)
-    let stake_weight = 1.0 + input.kvector_trust_score;
+    // Clamp mycel_score to [0.0, 1.0]
+    let mycel_score = input.mycel_score.clamp(0.0, 1.0);
 
-    // Calculate total USD value (simplified - in production, use oracle prices)
-    // Assuming MYC=$1, ETH=$2000, USDC=$1
-    let myc_usd = (input.myc_amount as f64) / 1e18;
-    let eth_usd = (input.eth_amount as f64) / 1e18 * 2000.0;
-    let usdc_usd = (input.usdc_amount as f64) / 1e6;
-    let total_value_usd = myc_usd + eth_usd + usdc_usd;
+    // Calculate stake weight: 1.0 + mycel_score (range: 1.0-2.0)
+    let stake_weight = 1.0 + mycel_score;
 
-    let stake = TriAssetStake {
+    let stake = CollateralStake {
         id: stake_id.clone(),
         staker_did: input.staker_did.clone(),
-        myc_amount: input.myc_amount,
-        eth_amount: input.eth_amount,
-        usdc_amount: input.usdc_amount,
-        total_value_usd,
-        kvector_trust_score: input.kvector_trust_score,
+        sap_amount: input.sap_amount,
+        mycel_score,
         stake_weight,
         staked_at: now,
         unbonding_until: None,
         status: StakeStatus::Active,
-        myc_lock_proof: input.myc_lock_proof,
-        eth_lock_proof: input.eth_lock_proof,
-        usdc_lock_proof: input.usdc_lock_proof,
         pending_rewards: 0,
         last_reward_claim: now,
     };
 
-    let action_hash = create_entry(&EntryTypes::TriAssetStake(stake))?;
+    let action_hash = create_entry(&EntryTypes::CollateralStake(stake))?;
 
     // Link staker to stake
     create_link(
@@ -152,13 +132,13 @@ pub fn begin_unbonding(stake_id: String) -> ExternResult<Record> {
     );
 
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TriAssetStake)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CollateralStake)?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(stake) = record.entry().to_app_option::<TriAssetStake>().ok().flatten() {
+        if let Some(stake) = record.entry().to_app_option::<CollateralStake>().ok().flatten() {
             if stake.id == stake_id && stake.status == StakeStatus::Active {
-                let updated = TriAssetStake {
+                let updated = CollateralStake {
                     status: StakeStatus::Unbonding,
                     unbonding_until: Some(unbonding_end),
                     ..stake
@@ -166,7 +146,7 @@ pub fn begin_unbonding(stake_id: String) -> ExternResult<Record> {
 
                 let action_hash = update_entry(
                     record.action_address().clone(),
-                    &EntryTypes::TriAssetStake(updated),
+                    &EntryTypes::CollateralStake(updated),
                 )?;
 
                 return get(action_hash, GetOptions::default())?
@@ -184,11 +164,11 @@ pub fn withdraw_stake(stake_id: String) -> ExternResult<Record> {
     let now = sys_time()?;
 
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TriAssetStake)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CollateralStake)?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(stake) = record.entry().to_app_option::<TriAssetStake>().ok().flatten() {
+        if let Some(stake) = record.entry().to_app_option::<CollateralStake>().ok().flatten() {
             if stake.id == stake_id && stake.status == StakeStatus::Unbonding {
                 // Check if unbonding period is complete
                 if let Some(unbonding_until) = stake.unbonding_until {
@@ -199,14 +179,14 @@ pub fn withdraw_stake(stake_id: String) -> ExternResult<Record> {
                     }
                 }
 
-                let updated = TriAssetStake {
+                let updated = CollateralStake {
                     status: StakeStatus::Withdrawn,
                     ..stake
                 };
 
                 let action_hash = update_entry(
                     record.action_address().clone(),
-                    &EntryTypes::TriAssetStake(updated),
+                    &EntryTypes::CollateralStake(updated),
                 )?;
 
                 return get(action_hash, GetOptions::default())?
@@ -218,26 +198,27 @@ pub fn withdraw_stake(stake_id: String) -> ExternResult<Record> {
     Err(wasm_error!(WasmErrorInner::Guest("Unbonding stake not found".into())))
 }
 
-/// Update stake K-Vector trust score
+/// Update stake MYCEL score
 #[hdk_extern]
-pub fn update_stake_trust(input: UpdateTrustInput) -> ExternResult<Record> {
+pub fn update_stake_mycel(input: UpdateMycelInput) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TriAssetStake)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CollateralStake)?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(stake) = record.entry().to_app_option::<TriAssetStake>().ok().flatten() {
+        if let Some(stake) = record.entry().to_app_option::<CollateralStake>().ok().flatten() {
             if stake.id == input.stake_id && stake.status == StakeStatus::Active {
-                let new_weight = 1.0 + input.new_trust_score;
-                let updated = TriAssetStake {
-                    kvector_trust_score: input.new_trust_score,
+                let mycel_score = input.new_mycel_score.clamp(0.0, 1.0);
+                let new_weight = 1.0 + mycel_score;
+                let updated = CollateralStake {
+                    mycel_score,
                     stake_weight: new_weight,
                     ..stake
                 };
 
                 let action_hash = update_entry(
                     record.action_address().clone(),
-                    &EntryTypes::TriAssetStake(updated),
+                    &EntryTypes::CollateralStake(updated),
                 )?;
 
                 return get(action_hash, GetOptions::default())?
@@ -250,9 +231,9 @@ pub fn update_stake_trust(input: UpdateTrustInput) -> ExternResult<Record> {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct UpdateTrustInput {
+pub struct UpdateMycelInput {
     pub stake_id: String,
-    pub new_trust_score: f32,
+    pub new_mycel_score: f32,
 }
 
 // =============================================================================
@@ -280,19 +261,17 @@ pub fn slash_stake(input: SlashStakeInput) -> ExternResult<Record> {
     let evidence_hash = compute_bytes_hash(&evidence_bytes);
 
     let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TriAssetStake)?))
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CollateralStake)?))
         .include_entries(true);
 
     for record in query(filter)? {
-        if let Some(stake) = record.entry().to_app_option::<TriAssetStake>().ok().flatten() {
+        if let Some(stake) = record.entry().to_app_option::<CollateralStake>().ok().flatten() {
             if stake.id == input.stake_id {
                 let slash_pct = input.custom_slash_percentage
                     .unwrap_or_else(|| input.reason.default_slash_percentage());
 
-                // Calculate slashed amounts
-                let myc_slashed = (stake.myc_amount * slash_pct as u128) / 100;
-                let eth_slashed = (stake.eth_amount * slash_pct as u128) / 100;
-                let usdc_slashed = (stake.usdc_amount * slash_pct as u128) / 100;
+                // Calculate slashed SAP amount
+                let sap_slashed = (stake.sap_amount as u128 * slash_pct as u128 / 100) as u64;
 
                 let jailed = input.reason.results_in_jail();
                 let jail_release = if jailed {
@@ -312,9 +291,7 @@ pub fn slash_stake(input: SlashStakeInput) -> ExternResult<Record> {
                     staker_did: stake.staker_did.clone(),
                     reason: input.reason.clone(),
                     slash_percentage: slash_pct,
-                    myc_slashed,
-                    eth_slashed,
-                    usdc_slashed,
+                    sap_slashed,
                     evidence_hash: evidence_hash.clone(),
                     evidence: evidence_bytes,
                     slashed_at: now,
@@ -339,17 +316,15 @@ pub fn slash_stake(input: SlashStakeInput) -> ExternResult<Record> {
                     StakeStatus::Slashed
                 };
 
-                let updated_stake = TriAssetStake {
-                    myc_amount: stake.myc_amount - myc_slashed,
-                    eth_amount: stake.eth_amount - eth_slashed,
-                    usdc_amount: stake.usdc_amount - usdc_slashed,
+                let updated_stake = CollateralStake {
+                    sap_amount: stake.sap_amount - sap_slashed,
                     status: new_status,
                     ..stake
                 };
 
                 update_entry(
                     record.action_address().clone(),
-                    &EntryTypes::TriAssetStake(updated_stake),
+                    &EntryTypes::CollateralStake(updated_stake),
                 )?;
 
                 return get(event_hash, GetOptions::default())?
@@ -362,67 +337,6 @@ pub fn slash_stake(input: SlashStakeInput) -> ExternResult<Record> {
 }
 
 // =============================================================================
-// Cross-Chain Proofs
-// =============================================================================
-
-/// Input for submitting cross-chain lock proof
-#[derive(Serialize, Deserialize, Debug)]
-pub struct SubmitProofInput {
-    pub stake_id: String,
-    pub source_chain: ChainType,
-    pub asset: AssetType,
-    pub amount: u128,
-    pub lock_contract: String,
-    pub lock_tx_hash: Vec<u8>,
-    pub lock_block: u64,
-    pub merkle_proof: Vec<u8>,
-    pub block_header_hash: Vec<u8>,
-    pub validator_signatures: Vec<Vec<u8>>,
-}
-
-/// Submit a cross-chain lock proof
-#[hdk_extern]
-pub fn submit_cross_chain_proof(input: SubmitProofInput) -> ExternResult<Record> {
-    let now = sys_time()?;
-    let proof_id = format!("proof:{}:{}:{}", input.stake_id, input.source_chain.clone() as u8, now.as_micros());
-
-    // Proof expires in 24 hours (must be refreshed)
-    let expires_at = Timestamp::from_micros(
-        now.as_micros() as i64 + (24 * 3600 * 1_000_000)
-    );
-
-    let proof = CrossChainLockProof {
-        id: proof_id.clone(),
-        stake_id: input.stake_id.clone(),
-        source_chain: input.source_chain,
-        asset: input.asset,
-        amount: input.amount,
-        lock_contract: input.lock_contract,
-        lock_tx_hash: input.lock_tx_hash,
-        lock_block: input.lock_block,
-        merkle_proof: input.merkle_proof,
-        block_header_hash: input.block_header_hash,
-        validator_signatures: input.validator_signatures,
-        created_at: now,
-        expires_at,
-        verified: false, // Verification happens separately
-    };
-
-    let action_hash = create_entry(&EntryTypes::CrossChainLockProof(proof))?;
-
-    // Link stake to proof
-    create_link(
-        anchor_hash(&format!("stake:{}", input.stake_id))?,
-        action_hash.clone(),
-        LinkTypes::StakeToProofs,
-        (),
-    )?;
-
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
-}
-
-// =============================================================================
 // Crypto Escrow
 // =============================================================================
 
@@ -431,9 +345,7 @@ pub fn submit_cross_chain_proof(input: SubmitProofInput) -> ExternResult<Record>
 pub struct CreateEscrowInput {
     pub depositor_did: String,
     pub beneficiary_did: String,
-    pub myc_amount: u128,
-    pub eth_amount: u128,
-    pub usdc_amount: u128,
+    pub sap_amount: u64,
     pub purpose: String,
     pub conditions: Vec<ReleaseCondition>,
     pub required_conditions: u8,
@@ -455,9 +367,7 @@ pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
         id: escrow_id.clone(),
         depositor_did: input.depositor_did.clone(),
         beneficiary_did: input.beneficiary_did.clone(),
-        myc_amount: input.myc_amount,
-        eth_amount: input.eth_amount,
-        usdc_amount: input.usdc_amount,
+        sap_amount: input.sap_amount,
         purpose: input.purpose,
         conditions: input.conditions,
         required_conditions: input.required_conditions,
@@ -747,7 +657,7 @@ pub fn get_active_stakes(_: ()) -> ExternResult<Vec<Record>> {
         let ah = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
         if let Some(record) = get(ah.clone(), GetOptions::default())? {
-            if let Some(stake) = record.entry().to_app_option::<TriAssetStake>()
+            if let Some(stake) = record.entry().to_app_option::<CollateralStake>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 if stake.status == StakeStatus::Active {
@@ -811,10 +721,10 @@ pub fn get_total_weighted_stake(_: ()) -> ExternResult<f64> {
     let mut total = 0.0;
 
     for record in stakes {
-        if let Some(stake) = record.entry().to_app_option::<TriAssetStake>()
+        if let Some(stake) = record.entry().to_app_option::<CollateralStake>()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
-            total += stake.total_value_usd * stake.stake_weight as f64;
+            total += stake.sap_amount as f64 * stake.stake_weight as f64;
         }
     }
 

@@ -20,10 +20,9 @@ pub struct Payment {
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum PaymentType {
     Direct,
-    LoanPayment(String),     // loan_id
     TreasuryContribution(String), // treasury_id
-    EnergyInvestment(String), // project_id
-    Escrow(String),          // escrow_id
+    CommonsContribution(String),  // commons_pool_id
+    Escrow(String),               // escrow_id
     Recurring(RecurringConfig),
 }
 
@@ -70,12 +69,42 @@ pub struct Receipt {
     pub signature: String,
 }
 
+/// How SAP should be handled when a member exits
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum SuccessionPreference {
+    /// Default: remaining SAP goes to member's local commons pool
+    Commons,
+    /// SAP transferred to a designated DID
+    Designee(String),
+    /// SAP redeemed for collateral through the bridge
+    Redemption,
+}
+
+/// Record of a member exit, coordinating across all currencies
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ExitRecord {
+    /// DID of the exiting member
+    pub member_did: String,
+    /// SAP succession preference
+    pub succession_preference: SuccessionPreference,
+    /// SAP balance at time of exit
+    pub sap_balance: f64,
+    /// TEND balances forgiven (list of dao_did:amount pairs)
+    pub tend_balances_forgiven: Vec<(String, i32)>,
+    /// Whether MYCEL was dissolved
+    pub mycel_dissolved: bool,
+    /// Timestamp of the exit
+    pub exited_at: Timestamp,
+}
+
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     Payment(Payment),
     PaymentChannel(PaymentChannel),
     Receipt(Receipt),
+    ExitRecord(ExitRecord),
 }
 
 #[hdk_link_types]
@@ -109,6 +138,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::Receipt(receipt) => {
                         validate_create_receipt(EntryCreationAction::Create(action), receipt)
                     }
+                    EntryTypes::ExitRecord(exit) => {
+                        validate_create_exit_record(EntryCreationAction::Create(action), exit)
+                    }
                 }
             }
             OpEntry::UpdateEntry { app_entry, action, .. } => {
@@ -122,6 +154,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::Receipt(_) => {
                         Ok(ValidateCallbackResult::Invalid(
                             "Receipts cannot be updated".into(),
+                        ))
+                    }
+                    EntryTypes::ExitRecord(_) => {
+                        Ok(ValidateCallbackResult::Invalid(
+                            "Exit records cannot be updated".into(),
                         ))
                     }
                 }
@@ -198,6 +235,12 @@ fn validate_create_payment(
     }
     if payment.from_did == payment.to_did {
         return Ok(ValidateCallbackResult::Invalid("Cannot send payment to yourself".into()));
+    }
+    // Only SAP and TEND currencies are accepted
+    if payment.currency != "SAP" && payment.currency != "TEND" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Currency must be \"SAP\" or \"TEND\"".into()
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -282,5 +325,26 @@ fn validate_create_receipt(
     // which would be fetched from the identity zome in production.
     // The signature should cover: payment_id | from_did | to_did | amount | currency | timestamp
 
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_create_exit_record(
+    _action: EntryCreationAction,
+    exit: ExitRecord,
+) -> ExternResult<ValidateCallbackResult> {
+    if !exit.member_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid("Member must be a valid DID".into()));
+    }
+    if exit.sap_balance < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("SAP balance cannot be negative".into()));
+    }
+    if let SuccessionPreference::Designee(ref designee) = exit.succession_preference {
+        if !designee.starts_with("did:") {
+            return Ok(ValidateCallbackResult::Invalid("Designee must be a valid DID".into()));
+        }
+        if *designee == exit.member_did {
+            return Ok(ValidateCallbackResult::Invalid("Cannot designate yourself as successor".into()));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }

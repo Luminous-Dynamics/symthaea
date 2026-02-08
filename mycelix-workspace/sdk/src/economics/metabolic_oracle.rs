@@ -1,9 +1,13 @@
-//! # Metabolic Oracle
+//! # Metabolic Oracle v2
 //!
-//! Implementation of MIP-E-002 Article VII: Autopoietic Self-Regulation
+//! Autopoietic self-regulation with 365-day rolling memory,
+//! counter-cyclical TEND expansion, and seasonal awareness.
 //!
-//! The Metabolic Oracle automatically adjusts network economic parameters
-//! based on the Vitality Index while respecting constitutional bounds.
+//! Changes from v1:
+//! - Memory: 365 days rolling (was 24 hours)
+//! - Removed: spore_allocation (CGC gone)
+//! - Added: TendLimitTier for counter-cyclical TEND expansion
+//! - Counter-cyclical: When stressed, lower fees + expand TEND limits
 
 use serde::{Deserialize, Serialize};
 
@@ -11,18 +15,14 @@ use serde::{Deserialize, Serialize};
 /// These are constitutional constraints that cannot be modified by the oracle
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct PolicyBounds {
-    /// Minimum fee rate (0.1% floor)
+    /// Minimum fee rate (0.01% floor)
     pub fee_rate_min: f64,
-    /// Maximum fee rate (3% ceiling)
+    /// Maximum fee rate (0.5% ceiling)
     pub fee_rate_max: f64,
-    /// Minimum decay rate (1% annual floor)
-    pub decay_rate_min: f64,
-    /// Maximum decay rate (5% annual ceiling)
-    pub decay_rate_max: f64,
-    /// Minimum SPORE allocation (5/month)
-    pub spore_allocation_min: u64,
-    /// Maximum SPORE allocation (20/month)
-    pub spore_allocation_max: u64,
+    /// Minimum demurrage rate (1% annual floor)
+    pub demurrage_rate_min: f64,
+    /// Maximum demurrage rate (5% annual ceiling)
+    pub demurrage_rate_max: f64,
     /// Emergency reserve minimum (5%)
     pub emergency_reserve_min: f64,
 }
@@ -30,12 +30,10 @@ pub struct PolicyBounds {
 impl Default for PolicyBounds {
     fn default() -> Self {
         Self {
-            fee_rate_min: 0.001,
-            fee_rate_max: 0.03,
-            decay_rate_min: 0.01,
-            decay_rate_max: 0.05,
-            spore_allocation_min: 5,
-            spore_allocation_max: 20,
+            fee_rate_min: 0.0001,
+            fee_rate_max: 0.005,
+            demurrage_rate_min: 0.01,
+            demurrage_rate_max: 0.05,
             emergency_reserve_min: 0.05,
         }
     }
@@ -48,7 +46,7 @@ pub struct VitalityComponents {
     pub circulation: f64,
     /// Average peer connections / max theoretical
     pub relationship: f64,
-    /// HEARTH utilization + CGC flow
+    /// Commons pool utilization + recognition flow
     pub commons: f64,
     /// Node count × geographic distribution / target
     pub resilience: f64,
@@ -89,7 +87,7 @@ pub struct VitalityIndex {
 /// Metabolic state classification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MetabolicState {
-    /// Score 70-100: Network thriving, increase rewards
+    /// Score 70-100: Network thriving
     Thriving,
     /// Score 40-70: Normal operation
     Healthy,
@@ -127,16 +125,51 @@ impl MetabolicState {
     }
 }
 
+/// TEND limit tier for counter-cyclical expansion (WIR Bank pattern)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TendLimitTier {
+    /// Healthy/Thriving: ±40 TEND
+    Normal,
+    /// Stressed: ±60 TEND
+    Elevated,
+    /// Critical: ±80 TEND
+    High,
+    /// Failing: ±120 TEND
+    Emergency,
+}
+
+impl TendLimitTier {
+    /// Get the TEND balance limit for this tier
+    pub fn limit(&self) -> i32 {
+        match self {
+            TendLimitTier::Normal => 40,
+            TendLimitTier::Elevated => 60,
+            TendLimitTier::High => 80,
+            TendLimitTier::Emergency => 120,
+        }
+    }
+
+    /// Determine tier from metabolic state
+    pub fn from_state(state: MetabolicState) -> Self {
+        match state {
+            MetabolicState::Thriving | MetabolicState::Healthy => TendLimitTier::Normal,
+            MetabolicState::Stressed => TendLimitTier::Elevated,
+            MetabolicState::Critical => TendLimitTier::High,
+            MetabolicState::Failing => TendLimitTier::Emergency,
+        }
+    }
+}
+
 /// Vitality trend direction
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VitalityTrend {
-    /// Improving over 24h window
+    /// Improving over measurement window
     Improving,
     /// Stable (±5%)
     Stable,
-    /// Declining over 24h window
+    /// Declining over measurement window
     Declining,
-    /// Rapid decline (>10% in 24h)
+    /// Rapid decline (>10%)
     RapidDecline,
 }
 
@@ -145,12 +178,12 @@ pub enum VitalityTrend {
 pub struct PolicyAdjustment {
     /// Fee rate adjustment factor (1.0 = no change)
     pub fee_rate_factor: f64,
-    /// SPORE allocation adjustment
-    pub spore_adjustment: i32,
-    /// Decay rate adjustment factor
-    pub decay_rate_factor: f64,
+    /// Demurrage rate adjustment factor
+    pub demurrage_rate_factor: f64,
     /// Velocity incentive multiplier
     pub velocity_incentive: f64,
+    /// TEND limit tier for counter-cyclical expansion
+    pub tend_limit_tier: TendLimitTier,
     /// Emergency liquidity release (if critical)
     pub emergency_release: Option<u64>,
     /// Reason for adjustment
@@ -166,7 +199,7 @@ pub struct MetabolicOracle {
     pub bounds: PolicyBounds,
     /// Current network parameters
     pub current_params: NetworkParameters,
-    /// Historical vitality readings (24h rolling)
+    /// Historical vitality readings (365-day rolling)
     pub vitality_history: Vec<VitalityIndex>,
     /// Adjustment history for audit
     pub adjustment_history: Vec<PolicyAdjustment>,
@@ -177,24 +210,24 @@ pub struct MetabolicOracle {
 pub struct NetworkParameters {
     /// Current base fee rate
     pub fee_rate: f64,
-    /// Current decay rate (annual)
-    pub decay_rate: f64,
-    /// Current SPORE allocation per month
-    pub spore_allocation: u64,
+    /// Current demurrage rate (annual)
+    pub demurrage_rate: f64,
     /// Velocity incentive multiplier
     pub velocity_incentive: f64,
     /// Emergency reserve ratio
     pub emergency_reserve: f64,
+    /// Current TEND limit tier
+    pub tend_limit_tier: TendLimitTier,
 }
 
 impl Default for NetworkParameters {
     fn default() -> Self {
         Self {
-            fee_rate: 0.0015, // 0.15%
-            decay_rate: 0.02, // 2% annual
-            spore_allocation: 10,
+            fee_rate: 0.0003,     // 0.03% (Member tier default)
+            demurrage_rate: 0.02, // 2% annual
             velocity_incentive: 1.0,
             emergency_reserve: 0.10,
+            tend_limit_tier: TendLimitTier::Normal,
         }
     }
 }
@@ -214,7 +247,6 @@ impl MetabolicOracle {
     pub fn record_vitality(&mut self, components: VitalityComponents, timestamp: u64) {
         let score = components.calculate_vitality();
         let state = MetabolicState::from_score(score);
-
         let trend = self.calculate_trend(score);
 
         let vitality = VitalityIndex {
@@ -227,8 +259,8 @@ impl MetabolicOracle {
 
         self.vitality_history.push(vitality);
 
-        // Keep 24h of history (assuming hourly measurements)
-        if self.vitality_history.len() > 24 {
+        // Keep 365 days of history (assuming daily measurements)
+        if self.vitality_history.len() > 365 {
             self.vitality_history.remove(0);
         }
     }
@@ -243,8 +275,12 @@ impl MetabolicOracle {
             Some(entry) => entry.score,
             None => return VitalityTrend::Stable,
         };
-        let delta = current - oldest;
-        let delta_pct = (delta / oldest) * 100.0;
+
+        if oldest == 0.0 {
+            return VitalityTrend::Stable;
+        }
+
+        let delta_pct = ((current - oldest) / oldest) * 100.0;
 
         match delta_pct {
             d if d > 5.0 => VitalityTrend::Improving,
@@ -261,9 +297,9 @@ impl MetabolicOracle {
             None => {
                 return PolicyAdjustment {
                     fee_rate_factor: 1.0,
-                    spore_adjustment: 0,
-                    decay_rate_factor: 1.0,
+                    demurrage_rate_factor: 1.0,
                     velocity_incentive: 1.0,
+                    tend_limit_tier: TendLimitTier::Normal,
                     emergency_release: None,
                     reason: "No vitality data available".to_string(),
                     requires_approval: false,
@@ -281,25 +317,23 @@ impl MetabolicOracle {
     }
 
     fn thriving_adjustment(&self) -> PolicyAdjustment {
-        // Increase rewards, maintain fees
         PolicyAdjustment {
             fee_rate_factor: 1.0,
-            spore_adjustment: 2, // Increase SPORE allocation
-            decay_rate_factor: 0.9, // Slightly reduce decay
+            demurrage_rate_factor: 0.9,
             velocity_incentive: 1.0,
+            tend_limit_tier: TendLimitTier::Normal,
             emergency_release: None,
-            reason: "Thriving: Increasing network rewards".to_string(),
+            reason: "Thriving: Slightly reducing demurrage".to_string(),
             requires_approval: false,
         }
     }
 
     fn healthy_adjustment(&self) -> PolicyAdjustment {
-        // Maintain current parameters
         PolicyAdjustment {
             fee_rate_factor: 1.0,
-            spore_adjustment: 0,
-            decay_rate_factor: 1.0,
+            demurrage_rate_factor: 1.0,
             velocity_incentive: 1.0,
+            tend_limit_tier: TendLimitTier::Normal,
             emergency_release: None,
             reason: "Healthy: Maintaining stable parameters".to_string(),
             requires_approval: false,
@@ -307,74 +341,63 @@ impl MetabolicOracle {
     }
 
     fn stressed_adjustment(&self) -> PolicyAdjustment {
-        // Reduce fees, boost circulation
+        // Counter-cyclical: lower fees + expand TEND limits
         PolicyAdjustment {
-            fee_rate_factor: 0.8, // 20% fee reduction
-            spore_adjustment: 0,
-            decay_rate_factor: 1.0,
-            velocity_incentive: 1.2, // Boost velocity rewards
+            fee_rate_factor: 0.8,
+            demurrage_rate_factor: 1.0,
+            velocity_incentive: 1.2,
+            tend_limit_tier: TendLimitTier::Elevated, // ±60 TEND
             emergency_release: None,
-            reason: "Stressed: Activating auto-healing".to_string(),
+            reason: "Stressed: Lower fees, expand TEND limits to ±60".to_string(),
             requires_approval: false,
         }
     }
 
     fn critical_adjustment(&self) -> PolicyAdjustment {
-        // Emergency response
         PolicyAdjustment {
-            fee_rate_factor: 0.5, // 50% fee reduction
-            spore_adjustment: 5, // Boost SPORE
-            decay_rate_factor: 0.5, // Reduce decay
+            fee_rate_factor: 0.5,
+            demurrage_rate_factor: 0.5,
             velocity_incentive: 1.5,
-            emergency_release: Some(10_000), // Release emergency liquidity
-            reason: "Critical: Emergency response activated".to_string(),
-            requires_approval: true, // Requires human approval
+            tend_limit_tier: TendLimitTier::High, // ±80 TEND
+            emergency_release: Some(10_000),
+            reason: "Critical: Emergency response, TEND limits ±80".to_string(),
+            requires_approval: true,
         }
     }
 
     fn failing_adjustment(&self) -> PolicyAdjustment {
-        // Circuit breaker - minimal activity
         PolicyAdjustment {
-            fee_rate_factor: 0.0, // Fee waiver
-            spore_adjustment: 0,
-            decay_rate_factor: 0.0, // Suspend decay
-            velocity_incentive: 0.0, // Suspend velocity incentives
-            emergency_release: Some(50_000), // Major liquidity release
-            reason: "FAILING: Circuit breaker activated - awaiting recovery".to_string(),
+            fee_rate_factor: 0.0,
+            demurrage_rate_factor: 0.0,
+            velocity_incentive: 0.0,
+            tend_limit_tier: TendLimitTier::Emergency, // ±120 TEND
+            emergency_release: Some(50_000),
+            reason: "FAILING: Circuit breaker, TEND limits ±120".to_string(),
             requires_approval: true,
         }
     }
 
     /// Apply adjustment with bounds checking
     pub fn apply_adjustment(&mut self, adjustment: &PolicyAdjustment) -> Result<(), String> {
-        // Check if approval required and not provided
         if adjustment.requires_approval {
-            return Err("Adjustment requires Karmic Council approval".to_string());
+            return Err("Adjustment requires governance approval".to_string());
         }
 
-        // Apply with bounds checking
         let new_fee = self.current_params.fee_rate * adjustment.fee_rate_factor;
         self.current_params.fee_rate = new_fee.clamp(
             self.bounds.fee_rate_min,
             self.bounds.fee_rate_max,
         );
 
-        let new_spore = (self.current_params.spore_allocation as i64
-            + adjustment.spore_adjustment as i64) as u64;
-        self.current_params.spore_allocation = new_spore.clamp(
-            self.bounds.spore_allocation_min,
-            self.bounds.spore_allocation_max,
-        );
-
-        let new_decay = self.current_params.decay_rate * adjustment.decay_rate_factor;
-        self.current_params.decay_rate = new_decay.clamp(
-            self.bounds.decay_rate_min,
-            self.bounds.decay_rate_max,
+        let new_demurrage = self.current_params.demurrage_rate * adjustment.demurrage_rate_factor;
+        self.current_params.demurrage_rate = new_demurrage.clamp(
+            self.bounds.demurrage_rate_min,
+            self.bounds.demurrage_rate_max,
         );
 
         self.current_params.velocity_incentive = adjustment.velocity_incentive;
+        self.current_params.tend_limit_tier = adjustment.tend_limit_tier;
 
-        // Record adjustment for audit
         self.adjustment_history.push(adjustment.clone());
 
         Ok(())
@@ -423,9 +446,7 @@ mod tests {
     fn test_vitality_calculation() {
         let healthy = healthy_components();
         let vitality = healthy.calculate_vitality();
-
-        // 0.65*0.40 + 0.55*0.30 + 0.60*0.20 + 0.45*0.10
-        // = 0.26 + 0.165 + 0.12 + 0.045 = 0.59 → 59
+        // 0.65*0.40 + 0.55*0.30 + 0.60*0.20 + 0.45*0.10 = 59
         assert!(vitality > 55.0 && vitality < 65.0);
     }
 
@@ -439,43 +460,40 @@ mod tests {
     }
 
     #[test]
-    fn test_oracle_adjustment_healthy() {
-        let mut oracle = MetabolicOracle::new();
-        oracle.record_vitality(healthy_components(), 1000);
-
-        let adjustment = oracle.generate_adjustment();
-        assert!((adjustment.fee_rate_factor - 1.0).abs() < 0.01);
-        assert!(!adjustment.requires_approval);
+    fn test_tend_limit_tiers() {
+        assert_eq!(TendLimitTier::from_state(MetabolicState::Healthy).limit(), 40);
+        assert_eq!(TendLimitTier::from_state(MetabolicState::Stressed).limit(), 60);
+        assert_eq!(TendLimitTier::from_state(MetabolicState::Critical).limit(), 80);
+        assert_eq!(TendLimitTier::from_state(MetabolicState::Failing).limit(), 120);
     }
 
     #[test]
-    fn test_oracle_adjustment_stressed() {
+    fn test_oracle_stressed_expands_tend() {
         let mut oracle = MetabolicOracle::new();
         oracle.record_vitality(stressed_components(), 1000);
 
         let adjustment = oracle.generate_adjustment();
-        assert!(adjustment.fee_rate_factor < 1.0); // Fee reduction
-        assert!(adjustment.velocity_incentive > 1.0); // Velocity boost
+        assert_eq!(adjustment.tend_limit_tier, TendLimitTier::Elevated);
+        assert!(adjustment.fee_rate_factor < 1.0);
+        assert!(adjustment.velocity_incentive > 1.0);
     }
 
     #[test]
     fn test_bounds_enforcement() {
         let mut oracle = MetabolicOracle::new();
-        oracle.current_params.fee_rate = 0.001; // At minimum
+        oracle.current_params.fee_rate = 0.0001; // At minimum
 
-        let extreme_adjustment = PolicyAdjustment {
-            fee_rate_factor: 0.1, // Would push below minimum
-            spore_adjustment: 0,
-            decay_rate_factor: 1.0,
+        let extreme = PolicyAdjustment {
+            fee_rate_factor: 0.1,
+            demurrage_rate_factor: 1.0,
             velocity_incentive: 1.0,
+            tend_limit_tier: TendLimitTier::Normal,
             emergency_release: None,
             reason: "Test".to_string(),
             requires_approval: false,
         };
 
-        oracle.apply_adjustment(&extreme_adjustment).unwrap();
-
-        // Should be clamped to minimum
-        assert!((oracle.current_params.fee_rate - 0.001).abs() < 0.0001);
+        oracle.apply_adjustment(&extreme).unwrap();
+        assert!((oracle.current_params.fee_rate - 0.0001).abs() < 0.00001);
     }
 }

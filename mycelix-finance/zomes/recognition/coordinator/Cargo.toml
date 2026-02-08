@@ -1,16 +1,15 @@
 [package]
-name = "hearth"
+name = "recognition"
 version = "0.1.0"
 edition = "2021"
-description = "HEARTH Commons Pool coordinator zome - Commons Charter Article I"
+description = "Recognition coordinator zome — MYCEL reputation via weighted recognition"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-name = "hearth"
+name = "recognition"
 
 [dependencies]
 holochain_serialized_bytes = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
-hearth_integrity = { path = "../integrity" }
+recognition_integrity = { path = "../integrity" }

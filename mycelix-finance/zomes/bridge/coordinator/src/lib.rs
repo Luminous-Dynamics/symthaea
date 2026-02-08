@@ -1,7 +1,7 @@
 //! Finance Bridge Coordinator Zome
 //!
-//! Cross-hApp communication for credit queries, payment processing,
-//! and collateral management across the Mycelix ecosystem.
+//! Cross-hApp communication for payment processing, collateral management,
+//! and collateral bridge deposits across the Mycelix ecosystem.
 
 use hdk::prelude::*;
 use finance_bridge_integrity::*;
@@ -30,46 +30,6 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     result[24..32].copy_from_slice(&h4.to_le_bytes());
 
     Ok(EntryHash::from_raw_32(result.to_vec()))
-}
-
-/// Query credit score for a DID
-#[hdk_extern]
-pub fn query_credit(input: QueryCreditInput) -> ExternResult<CreditResult> {
-    let now = sys_time()?;
-
-    let query = CreditQuery {
-        id: format!("credit:{}:{}:{}", input.source_happ, input.did, now.as_micros()),
-        did: input.did.clone(),
-        source_happ: input.source_happ.clone(),
-        purpose: input.purpose,
-        queried_at: now,
-    };
-    create_entry(&EntryTypes::CreditQuery(query))?;
-
-    // Calculate credit score (would integrate with MATL in production)
-    let result = CreditResult {
-        id: format!("result:{}:{}", input.did, now.as_micros()),
-        did: input.did.clone(),
-        matl_score: 0.5, // Would query identity hApp
-        credit_score: 0.6,
-        payment_history_score: 0.7,
-        collateral_ratio: 0.0,
-        active_loans: 0,
-        total_repaid: 0,
-        calculated_at: now,
-    };
-
-    let hash = create_entry(&EntryTypes::CreditResult(result.clone()))?;
-    create_link(anchor_hash(&input.did)?, hash, LinkTypes::DidToCredit, ())?;
-
-    Ok(result)
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryCreditInput {
-    pub did: String,
-    pub source_happ: String,
-    pub purpose: CreditPurpose,
 }
 
 /// Process a cross-hApp payment
@@ -222,4 +182,110 @@ pub fn get_payment_history(did: String) -> ExternResult<Vec<Record>> {
     }
 
     Ok(payments)
+}
+
+// ---------------------------------------------------------------------------
+// Collateral Bridge Deposit functions
+// ---------------------------------------------------------------------------
+
+/// Deposit collateral to mint SAP.
+/// Creates a CollateralBridgeDeposit entry recording the collateral-to-SAP conversion.
+#[hdk_extern]
+pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+
+    let sap_minted = (input.collateral_amount as f64 * input.oracle_rate) as u64;
+
+    let deposit = CollateralBridgeDeposit {
+        id: format!("deposit:{}:{}:{}", input.depositor_did, input.collateral_type, now.as_micros()),
+        depositor_did: input.depositor_did.clone(),
+        collateral_type: input.collateral_type.clone(),
+        collateral_amount: input.collateral_amount,
+        sap_minted,
+        oracle_rate: input.oracle_rate,
+        status: BridgeDepositStatus::Pending,
+        created_at: now,
+        completed_at: None,
+    };
+
+    let hash = create_entry(&EntryTypes::CollateralBridgeDeposit(deposit))?;
+
+    create_link(
+        anchor_hash(&input.depositor_did)?,
+        hash.clone(),
+        LinkTypes::DidToDeposits,
+        (),
+    )?;
+
+    // Broadcast the deposit event
+    broadcast_finance_event(BroadcastFinanceEventInput {
+        event_type: FinanceEventType::CollateralDeposited,
+        subject_did: input.depositor_did,
+        amount: Some(sap_minted),
+        payload: serde_json::json!({
+            "collateral_type": input.collateral_type,
+            "collateral_amount": input.collateral_amount,
+            "oracle_rate": input.oracle_rate,
+            "sap_minted": sap_minted,
+        }).to_string(),
+    })?;
+
+    get(hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DepositCollateralInput {
+    pub depositor_did: String,
+    pub collateral_type: String,  // "ETH" or "USDC"
+    pub collateral_amount: u64,
+    pub oracle_rate: f64,
+}
+
+/// Redeem collateral by marking a deposit as redeemed (SAP returned, collateral released).
+#[hdk_extern]
+pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CollateralBridgeDeposit)?))
+        .include_entries(true);
+
+    for record in query(filter)? {
+        if let Some(deposit) = record.entry().to_app_option::<CollateralBridgeDeposit>().ok().flatten() {
+            if deposit.id == deposit_id {
+                if deposit.status != BridgeDepositStatus::Confirmed {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only confirmed deposits can be redeemed".into()
+                    )));
+                }
+
+                let now = sys_time()?;
+                let redeemed = CollateralBridgeDeposit {
+                    status: BridgeDepositStatus::Redeemed,
+                    completed_at: Some(now),
+                    ..deposit.clone()
+                };
+
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::CollateralBridgeDeposit(redeemed),
+                )?;
+
+                // Broadcast the redemption event
+                broadcast_finance_event(BroadcastFinanceEventInput {
+                    event_type: FinanceEventType::CollateralRedeemed,
+                    subject_did: deposit.depositor_did,
+                    amount: Some(deposit.sap_minted),
+                    payload: serde_json::json!({
+                        "collateral_type": deposit.collateral_type,
+                        "collateral_amount": deposit.collateral_amount,
+                        "sap_returned": deposit.sap_minted,
+                    }).to_string(),
+                })?;
+
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            }
+        }
+    }
+    Err(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))
 }

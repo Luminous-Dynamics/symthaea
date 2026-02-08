@@ -630,3 +630,198 @@ pub struct AllocationStatusQuery {
     pub treasury_id: String,
     pub status: AllocationStatus,
 }
+
+// ---------------------------------------------------------------------------
+// Commons Pool functions
+// ---------------------------------------------------------------------------
+
+/// Create a new commons pool for a DAO
+#[hdk_extern]
+pub fn create_commons_pool(input: CreateCommonsPoolInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+    let pool = CommonsPool {
+        id: format!("commons:{}:{}", input.dao_did.replace(':', "_"), now.as_micros()),
+        dao_did: input.dao_did.clone(),
+        inalienable_reserve: 0,
+        available_balance: 0,
+        demurrage_exempt: true, // Constitutional -- always true
+        created_at: now,
+        last_activity: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::CommonsPool(pool))?;
+    create_link(anchor_hash(&input.dao_did)?, action_hash.clone(), LinkTypes::DaoToCommonsPool, ())?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateCommonsPoolInput {
+    pub dao_did: String,
+}
+
+/// Contribute SAP to a commons pool.
+/// 25% goes to the inalienable reserve, 75% goes to available balance.
+#[hdk_extern]
+pub fn contribute_to_commons(input: ContributeToCommonsInput) -> ExternResult<Record> {
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonsPool)?))
+        .include_entries(true);
+
+    for record in query(filter)? {
+        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().ok().flatten() {
+            if pool.id == input.commons_pool_id {
+                let now = sys_time()?;
+
+                // Split: 25% inalienable reserve, 75% available
+                let to_reserve = input.amount / 4;
+                let to_available = input.amount - to_reserve;
+
+                let updated = CommonsPool {
+                    inalienable_reserve: pool.inalienable_reserve + to_reserve,
+                    available_balance: pool.available_balance + to_available,
+                    last_activity: now,
+                    ..pool
+                };
+
+                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::CommonsPool(updated))?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            }
+        }
+    }
+    Err(wasm_error!(WasmErrorInner::Guest("Commons pool not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ContributeToCommonsInput {
+    pub commons_pool_id: String,
+    pub contributor_did: String,
+    pub amount: u64,
+}
+
+/// Receive demurrage redistribution (compost) into the commons pool available balance.
+#[hdk_extern]
+pub fn receive_compost(input: ReceiveCompostInput) -> ExternResult<Record> {
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonsPool)?))
+        .include_entries(true);
+
+    for record in query(filter)? {
+        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().ok().flatten() {
+            if pool.id == input.commons_pool_id {
+                let now = sys_time()?;
+
+                // Record the compost receival
+                let receival = CompostReceival {
+                    id: format!("compost:{}:{}", input.commons_pool_id, now.as_micros()),
+                    commons_pool_id: input.commons_pool_id.clone(),
+                    amount: input.amount,
+                    source_member_did: input.source_member_did.clone(),
+                    timestamp: now,
+                };
+                let receival_hash = create_entry(&EntryTypes::CompostReceival(receival))?;
+                create_link(
+                    anchor_hash(&input.commons_pool_id)?,
+                    receival_hash,
+                    LinkTypes::CommonsPoolToCompost,
+                    (),
+                )?;
+
+                // Add to available balance (compost goes to available, not reserve)
+                let updated = CommonsPool {
+                    available_balance: pool.available_balance + input.amount,
+                    last_activity: now,
+                    ..pool
+                };
+
+                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::CommonsPool(updated))?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            }
+        }
+    }
+    Err(wasm_error!(WasmErrorInner::Guest("Commons pool not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ReceiveCompostInput {
+    pub commons_pool_id: String,
+    pub amount: u64,
+    pub source_member_did: String,
+}
+
+/// Request allocation from commons pool available balance only.
+/// Validates that the inalienable reserve is never touched and that the
+/// reserve ratio remains at or above 25% after the allocation.
+#[hdk_extern]
+pub fn request_allocation(input: RequestCommonsAllocationInput) -> ExternResult<Record> {
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonsPool)?))
+        .include_entries(true);
+
+    for record in query(filter)? {
+        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().ok().flatten() {
+            if pool.id == input.commons_pool_id {
+                // Validate: allocation comes only from available balance
+                if input.amount > pool.available_balance {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Allocation exceeds available balance (inalienable reserve is untouchable)".into()
+                    )));
+                }
+
+                let new_available = pool.available_balance - input.amount;
+                let new_total = pool.inalienable_reserve + new_available;
+
+                // Validate reserve ratio stays >= 25% (or total is 0)
+                if new_total > 0 {
+                    let reserve_pct = pool.inalienable_reserve as u128 * 100;
+                    let threshold = new_total as u128 * 25;
+                    if reserve_pct < threshold {
+                        return Err(wasm_error!(WasmErrorInner::Guest(
+                            "Allocation would drop reserve ratio below 25% constitutional minimum".into()
+                        )));
+                    }
+                }
+
+                let now = sys_time()?;
+                let updated = CommonsPool {
+                    available_balance: new_available,
+                    last_activity: now,
+                    ..pool
+                };
+
+                let action_hash = update_entry(record.action_address().clone(), &EntryTypes::CommonsPool(updated))?;
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            }
+        }
+    }
+    Err(wasm_error!(WasmErrorInner::Guest("Commons pool not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RequestCommonsAllocationInput {
+    pub commons_pool_id: String,
+    pub requester_did: String,
+    pub amount: u64,
+    pub purpose: String,
+}
+
+/// Get a commons pool by its ID
+#[hdk_extern]
+pub fn get_commons_pool(pool_id: String) -> ExternResult<Option<Record>> {
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonsPool)?))
+        .include_entries(true);
+
+    for record in query(filter)? {
+        if let Some(pool) = record.entry().to_app_option::<CommonsPool>().ok().flatten() {
+            if pool.id == pool_id {
+                return Ok(Some(record));
+            }
+        }
+    }
+    Ok(None)
+}

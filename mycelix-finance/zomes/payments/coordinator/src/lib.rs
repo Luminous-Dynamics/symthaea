@@ -26,18 +26,92 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     Ok(EntryHash::from_raw_32(result.to_vec()))
 }
 
+/// Compute demurrage deduction on SAP balances.
+///
+/// Implements: eligible * (1 - e^(-rate * years))
+/// where eligible = max(balance - exempt_floor, 0) and years = seconds_elapsed / 31_536_000.
+///
+/// Returns the amount to deduct (in the same integer unit as balance).
+pub fn compute_demurrage_deduction(balance: u64, exempt_floor: u64, rate: f64, seconds_elapsed: u64) -> u64 {
+    if balance <= exempt_floor || seconds_elapsed == 0 {
+        return 0;
+    }
+    let eligible = (balance - exempt_floor) as f64;
+    let years = seconds_elapsed as f64 / 31_536_000.0;
+    let decay = 1.0 - (-rate * years).exp();
+    let deduction = eligible * decay;
+    // Clamp to eligible amount and floor at zero
+    if deduction < 0.0 {
+        0
+    } else if deduction > eligible {
+        eligible as u64
+    } else {
+        deduction as u64
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DemurrageOnSendInput {
+    pub balance: u64,
+    pub exempt_floor: u64,
+    pub rate: f64,
+    pub last_demurrage_at: u64, // epoch seconds of last demurrage computation
+    pub now: u64,               // current epoch seconds
+}
+
 #[hdk_extern]
 pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
+    // Validate currency before creating any entries
+    if input.currency != "SAP" && input.currency != "TEND" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Currency must be \"SAP\" or \"TEND\"".into()
+        )));
+    }
+
     let now = sys_time()?;
+
+    // If sending SAP, compute informational demurrage note for memo
+    let memo = if input.currency == "SAP" {
+        if let Some(ref demurrage) = input.demurrage {
+            let seconds_elapsed = if demurrage.now > demurrage.last_demurrage_at {
+                demurrage.now - demurrage.last_demurrage_at
+            } else {
+                0
+            };
+            let deduction = compute_demurrage_deduction(
+                demurrage.balance,
+                demurrage.exempt_floor,
+                demurrage.rate,
+                seconds_elapsed,
+            );
+            if deduction > 0 {
+                let base_memo = input.memo.clone().unwrap_or_default();
+                Some(format!(
+                    "{}{}[demurrage: {} SAP pending deduction over {}s]",
+                    base_memo,
+                    if base_memo.is_empty() { "" } else { " " },
+                    deduction,
+                    seconds_elapsed
+                ))
+            } else {
+                input.memo.clone()
+            }
+        } else {
+            input.memo.clone()
+        }
+    } else {
+        input.memo.clone()
+    };
+
     let payment = Payment {
         id: format!("payment:{}:{}", input.from_did, now.as_micros()),
         from_did: input.from_did.clone(),
         to_did: input.to_did.clone(),
         amount: input.amount,
-        currency: input.currency,
+        currency: input.currency.clone(),
         payment_type: input.payment_type,
         status: TransferStatus::Completed, // Simplified: immediate completion
-        memo: input.memo,
+        memo,
         created: now,
         completed: Some(now),
     };
@@ -70,6 +144,7 @@ pub struct SendPaymentInput {
     pub currency: String,
     pub payment_type: PaymentType,
     pub memo: Option<String>,
+    pub demurrage: Option<DemurrageOnSendInput>,
 }
 
 #[hdk_extern]
@@ -307,6 +382,133 @@ pub struct CreateEscrowInput {
     pub currency: String,
     pub escrow_id: String,
     pub memo: Option<String>,
+}
+
+// =============================================================================
+// EXIT PROTOCOL
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct InitiateExitInput {
+    /// DID of the exiting member
+    pub member_did: String,
+    /// How to handle remaining SAP balance
+    pub succession_preference: payments_integrity::SuccessionPreference,
+    /// Current SAP balance (caller must provide; on-chain accounting is external)
+    pub sap_balance: f64,
+}
+
+/// Initiate member exit — coordinates MYCEL dissolution, SAP succession, and TEND forgiveness.
+///
+/// Per the Three-Currency Spec:
+/// - MYCEL: dissolved immediately (contribution history preserved in DKG)
+/// - SAP: follows succession preference (Commons default, Designee, or Redemption)
+/// - TEND: all balances forgiven (returned to zero)
+#[hdk_extern]
+pub fn initiate_exit(input: InitiateExitInput) -> ExternResult<Record> {
+    if !input.member_did.starts_with("did:") {
+        return Err(wasm_error!(WasmErrorInner::Guest("Member must be a valid DID".into())));
+    }
+
+    let now = sys_time()?;
+
+    // Step 1: Dissolve MYCEL via recognition zome
+    let mycel_dissolved = match call(
+        CallTargetCell::Local,
+        ZomeName::from("recognition"),
+        FunctionName::from("dissolve_mycel"),
+        None,
+        input.member_did.clone(),
+    ) {
+        Ok(_) => true,
+        Err(e) => {
+            debug!("Warning: MYCEL dissolution failed for {}: {:?}", input.member_did, e);
+            false
+        }
+    };
+
+    // Step 2: Handle SAP succession
+    if input.sap_balance > 0.0 {
+        match &input.succession_preference {
+            payments_integrity::SuccessionPreference::Commons => {
+                // For commons succession, we record a payment to the commons pool.
+                // The actual treasury contribution requires a pool ID which is
+                // external state — the caller should handle that via the treasury zome.
+                send_payment(SendPaymentInput {
+                    from_did: input.member_did.clone(),
+                    to_did: format!("did:mycelix:commons:{}", input.member_did),
+                    amount: input.sap_balance,
+                    currency: "SAP".to_string(),
+                    payment_type: PaymentType::CommonsContribution("exit-succession".to_string()),
+                    memo: Some("Exit succession: SAP to local commons pool".to_string()),
+                    demurrage: None,
+                })?;
+            }
+            payments_integrity::SuccessionPreference::Designee(designee_did) => {
+                send_payment(SendPaymentInput {
+                    from_did: input.member_did.clone(),
+                    to_did: designee_did.clone(),
+                    amount: input.sap_balance,
+                    currency: "SAP".to_string(),
+                    payment_type: PaymentType::Direct,
+                    memo: Some("Exit succession to designated heir".to_string()),
+                    demurrage: None,
+                })?;
+            }
+            payments_integrity::SuccessionPreference::Redemption => {
+                // For redemption, record the intent. Actual bridge redemption
+                // requires deposit IDs and oracle rates which are bridge-zome state.
+                send_payment(SendPaymentInput {
+                    from_did: input.member_did.clone(),
+                    to_did: format!("did:mycelix:bridge:redemption"),
+                    amount: input.sap_balance,
+                    currency: "SAP".to_string(),
+                    payment_type: PaymentType::Direct,
+                    memo: Some("Exit succession: SAP queued for collateral redemption".to_string()),
+                    demurrage: None,
+                })?;
+            }
+        }
+    }
+
+    // Step 3: Forgive TEND balances via tend zome
+    let tend_balances_forgiven: Vec<(String, i32)> = match call(
+        CallTargetCell::Local,
+        ZomeName::from("tend"),
+        FunctionName::from("forgive_balance"),
+        None,
+        input.member_did.clone(),
+    ) {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            extern_io.decode().unwrap_or_default()
+        }
+        Ok(_) => Vec::new(),
+        Err(e) => {
+            debug!("Warning: TEND balance forgiveness failed: {:?}", e);
+            Vec::new()
+        }
+    };
+
+    // Step 4: Create the exit record
+    let exit_record = payments_integrity::ExitRecord {
+        member_did: input.member_did.clone(),
+        succession_preference: input.succession_preference,
+        sap_balance: input.sap_balance,
+        tend_balances_forgiven,
+        mycel_dissolved,
+        exited_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::ExitRecord(exit_record))?;
+    create_link(
+        anchor_hash(&input.member_did)?,
+        action_hash.clone(),
+        LinkTypes::SenderToPayments,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Failed to retrieve exit record".into())))
 }
 
 /// Release escrow to recipient

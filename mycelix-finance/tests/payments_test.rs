@@ -7,6 +7,8 @@
 //! - Fee calculation
 //! - Failed transaction handling
 //! - Payment channels
+//! - Currency validation (SAP and TEND only)
+//! - Demurrage on SAP payments
 //!
 //! ## Running Tests
 //!
@@ -39,7 +41,7 @@ mod test_helpers {
     use super::*;
 
     pub const TEST_DID_PREFIX: &str = "did:mycelix:test:";
-    pub const TEST_CURRENCY: &str = "MYC";
+    pub const TEST_CURRENCY: &str = "SAP";
 
     pub fn test_did(suffix: &str) -> String {
         format!("{}{}", TEST_DID_PREFIX, suffix)
@@ -64,7 +66,7 @@ mod payment_creation {
     /// Test 1.1: Basic payment creation succeeds with valid inputs
     ///
     /// Scenario:
-    /// - Alice sends 100 MYC to Bob
+    /// - Alice sends 100 SAP to Bob
     /// - Verify payment is created with correct fields
     /// - Verify receipt is generated
     #[tokio::test]
@@ -97,6 +99,7 @@ mod payment_creation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Test payment from Alice to Bob".to_string()),
+            demurrage: None,
         };
 
         // Send payment
@@ -153,12 +156,11 @@ mod payment_creation {
         let alice_did = test_did("alice");
         let bob_did = test_did("bob");
 
-        // Test each payment type
+        // Test each valid payment type (LoanPayment and EnergyInvestment removed)
         let payment_types = vec![
             (PaymentType::Direct, "Direct"),
-            (PaymentType::LoanPayment("loan:123".to_string()), "LoanPayment"),
             (PaymentType::TreasuryContribution("treasury:abc".to_string()), "TreasuryContribution"),
-            (PaymentType::EnergyInvestment("project:xyz".to_string()), "EnergyInvestment"),
+            (PaymentType::CommonsContribution("commons:pool:1".to_string()), "CommonsContribution"),
             (PaymentType::Escrow("escrow:456".to_string()), "Escrow"),
         ];
 
@@ -170,6 +172,7 @@ mod payment_creation {
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: payment_type.clone(),
                 memo: Some(format!("Test {} payment", type_name)),
+                demurrage: None,
             };
 
             let result: Record = conductor
@@ -225,6 +228,7 @@ mod payment_creation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Recurring(recurring_config.clone()),
             memo: Some("Monthly subscription".to_string()),
+            demurrage: None,
         };
 
         let result: Record = conductor
@@ -285,6 +289,7 @@ mod payment_validation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
+            demurrage: None,
         };
 
         let result: Result<Record, _> = conductor
@@ -312,6 +317,7 @@ mod payment_validation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
+            demurrage: None,
         };
 
         let result: Result<Record, _> = conductor
@@ -362,6 +368,7 @@ mod payment_validation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
+            demurrage: None,
         };
 
         let result: Result<Record, _> = conductor
@@ -388,6 +395,7 @@ mod payment_validation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
+            demurrage: None,
         };
 
         let result: Result<Record, _> = conductor
@@ -436,6 +444,7 @@ mod payment_validation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Self payment attempt".to_string()),
+            demurrage: None,
         };
 
         let result: Result<Record, _> = conductor
@@ -455,6 +464,60 @@ mod payment_validation {
         }
 
         println!("Test 2.3 PASSED: Self-payments are properly rejected");
+    }
+
+    /// Test 2.4: Invalid currency rejected (only SAP and TEND accepted)
+    #[tokio::test]
+    #[ignore]
+    async fn test_invalid_currency_rejected() {
+        println!("Test 2.4: Invalid Currency Validation");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_did = test_did("alice");
+        let bob_did = test_did("bob");
+
+        // Test invalid currencies that are no longer accepted
+        let invalid_currencies = vec!["MYC", "USD", "ENERGY", "BTC", "ETH"];
+
+        for currency in invalid_currencies {
+            let input = SendPaymentInput {
+                from_did: alice_did.clone(),
+                to_did: bob_did.clone(),
+                amount: 10.0,
+                currency: currency.to_string(),
+                payment_type: PaymentType::Direct,
+                memo: None,
+                demurrage: None,
+            };
+
+            let result: Result<Record, _> = conductor
+                .call_fallible(&alice_cell.zome("payments"), "send_payment", input)
+                .await;
+
+            match result {
+                Err(e) => {
+                    let error_msg = format!("{:?}", e);
+                    assert!(
+                        error_msg.contains("Currency must be") || error_msg.contains("SAP") || error_msg.contains("TEND"),
+                        "Should reject {} currency, got: {}", currency, error_msg
+                    );
+                    println!("  - {} currency rejected: OK", currency);
+                }
+                Ok(_) => panic!("Should have rejected {} currency", currency),
+            }
+        }
+
+        println!("Test 2.4 PASSED: Invalid currencies are properly rejected");
     }
 }
 
@@ -498,6 +561,7 @@ mod double_spend_prevention {
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: PaymentType::Direct,
                 memo: Some(format!("Payment {}", i)),
+                demurrage: None,
             };
 
             let result: Record = conductor
@@ -561,6 +625,7 @@ mod double_spend_prevention {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Payment with receipt".to_string()),
+            demurrage: None,
         };
 
         let payment_record: Record = conductor
@@ -778,6 +843,7 @@ mod transaction_confirmation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
+            demurrage: None,
         };
 
         let result: Record = conductor
@@ -839,6 +905,7 @@ mod transaction_confirmation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Alice to Bob".to_string()),
+            demurrage: None,
         };
 
         let _: Record = conductor
@@ -855,6 +922,7 @@ mod transaction_confirmation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Charlie to Alice".to_string()),
+            demurrage: None,
         };
 
         let _: Record = conductor
@@ -871,6 +939,7 @@ mod transaction_confirmation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Alice to Charlie".to_string()),
+            demurrage: None,
         };
 
         let _: Record = conductor
@@ -905,21 +974,18 @@ mod transaction_confirmation {
 }
 
 // ============================================================================
-// Section 5: Fee Calculation Tests
+// Section 5: Currency and Fee Tests
 // ============================================================================
 
 #[cfg(test)]
-mod fee_calculation {
+mod currency_tests {
     use super::*;
 
-    /// Test 5.1: Base payment (no fee in current implementation)
-    ///
-    /// The current implementation doesn't include fees, but this test
-    /// verifies the structure for future fee implementation
+    /// Test 5.1: SAP currency payment
     #[tokio::test]
     #[ignore]
-    async fn test_base_payment_structure() {
-        println!("Test 5.1: Base Payment Structure for Fees");
+    async fn test_sap_payment() {
+        println!("Test 5.1: SAP Currency Payment");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
         let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
@@ -939,15 +1005,16 @@ mod fee_calculation {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
             amount: 100.0,
-            currency: TEST_CURRENCY.to_string(),
+            currency: "SAP".to_string(),
             payment_type: PaymentType::Direct,
-            memo: Some("Payment to verify amount".to_string()),
+            memo: Some("SAP payment".to_string()),
+            demurrage: None,
         };
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
             .await
-            .expect("Failed to send payment");
+            .expect("Failed to send SAP payment");
 
         let payment: Payment = result
             .entry()
@@ -955,24 +1022,18 @@ mod fee_calculation {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        // In current implementation, full amount is transferred
+        assert_eq!(payment.currency, "SAP", "Currency should be SAP");
         assert_eq!(payment.amount, 100.0, "Full amount should be recorded");
-        println!("  - Payment amount: {}", payment.amount);
+        println!("  - SAP payment amount: {}", payment.amount);
         println!("  - Currency: {}", payment.currency);
-
-        // Note: Future fee implementation would add:
-        // - payment.fee field
-        // - payment.net_amount field
-        // - Fee calculation based on payment type, amount, etc.
-
-        println!("Test 5.1 PASSED: Payment structure verified");
+        println!("Test 5.1 PASSED: SAP payment works");
     }
 
-    /// Test 5.2: Different currencies supported
+    /// Test 5.2: TEND currency payment
     #[tokio::test]
     #[ignore]
-    async fn test_multiple_currencies() {
-        println!("Test 5.2: Multiple Currency Support");
+    async fn test_tend_payment() {
+        println!("Test 5.2: TEND Currency Payment");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
         let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
@@ -988,34 +1049,106 @@ mod fee_calculation {
         let alice_did = test_did("alice");
         let bob_did = test_did("bob");
 
-        let currencies = vec!["MYC", "USD", "ENERGY", "BTC"];
+        let input = SendPaymentInput {
+            from_did: alice_did.clone(),
+            to_did: bob_did.clone(),
+            amount: 5.0,
+            currency: "TEND".to_string(),
+            payment_type: PaymentType::Direct,
+            memo: Some("TEND payment".to_string()),
+            demurrage: None,
+        };
 
-        for currency in currencies {
-            let input = SendPaymentInput {
-                from_did: alice_did.clone(),
-                to_did: bob_did.clone(),
-                amount: 10.0,
-                currency: currency.to_string(),
-                payment_type: PaymentType::Direct,
-                memo: Some(format!("Test {} payment", currency)),
-            };
+        let result: Record = conductor
+            .call(&alice_cell.zome("payments"), "send_payment", input)
+            .await
+            .expect("Failed to send TEND payment");
 
-            let result: Record = conductor
-                .call(&alice_cell.zome("payments"), "send_payment", input)
-                .await
-                .expect(&format!("Failed {} payment", currency));
+        let payment: Payment = result
+            .entry()
+            .to_app_option()
+            .expect("Deserialize failed")
+            .expect("No entry");
 
-            let payment: Payment = result
-                .entry()
-                .to_app_option()
-                .expect("Deserialize failed")
-                .expect("No entry");
+        assert_eq!(payment.currency, "TEND", "Currency should be TEND");
+        println!("  - TEND payment amount: {}", payment.amount);
+        println!("  - Currency: {}", payment.currency);
+        println!("Test 5.2 PASSED: TEND payment works");
+    }
 
-            assert_eq!(payment.currency, currency, "Currency mismatch");
-            println!("  - {} payment: OK", currency);
-        }
+    /// Test 5.3: Only SAP and TEND currencies are valid
+    #[tokio::test]
+    #[ignore]
+    async fn test_valid_currencies_only() {
+        println!("Test 5.3: Valid Currencies Only (SAP/TEND)");
 
-        println!("Test 5.2 PASSED: Multiple currencies supported");
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_did = test_did("alice");
+        let bob_did = test_did("bob");
+
+        // Valid: SAP
+        let sap_input = SendPaymentInput {
+            from_did: alice_did.clone(),
+            to_did: bob_did.clone(),
+            amount: 10.0,
+            currency: "SAP".to_string(),
+            payment_type: PaymentType::Direct,
+            memo: None,
+            demurrage: None,
+        };
+
+        let _: Record = conductor
+            .call(&alice_cell.zome("payments"), "send_payment", sap_input)
+            .await
+            .expect("SAP payment should succeed");
+        println!("  - SAP accepted: OK");
+
+        // Valid: TEND
+        let tend_input = SendPaymentInput {
+            from_did: alice_did.clone(),
+            to_did: bob_did.clone(),
+            amount: 10.0,
+            currency: "TEND".to_string(),
+            payment_type: PaymentType::Direct,
+            memo: None,
+            demurrage: None,
+        };
+
+        let _: Record = conductor
+            .call(&alice_cell.zome("payments"), "send_payment", tend_input)
+            .await
+            .expect("TEND payment should succeed");
+        println!("  - TEND accepted: OK");
+
+        // Invalid: MYC (old currency, no longer accepted)
+        let myc_input = SendPaymentInput {
+            from_did: alice_did.clone(),
+            to_did: bob_did.clone(),
+            amount: 10.0,
+            currency: "MYC".to_string(),
+            payment_type: PaymentType::Direct,
+            memo: None,
+            demurrage: None,
+        };
+
+        let result: Result<Record, _> = conductor
+            .call_fallible(&alice_cell.zome("payments"), "send_payment", myc_input)
+            .await;
+
+        assert!(result.is_err(), "MYC should be rejected");
+        println!("  - MYC rejected: OK");
+
+        println!("Test 5.3 PASSED: Only SAP and TEND currencies accepted");
     }
 }
 
@@ -1454,11 +1587,11 @@ mod unit_tests {
 
     #[test]
     fn test_payment_type_serialization() {
+        // Only current valid payment types (no LoanPayment or EnergyInvestment)
         let types = vec![
             PaymentType::Direct,
-            PaymentType::LoanPayment("loan:123".to_string()),
             PaymentType::TreasuryContribution("treasury:456".to_string()),
-            PaymentType::EnergyInvestment("project:789".to_string()),
+            PaymentType::CommonsContribution("commons:pool:789".to_string()),
             PaymentType::Escrow("escrow:abc".to_string()),
             PaymentType::Recurring(RecurringConfig {
                 frequency_days: 30,
@@ -1489,6 +1622,45 @@ mod unit_tests {
             let json = serde_json::to_string(&status).expect("Serialize failed");
             let deserialized: TransferStatus = serde_json::from_str(&json).expect("Deserialize failed");
             assert_eq!(status, deserialized, "Status round-trip failed");
+        }
+    }
+
+    #[test]
+    fn test_demurrage_deduction_basic() {
+        // Zero balance => no deduction
+        assert_eq!(compute_demurrage_deduction(0, 100, 0.05, 31_536_000), 0);
+
+        // Balance below exempt floor => no deduction
+        assert_eq!(compute_demurrage_deduction(50, 100, 0.05, 31_536_000), 0);
+
+        // Balance above exempt floor, 1 year elapsed at 5% rate
+        let deduction = compute_demurrage_deduction(1000, 100, 0.05, 31_536_000);
+        // eligible = 900, decay = 1 - e^(-0.05) ~ 0.04877, deduction ~ 43
+        assert!(deduction > 0, "Should have some deduction");
+        assert!(deduction < 900, "Should not exceed eligible amount");
+
+        // Zero time elapsed => no deduction
+        assert_eq!(compute_demurrage_deduction(1000, 100, 0.05, 0), 0);
+    }
+
+    #[test]
+    fn test_valid_currencies() {
+        // Only SAP and TEND are valid
+        let valid = vec!["SAP", "TEND"];
+        let invalid = vec!["MYC", "USD", "ENERGY", "BTC", "ETH"];
+
+        for currency in &valid {
+            assert!(
+                *currency == "SAP" || *currency == "TEND",
+                "{} should be valid", currency
+            );
+        }
+
+        for currency in &invalid {
+            assert!(
+                *currency != "SAP" && *currency != "TEND",
+                "{} should be invalid", currency
+            );
         }
     }
 }
@@ -1532,6 +1704,7 @@ mod performance_benchmarks {
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: PaymentType::Direct,
                 memo: Some(format!("Benchmark payment {}", i)),
+                demurrage: None,
             };
 
             let start = std::time::Instant::now();

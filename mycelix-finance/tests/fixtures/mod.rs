@@ -14,10 +14,9 @@ pub use payments::*;
 /// Standard test DID prefix
 pub const TEST_DID_PREFIX: &str = "did:mycelix:test:";
 
-/// Test currencies
-pub const TEST_CURRENCY_MYC: &str = "MYC";
-pub const TEST_CURRENCY_USD: &str = "USD";
-pub const TEST_CURRENCY_ENERGY: &str = "ENERGY";
+/// Test currencies (only SAP and TEND are valid)
+pub const TEST_CURRENCY_SAP: &str = "SAP";
+pub const TEST_CURRENCY_TEND: &str = "TEND";
 
 /// Generate a test DID
 pub fn test_did(suffix: &str) -> String {
@@ -66,14 +65,24 @@ pub fn payments_zome(cell: &SweetCell) -> holochain::sweettest::SweetZome {
     cell.zome("payments")
 }
 
-/// Helper to get the lending zome from a cell
-pub fn lending_zome(cell: &SweetCell) -> holochain::sweettest::SweetZome {
-    cell.zome("lending")
+/// Helper to get the recognition zome from a cell
+pub fn recognition_zome(cell: &SweetCell) -> holochain::sweettest::SweetZome {
+    cell.zome("recognition")
 }
 
-/// Helper to get the credit_scoring zome from a cell
-pub fn credit_scoring_zome(cell: &SweetCell) -> holochain::sweettest::SweetZome {
-    cell.zome("credit_scoring")
+/// Helper to get the tend zome from a cell
+pub fn tend_zome(cell: &SweetCell) -> holochain::sweettest::SweetZome {
+    cell.zome("tend")
+}
+
+/// Helper to get the bridge zome from a cell
+pub fn bridge_zome(cell: &SweetCell) -> holochain::sweettest::SweetZome {
+    cell.zome("bridge")
+}
+
+/// Helper to get the staking zome from a cell
+pub fn staking_zome(cell: &SweetCell) -> holochain::sweettest::SweetZome {
+    cell.zome("staking")
 }
 
 /// Helper to get the treasury zome from a cell
@@ -92,9 +101,10 @@ pub fn create_test_payment_input(
         from_did: from_did.to_string(),
         to_did: to_did.to_string(),
         amount,
-        currency: TEST_CURRENCY_MYC.to_string(),
+        currency: TEST_CURRENCY_SAP.to_string(),
         payment_type,
         memo: Some("Test payment".to_string()),
+        demurrage: None,
     }
 }
 
@@ -108,7 +118,7 @@ pub fn create_test_channel_input(
     OpenChannelInput {
         party_a: party_a.to_string(),
         party_b: party_b.to_string(),
-        currency: TEST_CURRENCY_MYC.to_string(),
+        currency: TEST_CURRENCY_SAP.to_string(),
         initial_deposit_a: deposit_a,
         initial_deposit_b: deposit_b,
     }
@@ -127,6 +137,10 @@ pub fn assert_payment_valid(payment: &Payment, from_did: &str, to_did: &str, amo
     assert_eq!(payment.to_did, to_did, "To DID mismatch");
     assert_eq!(payment.amount, amount, "Amount mismatch");
     assert!(payment.amount > 0.0, "Amount must be positive");
+    assert!(
+        payment.currency == "SAP" || payment.currency == "TEND",
+        "Currency must be SAP or TEND, got: {}", payment.currency
+    );
 }
 
 /// Test assertion helper - checks if a payment channel is valid
@@ -174,5 +188,13 @@ mod fixture_tests {
         assert_eq!(input.from_did, "did:mycelix:alice");
         assert_eq!(input.to_did, "did:mycelix:bob");
         assert_eq!(input.amount, 100.0);
+        assert_eq!(input.currency, "SAP", "Default currency should be SAP");
+        assert!(input.demurrage.is_none(), "Demurrage should be None by default");
+    }
+
+    #[test]
+    fn test_currency_constants() {
+        assert_eq!(TEST_CURRENCY_SAP, "SAP");
+        assert_eq!(TEST_CURRENCY_TEND, "TEND");
     }
 }

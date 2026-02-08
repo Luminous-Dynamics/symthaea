@@ -30,6 +30,51 @@ pub const MAX_SERVICE_HOURS: u32 = 8;
 /// Minimum service duration (15 minutes)
 pub const MIN_SERVICE_MINUTES: u32 = 15;
 
+/// Elevated balance limit (Stressed state)
+pub const BALANCE_LIMIT_ELEVATED: i32 = 60;
+
+/// High balance limit (Critical state)
+pub const BALANCE_LIMIT_HIGH: i32 = 80;
+
+/// Emergency balance limit (Failing state)
+pub const BALANCE_LIMIT_EMERGENCY: i32 = 120;
+
+/// Apprentice balance limit
+pub const APPRENTICE_BALANCE_LIMIT: i32 = 10;
+
+// =============================================================================
+// TEND LIMIT TIERS
+// =============================================================================
+
+/// Tiered balance limits based on community/member state.
+///
+/// Normal operation uses ±40, but elevated tiers allow wider limits
+/// during periods of community stress or emergency. The coordinator
+/// zome is responsible for determining which tier applies dynamically.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum TendLimitTier {
+    /// Normal operation: ±40 TEND
+    Normal,
+    /// Stressed state: ±60 TEND
+    Elevated,
+    /// Critical state: ±80 TEND
+    High,
+    /// Failing state: ±120 TEND
+    Emergency,
+}
+
+impl TendLimitTier {
+    /// Returns the balance limit for this tier.
+    pub fn limit(&self) -> i32 {
+        match self {
+            TendLimitTier::Normal => BALANCE_LIMIT,
+            TendLimitTier::Elevated => BALANCE_LIMIT_ELEVATED,
+            TendLimitTier::High => BALANCE_LIMIT_HIGH,
+            TendLimitTier::Emergency => BALANCE_LIMIT_EMERGENCY,
+        }
+    }
+}
+
 // =============================================================================
 // ENTRY TYPES
 // =============================================================================
@@ -235,6 +280,95 @@ pub enum Urgency {
     Emergency,
 }
 
+/// Quality rating for a completed exchange
+///
+/// After an exchange is confirmed, either party can rate the experience.
+/// Ratings feed into MYCEL reputation scores and help the community
+/// identify reliable service providers.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct QualityRating {
+    /// ID of the exchange being rated
+    pub exchange_id: String,
+
+    /// DID of the member submitting the rating
+    pub rater_did: String,
+
+    /// DID of the service provider being rated
+    pub provider_did: String,
+
+    /// Rating from 1-5 stars
+    pub rating: u8,
+
+    /// Optional comment explaining the rating
+    pub comment: Option<String>,
+
+    /// When the rating was submitted
+    pub timestamp: Timestamp,
+}
+
+// =============================================================================
+// DISPUTE RESOLUTION
+// =============================================================================
+
+/// Stage of a dispute case, following the three-tier resolution process.
+///
+/// Disputes escalate through stages with increasing community involvement:
+/// 1. DirectNegotiation - 72 hours for the two parties to resolve directly
+/// 2. MediationPanel - 3 random members with MYCEL > 0.5, 7 day window
+/// 3. GovernanceVote - Full community vote, final and binding
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum DisputeStage {
+    /// 72 hours between parties to resolve directly
+    DirectNegotiation,
+    /// 3 random members with MYCEL > 0.5, 7 days to mediate
+    MediationPanel,
+    /// Final, binding community governance vote
+    GovernanceVote,
+}
+
+/// A dispute case for a contested exchange
+///
+/// When an exchange is disputed, a DisputeCase tracks the resolution
+/// process through the three-tier escalation system defined in the
+/// Commons Charter.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct DisputeCase {
+    /// Unique identifier for the dispute
+    pub id: String,
+
+    /// ID of the disputed exchange
+    pub exchange_id: String,
+
+    /// DID of the member who filed the dispute
+    pub complainant_did: String,
+
+    /// DID of the member the dispute is against
+    pub respondent_did: String,
+
+    /// Current stage of the dispute
+    pub stage: DisputeStage,
+
+    /// Description of the dispute
+    pub description: String,
+
+    /// DIDs of assigned mediators (populated in MediationPanel stage)
+    pub mediator_dids: Vec<String>,
+
+    /// Resolution outcome (populated when resolved)
+    pub resolution: Option<String>,
+
+    /// When the dispute was opened
+    pub opened_at: Timestamp,
+
+    /// When the dispute was escalated to the next stage (if applicable)
+    pub escalated_at: Option<Timestamp>,
+
+    /// When the dispute was resolved (if applicable)
+    pub resolved_at: Option<Timestamp>,
+}
+
 // =============================================================================
 // ENTRY & LINK TYPE ENUMS
 // =============================================================================
@@ -252,6 +386,8 @@ pub enum EntryTypes {
     ServiceListing(ServiceListing),
     ServiceRequest(ServiceRequest),
     Anchor(Anchor),
+    QualityRating(QualityRating),
+    DisputeCase(DisputeCase),
 }
 
 #[hdk_link_types]
@@ -276,6 +412,12 @@ pub enum LinkTypes {
     ExchangeIdToExchange,
     /// Link type for anchor/path infrastructure
     AnchorLinks,
+    /// Link from exchange to quality ratings
+    ExchangeToRating,
+    /// Link from member DID to disputes they are involved in
+    MemberToDisputes,
+    /// Link from exchange to its dispute case
+    ExchangeToDispute,
 }
 
 // =============================================================================
@@ -305,6 +447,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::ServiceRequest(request) => {
                         validate_create_request(EntryCreationAction::Create(action), request)
                     }
+                    EntryTypes::QualityRating(rating) => {
+                        validate_create_quality_rating(EntryCreationAction::Create(action), rating)
+                    }
+                    EntryTypes::DisputeCase(dispute) => {
+                        validate_create_dispute_case(EntryCreationAction::Create(action), dispute)
+                    }
                     // Anchors are always valid (just hash placeholders)
                     EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 }
@@ -322,6 +470,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     EntryTypes::ServiceRequest(request) => {
                         validate_update_request(action, request)
+                    }
+                    EntryTypes::QualityRating(_) => {
+                        // Ratings are immutable once created
+                        Ok(ValidateCallbackResult::Invalid(
+                            "Quality ratings cannot be updated".into(),
+                        ))
+                    }
+                    EntryTypes::DisputeCase(dispute) => {
+                        validate_update_dispute_case(action, dispute)
                     }
                     // Anchors cannot be updated
                     EntryTypes::Anchor(_) => {
@@ -345,6 +502,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::CategoryToListings => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::ExchangeIdToExchange => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::AnchorLinks => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::ExchangeToRating => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::MemberToDisputes => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::ExchangeToDispute => Ok(ValidateCallbackResult::Valid),
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -498,5 +658,164 @@ fn validate_update_request(
     _action: Update,
     _request: ServiceRequest,
 ) -> ExternResult<ValidateCallbackResult> {
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_create_quality_rating(
+    _action: EntryCreationAction,
+    rating: QualityRating,
+) -> ExternResult<ValidateCallbackResult> {
+    // Validate rater DID
+    if !rating.rater_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid("Rater must be a valid DID".into()));
+    }
+
+    // Validate provider DID
+    if !rating.provider_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid("Provider must be a valid DID".into()));
+    }
+
+    // Cannot rate yourself
+    if rating.rater_did == rating.provider_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot rate yourself".into(),
+        ));
+    }
+
+    // Rating must be 1-5 stars
+    if rating.rating < 1 || rating.rating > 5 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rating must be between 1 and 5".into(),
+        ));
+    }
+
+    // Exchange ID must not be empty
+    if rating.exchange_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Exchange ID is required".into(),
+        ));
+    }
+
+    // Comment length check (if provided)
+    if let Some(ref comment) = rating.comment {
+        if comment.len() > 2000 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Comment too long (max 2000 chars)".into(),
+            ));
+        }
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_create_dispute_case(
+    _action: EntryCreationAction,
+    dispute: DisputeCase,
+) -> ExternResult<ValidateCallbackResult> {
+    // Validate complainant DID
+    if !dispute.complainant_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Complainant must be a valid DID".into(),
+        ));
+    }
+
+    // Validate respondent DID
+    if !dispute.respondent_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Respondent must be a valid DID".into(),
+        ));
+    }
+
+    // Cannot dispute with yourself
+    if dispute.complainant_did == dispute.respondent_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot file a dispute against yourself".into(),
+        ));
+    }
+
+    // Validate mediator DIDs (if any are present)
+    for mediator_did in &dispute.mediator_dids {
+        if !mediator_did.starts_with("did:") {
+            return Ok(ValidateCallbackResult::Invalid(
+                "All mediator DIDs must be valid".into(),
+            ));
+        }
+    }
+
+    // Description is required
+    if dispute.description.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute description is required".into(),
+        ));
+    }
+    if dispute.description.len() > 5000 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute description too long (max 5000 chars)".into(),
+        ));
+    }
+
+    // Exchange ID must not be empty
+    if dispute.exchange_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Exchange ID is required".into(),
+        ));
+    }
+
+    // Dispute ID must not be empty
+    if dispute.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute ID is required".into(),
+        ));
+    }
+
+    // New disputes must start at DirectNegotiation stage
+    if dispute.stage != DisputeStage::DirectNegotiation {
+        return Ok(ValidateCallbackResult::Invalid(
+            "New disputes must start at DirectNegotiation stage".into(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_dispute_case(
+    _action: Update,
+    dispute: DisputeCase,
+) -> ExternResult<ValidateCallbackResult> {
+    // Validate core DID fields remain valid
+    if !dispute.complainant_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Complainant must be a valid DID".into(),
+        ));
+    }
+    if !dispute.respondent_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Respondent must be a valid DID".into(),
+        ));
+    }
+
+    // Validate mediator DIDs
+    for mediator_did in &dispute.mediator_dids {
+        if !mediator_did.starts_with("did:") {
+            return Ok(ValidateCallbackResult::Invalid(
+                "All mediator DIDs must be valid".into(),
+            ));
+        }
+    }
+
+    // MediationPanel stage requires exactly 3 mediators
+    if dispute.stage == DisputeStage::MediationPanel && dispute.mediator_dids.len() != 3 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MediationPanel stage requires exactly 3 mediators".into(),
+        ));
+    }
+
+    // Description must remain non-empty
+    if dispute.description.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Dispute description is required".into(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }

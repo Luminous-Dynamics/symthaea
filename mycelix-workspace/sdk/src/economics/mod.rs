@@ -1,121 +1,110 @@
 //! # Mycelix Economics Module
 //!
-//! Implementation of MIP-E-002: Metabolic Bridge Amendment
+//! Three-Currency Economic System:
+//! - **MYCEL**: Soulbound reputation substrate (non-transferable, 0.0-1.0)
+//! - **SAP**: Circulation medium with continuous demurrage
+//! - **TEND**: Mutual credit time exchange (zero-sum)
 //!
-//! Core economic primitives for circulation-based value flows:
-//! - **Proof of Contribution (PoC)**: Behavioral + Physical contribution scoring
-//! - **Metabolic Oracle**: Autopoietic parameter self-adjustment
-//! - **HEARTH**: Liquid commons pools
-//! - **Decay Garden**: Wealth circulation mechanism
+//! Anti-reflexivity: SAP value never depends on MYCEL, MYCEL never computed
+//! from SAP balance, TEND never convertible to SAP at fixed rate.
 
 pub mod poc;
 pub mod metabolic_oracle;
-pub mod hearth;
+pub mod commons;
 pub mod decay_garden;
+pub mod recognition;
 
 pub use poc::{
-    ProofOfContribution, BehavioralMetrics, ContributionScore,
-    PoCWeights, calculate_poc_score,
+    MycelCalculation, MycelScore, MycelComponent,
+    calculate_mycel_score, jubilee_normalize,
+    GamingDetection, GamingRecommendation,
 };
 pub use metabolic_oracle::{
     MetabolicOracle, VitalityIndex, MetabolicState, PolicyBounds,
-    PolicyAdjustment,
+    PolicyAdjustment, TendLimitTier,
 };
-pub use hearth::{
-    Hearth, HearthPool, WarmingAction, TendingAction, HarvestRequest,
+pub use commons::{
+    CommonsPool, CommonsContribution, CommonsResult,
 };
 pub use decay_garden::{
-    DecayGarden, CompostDistribution, DormancyCheck, CompostEvent,
+    DemurrageConfig, CompostDistribution, CompostEvent, CompostAllocation,
+    calculate_demurrage,
+};
+pub use recognition::{
+    RecognitionEvent, RecognitionConfig, calculate_recognition_score,
 };
 
 use serde::{Deserialize, Serialize};
 
-/// Currency identifiers per MIP-E-002 naming conventions
+/// Currency identifiers — Three-Currency Model
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Currency {
-    /// CIV / MYCELIUM - Reputation substrate (non-transferable)
-    Civ,
-    /// CGC / SPORE - Gift circulation credits
-    Cgc,
-    /// FLOW / SAP - Utility/transaction token
-    Flow,
-    /// TEND - Time exchange credits
+    /// MYCEL — Soulbound reputation substrate (non-transferable)
+    Mycel,
+    /// SAP — Circulation medium with continuous demurrage
+    Sap,
+    /// TEND — Mutual credit time exchange
     Tend,
-    /// HEARTH - Liquid commons pool tokens
-    Hearth,
-    /// ROOT - Stewardship/guardianship tokens
-    Root,
 }
 
 impl Currency {
-    /// Get the metabolic name for this currency
-    pub fn metabolic_name(&self) -> &'static str {
+    /// Get the display name for this currency
+    pub fn display_name(&self) -> &'static str {
         match self {
-            Currency::Civ => "MYCELIUM",
-            Currency::Cgc => "SPORE",
-            Currency::Flow => "SAP",
+            Currency::Mycel => "MYCEL",
+            Currency::Sap => "SAP",
             Currency::Tend => "TEND",
-            Currency::Hearth => "HEARTH",
-            Currency::Root => "ROOT",
         }
     }
 
     /// Get the technical identifier
     pub fn technical_id(&self) -> &'static str {
         match self {
-            Currency::Civ => "CIV",
-            Currency::Cgc => "CGC",
-            Currency::Flow => "FLOW",
+            Currency::Mycel => "MYCEL",
+            Currency::Sap => "SAP",
             Currency::Tend => "TEND",
-            Currency::Hearth => "HEARTH",
-            Currency::Root => "ROOT",
         }
     }
 
     /// Check if currency is transferable
     pub fn is_transferable(&self) -> bool {
         match self {
-            Currency::Civ => false, // Reputation is non-transferable
-            _ => true,
+            Currency::Mycel => false, // Soulbound — never transferable
+            Currency::Sap => true,
+            Currency::Tend => true,
         }
     }
 }
 
-/// Progressive fee tier based on CIV score (MIP-E-002 Article III)
+/// Progressive fee tier based on MYCEL score
+///
+/// Simplified from 5 tiers to 3. Constitutional: progressive fees must exist.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum FeeTier {
-    /// CIV < 0.3: 0.15% base fee
+    /// MYCEL < 0.3: 0.10% base fee
     Newcomer,
-    /// CIV 0.3-0.5: 0.10% base fee
-    Participant,
-    /// CIV 0.5-0.7: 0.05% base fee
-    Contributor,
-    /// CIV 0.7-0.9: 0.025% base fee
+    /// MYCEL 0.3-0.7: 0.03% base fee
+    Member,
+    /// MYCEL > 0.7: 0.01% base fee
     Steward,
-    /// CIV > 0.9: 0.01% base fee
-    Guardian,
 }
 
 impl FeeTier {
-    /// Determine fee tier from CIV score
-    pub fn from_civ(civ: f64) -> Self {
-        match civ {
-            c if c < 0.3 => FeeTier::Newcomer,
-            c if c < 0.5 => FeeTier::Participant,
-            c if c < 0.7 => FeeTier::Contributor,
-            c if c < 0.9 => FeeTier::Steward,
-            _ => FeeTier::Guardian,
+    /// Determine fee tier from MYCEL score
+    pub fn from_mycel(mycel: f64) -> Self {
+        match mycel {
+            m if m < 0.3 => FeeTier::Newcomer,
+            m if m <= 0.7 => FeeTier::Member,
+            _ => FeeTier::Steward,
         }
     }
 
     /// Get base fee rate (as fraction, not percentage)
     pub fn base_rate(&self) -> f64 {
         match self {
-            FeeTier::Newcomer => 0.0015,    // 0.15%
-            FeeTier::Participant => 0.0010, // 0.10%
-            FeeTier::Contributor => 0.0005, // 0.05%
-            FeeTier::Steward => 0.00025,    // 0.025%
-            FeeTier::Guardian => 0.0001,    // 0.01%
+            FeeTier::Newcomer => 0.0010, // 0.10%
+            FeeTier::Member => 0.0003,   // 0.03%
+            FeeTier::Steward => 0.0001,  // 0.01%
         }
     }
 
@@ -133,64 +122,107 @@ impl FeeTier {
     }
 }
 
+/// Succession preference for SAP on exit/death
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum SuccessionPreference {
+    /// SAP goes to member's local commons pool (default)
+    Commons,
+    /// SAP goes to a designated member
+    Designee(String),
+    /// SAP is redeemed through collateral bridge
+    Redemption,
+}
+
+impl Default for SuccessionPreference {
+    fn default() -> Self {
+        SuccessionPreference::Commons
+    }
+}
+
 /// Member economic state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberEconomics {
     /// Decentralized identifier
     pub did: String,
-    /// CIV reputation score (0.0 - 1.0)
-    pub civ_score: f64,
-    /// SAP/FLOW balance
+    /// MYCEL reputation score (computed from 4 components)
+    pub mycel_score: MycelScore,
+    /// SAP balance (raw — demurrage computed on read)
     pub sap_balance: u64,
     /// SAP locked as collateral
     pub sap_locked: u64,
-    /// CGC/SPORE monthly allocation
-    pub cgc_allocation: u64,
-    /// TEND time credits
-    pub tend_balance: u64,
-    /// Last activity timestamp (for dormancy)
-    pub last_activity: u64,
+    /// TEND time credits (signed, mutual credit)
+    pub tend_balance: i32,
+    /// Timestamp of last demurrage computation
+    pub last_demurrage_at: u64,
+    /// Whether member is in apprentice mode
+    pub is_apprentice: bool,
+    /// Mentor DID (if apprentice)
+    pub mentor_did: Option<String>,
+    /// SAP succession preference on exit/death
+    pub succession_preference: SuccessionPreference,
     /// Local DAO membership
     pub local_dao_id: Option<String>,
-    /// Active agent count (for agentic economy)
-    pub active_agent_count: u32,
 }
 
 impl MemberEconomics {
-    /// Create new member with initial state
-    pub fn new(did: String) -> Self {
+    /// Create new member with initial apprentice state
+    pub fn new(did: String, mentor_did: Option<String>) -> Self {
         Self {
             did,
-            civ_score: 0.3, // Starting CIV
+            mycel_score: MycelScore::apprentice(),
             sap_balance: 0,
             sap_locked: 0,
-            cgc_allocation: 10, // Default 10 SPORE/month
             tend_balance: 0,
-            last_activity: 0,
+            last_demurrage_at: 0,
+            is_apprentice: true,
+            mentor_did,
+            succession_preference: SuccessionPreference::default(),
             local_dao_id: None,
-            active_agent_count: 0,
         }
     }
 
     /// Get current fee tier
     pub fn fee_tier(&self) -> FeeTier {
-        FeeTier::from_civ(self.civ_score)
+        FeeTier::from_mycel(self.mycel_score.composite)
     }
 
-    /// Check if member is dormant (180+ days inactive)
-    pub fn is_dormant(&self, current_time: u64) -> bool {
-        const DORMANCY_THRESHOLD: u64 = 180 * 24 * 60 * 60; // 180 days in seconds
-        current_time.saturating_sub(self.last_activity) > DORMANCY_THRESHOLD
+    /// Calculate effective SAP balance after demurrage
+    pub fn effective_sap_balance(&self, config: &DemurrageConfig, current_time: u64) -> u64 {
+        let seconds_elapsed = current_time.saturating_sub(self.last_demurrage_at);
+        if seconds_elapsed == 0 || self.sap_balance <= config.exempt_floor {
+            return self.sap_balance;
+        }
+        let decayed = calculate_demurrage(
+            self.sap_balance,
+            config.exempt_floor,
+            config.annual_rate,
+            seconds_elapsed,
+        );
+        self.sap_balance - decayed
     }
 
-    /// Update last activity timestamp
-    pub fn record_activity(&mut self, timestamp: u64) {
-        self.last_activity = timestamp;
+    /// Apply demurrage and return the amount decayed
+    pub fn apply_demurrage(&mut self, config: &DemurrageConfig, current_time: u64) -> u64 {
+        let seconds_elapsed = current_time.saturating_sub(self.last_demurrage_at);
+        if seconds_elapsed == 0 || self.sap_balance <= config.exempt_floor {
+            self.last_demurrage_at = current_time;
+            return 0;
+        }
+        let decayed = calculate_demurrage(
+            self.sap_balance,
+            config.exempt_floor,
+            config.annual_rate,
+            seconds_elapsed,
+        );
+        self.sap_balance -= decayed;
+        self.last_demurrage_at = current_time;
+        decayed
     }
 
-    /// Calculate maximum loan based on reputation-collateralized lending
-    pub fn max_loan(&self, hearth_available: u64) -> u64 {
-        (self.civ_score * hearth_available as f64 * 0.3) as u64
+    /// Graduate from apprentice to newcomer (MYCEL >= 0.3)
+    pub fn graduate(&mut self) {
+        self.is_apprentice = false;
+        self.mentor_did = None;
     }
 }
 
@@ -199,50 +231,56 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_fee_tier_from_civ() {
-        assert_eq!(FeeTier::from_civ(0.1), FeeTier::Newcomer);
-        assert_eq!(FeeTier::from_civ(0.4), FeeTier::Participant);
-        assert_eq!(FeeTier::from_civ(0.6), FeeTier::Contributor);
-        assert_eq!(FeeTier::from_civ(0.8), FeeTier::Steward);
-        assert_eq!(FeeTier::from_civ(0.95), FeeTier::Guardian);
+    fn test_fee_tier_from_mycel() {
+        assert_eq!(FeeTier::from_mycel(0.1), FeeTier::Newcomer);
+        assert_eq!(FeeTier::from_mycel(0.29), FeeTier::Newcomer);
+        assert_eq!(FeeTier::from_mycel(0.3), FeeTier::Member);
+        assert_eq!(FeeTier::from_mycel(0.5), FeeTier::Member);
+        assert_eq!(FeeTier::from_mycel(0.7), FeeTier::Member);
+        assert_eq!(FeeTier::from_mycel(0.71), FeeTier::Steward);
+        assert_eq!(FeeTier::from_mycel(0.95), FeeTier::Steward);
     }
 
     #[test]
     fn test_progressive_fee() {
-        let tier = FeeTier::Contributor;
+        let tier = FeeTier::Member;
         let median = 1000;
 
         // Normal transaction pays base rate
-        assert!((tier.effective_rate(500, median) - 0.0005).abs() < 0.0001);
+        assert!((tier.effective_rate(500, median) - 0.0003).abs() < 0.0001);
 
-        // 10x median pays ~2x base rate
+        // 10x median pays higher rate
         let rate_10x = tier.effective_rate(10000, median);
-        assert!(rate_10x > 0.0005 && rate_10x < 0.0015);
+        assert!(rate_10x > 0.0003);
     }
 
     #[test]
-    fn test_member_dormancy() {
-        let mut member = MemberEconomics::new("did:example:123".to_string());
-        member.last_activity = 1000;
+    fn test_member_demurrage() {
+        let config = DemurrageConfig::default();
+        let mut member = MemberEconomics::new("did:example:123".to_string(), None);
+        member.sap_balance = 10_000;
+        member.last_demurrage_at = 0;
 
-        // Not dormant after 100 days
-        let time_100_days = 1000 + 100 * 24 * 60 * 60;
-        assert!(!member.is_dormant(time_100_days));
+        // One year later
+        let one_year = 365 * 24 * 60 * 60;
 
-        // Dormant after 200 days
-        let time_200_days = 1000 + 200 * 24 * 60 * 60;
-        assert!(member.is_dormant(time_200_days));
+        // Balance at exempt floor — no decay
+        member.sap_balance = 1_000;
+        let effective = member.effective_sap_balance(&config, one_year);
+        assert_eq!(effective, 1_000);
+
+        // Balance above exempt floor — decays
+        member.sap_balance = 10_000;
+        let effective = member.effective_sap_balance(&config, one_year);
+        // 9000 above exempt decays ~2%/year = ~180 decay, effective ~9820
+        assert!(effective < 10_000);
+        assert!(effective > 9_700);
     }
 
     #[test]
-    fn test_max_loan() {
-        let mut member = MemberEconomics::new("did:example:123".to_string());
-        member.civ_score = 0.7;
-
-        let hearth_available = 100_000;
-        let max_loan = member.max_loan(hearth_available);
-
-        // 0.7 * 100,000 * 0.3 = 21,000
-        assert_eq!(max_loan, 21_000);
+    fn test_succession_default() {
+        let member = MemberEconomics::new("did:example:alice".to_string(), None);
+        assert_eq!(member.succession_preference, SuccessionPreference::Commons);
+        assert!(member.is_apprentice);
     }
 }

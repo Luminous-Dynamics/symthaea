@@ -1,53 +1,55 @@
 ---
-# Mycelix Finance DNA
-# P2P lending, credit scoring, and value transfer
+# Mycelix Finance DNA — Three-Currency Model
+# SAP (circulation), TEND (mutual credit), MYCEL (reputation via recognition)
 
 manifest_version: "0"
 name: mycelix_finance
 integrity:
   network_seed: ~
   properties:
-    # Credit scoring configuration
-    min_credit_score: 0.0
-    max_credit_score: 1000.0
-    decay_rate: 0.01
+    # Demurrage configuration
+    demurrage_rate: 0.02           # 2% annual (constitutional bounds: 1-5%)
+    exempt_floor: 1000             # SAP exempt from demurrage per member
+    inalienable_reserve_ratio: 0.25 # Constitutional minimum 25%
 
-    # Lending configuration
-    max_loan_duration_days: 365
-    collateralization_ratio: 1.5
+    # TEND configuration
+    tend_base_limit: 40            # ±40 hours (adjustable 20-80 by governance)
+    tend_apprentice_limit: 10      # ±10 hours for apprentices
 
-    # MATL integration
-    quality_weight: 0.4
-    consistency_weight: 0.3
-    reputation_weight: 0.3
+    # Recognition configuration
+    max_recognitions_per_cycle: 10
+    recognition_base_weight: 1.0
+
+    # MYCEL thresholds
+    mycel_apprentice_max: 0.3      # Graduate above this
+    mycel_steward_min: 0.7         # Steward tier above this
+
+    # Collateral bridge
+    min_mycel_for_bridge: 0.3      # Minimum MYCEL to mint/redeem SAP
+    max_vault_daily_pct: 0.05      # Max 5% of vault per day per member
 
   zomes:
-    - name: credit_scoring_integrity
-      path: ../target/wasm32-unknown-unknown/release/credit_scoring_integrity.wasm
-    - name: lending_integrity
-      path: ../target/wasm32-unknown-unknown/release/lending_integrity.wasm
     - name: payments_integrity
       path: ../target/wasm32-unknown-unknown/release/payments_integrity.wasm
     - name: treasury_integrity
       path: ../target/wasm32-unknown-unknown/release/treasury_integrity.wasm
     - name: finance_bridge_integrity
       path: ../target/wasm32-unknown-unknown/release/finance_bridge_integrity.wasm
+    - name: staking_integrity
+      path: ../target/wasm32-unknown-unknown/release/staking_integrity.wasm
+    - name: tend_integrity
+      path: ../target/wasm32-unknown-unknown/release/tend_integrity.wasm
+    - name: recognition_integrity
+      path: ../target/wasm32-unknown-unknown/release/recognition_integrity.wasm
 
 coordinator:
   zomes:
-    - name: credit_scoring
-      path: ../target/wasm32-unknown-unknown/release/credit_scoring.wasm
-      dependencies:
-        - name: credit_scoring_integrity
-    - name: lending
-      path: ../target/wasm32-unknown-unknown/release/lending.wasm
-      dependencies:
-        - name: lending_integrity
-        - name: credit_scoring_integrity
     - name: payments
       path: ../target/wasm32-unknown-unknown/release/payments.wasm
       dependencies:
         - name: payments_integrity
+        - name: recognition_integrity
+        - name: tend_integrity
     - name: treasury
       path: ../target/wasm32-unknown-unknown/release/treasury.wasm
       dependencies:
@@ -57,3 +59,15 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/finance_bridge.wasm
       dependencies:
         - name: finance_bridge_integrity
+    - name: staking
+      path: ../target/wasm32-unknown-unknown/release/staking.wasm
+      dependencies:
+        - name: staking_integrity
+    - name: tend
+      path: ../target/wasm32-unknown-unknown/release/tend.wasm
+      dependencies:
+        - name: tend_integrity
+    - name: recognition
+      path: ../target/wasm32-unknown-unknown/release/recognition.wasm
+      dependencies:
+        - name: recognition_integrity

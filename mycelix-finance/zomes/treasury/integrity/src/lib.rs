@@ -76,6 +76,30 @@ pub struct SavingsPool {
     pub created: Timestamp,
 }
 
+/// Commons pool for a DAO -- inalienable reserve is constitutionally protected
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CommonsPool {
+    pub id: String,
+    pub dao_did: String,
+    pub inalienable_reserve: u64,
+    pub available_balance: u64,
+    pub demurrage_exempt: bool, // Always true -- constitutional
+    pub created_at: Timestamp,
+    pub last_activity: Timestamp,
+}
+
+/// Record of demurrage redistribution received into a commons pool
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CompostReceival {
+    pub id: String,
+    pub commons_pool_id: String,
+    pub amount: u64,
+    pub source_member_did: String,
+    pub timestamp: Timestamp,
+}
+
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
@@ -83,6 +107,8 @@ pub enum EntryTypes {
     Contribution(Contribution),
     Allocation(Allocation),
     SavingsPool(SavingsPool),
+    CommonsPool(CommonsPool),
+    CompostReceival(CompostReceival),
 }
 
 #[hdk_link_types]
@@ -93,6 +119,8 @@ pub enum LinkTypes {
     ManagerToTreasury,
     ContributorToContributions,
     MemberToPool,
+    DaoToCommonsPool,
+    CommonsPoolToCompost,
 }
 
 /// Genesis self-check
@@ -120,6 +148,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::SavingsPool(pool) => {
                         validate_create_savings_pool(EntryCreationAction::Create(action), pool)
                     }
+                    EntryTypes::CommonsPool(pool) => {
+                        validate_create_commons_pool(EntryCreationAction::Create(action), pool)
+                    }
+                    EntryTypes::CompostReceival(receival) => {
+                        validate_create_compost_receival(EntryCreationAction::Create(action), receival)
+                    }
                 }
             }
             OpEntry::UpdateEntry { app_entry, action, .. } => {
@@ -137,6 +171,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     EntryTypes::SavingsPool(pool) => {
                         validate_update_savings_pool(action, pool)
+                    }
+                    EntryTypes::CommonsPool(pool) => {
+                        validate_update_commons_pool(action, pool)
+                    }
+                    EntryTypes::CompostReceival(_) => {
+                        Ok(ValidateCallbackResult::Invalid(
+                            "Compost receivals cannot be updated -- they are immutable records".into(),
+                        ))
                     }
                 }
             }
@@ -170,6 +212,22 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::DaoToCommonsPool => {
+                    if !base_valid || !target_valid {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "DaoToCommonsPool link must connect valid hashes".into()
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::CommonsPoolToCompost => {
+                    if !base_valid || !target_valid {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "CommonsPoolToCompost link must connect valid hashes".into()
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { link_type, .. } => {
@@ -184,6 +242,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::ManagerToTreasury => {
                     Ok(ValidateCallbackResult::Invalid(
                         "Manager links cannot be directly deleted - use governance process".into()
+                    ))
+                }
+                // Compost receival links are immutable (audit trail)
+                LinkTypes::CommonsPoolToCompost => {
+                    Ok(ValidateCallbackResult::Invalid(
+                        "Compost receival links cannot be deleted - audit trail must be preserved".into()
                     ))
                 }
                 _ => Ok(ValidateCallbackResult::Valid)
@@ -279,6 +343,64 @@ fn validate_update_savings_pool(
 ) -> ExternResult<ValidateCallbackResult> {
     if pool.target_amount <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Target amount must be positive".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate CommonsPool: reserve ratio must never drop below 25%.
+/// inalienable_reserve / (inalienable_reserve + available_balance) >= 0.25
+/// Exception: total is 0 (empty pool is valid).
+fn validate_commons_pool_reserve_ratio(pool: &CommonsPool) -> ExternResult<ValidateCallbackResult> {
+    let total = pool.inalienable_reserve + pool.available_balance;
+    if total > 0 {
+        // Use integer math to avoid floating point: reserve * 100 >= total * 25
+        let reserve_pct = pool.inalienable_reserve as u128 * 100;
+        let threshold = total as u128 * 25;
+        if reserve_pct < threshold {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Commons pool reserve ratio must be at least 25% (inalienable_reserve / total >= 0.25)".into()
+            ));
+        }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_create_commons_pool(
+    _action: EntryCreationAction,
+    pool: CommonsPool,
+) -> ExternResult<ValidateCallbackResult> {
+    if !pool.dao_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid("DAO DID must be a valid DID".into()));
+    }
+    if !pool.demurrage_exempt {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Commons pool must be demurrage exempt (constitutional requirement)".into()
+        ));
+    }
+    validate_commons_pool_reserve_ratio(&pool)
+}
+
+fn validate_update_commons_pool(
+    _action: Update,
+    pool: CommonsPool,
+) -> ExternResult<ValidateCallbackResult> {
+    if !pool.demurrage_exempt {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Commons pool must remain demurrage exempt (constitutional requirement)".into()
+        ));
+    }
+    validate_commons_pool_reserve_ratio(&pool)
+}
+
+fn validate_create_compost_receival(
+    _action: EntryCreationAction,
+    receival: CompostReceival,
+) -> ExternResult<ValidateCallbackResult> {
+    if receival.amount == 0 {
+        return Ok(ValidateCallbackResult::Invalid("Compost receival amount must be positive".into()));
+    }
+    if !receival.source_member_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid("Source member must be a valid DID".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }

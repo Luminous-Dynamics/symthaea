@@ -1,44 +1,10 @@
 //! Finance Bridge Integrity Zome
 //! Updated to use HDI 0.7 patterns with FlatOp validation
 //!
-//! Entry types for cross-hApp credit queries, payment processing, and collateral management.
+//! Entry types for cross-hApp payment processing, collateral management,
+//! and collateral bridge deposits for SAP minting.
 
 use hdi::prelude::*;
-
-/// Credit query from another hApp
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct CreditQuery {
-    pub id: String,
-    pub did: String,
-    pub source_happ: String,
-    pub purpose: CreditPurpose,
-    pub queried_at: Timestamp,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum CreditPurpose {
-    LoanApplication,
-    TrustVerification,
-    MarketplaceTransaction,
-    PropertyPurchase,
-    EnergyInvestment,
-}
-
-/// Credit score result
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct CreditResult {
-    pub id: String,
-    pub did: String,
-    pub matl_score: f64,
-    pub credit_score: f64,
-    pub payment_history_score: f64,
-    pub collateral_ratio: f64,
-    pub active_loans: u32,
-    pub total_repaid: u64,
-    pub calculated_at: Timestamp,
-}
 
 /// Cross-hApp payment request
 #[hdk_entry_helper]
@@ -114,32 +80,53 @@ pub struct FinanceBridgeEvent {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum FinanceEventType {
-    CreditScoreUpdated,
-    LoanApproved,
-    LoanRepaid,
     PaymentCompleted,
     CollateralPledged,
     CollateralReleased,
-    DefaultOccurred,
+    CollateralDeposited,
+    CollateralRedeemed,
+    CommonsContributed,
+}
+
+/// Collateral bridge deposit for minting SAP from external collateral
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CollateralBridgeDeposit {
+    pub id: String,
+    pub depositor_did: String,
+    pub collateral_type: String,  // "ETH" or "USDC"
+    pub collateral_amount: u64,
+    pub sap_minted: u64,
+    pub oracle_rate: f64,
+    pub status: BridgeDepositStatus,
+    pub created_at: Timestamp,
+    pub completed_at: Option<Timestamp>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum BridgeDepositStatus {
+    Pending,
+    Confirmed,
+    Redeemed,
+    Failed,
 }
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
-    CreditQuery(CreditQuery),
-    CreditResult(CreditResult),
     CrossHappPayment(CrossHappPayment),
     CollateralRegistration(CollateralRegistration),
     FinanceBridgeEvent(FinanceBridgeEvent),
+    CollateralBridgeDeposit(CollateralBridgeDeposit),
 }
 
 #[hdk_link_types]
 pub enum LinkTypes {
-    DidToCredit,
     DidToPayments,
     HappToPayments,
     CollateralRegistry,
     RecentEvents,
+    DidToDeposits,
 }
 
 /// Genesis self-check
@@ -155,12 +142,6 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => {
                 match app_entry {
-                    EntryTypes::CreditQuery(query) => {
-                        validate_create_credit_query(EntryCreationAction::Create(action), query)
-                    }
-                    EntryTypes::CreditResult(result) => {
-                        validate_create_credit_result(EntryCreationAction::Create(action), result)
-                    }
                     EntryTypes::CrossHappPayment(payment) => {
                         validate_create_cross_happ_payment(EntryCreationAction::Create(action), payment)
                     }
@@ -170,18 +151,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::FinanceBridgeEvent(event) => {
                         validate_create_finance_bridge_event(EntryCreationAction::Create(action), event)
                     }
+                    EntryTypes::CollateralBridgeDeposit(deposit) => {
+                        validate_create_collateral_bridge_deposit(EntryCreationAction::Create(action), deposit)
+                    }
                 }
             }
             OpEntry::UpdateEntry { app_entry, action, .. } => {
                 match app_entry {
-                    EntryTypes::CreditQuery(_) => {
-                        Ok(ValidateCallbackResult::Invalid(
-                            "Credit queries cannot be updated".into(),
-                        ))
-                    }
-                    EntryTypes::CreditResult(result) => {
-                        validate_update_credit_result(action, result)
-                    }
                     EntryTypes::CrossHappPayment(payment) => {
                         validate_update_cross_happ_payment(action, payment)
                     }
@@ -193,17 +169,20 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                             "Finance events cannot be updated".into(),
                         ))
                     }
+                    EntryTypes::CollateralBridgeDeposit(deposit) => {
+                        validate_update_collateral_bridge_deposit(action, deposit)
+                    }
                 }
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterCreateLink { link_type, .. } => {
             match link_type {
-                LinkTypes::DidToCredit => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::DidToPayments => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::HappToPayments => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::CollateralRegistry => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::RecentEvents => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::DidToDeposits => Ok(ValidateCallbackResult::Valid),
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -214,42 +193,17 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_create_credit_query(
-    _action: EntryCreationAction,
-    query: CreditQuery,
-) -> ExternResult<ValidateCallbackResult> {
-    if !query.did.starts_with("did:mycelix:") {
-        return Ok(ValidateCallbackResult::Invalid("DID must be valid".into()));
-    }
-    Ok(ValidateCallbackResult::Valid)
-}
-
-fn validate_create_credit_result(
-    _action: EntryCreationAction,
-    result: CreditResult,
-) -> ExternResult<ValidateCallbackResult> {
-    if result.credit_score < 0.0 || result.credit_score > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Credit score must be 0.0-1.0".into()));
-    }
-    Ok(ValidateCallbackResult::Valid)
-}
-
-fn validate_update_credit_result(
-    _action: Update,
-    result: CreditResult,
-) -> ExternResult<ValidateCallbackResult> {
-    if result.credit_score < 0.0 || result.credit_score > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Credit score must be 0.0-1.0".into()));
-    }
-    Ok(ValidateCallbackResult::Valid)
-}
-
 fn validate_create_cross_happ_payment(
     _action: EntryCreationAction,
     payment: CrossHappPayment,
 ) -> ExternResult<ValidateCallbackResult> {
     if payment.amount == 0 {
         return Ok(ValidateCallbackResult::Invalid("Amount must be positive".into()));
+    }
+    if payment.currency != "SAP" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "CrossHappPayment currency must be SAP".into()
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -283,6 +237,42 @@ fn validate_create_finance_bridge_event(
 ) -> ExternResult<ValidateCallbackResult> {
     if event.source_happ.is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Source hApp required".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_create_collateral_bridge_deposit(
+    _action: EntryCreationAction,
+    deposit: CollateralBridgeDeposit,
+) -> ExternResult<ValidateCallbackResult> {
+    if !deposit.depositor_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid("Depositor must be a valid DID".into()));
+    }
+    if deposit.collateral_amount == 0 {
+        return Ok(ValidateCallbackResult::Invalid("Collateral amount must be positive".into()));
+    }
+    if deposit.sap_minted == 0 {
+        return Ok(ValidateCallbackResult::Invalid("SAP minted must be positive".into()));
+    }
+    if deposit.oracle_rate <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("Oracle rate must be positive".into()));
+    }
+    // Validate collateral type is supported
+    if deposit.collateral_type != "ETH" && deposit.collateral_type != "USDC" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Collateral type must be ETH or USDC".into()
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_collateral_bridge_deposit(
+    _action: Update,
+    deposit: CollateralBridgeDeposit,
+) -> ExternResult<ValidateCallbackResult> {
+    // Only status transitions are meaningful; validate the deposit DID is still valid
+    if !deposit.depositor_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid("Depositor must be a valid DID".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }

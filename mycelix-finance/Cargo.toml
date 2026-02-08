@@ -2,10 +2,6 @@
 resolver = "2"
 members = [
     "zomes/shared",
-    "zomes/credit_scoring/integrity",
-    "zomes/credit_scoring/coordinator",
-    "zomes/lending/integrity",
-    "zomes/lending/coordinator",
     "zomes/payments/integrity",
     "zomes/payments/coordinator",
     "zomes/treasury/integrity",
@@ -14,12 +10,10 @@ members = [
     "zomes/bridge/coordinator",
     "zomes/staking/integrity",
     "zomes/staking/coordinator",
-    "zomes/cgc/integrity",
-    "zomes/cgc/coordinator",
     "zomes/tend/integrity",
     "zomes/tend/coordinator",
-    "zomes/hearth/integrity",
-    "zomes/hearth/coordinator",
+    "zomes/recognition/integrity",
+    "zomes/recognition/coordinator",
 ]
 exclude = ["tests"]
 

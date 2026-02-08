@@ -1,15 +1,14 @@
 [package]
-name = "cgc_integrity"
+name = "recognition_integrity"
 version = "0.1.0"
 edition = "2021"
-description = "Civic Gifting Credits (CGC) integrity zome - Commons Charter Article I"
+description = "Recognition integrity zome — MYCEL reputation via weighted recognition"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-name = "cgc_integrity"
+name = "recognition_integrity"
 
 [dependencies]
 holochain_serialized_bytes = { workspace = true }
 hdi = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
