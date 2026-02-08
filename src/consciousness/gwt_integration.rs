@@ -38,7 +38,7 @@ use crate::hdc::global_workspace::{
 };
 use crate::hdc::binary_hv::BinaryHV;
 #[cfg(feature = "observability_module")]
-use crate::observability::{SharedObserver, types::*};
+use crate::observability::{SharedObserver, SymthaeaObserver, WorkspaceIgnitionEvent};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -86,7 +86,7 @@ pub struct UnifiedGlobalWorkspace {
     /// observability infrastructure - useful for debugging and visualization.
     #[cfg(feature = "observability_module")]
     #[allow(dead_code)]
-    observer: Option<SharedObserver>,
+    observer: Option<SharedObserver<dyn SymthaeaObserver>>,
 }
 
 impl fmt::Debug for UnifiedGlobalWorkspace {
@@ -285,7 +285,7 @@ impl UnifiedGlobalWorkspace {
 
     /// Create new unified workspace with observer
     #[cfg(feature = "observability_module")]
-    pub fn with_observer(config: UnifiedGWTConfig, observer: Option<SharedObserver>) -> Self {
+    pub fn with_observer(config: UnifiedGWTConfig, observer: Option<SharedObserver<dyn SymthaeaObserver>>) -> Self {
         Self {
             hdc_workspace: GlobalWorkspace::new(config.workspace_config.clone()),
             strategy_activations: HashMap::new(),
@@ -599,27 +599,32 @@ impl UnifiedGlobalWorkspace {
         #[cfg(feature = "observability_module")]
         if assessment.ignition_detected {
             if let Some(ref observer) = self.observer {
-                let phi = winning_coalition.as_ref()
-                    .and_then(|c| self.phi_estimates.get(&c.strategy_name))
-                    .copied()
-                    .unwrap_or(0.5);
+                use crate::observability::EventMetadata;
 
-                let (coalition_size, active_primitives) = winning_coalition.as_ref()
-                    .map(|c| (c.members.len(), c.members.clone()))
-                    .unwrap_or((0, Vec::new()));
+                let components = winning_coalition.as_ref()
+                    .map(|c| c.members.clone())
+                    .unwrap_or_default();
 
-                let broadcast_payload_size = assessment.broadcasts.iter()
-                    .map(|b| b.content.len() * 16384 / 8)
-                    .sum();
+                let mut tags = std::collections::HashMap::new();
+                if let Some(ref c) = winning_coalition {
+                    if let Some(phi) = self.phi_estimates.get(&c.strategy_name) {
+                        tags.insert("phi".to_string(), format!("{:.4}", phi));
+                    }
+                    tags.insert("strategy".to_string(), c.strategy_name.clone());
+                }
 
                 let event = WorkspaceIgnitionEvent {
-                    timestamp: chrono::Utc::now(),
-                    phi,
-                    free_energy: 0.0,
-                    coalition_size,
-                    active_primitives,
-                    broadcast_payload_size,
-                    metadata: None,
+                    id: format!("gwt-ignition-{}", self.stats.total_decisions),
+                    workspace: "unified_gwt".to_string(),
+                    components,
+                    duration_us: 0,
+                    success: true,
+                    metadata: EventMetadata {
+                        correlation_id: format!("gwt-{}", self.stats.total_decisions),
+                        parent_id: None,
+                        tags,
+                        timestamp: 0,
+                    },
                 };
 
                 if let Ok(mut obs) = observer.try_write() {
