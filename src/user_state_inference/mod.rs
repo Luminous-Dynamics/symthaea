@@ -501,6 +501,27 @@ impl UserStateInference {
         self.last_interaction = None;
     }
 
+    /// Record that an error occurred in the interaction
+    ///
+    /// This increases frustration and cognitive load, indicating
+    /// the user may be struggling.
+    pub fn record_error(&mut self) {
+        self.current_state.frustration = (self.current_state.frustration + 0.15).min(1.0);
+        self.current_state.cognitive_load.level =
+            (self.current_state.cognitive_load.level + 0.1).min(1.0);
+        self.current_state.cognitive_load.primary_factor = CognitiveLoadFactor::ErrorRecovery;
+    }
+
+    /// Record that the user initiated an undo action
+    ///
+    /// This may indicate frustration with the previous action's result.
+    pub fn record_undo(&mut self) {
+        self.current_state.frustration = (self.current_state.frustration + 0.1).min(1.0);
+        // Undo suggests trying to fix something - slight cognitive load increase
+        self.current_state.cognitive_load.level =
+            (self.current_state.cognitive_load.level + 0.05).min(1.0);
+    }
+
     /// Infer user state from context for empathic unification
     ///
     /// This method provides a simplified inference based on context,
