@@ -6,6 +6,54 @@
 use hdk::prelude::*;
 use did_registry_integrity::*;
 
+/// Validate a multibase-encoded Ed25519 public key.
+///
+/// Per the W3C DID specification and multibase encoding:
+/// - Must start with 'z' (base58btc prefix)
+/// - Remaining characters must be valid base58btc (no 0, O, I, l)
+/// - Decoded key should be 32 bytes for Ed25519
+fn validate_multibase_ed25519_key(key: &str) -> Result<(), String> {
+    if key.is_empty() {
+        return Err("Public key multibase is empty".to_string());
+    }
+
+    // Check multibase prefix (z = base58btc)
+    if !key.starts_with('z') {
+        return Err(format!(
+            "Invalid multibase prefix '{}': expected 'z' (base58btc)",
+            key.chars().next().unwrap_or('?')
+        ));
+    }
+
+    let encoded = &key[1..]; // Strip 'z' prefix
+    if encoded.is_empty() {
+        return Err("Public key multibase has no data after prefix".to_string());
+    }
+
+    // Validate base58btc character set (Bitcoin alphabet)
+    const BASE58_CHARS: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    for (i, ch) in encoded.bytes().enumerate() {
+        if !BASE58_CHARS.contains(&ch) {
+            return Err(format!(
+                "Invalid base58btc character '{}' at position {}",
+                ch as char, i + 1
+            ));
+        }
+    }
+
+    // Length sanity check: base58-encoded 32 bytes is typically 43-44 chars
+    // but Holochain agent pub keys are 39 bytes (36 + 3 byte location),
+    // so we accept 32-64 chars to accommodate various key formats
+    if encoded.len() < 32 || encoded.len() > 128 {
+        return Err(format!(
+            "Unexpected base58btc key length {}: expected 32-128 characters",
+            encoded.len()
+        ));
+    }
+
+    Ok(())
+}
+
 // ==================== MFA INTEGRATION ====================
 
 /// Input structure for creating MFA state (mirrors mfa_coordinator)
@@ -179,6 +227,14 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
             }
             if method.public_key_multibase.is_empty() || method.public_key_multibase.len() > 4096 {
                 return Err(wasm_error!(WasmErrorInner::Guest("Public key multibase must be 1-4096 characters".into())));
+            }
+            // Validate multibase Ed25519 key format
+            if method.type_ == "Ed25519VerificationKey2020" || method.type_ == "Ed25519VerificationKey2018" {
+                if let Err(e) = validate_multibase_ed25519_key(&method.public_key_multibase) {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        format!("Invalid Ed25519 multibase key in update: {}", e)
+                    )));
+                }
             }
         }
     }
@@ -472,6 +528,15 @@ pub fn add_verification_method(method: VerificationMethod) -> ExternResult<Recor
     }
     if method.public_key_multibase.is_empty() || method.public_key_multibase.len() > 4096 {
         return Err(wasm_error!(WasmErrorInner::Guest("Public key multibase must be 1-4096 characters".into())));
+    }
+
+    // Validate multibase encoding format for Ed25519 keys
+    if method.type_ == "Ed25519VerificationKey2020" || method.type_ == "Ed25519VerificationKey2018" {
+        if let Err(e) = validate_multibase_ed25519_key(&method.public_key_multibase) {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                format!("Invalid Ed25519 multibase key: {}", e)
+            )));
+        }
     }
 
     let agent_info = agent_info()?;

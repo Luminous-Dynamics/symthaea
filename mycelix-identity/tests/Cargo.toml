@@ -47,3 +47,8 @@ path = "education_test.rs"
 [[test]]
 name = "sweettest_integration"
 path = "sweettest_integration.rs"
+
+# MFA (Multi-Factor Authentication) Sweettest Integration Tests
+[[test]]
+name = "mfa_sweettest"
+path = "mfa_sweettest.rs"

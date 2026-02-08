@@ -11,5 +11,6 @@ crate-type = ["cdylib", "rlib"]
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+subtle = { workspace = true }
 recovery_integrity = { path = "../integrity" }
 did_registry_integrity = { path = "../../did_registry/integrity" }

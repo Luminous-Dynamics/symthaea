@@ -49,6 +49,10 @@ impl DnaPaths {
     pub fn climate() -> PathBuf {
         Self::workspace_root().join("../mycelix-climate/dnas/climate/workdir/climate.dna")
     }
+
+    pub fn federated_learning() -> PathBuf {
+        Self::workspace_root().join("../Mycelix-Core/zomes/federated_learning/workdir/dna/federated_learning.dna")
+    }
 }
 
 /// A test agent with conductor and cell references for Holochain 0.6 API.

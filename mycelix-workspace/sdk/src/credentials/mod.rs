@@ -53,10 +53,21 @@ pub trait CredentialKeyRegistry: Send + Sync {
     fn get_public_key(&self, verification_method: &str) -> Option<[u8; 32]>;
 }
 
-/// A simple in-memory credential key registry for testing
+/// A simple in-memory credential key registry for testing.
+///
+/// Key material is zeroized on drop to prevent residual data in memory.
 #[derive(Clone, Debug, Default)]
 pub struct InMemoryCredentialKeyRegistry {
     keys: HashMap<String, [u8; 32]>,
+}
+
+impl Drop for InMemoryCredentialKeyRegistry {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        for value in self.keys.values_mut() {
+            value.zeroize();
+        }
+    }
 }
 
 impl InMemoryCredentialKeyRegistry {

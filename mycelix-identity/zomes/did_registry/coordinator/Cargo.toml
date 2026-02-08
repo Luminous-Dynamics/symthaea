@@ -12,4 +12,5 @@ hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 getrandom_03 = { workspace = true }
+subtle = { workspace = true }
 did_registry_integrity = { path = "../integrity" }

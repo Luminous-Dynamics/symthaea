@@ -10,6 +10,7 @@
 
 use hdk::prelude::*;
 use recovery_integrity::*;
+use subtle::ConstantTimeEq;
 
 // =============================================================================
 // MFA CROSS-ZOME INTEGRATION
@@ -274,8 +275,11 @@ pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
             "Invalid recovery config".into()
         )))?;
 
-    // Verify initiator is a trustee
-    if !config.trustees.contains(&input.initiator_did) {
+    // Verify initiator is a trustee (constant-time to prevent timing side-channel)
+    let is_trustee = config.trustees.iter().fold(0u8, |acc, trustee| {
+        acc | trustee.as_bytes().ct_eq(input.initiator_did.as_bytes()).unwrap_u8()
+    });
+    if is_trustee == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Only trustees can initiate recovery".into()
         )));

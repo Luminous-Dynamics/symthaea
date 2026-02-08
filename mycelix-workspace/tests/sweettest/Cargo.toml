@@ -40,3 +40,7 @@ path = "tests/cross_happ_bridge.rs"
 [[test]]
 name = "privacy_zk_attestation"
 path = "tests/privacy_zk_attestation.rs"
+
+[[test]]
+name = "fl_bridge_e2e"
+path = "tests/fl_bridge_e2e.rs"

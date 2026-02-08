@@ -14,6 +14,9 @@ serde.workspace = true
 serde_json.workspace = true
 holochain_serialized_bytes.workspace = true
 
+subtle = { workspace = true }
+sha2 = { workspace = true }
+
 # Link to integrity zome
 mfa_integrity = { path = "../integrity" }
 

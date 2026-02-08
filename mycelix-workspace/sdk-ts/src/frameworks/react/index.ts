@@ -191,6 +191,37 @@ export {
 } from './hooks.js';
 
 // =============================================================================
+// MFA UI Components
+// =============================================================================
+
+export {
+  // Enrollment
+  MfaEnrollmentWizard,
+  type MfaEnrollmentWizardProps,
+
+  // Verification
+  FactorVerificationModal,
+  type FactorVerificationModalProps,
+
+  // Status Display
+  AssuranceLevelBadge,
+  AssuranceLevelIndicator,
+  type AssuranceLevelBadgeProps,
+  type AssuranceLevelIndicatorProps,
+  type BadgeSize,
+
+  FlEligibilityBanner,
+  FlEligibilityIndicator,
+  type FlEligibilityBannerProps,
+  type FlEligibilityIndicatorProps,
+  type BannerVariant,
+
+  // Factor Management
+  FactorList,
+  type FactorListProps,
+} from './components/index.js';
+
+// =============================================================================
 // Re-exports from Core
 // =============================================================================
 

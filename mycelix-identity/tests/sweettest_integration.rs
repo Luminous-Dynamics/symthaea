@@ -788,7 +788,8 @@ mod mfa_tests {
             .await;
 
         let did = format!("did:mycelix:{}", agent);
-        let primary_key_hash = format!("sha256:{}", hex::encode(&agent.get_raw_39()[..32]));
+        // Use agent string representation as a simple hash for testing
+        let primary_key_hash = format!("sha256:{}", agent);
 
         // Create MFA state
         let input = CreateMfaStateInput {
@@ -1138,4 +1139,150 @@ mod mfa_tests {
             "Should have 4+ categories"
         );
     }
+}
+
+// ============================================================================
+// Security edge case tests (SEC-005, SEC-017, FIND-001, FIND-003)
+// ============================================================================
+
+/// Mirror of UpdateDidInput for security tests
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct UpdateDidInput {
+    pub verification_method: Option<Vec<VerificationMethod>>,
+    pub authentication: Option<Vec<String>>,
+    pub service: Option<Vec<ServiceEndpoint>>,
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+async fn test_reject_malformed_multibase_key_no_prefix() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let dna_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("dna/mycelix_identity_dna.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path).await.unwrap();
+    let app = conductor.setup_app("test", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Create DID first
+    let _record: Record = conductor
+        .call(&cell.zome("did_registry"), "create_did", ())
+        .await;
+
+    // Try to add a verification method with no 'z' prefix (invalid multibase)
+    let update = UpdateDidInput {
+        verification_method: Some(vec![VerificationMethod {
+            id: "did:mycelix:test#key-2".to_string(),
+            type_: "Ed25519VerificationKey2020".to_string(),
+            controller: "did:mycelix:test".to_string(),
+            public_key_multibase: "ABCDEF1234567890ABCDEF1234567890ABCDEF12".to_string(),
+        }]),
+        authentication: None,
+        service: None,
+    };
+
+    let result: Result<Record, _> = conductor
+        .call_fallible(&cell.zome("did_registry"), "update_did_document", update)
+        .await;
+
+    assert!(result.is_err(), "Should reject multibase key without 'z' prefix");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+async fn test_reject_multibase_key_with_invalid_base58_chars() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let dna_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("dna/mycelix_identity_dna.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path).await.unwrap();
+    let app = conductor.setup_app("test", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    let _record: Record = conductor
+        .call(&cell.zome("did_registry"), "create_did", ())
+        .await;
+
+    // 'z' prefix but contains '0' and 'O' which are not in base58btc Bitcoin alphabet
+    let update = UpdateDidInput {
+        verification_method: Some(vec![VerificationMethod {
+            id: "did:mycelix:test#key-2".to_string(),
+            type_: "Ed25519VerificationKey2020".to_string(),
+            controller: "did:mycelix:test".to_string(),
+            public_key_multibase: "z0OIlInvalidBase58Characters!!".to_string(),
+        }]),
+        authentication: None,
+        service: None,
+    };
+
+    let result: Result<Record, _> = conductor
+        .call_fallible(&cell.zome("did_registry"), "update_did_document", update)
+        .await;
+
+    assert!(result.is_err(), "Should reject multibase key with invalid base58btc characters");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+async fn test_reject_multibase_key_too_short() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let dna_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("dna/mycelix_identity_dna.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path).await.unwrap();
+    let app = conductor.setup_app("test", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    let _record: Record = conductor
+        .call(&cell.zome("did_registry"), "create_did", ())
+        .await;
+
+    // Valid prefix and chars, but way too short for an Ed25519 key
+    let update = UpdateDidInput {
+        verification_method: Some(vec![VerificationMethod {
+            id: "did:mycelix:test#key-2".to_string(),
+            type_: "Ed25519VerificationKey2020".to_string(),
+            controller: "did:mycelix:test".to_string(),
+            public_key_multibase: "zABC".to_string(),
+        }]),
+        authentication: None,
+        service: None,
+    };
+
+    let result: Result<Record, _> = conductor
+        .call_fallible(&cell.zome("did_registry"), "update_did_document", update)
+        .await;
+
+    assert!(result.is_err(), "Should reject multibase key that is too short for Ed25519");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+async fn test_accept_valid_non_ed25519_key_type() {
+    let conductor = SweetConductor::from_standard_config().await;
+    let dna_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("dna/mycelix_identity_dna.dna");
+    let dna = SweetDnaFile::from_bundle(&dna_path).await.unwrap();
+    let app = conductor.setup_app("test", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    let _record: Record = conductor
+        .call(&cell.zome("did_registry"), "create_did", ())
+        .await;
+
+    // Non-Ed25519 key types should not be validated by multibase Ed25519 rules
+    let update = UpdateDidInput {
+        verification_method: Some(vec![VerificationMethod {
+            id: "did:mycelix:test#key-2".to_string(),
+            type_: "X25519KeyAgreementKey2020".to_string(),
+            controller: "did:mycelix:test".to_string(),
+            public_key_multibase: "zSomeOpaqueKeyMaterial12345678901234567890".to_string(),
+        }]),
+        authentication: None,
+        service: None,
+    };
+
+    // Should succeed - X25519 keys are not validated by Ed25519 multibase rules
+    let result: Result<Record, _> = conductor
+        .call_fallible(&cell.zome("did_registry"), "update_did_document", update)
+        .await;
+
+    assert!(result.is_ok(), "Non-Ed25519 key types should bypass multibase Ed25519 validation");
 }

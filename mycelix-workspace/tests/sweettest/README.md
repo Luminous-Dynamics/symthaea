@@ -129,6 +129,20 @@ Sweettest MUST run with `--release` due to Holochain's hardcoded 5-minute nonce 
 | `test_report_to_bridge` | 2 | Report transaction outcome to MATL Bridge |
 | `test_multi_agent_listing_visibility` | 2 | Listing visible via DHT propagation |
 
+### FL Bridge E2E (6 tests) - NEW
+**File:** `tests/fl_bridge_e2e.rs`
+
+| Test | Agents | Description |
+|------|--------|-------------|
+| `test_honest_gradient_accepted` | 1 | Honest gradient (quality=0.95, consistency=0.88) accepted |
+| `test_byzantine_gradient_rejected` | 1 | Byzantine gradient (quality=0.1, consistency=0.05) flagged |
+| `test_gradient_stored_on_dht` | 1 | Stored gradient retrievable by action hash |
+| `test_pogq_composite_score_formula` | - | MATL formula produces correct composite scores |
+| `test_pogq_round_trip_values` | - | PoGQ values from bridge are in zome's expected range |
+| `test_pogq_boundary_values` | - | Edge cases: perfect, worst, threshold boundary |
+
+**Note:** First 3 tests require conductor + FL DNA bundle; last 3 are SDK-level (no conductor).
+
 ### Climate Workflow (11 tests) - NEW
 **File:** `tests/climate_workflow.rs`
 
@@ -161,7 +175,8 @@ tests/sweettest/
     ├── supplychain_workflow.rs  # Supply chain hApp tests (11)
     ├── health_workflow.rs       # Health hApp tests (10)
     ├── marketplace_workflow.rs  # Marketplace hApp tests (10)
-    └── climate_workflow.rs      # Climate hApp tests (11)
+    ├── climate_workflow.rs      # Climate hApp tests (11)
+    └── fl_bridge_e2e.rs         # FL Bridge E2E tests (6)
 ```
 
 ### Test Harness
@@ -184,6 +199,7 @@ Tests expect pre-built DNA bundles at:
 - `mycelix-health/dna/health.dna`
 - `mycelix-marketplace/backend/mycelix_marketplace.dna`
 - `mycelix-climate/dnas/climate/workdir/climate.dna`
+- `Mycelix-Core/zomes/federated_learning/workdir/dna/federated_learning.dna`
 
 Build them with:
 ```bash
@@ -194,6 +210,7 @@ cd mycelix-supplychain/holochain && cargo build --release --target wasm32-unknow
 cd mycelix-health && cargo build --release --target wasm32-unknown-unknown && hc dna pack dna/
 cd mycelix-marketplace/backend && cargo build --release --target wasm32-unknown-unknown && hc dna pack .
 cd mycelix-climate && cargo build --release --target wasm32-unknown-unknown && hc dna pack dnas/climate/workdir/
+cd Mycelix-Core/zomes/federated_learning && cargo build --release --target wasm32-unknown-unknown && cd workdir && hc dna pack dna/
 ```
 
 ## Version Compatibility

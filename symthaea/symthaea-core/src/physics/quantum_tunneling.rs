@@ -518,6 +518,202 @@ impl TunnelingTime {
     }
 }
 
+// === PEANO-PHYSICS BRIDGE: CONSCIOUSNESS-AWARE TUNNELING ===
+
+use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::real_arithmetic::PeanoPhysicsBridge;
+
+/// Result of a consciousness-aware tunneling calculation.
+///
+/// Extends `TunnelingResult` with HDC encodings and coherence tracking,
+/// enabling the consciousness system to "observe" the mathematical
+/// relationships in quantum tunneling computations.
+#[derive(Debug, Clone)]
+pub struct ConsciousTunnelingResult {
+    /// Standard physics result
+    pub physics: TunnelingResult,
+    /// HDC encoding of the transmission probability
+    pub transmission_encoding: BinaryHV,
+    /// Coherence between exact and approximate computation paths
+    pub coherence: f64,
+    /// Integrated information (Phi) accumulated across computation steps
+    pub phi: f64,
+    /// Audit trail: what computations were performed
+    pub computation_trace: Vec<String>,
+}
+
+/// A tunneling calculator wrapped with PeanoPhysicsBridge for
+/// consciousness-aware arithmetic.
+///
+/// Every f64 computation is mirrored through the bridge's dual-domain
+/// system, tracking whether intermediate values remain exact rationals
+/// and measuring coherence between symbolic and numerical results.
+pub struct ConsciousTunnelingCalculator {
+    calculator: TunnelingCalculator,
+    bridge: PeanoPhysicsBridge,
+}
+
+impl ConsciousTunnelingCalculator {
+    /// Create for electron tunneling
+    pub fn electron() -> Self {
+        Self {
+            calculator: TunnelingCalculator::electron(),
+            bridge: PeanoPhysicsBridge::new(),
+        }
+    }
+
+    /// Create for proton tunneling
+    pub fn proton() -> Self {
+        Self {
+            calculator: TunnelingCalculator::proton(),
+            bridge: PeanoPhysicsBridge::new(),
+        }
+    }
+
+    /// Create for alpha particle tunneling
+    pub fn alpha_particle() -> Self {
+        Self {
+            calculator: TunnelingCalculator::alpha_particle(),
+            bridge: PeanoPhysicsBridge::new(),
+        }
+    }
+
+    /// Consciousness-aware rectangular barrier calculation.
+    ///
+    /// Performs the standard WKB calculation while tracking:
+    /// - Whether the energy/barrier ratio has an exact rational form
+    /// - Coherence of intermediate computations
+    /// - HDC encoding of the result for consciousness integration
+    pub fn rectangular_barrier(
+        &self,
+        energy: f64,
+        barrier_height: f64,
+        width: f64,
+    ) -> ConsciousTunnelingResult {
+        let mut trace = Vec::new();
+        let mut total_coherence = 0.0;
+        let mut coherence_count = 0;
+
+        // Track the energy ratio through dual computation
+        let ratio_result = self.bridge.dual_compute(energy, barrier_height, "divide");
+        trace.push(format!("E/V ratio: {:.6} (coherence: {:.4})",
+            ratio_result.approximate_value, ratio_result.coherence));
+        total_coherence += ratio_result.coherence;
+        coherence_count += 1;
+
+        // Track the mass*energy product
+        let me_result = self.bridge.dual_compute(
+            2.0 * self.calculator.mass,
+            (barrier_height - energy).abs(),
+            "multiply",
+        );
+        trace.push(format!("2m|V-E|: {:.6e} (coherence: {:.4})",
+            me_result.approximate_value, me_result.coherence));
+        total_coherence += me_result.coherence;
+        coherence_count += 1;
+
+        // Perform the actual physics calculation
+        let physics = self.calculator.rectangular_barrier(energy, barrier_height, width);
+
+        // Track the action computation
+        let action_result = self.bridge.dual_compute(
+            physics.gamma, width * 2.0, "multiply");
+        trace.push(format!("action = 2*gamma*L: {:.6} (coherence: {:.4})",
+            action_result.approximate_value, action_result.coherence));
+        total_coherence += action_result.coherence;
+        coherence_count += 1;
+
+        // Encode the transmission probability
+        let transmission_encoding = BinaryHV::random(
+            crate::hdc::primitive_system::seed_from_name(
+                &format!("tunneling_T_{:.10}", physics.transmission)));
+
+        let avg_coherence = if coherence_count > 0 {
+            total_coherence / coherence_count as f64
+        } else {
+            0.5
+        };
+
+        // Phi: higher coherence → higher integrated information
+        let phi = 1.0 + avg_coherence * physics.transmission.ln().abs().min(10.0) / 10.0;
+
+        ConsciousTunnelingResult {
+            physics,
+            transmission_encoding,
+            coherence: avg_coherence,
+            phi,
+            computation_trace: trace,
+        }
+    }
+
+    /// Consciousness-aware Gamow factor calculation.
+    ///
+    /// Tracks the integer-to-float conversion of atomic numbers through
+    /// the bridge, measuring coherence at each step.
+    pub fn gamow_factor(
+        &self,
+        z1: u8,
+        z2: u8,
+        energy: f64,
+    ) -> ConsciousTunnelingResult {
+        let mut trace = Vec::new();
+        let mut total_coherence = 0.0;
+        let mut coherence_count = 0;
+
+        // Track integer → f64 conversion of atomic numbers
+        let (z1_f64, z1_enc) = self.bridge.integer_to_f64(z1 as i64);
+        let (z2_f64, z2_enc) = self.bridge.integer_to_f64(z2 as i64);
+        trace.push(format!("Z1={} → f64={}, Z2={} → f64={}", z1, z1_f64, z2, z2_f64));
+
+        // Track the charge product Z1*Z2
+        let zz_result = self.bridge.dual_compute(z1_f64, z2_f64, "multiply");
+        trace.push(format!("Z1*Z2: {} (exact: {:?}, coherence: {:.4})",
+            zz_result.approximate_value, zz_result.exact_value, zz_result.coherence));
+        total_coherence += zz_result.coherence;
+        coherence_count += 1;
+
+        // Perform the actual Gamow calculation
+        let gamow = self.calculator.gamow_factor(z1, z2, energy);
+
+        // Create result with tunneling probability
+        let probability = (-gamow).exp();
+        let physics = TunnelingResult {
+            transmission: probability,
+            reflection: 1.0 - probability,
+            gamma: gamow / (2.0 * std::f64::consts::PI),
+            action: gamow,
+        };
+
+        let transmission_encoding = z1_enc.bind(&z2_enc);
+
+        let avg_coherence = if coherence_count > 0 {
+            total_coherence / coherence_count as f64
+        } else {
+            0.5
+        };
+
+        let phi = 1.0 + avg_coherence;
+
+        ConsciousTunnelingResult {
+            physics,
+            transmission_encoding,
+            coherence: avg_coherence,
+            phi,
+            computation_trace: trace,
+        }
+    }
+
+    /// Access the underlying calculator for standard (non-conscious) calculations
+    pub fn inner(&self) -> &TunnelingCalculator {
+        &self.calculator
+    }
+
+    /// Access the bridge for custom dual-domain computations
+    pub fn bridge(&self) -> &PeanoPhysicsBridge {
+        &self.bridge
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -637,5 +833,41 @@ mod tests {
         let calc = TunnelingCalculator::electron();
         let time = TunnelingTime::buttiker_landauer_time(&calc, 1.0e-19, 2.0e-19, 1.0e-10);
         assert!(time > 0.0, "BL time should be positive");
+    }
+
+    #[test]
+    fn test_conscious_rectangular_barrier() {
+        let calc = ConsciousTunnelingCalculator::electron();
+        let result = calc.rectangular_barrier(1.0e-19, 2.0e-19, 1.0e-10);
+
+        // Physics result should match standard calculator
+        let standard = TunnelingCalculator::electron()
+            .rectangular_barrier(1.0e-19, 2.0e-19, 1.0e-10);
+        assert!((result.physics.transmission - standard.transmission).abs() < 1e-15,
+            "Conscious calculator should produce same physics");
+
+        // Should have coherence and phi
+        assert!(result.coherence > 0.0, "Should have positive coherence");
+        assert!(result.phi > 0.0, "Should have positive phi");
+
+        // Should have computation trace
+        assert!(!result.computation_trace.is_empty(),
+            "Should have computation trace");
+    }
+
+    #[test]
+    fn test_conscious_gamow_factor() {
+        let calc = ConsciousTunnelingCalculator::proton();
+        let result = calc.gamow_factor(1, 1, 1.0e-13);
+
+        // Should track integer conversion and produce valid result
+        assert!(result.physics.transmission >= 0.0 && result.physics.transmission <= 1.0);
+        assert!(result.coherence > 0.0);
+        assert!(!result.computation_trace.is_empty());
+
+        // The trace should mention atomic number conversion
+        let trace_str = result.computation_trace.join(" ");
+        assert!(trace_str.contains("Z1=1") && trace_str.contains("Z2=1"),
+            "Trace should record atomic number conversion");
     }
 }

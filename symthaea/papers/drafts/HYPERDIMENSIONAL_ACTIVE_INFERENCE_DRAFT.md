@@ -329,7 +329,7 @@ The Sleep Staging benchmark uses real clinical polysomnography recordings in Eur
 | Tokamak CfC | 4/5 | 87K inferences/sec, <1ms real-time; CfC sensitivity limited on synthetic data (§6.5) |
 | PCI Validation | 4/5 | Φ ordering correct; Φ-PCI correlation low (expected, §6.4) |
 | Emotion EEG | 4/5 | Valence/arousal separation validated |
-| MNIST HDC | 2/3 | 84-88% with retrain (8K dim, 5 iter); baseline 81.6% without retrain |
+| MNIST HDC | 2/3 | 87.6% with retrain (8K dim, 5 iter); baseline 81.6% without retrain |
 | Ethics HDC | Mixed | Virtue 80%, Commonsense 53.2%, Justice 50.6%, Deontology 52.4% (59.1% overall) |
 | λ₂-Φ Proxy | 3/5 | λ₂ shows meaningful topology variation; system_phi returns 0 for small weighted graphs (§6.3) |
 

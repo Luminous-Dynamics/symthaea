@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     ".",
     "symthaea-core",
+    "crates/symthaea-nix",
     "crates/symthaea-stt",
     "crates/symthaea-sentinel",
 ]
@@ -37,6 +38,9 @@ symthaea-stt = { path = "crates/symthaea-stt", optional = true }
 
 # Symthaea Sentinel - Zero-shot temporal audio pattern recognition
 symthaea-sentinel = { path = "crates/symthaea-sentinel", optional = true }
+
+# Symthaea Nix - Conscious NixOS mind (HDC + active inference)
+symthaea-nix = { path = "crates/symthaea-nix", optional = true }
 
 # HDC / Vector Symbolic Architectures
 # hypervector = "0.1"  # Using custom HDC implementation instead
@@ -208,6 +212,7 @@ voice-tts-cuda = ["voice-tts", "ort/cuda"]  # TTS with CUDA acceleration (requir
 voice-tts-async = ["voice-tts", "futures"]  # Async/streaming TTS
 voice-stt = ["symthaea-stt", "hound"]  # STT with symthaea-stt crate (HDC + LTC + CfC)
 audio-sentinel = ["symthaea-sentinel"]  # Zero-shot temporal audio pattern recognition (HDC + LTC + CfC)
+nix-mind = ["symthaea-nix"]  # Conscious NixOS mind with HDC world model + active inference
 audio = ["voice-tts", "rodio"]  # Full audio including playback
 audio-cuda = ["voice-tts-cuda", "rodio"]  # Full audio with GPU acceleration
 pyphi = ["pyo3"]  # Enhancement #8 Week 4: Enable PyPhi integration for exact IIT Φ validation
