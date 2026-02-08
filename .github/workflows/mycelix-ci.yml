@@ -375,13 +375,39 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Install Holochain binaries
+        id: holochain-setup
         run: |
-          nix-shell --run "holochain --version && hc --version && lair-keystore --version" || {
-            echo "Installing Holochain via cargo..."
-            cargo install holochain --version 0.4.0 || true
-            cargo install hc --version 0.4.0 || true
-            cargo install lair_keystore --version 0.5.0 || true
-          }
+          # Try nix-shell first (preferred for reproducibility)
+          if nix-shell --run "holochain --version && hc --version && lair-keystore --version" 2>/dev/null; then
+            echo "holochain_available=true" >> $GITHUB_OUTPUT
+            echo "✅ Holochain tools available via nix-shell"
+          else
+            echo "⚠️ nix-shell failed, attempting cargo install..."
+
+            # Install with explicit error handling
+            cargo install holochain --version 0.4.0 2>&1 || {
+              echo "::error::Failed to install holochain"
+              exit 1
+            }
+            cargo install hc --version 0.4.0 2>&1 || {
+              echo "::error::Failed to install hc CLI"
+              exit 1
+            }
+            cargo install lair_keystore --version 0.5.0 2>&1 || {
+              echo "::error::Failed to install lair-keystore"
+              exit 1
+            }
+            echo "holochain_available=true" >> $GITHUB_OUTPUT
+            echo "✅ Holochain tools installed via cargo"
+          fi
+
+      - name: Verify Holochain installation
+        run: |
+          echo "Verifying Holochain binaries..."
+          holochain --version || { echo "::error::holochain binary not found"; exit 1; }
+          hc --version || { echo "::error::hc binary not found"; exit 1; }
+          lair-keystore --version || { echo "::error::lair-keystore binary not found"; exit 1; }
+          echo "✅ All Holochain binaries verified"
 
       - name: Build DNA bundles
         run: |
@@ -392,11 +418,25 @@ jobs:
             -p fl_integrity \
             -p fl_coordinator
 
-          # Package DNAs if hc is available
-          if command -v hc &> /dev/null; then
-            hc dna pack Mycelix-Core/zomes/bridge/workdir -o Mycelix-Core/zomes/bridge/workdir/bridge.dna
-            hc dna pack Mycelix-Core/zomes/federated_learning/workdir -o Mycelix-Core/zomes/federated_learning/workdir/fl.dna
+          # Package DNAs - fail if hc not available (required for integration tests)
+          if ! command -v hc &> /dev/null; then
+            echo "::error::hc CLI not found - cannot pack DNAs"
+            exit 1
           fi
+
+          echo "Packing bridge DNA..."
+          hc dna pack zomes/bridge/workdir -o zomes/bridge/workdir/bridge.dna || {
+            echo "::error::Failed to pack bridge DNA"
+            exit 1
+          }
+
+          echo "Packing FL DNA..."
+          hc dna pack zomes/federated_learning/workdir -o zomes/federated_learning/workdir/fl.dna || {
+            echo "::error::Failed to pack FL DNA"
+            exit 1
+          }
+
+          echo "✅ DNA bundles packed successfully"
         working-directory: Mycelix-Core
 
       - name: Start Holochain conductor
@@ -425,46 +465,87 @@ jobs:
                 signal_url: wss://signal.holo.host
           EOF
 
-          # Start conductor in background
-          if command -v holochain &> /dev/null; then
-            echo "$LAIR_PASSPHRASE" | holochain -c /tmp/holochain-test/conductor-config.yaml &
-            CONDUCTOR_PID=$!
-            echo "conductor_pid=$CONDUCTOR_PID" >> $GITHUB_OUTPUT
-            sleep 10
-            echo "Conductor started with PID: $CONDUCTOR_PID"
-          else
-            echo "Holochain not available, skipping conductor start"
+          # Start conductor in background - fail if holochain not available
+          if ! command -v holochain &> /dev/null; then
+            echo "::error::holochain binary not found - cannot start conductor"
+            exit 1
           fi
+
+          echo "Starting Holochain conductor..."
+          echo "$LAIR_PASSPHRASE" | holochain -c /tmp/holochain-test/conductor-config.yaml &
+          CONDUCTOR_PID=$!
+          echo "conductor_pid=$CONDUCTOR_PID" >> $GITHUB_OUTPUT
+
+          # Wait for conductor to be ready
+          echo "Waiting for conductor to start (PID: $CONDUCTOR_PID)..."
+          for i in {1..30}; do
+            if curl -s http://localhost:4444 >/dev/null 2>&1 || nc -z localhost 4444 2>/dev/null; then
+              echo "✅ Conductor ready on port 4444"
+              break
+            fi
+            if ! kill -0 $CONDUCTOR_PID 2>/dev/null; then
+              echo "::error::Conductor process died unexpectedly"
+              exit 1
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 1
+          done
+
+          # Final verification
+          if ! kill -0 $CONDUCTOR_PID 2>/dev/null; then
+            echo "::error::Conductor failed to start"
+            exit 1
+          fi
+          echo "✅ Conductor started successfully with PID: $CONDUCTOR_PID"
 
       - name: Run zome integration tests
         run: |
           # Test bridge zome calls
           echo "Testing bridge zome integration..."
-          cargo test --test integration -- --test-threads=1 2>&1 || echo "Bridge integration tests skipped"
+          if cargo test --test integration -- --test-threads=1 2>&1; then
+            echo "✅ Bridge integration tests passed"
+          else
+            echo "::warning::Bridge integration tests failed or not found"
+          fi
 
           # Test federated learning zome calls
           echo "Testing FL zome integration..."
-          cargo test --test integration -- --test-threads=1 2>&1 || echo "FL integration tests skipped"
+          if cargo test --test integration -- --test-threads=1 2>&1; then
+            echo "✅ FL integration tests passed"
+          else
+            echo "::warning::FL integration tests failed or not found"
+          fi
         working-directory: Mycelix-Core
         env:
           HOLOCHAIN_ADMIN_URL: ws://localhost:4444
+        continue-on-error: true  # Don't fail CI for missing tests, but do warn
 
       - name: Run cross-zome communication tests
         run: |
           echo "Testing cross-zome communication..."
-          # Test bridge -> FL communication
-          cargo test cross_zome -- --test-threads=1 2>&1 || echo "Cross-zome tests not found"
+          if cargo test cross_zome -- --test-threads=1 2>&1; then
+            echo "✅ Cross-zome tests passed"
+          else
+            echo "::warning::Cross-zome tests not found or failed"
+          fi
         working-directory: Mycelix-Core
         env:
           HOLOCHAIN_ADMIN_URL: ws://localhost:4444
+        continue-on-error: true
 
       - name: Run TypeScript integration tests
         run: |
           npm ci
-          npm run test:integration || echo "Integration tests not configured"
+          if npm run test:integration 2>&1; then
+            echo "✅ TypeScript integration tests passed"
+          else
+            echo "::warning::TypeScript integration tests failed or not configured"
+          fi
         working-directory: mycelix-workspace/sdk-ts
         env:
           HOLOCHAIN_ADMIN_URL: ws://localhost:4444
+          CONDUCTOR_AVAILABLE: "true"
+        continue-on-error: true
 
       - name: Cleanup conductor
         if: always()
