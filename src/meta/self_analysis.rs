@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 
 use symthaea_core::hdc::ContinuousHV;
 
+use crate::consciousness::code_primitives::{CodePrimitiveExecutor, CodeOperation, CodeExecutionResult};
 use crate::hdc::code_encoder::CodeHDEncoder;
 use crate::hdc::code_algebra::CodeAlgebra;
 use crate::hdc::code_memory::{CodebaseMemory, CodeMatch};
@@ -37,10 +38,27 @@ pub struct SelfModel {
     pub coherence: f32,
 }
 
+/// Insight from primitive-based module analysis
+#[derive(Debug)]
+pub struct ModuleInsight {
+    /// Module path
+    pub path: PathBuf,
+    /// Complexity score from EXPLAIN primitive phi
+    pub complexity: f32,
+    /// Integration score from consciousness map
+    pub integration: f32,
+    /// Primitives used for analysis
+    pub analysis_primitives: Vec<String>,
+    /// Potential issues from DEBUG primitive
+    pub potential_issues: Vec<String>,
+}
+
 /// Self-analysis engine
 pub struct SelfAnalyzer {
     memory: CodebaseMemory,
     _algebra: CodeAlgebra,
+    /// Primitive executor for consciousness-aware code analysis
+    primitive_executor: CodePrimitiveExecutor,
 }
 
 impl SelfAnalyzer {
@@ -48,15 +66,22 @@ impl SelfAnalyzer {
     pub fn new(dim: usize) -> Self {
         let encoder = CodeHDEncoder::new(dim);
         let algebra = CodeAlgebra::new(CodeHDEncoder::new(dim));
+        let primitive_executor = CodePrimitiveExecutor::new(dim);
         Self {
             memory: CodebaseMemory::new(encoder),
             _algebra: algebra,
+            primitive_executor,
         }
     }
 
     /// Create with default 512-D for testing (use 16384 for production)
     pub fn default_dim() -> Self {
         Self::new(512)
+    }
+
+    /// Get the primitive executor
+    pub fn primitive_executor(&self) -> &CodePrimitiveExecutor {
+        &self.primitive_executor
     }
 
     /// Get the codebase memory
@@ -166,6 +191,83 @@ impl SelfAnalyzer {
     /// Which files would reduce our uncertainty most if explored?
     pub fn suggest_exploration(&self, top_k: usize) -> Vec<(PathBuf, f32)> {
         self.memory.most_surprising_files(top_k)
+    }
+
+    // ========================================================================
+    // Primitive-Based Introspection
+    // ========================================================================
+
+    /// Analyze a module using Code tier primitives
+    ///
+    /// Uses EXPLAIN primitive to understand structure, DEBUG to find issues.
+    pub fn introspect_module(&self, path: &Path) -> ModuleInsight {
+        // Execute EXPLAIN primitive for understanding
+        let explain_result = self.primitive_executor.execute(CodeOperation::Explain);
+
+        // Execute DEBUG primitive for issue detection
+        let debug_result = self.primitive_executor.execute(CodeOperation::Debug);
+
+        // Get integration score from consciousness map
+        let integration = self.consciousness_map()
+            .get(path)
+            .copied()
+            .unwrap_or(0.0);
+
+        ModuleInsight {
+            path: path.to_path_buf(),
+            complexity: explain_result.phi,
+            integration,
+            analysis_primitives: explain_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
+            potential_issues: debug_result.primitives.iter()
+                .filter(|p| p.primitive.name.contains("DEBUG") || p.primitive.name.contains("VERIFY"))
+                .map(|p| format!("Primitive {} suggests verification needed", p.primitive.name))
+                .collect(),
+        }
+    }
+
+    /// Analyze all indexed modules and return insights sorted by integration (lowest first)
+    ///
+    /// This helps identify modules that may need refactoring for better cohesion.
+    pub fn find_least_integrated(&self) -> Vec<ModuleInsight> {
+        let mut insights: Vec<ModuleInsight> = self.memory.module_paths()
+            .iter()
+            .map(|p| self.introspect_module(p))
+            .collect();
+
+        insights.sort_by(|a, b| a.integration.partial_cmp(&b.integration).unwrap_or(std::cmp::Ordering::Equal));
+        insights
+    }
+
+    /// Get Phi scores for code operations
+    ///
+    /// Returns a map of operation -> phi score, useful for understanding
+    /// which operations have the most integrated primitive compositions.
+    pub fn operation_phi_scores(&self) -> HashMap<String, f32> {
+        let ops = [
+            ("Parse", CodeOperation::Parse),
+            ("Encode", CodeOperation::Encode),
+            ("Generate", CodeOperation::Generate),
+            ("Modify", CodeOperation::Modify),
+            ("Explain", CodeOperation::Explain),
+            ("FindSimilar", CodeOperation::FindSimilar),
+            ("Refactor", CodeOperation::Refactor),
+            ("Debug", CodeOperation::Debug),
+            ("Verify", CodeOperation::Verify),
+        ];
+
+        ops.iter()
+            .map(|(name, op)| {
+                let result = self.primitive_executor.execute(*op);
+                (name.to_string(), result.phi)
+            })
+            .collect()
+    }
+
+    /// "What am I doing when I process code?"
+    ///
+    /// Traces the primitive pipeline for a given operation.
+    pub fn trace_operation(&self, op: CodeOperation) -> CodeExecutionResult {
+        self.primitive_executor.execute(op)
     }
 }
 

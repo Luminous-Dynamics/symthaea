@@ -49,7 +49,7 @@
 //! 4. **Prospective Self**: Future-oriented self-projection for planning
 //! 5. **Self-Φ**: Integrated information specific to self-representation
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::Instant;
@@ -62,10 +62,10 @@ use std::time::Instant;
 #[derive(Debug, Clone)]
 pub struct ProtoSelf {
     /// Current "bodily" state encoding (system health, resource levels)
-    pub body_state: HV16,
+    pub body_state: BinaryHV,
 
     /// Immediate sensory state (current inputs being processed)
-    pub sensory_now: HV16,
+    pub sensory_now: BinaryHV,
 
     /// Primordial Φ - basic integrated information of immediate experience
     pub primordial_phi: f64,
@@ -83,8 +83,8 @@ pub struct ProtoSelf {
 impl ProtoSelf {
     pub fn new() -> Self {
         Self {
-            body_state: HV16::random(42),
-            sensory_now: HV16::zero(),
+            body_state: BinaryHV::random(42),
+            sensory_now: BinaryHV::zero(),
             primordial_phi: 0.0,
             valence: 0.0,
             arousal: 0.5,
@@ -93,9 +93,9 @@ impl ProtoSelf {
     }
 
     /// Update proto-self with new sensory input
-    pub fn update(&mut self, input: &HV16, success: bool, effort: f64) {
+    pub fn update(&mut self, input: &BinaryHV, success: bool, effort: f64) {
         // Blend new sensory input with existing
-        self.sensory_now = HV16::bundle(&[self.sensory_now.clone(), input.clone()]);
+        self.sensory_now = BinaryHV::bundle(&[self.sensory_now.clone(), input.clone()]);
 
         // Update valence based on success/failure
         self.valence = 0.9 * self.valence + 0.1 * if success { 0.5 } else { -0.3 };
@@ -135,7 +135,7 @@ pub struct ActiveGoal {
 
     /// Goal encoding
     #[serde(skip)]
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Priority (0-1)
     pub priority: f64,
@@ -154,13 +154,13 @@ pub struct CoreSelf {
     pub goals: Vec<ActiveGoal>,
 
     /// Active context encoding (what am I doing now?)
-    pub context: HV16,
+    pub context: BinaryHV,
 
     /// Working memory contents (recent conscious contents)
-    pub working_memory: VecDeque<HV16>,
+    pub working_memory: VecDeque<BinaryHV>,
 
     /// Attention focus (what am I attending to?)
-    pub attention_focus: Option<HV16>,
+    pub attention_focus: Option<BinaryHV>,
 
     /// Sense of agency (am I in control?)
     pub agency: f64,
@@ -173,7 +173,7 @@ impl CoreSelf {
     pub fn new() -> Self {
         Self {
             goals: Vec::new(),
-            context: HV16::zero(),
+            context: BinaryHV::zero(),
             working_memory: VecDeque::with_capacity(7), // Miller's 7±2
             attention_focus: None,
             agency: 1.0,
@@ -183,7 +183,7 @@ impl CoreSelf {
 
     /// Add a goal to pursue
     pub fn add_goal(&mut self, description: &str, priority: f64) {
-        let encoding = HV16::random(description.len() as u64);
+        let encoding = BinaryHV::random(description.len() as u64);
         self.goals.push(ActiveGoal {
             description: description.to_string(),
             encoding,
@@ -196,9 +196,9 @@ impl CoreSelf {
     }
 
     /// Update context with new information
-    pub fn update_context(&mut self, new_info: &HV16) {
+    pub fn update_context(&mut self, new_info: &BinaryHV) {
         // Blend new context with existing (recent bias)
-        self.context = HV16::bundle(&[self.context.clone(), new_info.clone(), new_info.clone()]);
+        self.context = BinaryHV::bundle(&[self.context.clone(), new_info.clone(), new_info.clone()]);
 
         // Add to working memory
         if self.working_memory.len() >= 7 {
@@ -208,7 +208,7 @@ impl CoreSelf {
     }
 
     /// Set attention focus
-    pub fn focus_attention(&mut self, target: HV16) {
+    pub fn focus_attention(&mut self, target: BinaryHV) {
         self.attention_focus = Some(target);
     }
 
@@ -273,7 +273,7 @@ pub struct LifeEpisode {
 
     /// Episode encoding
     #[serde(skip)]
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Emotional valence (-1 to +1)
     pub valence: f64,
@@ -296,7 +296,7 @@ pub struct PersonalityTrait {
 
     /// Trait encoding
     #[serde(skip)]
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Strength (0-1)
     pub strength: f64,
@@ -313,7 +313,7 @@ pub struct CoreValue {
 
     /// Value encoding
     #[serde(skip)]
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 
     /// Importance (0-1)
     pub importance: f64,
@@ -332,10 +332,10 @@ pub struct AutobiographicalSelf {
     pub values: Vec<CoreValue>,
 
     /// Self-concept encoding (who am I?)
-    pub self_concept: HV16,
+    pub self_concept: BinaryHV,
 
     /// Future self projection (who will I become?)
-    pub future_self: HV16,
+    pub future_self: BinaryHV,
 
     /// Identity stability (how consistent is identity over time)
     pub identity_stability: f64,
@@ -353,8 +353,8 @@ impl AutobiographicalSelf {
             life_story: Vec::new(),
             traits: Vec::new(),
             values: Vec::new(),
-            self_concept: HV16::random(0),
-            future_self: HV16::random(1),
+            self_concept: BinaryHV::random(0),
+            future_self: BinaryHV::random(1),
             identity_stability: 1.0,
             narrative_coherence: 1.0,
             runtime_secs: 0.0,
@@ -363,7 +363,7 @@ impl AutobiographicalSelf {
 
     /// Add a life episode
     pub fn add_episode(&mut self, description: &str, valence: f64, significance: f64) {
-        let encoding = HV16::random(self.life_story.len() as u64);
+        let encoding = BinaryHV::random(self.life_story.len() as u64);
 
         // Find causal links to recent episodes
         let causal_links: Vec<usize> = self.life_story.iter()
@@ -385,7 +385,7 @@ impl AutobiographicalSelf {
 
         // Update self-concept by integrating significant episodes
         if significance > 0.5 {
-            self.self_concept = HV16::bundle(&[
+            self.self_concept = BinaryHV::bundle(&[
                 self.self_concept.clone(),
                 self.life_story.last().unwrap().encoding.clone()
             ]);
@@ -399,7 +399,7 @@ impl AutobiographicalSelf {
     pub fn add_trait(&mut self, name: &str, strength: f64) {
         self.traits.push(PersonalityTrait {
             name: name.to_string(),
-            encoding: HV16::random(name.len() as u64),
+            encoding: BinaryHV::random(name.len() as u64),
             strength: strength.clamp(0.0, 1.0),
             consistency: 1.0,
         });
@@ -409,7 +409,7 @@ impl AutobiographicalSelf {
     pub fn add_value(&mut self, name: &str, importance: f64) {
         self.values.push(CoreValue {
             name: name.to_string(),
-            encoding: HV16::random(name.len() as u64 + 100),
+            encoding: BinaryHV::random(name.len() as u64 + 100),
             importance: importance.clamp(0.0, 1.0),
         });
     }
@@ -443,23 +443,23 @@ impl AutobiographicalSelf {
     /// Project future self based on current trajectory
     pub fn project_future(&mut self, time_horizon_secs: f64) {
         // Future self is blend of current self-concept and strongest values
-        let value_encodings: Vec<HV16> = self.values.iter()
+        let value_encodings: Vec<BinaryHV> = self.values.iter()
             .filter(|v| v.importance > 0.5)
             .map(|v| v.encoding.clone())
             .collect();
         let value_blend = if value_encodings.is_empty() {
-            HV16::zero()
+            BinaryHV::zero()
         } else {
-            HV16::bundle(&value_encodings)
+            BinaryHV::bundle(&value_encodings)
         };
 
-        self.future_self = HV16::bundle(&[self.self_concept.clone(), value_blend]);
+        self.future_self = BinaryHV::bundle(&[self.self_concept.clone(), value_blend]);
 
         // Adjust for time horizon (further future = more uncertainty)
         let uncertainty = (time_horizon_secs / 86400.0).min(1.0); // Max at 1 day
-        let noise = HV16::random((time_horizon_secs * 1000.0) as u64);
+        let noise = BinaryHV::random((time_horizon_secs * 1000.0) as u64);
         if uncertainty > 0.3 {
-            self.future_self = HV16::bundle(&[self.future_self.clone(), noise]);
+            self.future_self = BinaryHV::bundle(&[self.future_self.clone(), noise]);
         }
     }
 
@@ -604,7 +604,7 @@ pub struct NarrativeSelfModel {
     stats: NarrativeSelfStats,
 
     /// Unified self encoding (integration of all levels)
-    unified_self: HV16,
+    unified_self: BinaryHV,
 
     /// Self-Φ: Integrated information specific to self-model
     self_phi: f64,
@@ -621,7 +621,7 @@ impl NarrativeSelfModel {
             autobio: AutobiographicalSelf::new(),
             config,
             stats: NarrativeSelfStats::default(),
-            unified_self: HV16::random(999),
+            unified_self: BinaryHV::random(999),
             self_phi: 0.0,
             last_update: Instant::now(),
         };
@@ -645,7 +645,7 @@ impl NarrativeSelfModel {
     /// Process new experience and update self-model
     pub fn process_experience(
         &mut self,
-        input: &HV16,
+        input: &BinaryHV,
         description: &str,
         success: bool,
         effort: f64,
@@ -728,7 +728,7 @@ impl NarrativeSelfModel {
             components.push(autobio_contrib.clone());
         }
 
-        self.unified_self = HV16::bundle(&components);
+        self.unified_self = BinaryHV::bundle(&components);
     }
 
     /// Compute self-Φ: integrated information of the self-model
@@ -772,7 +772,7 @@ impl NarrativeSelfModel {
     }
 
     /// Get unified self encoding
-    pub fn unified_encoding(&self) -> &HV16 {
+    pub fn unified_encoding(&self) -> &BinaryHV {
         &self.unified_self
     }
 
@@ -782,12 +782,12 @@ impl NarrativeSelfModel {
     }
 
     /// Get unified self vector (alias for unified_encoding)
-    pub fn unified_self(&self) -> &HV16 {
+    pub fn unified_self(&self) -> &BinaryHV {
         &self.unified_self
     }
 
     /// Get current active goals with their vector representations
-    pub fn current_goals(&self) -> Vec<(String, &HV16)> {
+    pub fn current_goals(&self) -> Vec<(String, &BinaryHV)> {
         self.core.goals.iter()
             .filter(|g| g.progress < 1.0)  // Active = not yet completed
             .map(|g| (g.description.clone(), &g.encoding))
@@ -795,7 +795,7 @@ impl NarrativeSelfModel {
     }
 
     /// Get core values with their vector representations
-    pub fn core_values(&self) -> Vec<(String, &HV16)> {
+    pub fn core_values(&self) -> Vec<(String, &BinaryHV)> {
         self.autobio.values.iter()
             .map(|v| (v.name.clone(), &v.encoding))
             .collect()
@@ -819,7 +819,7 @@ impl NarrativeSelfModel {
     }
 
     /// Project future self
-    pub fn project_future(&mut self, horizon_secs: f64) -> &HV16 {
+    pub fn project_future(&mut self, horizon_secs: f64) -> &BinaryHV {
         self.autobio.project_future(horizon_secs);
         &self.autobio.future_self
     }
@@ -907,7 +907,7 @@ mod tests {
     fn test_experience_processing() {
         let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
 
-        let input = HV16::random(42);
+        let input = BinaryHV::random(42);
         model.process_experience(&input, "Processed a command", true, 0.5, 0.7);
 
         assert_eq!(model.stats.total_updates, 1);
@@ -931,7 +931,7 @@ mod tests {
 
         // Process several experiences
         for i in 0..10 {
-            let input = HV16::random(i);
+            let input = BinaryHV::random(i);
             model.process_experience(&input, &format!("Experience {}", i), true, 0.5, 0.5);
         }
 
@@ -943,7 +943,7 @@ mod tests {
     fn test_future_projection() {
         let mut model = NarrativeSelfModel::new(NarrativeSelfConfig::default());
 
-        // Clone the future HV16 to avoid borrow conflict
+        // Clone the future BinaryHV to avoid borrow conflict
         let future = model.project_future(3600.0).clone(); // 1 hour ahead
 
         // Future self should be different from current

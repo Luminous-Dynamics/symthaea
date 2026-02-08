@@ -229,15 +229,15 @@ fn test_full_pipeline() {
 #[test]
 fn test_consciousness_metrics() {
     use symthaea::hdc::integrated_information::IntegratedInformation;
-    use symthaea::hdc::binary_hv::HV16;
+    use symthaea::hdc::binary_hv::BinaryHV;
 
     // Create IIT calculator
     let mut phi_calculator = IntegratedInformation::new();
 
     // Generate random HDC vectors representing conscious components
-    let components: Vec<HV16> = (0..8).map(|i| {
+    let components: Vec<BinaryHV> = (0..8).map(|i| {
         // Create random vectors with unique seeds
-        HV16::random(42 + i as u64)
+        BinaryHV::random(42 + i as u64)
     }).collect();
 
     // Compute Phi for these components

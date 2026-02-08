@@ -6,7 +6,7 @@
 //! - Network Modularity Analysis (#99): Detect consciousness modules and their relationships
 
 use symthaea_core::hdc::ContinuousHV;
-// Note: HV16 and TieredPhi/ApproximationTier are available via super if needed
+// Note: BinaryHV and TieredPhi/ApproximationTier are available via super if needed
 
 #[derive(Debug, Clone)]
 pub struct PhiTransferConfig {

@@ -17,7 +17,7 @@
 //!
 //! # Core Types
 //!
-//! ## Binary Hypervectors ([`HV16`])
+//! ## Binary Hypervectors ([`BinaryHV`])
 //!
 //! The primary type for efficient HDC operations. 16,384-bit vectors (2KB) with:
 //! - 32x memory reduction vs `Vec<f32>`
@@ -25,16 +25,16 @@
 //! - Deterministic random generation from seeds
 //!
 //! ```rust,ignore
-//! use symthaea::hdc::HV16;
+//! use symthaea::hdc::BinaryHV;
 //!
-//! let a = HV16::random(42);  // Deterministic from seed
-//! let b = HV16::random(43);
+//! let a = BinaryHV::random(42);  // Deterministic from seed
+//! let b = BinaryHV::random(43);
 //!
 //! // Bind: create associations (XOR)
 //! let bound = a.bind(&b);
 //!
 //! // Bundle: create prototypes (majority vote)
-//! let prototype = HV16::bundle(&[a, b]);
+//! let prototype = BinaryHV::bundle(&[a, b]);
 //!
 //! // Similarity: 0.0 = opposite, 0.5 = random, 1.0 = identical
 //! let sim = a.similarity(&b);
@@ -62,7 +62,7 @@
 //!
 //! # Module Organization
 //!
-//! - **Core types**: [`HV16`], [`ContinuousHV`], [`BinaryHV`]
+//! - **Core types**: [`BinaryHV`], [`ContinuousHV`]
 //! - **Operations**: [`simd_ops`] for accelerated computation
 //! - **Encoding**: [`text_encoder`], [`semantic_encoder`], [`semantic_decoder`]
 //! - **Consciousness**: [`tiered_phi`], [`phi`], [`consciousness`] submodules
@@ -73,7 +73,7 @@
 //! ## Encoding Text
 //!
 //! ```rust,ignore
-//! use symthaea::hdc::{TextEncoder, TextEncoderConfig, HV16};
+//! use symthaea::hdc::{TextEncoder, TextEncoderConfig, BinaryHV};
 //!
 //! let encoder = TextEncoder::new(TextEncoderConfig::default());
 //! let hello = encoder.encode("hello");
@@ -87,19 +87,19 @@
 //! ## Graph Encoding
 //!
 //! ```rust,ignore
-//! use symthaea::hdc::HV16;
+//! use symthaea::hdc::BinaryHV;
 //!
 //! // Create unique basis vectors for nodes
-//! let node_a = HV16::basis(0);
-//! let node_b = HV16::basis(1);
-//! let node_c = HV16::basis(2);
+//! let node_a = BinaryHV::basis(0);
+//! let node_b = BinaryHV::basis(1);
+//! let node_c = BinaryHV::basis(2);
 //!
 //! // Encode edges as bindings
 //! let edge_ab = node_a.bind(&node_b);
 //! let edge_bc = node_b.bind(&node_c);
 //!
 //! // Node representation = bundle of incident edges
-//! let node_b_repr = HV16::bundle(&[edge_ab, edge_bc]);
+//! let node_b_repr = BinaryHV::bundle(&[edge_ab, edge_bc]);
 //! ```
 //!
 //! # See Also
@@ -117,9 +117,9 @@
 // Core HDC types from symthaea-core
 pub use symthaea_core::hdc::{
     // Binary hypervectors
-    binary_hv::HV16,
+    binary_hv::BinaryHV,
     // Unified hypervector types
-    unified_hv::{ContinuousHV, BinaryHV, HV, HDC_DIMENSION},
+    unified_hv::{ContinuousHV, HV, HDC_DIMENSION},
     // Real-valued hypervectors
     // RealHV alias available via real_hv module
     // LTC neuron count constants

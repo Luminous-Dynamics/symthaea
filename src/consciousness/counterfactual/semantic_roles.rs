@@ -4,7 +4,7 @@
 //! in causal queries. E.g., "What if the AGENT were different?"
 
 use serde::{Deserialize, Serialize};
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 /// Semantic roles for causal reasoning.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -31,13 +31,13 @@ pub struct RoleSubstitution {
     /// Which role to substitute.
     pub role: SemanticRole,
     /// Original role filler (HDC vector).
-    pub original: HV16,
+    pub original: BinaryHV,
     /// New role filler (HDC vector).
-    pub replacement: HV16,
+    pub replacement: BinaryHV,
 }
 
 impl RoleSubstitution {
-    pub fn new(role: SemanticRole, original: HV16, replacement: HV16) -> Self {
+    pub fn new(role: SemanticRole, original: BinaryHV, replacement: BinaryHV) -> Self {
         Self { role, original, replacement }
     }
 
@@ -45,7 +45,7 @@ impl RoleSubstitution {
     ///
     /// Unbinds the original filler and binds the replacement.
     /// Result: causal_vector ⊗ original ⊗ replacement
-    pub fn apply(&self, causal_vector: &HV16) -> HV16 {
+    pub fn apply(&self, causal_vector: &BinaryHV) -> BinaryHV {
         // Unbind original, bind replacement
         let unbound = causal_vector.bind(&self.original);
         unbound.bind(&self.replacement)
@@ -55,7 +55,7 @@ impl RoleSubstitution {
     ///
     /// The substituted vector should be similar to the original
     /// in all roles except the substituted one.
-    pub fn verify_preservation(&self, original_vector: &HV16, substituted: &HV16) -> f32 {
+    pub fn verify_preservation(&self, original_vector: &BinaryHV, substituted: &BinaryHV) -> f32 {
         // The vectors should differ (substitution happened)
         let diff = original_vector.similarity(substituted);
         // But not be completely different (structure preserved)
@@ -65,7 +65,7 @@ impl RoleSubstitution {
 }
 
 /// Apply multiple role substitutions to a causal vector.
-pub fn apply_substitutions(causal_vector: &HV16, substitutions: &[RoleSubstitution]) -> HV16 {
+pub fn apply_substitutions(causal_vector: &BinaryHV, substitutions: &[RoleSubstitution]) -> BinaryHV {
     let mut result = causal_vector.clone();
     for sub in substitutions {
         result = sub.apply(&result);
@@ -79,9 +79,9 @@ mod tests {
 
     #[test]
     fn test_role_substitution_changes_vector() {
-        let original = HV16::random(1);
-        let replacement = HV16::random(2);
-        let context = HV16::random(3);
+        let original = BinaryHV::random(1);
+        let replacement = BinaryHV::random(2);
+        let context = BinaryHV::random(3);
 
         let sub = RoleSubstitution::new(SemanticRole::Agent, original, replacement);
 
@@ -95,9 +95,9 @@ mod tests {
 
     #[test]
     fn test_substitution_roundtrip() {
-        let original_filler = HV16::random(10);
-        let replacement_filler = HV16::random(20);
-        let base = HV16::random(30);
+        let original_filler = BinaryHV::random(10);
+        let replacement_filler = BinaryHV::random(20);
+        let base = BinaryHV::random(30);
 
         // Apply substitution
         let sub = RoleSubstitution::new(SemanticRole::Agent, original_filler, replacement_filler);
@@ -118,10 +118,10 @@ mod tests {
 
     #[test]
     fn test_multiple_substitutions() {
-        let agent = HV16::random(1);
-        let patient = HV16::random(2);
-        let new_agent = HV16::random(3);
-        let new_patient = HV16::random(4);
+        let agent = BinaryHV::random(1);
+        let patient = BinaryHV::random(2);
+        let new_agent = BinaryHV::random(3);
+        let new_patient = BinaryHV::random(4);
 
         let base = agent.bind(&patient);
 

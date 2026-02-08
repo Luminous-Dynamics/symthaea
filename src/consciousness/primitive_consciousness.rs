@@ -36,7 +36,7 @@
 //! ```
 
 use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
-use symthaea_core::hdc::HV16;
+use symthaea_core::hdc::BinaryHV;
 use crate::consciousness::primitive_reasoning::{
     ReasoningChain, TransformationType, AdaptivePrimitiveSelector,
     PrimitiveAffinityGraph, TaskType, TierAwareConfig,
@@ -58,7 +58,7 @@ pub struct PrimitiveConsciousnessState {
     pub active_by_tier: std::collections::HashMap<PrimitiveTier, Vec<ActivePrimitive>>,
 
     /// Combined encoding of all active primitives
-    pub unified_encoding: Option<HV16>,
+    pub unified_encoding: Option<BinaryHV>,
 
     /// Overall consciousness level (Φ)
     pub phi: f64,
@@ -171,12 +171,12 @@ impl PrimitiveConsciousnessState {
         }
 
         // Collect all encodings for bundling
-        let encodings: Vec<HV16> = actives.iter()
+        let encodings: Vec<BinaryHV> = actives.iter()
             .map(|a| a.primitive.encoding)
             .collect();
 
         // Bundle all active primitives
-        let unified = HV16::bundle(&encodings);
+        let unified = BinaryHV::bundle(&encodings);
 
         self.unified_encoding = Some(unified);
     }
@@ -252,7 +252,7 @@ impl ConsciousnessPrimitiveProcessor {
     }
 
     /// Process semantic input to activate primitives
-    pub fn process_input(&mut self, input: &HV16, timestamp: f64) -> PrimitiveConsciousnessState {
+    pub fn process_input(&mut self, input: &BinaryHV, timestamp: f64) -> PrimitiveConsciousnessState {
         let mut state = PrimitiveConsciousnessState::new(timestamp);
 
         // Find primitives that resonate with input
@@ -299,7 +299,7 @@ impl ConsciousnessPrimitiveProcessor {
     }
 
     /// Create a reasoning chain for a question
-    pub fn reason(&self, question: HV16, task: TaskType, depth: usize) -> Result<ReasoningChain> {
+    pub fn reason(&self, question: BinaryHV, task: TaskType, depth: usize) -> Result<ReasoningChain> {
         let mut chain = ReasoningChain::new(question);
 
         // Select primitives for task
@@ -427,7 +427,7 @@ impl ConsciousnessDecomposer {
 
     /// Decompose a semantic vector into active primitives
     pub fn decompose(&self, semantic: &[f32]) -> Vec<(Primitive, f64)> {
-        // Convert semantic to HV16 for comparison
+        // Convert semantic to BinaryHV for comparison
         let hv = self.semantic_to_hv(semantic);
 
         let mut activations = Vec::new();
@@ -460,15 +460,15 @@ impl ConsciousnessDecomposer {
             .map(|(tier, _)| tier)
     }
 
-    /// Convert semantic vector to HV16
-    fn semantic_to_hv(&self, semantic: &[f32]) -> HV16 {
+    /// Convert semantic vector to BinaryHV
+    fn semantic_to_hv(&self, semantic: &[f32]) -> BinaryHV {
         // Use semantic hash as seed for reproducible conversion
         let seed: u64 = semantic.iter()
             .enumerate()
             .map(|(i, &v)| (v.to_bits() as u64).wrapping_mul(i as u64 + 1))
             .fold(0u64, |acc, x| acc.wrapping_add(x));
 
-        HV16::random(seed)
+        BinaryHV::random(seed)
     }
 }
 
@@ -504,12 +504,12 @@ impl PrimitiveBindingEngine {
     ) -> PrimitiveBinding {
         let result = match binding_type {
             TransformationType::Bind => prim1.encoding.bind(&prim2.encoding),
-            TransformationType::Bundle => HV16::bundle(&[prim1.encoding, prim2.encoding]),
+            TransformationType::Bundle => BinaryHV::bundle(&[prim1.encoding, prim2.encoding]),
             TransformationType::Permute => prim1.encoding.permute(1),
             TransformationType::Resonate => {
                 // Resonance amplifies similar patterns
                 let combined = prim1.encoding.bind(&prim2.encoding);
-                HV16::bundle(&[combined, prim1.encoding, prim2.encoding])
+                BinaryHV::bundle(&[combined, prim1.encoding, prim2.encoding])
             }
             TransformationType::Abstract => {
                 // Abstract to higher-level - bundle with permutation
@@ -544,7 +544,7 @@ impl PrimitiveBindingEngine {
     }
 
     /// Estimate phi contribution from binding
-    fn estimate_binding_phi(&self, prim1: &Primitive, prim2: &Primitive, result: &HV16) -> f64 {
+    fn estimate_binding_phi(&self, prim1: &Primitive, prim2: &Primitive, result: &BinaryHV) -> f64 {
         // Tier affinity contributes to phi
         let tier_affinity = self.affinity_graph.get_tier_affinity(prim1.tier, prim2.tier);
 
@@ -587,7 +587,7 @@ mod tests {
 
         let prim = Primitive {
             name: "TEST".to_string(),
-            encoding: HV16::random(42),
+            encoding: BinaryHV::random(42),
             tier: PrimitiveTier::Physical,
             domain: "test".to_string(),
             definition: "Test".to_string(),
@@ -611,7 +611,7 @@ mod tests {
     #[test]
     fn test_processor_input_processing() {
         let mut processor = ConsciousnessPrimitiveProcessor::new();
-        let input = HV16::random(42);
+        let input = BinaryHV::random(42);
 
         let state = processor.process_input(&input, 0.0);
         assert!(state.phi >= 0.0);
@@ -633,7 +633,7 @@ mod tests {
 
         let prim1 = Primitive {
             name: "A".to_string(),
-            encoding: HV16::random(1),
+            encoding: BinaryHV::random(1),
             tier: PrimitiveTier::Physical,
             domain: "test".to_string(),
             definition: "A".to_string(),
@@ -643,7 +643,7 @@ mod tests {
 
         let prim2 = Primitive {
             name: "B".to_string(),
-            encoding: HV16::random(2),
+            encoding: BinaryHV::random(2),
             tier: PrimitiveTier::Physical,
             domain: "test".to_string(),
             definition: "B".to_string(),

@@ -17,7 +17,7 @@
 //! 3. **Compositional Pattern**: Learn "A ∘ B → C" structures
 //! 4. **Analogy Completion**: If X:Y then A:?
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 use crate::learnable_ltc::{LearnableLTC, LearnableLTCConfig};
 use serde::{Serialize, Deserialize};
@@ -189,16 +189,16 @@ impl PrimitiveLearningGate {
             return cached.clone();
         }
 
-        // Get HV16 encoding from primitive system
+        // Get BinaryHV encoding from primitive system
         let hv = if let Some(prim) = self.primitive_system.get(name) {
             prim.encoding
         } else {
             // Fallback: hash-based encoding
-            HV16::random(Self::name_to_seed(name))
+            BinaryHV::random(Self::name_to_seed(name))
         };
 
         // Compress 2048 bytes to 128 floats by averaging groups
-        // HV16 is a newtype wrapping [u8; 2048], access via .0
+        // BinaryHV is a newtype wrapping [u8; 2048], access via .0
         let bytes = &hv.0;
         let mut compressed = vec![0.0f32; 128];
         let group_size = bytes.len() / 128;  // 16 bytes per group

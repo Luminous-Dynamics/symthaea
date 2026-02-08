@@ -50,7 +50,7 @@ use crate::consciousness::{
         ConsciousnessGradientOptimizer, GradientOptimizerConfig,
     },
 };
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -198,7 +198,7 @@ impl ConsciousnessOracle {
     }
 
     /// Process input through the LTC and measure resulting Φ
-    pub fn process_and_measure(&mut self, _input: &HV16, context: &str) -> PhiSample {
+    pub fn process_and_measure(&mut self, _input: &BinaryHV, context: &str) -> PhiSample {
         // Step the LTC network (input injection would require API extension)
         let _ = self.ltc.step();
 

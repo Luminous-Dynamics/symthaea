@@ -26,29 +26,29 @@
 //! ## Date: January 17, 2026
 //! ## Author: Symthaea Theory Validation
 
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 use symthaea::hdc::tiered_phi::{TieredPhi, ApproximationTier};
 
 /// Generate a star topology: one hub connected to all spokes
 /// Hub is highly similar to all spokes, spokes are dissimilar to each other
-fn generate_star_topology(n: usize) -> Vec<HV16> {
+fn generate_star_topology(n: usize) -> Vec<BinaryHV> {
     let mut components = Vec::with_capacity(n);
 
     // Hub: random hypervector
-    let hub = HV16::random(42);
+    let hub = BinaryHV::random(42);
     components.push(hub.clone());
 
     // Spokes: each similar to hub but dissimilar to each other
     for i in 1..n {
         // Create spoke by binding hub with a unique pattern
-        let pattern = HV16::random(100 + i as u64);
+        let pattern = BinaryHV::random(100 + i as u64);
         // Mix hub with pattern to create similarity gradient
         // More hub = more similar to hub
         let spoke = if i % 2 == 0 {
             hub.bind(&pattern)  // ~0.5 similarity to hub
         } else {
             // Bundle hub with pattern for higher similarity
-            HV16::bundle(&[hub.clone(), pattern])
+            BinaryHV::bundle(&[hub.clone(), pattern])
         };
         components.push(spoke);
     }
@@ -58,18 +58,18 @@ fn generate_star_topology(n: usize) -> Vec<HV16> {
 
 /// Generate a ring topology: each node connected to neighbors only
 /// Creates a chain of similarity
-fn generate_ring_topology(n: usize) -> Vec<HV16> {
+fn generate_ring_topology(n: usize) -> Vec<BinaryHV> {
     let mut components = Vec::with_capacity(n);
 
     // Start with random base
-    let mut prev = HV16::random(200);
+    let mut prev = BinaryHV::random(200);
     components.push(prev.clone());
 
     // Each subsequent node is derived from previous (neighbor similarity)
     for i in 1..n {
-        let noise = HV16::random(200 + i as u64);
+        let noise = BinaryHV::random(200 + i as u64);
         // Bundle with previous to create neighbor similarity
-        let current = HV16::bundle(&[prev.clone(), noise]);
+        let current = BinaryHV::bundle(&[prev.clone(), noise]);
         components.push(current.clone());
         prev = current;
     }
@@ -78,34 +78,34 @@ fn generate_ring_topology(n: usize) -> Vec<HV16> {
     if n > 2 {
         let first = components[0].clone();
         let last_idx = n - 1;
-        components[last_idx] = HV16::bundle(&[components[last_idx].clone(), first]);
+        components[last_idx] = BinaryHV::bundle(&[components[last_idx].clone(), first]);
     }
 
     components
 }
 
 /// Generate random topology: all nodes roughly independent
-fn generate_random_topology(n: usize) -> Vec<HV16> {
-    (0..n).map(|i| HV16::random(300 + i as u64)).collect()
+fn generate_random_topology(n: usize) -> Vec<BinaryHV> {
+    (0..n).map(|i| BinaryHV::random(300 + i as u64)).collect()
 }
 
 /// Generate modular topology: two clusters with weak inter-cluster links
-fn generate_modular_topology(n: usize) -> Vec<HV16> {
+fn generate_modular_topology(n: usize) -> Vec<BinaryHV> {
     let half = n / 2;
     let mut components = Vec::with_capacity(n);
 
     // Cluster A: all similar to cluster_a_base
-    let cluster_a_base = HV16::random(400);
+    let cluster_a_base = BinaryHV::random(400);
     for i in 0..half {
-        let noise = HV16::random(410 + i as u64);
-        components.push(HV16::bundle(&[cluster_a_base.clone(), noise]));
+        let noise = BinaryHV::random(410 + i as u64);
+        components.push(BinaryHV::bundle(&[cluster_a_base.clone(), noise]));
     }
 
     // Cluster B: all similar to cluster_b_base (different from A)
-    let cluster_b_base = HV16::random(500);
+    let cluster_b_base = BinaryHV::random(500);
     for i in half..n {
-        let noise = HV16::random(510 + i as u64);
-        components.push(HV16::bundle(&[cluster_b_base.clone(), noise]));
+        let noise = BinaryHV::random(510 + i as u64);
+        components.push(BinaryHV::bundle(&[cluster_b_base.clone(), noise]));
     }
 
     components
@@ -442,7 +442,7 @@ fn test_exact_tier_produces_positive_phi_for_standard_topologies() {
 
     let mut calc = TieredPhi::new(ApproximationTier::ExhaustivePartition);
 
-    let topologies: Vec<(&str, Vec<HV16>)> = vec![
+    let topologies: Vec<(&str, Vec<BinaryHV>)> = vec![
         ("star", generate_star_topology(6)),
         ("ring", generate_ring_topology(6)),
         ("random", generate_random_topology(6)),
@@ -535,7 +535,7 @@ fn test_all_tiers_agree_on_trivial_cases() {
         let phi_empty = calc.compute(&[]);
         assert_eq!(phi_empty, 0.0, "{:?} should return 0 for empty input", tier);
 
-        let phi_single = calc.compute(&[HV16::random(42)]);
+        let phi_single = calc.compute(&[BinaryHV::random(42)]);
         assert_eq!(phi_single, 0.0, "{:?} should return 0 for single component", tier);
     }
 }

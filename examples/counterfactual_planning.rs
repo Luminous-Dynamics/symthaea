@@ -16,7 +16,7 @@ fn main() {
         CausalReferenceHarness,
         composer::CounterfactualComposer,
     };
-    use symthaea_core::hdc::binary_hv::HV16;
+    use symthaea_core::hdc::binary_hv::BinaryHV;
     use symthaea::consciousness::counterfactual::semantic_roles::{
         SemanticRole, RoleSubstitution,
     };
@@ -73,9 +73,9 @@ fn main() {
     // ── Example 5: Semantic role substitution ────────────────────────
     println!("── Example 5: Role substitution ──");
     println!("  \"What if a different agent performed the same action?\"");
-    let agent_a = HV16::random(100);
-    let agent_b = HV16::random(200);
-    let context = HV16::random(300);
+    let agent_a = BinaryHV::random(100);
+    let agent_b = BinaryHV::random(200);
+    let context = BinaryHV::random(300);
 
     // Create causal vector with agent_a
     let causal_vector = context.bind(&agent_a);

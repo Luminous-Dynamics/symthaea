@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
 /// Configuration for emotional core
@@ -77,8 +77,8 @@ pub struct EmotionalAnalysis {
 pub struct EmotionPrimitiveGrounding {
     /// NSM primitives that compose this emotion
     pub nsm_primitives: Vec<String>,
-    /// Binary HV16 encoding from primitives
-    pub primitive_encoding: HV16,
+    /// Binary BinaryHV encoding from primitives
+    pub primitive_encoding: BinaryHV,
     /// Valence weight (-1 to 1)
     pub valence_weight: f32,
     /// Arousal weight (0 to 1)
@@ -91,7 +91,7 @@ impl EmotionPrimitiveGrounding {
         let system = PrimitiveSystem::global();
 
         // Compose emotion encoding by binding primitives together
-        let mut encoding = HV16::random(0xE0C0_FEED); // Base seed for emotions
+        let mut encoding = BinaryHV::random(0xE0C0_FEED); // Base seed for emotions
         for name in primitives {
             if let Some(prim) = system.get(name) {
                 encoding = encoding.bind(&prim.encoding);

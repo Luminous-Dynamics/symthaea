@@ -22,7 +22,7 @@ use anyhow::Result;
 use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -175,7 +175,7 @@ fn analyze_class_topology(activations: &[Vec<f32>], config: &TopologyConfig) -> 
     let mut total_beta_0 = 0.0;
 
     for activation in activations {
-        // Convert to HV16 (bipolar)
+        // Convert to BinaryHV (bipolar)
         let hv = activation_to_hv16(activation);
 
         // Create topology analyzer
@@ -196,13 +196,13 @@ fn analyze_class_topology(activations: &[Vec<f32>], config: &TopologyConfig) -> 
     (total_unity / n, total_beta_0 / n)
 }
 
-/// Convert activation vector to HV16
+/// Convert activation vector to BinaryHV
 ///
-/// Since activations are 1024-dim and HV16 is 16384-dim, we use
+/// Since activations are 1024-dim and BinaryHV is 16384-dim, we use
 /// random projection: tile the activation 16x and add position-dependent
 /// perturbation to break symmetry, then bipolarize.
 #[cfg(feature = "neural-bridge")]
-fn activation_to_hv16(activation: &[f32]) -> HV16 {
+fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
     use symthaea_core::hdc::HDC_DIMENSION;
 
     // Expand 1024-dim to 16384-dim via tiling with perturbation
@@ -218,5 +218,5 @@ fn activation_to_hv16(activation: &[f32]) -> HV16 {
     }
 
     // Bipolarize: positive → 1, negative → -1
-    HV16::from_bipolar(&expanded)
+    BinaryHV::from_bipolar(&expanded)
 }

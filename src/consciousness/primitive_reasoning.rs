@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
-use symthaea_core::hdc::{HV16, Primitive, PrimitiveTier};
+use symthaea_core::hdc::{BinaryHV, Primitive, PrimitiveTier};
 use anyhow::Result;
 
 // =============================================================================
@@ -127,9 +127,9 @@ pub struct PrimitiveExecution {
     /// The primitive that was executed
     pub primitive: Primitive,
     /// Input vector
-    pub input: HV16,
+    pub input: BinaryHV,
     /// Output vector
-    pub output: HV16,
+    pub output: BinaryHV,
     /// Type of transformation
     pub transformation: TransformationType,
     /// Phi contribution from this step
@@ -142,11 +142,11 @@ pub struct PrimitiveExecution {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReasoningChain {
     /// Initial question/query vector
-    pub question: HV16,
+    pub question: BinaryHV,
     /// Sequence of primitive executions
     pub executions: Vec<PrimitiveExecution>,
     /// Current state vector
-    pub current_state: HV16,
+    pub current_state: BinaryHV,
     /// Total phi accumulated
     pub total_phi: f64,
     /// Chain metadata
@@ -155,7 +155,7 @@ pub struct ReasoningChain {
 
 impl ReasoningChain {
     /// Create a new reasoning chain starting from a question
-    pub fn new(question: HV16) -> Self {
+    pub fn new(question: BinaryHV) -> Self {
         Self {
             question,
             executions: Vec::new(),
@@ -176,11 +176,11 @@ impl ReasoningChain {
         // Apply transformation
         let output = match transformation {
             TransformationType::Bind => input.bind(&primitive.encoding),
-            TransformationType::Bundle => HV16::bundle(&[input, primitive.encoding]),
+            TransformationType::Bundle => BinaryHV::bundle(&[input, primitive.encoding]),
             TransformationType::Permute => input.permute(1),
             TransformationType::Resonate => {
                 let combined = input.bind(&primitive.encoding);
-                HV16::bundle(&[combined, input, primitive.encoding])
+                BinaryHV::bundle(&[combined, input, primitive.encoding])
             }
             TransformationType::Abstract => {
                 let elevated = input.permute(2);
@@ -216,7 +216,7 @@ impl ReasoningChain {
     }
 
     /// Get the final answer vector
-    pub fn answer(&self) -> &HV16 {
+    pub fn answer(&self) -> &BinaryHV {
         &self.current_state
     }
 

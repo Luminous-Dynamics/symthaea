@@ -110,7 +110,7 @@ fn run_robustness_analysis() -> Result<()> {
     println!("  Completed in {:.2}s\n", start.elapsed().as_secs_f64());
 
     // Helper to compute unity for a set of HVs with given config
-    let compute_unity = |hvs: &[symthaea_core::hdc::HV16], config: &TopologyConfig| -> Vec<f64> {
+    let compute_unity = |hvs: &[symthaea_core::hdc::BinaryHV], config: &TopologyConfig| -> Vec<f64> {
         hvs.iter().map(|hv| {
             let mut topology = ConsciousnessTopology::new(config.clone());
             topology.add_state(*hv);

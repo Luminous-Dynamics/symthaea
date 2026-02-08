@@ -21,7 +21,7 @@
 //! 3. **CompositionGrammar** - Learns which compositions tend to increase Φ
 //! 4. **EmergentDiscovery** - Discovers novel compositions that maximize Φ
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use crate::consciousness::compositionality_primitives::{
     CompositionalityEngine, CompositionalityConfig, ComposedPrimitive,
@@ -914,7 +914,7 @@ impl PhiOptimizedDiscovery {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::HV16;
+    use crate::hdc::BinaryHV;
     use crate::consciousness::compositionality_primitives::CompositionMetadata;
 
     fn create_test_system() -> Arc<PrimitiveSystem> {
@@ -962,7 +962,7 @@ mod tests {
             composition_type: CompositionType::Sequential,
             operand_a: "similarity".to_string(),
             operand_b: Some("bind".to_string()),
-            encoding: HV16::zero(),
+            encoding: BinaryHV::zero(),
             metadata: CompositionMetadata {
                 expected_cost: 1.0,
                 depth: 1,
@@ -1017,7 +1017,7 @@ mod tests {
                     composition_type: CompositionType::Sequential,
                     operand_a: "a".to_string(),
                     operand_b: Some("b".to_string()),
-                    encoding: HV16::zero(),
+                    encoding: BinaryHV::zero(),
                     metadata: CompositionMetadata {
                         expected_cost: 1.0,
                         depth: 1,

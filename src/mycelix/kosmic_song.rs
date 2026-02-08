@@ -743,9 +743,9 @@ impl KosmicSong {
 
     /// Get the HDC encoding of the current resonant harmony
     ///
-    /// This returns the HV16 semantic encoding from seven_harmonies.rs,
+    /// This returns the BinaryHV semantic encoding from seven_harmonies.rs,
     /// useful for similarity comparisons with other semantic vectors.
-    pub fn resonant_harmony_encoding(&self) -> Option<crate::hdc::HV16> {
+    pub fn resonant_harmony_encoding(&self) -> Option<crate::hdc::BinaryHV> {
         let harmonies_system = SevenHarmonies::new();
         let core_harmony: CoreHarmony = self.resonant_harmony.into();
         harmonies_system.get(core_harmony).map(|e| e.encoding)

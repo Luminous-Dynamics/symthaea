@@ -449,12 +449,12 @@ impl SynergyFrontier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::HV16;
+    use crate::hdc::BinaryHV;
 
     #[test]
     fn test_synergy_detection() {
         // Create profile with high Φ and high Entropy
-        let components = vec![HV16::random(1), HV16::random(2), HV16::random(3)];
+        let components = vec![BinaryHV::random(1), BinaryHV::random(2), BinaryHV::random(3)];
         let base = ConsciousnessProfile::from_components(&components);
         let synergy = SynergyProfile::from_base(base);
 
@@ -472,7 +472,7 @@ mod tests {
     fn test_emergent_properties() {
         // This test would need controlled profiles to trigger specific emergent properties
         // For now, just verify the framework works
-        let components = vec![HV16::random(1)];
+        let components = vec![BinaryHV::random(1)];
         let base = ConsciousnessProfile::from_components(&components);
         let synergy = SynergyProfile::from_base(base);
 

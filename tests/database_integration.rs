@@ -7,7 +7,7 @@ mod common;
 
 use common::prelude::*;
 use symthaea::databases::{ConsciousnessDatabase, DbResult, MemoryRecord, MemoryType, SqliteMemory};
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 // ============================================================================
 // SQLITEMEMORY CREATION TESTS
@@ -127,7 +127,7 @@ async fn test_similarity_search_exact_match() {
     let db = SqliteMemory::in_memory().expect("Should create database");
 
     // Store a memory with known encoding
-    let encoding = HV16::random(42);
+    let encoding = BinaryHV::random(42);
     let record = MemoryRecord {
         id: "exact-match".to_string(),
         memory_type: MemoryType::Semantic,
@@ -156,7 +156,7 @@ async fn test_similarity_search_exact_match() {
 async fn test_similarity_search_ordering() {
     let db = SqliteMemory::in_memory().expect("Should create database");
 
-    let query = HV16::random(1000);
+    let query = BinaryHV::random(1000);
 
     // Store memories with decreasing similarity to query
     for i in 0..5 {
@@ -208,7 +208,7 @@ async fn test_similarity_search_limit() {
     }
 
     // Search with limit 3
-    let query = HV16::random(505);
+    let query = BinaryHV::random(505);
     let results = db.search_similar(&query, 3).await.unwrap();
 
     assert_eq!(results.len(), 3, "Should respect limit parameter");
@@ -285,7 +285,7 @@ async fn test_persistence_across_connections() {
 async fn test_encoding_roundtrip_integrity() {
     let db = SqliteMemory::in_memory().expect("Should create database");
 
-    let original_encoding = HV16::random(9999);
+    let original_encoding = BinaryHV::random(9999);
     let record = MemoryRecord {
         id: "encoding-test".to_string(),
         memory_type: MemoryType::Semantic,
@@ -320,7 +320,7 @@ async fn test_emotional_values_roundtrip() {
     let record = MemoryRecord {
         id: "emotion-test".to_string(),
         memory_type: MemoryType::Episodic,
-        encoding: HV16::random(42),
+        encoding: BinaryHV::random(42),
         content: "Emotional memory".to_string(),
         timestamp_ms: 1704067200000,
         valence: -0.75, // Negative emotion

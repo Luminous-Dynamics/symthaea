@@ -481,8 +481,8 @@ impl SevenHarmonies {
 pub struct HarmonyEncoding {
     /// The harmony being encoded
     pub harmony: Harmony,
-    /// HDC encoding (HV16 binary hypervector)
-    pub encoding: symthaea_core::hdc::binary_hv::HV16,
+    /// HDC encoding (BinaryHV binary hypervector)
+    pub encoding: symthaea_core::hdc::binary_hv::BinaryHV,
 }
 
 impl Default for SevenHarmonies {

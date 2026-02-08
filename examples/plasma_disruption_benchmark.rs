@@ -51,7 +51,7 @@ use symthaea::physics::cmod_adapter::{
     compute_statistics, generate_synthetic_data, load_csv, to_cmod_plasma_sample,
 };
 use symthaea::hdc::tiered_phi::{TieredPhi, ApproximationTier};
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 // =============================================================================
 // BENCHMARK CONFIGURATION
@@ -430,15 +430,15 @@ fn run_benchmark(shots: &[CModShot], config: &BenchmarkConfig) -> Vec<BenchmarkR
             let plasma_sample = to_cmod_plasma_sample(sample, &normalizer, DisruptionLabel::Normal);
             let _encoding = encoder.encode(&plasma_sample);
 
-            // Convert RealHV to HV16 for Phi calculation
+            // Convert RealHV to BinaryHV for Phi calculation
             // We need multiple components for Phi, so we use the sensor-level encodings
-            let components: Vec<HV16> = plasma_sample.sensors
+            let components: Vec<BinaryHV> = plasma_sample.sensors
                 .iter()
                 .enumerate()
                 .map(|(idx, &val)| {
                     // Create a deterministic HV based on sensor value
                     let level = ((val * 31.0) as usize).min(31);
-                    HV16::random(42 + idx as u64 * 100 + level as u64)
+                    BinaryHV::random(42 + idx as u64 * 100 + level as u64)
                 })
                 .collect();
 

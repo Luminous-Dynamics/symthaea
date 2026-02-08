@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 
 /// Complete epistemic coordinate in 3D space
@@ -369,7 +369,7 @@ pub struct EmpiricalTierPrimitiveGrounding {
     /// NSM primitive composition
     pub nsm_primitives: Vec<String>,
     /// HDC encoding via primitive binding
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     /// Verification strength (0.0-1.0)
     pub verification_strength: f64,
 }
@@ -426,7 +426,7 @@ pub struct NormativeTierPrimitiveGrounding {
     /// NSM primitive composition
     pub nsm_primitives: Vec<String>,
     /// HDC encoding via primitive binding
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     /// Consensus breadth (0.0-1.0)
     pub consensus_breadth: f64,
 }
@@ -478,7 +478,7 @@ pub struct MaterialityTierPrimitiveGrounding {
     /// NSM primitive composition
     pub nsm_primitives: Vec<String>,
     /// HDC encoding via primitive binding
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     /// Temporal persistence (0.0-1.0)
     pub temporal_persistence: f64,
 }
@@ -579,23 +579,23 @@ impl EpistemicNSMGrounding {
     }
 
     /// Get combined encoding for an epistemic coordinate
-    pub fn encode_coordinate(&self, coord: &EpistemicCoordinate) -> HV16 {
+    pub fn encode_coordinate(&self, coord: &EpistemicCoordinate) -> BinaryHV {
         let e_enc = self.empirical_tiers.get(&coord.empirical)
             .map(|g| g.primitive_encoding.clone())
-            .unwrap_or_else(|| HV16::random(0));
+            .unwrap_or_else(|| BinaryHV::random(0));
         let n_enc = self.normative_tiers.get(&coord.normative)
             .map(|g| g.primitive_encoding.clone())
-            .unwrap_or_else(|| HV16::random(1));
+            .unwrap_or_else(|| BinaryHV::random(1));
         let m_enc = self.materiality_tiers.get(&coord.materiality)
             .map(|g| g.primitive_encoding.clone())
-            .unwrap_or_else(|| HV16::random(2));
+            .unwrap_or_else(|| BinaryHV::random(2));
 
         // Bind the three axes together
         e_enc.bind(&n_enc).bind(&m_enc)
     }
 
     /// Query empirical tiers by semantic similarity
-    pub fn query_empirical(&self, query: &HV16, threshold: f32) -> Vec<(&EmpiricalTier, f32)> {
+    pub fn query_empirical(&self, query: &BinaryHV, threshold: f32) -> Vec<(&EmpiricalTier, f32)> {
         let mut results: Vec<_> = self.empirical_tiers.iter()
             .map(|(tier, grounding)| (tier, grounding.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
@@ -605,7 +605,7 @@ impl EpistemicNSMGrounding {
     }
 
     /// Query normative tiers by semantic similarity
-    pub fn query_normative(&self, query: &HV16, threshold: f32) -> Vec<(&NormativeTier, f32)> {
+    pub fn query_normative(&self, query: &BinaryHV, threshold: f32) -> Vec<(&NormativeTier, f32)> {
         let mut results: Vec<_> = self.normative_tiers.iter()
             .map(|(tier, grounding)| (tier, grounding.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
@@ -615,7 +615,7 @@ impl EpistemicNSMGrounding {
     }
 
     /// Query materiality tiers by semantic similarity
-    pub fn query_materiality(&self, query: &HV16, threshold: f32) -> Vec<(&MaterialityTier, f32)> {
+    pub fn query_materiality(&self, query: &BinaryHV, threshold: f32) -> Vec<(&MaterialityTier, f32)> {
         let mut results: Vec<_> = self.materiality_tiers.iter()
             .map(|(tier, grounding)| (tier, grounding.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
@@ -650,8 +650,8 @@ impl EpistemicNSMGrounding {
 }
 
 /// Encode NSM primitives into HDC vector via sequential binding
-fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
-    let vectors: Vec<HV16> = primitives
+fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
+    let vectors: Vec<BinaryHV> = primitives
         .iter()
         .map(|name| {
             if let Some(p) = system.get(name) {
@@ -661,19 +661,19 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
             } else {
                 // Fallback: deterministic random for unknown primitives
                 let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-                HV16::random(seed)
+                BinaryHV::random(seed)
             }
         })
         .collect();
 
     if vectors.is_empty() {
-        return HV16::random(0);
+        return BinaryHV::random(0);
     }
 
     // Bind sequentially with position encoding for order preservation
     let mut result = vectors[0].clone();
     for (i, v) in vectors.iter().enumerate().skip(1) {
-        let position_hv = HV16::random(i as u64 * 1000);
+        let position_hv = BinaryHV::random(i as u64 * 1000);
         let positioned = v.bind(&position_hv);
         result = result.bind(&positioned);
     }

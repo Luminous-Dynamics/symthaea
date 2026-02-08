@@ -588,7 +588,7 @@ pub struct MonitoringStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::{HV16, primitive_system::{Primitive, PrimitiveTier}};
+    use crate::hdc::{BinaryHV, primitive_system::{Primitive, PrimitiveTier}};
 
     #[test]
     fn test_monitor_healthy() {
@@ -596,7 +596,7 @@ mod tests {
 
         let primitive = Primitive {
             name: "TEST".to_string(),
-            encoding: HV16::random(42),
+            encoding: BinaryHV::random(42),
             tier: PrimitiveTier::Physical,
             domain: "test".to_string(),
             definition: "Test".to_string(),
@@ -606,14 +606,14 @@ mod tests {
 
         let execution = PrimitiveExecution {
             primitive,
-            input: HV16::random(1),
-            output: HV16::random(2),
+            input: BinaryHV::random(1),
+            output: BinaryHV::random(2),
             transformation: TransformationType::Bind,
             phi_contribution: 0.002,  // Above threshold
             timestamp: 0.0,
         };
 
-        let chain = ReasoningChain::new(HV16::random(3));
+        let chain = ReasoningChain::new(BinaryHV::random(3));
 
         let result = monitor.monitor_step(&execution, &chain);
         assert!(matches!(result, MonitoringResult::Healthy));
@@ -625,7 +625,7 @@ mod tests {
 
         let primitive = Primitive {
             name: "TEST".to_string(),
-            encoding: HV16::random(42),
+            encoding: BinaryHV::random(42),
             tier: PrimitiveTier::Physical,
             domain: "test".to_string(),
             definition: "Test".to_string(),
@@ -639,14 +639,14 @@ mod tests {
         // Second step - Φ drops significantly
         let execution = PrimitiveExecution {
             primitive,
-            input: HV16::random(1),
-            output: HV16::random(2),
+            input: BinaryHV::random(1),
+            output: BinaryHV::random(2),
             transformation: TransformationType::Bind,
             phi_contribution: 0.001,  // Below threshold
             timestamp: 0.0,
         };
 
-        let chain = ReasoningChain::new(HV16::random(3));
+        let chain = ReasoningChain::new(BinaryHV::random(3));
 
         let result = monitor.monitor_step(&execution, &chain);
         // Result should be a valid monitoring result (any variant is acceptable)

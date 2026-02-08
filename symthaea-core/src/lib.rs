@@ -1,7 +1,32 @@
-//! Symthaea Core
+//! # Symthaea Core
 //!
 //! The mathematical and structural foundation for the Holographic Liquid Brain.
-//! Contains primitives for Hyperdimensional Computing (HDC) and Integrated Information (Phi).
+//! Provides Hyperdimensional Computing (HDC) primitives, Integrated Information Theory (IIT/Φ),
+//! and physics-grounded consciousness modeling.
+//!
+//! ## Hypervector Type System
+//!
+//! All semantic content is encoded in high-dimensional vectors. Two canonical types:
+//!
+//! | Type | Representation | Use Case |
+//! |------|---------------|----------|
+//! | [`BinaryHV`](hdc::BinaryHV) | `[u8; 2048]` (16,384 bits), `Copy`, SIMD-accelerated | Fast binding, memory, STT encoding |
+//! | [`ContinuousHV`](hdc::ContinuousHV) | `Vec<f32>`, configurable dimension | Gradients, phi computation, learning |
+//! | [`HV`](hdc::HV) | Enum wrapping both | Unified API across representations |
+//!
+//! Backward-compatible aliases `HV16` and `RealHV` are available but new code should
+//! use `BinaryHV` and `ContinuousHV` directly.
+//!
+//! ## Modules
+//!
+//! - **[`hdc`]** — Hyperdimensional computing: vector types, encoding, binding, bundling,
+//!   similarity search, attention, memory, and consciousness topology
+//! - **[`physics`]** — Physics-grounded modeling: periodic table, emergence chains,
+//!   chemical kinetics, IIT/Φ computation, and thermodynamic consciousness
+//! - **[`phi_engine`]** — Integrated Information (Φ) calculation engine
+//! - **[`core`]** — Core consciousness state types and configuration
+//! - **[`genesis`]** — System bootstrap and initialization
+//! - **[`observability`]** — Metrics, tracing, and introspection
 
 #![allow(clippy::needless_range_loop)]
 
@@ -11,10 +36,3 @@ pub mod hdc;
 pub mod observability;
 pub mod phi_engine;
 pub mod physics;
-
-// Re-exports are handled at the module level
-// Key types are available from their respective modules:
-// - hdc::binary_hv::BinaryHV
-// - hdc::consciousness::ConsciousnessState
-// - hdc::integrated_information::IntegratedInformation
-// - core::ConsciousnessState (different variant)

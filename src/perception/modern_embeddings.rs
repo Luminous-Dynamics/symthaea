@@ -58,7 +58,7 @@ use std::time::Instant;
 use candle_core::Device;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{binary_hv::HV16, HDC_DIMENSION, PackedBipolar};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION, PackedBipolar};
 
 // ============================================================================
 // Core Traits
@@ -118,16 +118,16 @@ pub struct LayerOutput {
 }
 
 impl LayerOutput {
-    /// Convert to HV16 for HDC processing
+    /// Convert to BinaryHV for HDC processing
     #[cfg(feature = "neural-bridge")]
-    pub fn to_hv16(&self) -> HV16 {
+    pub fn to_hv16(&self) -> BinaryHV {
         activation_to_hv16(&self.activation)
     }
 }
 
-/// Convert an activation vector to HV16
+/// Convert an activation vector to BinaryHV
 #[cfg(feature = "neural-bridge")]
-pub fn activation_to_hv16(activation: &[f32]) -> HV16 {
+pub fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
     let mut expanded = Vec::with_capacity(HDC_DIMENSION);
     let tiles = HDC_DIMENSION / activation.len();
     let remainder = HDC_DIMENSION % activation.len();
@@ -143,7 +143,7 @@ pub fn activation_to_hv16(activation: &[f32]) -> HV16 {
         expanded.push(activation[i]);
     }
 
-    HV16::from_bipolar(&expanded)
+    BinaryHV::from_bipolar(&expanded)
 }
 
 // ============================================================================
@@ -843,9 +843,9 @@ impl PhenomenalLayerAnalyzer {
 // HDC Integration
 // ============================================================================
 
-/// Project embedding to HV16 space
+/// Project embedding to BinaryHV space
 #[cfg(feature = "neural-bridge")]
-pub fn project_to_hv16(embedding: &[f32]) -> HV16 {
+pub fn project_to_hv16(embedding: &[f32]) -> BinaryHV {
     activation_to_hv16(embedding)
 }
 

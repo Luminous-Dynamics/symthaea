@@ -9,8 +9,7 @@ use std::collections::{HashMap, VecDeque};
 use symthaea_core::genesis::{GenesisSeed, ShakeRng};
 use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::primitive_system::PrimitiveTier;
-use crate::hdc::HV16;
-use symthaea_core::hdc::binary_hv::BinaryHV;
+use crate::hdc::BinaryHV;
 use anyhow::Result;
 
 /// Configuration for the primitive evolver
@@ -546,13 +545,13 @@ pub struct CandidatePrimitive {
     pub fitness: f64,
 
     /// HDC encoding of this primitive's phenotype
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 }
 
 impl CandidatePrimitive {
     /// Create a mutated copy of this primitive.
     ///
-    /// Uses HV16::add_noise to flip bits proportional to `mutation_rate`.
+    /// Uses BinaryHV::add_noise to flip bits proportional to `mutation_rate`.
     pub fn mutate(&self, mutation_rate: f64, generation: usize) -> Self {
         let encoding = self.encoding.add_noise(mutation_rate as f32, generation as u64);
         Self {
@@ -567,8 +566,8 @@ impl CandidatePrimitive {
     pub fn recombine(parent1: &Self, parent2: &Self, generation: usize) -> Self {
         let b1 = &parent1.encoding.0;
         let b2 = &parent2.encoding.0;
-        let mut child_bytes = [0u8; HV16::BYTES];
-        for i in 0..HV16::BYTES {
+        let mut child_bytes = [0u8; BinaryHV::BYTES];
+        for i in 0..BinaryHV::BYTES {
             child_bytes[i] = if (i + generation) % 2 == 0 { b1[i] } else { b2[i] };
         }
         Self {
@@ -657,7 +656,7 @@ impl PrimitiveEvolution {
                 name: format!("evolved_{}_{}", self.config.tier as u8, i),
                 tier: self.config.tier,
                 fitness: 0.0,
-                encoding: HV16::random(seed),
+                encoding: BinaryHV::random(seed),
             });
         }
     }

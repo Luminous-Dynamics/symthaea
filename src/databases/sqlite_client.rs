@@ -14,7 +14,7 @@
 //!
 //! ```rust,ignore
 //! use symthaea::databases::{SqliteMemory, ConsciousnessDatabase, MemoryRecord, MemoryType};
-//! use symthaea::hdc::HV16;
+//! use symthaea::hdc::BinaryHV;
 //!
 //! // Create persistent database
 //! let db = SqliteMemory::new("./data/memories.db")?;
@@ -26,7 +26,7 @@
 //! let record = MemoryRecord {
 //!     id: "unique-id".to_string(),
 //!     memory_type: MemoryType::Episodic,
-//!     encoding: HV16::random(42),
+//!     encoding: BinaryHV::random(42),
 //!     content: "First conversation with user".to_string(),
 //!     timestamp_ms: 1704067200000,
 //!     valence: 0.7,
@@ -38,7 +38,7 @@
 //! db.store(record).await?;
 //!
 //! // Search for similar memories
-//! let results = db.search_similar(&HV16::random(42), 10).await?;
+//! let results = db.search_similar(&BinaryHV::random(42), 10).await?;
 //! println!("Found {} similar memories", results.len());
 //! ```
 //!
@@ -49,7 +49,7 @@
 //! | Column | Type | Description |
 //! |--------|------|-------------|
 //! | id | TEXT PRIMARY KEY | Unique identifier |
-//! | encoding | BLOB | 2048-byte HV16 hypervector |
+//! | encoding | BLOB | 2048-byte BinaryHV hypervector |
 //! | timestamp_ms | INTEGER | Unix timestamp in milliseconds |
 //! | memory_type | TEXT | "episodic", "semantic", "procedural", "working" |
 //! | content | TEXT | Human-readable content |
@@ -66,7 +66,7 @@
 //! reads efficiently.
 
 use super::{ConsciousnessDatabase, DbResult, DatabaseError, DatabaseStats, MemoryRecord, MemoryType, SearchResult};
-use symthaea_core::hdc::binary_hv::{HV16, BinaryHV};
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use async_trait::async_trait;
 use rusqlite::{Connection, params};
 use std::sync::Mutex;
@@ -225,21 +225,21 @@ impl SqliteMemory {
         Ok(())
     }
 
-    /// Serialize HV16 to bytes (2048 bytes = 16,384 bits).
+    /// Serialize BinaryHV to bytes (2048 bytes = 16,384 bits).
     #[doc(hidden)]
-    fn hv_to_bytes(hv: &HV16) -> Vec<u8> {
+    fn hv_to_bytes(hv: &BinaryHV) -> Vec<u8> {
         hv.0.to_vec()
     }
 
-    /// Deserialize bytes to HV16.
+    /// Deserialize bytes to BinaryHV.
     #[doc(hidden)]
-    fn bytes_to_hv(bytes: &[u8]) -> HV16 {
-        if bytes.len() >= HV16::BYTES {
-            let mut arr = [0u8; HV16::BYTES];
-            arr.copy_from_slice(&bytes[..HV16::BYTES]);
+    fn bytes_to_hv(bytes: &[u8]) -> BinaryHV {
+        if bytes.len() >= BinaryHV::BYTES {
+            let mut arr = [0u8; BinaryHV::BYTES];
+            arr.copy_from_slice(&bytes[..BinaryHV::BYTES]);
             BinaryHV(arr)
         } else {
-            HV16::zero()
+            BinaryHV::zero()
         }
     }
 
@@ -303,7 +303,7 @@ impl ConsciousnessDatabase for SqliteMemory {
         Ok(())
     }
 
-    async fn search_similar(&self, query: &HV16, top_k: usize) -> DbResult<Vec<SearchResult>> {
+    async fn search_similar(&self, query: &BinaryHV, top_k: usize) -> DbResult<Vec<SearchResult>> {
         let conn = self.conn.lock_resilient("sqlite");
 
         let mut stmt = conn.prepare(
@@ -568,7 +568,7 @@ mod tests {
         // Store a memory
         let record = MemoryRecord {
             id: "test-1".to_string(),
-            encoding: HV16::random(42),
+            encoding: BinaryHV::random(42),
             timestamp_ms: 1234567890,
             memory_type: MemoryType::Episodic,
             content: "Hello, I am Symthaea".to_string(),
@@ -589,7 +589,7 @@ mod tests {
         assert_eq!(retrieved.content, "Hello, I am Symthaea");
 
         // Search similar
-        let results = db.search_similar(&HV16::random(42), 5).await.unwrap();
+        let results = db.search_similar(&BinaryHV::random(42), 5).await.unwrap();
         assert_eq!(results.len(), 1);
         assert!(results[0].similarity > 0.99); // Same seed = identical
 
@@ -611,7 +611,7 @@ mod tests {
             let db = SqliteMemory::new(&db_path).unwrap();
             let record = MemoryRecord {
                 id: "persist-test".to_string(),
-                encoding: HV16::random(123),
+                encoding: BinaryHV::random(123),
                 timestamp_ms: 1234567890,
                 memory_type: MemoryType::Semantic,
                 content: "I remember this".to_string(),
@@ -649,7 +649,7 @@ mod tests {
         for i in 0..5 {
             let record = MemoryRecord {
                 id: format!("stats-test-{}", i),
-                encoding: HV16::random(i as u64),
+                encoding: BinaryHV::random(i as u64),
                 timestamp_ms: 1000000000 + i as u64 * 1000,
                 memory_type: if i % 2 == 0 { MemoryType::Episodic } else { MemoryType::Semantic },
                 content: format!("Test memory {}", i),

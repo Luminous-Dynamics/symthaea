@@ -35,7 +35,7 @@
 //! let validated = service.get_validated_discoveries(0.5);
 //! ```
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveTier, PrimitiveSystem};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -72,7 +72,7 @@ pub struct DiscoveredPrimitive {
     /// Discovery source
     pub source: DiscoverySource,
     /// HDC encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
     /// Phi score from discovery evaluation
     pub phi_score: f64,
     /// Confidence in the discovery (based on evaluation count)
@@ -97,7 +97,7 @@ impl DiscoveredPrimitive {
         name: impl Into<String>,
         tier: PrimitiveTier,
         source: DiscoverySource,
-        encoding: HV16,
+        encoding: BinaryHV,
         phi_score: f64,
     ) -> Self {
         let name_str = name.into();
@@ -129,7 +129,7 @@ impl DiscoveredPrimitive {
     }
 
     /// Convert to a full Primitive for integration
-    pub fn to_primitive(&self, domain_hv: &HV16) -> Primitive {
+    pub fn to_primitive(&self, domain_hv: &BinaryHV) -> Primitive {
         Primitive::base(
             &self.name,
             self.tier,
@@ -295,13 +295,13 @@ pub struct PatternDetector {
     /// Minimum occurrences to consider a pattern significant
     min_occurrences: usize,
     /// Tier centroids for HDC-based tier inference
-    tier_centroids: std::collections::HashMap<PrimitiveTier, HV16>,
+    tier_centroids: std::collections::HashMap<PrimitiveTier, BinaryHV>,
 }
 
 #[derive(Debug, Clone)]
 struct DetectedPattern {
     /// Representative encoding
-    encoding: HV16,
+    encoding: BinaryHV,
     /// Occurrence count
     count: usize,
     /// Context primitives
@@ -322,7 +322,7 @@ impl PatternDetector {
     }
 
     /// Record a reasoning trace for pattern detection
-    pub fn record_trace(&mut self, primitives_used: &[&str], result_encoding: &HV16) {
+    pub fn record_trace(&mut self, primitives_used: &[&str], result_encoding: &BinaryHV) {
         // Hash the primitive sequence
         let hash = self.hash_sequence(primitives_used);
 
@@ -394,7 +394,7 @@ impl PatternDetector {
         ];
 
         for tier in &tiers {
-            let tier_hvs: Vec<&HV16> = system.get_tier(*tier)
+            let tier_hvs: Vec<&BinaryHV> = system.get_tier(*tier)
                 .iter()
                 .map(|p| &p.encoding)
                 .collect();
@@ -403,7 +403,7 @@ impl PatternDetector {
                 // Bundle all HVs in this tier to create centroid
                 let mut centroid = *tier_hvs[0];
                 for hv in &tier_hvs[1..] {
-                    centroid = HV16::bundle(&[centroid, *(*hv)]);
+                    centroid = BinaryHV::bundle(&[centroid, *(*hv)]);
                 }
                 self.tier_centroids.insert(*tier, centroid);
             }
@@ -411,7 +411,7 @@ impl PatternDetector {
     }
 
     /// Infer tier using HDC centroid similarity, falling back to keyword heuristic
-    fn infer_tier_hdc(&self, encoding: &HV16, primitives: &[&str]) -> PrimitiveTier {
+    fn infer_tier_hdc(&self, encoding: &BinaryHV, primitives: &[&str]) -> PrimitiveTier {
         if !self.tier_centroids.is_empty() {
             // Find best matching centroid
             let mut best_tier = PrimitiveTier::Physical;
@@ -564,7 +564,7 @@ impl PrimitiveDiscoveryService {
         // Generate random mutations of existing primitives
         for _ in 0..self.config.max_per_cycle {
             // Create a random primitive encoding
-            let encoding = HV16::random(self.random_u64());
+            let encoding = BinaryHV::random(self.random_u64());
 
             // Random tier selection weighted toward lower tiers
             let tier_idx = self.random_u64() % 9;
@@ -662,10 +662,10 @@ impl PrimitiveDiscoveryService {
     }
 
     /// Estimate Phi for an encoding (simplified heuristic)
-    fn estimate_phi(&self, encoding: &HV16) -> f64 {
+    fn estimate_phi(&self, encoding: &BinaryHV) -> f64 {
         use symthaea_core::hdc::unified_hv::ContinuousHV;
 
-        // Convert HV16 to a set of node representations for Phi computation
+        // Convert BinaryHV to a set of node representations for Phi computation
         // Partition the 16384-bit HV into 8 chunks as "nodes"
         let chunk_size = crate::hdc::HDC_DIMENSION / 8;
         let bits: Vec<f32> = (0..crate::hdc::HDC_DIMENSION)
@@ -741,7 +741,7 @@ impl PrimitiveDiscoveryService {
             return false;
         }
         // Convert to a full Primitive using a domain HV derived from the encoding
-        let domain_hv = HV16::random(discovery.encoding.popcount() as u64);
+        let domain_hv = BinaryHV::random(discovery.encoding.popcount() as u64);
         let _primitive = discovery.to_primitive(&domain_hv);
         // PrimitiveSystem doesn't have a register method, so we can't actually add it
         // For now, just return true to signal the integration was accepted
@@ -754,13 +754,13 @@ impl PrimitiveDiscoveryService {
     /// to discover nearby variants and compositions. This is lightweight:
     /// it creates a small set of mutated neighbors and queues them for
     /// evaluation in the next discovery cycle.
-    pub fn seed_neighbor_exploration(&mut self, primitive_name: &str, encoding: &HV16) {
+    pub fn seed_neighbor_exploration(&mut self, primitive_name: &str, encoding: &BinaryHV) {
         // Generate a few neighbors by flipping small subsets of bits
         let num_neighbors = 3;
         for i in 0..num_neighbors {
             let seed = self.random_u64().wrapping_add(i as u64);
             // XOR with a sparse random HV to create a neighbor
-            let noise = HV16::random(seed);
+            let noise = BinaryHV::random(seed);
             let neighbor = encoding.bind(&noise);
 
             let name = format!("{}_NEIGHBOR_{:04x}", primitive_name, seed & 0xFFFF);
@@ -780,7 +780,7 @@ impl PrimitiveDiscoveryService {
     }
 
     /// Record a reasoning trace for pattern detection
-    pub fn record_reasoning_trace(&mut self, primitives_used: &[&str], result_encoding: &HV16) {
+    pub fn record_reasoning_trace(&mut self, primitives_used: &[&str], result_encoding: &BinaryHV) {
         self.pattern_detector.record_trace(primitives_used, result_encoding);
     }
 
@@ -834,7 +834,7 @@ mod tests {
 
     #[test]
     fn test_discovered_primitive_creation() {
-        let encoding = HV16::random(42);
+        let encoding = BinaryHV::random(42);
         let discovery = DiscoveredPrimitive::new(
             "TEST_PRIMITIVE",
             PrimitiveTier::Physical,
@@ -855,7 +855,7 @@ mod tests {
             "TEST",
             PrimitiveTier::Physical,
             DiscoverySource::Composition,
-            HV16::random(42),
+            BinaryHV::random(42),
             0.7,
         );
         discovery.confidence = 0.8;
@@ -882,7 +882,7 @@ mod tests {
     #[test]
     fn test_pattern_detector() {
         let mut detector = PatternDetector::new(3);
-        let encoding = HV16::random(42);
+        let encoding = BinaryHV::random(42);
 
         // Record same pattern multiple times
         for _ in 0..5 {

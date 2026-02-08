@@ -16,7 +16,7 @@ use symthaea::hdc::cross_modal_attention_router::{
     CrossModalAttentionRouter, RouterConfig, ModalityInput,
 };
 use symthaea::hdc::cross_modal_binding::Modality;
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 
 // ============================================================================
 // BASIC ROUTER TESTS
@@ -65,7 +65,7 @@ fn test_empty_input_routing() {
 fn test_single_modality_routing() {
     let mut router = CrossModalAttentionRouter::new();
 
-    let hv = HV16::random(42);
+    let hv = BinaryHV::random(42);
     let input = ModalityInput::new(Modality::Visual, hv, 0.8);
 
     let result = router.route(&[input], 0.6);
@@ -79,7 +79,7 @@ fn test_single_modality_routing() {
 fn test_single_modality_with_label() {
     let mut router = CrossModalAttentionRouter::new();
 
-    let hv = HV16::random(123);
+    let hv = BinaryHV::random(123);
     let input = ModalityInput::new(Modality::Semantic, hv, 0.9)
         .with_label("test_semantic_input");
 
@@ -92,7 +92,7 @@ fn test_single_modality_with_label() {
 fn test_single_modality_with_confidence() {
     let mut router = CrossModalAttentionRouter::new();
 
-    let hv = HV16::random(456);
+    let hv = BinaryHV::random(456);
     let input = ModalityInput::new(Modality::Auditory, hv, 0.5)
         .with_confidence(0.9);
 
@@ -109,8 +109,8 @@ fn test_single_modality_with_confidence() {
 fn test_dual_modality_routing() {
     let mut router = CrossModalAttentionRouter::new();
 
-    let visual = ModalityInput::new(Modality::Visual, HV16::random(1), 0.8);
-    let auditory = ModalityInput::new(Modality::Auditory, HV16::random(2), 0.6);
+    let visual = ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.8);
+    let auditory = ModalityInput::new(Modality::Auditory, BinaryHV::random(2), 0.6);
 
     let result = router.route(&[visual, auditory], 0.7);
 
@@ -126,11 +126,11 @@ fn test_multi_modality_routing() {
     let mut router = CrossModalAttentionRouter::new();
 
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(10), 0.9),
-        ModalityInput::new(Modality::Auditory, HV16::random(20), 0.7),
-        ModalityInput::new(Modality::Semantic, HV16::random(30), 0.8),
-        ModalityInput::new(Modality::Temporal, HV16::random(40), 0.5),
-        ModalityInput::new(Modality::Emotional, HV16::random(50), 0.6),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(10), 0.9),
+        ModalityInput::new(Modality::Auditory, BinaryHV::random(20), 0.7),
+        ModalityInput::new(Modality::Semantic, BinaryHV::random(30), 0.8),
+        ModalityInput::new(Modality::Temporal, BinaryHV::random(40), 0.5),
+        ModalityInput::new(Modality::Emotional, BinaryHV::random(50), 0.6),
     ];
 
     let result = router.route(&inputs, 0.8);
@@ -144,8 +144,8 @@ fn test_salience_determines_attention() {
     let mut router = CrossModalAttentionRouter::new();
 
     // High salience visual vs low salience auditory
-    let visual = ModalityInput::new(Modality::Visual, HV16::random(100), 0.95);
-    let auditory = ModalityInput::new(Modality::Auditory, HV16::random(200), 0.05);
+    let visual = ModalityInput::new(Modality::Visual, BinaryHV::random(100), 0.95);
+    let auditory = ModalityInput::new(Modality::Auditory, BinaryHV::random(200), 0.05);
 
     let result = router.route(&[visual, auditory], 0.8);
 
@@ -165,9 +165,9 @@ fn test_low_phi_limits_integration() {
     let mut router = CrossModalAttentionRouter::new();
 
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(1000), 0.8),
-        ModalityInput::new(Modality::Auditory, HV16::random(2000), 0.7),
-        ModalityInput::new(Modality::Semantic, HV16::random(3000), 0.9),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(1000), 0.8),
+        ModalityInput::new(Modality::Auditory, BinaryHV::random(2000), 0.7),
+        ModalityInput::new(Modality::Semantic, BinaryHV::random(3000), 0.9),
     ];
 
     // Very low Φ should limit integration
@@ -196,8 +196,8 @@ fn test_phi_threshold_behavior() {
     let mut router = CrossModalAttentionRouter::with_config(config);
 
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(1), 0.8),
-        ModalityInput::new(Modality::Auditory, HV16::random(2), 0.7),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.8),
+        ModalityInput::new(Modality::Auditory, BinaryHV::random(2), 0.7),
     ];
 
     // Below threshold
@@ -220,12 +220,12 @@ fn test_context_influences_attention() {
     let mut router = CrossModalAttentionRouter::new();
 
     // Set a visual-like context
-    let visual_context = HV16::random(7777);
+    let visual_context = BinaryHV::random(7777);
     router.set_context(visual_context);
 
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(8888), 0.5),
-        ModalityInput::new(Modality::Auditory, HV16::random(9999), 0.5),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(8888), 0.5),
+        ModalityInput::new(Modality::Auditory, BinaryHV::random(9999), 0.5),
     ];
 
     let result = router.route(&inputs, 0.7);
@@ -239,12 +239,12 @@ fn test_goal_influences_attention() {
     let mut router = CrossModalAttentionRouter::new();
 
     // Set a goal vector
-    let goal = HV16::random(12345);
+    let goal = BinaryHV::random(12345);
     router.set_goal(goal);
 
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Semantic, HV16::random(11111), 0.6),
-        ModalityInput::new(Modality::Emotional, HV16::random(22222), 0.6),
+        ModalityInput::new(Modality::Semantic, BinaryHV::random(11111), 0.6),
+        ModalityInput::new(Modality::Emotional, BinaryHV::random(22222), 0.6),
     ];
 
     let result = router.route(&inputs, 0.6);
@@ -256,13 +256,13 @@ fn test_goal_influences_attention() {
 fn test_context_and_goal_together() {
     let mut router = CrossModalAttentionRouter::new();
 
-    router.set_context(HV16::random(111));
-    router.set_goal(HV16::random(222));
+    router.set_context(BinaryHV::random(111));
+    router.set_goal(BinaryHV::random(222));
 
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(333), 0.7),
-        ModalityInput::new(Modality::Semantic, HV16::random(444), 0.7),
-        ModalityInput::new(Modality::Temporal, HV16::random(555), 0.4),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(333), 0.7),
+        ModalityInput::new(Modality::Semantic, BinaryHV::random(444), 0.7),
+        ModalityInput::new(Modality::Temporal, BinaryHV::random(555), 0.4),
     ];
 
     let result = router.route(&inputs, 0.75);
@@ -283,7 +283,7 @@ fn test_sequential_routing() {
         let salience = 0.5 + (i as f64 * 0.05);
         let input = ModalityInput::new(
             Modality::Visual,
-            HV16::random(i as u64),
+            BinaryHV::random(i as u64),
             salience.min(1.0),
         );
 
@@ -297,11 +297,11 @@ fn test_modality_attention_persistence() {
     let mut router = CrossModalAttentionRouter::new();
 
     // First route with visual
-    let visual = ModalityInput::new(Modality::Visual, HV16::random(1), 0.9);
+    let visual = ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.9);
     router.route(&[visual], 0.7);
 
     // Then route with auditory
-    let auditory = ModalityInput::new(Modality::Auditory, HV16::random(2), 0.9);
+    let auditory = ModalityInput::new(Modality::Auditory, BinaryHV::random(2), 0.9);
     let result = router.route(&[auditory], 0.7);
 
     // Should handle modality switches
@@ -317,8 +317,8 @@ fn test_zero_salience_inputs() {
     let mut router = CrossModalAttentionRouter::new();
 
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(1), 0.0),
-        ModalityInput::new(Modality::Auditory, HV16::random(2), 0.0),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.0),
+        ModalityInput::new(Modality::Auditory, BinaryHV::random(2), 0.0),
     ];
 
     let result = router.route(&inputs, 0.5);
@@ -332,9 +332,9 @@ fn test_maximum_salience_inputs() {
     let mut router = CrossModalAttentionRouter::new();
 
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(1), 1.0),
-        ModalityInput::new(Modality::Auditory, HV16::random(2), 1.0),
-        ModalityInput::new(Modality::Semantic, HV16::random(3), 1.0),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(1), 1.0),
+        ModalityInput::new(Modality::Auditory, BinaryHV::random(2), 1.0),
+        ModalityInput::new(Modality::Semantic, BinaryHV::random(3), 1.0),
     ];
 
     let result = router.route(&inputs, 1.0);
@@ -347,7 +347,7 @@ fn test_maximum_salience_inputs() {
 fn test_zero_phi() {
     let mut router = CrossModalAttentionRouter::new();
 
-    let input = ModalityInput::new(Modality::Visual, HV16::random(999), 0.7);
+    let input = ModalityInput::new(Modality::Visual, BinaryHV::random(999), 0.7);
     let result = router.route(&[input], 0.0);
 
     // Zero Φ should not crash
@@ -359,8 +359,8 @@ fn test_extreme_phi() {
     let mut router = CrossModalAttentionRouter::new();
 
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(1), 0.5),
-        ModalityInput::new(Modality::Auditory, HV16::random(2), 0.5),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.5),
+        ModalityInput::new(Modality::Auditory, BinaryHV::random(2), 0.5),
     ];
 
     // Test with extreme Φ values
@@ -377,9 +377,9 @@ fn test_duplicate_modalities() {
 
     // Multiple inputs from same modality
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(1), 0.8),
-        ModalityInput::new(Modality::Visual, HV16::random(2), 0.6),
-        ModalityInput::new(Modality::Visual, HV16::random(3), 0.4),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.8),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(2), 0.6),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(3), 0.4),
     ];
 
     let result = router.route(&inputs, 0.7);
@@ -398,12 +398,12 @@ fn test_all_modality_types() {
 
     // Test all modality types
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(1), 0.7),
-        ModalityInput::new(Modality::Auditory, HV16::random(2), 0.6),
-        ModalityInput::new(Modality::Semantic, HV16::random(3), 0.8),
-        ModalityInput::new(Modality::Temporal, HV16::random(4), 0.5),
-        ModalityInput::new(Modality::Emotional, HV16::random(5), 0.7),
-        ModalityInput::new(Modality::Proprioceptive, HV16::random(6), 0.4),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.7),
+        ModalityInput::new(Modality::Auditory, BinaryHV::random(2), 0.6),
+        ModalityInput::new(Modality::Semantic, BinaryHV::random(3), 0.8),
+        ModalityInput::new(Modality::Temporal, BinaryHV::random(4), 0.5),
+        ModalityInput::new(Modality::Emotional, BinaryHV::random(5), 0.7),
+        ModalityInput::new(Modality::Proprioceptive, BinaryHV::random(6), 0.4),
     ];
 
     let result = router.route(&inputs, 0.85);
@@ -439,8 +439,8 @@ fn test_custom_config_extremes() {
     let mut router = CrossModalAttentionRouter::with_config(sharp_config);
 
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(1), 0.9),
-        ModalityInput::new(Modality::Auditory, HV16::random(2), 0.1),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.9),
+        ModalityInput::new(Modality::Auditory, BinaryHV::random(2), 0.1),
     ];
 
     let result = router.route(&inputs, 0.7);
@@ -466,8 +466,8 @@ fn test_routing_result_has_unified_representation() {
     let mut router = CrossModalAttentionRouter::new();
 
     let inputs: Vec<ModalityInput> = vec![
-        ModalityInput::new(Modality::Visual, HV16::random(1), 0.8),
-        ModalityInput::new(Modality::Semantic, HV16::random(2), 0.7),
+        ModalityInput::new(Modality::Visual, BinaryHV::random(1), 0.8),
+        ModalityInput::new(Modality::Semantic, BinaryHV::random(2), 0.7),
     ];
 
     let result = router.route(&inputs, 0.7);
@@ -483,7 +483,7 @@ fn test_routing_result_has_unified_representation() {
 fn test_routing_result_displays_correctly() {
     let mut router = CrossModalAttentionRouter::new();
 
-    let input = ModalityInput::new(Modality::Visual, HV16::random(42), 0.8);
+    let input = ModalityInput::new(Modality::Visual, BinaryHV::random(42), 0.8);
     let result = router.route(&[input], 0.6);
 
     // Debug should not panic

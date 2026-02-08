@@ -1,11 +1,11 @@
 //! HDC SIMD Performance Benchmark
 //!
-//! Benchmarks SIMD-optimized HV16 operations against scalar implementations
+//! Benchmarks SIMD-optimized BinaryHV operations against scalar implementations
 //! using real AI benchmark data for realistic workloads.
 //!
 //! Run with: cargo run --example hdc_simd_benchmark --release
 
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 use symthaea::hdc::simd_ops::{bind_simd, matching_bits_simd, hamming_distance_simd, invert_simd};
 use symthaea::hdc::HDC_DIMENSION;
 use std::time::{Instant, Duration};
@@ -59,8 +59,8 @@ fn benchmark_core_operations() -> Vec<BenchResult> {
     let mut results = Vec::new();
 
     // Create test vectors
-    let a = HV16::random(42);
-    let b = HV16::random(43);
+    let a = BinaryHV::random(42);
+    let b = BinaryHV::random(43);
 
     // 1. BIND (XOR) Operation
     println!("Benchmarking BIND (XOR)...");
@@ -104,12 +104,12 @@ fn benchmark_core_operations() -> Vec<BenchResult> {
 
     // 5. BUNDLE (Majority Vote) - Multiple vectors
     println!("Benchmarking BUNDLE (3 vectors)...");
-    let c = HV16::random(44);
+    let c = BinaryHV::random(44);
     let vectors = vec![a.clone(), b.clone(), c.clone()];
     let bundle_iterations = iterations / 10; // Fewer iterations for more expensive op
 
     let simd_bundle = benchmark_op(bundle_iterations, || {
-        black_box(HV16::bundle(&vectors))
+        black_box(BinaryHV::bundle(&vectors))
     });
     // Bundle uses SIMD internally, compare against repeated bind
     let scalar_bundle = benchmark_op(bundle_iterations, || {
@@ -201,16 +201,16 @@ fn benchmark_text_encoding() {
     println!("  Encoding {} text samples ({} chars each)...", n_samples, chars_per_sample);
 
     // Create character-level encoding vectors (item memory)
-    let char_memory: Vec<HV16> = (0..256u64).map(|i| HV16::random(i * 12345)).collect();
-    let pos_memory: Vec<HV16> = (0..chars_per_sample as u64).map(|i| HV16::random(i * 67890 + 1000)).collect();
+    let char_memory: Vec<BinaryHV> = (0..256u64).map(|i| BinaryHV::random(i * 12345)).collect();
+    let pos_memory: Vec<BinaryHV> = (0..chars_per_sample as u64).map(|i| BinaryHV::random(i * 67890 + 1000)).collect();
 
     // Benchmark encoding using SIMD bind
     let start = Instant::now();
-    let mut encoded_samples: Vec<HV16> = Vec::with_capacity(n_samples);
+    let mut encoded_samples: Vec<BinaryHV> = Vec::with_capacity(n_samples);
 
     for sample_idx in 0..n_samples {
         let seed = sample_idx as u64;
-        let mut result = HV16::random(seed); // Start with random base
+        let mut result = BinaryHV::random(seed); // Start with random base
 
         for pos in 0..chars_per_sample {
             let char_idx = ((seed + pos as u64) % 256) as usize;
@@ -267,8 +267,8 @@ fn benchmark_similarity_search() {
         println!("  Database size: {} vectors", n);
 
         // Create database
-        let database: Vec<HV16> = (0..n as u64).map(|i| HV16::random(i)).collect();
-        let query = HV16::random(999_999);
+        let database: Vec<BinaryHV> = (0..n as u64).map(|i| BinaryHV::random(i)).collect();
+        let query = BinaryHV::random(999_999);
 
         // SIMD search
         let start = Instant::now();

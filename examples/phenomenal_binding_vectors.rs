@@ -23,7 +23,7 @@ use anyhow::Result;
 use symthaea::perception::ConsciousnessProbeV2;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::HV16;
+use symthaea_core::hdc::BinaryHV;
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -97,9 +97,9 @@ fn run_h2_vectors() -> Result<()> {
         bundle_novelty: f64,
     }
 
-    let compute_metrics = |hv_a: &HV16, hv_b: &HV16| -> PairMetrics {
+    let compute_metrics = |hv_a: &BinaryHV, hv_b: &BinaryHV| -> PairMetrics {
         let bound = hv_a.bind(hv_b);
-        let bundled = HV16::bundle(&[hv_a.clone(), hv_b.clone()]);
+        let bundled = BinaryHV::bundle(&[hv_a.clone(), hv_b.clone()]);
 
         let hv_dim = 16384.0;
 

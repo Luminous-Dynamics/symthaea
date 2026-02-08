@@ -3,7 +3,7 @@
 //! Custom assertion macros and functions for common test patterns.
 
 use symthaea::databases::MemoryRecord;
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 
 // ============================================================================
 // Float Assertions
@@ -83,8 +83,8 @@ pub fn assert_memory_phi(record: &MemoryRecord, expected_phi: f64, epsilon: f64)
 // Encoding Assertions
 // ============================================================================
 
-/// Assert two HV16 encodings are identical
-pub fn assert_encoding_eq(actual: &HV16, expected: &HV16, msg: &str) {
+/// Assert two BinaryHV encodings are identical
+pub fn assert_encoding_eq(actual: &BinaryHV, expected: &BinaryHV, msg: &str) {
     assert_eq!(
         actual.0,
         expected.0,
@@ -94,7 +94,7 @@ pub fn assert_encoding_eq(actual: &HV16, expected: &HV16, msg: &str) {
 }
 
 /// Assert encoding roundtrip integrity
-pub fn assert_encoding_roundtrip(original: &HV16, recovered: &HV16) {
+pub fn assert_encoding_roundtrip(original: &BinaryHV, recovered: &BinaryHV) {
     assert_encoding_eq(original, recovered, "Encoding roundtrip failed");
 }
 

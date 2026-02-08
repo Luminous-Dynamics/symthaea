@@ -33,7 +33,7 @@ use crate::consciousness::primitive_reasoning::{
 use crate::consciousness::epistemic_tiers::{
     EpistemicCoordinate, EmpiricalTier, NormativeTier, MaterialityTier,
 };
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::{Primitive, PrimitiveSystem};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -643,7 +643,7 @@ pub struct CausalMechanismPrimitiveGrounding {
     /// NSM primitive composition
     pub nsm_primitives: Vec<String>,
     /// HDC encoding via primitive binding
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     /// Semantic polarity (+1 = constructive, -1 = reductive, 0 = neutral)
     pub polarity: i8,
 }
@@ -711,7 +711,7 @@ pub struct InteractionTypePrimitiveGrounding {
     /// NSM primitive composition
     pub nsm_primitives: Vec<String>,
     /// HDC encoding via primitive binding
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     /// Effect multiplier semantic (+1 = amplifying, -1 = dampening, 0 = neutral)
     pub effect_direction: i8,
 }
@@ -779,7 +779,7 @@ impl CausalNSMGrounding {
     }
 
     /// Query interactions by semantic similarity
-    pub fn query_interactions(&self, query: &HV16, threshold: f32) -> Vec<(&InteractionType, f32)> {
+    pub fn query_interactions(&self, query: &BinaryHV, threshold: f32) -> Vec<(&InteractionType, f32)> {
         let mut results: Vec<_> = self.interactions.iter()
             .map(|(t, g)| (t, g.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
@@ -806,8 +806,8 @@ impl CausalNSMGrounding {
 }
 
 /// Encode NSM primitives into HDC vector via sequential binding
-fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
-    let vectors: Vec<HV16> = primitives
+fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
+    let vectors: Vec<BinaryHV> = primitives
         .iter()
         .map(|name| {
             if let Some(p) = system.get(name) {
@@ -817,19 +817,19 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
             } else {
                 // Fallback: deterministic random for unknown primitives
                 let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-                HV16::random(seed)
+                BinaryHV::random(seed)
             }
         })
         .collect();
 
     if vectors.is_empty() {
-        return HV16::random(0);
+        return BinaryHV::random(0);
     }
 
     // Bind sequentially with position encoding for order preservation
     let mut result = vectors[0].clone();
     for (i, v) in vectors.iter().enumerate().skip(1) {
-        let position_hv = HV16::random(i as u64 * 1000);
+        let position_hv = BinaryHV::random(i as u64 * 1000);
         let positioned = v.bind(&position_hv);
         result = result.bind(&positioned);
     }
@@ -839,7 +839,7 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::{HV16, primitive_system::PrimitiveTier};
+    use crate::hdc::{BinaryHV, primitive_system::PrimitiveTier};
 
     #[test]
     fn test_causal_model_creation() {
@@ -855,7 +855,7 @@ mod tests {
             name: "TEST".to_string(),
             tier: PrimitiveTier::Physical,
             domain: "test".to_string(),
-            encoding: HV16::random(42),
+            encoding: BinaryHV::random(42),
             definition: "Test".to_string(),
             is_base: true,
             derivation: None,
@@ -863,8 +863,8 @@ mod tests {
 
         let execution = PrimitiveExecution {
             primitive: primitive.clone(),
-            input: HV16::random(1),
-            output: HV16::random(2),
+            input: BinaryHV::random(1),
+            output: BinaryHV::random(2),
             transformation: TransformationType::Bind,
             phi_contribution: 0.005,
             timestamp: 0.0,
@@ -901,7 +901,7 @@ mod tests {
 
     #[test]
     fn test_epistemic_tier_evolution() {
-        use crate::hdc::{HV16, primitive_system::PrimitiveTier};
+        use crate::hdc::{BinaryHV, primitive_system::PrimitiveTier};
 
         let mut model = CausalModel::new();
 
@@ -909,7 +909,7 @@ mod tests {
             name: "TEST".to_string(),
             tier: PrimitiveTier::Physical,
             domain: "test".to_string(),
-            encoding: HV16::random(42),
+            encoding: BinaryHV::random(42),
             definition: "Test".to_string(),
             is_base: true,
             derivation: None,
@@ -917,8 +917,8 @@ mod tests {
 
         let execution = PrimitiveExecution {
             primitive: primitive.clone(),
-            input: HV16::random(1),
-            output: HV16::random(2),
+            input: BinaryHV::random(1),
+            output: BinaryHV::random(2),
             transformation: TransformationType::Bind,
             phi_contribution: 0.005,
             timestamp: 0.0,

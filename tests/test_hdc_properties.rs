@@ -3,15 +3,15 @@
 //! Property-based tests for hyperdimensional computing operations to ensure
 //! mathematical invariants hold across random inputs.
 
-use symthaea::hdc::{HV16, HdcContext, HDC_DIMENSION};
+use symthaea::hdc::{BinaryHV, HdcContext, HDC_DIMENSION};
 
 /// Test: Binding is its own inverse (XOR property)
 /// bind(bind(a, b), b) ≈ a (within similarity threshold)
 #[test]
 fn test_bind_is_self_inverse() {
     for seed_base in 0..10 {
-        let a = HV16::random(seed_base);
-        let b = HV16::random(seed_base + 100);
+        let a = BinaryHV::random(seed_base);
+        let b = BinaryHV::random(seed_base + 100);
 
         // bind(a, b) then bind with b again should approximate a
         let bound = a.bind(&b);
@@ -31,8 +31,8 @@ fn test_bind_is_self_inverse() {
 #[test]
 fn test_bind_is_commutative() {
     for seed_base in 0..10 {
-        let a = HV16::random(seed_base * 7);
-        let b = HV16::random(seed_base * 7 + 50);
+        let a = BinaryHV::random(seed_base * 7);
+        let b = BinaryHV::random(seed_base * 7 + 50);
 
         let ab = a.bind(&b);
         let ba = b.bind(&a);
@@ -49,12 +49,12 @@ fn test_bind_is_commutative() {
 #[test]
 fn test_bundle_preserves_component_similarity() {
     for seed_base in 0..5 {
-        let a = HV16::random(seed_base * 11);
-        let b = HV16::random(seed_base * 11 + 10);
-        let c = HV16::random(seed_base * 11 + 20);
+        let a = BinaryHV::random(seed_base * 11);
+        let b = BinaryHV::random(seed_base * 11 + 10);
+        let c = BinaryHV::random(seed_base * 11 + 20);
 
         // Bundle all three
-        let abc = HV16::bundle(&[a.clone(), b.clone(), c.clone()]);
+        let abc = BinaryHV::bundle(&[a.clone(), b.clone(), c.clone()]);
 
         // Bundle should be more similar to each component than random
         // Random similarity is ~0.5, bundled should be > 0.5
@@ -78,7 +78,7 @@ fn test_bundle_preserves_component_similarity() {
 #[test]
 fn test_self_similarity_is_one() {
     for seed in 0..20 {
-        let hv = HV16::random(seed);
+        let hv = BinaryHV::random(seed);
         let sim = hv.similarity(&hv);
 
         assert!((sim - 1.0).abs() < 1e-6,
@@ -95,8 +95,8 @@ fn test_random_vectors_half_similar() {
 
     for i in 0..20u64 {
         for j in (i+1)..20u64 {
-            let a = HV16::random(i);
-            let b = HV16::random(j);
+            let a = BinaryHV::random(i);
+            let b = BinaryHV::random(j);
             total_similarity += a.similarity(&b) as f64;
             count += 1;
         }
@@ -115,7 +115,7 @@ fn test_random_vectors_half_similar() {
 /// permute(v, n); permute(_, n) cycles through positions
 #[test]
 fn test_permute_cyclic() {
-    let original = HV16::random(42);
+    let original = BinaryHV::random(42);
     let mut current = original.clone();
 
     // Permute by dimension should return to original
@@ -132,7 +132,7 @@ fn test_permute_cyclic() {
 /// Test: Single permutation changes the vector
 #[test]
 fn test_permute_changes_vector() {
-    let original = HV16::random(42);
+    let original = BinaryHV::random(42);
     let permuted = original.permute(1);
 
     // Permuted vector should be different (similarity < 1.0)
@@ -255,8 +255,8 @@ fn test_phi_is_deterministic() {
 #[test]
 fn test_hamming_similarity_relationship() {
     for seed in 0..10 {
-        let a = HV16::random(seed);
-        let b = HV16::random(seed + 100);
+        let a = BinaryHV::random(seed);
+        let b = BinaryHV::random(seed + 100);
 
         let sim = a.similarity(&b);
         let hamming = a.hamming_distance(&b);

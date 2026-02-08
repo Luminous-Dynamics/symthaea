@@ -58,7 +58,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::PrimitiveSystem;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -155,8 +155,8 @@ impl ActionType {
 pub struct ActionPrimitiveGrounding {
     /// NSM primitives that compose this action type
     pub nsm_primitives: Vec<String>,
-    /// Binary HV16 encoding from primitives
-    pub primitive_encoding: HV16,
+    /// Binary BinaryHV encoding from primitives
+    pub primitive_encoding: BinaryHV,
     /// Agency level (0 = passive, 1 = fully agentic)
     pub agency: f32,
     /// Outward vs inward direction (-1 = inward, 1 = outward)
@@ -169,7 +169,7 @@ impl ActionPrimitiveGrounding {
         let system = PrimitiveSystem::global();
 
         // Compose action encoding by binding primitives together
-        let mut encoding = HV16::random(0xAC71_0000); // Action base seed
+        let mut encoding = BinaryHV::random(0xAC71_0000); // Action base seed
         for name in primitives {
             if let Some(prim) = system.get(name) {
                 encoding = encoding.bind(&prim.encoding);
@@ -271,8 +271,8 @@ impl ActionPrimitiveGrounding {
 pub struct MeaningPrimitiveGrounding {
     /// NSM primitives that compose this meaning category
     pub nsm_primitives: Vec<String>,
-    /// Binary HV16 encoding from primitives
-    pub primitive_encoding: HV16,
+    /// Binary BinaryHV encoding from primitives
+    pub primitive_encoding: BinaryHV,
     /// Valence of this meaning type (-1 to 1)
     pub valence: f32,
     /// Motivational pull (how much it drives action)
@@ -285,7 +285,7 @@ impl MeaningPrimitiveGrounding {
         let system = PrimitiveSystem::global();
 
         // Compose meaning encoding by binding primitives together
-        let mut encoding = HV16::random(0x3EA0_1000); // Meaning base seed
+        let mut encoding = BinaryHV::random(0x3EA0_1000); // Meaning base seed
         for name in primitives {
             if let Some(prim) = system.get(name) {
                 encoding = encoding.bind(&prim.encoding);
@@ -1413,19 +1413,19 @@ impl EnactiveCognition {
 
     /// Get the combined encoding for an action-meaning pair
     ///
-    /// This represents "what action was taken with what meaning" as a single HV16.
+    /// This represents "what action was taken with what meaning" as a single BinaryHV.
     /// For example: Explore + Opportunity = "exploring and finding opportunity"
-    pub fn enacted_encoding(&self, action: ActionType, category: MeaningCategory) -> HV16 {
+    pub fn enacted_encoding(&self, action: ActionType, category: MeaningCategory) -> BinaryHV {
         let action_enc = self
             .action_groundings
             .get(&action)
             .map(|g| g.primitive_encoding.clone())
-            .unwrap_or_else(HV16::zero);
+            .unwrap_or_else(BinaryHV::zero);
         let meaning_enc = self
             .meaning_groundings
             .get(&category)
             .map(|g| g.primitive_encoding.clone())
-            .unwrap_or_else(HV16::zero);
+            .unwrap_or_else(BinaryHV::zero);
 
         action_enc.bind(&meaning_enc)
     }

@@ -40,7 +40,7 @@ use crate::consciousness::recursive_improvement::{
 use crate::consciousness::affective_consciousness::{
     CoreAffect, EmotionCategory, AffectiveConfig, AffectiveConsciousnessAnalyzer,
 };
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use crate::dynamics::CrystalizedConcept;
 use std::collections::{HashMap, VecDeque};
 

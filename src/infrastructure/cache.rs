@@ -209,7 +209,7 @@ impl<K: Eq + Hash + Clone, V: Clone> LruCache<K, V> {
 
 /// Specialized cache for HDC semantic vectors
 pub struct HdcCache {
-    /// Cache for text -> HV16 encodings
+    /// Cache for text -> BinaryHV encodings
     text_cache: LruCache<String, Vec<u16>>,
     /// Cache for command -> completion list
     completion_cache: LruCache<String, Vec<String>>,

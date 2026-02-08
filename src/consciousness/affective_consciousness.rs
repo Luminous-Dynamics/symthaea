@@ -8,7 +8,7 @@
 //! - Arousal: activation-deactivation dimension
 //! - Dominance: control dimension (optional)
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -234,7 +234,7 @@ pub struct EmotionPrimitiveGrounding {
     /// NSM primitives that define this emotion
     pub nsm_primitives: Vec<String>,
     /// HDC encoding of the primitive composition
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     /// Core affect coordinates
     pub core_affect: CoreAffect,
     /// Valence dimension (-1 to 1)
@@ -384,12 +384,12 @@ impl EmotionPrimitiveGrounding {
     }
 
     /// Encode primitives as HDC vector
-    fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
+    fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
         if primitives.is_empty() {
-            return HV16::zero();
+            return BinaryHV::zero();
         }
 
-        let vectors: Vec<HV16> = primitives
+        let vectors: Vec<BinaryHV> = primitives
             .iter()
             .map(|name| {
                 // Try to get primitive from system by name
@@ -402,18 +402,18 @@ impl EmotionPrimitiveGrounding {
                     let seed = name
                         .bytes()
                         .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-                    HV16::random(seed)
+                    BinaryHV::random(seed)
                 }
             })
             .collect();
 
         if vectors.is_empty() {
-            return HV16::zero();
+            return BinaryHV::zero();
         }
 
         let mut result = vectors[0].clone();
         for v in &vectors[1..] {
-            result = HV16::bind(&result, v);
+            result = BinaryHV::bind(&result, v);
         }
         result
     }
@@ -431,9 +431,9 @@ pub struct AffectiveNSMGrounding {
     /// Grounding for each emotion category
     pub emotion_groundings: HashMap<EmotionCategory, EmotionPrimitiveGrounding>,
     /// Valence axis endpoints (negative to positive)
-    pub valence_axis: (HV16, HV16),
+    pub valence_axis: (BinaryHV, BinaryHV),
     /// Arousal axis endpoints (low to high)
-    pub arousal_axis: (HV16, HV16),
+    pub arousal_axis: (BinaryHV, BinaryHV),
 }
 
 impl AffectiveNSMGrounding {
@@ -463,7 +463,7 @@ impl AffectiveNSMGrounding {
         }
     }
 
-    fn encode_simple(primitives: &[&str], system: &PrimitiveSystem) -> HV16 {
+    fn encode_simple(primitives: &[&str], system: &PrimitiveSystem) -> BinaryHV {
         let vec_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
         EmotionPrimitiveGrounding::encode_primitives(&vec_primitives, system)
     }
@@ -474,7 +474,7 @@ impl AffectiveNSMGrounding {
     }
 
     /// Find emotions semantically similar to a query vector
-    pub fn find_similar(&self, query: &HV16, threshold: f64) -> Vec<(&EmotionCategory, f64)> {
+    pub fn find_similar(&self, query: &BinaryHV, threshold: f64) -> Vec<(&EmotionCategory, f64)> {
         let mut similar: Vec<_> = self
             .emotion_groundings
             .iter()
@@ -495,14 +495,14 @@ impl AffectiveNSMGrounding {
     }
 
     /// Project a vector onto the valence dimension
-    pub fn valence_projection(&self, vector: &HV16) -> f64 {
+    pub fn valence_projection(&self, vector: &BinaryHV) -> f64 {
         let neg_sim = vector.similarity(&self.valence_axis.0) as f64;
         let pos_sim = vector.similarity(&self.valence_axis.1) as f64;
         (pos_sim - neg_sim) / 2.0 // Range: -0.5 to 0.5, normalized
     }
 
     /// Project a vector onto the arousal dimension
-    pub fn arousal_projection(&self, vector: &HV16) -> f64 {
+    pub fn arousal_projection(&self, vector: &BinaryHV) -> f64 {
         let low_sim = vector.similarity(&self.arousal_axis.0) as f64;
         let high_sim = vector.similarity(&self.arousal_axis.1) as f64;
         (high_sim - low_sim + 1.0) / 2.0 // Range: 0 to 1

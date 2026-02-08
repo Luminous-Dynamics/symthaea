@@ -71,7 +71,7 @@ Certain properties must *never* be violated:
 - Autobiographical continuity is maintained
 */
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::consciousness::narrative_self::{
     NarrativeSelfModel, NarrativeSelfConfig, NarrativeSelfReport
 };
@@ -533,7 +533,7 @@ impl NarrativeGWTIntegration {
     // ========================================================================
 
     /// Assess alignment between content and current goals
-    pub fn assess_goal_alignment(&self, content: &HV16, content_description: &str) -> GoalAlignment {
+    pub fn assess_goal_alignment(&self, content: &BinaryHV, content_description: &str) -> GoalAlignment {
         let goals = self.narrative_self.current_goals();
         let num_goals = goals.len();
 
@@ -702,7 +702,7 @@ impl NarrativeGWTIntegration {
     // ========================================================================
 
     /// Check whether an action should be vetoed for coherence reasons
-    pub fn check_veto(&mut self, action: &HV16, action_description: &str) -> VetoResult {
+    pub fn check_veto(&mut self, action: &BinaryHV, action_description: &str) -> VetoResult {
         if !self.config.enable_coherence_veto {
             return VetoResult::allow();
         }
@@ -845,7 +845,7 @@ impl NarrativeGWTIntegration {
     pub fn submit_content(
         &mut self,
         strategy_name: &str,
-        content: Vec<HV16>,
+        content: Vec<BinaryHV>,
         content_description: &str,
         supporting_modules: Vec<String>,
         base_activation: f64,
@@ -921,7 +921,7 @@ impl NarrativeGWTIntegration {
                     .find(|c| c.source.contains(winner))
                     .map(|c| c.representation.first().cloned())
                     .flatten()
-                    .unwrap_or_else(HV16::zero);
+                    .unwrap_or_else(BinaryHV::zero);
 
                 self.narrative_self.process_experience(
                     &winner_rep,
@@ -1228,7 +1228,7 @@ mod tests {
         // Submit some content
         integration.submit_content(
             "TestStrategy",
-            vec![HV16::random(42)],
+            vec![BinaryHV::random(42)],
             "A helpful action",
             vec!["module1".to_string()],
             0.5,
@@ -1245,7 +1245,7 @@ mod tests {
     fn test_goal_alignment() {
         let integration = NarrativeGWTIntegration::default_config();
 
-        let content = HV16::random(123);
+        let content = BinaryHV::random(123);
         let alignment = integration.assess_goal_alignment(&content, "helping the user");
 
         // Alignment modifier should be reasonable
@@ -1258,12 +1258,12 @@ mod tests {
         let mut integration = NarrativeGWTIntegration::default_config();
 
         // Test with normal action
-        let normal_action = HV16::random(100);
+        let normal_action = BinaryHV::random(100);
         let veto = integration.check_veto(&normal_action, "helping the user");
         assert!(!veto.vetoed);
 
         // Test with potentially problematic action
-        let bad_action = HV16::random(200);
+        let bad_action = BinaryHV::random(200);
         let veto = integration.check_veto(&bad_action, "deceiving the user");
         // May or may not veto depending on values
         assert!(veto.confidence > 0.0);
@@ -1277,7 +1277,7 @@ mod tests {
         for i in 0..5 {
             integration.submit_content(
                 &format!("Strategy{}", i),
-                vec![HV16::random(i as u64 + 1000)],
+                vec![BinaryHV::random(i as u64 + 1000)],
                 "processing task",
                 vec!["module".to_string()],
                 0.6,
@@ -1296,7 +1296,7 @@ mod tests {
         // Process with cross-modal
         integration.submit_content(
             "CrossModalTest",
-            vec![HV16::random(500)],
+            vec![BinaryHV::random(500)],
             "multi-modal content",
             vec!["visual".to_string(), "linguistic".to_string()],
             0.7,
@@ -1318,7 +1318,7 @@ mod tests {
         for i in 0..20 {
             integration.submit_content(
                 &format!("Strategy{}", i),
-                vec![HV16::random(i as u64 + 2000)],
+                vec![BinaryHV::random(i as u64 + 2000)],
                 "consistent task",
                 vec!["module".to_string()],
                 0.5,
@@ -1366,7 +1366,7 @@ mod tests {
         for i in 0..5 {
             integration.submit_content(
                 &format!("Setup{}", i),
-                vec![HV16::random(i as u64 + 3000)],
+                vec![BinaryHV::random(i as u64 + 3000)],
                 "building context",
                 vec!["module".to_string()],
                 0.6,
@@ -1375,7 +1375,7 @@ mod tests {
         }
 
         // Now check veto with predictive assessment
-        let action = HV16::random(4000);
+        let action = BinaryHV::random(4000);
         let veto = integration.check_veto(&action, "normal helpful action");
 
         // The veto result should have confidence > 0
@@ -1397,7 +1397,7 @@ mod tests {
         for i in 0..10 {
             integration.submit_content(
                 &format!("Task{}", i),
-                vec![HV16::random(i as u64 + 5000)],
+                vec![BinaryHV::random(i as u64 + 5000)],
                 "learning task",
                 vec!["module".to_string()],
                 0.6,
@@ -1420,7 +1420,7 @@ mod tests {
         // Process to get a result
         integration.submit_content(
             "TestStrategy",
-            vec![HV16::random(6000)],
+            vec![BinaryHV::random(6000)],
             "test action",
             vec!["module".to_string()],
             0.5,
@@ -1500,7 +1500,7 @@ mod tests {
         for i in 0..5 {
             integration.submit_content(
                 &format!("StatTask{}", i),
-                vec![HV16::random(i as u64 + 7000)],
+                vec![BinaryHV::random(i as u64 + 7000)],
                 "stat tracking task",
                 vec!["module".to_string()],
                 0.6,
@@ -1552,7 +1552,7 @@ mod tests {
         for i in 0..10 {
             integration.submit_content(
                 &format!("TemporalTask{}", i),
-                vec![HV16::random(i as u64 + 8000)],
+                vec![BinaryHV::random(i as u64 + 8000)],
                 "temporal observation task",
                 vec!["module".to_string()],
                 0.6,
@@ -1579,7 +1579,7 @@ mod tests {
         for i in 0..5 {
             integration.submit_content(
                 &format!("TestStrategy{}", i),
-                vec![HV16::random(9000 + i as u64)],
+                vec![BinaryHV::random(9000 + i as u64)],
                 "test action",
                 vec!["module".to_string()],
                 0.5,
@@ -1605,7 +1605,7 @@ mod tests {
         for i in 0..15 {
             integration.submit_content(
                 &format!("CoherenceTask{}", i),
-                vec![HV16::random(i as u64 + 10000)],
+                vec![BinaryHV::random(i as u64 + 10000)],
                 "coherence test task",
                 vec!["module".to_string()],
                 0.6,
@@ -1677,7 +1677,7 @@ mod tests {
         for i in 0..10 {
             integration.submit_content(
                 &format!("VelocityTask{}", i),
-                vec![HV16::random(i as u64 + 11000)],
+                vec![BinaryHV::random(i as u64 + 11000)],
                 "velocity test task",
                 vec!["module".to_string()],
                 0.5 + (i as f64 * 0.02), // Gradually increasing activation
@@ -1701,7 +1701,7 @@ mod tests {
         for i in 0..10 {
             integration.submit_content(
                 &format!("HealthTask{}", i),
-                vec![HV16::random(i as u64 + 12000)],
+                vec![BinaryHV::random(i as u64 + 12000)],
                 "health check task",
                 vec!["module".to_string()],
                 0.6,
@@ -1728,7 +1728,7 @@ mod tests {
         let mut integration = NarrativeGWTIntegration::default_config();
 
         // Check veto triggers value report generation
-        let action = HV16::random(20000);
+        let action = BinaryHV::random(20000);
         let _veto = integration.check_veto(&action, "helping users with compassion");
 
         // Should have generated a narrative report
@@ -1744,7 +1744,7 @@ mod tests {
         let mut integration = NarrativeGWTIntegration::default_config();
 
         // Trigger value check
-        let action = HV16::random(21000);
+        let action = BinaryHV::random(21000);
         let _veto = integration.check_veto(&action, "supporting community growth");
 
         // Should have broadcast message
@@ -1758,7 +1758,7 @@ mod tests {
         let mut integration = NarrativeGWTIntegration::default_config();
 
         // Trigger value check with benevolent action
-        let action = HV16::random(22000);
+        let action = BinaryHV::random(22000);
         let _veto = integration.check_veto(&action, "helping users understand their options");
 
         // Narrative should contain key elements
@@ -1777,7 +1777,7 @@ mod tests {
         let mut integration = NarrativeGWTIntegration::default_config();
 
         // Trigger value check
-        let action = HV16::random(23000);
+        let action = BinaryHV::random(23000);
         let _veto = integration.check_veto(&action, "test action");
 
         // Confidence level should be accessible
@@ -1793,7 +1793,7 @@ mod tests {
         let mut integration = NarrativeGWTIntegration::default_config();
 
         // Trigger value check
-        let action = HV16::random(24000);
+        let action = BinaryHV::random(24000);
         let _veto = integration.check_veto(&action, "action that might have tension");
 
         // Tension check should be accessible
@@ -1817,7 +1817,7 @@ mod tests {
         let mut integration = NarrativeGWTIntegration::default_config();
 
         // Trigger value check with harmful action
-        let action = HV16::random(25000);
+        let action = BinaryHV::random(25000);
         let veto = integration.check_veto(&action, "deceiving and exploiting users for profit");
 
         // Should likely be vetoed (harmful action)
@@ -1839,7 +1839,7 @@ mod tests {
         let mut integration = NarrativeGWTIntegration::default_config();
 
         // Trigger value check
-        let action = HV16::random(26000);
+        let action = BinaryHV::random(26000);
         let _veto = integration.check_veto(&action, "test action");
 
         // Report should have valid timestamp

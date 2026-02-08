@@ -54,7 +54,7 @@ use crate::perception::modern_embeddings::{
 };
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::HV16};
+use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -828,7 +828,7 @@ impl PhenomenalDetector {
         })
     }
 
-    fn activation_to_hv16(&self, activation: &[f32]) -> HV16 {
+    fn activation_to_hv16(&self, activation: &[f32]) -> BinaryHV {
         let mut expanded = Vec::with_capacity(HDC_DIMENSION);
         let tiles = HDC_DIMENSION / activation.len();
         let remainder = HDC_DIMENSION % activation.len();
@@ -844,7 +844,7 @@ impl PhenomenalDetector {
             expanded.push(activation[i]);
         }
 
-        HV16::from_bipolar(&expanded)
+        BinaryHV::from_bipolar(&expanded)
     }
 
     /// Evaluate detector on contrastive examples

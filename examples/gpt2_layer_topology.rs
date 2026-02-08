@@ -34,7 +34,7 @@ use tokenizers::Tokenizer;
 use hf_hub::{api::sync::Api, Repo, RepoType};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -230,7 +230,7 @@ fn load_corpus(path: &str) -> Result<Vec<String>> {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn activation_to_hv16(activation: &[f32]) -> HV16 {
+fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
     use symthaea_core::hdc::HDC_DIMENSION;
 
     let mut expanded = Vec::with_capacity(HDC_DIMENSION);
@@ -249,11 +249,11 @@ fn activation_to_hv16(activation: &[f32]) -> HV16 {
         expanded.push(activation[i]);
     }
 
-    HV16::from_bipolar(&expanded)
+    BinaryHV::from_bipolar(&expanded)
 }
 
 #[cfg(feature = "neural-bridge")]
-fn compute_unity(hv: &HV16, config: &TopologyConfig) -> f64 {
+fn compute_unity(hv: &BinaryHV, config: &TopologyConfig) -> f64 {
     let mut topology = ConsciousnessTopology::new(config.clone());
 
     topology.add_state(*hv);

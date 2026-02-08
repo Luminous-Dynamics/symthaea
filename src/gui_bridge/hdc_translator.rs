@@ -1,12 +1,12 @@
 //! HDC Translator - Semantic Translation via Hyperdimensional Computing
 //!
-//! Uses HV16 vectors for semantic operations:
+//! Uses BinaryHV vectors for semantic operations:
 //! - Encoding NixOS paths and concepts to hypervectors
 //! - Semantic similarity search for widget discovery
 //! - Role-based binding for structured mappings
 //! - Unbinding for reverse translation
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use super::widget_mapper::{WidgetBinding, NixPath, WidgetId};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
@@ -62,7 +62,7 @@ impl SemanticRole {
     }
 
     /// Get base HV for this role
-    pub fn to_hv(&self) -> HV16 {
+    pub fn to_hv(&self) -> BinaryHV {
         let seed = match self {
             Self::Service => 1000,
             Self::Package => 2000,
@@ -75,7 +75,7 @@ impl SemanticRole {
             Self::List => 9000,
             Self::Option => 10000,
         };
-        HV16::random(seed)
+        BinaryHV::random(seed)
     }
 }
 
@@ -83,16 +83,16 @@ impl SemanticRole {
 #[derive(Debug, Clone)]
 pub struct SemanticBinding {
     /// Widget semantic HV
-    pub widget_hv: HV16,
+    pub widget_hv: BinaryHV,
 
     /// Role HV
-    pub role_hv: HV16,
+    pub role_hv: BinaryHV,
 
     /// Combined bound HV (widget ⊗ role)
-    pub bound_hv: HV16,
+    pub bound_hv: BinaryHV,
 
     /// NixOS path semantic HV
-    pub nix_hv: HV16,
+    pub nix_hv: BinaryHV,
 
     /// Confidence of the binding
     pub confidence: f64,
@@ -100,7 +100,7 @@ pub struct SemanticBinding {
 
 impl SemanticBinding {
     /// Create new semantic binding
-    pub fn new(widget_hv: HV16, role: SemanticRole, nix_hv: HV16) -> Self {
+    pub fn new(widget_hv: BinaryHV, role: SemanticRole, nix_hv: BinaryHV) -> Self {
         let role_hv = role.to_hv();
         let bound_hv = widget_hv.bind(&role_hv);
 
@@ -117,13 +117,13 @@ impl SemanticBinding {
     }
 
     /// Unbind to recover widget HV from nix HV
-    pub fn unbind_widget(&self) -> HV16 {
+    pub fn unbind_widget(&self) -> BinaryHV {
         // nix ⊗ role = widget (approximately, due to XOR self-inverse)
         self.nix_hv.bind(&self.role_hv)
     }
 
     /// Unbind to recover nix HV from widget HV
-    pub fn unbind_nix(&self) -> HV16 {
+    pub fn unbind_nix(&self) -> BinaryHV {
         self.widget_hv.bind(&self.role_hv)
     }
 }
@@ -174,13 +174,13 @@ impl SemanticConfidence {
 /// HDC Translator for semantic operations
 pub struct HdcTranslator {
     /// Path to HV cache
-    path_cache: HashMap<String, HV16>,
+    path_cache: HashMap<String, BinaryHV>,
 
     /// Role HV cache
-    role_cache: HashMap<SemanticRole, HV16>,
+    role_cache: HashMap<SemanticRole, BinaryHV>,
 
     /// NixOS vocabulary (common terms -> HV)
-    vocabulary: HashMap<String, HV16>,
+    vocabulary: HashMap<String, BinaryHV>,
 }
 
 impl HdcTranslator {
@@ -251,40 +251,40 @@ impl HdcTranslator {
         hasher.finish()
     }
 
-    /// Encode text to HV16 using n-gram bundling
-    fn encode_text(&self, text: &str) -> HV16 {
-        let mut vectors: Vec<HV16> = Vec::new();
+    /// Encode text to BinaryHV using n-gram bundling
+    fn encode_text(&self, text: &str) -> BinaryHV {
+        let mut vectors: Vec<BinaryHV> = Vec::new();
         let chars: Vec<char> = text.to_lowercase().chars().collect();
 
         // 3-gram encoding
         for window in chars.windows(3) {
             let trigram: String = window.iter().collect();
             let seed = Self::string_to_seed(&trigram);
-            vectors.push(HV16::random(seed));
+            vectors.push(BinaryHV::random(seed));
         }
 
         // Word-level encoding
         for word in text.split_whitespace() {
             let seed = Self::string_to_seed(word);
-            vectors.push(HV16::random(seed));
+            vectors.push(BinaryHV::random(seed));
         }
 
         if vectors.is_empty() {
-            HV16::zero()
+            BinaryHV::zero()
         } else {
-            HV16::bundle(&vectors)
+            BinaryHV::bundle(&vectors)
         }
     }
 
     /// Encode NixOS path to semantic HV
-    pub fn encode_path(&mut self, path: &NixPath) -> HV16 {
+    pub fn encode_path(&mut self, path: &NixPath) -> BinaryHV {
         // Check cache
         if let Some(hv) = self.path_cache.get(&path.0) {
             return *hv;
         }
 
         // Encode path components
-        let mut vectors: Vec<HV16> = Vec::new();
+        let mut vectors: Vec<BinaryHV> = Vec::new();
 
         // Split path and encode each component
         for (i, component) in path.0.split('.').enumerate() {
@@ -302,13 +302,13 @@ impl HdcTranslator {
 
         // Determine role and bind with role HV
         let role = SemanticRole::from_path(&path.0);
-        let role_hv = self.role_cache.get(&role).copied().unwrap_or_else(HV16::zero);
+        let role_hv = self.role_cache.get(&role).copied().unwrap_or_else(BinaryHV::zero);
         vectors.push(role_hv);
 
         let result = if vectors.is_empty() {
-            HV16::zero()
+            BinaryHV::zero()
         } else {
-            HV16::bundle(&vectors)
+            BinaryHV::bundle(&vectors)
         };
 
         // Cache result
@@ -318,7 +318,7 @@ impl HdcTranslator {
     }
 
     /// Encode widget concept to semantic HV
-    pub fn encode_widget(&self, widget_id: &WidgetId, label: &str) -> HV16 {
+    pub fn encode_widget(&self, widget_id: &WidgetId, label: &str) -> BinaryHV {
         // Combine widget ID and label
         let combined = format!("{} {}", widget_id.0, label);
         self.encode_text(&combined)
@@ -485,8 +485,8 @@ mod tests {
 
     #[test]
     fn test_semantic_binding() {
-        let widget_hv = HV16::random(42);
-        let nix_hv = HV16::random(43);
+        let widget_hv = BinaryHV::random(42);
+        let nix_hv = BinaryHV::random(43);
         let role = SemanticRole::Service;
 
         let binding = SemanticBinding::new(widget_hv, role, nix_hv);

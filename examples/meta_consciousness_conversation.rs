@@ -2,7 +2,7 @@
 //!
 //! This example uses the `MetaConversationCore` helper to:
 //! - Encode user input into HDC space using the TextEncoder + PrimitiveSystem
-//! - Feed the resulting HV16 components into the MetaConsciousness engine
+//! - Feed the resulting BinaryHV components into the MetaConsciousness engine
 //! - Print Φ, meta-Φ, self-model confidence, and a short explanation each turn
 //!
 //! It does not use any external LLM; responses are simple summaries of the

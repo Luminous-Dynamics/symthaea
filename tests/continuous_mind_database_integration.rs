@@ -6,13 +6,13 @@
 
 use symthaea::continuous_mind::{ContinuousMind, MindConfig};
 use symthaea::databases::{MemoryRecord, MemoryType};
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 
 /// Create a test memory record
 fn create_test_memory(id: &str, seed: u64, memory_type: MemoryType) -> MemoryRecord {
     MemoryRecord {
         id: id.to_string(),
-        encoding: HV16::random(seed),
+        encoding: BinaryHV::random(seed),
         timestamp_ms: 1700000000000 + seed,
         memory_type,
         content: format!("Test memory content for {}", id),
@@ -86,7 +86,7 @@ async fn test_continuous_mind_recall_all() {
     mind.remember(episodic).await.unwrap();
 
     // Query should return results from multiple sources
-    let query = HV16::random(100); // Close to working memory
+    let query = BinaryHV::random(100); // Close to working memory
     let results = mind.recall_all(&query, 10).await.unwrap();
 
     assert!(results.len() >= 1, "Should recall at least one memory");

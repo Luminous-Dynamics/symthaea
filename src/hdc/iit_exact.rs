@@ -940,7 +940,7 @@ pub fn system_phi(tpm: &TransitionProbabilityMatrix, state: &[bool]) -> f64 {
 /// Result of comparing approximate (lambda2 proxy) Phi against exact IIT Phi.
 #[derive(Debug, Clone)]
 pub struct PhiValidation {
-    /// Approximate Phi from HV16 similarity-based proxy
+    /// Approximate Phi from BinaryHV similarity-based proxy
     pub approx_phi: f64,
     /// Exact Phi from TPM + MIP partition
     pub exact_phi: f64,
@@ -951,13 +951,13 @@ pub struct PhiValidation {
 /// Validate the lambda2 Phi proxy against exact IIT computation.
 ///
 /// Builds a TPM from a component similarity matrix, computes both the
-/// HV16-based approximate Phi and exact system Phi, and returns the
+/// BinaryHV-based approximate Phi and exact system Phi, and returns the
 /// comparison. This function is the bridge between the fast approximate
 /// world (HDC vectors) and the ground-truth IIT world (TPMs).
 ///
 /// # Arguments
 ///
-/// * `adjacency` - n x n weight/similarity matrix (e.g., from HV16 cosine similarities)
+/// * `adjacency` - n x n weight/similarity matrix (e.g., from BinaryHV cosine similarities)
 /// * `noise` - Noise level for TPM construction (0.0 = deterministic)
 ///
 /// # Returns

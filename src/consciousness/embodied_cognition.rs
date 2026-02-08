@@ -79,7 +79,7 @@ use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 use serde::{Serialize, Deserialize};
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use super::affective_consciousness::{CoreAffect, PhysiologicalState};
 
@@ -434,7 +434,7 @@ pub struct ActionPattern {
     pub duration: u32,
 
     /// HDC encoding of the action
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -467,7 +467,7 @@ pub struct SensoryPrediction {
     pub auditory_expected: f64,
 
     /// HDC encoding of expected sensation
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 }
 
 /// Sensorimotor contingency engine
@@ -518,7 +518,7 @@ impl SensorimotorEngine {
             tactile_expected: 0.0,
             proprioceptive_change: 0.0,
             auditory_expected: 0.0,
-            encoding: HV16::random(0),
+            encoding: BinaryHV::random(0),
         };
 
         for contingency in matches {
@@ -627,7 +627,7 @@ pub struct Affordance {
     pub expected_value: f64,
 
     /// HDC encoding
-    pub encoding: HV16,
+    pub encoding: BinaryHV,
 }
 
 impl Affordance {
@@ -677,7 +677,7 @@ impl AffordanceDetector {
                         effort: 0.3,
                         risk: 0.1,
                         expected_value: obj.value,
-                        encoding: HV16::random(obj.id as u64),
+                        encoding: BinaryHV::random(obj.id as u64),
                     });
                 }
             }
@@ -694,7 +694,7 @@ impl AffordanceDetector {
                     effort: surface.slope.abs() * 0.5,
                     risk: surface.slope.abs() * self.risk_sensitivity,
                     expected_value: 0.2,
-                    encoding: HV16::random(surface.id as u64),
+                    encoding: BinaryHV::random(surface.id as u64),
                 });
             }
         }
@@ -1010,7 +1010,7 @@ pub struct BodyPartPrimitiveGrounding {
     /// NSM primitive composition (e.g., ["BODY", "PART", "SEE", "KNOW"])
     pub nsm_primitives: Vec<String>,
     /// HDC encoding via primitive binding
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     /// Whether this part is a locus of agency
     pub agency_locus: bool,
     /// Whether this part is a sensory organ
@@ -1101,7 +1101,7 @@ pub struct MovementTypePrimitiveGrounding {
     /// NSM primitive composition
     pub nsm_primitives: Vec<String>,
     /// HDC encoding via primitive binding
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
     /// Whether this movement requires external object
     pub requires_object: bool,
     /// Whether this movement is self-directed
@@ -1222,7 +1222,7 @@ impl EmbodiedNSMGrounding {
     }
 
     /// Find body parts by semantic similarity to query vector
-    pub fn query_body_parts(&self, query: &HV16, threshold: f32) -> Vec<(&BodyPart, f32)> {
+    pub fn query_body_parts(&self, query: &BinaryHV, threshold: f32) -> Vec<(&BodyPart, f32)> {
         let mut results: Vec<_> = self.body_parts.iter()
             .map(|(part, grounding)| (part, grounding.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
@@ -1232,7 +1232,7 @@ impl EmbodiedNSMGrounding {
     }
 
     /// Find movements by semantic similarity to query vector
-    pub fn query_movements(&self, query: &HV16, threshold: f32) -> Vec<(&MovementType, f32)> {
+    pub fn query_movements(&self, query: &BinaryHV, threshold: f32) -> Vec<(&MovementType, f32)> {
         let mut results: Vec<_> = self.movements.iter()
             .map(|(movement, grounding)| (movement, grounding.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
@@ -1275,8 +1275,8 @@ impl EmbodiedNSMGrounding {
 }
 
 /// Encode NSM primitives into HDC vector via sequential binding
-fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
-    let vectors: Vec<HV16> = primitives
+fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryHV {
+    let vectors: Vec<BinaryHV> = primitives
         .iter()
         .map(|name| {
             if let Some(p) = system.get(name) {
@@ -1286,19 +1286,19 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> HV16 {
             } else {
                 // Fallback: deterministic random for unknown primitives
                 let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
-                HV16::random(seed)
+                BinaryHV::random(seed)
             }
         })
         .collect();
 
     if vectors.is_empty() {
-        return HV16::random(0);
+        return BinaryHV::random(0);
     }
 
     // Bind sequentially with position encoding for order preservation
     let mut result = vectors[0].clone();
     for (i, v) in vectors.iter().enumerate().skip(1) {
-        let position_hv = HV16::random(i as u64 * 1000);
+        let position_hv = BinaryHV::random(i as u64 * 1000);
         let positioned = v.bind(&position_hv);
         result = result.bind(&positioned);
     }
@@ -1366,7 +1366,7 @@ mod tests {
             effort: 0.2,
             risk: 0.1,
             expected_value: 0.9,
-            encoding: HV16::random(42),
+            encoding: BinaryHV::random(42),
         };
 
         assert!(affordance.attractiveness() > 0.0);
@@ -1381,7 +1381,7 @@ mod tests {
             movement_type: MovementType::Grasp,
             intensity: 0.5,
             duration: 10,
-            encoding: HV16::random(1),
+            encoding: BinaryHV::random(1),
         };
 
         let sensation = SensoryPrediction {
@@ -1389,7 +1389,7 @@ mod tests {
             tactile_expected: 0.7,
             proprioceptive_change: 0.5,
             auditory_expected: 0.1,
-            encoding: HV16::random(2),
+            encoding: BinaryHV::random(2),
         };
 
         // Learn
@@ -1449,7 +1449,7 @@ mod tests {
             movement_type: MovementType::Reach,
             intensity: 0.5,
             duration: 5,
-            encoding: HV16::random(100),
+            encoding: BinaryHV::random(100),
         };
 
         let outcome = analyzer.perform_action(action);

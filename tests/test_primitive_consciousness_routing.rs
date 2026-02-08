@@ -15,7 +15,7 @@
 //! 4. Evolution → Improved primitives
 
 use symthaea::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 use symthaea::consciousness::primitive_consciousness::{
     PrimitiveConsciousnessState, ConsciousnessPrimitiveProcessor,
     ConsciousnessDecomposer, PrimitiveBindingEngine,
@@ -40,7 +40,7 @@ fn test_primitive_activation_creates_consciousness_state() {
     println!("\n=== PRIMITIVE → CONSCIOUSNESS STATE ===");
 
     // Process input through primitive processor
-    let input = HV16::random(42);
+    let input = BinaryHV::random(42);
     let timestamp = 1.0;
     let result = processor.process_input(&input, timestamp);
 
@@ -61,9 +61,9 @@ fn test_tier_activation_pattern_reflects_input() {
 
     // Process different types of inputs
     let inputs = vec![
-        (HV16::random(1), "Random 1"),
-        (HV16::random(2), "Random 2"),
-        (HV16::random(3), "Random 3"),
+        (BinaryHV::random(1), "Random 1"),
+        (BinaryHV::random(2), "Random 2"),
+        (BinaryHV::random(3), "Random 3"),
     ];
 
     for (i, (input, label)) in inputs.into_iter().enumerate() {
@@ -138,7 +138,7 @@ fn test_adaptive_selector_learns_from_feedback() {
     let task = TaskType::Logical;
 
     // Create a reasoning chain with some executions
-    let question = HV16::random(100);
+    let question = BinaryHV::random(100);
     let chain = ReasoningChain::new(question);
 
     // The chain has been created, selector can learn from it
@@ -438,7 +438,7 @@ fn test_full_primitive_consciousness_pipeline() {
     println!("1. Systems initialized");
 
     // 2. Create input and process to consciousness state
-    let input = HV16::random(500);
+    let input = BinaryHV::random(500);
     let timestamp = 1.0;
     let state = processor.process_input(&input, timestamp);
 
@@ -485,7 +485,7 @@ fn test_phi_never_negative() {
 
     // Test with many random inputs
     for i in 0..100 {
-        let input = HV16::random(1000 + i as u64);
+        let input = BinaryHV::random(1000 + i as u64);
         let timestamp = i as f64;
         let state = processor.process_input(&input, timestamp);
 

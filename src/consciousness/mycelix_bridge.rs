@@ -49,7 +49,7 @@ use super::unified_value_evaluator::{
 };
 use super::seven_harmonies::{SevenHarmonies, Harmony, AlignmentResult};
 use super::affective_consciousness::CoreAffect;
-use crate::hdc::HV16;
+use crate::hdc::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -280,7 +280,7 @@ pub struct ValueLearningUpdate {
 /// Compressed value gradient for efficient transmission
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompressedValueGradient {
-    /// Harmony encoded as HV16
+    /// Harmony encoded as BinaryHV
     pub harmony_encoding: Vec<u8>,
     /// Importance gradient (compressed)
     pub importance_gradient: Vec<u8>,
@@ -611,9 +611,10 @@ impl MycelixBridge {
             .cloned()
             .collect();
 
-        let violations: Vec<String> = eval.harmony_alignment.violations
+        let violations: Vec<String> = eval.harmony_alignment.alignments
             .iter()
-            .map(|h| h.name().to_string())
+            .filter(|(_, a)| a.score < -0.2)
+            .map(|(h, _)| h.name().to_string())
             .collect();
 
         let recommendation = self.score_to_recommendation(

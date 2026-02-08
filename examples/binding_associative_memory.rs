@@ -21,7 +21,7 @@ use anyhow::Result;
 use symthaea::perception::bge_m3::BgeM3;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::HV16};
+use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -95,7 +95,7 @@ fn run_experiment() -> Result<()> {
 
         // Create the correct binding
         let correct_bind = obj_hv.bind(&correct_hv);
-        let correct_bundle = HV16::bundle(&[obj_hv, correct_hv]);
+        let correct_bundle = BinaryHV::bundle(&[obj_hv, correct_hv]);
 
         // Test retrieval: which attribute is most similar when bound to object?
         let mut bind_sims = Vec::new();
@@ -111,7 +111,7 @@ fn run_experiment() -> Result<()> {
             let dist_hv = embedding_to_hv16(&dist_emb);
 
             let dist_bind = obj_hv.bind(&dist_hv);
-            let dist_bundle = HV16::bundle(&[obj_hv, dist_hv]);
+            let dist_bundle = BinaryHV::bundle(&[obj_hv, dist_hv]);
 
             // Similarity to the QUERY (correct binding/bundle)
             bind_sims.push((distractor.to_string(), hv_similarity(&correct_bind, &dist_bind)));
@@ -192,8 +192,8 @@ fn run_experiment() -> Result<()> {
         let correct_bind = obj_hv.bind(&correct_hv);
         let competing_bind = obj_hv.bind(&competing_hv);
 
-        let correct_bundle = HV16::bundle(&[obj_hv, correct_hv]);
-        let competing_bundle = HV16::bundle(&[obj_hv, competing_hv]);
+        let correct_bundle = BinaryHV::bundle(&[obj_hv, correct_hv]);
+        let competing_bundle = BinaryHV::bundle(&[obj_hv, competing_hv]);
 
         // For binding: unbind query from each to recover object, see which is closer
         // bind(obj, attr) ⊗ attr = obj (approximately, due to self-inverse property)
@@ -279,8 +279,8 @@ fn run_experiment() -> Result<()> {
 
         // Bundling analogy: average of relationship components
         // Not a good fit for analogies, but let's test
-        let bundle_relationship = HV16::bundle(&[a_hv, b_hv]);
-        let bundle_predicted = HV16::bundle(&[bundle_relationship, c_hv]);
+        let bundle_relationship = BinaryHV::bundle(&[a_hv, b_hv]);
+        let bundle_predicted = BinaryHV::bundle(&[bundle_relationship, c_hv]);
 
         // Find best matching candidate
         let mut bind_best = ("", f64::NEG_INFINITY);
@@ -349,7 +349,7 @@ fn run_experiment() -> Result<()> {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn embedding_to_hv16(embedding: &[f32]) -> HV16 {
+fn embedding_to_hv16(embedding: &[f32]) -> BinaryHV {
     let mut expanded = Vec::with_capacity(HDC_DIMENSION);
     let tiles = HDC_DIMENSION / embedding.len();
 
@@ -360,11 +360,11 @@ fn embedding_to_hv16(embedding: &[f32]) -> HV16 {
         }
     }
 
-    HV16::from_bipolar(&expanded)
+    BinaryHV::from_bipolar(&expanded)
 }
 
 #[cfg(feature = "neural-bridge")]
-fn hv_similarity(a: &HV16, b: &HV16) -> f64 {
+fn hv_similarity(a: &BinaryHV, b: &BinaryHV) -> f64 {
     let hamming = a.hamming_distance(b);
     1.0 - (hamming as f64 / HDC_DIMENSION as f64)
 }

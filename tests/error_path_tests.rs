@@ -9,7 +9,7 @@
 use symthaea::phi_engine::PhiEngine;
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::tiered_phi::{TieredPhi, ApproximationTier};
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 
 // =============================================================================
 // PHI WITH EDGE-CASE INPUTS
@@ -50,7 +50,7 @@ fn test_phi_engine_two_identical_nodes() {
 #[test]
 fn test_tiered_phi_empty_components() {
     let mut calc = TieredPhi::new(ApproximationTier::SpectralConnectivity);
-    let empty: Vec<HV16> = vec![];
+    let empty: Vec<BinaryHV> = vec![];
     let phi = calc.compute(&empty);
     assert_eq!(phi, 0.0, "Empty components should give 0");
 }
@@ -58,14 +58,14 @@ fn test_tiered_phi_empty_components() {
 #[test]
 fn test_tiered_phi_single_component() {
     let mut calc = TieredPhi::new(ApproximationTier::SpectralConnectivity);
-    let single = vec![HV16::random(42)];
+    let single = vec![BinaryHV::random(42)];
     let phi = calc.compute(&single);
     assert_eq!(phi, 0.0, "Single component should give 0");
 }
 
 #[test]
 fn test_tiered_phi_all_tiers_handle_two_components() {
-    let components = vec![HV16::random(1), HV16::random(2)];
+    let components = vec![BinaryHV::random(1), BinaryHV::random(2)];
 
     for tier in [
         ApproximationTier::RandomBaseline,
@@ -137,18 +137,18 @@ fn test_cosine_similarity_range() {
 
 #[test]
 fn test_hv16_bundle_empty() {
-    let empty: Vec<HV16> = vec![];
-    // HV16::bundle requires non-empty input; verify it doesn't panic
+    let empty: Vec<BinaryHV> = vec![];
+    // BinaryHV::bundle requires non-empty input; verify it doesn't panic
     // or returns a zero vector
-    let result = HV16::bundle(&empty);
+    let result = BinaryHV::bundle(&empty);
     // Should return zero or some default, not crash
     let _ = result;
 }
 
 #[test]
 fn test_hv16_bundle_single() {
-    let hv = HV16::random(42);
-    let bundled = HV16::bundle(&[hv.clone()]);
+    let hv = BinaryHV::random(42);
+    let bundled = BinaryHV::bundle(&[hv.clone()]);
     // Bundle of single element should be similar to itself
     let sim = hv.similarity(&bundled);
     assert!(sim > 0.9, "Bundle of single HV should be very similar to original");
@@ -156,10 +156,10 @@ fn test_hv16_bundle_single() {
 
 #[test]
 fn test_hv16_similarity_with_self() {
-    let hv = HV16::random(42);
+    let hv = BinaryHV::random(42);
     let sim = hv.similarity(&hv);
     assert!(
         (sim - 1.0).abs() < 0.01,
-        "Self-similarity should be ~1.0 for HV16"
+        "Self-similarity should be ~1.0 for BinaryHV"
     );
 }

@@ -50,7 +50,7 @@
 //! println!("Mode: {:?}", state.resonance_mode);
 //! ```
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -82,7 +82,7 @@ pub struct FrequencyBandPrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Consciousness level: 0.0 (unconscious) to 1.0 (peak awareness)
     pub consciousness_level: f32,
@@ -140,15 +140,15 @@ impl FrequencyBandPrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(9000 + band as u64 * 100)
+            BinaryHV::random(9000 + band as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {
@@ -200,7 +200,7 @@ pub struct ResonanceModePrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Awareness level: 0.0 (none) to 1.0 (full)
     pub awareness: f32,
@@ -280,15 +280,15 @@ impl ResonanceModePrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(9100 + mode as u64 * 100)
+            BinaryHV::random(9100 + mode as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {
@@ -341,7 +341,7 @@ pub struct CouplingTypePrimitiveGrounding {
     pub nsm_primitives: Vec<String>,
 
     /// HDC encoding from bundled primitive vectors
-    pub primitive_encoding: HV16,
+    pub primitive_encoding: BinaryHV,
 
     /// Coherence tendency: -1.0 (anti) to 1.0 (sync)
     pub coherence_direction: f32,
@@ -394,15 +394,15 @@ impl CouplingTypePrimitiveGrounding {
 
         let nsm_primitives: Vec<String> = primitives.iter().map(|s| s.to_string()).collect();
 
-        let encodings: Vec<HV16> = nsm_primitives
+        let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
             .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
-            HV16::random(9200 + coupling as u64 * 100)
+            BinaryHV::random(9200 + coupling as u64 * 100)
         } else {
-            HV16::bundle(&encodings)
+            BinaryHV::bundle(&encodings)
         };
 
         Self {

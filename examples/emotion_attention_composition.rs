@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use symthaea::consciousness::attention_schema::{
     AttentionMode, AttentionPrimitiveGrounding, AttentionSchema,
 };
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 use symthaea::language::emotional_core::{
     EmotionPrimitiveGrounding, EmotionalCore, EmotionalCoreConfig,
 };
@@ -194,7 +194,7 @@ fn main() {
     println!("│  COMPOSED STATES                                                        │");
     println!("├─────────────────────────────────────────────────────────────────────────┤");
 
-    let mut composed_states: HashMap<String, HV16> = HashMap::new();
+    let mut composed_states: HashMap<String, BinaryHV> = HashMap::new();
 
     for (emotion, mode, description) in &pairs {
         let emotion_encoding = emotions.get(*emotion).unwrap().primitive_encoding.clone();

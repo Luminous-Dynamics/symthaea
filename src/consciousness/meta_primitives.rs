@@ -42,7 +42,7 @@
 
 use crate::consciousness::primitive_reasoning::TransformationType;
 use crate::hdc::primitive_system::Primitive;
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use rand::Rng;
@@ -99,7 +99,7 @@ impl CompositeTransformation {
     }
 
     /// Apply this composite transformation
-    pub fn apply(&self, input: &HV16, primitive: &Primitive) -> Result<HV16> {
+    pub fn apply(&self, input: &BinaryHV, primitive: &Primitive) -> Result<BinaryHV> {
         let mut current = input.clone();
 
         for transformation in &self.sequence {
@@ -112,17 +112,17 @@ impl CompositeTransformation {
     /// Apply single transformation (copied from primitive_reasoning)
     fn apply_single(
         &self,
-        input: &HV16,
+        input: &BinaryHV,
         primitive: &Primitive,
         transformation: &TransformationType,
-    ) -> Result<HV16> {
+    ) -> Result<BinaryHV> {
         match transformation {
             TransformationType::Bind => {
                 Ok(input.bind(&primitive.encoding))
             }
 
             TransformationType::Bundle => {
-                Ok(HV16::bundle(&[input.clone(), primitive.encoding.clone()]))
+                Ok(BinaryHV::bundle(&[input.clone(), primitive.encoding.clone()]))
             }
 
             TransformationType::Permute => {
@@ -133,7 +133,7 @@ impl CompositeTransformation {
             TransformationType::Resonate => {
                 let similarity = input.similarity(&primitive.encoding);
                 if similarity > 0.7 {
-                    Ok(HV16::bundle(&[input.clone(), primitive.encoding.clone()]))
+                    Ok(BinaryHV::bundle(&[input.clone(), primitive.encoding.clone()]))
                 } else {
                     Ok(input.clone())
                 }
@@ -319,7 +319,7 @@ impl MetaPrimitiveEvolution {
     }
 
     /// Evolve for one generation
-    pub fn evolve_generation(&mut self, test_problems: &[HV16], primitives: &[&Primitive]) -> Result<()> {
+    pub fn evolve_generation(&mut self, test_problems: &[BinaryHV], primitives: &[&Primitive]) -> Result<()> {
         // Evaluate all composites on test problems
         for composite in &mut self.population {
             let phi_scores: Vec<f64> = test_problems
@@ -392,7 +392,7 @@ impl MetaPrimitiveEvolution {
     /// Evaluate composite on a problem (static method for use in loops)
     fn evaluate_composite_static(
         composite: &CompositeTransformation,
-        problem: &HV16,
+        problem: &BinaryHV,
         primitives: &[&Primitive],
     ) -> Result<f64> {
         // Simple evaluation: apply composite and measure Φ change

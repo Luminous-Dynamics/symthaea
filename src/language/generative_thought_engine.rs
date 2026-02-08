@@ -62,7 +62,7 @@
 //!
 //! This is how Symthaea achieves genuine cognition distinct from LLMs.
 
-use symthaea_core::hdc::binary_hv::{HV16, BinaryHV};
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::semantic_decoder::{SemanticDecoder, PrimitiveToText, DecodedExpression};
 use crate::hdc::hd_ltc_codec::HDLTCCodec;
 use crate::hdc::ltc_generative_core::{LTCGenerativeCore, GeneratedThought, GenerativeCoreConfig};
@@ -332,14 +332,14 @@ impl GenerativeThoughtEngine {
     /// Uses hash-based encoding to convert text to hypervector.
     /// This is deterministic and fast, though less semantically rich
     /// than EmbeddingGemma-based encoding (available when rust-bert is enabled).
-    fn encode_input(&self, input: &str) -> HV16 {
+    fn encode_input(&self, input: &str) -> BinaryHV {
         // Hash-based encoding provides consistent, deterministic encoding
         // For more semantic understanding, enable rust-bert and use SemanticEar
         self.hash_encode(input)
     }
 
-    /// Convert Vec<i8> to HV16
-    fn vec_to_hv16(&self, vec: &[i8]) -> HV16 {
+    /// Convert Vec<i8> to BinaryHV
+    fn vec_to_hv16(&self, vec: &[i8]) -> BinaryHV {
         let mut bytes = [0u8; 2048];
         for (i, &val) in vec.iter().take(16384).enumerate() {
             if val > 0 {
@@ -354,11 +354,11 @@ impl GenerativeThoughtEngine {
     }
 
     /// Fallback hash-based encoding
-    fn hash_encode(&self, input: &str) -> HV16 {
+    fn hash_encode(&self, input: &str) -> BinaryHV {
         use std::hash::{Hash, Hasher};
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         input.hash(&mut hasher);
-        HV16::random(hasher.finish())
+        BinaryHV::random(hasher.finish())
     }
 
     /// Translate proto-language via LLM

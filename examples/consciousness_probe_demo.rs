@@ -28,7 +28,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::consciousness_topology::{
     BettiNumbers, ConsciousnessTopology, TopologyConfig,
 };
@@ -89,22 +89,22 @@ fn main() {
     // In production, these would come from LLM activations via NeuralBridge
     println!("Generating HDC vectors (simulated)...\n");
 
-    let phenomenal_hvs: HashMap<String, HV16> = phenomenal_concepts
+    let phenomenal_hvs: HashMap<String, BinaryHV> = phenomenal_concepts
         .iter()
         .enumerate()
         .map(|(i, c)| {
             // Use concept hash for deterministic but varied vectors
             let seed = hash_concept(&c.text) + i as u64;
-            (c.id.clone(), HV16::random(seed))
+            (c.id.clone(), BinaryHV::random(seed))
         })
         .collect();
 
-    let functional_hvs: HashMap<String, HV16> = functional_concepts
+    let functional_hvs: HashMap<String, BinaryHV> = functional_concepts
         .iter()
         .enumerate()
         .map(|(i, c)| {
             let seed = hash_concept(&c.text) + 10000 + i as u64;
-            (c.id.clone(), HV16::random(seed))
+            (c.id.clone(), BinaryHV::random(seed))
         })
         .collect();
 
@@ -250,7 +250,7 @@ fn hash_concept(text: &str) -> u64 {
 }
 
 /// Probe a set of concepts
-fn probe_concepts(concepts: &[Concept], hvs: &HashMap<String, HV16>) -> Vec<ProbeResult> {
+fn probe_concepts(concepts: &[Concept], hvs: &HashMap<String, BinaryHV>) -> Vec<ProbeResult> {
     let config = TopologyConfig {
         min_persistence: 0.1,
         max_scale: 1.0,

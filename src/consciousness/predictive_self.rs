@@ -58,7 +58,7 @@ The Predictive Self enables **"mental time travel for identity"**:
 - Learn from prediction errors to improve self-understanding
 */
 
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 use crate::consciousness::narrative_self::NarrativeSelfModel;
 #[cfg(test)]
 use crate::consciousness::narrative_self::NarrativeSelfConfig;
@@ -125,7 +125,7 @@ pub struct SelfState {
     /// Active goals count
     pub active_goals: usize,
     /// Unified self representation
-    pub unified_self: HV16,
+    pub unified_self: BinaryHV,
     /// Timestamp
     pub timestamp: Instant,
     /// Action that led to this state (if any)
@@ -270,7 +270,7 @@ impl SelfPredictor {
             core_coherence: 0.5,
             autobio_coherence: 0.5,
             active_goals: 0,
-            unified_self: HV16::random(999),
+            unified_self: BinaryHV::random(999),
             timestamp: Instant::now(),
             causal_action: None,
         });
@@ -857,7 +857,7 @@ mod tests {
             core_coherence: 0.7,
             autobio_coherence: 0.8,
             active_goals: 2,
-            unified_self: HV16::random(1),
+            unified_self: BinaryHV::random(1),
             timestamp: Instant::now(),
             causal_action: None,
         };
@@ -887,7 +887,7 @@ mod tests {
                 core_coherence: 0.6,
                 autobio_coherence: 0.7,
                 active_goals: 1,
-                unified_self: HV16::random(i as u64),
+                unified_self: BinaryHV::random(i as u64),
                 timestamp: Instant::now(),
                 causal_action: None,
             });
@@ -915,7 +915,7 @@ mod tests {
                 core_coherence: 0.5,
                 autobio_coherence: 0.5,
                 active_goals: 1,
-                unified_self: HV16::random(i as u64 + 100),
+                unified_self: BinaryHV::random(i as u64 + 100),
                 timestamp: Instant::now(),
                 causal_action: None,
             });
@@ -931,7 +931,7 @@ mod tests {
             core_coherence: 0.6,
             autobio_coherence: 0.6,
             active_goals: 1,
-            unified_self: HV16::random(200),
+            unified_self: BinaryHV::random(200),
             timestamp: Instant::now(),
             causal_action: None,
         };

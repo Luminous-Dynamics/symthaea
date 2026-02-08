@@ -104,6 +104,34 @@ pub struct MoralParser {
 
     /// Common action verbs
     action_verbs: HashSet<String>,
+
+    /// Pronouns for coreference resolution
+    pronouns: std::collections::HashMap<String, PronounInfo>,
+
+    /// Clause separators for multi-clause handling
+    clause_separators: HashSet<String>,
+}
+
+/// Information about a pronoun for coreference resolution
+#[derive(Debug, Clone)]
+pub struct PronounInfo {
+    /// Gender: male, female, neutral, or unknown
+    pub gender: &'static str,
+    /// Person: first, second, third
+    pub person: &'static str,
+    /// Number: singular or plural
+    pub number: &'static str,
+}
+
+/// A clause extracted from multi-clause text
+#[derive(Debug, Clone)]
+pub struct Clause {
+    /// The clause text
+    pub text: String,
+    /// The connector that introduced this clause (if any)
+    pub connector: Option<String>,
+    /// Whether this is the main clause
+    pub is_main: bool,
 }
 
 impl MoralParser {
@@ -220,7 +248,154 @@ impl MoralParser {
                 // Set up (multi-word)
                 "set up", "setting up",
             ].iter().map(|s| s.to_string()).collect(),
+
+            // Pronouns for coreference resolution
+            pronouns: {
+                let mut map = std::collections::HashMap::new();
+                map.insert("i".to_string(), PronounInfo { gender: "neutral", person: "first", number: "singular" });
+                map.insert("me".to_string(), PronounInfo { gender: "neutral", person: "first", number: "singular" });
+                map.insert("my".to_string(), PronounInfo { gender: "neutral", person: "first", number: "singular" });
+                map.insert("we".to_string(), PronounInfo { gender: "neutral", person: "first", number: "plural" });
+                map.insert("us".to_string(), PronounInfo { gender: "neutral", person: "first", number: "plural" });
+                map.insert("he".to_string(), PronounInfo { gender: "male", person: "third", number: "singular" });
+                map.insert("him".to_string(), PronounInfo { gender: "male", person: "third", number: "singular" });
+                map.insert("his".to_string(), PronounInfo { gender: "male", person: "third", number: "singular" });
+                map.insert("she".to_string(), PronounInfo { gender: "female", person: "third", number: "singular" });
+                map.insert("her".to_string(), PronounInfo { gender: "female", person: "third", number: "singular" });
+                map.insert("they".to_string(), PronounInfo { gender: "neutral", person: "third", number: "plural" });
+                map.insert("them".to_string(), PronounInfo { gender: "neutral", person: "third", number: "plural" });
+                map.insert("their".to_string(), PronounInfo { gender: "neutral", person: "third", number: "plural" });
+                map
+            },
+
+            // Clause separators for multi-clause handling
+            clause_separators: [
+                "and", "but", "or", "because", "since", "while",
+                "although", "though", "however", "therefore",
+                "so", "yet", "then", "when", "if", "unless",
+            ].iter().map(|s| s.to_string()).collect(),
         }
+    }
+
+    /// Split text into multiple clauses
+    pub fn split_clauses(&self, text: &str) -> Vec<Clause> {
+        let lower = text.to_lowercase();
+        let mut clauses = Vec::new();
+        let mut current_clause = String::new();
+        let mut current_connector: Option<String> = None;
+        let mut is_first = true;
+
+        for word in lower.split_whitespace() {
+            if self.clause_separators.contains(word) && !current_clause.is_empty() {
+                clauses.push(Clause {
+                    text: current_clause.trim().to_string(),
+                    connector: current_connector.take(),
+                    is_main: is_first,
+                });
+                current_connector = Some(word.to_string());
+                current_clause = String::new();
+                is_first = false;
+            } else {
+                if !current_clause.is_empty() {
+                    current_clause.push(' ');
+                }
+                current_clause.push_str(word);
+            }
+        }
+
+        // Add final clause
+        if !current_clause.is_empty() {
+            clauses.push(Clause {
+                text: current_clause.trim().to_string(),
+                connector: current_connector,
+                is_main: is_first,
+            });
+        }
+
+        clauses
+    }
+
+    /// Resolve a pronoun to a likely antecedent from context
+    ///
+    /// Uses simple heuristics: looks for nearest matching noun phrase
+    pub fn resolve_pronoun(&self, pronoun: &str, context: &[String]) -> Option<String> {
+        let pronoun_lower = pronoun.to_lowercase();
+        if let Some(info) = self.pronouns.get(&pronoun_lower) {
+            // For first person, the agent is the speaker
+            if info.person == "first" {
+                return Some("speaker".to_string());
+            }
+
+            // For third person, look for nearest matching noun
+            for antecedent in context.iter().rev() {
+                // Simple matching: skip pronouns, use nouns
+                if !self.pronouns.contains_key(&antecedent.to_lowercase()) {
+                    return Some(antecedent.clone());
+                }
+            }
+        }
+        None
+    }
+
+    /// Parse text with multi-clause awareness
+    ///
+    /// Splits into clauses, parses each, then combines with primary clause taking precedence
+    pub fn parse_with_clauses(&self, text: &str) -> ParsedMoralScenario {
+        let clauses = self.split_clauses(text);
+
+        if clauses.len() <= 1 {
+            // Single clause - use standard parsing
+            return self.parse(text);
+        }
+
+        // Parse main clause first
+        let main_clause = clauses.iter().find(|c| c.is_main)
+            .or_else(|| clauses.first())
+            .map(|c| &c.text);
+
+        let mut primary = if let Some(main_text) = main_clause {
+            self.parse(main_text)
+        } else {
+            self.parse(text)
+        };
+
+        // Check subordinate clauses for additional moral context
+        for clause in &clauses {
+            if !clause.is_main {
+                let sub_parsed = self.parse(&clause.text);
+
+                // Connector affects interpretation
+                match clause.connector.as_deref() {
+                    Some("because" | "since") => {
+                        // Reason clause might provide justification
+                        if sub_parsed.intent == MoralIntent::Good && primary.intent != MoralIntent::Good {
+                            // Good reason might mitigate bad action (partial)
+                            primary.confidence *= 0.8;
+                        }
+                    }
+                    Some("but" | "however") => {
+                        // Contrast - subordinate clause might override
+                        if sub_parsed.has_negation != primary.has_negation {
+                            primary.has_negation = sub_parsed.has_negation;
+                        }
+                    }
+                    Some("although" | "though") => {
+                        // Concession - main clause takes precedence but note the contrast
+                        primary.confidence *= 0.9;
+                    }
+                    _ => {}
+                }
+
+                // Merge consent information (absent consent anywhere is significant)
+                if sub_parsed.consent == ConsentState::Absent {
+                    primary.consent = ConsentState::Absent;
+                }
+            }
+        }
+
+        // Update text to original
+        primary.text = text.to_string();
+        primary
     }
 
     /// Parse a text into a moral scenario structure
@@ -468,6 +643,29 @@ impl EncodedMoralScenario {
     pub fn check_consent_violation(&self, _algebra: &MoralAlgebra) -> Option<f32> {
         // Return high similarity if there's a violation, low otherwise
         Some(if self.is_consent_violation() { 0.9 } else { 0.1 })
+    }
+
+    /// Ensemble judgment combining HDC similarity, parsed intent, and deontological rules
+    ///
+    /// This is the recommended judgment method as it combines multiple signals
+    /// for more robust moral reasoning. Returns an EnsembleJudgment with:
+    /// - Individual verdicts from each signal
+    /// - Final weighted verdict
+    /// - Confidence score
+    /// - Detailed violation/satisfaction information
+    pub fn judge_ensemble(&self, algebra: &MoralAlgebra, text: &str) -> super::moral_algebra::EnsembleJudgment {
+        let mut judgment = algebra.judge_ensemble(
+            self.action_hv.as_ref(),
+            self.parsed.intent,
+            text,
+        );
+
+        // Override for consent violations (detected directly, not via HDC)
+        if self.is_consent_violation() {
+            judgment.final_verdict = super::moral_algebra::MoralVerdict::ConsentViolation;
+        }
+
+        judgment
     }
 }
 

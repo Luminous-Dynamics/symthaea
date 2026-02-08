@@ -19,7 +19,7 @@ use anyhow::Result;
 use symthaea::perception::bge_m3::BgeM3;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::HV16};
+use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -295,7 +295,7 @@ fn analyze_pair(encoder: &BgeM3, pair: &ConceptPair) -> Result<CompositionResult
 
     // Compose via binding and bundling
     let bound = hv_a.bind(&hv_b);
-    let bundled = HV16::bundle(&[hv_a, hv_b]);
+    let bundled = BinaryHV::bundle(&[hv_a, hv_b]);
 
     // Compute similarities to combined phrase
     let bind_similarity = hv_similarity(&bound, &hv_combined);
@@ -315,7 +315,7 @@ fn analyze_pair(encoder: &BgeM3, pair: &ConceptPair) -> Result<CompositionResult
 }
 
 #[cfg(feature = "neural-bridge")]
-fn embedding_to_hv16(embedding: &[f32]) -> HV16 {
+fn embedding_to_hv16(embedding: &[f32]) -> BinaryHV {
     let mut expanded = Vec::with_capacity(HDC_DIMENSION);
     let tiles = HDC_DIMENSION / embedding.len();
 
@@ -326,11 +326,11 @@ fn embedding_to_hv16(embedding: &[f32]) -> HV16 {
         }
     }
 
-    HV16::from_bipolar(&expanded)
+    BinaryHV::from_bipolar(&expanded)
 }
 
 #[cfg(feature = "neural-bridge")]
-fn hv_similarity(a: &HV16, b: &HV16) -> f64 {
+fn hv_similarity(a: &BinaryHV, b: &BinaryHV) -> f64 {
     // Hamming similarity: 1 - (hamming_distance / dimension)
     let hamming = a.hamming_distance(b);
     1.0 - (hamming as f64 / HDC_DIMENSION as f64)

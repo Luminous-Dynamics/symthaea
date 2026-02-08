@@ -73,7 +73,7 @@ use symthaea_core::genesis::GenesisSeed;
 
 use crate::dynamics::cfc::{CfCNetwork, CfCNetworkConfig, CfCConfig};
 use crate::embeddings::{HdcBridge, BridgeConfig};
-use crate::hdc::{HV16};
+use crate::hdc::{BinaryHV};
 use crate::bridges::{HdcCfcBridge, HdcCfcBridgeConfig};
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -225,24 +225,24 @@ pub struct TwoTrackOutput {
 }
 
 impl TwoTrackOutput {
-    /// Get the semantic HV as a binary HV16
-    pub fn semantic_hv16(&self) -> HV16 {
+    /// Get the semantic HV as a binary BinaryHV
+    pub fn semantic_hv16(&self) -> BinaryHV {
         continuous_to_hv16(&self.semantic_hv)
     }
 
-    /// Get the fused representation as binary HV16
-    pub fn fused_hv16(&self) -> HV16 {
+    /// Get the fused representation as binary BinaryHV
+    pub fn fused_hv16(&self) -> BinaryHV {
         continuous_to_hv16(&self.fused)
     }
 }
 
-/// Convert a ContinuousHV to HV16 by thresholding
-fn continuous_to_hv16(hv: &ContinuousHV) -> HV16 {
+/// Convert a ContinuousHV to BinaryHV by thresholding
+fn continuous_to_hv16(hv: &ContinuousHV) -> BinaryHV {
     // Convert continuous values to bipolar (-1, +1) representation
     let bipolar: Vec<f32> = hv.values.iter()
         .map(|&v| if v > 0.0 { 1.0 } else { -1.0 })
         .collect();
-    HV16::from_bipolar(&bipolar)
+    BinaryHV::from_bipolar(&bipolar)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -275,15 +275,15 @@ impl HdcProjector {
 
     /// Project an embedding to HDC space as ContinuousHV
     pub fn project(&self, embedding: &[f32]) -> ContinuousHV {
-        // Project to HV16 first
-        let hv16 = self.bridge.project(embedding);
+        // Project to BinaryHV first
+        let binary_hv = self.bridge.project(embedding);
 
         // Convert to ContinuousHV (bipolar: 0 -> -1.0, 1 -> +1.0)
-        hv16_to_continuous(&hv16, self.config.output_dim)
+        hv16_to_continuous(&binary_hv, self.config.output_dim)
     }
 
-    /// Project and return HV16 directly
-    pub fn project_hv16(&self, embedding: &[f32]) -> HV16 {
+    /// Project and return BinaryHV directly
+    pub fn project_hv16(&self, embedding: &[f32]) -> BinaryHV {
         self.bridge.project(embedding)
     }
 
@@ -293,10 +293,10 @@ impl HdcProjector {
     }
 }
 
-/// Convert HV16 to ContinuousHV using to_bipolar method
-fn hv16_to_continuous(hv16: &HV16, dim: usize) -> ContinuousHV {
-    // Use HV16's to_bipolar which returns Vec<f32> with -1.0/+1.0 values
-    let bipolar = hv16.to_bipolar();
+/// Convert BinaryHV to ContinuousHV using to_bipolar method
+fn hv16_to_continuous(binary_hv: &BinaryHV, dim: usize) -> ContinuousHV {
+    // Use BinaryHV's to_bipolar which returns Vec<f32> with -1.0/+1.0 values
+    let bipolar = binary_hv.to_bipolar();
 
     // Ensure we have the right dimension
     let values: Vec<f32> = if bipolar.len() >= dim {

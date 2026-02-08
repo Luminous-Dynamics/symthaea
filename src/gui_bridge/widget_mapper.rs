@@ -3,7 +3,7 @@
 //! Maps between GUI widget values and NixOS configuration expressions.
 //! Supports various widget types and value transformers.
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use std::collections::HashMap;
 
 /// Unique widget identifier
@@ -323,7 +323,7 @@ pub struct WidgetBinding {
     pub nix_path: NixPath,
 
     /// HDC semantic encoding of the binding
-    pub semantic_hv: HV16,
+    pub semantic_hv: BinaryHV,
 
     /// Value transformer
     pub transformer: ValueTransformer,
@@ -424,7 +424,7 @@ impl WidgetBindingBuilder {
         WidgetBinding {
             widget_id: self.widget_id,
             nix_path: self.nix_path,
-            semantic_hv: HV16::zero(), // Will be set by GuiBridge
+            semantic_hv: BinaryHV::zero(), // Will be set by GuiBridge
             transformer: self.transformer,
             value_type: self.value_type,
             options: self.options,

@@ -54,7 +54,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::consciousness_topology::{
     BettiNumbers, ConsciousnessTopology, TopologicalAssessment, TopologyConfig,
 };
@@ -303,14 +303,14 @@ impl ConsciousnessProbe {
         // Project to HDC space
         let hdc_vec = bridge.project_to_packed(activation)?;
 
-        // Convert to HV16 for topology analysis
+        // Convert to BinaryHV for topology analysis
         let hv = packed_bipolar_to_hv16(&hdc_vec);
 
         self.probe_concept_from_hv(concept, &hv)
     }
 
-    /// Probe a concept from a pre-computed HV16 vector
-    pub fn probe_concept_from_hv(&self, concept: &Concept, hv: &HV16) -> Result<ConceptProbeResult> {
+    /// Probe a concept from a pre-computed BinaryHV vector
+    pub fn probe_concept_from_hv(&self, concept: &Concept, hv: &BinaryHV) -> Result<ConceptProbeResult> {
         // For single-concept analysis, we create variations via permutation
         // to build a point cloud for topology analysis
         let mut topology = ConsciousnessTopology::new(self.config.topology_config.clone());
@@ -362,7 +362,7 @@ impl ConsciousnessProbe {
     pub fn probe_corpus_from_hvs(
         &self,
         corpus: &ConceptCorpus,
-        hvs: &HashMap<String, HV16>,
+        hvs: &HashMap<String, BinaryHV>,
     ) -> Result<Vec<ConceptProbeResult>> {
         let mut results = Vec::with_capacity(corpus.len());
 
@@ -519,19 +519,19 @@ impl ConsciousnessProbe {
     }
 }
 
-/// Convert PackedBipolar to HV16
+/// Convert PackedBipolar to BinaryHV
 ///
-/// This is needed because PackedBipolar and HV16 have different internal
+/// This is needed because PackedBipolar and BinaryHV have different internal
 /// representations but represent the same semantic content.
-fn packed_bipolar_to_hv16(packed: &symthaea_core::hdc::PackedBipolar) -> HV16 {
-    // PackedBipolar stores bipolar values (-1, +1), HV16 stores binary (0, 1)
-    // Convert via the to_bipolar() method and then to HV16
+fn packed_bipolar_to_hv16(packed: &symthaea_core::hdc::PackedBipolar) -> BinaryHV {
+    // PackedBipolar stores bipolar values (-1, +1), BinaryHV stores binary (0, 1)
+    // Convert via the to_bipolar() method and then to BinaryHV
     let bipolar = packed.to_bipolar();
 
-    // Convert i8 bipolar (-1, +1) to f32 for HV16::from_bipolar
+    // Convert i8 bipolar (-1, +1) to f32 for BinaryHV::from_bipolar
     let bipolar_f32: Vec<f32> = bipolar.iter().map(|&v| v as f32).collect();
 
-    HV16::from_bipolar(&bipolar_f32)
+    BinaryHV::from_bipolar(&bipolar_f32)
 }
 
 // =============================================================================
@@ -626,15 +626,15 @@ impl ConsciousnessProbeV2 {
         // Encode text to HDC via BGE-M3 + probe
         let packed = self.bridge.encode_to_hdc(&concept.text)?;
 
-        // Convert to HV16 for topology analysis
+        // Convert to BinaryHV for topology analysis
         let hv = packed_to_hv16(&packed);
 
         // Analyze topology
         self.probe_concept_from_hv(concept, &hv)
     }
 
-    /// Probe a concept from a pre-computed HV16 vector
-    pub fn probe_concept_from_hv(&self, concept: &Concept, hv: &HV16) -> Result<ConceptProbeResult> {
+    /// Probe a concept from a pre-computed BinaryHV vector
+    pub fn probe_concept_from_hv(&self, concept: &Concept, hv: &BinaryHV) -> Result<ConceptProbeResult> {
         let mut topology = ConsciousnessTopology::new(self.config.topology_config.clone());
 
         // Add the original state
@@ -658,11 +658,11 @@ impl ConsciousnessProbeV2 {
         })
     }
 
-    /// Convert a concept text to HV16 via BGE-M3 + probe projection
+    /// Convert a concept text to BinaryHV via BGE-M3 + probe projection
     ///
     /// This is useful for operations that need raw HDC vectors, such as
     /// binding/bundling experiments (H2 hypothesis testing).
-    pub fn concept_to_hv(&mut self, text: &str) -> Result<HV16> {
+    pub fn concept_to_hv(&mut self, text: &str) -> Result<BinaryHV> {
         let packed = self.bridge.encode_to_hdc(text)?;
         Ok(packed_to_hv16(&packed))
     }
@@ -775,12 +775,12 @@ impl ConsciousnessProbeV2 {
     }
 }
 
-/// Convert PackedBipolar to HV16 (feature-gated version)
+/// Convert PackedBipolar to BinaryHV (feature-gated version)
 #[cfg(feature = "neural-bridge")]
-fn packed_to_hv16(packed: &PackedBipolar) -> HV16 {
+fn packed_to_hv16(packed: &PackedBipolar) -> BinaryHV {
     let bipolar = packed.to_bipolar();
     let bipolar_f32: Vec<f32> = bipolar.iter().map(|&v| v as f32).collect();
-    HV16::from_bipolar(&bipolar_f32)
+    BinaryHV::from_bipolar(&bipolar_f32)
 }
 
 /// Simple text hash for generating concept IDs
@@ -833,7 +833,7 @@ mod tests {
     fn test_probe_without_bridge() {
         let probe = ConsciousnessProbe::new_without_bridge();
         let concept = make_test_concept("test", "The subjective experience of seeing red");
-        let hv = HV16::random(42);
+        let hv = BinaryHV::random(42);
 
         let result = probe.probe_concept_from_hv(&concept, &hv).unwrap();
         assert!(result.unity_score > 0.0);
@@ -851,7 +851,7 @@ mod tests {
         // Create mock results with different distributions
         let phenomenal: Vec<ConceptProbeResult> = (0..10)
             .map(|i| {
-                let hv = HV16::random(1000 + i);
+                let hv = BinaryHV::random(1000 + i);
                 let mut result = probe
                     .probe_concept_from_hv(&make_test_concept(&format!("phen_{}", i), "phenomenal"), &hv)
                     .unwrap();
@@ -863,7 +863,7 @@ mod tests {
 
         let functional: Vec<ConceptProbeResult> = (0..10)
             .map(|i| {
-                let hv = HV16::random(2000 + i);
+                let hv = BinaryHV::random(2000 + i);
                 let mut result = probe
                     .probe_concept_from_hv(&make_test_concept(&format!("func_{}", i), "functional"), &hv)
                     .unwrap();

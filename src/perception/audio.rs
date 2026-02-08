@@ -13,7 +13,7 @@
 //! │ AudioProjector  │ ← LTC temporal dynamics
 //! │ (symthaea-stt)  │
 //! └────────┬────────┘
-//!          │ HV16 (2048-bit)
+//!          │ BinaryHV (2048-bit)
 //!          ▼
 //! ┌─────────────────┐
 //! │ PhonemeDecoder  │ ← Hopfield associative memory
@@ -22,7 +22,7 @@
 //!          │ Phoneme sequence
 //!          ▼
 //! ┌─────────────────┐
-//! │ Bridge to Core  │ ← HV16 → ContinuousHV conversion
+//! │ Bridge to Core  │ ← BinaryHV → ContinuousHV conversion
 //! │                 │
 //! └────────┬────────┘
 //!          │
@@ -197,7 +197,7 @@ impl AudioPerception {
         // Create combined HV from all frames (bundled representation)
         let combined_hv = symthaea_stt::bundle(&hvs);
 
-        // Convert HV16 to continuous f32 embedding for perception pipeline
+        // Convert BinaryHV to continuous f32 embedding for perception pipeline
         // Use core dimension (16,384) for compatibility with symthaea-core
         let embedding = combined_hv.to_core_continuous();
 
@@ -257,7 +257,7 @@ impl AudioPerception {
     }
 
     /// Extract prosody features from audio
-    fn extract_prosody(&self, samples: &[f32], _hvs: &[symthaea_stt::HV16]) -> ProsodyFeatures {
+    fn extract_prosody(&self, samples: &[f32], _hvs: &[symthaea_stt::BinaryHV]) -> ProsodyFeatures {
         // Simple prosody extraction
         let energy: f32 = samples.iter().map(|x| x.abs()).sum::<f32>() / samples.len() as f32;
 

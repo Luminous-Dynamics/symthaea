@@ -10,7 +10,7 @@ use symthaea::web_research::{
     KnowledgeIntegrator, ResearchResult,
     EpistemicStatus, Source, VerificationLevel, Verification, Claim,
 };
-use symthaea::hdc::binary_hv::HV16;
+use symthaea::hdc::binary_hv::BinaryHV;
 use std::time::SystemTime;
 
 // ============================================================================
@@ -109,7 +109,7 @@ fn test_source_creation() {
         published_date: Some(SystemTime::now()),
         author: Some("Test Author".to_string()),
         credibility: 0.85,
-        encoding: HV16::random(42),
+        encoding: BinaryHV::random(42),
         fetch_timestamp: SystemTime::now(),
     };
 
@@ -126,7 +126,7 @@ fn test_source_credibility_comparison() {
         published_date: None,
         author: None,
         credibility: 0.95,
-        encoding: HV16::zero(),
+        encoding: BinaryHV::zero(),
         fetch_timestamp: SystemTime::now(),
     };
 
@@ -137,7 +137,7 @@ fn test_source_credibility_comparison() {
         published_date: None,
         author: None,
         credibility: 0.3,
-        encoding: HV16::zero(),
+        encoding: BinaryHV::zero(),
         fetch_timestamp: SystemTime::now(),
     };
 
@@ -152,7 +152,7 @@ fn test_source_credibility_comparison() {
 fn test_claim_creation() {
     let claim = Claim {
         text: "The sky is blue".to_string(),
-        encoding: HV16::random(123),
+        encoding: BinaryHV::random(123),
         subject: "sky".to_string(),
         predicate: "is".to_string(),
         object: Some("blue".to_string()),
@@ -179,7 +179,7 @@ fn test_research_result_creation() {
                 published_date: None,
                 author: None,
                 credibility: 0.85,
-                encoding: HV16::random(1),
+                encoding: BinaryHV::random(1),
                 fetch_timestamp: SystemTime::now(),
             },
         ],
@@ -205,7 +205,7 @@ async fn test_integrate_mock_research_result() {
 
     let claim = Claim {
         text: "Test claim".to_string(),
-        encoding: HV16::random(100),
+        encoding: BinaryHV::random(100),
         subject: "test".to_string(),
         predicate: "is".to_string(),
         object: Some("verified".to_string()),
@@ -235,7 +235,7 @@ async fn test_integrate_mock_research_result() {
                 published_date: None,
                 author: None,
                 credibility: 0.8,
-                encoding: HV16::random(200),
+                encoding: BinaryHV::random(200),
                 fetch_timestamp: SystemTime::now(),
             },
         ],

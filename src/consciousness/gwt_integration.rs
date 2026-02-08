@@ -37,10 +37,10 @@ use crate::hdc::global_workspace::{
     GlobalWorkspace, WorkspaceConfig, WorkspaceContent, WorkspaceAssessment
 };
 use crate::hdc::binary_hv::HV16;
+#[cfg(feature = "observability_module")]
 use crate::observability::{SharedObserver, types::*};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::fmt;
 
 /// Unified GWT processor integrating #23 and #69
@@ -84,6 +84,7 @@ pub struct UnifiedGlobalWorkspace {
     /// TODO(future): Connect observer to emit tracing events on workspace ignition.
     /// This enables real-time monitoring of consciousness dynamics via the
     /// observability infrastructure - useful for debugging and visualization.
+    #[cfg(feature = "observability_module")]
     #[allow(dead_code)]
     observer: Option<SharedObserver>,
 }
@@ -100,7 +101,7 @@ impl fmt::Debug for UnifiedGlobalWorkspace {
             .field("metacognitive_assessments", &self.metacognitive_assessments)
             .field("workspace_stability", &self.workspace_stability)
             .field("phi_estimates", &self.phi_estimates)
-            .field("observer", &"<SharedObserver>")
+            .field("observer", &"<optional>")
             .finish()
     }
 }
@@ -266,10 +267,24 @@ pub struct UnifiedGWTResult {
 impl UnifiedGlobalWorkspace {
     /// Create new unified workspace (backwards-compatible)
     pub fn new(config: UnifiedGWTConfig) -> Self {
-        Self::with_observer(config, None)
+        Self {
+            hdc_workspace: GlobalWorkspace::new(config.workspace_config.clone()),
+            strategy_activations: HashMap::new(),
+            coalitions: Vec::new(),
+            config,
+            stats: UnifiedGWTStats::default(),
+            timesteps_since_ignition: 100,
+            in_attentional_blink: false,
+            metacognitive_assessments: Vec::new(),
+            workspace_stability: 1.0,
+            phi_estimates: HashMap::new(),
+            #[cfg(feature = "observability_module")]
+            observer: None,
+        }
     }
 
     /// Create new unified workspace with observer
+    #[cfg(feature = "observability_module")]
     pub fn with_observer(config: UnifiedGWTConfig, observer: Option<SharedObserver>) -> Self {
         Self {
             hdc_workspace: GlobalWorkspace::new(config.workspace_config.clone()),
@@ -277,8 +292,7 @@ impl UnifiedGlobalWorkspace {
             coalitions: Vec::new(),
             config,
             stats: UnifiedGWTStats::default(),
-            // Revolutionary state initialization
-            timesteps_since_ignition: 100,  // Start outside blink period
+            timesteps_since_ignition: 100,
             in_attentional_blink: false,
             metacognitive_assessments: Vec::new(),
             workspace_stability: 1.0,
@@ -581,29 +595,27 @@ impl UnifiedGlobalWorkspace {
             }
         }
 
-        // Record workspace ignition event
+        // Record workspace ignition event (when observability is enabled)
+        #[cfg(feature = "observability_module")]
         if assessment.ignition_detected {
             if let Some(ref observer) = self.observer {
-                // Get phi estimate for winning strategy
                 let phi = winning_coalition.as_ref()
                     .and_then(|c| self.phi_estimates.get(&c.strategy_name))
                     .copied()
                     .unwrap_or(0.5);
 
-                // Get coalition size and members
                 let (coalition_size, active_primitives) = winning_coalition.as_ref()
                     .map(|c| (c.members.len(), c.members.clone()))
                     .unwrap_or((0, Vec::new()));
 
-                // Calculate broadcast payload size
                 let broadcast_payload_size = assessment.broadcasts.iter()
-                    .map(|b| b.content.len() * 16384 / 8)  // HV16 bits to bytes
+                    .map(|b| b.content.len() * 16384 / 8)
                     .sum();
 
                 let event = WorkspaceIgnitionEvent {
                     timestamp: chrono::Utc::now(),
                     phi,
-                    free_energy: 0.0,  // Would need active inference integration for actual value
+                    free_energy: 0.0,
                     coalition_size,
                     active_primitives,
                     broadcast_payload_size,
