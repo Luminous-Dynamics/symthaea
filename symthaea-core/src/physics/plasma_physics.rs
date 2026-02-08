@@ -26,9 +26,6 @@ use super::standard_model::PHYSICS_DIM;
 use super::constants::{E_CHARGE, M_ELECTRON, EPSILON_0, K_BOLTZMANN};
 use serde::{Deserialize, Serialize};
 
-/// Alias for backward compatibility
-pub const K_B: f64 = K_BOLTZMANN;
-
 /// Plasma confinement scheme
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConfinementScheme {
@@ -225,7 +222,7 @@ impl PlasmaEncoder {
     /// Calculate Debye length: λ_D = √(ε₀ k_B T / n e²)
     pub fn debye_length_m(&self, temp_ev: f64, density_m3: f64) -> f64 {
         let temp_k = temp_ev * 11604.0;  // eV to Kelvin
-        (EPSILON_0 * K_B * temp_k / (density_m3 * E_CHARGE * E_CHARGE)).sqrt()
+        (EPSILON_0 * K_BOLTZMANN * temp_k / (density_m3 * E_CHARGE * E_CHARGE)).sqrt()
     }
 
     /// Calculate plasma frequency: ω_p = √(n e² / ε₀ m_e)
@@ -248,7 +245,7 @@ impl PlasmaEncoder {
     pub fn plasma_beta(&self, density_m3: f64, temp_ev: f64, magnetic_field_t: f64) -> f64 {
         let mu_0 = 4.0 * std::f64::consts::PI * 1e-7;
         let temp_k = temp_ev * 11604.0;
-        2.0 * mu_0 * density_m3 * K_B * temp_k / (magnetic_field_t * magnetic_field_t)
+        2.0 * mu_0 * density_m3 * K_BOLTZMANN * temp_k / (magnetic_field_t * magnetic_field_t)
     }
 
     /// Create a plasma

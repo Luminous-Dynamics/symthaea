@@ -26,17 +26,8 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
-use super::constants::{HBAR, E_CHARGE, M_ELECTRON, M_PROTON, C};
+use super::constants::{HBAR, E_CHARGE, M_ELECTRON, M_PROTON, C, ALPHA, K_COULOMB, AMU};
 use serde::{Deserialize, Serialize};
-
-/// Fine structure constant (dimensionless)
-const ALPHA: f64 = 7.297_352_5693e-3;
-
-/// Coulomb constant k_e = 1/(4πε₀)
-const K_COULOMB: f64 = 8.987_551_7923e9;
-
-/// Atomic mass unit in kg
-const AMU: f64 = 1.660_539_066_60e-27;
 
 /// Result of a tunneling calculation
 #[derive(Debug, Clone, Serialize, Deserialize)]

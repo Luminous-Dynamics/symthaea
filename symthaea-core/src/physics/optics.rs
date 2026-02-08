@@ -24,10 +24,6 @@ use super::standard_model::PHYSICS_DIM;
 use super::constants::{C, H};
 use serde::{Deserialize, Serialize};
 
-// Re-export with original names for backward compatibility
-pub const C_LIGHT: f64 = C;
-pub const H_PLANCK: f64 = H;
-
 /// Optical regime
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OpticalRegime {
@@ -78,7 +74,7 @@ impl OpticalBeam {
 
     /// Photon flux (photons/s)
     pub fn photon_flux(&self) -> f64 {
-        self.power_w / (H_PLANCK * C_LIGHT / (self.wavelength_nm * 1e-9))
+        self.power_w / (H * C / (self.wavelength_nm * 1e-9))
     }
 
     /// Rayleigh range

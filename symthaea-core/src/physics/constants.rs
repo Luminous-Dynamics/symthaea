@@ -21,13 +21,13 @@ pub const K_BOLTZMANN: f64 = 1.380_649e-23;
 pub const E_CHARGE: f64 = 1.602_176_634e-19;
 
 /// Electron mass (kg)
-pub const M_ELECTRON: f64 = 9.109_383_7015e-31;
+pub const M_ELECTRON: f64 = 9.109_383_701_5e-31;
 
 /// Proton mass (kg)
 pub const M_PROTON: f64 = 1.672_621_923_69e-27;
 
 /// Vacuum permittivity (F/m)
-pub const EPSILON_0: f64 = 8.854_187_8128e-12;
+pub const EPSILON_0: f64 = 8.854_187_812_8e-12;
 
 /// Vacuum permeability (H/m)
 pub const MU_0: f64 = 1.256_637_062_12e-6;
@@ -43,3 +43,12 @@ pub const T_ROOM: f64 = 298.15;
 
 /// Standard atmosphere (Pa)
 pub const P_STANDARD: f64 = 101_325.0;
+
+/// Fine structure constant (dimensionless)
+pub const ALPHA: f64 = 7.297_352_569_3e-3;
+
+/// Coulomb constant k_e = 1/(4πε₀) (N·m²/C²)
+pub const K_COULOMB: f64 = 8.987_551_792_3e9;
+
+/// Atomic mass unit (kg)
+pub const AMU: f64 = 1.660_539_066_60e-27;
