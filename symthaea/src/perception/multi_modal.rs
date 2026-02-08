@@ -188,7 +188,7 @@ impl MultiModalPerception {
             ModalityType::Temporal,
             ModalityType::Spatial,
         ] {
-            modality_encoders.insert(modality, ContinuousHV::random(dim));
+            modality_encoders.insert(modality, ContinuousHV::random(dim, (modality as u64 + 1) * 42));
         }
 
         Self {
@@ -219,7 +219,7 @@ impl MultiModalPerception {
     fn encode(&self, input: &PerceptionInput) -> ContinuousHV {
         let modality_basis = self.modality_encoders.get(&input.modality)
             .cloned()
-            .unwrap_or_else(|| ContinuousHV::random(self.config.dimension));
+            .unwrap_or_else(|| ContinuousHV::random(self.config.dimension, 999));
 
         // Simple encoding: hash data and combine with modality basis
         let data_hv = self.data_to_hv(&input.data);
@@ -300,7 +300,7 @@ impl MultiModalPerception {
     /// Fuse multiple embeddings
     fn fuse_embeddings(&self, embeddings: &[ContinuousHV]) -> ContinuousHV {
         if embeddings.is_empty() {
-            return ContinuousHV::random(self.config.dimension);
+            return ContinuousHV::random(self.config.dimension, 0);
         }
         if embeddings.len() == 1 {
             return embeddings[0].clone();
@@ -308,7 +308,7 @@ impl MultiModalPerception {
 
         match self.config.fusion_strategy {
             FusionStrategy::Sum | FusionStrategy::Concatenate => {
-                embeddings[0].bundle(&embeddings[1..])
+                ContinuousHV::bundle_owned(embeddings)
             }
             FusionStrategy::Product => {
                 let mut result = embeddings[0].clone();
@@ -319,7 +319,7 @@ impl MultiModalPerception {
             }
             FusionStrategy::Attention | FusionStrategy::Hierarchical => {
                 // Simplified attention-based fusion
-                embeddings[0].bundle(&embeddings[1..])
+                ContinuousHV::bundle_owned(embeddings)
             }
         }
     }
@@ -389,7 +389,7 @@ impl MultiModalIntegrator {
             let mut count = 0;
             for i in 0..outputs.len() {
                 for j in (i + 1)..outputs.len() {
-                    let sim = outputs[i].embedding.cosine_similarity(&outputs[j].embedding);
+                    let sim = outputs[i].embedding.similarity(&outputs[j].embedding);
                     total_sim += sim;
                     count += 1;
                 }
@@ -446,7 +446,7 @@ mod tests {
         let input = PerceptionInput::new("test", ModalityType::Visual, vec![1, 2, 3]);
         let embedding = perception.process_input(input);
 
-        assert_eq!(embedding.dimension(), 512);
+        assert_eq!(embedding.dim(), 512);
         assert_eq!(perception.stats.inputs_processed, 1);
     }
 

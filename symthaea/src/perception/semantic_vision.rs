@@ -491,7 +491,7 @@ mod tests {
         let image_data = vec![0u8; 1024];
 
         let embedding = vision.embed_image(&image_data);
-        assert_eq!(embedding.embedding.dimension(), 512);
+        assert_eq!(embedding.embedding.dim(), 512);
     }
 
     #[test]

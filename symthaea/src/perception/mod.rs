@@ -142,7 +142,7 @@ pub use visual_cortex::{VisualCortex, VisualCortexConfig, FeatureExtractionResul
 #[cfg(feature = "full_perception")]
 pub use semantic_vision::{SemanticVision, VisionConfig, VisualFeatures, ImageEmbedding, ImageCaption, OcrSystem};
 #[cfg(feature = "full_perception")]
-pub use multi_modal::{MultiModalIntegrator, ModalityType};
+pub use multi_modal::{MultiModalIntegrator, MultiModalPerception, MultiModalConfig, ModalityType, PerceptionInput};
 
 #[cfg(feature = "full_perception")]
 pub mod conscious_perception;

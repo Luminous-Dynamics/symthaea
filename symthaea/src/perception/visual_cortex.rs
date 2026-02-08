@@ -190,11 +190,11 @@ impl VisualCortex {
     /// Aggregate features from all layers
     fn aggregate_features(&self, layer_features: &[ContinuousHV]) -> ContinuousHV {
         if layer_features.is_empty() {
-            return ContinuousHV::zeros(self.config.dimension);
+            return ContinuousHV::zero(self.config.dimension);
         }
 
         // Weighted sum based on attention weights
-        let mut result = ContinuousHV::zeros(self.config.dimension);
+        let mut result = ContinuousHV::zero(self.config.dimension);
         for (feat, &weight) in layer_features.iter().zip(self.attention_weights.iter()) {
             let weighted = feat.scale(weight);
             result = ContinuousHV::bundle_owned(&[result, weighted]);
@@ -253,8 +253,8 @@ impl VisualFeatureExtractor {
         let mut feature_bases = HashMap::new();
 
         // Initialize bases for common visual features
-        for feature in ["edge", "color", "texture", "shape", "motion", "depth"] {
-            feature_bases.insert(feature.to_string(), ContinuousHV::random(dimension));
+        for (i, feature) in ["edge", "color", "texture", "shape", "motion", "depth"].iter().enumerate() {
+            feature_bases.insert(feature.to_string(), ContinuousHV::random(dimension, (i + 1) as u64));
         }
 
         Self {
@@ -323,9 +323,9 @@ impl VisualAttention {
     pub fn new(dimension: usize) -> Self {
         Self {
             dimension,
-            query_transform: ContinuousHV::random(dimension),
-            key_transform: ContinuousHV::random(dimension),
-            value_transform: ContinuousHV::random(dimension),
+            query_transform: ContinuousHV::random(dimension, 100),
+            key_transform: ContinuousHV::random(dimension, 101),
+            value_transform: ContinuousHV::random(dimension, 102),
         }
     }
 
@@ -342,7 +342,7 @@ impl VisualAttention {
         let scores: Vec<f32> = keys.iter()
             .map(|k| {
                 let k_transformed = k.bind(&self.key_transform);
-                q.cosine_similarity(&k_transformed)
+                q.similarity(&k_transformed)
             })
             .collect();
 
@@ -353,11 +353,11 @@ impl VisualAttention {
         let attention_weights: Vec<f32> = exp_scores.iter().map(|e| e / sum_exp).collect();
 
         // Weighted sum of values
-        let mut result = ContinuousHV::zeros(self.dimension);
+        let mut result = ContinuousHV::zero(self.dimension);
         for (v, &weight) in values.iter().zip(attention_weights.iter()) {
             let v_transformed = v.bind(&self.value_transform);
             let weighted = v_transformed.scale(weight);
-            result = result.bundle(&[weighted]);
+            result = ContinuousHV::bundle(&[&result, &weighted]);
         }
 
         result
@@ -374,7 +374,7 @@ impl VisualAttention {
         let scores: Vec<f32> = keys.iter()
             .map(|k| {
                 let k_transformed = k.bind(&self.key_transform);
-                q.cosine_similarity(&k_transformed)
+                q.similarity(&k_transformed)
             })
             .collect();
 
@@ -406,11 +406,11 @@ mod tests {
     #[test]
     fn test_visual_processing() {
         let mut cortex = VisualCortex::default();
-        let input = ContinuousHV::random(512);
+        let input = ContinuousHV::random(512, 1);
 
         let result = cortex.process(&input);
         assert!(!result.layer_features.is_empty());
-        assert_eq!(result.final_features.dimension(), 512);
+        assert_eq!(result.final_features.dim(), 512);
     }
 
     #[test]
@@ -426,20 +426,20 @@ mod tests {
     fn test_visual_attention() {
         let attention = VisualAttention::default();
 
-        let query = ContinuousHV::random(512);
-        let keys = vec![ContinuousHV::random(512), ContinuousHV::random(512)];
-        let values = vec![ContinuousHV::random(512), ContinuousHV::random(512)];
+        let query = ContinuousHV::random(512, 10);
+        let keys = vec![ContinuousHV::random(512, 11), ContinuousHV::random(512, 12)];
+        let values = vec![ContinuousHV::random(512, 13), ContinuousHV::random(512, 14)];
 
         let result = attention.attend(&query, &keys, &values);
-        assert_eq!(result.dimension(), 512);
+        assert_eq!(result.dim(), 512);
     }
 
     #[test]
     fn test_attention_weights() {
         let attention = VisualAttention::default();
 
-        let query = ContinuousHV::random(512);
-        let keys = vec![ContinuousHV::random(512), ContinuousHV::random(512), ContinuousHV::random(512)];
+        let query = ContinuousHV::random(512, 20);
+        let keys = vec![ContinuousHV::random(512, 21), ContinuousHV::random(512, 22), ContinuousHV::random(512, 23)];
 
         let weights = attention.get_attention_weights(&query, &keys);
         assert_eq!(weights.len(), 3);
