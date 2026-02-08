@@ -34,7 +34,7 @@ use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::phi_engine::PhiEngine;
 
 const HDC_DIM: usize = 512;
-const N_NEURONS: usize = 16;
+const N_NEURONS: usize = 32;
 
 /// Anesthesia phase parameters
 #[derive(Clone)]
