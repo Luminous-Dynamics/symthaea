@@ -1,0 +1,21 @@
+[package]
+name = "mfa_coordinator"
+version = "0.1.0"
+edition = "2021"
+description = "Multi-Factor Authentication coordinator zome for MFDI spec"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "mfa_coordinator"
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+holochain_serialized_bytes.workspace = true
+
+# Link to integrity zome
+mfa_integrity = { path = "../integrity" }
+
+[features]
+default = []

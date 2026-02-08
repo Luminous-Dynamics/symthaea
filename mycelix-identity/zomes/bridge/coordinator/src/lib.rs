@@ -59,6 +59,46 @@ const IDENTITY_HAPP_ID: &str = "mycelix-identity";
 const REGISTERED_HAPPS_ANCHOR: &str = "registered_happs";
 const RECENT_EVENTS_ANCHOR: &str = "recent_events";
 
+// MFA weight in combined MATL score (40% MFA, 60% reputation)
+const MFA_WEIGHT: f64 = 0.4;
+const REPUTATION_WEIGHT: f64 = 0.6;
+
+// ==================== MFA MIRROR TYPES ====================
+// These mirror types from mfa_coordinator to avoid import cycles
+
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
+pub enum AssuranceLevel {
+    Anonymous,
+    Basic,
+    Verified,
+    HighlyAssured,
+    ConstitutionallyCritical,
+}
+
+impl AssuranceLevel {
+    /// Convert assurance level to a numeric score (0.0 - 1.0)
+    pub fn to_score(&self) -> f64 {
+        match self {
+            AssuranceLevel::Anonymous => 0.0,
+            AssuranceLevel::Basic => 0.25,
+            AssuranceLevel::Verified => 0.5,
+            AssuranceLevel::HighlyAssured => 0.75,
+            AssuranceLevel::ConstitutionallyCritical => 1.0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MfaSummary {
+    pub did: String,
+    pub assurance_level: AssuranceLevel,
+    pub assurance_score: f64,
+    pub factor_count: usize,
+    pub category_count: u8,
+    pub has_external_verification: bool,
+    pub fl_eligible: bool,
+}
+
 // ==================== HELPER FUNCTIONS ====================
 
 /// Create a deterministic entry hash from a string identifier
@@ -72,6 +112,111 @@ fn string_to_entry_hash(s: &str) -> EntryHash {
             .try_into()
             .expect("36 bytes"),
     )
+}
+
+// ==================== MFA CROSS-ZOME CALLS ====================
+
+/// Get MFA summary for a DID via cross-zome call
+fn get_mfa_summary_for_did(did: &str) -> ExternResult<Option<MfaSummary>> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("mfa"),
+        FunctionName::new("get_mfa_summary"),
+        None,
+        did.to_string(),
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(result) => {
+            let summary: Option<MfaSummary> = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode get_mfa_summary response: {:?}",
+                    e
+                )))
+            })?;
+            Ok(summary)
+        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => {
+            // MFA zome not accessible, return None
+            Ok(None)
+        }
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling mfa zome: {}",
+            err
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error: {}", err)
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => {
+            // Authentication failed, return None
+            Ok(None)
+        }
+    }
+}
+
+/// Get MFA assurance score for a DID (0.0 - 1.0)
+fn get_mfa_assurance_for_did(did: &str) -> ExternResult<f64> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("mfa"),
+        FunctionName::new("get_mfa_assurance_score"),
+        None,
+        did.to_string(),
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(result) => {
+            let score: f64 = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode get_mfa_assurance_score response: {:?}",
+                    e
+                )))
+            })?;
+            Ok(score)
+        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => {
+            // MFA zome not accessible, return 0 (Anonymous level)
+            Ok(0.0)
+        }
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling mfa zome: {}",
+            err
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error: {}", err)
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => {
+            // Authentication failed, return 0 (Anonymous level)
+            Ok(0.0)
+        }
+    }
+}
+
+/// Check if DID has MFA state enrolled
+fn has_mfa_enrolled(did: &str) -> ExternResult<bool> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("mfa"),
+        FunctionName::new("has_mfa_state"),
+        None,
+        did.to_string(),
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(result) => {
+            let has_mfa: bool = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode has_mfa_state response: {:?}",
+                    e
+                )))
+            })?;
+            Ok(has_mfa)
+        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Ok(false),
+        ZomeCallResponse::NetworkError(_) => Ok(false),
+        ZomeCallResponse::CountersigningSession(_) => Ok(false),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Ok(false),
+    }
 }
 
 // ==================== HAPP REGISTRATION ====================
@@ -173,8 +318,24 @@ pub fn query_identity(input: QueryIdentityInput) -> ExternResult<IdentityVerific
     // Check if DID is deactivated
     let is_deactivated = is_did_deactivated(&input.did)?;
 
-    // Get aggregated reputation
-    let matl_score = get_aggregated_reputation(&input.did)?;
+    // Get aggregated reputation from hApps
+    let reputation_score = get_aggregated_reputation(&input.did)?;
+
+    // Get MFA summary for enhanced verification
+    let mfa_summary = get_mfa_summary_for_did(&input.did)?;
+    let mfa_enrolled = mfa_summary.is_some();
+    let mfa_assurance_score = mfa_summary.as_ref().map(|s| s.assurance_score).unwrap_or(0.0);
+    let mfa_assurance_level = mfa_summary.as_ref().map(|s| s.assurance_level.clone());
+    let mfa_factor_count = mfa_summary.as_ref().map(|s| s.factor_count).unwrap_or(0);
+    let fl_eligible = mfa_summary.as_ref().map(|s| s.fl_eligible).unwrap_or(false);
+
+    // Calculate combined MATL score (weighted average of reputation and MFA)
+    // If MFA is enrolled, use weighted combination; otherwise use reputation only
+    let matl_score = if mfa_enrolled {
+        (reputation_score * REPUTATION_WEIGHT) + (mfa_assurance_score * MFA_WEIGHT)
+    } else {
+        reputation_score
+    };
 
     // Count credentials from credential_schema zome
     let credential_count = count_credentials_for_did(&input.did)?;
@@ -199,6 +360,11 @@ pub fn query_identity(input: QueryIdentityInput) -> ExternResult<IdentityVerific
         is_valid: verification.is_valid,
         matl_score: verification.matl_score,
         credential_count: verification.credential_count,
+        mfa_enrolled,
+        mfa_assurance_level,
+        mfa_assurance_score,
+        mfa_factor_count,
+        fl_eligible,
     })
 }
 
@@ -216,6 +382,12 @@ pub struct IdentityVerificationResult {
     pub is_valid: bool,
     pub matl_score: f64,
     pub credential_count: u32,
+    // MFA-related fields
+    pub mfa_enrolled: bool,
+    pub mfa_assurance_level: Option<AssuranceLevel>,
+    pub mfa_assurance_score: f64,
+    pub mfa_factor_count: usize,
+    pub fl_eligible: bool,
 }
 
 /// Verify if a DID exists (calls did_registry zome)
@@ -643,21 +815,115 @@ pub fn verify_did(did: String) -> ExternResult<bool> {
     verify_did_exists(&did)
 }
 
-/// Get MATL score for a DID
+/// Get MATL score for a DID (combines reputation + MFA assurance)
 #[hdk_extern]
 pub fn get_matl_score(did: String) -> ExternResult<f64> {
+    let reputation_score = get_aggregated_reputation(&did)?;
+    let mfa_score = get_mfa_assurance_for_did(&did)?;
+
+    // If MFA enrolled (score > 0), use weighted combination
+    if mfa_score > 0.0 {
+        Ok((reputation_score * REPUTATION_WEIGHT) + (mfa_score * MFA_WEIGHT))
+    } else {
+        Ok(reputation_score)
+    }
+}
+
+/// Get reputation-only score (without MFA factor)
+#[hdk_extern]
+pub fn get_reputation_score(did: String) -> ExternResult<f64> {
     get_aggregated_reputation(&did)
 }
 
 /// Check if DID meets trust threshold
 #[hdk_extern]
 pub fn is_trustworthy(input: TrustCheckInput) -> ExternResult<bool> {
-    let score = get_aggregated_reputation(&input.did)?;
-    Ok(score >= input.threshold)
+    let matl_score = get_matl_score(input.did.clone())?;
+    Ok(matl_score >= input.threshold)
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct TrustCheckInput {
     pub did: String,
     pub threshold: f64,
+}
+
+/// Check if DID is eligible for FL participation (requires MFA)
+#[hdk_extern]
+pub fn is_fl_eligible(did: String) -> ExternResult<bool> {
+    let mfa_summary = get_mfa_summary_for_did(&did)?;
+    Ok(mfa_summary.map(|s| s.fl_eligible).unwrap_or(false))
+}
+
+/// Get MFA summary for a DID (exposed for other hApps)
+#[hdk_extern]
+pub fn get_identity_mfa_summary(did: String) -> ExternResult<Option<MfaSummary>> {
+    get_mfa_summary_for_did(&did)
+}
+
+/// Enhanced trust check that considers both MATL score and MFA requirements
+#[hdk_extern]
+pub fn check_enhanced_trust(input: EnhancedTrustCheckInput) -> ExternResult<EnhancedTrustResult> {
+    let reputation_score = get_aggregated_reputation(&input.did)?;
+    let mfa_summary = get_mfa_summary_for_did(&input.did)?;
+
+    let mfa_enrolled = mfa_summary.is_some();
+    let mfa_score = mfa_summary.as_ref().map(|s| s.assurance_score).unwrap_or(0.0);
+    let mfa_level = mfa_summary.as_ref().map(|s| s.assurance_level.clone());
+    let fl_eligible = mfa_summary.as_ref().map(|s| s.fl_eligible).unwrap_or(false);
+
+    // Calculate combined MATL score
+    let matl_score = if mfa_enrolled {
+        (reputation_score * REPUTATION_WEIGHT) + (mfa_score * MFA_WEIGHT)
+    } else {
+        reputation_score
+    };
+
+    // Check if meets threshold
+    let meets_threshold = matl_score >= input.threshold;
+
+    // Check if meets MFA requirement
+    let meets_mfa_requirement = if input.require_mfa {
+        mfa_enrolled && mfa_score >= input.min_mfa_score.unwrap_or(0.0)
+    } else {
+        true
+    };
+
+    // Overall trust result
+    let is_trusted = meets_threshold && meets_mfa_requirement;
+
+    Ok(EnhancedTrustResult {
+        did: input.did,
+        is_trusted,
+        matl_score,
+        reputation_score,
+        mfa_score,
+        mfa_level,
+        mfa_enrolled,
+        fl_eligible,
+        meets_threshold,
+        meets_mfa_requirement,
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EnhancedTrustCheckInput {
+    pub did: String,
+    pub threshold: f64,
+    pub require_mfa: bool,
+    pub min_mfa_score: Option<f64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EnhancedTrustResult {
+    pub did: String,
+    pub is_trusted: bool,
+    pub matl_score: f64,
+    pub reputation_score: f64,
+    pub mfa_score: f64,
+    pub mfa_level: Option<AssuranceLevel>,
+    pub mfa_enrolled: bool,
+    pub fl_eligible: bool,
+    pub meets_threshold: bool,
+    pub meets_mfa_requirement: bool,
 }

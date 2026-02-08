@@ -13,6 +13,7 @@ on:
       - 'mycelix-governance/zomes/**'
       - 'mycelix-workspace/happs/**'
       - 'mycelix-workspace/sdk/**'
+      - 'mycelix-identity/**'
       - 'mycelix-care/zomes/**'
       - 'mycelix-emergency/zomes/**'
       - 'mycelix-water/zomes/**'
@@ -27,6 +28,7 @@ on:
       - 'mycelix-governance/zomes/**'
       - 'mycelix-workspace/happs/**'
       - 'mycelix-workspace/sdk/**'
+      - 'mycelix-identity/**'
       - 'mycelix-care/zomes/**'
       - 'mycelix-emergency/zomes/**'
       - 'mycelix-water/zomes/**'
@@ -450,6 +452,14 @@ jobs:
         run: |
           nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release identity -- --ignored --test-threads=1 --nocapture"
 
+      - name: Run sweettest - MFA Identity (7 tests)
+        run: |
+          nix develop ./mycelix-identity --command bash -c "cd mycelix-identity/tests && cargo test --release mfa -- --ignored --test-threads=1 --nocapture"
+
+      - name: Run MFA Unit Tests
+        run: |
+          nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo test --all-features --lib -- --test-threads=1"
+
       - name: Run sweettest - Governance (3 tests)
         run: |
           nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release governance -- --ignored --test-threads=1 --nocapture"
@@ -854,6 +864,8 @@ jobs:
           echo "| Suite | Tests | Description |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|-------------|" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Identity | 4 | DID registration, profile updates, trust attestations |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Sweettest MFA Identity** | 7 | MFA state, factor enrollment, assurance levels, FL eligibility |" >> $GITHUB_STEP_SUMMARY
+          echo "| MFA Unit Tests | 16 | Decay calculations, factor strength, assurance scores |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Governance | 3 | Proposal lifecycle, voting, execution |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Bridge | 2 | Cross-hApp communication |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Privacy | 6 | ZK attestations, anonymous credentials |" >> $GITHUB_STEP_SUMMARY

@@ -6,6 +6,62 @@
 use hdk::prelude::*;
 use did_registry_integrity::*;
 
+// ==================== MFA INTEGRATION ====================
+
+/// Input structure for creating MFA state (mirrors mfa_coordinator)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct CreateMfaStateInput {
+    did: String,
+    primary_key_hash: String,
+}
+
+/// Auto-create MFA state for a newly created DID
+/// This sets up the initial PrimaryKeyPair factor automatically
+fn auto_create_mfa_state(did: &str, agent_pub_key: &AgentPubKey) -> ExternResult<()> {
+    // Create primary key hash from agent pub key
+    // Using the agent's public key as the initial factor
+    let primary_key_hash = format!("sha256:{}", agent_pub_key);
+
+    let input = CreateMfaStateInput {
+        did: did.to_string(),
+        primary_key_hash,
+    };
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("mfa"),
+        FunctionName::new("create_mfa_state"),
+        None,
+        input,
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(_) => {
+            // MFA state created successfully
+            Ok(())
+        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => {
+            // MFA zome not accessible - log but don't fail DID creation
+            // This allows DID creation even if MFA zome is not installed
+            debug!("MFA zome unauthorized - DID created without MFA state");
+            Ok(())
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            // Network error - log but don't fail DID creation
+            debug!("MFA zome network error: {} - DID created without MFA state", err);
+            Ok(())
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            debug!("MFA zome countersigning error: {} - DID created without MFA state", err);
+            Ok(())
+        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => {
+            debug!("MFA zome authentication failed - DID created without MFA state");
+            Ok(())
+        }
+    }
+}
+
 /// Create a new DID document for the calling agent
 #[hdk_extern]
 pub fn create_did() -> ExternResult<Record> {
@@ -44,6 +100,13 @@ pub fn create_did() -> ExternResult<Record> {
         LinkTypes::AgentToDid,
         (),
     )?;
+
+    // Auto-create MFA state for the new DID
+    // This registers the primary key pair as the initial authentication factor
+    // Errors are logged but don't fail DID creation (MFA is optional)
+    if let Err(e) = auto_create_mfa_state(&did_id, &agent_pub_key) {
+        debug!("Failed to auto-create MFA state: {:?}", e);
+    }
 
     let record = get(action_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
