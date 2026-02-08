@@ -591,6 +591,10 @@ mod tests {
 }
 
 /// Backward-compatible alias: `PooledHV16` is now `PooledBinaryHV`.
+/// Use `PooledBinaryHV` directly in new code.
+#[deprecated(since = "0.5.0", note = "renamed to PooledBinaryHV — use PooledBinaryHV instead")]
 pub type PooledHV16 = PooledBinaryHV;
 /// Backward-compatible alias: `HV16Pool` is now `BinaryHVPool`.
+/// Use `BinaryHVPool` directly in new code.
+#[deprecated(since = "0.5.0", note = "renamed to BinaryHVPool — use BinaryHVPool instead")]
 pub type HV16Pool = BinaryHVPool;

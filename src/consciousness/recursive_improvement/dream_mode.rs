@@ -267,6 +267,7 @@ impl DreamMode {
                 to_state: next_state.clone(),
                 reward: next_state.phi - current_state.phi,
                 timestamp: 0, // Dream transitions use 0 timestamp
+                surprise: 0.0, // No surprise in dream mode
             };
 
             trajectory.push(transition);

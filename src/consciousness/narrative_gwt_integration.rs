@@ -76,7 +76,7 @@ use crate::consciousness::narrative_self::{
     NarrativeSelfModel, NarrativeSelfConfig, NarrativeSelfReport
 };
 use crate::consciousness::gwt_integration::{
-    UnifiedGlobalWorkspace, UnifiedGWTConfig, UnifiedGWTResult, Coalition
+    UnifiedGlobalWorkspace, UnifiedGWTConfig, UnifiedGWTResult
 };
 use crate::consciousness::cross_modal_binding::{
     CrossModalBinder, BindingConfig, Modality
@@ -89,14 +89,14 @@ use crate::consciousness::predictive_self::{
 // **REVOLUTIONARY IMPROVEMENT #75**: Temporal Consciousness Integration
 // Consciousness as temporal flow, not just instant measurement!
 use crate::consciousness::temporal_consciousness::{
-    TemporalConsciousnessAnalyzer, TemporalConsciousnessConfig, TemporalConsciousnessReport,
+    TemporalConsciousnessAnalyzer, TemporalConsciousnessConfig,
 };
 // **REVOLUTIONARY IMPROVEMENT #76**: Unified Value Evaluator Integration
 // Uses Seven Harmonies + Affective Consciousness for semantic value checking
 use crate::consciousness::unified_value_evaluator::{
     UnifiedValueEvaluator, EvaluationContext, EvaluationResult,
     ActionType, Decision as ValueDecision, AffectiveSystemsState,
-    NarrativeValueReport, DecisionExplanation, ConfidenceLevel,
+    NarrativeValueReport, ConfidenceLevel,
 };
 use crate::consciousness::affective_consciousness::CoreAffect;
 use std::collections::{HashMap, VecDeque};

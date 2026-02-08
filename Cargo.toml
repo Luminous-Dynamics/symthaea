@@ -266,6 +266,7 @@ physiology_module = []         # Physiology integration in school
 mycelix_module = []            # Mycelix governance hooks
 databases_module = []          # Database backends in experience module
 magi_loop = []                 # MAGI Loop world-grounded prediction (recursive_improvement)
+recursive_improvement_advanced = ["full_consciousness"]  # benchmark_suite, routing_hub, primitive_semantic_bridge (need SemanticPrimitiveEncoder)
 epistemic_conflict = []        # Epistemic conflict detection + reliability + Φ_eff
 conscious_tool_gate = ["epistemic_conflict"]  # Consciousness-gated tool use (requires epistemic_conflict)
 temporal_planning = ["epistemic_conflict", "magi_loop"]  # ForkedState + MCTS + EVS

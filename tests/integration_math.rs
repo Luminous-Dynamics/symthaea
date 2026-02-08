@@ -269,3 +269,225 @@ fn test_causal_factor_hodge() {
         );
     }
 }
+
+// =============================================================================
+// Test 3.5: Phi Proxy Validation Across Multiple Topologies
+// =============================================================================
+//
+// Validate the lambda2 proxy against exact Phi on 15 networks with
+// varying topology (chain, ring, star, fully connected, random).
+// Report correlation and verify proxy correctly rank-orders integration.
+
+#[test]
+fn test_phi_proxy_multi_topology_validation() {
+    use symthaea::hdc::iit_exact::validate_phi_proxy;
+
+    let noise = 0.05;
+    let mut results: Vec<(String, f64, f64)> = Vec::new(); // (name, approx, exact)
+
+    // 1. Chain (3 nodes): A→B→C — minimal integration
+    results.push(("chain_3".into(), {
+        let r = validate_phi_proxy(&vec![
+            vec![0.0, 0.8, 0.0],
+            vec![0.0, 0.0, 0.8],
+            vec![0.0, 0.0, 0.0],
+        ], noise);
+        (r.approx_phi, r.exact_phi)
+    }.0, results.last().map(|_| 0.0).unwrap_or(0.0)));
+
+    // Re-do properly with tuples
+    results.clear();
+
+    // 1. Chain 3
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.8, 0.0],
+        vec![0.0, 0.0, 0.8],
+        vec![0.0, 0.0, 0.0],
+    ], noise);
+    results.push(("chain_3".into(), r.approx_phi, r.exact_phi));
+
+    // 2. Chain 4
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.8, 0.0, 0.0],
+        vec![0.0, 0.0, 0.8, 0.0],
+        vec![0.0, 0.0, 0.0, 0.8],
+        vec![0.0, 0.0, 0.0, 0.0],
+    ], noise);
+    results.push(("chain_4".into(), r.approx_phi, r.exact_phi));
+
+    // 3. Ring 3: A→B→C→A — cycle adds integration
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.8, 0.0],
+        vec![0.0, 0.0, 0.8],
+        vec![0.8, 0.0, 0.0],
+    ], noise);
+    results.push(("ring_3".into(), r.approx_phi, r.exact_phi));
+
+    // 4. Ring 4
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.8, 0.0, 0.0],
+        vec![0.0, 0.0, 0.8, 0.0],
+        vec![0.0, 0.0, 0.0, 0.8],
+        vec![0.8, 0.0, 0.0, 0.0],
+    ], noise);
+    results.push(("ring_4".into(), r.approx_phi, r.exact_phi));
+
+    // 5. Star 4: center→all, no return
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.8, 0.8, 0.8],
+        vec![0.0, 0.0, 0.0, 0.0],
+        vec![0.0, 0.0, 0.0, 0.0],
+        vec![0.0, 0.0, 0.0, 0.0],
+    ], noise);
+    results.push(("star_4_out".into(), r.approx_phi, r.exact_phi));
+
+    // 6. Star 4: all→center — feedforward convergence
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.0, 0.0, 0.0],
+        vec![0.8, 0.0, 0.0, 0.0],
+        vec![0.8, 0.0, 0.0, 0.0],
+        vec![0.8, 0.0, 0.0, 0.0],
+    ], noise);
+    results.push(("star_4_in".into(), r.approx_phi, r.exact_phi));
+
+    // 7. Bidirectional ring 3
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.7, 0.7],
+        vec![0.7, 0.0, 0.7],
+        vec![0.7, 0.7, 0.0],
+    ], noise);
+    results.push(("bidir_ring_3".into(), r.approx_phi, r.exact_phi));
+
+    // 8. Fully connected 3
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.9, 0.9],
+        vec![0.9, 0.0, 0.9],
+        vec![0.9, 0.9, 0.0],
+    ], noise);
+    results.push(("full_3".into(), r.approx_phi, r.exact_phi));
+
+    // 9. Fully connected 4
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.7, 0.6, 0.5],
+        vec![0.7, 0.0, 0.7, 0.6],
+        vec![0.6, 0.7, 0.0, 0.7],
+        vec![0.5, 0.6, 0.7, 0.0],
+    ], noise);
+    results.push(("full_4".into(), r.approx_phi, r.exact_phi));
+
+    // 10. Modular 4: two pairs weakly coupled
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.9, 0.1, 0.0],
+        vec![0.9, 0.0, 0.0, 0.1],
+        vec![0.1, 0.0, 0.0, 0.9],
+        vec![0.0, 0.1, 0.9, 0.0],
+    ], noise);
+    results.push(("modular_4".into(), r.approx_phi, r.exact_phi));
+
+    // 11. Sparse random 4
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.3, 0.0, 0.5],
+        vec![0.0, 0.0, 0.6, 0.0],
+        vec![0.4, 0.0, 0.0, 0.0],
+        vec![0.0, 0.7, 0.0, 0.0],
+    ], noise);
+    results.push(("sparse_4".into(), r.approx_phi, r.exact_phi));
+
+    // 12. Dense random 3
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.5, 0.3],
+        vec![0.4, 0.0, 0.6],
+        vec![0.7, 0.2, 0.0],
+    ], noise);
+    results.push(("dense_random_3".into(), r.approx_phi, r.exact_phi));
+
+    // 13. Disconnected 3 (no edges)
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.0, 0.0],
+        vec![0.0, 0.0, 0.0],
+        vec![0.0, 0.0, 0.0],
+    ], noise);
+    results.push(("disconnected_3".into(), r.approx_phi, r.exact_phi));
+
+    // 14. Single strong edge 3
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.95, 0.0],
+        vec![0.0, 0.0, 0.0],
+        vec![0.0, 0.0, 0.0],
+    ], noise);
+    results.push(("single_edge_3".into(), r.approx_phi, r.exact_phi));
+
+    // 15. Hierarchical 4
+    let r = validate_phi_proxy(&vec![
+        vec![0.0, 0.9, 0.9, 0.0],
+        vec![0.0, 0.0, 0.0, 0.8],
+        vec![0.0, 0.0, 0.0, 0.8],
+        vec![0.0, 0.0, 0.0, 0.0],
+    ], noise);
+    results.push(("hierarchical_4".into(), r.approx_phi, r.exact_phi));
+
+    // Print results table
+    println!("\n  Phi Proxy Validation (15 topologies):");
+    println!("  {:<20} {:>10} {:>10}", "Topology", "Approx", "Exact");
+    println!("  {}", "-".repeat(42));
+    for (name, approx, exact) in &results {
+        println!("  {:<20} {:>10.4} {:>10.4}", name, approx, exact);
+    }
+
+    // Compute Spearman rank correlation between proxy and exact
+    let n = results.len() as f64;
+    let approx_ranks: Vec<f64> = rank_values(&results.iter().map(|r| r.1).collect::<Vec<_>>());
+    let exact_ranks: Vec<f64> = rank_values(&results.iter().map(|r| r.2).collect::<Vec<_>>());
+
+    let d_squared_sum: f64 = approx_ranks.iter().zip(exact_ranks.iter())
+        .map(|(a, e)| (a - e).powi(2))
+        .sum();
+    let spearman = 1.0 - (6.0 * d_squared_sum) / (n * (n * n - 1.0));
+
+    println!("\n  Spearman rank correlation: {:.4}", spearman);
+
+    // Verify: proxy should at least weakly correlate with exact (r > 0.3)
+    // and correctly identify disconnected as lowest integration
+    assert!(
+        spearman > 0.3,
+        "Phi proxy should rank-correlate with exact Phi: rho={:.4}",
+        spearman
+    );
+
+    // Disconnected should have lowest approximate Phi
+    let disconnected_approx = results.iter()
+        .find(|r| r.0 == "disconnected_3")
+        .map(|r| r.1)
+        .unwrap();
+    let min_other_approx = results.iter()
+        .filter(|r| r.0 != "disconnected_3")
+        .map(|r| r.1)
+        .fold(f64::INFINITY, f64::min);
+    assert!(
+        disconnected_approx <= min_other_approx,
+        "Disconnected should have lowest proxy Phi: {} vs {}",
+        disconnected_approx, min_other_approx
+    );
+}
+
+/// Helper: compute ranks for a slice of values (average rank for ties)
+fn rank_values(values: &[f64]) -> Vec<f64> {
+    let n = values.len();
+    let mut indexed: Vec<(usize, f64)> = values.iter().enumerate().map(|(i, &v)| (i, v)).collect();
+    indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut ranks = vec![0.0f64; n];
+    let mut i = 0;
+    while i < n {
+        let mut j = i;
+        while j < n && (indexed[j].1 - indexed[i].1).abs() < 1e-12 {
+            j += 1;
+        }
+        let avg_rank = (i + j + 1) as f64 / 2.0; // 1-indexed average
+        for k in i..j {
+            ranks[indexed[k].0] = avg_rank;
+        }
+        i = j;
+    }
+    ranks
+}
