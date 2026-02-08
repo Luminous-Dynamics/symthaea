@@ -28,18 +28,13 @@ use super::constants::{C, G};
 use serde::{Deserialize, Serialize};
 
 /// Metric signature convention
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Signature {
     /// (-,+,+,+) mostly plus convention (spacelike positive)
+    #[default]
     MostlyPlus,
     /// (+,-,-,-) mostly minus convention (timelike positive)
     MostlyMinus,
-}
-
-impl Default for Signature {
-    fn default() -> Self {
-        Signature::MostlyPlus
-    }
 }
 
 /// 4x4 matrix for 4D spacetime tensors

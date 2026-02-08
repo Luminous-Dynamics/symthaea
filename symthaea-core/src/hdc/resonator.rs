@@ -498,7 +498,7 @@ impl ResonatorNetwork {
         let solutions = unknowns
             .iter()
             .map(|&name| {
-                let estimate = estimates.remove(&name.to_string()).unwrap();
+                let estimate = estimates.remove(name).unwrap();
                 (name.to_string(), self.create_solution(estimate, max_iterations, true))
             })
             .collect();
@@ -708,7 +708,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 }
 
 /// Normalize vector to unit length
-fn normalize(v: &mut Vec<f32>) {
+fn normalize(v: &mut [f32]) {
     let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
     if norm > 0.0 {
         for x in v.iter_mut() {

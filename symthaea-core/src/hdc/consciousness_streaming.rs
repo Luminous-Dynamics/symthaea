@@ -256,6 +256,7 @@ pub struct SubscriptionId(u64);
 /// Event emitter for consciousness events
 ///
 /// Provides pub/sub functionality for internal event routing
+#[allow(clippy::type_complexity)]
 pub struct ConsciousnessEventEmitter {
     /// Subscribers by event type
     subscribers: Arc<RwLock<HashMap<ConsciousnessEventType, Vec<(SubscriptionId, SubscriberCallback)>>>>,

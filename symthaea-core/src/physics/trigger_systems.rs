@@ -87,6 +87,7 @@ pub enum ExtendedTriggerMethod {
 
 /// Technology Readiness Level (NASA scale 1-9)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[allow(clippy::upper_case_acronyms)]
 pub struct TRL(pub u8);
 
 impl TRL {
@@ -224,6 +225,7 @@ pub struct TriggerSystemLibrary {
 
 impl TriggerSystemLibrary {
     /// Initialize library with all known trigger systems
+    #[allow(clippy::vec_init_then_push)]
     pub fn new() -> Self {
         let mut systems = Vec::new();
 

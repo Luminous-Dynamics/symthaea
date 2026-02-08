@@ -283,6 +283,7 @@ impl ElectronNuclearCoupling {
     }
 
     /// Create a NEEC candidate with full coupling analysis
+    #[allow(clippy::too_many_arguments)]
     fn create_candidate(
         &self,
         _genesis: &GenesisSeed,

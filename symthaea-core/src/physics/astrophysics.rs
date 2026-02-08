@@ -282,6 +282,7 @@ impl StellarEncoder {
     }
 
     /// Encode a star from its properties
+    #[allow(clippy::too_many_arguments)]
     pub fn encode_star(
         &self,
         name: &str,

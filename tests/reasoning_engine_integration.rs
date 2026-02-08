@@ -544,7 +544,7 @@ mod proptest_counterfactual {
     /// Generate a random DAG with n nodes
     fn random_dag(n: usize, seed: u64) -> CausalDAG {
         let mut rng_state = seed;
-        let next_rand = || {
+        let mut next_rand = || {
             rng_state = rng_state.wrapping_mul(1103515245).wrapping_add(12345);
             rng_state
         };

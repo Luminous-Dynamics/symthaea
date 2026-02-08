@@ -17,17 +17,17 @@
 //! - **Phrasing**: ~0.05Hz deep breathing (4-bar phrases)
 
 use symthaea::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig};
-use symthaea::hdc::real_hv::RealHV;
+use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
 use std::f32::consts::PI;
 
-/// Helper trait for linear interpolation on RealHV
+/// Helper trait for linear interpolation on ContinuousHV
 trait Lerp {
     fn lerp(&self, other: &Self, t: f32) -> Self;
     fn norm(&self) -> f32;
 }
 
-impl Lerp for RealHV {
+impl Lerp for ContinuousHV {
     fn lerp(&self, other: &Self, t: f32) -> Self {
         let t = t.clamp(0.0, 1.0);
         self.scale(1.0 - t).add(&other.scale(t))
@@ -66,8 +66,8 @@ fn main() {
     let mut last_print = -print_interval;
 
     // Seeds for semantic vectors
-    let tonic_vector = RealHV::random(HDC_DIMENSION, 1);
-    let dominant_vector = RealHV::random(HDC_DIMENSION, 5); // Musical Dominant (Tension) 
+    let tonic_vector = ContinuousHV::random(HDC_DIMENSION, 1);
+    let dominant_vector = ContinuousHV::random(HDC_DIMENSION, 5); // Musical Dominant (Tension) 
     
     println!("\nTime(ms),Input_Energy,Phi,Root_Activity,Leaf_Activity");
 

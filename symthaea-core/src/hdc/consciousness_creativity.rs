@@ -25,7 +25,7 @@
 //! ## 3. Divergent/Convergent Thinking (Guilford 1967)
 //! - **Divergent**: Generate many possibilities (fluency, flexibility, originality)
 //! - **Convergent**: Select the best one
-//! Creative process oscillates between these modes.
+//!   Creative process oscillates between these modes.
 //!
 //! ## 4. Bisociation (Koestler 1964)
 //! Creativity occurs when two incompatible "matrices of thought" collide.
@@ -41,7 +41,7 @@
 //! - Self-referential thought
 //! - Future simulation
 //! - Creative incubation
-//! Integration with #27: sleep and dreams enable incubation
+//!   Integration with #27: sleep and dreams enable incubation
 //!
 //! # The Creative Consciousness Formula
 //!

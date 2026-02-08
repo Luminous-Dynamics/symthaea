@@ -29,7 +29,6 @@
 use std::time::Instant;
 
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::real_hv::RealHV;
 use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::phi_engine::PhiEngine;
 
@@ -119,13 +118,7 @@ fn main() {
     for state in &states {
         let hvs = simulate_neural_state(state, N_NEURONS, HDC_DIM);
         let phi_result = phi_engine.compute(&hvs);
-        let real_hvs: Vec<RealHV> = hvs
-            .iter()
-            .map(|hv| RealHV {
-                values: hv.values.clone(),
-            })
-            .collect();
-        let algebraic = conn_calc.algebraic_connectivity(&real_hvs);
+        let algebraic = conn_calc.algebraic_connectivity(&hvs);
 
         println!(
             "  {:25} │ Φ = {:.6} │ Algebraic = {:.6} │ coupling={:.2} noise={:.2}",
@@ -176,13 +169,7 @@ fn main() {
 
             let hvs = simulate_neural_state(&state, N_NEURONS, HDC_DIM);
             phi_sum += phi_engine.compute(&hvs).phi;
-            let real_hvs: Vec<RealHV> = hvs
-                .iter()
-                .map(|hv| RealHV {
-                    values: hv.values.clone(),
-                })
-                .collect();
-            alg_sum += conn_calc.algebraic_connectivity(&real_hvs);
+            alg_sum += conn_calc.algebraic_connectivity(&hvs);
         }
 
         let avg_phi = phi_sum / n_trials as f64;

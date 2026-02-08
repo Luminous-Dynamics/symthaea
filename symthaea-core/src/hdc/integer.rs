@@ -110,7 +110,7 @@ impl HdcInteger {
     /// - Zero: ZERO primitive
     fn encode(n: i64, primitives: &PrimitiveSystem) -> Self {
         let sign = Sign::from_value(n);
-        let magnitude = n.abs() as u64;
+        let magnitude = n.unsigned_abs();
 
         // Get magnitude encoding
         let magnitude_encoding = if magnitude == 0 {
@@ -157,9 +157,9 @@ impl HdcInteger {
         }
     }
 
-    /// Get the absolute value
-    pub fn abs(&self) -> i64 {
-        self.value.abs()
+    /// Get the absolute value (returns u64 to handle i64::MIN correctly)
+    pub fn unsigned_abs(&self) -> u64 {
+        self.value.unsigned_abs()
     }
 
     /// Get the signum (-1, 0, or 1)
@@ -248,7 +248,7 @@ impl IntegerArithmeticEngine {
     /// - neg + neg = neg
     /// - pos + neg = depends on magnitudes
     pub fn add(&mut self, a: i64, b: i64) -> IntegerResult {
-        let result_value = a + b;
+        let result_value = a.wrapping_add(b);
         let hdc_a = self.encode(a);
         let hdc_b = self.encode(b);
 
@@ -272,14 +272,14 @@ impl IntegerArithmeticEngine {
                 result.phi
             }
             (Sign::Negative, Sign::Negative) => {
-                let result = self.hybrid_engine.add(hdc_a.abs() as u64, hdc_b.abs() as u64);
-                proof_trace.push(format!("Negative sum: -({} + {}) = -{}", hdc_a.abs(), hdc_b.abs(), result.value));
+                let result = self.hybrid_engine.add(hdc_a.unsigned_abs(), hdc_b.unsigned_abs());
+                proof_trace.push(format!("Negative sum: -({} + {}) = -{}", hdc_a.unsigned_abs(), hdc_b.unsigned_abs(), result.value));
                 result.phi + 1.0 // Extra phi for sign handling
             }
             (Sign::Positive, Sign::Negative) | (Sign::Negative, Sign::Positive) => {
-                proof_trace.push(format!("Mixed signs: compute difference of magnitudes"));
-                let mag_a = hdc_a.abs() as u64;
-                let mag_b = hdc_b.abs() as u64;
+                proof_trace.push("Mixed signs: compute difference of magnitudes".to_string());
+                let mag_a = hdc_a.unsigned_abs();
+                let mag_b = hdc_b.unsigned_abs();
                 if mag_a >= mag_b {
                     let result = self.hybrid_engine.subtract(mag_a, mag_b);
                     result.map(|r| r.phi).unwrap_or(0.0) + 1.5 // Phi for subtraction and sign determination
@@ -304,7 +304,7 @@ impl IntegerArithmeticEngine {
     ///
     /// Implemented as a + (-b)
     pub fn subtract(&mut self, a: i64, b: i64) -> IntegerResult {
-        let result_value = a - b;
+        let result_value = a.wrapping_sub(b);
         let mut proof_trace = vec![
             format!("Subtract: {} - {}", a, b),
             format!("Rewrite as: {} + (-{})", a, b),
@@ -329,7 +329,7 @@ impl IntegerArithmeticEngine {
     /// - neg × neg = pos
     /// - pos × neg = neg
     pub fn multiply(&mut self, a: i64, b: i64) -> IntegerResult {
-        let result_value = a * b;
+        let result_value = a.wrapping_mul(b);
         let hdc_a = self.encode(a);
         let hdc_b = self.encode(b);
 
@@ -338,8 +338,8 @@ impl IntegerArithmeticEngine {
         ];
 
         // Compute magnitude
-        let mag_a = hdc_a.abs() as u64;
-        let mag_b = hdc_b.abs() as u64;
+        let mag_a = hdc_a.unsigned_abs();
+        let mag_b = hdc_b.unsigned_abs();
 
         let phi_operation = if mag_a == 0 || mag_b == 0 {
             proof_trace.push(format!("Zero product: {} × {} = 0", a, b));
@@ -380,8 +380,8 @@ impl IntegerArithmeticEngine {
         ];
 
         // Compute magnitude division
-        let mag_a = hdc_a.abs() as u64;
-        let mag_b = hdc_b.abs() as u64;
+        let mag_a = hdc_a.unsigned_abs();
+        let mag_b = hdc_b.unsigned_abs();
         let mag_result = mag_a / mag_b;
 
         proof_trace.push(format!("Magnitude: {} ÷ {} = {}", mag_a, mag_b, mag_result));
@@ -436,13 +436,13 @@ impl IntegerArithmeticEngine {
 
     /// Absolute value: |a|
     pub fn abs(&mut self, a: i64) -> IntegerResult {
-        let result_value = a.abs();
+        let result_value = a.checked_abs().unwrap_or(i64::MAX);
         let hdc_a = self.encode(a);
 
         let proof_trace = vec![
             format!("Absolute value: |{}|", a),
             match hdc_a.sign {
-                Sign::Zero => format!("Result: 0"),
+                Sign::Zero => "Result: 0".to_string(),
                 Sign::Positive => format!("Already positive: {}", a),
                 Sign::Negative => format!("Negate: -({}) = {}", a, result_value),
             },
@@ -485,7 +485,7 @@ impl IntegerArithmeticEngine {
 
     /// Negate an integer: -a
     pub fn negate(&mut self, a: i64) -> IntegerResult {
-        let result_value = -a;
+        let result_value = a.wrapping_neg();
         let hdc_a = self.encode(a);
 
         let proof_trace = vec![

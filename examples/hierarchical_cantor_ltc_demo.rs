@@ -9,7 +9,7 @@
 //! Run with: cargo run --example hierarchical_cantor_ltc_demo --release
 
 use symthaea::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig};
-use symthaea::hdc::real_hv::RealHV;
+use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
 use std::time::Instant;
 
@@ -82,7 +82,7 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // Inject external input (simulate sensory stimulus)
-    let stimulus = RealHV::random(HDC_DIMENSION, 42);
+    let stimulus = ContinuousHV::random(HDC_DIMENSION, 42);
     println!("  Injecting stimulus into root node...");
 
     // Run simulation for 100ms
@@ -141,7 +141,7 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // Query for similar nodes to a random pattern
-    let query_pattern = RealHV::random(HDC_DIMENSION, 12345);
+    let query_pattern = ContinuousHV::random(HDC_DIMENSION, 12345);
     let query_start = Instant::now();
     let results = network.query(&query_pattern, 5);
     let query_time = query_start.elapsed();

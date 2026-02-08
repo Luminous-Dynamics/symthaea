@@ -14,7 +14,6 @@ use std::time::Instant;
 
 // Symthaea imports
 use symthaea::cfc::CfCNetwork;
-use symthaea::hdc::real_hv::RealHV;
 use symthaea::hdc::HDC_DIMENSION;
 use symthaea::phi_engine::{PhiEngine, PhiMethod};
 use symthaea::hdc::unified_hv::ContinuousHV;
@@ -29,14 +28,14 @@ struct LearningObjective {
     name: String,
     domain: String,
     difficulty: f32,
-    encoding: RealHV,
+    encoding: ContinuousHV,
     prerequisites: Vec<String>,
 }
 
 impl LearningObjective {
     fn new(id: &str, name: &str, domain: &str, difficulty: f32, seed: u64) -> Self {
-        let base = RealHV::random(HDC_DIMENSION, seed);
-        let domain_hv = RealHV::random(HDC_DIMENSION, seed + 1000);
+        let base = ContinuousHV::random(HDC_DIMENSION, seed);
+        let domain_hv = ContinuousHV::random(HDC_DIMENSION, seed + 1000);
         let encoding = base.bind(&domain_hv).scale(1.0 - difficulty * 0.5);
 
         Self {
@@ -92,7 +91,7 @@ impl CfCLearningLookahead {
 
         let consciousness_state: Vec<ContinuousHV> = (0..8)
             .map(|i| {
-                let hv = RealHV::random(HDC_DIMENSION, 42 + i as u64);
+                let hv = ContinuousHV::random(HDC_DIMENSION, 42 + i as u64);
                 ContinuousHV::from_vec(hv.values)
             })
             .collect();

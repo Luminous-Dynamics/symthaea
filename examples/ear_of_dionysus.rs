@@ -21,7 +21,7 @@ use std::env;
 use std::f32::consts::PI;
 use rustfft::{FftPlanner, num_complex::Complex};
 use symthaea::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig, CantorLtcNode};
-use symthaea::hdc::real_hv::RealHV;
+use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
 
 /// Configuration for the Ear
@@ -29,12 +29,12 @@ const WINDOW_SIZE: usize = 1024; // Samples per FFT window
 const SAMPLE_RATE: usize = 44100;
 const LEVELS: usize = 8; // 0 to 7
 
-/// Helper trait for norm calculation on RealHV
+/// Helper trait for norm calculation on ContinuousHV
 trait Norm {
     fn norm(&self) -> f32;
 }
 
-impl Norm for RealHV {
+impl Norm for ContinuousHV {
     fn norm(&self) -> f32 {
         self.values.iter().map(|x| x * x).sum::<f32>().sqrt()
     }
@@ -91,8 +91,8 @@ fn main() {
 
     // Semantic Vectors for Frequency Bands (The "Qualia" of Pitch)
     // We create random vectors to represent "Bass-ness", "Treble-ness", etc.
-    let band_vectors: Vec<RealHV> = (0..LEVELS)
-        .map(|i| RealHV::random(HDC_DIMENSION, i as u64 * 1000))
+    let band_vectors: Vec<ContinuousHV> = (0..LEVELS)
+        .map(|i| ContinuousHV::random(HDC_DIMENSION, i as u64 * 1000))
         .collect();
 
     while let Some(samples) = audio_stream.next_window(WINDOW_SIZE) {
@@ -319,7 +319,7 @@ fn map_spectrum_to_bands(spectrum: &[f32], bands: usize) -> Vec<f32> {
 fn inject_spectral_energy(
     node: &mut CantorLtcNode,
     energies: &[f32],
-    vectors: &[RealHV],
+    vectors: &[ContinuousHV],
     current_level: usize
 ) {
     if current_level >= energies.len() { return; }
@@ -342,7 +342,7 @@ fn inject_spectral_energy(
     // But since step() takes one parent input, we'll modify the state directly before step()
     // to simulate "sensory transduction".
 
-    node.state = RealHV::bundle(&[&node.state.clone(), &input]);
+    node.state = ContinuousHV::bundle(&[&node.state.clone(), &input]);
 
     // Recurse
     if let Some((ref mut left, ref mut right)) = node.children {

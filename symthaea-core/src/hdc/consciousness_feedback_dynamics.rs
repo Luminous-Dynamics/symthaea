@@ -280,10 +280,8 @@ impl FeedbackProcessor {
             InsightType::CausalDiscovery
         } else if is_lucid {
             InsightType::CreativeSolution
-        } else if dream.overall_bizarreness() > 0.7 {
-            InsightType::Warning
-        } else if is_nightmare {
-            InsightType::Warning // Nightmares often signal warnings
+        } else if dream.overall_bizarreness() > 0.7 || is_nightmare {
+            InsightType::Warning // High bizarreness or nightmares often signal warnings
         } else {
             InsightType::MemoryIntegration
         }

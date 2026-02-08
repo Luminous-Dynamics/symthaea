@@ -22,7 +22,7 @@ fn main() {
     let ring = ConsciousnessTopology::ring(n_nodes, dim, seed);
     let random = ConsciousnessTopology::random(n_nodes, dim, seed + 1);
 
-    // Helper: convert RealHV nodes to ContinuousHV for PhiEngine
+    // Helper: convert topology nodes to ContinuousHV for PhiEngine
     fn to_continuous(topology: &ConsciousnessTopology) -> Vec<ContinuousHV> {
         topology
             .node_representations

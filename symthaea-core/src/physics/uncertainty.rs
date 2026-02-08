@@ -262,7 +262,7 @@ pub struct OutputStatistics {
 }
 
 impl OutputStatistics {
-    fn from_samples(name: &str, units: &str, values: &mut Vec<f64>) -> Self {
+    fn from_samples(name: &str, units: &str, values: &mut [f64]) -> Self {
         values.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
         let n = values.len();

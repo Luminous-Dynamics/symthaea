@@ -71,6 +71,12 @@ pub struct ModernHopfieldNetwork {
     metadata: Vec<PatternMetadata>,
 }
 
+impl Default for ModernHopfieldNetwork {
+    fn default() -> Self {
+        Self::new(5.0)
+    }
+}
+
 /// Metadata about stored patterns
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PatternMetadata {
@@ -110,7 +116,7 @@ impl ModernHopfieldNetwork {
     }
 
     /// Create with default beta = 5.0 (good default)
-    pub fn default() -> Self {
+    pub fn with_default_beta() -> Self {
         Self::new(5.0)
     }
 

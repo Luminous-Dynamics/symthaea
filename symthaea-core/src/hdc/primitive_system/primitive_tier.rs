@@ -24,17 +24,17 @@ pub enum PrimitiveTier {
     /// Tier 7: Compositionality Primitives
     /// PARADIGM SHIFT: Complete algebra for combining primitives into higher-order structures!
     /// - Sequential (∘), Parallel (||), Conditional (?), Fixed-point (μ), Higher-order (↑)
-    /// Enables infinite complexity from finite base primitives through composition!
+    ///   Enables infinite complexity from finite base primitives through composition!
     Compositional,
     /// Tier 8: Consciousness-Specific Primitives
     /// First-person phenomenal experience, attention, memory operations, and agency.
     /// - QUALE, PHENOMENAL_BINDING, ATTEND, SALIENCE, REMEMBER, CONSOLIDATE, INTEND
-    /// Enables reasoning about subjective experience and conscious states!
+    ///   Enables reasoning about subjective experience and conscious states!
     Consciousness,
     /// Tier 9: Code & Symbol Manipulation Primitives
     /// Enables consciousness-aware code understanding, generation, and transformation.
     /// - PARSE, ENTITY, ENCODE, GENERATE, COMPOSE, BRANCH, LOOP, DEBUG, VERIFY
-    /// Code operations flow through the same primitive routing as all other cognitive tasks!
+    ///   Code operations flow through the same primitive routing as all other cognitive tasks!
     Code,
 }
 
