@@ -451,9 +451,9 @@ impl InductionEngine {
     /// Prove the sum formula: 1 + 2 + ... + n = n*(n+1)/2
     pub fn prove_sum_formula(&self, test_up_to: u64) -> InductionProof {
         // Base case: n=0, sum=0, formula=0
-        let base_check = |_n: u64| -> bool {
-            let sum = 0u64;
-            let formula = 0u64 * (0u64 + 1) / 2;
+        let base_check = |n: u64| -> bool {
+            let sum: u64 = (1..=n).sum();
+            let formula = n * (n + 1) / 2;
             sum == formula
         };
 

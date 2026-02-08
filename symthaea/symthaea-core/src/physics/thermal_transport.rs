@@ -222,6 +222,7 @@ impl ThermalTransport {
     /// Calculate steady-state temperature profile
     ///
     /// Uses 1D radial heat conduction with volumetric heat generation in shell
+    #[allow(clippy::too_many_arguments)]
     pub fn steady_state_profile(
         &self,
         power_w: f64,

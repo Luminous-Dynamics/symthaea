@@ -34,7 +34,6 @@ use std::time::Instant;
 
 // Symthaea imports
 use symthaea::cfc::CfCNetwork;
-use symthaea::hdc::real_hv::RealHV;
 use symthaea::hdc::HDC_DIMENSION;
 use symthaea::phi_engine::PhiEngine;
 use symthaea::hdc::unified_hv::ContinuousHV;
@@ -59,7 +58,7 @@ struct LearningObjective {
     difficulty: f32,
 
     /// HDC semantic encoding (16,384D)
-    encoding: RealHV,
+    encoding: ContinuousHV,
 
     /// Prerequisites (other objective IDs)
     prerequisites: Vec<String>,
@@ -69,7 +68,7 @@ impl LearningObjective {
     /// Create a new learning objective
     fn new(id: &str, name: &str, domain: &str, difficulty: f32, seed: u64) -> Self {
         // Create deterministic HDC encoding based on seed
-        let encoding = RealHV::random(HDC_DIMENSION, seed);
+        let encoding = ContinuousHV::random(HDC_DIMENSION, seed);
 
         Self {
             id: id.to_string(),

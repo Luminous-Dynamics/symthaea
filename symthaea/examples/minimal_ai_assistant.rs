@@ -10,7 +10,7 @@
 //! This is the MINIMAL VIABLE AI from CRITICAL_ROADMAP.md
 
 use symthaea::language::llm_organ::{LlmConfig, LlmOrgan, LlmProvider, LlmRequest, ConsciousLlmOrgan};
-use symthaea::hdc::real_hv::RealHV;
+use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
 use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;

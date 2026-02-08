@@ -58,7 +58,7 @@ fn normalize(num: i64, den: i64) -> (i64, i64) {
     }
 
     // Reduce to lowest terms
-    let g = gcd(num.abs() as u64, den as u64) as i64;
+    let g = gcd(num.unsigned_abs(), den as u64) as i64;
     (num / g, den / g)
 }
 

@@ -31,7 +31,6 @@ use std::time::Instant;
 
 use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
 use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
-use symthaea_core::hdc::real_hv::RealHV;
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::phi_engine::{PhiEngine, PhiMethod};
 
@@ -238,11 +237,7 @@ fn main() {
         let phi_time = t.elapsed().as_secs_f64();
 
         // Algebraic connectivity for comparison
-        let real_hvs: Vec<_> = hvs
-            .iter()
-            .map(|hv| RealHV { values: hv.values.clone() })
-            .collect();
-        let algebraic = conn_calc.algebraic_connectivity(&real_hvs);
+        let algebraic = conn_calc.algebraic_connectivity(hvs);
 
         println!(
             "  {:20} │ PhiEngine: {:.6} ({:>8}) │ Algebraic: {:.6} │ {:.1}ms",

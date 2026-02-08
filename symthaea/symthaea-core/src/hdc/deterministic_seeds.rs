@@ -110,6 +110,7 @@ impl SeedDomain {
     }
 
     /// Get the next sequential seed in this domain.
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> u64 {
         let seed = seed_namespaced(&self.namespace, self.next_index);
         self.next_index += 1;

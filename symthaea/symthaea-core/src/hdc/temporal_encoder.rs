@@ -144,7 +144,7 @@ impl TemporalEncoder {
     /// Using both sin and cos ensures non-zero vectors at all phases:
     /// - At phase=0: sin(0)=0 but cos(0)=1
     /// - At phase=π: sin(π)≈0 but cos(π)=-1
-    /// This guarantees valid similarity comparisons for all time points.
+    ///   This guarantees valid similarity comparisons for all time points.
     fn phase_to_vector(&self, phase: f32) -> Vec<f32> {
         // Limit max frequency to ensure smooth similarity for nearby times
         // sqrt(10000)/2 = 50, giving ~1-minute resolution for 24h cycle

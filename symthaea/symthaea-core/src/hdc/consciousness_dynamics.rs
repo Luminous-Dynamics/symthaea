@@ -174,15 +174,21 @@ pub struct ConsciousnessTrajectory {
     pub lyapunov_exponent: f64,
 }
 
-impl ConsciousnessTrajectory {
-    /// Create empty trajectory
-    pub fn new() -> Self {
+impl Default for ConsciousnessTrajectory {
+    fn default() -> Self {
         Self {
             points: Vec::new(),
             stable: false,
             attractor: None,
             lyapunov_exponent: 0.0,
         }
+    }
+}
+
+impl ConsciousnessTrajectory {
+    /// Create empty trajectory
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Add point to trajectory

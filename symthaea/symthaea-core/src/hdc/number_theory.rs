@@ -57,7 +57,7 @@ impl NumberTheoryEngine {
 
         while divisor * divisor <= remaining {
             let mut count = 0;
-            while remaining % divisor == 0 {
+            while remaining.is_multiple_of(divisor) {
                 count += 1;
                 remaining /= divisor;
             }
@@ -193,14 +193,14 @@ impl NumberTheoryEngine {
         if n == 2 {
             return true;
         }
-        if n % 2 == 0 {
+        if n.is_multiple_of(2) {
             return false;
         }
 
         let limit = (n as f64).sqrt() as u64;
         let mut divisor = 3;
         while divisor <= limit {
-            if n % divisor == 0 {
+            if n.is_multiple_of(divisor) {
                 return false;
             }
             divisor += 2;
@@ -216,7 +216,7 @@ impl NumberTheoryEngine {
         if n == 2 {
             return true;
         }
-        if n % 2 == 0 {
+        if n.is_multiple_of(2) {
             return false;
         }
 

@@ -430,7 +430,7 @@ fn run_benchmark(shots: &[CModShot], config: &BenchmarkConfig) -> Vec<BenchmarkR
             let plasma_sample = to_cmod_plasma_sample(sample, &normalizer, DisruptionLabel::Normal);
             let _encoding = encoder.encode(&plasma_sample);
 
-            // Convert RealHV to BinaryHV for Phi calculation
+            // Convert ContinuousHV to BinaryHV for Phi calculation
             // We need multiple components for Phi, so we use the sensor-level encodings
             let components: Vec<BinaryHV> = plasma_sample.sensors
                 .iter()

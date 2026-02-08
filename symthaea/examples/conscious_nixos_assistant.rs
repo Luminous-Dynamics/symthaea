@@ -39,7 +39,7 @@
 //! Run with: cargo run --example conscious_nixos_assistant --release
 
 use symthaea::language::llm_organ::{LlmConfig, LlmOrgan, LlmProvider, LlmRequest, ConsciousLlmOrgan};
-use symthaea::hdc::real_hv::RealHV;
+use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
 use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
@@ -213,7 +213,7 @@ Example: [COMMAND]: search markdown editor"#.to_string();
         let phi_before = self.current_phi;
 
         // 2. Store user turn in memory
-        let user_embedding = RealHV::random(HDC_DIMENSION, input.len() as u64);
+        let user_embedding = ContinuousHV::random(HDC_DIMENSION, input.len() as u64);
         self.memory.add_turn("user", input, self.current_phi, Some(&user_embedding))?;
 
         // 3. Get LLM response with Φ context
@@ -312,7 +312,7 @@ Example: [COMMAND]: search markdown editor"#.to_string();
 
             // Store assistant turn
             let response_with_action = format!("{}{}", response_text, action_summary);
-            let assistant_embedding = RealHV::random(HDC_DIMENSION, response_with_action.len() as u64);
+            let assistant_embedding = ContinuousHV::random(HDC_DIMENSION, response_with_action.len() as u64);
             self.memory.add_turn("assistant", &response_with_action, self.current_phi, Some(&assistant_embedding))?;
 
             Ok(format!(
@@ -324,7 +324,7 @@ Example: [COMMAND]: search markdown editor"#.to_string();
             ))
         } else {
             // No command, just informational response
-            let assistant_embedding = RealHV::random(HDC_DIMENSION, response_text.len() as u64);
+            let assistant_embedding = ContinuousHV::random(HDC_DIMENSION, response_text.len() as u64);
             self.memory.add_turn("assistant", &response_text, self.current_phi, Some(&assistant_embedding))?;
 
             Ok(format!(

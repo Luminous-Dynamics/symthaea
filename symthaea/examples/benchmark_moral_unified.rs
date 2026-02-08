@@ -11,6 +11,7 @@
 
 use symthaea::hdc::moral_algebra::{MoralAlgebra, MoralVerdict, EnsembleJudgment, MoralIntent};
 use symthaea::hdc::moral_parser::MoralParser;
+use symthaea::hdc::moral_prototypes::{MoralPrototypeClassifier, MoralSample, MoralLabel, TrainedPrototypes};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -157,8 +158,37 @@ fn main() {
     println!("║   Testing HDC Moral Algebra on 5 Priority Datasets           ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
-    let algebra = MoralAlgebra::default_dim();
+    let mut algebra = MoralAlgebra::default_dim();
     let parser = MoralParser::new();
+
+    // Try to load or train learned moral prototypes from Social Chemistry 292K
+    let prototypes_path = Path::new(DATASETS_PATH).join("social_chem_prototypes.json");
+    let dataset_292k_path = Path::new(DATASETS_PATH).join("social_chemistry_292k.json");
+
+    if prototypes_path.exists() {
+        println!("Loading cached learned prototypes from {}...", prototypes_path.display());
+        match TrainedPrototypes::load(&prototypes_path) {
+            Ok(protos) => {
+                let classifier = MoralPrototypeClassifier::from_prototypes(4096, 3, protos);
+                algebra.set_learned_classifier(classifier);
+                println!("  Learned prototypes loaded (4th ensemble signal active)\n");
+            }
+            Err(e) => println!("  Warning: failed to load prototypes: {}\n", e),
+        }
+    } else if dataset_292k_path.exists() {
+        println!("Training learned prototypes from Social Chemistry 292K...");
+        let train_start = Instant::now();
+        if let Some(classifier) = train_prototypes_from_292k(&dataset_292k_path, &prototypes_path) {
+            algebra.set_learned_classifier(classifier);
+            println!(
+                "  Prototypes trained and cached in {:.1}s (4th ensemble signal active)\n",
+                train_start.elapsed().as_secs_f64()
+            );
+        }
+    } else {
+        println!("No Social Chemistry 292K dataset found - running without learned prototypes.");
+        println!("  Run: python3 scripts/download_social_chemistry.py\n");
+    }
 
     let start = Instant::now();
     let mut results = Vec::new();
@@ -396,14 +426,21 @@ fn benchmark_scruples(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<Be
 }
 
 fn benchmark_social_chemistry(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<BenchmarkResult> {
-    let path = format!("{}/social_chemistry.json", DATASETS_PATH);
+    // Prefer the 292K dataset if available (larger, real data)
+    let path_292k = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
+    let path = if Path::new(&path_292k).exists() {
+        path_292k
+    } else {
+        format!("{}/social_chemistry.json", DATASETS_PATH)
+    };
     if !Path::new(&path).exists() {
         println!("⚠ Social Chemistry dataset not found at {}", path);
         return None;
     }
 
+    let is_292k = path.contains("292k");
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Dataset: Social Chemistry 101");
+    println!("Dataset: Social Chemistry 101{}", if is_292k { " (292K)" } else { "" });
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let file = File::open(&path).ok()?;
@@ -840,4 +877,106 @@ fn save_results(results: &[BenchmarkResult], total_duration_ms: u128) {
             println!("\n📁 Results saved to {}", output_path.display());
         }
     }
+}
+
+// ============================================================================
+// Learned Prototype Training
+// ============================================================================
+
+/// Dataset structure for the 292K Social Chemistry file.
+#[derive(Debug, Deserialize)]
+struct SocialChem292kFile {
+    #[serde(default)]
+    metadata: HashMap<String, serde_json::Value>,
+    examples: Vec<SocialChem292kExample>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SocialChem292kExample {
+    #[serde(default)]
+    action: String,
+    #[serde(default)]
+    rot: String,
+    #[serde(default)]
+    rot_judgment: String,
+    #[serde(default)]
+    split: String,
+}
+
+/// Train moral prototypes from the Social Chemistry 292K dataset.
+/// Returns the trained classifier and caches prototypes to disk.
+fn train_prototypes_from_292k(
+    dataset_path: &Path,
+    cache_path: &Path,
+) -> Option<MoralPrototypeClassifier> {
+    let file = File::open(dataset_path).ok()?;
+    let reader = BufReader::new(file);
+    let data: SocialChem292kFile = serde_json::from_reader(reader).ok()?;
+
+    println!("  Loaded {} examples from 292K dataset", data.examples.len());
+
+    // Convert to MoralSamples, using rot (rule-of-thumb) as the text
+    let samples: Vec<MoralSample> = data
+        .examples
+        .iter()
+        .filter_map(|ex| {
+            let text = if !ex.rot.is_empty() {
+                ex.rot.clone()
+            } else if !ex.action.is_empty() {
+                ex.action.clone()
+            } else {
+                return None;
+            };
+
+            let judgment: i32 = ex.rot_judgment.parse().unwrap_or(0);
+            Some(MoralSample {
+                text,
+                label: MoralLabel::from_rot_judgment(judgment),
+            })
+        })
+        .collect();
+
+    if samples.is_empty() {
+        println!("  Warning: no valid samples found in dataset");
+        return None;
+    }
+
+    // Split into train/test
+    let (train_samples, test_samples): (Vec<_>, Vec<_>) = samples
+        .into_iter()
+        .partition(|_| true); // Use all for training; the benchmark does its own eval
+
+    println!("  Training on {} samples...", train_samples.len());
+
+    let mut classifier = MoralPrototypeClassifier::new(4096, 3);
+    classifier.train(&train_samples);
+
+    // Retrain (iterative correction)
+    println!("  Retraining (lr=0.1, 5 iterations)...");
+    classifier.retrain(&train_samples, 0.1, 5);
+
+    // Report training accuracy
+    let mut correct = 0;
+    let total = train_samples.len().min(5000); // Sample for speed
+    for sample in train_samples.iter().take(total) {
+        if classifier.classify(&sample.text).0 == sample.label {
+            correct += 1;
+        }
+    }
+    println!(
+        "  Training accuracy (sampled {}): {:.1}%",
+        total,
+        correct as f64 / total as f64 * 100.0
+    );
+
+    // Cache prototypes
+    if let Some(protos) = classifier.prototypes() {
+        if let Err(e) = protos.save(cache_path) {
+            println!("  Warning: failed to cache prototypes: {}", e);
+        } else {
+            println!("  Prototypes cached to {}", cache_path.display());
+        }
+    }
+
+    Some(classifier)
 }

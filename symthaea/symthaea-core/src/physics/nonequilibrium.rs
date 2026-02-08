@@ -334,7 +334,7 @@ impl JarzynskiEstimator {
             let mut bootstrap_sample = Vec::with_capacity(n);
             for i in 0..n {
                 // Deterministic pseudo-random selection
-                let idx = ((b * 31 + i * 17) % n) as usize;
+                let idx = (b * 31 + i * 17) % n;
                 bootstrap_sample.push(work_samples[idx]);
             }
             bootstrap_estimates.push(self.free_energy_difference(&bootstrap_sample, temperature));

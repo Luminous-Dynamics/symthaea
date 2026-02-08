@@ -318,9 +318,7 @@ impl RadiationDamageSystem {
         let net_factor = normalized_healing - damage_severity * 0.5;
 
         // Sustainable DPA based on healing vs damage balance
-        let sustainable_dpa = if is_liquid {
-            1000.0
-        } else if is_hea && net_factor > 0.5 {
+        let sustainable_dpa = if is_liquid || (is_hea && net_factor > 0.5) {
             1000.0
         } else if is_hea {
             100.0 * net_factor.max(0.1)

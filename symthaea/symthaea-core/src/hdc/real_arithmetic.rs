@@ -100,6 +100,12 @@ impl MathConstants {
 /// Bridge between Peano arithmetic (integers) and real number physics.
 pub struct PeanoPhysicsBridge;
 
+impl Default for PeanoPhysicsBridge {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl PeanoPhysicsBridge {
     pub fn new() -> Self {
         Self

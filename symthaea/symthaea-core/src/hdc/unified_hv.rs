@@ -581,6 +581,7 @@ impl Default for ContinuousHV {
 /// Use this when you need to work with both representations
 /// or when the representation might change at runtime.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum HV {
     /// Continuous f32 representation
     Continuous(ContinuousHV),

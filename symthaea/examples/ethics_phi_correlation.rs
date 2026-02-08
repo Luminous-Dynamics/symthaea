@@ -25,7 +25,7 @@ use std::path::Path;
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
     spectral_connectivity::ConnectivityCalculator,
-    real_hv::RealHV,
+    unified_hv::ContinuousHV,
     semantic_encoder::{SemanticEncoder, MoralSemanticEncoder, CharNgramEncoder},
     HDC_DIMENSION,
 };
@@ -238,7 +238,7 @@ impl EncoderMethod {
 }
 
 /// Encode text as hypervector using the specified encoding method
-fn encode_text_hdc(text: &str, seed: u64, method: EncoderMethod) -> RealHV {
+fn encode_text_hdc(text: &str, seed: u64, method: EncoderMethod) -> ContinuousHV {
     match method {
         EncoderMethod::CharNgram => {
             // Original character n-gram encoding (baseline)
@@ -254,22 +254,22 @@ fn encode_text_hdc(text: &str, seed: u64, method: EncoderMethod) -> RealHV {
 }
 
 /// Create concept hypervectors for ethical/unethical classification
-fn create_concept_vectors(seed: u64) -> (RealHV, RealHV) {
+fn create_concept_vectors(seed: u64) -> (ContinuousHV, ContinuousHV) {
     let dim = HDC_DIMENSION;
 
     // Create orthogonal vectors for ethical/unethical concepts
-    let ethical = RealHV::random(dim, seed);
-    let unethical = RealHV::random(dim, seed + 1000000); // Different seed = quasi-orthogonal
+    let ethical = ContinuousHV::random(dim, seed);
+    let unethical = ContinuousHV::random(dim, seed + 1000000); // Different seed = quasi-orthogonal
 
     (ethical, unethical)
 }
 
 /// Apply topology-based transformation to encoding
-fn apply_topology_transform(hv: &RealHV, topology: &ConsciousnessTopology) -> RealHV {
+fn apply_topology_transform(hv: &ContinuousHV, topology: &ConsciousnessTopology) -> ContinuousHV {
     // Project input through topology's node representations
     // This simulates how information integrates through the network structure
 
-    let mut result = RealHV::zero(hv.values.len());
+    let mut result = ContinuousHV::zero(hv.values.len());
 
     // Weight by similarity to each node, then bundle with node representation
     for node_rep in &topology.node_representations {
@@ -285,8 +285,8 @@ fn apply_topology_transform(hv: &RealHV, topology: &ConsciousnessTopology) -> Re
 fn evaluate_topology(
     topology: &ConsciousnessTopology,
     scenarios: &[EthicsScenario],
-    ethical_concept: &RealHV,
-    unethical_concept: &RealHV,
+    ethical_concept: &ContinuousHV,
+    unethical_concept: &ContinuousHV,
     seed: u64,
     method: EncoderMethod,
 ) -> f32 {

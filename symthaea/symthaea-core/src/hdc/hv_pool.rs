@@ -57,6 +57,7 @@ const CONTINUOUS_HV_POOL_CAPACITY: usize = 8;
 // =============================================================================
 
 thread_local! {
+    #[allow(clippy::vec_box)]
     static HV16_POOL: RefCell<Vec<Box<[u8; 2048]>>> = RefCell::new(Vec::with_capacity(HV16_POOL_CAPACITY));
 }
 
@@ -208,10 +209,12 @@ impl BinaryHVPool {
 // =============================================================================
 
 thread_local! {
+    #[allow(clippy::vec_box)]
     static CONTINUOUS_HV_POOL: RefCell<Vec<Box<Vec<f32>>>> = RefCell::new(Vec::with_capacity(CONTINUOUS_HV_POOL_CAPACITY));
 }
 
 /// A pooled ContinuousHV that returns to the pool when dropped
+#[allow(clippy::box_collection)]
 pub struct PooledContinuousHV {
     data: Option<Box<Vec<f32>>>,
 }

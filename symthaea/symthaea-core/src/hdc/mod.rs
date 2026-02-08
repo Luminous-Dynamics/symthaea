@@ -349,6 +349,8 @@ pub mod hv_pool;                           // Thread-local memory pools for Bina
 // Property-based tests for HDC invariants
 #[cfg(test)]
 mod proptest_hdc;
+#[cfg(test)]
+mod proptest_math;
 
 // Track 6: Consciousness integration for awakening module
 pub mod substrate_independence;            // Substrate type definitions

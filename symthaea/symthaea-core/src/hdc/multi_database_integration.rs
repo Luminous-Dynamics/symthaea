@@ -1341,6 +1341,7 @@ pub struct PhiStatistics {
 
 /// In-memory fallback storage when databases are unavailable
 #[derive(Debug, Default)]
+#[allow(clippy::type_complexity)]
 pub struct InMemoryFallback {
     /// Vector storage (simulates Qdrant)
     pub vectors: parking_lot::RwLock<HashMap<String, (BinaryHV, HashMap<String, String>)>>,

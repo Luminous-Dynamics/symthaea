@@ -28,7 +28,6 @@
 use std::time::Instant;
 
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::real_hv::RealHV;
 use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::phi_engine::PhiEngine;
 
@@ -61,13 +60,8 @@ fn main() {
         let phi_result = phi_engine.compute(&hvs);
         let phi_time = t.elapsed().as_secs_f64() * 1000.0;
 
-        let real_hvs: Vec<RealHV> = hvs
-            .iter()
-            .map(|hv| RealHV { values: hv.values.clone() })
-            .collect();
-
         let t = Instant::now();
-        let algebraic = conn_calc.algebraic_connectivity(&real_hvs);
+        let algebraic = conn_calc.algebraic_connectivity(&hvs);
         let alg_time = t.elapsed().as_secs_f64() * 1000.0;
 
         println!(

@@ -50,9 +50,7 @@ pub struct ModelDesignation {
 
 impl ModelDesignation {
     pub fn from_conditions(conditions: &OperatingConditions) -> Self {
-        let power_class = if conditions.power_kw < 10.0 {
-            format!("{:.0}K", conditions.power_kw)
-        } else if conditions.power_kw < 1000.0 {
+        let power_class = if conditions.power_kw < 1000.0 {
             format!("{:.0}K", conditions.power_kw)
         } else {
             format!("{:.0}M", conditions.power_kw / 1000.0)
@@ -592,6 +590,7 @@ impl PrototypeSpecification {
     }
 
     /// Generate formatted specification document
+    #[allow(clippy::inherent_to_string)]
     pub fn to_string(&self) -> String {
         let mut output = String::new();
 

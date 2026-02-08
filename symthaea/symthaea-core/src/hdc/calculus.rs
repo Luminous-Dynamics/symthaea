@@ -270,6 +270,182 @@ impl FundamentalTheoremVerifier {
     }
 }
 
+/// GCD for i64 values (used for rational normalization)
+fn gcd_i64(a: i64, b: i64) -> i64 {
+    let (mut a, mut b) = (a.abs(), b.abs());
+    while b != 0 {
+        let t = b;
+        b = a % b;
+        a = t;
+    }
+    a.max(1)
+}
+
+/// A polynomial with rational (exact) coefficients.
+///
+/// Allows lossless integration: ∫x dx = (1/2)x² instead of truncating to 0.
+/// Coefficients are stored as (numerator, denominator) pairs in lowest terms.
+pub struct RationalPolynomial {
+    /// Coefficients as (numerator, denominator) pairs, index = power of x
+    coefficients: Vec<(i64, i64)>,
+    /// Variable name
+    variable: String,
+}
+
+impl RationalPolynomial {
+    /// Create from integer polynomial coefficients
+    pub fn from_integer_coeffs(coeffs: &[i64], variable: &str) -> Self {
+        Self {
+            coefficients: coeffs.iter().map(|&c| (c, 1)).collect(),
+            variable: variable.to_string(),
+        }
+    }
+
+    /// Create from rational coefficient pairs
+    pub fn new(coeffs: Vec<(i64, i64)>, variable: &str) -> Self {
+        // Normalize each coefficient
+        let normalized: Vec<(i64, i64)> = coeffs.iter().map(|&(n, d)| {
+            if n == 0 { return (0, 1); }
+            let g = gcd_i64(n.abs(), d.abs());
+            let (n2, d2) = (n / g, d / g);
+            if d2 < 0 { (-n2, -d2) } else { (n2, d2) }
+        }).collect();
+        Self {
+            coefficients: normalized,
+            variable: variable.to_string(),
+        }
+    }
+
+    /// Get coefficients
+    pub fn coefficients(&self) -> &[(i64, i64)] {
+        &self.coefficients
+    }
+
+    /// Evaluate at an integer point, returning a rational result (num, den)
+    pub fn evaluate_rational(&self, x: i64) -> (i64, i64) {
+        let mut num = 0i64;
+        let mut den = 1i64;
+
+        for (power, &(cn, cd)) in self.coefficients.iter().enumerate() {
+            if cn == 0 { continue; }
+            // term = (cn/cd) * x^power
+            let x_pow = x.pow(power as u32);
+            let term_num = cn * x_pow;
+            let term_den = cd;
+
+            // Add: num/den + term_num/term_den = (num*term_den + term_num*den) / (den*term_den)
+            num = num * term_den + term_num * den;
+            den *= term_den;
+
+            // Reduce to prevent overflow
+            let g = gcd_i64(num.abs(), den.abs());
+            if g > 1 {
+                num /= g;
+                den /= g;
+            }
+        }
+
+        (num, den)
+    }
+
+    /// Evaluate at an integer point, returning f64
+    pub fn evaluate_f64(&self, x: i64) -> f64 {
+        let (num, den) = self.evaluate_rational(x);
+        num as f64 / den as f64
+    }
+
+    /// Integrate: exact power rule with rational coefficients
+    ///
+    /// ∫ (a_n/b_n) x^n dx = (a_n / (b_n * (n+1))) x^(n+1)
+    pub fn integrate(&self) -> RationalPolynomial {
+        let mut new_coeffs = vec![(0i64, 1i64)]; // constant of integration = 0
+
+        for (power, &(cn, cd)) in self.coefficients.iter().enumerate() {
+            let new_power = power as i64 + 1;
+            // (cn/cd) / new_power = cn / (cd * new_power)
+            let new_num = cn;
+            let new_den = cd * new_power;
+
+            // Normalize
+            if new_num == 0 {
+                new_coeffs.push((0, 1));
+            } else {
+                let g = gcd_i64(new_num.abs(), new_den.abs());
+                let (n, d) = (new_num / g, new_den / g);
+                if d < 0 { new_coeffs.push((-n, -d)); } else { new_coeffs.push((n, d)); }
+            }
+        }
+
+        RationalPolynomial {
+            coefficients: new_coeffs,
+            variable: self.variable.clone(),
+        }
+    }
+
+    /// Differentiate: power rule with rational coefficients
+    ///
+    /// d/dx (a_n/b_n) x^n = (n * a_n / b_n) x^(n-1)
+    pub fn derivative(&self) -> RationalPolynomial {
+        if self.coefficients.len() <= 1 {
+            return RationalPolynomial {
+                coefficients: vec![(0, 1)],
+                variable: self.variable.clone(),
+            };
+        }
+
+        let mut new_coeffs = Vec::new();
+        for (power, &(cn, cd)) in self.coefficients.iter().enumerate().skip(1) {
+            let new_num = cn * power as i64;
+            let new_den = cd;
+            if new_num == 0 {
+                new_coeffs.push((0, 1));
+            } else {
+                let g = gcd_i64(new_num.abs(), new_den.abs());
+                new_coeffs.push((new_num / g, new_den / g));
+            }
+        }
+
+        if new_coeffs.is_empty() {
+            new_coeffs.push((0, 1));
+        }
+
+        RationalPolynomial {
+            coefficients: new_coeffs,
+            variable: self.variable.clone(),
+        }
+    }
+
+    /// Compute definite integral from lower to upper
+    pub fn definite_integral(&self, lower: i64, upper: i64) -> (i64, i64) {
+        let antideriv = self.integrate();
+        let (upper_num, upper_den) = antideriv.evaluate_rational(upper);
+        let (lower_num, lower_den) = antideriv.evaluate_rational(lower);
+
+        // upper - lower
+        let num = upper_num * lower_den - lower_num * upper_den;
+        let den = upper_den * lower_den;
+
+        let g = gcd_i64(num.abs(), den.abs());
+        if g > 1 { (num / g, den / g) } else { (num, den) }
+    }
+
+    /// Verify fundamental theorem: d/dx ∫f(x) dx == f(x)
+    pub fn verify_fundamental_theorem(&self) -> bool {
+        let integral = self.integrate();
+        let derivative_of_integral = integral.derivative();
+
+        if self.coefficients.len() != derivative_of_integral.coefficients.len() {
+            return false;
+        }
+
+        self.coefficients.iter().zip(derivative_of_integral.coefficients.iter())
+            .all(|(&(an, ad), &(bn, bd))| {
+                // Compare: an/ad == bn/bd => an*bd == bn*ad
+                an * bd == bn * ad
+            })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -362,5 +538,51 @@ mod tests {
         vars.insert("x".to_string(), 2);
         let val = result.expr.evaluate(&vars, &mut engine).unwrap();
         assert_eq!(val.value, 12); // 6*2 = 12
+    }
+
+    #[test]
+    fn test_rational_polynomial_integrate_x() {
+        // ∫x dx = (1/2)x² — the case that integer division breaks
+        let poly = RationalPolynomial::from_integer_coeffs(&[0, 1], "x"); // f(x) = x
+        let integral = poly.integrate();
+        // integral should be [0, 0, (1,2)] → (1/2)x²
+        assert_eq!(integral.coefficients()[2], (1, 2));
+    }
+
+    #[test]
+    fn test_rational_polynomial_ftc() {
+        // Fundamental theorem should hold for any integer-coefficient polynomial
+        for coeffs in &[
+            vec![1],                    // f(x) = 1
+            vec![0, 1],                 // f(x) = x
+            vec![0, 0, 1],             // f(x) = x²
+            vec![1, 2, 3],             // f(x) = 1 + 2x + 3x²
+            vec![5, -3, 0, 7],         // f(x) = 5 - 3x + 7x³
+        ] {
+            let poly = RationalPolynomial::from_integer_coeffs(coeffs, "x");
+            assert!(poly.verify_fundamental_theorem(),
+                "FTC should hold for {:?}", coeffs);
+        }
+    }
+
+    #[test]
+    fn test_rational_definite_integral() {
+        // ∫₀¹ x dx = 1/2
+        let poly = RationalPolynomial::from_integer_coeffs(&[0, 1], "x");
+        let (num, den) = poly.definite_integral(0, 1);
+        assert_eq!((num, den), (1, 2));
+
+        // ∫₀² (3x²) dx = [x³]₀² = 8
+        let poly2 = RationalPolynomial::from_integer_coeffs(&[0, 0, 3], "x");
+        let (num2, den2) = poly2.definite_integral(0, 2);
+        assert_eq!(num2 as f64 / den2 as f64, 8.0);
+    }
+
+    #[test]
+    fn test_rational_polynomial_evaluate() {
+        // f(x) = 1/2 + (3/4)x, evaluate at x=2: 1/2 + 3/2 = 2
+        let poly = RationalPolynomial::new(vec![(1, 2), (3, 4)], "x");
+        let (num, den) = poly.evaluate_rational(2);
+        assert_eq!(num as f64 / den as f64, 2.0);
     }
 }

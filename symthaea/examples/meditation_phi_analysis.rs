@@ -22,7 +22,6 @@ use std::path::{Path, PathBuf};
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
     spectral_connectivity::RealPhiCalculator,
-    real_hv::RealHV,
     HDC_DIMENSION,
 };
 

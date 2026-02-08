@@ -151,18 +151,19 @@ pub struct LiteratureValidation {
 impl LiteratureValidation {
     /// Run all validations
     pub fn validate_all() -> Self {
-        let mut results = Vec::new();
-
-        results.push(Self::validate_neutron_cross_sections());
-        results.push(Self::validate_thermal_conductivity());
-        results.push(Self::validate_hea_properties());
-        results.push(Self::validate_radiation_damage());
-        results.push(Self::validate_fusion_parameters());
+        let results = vec![
+            Self::validate_neutron_cross_sections(),
+            Self::validate_thermal_conductivity(),
+            Self::validate_hea_properties(),
+            Self::validate_radiation_damage(),
+            Self::validate_fusion_parameters(),
+        ];
 
         Self { results }
     }
 
     /// Validate neutron cross-sections against ENDF/B-VIII.0
+    #[allow(clippy::vec_init_then_push)]
     fn validate_neutron_cross_sections() -> ValidationResult {
         // ENDF/B-VIII.0 reference
         let endf = LiteratureReference {
@@ -260,6 +261,7 @@ impl LiteratureValidation {
     }
 
     /// Validate thermal conductivity values against materials handbooks
+    #[allow(clippy::vec_init_then_push)]
     fn validate_thermal_conductivity() -> ValidationResult {
         // ASM Handbook reference
         let asm = LiteratureReference {
@@ -365,6 +367,7 @@ impl LiteratureValidation {
     }
 
     /// Validate HEA properties against published experiments
+    #[allow(clippy::vec_init_then_push)]
     fn validate_hea_properties() -> ValidationResult {
         // Key HEA references
         let miracle = LiteratureReference {
@@ -468,6 +471,7 @@ impl LiteratureValidation {
     }
 
     /// Validate radiation damage parameters
+    #[allow(clippy::vec_init_then_push)]
     fn validate_radiation_damage() -> ValidationResult {
         let was = LiteratureReference {
             key: "Was2017".to_string(),
@@ -551,6 +555,7 @@ impl LiteratureValidation {
     }
 
     /// Validate fusion reaction parameters
+    #[allow(clippy::vec_init_then_push)]
     fn validate_fusion_parameters() -> ValidationResult {
         // NRL Plasma Formulary reference
         let nrl = LiteratureReference {

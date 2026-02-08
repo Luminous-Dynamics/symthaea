@@ -3547,7 +3547,7 @@ impl ApproximateMIPFinder {
 
         // Simple deterministic move based on partition state
         let hash = new_a.len() * 17 + new_b.len() * 31;
-        let move_from_a = hash % 2 == 0 && new_a.len() > 1;
+        let move_from_a = hash.is_multiple_of(2) && new_a.len() > 1;
 
         if move_from_a {
             let idx = hash % new_a.len();
