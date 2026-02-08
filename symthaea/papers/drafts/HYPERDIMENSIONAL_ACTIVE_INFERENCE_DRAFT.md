@@ -302,28 +302,29 @@ Notably, HAI achieves significantly higher task success rates (88-100% vs. 10-16
 
 ### 4.6 Extended Benchmark Validation
 
-Beyond the core active inference benchmarks, Symthaea has been validated on 16 additional benchmarks spanning neuroscience, signal processing, and federated learning. Results as of February 2026:
+Beyond the core active inference benchmarks, Symthaea has been validated on 17 additional benchmarks spanning neuroscience, signal processing, and federated learning. Results as of February 2026:
 
 | Benchmark | Tests Passed | Key Metrics |
 |-----------|-------------|-------------|
 | Federated Learning | 5/5 | FedAvg converges, BFT reduces adversarial loss 5×, trust-weighting effective |
 | PyPhi Groundtruth | 6/6 | All IIT theory predictions validated |
-| Drosophila Phi | 5-6/6 | Scales to 4096 neurons, scaling exponent <3.0 |
-| Anesthesia Phi | 6/6 | Φ ordering (alert > deep), monotonic gradients validated |
-| Tokamak CfC | 5/5 | 45K inferences/sec, <1ms real-time, configurable gradient clipping (see §6.5) |
+| Drosophila Phi | 6/6 | Scales to 4096 neurons, MB Φ > OL Φ, scaling exponent <3.0 |
+| Anesthesia Phi | 5/6 | Induction/recovery monotonic (10-trial averaging), sensitivities validated; discrete Φ ordering fails |
+| Tokamak CfC | 4/5 | 87K inferences/sec, <1ms real-time; CfC sensitivity limited on synthetic data (see §6.5) |
 | PCI Validation | 3/5 | Φ ordering correct; Φ-PCI correlation low (expected, see §6.4) |
 | Sleep Staging (EDF) | 5/5 | All 5 stages classified (25.6% overall; N3: 62.1%, Wake-REM: 6-15%) |
 | Emotion EEG | 4/5 | Valence/arousal separation validated |
+| Meditation EEG | 6/6 | Gamma flow, theta absorption, quality ordering, session progression |
 | LibriSpeech HDC | 3/3 | 94.5% speaker ID (10 speakers) |
 | MNIST HDC | 1/3 | 81.63% accuracy (8K dim) |
-| ISOLET HDC | 3/3 | 91.66% with retraining (lr=0.1 + Gram-Schmidt), 87.68% baseline |
+| ISOLET HDC | 2/3 | 87.68% baseline; retraining degrades accuracy (gradient conflict) |
 | Ethics HDC | Mixed | Virtue 77.5%, Commonsense 53.5%, Justice 49.5%, Deontology 44.0% (56.1% overall) |
 | ARC Reasoning | 4/5 | 96% intra-task consistency |
-| EEG Seizure | 3/3 | 100% sensitivity, 100% specificity, pre-ictal detection |
+| EEG Seizure | 3/3 | 100% sensitivity, 100% specificity (spectral classifier) |
 | C. elegans Phi | Complete | 448 neurons, 7379 connections, circuit Φ 0.54-0.58 |
-| λ₂-Φ Proxy Validation | Complete | Spearman ρ = 0.50 across 15 topologies (see §6.3) |
+| λ₂-Φ Proxy | 3/5 | λ₂ shows meaningful topology variation; system_phi returns 0 for small weighted graphs (see §6.3) |
 
-**Federated Byzantine tolerance:** Validated at 20% (2/10 adversarial nodes) with the trimmed-mean aggregator. The 34% level (from the federated learning benchmark) represents the highest validated adversarial fraction. Claims of 45% Byzantine tolerance require further validation at scale and should be considered an upper bound.
+**Federated Byzantine tolerance:** Validated at 34% (trimmed-mean aggregator). Testing at 45% Byzantine fraction showed zero convergence (mean_weight=0.0, positive_dims=0/20). The 34% level represents the empirically validated maximum; 45% should be considered a theoretical upper bound only.
 
 ### 4.7 Known Limitations
 
@@ -372,19 +373,21 @@ The eight motor command types derived from EFE minimization provide an interpret
 
 ### 6.3 When HDC Approximation Fails
 
-We validated the λ₂ (algebraic connectivity / spectral gap) as a proxy for exact IIT Φ across 15 network topologies (n=3..4 nodes, including chain, ring, star, bidirectional ring, full, modular, sparse, and disconnected configurations). The proxy shows moderate positive rank correlation (**Spearman ρ = 0.50**, p < 0.05) with exact Φ, but with an important caveat:
+We validated λ₂ (algebraic connectivity / spectral gap) as a proxy for exact IIT Φ across multiple network topologies (chain, ring, star, random, complete) at scales n=4..7.
 
-| Topology Class | Proxy λ₂ (range) | Exact Φ | Rank Agreement | Notes |
-|----------------|-----------------|---------|----------------|-------|
-| Fully connected (n=3,4) | 0.63–0.78 | 0.0 | N/A | MIP trivially partitions all small systems |
-| Bidirectional ring | 0.58–0.61 | 0.0 | N/A | Same MIP degeneracy |
-| Chain/ring | 0.22–0.41 | 0.0 | Consistent | Both low, correct relative ordering |
-| Star (directed) | 0.17–0.20 | 0.0 | Consistent | Both low |
-| Disconnected | 0.0 | 0.0 | Perfect | Both correctly identify zero integration |
+| Topology | λ₂ (n=5) | Exact Φ | Notes |
+|----------|----------|---------|-------|
+| Chain | 0.382 | 0.0 | Low connectivity, low λ₂ |
+| Ring | 0.691 | 0.0 | Moderate connectivity |
+| Star | 1.000 | 0.0 | Hub topology |
+| Complete | 1.250 | 0.0 | All-to-all connectivity |
+| Random | varies | 0.0 | Density-dependent |
 
-**Critical finding — small-system MIP degeneracy:** Exact Φ (via IIT 3.0 minimum information partition) evaluates to 0.0 for *all* tested 3-4 node systems. This occurs because for small N, the MIP can always find a partition that reduces integrated information to zero. The proxy λ₂ is strictly **more informative** than exact Φ for these scales: it correctly rank-orders fully connected > bidirectional ring > chain > star > disconnected, capturing meaningful structural differences that exact Φ collapses to zero.
+**Critical finding — exact Φ degeneracy:** Our `system_phi` implementation (based on IIT 3.0 minimum information partition) returns 0.0 for *all* tested weighted adjacency matrices at n=4..7. This occurs because the MIP algorithm can always find a trivial partition for small weighted systems. Consequently, no meaningful Φ-λ₂ correlation can be computed (Pearson r = 0.05, Spearman ρ = 0.0).
 
-**Implications:** For systems with N < 6, where exact Φ degenerates, the λ₂ proxy provides a useful *relative* integration measure. For N > 8, exact Φ becomes computationally intractable (O(2^n)). The proxy is most reliable for relative comparisons within the same topology class and system size. For modular architectures with N = 6-8 (where exact Φ is both computable and non-degenerate), explicit validation against exact Φ is recommended.
+However, λ₂ itself shows meaningful and correct topology variation: chain (0.19) < ring (0.50) < star (1.0) < complete (1.2), correctly ordering topologies by algebraic connectivity. The proxy captures structural integration that exact Φ collapses to zero.
+
+**Implications:** λ₂ is useful for *relative* ordering of network integration within the same system size, but cannot be validated against exact Φ at accessible scales due to MIP degeneracy. For N > 8, exact Φ is computationally intractable (O(2^N)), making λ₂ the only feasible integration measure. We recommend λ₂ for relative comparisons only, not as a quantitative Φ substitute.
 
 ### 6.4 Divergence of Consciousness Measures
 
@@ -407,7 +410,7 @@ The Closed-form Continuous-time (CfC) neural ODE cells exhibit gradient vanishin
 
 2. **Extended POMDP benchmarks:** Current validation covers T-Maze and Grid World; additional tasks (Tiger problem, multi-step planning) would strengthen generalization claims.
 
-3. **HDC-Φ correspondence:** Preliminary investigation of HDC-based Φ (integrated information) approximation showed no correlation (r = -0.0075) with IIT Φ computed via PyPhi. This negative result suggests HDC similarity does not capture integrated information as defined by IIT, though it may capture related but distinct organizational properties (see Section 6.3).
+3. **HDC-Φ correspondence:** HDC-based cosine similarity matrices do not produce meaningful exact IIT Φ values. In high dimensions (d ≥ 256), cosine similarities between random HVs converge to ~0 regardless of topology structure. Even with explicit adjacency matrices, our `system_phi` implementation returns 0 for all weighted graphs at n ≤ 7 due to MIP degeneracy (see Section 6.3). The spectral proxy λ₂ provides useful relative ordering but should not be treated as a quantitative Φ substitute.
 
 4. **ETHICS benchmark gap:** Moral algebra achieves 77.5% on Virtue classification but only 44-53% on Deontology, Justice, and Commonsense. The virtue category benefits from clear sentiment polarity in trait words; the other categories require deeper contextual reasoning about obligations and fairness that HDC keyword-matching alone cannot capture. Integrating the moral algebra's compositional operators (CAUSES, VIOLATES, SATISFIES) with richer text parsing is a priority for future work.
 
@@ -534,7 +537,7 @@ Higher QR indicates HAI achieves lower (better) free energy.
 
 *Draft completed: February 8, 2026*
 *Version: 0.5*
-*Status: Full experimental validation with extended benchmark suite (16 benchmarks), 14 mathematical foundation modules wired into live system, λ₂-Φ proxy validation (Spearman ρ=0.50), ETHICS moral reasoning benchmark (56.1%), and CfC gradient stabilization.*
+*Status: Full experimental validation with extended benchmark suite (17 benchmarks, 72/82 tests passing), 14 mathematical foundation modules wired into live system, λ₂ proxy validation (meaningful topology ordering, exact Φ degeneracy documented), Byzantine tolerance validated to 34%, ETHICS moral reasoning benchmark (56.1%), and CfC gradient stabilization.*
 
 **Supplementary Materials:**
 - `papers/figures/` - Figures 1-4 (PDF and PNG)
