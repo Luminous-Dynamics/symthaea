@@ -2544,3 +2544,187 @@ pub fn compute_modularity_score(node_representations: &[ContinuousHV]) -> f64 {
     PhiModularityAnalyzer::new().analyze(node_representations).modularity_score
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hdc::ContinuousHV;
+    use crate::hdc::HDC_DIMENSION;
+
+    /// Helper: create n random ContinuousHV node representations.
+    fn make_nodes(n: usize) -> Vec<ContinuousHV> {
+        (0..n)
+            .map(|i| ContinuousHV::random(HDC_DIMENSION, i as u64 + 500))
+            .collect()
+    }
+
+    // ------------------------------------------------------------------
+    // 1. PhiTransfer constructors and config
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_phi_transfer_constructors() {
+        let t1 = PhiTransfer::new();
+        assert_eq!(t1.config.signature_dims, 16);
+        assert!(t1.transfer_weights.is_none());
+
+        let t2 = PhiTransfer::fast();
+        assert_eq!(t2.config.signature_dims, 8);
+        assert_eq!(t2.config.max_iterations, 100);
+
+        let t3 = PhiTransfer::research();
+        assert_eq!(t3.config.signature_dims, 32);
+    }
+
+    // ------------------------------------------------------------------
+    // 2. PhiSignature extraction
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_extract_signature_basic() {
+        let transfer = PhiTransfer::new();
+        let nodes = make_nodes(6);
+        let sig = transfer.extract_signature(&nodes, 0.5, Some("Ring"));
+
+        assert!(sig.dim() > 0, "Signature must have non-zero dimension");
+        assert_eq!(sig.original_phi, 0.5);
+        assert_eq!(sig.num_components, 6);
+        assert_eq!(sig.topology_type.as_deref(), Some("Ring"));
+
+        // as_vector should match dim()
+        assert_eq!(sig.as_vector().len(), sig.dim());
+    }
+
+    #[test]
+    fn test_extract_signature_empty_input() {
+        let transfer = PhiTransfer::new();
+        let sig = transfer.extract_signature(&[], 0.0, None);
+        assert_eq!(sig.num_components, 0);
+        // Features should still be padded to the expected size
+        assert_eq!(sig.dim(), sig.as_vector().len());
+    }
+
+    // ------------------------------------------------------------------
+    // 3. PhiTransfer: transfer produces valid result
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_transfer_produces_valid_result() {
+        let transfer = PhiTransfer::new();
+        let source = make_nodes(8);
+        let target = make_nodes(8);
+
+        let result = transfer.transfer(&source, &target, 0.8, 0.3, "Star", "Random");
+        assert_eq!(result.source_type, "Star");
+        assert_eq!(result.target_type, "Random");
+        assert_eq!(result.original_phi, 0.3);
+        // Enhanced phi should be >= original when source phi > target phi
+        assert!(
+            result.enhanced_phi >= result.original_phi,
+            "Transfer from higher-phi source should not reduce target phi"
+        );
+        assert!(!result.transfer_vector.is_empty());
+    }
+
+    // ------------------------------------------------------------------
+    // 4. PhiCausalAnalyzer constructors
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_causal_analyzer_constructors() {
+        let a1 = PhiCausalAnalyzer::new();
+        assert_eq!(a1.config.bootstrap_samples, 10);
+
+        let a2 = PhiCausalAnalyzer::fast();
+        assert_eq!(a2.config.bootstrap_samples, 3);
+
+        let a3 = PhiCausalAnalyzer::research();
+        assert_eq!(a3.config.bootstrap_samples, 50);
+    }
+
+    // ------------------------------------------------------------------
+    // 5. Causal analysis on empty input
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_causal_analysis_empty() {
+        let analyzer = PhiCausalAnalyzer::new();
+        let result = analyzer.analyze(&[]);
+        assert_eq!(result.baseline_phi, 0.0);
+        assert!(result.node_results.is_empty());
+        assert!(result.causal_power.is_empty());
+    }
+
+    // ------------------------------------------------------------------
+    // 6. Causal analysis produces valid structure
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_causal_analysis_basic() {
+        let analyzer = PhiCausalAnalyzer::fast();
+        let nodes = make_nodes(4);
+        let result = analyzer.analyze(&nodes);
+
+        // Should have results for all 4 nodes
+        assert_eq!(result.node_results.len(), 4);
+        assert_eq!(result.causal_power.len(), 4);
+        assert_eq!(result.node_ranking.len(), 4);
+
+        // All causal power values should be non-negative
+        for &cp in &result.causal_power {
+            assert!(cp >= 0.0, "Causal power must be non-negative");
+        }
+
+        // Robustness should be in [0, 1]
+        let rob = result.robustness();
+        assert!((0.0..=1.0).contains(&rob), "Robustness must be in [0,1]");
+    }
+
+    // ------------------------------------------------------------------
+    // 7. PhiModularityAnalyzer on empty input
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_modularity_empty() {
+        let analyzer = PhiModularityAnalyzer::new();
+        let result = analyzer.analyze(&[]);
+        assert_eq!(result.total_phi, 0.0);
+        assert!(result.modules.is_empty());
+        assert_eq!(result.modularity_score, 0.0);
+    }
+
+    // ------------------------------------------------------------------
+    // 8. Modularity analysis produces reasonable structure
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_modularity_basic() {
+        let config = ModularityConfig::quick();
+        let analyzer = PhiModularityAnalyzer::with_config(config);
+        let nodes = make_nodes(10);
+        let result = analyzer.analyze(&nodes);
+
+        // Should detect at least one module
+        assert!(
+            !result.modules.is_empty(),
+            "Should detect at least one module for 10 nodes"
+        );
+
+        // Node classifications should cover every node
+        assert_eq!(result.node_classifications.len(), 10);
+
+        // Segregation and integration should be non-negative
+        assert!(
+            result.segregation_index >= 0.0,
+            "Segregation index must be non-negative"
+        );
+        assert!(
+            result.integration_index >= 0.0,
+            "Integration index must be non-negative"
+        );
+
+        // Balance score in [0, 1]
+        let bal = result.balance_score();
+        assert!((0.0..=1.0).contains(&bal), "Balance score must be in [0,1]");
+    }
+}
+

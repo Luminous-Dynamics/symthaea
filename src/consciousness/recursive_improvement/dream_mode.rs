@@ -259,7 +259,7 @@ impl DreamMode {
             let action = ConsciousnessAction::new("dream_explore", ACTION_TYPES[action_idx]);
 
             // Simulate step
-            let next_state = world_model.predict(&current_state, action);
+            let next_state = world_model.predict(&current_state, &action);
 
             let transition = ConsciousnessTransition {
                 from_state: current_state.clone(),

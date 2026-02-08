@@ -21,13 +21,12 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
+use super::constants::{C, H};
 use serde::{Deserialize, Serialize};
 
-/// Speed of light
-pub const C_LIGHT: f64 = 2.998e8; // m/s
-
-/// Planck constant
-pub const H_PLANCK: f64 = 6.626e-34; // J·s
+// Re-export with original names for backward compatibility
+pub const C_LIGHT: f64 = C;
+pub const H_PLANCK: f64 = H;
 
 /// Optical regime
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

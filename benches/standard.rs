@@ -19,9 +19,10 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::RealPhiCalculator,
+    spectral_connectivity::ConnectivityCalculator,
     phi_resonant::ResonantPhiCalculator,
-    HV16, HDC_DIMENSION,
+    binary_hv::BinaryHV,
+    HDC_DIMENSION,
 };
 // Note: temporal_primitives module is not yet implemented - benchmark removed
 
@@ -33,8 +34,8 @@ fn bench_hdc_comprehensive(c: &mut Criterion) {
     let mut group = c.benchmark_group("std_hdc");
     group.sample_size(100);
 
-    let hv1 = HV16::random(42);
-    let hv2 = HV16::random(43);
+    let hv1 = BinaryHV::random(42);
+    let hv2 = BinaryHV::random(43);
 
     // All core operations
     group.bench_function("bind", |b| {
@@ -55,11 +56,11 @@ fn bench_hdc_comprehensive(c: &mut Criterion) {
 
     // Bundle scaling
     for size in [2, 5, 10, 20] {
-        let hvs: Vec<HV16> = (0..size).map(|i| HV16::random(i)).collect();
+        let hvs: Vec<BinaryHV> = (0..size).map(|i| BinaryHV::random(i)).collect();
         group.bench_with_input(
             BenchmarkId::new("bundle", size),
             &hvs,
-            |b, hvs| b.iter(|| black_box(HV16::bundle(hvs))),
+            |b, hvs| b.iter(|| black_box(BinaryHV::bundle(hvs))),
         );
     }
 
@@ -83,7 +84,7 @@ fn bench_standard_topologies(c: &mut Criterion) {
     let mut group = c.benchmark_group("std_topologies");
     group.sample_size(50);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     let topologies = vec![
         ("Ring", ConsciousnessTopology::ring(8, HDC_DIMENSION, 42)),
@@ -119,11 +120,11 @@ fn bench_scalability(c: &mut Criterion) {
     let mut group = c.benchmark_group("std_scalability");
     group.sample_size(20);
 
-    // HV16 search scalability
-    let query = HV16::random(42);
+    // BinaryHV search scalability
+    let query = BinaryHV::random(42);
 
     for size in [100, 1000, 5000] {
-        let corpus: Vec<HV16> = (0..size).map(|i| HV16::random(i as u64)).collect();
+        let corpus: Vec<BinaryHV> = (0..size).map(|i| BinaryHV::random(i as u64)).collect();
         group.throughput(Throughput::Elements(size as u64));
 
         group.bench_with_input(
@@ -164,7 +165,7 @@ fn bench_hypercube_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("std_hypercube");
     group.sample_size(30);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     for dim in 3..=5 {
         let n_nodes = 1 << dim;

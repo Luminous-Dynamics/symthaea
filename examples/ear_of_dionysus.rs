@@ -21,7 +21,8 @@ use std::env;
 use std::f32::consts::PI;
 use rustfft::{FftPlanner, num_complex::Complex};
 use symthaea::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig, CantorLtcNode};
-use symthaea::hdc::{RealHV, HDC_DIMENSION};
+use symthaea::hdc::real_hv::RealHV;
+use symthaea::hdc::HDC_DIMENSION;
 
 /// Configuration for the Ear
 const WINDOW_SIZE: usize = 1024; // Samples per FFT window
@@ -341,7 +342,7 @@ fn inject_spectral_energy(
     // But since step() takes one parent input, we'll modify the state directly before step()
     // to simulate "sensory transduction".
 
-    node.state = RealHV::bundle(&[node.state.clone(), input]);
+    node.state = RealHV::bundle(&[&node.state.clone(), &input]);
 
     // Recurse
     if let Some((ref mut left, ref mut right)) = node.children {

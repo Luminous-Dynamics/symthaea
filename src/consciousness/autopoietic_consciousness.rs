@@ -410,6 +410,29 @@ pub enum AutopoieticPhase {
     Integrating,
 }
 
+/// Life state of the autopoietic system
+///
+/// Describes the overall vitality and operational state of the system.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum LifeState {
+    /// System is thriving and expanding capabilities
+    Flourishing,
+    /// System is maintaining itself at steady state
+    Stable,
+    /// System is experiencing difficulty maintaining organization
+    Struggling,
+    /// System's organization is collapsing
+    Dying,
+    /// System has lost autopoietic organization
+    Dead,
+}
+
+impl Default for LifeState {
+    fn default() -> Self {
+        Self::Stable
+    }
+}
+
 /// A perturbation from the environment
 #[derive(Debug, Clone)]
 pub struct Perturbation {
@@ -846,6 +869,71 @@ impl AutopoieticConsciousness {
 
         // 5. Perform self-observation to update metrics
         self.self_observe();
+    }
+
+    /// Calculate the autopoietic index - a measure of self-production capacity
+    ///
+    /// This composite metric reflects:
+    /// - Component production rate vs. decay
+    /// - Operational closure (internal coherence)
+    /// - Boundary integrity
+    /// - Adaptation capacity
+    ///
+    /// Returns a value between 0.0 (no autopoiesis) and 1.0 (maximum autopoiesis)
+    pub fn autopoietic_index(&self) -> f64 {
+        // Factor 1: Component viability (average health)
+        let component_viability = if self.components.is_empty() {
+            0.0
+        } else {
+            let total: f32 = self.components.values().map(|c| c.health).sum();
+            total / self.components.len() as f32
+        };
+
+        // Factor 2: Operational closure
+        let closure = self.state.closure;
+
+        // Factor 3: Boundary strength (ability to maintain identity)
+        let boundary = self.state.boundary_strength;
+
+        // Factor 4: Adaptation (response to environment)
+        let adaptation = self.state.adaptation;
+
+        // Factor 5: Integrity (overall system coherence)
+        let integrity = self.state.integrity;
+
+        // Weighted combination - emphasizing closure and integrity
+        // as core autopoietic properties
+        let index = 0.15 * component_viability
+            + 0.25 * closure
+            + 0.15 * boundary
+            + 0.20 * adaptation
+            + 0.25 * integrity;
+
+        index as f64
+    }
+
+    /// Determine the current life state based on autopoietic metrics
+    ///
+    /// Maps the autopoietic index to a categorical life state:
+    /// - Flourishing: High autopoiesis (> 0.7)
+    /// - Stable: Normal operation (0.4 - 0.7)
+    /// - Struggling: Compromised autopoiesis (0.2 - 0.4)
+    /// - Dying: Critical state (0.1 - 0.2)
+    /// - Dead: No autopoiesis (< 0.1)
+    pub fn current_life_state(&self) -> LifeState {
+        let index = self.autopoietic_index();
+
+        if index >= 0.7 {
+            LifeState::Flourishing
+        } else if index >= 0.4 {
+            LifeState::Stable
+        } else if index >= 0.2 {
+            LifeState::Struggling
+        } else if index >= 0.1 {
+            LifeState::Dying
+        } else {
+            LifeState::Dead
+        }
     }
 }
 

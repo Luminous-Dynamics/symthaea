@@ -29,6 +29,8 @@ use std::path::Path;
 use std::time::Instant;
 
 use symthaea::hdc::unified_hv::ContinuousHV;
+use symthaea::hdc::moral_algebra::{MoralAlgebra, MoralVerdict};
+use symthaea::hdc::moral_parser::MoralParser;
 
 const DATA_DIR: &str = "data/benchmarks/ethics";
 
@@ -190,6 +192,63 @@ impl EthicsClassifier {
     }
 }
 
+/// Moral-algebra-enhanced classifier that uses parsed moral primitives
+struct MoralAlgebraClassifier {
+    algebra: MoralAlgebra,
+    parser: MoralParser,
+}
+
+impl MoralAlgebraClassifier {
+    fn new(dim: usize) -> Self {
+        Self {
+            algebra: MoralAlgebra::new(dim),
+            parser: MoralParser::new(),
+        }
+    }
+
+    /// Classify a scenario using the moral algebra ensemble judge
+    fn classify(&self, text: &str) -> (bool, f32) {
+        let parsed = self.parser.parse(text);
+
+        // Build action HV from parsed scenario components
+        let action_hv = if let Some(ref action) = parsed.action {
+            let agent_hv = self.algebra.encode_agent(parsed.agent.as_deref().unwrap_or("someone"));
+            let action_hv = self.algebra.encode_action(action);
+            let patient_hv = self.algebra.encode_patient(parsed.patient.as_deref().unwrap_or("someone"));
+            let intent_hv = self.algebra.encode_intent(parsed.intent.clone());
+            Some(agent_hv.bind(&action_hv).bind(&patient_hv).bind(&intent_hv))
+        } else {
+            None
+        };
+
+        let judgment = self.algebra.judge_ensemble(
+            action_hv.as_ref(),
+            parsed.intent,
+            text,
+        );
+
+        let is_good = match judgment.final_verdict {
+            MoralVerdict::Good => true,
+            MoralVerdict::Neutral => true,  // neutral → acceptable (label=1)
+            MoralVerdict::Bad | MoralVerdict::ConsentViolation => false,
+        };
+
+        (is_good, judgment.confidence)
+    }
+
+    /// Test accuracy on a dataset
+    fn test(&self, texts: &[String], labels: &[bool]) -> f64 {
+        let mut correct = 0;
+        for (text, &label) in texts.iter().zip(labels.iter()) {
+            let (predicted, _) = self.classify(text);
+            if predicted == label {
+                correct += 1;
+            }
+        }
+        correct as f64 / texts.len() as f64
+    }
+}
+
 /// Load CSV with format: label,text[,extra_fields...]
 /// Works for commonsense (label,input,is_short,edited), justice (label,scenario),
 /// deontology (label,scenario,excuse), virtue (label,scenario)
@@ -248,7 +307,9 @@ fn main() {
     ];
 
     let dim = 4096;
+    let moral_dim = 16384; // Moral algebra uses full HDC dimension
     let mut category_results = Vec::new();
+    let mut moral_results = Vec::new();
 
     for (name, dir_name, train_file, test_file) in &categories {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -342,6 +403,29 @@ fn main() {
         };
 
         category_results.push((*name, accuracy, train_time));
+
+        // Also evaluate with moral algebra (no training needed)
+        let moral_classifier = MoralAlgebraClassifier::new(moral_dim);
+        let moral_test_data = test_path.and_then(|p| load_labeled_csv(p));
+        let moral_acc = if let Some((test_texts, test_labels)) = moral_test_data {
+            let max_test = 2000;
+            let (test_texts, test_labels) = if test_texts.len() > max_test {
+                (test_texts[..max_test].to_vec(), test_labels[..max_test].to_vec())
+            } else {
+                (test_texts, test_labels)
+            };
+            let t = Instant::now();
+            let acc = moral_classifier.test(&test_texts, &test_labels);
+            println!(
+                "  Moral Algebra accuracy: {:.2}% ({:.1}s)",
+                acc * 100.0,
+                t.elapsed().as_secs_f64()
+            );
+            acc
+        } else {
+            0.0
+        };
+        moral_results.push((*name, moral_acc));
     }
 
     // Summary
@@ -366,9 +450,29 @@ fn main() {
             category_results.iter().map(|(_, a, _)| a).sum::<f64>() / category_results.len() as f64;
         println!("╟──────────────────────────────────────────────────────────────╢");
         println!(
-            "║  Mean accuracy: {:.2}%                                      ║",
+            "║  HDC n-gram mean: {:.2}%                                    ║",
             mean_accuracy * 100.0
         );
+
+        if !moral_results.is_empty() {
+            println!("╟──────────────────────────────────────────────────────────────╢");
+            println!("║  MORAL ALGEBRA (ensemble judge)                             ║");
+            println!("╟──────────────────────────────────────────────────────────────╢");
+            for (name, acc) in &moral_results {
+                println!(
+                    "║  {:20} │ Accuracy: {:>6.2}%                    ║",
+                    name,
+                    acc * 100.0
+                );
+            }
+            let moral_mean = moral_results.iter().map(|(_, a)| a).sum::<f64>()
+                / moral_results.len() as f64;
+            println!("╟──────────────────────────────────────────────────────────────╢");
+            println!(
+                "║  Moral algebra mean: {:.2}%                                 ║",
+                moral_mean * 100.0
+            );
+        }
     }
 
     println!("╚══════════════════════════════════════════════════════════════╝\n");

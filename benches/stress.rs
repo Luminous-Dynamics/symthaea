@@ -15,9 +15,10 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::RealPhiCalculator,
-    real_hv::RealHV,
-    HV16, HDC_DIMENSION,
+    spectral_connectivity::ConnectivityCalculator,
+    unified_hv::ContinuousHV,
+    binary_hv::BinaryHV,
+    HDC_DIMENSION,
 };
 
 // =============================================================================
@@ -35,7 +36,7 @@ fn bench_memory_stress(c: &mut Criterion) {
             BenchmarkId::new("sustained_operations", n_ops),
             n_ops,
             |b, &n| {
-                let calc = RealPhiCalculator::new();
+                let calc = ConnectivityCalculator::new();
 
                 b.iter(|| {
                     // Create and discard many topologies
@@ -62,7 +63,7 @@ fn bench_large_topology(c: &mut Criterion) {
     let mut group = c.benchmark_group("stress_large_topology");
     group.sample_size(10);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     for n_nodes in [16, 32, 64, 128].iter() {
         group.bench_with_input(
@@ -98,7 +99,7 @@ fn bench_hdc_vector_stress(c: &mut Criterion) {
             |b, &n| {
                 b.iter(|| {
                     let vectors: Vec<_> = (0..n)
-                        .map(|i| RealHV::random(HDC_DIMENSION, i as u64))
+                        .map(|i| ContinuousHV::random(HDC_DIMENSION, i as u64))
                         .collect();
                     black_box(vectors)
                 })
@@ -110,7 +111,7 @@ fn bench_hdc_vector_stress(c: &mut Criterion) {
             n_vectors,
             |b, &n| {
                 let vectors: Vec<_> = (0..n)
-                    .map(|i| HV16::random(i as u64))
+                    .map(|i| BinaryHV::random(i as u64))
                     .collect();
 
                 b.iter(|| {
@@ -137,7 +138,7 @@ fn bench_parallel_stress(c: &mut Criterion) {
     let mut group = c.benchmark_group("stress_parallel");
     group.sample_size(10);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     for n_parallel in [10, 50, 100].iter() {
         group.throughput(Throughput::Elements(*n_parallel as u64));
@@ -172,7 +173,7 @@ fn bench_dimension_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("stress_dimension_scaling");
     group.sample_size(10);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     // Test hypercube dimensions 1-7
     for dim in 1..=7 {
@@ -205,7 +206,7 @@ fn bench_all_topologies(c: &mut Criterion) {
     let mut group = c.benchmark_group("stress_all_topologies");
     group.sample_size(10);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
     let n_nodes = 8;
 
     // Test multiple topology types

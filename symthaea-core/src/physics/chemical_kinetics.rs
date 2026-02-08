@@ -24,10 +24,8 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
+use super::constants::R_GAS;
 use serde::{Deserialize, Serialize};
-
-/// Gas constant
-pub const R_GAS: f64 = 8.314; // J/(mol·K)
 
 /// Reaction order
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

@@ -46,8 +46,8 @@
 use crate::consciousness::{
     hierarchical_ltc::{HierarchicalLTC, HierarchicalConfig},
     recursive_improvement::{
-        RecursiveOptimizer, OptimizerConfig,
-        ConsciousnessGradientOptimizer, GradientOptimizerConfig,
+        recursive_optimizer::{RecursiveOptimizer, OptimizerConfig},
+        gradient_optimizer::{ConsciousnessGradientOptimizer, GradientOptimizerConfig},
     },
 };
 use crate::hdc::binary_hv::BinaryHV;

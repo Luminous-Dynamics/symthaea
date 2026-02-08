@@ -17,7 +17,8 @@
 //! - **Phrasing**: ~0.05Hz deep breathing (4-bar phrases)
 
 use symthaea::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig};
-use symthaea::hdc::{RealHV, HDC_DIMENSION};
+use symthaea::hdc::real_hv::RealHV;
+use symthaea::hdc::HDC_DIMENSION;
 use std::f32::consts::PI;
 
 /// Helper trait for linear interpolation on RealHV

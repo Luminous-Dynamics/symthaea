@@ -455,6 +455,7 @@ impl EmpathicUnification {
     ) -> UserEmotionalState {
         // Map cognitive load to stress
         let stress_from_load = match user_state.cognitive_load {
+            CognitiveLoad::Overloaded => 1.0,
             CognitiveLoad::High => 0.8,
             CognitiveLoad::Medium => 0.4,
             CognitiveLoad::Low => 0.2,

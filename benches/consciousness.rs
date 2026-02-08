@@ -29,7 +29,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    phi_real::RealPhiCalculator,
+    spectral_connectivity::ConnectivityCalculator,
     phi_resonant::ResonantPhiCalculator,
     HDC_DIMENSION,
 };
@@ -42,7 +42,7 @@ fn bench_topology_19(c: &mut Criterion) {
     let mut group = c.benchmark_group("topology_19");
     group.sample_size(30);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     // Original 8 topologies
     let topologies = vec![
@@ -85,7 +85,7 @@ fn bench_dimensional_sweep(c: &mut Criterion) {
     let mut group = c.benchmark_group("dimensional_sweep");
     group.sample_size(20);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     // Sweep from 2D to 7D (1D is degenerate case with n=2)
     for dim in 2..=7 {
@@ -118,7 +118,7 @@ fn bench_phi_methods(c: &mut Criterion) {
     let star = ConsciousnessTopology::star(8, HDC_DIMENSION, 42);
 
     // RealPhi (algebraic connectivity)
-    let real_calc = RealPhiCalculator::new();
+    let real_calc = ConnectivityCalculator::new();
     group.bench_function("RealPhi_Ring", |b| {
         b.iter(|| black_box(real_calc.compute(&ring.node_representations)))
     });
@@ -176,7 +176,7 @@ fn bench_phi_accuracy(c: &mut Criterion) {
     let mut group = c.benchmark_group("phi_accuracy");
     group.sample_size(50);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     // Statistical validation with multiple seeds
     group.bench_function("ring_10_samples", |b| {
@@ -214,7 +214,7 @@ fn bench_non_orientability(c: &mut Criterion) {
     let mut group = c.benchmark_group("non_orientability");
     group.sample_size(30);
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     // 1D non-orientable (Möbius) - catastrophic failure expected
     group.bench_function("Mobius_8", |b| {

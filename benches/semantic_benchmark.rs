@@ -290,7 +290,8 @@ fn bench_semantic_operations(c: &mut Criterion) {
                         .enumerate()
                         .collect();
                     similarities.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap());
-                    black_box(&similarities[..k])
+                    similarities.truncate(k);
+                    black_box(similarities)
                 })
             },
         );

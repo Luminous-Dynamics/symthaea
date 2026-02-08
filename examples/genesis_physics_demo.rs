@@ -28,9 +28,10 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    StandardModel, Hadrons, PeriodicTable, Chemistry, NuclearPhysics,
-    PhysicsConsciousnessBridge, EnergyScale, BondType,
+    StandardModel, Hadrons, PeriodicTable, NuclearPhysics,
+    PhysicsConsciousnessBridge, EnergyScale,
 };
+use symthaea_core::physics::chemistry::{Chemistry, BondType};
 
 fn main() {
     println!("\n");

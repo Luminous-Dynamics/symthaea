@@ -183,7 +183,7 @@ impl HdcMnistClassifier {
             }
         }
 
-        // Normalize prototypes
+        // Normalize accumulators to create class prototypes
         for class in 0..10 {
             if self.class_counts[class] > 0 {
                 let norm: f32 = accumulators[class]
@@ -211,6 +211,79 @@ impl HdcMnistClassifier {
             "  Class distribution: {:?}",
             self.class_counts
         );
+    }
+
+    /// Retrain prototypes using ISOLET-proven direct prototype modification.
+    /// For misclassified samples: subtract (scaled) from wrong class prototype,
+    /// add (scaled) to correct class prototype. Normalize only at the end.
+    fn retrain(&mut self, images: &[Vec<u8>], labels: &[u8], lr: f32, iterations: usize) {
+        for iter in 0..iterations {
+            let t = Instant::now();
+            let mut corrections = 0;
+
+            for (img, &label) in images.iter().zip(labels.iter()) {
+                let encoded = self.encode(img);
+                let actual = label as usize;
+
+                // Classify using pre-encoded HV to avoid double-encoding
+                let mut best_class = 0;
+                let mut best_sim = f32::NEG_INFINITY;
+                for (class, proto) in self.class_prototypes.iter().enumerate() {
+                    if let Some(ref p) = proto {
+                        let sim = encoded.similarity(p);
+                        if sim > best_sim {
+                            best_sim = sim;
+                            best_class = class;
+                        }
+                    }
+                }
+
+                if best_class != actual {
+                    // Subtract (scaled) from wrong class prototype
+                    if let Some(ref mut proto) = self.class_prototypes[best_class] {
+                        for (p, &e) in proto.values.iter_mut().zip(encoded.values.iter()) {
+                            *p -= lr * e;
+                        }
+                    }
+                    // Add (scaled) to correct class prototype
+                    if let Some(ref mut proto) = self.class_prototypes[actual] {
+                        for (p, &e) in proto.values.iter_mut().zip(encoded.values.iter()) {
+                            *p += lr * e;
+                        }
+                    }
+                    corrections += 1;
+                }
+            }
+
+            let accuracy = 1.0 - corrections as f64 / images.len() as f64;
+            let elapsed = t.elapsed().as_secs_f64();
+            println!(
+                "  Retrain iter {}/{}: {} corrections, train acc = {:.2}% ({:.1}s)",
+                iter + 1,
+                iterations,
+                corrections,
+                accuracy * 100.0,
+                elapsed
+            );
+
+            // Early stop if very few corrections
+            if corrections < images.len() / 200 {
+                println!("  Early stopping: corrections < 0.5% of training set");
+                break;
+            }
+        }
+
+        // Normalize prototypes once at end (preserves relative magnitudes during training)
+        for proto in &mut self.class_prototypes {
+            if let Some(ref mut p) = proto {
+                let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm > 0.0 {
+                    for v in &mut p.values {
+                        *v /= norm;
+                    }
+                }
+            }
+        }
     }
 
     /// Classify a single image
@@ -307,15 +380,17 @@ fn main() {
     println!();
 
     // Run benchmark at multiple dimensions
-    let configs = vec![
-        (2048, 16, "Quick (2K dim, 16 levels)"),
-        (4096, 32, "Standard (4K dim, 32 levels)"),
-        (8192, 32, "Extended (8K dim, 32 levels)"),
+    // (dim, levels, retrain_iters, label)
+    let configs: Vec<(usize, usize, usize, &str)> = vec![
+        (4096, 32, 0, "Standard (4K dim, 32 levels)"),
+        (4096, 32, 5, "Standard+Retrain (4K, 5 iters)"),
+        (8192, 32, 0, "Extended (8K dim, 32 levels)"),
+        (8192, 32, 5, "Extended+Retrain (8K, 5 iters)"),
     ];
 
     let mut results = Vec::new();
 
-    for (dim, levels, label) in &configs {
+    for (dim, levels, retrain_iters, label) in &configs {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         println!("Configuration: {}", label);
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -327,6 +402,12 @@ fn main() {
         // Train
         println!("\nTraining...");
         classifier.train(&train_images, &train_labels);
+
+        // Retrain if configured
+        if *retrain_iters > 0 {
+            println!("\nRetraining (lr=0.1, {} iterations)...", retrain_iters);
+            classifier.retrain(&train_images, &train_labels, 0.1, *retrain_iters);
+        }
 
         // Test
         println!("\nTesting...");
@@ -344,7 +425,7 @@ fn main() {
             println!("    Digit {}: {:.1}%", digit, acc * 100.0);
         }
 
-        results.push((*dim, *levels, label, result));
+        results.push((*dim, *levels, *retrain_iters, label, result));
         println!();
     }
 
@@ -355,7 +436,7 @@ fn main() {
     println!("║ {:30} │ {:>8} │ {:>10} ║", "Configuration", "Accuracy", "Infer/ms");
     println!("╟────────────────────────────────┼──────────┼────────────╢");
 
-    for (_dim, _levels, label, result) in &results {
+    for (_dim, _levels, _retrain, label, result) in results.iter() {
         println!(
             "║ {:30} │ {:>7.2}% │ {:>9.3} ║",
             label, result.accuracy * 100.0, result.inference_time_ms
@@ -369,7 +450,7 @@ fn main() {
 
     let best_accuracy = results
         .iter()
-        .map(|(_, _, _, r)| r.accuracy)
+        .map(|(_, _, _, _, r)| r.accuracy)
         .fold(f64::NEG_INFINITY, f64::max);
 
     let checks = vec![
@@ -392,11 +473,12 @@ fn main() {
     let result_json = serde_json::json!({
         "benchmark": "MNIST HDC Classification",
         "timestamp": chrono::Utc::now().to_rfc3339(),
-        "results": results.iter().map(|(dim, levels, label, r)| {
+        "results": results.iter().map(|(dim, levels, retrain, label, r)| {
             serde_json::json!({
-                "config": label,
-                "dim": dim,
-                "levels": levels,
+                "config": *label,
+                "dim": *dim,
+                "levels": *levels,
+                "retrain_iterations": *retrain,
                 "accuracy": r.accuracy,
                 "correct": r.correct,
                 "total": r.total,

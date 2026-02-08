@@ -1375,6 +1375,563 @@ impl PeriodicTable {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// MOLECULAR PROPERTY PREDICTION
+// Predict molecular properties from HDC vector representations
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Molecular properties derived from HDC vector analysis
+#[derive(Debug, Clone)]
+pub struct MolecularProperties {
+    /// Polarity score (0 = nonpolar, 1 = highly polar)
+    pub polarity: f32,
+    /// Hydrophilicity (water-loving, 0-1)
+    pub hydrophilicity: f32,
+    /// Lipophilicity (fat-loving, 0-1)
+    pub lipophilicity: f32,
+    /// Predicted pKa (acidity constant, 0-14 scale)
+    pub pka_estimate: Option<f32>,
+    /// Molecular size estimate (relative scale)
+    pub size_estimate: f32,
+    /// Reactivity index (0 = stable, 1 = highly reactive)
+    pub reactivity: f32,
+}
+
+/// Molecular property predictor
+#[derive(Debug, Clone)]
+pub struct MolecularPropertyPredictor<'a> {
+    table: &'a PeriodicTable,
+    hadrons: &'a Hadrons,
+}
+
+impl<'a> MolecularPropertyPredictor<'a> {
+    /// Create a new property predictor
+    pub fn new(table: &'a PeriodicTable, hadrons: &'a Hadrons) -> Self {
+        Self { table, hadrons }
+    }
+
+    /// Predict properties of a molecule from its constituent atoms
+    pub fn predict_properties(&self, atom_numbers: &[u8]) -> Option<MolecularProperties> {
+        if atom_numbers.is_empty() {
+            return None;
+        }
+
+        let vectors: Vec<ContinuousHV> = atom_numbers.iter()
+            .filter_map(|&z| self.table.compose_grounded(z, self.hadrons))
+            .collect();
+
+        if vectors.is_empty() {
+            return None;
+        }
+
+        // Bundle all atom vectors to get molecular vector
+        let refs: Vec<&ContinuousHV> = vectors.iter().collect();
+        let mol_vector = ContinuousHV::bundle(&refs);
+
+        // Compute polarity from electronegativity differences
+        let polarity = self.compute_polarity(atom_numbers);
+
+        // Hydrophilicity based on presence of polar atoms (O, N, S)
+        let hydrophilicity = self.compute_hydrophilicity(atom_numbers, &mol_vector);
+
+        // Lipophilicity (inverse of hydrophilicity for simple model)
+        let lipophilicity = 1.0 - hydrophilicity;
+
+        // pKa estimate based on acidic/basic groups
+        let pka_estimate = self.estimate_pka(atom_numbers);
+
+        // Size estimate from atomic radii
+        let size_estimate = self.estimate_size(atom_numbers);
+
+        // Reactivity from reactive atom count
+        let reactivity = mol_vector.similarity(&self.table.reactive);
+
+        Some(MolecularProperties {
+            polarity,
+            hydrophilicity,
+            lipophilicity,
+            pka_estimate,
+            size_estimate,
+            reactivity,
+        })
+    }
+
+    /// Compute polarity from electronegativity differences
+    fn compute_polarity(&self, atoms: &[u8]) -> f32 {
+        if atoms.len() < 2 {
+            return 0.0;
+        }
+
+        let ens: Vec<f32> = atoms.iter()
+            .filter_map(|&z| self.table.element(z))
+            .filter_map(|e| e.data.electronegativity)
+            .collect();
+
+        if ens.len() < 2 {
+            return 0.0;
+        }
+
+        let max_en = ens.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let min_en = ens.iter().cloned().fold(f32::INFINITY, f32::min);
+        let en_diff = max_en - min_en;
+
+        // Normalize: 0-0.4 diff = nonpolar, 0.4-1.7 = polar, >1.7 = ionic
+        (en_diff / 2.0).clamp(0.0, 1.0)
+    }
+
+    /// Compute hydrophilicity from polar atom content
+    fn compute_hydrophilicity(&self, atoms: &[u8], mol_vector: &ContinuousHV) -> f32 {
+        // Count polar atoms (O, N, S, F)
+        let polar_count = atoms.iter()
+            .filter(|&&z| matches!(z, 7 | 8 | 9 | 16))
+            .count();
+
+        let polar_fraction = polar_count as f32 / atoms.len().max(1) as f32;
+
+        // Also check similarity to oxidizing (indicates polarity)
+        let oxidizing_sim = mol_vector.similarity(&self.table.oxidizing);
+
+        (polar_fraction * 0.6 + oxidizing_sim * 0.4).clamp(0.0, 1.0)
+    }
+
+    /// Estimate pKa based on functional groups
+    fn estimate_pka(&self, atoms: &[u8]) -> Option<f32> {
+        // Simple heuristic based on common functional groups
+        let has_carboxyl = atoms.contains(&6) && atoms.iter().filter(|&&z| z == 8).count() >= 2;
+        let has_amine = atoms.contains(&7);
+        let has_hydroxyl = atoms.contains(&8);
+
+        if has_carboxyl {
+            Some(4.5) // Typical carboxylic acid pKa
+        } else if has_amine {
+            Some(10.0) // Typical amine pKa
+        } else if has_hydroxyl {
+            Some(15.0) // Typical alcohol pKa
+        } else {
+            None
+        }
+    }
+
+    /// Estimate molecular size from atomic radii
+    fn estimate_size(&self, atoms: &[u8]) -> f32 {
+        let total_radius: f32 = atoms.iter()
+            .filter_map(|&z| {
+                ELEMENT_PHYSICAL_PROPERTIES.get((z.saturating_sub(1)) as usize)
+                    .and_then(|(_, r, _)| *r)
+            })
+            .sum();
+
+        // Normalize to 0-1 scale (H2 ≈ 106pm, large proteins >> 1000pm)
+        (total_radius / 500.0).clamp(0.0, 1.0)
+    }
+
+    /// Predict solubility class
+    pub fn predict_solubility(&self, atoms: &[u8]) -> SolubilityClass {
+        let props = match self.predict_properties(atoms) {
+            Some(p) => p,
+            None => return SolubilityClass::Unknown,
+        };
+
+        if props.hydrophilicity > 0.6 {
+            SolubilityClass::WaterSoluble
+        } else if props.lipophilicity > 0.6 {
+            SolubilityClass::LipidSoluble
+        } else {
+            SolubilityClass::Amphiphilic
+        }
+    }
+}
+
+/// Solubility classification
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SolubilityClass {
+    /// Dissolves well in water
+    WaterSoluble,
+    /// Dissolves well in lipids/fats
+    LipidSoluble,
+    /// Has both polar and nonpolar regions
+    Amphiphilic,
+    /// Cannot determine
+    Unknown,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REACTION KINETICS AND EQUILIBRIUM
+// Model reaction rates and thermodynamic equilibrium
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Reaction kinetics parameters
+#[derive(Debug, Clone)]
+pub struct ReactionKinetics {
+    /// Estimated activation energy (arbitrary units, 0-1 scale)
+    pub activation_energy: f32,
+    /// Predicted rate constant class
+    pub rate_class: RateClass,
+    /// Temperature sensitivity (higher = more T-dependent)
+    pub temperature_sensitivity: f32,
+    /// Catalyst susceptibility (higher = more catalyzable)
+    pub catalyst_susceptibility: f32,
+}
+
+/// Reaction rate classification
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RateClass {
+    /// Essentially instantaneous (< 1 ms)
+    Instantaneous,
+    /// Fast reaction (ms to seconds)
+    Fast,
+    /// Moderate rate (seconds to minutes)
+    Moderate,
+    /// Slow reaction (minutes to hours)
+    Slow,
+    /// Very slow (hours to days)
+    VerySlow,
+}
+
+/// Chemical equilibrium parameters
+#[derive(Debug, Clone)]
+pub struct EquilibriumParameters {
+    /// Estimated equilibrium constant (log scale, -10 to +10)
+    pub log_keq: f32,
+    /// Favorability of forward reaction
+    pub forward_favorable: bool,
+    /// Estimated Gibbs free energy change (arbitrary units)
+    pub delta_g_estimate: f32,
+    /// Reversibility index (0 = irreversible, 1 = highly reversible)
+    pub reversibility: f32,
+}
+
+/// Reaction kinetics predictor
+#[derive(Debug, Clone)]
+pub struct KineticsPredictor<'a> {
+    table: &'a PeriodicTable,
+    hadrons: &'a Hadrons,
+}
+
+impl<'a> KineticsPredictor<'a> {
+    /// Create a new kinetics predictor
+    pub fn new(table: &'a PeriodicTable, hadrons: &'a Hadrons) -> Self {
+        Self { table, hadrons }
+    }
+
+    /// Predict reaction kinetics between two species
+    pub fn predict_kinetics(&self, reactant1: &[u8], reactant2: &[u8]) -> Option<ReactionKinetics> {
+        let v1 = self.bundle_atoms(reactant1)?;
+        let v2 = self.bundle_atoms(reactant2)?;
+
+        // Activation energy estimate from reactivity
+        let react1 = v1.similarity(&self.table.reactive);
+        let react2 = v2.similarity(&self.table.reactive);
+
+        // Higher reactivity = lower activation energy
+        let avg_reactivity = (react1 + react2) / 2.0;
+        let activation_energy = 1.0 - avg_reactivity;
+
+        // Rate class based on activation energy
+        let rate_class = if activation_energy < 0.1 {
+            RateClass::Instantaneous
+        } else if activation_energy < 0.3 {
+            RateClass::Fast
+        } else if activation_energy < 0.5 {
+            RateClass::Moderate
+        } else if activation_energy < 0.7 {
+            RateClass::Slow
+        } else {
+            RateClass::VerySlow
+        };
+
+        // Temperature sensitivity from thermal properties
+        let thermal1 = v1.similarity(&self.table.thermal_stable);
+        let thermal2 = v2.similarity(&self.table.thermal_stable);
+        let temperature_sensitivity = 1.0 - (thermal1 + thermal2) / 2.0;
+
+        // Catalyst susceptibility from electronic structure
+        let catalyst_susceptibility = avg_reactivity * 0.8;
+
+        Some(ReactionKinetics {
+            activation_energy,
+            rate_class,
+            temperature_sensitivity,
+            catalyst_susceptibility,
+        })
+    }
+
+    /// Predict equilibrium parameters
+    pub fn predict_equilibrium(
+        &self,
+        reactants: &[&[u8]],
+        products: &[&[u8]],
+    ) -> Option<EquilibriumParameters> {
+        // Bundle reactants and products
+        let reactant_vecs: Vec<ContinuousHV> = reactants.iter()
+            .filter_map(|atoms| self.bundle_atoms(atoms))
+            .collect();
+        let product_vecs: Vec<ContinuousHV> = products.iter()
+            .filter_map(|atoms| self.bundle_atoms(atoms))
+            .collect();
+
+        if reactant_vecs.is_empty() || product_vecs.is_empty() {
+            return None;
+        }
+
+        let r_refs: Vec<&ContinuousHV> = reactant_vecs.iter().collect();
+        let p_refs: Vec<&ContinuousHV> = product_vecs.iter().collect();
+        let reactant_bundle = ContinuousHV::bundle(&r_refs);
+        let product_bundle = ContinuousHV::bundle(&p_refs);
+
+        // Compare stability of products vs reactants
+        let r_stability = reactant_bundle.similarity(&self.table.thermal_stable);
+        let p_stability = product_bundle.similarity(&self.table.thermal_stable);
+
+        // ΔG ∝ (reactant stability - product stability)
+        // Negative ΔG = forward favorable
+        let delta_g_estimate = r_stability - p_stability;
+        let forward_favorable = delta_g_estimate < 0.0;
+
+        // log Keq ∝ -ΔG
+        let log_keq = -delta_g_estimate * 10.0; // Scale to -10 to +10
+
+        // Reversibility from similarity between reactants and products
+        let reversibility = reactant_bundle.similarity(&product_bundle);
+
+        Some(EquilibriumParameters {
+            log_keq,
+            forward_favorable,
+            delta_g_estimate,
+            reversibility,
+        })
+    }
+
+    /// Helper: bundle atom vectors
+    fn bundle_atoms(&self, atoms: &[u8]) -> Option<ContinuousHV> {
+        let vecs: Vec<ContinuousHV> = atoms.iter()
+            .filter_map(|&z| self.table.compose_grounded(z, self.hadrons))
+            .collect();
+
+        if vecs.is_empty() {
+            None
+        } else {
+            let refs: Vec<&ContinuousHV> = vecs.iter().collect();
+            Some(ContinuousHV::bundle(&refs))
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MOLECULAR DYNAMICS SIMULATION
+// HDC-based molecular conformations and energy minimization
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Molecular conformation represented as HDC vector
+#[derive(Debug, Clone)]
+pub struct MolecularConformation {
+    /// The molecular vector encoding this conformation
+    pub vector: ContinuousHV,
+    /// Atom positions (simplified 1D representation)
+    pub positions: Vec<f32>,
+    /// Estimated potential energy (arbitrary units)
+    pub energy: f32,
+    /// Conformation stability index
+    pub stability: f32,
+}
+
+/// Molecular dynamics simulator using HDC
+#[derive(Debug, Clone)]
+pub struct MolecularDynamics<'a> {
+    table: &'a PeriodicTable,
+    hadrons: &'a Hadrons,
+    /// Time step for simulation
+    dt: f32,
+    /// Damping factor for energy minimization
+    damping: f32,
+}
+
+impl<'a> MolecularDynamics<'a> {
+    /// Create a new molecular dynamics simulator
+    pub fn new(table: &'a PeriodicTable, hadrons: &'a Hadrons) -> Self {
+        Self {
+            table,
+            hadrons,
+            dt: 0.01,
+            damping: 0.1,
+        }
+    }
+
+    /// Create with custom parameters
+    pub fn with_params(table: &'a PeriodicTable, hadrons: &'a Hadrons, dt: f32, damping: f32) -> Self {
+        Self { table, hadrons, dt, damping }
+    }
+
+    /// Create initial conformation from atoms
+    pub fn create_conformation(&self, atoms: &[u8]) -> Option<MolecularConformation> {
+        let vecs: Vec<ContinuousHV> = atoms.iter()
+            .filter_map(|&z| self.table.compose_grounded(z, self.hadrons))
+            .collect();
+
+        if vecs.is_empty() {
+            return None;
+        }
+
+        // Initial positions: evenly spaced
+        let positions: Vec<f32> = (0..atoms.len())
+            .map(|i| i as f32 * 1.5) // 1.5 Å typical bond length
+            .collect();
+
+        // Bundle vectors with position encoding
+        let refs: Vec<&ContinuousHV> = vecs.iter().collect();
+        let mol_vector = ContinuousHV::bundle(&refs);
+
+        // Initial energy estimate
+        let energy = self.compute_energy(&mol_vector, &positions);
+        let stability = mol_vector.similarity(&self.table.thermal_stable);
+
+        Some(MolecularConformation {
+            vector: mol_vector,
+            positions,
+            energy,
+            stability,
+        })
+    }
+
+    /// Compute potential energy for a conformation
+    fn compute_energy(&self, vector: &ContinuousHV, positions: &[f32]) -> f32 {
+        // Simple harmonic potential between adjacent atoms
+        let mut energy = 0.0;
+        let ideal_distance = 1.5; // Å
+
+        for i in 0..positions.len().saturating_sub(1) {
+            let dist = (positions[i + 1] - positions[i]).abs();
+            let deviation = dist - ideal_distance;
+            energy += deviation * deviation; // Harmonic potential
+        }
+
+        // Add stability contribution (more stable = lower energy)
+        let stability = vector.similarity(&self.table.thermal_stable);
+        energy += (1.0 - stability) * 10.0;
+
+        energy
+    }
+
+    /// Run energy minimization
+    pub fn minimize_energy(&self, conformation: &MolecularConformation, max_steps: usize) -> MolecularConformation {
+        let mut positions = conformation.positions.clone();
+        let mut best_energy = conformation.energy;
+        let mut best_positions = positions.clone();
+
+        for _ in 0..max_steps {
+            // Compute forces (negative gradient of energy)
+            let forces = self.compute_forces(&positions);
+
+            // Update positions with damping
+            for i in 0..positions.len() {
+                positions[i] += forces[i] * self.dt * self.damping;
+            }
+
+            // Compute new energy
+            let energy = self.compute_energy(&conformation.vector, &positions);
+
+            if energy < best_energy {
+                best_energy = energy;
+                best_positions = positions.clone();
+            }
+        }
+
+        MolecularConformation {
+            vector: conformation.vector.clone(),
+            positions: best_positions,
+            energy: best_energy,
+            stability: conformation.vector.similarity(&self.table.thermal_stable),
+        }
+    }
+
+    /// Compute forces on each atom
+    fn compute_forces(&self, positions: &[f32]) -> Vec<f32> {
+        let mut forces = vec![0.0; positions.len()];
+        let ideal_distance = 1.5;
+
+        for i in 0..positions.len().saturating_sub(1) {
+            let dist = positions[i + 1] - positions[i];
+            let deviation = dist.abs() - ideal_distance;
+            let force = -2.0 * deviation * dist.signum();
+
+            forces[i] -= force;
+            forces[i + 1] += force;
+        }
+
+        forces
+    }
+
+    /// Compute intermolecular interaction energy
+    pub fn interaction_energy(&self, mol1: &MolecularConformation, mol2: &MolecularConformation) -> f32 {
+        // Use vector similarity as proxy for interaction strength
+        let similarity = mol1.vector.similarity(&mol2.vector);
+
+        // High similarity = repulsion (Pauli exclusion)
+        // Low similarity = weak attraction (van der Waals)
+        if similarity > 0.7 {
+            (similarity - 0.7) * 10.0 // Repulsion
+        } else {
+            -(0.7 - similarity) * 2.0 // Weak attraction
+        }
+    }
+
+    /// Simulate molecular collision
+    pub fn simulate_collision(
+        &self,
+        mol1: &MolecularConformation,
+        mol2: &MolecularConformation,
+    ) -> CollisionResult {
+        let interaction = self.interaction_energy(mol1, mol2);
+        let similarity = mol1.vector.similarity(&mol2.vector);
+
+        // Predict collision outcome based on similarity and energy
+        if similarity > 0.8 {
+            CollisionResult::Repulsion { energy: interaction }
+        } else if similarity < 0.3 && mol1.energy + mol2.energy > 5.0 {
+            // High energy + low similarity = possible reaction
+            let refs = [&mol1.vector, &mol2.vector];
+            let product = ContinuousHV::bundle(&refs);
+            CollisionResult::Reaction {
+                product_vector: product,
+                energy_released: mol1.energy + mol2.energy - interaction.abs(),
+            }
+        } else {
+            CollisionResult::ElasticScattering { energy_transfer: interaction.abs() * 0.5 }
+        }
+    }
+}
+
+/// Result of molecular collision simulation
+#[derive(Debug, Clone)]
+pub enum CollisionResult {
+    /// Molecules repel each other
+    Repulsion { energy: f32 },
+    /// Elastic scattering (no reaction)
+    ElasticScattering { energy_transfer: f32 },
+    /// Chemical reaction occurred
+    Reaction {
+        product_vector: ContinuousHV,
+        energy_released: f32,
+    },
+}
+
+impl PeriodicTable {
+    /// Create a molecular property predictor
+    pub fn property_predictor<'a>(&'a self, hadrons: &'a Hadrons) -> MolecularPropertyPredictor<'a> {
+        MolecularPropertyPredictor::new(self, hadrons)
+    }
+
+    /// Create a kinetics predictor
+    pub fn kinetics_predictor<'a>(&'a self, hadrons: &'a Hadrons) -> KineticsPredictor<'a> {
+        KineticsPredictor::new(self, hadrons)
+    }
+
+    /// Create a molecular dynamics simulator
+    pub fn dynamics<'a>(&'a self, hadrons: &'a Hadrons) -> MolecularDynamics<'a> {
+        MolecularDynamics::new(self, hadrons)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

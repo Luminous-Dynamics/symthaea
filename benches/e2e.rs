@@ -13,9 +13,9 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::RealPhiCalculator,
-    real_hv::RealHV,
-    HV16, HDC_DIMENSION,
+    spectral_connectivity::ConnectivityCalculator,
+    unified_hv::ContinuousHV,
+    HDC_DIMENSION,
 };
 
 // =============================================================================
@@ -28,11 +28,11 @@ fn bench_full_pipeline(c: &mut Criterion) {
 
     // Target: <200ms end-to-end
     group.bench_function("complete_cycle", |b| {
-        let calc = RealPhiCalculator::new();
+        let calc = ConnectivityCalculator::new();
 
         b.iter(|| {
             // 1. Input: Create random input vector (simulates text embedding)
-            let input = RealHV::random(HDC_DIMENSION, 42);
+            let input = ContinuousHV::random(HDC_DIMENSION, 42);
 
             // 2. HDC Encoding: Create topology representation
             let topo = ConsciousnessTopology::ring(8, HDC_DIMENSION, 42);
@@ -67,7 +67,7 @@ fn bench_concurrent_phi(c: &mut Criterion) {
             BenchmarkId::new("concurrent_phi", n_concurrent),
             n_concurrent,
             |b, &n| {
-                let calc = RealPhiCalculator::new();
+                let calc = ConnectivityCalculator::new();
 
                 // Pre-generate topologies
                 let topologies: Vec<_> = (0..n)
@@ -100,7 +100,7 @@ fn bench_latency_breakdown(c: &mut Criterion) {
     // Measure each component separately
     group.bench_function("hdc_encode", |b| {
         b.iter(|| {
-            let hv = RealHV::random(HDC_DIMENSION, 42);
+            let hv = ContinuousHV::random(HDC_DIMENSION, 42);
             black_box(hv)
         })
     });
@@ -113,7 +113,7 @@ fn bench_latency_breakdown(c: &mut Criterion) {
     });
 
     group.bench_function("phi_compute_8node", |b| {
-        let calc = RealPhiCalculator::new();
+        let calc = ConnectivityCalculator::new();
         let topo = ConsciousnessTopology::ring(8, HDC_DIMENSION, 42);
         b.iter(|| {
             let result = calc.compute(&topo.node_representations);
@@ -122,7 +122,7 @@ fn bench_latency_breakdown(c: &mut Criterion) {
     });
 
     group.bench_function("phi_compute_16node", |b| {
-        let calc = RealPhiCalculator::new();
+        let calc = ConnectivityCalculator::new();
         let topo = ConsciousnessTopology::ring(16, HDC_DIMENSION, 42);
         b.iter(|| {
             let result = calc.compute(&topo.node_representations);
@@ -138,7 +138,7 @@ fn bench_latency_breakdown(c: &mut Criterion) {
 // =============================================================================
 
 fn bench_phi_dyad(c: &mut Criterion) {
-    use symthaea::core::ContinuousHV;
+    use symthaea::hdc::ContinuousHV;
     use symthaea::hdc::relational_consciousness::{RelationalAssessment, RelationMode, RelationshipStage};
     use symthaea::partnership::{DyadInput, DyadWeights, HumanPartnerModel, PhiDyadCalculator};
 

@@ -3,10 +3,11 @@
 //! This module implements a compositional physics hierarchy where higher-level
 //! structures are **derived** from lower-level ones using HDC operations.
 
+pub mod constants;
 mod standard_model;
 mod hadrons;
 mod periodic_table;
-mod chemistry;
+pub mod chemistry;
 mod nuclear;
 mod consciousness_bridge;
 mod electron_nuclear_coupling;
@@ -82,6 +83,13 @@ mod geophysics;
 #[allow(dead_code)]
 mod analogy_engine;
 
+// Phase 5: New physics implementations (reorganization plan)
+mod quantum_tunneling;
+mod decoherence;
+mod tensor_algebra;
+mod chaos_dynamics;
+mod nonequilibrium;
+
 // Demonstration module
 #[cfg(test)]
 mod demo;
@@ -146,3 +154,10 @@ pub use optics::*;
 pub use biophysics::*;
 pub use geophysics::*;
 pub use analogy_engine::*;
+
+// Phase 5: exports (new physics implementations)
+pub use quantum_tunneling::*;
+pub use decoherence::*;
+pub use tensor_algebra::*;
+pub use chaos_dynamics::*;
+pub use nonequilibrium::*;

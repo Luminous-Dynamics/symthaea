@@ -111,6 +111,7 @@ fn to_cpu_config(gpu_config: &GpuCfcConfig) -> CfCNetworkConfig {
             activation: gpu_config.activation,
             tau_range: gpu_config.tau_range,
             dropout: 0.0, // Disable dropout for deterministic comparison
+            gradient_clip: 1.0,
             online_learning: None,
         },
         residual: true,

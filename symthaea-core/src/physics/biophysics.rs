@@ -20,10 +20,11 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
+use super::constants::{K_BOLTZMANN, T_ROOM};
 use serde::{Deserialize, Serialize};
 
-/// Thermal energy at 300K
-pub const KT_300: f64 = 4.11e-21; // J (~25 meV)
+/// Thermal energy at 300K (computed from constants)
+pub const KT_300: f64 = K_BOLTZMANN * T_ROOM; // J (~25 meV)
 
 /// Biological structure type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

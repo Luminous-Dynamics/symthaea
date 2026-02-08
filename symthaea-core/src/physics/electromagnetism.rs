@@ -24,19 +24,8 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
+use super::constants::{C, H};
 use serde::{Deserialize, Serialize};
-
-/// Speed of light in vacuum (m/s)
-pub const C: f64 = 299_792_458.0;
-
-/// Vacuum permittivity (F/m)
-pub const EPSILON_0: f64 = 8.854187817e-12;
-
-/// Vacuum permeability (H/m)
-pub const MU_0: f64 = 1.2566370614e-6;
-
-/// Planck constant (J·s)
-pub const H: f64 = 6.62607015e-34;
 
 /// Polarization state
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

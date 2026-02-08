@@ -24,10 +24,8 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
+use super::constants::K_BOLTZMANN;
 use serde::{Deserialize, Serialize};
-
-/// Boltzmann constant
-pub const K_BOLTZMANN: f64 = 1.380649e-23; // J/K
 
 /// Ensemble type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
