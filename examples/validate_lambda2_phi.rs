@@ -4,9 +4,9 @@
 //! proxy for IIT Φ (integrated information) across different topologies and sizes.
 //!
 //! ## Method
-//! 1. Generate small systems (n=4..8) across multiple topologies
-//! 2. Compute exact Φ via `iit_exact::system_phi` (exponential in n, but feasible for n≤8)
-//! 3. Compute λ₂ via `ConnectivityCalculator::algebraic_connectivity`
+//! 1. Generate explicit adjacency matrices for small systems (n=4..7)
+//! 2. Compute exact Φ via `iit_exact::system_phi` (exponential in n)
+//! 3. Compute λ₂ from the same adjacency matrix via normalized Laplacian
 //! 4. Report Pearson correlation, rank correlation, and failure modes
 //!
 //! ## Run
@@ -15,11 +15,7 @@
 //! ```
 
 use symthaea::hdc::iit_exact::{compute_tpm, system_phi};
-use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::real_hv::RealHV;
 use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
-
-const HDC_DIM: usize = 256;
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
@@ -30,13 +26,14 @@ fn main() {
     let conn_calc = ConnectivityCalculator::new();
 
     // ═══════════════════════════════════════════════════════════════
-    // Generate test systems across topologies and sizes
+    // Generate test systems using EXPLICIT adjacency matrices
+    // This avoids the HV representation bottleneck entirely.
     // ═══════════════════════════════════════════════════════════════
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    println!("Generating test systems (n=4..8, 5 topologies, 3 seeds each)");
+    println!("Generating test systems (n=4..7, 5 topologies, 3 seeds each)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
-    let sizes = [4, 5, 6, 7, 8];
+    let sizes = [4, 5, 6, 7];
     let seeds = [42u64, 137, 271];
     let noise = 0.05; // TPM noise for exact Phi
 
@@ -45,42 +42,38 @@ fn main() {
     let mut all_labels = Vec::new();
 
     for &n in &sizes {
-        let topologies: Vec<(&str, Vec<ContinuousHV>)> = seeds.iter().flat_map(|&seed| {
-            vec![
-                ("chain", generate_chain(n, HDC_DIM, seed)),
-                ("ring", generate_ring(n, HDC_DIM, seed)),
-                ("star", generate_star(n, HDC_DIM, seed)),
-                ("random", generate_random(n, HDC_DIM, 0.4, seed)),
-                ("modular", generate_modular(n, HDC_DIM, 2, seed)),
-            ]
-        }).collect();
+        for &seed in &seeds {
+            let topologies: Vec<(&str, Vec<Vec<f64>>)> = vec![
+                ("chain", make_chain(n)),
+                ("ring", make_ring(n)),
+                ("star", make_star(n)),
+                ("random", make_random(n, 0.4, seed)),
+                ("complete", make_complete(n)),
+            ];
 
-        for (topo_name, hvs) in &topologies {
-            // Compute lambda2
-            let real_hvs: Vec<RealHV> = hvs.iter()
-                .map(|hv| RealHV { values: hv.values.clone() })
-                .collect();
-            let lambda2 = conn_calc.algebraic_connectivity(&real_hvs);
+            for (topo_name, adj) in &topologies {
+                // Compute lambda2 from adjacency matrix
+                let lambda2 = conn_calc.compute_lambda2(adj);
 
-            // Build adjacency matrix from cosine similarities for exact Phi
-            let sim_matrix = conn_calc.build_similarity_matrix(&real_hvs);
-            let adj_f32: Vec<Vec<f32>> = sim_matrix.iter()
-                .map(|row| row.iter().map(|&v| v as f32).collect())
-                .collect();
+                // Convert to f32 for TPM computation
+                let adj_f32: Vec<Vec<f32>> = adj.iter()
+                    .map(|row| row.iter().map(|&v| v as f32).collect())
+                    .collect();
 
-            // Compute exact Phi (average over all 2^n states)
-            let tpm = compute_tpm(&adj_f32, noise);
-            let n_states = 1usize << n;
-            let mut phi_sum = 0.0f64;
-            for state_idx in 0..n_states {
-                let state: Vec<bool> = (0..n).map(|i| ((state_idx >> i) & 1) == 1).collect();
-                phi_sum += system_phi(&tpm, &state);
+                // Compute exact Phi (average over all 2^n states)
+                let tpm = compute_tpm(&adj_f32, noise);
+                let n_states = 1usize << n;
+                let mut phi_sum = 0.0f64;
+                for state_idx in 0..n_states {
+                    let state: Vec<bool> = (0..n).map(|i| ((state_idx >> i) & 1) == 1).collect();
+                    phi_sum += system_phi(&tpm, &state);
+                }
+                let exact_phi = phi_sum / n_states as f64;
+
+                all_lambda2.push(lambda2);
+                all_exact_phi.push(exact_phi);
+                all_labels.push(format!("n={} {}", n, topo_name));
             }
-            let exact_phi = phi_sum / n_states as f64;
-
-            all_lambda2.push(lambda2);
-            all_exact_phi.push(exact_phi);
-            all_labels.push(format!("n={} {}", n, topo_name));
         }
     }
 
@@ -99,8 +92,8 @@ fn main() {
         } else {
             f64::NAN
         };
-        // Print every 5th entry or all if small
-        if all_lambda2.len() <= 30 || i % 3 == 0 {
+        // Print every entry for first size, then every 3rd
+        if i < 15 || i % 3 == 0 {
             println!(
                 "  {:20} │ {:>10.6} │ {:>10.6} │ {:>10.3}",
                 all_labels[i], all_lambda2[i], all_exact_phi[i], ratio
@@ -139,7 +132,7 @@ fn main() {
 
     // Per-topology correlations
     println!("\n  Per-topology Pearson r:");
-    let topo_names = ["chain", "ring", "star", "random", "modular"];
+    let topo_names = ["chain", "ring", "star", "random", "complete"];
     for (ti, topo) in topo_names.iter().enumerate() {
         let mut l2_topo = Vec::new();
         let mut phi_topo = Vec::new();
@@ -248,123 +241,74 @@ fn main() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Topology Generators (small-n versions for exact IIT)
+// Topology generators: produce explicit adjacency matrices
+// Entries are edge weights in [0, 1] (0 = no edge, 1 = full edge)
 // ═══════════════════════════════════════════════════════════════
 
-fn generate_chain(n: usize, dim: usize, seed: u64) -> Vec<ContinuousHV> {
-    let base: Vec<ContinuousHV> = (0..n)
-        .map(|i| ContinuousHV::random(dim, seed * 1000 + i as u64))
-        .collect();
-    let mut result: Vec<Vec<f32>> = vec![vec![0.0; dim]; n];
+fn make_chain(n: usize) -> Vec<Vec<f64>> {
+    let mut adj = vec![vec![0.0; n]; n];
     for i in 0..n {
-        for d in 0..dim {
-            result[i][d] = base[i].values[d];
-            if i > 0 { result[i][d] += base[i - 1].values[d] * 0.3; }
-            if i + 1 < n { result[i][d] += base[i + 1].values[d] * 0.3; }
+        adj[i][i] = 1.0; // self-loop
+        if i + 1 < n {
+            adj[i][i + 1] = 0.5;
+            adj[i + 1][i] = 0.5;
         }
     }
-    normalize_hvs(result)
+    adj
 }
 
-fn generate_ring(n: usize, dim: usize, seed: u64) -> Vec<ContinuousHV> {
-    let base: Vec<ContinuousHV> = (0..n)
-        .map(|i| ContinuousHV::random(dim, seed * 1000 + i as u64))
-        .collect();
-    let mut result: Vec<Vec<f32>> = vec![vec![0.0; dim]; n];
+fn make_ring(n: usize) -> Vec<Vec<f64>> {
+    let mut adj = make_chain(n);
+    // Close the ring
+    adj[0][n - 1] = 0.5;
+    adj[n - 1][0] = 0.5;
+    adj
+}
+
+fn make_star(n: usize) -> Vec<Vec<f64>> {
+    let mut adj = vec![vec![0.0; n]; n];
     for i in 0..n {
-        let prev = if i == 0 { n - 1 } else { i - 1 };
-        let next = (i + 1) % n;
-        for d in 0..dim {
-            result[i][d] = base[i].values[d] + base[prev].values[d] * 0.3 + base[next].values[d] * 0.3;
-        }
-    }
-    normalize_hvs(result)
-}
-
-fn generate_star(n: usize, dim: usize, seed: u64) -> Vec<ContinuousHV> {
-    let base: Vec<ContinuousHV> = (0..n)
-        .map(|i| ContinuousHV::random(dim, seed * 1000 + i as u64))
-        .collect();
-    let mut result: Vec<Vec<f32>> = vec![vec![0.0; dim]; n];
-    // Node 0 is the hub
-    for d in 0..dim {
-        let mut hub_val = base[0].values[d];
-        for j in 1..n {
-            hub_val += base[j].values[d] * 0.2;
-        }
-        result[0][d] = hub_val;
+        adj[i][i] = 1.0;
     }
     for i in 1..n {
-        for d in 0..dim {
-            result[i][d] = base[i].values[d] + base[0].values[d] * 0.3;
-        }
+        adj[0][i] = 0.6;
+        adj[i][0] = 0.6;
     }
-    normalize_hvs(result)
+    adj
 }
 
-fn generate_random(n: usize, dim: usize, density: f32, seed: u64) -> Vec<ContinuousHV> {
-    let base: Vec<ContinuousHV> = (0..n)
-        .map(|i| ContinuousHV::random(dim, seed * 1000 + i as u64))
-        .collect();
+fn make_random(n: usize, density: f64, seed: u64) -> Vec<Vec<f64>> {
+    let mut adj = vec![vec![0.0; n]; n];
     let mut rng = seed.wrapping_add(5555);
-    let mut rand_f32 = || -> f32 {
+    let mut rand_f64 = || -> f64 {
         rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-        (rng >> 33) as f32 / (1u64 << 31) as f32
+        (rng >> 33) as f64 / (1u64 << 31) as f64
     };
-    let mut result: Vec<Vec<f32>> = vec![vec![0.0; dim]; n];
     for i in 0..n {
-        for d in 0..dim {
-            let mut val = base[i].values[d];
-            for j in 0..n {
-                if i != j && rand_f32() < density {
-                    val += base[j].values[d] * 0.15;
-                }
+        adj[i][i] = 1.0;
+        for j in (i + 1)..n {
+            if rand_f64() < density {
+                let weight = 0.3 + rand_f64() * 0.5; // weight in [0.3, 0.8]
+                adj[i][j] = weight;
+                adj[j][i] = weight;
             }
-            result[i][d] = val;
         }
     }
-    normalize_hvs(result)
+    adj
 }
 
-fn generate_modular(n: usize, dim: usize, n_modules: usize, seed: u64) -> Vec<ContinuousHV> {
-    let base: Vec<ContinuousHV> = (0..n)
-        .map(|i| ContinuousHV::random(dim, seed * 1000 + i as u64))
-        .collect();
-    let module_size = n / n_modules.max(1);
-    let mut rng = seed.wrapping_add(7777);
-    let mut rand_f32 = || -> f32 {
-        rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-        (rng >> 33) as f32 / (1u64 << 31) as f32
-    };
-    let mut result: Vec<Vec<f32>> = vec![vec![0.0; dim]; n];
+fn make_complete(n: usize) -> Vec<Vec<f64>> {
+    let mut adj = vec![vec![0.0; n]; n];
     for i in 0..n {
-        let mod_i = i / module_size.max(1);
-        for d in 0..dim {
-            let mut val = base[i].values[d];
-            for j in 0..n {
-                if i == j { continue; }
-                let mod_j = j / module_size.max(1);
-                let prob = if mod_i == mod_j { 0.7 } else { 0.1 };
-                if rand_f32() < prob {
-                    val += base[j].values[d] * 0.2;
-                }
+        for j in 0..n {
+            if i == j {
+                adj[i][j] = 1.0;
+            } else {
+                adj[i][j] = 0.5;
             }
-            result[i][d] = val;
         }
     }
-    normalize_hvs(result)
-}
-
-fn normalize_hvs(vecs: Vec<Vec<f32>>) -> Vec<ContinuousHV> {
-    vecs.into_iter()
-        .map(|mut v| {
-            let norm: f32 = v.iter().map(|x| x * x).sum::<f32>().sqrt();
-            if norm > 0.0 {
-                for val in v.iter_mut() { *val /= norm; }
-            }
-            ContinuousHV::from_vec(v)
-        })
-        .collect()
+    adj
 }
 
 // ═══════════════════════════════════════════════════════════════

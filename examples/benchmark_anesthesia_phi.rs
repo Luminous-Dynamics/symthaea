@@ -34,7 +34,7 @@ use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::phi_engine::PhiEngine;
 
 const HDC_DIM: usize = 512;
-const N_NEURONS: usize = 32;
+const N_NEURONS: usize = 16;
 
 /// Anesthesia phase parameters
 #[derive(Clone)]
@@ -154,7 +154,7 @@ fn main() {
 
     let t = Instant::now();
     let n_steps = 20;
-    let n_trials = 5; // Average multiple trials per step to smooth noise
+    let n_trials = 10; // Average multiple trials per step to smooth noise
     let mut induction_phis = Vec::new();
     let mut induction_algebraic = Vec::new();
 

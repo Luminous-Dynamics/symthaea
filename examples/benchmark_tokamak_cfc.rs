@@ -106,7 +106,9 @@ fn main() {
 
     let n_test = 50;
 
-    // Calibration pass: collect final-step predictions to find adaptive threshold
+    // Calibration pass: collect late-sequence mean predictions for adaptive threshold
+    // Using mean of last 30% of timesteps rather than max_prob, which saturates to
+    // the same ceiling for all shots and destroys discriminability.
     let mut disruptive_scores = Vec::new();
     let mut stable_scores = Vec::new();
 
@@ -117,19 +119,39 @@ fn main() {
         );
 
         network.reset();
-        let mut max_prob = f32::NEG_INFINITY;
+        let late_start = (inputs.len() as f32 * 0.7) as usize;
+        let mut late_probs = Vec::new();
         for i in 0..inputs.len() {
             let output = network.forward(&inputs[i], dts[i]);
             let prob = output[0].clamp(0.0, 1.0);
-            if prob > max_prob { max_prob = prob; }
+            if i >= late_start {
+                late_probs.push(prob);
+            }
         }
+        let mean_late_prob = if late_probs.is_empty() {
+            0.0
+        } else {
+            late_probs.iter().sum::<f32>() / late_probs.len() as f32
+        };
 
         if is_disruptive {
-            disruptive_scores.push(max_prob);
+            disruptive_scores.push(mean_late_prob);
         } else {
-            stable_scores.push(max_prob);
+            stable_scores.push(mean_late_prob);
         }
     }
+
+    // Debug: show score distributions
+    let dis_mean = disruptive_scores.iter().sum::<f32>() / disruptive_scores.len().max(1) as f32;
+    let sta_mean = stable_scores.iter().sum::<f32>() / stable_scores.len().max(1) as f32;
+    println!("  Disruptive late-mean scores: mean={:.6}, min={:.6}, max={:.6}",
+        dis_mean,
+        disruptive_scores.iter().cloned().fold(f32::INFINITY, f32::min),
+        disruptive_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max));
+    println!("  Stable late-mean scores:     mean={:.6}, min={:.6}, max={:.6}",
+        sta_mean,
+        stable_scores.iter().cloned().fold(f32::INFINITY, f32::min),
+        stable_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max));
 
     // Adaptive threshold: Youden's J statistic (maximize sensitivity + specificity - 1)
     let mut all_scores: Vec<f32> = disruptive_scores.iter().chain(stable_scores.iter()).copied().collect();
@@ -139,10 +161,10 @@ fn main() {
     let mut best_threshold = 0.5f32;
     let mut best_j = f32::NEG_INFINITY;
     for &candidate in &all_scores {
-        let tp = disruptive_scores.iter().filter(|&&s| s > candidate).count() as f32;
-        let fn_ = disruptive_scores.iter().filter(|&&s| s <= candidate).count() as f32;
-        let tn = stable_scores.iter().filter(|&&s| s <= candidate).count() as f32;
-        let fp = stable_scores.iter().filter(|&&s| s > candidate).count() as f32;
+        let tp = disruptive_scores.iter().filter(|&&s| s >= candidate).count() as f32;
+        let fn_ = disruptive_scores.iter().filter(|&&s| s < candidate).count() as f32;
+        let tn = stable_scores.iter().filter(|&&s| s < candidate).count() as f32;
+        let fp = stable_scores.iter().filter(|&&s| s >= candidate).count() as f32;
         let sens = tp / (tp + fn_).max(1.0);
         let spec = tn / (tn + fp).max(1.0);
         let j = sens + spec - 1.0;
@@ -151,8 +173,16 @@ fn main() {
             best_threshold = candidate;
         }
     }
-    let threshold = best_threshold;
-    println!("  Adaptive threshold (Youden's J): {:.4} (J={:.3})", threshold, best_j);
+
+    // If J is near zero (no discrimination), fall back to median threshold
+    let threshold = if best_j <= 0.0 {
+        let midpoint = (dis_mean + sta_mean) / 2.0;
+        println!("  No discriminative threshold found (J={:.3}), using midpoint: {:.6}", best_j, midpoint);
+        midpoint
+    } else {
+        println!("  Adaptive threshold (Youden's J): {:.4} (J={:.3})", best_threshold, best_j);
+        best_threshold
+    };
 
     // Evaluation pass with calibrated threshold
     let mut true_positives = 0;
@@ -177,7 +207,7 @@ fn main() {
             let output = network.forward(&inputs[i], dts[i]);
             let prob = output[0].clamp(0.0, 1.0);
 
-            if prob > threshold && !predicted_disruption {
+            if prob >= threshold && !predicted_disruption {
                 predicted_disruption = true;
                 warning_step = Some(i);
             }
