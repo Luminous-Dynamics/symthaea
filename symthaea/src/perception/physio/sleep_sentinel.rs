@@ -1383,99 +1383,134 @@ impl SleepSentinel {
         let high_freq_score = (m.dominant_freq_hz - freq_high) / freq_high.max(1.0);
 
         // Compute evidence scores for each state
-        // These weights are based on neurophysiological signatures:
+        // These weights are based on neurophysiological signatures.
+        //
+        // Welch PSD vs moving-average thresholds:
+        // With proper Welch PSD, delta is 60-80% of total power for ALL stages.
+        // The delta_ratio (delta/faster) is thus always high (~2-5).
+        // We use higher thresholds when spectral analysis is active.
+        let spectral = self.config.use_spectral_analysis;
+
+        // Adaptive threshold multipliers for Welch PSD
+        // With PSD: delta_ratio for N3 needs ~3.5 (vs 2.0 for moving-avg)
+        // With PSD: fast_ratio for Wake needs ~0.25 (vs 0.6 for moving-avg)
+        let (n3_delta_thresh, n3_delta_strong, _n3_delta_mid, n3_delta_low,
+             wake_fast_high, wake_fast_mid, wake_beta_thresh, wake_activity_thresh,
+             rem_theta_delta_thresh, rem_delta_ratio_thresh, rem_activity_thresh,
+             n2_delta_upper, n2_delta_mid, n2_delta_border,
+             n1_theta_thresh, n1_alpha_ceil) = if spectral {
+            // Welch PSD thresholds: delta always dominates, use tighter ratios
+            (3.5, 3.0, 2.5, 2.0,  // N3 delta_ratio thresholds (raised) - 4 values
+             0.25, 0.15, 0.03, 0.05, // Wake fast thresholds (lowered: alpha+beta/delta)
+             0.30, 2.8, 0.08,  // REM thresholds (adjusted for PSD)
+             3.0, 2.8, 3.5,    // N2 delta_ratio upper bounds (raised)
+             0.08, 0.20)       // N1 theta/alpha thresholds (lowered)
+        } else {
+            // Moving-average thresholds: original values
+            (2.0, 1.8, 1.5, 1.2,  // N3 - 4 values
+             0.6, 0.4, 0.06, 0.12,
+             0.50, 1.6, 0.12,
+             2.0, 1.8, 2.5,
+             0.12, 0.25)
+        };
 
         // Wake: High complexity, high frequency (alpha/beta), lowest delta ratio
-        // Alpha/beta activity is key signature; delta should be relatively LOW vs faster bands
-        // Key: Wake has fast activity present - use very lenient thresholds
         let fast_activity = m.alpha_power + m.beta_power;
         let fast_ratio = if m.delta_power > 0.01 { fast_activity / m.delta_power } else { 2.0 };
-        let wake_boost = if fast_ratio > 0.6 && fast_activity > 0.12 {
-            0.45  // Wake pattern: fast bands present, not completely delta-dominated
-        } else if fast_ratio > 0.4 || m.beta_power > 0.06 {
-            0.30  // Any beta or decent fast ratio
-        } else if fast_activity > 0.10 {
-            0.18  // Some fast activity
+        // Spectral entropy boost for Wake: high entropy = more complex/awake signal
+        let entropy_wake_boost = if spectral && m.spectral_entropy > 0.7 {
+            0.20
+        } else if spectral && m.spectral_entropy > 0.5 {
+            0.10
+        } else {
+            0.0
+        };
+        let wake_boost = if fast_ratio > wake_fast_high && fast_activity > wake_activity_thresh {
+            0.45
+        } else if fast_ratio > wake_fast_mid || m.beta_power > wake_beta_thresh {
+            0.30
+        } else if fast_activity > wake_activity_thresh * 0.83 {
+            0.18
         } else {
             0.0
         };
         let wake_score =
-            complexity_score.max(0.0) * 0.18 +  // Active brain
-            high_freq_score.max(0.0) * 0.15 +   // Fast frequencies
-            (-synchrony_score) * 0.15 +         // Desynchronized (even less weight)
-            wake_boost;                          // Band power is KEY for wake
+            complexity_score.max(0.0) * 0.18 +
+            high_freq_score.max(0.0) * 0.15 +
+            (-synchrony_score) * 0.15 +
+            wake_boost + entropy_wake_boost;
 
-        // N3 (Deep Sleep): High synchrony + high phi + delta OVERWHELMINGLY dominates
-        // Delta waves must be OVERWHELMING majority of power in N3 (>2x faster bands)
-        // Key: delta >> theta + alpha (very strong delta dominance)
+        // N3 (Deep Sleep): Delta OVERWHELMINGLY dominates + high synchrony
         let faster_power = m.theta_power + m.alpha_power + m.beta_power;
         let delta_ratio = if faster_power > 0.01 { m.delta_power / faster_power } else { 2.0 };
-        let strong_delta = delta_ratio > 2.0; // Delta is 2x all other bands combined
+        let strong_delta = delta_ratio > n3_delta_thresh;
+        // Spectral entropy boost for N3: low entropy = simple/deep-sleep signal
+        let entropy_deep_boost = if spectral && m.spectral_entropy < 0.3 {
+            0.15
+        } else if spectral && m.spectral_entropy < 0.5 {
+            0.05
+        } else {
+            0.0
+        };
         let delta_boost = if strong_delta && synchrony_score > 0.0 {
-            0.28  // N3 pattern: very strong delta dominance + synchronized
-        } else if delta_ratio > 1.8 {
-            0.15  // Strong delta dominance
-        } else if delta_ratio > 1.5 {
-            0.05  // Moderate delta dominance
+            0.28
+        } else if delta_ratio > n3_delta_strong {
+            0.15
+        } else if delta_ratio > n3_delta_low {
+            0.05
         } else {
             0.0
         };
         let deep_score =
-            synchrony_score.max(0.0) * 0.25 +      // HIGH synchrony is key
-            low_freq_score.max(0.0) * 0.20 +       // Slow waves
-            phi_score.max(0.0) * 0.22 +            // High integration
-            delta_boost;                            // N3 needs VERY strong delta dominance + synchrony
+            synchrony_score.max(0.0) * 0.25 +
+            low_freq_score.max(0.0) * 0.20 +
+            phi_score.max(0.0) * 0.22 +
+            delta_boost + entropy_deep_boost;
 
-        // REM: Theta/alpha mix without delta dominance (the paradox)
-        // Key: REM has theta/alpha with minimal delta - very different from N3
-        // REM vs N1/N2: REM has HIGHEST theta relative to delta
+        // REM: Theta/alpha mix without extreme delta dominance (the paradox)
         let rem_active = m.theta_power + m.alpha_power;
         let theta_to_delta = if m.delta_power > 0.01 { m.theta_power / m.delta_power } else { 2.0 };
-        let is_rem_pattern = theta_to_delta > 0.5 && delta_ratio < 1.6;
-        let rem_paradox_boost = if is_rem_pattern && rem_active > 0.12 {
-            0.75  // Very strong REM boost when pattern matches
-        } else if rem_active > 0.12 && delta_ratio < 1.8 {
-            0.50  // Activated pattern without delta dominance
-        } else if theta_to_delta > 0.35 {
-            0.30  // Moderate theta relative to delta
+        let is_rem_pattern = theta_to_delta > rem_theta_delta_thresh && delta_ratio < rem_delta_ratio_thresh;
+        let rem_paradox_boost = if is_rem_pattern && rem_active > rem_activity_thresh {
+            0.75
+        } else if rem_active > rem_activity_thresh && delta_ratio < rem_delta_ratio_thresh * 1.125 {
+            0.50
+        } else if theta_to_delta > rem_theta_delta_thresh * 0.7 {
+            0.30
         } else {
             0.0
         };
         let rem_score =
-            complexity_score.max(0.0) * 0.10 +     // Less reliance on complexity
-            (-phi_score).max(0.0) * 0.05 +         // Even less weight
-            (-synchrony_score).max(0.0) * 0.03 +   // Even less weight
-            rem_paradox_boost;                      // Theta/delta ratio is PRIMARY
+            complexity_score.max(0.0) * 0.10 +
+            (-phi_score).max(0.0) * 0.05 +
+            (-synchrony_score).max(0.0) * 0.03 +
+            rem_paradox_boost;
 
-        // N2 (Light Sleep): Moderate synchrony, theta/spindle activity
-        // Key: Synchrony present but delta NOT strongly dominant (ratio < 2.0)
-        // N2 should be the DEFAULT sleep stage unless delta is overwhelming OR REM pattern
-        // Reduce N2 score when REM pattern is detected to let REM win
+        // N2 (Light Sleep): Moderate synchrony, delta present but not overwhelming
         let rem_penalty = if is_rem_pattern { 0.15 } else { 0.0 };
-        let n2_boost = if synchrony_score > 0.0 && delta_ratio < 2.0 && !is_rem_pattern {
-            0.28  // Sleep + delta not overwhelming + not REM = likely N2
-        } else if delta_ratio < 1.8 && !is_rem_pattern {
-            0.20  // Delta present but not extreme
-        } else if delta_ratio < 2.5 {
-            0.08  // Borderline N2/N3
+        let n2_boost = if synchrony_score > 0.0 && delta_ratio < n2_delta_upper && !is_rem_pattern {
+            0.28
+        } else if delta_ratio < n2_delta_mid && !is_rem_pattern {
+            0.20
+        } else if delta_ratio < n2_delta_border {
+            0.08
         } else {
-            0.0   // Clearly N3 territory or REM territory
+            0.0
         };
         let n2_score =
-            synchrony_score.max(0.0) * 0.28 +          // Some synchrony (more than wake)
-            phi_score.max(0.0) * 0.20 +                // Some integration
-            low_freq_score.max(0.0) * 0.24 +           // Lower frequency than wake
-            n2_boost -                                  // N2 is default sleep unless strong delta or REM
-            rem_penalty;                                // Penalty when REM pattern detected
+            synchrony_score.max(0.0) * 0.28 +
+            phi_score.max(0.0) * 0.20 +
+            low_freq_score.max(0.0) * 0.24 +
+            n2_boost -
+            rem_penalty;
 
         // N1 (Transitional): Lower complexity than wake, theta appearing
-        // Key: Between wake and N2 - dropping complexity, rising theta
-        let n1_boost = if m.theta_power > 0.12 && m.alpha_power < 0.25 { 0.15 } else { 0.0 };
+        let n1_boost = if m.theta_power > n1_theta_thresh && m.alpha_power < n1_alpha_ceil { 0.15 } else { 0.0 };
         let n1_score =
-            (-complexity_score).max(0.0) * 0.30 +     // Lower complexity than wake
-            synchrony_score.max(0.0) * 0.25 +          // Some synchrony emerging
-            low_freq_score.max(0.0) * 0.30 +           // Slowing EEG
-            n1_boost;                                   // Theta replacing alpha
+            (-complexity_score).max(0.0) * 0.30 +
+            synchrony_score.max(0.0) * 0.25 +
+            low_freq_score.max(0.0) * 0.30 +
+            n1_boost;
 
         // Find the state with highest score
         let scores = [

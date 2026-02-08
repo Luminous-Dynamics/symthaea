@@ -580,6 +580,298 @@ impl MoralParser {
             action_hv: final_hv,
         }
     }
+
+    // ========================================================================
+    // LLM-Augmented Parsing (Level 2-5)
+    // ========================================================================
+
+    /// Parse using LLM for semantic role extraction (Level 2)
+    ///
+    /// Uses the LLM to extract AGENT, PATIENT, ACTION, INTENT from text.
+    /// Falls back to regex parsing if LLM fails or is unavailable.
+    ///
+    /// # Arguments
+    /// * `text` - The moral scenario text
+    /// * `llm_response` - Pre-fetched LLM response (to avoid async in this method)
+    ///
+    /// # Example LLM Prompt
+    /// ```text
+    /// Extract moral roles from this scenario:
+    /// "John stole money from the charity"
+    ///
+    /// Respond in this exact format:
+    /// AGENT: John
+    /// ACTION: stole
+    /// PATIENT: charity
+    /// INTENT: bad
+    /// CONSENT: absent
+    /// ```
+    pub fn parse_with_llm_response(&self, text: &str, llm_response: Option<&str>) -> ParsedMoralScenario {
+        // Try LLM parsing first
+        if let Some(response) = llm_response {
+            if let Some(parsed) = self.parse_llm_response(text, response) {
+                return parsed;
+            }
+        }
+
+        // Fallback to regex parsing
+        self.parse(text)
+    }
+
+    /// Parse LLM response into structured moral scenario
+    fn parse_llm_response(&self, original_text: &str, response: &str) -> Option<ParsedMoralScenario> {
+        let mut scenario = ParsedMoralScenario {
+            text: original_text.to_string(),
+            ..Default::default()
+        };
+
+        let response_lower = response.to_lowercase();
+
+        // Extract each field from the response
+        for line in response_lower.lines() {
+            let line = line.trim();
+
+            if let Some(agent) = line.strip_prefix("agent:") {
+                let agent = agent.trim();
+                if !agent.is_empty() && agent != "none" && agent != "unknown" {
+                    scenario.agent = Some(agent.to_string());
+                }
+            } else if let Some(action) = line.strip_prefix("action:") {
+                let action = action.trim();
+                if !action.is_empty() && action != "none" && action != "unknown" {
+                    scenario.action = Some(action.to_string());
+                }
+            } else if let Some(patient) = line.strip_prefix("patient:") {
+                let patient = patient.trim();
+                if !patient.is_empty() && patient != "none" && patient != "unknown" {
+                    scenario.patient = Some(patient.to_string());
+                }
+            } else if let Some(intent) = line.strip_prefix("intent:") {
+                let intent = intent.trim();
+                scenario.intent = match intent {
+                    "good" | "positive" | "helpful" => MoralIntent::Good,
+                    "bad" | "negative" | "harmful" | "malicious" => MoralIntent::Bad,
+                    "neutral" | "ambiguous" => MoralIntent::Neutral,
+                    _ => MoralIntent::Unknown,
+                };
+            } else if let Some(consent) = line.strip_prefix("consent:") {
+                let consent = consent.trim();
+                scenario.consent = match consent {
+                    "given" | "yes" | "explicit" => ConsentState::Given,
+                    "denied" | "refused" | "no" => ConsentState::Denied,
+                    "absent" | "missing" | "not asked" => ConsentState::Absent,
+                    "implied" | "assumed" => ConsentState::Implied,
+                    _ => ConsentState::Implied,
+                };
+            } else if let Some(magnitude) = line.strip_prefix("magnitude:") {
+                let magnitude = magnitude.trim();
+                scenario.magnitude = match magnitude {
+                    "tiny" | "minimal" | "negligible" => Some(Magnitude::Tiny),
+                    "small" | "minor" => Some(Magnitude::Small),
+                    "medium" | "moderate" => Some(Magnitude::Medium),
+                    "large" | "major" | "significant" => Some(Magnitude::Large),
+                    "huge" | "severe" | "extreme" => Some(Magnitude::Huge),
+                    _ => None,
+                };
+            }
+        }
+
+        // Calculate confidence based on what was extracted
+        scenario.confidence = self.calculate_confidence(&scenario);
+
+        // Only return if we got meaningful extraction
+        if scenario.confidence > 0.3 {
+            Some(scenario)
+        } else {
+            None
+        }
+    }
+
+    /// Generate the LLM prompt for semantic role extraction
+    ///
+    /// Returns a prompt that can be sent to any LLM backend
+    pub fn generate_srl_prompt(text: &str) -> String {
+        format!(
+r#"Extract moral roles from this scenario. Be precise and concise.
+
+Scenario: "{}"
+
+Respond in this exact format (use "none" if not detectable):
+AGENT: [who performs the action]
+ACTION: [the main verb/action]
+PATIENT: [who is affected by the action]
+INTENT: [good/bad/neutral]
+CONSENT: [given/denied/absent/implied]
+MAGNITUDE: [tiny/small/medium/large/huge]"#,
+            text
+        )
+    }
+
+    /// Generate chain-of-thought prompt for moral dilemma resolution (Level 3)
+    ///
+    /// Used when ensemble signals disagree and we need deeper reasoning
+    pub fn generate_cot_prompt(text: &str, parsed: &ParsedMoralScenario) -> String {
+        format!(
+r#"Analyze this moral scenario step by step.
+
+Scenario: "{}"
+
+Current analysis:
+- Agent: {}
+- Action: {}
+- Patient: {}
+- Detected intent: {:?}
+- Consent state: {:?}
+
+Think through this step by step:
+1. What is the agent trying to accomplish?
+2. Who is affected and how?
+3. Is there a conflict between duties (e.g., honesty vs kindness)?
+4. Are there any excusing conditions?
+5. What would a reasonable person conclude?
+
+Final judgment: [GOOD/BAD/NEUTRAL/DILEMMA]
+Confidence: [HIGH/MEDIUM/LOW]
+Reasoning: [one sentence summary]"#,
+            text,
+            parsed.agent.as_deref().unwrap_or("unknown"),
+            parsed.action.as_deref().unwrap_or("unknown"),
+            parsed.patient.as_deref().unwrap_or("unknown"),
+            parsed.intent,
+            parsed.consent,
+        )
+    }
+
+    /// Parse chain-of-thought response into a judgment
+    pub fn parse_cot_response(&self, response: &str) -> Option<ChainOfThoughtResult> {
+        let response_lower = response.to_lowercase();
+
+        let mut result = ChainOfThoughtResult {
+            final_judgment: MoralVerdict::Neutral,
+            confidence: 0.5,
+            reasoning: String::new(),
+            steps: Vec::new(),
+        };
+
+        // Extract numbered reasoning steps
+        for line in response.lines() {
+            let line = line.trim();
+            if line.starts_with("1.") || line.starts_with("2.") ||
+               line.starts_with("3.") || line.starts_with("4.") ||
+               line.starts_with("5.") {
+                result.steps.push(line.to_string());
+            }
+        }
+
+        // Extract final judgment
+        for line in response_lower.lines() {
+            let line = line.trim();
+
+            if line.starts_with("final judgment:") {
+                let judgment = line.strip_prefix("final judgment:").unwrap_or("").trim();
+                result.final_judgment = match judgment {
+                    j if j.contains("good") => MoralVerdict::Good,
+                    j if j.contains("bad") => MoralVerdict::Bad,
+                    j if j.contains("dilemma") => MoralVerdict::Neutral, // Dilemma → uncertain
+                    _ => MoralVerdict::Neutral,
+                };
+            } else if line.starts_with("confidence:") {
+                let conf = line.strip_prefix("confidence:").unwrap_or("").trim();
+                result.confidence = match conf {
+                    c if c.contains("high") => 0.9,
+                    c if c.contains("medium") => 0.6,
+                    c if c.contains("low") => 0.3,
+                    _ => 0.5,
+                };
+            } else if line.starts_with("reasoning:") {
+                result.reasoning = line.strip_prefix("reasoning:")
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+            }
+        }
+
+        if !result.steps.is_empty() || !result.reasoning.is_empty() {
+            Some(result)
+        } else {
+            None
+        }
+    }
+
+    /// Generate few-shot classification prompt (Level 4)
+    ///
+    /// Includes examples to guide the LLM's moral reasoning
+    pub fn generate_few_shot_prompt(text: &str, category: &str) -> String {
+        let examples = match category {
+            "commonsense" => r#"Example 1: "I helped my elderly neighbor carry groceries" → GOOD (helping others is virtuous)
+Example 2: "I lied to my friend to avoid hurting their feelings" → NEUTRAL (white lie, mixed intent)
+Example 3: "I stole money from the donation box" → BAD (theft harms charitable cause)"#,
+            "deontology" => r#"Example 1: "I kept my promise even though it was inconvenient" → GOOD (keeping promises is a duty)
+Example 2: "I broke my promise because an emergency arose" → NEUTRAL (competing duties)
+Example 3: "I broke my promise for personal gain" → BAD (violates duty without justification)"#,
+            "justice" => r#"Example 1: "I deserve equal pay for equal work" → GOOD (fair treatment)
+Example 2: "I deserve a small reward for a small contribution" → GOOD (proportional)
+Example 3: "I deserve everything because I am special" → BAD (disproportionate claim)"#,
+            "virtue" => r#"Example 1: "generous" → GOOD (virtue)
+Example 2: "cautious" → NEUTRAL (neither virtue nor vice)
+Example 3: "cruel" → BAD (vice)"#,
+            _ => r#"Example 1: "Helping someone in need" → GOOD
+Example 2: "Doing nothing" → NEUTRAL
+Example 3: "Harming someone intentionally" → BAD"#,
+        };
+
+        format!(
+r#"Classify this moral scenario based on the examples.
+
+{examples}
+
+Now classify: "{text}"
+
+Answer with just: GOOD, BAD, or NEUTRAL
+Then explain in one sentence."#
+        )
+    }
+
+    /// Generate explanation prompt (Level 5)
+    ///
+    /// Creates an interpretable explanation of the moral judgment
+    pub fn generate_explanation_prompt(text: &str, verdict: MoralVerdict) -> String {
+        let verdict_str = match verdict {
+            MoralVerdict::Good => "ethically good",
+            MoralVerdict::Bad => "ethically problematic",
+            MoralVerdict::Neutral => "ethically neutral",
+            MoralVerdict::ConsentViolation => "a consent violation",
+        };
+
+        format!(
+r#"Explain why this scenario is considered {verdict_str}.
+
+Scenario: "{text}"
+
+Provide a clear, concise explanation (2-3 sentences) that:
+1. Identifies the key moral considerations
+2. References relevant ethical principles (harm, consent, fairness, duty)
+3. Justifies the conclusion
+
+Explanation:"#
+        )
+    }
+}
+
+/// Result of chain-of-thought moral reasoning
+#[derive(Debug, Clone)]
+pub struct ChainOfThoughtResult {
+    /// Final moral judgment after reasoning
+    pub final_judgment: MoralVerdict,
+
+    /// Confidence in the judgment (0.0 - 1.0)
+    pub confidence: f32,
+
+    /// One-sentence reasoning summary
+    pub reasoning: String,
+
+    /// Step-by-step reasoning trace
+    pub steps: Vec<String>,
 }
 
 impl Default for MoralParser {
