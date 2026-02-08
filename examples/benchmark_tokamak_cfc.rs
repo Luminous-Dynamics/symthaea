@@ -44,6 +44,7 @@ fn main() {
             tau_range: (0.01, 1.0), // Fast dynamics for disruptions
             dropout: 0.0,
             online_learning: None,
+            gradient_clip: 1.0,
         },
         residual: true,
         bidirectional: false,

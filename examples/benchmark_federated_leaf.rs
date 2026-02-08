@@ -59,6 +59,7 @@ fn main() {
             tau_range: (0.1, 5.0),
             dropout: 0.0,
             online_learning: None,
+            gradient_clip: 1.0,
         },
         residual: false,
         bidirectional: false,
