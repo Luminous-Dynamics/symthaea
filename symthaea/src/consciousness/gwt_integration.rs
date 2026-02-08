@@ -36,7 +36,7 @@
 use crate::hdc::global_workspace::{
     GlobalWorkspace, WorkspaceConfig, WorkspaceContent, WorkspaceAssessment
 };
-use crate::hdc::binary_hv::HV16;
+use crate::hdc::binary_hv::BinaryHV;
 #[cfg(feature = "observability_module")]
 use crate::observability::{SharedObserver, types::*};
 use serde::{Deserialize, Serialize};
@@ -311,7 +311,7 @@ impl UnifiedGlobalWorkspace {
     /// - Coalition size (more integration = higher Φ)
     /// - Cross-module connectivity
     /// - Information distinctiveness
-    fn estimate_phi(&self, strategy_name: &str, coalition_size: usize, representation: &[HV16]) -> f64 {
+    fn estimate_phi(&self, strategy_name: &str, coalition_size: usize, representation: &[BinaryHV]) -> f64 {
         // Base Φ from coalition size (logarithmic scaling)
         let coalition_phi = if coalition_size > 1 {
             (coalition_size as f64).ln() / 3.0_f64.ln()  // Normalized to ~1 for size 3
@@ -327,7 +327,7 @@ impl UnifiedGlobalWorkspace {
             // Closer to 50% bit balance = higher Φ (more information content)
             let first = &representation[0];
             let popcount = first.popcount() as f64;
-            let dimension = 16384.0;  // HV16 dimension
+            let dimension = 16384.0;  // BinaryHV dimension
             let ratio = popcount / dimension;  // 0.0 to 1.0
             let distance_from_half = (ratio - 0.5).abs();  // 0.0 to 0.5
             let balance = 1.0 - distance_from_half * 2.0;  // 1.0 for 50%, 0.0 for 0%/100%
@@ -456,7 +456,7 @@ impl UnifiedGlobalWorkspace {
         &mut self,
         strategy_name: &str,
         activation: f64,
-        representation: Vec<HV16>,
+        representation: Vec<BinaryHV>,
         supporting_modules: Vec<String>,
     ) {
         // REVOLUTIONARY: Check attentional blink
@@ -719,7 +719,7 @@ mod tests {
         ws.submit_strategy(
             "FullDeliberation",
             0.9,
-            vec![HV16::ones()],
+            vec![BinaryHV::ones()],
             vec!["Perception".to_string(), "Memory".to_string(), "Attention".to_string()],
         );
 
@@ -735,7 +735,7 @@ mod tests {
         ws.submit_strategy(
             "FastPatterns",
             0.95,
-            vec![HV16::ones()],
+            vec![BinaryHV::ones()],
             vec!["Motor".to_string(), "Perception".to_string()],
         );
 
@@ -756,7 +756,7 @@ mod tests {
         ws.submit_strategy(
             "Ensemble",
             0.8,
-            vec![HV16::ones()],
+            vec![BinaryHV::ones()],
             vec!["A".to_string(), "B".to_string(), "C".to_string()],
         );
 
@@ -771,7 +771,7 @@ mod tests {
         ws.submit_strategy(
             "HeuristicGuided",
             0.9,
-            vec![HV16::ones()],
+            vec![BinaryHV::ones()],
             vec!["Evaluation".to_string(), "Memory".to_string()],
         );
         ws.process();
@@ -791,7 +791,7 @@ mod tests {
         ws.submit_strategy(
             "StandardProcessing",
             0.85,
-            vec![HV16::ones()],
+            vec![BinaryHV::ones()],
             vec!["Symbolic".to_string(), "MetaCognition".to_string()],
         );
 
@@ -810,7 +810,7 @@ mod tests {
             ws.submit_strategy(
                 &format!("Strategy{}", i),
                 0.7 + i as f64 * 0.05,
-                vec![HV16::random(i as u64)],
+                vec![BinaryHV::random(i as u64)],
                 vec!["A".to_string(), "B".to_string()],
             );
         }

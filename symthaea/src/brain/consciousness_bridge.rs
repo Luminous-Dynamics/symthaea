@@ -354,6 +354,7 @@ mod tests {
                 to_state: state2.clone(),
                 reward: 0.1,
                 timestamp: 0,
+                surprise: 0.0,
             };
             world_model.observe_transition(transition);
         }

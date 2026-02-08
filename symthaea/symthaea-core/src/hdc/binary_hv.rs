@@ -2556,4 +2556,6 @@ mod tests {
 }
 
 /// Backward-compatible alias: `HV16` is now `BinaryHV`.
+/// Use `BinaryHV` directly in new code.
+#[deprecated(since = "0.5.0", note = "renamed to BinaryHV — use BinaryHV instead")]
 pub type HV16 = BinaryHV;

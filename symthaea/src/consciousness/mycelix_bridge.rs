@@ -45,15 +45,13 @@
 
 use super::unified_value_evaluator::{
     UnifiedValueEvaluator, EvaluationContext, EvaluationResult,
-    ActionType, Decision, VetoReason, AffectiveSystemsState,
+    ActionType, Decision, AffectiveSystemsState,
 };
-use super::seven_harmonies::{SevenHarmonies, Harmony, AlignmentResult};
+use super::seven_harmonies::Harmony;
 use super::affective_consciousness::CoreAffect;
-use crate::hdc::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use tracing::{debug, info, warn};
 
 // ============================================================================
 // MYCELIX SDK INTEGRATION (when feature enabled)
@@ -416,7 +414,7 @@ impl MycelixBridge {
                     reason: format!("{:?}", reason),
                 });
             }
-            Decision::Warn(warnings) => {
+            Decision::Warn(_warnings) => {
                 // Log warnings but allow
                 // In production, might require confirmation
             }

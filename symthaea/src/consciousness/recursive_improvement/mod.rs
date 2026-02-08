@@ -182,15 +182,14 @@ pub mod naming_ceremony;
 #[cfg(feature = "full_consciousness")]
 pub mod semantic_bridge;
 
-// TODO: These 3 modules need significant type stubs before they can compile.
-// They depend on advanced router types, SemanticPrimitiveEncoder, and other
-// types that don't exist yet.
-// #[cfg(feature = "full_consciousness")]
-// pub mod benchmark_suite;
-// #[cfg(feature = "full_consciousness")]
-// pub mod routing_hub;
-// #[cfg(feature = "full_consciousness")]
-// pub mod primitive_semantic_bridge;
+// These 3 modules need SemanticPrimitiveEncoder type stubs before they can compile.
+// Gated behind `recursive_improvement_advanced` feature flag (which implies full_consciousness).
+#[cfg(feature = "recursive_improvement_advanced")]
+pub mod benchmark_suite;
+#[cfg(feature = "recursive_improvement_advanced")]
+pub mod routing_hub;
+#[cfg(feature = "recursive_improvement_advanced")]
+pub mod primitive_semantic_bridge;
 
 // ── Conditional re-exports for compiled legacy modules ──
 
