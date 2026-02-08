@@ -24,9 +24,6 @@ use super::standard_model::PHYSICS_DIM;
 use super::constants::G;
 use serde::{Deserialize, Serialize};
 
-// Re-export with original name for backward compatibility
-pub const G_GRAV: f64 = G;
-
 /// Earth's average density
 pub const EARTH_DENSITY: f64 = 5515.0; // kg/m³
 
@@ -364,7 +361,7 @@ impl GeophysicsEncoder {
 
     /// Surface gravity from mass and radius
     pub fn surface_gravity(&self, mass_kg: f64, radius_m: f64) -> f64 {
-        G_GRAV * mass_kg / (radius_m * radius_m)
+        G * mass_kg / (radius_m * radius_m)
     }
 
     // ============================================================
