@@ -67,6 +67,10 @@ harness = false
 name = "primitive_system_bench"
 harness = false
 
+[[bench]]
+name = "entropy_methods"
+harness = false
+
 [features]
 default = []
 embeddings = []       # Enable embedding model integration

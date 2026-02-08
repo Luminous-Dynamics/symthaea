@@ -487,6 +487,169 @@ impl CompositionalPhiAnalysis {
     }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEMPORAL Φ AND CONSCIOUSNESS DYNAMICS
+// Connecting temporal information integration to consciousness evolution
+// ═══════════════════════════════════════════════════════════════════════════════
+
+use super::true_phi::{TemporalPhiCalculator, TemporalTransition, CauseEffectInfo};
+
+/// Temporal consciousness state
+///
+/// Represents a conscious state at a moment in time, enabling
+/// cause-effect analysis over temporal dynamics.
+#[derive(Debug, Clone)]
+pub struct TemporalConsciousnessState {
+    /// Current state vector
+    pub state: ContinuousHV,
+    /// Timestamp (arbitrary units)
+    pub time: f64,
+    /// Phenomenal index at this moment
+    pub phenomenal_index: f32,
+}
+
+/// Result of temporal consciousness analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemporalConsciousnessAnalysis {
+    /// Cause information: how much present specifies past
+    pub cause_info: f64,
+    /// Effect information: how much present specifies future
+    pub effect_info: f64,
+    /// Integrated cause information (φ_cause)
+    pub integrated_cause: f64,
+    /// Integrated effect information (φ_effect)
+    pub integrated_effect: f64,
+    /// Total cause-effect Φ
+    pub phi_cause_effect: f64,
+    /// Change in phenomenal index over time
+    pub phenomenal_gradient: f64,
+    /// Whether consciousness is growing (gradient > 0)
+    pub is_growing: bool,
+}
+
+impl PhysicsConsciousnessBridge {
+    /// Analyze temporal consciousness dynamics
+    ///
+    /// Computes cause-effect information for a sequence of conscious states.
+    /// This connects temporal IIT to consciousness evolution.
+    ///
+    /// # Arguments
+    /// * `past_state` - Previous conscious state
+    /// * `current_state` - Current conscious state
+    ///
+    /// # Returns
+    /// Temporal consciousness analysis including cause-effect measures
+    pub fn analyze_temporal_consciousness(
+        &self,
+        past_state: &TemporalConsciousnessState,
+        current_state: &TemporalConsciousnessState,
+    ) -> TemporalConsciousnessAnalysis {
+        let calc = TemporalPhiCalculator::new();
+
+        // Create temporal transition
+        let transition = TemporalTransition::new(
+            past_state.state.clone(),
+            current_state.state.clone(),
+        );
+
+        // Compute cause-effect information
+        let ce_info = calc.compute_cause_effect(&transition);
+
+        // Compute phenomenal gradient
+        let phenomenal_gradient = if (current_state.time - past_state.time).abs() > 1e-10 {
+            (current_state.phenomenal_index - past_state.phenomenal_index) as f64
+                / (current_state.time - past_state.time)
+        } else {
+            0.0
+        };
+
+        TemporalConsciousnessAnalysis {
+            cause_info: ce_info.cause_info,
+            effect_info: ce_info.effect_info,
+            integrated_cause: ce_info.integrated_cause,
+            integrated_effect: ce_info.integrated_effect,
+            phi_cause_effect: ce_info.phi_cause_effect,
+            phenomenal_gradient,
+            is_growing: phenomenal_gradient > 0.0,
+        }
+    }
+
+    /// Analyze consciousness trajectory over multiple states
+    ///
+    /// Computes how consciousness evolves through a sequence of states,
+    /// measuring integrated information flow over time.
+    pub fn analyze_consciousness_trajectory(
+        &self,
+        states: &[TemporalConsciousnessState],
+    ) -> Vec<TemporalConsciousnessAnalysis> {
+        if states.len() < 2 {
+            return vec![];
+        }
+
+        let mut analyses = Vec::with_capacity(states.len() - 1);
+
+        for i in 0..states.len() - 1 {
+            let analysis = self.analyze_temporal_consciousness(&states[i], &states[i + 1]);
+            analyses.push(analysis);
+        }
+
+        analyses
+    }
+
+    /// Compute consciousness momentum
+    ///
+    /// Measures the "inertia" of consciousness - how much the current state
+    /// preserves information from the past and projects into the future.
+    pub fn consciousness_momentum(
+        &self,
+        past: &TemporalConsciousnessState,
+        current: &TemporalConsciousnessState,
+        future: &TemporalConsciousnessState,
+    ) -> f64 {
+        let past_analysis = self.analyze_temporal_consciousness(past, current);
+        let future_analysis = self.analyze_temporal_consciousness(current, future);
+
+        // Momentum = average of cause and effect preservation
+        (past_analysis.cause_info + future_analysis.effect_info) / 2.0
+    }
+
+    /// Create a temporal consciousness state from a physical vector
+    pub fn create_conscious_state(&self, physical: &ContinuousHV, time: f64) -> TemporalConsciousnessState {
+        let phenomenal_index = self.phenomenal_index(physical);
+        TemporalConsciousnessState {
+            state: physical.clone(),
+            time,
+            phenomenal_index,
+        }
+    }
+
+    /// Simulate consciousness evolution with a transformation
+    ///
+    /// Creates a sequence of conscious states by applying a transformation.
+    pub fn simulate_consciousness_evolution<F>(
+        &self,
+        initial: &ContinuousHV,
+        steps: usize,
+        transform: F,
+    ) -> Vec<TemporalConsciousnessState>
+    where
+        F: Fn(&ContinuousHV, usize) -> ContinuousHV,
+    {
+        let mut states = Vec::with_capacity(steps + 1);
+        let mut current = initial.clone();
+
+        for step in 0..=steps {
+            let state = self.create_conscious_state(&current, step as f64);
+            states.push(state);
+            if step < steps {
+                current = transform(&current, step);
+            }
+        }
+
+        states
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
