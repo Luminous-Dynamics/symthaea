@@ -492,7 +492,7 @@ impl CompositionalPhiAnalysis {
 // Connecting temporal information integration to consciousness evolution
 // ═══════════════════════════════════════════════════════════════════════════════
 
-use super::true_phi::{TemporalPhiCalculator, TemporalTransition, CauseEffectInfo};
+use super::true_phi::{TemporalPhiCalculator, TemporalTransition};
 
 /// Temporal consciousness state
 ///
@@ -614,6 +614,7 @@ impl PhysicsConsciousnessBridge {
     }
 
     /// Create a temporal consciousness state from a physical vector
+    #[allow(deprecated)]
     pub fn create_conscious_state(&self, physical: &ContinuousHV, time: f64) -> TemporalConsciousnessState {
         let phenomenal_index = self.phenomenal_index(physical);
         TemporalConsciousnessState {

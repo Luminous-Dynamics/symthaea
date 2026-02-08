@@ -400,6 +400,7 @@ pub mod deep_integration;                   // Deep integration bridge for Φ-gu
 
 // Re-export BinaryHV at module level for convenience (used by language/nix_* modules)
 pub use binary_hv::BinaryHV;
+#[allow(deprecated)]
 pub use binary_hv::HV16;
 // Backward compat: RealHV alias is still available via real_hv module
 
@@ -738,6 +739,7 @@ pub use hv_pool::{
     pooled_bind, pooled_similarity,
 };
 
+#[allow(deprecated)]
 pub use hv_pool::{PooledHV16, HV16Pool};
 // Re-export SIMD continuous HV operations (4x+ speedup for 16K-dim vectors)
 pub use simd_continuous::{

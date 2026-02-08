@@ -86,6 +86,7 @@ impl BondType {
 
 /// A chemical bond between atoms
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Bond {
     pub bond_type: BondType,
     pub vector: ContinuousHV,
