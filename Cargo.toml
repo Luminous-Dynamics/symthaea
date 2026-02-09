@@ -33,6 +33,9 @@ categories = ["science", "algorithms", "data-structures"]
 # Symthaea Core - HDC, Φ engine, and minimal consciousness pipeline
 symthaea-core = { path = "symthaea-core" }
 
+# Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
+mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core" }
+
 # Symthaea STT - Speech-to-Text, Bioacoustics, EEG processing
 symthaea-stt = { path = "crates/symthaea-stt", optional = true }
 
