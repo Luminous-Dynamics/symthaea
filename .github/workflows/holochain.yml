@@ -13,6 +13,7 @@ on:
       - 'mycelix-governance/zomes/**'
       - 'mycelix-workspace/happs/**'
       - 'mycelix-workspace/sdk/**'
+      - 'mycelix-workspace/tests/sweettest/**'
       - 'mycelix-identity/**'
       - 'mycelix-care/zomes/**'
       - 'mycelix-emergency/zomes/**'
@@ -28,6 +29,7 @@ on:
       - 'mycelix-governance/zomes/**'
       - 'mycelix-workspace/happs/**'
       - 'mycelix-workspace/sdk/**'
+      - 'mycelix-workspace/tests/sweettest/**'
       - 'mycelix-identity/**'
       - 'mycelix-care/zomes/**'
       - 'mycelix-emergency/zomes/**'
@@ -145,6 +147,14 @@ jobs:
             done
 
             echo ""
+            echo "=== Building Federated Learning Zome ==="
+            if [ -d "Mycelix-Core/zomes/federated_learning" ]; then
+              cd Mycelix-Core/zomes/federated_learning
+              cargo build --release --target wasm32-unknown-unknown
+              cd -
+            fi
+
+            echo ""
             echo "=== Building SDK ==="
             cd mycelix-workspace/sdk
             cargo build --release
@@ -156,6 +166,7 @@ jobs:
           name: zome-wasm
           path: |
             Mycelix-Core/dna/*/target/wasm32-unknown-unknown/release/*.wasm
+            Mycelix-Core/zomes/federated_learning/target/wasm32-unknown-unknown/release/*.wasm
             Mycelix-Core/target/wasm32-unknown-unknown/release/*.wasm
             mycelix-care/target/wasm32-unknown-unknown/release/*.wasm
             mycelix-emergency/target/wasm32-unknown-unknown/release/*.wasm
@@ -491,6 +502,14 @@ jobs:
       - name: Run sweettest - Climate (11 tests)
         run: |
           nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release climate -- --ignored --test-threads=1 --nocapture"
+
+      - name: Run sweettest - FL Bridge E2E (3 conductor tests)
+        run: |
+          nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release fl_bridge_e2e -- --ignored --test-threads=1 --nocapture"
+
+      - name: Run FL Bridge SDK Tests (3 tests, no conductor)
+        run: |
+          nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release fl_bridge_e2e::sdk_tests"
 
   # ============================================================================
   # Package hApps
@@ -854,7 +873,7 @@ jobs:
           echo "| Lint Zomes | $(format_status '${{ needs.lint-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | $(format_status '${{ needs.integration-test.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| SDK Conductor Tests | $(format_status '${{ needs.sdk-conductor-tests.result }}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Sweettest Integration (64 tests)** | $(format_status '${{ needs.sweettest.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Sweettest Integration (70 tests)** | $(format_status '${{ needs.sweettest.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Package DNAs | $(format_status '${{ needs.package-dna.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Package hApps | $(format_status '${{ needs.package-happs.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -874,6 +893,7 @@ jobs:
           echo "| Sweettest Health | 10 | Patient CRUD, DID linking, consent access |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Marketplace | 10 | Listings, transactions, reputation, Bridge |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Climate | 11 | Carbon credits, transfers, footprints, projects |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Sweettest FL Bridge** | 6 | PoGQ round-trip, honest accept, Byzantine reject, SDK validation |" >> $GITHUB_STEP_SUMMARY
           echo "| Zome Unit Tests | ~50 | Per-zome unit tests |" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | 3+ | Multi-conductor network tests |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
