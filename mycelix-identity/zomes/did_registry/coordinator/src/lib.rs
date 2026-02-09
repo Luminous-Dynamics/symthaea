@@ -5,13 +5,15 @@
 
 use hdk::prelude::*;
 use did_registry_integrity::*;
+use bs58;
 
 /// Validate a multibase-encoded Ed25519 public key.
 ///
 /// Per the W3C DID specification and multibase encoding:
 /// - Must start with 'z' (base58btc prefix)
 /// - Remaining characters must be valid base58btc (no 0, O, I, l)
-/// - Decoded key should be 32 bytes for Ed25519
+/// - Decoded bytes must be exactly 34 bytes (2-byte multicodec prefix + 32-byte Ed25519 key)
+///   or 32 bytes (raw Ed25519 key without multicodec prefix)
 fn validate_multibase_ed25519_key(key: &str) -> Result<(), String> {
     if key.is_empty() {
         return Err("Public key multibase is empty".to_string());
@@ -30,28 +32,37 @@ fn validate_multibase_ed25519_key(key: &str) -> Result<(), String> {
         return Err("Public key multibase has no data after prefix".to_string());
     }
 
-    // Validate base58btc character set (Bitcoin alphabet)
-    const BASE58_CHARS: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    for (i, ch) in encoded.bytes().enumerate() {
-        if !BASE58_CHARS.contains(&ch) {
-            return Err(format!(
-                "Invalid base58btc character '{}' at position {}",
-                ch as char, i + 1
-            ));
+    // Decode base58btc to verify character set and get actual key bytes
+    let decoded = bs58::decode(encoded)
+        .with_alphabet(bs58::Alphabet::BITCOIN)
+        .into_vec()
+        .map_err(|e| format!("Invalid base58btc encoding: {}", e))?;
+
+    // Accept either:
+    // - 34 bytes: multicodec prefix (0xed, 0x01 for Ed25519) + 32-byte key
+    // - 32 bytes: raw Ed25519 key (no multicodec prefix)
+    match decoded.len() {
+        34 => {
+            // Verify Ed25519 multicodec prefix (varint 0xed01)
+            if decoded[0] != 0xed || decoded[1] != 0x01 {
+                return Err(format!(
+                    "Invalid multicodec prefix: expected [0xed, 0x01] (Ed25519), got [{:#04x}, {:#04x}]",
+                    decoded[0], decoded[1]
+                ));
+            }
+            Ok(())
+        }
+        32 => {
+            // Raw Ed25519 key without multicodec prefix - acceptable
+            Ok(())
+        }
+        n => {
+            Err(format!(
+                "Invalid Ed25519 key length: decoded to {} bytes, expected 34 (with multicodec prefix) or 32 (raw)",
+                n
+            ))
         }
     }
-
-    // Length sanity check: base58-encoded 32 bytes is typically 43-44 chars
-    // but Holochain agent pub keys are 39 bytes (36 + 3 byte location),
-    // so we accept 32-64 chars to accommodate various key formats
-    if encoded.len() < 32 || encoded.len() > 128 {
-        return Err(format!(
-            "Unexpected base58btc key length {}: expected 32-128 characters",
-            encoded.len()
-        ));
-    }
-
-    Ok(())
 }
 
 // ==================== MFA INTEGRATION ====================
@@ -566,4 +577,103 @@ pub fn add_verification_method(method: VerificationMethod) -> ExternResult<Recor
 pub fn get_my_did(_: ()) -> ExternResult<Option<Record>> {
     let agent_info = agent_info()?;
     get_did_document(agent_info.agent_initial_pubkey)
+}
+
+// =============================================================================
+// UNIT TESTS
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_multibase_ed25519_key_with_multicodec() {
+        // Ed25519 multicodec prefix (0xed, 0x01) + 32 bytes = 34 bytes total
+        let mut key_bytes = vec![0xed, 0x01];
+        key_bytes.extend([0x42u8; 32]); // 32-byte dummy Ed25519 key
+        let encoded = bs58::encode(&key_bytes)
+            .with_alphabet(bs58::Alphabet::BITCOIN)
+            .into_string();
+        let multibase = format!("z{}", encoded);
+
+        assert!(validate_multibase_ed25519_key(&multibase).is_ok());
+    }
+
+    #[test]
+    fn test_valid_raw_32_byte_key() {
+        // Raw 32-byte Ed25519 key (no multicodec prefix)
+        let key_bytes = [0x42u8; 32];
+        let encoded = bs58::encode(&key_bytes)
+            .with_alphabet(bs58::Alphabet::BITCOIN)
+            .into_string();
+        let multibase = format!("z{}", encoded);
+
+        assert!(validate_multibase_ed25519_key(&multibase).is_ok());
+    }
+
+    #[test]
+    fn test_empty_key_rejected() {
+        assert!(validate_multibase_ed25519_key("").is_err());
+    }
+
+    #[test]
+    fn test_missing_prefix_rejected() {
+        let key_bytes = [0x42u8; 32];
+        let encoded = bs58::encode(&key_bytes)
+            .with_alphabet(bs58::Alphabet::BITCOIN)
+            .into_string();
+        // Missing 'z' prefix
+        assert!(validate_multibase_ed25519_key(&encoded).is_err());
+    }
+
+    #[test]
+    fn test_wrong_prefix_rejected() {
+        assert!(validate_multibase_ed25519_key("m" ).is_err());
+        assert!(validate_multibase_ed25519_key("u" ).is_err());
+    }
+
+    #[test]
+    fn test_invalid_base58_characters_rejected() {
+        // '0', 'O', 'I', 'l' are not in base58btc alphabet
+        assert!(validate_multibase_ed25519_key("z0000000000000000000000000000000000000000000").is_err());
+        assert!(validate_multibase_ed25519_key("zOOOOOOOOOOOO").is_err());
+    }
+
+    #[test]
+    fn test_wrong_key_length_rejected() {
+        // 16 bytes - too short for Ed25519
+        let short_key = [0x42u8; 16];
+        let encoded = bs58::encode(&short_key)
+            .with_alphabet(bs58::Alphabet::BITCOIN)
+            .into_string();
+        let multibase = format!("z{}", encoded);
+        assert!(validate_multibase_ed25519_key(&multibase).is_err());
+
+        // 64 bytes - too long for Ed25519
+        let long_key = [0x42u8; 64];
+        let encoded = bs58::encode(&long_key)
+            .with_alphabet(bs58::Alphabet::BITCOIN)
+            .into_string();
+        let multibase = format!("z{}", encoded);
+        assert!(validate_multibase_ed25519_key(&multibase).is_err());
+    }
+
+    #[test]
+    fn test_wrong_multicodec_prefix_rejected() {
+        // Use P-256 multicodec prefix (0x80, 0x24) instead of Ed25519
+        let mut key_bytes = vec![0x80, 0x24];
+        key_bytes.extend([0x42u8; 32]); // 32-byte key body
+        let encoded = bs58::encode(&key_bytes)
+            .with_alphabet(bs58::Alphabet::BITCOIN)
+            .into_string();
+        let multibase = format!("z{}", encoded);
+
+        assert!(validate_multibase_ed25519_key(&multibase).is_err());
+    }
+
+    #[test]
+    fn test_prefix_only_rejected() {
+        assert!(validate_multibase_ed25519_key("z").is_err());
+    }
 }

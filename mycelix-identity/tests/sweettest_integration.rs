@@ -1156,10 +1156,8 @@ pub struct UpdateDidInput {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
 async fn test_reject_malformed_multibase_key_no_prefix() {
-    let conductor = SweetConductor::from_standard_config().await;
-    let dna_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("dna/mycelix_identity_dna.dna");
-    let dna = SweetDnaFile::from_bundle(&dna_path).await.unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
     let app = conductor.setup_app("test", &[dna]).await.unwrap();
     let cell = app.cells()[0].clone();
 
@@ -1190,10 +1188,8 @@ async fn test_reject_malformed_multibase_key_no_prefix() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
 async fn test_reject_multibase_key_with_invalid_base58_chars() {
-    let conductor = SweetConductor::from_standard_config().await;
-    let dna_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("dna/mycelix_identity_dna.dna");
-    let dna = SweetDnaFile::from_bundle(&dna_path).await.unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
     let app = conductor.setup_app("test", &[dna]).await.unwrap();
     let cell = app.cells()[0].clone();
 
@@ -1223,10 +1219,8 @@ async fn test_reject_multibase_key_with_invalid_base58_chars() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
 async fn test_reject_multibase_key_too_short() {
-    let conductor = SweetConductor::from_standard_config().await;
-    let dna_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("dna/mycelix_identity_dna.dna");
-    let dna = SweetDnaFile::from_bundle(&dna_path).await.unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
     let app = conductor.setup_app("test", &[dna]).await.unwrap();
     let cell = app.cells()[0].clone();
 
@@ -1256,10 +1250,8 @@ async fn test_reject_multibase_key_too_short() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
 async fn test_accept_valid_non_ed25519_key_type() {
-    let conductor = SweetConductor::from_standard_config().await;
-    let dna_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("dna/mycelix_identity_dna.dna");
-    let dna = SweetDnaFile::from_bundle(&dna_path).await.unwrap();
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
     let app = conductor.setup_app("test", &[dna]).await.unwrap();
     let cell = app.cells()[0].clone();
 

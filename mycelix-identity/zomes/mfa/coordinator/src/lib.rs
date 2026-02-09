@@ -646,7 +646,7 @@ fn verify_factor_proof(
         }
 
         FactorType::Biometric => {
-            verify_biometric(proof)
+            verify_biometric(factor_id, proof)
         }
 
         FactorType::GitcoinPassport => {
@@ -654,7 +654,7 @@ fn verify_factor_proof(
         }
 
         FactorType::VerifiableCredential => {
-            verify_verifiable_credential(proof)
+            verify_verifiable_credential(factor_id, proof)
         }
 
         FactorType::SocialRecovery => {
@@ -865,16 +865,25 @@ fn verify_hardware_key(
         }
     }
 
-    // For other key types, we'd need additional verification logic
-    // For now, verify the signature is present and authenticator data is valid
-    Ok(!sig_bytes.is_empty() && !auth_data.is_empty())
+    // Reject unsupported key types rather than accepting unverified signatures
+    Err(wasm_error!(WasmErrorInner::Guest(
+        format!(
+            "Unsupported WebAuthn key type: signature length {} bytes, key length {} bytes. \
+             Only Ed25519 (64-byte sig, 32-byte key) is currently supported.",
+            sig_bytes.len(), credential_pubkey.len()
+        )
+    )))
 }
 
 /// Verify biometric challenge response
 ///
 /// Biometric verification is privacy-preserving: we only verify hash commitments,
 /// never raw biometric data. The actual biometric matching happens on the client device.
-fn verify_biometric(proof: &Option<VerificationProof>) -> ExternResult<bool> {
+///
+/// The factor_id stores the enrolled template hash (set during enrollment).
+/// We verify the proof's template_hash matches the enrolled hash using constant-time
+/// comparison, then check the response attestation is non-empty.
+fn verify_biometric(factor_id: &str, proof: &Option<VerificationProof>) -> ExternResult<bool> {
     let Some(VerificationProof::BiometricChallenge { template_hash, response }) = proof else {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "BiometricChallenge proof required for Biometric verification".into()
@@ -895,14 +904,17 @@ fn verify_biometric(proof: &Option<VerificationProof>) -> ExternResult<bool> {
         )));
     }
 
-    // In production, this would verify:
-    // 1. The template_hash matches the enrolled biometric factor
-    // 2. The response contains a valid attestation from a trusted secure enclave
-    // 3. The attestation timestamp is recent
-    // 4. The device has not been tampered with
+    // Verify the template_hash matches the enrolled biometric factor (constant-time)
+    let matches: bool = template_hash.as_bytes().ct_eq(factor_id.as_bytes()).into();
+    if !matches {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Biometric template hash does not match enrolled factor".into()
+        )));
+    }
 
-    // For now, accept valid-looking proofs
-    // Full implementation requires integration with platform-specific biometric APIs
+    // Note: Full attestation verification requires platform-specific secure enclave APIs
+    // (e.g., Apple Secure Enclave, Android StrongBox) which are not available in WASM.
+    // The client-side device must produce the attestation; we verify the template binding.
     Ok(true)
 }
 
@@ -952,21 +964,30 @@ fn verify_gitcoin_passport(proof: &Option<VerificationProof>) -> ExternResult<bo
         )));
     }
 
-    // Note: Full verification would require:
+    // SECURITY NOTE: Score, timestamp, and stamp presence are validated above.
+    // However, these values are self-reported by the client. Full verification requires:
     // 1. Off-chain oracle to verify the score with Gitcoin's API
-    // 2. Verification of stamp cryptographic proofs
+    // 2. Verification of stamp cryptographic proofs against Gitcoin's signing keys
     // 3. Check that stamps haven't been revoked
-    // For on-chain verification, we trust the attestation provided by the client
-    // which should be signed by a trusted oracle in production
+    //
+    // Current trust model: client provides values validated by structure/range checks.
+    // This is acceptable for FL eligibility gating (not high-security operations)
+    // because Byzantine detection via PoGQ catches malicious nodes regardless.
+    //
+    // TODO(SEC-HIGH): Add oracle-signed attestation verification for production use.
 
     Ok(true)
 }
 
 /// Verify Verifiable Credential proof
 ///
-/// Validates the credential structure and issuer DID format.
-/// Full verification requires cross-zome call to verifiable_credential zome.
-fn verify_verifiable_credential(proof: &Option<VerificationProof>) -> ExternResult<bool> {
+/// Validates credential structure, issuer DID format, and issuer binding.
+/// The factor_id stores the expected issuer DID (set during enrollment).
+///
+/// Note: Full cryptographic signature verification requires cross-zome call
+/// to the verifiable_credential zome, which is not yet wired. This function
+/// verifies structural validity and issuer binding as a minimum security baseline.
+fn verify_verifiable_credential(factor_id: &str, proof: &Option<VerificationProof>) -> ExternResult<bool> {
     let Some(VerificationProof::VerifiableCredential {
         credential,
         issuer,
@@ -998,14 +1019,46 @@ fn verify_verifiable_credential(proof: &Option<VerificationProof>) -> ExternResu
         )));
     }
 
-    // In production, would:
-    // 1. Parse the credential (JWT or JSON-LD format)
-    // 2. Verify the issuer's signature
-    // 3. Check the credential hasn't expired
-    // 4. Verify the credential hasn't been revoked (cross-zome call)
-    // 5. Validate the credential against its schema
+    // Verify the issuer matches the enrolled factor (constant-time)
+    let issuer_matches: bool = issuer.as_bytes().ct_eq(factor_id.as_bytes()).into();
+    if !issuer_matches {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential issuer does not match enrolled factor".into()
+        )));
+    }
 
-    Ok(true)
+    // Attempt cross-zome credential verification
+    let vc_response = call(
+        CallTargetCell::Local,
+        ZomeName::new("verifiable_credential"),
+        FunctionName::new("verify_credential"),
+        None,
+        credential.clone(),
+    );
+
+    match vc_response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            let verified: bool = extern_io.decode().unwrap_or(false);
+            if !verified {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Credential failed cryptographic verification".into()
+                )));
+            }
+            Ok(true)
+        }
+        Ok(ZomeCallResponse::Unauthorized(..)) | Ok(ZomeCallResponse::NetworkError(_)) | Err(_) => {
+            // verifiable_credential zome not available - fail closed
+            Err(wasm_error!(WasmErrorInner::Guest(
+                "Credential verification unavailable: verifiable_credential zome not accessible. \
+                 Cannot accept unverified credentials.".into()
+            )))
+        }
+        _ => {
+            Err(wasm_error!(WasmErrorInner::Guest(
+                "Unexpected response from verifiable_credential zome".into()
+            )))
+        }
+    }
 }
 
 /// Verify Social Recovery proof with guardian signatures
@@ -1104,11 +1157,12 @@ fn verify_social_recovery(
                 }
             }
         } else {
-            // Without challenge, we can't cryptographically verify
-            // but we still count signatures with valid structure
-            if !attestation.signature.is_empty() && !attestation.guardian_did.is_empty() {
-                valid_count += 1;
-            }
+            // Without a challenge, signatures cannot be cryptographically verified.
+            // Accepting unchallenged signatures enables replay attacks.
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Challenge required for social recovery verification. \
+                 Cannot verify guardian signatures without a challenge to prevent replay attacks.".into()
+            )));
         }
     }
 
