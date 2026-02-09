@@ -154,6 +154,7 @@ pub use symthaea_core::phi_engine::{
 pub use symthaea_core::observability::{
     SharedObserver, Observer, NoOpObserver, no_op_observer,
     PhiComponents, PhiMeasurementEvent,
+    MetricsCollector, MetricsSnapshot, DataPoint, metrics_collector,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -214,6 +215,10 @@ pub use symthaea_core::hdc::consciousness_complete_being as core_complete_being;
 pub use symthaea_core::hdc::consciousness_cross_integration as core_cross_integration;
 pub use symthaea_core::hdc::consciousness_feedback_dynamics as core_feedback_dynamics;
 pub use symthaea_core::hdc::integrated_information;
+pub use symthaea_core::hdc::consciousness_perf;
+pub use symthaea_core::hdc::consciousness_verifier;
+pub use symthaea_core::hdc::semantic_bridge;
+pub use symthaea_core::hdc::phi_feedback;
 pub use symthaea_core::hdc::hdc_ltc_unified as core_hdc_ltc_unified;
 
 // Re-export unified HDC-LTC types (revolutionary closed-form dynamics)

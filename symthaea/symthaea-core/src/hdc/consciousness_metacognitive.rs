@@ -99,6 +99,60 @@ impl ConsciousnessSubsystem for MetacognitiveSubsystem {
     }
 }
 
+// =============================================================================
+// ENGINE-BACKED VARIANT: Wraps the real MetaConsciousness engine
+// =============================================================================
+
+use super::meta_consciousness::{MetaConsciousness, MetaConfig, MetaConsciousnessState};
+
+/// Engine-backed meta-consciousness subsystem.
+///
+/// Wraps the full `MetaConsciousness` engine (Φ-of-Φ, strange loops)
+/// in the `ConsciousnessSubsystem` trait for pluggable registration.
+pub struct MetaConsciousnessWrapped {
+    engine: MetaConsciousness,
+    latest_state: Option<MetaConsciousnessState>,
+}
+
+impl MetaConsciousnessWrapped {
+    /// Create with default config and the given number of components.
+    pub fn new(num_components: usize) -> Self {
+        Self {
+            engine: MetaConsciousness::new(num_components, MetaConfig::default()),
+            latest_state: None,
+        }
+    }
+
+    /// Create with custom config.
+    pub fn with_config(num_components: usize, config: MetaConfig) -> Self {
+        Self {
+            engine: MetaConsciousness::new(num_components, config),
+            latest_state: None,
+        }
+    }
+
+    /// Get the latest meta-consciousness state (after at least one cycle).
+    pub fn latest_state(&self) -> Option<&MetaConsciousnessState> {
+        self.latest_state.as_ref()
+    }
+}
+
+impl ConsciousnessSubsystem for MetaConsciousnessWrapped {
+    fn name(&self) -> &str {
+        "meta_consciousness"
+    }
+
+    fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV]) {
+        let meta_state = self.engine.meta_reflect(inputs);
+        state.metacognitive_confidence = meta_state.metacognitive_confidence;
+        self.latest_state = Some(meta_state);
+    }
+
+    fn is_enabled(&self) -> bool {
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

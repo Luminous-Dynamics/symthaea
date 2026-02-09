@@ -12,7 +12,7 @@
 //! 5. **Emergent Self-Model** - Recursive higher-order thought
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use super::binary_hv::BinaryHV;
 use super::integrated_information::IntegratedInformation;
@@ -652,8 +652,10 @@ pub struct ConsciousnessPipeline {
     pub config: IntegrationConfig,
     /// Current state
     pub state: ConsciousnessState,
-    /// Processing history
-    history: Vec<ConsciousnessState>,
+    /// Processing history (bounded ring buffer, keeps last `max_history_size` states)
+    history: VecDeque<ConsciousnessState>,
+    /// Maximum history entries to retain
+    max_history_size: usize,
     /// Embodiment level
     embodiment_level: f64,
     /// Current processing cycle (for temporal tracking)
@@ -835,7 +837,8 @@ impl ConsciousnessPipeline {
         let pipeline = Self {
             config,
             state: ConsciousnessState::default(),
-            history: Vec::new(),
+            history: VecDeque::with_capacity(128),
+            max_history_size: 128,
             embodiment_level: 0.5,
             current_cycle: 0,
             temporal_memory: Vec::new(),
@@ -1883,6 +1886,14 @@ impl ConsciousnessPipeline {
         self.subsystems.len()
     }
 
+    /// Check if a subsystem with the given name is registered.
+    ///
+    /// When a subsystem is registered, the inline version in `process()` is skipped
+    /// in favor of the subsystem's `process_cycle()` implementation.
+    pub fn has_subsystem_named(&self, name: &str) -> bool {
+        self.subsystems.iter().any(|s| s.name() == name)
+    }
+
     /// Process Φ feedback: feed current Φ into controller, apply modulation
     fn process_phi_feedback(&mut self) {
         if let Some(ref mut controller) = self.phi_feedback {
@@ -2496,12 +2507,14 @@ impl ConsciousnessPipeline {
         // === ADVANCED CONSCIOUSNESS SYSTEMS ===
 
         // Meta-consciousness: Φ of Φ, strange loops
-        if self.meta_consciousness_enabled {
+        // (skipped if a "meta_consciousness" subsystem is registered)
+        if self.meta_consciousness_enabled && !self.has_subsystem_named("meta_consciousness") {
             self.process_meta_consciousness(&input);
         }
 
         // Temporal consciousness: Multi-scale time processing
-        if self.temporal_consciousness_enabled {
+        // (skipped if a "temporal_consciousness" subsystem is registered)
+        if self.temporal_consciousness_enabled && !self.has_subsystem_named("temporal_consciousness") {
             self.process_temporal_consciousness(&input);
         }
 
@@ -2511,7 +2524,8 @@ impl ConsciousnessPipeline {
         }
 
         // Phase transitions: Consciousness state detection
-        if self.phase_transitions_enabled {
+        // (skipped if a "phase_transitions" subsystem is registered)
+        if self.phase_transitions_enabled && !self.has_subsystem_named("phase_transitions") {
             self.process_phase_transitions();
         }
 
@@ -2568,8 +2582,11 @@ impl ConsciousnessPipeline {
             }
         }
 
-        // Store in history
-        self.history.push(self.state.clone());
+        // Store in history (bounded ring buffer)
+        if self.history.len() >= self.max_history_size {
+            self.history.pop_front();
+        }
+        self.history.push_back(self.state.clone());
 
         &self.state
     }
@@ -2766,7 +2783,10 @@ impl ConsciousnessPipeline {
             self.state.temporal_coherence * 0.3 +
             (1.0 - self.state.free_energy) * 0.2;
 
-        self.history.push(self.state.clone());
+        if self.history.len() >= self.max_history_size {
+            self.history.pop_front();
+        }
+        self.history.push_back(self.state.clone());
     }
 
     /// Set altered state
@@ -2932,6 +2952,14 @@ impl ConsciousnessPipeline {
     pub fn clear(&mut self) {
         self.state = ConsciousnessState::default();
         self.history.clear();
+    }
+
+    /// Set maximum history size (ring buffer capacity).
+    pub fn set_max_history(&mut self, max_size: usize) {
+        self.max_history_size = max_size.max(4);
+        while self.history.len() > self.max_history_size {
+            self.history.pop_front();
+        }
     }
 }
 
@@ -4507,5 +4535,47 @@ mod tests {
         // The pipeline should have processed without error
         let state = pipeline.get_state();
         assert!(state.phi >= 0.0);
+    }
+
+    #[test]
+    fn test_subsystem_replaces_inline_processing() {
+        // Register a "meta_consciousness" subsystem → inline process_meta_consciousness is skipped
+        use crate::hdc::consciousness_metacognitive::MetaConsciousnessWrapped;
+
+        let mut pipeline = ConsciousnessPipeline::default();
+        pipeline.set_embodiment(0.8);
+        pipeline.enable_meta_consciousness(4);
+
+        // Register the wrapped variant (should override inline)
+        pipeline.register_subsystem(Box::new(MetaConsciousnessWrapped::new(4)));
+        assert!(pipeline.has_subsystem_named("meta_consciousness"));
+
+        // Process — should not panic and should use the subsystem
+        for i in 0..5 {
+            let inputs = vec![BinaryHV::random(950 + i as u64), BinaryHV::random(960 + i as u64)];
+            let priorities = vec![0.8, 0.75];
+            pipeline.process(inputs, &priorities);
+        }
+
+        let state = pipeline.get_state();
+        assert!(state.phi >= 0.0 && state.phi <= 1.0);
+        assert!(state.metacognitive_confidence >= 0.0);
+    }
+
+    #[test]
+    fn test_ring_buffer_history_cap() {
+        let mut pipeline = ConsciousnessPipeline::default();
+        pipeline.set_embodiment(0.8);
+        pipeline.set_max_history(10);
+
+        // Run 20 cycles
+        for i in 0..20 {
+            let inputs = vec![BinaryHV::random(1000 + i as u64)];
+            let priorities = vec![0.8];
+            pipeline.process(inputs, &priorities);
+        }
+
+        // History should be capped at 10
+        assert!(pipeline.history.len() <= 10, "History should be bounded, got {}", pipeline.history.len());
     }
 }

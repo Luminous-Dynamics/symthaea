@@ -98,6 +98,81 @@ impl ConsciousnessSubsystem for PhiOptimizationSubsystem {
     }
 }
 
+// =============================================================================
+// ENGINE-BACKED VARIANT: Wraps the real PhaseTransitions engine
+// =============================================================================
+
+use super::consciousness_phase_transitions::{
+    ConsciousnessPhaseTransitions, PhaseTransitionConfig,
+    ConsciousnessPhase, PhaseTransitionAssessment,
+};
+
+/// Engine-backed phase transition subsystem.
+///
+/// Wraps the full `ConsciousnessPhaseTransitions` engine (critical state detection)
+/// in the `ConsciousnessSubsystem` trait for pluggable registration.
+pub struct PhaseTransitionWrapped {
+    engine: ConsciousnessPhaseTransitions,
+    current_phase: ConsciousnessPhase,
+    latest_assessment: Option<PhaseTransitionAssessment>,
+}
+
+impl PhaseTransitionWrapped {
+    /// Create with default config.
+    pub fn new() -> Self {
+        Self {
+            engine: ConsciousnessPhaseTransitions::new(PhaseTransitionConfig::default()),
+            current_phase: ConsciousnessPhase::Critical,
+            latest_assessment: None,
+        }
+    }
+
+    /// Create with custom config.
+    pub fn with_config(config: PhaseTransitionConfig) -> Self {
+        Self {
+            engine: ConsciousnessPhaseTransitions::new(config),
+            current_phase: ConsciousnessPhase::Critical,
+            latest_assessment: None,
+        }
+    }
+
+    /// Get the current phase.
+    pub fn current_phase(&self) -> ConsciousnessPhase {
+        self.current_phase
+    }
+
+    /// Get the latest phase assessment.
+    pub fn latest_assessment(&self) -> Option<&PhaseTransitionAssessment> {
+        self.latest_assessment.as_ref()
+    }
+}
+
+impl Default for PhaseTransitionWrapped {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ConsciousnessSubsystem for PhaseTransitionWrapped {
+    fn name(&self) -> &str {
+        "phase_transitions"
+    }
+
+    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV]) {
+        let workspace_hvs: Vec<super::binary_hv::BinaryHV> = state.conscious_contents.iter()
+            .map(|item| item.content)
+            .collect();
+        self.engine.observe(state.phi, workspace_hvs);
+        let assessment = self.engine.assess();
+        self.current_phase = assessment.current_phase;
+        self.latest_assessment = Some(assessment);
+    }
+
+    fn is_enabled(&self) -> bool {
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

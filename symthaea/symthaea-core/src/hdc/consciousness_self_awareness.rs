@@ -81,6 +81,68 @@ impl ConsciousnessSubsystem for SelfAwarenessSubsystem {
     }
 }
 
+// =============================================================================
+// ENGINE-BACKED VARIANT: Wraps the real TemporalConsciousness engine
+// =============================================================================
+
+use super::temporal_consciousness::{
+    TemporalConsciousness, TemporalConfig as TemporalConsciousnessConfig, TemporalAssessment,
+};
+
+/// Engine-backed temporal consciousness subsystem.
+///
+/// Wraps the full `TemporalConsciousness` engine (multi-scale time processing)
+/// in the `ConsciousnessSubsystem` trait for pluggable registration.
+pub struct TemporalConsciousnessWrapped {
+    engine: TemporalConsciousness,
+    cycle_count: u64,
+    latest_assessment: Option<TemporalAssessment>,
+}
+
+impl TemporalConsciousnessWrapped {
+    /// Create with default config.
+    pub fn new(num_components: usize) -> Self {
+        Self {
+            engine: TemporalConsciousness::new(num_components, TemporalConsciousnessConfig::default()),
+            cycle_count: 0,
+            latest_assessment: None,
+        }
+    }
+
+    /// Create with custom config.
+    pub fn with_config(num_components: usize, config: TemporalConsciousnessConfig) -> Self {
+        Self {
+            engine: TemporalConsciousness::new(num_components, config),
+            cycle_count: 0,
+            latest_assessment: None,
+        }
+    }
+
+    /// Get the latest temporal assessment.
+    pub fn latest_assessment(&self) -> Option<&TemporalAssessment> {
+        self.latest_assessment.as_ref()
+    }
+}
+
+impl ConsciousnessSubsystem for TemporalConsciousnessWrapped {
+    fn name(&self) -> &str {
+        "temporal_consciousness"
+    }
+
+    fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV]) {
+        self.cycle_count += 1;
+        let current_time = self.cycle_count as f64;
+        self.engine.add_snapshot(current_time, inputs.to_vec());
+        let assessment = self.engine.assess();
+        state.temporal_coherence = assessment.phi_temporal;
+        self.latest_assessment = Some(assessment);
+    }
+
+    fn is_enabled(&self) -> bool {
+        true
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
