@@ -106,6 +106,8 @@ class FLRound:
     status: str  # 'collecting', 'aggregating', 'completed'
     start_time: float
     end_time: Optional[float] = None
+    aggregated_result: Optional[AggregatedGradient] = None
+    excluded_ids: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -401,30 +403,72 @@ class FLCoordinator:
         self._current_round.status = "aggregating"
 
         # Pre-filter Byzantine updates using norm-based z-score detection
-        updates = detect_and_filter_byzantine(
+        filtered = detect_and_filter_byzantine(
             self._current_round.updates,
             self.config.byzantine_tolerance,
         )
+        excluded_count = len(self._current_round.updates) - len(filtered)
+
+        if len(filtered) < self.config.min_participants:
+            self._current_round.status = "collecting"
+            return False
+
+        # Track which participant IDs survived filtering
+        filtered_ids = {u.participant_id for u in filtered}
+        self._current_round.excluded_ids = [
+            u.participant_id
+            for u in self._current_round.updates
+            if u.participant_id not in filtered_ids
+        ]
 
         # Perform aggregation on filtered updates
         method = self.config.aggregation_method
         if method == AggregationMethod.FEDAVG:
-            fed_avg(updates)
+            gradients = fed_avg(filtered)
+            result = AggregatedGradient(
+                gradients=gradients,
+                participant_count=len(filtered),
+                excluded_count=excluded_count,
+                aggregation_method=method,
+            )
         elif method == AggregationMethod.TRIMMED_MEAN:
-            trimmed_mean(updates, 0.1)
+            trim_pct = max(0.1, self.config.byzantine_tolerance)
+            gradients = trimmed_mean(filtered, trim_pct)
+            result = AggregatedGradient(
+                gradients=gradients,
+                participant_count=len(filtered),
+                excluded_count=excluded_count,
+                aggregation_method=method,
+            )
         elif method == AggregationMethod.MEDIAN:
-            coordinate_median(updates)
+            gradients = coordinate_median(filtered)
+            result = AggregatedGradient(
+                gradients=gradients,
+                participant_count=len(filtered),
+                excluded_count=excluded_count,
+                aggregation_method=method,
+            )
         elif method == AggregationMethod.KRUM:
-            krum(updates)
+            gradients = krum(filtered)
+            result = AggregatedGradient(
+                gradients=gradients,
+                participant_count=len(filtered),
+                excluded_count=excluded_count,
+                aggregation_method=method,
+            )
         else:  # TRUST_WEIGHTED
-            trust_weighted_aggregation(
-                updates,
+            result = trust_weighted_aggregation(
+                filtered,
                 self._participants,
                 self.config.trust_threshold,
             )
+            result.excluded_count += excluded_count
 
-        # Update reputations
-        self._update_reputations()
+        # Store the aggregated result
+        self._current_round.aggregated_result = result
+
+        # Update reputations (only for participants included in aggregation)
+        self._update_reputations(filtered_ids)
 
         self._current_round.status = "completed"
         self._current_round.end_time = time.time()
@@ -455,12 +499,19 @@ class FLCoordinator:
         mag_quality = 1.0 / (1.0 + np.log1p(grad_mag))
         return (loss_quality + mag_quality) / 2
 
-    def _update_reputations(self) -> None:
-        """Update participant reputations after round."""
+    def _update_reputations(self, included_ids: set[str]) -> None:
+        """Update participant reputations after round.
+
+        Only participants whose gradients were included in aggregation
+        receive positive reputation updates. Excluded (Byzantine) participants
+        are not penalized here — that's handled by the MATL decay system.
+        """
         if not self._current_round:
             return
 
         for update in self._current_round.updates:
+            if update.participant_id not in included_ids:
+                continue
             participant = self._participants.get(update.participant_id)
             if participant:
                 participant.reputation = matl.record_positive(participant.reputation)
@@ -527,6 +578,11 @@ def detect_and_filter_byzantine(
 
     if not flagged:
         return updates
+
+    # Sort flagged indices by severity (highest norm deviation first)
+    norms = np.array([np.linalg.norm(u.gradients) for u in updates])
+    mean_norm = np.mean(norms)
+    flagged.sort(key=lambda i: abs(norms[i] - mean_norm), reverse=True)
 
     # Don't exclude more than byzantine_tolerance fraction
     max_exclude = int(len(updates) * byzantine_tolerance)

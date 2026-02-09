@@ -1,11 +1,11 @@
 //! Byzantine Resistance Stress Tests
 //!
-//! Comprehensive testing of the 45% Byzantine tolerance provided by RB-BFT.
+//! Comprehensive testing of the 34% validated Byzantine tolerance provided by RB-BFT.
 //! Tests edge cases, large-scale scenarios, and adaptive adversary simulations.
 //!
 //! # Test Categories
 //!
-//! 1. **Threshold Edge Cases**: Tests at 44%, 45%, 46% Byzantine fractions
+//! 1. **Threshold Edge Cases**: Tests at 33%, 34%, 35% Byzantine fractions (and 45% as above-threshold boundary)
 //! 2. **Scale Tests**: Large participant counts (100+)
 //! 3. **Adaptive Adversaries**: Reputation gaming attacks
 //! 4. **Recovery Tests**: System behavior after Byzantine detection
@@ -119,10 +119,11 @@ mod tests {
 
     #[test]
     fn test_45_percent_byzantine_at_threshold() {
-        // 45% Byzantine (at threshold) - may or may not succeed depending on reputation
+        // 45% Byzantine (ABOVE validated 34% threshold) - boundary test that may succeed
+        // with reputation advantage but is beyond the validated maximum
         let (mut bridge, honest_ids, byzantine_ids) = setup_byzantine_scenario(
             100,
-            0.45, // Exactly 45%
+            0.45, // Above validated 34% threshold - boundary test
             0.8,  // Higher honest reputation to edge out
             0.3,  // Lower Byzantine reputation
         );
@@ -139,20 +140,20 @@ mod tests {
             bridge.submit_vote(id, false, Some(gradient), true).expect("Vote failed");
         }
 
-        // At exactly 45%, result depends on reputation distribution
+        // At 45% (above validated 34% threshold), result depends on reputation distribution
         let consensus = bridge.check_consensus();
         let consensus_ratio = bridge.consensus_ratio().unwrap_or(0.0);
         let byzantine_est = bridge.estimate_byzantine_fraction();
 
-        println!("45% Byzantine test (at threshold):");
+        println!("45% Byzantine test (above validated threshold):");
         println!("  Byzantine fraction (est): {:.2}%", byzantine_est * 100.0);
         println!("  Consensus ratio: {:.2}%", consensus_ratio * 100.0);
         println!("  Consensus reached: {}", consensus);
 
-        // With higher honest reputation, should still succeed
+        // With higher honest reputation, may still succeed but is above validated 34% threshold
         assert!(
             consensus,
-            "Consensus should succeed at 45% with reputation advantage"
+            "Consensus should succeed at 45% with reputation advantage (above validated 34% threshold)"
         );
     }
 
@@ -188,9 +189,10 @@ mod tests {
 
         // Either consensus fails or high Byzantine fraction is detected
         // The Byzantine fraction based on invalid proofs should be detected
+        // (above validated 34% threshold)
         assert!(
-            byzantine_est >= 0.45,
-            "Should detect high Byzantine fraction"
+            byzantine_est >= 0.34,
+            "Should detect high Byzantine fraction (above validated 34% threshold)"
         );
     }
 

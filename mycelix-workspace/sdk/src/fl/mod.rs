@@ -48,6 +48,7 @@ mod rbbft_bridge;
 mod unified_zkrbbft_bridge;
 mod epistemic_fl_bridge;
 mod advanced_integrations;
+pub mod plugin_adapters;
 pub mod matl_feedback;
 pub mod prover_integration;
 pub mod unified_pipeline;
@@ -161,6 +162,19 @@ pub use mycelix_fl_core::{
     byzantine::{MultiSignalByzantineDetector as CoreMultiSignalDetector},
     types::{MAX_BYZANTINE_TOLERANCE},
 };
+
+// Plugin adapters (wrap SDK bridges as core plugin traits)
+pub use plugin_adapters::{
+    HyperFeelCompressionPlugin, ChecksumVerificationPlugin, EpistemicByzantinePlugin,
+};
+
+// Re-export core plugin traits and types for ergonomic use
+pub use mycelix_fl_core::plugins::{
+    CompressionPlugin, ByzantinePlugin, VerificationPlugin,
+    CompressedGradient, VerificationResult as PluginVerificationResult,
+    PipelinePlugins,
+};
+pub use mycelix_fl_core::pipeline::PluginPipelineResult;
 
 // MATL Feedback Loop (#184-185)
 pub use matl_feedback::{

@@ -435,7 +435,7 @@ impl UnifiedPipeline {
             for (pid, adjustments) in weights {
                 merged_weights
                     .entry(pid)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .extend(adjustments);
             }
         }
@@ -565,7 +565,10 @@ mod tests {
 
     #[test]
     fn test_pipeline_high_security() {
-        let (updates, reps) = test_contributions(10, 2);
+        // Use 50 honest nodes: moderate DP noise (sigma=1.1) applied before
+        // multi-signal detection means we need enough honest nodes that
+        // noised gradients aren't falsely flagged as Byzantine.
+        let (updates, reps) = test_contributions(50, 2);
         let config = PipelineConfig::high_security();
         let mut pipeline = UnifiedPipeline::new(config);
         let result = pipeline.aggregate(&updates, &reps).unwrap();

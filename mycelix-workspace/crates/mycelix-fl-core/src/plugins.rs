@@ -21,7 +21,7 @@
 
 use std::collections::HashMap;
 
-use crate::pipeline::{ExternalWeightMap, ParticipantWeightAdjustment};
+use crate::pipeline::ExternalWeightMap;
 use crate::types::GradientUpdate;
 
 /// Plugin for gradient compression (e.g., HyperFeel HDC encoding).
@@ -204,6 +204,7 @@ impl<'a> PipelinePlugins<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pipeline::ParticipantWeightAdjustment;
 
     // A simple test plugin that flags participants with "bad" in their ID
     struct TestByzantinePlugin;

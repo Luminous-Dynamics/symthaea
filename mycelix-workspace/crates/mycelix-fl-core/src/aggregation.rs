@@ -148,7 +148,7 @@ pub fn coordinate_median(updates: &[GradientUpdate]) -> Result<Vec<f32>, Aggrega
     let mut result = vec![0.0f32; gradient_size];
     let mut values: Vec<f32> = Vec::with_capacity(updates.len());
     let mid = updates.len() / 2;
-    let is_even = updates.len() % 2 == 0;
+    let is_even = updates.len().is_multiple_of(2);
 
     for (i, res) in result.iter_mut().enumerate() {
         values.clear();

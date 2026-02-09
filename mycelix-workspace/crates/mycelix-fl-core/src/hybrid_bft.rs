@@ -99,7 +99,7 @@ pub fn hybrid_trimmed_mean(
         let sample_dims = if config.sample_dims > 0 && config.sample_dims < dim {
             config.sample_dims
         } else {
-            (dim / 10).max(1).min(100)
+            (dim / 10).clamp(1, 100)
         };
         let step = (dim / sample_dims).max(1);
         let sampled: Vec<usize> = (0..dim).step_by(step).collect();

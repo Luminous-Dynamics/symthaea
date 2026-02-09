@@ -331,7 +331,7 @@ pub struct FLConfig {
     pub max_participants: usize,
     /// Round timeout in milliseconds
     pub round_timeout_ms: u64,
-    /// Byzantine tolerance (0.0-0.45)
+    /// Byzantine tolerance (0.0-0.34, validated maximum)
     pub byzantine_tolerance: f64,
     /// Aggregation method to use
     pub aggregation_method: AggregationMethod,
@@ -348,8 +348,8 @@ impl FLConfig {
         if self.max_participants < self.min_participants {
             return Err("max_participants cannot be less than min_participants");
         }
-        if self.byzantine_tolerance < 0.0 || self.byzantine_tolerance > 0.45 {
-            return Err("byzantine_tolerance must be between 0.0 and 0.45");
+        if self.byzantine_tolerance < 0.0 || self.byzantine_tolerance > 0.34 {
+            return Err("byzantine_tolerance must be between 0.0 and 0.34");
         }
         if self.trust_threshold < 0.0 || self.trust_threshold > 1.0 {
             return Err("trust_threshold must be between 0.0 and 1.0");

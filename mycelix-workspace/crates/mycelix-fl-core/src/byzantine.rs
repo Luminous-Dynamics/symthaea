@@ -276,14 +276,14 @@ impl MultiSignalByzantineDetector {
         // Robust statistics (median-based)
         let mut sorted_norms = norms.clone();
         sorted_norms.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let median_norm = if n % 2 == 0 {
+        let median_norm = if n.is_multiple_of(2) {
             (sorted_norms[n / 2 - 1] + sorted_norms[n / 2]) / 2.0
         } else {
             sorted_norms[n / 2]
         };
         let mut deviations: Vec<f32> = norms.iter().map(|&n| (n - median_norm).abs()).collect();
         deviations.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let mad = if n % 2 == 0 {
+        let mad = if n.is_multiple_of(2) {
             (deviations[n / 2 - 1] + deviations[n / 2]) / 2.0
         } else {
             deviations[n / 2]

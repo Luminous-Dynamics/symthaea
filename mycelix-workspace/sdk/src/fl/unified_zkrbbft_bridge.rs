@@ -1,7 +1,7 @@
 //! Unified ZK + RB-BFT Bridge for Federated Learning
 //!
 //! Combines zero-knowledge proofs with Reputation-Based Byzantine Fault Tolerance
-//! to achieve cryptographically verified gradients with 45% Byzantine tolerance.
+//! to achieve cryptographically verified gradients with 34% validated Byzantine tolerance.
 //!
 //! # Architecture
 //!
@@ -13,7 +13,7 @@
 //! │  Phase 1: Submission            Phase 2: Consensus           Phase 3: Aggregate│
 //! │  ┌────────────────┐             ┌────────────────┐           ┌────────────────┐│
 //! │  │ Gradient       │             │ Reputation²    │           │ Weighted Avg   ││
-//! │  │ + ZK Proof     │ ─────────▶  │ Voting         │ ────────▶ │ (45% Tolerant) ││
+//! │  │ + ZK Proof     │ ─────────▶  │ Voting         │ ────────▶ │ (34% Validated)││
 //! │  │ + K-Vector     │             │ (67% Quorum)   │           │ + ZK Commit    ││
 //! │  └────────────────┘             └────────────────┘           └────────────────┘│
 //! │         │                              │                            │          │
@@ -29,7 +29,7 @@
 //! # Security Properties
 //!
 //! - **Cryptographic Quality**: Gradients verified inside zkVM before acceptance
-//! - **45% Byzantine Tolerance**: Reputation² weighting allows tolerating up to 45% malicious
+//! - **34% Validated Byzantine Tolerance**: Reputation² weighting with validated maximum of 34%
 //! - **Privacy-Preserving**: Gradient values never leave the prover
 //! - **Accountability**: All actions tied to K-Vector trust profiles
 //!
@@ -142,7 +142,7 @@ pub struct UnifiedZkRbbftConfig {
     pub min_reputation: f32,
     /// Minimum participants for consensus (default 3)
     pub min_participants: usize,
-    /// Byzantine tolerance threshold (default 0.45)
+    /// Byzantine tolerance threshold (default 0.34, validated maximum)
     pub byzantine_threshold: f32,
     /// Quorum threshold for consensus (default 0.667)
     pub quorum_threshold: f32,

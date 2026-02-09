@@ -704,11 +704,11 @@ export class FLCoordinator {
         break;
 
       case AggregationMethod.TrimmedMean:
-        // Use a fixed trim percentage (not byzantineTolerance) for the
-        // trimmed mean algorithm. byzantineTolerance is enforced above
-        // via pre-filtering.
+        // Use byzantineTolerance as minimum trim floor for defense-in-depth:
+        // pre-filtering removes detected Byzantine nodes, trimming handles
+        // undetected adversaries that passed the z-score filter.
         aggregatedResult = {
-          gradients: trimmedMean(filtered, 0.1),
+          gradients: trimmedMean(filtered, Math.max(0.1, this.config.byzantineTolerance)),
           modelVersion: this.roundHistory.length + 1,
           participantCount: filtered.length,
           excludedCount,

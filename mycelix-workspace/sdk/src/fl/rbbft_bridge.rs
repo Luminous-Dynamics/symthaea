@@ -1,7 +1,7 @@
 //! RB-BFT Bridge for Federated Learning
 //!
 //! Integrates Reputation-Based Byzantine Fault Tolerance consensus with
-//! federated learning for 45% Byzantine tolerance through K-Vector reputation.
+//! federated learning for 34% validated Byzantine tolerance through K-Vector reputation.
 //!
 //! # Architecture
 //!
@@ -19,7 +19,7 @@
 //! │         ▼                                  ▼                          │
 //! │  ┌────────────────┐                 ┌────────────────┐                │
 //! │  │ K-Vector       │──────────────▶  │ Weighted Avg   │                │
-//! │  │ (Trust)        │                 │ (45% Tolerance)│                │
+//! │  │ (Trust)        │                 │ (34% Validated)│                │
 //! │  └────────────────┘                 └────────────────┘                │
 //! │                                            │                          │
 //! │                                            ▼                          │
@@ -30,7 +30,7 @@
 //! # Key Features
 //!
 //! - **Reputation² Weighting**: High-reputation participants have quadratically more influence
-//! - **45% Byzantine Tolerance**: Revolutionary improvement over classical 33%
+//! - **34% Validated Byzantine Tolerance**: Improvement over classical 33% with reputation weighting
 //! - **K-Vector Integration**: Trust scores from MATL drive aggregation weights
 //! - **Consensus Voting**: Participants vote on whether to accept/reject round
 //!
@@ -107,7 +107,7 @@ pub struct RbbftFLConfig {
     pub min_reputation: f32,
     /// Minimum participants for consensus (default 3)
     pub min_participants: usize,
-    /// Byzantine tolerance threshold (default 0.45)
+    /// Byzantine tolerance threshold (default 0.34, validated maximum)
     pub byzantine_threshold: f32,
     /// Quorum threshold for consensus (default 0.667)
     pub quorum_threshold: f32,

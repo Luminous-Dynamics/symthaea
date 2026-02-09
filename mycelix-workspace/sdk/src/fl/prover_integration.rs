@@ -595,7 +595,7 @@ pub struct ProductionFLConfig {
     pub min_reputation: f32,
     /// Minimum participants per round
     pub min_participants: usize,
-    /// Byzantine tolerance threshold (max 0.45 for RB-BFT)
+    /// Byzantine tolerance threshold (max 0.34 validated for RB-BFT)
     pub byzantine_threshold: f32,
     /// Quorum threshold (typically 0.667)
     pub quorum_threshold: f32,
@@ -610,7 +610,7 @@ impl Default for ProductionFLConfig {
             prover: ProverBackend::default(),
             min_reputation: 0.5,
             min_participants: 5,
-            byzantine_threshold: 0.45,
+            byzantine_threshold: 0.34,
             quorum_threshold: 0.667,
             gradient_constraints: constraints.into(),
         }
