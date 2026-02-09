@@ -153,6 +153,50 @@ fn bench_jarzynski_10k(c: &mut Criterion) {
     });
 }
 
+// =========================================================================
+// Round 8 benchmarks: Particle physics hot paths
+// =========================================================================
+
+fn bench_standard_model_construction(c: &mut Criterion) {
+    use symthaea_core::physics::StandardModel;
+    let genesis = GenesisSeed::from_phrase("bench standard model");
+
+    c.bench_function("standard_model_construction", |b| {
+        b.iter(|| {
+            let model = StandardModel::from_genesis(black_box(&genesis));
+            black_box(model)
+        });
+    });
+}
+
+fn bench_hadron_composition(c: &mut Criterion) {
+    use symthaea_core::physics::{StandardModel, Hadrons};
+    let genesis = GenesisSeed::from_phrase("bench hadrons");
+    let model = StandardModel::from_genesis(&genesis);
+
+    c.bench_function("hadron_composition", |b| {
+        b.iter(|| {
+            let hadrons = Hadrons::from_model(black_box(&model), black_box(&genesis));
+            black_box(hadrons)
+        });
+    });
+}
+
+fn bench_antimatter_annihilation(c: &mut Criterion) {
+    use symthaea_core::physics::{StandardModel, Hadrons, Antimatter};
+    let genesis = GenesisSeed::from_phrase("bench antimatter");
+    let model = StandardModel::from_genesis(&genesis);
+    let hadrons = Hadrons::from_model(&model, &genesis);
+    let antimatter = Antimatter::from_model(&model, &hadrons, &genesis);
+
+    c.bench_function("antimatter_annihilation", |b| {
+        b.iter(|| {
+            let event = antimatter.electron_positron_annihilation(black_box(&model));
+            black_box(event)
+        });
+    });
+}
+
 criterion_group!(
     benches,
     bench_lindblad_single_rk4_step,
@@ -163,5 +207,8 @@ criterion_group!(
     bench_true_phi_entropy,
     bench_tensor_determinant,
     bench_jarzynski_10k,
+    bench_standard_model_construction,
+    bench_hadron_composition,
+    bench_antimatter_annihilation,
 );
 criterion_main!(benches);
