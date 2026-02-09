@@ -28,7 +28,7 @@ fn dot_product(a: &[f32], b: &[f32]) -> f32 {
 }
 
 /// Recommended dimension for moral prototypes (higher = better separation).
-pub const MORAL_PROTO_DIM: usize = 8192;
+pub const MORAL_PROTO_DIM: usize = 16384;
 
 /// Moral label for 3-class classification.
 ///
@@ -111,10 +111,29 @@ impl MoralPrototypeClassifier {
         }
     }
 
+    /// Create with sentiment channel enabled.
+    ///
+    /// When `sentiment_weight > 0`, the encoder blends a third channel that
+    /// accumulates positive/negative seed HVs for moral vocabulary words.
+    pub fn with_sentiment(dim: usize, ngram_size: usize, sentiment_weight: f32) -> Self {
+        Self {
+            encoder: TextHdcEncoder::with_sentiment(dim, ngram_size, 0.5, sentiment_weight),
+            prototypes: None,
+        }
+    }
+
     /// Create from pre-trained prototypes (e.g., loaded from disk).
     pub fn from_prototypes(dim: usize, ngram_size: usize, prototypes: TrainedPrototypes) -> Self {
         Self {
             encoder: TextHdcEncoder::new(dim, ngram_size),
+            prototypes: Some(prototypes),
+        }
+    }
+
+    /// Create from pre-trained prototypes with sentiment channel enabled.
+    pub fn from_prototypes_with_sentiment(dim: usize, ngram_size: usize, sentiment_weight: f32, prototypes: TrainedPrototypes) -> Self {
+        Self {
+            encoder: TextHdcEncoder::with_sentiment(dim, ngram_size, 0.5, sentiment_weight),
             prototypes: Some(prototypes),
         }
     }
@@ -297,6 +316,243 @@ impl MoralPrototypeClassifier {
     }
 }
 
+// ============================================================================
+// VirtueMatchClassifier — 2-class pair-encoding classifier for ETHICS Virtue
+// ============================================================================
+
+/// Label for the virtue matching task: does the trait apply to the scenario?
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum VirtueLabel {
+    Applies,
+    NotApplies,
+}
+
+/// A labeled sample for virtue matching: scenario + trait word + label.
+#[derive(Clone)]
+pub struct VirtueSample {
+    pub scenario: String,
+    pub trait_word: String,
+    pub label: VirtueLabel,
+}
+
+/// Serializable trained virtue prototypes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrainedVirtuePrototypes {
+    pub applies: Vec<f32>,
+    pub not_applies: Vec<f32>,
+    pub dim: usize,
+    pub training_counts: [usize; 2],
+}
+
+impl TrainedVirtuePrototypes {
+    /// Save to a JSON file.
+    pub fn save(&self, path: &Path) -> std::io::Result<()> {
+        let json = serde_json::to_string(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        std::fs::write(path, json)
+    }
+
+    /// Load from a JSON file.
+    pub fn load(path: &Path) -> std::io::Result<Self> {
+        let json = std::fs::read_to_string(path)?;
+        serde_json::from_str(&json)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    }
+}
+
+/// Encode a (scenario, trait_word) pair into a single HV using a given encoder.
+///
+/// Free function to avoid borrow checker conflicts in retrain_adaptive.
+fn encode_pair_with_encoder(encoder: &TextHdcEncoder, scenario: &str, trait_word: &str) -> Vec<f32> {
+    let scenario_hv = encoder.encode(scenario);
+    let trait_hv = encoder.encode(trait_word);
+    let dim = scenario_hv.values.len();
+
+    let mut bound = vec![0.0f32; dim];
+    for i in 0..dim {
+        bound[i] = scenario_hv.values[i] * trait_hv.values[i];
+    }
+
+    let norm: f32 = bound.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm > 0.0 {
+        for v in &mut bound {
+            *v /= norm;
+        }
+    }
+    bound
+}
+
+/// 2-class virtue match classifier using HDC pair encoding.
+///
+/// Encodes (scenario, trait_word) pairs by encoding each separately,
+/// element-wise multiplying (binding), and classifying against
+/// Applies / NotApplies prototypes.
+#[derive(Debug, Clone)]
+pub struct VirtueMatchClassifier {
+    encoder: TextHdcEncoder,
+    prototypes: Option<TrainedVirtuePrototypes>,
+}
+
+impl VirtueMatchClassifier {
+    /// Create a new classifier with the given dimension.
+    pub fn new(dim: usize) -> Self {
+        Self {
+            encoder: TextHdcEncoder::with_sentiment(dim, 3, 0.5, 0.15),
+            prototypes: None,
+        }
+    }
+
+    /// Create from pre-trained prototypes.
+    pub fn from_prototypes(prototypes: TrainedVirtuePrototypes) -> Self {
+        let dim = prototypes.dim;
+        Self {
+            encoder: TextHdcEncoder::with_sentiment(dim, 3, 0.5, 0.15),
+            prototypes: Some(prototypes),
+        }
+    }
+
+    /// Whether prototypes have been trained.
+    pub fn is_trained(&self) -> bool {
+        self.prototypes.is_some()
+    }
+
+    /// Encode a (scenario, trait_word) pair into a single HV.
+    ///
+    /// Encodes each text independently, then binds (element-wise multiply)
+    /// and L2-normalizes.
+    fn encode_pair(&self, scenario: &str, trait_word: &str) -> Vec<f32> {
+        encode_pair_with_encoder(&self.encoder, scenario, trait_word)
+    }
+
+    /// Initial training: accumulate per-class pair HVs and normalize.
+    pub fn train(&mut self, samples: &[VirtueSample]) {
+        let dim = self.encoder.dim();
+        let mut applies_acc = vec![0.0f32; dim];
+        let mut not_applies_acc = vec![0.0f32; dim];
+        let mut counts = [0usize; 2];
+
+        for sample in samples {
+            let pair_hv = self.encode_pair(&sample.scenario, &sample.trait_word);
+            let target = match sample.label {
+                VirtueLabel::Applies => {
+                    counts[0] += 1;
+                    &mut applies_acc
+                }
+                VirtueLabel::NotApplies => {
+                    counts[1] += 1;
+                    &mut not_applies_acc
+                }
+            };
+            for (acc, &val) in target.iter_mut().zip(pair_hv.iter()) {
+                *acc += val;
+            }
+        }
+
+        for acc in [&mut applies_acc, &mut not_applies_acc] {
+            let norm: f32 = acc.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in acc.iter_mut() {
+                    *v /= norm;
+                }
+            }
+        }
+
+        self.prototypes = Some(TrainedVirtuePrototypes {
+            applies: applies_acc,
+            not_applies: not_applies_acc,
+            dim,
+            training_counts: counts,
+        });
+    }
+
+    /// Iterative retraining with adaptive LR decay.
+    pub fn retrain_adaptive(&mut self, samples: &[VirtueSample], lr_start: f32, iterations: usize) {
+        let protos = match self.prototypes.as_mut() {
+            Some(p) => p,
+            None => return,
+        };
+
+        let lr_end = lr_start * 0.1;
+
+        for iter in 0..iterations {
+            let progress = if iterations > 1 { iter as f32 / (iterations - 1) as f32 } else { 0.0 };
+            let lr = lr_start + (lr_end - lr_start) * progress;
+            let mut corrections = 0;
+
+            for sample in samples {
+                let pair_hv = encode_pair_with_encoder(&self.encoder, &sample.scenario, &sample.trait_word);
+
+                let sim_applies = dot_product(&pair_hv, &protos.applies);
+                let sim_not = dot_product(&pair_hv, &protos.not_applies);
+
+                let predicted = if sim_applies >= sim_not {
+                    VirtueLabel::Applies
+                } else {
+                    VirtueLabel::NotApplies
+                };
+
+                if predicted != sample.label {
+                    corrections += 1;
+
+                    let correct_proto = match sample.label {
+                        VirtueLabel::Applies => &mut protos.applies,
+                        VirtueLabel::NotApplies => &mut protos.not_applies,
+                    };
+                    for (pv, &ev) in correct_proto.iter_mut().zip(pair_hv.iter()) {
+                        *pv += lr * ev;
+                    }
+
+                    let wrong_proto = match predicted {
+                        VirtueLabel::Applies => &mut protos.applies,
+                        VirtueLabel::NotApplies => &mut protos.not_applies,
+                    };
+                    for (pv, &ev) in wrong_proto.iter_mut().zip(pair_hv.iter()) {
+                        *pv -= lr * ev;
+                    }
+                }
+            }
+
+            if corrections < samples.len() / 200 {
+                break;
+            }
+        }
+
+        for proto in [&mut protos.applies, &mut protos.not_applies] {
+            let norm: f32 = proto.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in proto.iter_mut() {
+                    *v /= norm;
+                }
+            }
+        }
+    }
+
+    /// Classify a (scenario, trait_word) pair.
+    ///
+    /// Returns (label, confidence) where confidence is the similarity gap.
+    pub fn classify(&self, scenario: &str, trait_word: &str) -> (VirtueLabel, f32) {
+        let protos = match &self.prototypes {
+            Some(p) => p,
+            None => return (VirtueLabel::NotApplies, 0.0),
+        };
+
+        let pair_hv = self.encode_pair(scenario, trait_word);
+        let sim_applies = dot_product(&pair_hv, &protos.applies);
+        let sim_not = dot_product(&pair_hv, &protos.not_applies);
+
+        if sim_applies >= sim_not {
+            (VirtueLabel::Applies, sim_applies - sim_not)
+        } else {
+            (VirtueLabel::NotApplies, sim_not - sim_applies)
+        }
+    }
+
+    /// Get a reference to the trained prototypes (for saving).
+    pub fn prototypes(&self) -> Option<&TrainedVirtuePrototypes> {
+        self.prototypes.as_ref()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -426,5 +682,42 @@ mod tests {
         assert_eq!(MoralLabel::Good.to_rot_judgment(), 1);
         assert_eq!(MoralLabel::Neutral.to_rot_judgment(), 0);
         assert_eq!(MoralLabel::Bad.to_rot_judgment(), -1);
+    }
+
+    #[test]
+    fn test_virtue_pair_encoding() {
+        let samples = vec![
+            VirtueSample {
+                scenario: "She donated her savings to help disaster victims".into(),
+                trait_word: "generous".into(),
+                label: VirtueLabel::Applies,
+            },
+            VirtueSample {
+                scenario: "She donated her savings to help disaster victims".into(),
+                trait_word: "selfish".into(),
+                label: VirtueLabel::NotApplies,
+            },
+            VirtueSample {
+                scenario: "He stole money from the charity fund".into(),
+                trait_word: "dishonest".into(),
+                label: VirtueLabel::Applies,
+            },
+            VirtueSample {
+                scenario: "He stole money from the charity fund".into(),
+                trait_word: "honest".into(),
+                label: VirtueLabel::NotApplies,
+            },
+        ];
+
+        let mut classifier = VirtueMatchClassifier::new(4096);
+        classifier.train(&samples);
+        classifier.retrain_adaptive(&samples, 0.1, 10);
+
+        // Should correctly classify training examples
+        let (label, _) = classifier.classify("She donated her savings to help disaster victims", "generous");
+        assert_eq!(label, VirtueLabel::Applies);
+
+        let (label, _) = classifier.classify("He stole money from the charity fund", "honest");
+        assert_eq!(label, VirtueLabel::NotApplies);
     }
 }

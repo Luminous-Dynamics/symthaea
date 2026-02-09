@@ -12,8 +12,10 @@
 //! fine-grained character patterns and coarse word-level signal.
 
 use symthaea_core::hdc::ContinuousHV;
+use std::collections::HashSet;
 
-/// Dual-channel HDC text encoder combining character trigrams and word-level encoding.
+/// Dual-channel HDC text encoder combining character trigrams and word-level encoding,
+/// with an optional third sentiment channel.
 ///
 /// ## Encoding Pipeline
 ///
@@ -21,7 +23,9 @@ use symthaea_core::hdc::ContinuousHV;
 ///    within the window, multiply to get n-gram HV, accumulate across text.
 /// 2. **Word channel**: Split on whitespace, hash each word to a deterministic HV,
 ///    bind with word-position HV, accumulate across all words.
-/// 3. **Combine**: Weight trigram and word channels, sum, L2-normalize.
+/// 3. **Sentiment channel** (optional): Accumulate POSITIVE_SEED for good words,
+///    NEGATIVE_SEED for bad words. L2-normalize.
+/// 4. **Combine**: Weight channels, sum, L2-normalize.
 #[derive(Debug, Clone)]
 pub struct TextHdcEncoder {
     dim: usize,
@@ -34,6 +38,16 @@ pub struct TextHdcEncoder {
     word_pos_hvs: Vec<ContinuousHV>,
     /// Weight for trigram channel (word channel = 1 - trigram_weight)
     trigram_weight: f32,
+    /// Weight for sentiment channel (0.0 = off, blends into trigram+word)
+    sentiment_weight: f32,
+    /// Seed HV for positive moral sentiment
+    positive_seed: ContinuousHV,
+    /// Seed HV for negative moral sentiment
+    negative_seed: ContinuousHV,
+    /// Good/positive moral words
+    good_words: HashSet<String>,
+    /// Bad/negative moral words
+    bad_words: HashSet<String>,
 }
 
 /// Maximum number of distinct word positions tracked.
@@ -42,15 +56,26 @@ const MAX_WORD_POSITIONS: usize = 64;
 impl TextHdcEncoder {
     /// Create a new text encoder with the given dimension and n-gram size.
     ///
-    /// Uses default channel weights: trigram 0.5, word 0.5.
+    /// Uses default channel weights: trigram 0.5, word 0.5, sentiment off.
     pub fn new(dim: usize, ngram_size: usize) -> Self {
-        Self::with_weights(dim, ngram_size, 0.5)
+        Self::with_sentiment(dim, ngram_size, 0.5, 0.0)
     }
 
-    /// Create with explicit channel weights.
+    /// Create with explicit trigram/word channel weights (sentiment off).
     ///
     /// `trigram_weight` controls the balance: 0.0 = pure word-level, 1.0 = pure trigram.
     pub fn with_weights(dim: usize, ngram_size: usize, trigram_weight: f32) -> Self {
+        Self::with_sentiment(dim, ngram_size, trigram_weight, 0.0)
+    }
+
+    /// Create with explicit trigram, word, and sentiment channel weights.
+    ///
+    /// When `sentiment_weight > 0`, the final encoding blends:
+    ///   `tw*(1-sw) * trigram + ww*(1-sw) * word + sw * sentiment`
+    /// where `tw = trigram_weight`, `ww = 1 - trigram_weight`, `sw = sentiment_weight`.
+    ///
+    /// When `sentiment_weight == 0`, identical to `with_weights()` (fast path, no regression).
+    pub fn with_sentiment(dim: usize, ngram_size: usize, trigram_weight: f32, sentiment_weight: f32) -> Self {
         let char_hvs: Vec<ContinuousHV> = (0..128)
             .map(|c| ContinuousHV::random(dim, 30000 + c as u64))
             .collect();
@@ -63,6 +88,38 @@ impl TextHdcEncoder {
             .map(|p| ContinuousHV::random(dim, 60000 + p as u64))
             .collect();
 
+        let positive_seed = ContinuousHV::random(dim, 70000001);
+        let negative_seed = ContinuousHV::random(dim, 70000017);
+
+        let good_words: HashSet<String> = [
+            "good", "kind", "help", "helps", "helped", "helping", "generous", "honest",
+            "brave", "fair", "love", "caring", "protect", "save", "share", "donate",
+            "forgive", "respect", "trust", "loyal", "gentle", "mercy", "grateful",
+            "compassion", "empathy", "encourage", "support", "nurture", "inspire",
+            "cooperate", "volunteer", "rescue", "praise", "comfort", "heal",
+            "thoughtful", "considerate", "responsible", "patient", "humble",
+            "sincere", "peaceful", "noble", "virtuous", "admirable", "heroic",
+            "selfless", "charitable", "benevolent", "righteous", "worthy",
+            "honorable", "dignified", "gracious", "courteous", "polite",
+            "wonderful", "beautiful", "excellent", "joyful", "happy",
+        ].iter().map(|s| s.to_string()).collect();
+
+        let bad_words: HashSet<String> = [
+            "bad", "cruel", "harm", "harms", "harmed", "harming", "selfish", "dishonest",
+            "coward", "unfair", "hate", "uncaring", "attack", "destroy", "steal", "stole",
+            "betray", "disrespect", "distrust", "disloyal", "harsh", "merciless", "ungrateful",
+            "heartless", "callous", "discourage", "undermine", "neglect", "demean",
+            "cheat", "cheated", "lie", "lied", "lying", "deceive", "manipulate",
+            "murder", "kill", "abuse", "exploit", "bully", "threaten", "blackmail",
+            "corrupt", "greedy", "malicious", "spiteful", "vengeful", "violent",
+            "arrogant", "reckless", "lazy", "irresponsible", "impatient", "vain",
+            "wicked", "evil", "terrible", "horrible", "vicious", "nasty",
+            "wrong", "immoral", "unethical", "unjust", "sinful", "shameful",
+            "rude", "aggressive", "hostile", "toxic", "destructive", "damaging",
+            "hurt", "hurting", "stolen", "stealing", "killed", "killing",
+            "broke", "vandalize", "sabotage", "fraud", "forge", "fake",
+        ].iter().map(|s| s.to_string()).collect();
+
         Self {
             dim,
             ngram_size,
@@ -70,6 +127,11 @@ impl TextHdcEncoder {
             pos_hvs,
             word_pos_hvs,
             trigram_weight,
+            sentiment_weight,
+            positive_seed,
+            negative_seed,
+            good_words,
+            bad_words,
         }
     }
 
@@ -85,17 +147,32 @@ impl TextHdcEncoder {
 
     /// Encode a text string into a normalized HDC vector.
     ///
-    /// Combines character trigram and word-level channels.
+    /// Combines character trigram, word-level, and (optionally) sentiment channels.
     pub fn encode(&self, text: &str) -> ContinuousHV {
         let trigram_hv = self.encode_trigrams(text);
         let word_hv = self.encode_words(text);
 
-        // Weighted combination of both channels
         let tw = self.trigram_weight;
         let ww = 1.0 - tw;
+        let sw = self.sentiment_weight;
+
         let mut combined = vec![0.0f32; self.dim];
-        for i in 0..self.dim {
-            combined[i] = tw * trigram_hv.values[i] + ww * word_hv.values[i];
+
+        if sw > 0.0 {
+            // Three-channel blend: tw*(1-sw)*trigram + ww*(1-sw)*word + sw*sentiment
+            let sentiment_hv = self.encode_sentiment(text);
+            let tw_scaled = tw * (1.0 - sw);
+            let ww_scaled = ww * (1.0 - sw);
+            for i in 0..self.dim {
+                combined[i] = tw_scaled * trigram_hv.values[i]
+                    + ww_scaled * word_hv.values[i]
+                    + sw * sentiment_hv.values[i];
+            }
+        } else {
+            // Fast path: original two-channel blend (no regression)
+            for i in 0..self.dim {
+                combined[i] = tw * trigram_hv.values[i] + ww * word_hv.values[i];
+            }
         }
 
         // L2-normalize the combined vector
@@ -107,6 +184,47 @@ impl TextHdcEncoder {
         }
 
         ContinuousHV::from_vec(combined)
+    }
+
+    /// Sentiment channel: accumulate positive/negative seed HVs for moral words.
+    ///
+    /// For each word in the text, if it's in the good_words set, add POSITIVE_SEED;
+    /// if in bad_words, add NEGATIVE_SEED. The result is L2-normalized.
+    /// If no sentiment words are found, returns a zero vector (neutral contribution).
+    fn encode_sentiment(&self, text: &str) -> ContinuousHV {
+        let mut accumulator = vec![0.0f32; self.dim];
+        let text_lower = text.to_lowercase();
+        let mut found_any = false;
+
+        for word in text_lower.split_whitespace() {
+            // Strip punctuation from word edges
+            let clean: &str = word.trim_matches(|c: char| !c.is_alphanumeric());
+            if clean.is_empty() {
+                continue;
+            }
+            if self.good_words.contains(clean) {
+                found_any = true;
+                for (acc, &val) in accumulator.iter_mut().zip(self.positive_seed.values.iter()) {
+                    *acc += val;
+                }
+            } else if self.bad_words.contains(clean) {
+                found_any = true;
+                for (acc, &val) in accumulator.iter_mut().zip(self.negative_seed.values.iter()) {
+                    *acc += val;
+                }
+            }
+        }
+
+        if found_any {
+            let norm: f32 = accumulator.iter().map(|x| x * x).sum::<f32>().sqrt();
+            if norm > 0.0 {
+                for v in &mut accumulator {
+                    *v /= norm;
+                }
+            }
+        }
+
+        ContinuousHV::from_vec(accumulator)
     }
 
     /// Character trigram encoding channel.
@@ -295,5 +413,44 @@ mod tests {
         // Both should produce meaningful (non-zero) similarity
         assert!(dual_sim.abs() > 0.01, "Dual should produce meaningful similarity");
         assert!(tri_sim.abs() > 0.01, "Trigram should produce meaningful similarity");
+    }
+
+    #[test]
+    fn test_sentiment_channel_default_off() {
+        // When sentiment_weight=0, output should be identical to the original encoder
+        let enc_default = TextHdcEncoder::new(4096, 3);
+        let enc_sentiment_off = TextHdcEncoder::with_sentiment(4096, 3, 0.5, 0.0);
+
+        let text = "stealing is wrong and harmful";
+        let hv_default = enc_default.encode(text);
+        let hv_off = enc_sentiment_off.encode(text);
+
+        let sim = hv_default.similarity(&hv_off);
+        assert!(
+            (sim - 1.0).abs() < 1e-6,
+            "Sentiment off should produce identical output, got similarity {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_sentiment_separates_polarity() {
+        // With sentiment channel active, good text and bad text should be more
+        // separated than without sentiment
+        let enc_no_sent = TextHdcEncoder::new(4096, 3);
+        let enc_sent = TextHdcEncoder::with_sentiment(4096, 3, 0.5, 0.3);
+
+        let good_text = "helping kind generous caring love";
+        let bad_text = "stealing cruel selfish harming hate";
+
+        let sim_no_sent = enc_no_sent.encode(good_text).similarity(&enc_no_sent.encode(bad_text));
+        let sim_sent = enc_sent.encode(good_text).similarity(&enc_sent.encode(bad_text));
+
+        // Sentiment channel should push good/bad further apart (lower similarity)
+        assert!(
+            sim_sent < sim_no_sent,
+            "Sentiment channel should separate polarity: with={:.4} should be < without={:.4}",
+            sim_sent, sim_no_sent
+        );
     }
 }

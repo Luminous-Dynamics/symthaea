@@ -184,52 +184,53 @@ fn main() {
     let mut algebra = MoralAlgebra::default_dim();
     let parser = MoralParser::new();
 
-    // Try to load or train learned moral prototypes from Social Chemistry 292K
-    let prototypes_path = Path::new(DATASETS_PATH).join("social_chem_prototypes_v3.json");
-    let prototypes_path_v2 = Path::new(DATASETS_PATH).join("social_chem_prototypes_v2.json");
+    // Load Social Chemistry prototypes for direct classifier and ensemble signal.
+    // v3 (8192D) prototypes have 66.9% training accuracy — better than v4 (16384D, 59.2%).
+    // Per-category ETHICS classifiers use MORAL_PROTO_DIM (16384) separately.
+    let prototypes_v3_path = Path::new(DATASETS_PATH).join("social_chem_prototypes_v3.json");
+    let prototypes_v4_path = Path::new(DATASETS_PATH).join("social_chem_prototypes_v4.json");
     let dataset_292k_path = Path::new(DATASETS_PATH).join("social_chemistry_292k.json");
 
-    // Also store a direct classifier for Social Chemistry benchmark (#1 improvement)
     let mut direct_social_chem_classifier: Option<MoralPrototypeClassifier> = None;
-
-    // Sentiment weight for the third encoder channel
     let sentiment_weight = 0.15;
 
-    if prototypes_path.exists() {
-        println!("Loading cached v3 learned prototypes from {}...", prototypes_path.display());
-        match TrainedPrototypes::load(&prototypes_path) {
+    // Prefer v3 (8192D) prototypes — they classify better due to denser representations
+    if prototypes_v3_path.exists() {
+        println!("Loading cached v3 learned prototypes from {}...", prototypes_v3_path.display());
+        match TrainedPrototypes::load(&prototypes_v3_path) {
             Ok(protos) => {
                 let dim = protos.dim;
                 let classifier = MoralPrototypeClassifier::from_prototypes_with_sentiment(dim, 3, sentiment_weight, protos.clone());
                 direct_social_chem_classifier = Some(MoralPrototypeClassifier::from_prototypes_with_sentiment(dim, 3, sentiment_weight, protos));
                 algebra.set_learned_classifier(classifier);
-                println!("  Learned v3 prototypes loaded (dim={}, sentiment={}, 4th ensemble signal active)\n", dim, sentiment_weight);
+                println!("  v3 prototypes loaded (dim={}, sentiment={}, 4th ensemble signal active)\n", dim, sentiment_weight);
             }
-            Err(e) => println!("  Warning: failed to load prototypes: {}\n", e),
+            Err(e) => println!("  Warning: failed to load v3 prototypes: {}\n", e),
+        }
+    } else if prototypes_v4_path.exists() {
+        println!("Loading cached v4 learned prototypes from {}...", prototypes_v4_path.display());
+        match TrainedPrototypes::load(&prototypes_v4_path) {
+            Ok(protos) => {
+                let dim = protos.dim;
+                let classifier = MoralPrototypeClassifier::from_prototypes_with_sentiment(dim, 3, sentiment_weight, protos.clone());
+                direct_social_chem_classifier = Some(MoralPrototypeClassifier::from_prototypes_with_sentiment(dim, 3, sentiment_weight, protos));
+                algebra.set_learned_classifier(classifier);
+                println!("  v4 prototypes loaded (dim={}, sentiment={}, 4th ensemble signal active)\n", dim, sentiment_weight);
+            }
+            Err(e) => println!("  Warning: failed to load v4 prototypes: {}\n", e),
         }
     } else if dataset_292k_path.exists() {
-        println!("Training v3 learned prototypes from Social Chemistry 292K (dim={}, sentiment={})...", MORAL_PROTO_DIM, sentiment_weight);
+        // Train new prototypes at MORAL_PROTO_DIM if no cache exists
+        let cache_path = Path::new(DATASETS_PATH).join("social_chem_prototypes_v4.json");
+        println!("Training v4 learned prototypes from Social Chemistry 292K (dim={}, sentiment={})...", MORAL_PROTO_DIM, sentiment_weight);
         let train_start = Instant::now();
-        if let Some(classifier) = train_prototypes_from_292k(&dataset_292k_path, &prototypes_path) {
+        if let Some(classifier) = train_prototypes_from_292k(&dataset_292k_path, &cache_path) {
             direct_social_chem_classifier = Some(classifier.clone());
             algebra.set_learned_classifier(classifier);
             println!(
-                "  v3 prototypes trained and cached in {:.1}s (4th ensemble signal active)\n",
+                "  v4 prototypes trained and cached in {:.1}s (4th ensemble signal active)\n",
                 train_start.elapsed().as_secs_f64()
             );
-        }
-    } else if prototypes_path_v2.exists() {
-        // Fall back to v2 if no 292K dataset available for retraining
-        println!("Loading cached v2 learned prototypes from {}...", prototypes_path_v2.display());
-        match TrainedPrototypes::load(&prototypes_path_v2) {
-            Ok(protos) => {
-                let dim = protos.dim;
-                let classifier = MoralPrototypeClassifier::from_prototypes(dim, 3, protos.clone());
-                direct_social_chem_classifier = Some(MoralPrototypeClassifier::from_prototypes(dim, 3, protos));
-                algebra.set_learned_classifier(classifier);
-                println!("  Learned v2 prototypes loaded (dim={}, no sentiment, 4th ensemble signal active)\n", dim);
-            }
-            Err(e) => println!("  Warning: failed to load prototypes: {}\n", e),
         }
     } else {
         println!("No Social Chemistry 292K dataset found - running without learned prototypes.");
@@ -838,77 +839,31 @@ fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, 
         "virtue" => {
             // ETHICS Virtue: "scenario [SEP] trait" — does trait apply to scenario?
             // label=1 = trait applies, label=0 = trait does not apply
-            // Uses VirtueMatchClassifier (pair encoding) when available and confident,
-            // then falls back to keyword matching, then per-category classifier.
-            if let Some(vcl) = virtue_clf {
-                if let Some(sep_idx) = text.find(" [SEP] ") {
-                    let scen = &text[..sep_idx];
-                    let tw = &text[sep_idx + 7..];
-                    let (vl, vc) = vcl.classify(scen, tw);
-                    if vc > 0.01 {
-                        return match vl {
-                            VirtueLabel::Applies => 1,
-                            VirtueLabel::NotApplies => 0,
-                        };
-                    }
+            // Note: label=1 means trait DESCRIBES person, not that trait is positive.
+            // VirtueMatchClassifier fails at 16384D (too sparse with 1000 samples).
+            // Per-category classifier (92.8% train acc) is the best signal.
+            let _ = virtue_clf; // available but not used at 16384D
+            if text.contains(" [SEP] ") {
+                // [SEP] format: use per-category classifier → default 0
+                if let Some(clf) = per_cat {
+                    return match clf.classify(text).0 {
+                        MoralLabel::Good => 1,
+                        _ => 0,
+                    };
                 }
-            }
-            let virtues = [
-                "generous", "kind", "compassionate", "loving", "honest", "helpful",
-                "brave", "courageous", "humble", "modest", "patient", "prudent",
-                "wise", "just", "fair", "loyal", "faithful", "trustworthy",
-                "sincere", "respectful", "polite", "courteous", "gentle", "merciful",
-                "forgiving", "grateful", "thankful", "hopeful", "cheerful", "merry",
-                "joyful", "optimistic", "friendly", "caring", "nurturing", "protective",
-                "diligent", "hardworking", "persevering", "determined", "reliable",
-                "dependable", "responsible", "charitable", "benevolent", "altruistic",
-                "selfless", "empathetic", "understanding", "tolerant", "accepting",
-                "open-minded", "curious", "creative", "innovative", "insightful",
-                "thoughtful", "considerate", "tactful", "diplomatic", "cooperative",
-                "collaborative", "supportive", "encouraging", "inspiring", "motivating",
-            ];
-            let vices = [
-                "cruel", "mean", "selfish", "greedy", "dishonest", "deceitful",
-                "cowardly", "arrogant", "impatient", "reckless", "foolish",
-                "unjust", "unfair", "disloyal", "treacherous", "untrustworthy",
-                "insincere", "disrespectful", "rude", "harsh", "merciless",
-                "unforgiving", "ungrateful", "hopeless", "miserable", "cynical",
-                "resentful", "pessimistic", "hostile", "uncaring", "negligent",
-                "lazy", "indolent", "unreliable", "irresponsible", "stingy",
-                "malevolent", "envious", "jealous", "spiteful", "vengeful",
-                "intolerant", "bigoted", "narrow-minded", "ignorant", "apathetic",
-                "inconsiderate", "tactless", "uncooperative", "discouraging",
-                "manipulative", "controlling", "domineering", "aggressive", "violent",
-                "vain", "narcissistic", "self-importance", "self-centered",
-            ];
-            // For [SEP]-format, check the trait word specifically
-            let check_text = if let Some(sep_pos) = text_lower.find(" [sep] ") {
-                text_lower[sep_pos + 7..].to_string()
+                0 // default: trait does not apply (80% baseline)
             } else {
-                text_lower.clone()
-            };
-            let is_virtue = virtues.iter().any(|v| check_text.contains(v));
-            let is_vice = vices.iter().any(|v| check_text.contains(v));
-            if is_virtue && !is_vice {
-                1
-            } else if is_vice && !is_virtue {
-                0
-            } else if let Some(clf) = per_cat {
-                match clf.classify(text).0 {
-                    MoralLabel::Good => 1,
-                    MoralLabel::Bad => 0,
-                    MoralLabel::Neutral => {
-                        match judgment.final_verdict {
-                            MoralVerdict::Good => 1,
-                            _ => 0,
-                        }
+                // Non-SEP format: fall back to per-category or ensemble
+                if let Some(clf) = per_cat {
+                    match clf.classify(text).0 {
+                        MoralLabel::Good => 1,
+                        _ => 0,
                     }
-                }
-            } else {
-                match judgment.final_verdict {
-                    MoralVerdict::Good => 1,
-                    MoralVerdict::Bad => 0,
-                    _ => 0,
+                } else {
+                    match judgment.final_verdict {
+                        MoralVerdict::Good => 1,
+                        _ => 0,
+                    }
                 }
             }
         }
@@ -1110,9 +1065,8 @@ fn train_prototypes_from_292k(
         return None;
     }
 
-    // Cap training set: initial accumulation uses all samples for representative
-    // prototypes, but retraining uses at most 25K (up from 10K in v2).
-    let max_retrain = 25_000;
+    // Use all samples for retraining (v4: full 50K at dim 16384).
+    let max_retrain = 50_000;
     let sentiment_weight = 0.15;
     println!("  Training on {} samples (retrain cap: {}, dim={}, sentiment={})...",
              samples.len(), max_retrain, MORAL_PROTO_DIM, sentiment_weight);
@@ -1254,7 +1208,7 @@ fn train_per_category_ethics_prototypes(ethics_path: &str) -> HashMap<String, Mo
 /// Loads virtue examples (format: "scenario [SEP] trait_word"),
 /// trains a VirtueMatchClassifier on pair encodings.
 fn train_virtue_classifier(ethics_path: &str) -> Option<VirtueMatchClassifier> {
-    let virtue_cache_path = Path::new(DATASETS_PATH).join("virtue_prototypes_v1.json");
+    let virtue_cache_path = Path::new(DATASETS_PATH).join("virtue_prototypes_v2.json");
 
     // Try loading cached prototypes first
     if virtue_cache_path.exists() {
