@@ -112,6 +112,58 @@ fn bench_find_similar(c: &mut Criterion) {
     group.finish();
 }
 
+// =============================================================================
+// SUBSYSTEM DISPATCH OVERHEAD BENCHMARKS
+// =============================================================================
+
+fn bench_subsystem_dispatch_overhead(c: &mut Criterion) {
+    use symthaea_core::hdc::consciousness_metacognitive::MetacognitiveSubsystem;
+    use symthaea_core::hdc::consciousness_self_awareness::SelfAwarenessSubsystem;
+    use symthaea_core::hdc::consciousness_phi_optimization::PhiOptimizationSubsystem;
+
+    let mut group = c.benchmark_group("subsystem_dispatch");
+    group.sample_size(10);
+
+    let inputs: Vec<BinaryHV> = (0..8).map(|s| BinaryHV::random(s)).collect();
+    let priorities: Vec<f64> = vec![0.8; 8];
+
+    // Baseline: pipeline with 0 subsystems
+    group.bench_function("0_subsystems", |b| {
+        let mut pipeline = ConsciousnessPipeline::new(IntegrationConfig::default());
+        pipeline.set_embodiment(0.8);
+        b.iter(|| {
+            let state = pipeline.process(black_box(inputs.clone()), black_box(&priorities));
+            black_box(state);
+        });
+    });
+
+    // 1 subsystem
+    group.bench_function("1_subsystem", |b| {
+        let mut pipeline = ConsciousnessPipeline::new(IntegrationConfig::default());
+        pipeline.set_embodiment(0.8);
+        pipeline.register_subsystem(Box::new(MetacognitiveSubsystem::new()));
+        b.iter(|| {
+            let state = pipeline.process(black_box(inputs.clone()), black_box(&priorities));
+            black_box(state);
+        });
+    });
+
+    // 3 subsystems
+    group.bench_function("3_subsystems", |b| {
+        let mut pipeline = ConsciousnessPipeline::new(IntegrationConfig::default());
+        pipeline.set_embodiment(0.8);
+        pipeline.register_subsystem(Box::new(MetacognitiveSubsystem::new()));
+        pipeline.register_subsystem(Box::new(SelfAwarenessSubsystem::new()));
+        pipeline.register_subsystem(Box::new(PhiOptimizationSubsystem::new(1)));
+        b.iter(|| {
+            let state = pipeline.process(black_box(inputs.clone()), black_box(&priorities));
+            black_box(state);
+        });
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_pipeline_process,
@@ -119,5 +171,6 @@ criterion_group!(
     bench_cluster_by_similarity,
     bench_binary_to_continuous_pooled,
     bench_find_similar,
+    bench_subsystem_dispatch_overhead,
 );
 criterion_main!(benches);

@@ -131,6 +131,32 @@ pub use crate::observability::{
     DataPoint,
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSCIOUSNESS SUBSYSTEM PLUGIN ARCHITECTURE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pub use crate::hdc::consciousness_subsystem::{
+    ConsciousnessSubsystem,
+    SubsystemError,
+};
+
+pub use crate::hdc::consciousness_metacognitive::{
+    MetacognitiveSubsystem,
+    MetaConsciousnessWrapped,
+};
+
+pub use crate::hdc::consciousness_self_awareness::{
+    SelfAwarenessSubsystem,
+    TemporalConsciousnessWrapped,
+};
+
+pub use crate::hdc::consciousness_phi_optimization::{
+    PhiOptimizationSubsystem,
+    PhaseTransitionWrapped,
+};
+
+pub use crate::hdc::consciousness_integration::PipelineCheckpoint;
+
 // Consciousness API traits
 pub mod traits;
 pub use traits::{

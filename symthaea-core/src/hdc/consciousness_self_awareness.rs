@@ -5,7 +5,7 @@
 
 use super::binary_hv::BinaryHV;
 use super::consciousness_integration::ConsciousnessState;
-use super::consciousness_subsystem::ConsciousnessSubsystem;
+use super::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
 
 /// Self-awareness subsystem for recursive self-modeling.
 ///
@@ -55,7 +55,9 @@ impl ConsciousnessSubsystem for SelfAwarenessSubsystem {
         "self_awareness"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV]) {
+    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
+        -> Result<(), SubsystemError>
+    {
         self.cycle_count += 1;
 
         // Compute prediction error
@@ -74,6 +76,8 @@ impl ConsciousnessSubsystem for SelfAwarenessSubsystem {
 
         // Simple prediction for next cycle: EMA of recent Phi
         self.predicted_phi = self.ema_alpha * state.phi + (1.0 - self.ema_alpha) * self.predicted_phi;
+
+        Ok(())
     }
 
     fn is_enabled(&self) -> bool {
@@ -129,13 +133,16 @@ impl ConsciousnessSubsystem for TemporalConsciousnessWrapped {
         "temporal_consciousness"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV]) {
+    fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV])
+        -> Result<(), SubsystemError>
+    {
         self.cycle_count += 1;
         let current_time = self.cycle_count as f64;
         self.engine.add_snapshot(current_time, inputs.to_vec());
         let assessment = self.engine.assess();
         state.temporal_coherence = assessment.phi_temporal;
         self.latest_assessment = Some(assessment);
+        Ok(())
     }
 
     fn is_enabled(&self) -> bool {
@@ -164,7 +171,7 @@ mod tests {
         // Stable Phi = easy to predict = awareness increases
         for _ in 0..50 {
             state.phi = 0.5;
-            sub.process_cycle(&mut state, &inputs);
+            sub.process_cycle(&mut state, &inputs).unwrap();
         }
 
         assert!(sub.awareness_level() > 0.0, "Awareness should increase with stable Phi");
@@ -179,7 +186,7 @@ mod tests {
 
         for i in 0..100 {
             state.phi = (i as f64 * 0.37).sin().abs(); // Chaotic-ish pattern
-            sub.process_cycle(&mut state, &inputs);
+            sub.process_cycle(&mut state, &inputs).unwrap();
         }
 
         assert!(sub.awareness_level() >= 0.0 && sub.awareness_level() <= 1.0);

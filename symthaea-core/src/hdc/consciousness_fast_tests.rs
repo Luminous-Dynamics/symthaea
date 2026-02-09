@@ -25,7 +25,7 @@ fn test_fast_phi_optimization_steps() {
     // Run 10 optimization steps
     for i in 0..10 {
         state.phi = 0.3 + (i as f64 * 0.05).min(0.4);
-        sub.process_cycle(&mut state, &inputs);
+        sub.process_cycle(&mut state, &inputs).unwrap();
     }
 
     assert!(sub.best_phi() > 0.3);
@@ -82,7 +82,7 @@ fn test_fast_self_awareness_processing() {
 
     state.phi = 0.5;
     for _ in 0..20 {
-        sub.process_cycle(&mut state, &inputs);
+        sub.process_cycle(&mut state, &inputs).unwrap();
     }
 
     assert!(sub.awareness_level() > 0.0);
@@ -101,7 +101,7 @@ fn test_fast_self_awareness_prediction_learning() {
     let prev_confidence = 0.0;
     for _ in 0..50 {
         state.phi = 0.6;
-        sub.process_cycle(&mut state, &inputs);
+        sub.process_cycle(&mut state, &inputs).unwrap();
     }
 
     assert!(state.self_model_confidence > prev_confidence,
@@ -138,7 +138,7 @@ fn test_fast_meta_cognitive_assessment() {
     for i in 0..10 {
         state.phi = 0.2 + i as f64 * 0.05;
         state.consciousness_level = state.phi * 0.8;
-        sub.process_cycle(&mut state, &inputs);
+        sub.process_cycle(&mut state, &inputs).unwrap();
     }
 
     assert!(state.metacognitive_confidence >= 0.0 && state.metacognitive_confidence <= 1.0);

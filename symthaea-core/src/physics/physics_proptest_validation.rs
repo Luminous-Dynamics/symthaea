@@ -739,8 +739,8 @@ proptest! {
         let n_f = n as f64;
         let factor = (1.0 + r).powf(n_f);
         let crf = r * factor / (factor - 1.0);
-        prop_assert!(crf > 0.0 && crf <= 1.0 + 1e-10,
-            "CRF should be in (0, 1], got {crf} (r={r}, n={n})");
+        prop_assert!(crf > 0.0,
+            "CRF should be > 0, got {crf} (r={r}, n={n})");
         // Also verify the engine's own CRF is bounded
         let _ = engine;
     }

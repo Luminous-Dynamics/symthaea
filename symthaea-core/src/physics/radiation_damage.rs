@@ -445,7 +445,7 @@ impl FusionReaction {
     pub fn optimal_temp_kev(&self) -> f64 {
         match self {
             FusionReaction::DD => 15.0,
-            FusionReaction::DT => 10.0,      // Lowest ignition temp
+            FusionReaction::DT => 60.0,      // Peak cross-section temperature
             FusionReaction::DdProton => 15.0,
             FusionReaction::DHe3 => 58.0,    // Highest - hardest to achieve
         }
