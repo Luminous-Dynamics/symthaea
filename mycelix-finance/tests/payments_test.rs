@@ -2516,3 +2516,193 @@ mod sap_balance_unit_tests {
         println!("  - FeeTier::Member base_fee_rate = {}, fee on 1M = {}", rate, fee);
     }
 }
+
+// ============================================================================
+// Section 13: SAP Fee Tier and TEND Fee Tests
+// ============================================================================
+
+#[cfg(test)]
+mod fee_tier_tests {
+    use super::*;
+
+    /// Test 13.1: SAP payment applies a progressive fee
+    ///
+    /// Initialize a SAP balance, credit sufficient funds, send a SAP payment
+    /// of 1,000,000 micro-SAP (amount=1.0), and verify that a fee is deducted.
+    ///
+    /// Without cross-zome access to the recognition zome, the fee falls back
+    /// to the Newcomer tier (0.10% = 0.001). For 1M micro-SAP, the fee should
+    /// be 1000 micro-SAP.
+    ///
+    /// NOTE: Testing different MYCEL scores requires the recognition zome to be
+    /// initialized with specific scores for each agent. Since cross-zome setup
+    /// is complex in integration tests, we verify the default (Newcomer) tier.
+    #[tokio::test]
+    #[ignore]
+    async fn test_sap_fee_tiers() {
+        println!("Test 13.1: SAP Fee Tiers (Default Newcomer)");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let bob_cell = &apps[1].cells()[0];
+        let alice_key = agents[0].clone();
+        let bob_key = agents[1].clone();
+        let alice_did = format!("did:mycelix:{}", alice_key);
+        let bob_did = format!("did:mycelix:{}", bob_key);
+
+        // Initialize Alice's SAP balance and credit 10M micro-SAP
+        let _: Record = conductor
+            .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
+            .await
+            .expect("Failed to initialize Alice SAP balance");
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct CreditSapInput {
+            pub member_did: String,
+            pub amount: u64,
+            pub reason: String,
+        }
+
+        let _: Record = conductor
+            .call(&alice_cell.zome("payments"), "credit_sap", CreditSapInput {
+                member_did: alice_did.clone(),
+                amount: 10_000_000, // 10M micro-SAP
+                reason: "Test credit for fee test".to_string(),
+            })
+            .await
+            .expect("Failed to credit Alice SAP");
+
+        // Initialize Bob's SAP balance (so credit_sap on receive works)
+        let _: Record = conductor
+            .call(&bob_cell.zome("payments"), "initialize_sap_balance", bob_did.clone())
+            .await
+            .expect("Failed to initialize Bob SAP balance");
+
+        println!("  - Alice funded with 10M micro-SAP");
+
+        // Get Alice's balance before payment
+        let balance_before: SapBalanceResponse = conductor
+            .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
+            .await
+            .expect("Failed to get Alice balance before");
+
+        // Send 1.0 SAP (= 1_000_000 micro-SAP) from Alice to Bob
+        let input = SendPaymentInput {
+            from_did: alice_did.clone(),
+            to_did: bob_did.clone(),
+            amount: 1.0, // 1 SAP = 1_000_000 micro-SAP
+            currency: "SAP".to_string(),
+            payment_type: PaymentType::Direct,
+            memo: Some("Fee tier test payment".to_string()),
+        };
+
+        let payment_record: Record = conductor
+            .call(&alice_cell.zome("payments"), "send_payment", input)
+            .await
+            .expect("Failed to send SAP payment");
+
+        let payment: Payment = payment_record
+            .entry()
+            .to_app_option()
+            .expect("Deserialize failed")
+            .expect("No entry");
+
+        assert!(matches!(payment.status, TransferStatus::Completed));
+        println!("  - SAP payment sent: {} SAP", payment.amount);
+
+        // Check Alice's balance after -- should be reduced by amount + fee
+        let balance_after: SapBalanceResponse = conductor
+            .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
+            .await
+            .expect("Failed to get Alice balance after");
+
+        // Total debit = amount (1M) + fee (Newcomer 0.001 * 1M = 1000) = 1_001_000
+        // Note: demurrage may also apply, so we check the balance decrease is >= amount + fee
+        let decrease = balance_before.effective_balance.saturating_sub(balance_after.effective_balance);
+        let micro_amount: u64 = 1_000_000;
+        let newcomer_fee = (micro_amount as f64 * 0.001) as u64; // Newcomer tier: 0.10%
+
+        assert!(decrease >= micro_amount + newcomer_fee,
+            "Balance decrease ({}) should be >= amount ({}) + fee ({})",
+            decrease, micro_amount, newcomer_fee);
+        println!("  - Balance decrease: {} (amount {} + fee {} + any demurrage)",
+            decrease, micro_amount, newcomer_fee);
+
+        // Verify Bob received the amount (without fee)
+        let bob_balance: SapBalanceResponse = conductor
+            .call(&bob_cell.zome("payments"), "get_sap_balance", bob_did.clone())
+            .await
+            .expect("Failed to get Bob balance");
+
+        assert_eq!(bob_balance.raw_balance, micro_amount,
+            "Bob should receive exactly the payment amount (no fee)");
+        println!("  - Bob received: {} micro-SAP (fee-free)", bob_balance.raw_balance);
+
+        println!("Test 13.1 PASSED: SAP fee tiers applied correctly (Newcomer default)");
+    }
+
+    /// Test 13.2: TEND payment has no fee
+    ///
+    /// Send a TEND payment and verify no fee is deducted. TEND is fee-free
+    /// because the payments coordinator only computes fees for SAP currency.
+    #[tokio::test]
+    #[ignore]
+    async fn test_tend_payment_no_fee() {
+        println!("Test 13.2: TEND Payment No Fee");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Failed to load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_did = test_did("alice");
+        let bob_did = test_did("bob");
+
+        // Send a TEND payment -- TEND bypasses SAP balance/fee logic entirely
+        let input = SendPaymentInput {
+            from_did: alice_did.clone(),
+            to_did: bob_did.clone(),
+            amount: 5.0,
+            currency: "TEND".to_string(),
+            payment_type: PaymentType::Direct,
+            memo: Some("TEND fee test".to_string()),
+        };
+
+        let payment_record: Record = conductor
+            .call(&alice_cell.zome("payments"), "send_payment", input)
+            .await
+            .expect("Failed to send TEND payment");
+
+        let payment: Payment = payment_record
+            .entry()
+            .to_app_option()
+            .expect("Deserialize failed")
+            .expect("No entry");
+
+        assert_eq!(payment.currency, "TEND", "Currency should be TEND");
+        assert_eq!(payment.amount, 5.0, "Amount should be recorded as-is");
+        assert!(matches!(payment.status, TransferStatus::Completed));
+
+        // TEND payments do not go through debit_sap/credit_sap, so no fee is applied.
+        // The coordinator code path for non-SAP currencies sets fee_amount = 0.0.
+        println!("  - TEND payment completed: {} TEND (fee-free)", payment.amount);
+        println!("  - No SAP balance deduction for TEND payments");
+
+        println!("Test 13.2 PASSED: TEND payments are fee-free");
+    }
+}

@@ -258,15 +258,17 @@ fn validate_create_recognition(
         )));
     }
 
-    // Weight must be positive
-    if event.weight <= 0.0 {
+    // Weight must be in (0.0, 1.0] — max MYCEL is 1.0, base_weight is 1.0
+    if event.weight <= 0.0 || event.weight > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Recognition weight must be positive".into(),
+            "Recognition weight must be > 0.0 and <= 1.0".into(),
         ));
     }
 
-    // Cycle ID format check (YYYY-MM)
-    if event.cycle_id.len() != 7 || !event.cycle_id.contains('-') {
+    // Cycle ID format check (YYYY-MM): length 7 with dash at position 4
+    if event.cycle_id.len() != 7
+        || event.cycle_id.as_bytes()[4] != b'-'
+    {
         return Ok(ValidateCallbackResult::Invalid(
             "Cycle ID must be in YYYY-MM format".into(),
         ));
@@ -326,12 +328,50 @@ fn validate_update_mycel_state(
     _action: Update,
     state: MemberMycelState,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Same constraints as create
+    // Validate member DID format (must remain a valid DID)
+    if !state.member_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid("Member must be a valid DID".into()));
+    }
+
+    // MYCEL score must be 0.0-1.0
     if state.mycel_score < 0.0 || state.mycel_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "MYCEL score must be between 0.0 and 1.0".into(),
         ));
     }
+
+    // All components must be 0.0-1.0
+    for (name, value) in [
+        ("participation", state.participation),
+        ("recognition", state.recognition),
+        ("validation", state.validation),
+        ("longevity", state.longevity),
+    ] {
+        if value < 0.0 || value > 1.0 {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "{} component must be between 0.0 and 1.0", name
+            )));
+        }
+    }
+
+    // Note: member_did immutability (cannot change which member this state belongs to)
+    // cannot be fully enforced here because integrity validation does not have access
+    // to fetch the original entry from the DHT. The coordinator must enforce this.
+
+    // Apprentices must have a mentor
+    if state.is_apprentice && state.mentor_did.is_none() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Apprentice must have a mentor DID".into(),
+        ));
+    }
+
+    // Validate mentor DID if present
+    if let Some(ref mentor) = state.mentor_did {
+        if !mentor.starts_with("did:") {
+            return Ok(ValidateCallbackResult::Invalid("Mentor must be a valid DID".into()));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 

@@ -313,6 +313,20 @@ fn validate_create_collateral_bridge_deposit(
             "Collateral type must be ETH or USDC".into()
         ));
     }
+    // Validate sap_minted is consistent with collateral and oracle rate (allow +-1 for rounding)
+    let expected = (deposit.collateral_amount as f64 * deposit.oracle_rate) as u64;
+    if deposit.sap_minted < expected.saturating_sub(1) || deposit.sap_minted > expected.saturating_add(1) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "SAP minted ({}) is inconsistent with collateral ({}) * oracle rate ({:.6}), expected ~{}",
+            deposit.sap_minted, deposit.collateral_amount, deposit.oracle_rate, expected
+        )));
+    }
+    // New deposits must start in Pending status
+    if deposit.status != BridgeDepositStatus::Pending {
+        return Ok(ValidateCallbackResult::Invalid(
+            "New collateral bridge deposits must start with Pending status".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -320,9 +334,34 @@ fn validate_update_collateral_bridge_deposit(
     _action: Update,
     deposit: CollateralBridgeDeposit,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Only status transitions are meaningful; validate the deposit DID is still valid
+    // Validate the deposit DID is still valid
     if !deposit.depositor_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Depositor must be a valid DID".into()));
+    }
+    // Core field invariants must still hold on update
+    if deposit.collateral_amount == 0 {
+        return Ok(ValidateCallbackResult::Invalid("Collateral amount must be positive".into()));
+    }
+    if deposit.sap_minted == 0 {
+        return Ok(ValidateCallbackResult::Invalid("SAP minted must be positive".into()));
+    }
+    if deposit.oracle_rate <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("Oracle rate must be positive".into()));
+    }
+    if deposit.collateral_type != "ETH" && deposit.collateral_type != "USDC" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Collateral type must be ETH or USDC".into()
+        ));
+    }
+    // Status transition validation: cannot transition back to Pending.
+    // Valid transitions are: Pending->Confirmed, Confirmed->Redeemed, Pending->Failed.
+    // Full transition validation requires fetching the original entry, which is not
+    // available in integrity validation. We enforce that updated status is never Pending
+    // (a deposit cannot revert to Pending once it has progressed).
+    if deposit.status == BridgeDepositStatus::Pending {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot transition deposit status back to Pending".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }

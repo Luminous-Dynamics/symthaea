@@ -352,7 +352,7 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // If sending SAP, enforce on-chain balance with demurrage + progressive fee
-    let (memo, _fee_amount) = if input.currency == "SAP" {
+    let (memo, fee_amount) = if input.currency == "SAP" {
         // Convert f64 amount to micro-SAP (u64)
         let micro_amount = (input.amount * 1_000_000.0) as u64;
 
@@ -402,6 +402,7 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
         from_did: input.from_did.clone(),
         to_did: input.to_did.clone(),
         amount: input.amount,
+        fee: fee_amount,
         currency: input.currency.clone(),
         payment_type: input.payment_type,
         status: TransferStatus::Completed, // Simplified: immediate completion
@@ -596,11 +597,13 @@ pub fn refund_payment(payment_id: String) -> ExternResult<Record> {
 
     // Create refund payment (reverse direction)
     let now = sys_time()?;
+    // Refunds carry the original fee (already collected; stored for audit trail)
     let refund = Payment {
         id: format!("refund:{}:{}", payment_id, now.as_micros()),
         from_did: original_payment.to_did.clone(),
         to_did: original_payment.from_did.clone(),
         amount: original_payment.amount,
+        fee: original_payment.fee,
         currency: original_payment.currency.clone(),
         payment_type: PaymentType::Direct,
         status: TransferStatus::Completed,
@@ -648,11 +651,20 @@ pub fn get_channels(did: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
     let now = sys_time()?;
+    // Compute fee for escrow (SAP: progressive fee; TEND: zero)
+    let escrow_fee = if input.currency == "SAP" {
+        let micro_amount = (input.amount * 1_000_000.0) as u64;
+        let fee_micro = compute_sap_fee(&input.from_did, micro_amount)?;
+        fee_micro as f64 / 1_000_000.0
+    } else {
+        0.0
+    };
     let payment = Payment {
         id: format!("escrow:{}:{}", input.from_did, now.as_micros()),
         from_did: input.from_did.clone(),
         to_did: input.to_did.clone(),
         amount: input.amount,
+        fee: escrow_fee,
         currency: input.currency,
         payment_type: PaymentType::Escrow(input.escrow_id),
         status: TransferStatus::Pending, // Held until released

@@ -189,6 +189,7 @@ pub struct Payment {
     pub from_did: String,
     pub to_did: String,
     pub amount: f64,
+    pub fee: f64,
     pub currency: String,
     pub payment_type: PaymentType,
     pub status: TransferStatus,

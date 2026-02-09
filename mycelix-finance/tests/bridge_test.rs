@@ -783,7 +783,274 @@ mod redemption_tests {
         println!("Test 5.1 PASSED: Collateral redemption works");
     }
 
-    /// Test 5.2: Make 3 cross-hApp payments and query payment history
+    /// Test 5.2: Deposit rate limit enforcement
+    ///
+    /// Makes an initial deposit (bootstraps vault), confirms it, makes a second
+    /// deposit, then attempts a third that would exceed 5% of vault value in 24h.
+    #[tokio::test]
+    #[ignore]
+    async fn test_deposit_rate_limit_enforcement() {
+        println!("Test 5.2: Deposit Rate Limit Enforcement");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_did = test_did("alice");
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct DepositCollateralInput {
+            pub depositor_did: String,
+            pub collateral_type: String,
+            pub collateral_amount: u64,
+            pub oracle_rate: f64,
+        }
+
+        // First deposit: bootstraps the vault (empty vault bypasses rate limit)
+        let input1 = DepositCollateralInput {
+            depositor_did: alice_did.clone(),
+            collateral_type: "ETH".to_string(),
+            collateral_amount: 1_000_000,
+            oracle_rate: 2000.0,
+        };
+
+        let record1: Record = conductor
+            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input1)
+            .await
+            .expect("First deposit should succeed (bootstrap)");
+
+        let deposit1: CollateralBridgeDeposit = record1
+            .entry()
+            .to_app_option()
+            .expect("Deserialize failed")
+            .expect("No entry");
+        println!("  - First deposit (bootstrap): {} SAP minted", deposit1.sap_minted);
+
+        // Confirm the first deposit so it counts toward vault total
+        let _: Record = conductor
+            .call(&alice_cell.zome("finance_bridge"), "confirm_deposit", deposit1.id.clone())
+            .await
+            .expect("Failed to confirm first deposit");
+        println!("  - First deposit confirmed (vault now has confirmed SAP)");
+
+        // Second deposit: should succeed if within 5% of vault
+        let input2 = DepositCollateralInput {
+            depositor_did: alice_did.clone(),
+            collateral_type: "USDC".to_string(),
+            collateral_amount: 10_000, // Small amount
+            oracle_rate: 1.0,
+        };
+
+        let _: Record = conductor
+            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input2)
+            .await
+            .expect("Second deposit should succeed (within rate limit)");
+        println!("  - Second deposit succeeded (within daily limit)");
+
+        // Third deposit: attempt a huge amount that exceeds 5% of vault
+        // Vault is ~2B SAP (from first deposit), 5% = ~100M SAP.
+        // Attempt to deposit much more than that.
+        let input3 = DepositCollateralInput {
+            depositor_did: alice_did.clone(),
+            collateral_type: "ETH".to_string(),
+            collateral_amount: 10_000_000, // 10 ETH at 2000 rate = 20B SAP (far exceeds 5%)
+            oracle_rate: 2000.0,
+        };
+
+        let result: Result<Record, _> = conductor
+            .call_fallible(alice_cell.zome("finance_bridge"), "deposit_collateral", input3)
+            .await;
+
+        match result {
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                assert!(
+                    error_msg.contains("Rate limit exceeded") || error_msg.contains("rate limit"),
+                    "Should fail with rate limit error, got: {}", error_msg
+                );
+                println!("  - Third deposit rejected (rate limit exceeded): OK");
+            }
+            Ok(_) => panic!("Third deposit should have been rejected by rate limit"),
+        }
+
+        println!("Test 5.2 PASSED: Deposit rate limit enforcement works");
+    }
+
+    /// Test 5.3: Confirm deposit lifecycle
+    ///
+    /// Deposit -> Confirm -> Verify status transitions. Then try confirming
+    /// again, which should fail because only Pending deposits can be confirmed.
+    #[tokio::test]
+    #[ignore]
+    async fn test_confirm_deposit_lifecycle() {
+        println!("Test 5.3: Confirm Deposit Lifecycle");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_did = test_did("alice");
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct DepositCollateralInput {
+            pub depositor_did: String,
+            pub collateral_type: String,
+            pub collateral_amount: u64,
+            pub oracle_rate: f64,
+        }
+
+        // Create a deposit
+        let input = DepositCollateralInput {
+            depositor_did: alice_did.clone(),
+            collateral_type: "ETH".to_string(),
+            collateral_amount: 500_000,
+            oracle_rate: 2000.0,
+        };
+
+        let record: Record = conductor
+            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .await
+            .expect("Failed to deposit");
+
+        let deposit: CollateralBridgeDeposit = record
+            .entry()
+            .to_app_option()
+            .expect("Deserialize failed")
+            .expect("No entry");
+
+        assert!(matches!(deposit.status, BridgeDepositStatus::Pending),
+            "New deposit should be Pending");
+        println!("  - Deposit created: {} (Pending)", deposit.id);
+
+        // Confirm the deposit
+        let confirmed_record: Record = conductor
+            .call(&alice_cell.zome("finance_bridge"), "confirm_deposit", deposit.id.clone())
+            .await
+            .expect("Failed to confirm deposit");
+
+        let confirmed: CollateralBridgeDeposit = confirmed_record
+            .entry()
+            .to_app_option()
+            .expect("Deserialize failed")
+            .expect("No entry");
+
+        assert!(matches!(confirmed.status, BridgeDepositStatus::Confirmed),
+            "Confirmed deposit should have Confirmed status");
+        assert!(confirmed.completed_at.is_some(), "Should have completion timestamp");
+        println!("  - Deposit confirmed: {:?}", confirmed.status);
+
+        // Try to confirm again -- should fail
+        let result: Result<Record, _> = conductor
+            .call_fallible(alice_cell.zome("finance_bridge"), "confirm_deposit", deposit.id.clone())
+            .await;
+
+        match result {
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                assert!(
+                    error_msg.contains("only Pending deposits can be confirmed")
+                        || error_msg.contains("Confirmed")
+                        || error_msg.contains("Pending"),
+                    "Should reject re-confirmation, got: {}", error_msg
+                );
+                println!("  - Re-confirmation rejected: OK");
+            }
+            Ok(_) => panic!("Should have rejected confirming an already-confirmed deposit"),
+        }
+
+        println!("Test 5.3 PASSED: Confirm deposit lifecycle works correctly");
+    }
+
+    /// Test 5.4: Redeem unconfirmed deposit
+    ///
+    /// Create a deposit (Pending status), attempt to redeem it.
+    /// Should fail because only confirmed deposits can be redeemed.
+    #[tokio::test]
+    #[ignore]
+    async fn test_redeem_unconfirmed_deposit() {
+        println!("Test 5.4: Redeem Unconfirmed Deposit");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_did = test_did("alice");
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct DepositCollateralInput {
+            pub depositor_did: String,
+            pub collateral_type: String,
+            pub collateral_amount: u64,
+            pub oracle_rate: f64,
+        }
+
+        // Create a deposit (stays Pending -- do NOT confirm)
+        let input = DepositCollateralInput {
+            depositor_did: alice_did.clone(),
+            collateral_type: "USDC".to_string(),
+            collateral_amount: 100_000,
+            oracle_rate: 1.0,
+        };
+
+        let record: Record = conductor
+            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .await
+            .expect("Failed to deposit");
+
+        let deposit: CollateralBridgeDeposit = record
+            .entry()
+            .to_app_option()
+            .expect("Deserialize failed")
+            .expect("No entry");
+
+        assert!(matches!(deposit.status, BridgeDepositStatus::Pending),
+            "Deposit should be Pending");
+        println!("  - Deposit created: {} (Pending)", deposit.id);
+
+        // Attempt to redeem the Pending deposit -- should fail
+        let result: Result<Record, _> = conductor
+            .call_fallible(alice_cell.zome("finance_bridge"), "redeem_collateral", deposit.id.clone())
+            .await;
+
+        match result {
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                assert!(
+                    error_msg.contains("Only confirmed deposits can be redeemed")
+                        || error_msg.contains("confirmed")
+                        || error_msg.contains("Confirmed"),
+                    "Should reject redeeming unconfirmed deposit, got: {}", error_msg
+                );
+                println!("  - Redeem of Pending deposit rejected: OK");
+            }
+            Ok(_) => panic!("Should have rejected redeeming an unconfirmed deposit"),
+        }
+
+        println!("Test 5.4 PASSED: Unconfirmed deposits cannot be redeemed");
+    }
+
+    /// Test 5.5: Make 3 cross-hApp payments and query payment history
     #[tokio::test]
     #[ignore]
     async fn test_payment_history() {

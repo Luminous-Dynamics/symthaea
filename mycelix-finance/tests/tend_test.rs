@@ -1476,7 +1476,7 @@ mod tend_additional_unit_tests {
         assert_eq!(TendLimitTier::Emergency.limit(), 120, "Emergency limit should be 120");
     }
 
-    /// Test TEND limit tier from vitality score mapping
+    /// Test TEND limit tier from vitality score mapping (from mycelix_finance_types)
     #[test]
     fn test_tend_limit_from_vitality() {
         // Vitality 5 (0-10) -> Emergency
@@ -1494,5 +1494,440 @@ mod tend_additional_unit_tests {
         // Vitality 50 (41+) -> Normal
         assert_eq!(TendLimitTier::from_vitality(50), TendLimitTier::Normal,
             "Vitality 50 should map to Normal");
+    }
+}
+
+// ============================================================================
+// Section 12: TEND Boundary Tests (Service Hours Limits)
+// ============================================================================
+
+#[cfg(test)]
+mod tend_boundary_tests {
+    use super::*;
+
+    /// Test 12.1: MAX_SERVICE_HOURS boundary
+    ///
+    /// Record an exchange with exactly 8.0 hours (MAX_SERVICE_HOURS) -- should succeed.
+    /// Record one with 8.1 hours -- should fail (integrity validation rejects > 8).
+    #[tokio::test]
+    #[ignore]
+    async fn test_max_service_hours_boundary() {
+        println!("Test 12.1: MAX_SERVICE_HOURS Boundary (8h)");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let bob_did = test_did("bob");
+
+        // Exactly 8.0 hours -- should succeed
+        let input_ok = RecordExchangeInput {
+            receiver_did: bob_did.clone(),
+            dao_did: TEST_DAO.to_string(),
+            hours: 8.0,
+            service_description: "Full day workshop".to_string(),
+            service_category: ServiceCategory::Education,
+            cultural_alias: None,
+            service_date: None,
+        };
+
+        let result_ok: Result<ExchangeRecord, _> = conductor
+            .call_fallible(alice_cell.zome("tend"), "record_exchange", input_ok)
+            .await;
+
+        match result_ok {
+            Ok(exchange) => {
+                assert_eq!(exchange.hours, 8.0, "Hours should be exactly 8.0");
+                println!("  - 8.0 hours accepted: OK");
+            }
+            Err(e) => panic!("8.0 hours should succeed, got: {:?}", e),
+        }
+
+        // 8.1 hours -- should fail (exceeds MAX_SERVICE_HOURS = 8)
+        let input_over = RecordExchangeInput {
+            receiver_did: bob_did.clone(),
+            dao_did: TEST_DAO.to_string(),
+            hours: 8.1,
+            service_description: "Over-limit workshop".to_string(),
+            service_category: ServiceCategory::Education,
+            cultural_alias: None,
+            service_date: None,
+        };
+
+        let result_over: Result<ExchangeRecord, _> = conductor
+            .call_fallible(alice_cell.zome("tend"), "record_exchange", input_over)
+            .await;
+
+        match result_over {
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                assert!(
+                    error_msg.contains("Maximum service duration")
+                        || error_msg.contains("8 hours")
+                        || error_msg.contains("MAX_SERVICE_HOURS"),
+                    "Should reject > 8h exchange, got: {}", error_msg
+                );
+                println!("  - 8.1 hours rejected: OK");
+            }
+            Ok(_) => panic!("8.1 hours should have been rejected"),
+        }
+
+        println!("Test 12.1 PASSED: MAX_SERVICE_HOURS boundary enforced");
+    }
+
+    /// Test 12.2: MIN_SERVICE_MINUTES boundary
+    ///
+    /// Record an exchange with 0.25 hours (15 min = MIN_SERVICE_MINUTES) -- should succeed.
+    /// Record with 0.24 hours (14.4 min, below 15 min) -- should fail.
+    #[tokio::test]
+    #[ignore]
+    async fn test_min_service_minutes_boundary() {
+        println!("Test 12.2: MIN_SERVICE_MINUTES Boundary (15 min)");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let bob_did = test_did("bob");
+
+        // 0.25 hours = 15 minutes (MIN_SERVICE_MINUTES) -- should succeed
+        let input_ok = RecordExchangeInput {
+            receiver_did: bob_did.clone(),
+            dao_did: TEST_DAO.to_string(),
+            hours: 0.25,
+            service_description: "Quick consultation".to_string(),
+            service_category: ServiceCategory::GeneralAssistance,
+            cultural_alias: None,
+            service_date: None,
+        };
+
+        let result_ok: Result<ExchangeRecord, _> = conductor
+            .call_fallible(alice_cell.zome("tend"), "record_exchange", input_ok)
+            .await;
+
+        match result_ok {
+            Ok(exchange) => {
+                assert_eq!(exchange.hours, 0.25, "Hours should be 0.25");
+                println!("  - 0.25 hours (15 min) accepted: OK");
+            }
+            Err(e) => panic!("0.25 hours should succeed, got: {:?}", e),
+        }
+
+        // 0.24 hours = 14.4 minutes (below 15 min minimum) -- should fail
+        let input_under = RecordExchangeInput {
+            receiver_did: bob_did.clone(),
+            dao_did: TEST_DAO.to_string(),
+            hours: 0.24,
+            service_description: "Too-short task".to_string(),
+            service_category: ServiceCategory::GeneralAssistance,
+            cultural_alias: None,
+            service_date: None,
+        };
+
+        let result_under: Result<ExchangeRecord, _> = conductor
+            .call_fallible(alice_cell.zome("tend"), "record_exchange", input_under)
+            .await;
+
+        match result_under {
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                assert!(
+                    error_msg.contains("Minimum service duration")
+                        || error_msg.contains("15 minutes")
+                        || error_msg.contains("MIN_SERVICE_MINUTES"),
+                    "Should reject < 15min exchange, got: {}", error_msg
+                );
+                println!("  - 0.24 hours (14.4 min) rejected: OK");
+            }
+            Ok(_) => panic!("0.24 hours should have been rejected"),
+        }
+
+        println!("Test 12.2 PASSED: MIN_SERVICE_MINUTES boundary enforced");
+    }
+
+    /// Test 12.3: Self-exchange rejected (provider_did == receiver_did)
+    ///
+    /// Note: test_self_exchange_rejected already exists in exchange_recording (Test 2.3),
+    /// but that test uses the agent pubkey format. This test uses test_did format to
+    /// verify the coordinator also catches it via DID comparison.
+    #[tokio::test]
+    #[ignore]
+    async fn test_self_exchange_rejected() {
+        println!("Test 12.3: Self-Exchange Rejected");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+
+        // The coordinator derives provider_did as "did:mycelix:{agent_pubkey}",
+        // so we set receiver_did to the same DID to trigger self-exchange check.
+        let caller_key = agents[0].clone();
+        let caller_did = format!("did:mycelix:{}", caller_key);
+
+        let exchange_input = RecordExchangeInput {
+            receiver_did: caller_did.clone(),
+            dao_did: TEST_DAO.to_string(),
+            hours: 1.0,
+            service_description: "Self-service attempt".to_string(),
+            service_category: ServiceCategory::GeneralAssistance,
+            cultural_alias: None,
+            service_date: None,
+        };
+
+        let result: Result<ExchangeRecord, _> = conductor
+            .call_fallible(alice_cell.zome("tend"), "record_exchange", exchange_input)
+            .await;
+
+        match result {
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                assert!(
+                    error_msg.contains("Cannot exchange") || error_msg.contains("yourself"),
+                    "Should reject self-exchange, got: {}", error_msg
+                );
+                println!("  - Self-exchange rejected: OK");
+            }
+            Ok(_) => panic!("Should have rejected self-exchange"),
+        }
+
+        println!("Test 12.3 PASSED: Self-exchanges are rejected");
+    }
+}
+
+// ============================================================================
+// Section 13: TEND Lifecycle Edge Cases
+// ============================================================================
+
+#[cfg(test)]
+mod tend_lifecycle_edge_cases {
+    use super::*;
+
+    /// Test 13.1: Confirm a disputed exchange should fail
+    ///
+    /// Record an exchange, dispute it, then try to confirm -- should fail
+    /// because confirm_exchange requires Proposed status.
+    #[tokio::test]
+    #[ignore]
+    async fn test_confirm_disputed_exchange_rejected() {
+        println!("Test 13.1: Confirm Disputed Exchange Rejected");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let bob_cell = &apps[1].cells()[0];
+        let bob_did = test_did("bob");
+
+        // Alice records an exchange
+        let exchange: ExchangeRecord = conductor
+            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
+                receiver_did: bob_did.clone(),
+                dao_did: TEST_DAO.to_string(),
+                hours: 2.0,
+                service_description: "Gardening help".to_string(),
+                service_category: ServiceCategory::Gardening,
+                cultural_alias: None,
+                service_date: None,
+            })
+            .await
+            .expect("Failed to record exchange");
+
+        assert!(matches!(exchange.status, ExchangeStatus::Proposed));
+        println!("  - Exchange recorded: {} (Proposed)", exchange.id);
+
+        // Bob disputes the exchange
+        let disputed: ExchangeRecord = conductor
+            .call(&bob_cell.zome("tend"), "dispute_exchange", exchange.id.clone())
+            .await
+            .expect("Failed to dispute exchange");
+
+        assert!(matches!(disputed.status, ExchangeStatus::Disputed));
+        println!("  - Exchange disputed: {:?}", disputed.status);
+
+        // Bob tries to confirm the now-Disputed exchange -- should fail
+        let result: Result<ExchangeRecord, _> = conductor
+            .call_fallible(bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
+            .await;
+
+        match result {
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                assert!(
+                    error_msg.contains("Proposed")
+                        || error_msg.contains("not in Proposed")
+                        || error_msg.contains("status"),
+                    "Should reject confirming a disputed exchange, got: {}", error_msg
+                );
+                println!("  - Confirm of disputed exchange rejected: OK");
+            }
+            Ok(_) => panic!("Should have rejected confirming a disputed exchange"),
+        }
+
+        println!("Test 13.1 PASSED: Cannot confirm a disputed exchange");
+    }
+
+    /// Test 13.2: Cancel a confirmed exchange should fail
+    ///
+    /// Record an exchange, confirm it, then try to cancel -- should fail
+    /// because cancel_exchange requires Proposed status.
+    /// Note: test_cannot_cancel_confirmed already exists in Section 8 (Test 8.2).
+    /// This test is included for completeness in the lifecycle edge cases section.
+    /// Skipping to avoid duplication -- see exchange_cancellation::test_cannot_cancel_confirmed.
+
+    /// Test 13.3: Rate an unconfirmed (Proposed) exchange should fail
+    ///
+    /// Note: test_cannot_rate_unconfirmed_exchange already exists in Section 5 (Test 5.2).
+    /// Skipping to avoid duplication -- see quality_ratings::test_cannot_rate_unconfirmed_exchange.
+}
+
+// ============================================================================
+// Section 14: Bilateral Settlement Atomicity
+// ============================================================================
+
+#[cfg(test)]
+mod bilateral_settlement_atomicity {
+    use super::*;
+
+    /// Test 14.1: Bilateral settlement creates a zeroed record
+    ///
+    /// Record a cross-DAO exchange, settle the bilateral balance, and verify
+    /// the balance is zeroed. The settlement function returns the settled amount
+    /// and zeros the BilateralBalance record.
+    ///
+    /// NOTE: In production, settlement triggers a SAP transfer from the debtor
+    /// DAO's commons pool to the creditor DAO's commons pool via the treasury zome.
+    /// This cross-zome call cannot be fully tested without a treasury zome setup.
+    /// The atomicity gap is that settle_bilateral_balance zeros the balance record
+    /// independently of the SAP transfer -- if the treasury call fails, the
+    /// balance is zeroed but funds are not transferred. This should be verified
+    /// in full integration testing with the treasury zome.
+    #[tokio::test]
+    #[ignore]
+    async fn test_bilateral_settlement_creates_record() {
+        println!("Test 14.1: Bilateral Settlement Creates Zeroed Record");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+
+        let dao_a = "did:mycelix:dao:epsilon_community".to_string();
+        let dao_b = "did:mycelix:dao:zeta_community".to_string();
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct RecordCrossDAOExchangeInput {
+            pub provider_dao_did: String,
+            pub receiver_dao_did: String,
+            pub hours: f32,
+        }
+
+        // Record cross-DAO exchanges to build up a bilateral balance
+        for _ in 0..3 {
+            let _: BilateralBalance = conductor
+                .call(&alice_cell.zome("tend"), "record_cross_dao_exchange", RecordCrossDAOExchangeInput {
+                    provider_dao_did: dao_a.clone(),
+                    receiver_dao_did: dao_b.clone(),
+                    hours: 4.0,
+                })
+                .await
+                .expect("Failed to record cross-DAO exchange");
+        }
+
+        println!("  - 3 cross-DAO exchanges recorded (4h each)");
+
+        // Check pre-settlement balance
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct GetBilateralInput {
+            pub dao_a_did: String,
+            pub dao_b_did: String,
+        }
+
+        let pre_balance: Option<BilateralBalance> = conductor
+            .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
+                dao_a_did: dao_a.clone(),
+                dao_b_did: dao_b.clone(),
+            })
+            .await
+            .expect("Failed to get pre-settlement balance");
+
+        assert!(pre_balance.is_some(), "Should have a bilateral balance before settlement");
+        if let Some(ref bal) = pre_balance {
+            assert_ne!(bal.net_balance, 0, "Net balance should be non-zero before settlement");
+            println!("  - Pre-settlement net balance: {}", bal.net_balance);
+        }
+
+        // Settle the bilateral balance
+        let settled_amount: i32 = conductor
+            .call(&alice_cell.zome("tend"), "settle_bilateral_balance", GetBilateralInput {
+                dao_a_did: dao_a.clone(),
+                dao_b_did: dao_b.clone(),
+            })
+            .await
+            .expect("Failed to settle bilateral balance");
+
+        assert_ne!(settled_amount, 0, "Settled amount should be non-zero");
+        println!("  - Settled amount: {}", settled_amount);
+
+        // Verify post-settlement balance is zeroed
+        let post_balance: Option<BilateralBalance> = conductor
+            .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
+                dao_a_did: dao_a.clone(),
+                dao_b_did: dao_b.clone(),
+            })
+            .await
+            .expect("Failed to get post-settlement balance");
+
+        if let Some(bal) = &post_balance {
+            assert_eq!(bal.net_balance, 0, "Net balance should be 0 after settlement");
+            println!("  - Post-settlement net balance: {} (zeroed)", bal.net_balance);
+        }
+
+        // Atomicity gap documentation:
+        // settle_bilateral_balance zeros the BilateralBalance entry but does NOT
+        // perform the treasury SAP transfer atomically. If the treasury zome
+        // call were to fail, the balance would be zeroed without funds moving.
+        // Full atomicity verification requires integration testing with:
+        //   1. Treasury zome deployed and initialized
+        //   2. DAO commons pools funded with SAP
+        //   3. Verify SAP transfer matches settled_amount
+        //   4. Verify rollback on treasury failure
+
+        println!("Test 14.1 PASSED: Bilateral settlement zeroes balance record");
     }
 }

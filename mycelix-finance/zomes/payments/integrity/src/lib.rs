@@ -3,6 +3,15 @@
 use hdi::prelude::*;
 pub use mycelix_finance_types::SuccessionPreference;
 
+// =============================================================================
+// CONSTANTS — Fee Proportionality (Commons Charter)
+// =============================================================================
+
+/// Steward minimum fee rate: 0.01% (1 basis point).
+/// For micro-SAP amounts: fee_micro >= amount_micro / 10_000.
+/// Using f64: fee >= amount / 10_000.0.
+pub const SAP_STEWARD_MIN_FEE_DIVISOR: f64 = 10_000.0;
+
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Payment {
@@ -10,6 +19,7 @@ pub struct Payment {
     pub from_did: String,
     pub to_did: String,
     pub amount: f64,
+    pub fee: f64,
     pub currency: String,
     pub payment_type: PaymentType,
     pub status: TransferStatus,
@@ -260,6 +270,34 @@ fn validate_create_payment(
             "Currency must be \"SAP\" or \"TEND\"".into()
         ));
     }
+
+    // Fee must not be negative
+    if payment.fee < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Fee cannot be negative".into()
+        ));
+    }
+
+    // Fee proportionality: SAP payments must pay at least the Steward minimum (0.01%)
+    if payment.currency == "SAP" && payment.amount > 0.0 {
+        let min_fee = payment.amount / SAP_STEWARD_MIN_FEE_DIVISOR;
+        if payment.fee < min_fee {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!(
+                    "SAP payment fee ({}) is below Steward minimum (0.01% = {})",
+                    payment.fee, min_fee
+                ),
+            ));
+        }
+    }
+
+    // TEND payments are fee-free (mutual credit)
+    if payment.currency == "TEND" && payment.fee != 0.0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "TEND payments must have zero fee (mutual credit is fee-free)".into()
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
