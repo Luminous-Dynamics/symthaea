@@ -7,7 +7,7 @@ use proptest::prelude::*;
 
 use super::semantic_bridge::SemanticBridge;
 use super::consciousness_verifier::{ConsciousnessVerifier, ConsciousnessVerdict};
-use super::phi_feedback::{PhiFeedbackController, PhiFeedbackConfig};
+use super::phi_feedback::PhiFeedbackController;
 use super::consciousness_integration::ConsciousnessState;
 
 // =============================================================================

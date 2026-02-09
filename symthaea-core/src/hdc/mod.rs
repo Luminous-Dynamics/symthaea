@@ -352,6 +352,10 @@ mod cross_bridge_integration_tests;
 mod phi_feedback_integration_tests;
 #[cfg(test)]
 mod proptest_consciousness;
+#[cfg(test)]
+mod consciousness_e2e_tests;
+#[cfg(test)]
+mod consciousness_fast_tests;
 pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
 pub mod native_similarity;                 // O(1) XOR+popcount similarity search (consciousness-native)
 pub mod sparse_hv;                         // Sparse HDC for memory-efficient low-density vectors
