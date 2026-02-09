@@ -285,15 +285,15 @@ mod sdk_tests {
     #[test]
     fn test_pogq_boundary_values() {
         // Perfect gradient
-        let perfect = 0.4 * 1.0 + 0.3 * 1.0 + 0.3 * 1.0;
+        let perfect: f64 = 0.4 * 1.0 + 0.3 * 1.0 + 0.3 * 1.0;
         assert!((perfect - 1.0).abs() < 1e-10, "Perfect composite = 1.0");
 
         // Worst gradient
-        let worst = 0.4 * 0.0 + 0.3 * 0.0 + 0.3 * 0.0;
+        let worst: f64 = 0.4 * 0.0 + 0.3 * 0.0 + 0.3 * 0.0;
         assert!(worst.abs() < 1e-10, "Worst composite = 0.0");
 
         // Threshold boundary (all 0.5)
-        let boundary = 0.4 * 0.5 + 0.3 * 0.5 + 0.3 * 0.5;
+        let boundary: f64 = 0.4 * 0.5 + 0.3 * 0.5 + 0.3 * 0.5;
         assert!((boundary - 0.5).abs() < 1e-10, "Boundary composite = 0.5");
 
         // Just above threshold with new node
