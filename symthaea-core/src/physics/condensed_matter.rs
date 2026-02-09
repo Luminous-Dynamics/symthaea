@@ -320,6 +320,9 @@ impl CMEncoder {
 
     /// Fermi-Dirac distribution
     pub fn fermi_dirac(&self, energy_ev: f64, fermi_ev: f64, temperature_k: f64) -> f64 {
+        if temperature_k <= 0.0 {
+            return if energy_ev <= fermi_ev { 1.0 } else { 0.0 };
+        }
         let k_b = 8.617e-5;  // eV/K
         let x = (energy_ev - fermi_ev) / (k_b * temperature_k);
         1.0 / (x.exp() + 1.0)

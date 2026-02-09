@@ -355,7 +355,7 @@ impl AttractorAnalyzer {
             return 0.0;
         }
 
-        distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        distances.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         // Estimate D₂ from scaling: C(r) ~ r^D₂
         // Use linear fit to log(C) vs log(r)

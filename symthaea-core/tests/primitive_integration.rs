@@ -7,7 +7,7 @@
 //! Also tests cross-feature integration: LSH + batch ops, composition algebra + cache,
 //! persistence round-trip, and graph generation from composed primitives.
 
-use symthaea_core::hdc::binary_hv::HV16;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::{
     PrimitiveSystem, PrimitiveTier, CompositionCache, CompositionAlgebra,
     PrimitiveGraph, PrimitivePersistence, HistoryEntry,
@@ -61,7 +61,7 @@ mod bootstrapping_integration {
     #[test]
     fn bootstrapped_working_memory_is_distinct_per_subject() {
         let bootstrapper = PrimitiveBootstrapper::new();
-        let question_hv = HV16::random(42);
+        let question_hv = BinaryHV::random(42);
 
         let math_wm = bootstrapper.bootstrap_working_memory("mathematics", &question_hv);
         let ethics_wm = bootstrapper.bootstrap_working_memory("ethics", &question_hv);
@@ -417,7 +417,7 @@ mod cross_feature_integration {
     fn pairwise_similarities_consistent() {
         let system = PrimitiveSystem::global();
 
-        let encodings: Vec<HV16> = ["CAUSE", "EFFECT", "BEFORE", "AFTER"]
+        let encodings: Vec<BinaryHV> = ["CAUSE", "EFFECT", "BEFORE", "AFTER"]
             .iter()
             .filter_map(|n| system.get(n))
             .map(|p| p.encoding.clone())

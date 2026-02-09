@@ -86,6 +86,51 @@ pub use crate::physics::simulation_bridge::{
     SimulationAnalysis,
 };
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSCIOUSNESS VERIFICATION — from hdc::consciousness_verifier
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pub use crate::hdc::consciousness_verifier::{
+    ConsciousnessVerifier,
+    VerificationReport,
+    ConsciousnessVerdict,
+    IITAxiomScores,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SEMANTIC BRIDGE — from hdc::semantic_bridge
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pub use crate::hdc::semantic_bridge::SemanticBridge;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Φ FEEDBACK — from hdc::phi_feedback
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pub use crate::hdc::phi_feedback::{
+    PhiFeedbackController,
+    PhiFeedbackConfig,
+    FeedbackModulation,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PERFORMANCE & OBSERVABILITY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pub use crate::hdc::consciousness_perf::{
+    SimdCapabilities,
+    simd_capabilities,
+    batch_similarity_matrix,
+    find_similar,
+    cluster_by_similarity,
+};
+
+pub use crate::observability::{
+    MetricsCollector,
+    MetricsSnapshot,
+    DataPoint,
+};
+
 // Consciousness API traits
 pub mod traits;
 pub use traits::{

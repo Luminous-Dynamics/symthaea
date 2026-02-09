@@ -235,7 +235,7 @@ impl ContinuousEntropyEstimator {
 
         // For 1D data, we sort and find k-th NN distances directly
         let mut sorted: Vec<f32> = hv.values.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         // Compute k-th nearest neighbor distances
         let mut log_distances_sum = 0.0;
@@ -249,7 +249,7 @@ impl ContinuousEntropyEstimator {
                     distances.push((sorted[i] - sorted[j]).abs());
                 }
             }
-            distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            distances.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
             let rho_k = distances[k - 1] as f64;
             if rho_k > 1e-10 {
@@ -332,7 +332,7 @@ impl ContinuousEntropyEstimator {
 
         // Compute IQR
         let mut sorted: Vec<f32> = hv.values.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let q1_idx = n / 4;
         let q3_idx = 3 * n / 4;
@@ -409,7 +409,7 @@ impl ContinuousEntropyEstimator {
                     joint_distances.push(dx.max(dy)); // Chebyshev (L∞)
                 }
             }
-            joint_distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            joint_distances.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let epsilon = joint_distances[k - 1];
 
             // Count points within epsilon in marginals
@@ -454,7 +454,7 @@ impl ContinuousEntropyEstimator {
 
         // Sort once: O(n log n)
         let mut sorted: Vec<f32> = hv.values.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         // For each point in sorted order, k-th NN is at most k positions away
         let mut log_distances_sum = 0.0;
@@ -485,7 +485,7 @@ impl ContinuousEntropyEstimator {
                     distances.push((sorted[i + j] - sorted[i]).abs());
                 }
             }
-            distances.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            distances.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
             if distances.len() >= k {
                 let rho_k = distances[k - 1] as f64;
@@ -535,7 +535,7 @@ impl ContinuousEntropyEstimator {
             .enumerate()
             .map(|(i, &v)| (v, i))
             .collect();
-        indexed.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+        indexed.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
         // Truncation distance: beyond 4σ, contribution is negligible
         let truncation = 4.0 * bandwidth;
@@ -683,7 +683,7 @@ fn silverman_bandwidth(values: &[f32]) -> f64 {
 
     // Compute IQR
     let mut sorted: Vec<f32> = values.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     let q1 = sorted[n / 4] as f64;
     let q3 = sorted[3 * n / 4] as f64;
     let iqr = q3 - q1;
@@ -1975,7 +1975,7 @@ impl TruePhiCalculator {
 
         if part_a.is_empty() || part_b.is_empty() {
             let mut indices: Vec<usize> = (0..n).collect();
-            indices.sort_by(|&a, &b| fiedler[a].partial_cmp(&fiedler[b]).unwrap());
+            indices.sort_by(|&a, &b| fiedler[a].partial_cmp(&fiedler[b]).unwrap_or(std::cmp::Ordering::Equal));
             let mid = n / 2;
             return Some(TruePartition {
                 part_a: indices[..mid].to_vec(),

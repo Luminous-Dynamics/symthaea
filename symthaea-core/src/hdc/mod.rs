@@ -310,6 +310,7 @@ pub mod tiered_phi;                        // Multi-tier Φ (integrated informat
 #[cfg(test)]
 mod phi_tier_tests;                        // Unit tests for Φ tier implementations
 pub mod phi_topology_validation;           // ContinuousHV-TieredPhi integration for topology validation
+#[allow(deprecated)]
 pub mod phi_real;                          // ContinuousHV Φ calculator (no binarization) using cosine similarity
 pub mod spectral_connectivity;             // Algebraic connectivity (λ₂) calculator - NOT IIT Φ!
 pub mod phi_resonant;                      // Resonator-based Φ calculator (O(n log N) dynamics)
@@ -349,6 +350,8 @@ mod math_integration_tests;
 mod cross_bridge_integration_tests;
 #[cfg(test)]
 mod phi_feedback_integration_tests;
+#[cfg(test)]
+mod proptest_consciousness;
 pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
 pub mod native_similarity;                 // O(1) XOR+popcount similarity search (consciousness-native)
 pub mod sparse_hv;                         // Sparse HDC for memory-efficient low-density vectors
@@ -677,6 +680,10 @@ pub mod phi_guided_math;                  // Φ-guided math domain selection (co
 pub mod phi_feedback;                     // Φ feedback controller (closes the loop: Φ measurement → parameter modulation)
 pub mod semantic_bridge;                   // Bidirectional text <-> HV <-> consciousness bridge
 pub mod consciousness_perf;                // SIMD batch ops + HV pool integration for consciousness hot paths
+pub mod consciousness_subsystem;           // Trait-based pluggable consciousness subsystems
+pub mod consciousness_metacognitive;       // Metacognitive monitoring subsystem
+pub mod consciousness_self_awareness;      // Self-awareness subsystem
+pub mod consciousness_phi_optimization;    // Phi optimization subsystem
 
 // Re-export multi-database integration types
 // Note: QdrantConfig is aliased to MdbQdrantConfig to avoid conflict with long_term_memory::QdrantConfig

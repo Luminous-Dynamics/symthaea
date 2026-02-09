@@ -263,7 +263,7 @@ pub struct OutputStatistics {
 
 impl OutputStatistics {
     fn from_samples(name: &str, units: &str, values: &mut [f64]) -> Self {
-        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
         let n = values.len();
         let mean = values.iter().sum::<f64>() / n as f64;
@@ -517,7 +517,7 @@ impl UncertaintyEngine {
             (1.0 - p_lifetime_met, "Lifetime below minimum"),
         ];
         let primary_failure_mode = failure_rates.iter()
-            .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
+            .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(_, mode)| mode.to_string())
             .unwrap_or_else(|| "None".to_string());
 
@@ -572,7 +572,7 @@ impl UncertaintyEngine {
         sensitivities.sort_by(|a, b| {
             let a_total = a.dose_sensitivity + a.temp_sensitivity + a.lifetime_sensitivity;
             let b_total = b.dose_sensitivity + b.temp_sensitivity + b.lifetime_sensitivity;
-            b_total.partial_cmp(&a_total).unwrap()
+            b_total.partial_cmp(&a_total).unwrap_or(std::cmp::Ordering::Equal)
         });
 
         for (i, sens) in sensitivities.iter_mut().enumerate() {
@@ -641,7 +641,7 @@ impl UncertaintyEngine {
         sensitivities.sort_by(|a, b| {
             let a_max = a.dose_sensitivity.max(a.temp_sensitivity).max(a.lifetime_sensitivity);
             let b_max = b.dose_sensitivity.max(b.temp_sensitivity).max(b.lifetime_sensitivity);
-            b_max.partial_cmp(&a_max).unwrap()
+            b_max.partial_cmp(&a_max).unwrap_or(std::cmp::Ordering::Equal)
         });
 
         for (i, sens) in sensitivities.iter_mut().enumerate() {
@@ -740,7 +740,7 @@ impl UncertaintyEngine {
         }).collect();
 
         // Rank by μ*
-        morris.sort_by(|a, b| b.mu_star.partial_cmp(&a.mu_star).unwrap());
+        morris.sort_by(|a, b| b.mu_star.partial_cmp(&a.mu_star).unwrap_or(std::cmp::Ordering::Equal));
         for (i, m) in morris.iter_mut().enumerate() {
             m.rank = i + 1;
         }
@@ -795,7 +795,7 @@ impl UncertaintyEngine {
         }).collect();
 
         // Sort by swing (descending)
-        entries.sort_by(|a, b| b.swing.partial_cmp(&a.swing).unwrap());
+        entries.sort_by(|a, b| b.swing.partial_cmp(&a.swing).unwrap_or(std::cmp::Ordering::Equal));
         for (i, entry) in entries.iter_mut().enumerate() {
             entry.rank = i + 1;
         }

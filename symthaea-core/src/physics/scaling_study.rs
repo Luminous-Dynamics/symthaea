@@ -276,14 +276,14 @@ impl ScalingStudy {
             }
 
             // Sort for percentiles
-            mc_costs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            mc_masses.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            mc_volumes.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            mc_specific_costs.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            mc_power_densities.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            mc_specific_powers.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            mc_lifetimes.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            mc_feasibilities.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            mc_costs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            mc_masses.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            mc_volumes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            mc_specific_costs.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            mc_power_densities.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            mc_specific_powers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            mc_lifetimes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            mc_feasibilities.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
             let pct = |v: &[f64], p: f64| -> f64 {
                 let idx = ((v.len() as f64) * p) as usize;
