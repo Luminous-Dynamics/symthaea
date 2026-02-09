@@ -228,10 +228,10 @@ impl DensityMatrix {
 
     /// von Neumann entropy S = -Tr(ρ log ρ)
     ///
-    /// Computed via eigenvalue decomposition (approximate)
+    /// Computed via eigenvalue decomposition using analytical (d=2) or
+    /// Jacobi iteration (d≥3) for Hermitian matrices.
     pub fn von_neumann_entropy(&self) -> f64 {
-        // Get eigenvalues via power iteration
-        let eigenvalues = self.approximate_eigenvalues(10);
+        let eigenvalues = self.hermitian_eigenvalues();
 
         let mut s = 0.0;
         for lambda in eigenvalues {
@@ -240,6 +240,171 @@ impl DensityMatrix {
             }
         }
         s.max(0.0)
+    }
+
+    /// Compute eigenvalues of a Hermitian density matrix.
+    ///
+    /// Dispatches: d=1 trivial, d=2 analytical, d≥3 Jacobi rotation.
+    pub fn hermitian_eigenvalues(&self) -> Vec<f64> {
+        match self.dim {
+            0 => vec![],
+            1 => vec![self.get(0, 0).re],
+            2 => self.eigenvalues_2x2(),
+            _ => self.jacobi_eigenvalues(),
+        }
+    }
+
+    /// Analytical eigenvalues for 2×2 Hermitian matrix.
+    ///
+    /// For [[a, b], [b*, d]]:
+    /// λ = (a+d)/2 ± √(((a-d)/2)² + |b|²)
+    fn eigenvalues_2x2(&self) -> Vec<f64> {
+        let a = self.get(0, 0).re;
+        let d = self.get(1, 1).re;
+        let b_norm_sq = self.get(0, 1).norm_sqr();
+
+        let avg = (a + d) * 0.5;
+        let half_diff = (a - d) * 0.5;
+        let disc = (half_diff * half_diff + b_norm_sq).sqrt();
+
+        vec![avg + disc, avg - disc]
+    }
+
+    /// Jacobi eigenvalue algorithm for complex Hermitian matrices.
+    ///
+    /// Iteratively applies Givens rotations to diagonalize the matrix.
+    /// Converges quadratically for small matrices (d=2–10).
+    fn jacobi_eigenvalues(&self) -> Vec<f64> {
+        let n = self.dim;
+        // Work with a real-symmetric proxy: for Hermitian A, eigenvalues are real.
+        // We build real and imaginary parts and apply 2n×2n real Jacobi,
+        // but for density matrices (which are often nearly real-diagonal),
+        // we use the standard complex Jacobi approach on the Hermitian matrix.
+
+        // Copy matrix elements into mutable working arrays (re, im parts)
+        let mut re = vec![vec![0.0f64; n]; n];
+        let mut im = vec![vec![0.0f64; n]; n];
+        for i in 0..n {
+            for j in 0..n {
+                let c = self.get(i, j);
+                re[i][j] = c.re;
+                im[i][j] = c.im;
+            }
+        }
+
+        let max_iter = 100 * n * n;
+        let eps = 1e-12;
+
+        for _ in 0..max_iter {
+            // Find largest off-diagonal element |A[p][q]|
+            let mut max_off = 0.0f64;
+            let mut p = 0;
+            let mut q = 1;
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    let mag = re[i][j] * re[i][j] + im[i][j] * im[i][j];
+                    if mag > max_off {
+                        max_off = mag;
+                        p = i;
+                        q = j;
+                    }
+                }
+            }
+
+            if max_off.sqrt() < eps {
+                break;
+            }
+
+            // Phase correction: rotate A[p][q] to be real and non-negative
+            let apq_re = re[p][q];
+            let apq_im = im[p][q];
+            let apq_abs = (apq_re * apq_re + apq_im * apq_im).sqrt();
+
+            if apq_abs < eps {
+                continue;
+            }
+
+            // Phase factor e^{iφ} such that A[p][q] * e^{-iφ} is real
+            let phase_re = apq_re / apq_abs;
+            let phase_im = apq_im / apq_abs;
+
+            // Apply phase to column q: multiply column q by e^{-iφ}
+            // This makes A[p][q] real so we can apply standard real Jacobi rotation
+            for i in 0..n {
+                let r = re[i][q];
+                let m = im[i][q];
+                // (r + im) * (phase_re - i*phase_im)
+                re[i][q] = r * phase_re + m * phase_im;
+                im[i][q] = m * phase_re - r * phase_im;
+            }
+            // Apply conjugate phase to row q (Hermitian: row q = conj of col q transform)
+            for j in 0..n {
+                let r = re[q][j];
+                let m = im[q][j];
+                // (r + im) * (phase_re + i*phase_im)
+                re[q][j] = r * phase_re - m * phase_im;
+                im[q][j] = m * phase_re + r * phase_im;
+            }
+
+            // Now A[p][q] should be real (and equal to apq_abs)
+            // Standard Jacobi rotation for real symmetric 2x2 subproblem
+            let app = re[p][p];
+            let aqq = re[q][q];
+            let apq_real = re[p][q]; // Should be ~apq_abs
+
+            let tau = (aqq - app) / (2.0 * apq_real);
+            let t = if tau >= 0.0 {
+                1.0 / (tau + (1.0 + tau * tau).sqrt())
+            } else {
+                -1.0 / (-tau + (1.0 + tau * tau).sqrt())
+            };
+            let c = 1.0 / (1.0 + t * t).sqrt();
+            let s = t * c;
+
+            // Apply Givens rotation G^T * A * G where G rotates in (p,q) plane
+            // Update rows p and q
+            let mut new_rp = vec![(0.0f64, 0.0f64); n];
+            let mut new_rq = vec![(0.0f64, 0.0f64); n];
+            for j in 0..n {
+                new_rp[j] = (
+                    c * re[p][j] - s * re[q][j],
+                    c * im[p][j] - s * im[q][j],
+                );
+                new_rq[j] = (
+                    s * re[p][j] + c * re[q][j],
+                    s * im[p][j] + c * im[q][j],
+                );
+            }
+            for j in 0..n {
+                re[p][j] = new_rp[j].0;
+                im[p][j] = new_rp[j].1;
+                re[q][j] = new_rq[j].0;
+                im[q][j] = new_rq[j].1;
+            }
+
+            // Update columns p and q
+            let mut new_cp = vec![(0.0f64, 0.0f64); n];
+            let mut new_cq = vec![(0.0f64, 0.0f64); n];
+            for i in 0..n {
+                new_cp[i] = (
+                    c * re[i][p] - s * re[i][q],
+                    c * im[i][p] - s * im[i][q],
+                );
+                new_cq[i] = (
+                    s * re[i][p] + c * re[i][q],
+                    s * im[i][p] + c * im[i][q],
+                );
+            }
+            for i in 0..n {
+                re[i][p] = new_cp[i].0;
+                im[i][p] = new_cp[i].1;
+                re[i][q] = new_cq[i].0;
+                im[i][q] = new_cq[i].1;
+            }
+        }
+
+        // Eigenvalues are on the diagonal
+        (0..n).map(|i| re[i][i]).collect()
     }
 
     /// Approximate eigenvalues using power iteration
