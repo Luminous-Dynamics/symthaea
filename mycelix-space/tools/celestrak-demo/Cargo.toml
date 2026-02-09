@@ -30,6 +30,3 @@ colored = "2.1"
 
 # Error handling
 anyhow = "1.0"
-
-# Async runtime (for Holochain client)
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }

@@ -14,6 +14,46 @@ use orbital_mechanics::tle::TwoLineElement;
 use orbital_mechanics::propagator::Propagator;
 use orbital_mechanics::conjunction::ConjunctionAnalyzer;
 
+// =============================================================================
+// Anchor helpers (deterministic DHT-discoverable paths)
+// =============================================================================
+
+/// Anchor for all conjunctions involving a given NORAD ID.
+fn anchor_for_object_conjunctions(norad_id: u32) -> ExternResult<AnyLinkableHash> {
+    let path = Path::from(format!("conj_by_object.{}", norad_id));
+    let typed = path.typed(LinkTypes::ObjectConjunctions)?;
+    typed.ensure()?;
+    Ok(typed.path_entry_hash()?.into())
+}
+
+/// Anchor for all active (risk >= Medium) conjunctions.
+fn anchor_for_active_conjunctions() -> ExternResult<AnyLinkableHash> {
+    let path = Path::from("active_conjunctions");
+    let typed = path.typed(LinkTypes::ActiveConjunctions)?;
+    typed.ensure()?;
+    Ok(typed.path_entry_hash()?.into())
+}
+
+/// Anchor for all CDMs belonging to a conjunction event.
+fn anchor_for_event_cdms(event_id: &str) -> ExternResult<AnyLinkableHash> {
+    let path = Path::from(format!("cdms_for_event.{}", event_id));
+    let typed = path.typed(LinkTypes::EventToCdms)?;
+    typed.ensure()?;
+    Ok(typed.path_entry_hash()?.into())
+}
+
+/// Anchor for all maneuvers belonging to a conjunction event.
+fn anchor_for_event_maneuvers(event_id: &str) -> ExternResult<AnyLinkableHash> {
+    let path = Path::from(format!("maneuvers_for_event.{}", event_id));
+    let typed = path.typed(LinkTypes::EventToManeuvers)?;
+    typed.ensure()?;
+    Ok(typed.path_entry_hash()?.into())
+}
+
+// =============================================================================
+// Signal types
+// =============================================================================
+
 /// Signal types for this zome (used by Holochain's emit_signal)
 #[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
 pub enum ConjunctionSignal {
@@ -106,8 +146,32 @@ pub fn create_conjunction_event(input: CreateEventInput) -> ExternResult<ActionH
 
     let action_hash = create_entry(&EntryTypes::ConjunctionEvent(event.clone()))?;
 
-    // Emit signal if risk level is at or above threshold
+    // Link to both primary and secondary object anchors
+    let primary_anchor = anchor_for_object_conjunctions(input.primary_norad_id)?;
+    create_link(
+        primary_anchor,
+        action_hash.clone(),
+        LinkTypes::ObjectConjunctions,
+        LinkTag::new(format!("conj:{}", input.event_id)),
+    )?;
+    let secondary_anchor = anchor_for_object_conjunctions(input.secondary_norad_id)?;
+    create_link(
+        secondary_anchor,
+        action_hash.clone(),
+        LinkTypes::ObjectConjunctions,
+        LinkTag::new(format!("conj:{}", input.event_id)),
+    )?;
+
+    // If risk >= Medium, also link to active conjunctions index
     if risk_level >= ALERT_THRESHOLD {
+        let active_anchor = anchor_for_active_conjunctions()?;
+        create_link(
+            active_anchor,
+            action_hash.clone(),
+            LinkTypes::ActiveConjunctions,
+            LinkTag::new(format!("active:{}", input.event_id)),
+        )?;
+
         emit_conjunction_alert(&event)?;
     }
 
@@ -190,6 +254,15 @@ pub fn submit_cdm(input: SubmitCdmInput) -> ExternResult<ActionHash> {
 
     let action_hash = create_entry(&EntryTypes::Cdm(cdm_entry))?;
 
+    // Link CDM to its conjunction event anchor
+    let cdm_anchor = anchor_for_event_cdms(&input.cdm.conjunction_id)?;
+    create_link(
+        cdm_anchor,
+        action_hash.clone(),
+        LinkTypes::EventToCdms,
+        LinkTag::new(format!("cdm:v{}", input.version)),
+    )?;
+
     // Emit CDM update signal
     let signal = ConjunctionSignal::CdmUpdate {
         event_id: input.cdm.conjunction_id.clone(),
@@ -235,6 +308,15 @@ pub fn announce_maneuver(input: AnnounceManeuverInput) -> ExternResult<ActionHas
     };
 
     let action_hash = create_entry(&EntryTypes::AvoidanceManeuver(maneuver))?;
+
+    // Link maneuver to its conjunction event anchor
+    let maneuver_anchor = anchor_for_event_maneuvers(&input.event_id)?;
+    create_link(
+        maneuver_anchor,
+        action_hash.clone(),
+        LinkTypes::EventToManeuvers,
+        LinkTag::new(format!("maneuver:{}", input.norad_id)),
+    )?;
 
     // Emit maneuver announcement signal
     let maneuver_alert = ManeuverAlert {
@@ -308,20 +390,133 @@ pub struct ManeuverExecutedInput {
     pub maneuver_hash: ActionHash,
 }
 
-/// Get all high-risk conjunctions
+/// Get all active (risk >= Medium) conjunctions, sorted by risk desc then Pc desc.
 #[hdk_extern]
 pub fn get_high_risk_conjunctions(_: ()) -> ExternResult<Vec<ConjunctionEvent>> {
-    // Query all conjunction events with risk level >= High
-    // In a real implementation, this would use a path or link query
-    // For now, return empty - would need proper indexing
-    Ok(vec![])
+    let anchor = anchor_for_active_conjunctions()?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::ActiveConjunctions)?,
+        GetStrategy::Network,
+    )?;
+
+    let mut events = Vec::new();
+    for link in links {
+        let Some(target) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(target, GetOptions::default())? else {
+            continue;
+        };
+        if let Some(event) = record
+            .entry()
+            .to_app_option::<ConjunctionEvent>()
+            .ok()
+            .flatten()
+        {
+            events.push(event);
+        }
+    }
+
+    // Sort: highest risk first, then highest Pc first
+    events.sort_by(|a, b| {
+        b.risk_level.cmp(&a.risk_level)
+            .then(b.max_pc.partial_cmp(&a.max_pc).unwrap_or(std::cmp::Ordering::Equal))
+    });
+
+    Ok(events)
 }
 
 /// Query conjunctions by object
 #[hdk_extern]
-pub fn get_conjunctions_for_object(_norad_id: u32) -> ExternResult<Vec<ConjunctionEvent>> {
-    // Would query by link or path anchored on the NORAD ID
-    Ok(vec![])
+pub fn get_conjunctions_for_object(norad_id: u32) -> ExternResult<Vec<ConjunctionEvent>> {
+    let anchor = anchor_for_object_conjunctions(norad_id)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::ObjectConjunctions)?,
+        GetStrategy::Network,
+    )?;
+
+    let mut events = Vec::new();
+    for link in links {
+        let Some(target) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(target, GetOptions::default())? else {
+            continue;
+        };
+        if let Some(event) = record
+            .entry()
+            .to_app_option::<ConjunctionEvent>()
+            .ok()
+            .flatten()
+        {
+            events.push(event);
+        }
+    }
+
+    Ok(events)
+}
+
+/// Get all CDMs for a conjunction event
+#[hdk_extern]
+pub fn get_cdms_for_event(event_id: String) -> ExternResult<Vec<CdmEntry>> {
+    let anchor = anchor_for_event_cdms(&event_id)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::EventToCdms)?,
+        GetStrategy::Network,
+    )?;
+
+    let mut cdms = Vec::new();
+    for link in links {
+        let Some(target) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(target, GetOptions::default())? else {
+            continue;
+        };
+        if let Some(cdm) = record
+            .entry()
+            .to_app_option::<CdmEntry>()
+            .ok()
+            .flatten()
+        {
+            cdms.push(cdm);
+        }
+    }
+
+    // Sort by version ascending
+    cdms.sort_by_key(|c| c.version);
+
+    Ok(cdms)
+}
+
+/// Get all maneuvers for a conjunction event
+#[hdk_extern]
+pub fn get_maneuvers_for_event(event_id: String) -> ExternResult<Vec<AvoidanceManeuver>> {
+    let anchor = anchor_for_event_maneuvers(&event_id)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::EventToManeuvers)?,
+        GetStrategy::Network,
+    )?;
+
+    let mut maneuvers = Vec::new();
+    for link in links {
+        let Some(target) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(target, GetOptions::default())? else {
+            continue;
+        };
+        if let Some(m) = record
+            .entry()
+            .to_app_option::<AvoidanceManeuver>()
+            .ok()
+            .flatten()
+        {
+            maneuvers.push(m);
+        }
+    }
+
+    Ok(maneuvers)
 }
 
 /// Screen a primary object against secondaries using SGP4 propagation

@@ -145,6 +145,30 @@ impl Default for IntegrationConfig {
 }
 
 // ==========================================
+// PIPELINE CHECKPOINT
+// ==========================================
+
+/// Serializable snapshot of pipeline state for save/restore.
+///
+/// Does NOT include subsystems (which must be re-registered after restore)
+/// or the metrics collector / verifier (which are runtime-only).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PipelineCheckpoint {
+    /// Consciousness state at checkpoint time
+    pub state: ConsciousnessState,
+    /// Pipeline configuration
+    pub config: IntegrationConfig,
+    /// Processing history
+    pub history: Vec<ConsciousnessState>,
+    /// Maximum history size setting
+    pub max_history_size: usize,
+    /// Current processing cycle
+    pub current_cycle: u64,
+    /// Embodiment level
+    pub embodiment_level: f64,
+}
+
+// ==========================================
 // UNIFIED CONSCIOUSNESS OPTIMIZER TYPES
 // ==========================================
 
@@ -827,8 +851,10 @@ pub struct ConsciousnessPipeline {
     /// Latest verification report
     latest_verification: Option<super::consciousness_verifier::VerificationReport>,
 
-    /// Pluggable subsystems (trait-based extension point)
+    /// Pluggable subsystems (trait-based extension point, sorted by priority descending)
     subsystems: Vec<Box<dyn ConsciousnessSubsystem>>,
+    /// Errors from subsystem dispatch in the most recent process() cycle
+    subsystem_errors: Vec<super::consciousness_subsystem::SubsystemError>,
 }
 
 impl ConsciousnessPipeline {
@@ -924,6 +950,7 @@ impl ConsciousnessPipeline {
 
             // Pluggable subsystems
             subsystems: Vec::new(),
+            subsystem_errors: Vec::new(),
         };
 
         // Pre-warm HV pools for consciousness pipeline operation
@@ -1876,14 +1903,26 @@ impl ConsciousnessPipeline {
 
     /// Register a custom consciousness subsystem.
     ///
-    /// Subsystems are called in registration order at the end of each `process()` cycle.
-    pub fn register_subsystem(&mut self, sub: Box<dyn ConsciousnessSubsystem>) {
+    /// Subsystems are called in priority order (highest first) at the end of
+    /// each `process()` cycle. The `on_register()` lifecycle hook is called
+    /// immediately.
+    pub fn register_subsystem(&mut self, mut sub: Box<dyn ConsciousnessSubsystem>) {
+        sub.on_register();
         self.subsystems.push(sub);
+        // Re-sort by descending priority so highest-priority subsystems run first
+        self.subsystems.sort_by(|a, b| b.priority().cmp(&a.priority()));
     }
 
     /// Get the number of registered subsystems.
     pub fn subsystem_count(&self) -> usize {
         self.subsystems.len()
+    }
+
+    /// Get errors from the most recent `process()` cycle's subsystem dispatch.
+    ///
+    /// Returns an empty slice if no subsystem errors occurred.
+    pub fn last_subsystem_errors(&self) -> &[super::consciousness_subsystem::SubsystemError] {
+        &self.subsystem_errors
     }
 
     /// Check if a subsystem with the given name is registered.
@@ -2552,10 +2591,34 @@ impl ConsciousnessPipeline {
         }
 
         // === PLUGGABLE SUBSYSTEMS ===
-        // Run any registered custom subsystems
+        // Run registered subsystems in priority order, catching panics and errors.
+        self.subsystem_errors.clear();
         for sub in &mut self.subsystems {
-            if sub.is_enabled() {
-                sub.process_cycle(&mut self.state, &input);
+            if !sub.is_enabled() {
+                continue;
+            }
+            let sub_name = sub.name().to_string();
+            // Safety: catch_unwind requires the closure to be UnwindSafe.
+            // We use AssertUnwindSafe since subsystems are behind &mut and we
+            // accept the state may be partially updated on panic.
+            let state_ptr = &mut self.state as *mut ConsciousnessState;
+            let input_ref = &input;
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                // SAFETY: we hold exclusive access; no other thread touches state during process()
+                let state = unsafe { &mut *state_ptr };
+                sub.process_cycle(state, input_ref)
+            }));
+            match result {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => {
+                    self.subsystem_errors.push(e);
+                }
+                Err(_panic) => {
+                    self.subsystem_errors.push(super::consciousness_subsystem::SubsystemError {
+                        subsystem: sub_name,
+                        message: "subsystem panicked during process_cycle".to_string(),
+                    });
+                }
             }
         }
 
@@ -2948,10 +3011,14 @@ impl ConsciousnessPipeline {
         &self.state
     }
 
-    /// Clear history
+    /// Clear history and call `on_shutdown` on all subsystems.
     pub fn clear(&mut self) {
+        for sub in &mut self.subsystems {
+            sub.on_shutdown();
+        }
         self.state = ConsciousnessState::default();
         self.history.clear();
+        self.subsystem_errors.clear();
     }
 
     /// Set maximum history size (ring buffer capacity).
@@ -2960,6 +3027,34 @@ impl ConsciousnessPipeline {
         while self.history.len() > self.max_history_size {
             self.history.pop_front();
         }
+    }
+
+    /// Save a checkpoint of the pipeline's current state.
+    ///
+    /// Captures the consciousness state, configuration, history, and cycle count.
+    /// Subsystems are NOT serialized (they must be re-registered after restore).
+    pub fn save_checkpoint(&self) -> PipelineCheckpoint {
+        PipelineCheckpoint {
+            state: self.state.clone(),
+            config: self.config.clone(),
+            history: self.history.iter().cloned().collect(),
+            max_history_size: self.max_history_size,
+            current_cycle: self.current_cycle,
+            embodiment_level: self.embodiment_level,
+        }
+    }
+
+    /// Restore pipeline state from a checkpoint.
+    ///
+    /// Replaces the current state, config, and history. Subsystems are NOT affected
+    /// — they must be re-registered separately.
+    pub fn restore_checkpoint(&mut self, checkpoint: PipelineCheckpoint) {
+        self.state = checkpoint.state;
+        self.config = checkpoint.config;
+        self.history = checkpoint.history.into_iter().collect();
+        self.max_history_size = checkpoint.max_history_size;
+        self.current_cycle = checkpoint.current_cycle;
+        self.embodiment_level = checkpoint.embodiment_level;
     }
 }
 
@@ -4508,16 +4603,18 @@ mod tests {
 
     #[test]
     fn test_register_subsystem() {
-        use crate::hdc::consciousness_subsystem::ConsciousnessSubsystem;
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
 
         struct TestSubsystem { call_count: usize }
 
         impl ConsciousnessSubsystem for TestSubsystem {
             fn name(&self) -> &str { "test" }
-            fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV]) {
+            fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
+                -> Result<(), SubsystemError>
+            {
                 self.call_count += 1;
-                // Slightly boost phi to prove we ran
                 state.phi = (state.phi + 0.001).min(1.0);
+                Ok(())
             }
             fn is_enabled(&self) -> bool { true }
         }
@@ -4532,7 +4629,8 @@ mod tests {
         let priorities = vec![0.8, 0.75];
         pipeline.process(inputs, &priorities);
 
-        // The pipeline should have processed without error
+        // No subsystem errors
+        assert!(pipeline.last_subsystem_errors().is_empty());
         let state = pipeline.get_state();
         assert!(state.phi >= 0.0);
     }
@@ -4577,5 +4675,167 @@ mod tests {
 
         // History should be capped at 10
         assert!(pipeline.history.len() <= 10, "History should be bounded, got {}", pipeline.history.len());
+    }
+
+    #[test]
+    fn test_subsystem_panic_safety() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+
+        struct PanickingSubsystem;
+        impl ConsciousnessSubsystem for PanickingSubsystem {
+            fn name(&self) -> &str { "panicker" }
+            fn process_cycle(&mut self, _state: &mut ConsciousnessState, _inputs: &[BinaryHV])
+                -> Result<(), SubsystemError> { panic!("intentional test panic"); }
+            fn is_enabled(&self) -> bool { true }
+        }
+
+        struct GoodSubsystem;
+        impl ConsciousnessSubsystem for GoodSubsystem {
+            fn name(&self) -> &str { "good" }
+            fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
+                -> Result<(), SubsystemError>
+            {
+                state.phi = (state.phi + 0.01).min(1.0);
+                Ok(())
+            }
+            fn is_enabled(&self) -> bool { true }
+        }
+
+        let mut pipeline = ConsciousnessPipeline::default();
+        pipeline.set_embodiment(0.8);
+        pipeline.register_subsystem(Box::new(PanickingSubsystem));
+        pipeline.register_subsystem(Box::new(GoodSubsystem));
+
+        // Should NOT panic — panicking subsystem is caught
+        let inputs = vec![BinaryHV::random(1100)];
+        pipeline.process(inputs, &[0.8]);
+
+        // Should have 1 error from the panicker
+        assert_eq!(pipeline.last_subsystem_errors().len(), 1);
+        assert_eq!(pipeline.last_subsystem_errors()[0].subsystem, "panicker");
+    }
+
+    #[test]
+    fn test_subsystem_error_collection() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+
+        struct FailingSubsystem;
+        impl ConsciousnessSubsystem for FailingSubsystem {
+            fn name(&self) -> &str { "failer" }
+            fn process_cycle(&mut self, _state: &mut ConsciousnessState, _inputs: &[BinaryHV])
+                -> Result<(), SubsystemError>
+            {
+                Err(SubsystemError { subsystem: "failer".into(), message: "test error".into() })
+            }
+            fn is_enabled(&self) -> bool { true }
+        }
+
+        let mut pipeline = ConsciousnessPipeline::default();
+        pipeline.set_embodiment(0.8);
+        pipeline.register_subsystem(Box::new(FailingSubsystem));
+
+        let inputs = vec![BinaryHV::random(1200)];
+        pipeline.process(inputs, &[0.8]);
+
+        assert_eq!(pipeline.last_subsystem_errors().len(), 1);
+        assert_eq!(pipeline.last_subsystem_errors()[0].message, "test error");
+
+        // Errors should clear on next cycle
+        let inputs2 = vec![BinaryHV::random(1201)];
+        pipeline.process(inputs2, &[0.8]);
+        // Still 1 error because the same subsystem fails every cycle
+        assert_eq!(pipeline.last_subsystem_errors().len(), 1);
+    }
+
+    #[test]
+    fn test_subsystem_priority_ordering() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+        use std::sync::{Arc, Mutex};
+
+        let order: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+
+        struct OrderTracker { name: String, prio: i32, order: Arc<Mutex<Vec<String>>> }
+        impl ConsciousnessSubsystem for OrderTracker {
+            fn name(&self) -> &str { &self.name }
+            fn process_cycle(&mut self, _state: &mut ConsciousnessState, _inputs: &[BinaryHV])
+                -> Result<(), SubsystemError>
+            {
+                self.order.lock().unwrap().push(self.name.clone());
+                Ok(())
+            }
+            fn is_enabled(&self) -> bool { true }
+            fn priority(&self) -> i32 { self.prio }
+        }
+
+        let mut pipeline = ConsciousnessPipeline::default();
+        pipeline.set_embodiment(0.8);
+
+        // Register in non-priority order
+        pipeline.register_subsystem(Box::new(OrderTracker {
+            name: "low".into(), prio: -10, order: order.clone()
+        }));
+        pipeline.register_subsystem(Box::new(OrderTracker {
+            name: "high".into(), prio: 100, order: order.clone()
+        }));
+        pipeline.register_subsystem(Box::new(OrderTracker {
+            name: "mid".into(), prio: 0, order: order.clone()
+        }));
+
+        let inputs = vec![BinaryHV::random(1300)];
+        pipeline.process(inputs, &[0.8]);
+
+        let executed = order.lock().unwrap();
+        assert_eq!(executed.as_slice(), &["high", "mid", "low"]);
+    }
+
+    #[test]
+    fn test_checkpoint_save_restore() {
+        let mut pipeline = ConsciousnessPipeline::default();
+        pipeline.set_embodiment(0.9);
+
+        // Run some cycles to build up state
+        for i in 0..10 {
+            let inputs = vec![BinaryHV::random(1400 + i as u64)];
+            pipeline.process(inputs, &[0.85]);
+        }
+
+        let checkpoint = pipeline.save_checkpoint();
+        let saved_phi = pipeline.get_state().phi;
+        let saved_cycle = checkpoint.current_cycle;
+
+        // Mutate the pipeline further
+        for i in 0..5 {
+            let inputs = vec![BinaryHV::random(1500 + i as u64)];
+            pipeline.process(inputs, &[0.5]);
+        }
+
+        // Restore
+        pipeline.restore_checkpoint(checkpoint);
+        assert!((pipeline.get_state().phi - saved_phi).abs() < 1e-15,
+            "Phi should be restored exactly");
+        assert_eq!(pipeline.current_cycle, saved_cycle);
+    }
+
+    #[test]
+    fn test_checkpoint_serialization_roundtrip() {
+        let mut pipeline = ConsciousnessPipeline::default();
+        pipeline.set_embodiment(0.8);
+
+        for i in 0..5 {
+            let inputs = vec![BinaryHV::random(1600 + i as u64)];
+            pipeline.process(inputs, &[0.8]);
+        }
+
+        let checkpoint = pipeline.save_checkpoint();
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&checkpoint).expect("checkpoint should serialize");
+        assert!(!json.is_empty());
+
+        // Deserialize back
+        let restored: PipelineCheckpoint = serde_json::from_str(&json)
+            .expect("checkpoint should deserialize");
+        assert!((restored.state.phi - checkpoint.state.phi).abs() < 1e-15);
+        assert_eq!(restored.current_cycle, checkpoint.current_cycle);
     }
 }

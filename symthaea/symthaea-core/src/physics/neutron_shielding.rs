@@ -56,7 +56,7 @@ pub struct NeutronCrossSection {
 impl NeutronCrossSection {
     /// Number density (atoms/m³)
     pub fn number_density(&self) -> f64 {
-        let n_a = 6.022e23; // Avogadro's number
+        let n_a = 6.022_140_76e23; // Avogadro's number (2019 SI exact)
         self.density * n_a / (self.a * 1e-3)
     }
 
@@ -82,12 +82,12 @@ impl NeutronCrossSection {
 
     /// Half-value layer (m)
     pub fn hvl(&self, energy_mev: f64) -> f64 {
-        0.693 / self.macro_cross_section(energy_mev)
+        2.0_f64.ln() / self.macro_cross_section(energy_mev)
     }
 
     /// Tenth-value layer (m)
     pub fn tvl(&self, energy_mev: f64) -> f64 {
-        2.303 / self.macro_cross_section(energy_mev)
+        10.0_f64.ln() / self.macro_cross_section(energy_mev)
     }
 
     /// Average energy loss per collision (fraction)

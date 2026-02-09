@@ -6,7 +6,7 @@
 
 use super::binary_hv::BinaryHV;
 use super::consciousness_integration::ConsciousnessState;
-use super::consciousness_subsystem::ConsciousnessSubsystem;
+use super::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
 
 /// Metacognitive monitoring subsystem.
 ///
@@ -63,7 +63,9 @@ impl ConsciousnessSubsystem for MetacognitiveSubsystem {
         "metacognitive"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV]) {
+    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
+        -> Result<(), SubsystemError>
+    {
         self.cycle_count += 1;
 
         // Record Phi history
@@ -92,6 +94,8 @@ impl ConsciousnessSubsystem for MetacognitiveSubsystem {
             state.predicted_phi = Some((state.phi + trend * 0.5).clamp(0.0, 1.0));
             state.phi_trend = trend;
         }
+
+        Ok(())
     }
 
     fn is_enabled(&self) -> bool {
@@ -142,10 +146,13 @@ impl ConsciousnessSubsystem for MetaConsciousnessWrapped {
         "meta_consciousness"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV]) {
+    fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV])
+        -> Result<(), SubsystemError>
+    {
         let meta_state = self.engine.meta_reflect(inputs);
         state.metacognitive_confidence = meta_state.metacognitive_confidence;
         self.latest_state = Some(meta_state);
+        Ok(())
     }
 
     fn is_enabled(&self) -> bool {
@@ -174,7 +181,7 @@ mod tests {
         // Run several cycles with increasing Phi
         for i in 0..5 {
             state.phi = 0.3 + i as f64 * 0.1;
-            sub.process_cycle(&mut state, &inputs);
+            sub.process_cycle(&mut state, &inputs).unwrap();
         }
 
         // After 5 cycles, should have valid metacognitive metrics
@@ -192,7 +199,7 @@ mod tests {
         // Rising Phi
         for i in 0..5 {
             state.phi = 0.2 + i as f64 * 0.1;
-            sub.process_cycle(&mut state, &inputs);
+            sub.process_cycle(&mut state, &inputs).unwrap();
         }
 
         assert!(sub.phi_trend() > 0.0, "Trend should be positive for rising Phi");
@@ -206,7 +213,7 @@ mod tests {
 
         for i in 0..10 {
             state.phi = 0.5;
-            sub.process_cycle(&mut state, &inputs);
+            sub.process_cycle(&mut state, &inputs).unwrap();
         }
 
         // Only last 3 values should be in history

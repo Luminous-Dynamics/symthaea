@@ -54,6 +54,10 @@ path = "propagation_tests.rs"
 name = "shared_types"
 path = "integration/zome_tests.rs"
 
+[[test]]
+name = "edge_cases"
+path = "edge_case_tests.rs"
+
 # Sweettest Integration Tests (conductor-based)
 [[test]]
 name = "sweettest_integration"

@@ -104,7 +104,17 @@ pub mod simulation_bridge;
 #[cfg(test)]
 mod physics_integration_examples;
 #[cfg(test)]
+mod physics_test_helpers;
+#[cfg(test)]
 mod physics_numerical_validation;
+#[cfg(test)]
+mod physics_validation_r7;
+#[cfg(test)]
+mod physics_validation_particle;
+#[cfg(test)]
+mod physics_cross_validation;
+#[cfg(test)]
+mod physics_benchmark_gates;
 #[cfg(test)]
 mod physics_proptest_validation;
 

@@ -6,7 +6,7 @@
 
 use super::binary_hv::BinaryHV;
 use super::consciousness_integration::ConsciousnessState;
-use super::consciousness_subsystem::ConsciousnessSubsystem;
+use super::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
 
 /// Φ optimization subsystem.
 ///
@@ -62,7 +62,9 @@ impl ConsciousnessSubsystem for PhiOptimizationSubsystem {
         "phi_optimization"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV]) {
+    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
+        -> Result<(), SubsystemError>
+    {
         self.cycle_count += 1;
 
         // Track best Phi
@@ -73,7 +75,7 @@ impl ConsciousnessSubsystem for PhiOptimizationSubsystem {
         // Only optimize every N cycles
         if self.cycle_count % self.optimize_every != 0 {
             self.prev_phi = state.phi;
-            return;
+            return Ok(());
         }
 
         // Compute Phi delta
@@ -91,6 +93,7 @@ impl ConsciousnessSubsystem for PhiOptimizationSubsystem {
         }
 
         self.prev_phi = state.phi;
+        Ok(())
     }
 
     fn is_enabled(&self) -> bool {
@@ -158,7 +161,9 @@ impl ConsciousnessSubsystem for PhaseTransitionWrapped {
         "phase_transitions"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV]) {
+    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
+        -> Result<(), SubsystemError>
+    {
         let workspace_hvs: Vec<super::binary_hv::BinaryHV> = state.conscious_contents.iter()
             .map(|item| item.content)
             .collect();
@@ -166,6 +171,7 @@ impl ConsciousnessSubsystem for PhaseTransitionWrapped {
         let assessment = self.engine.assess();
         self.current_phase = assessment.current_phase;
         self.latest_assessment = Some(assessment);
+        Ok(())
     }
 
     fn is_enabled(&self) -> bool {
@@ -192,11 +198,11 @@ mod tests {
         let inputs = vec![BinaryHV::random(42)];
 
         state.phi = 0.3;
-        sub.process_cycle(&mut state, &inputs);
+        sub.process_cycle(&mut state, &inputs).unwrap();
         state.phi = 0.7;
-        sub.process_cycle(&mut state, &inputs);
+        sub.process_cycle(&mut state, &inputs).unwrap();
         state.phi = 0.5;
-        sub.process_cycle(&mut state, &inputs);
+        sub.process_cycle(&mut state, &inputs).unwrap();
 
         assert!((sub.best_phi() - 0.7).abs() < 1e-10);
     }
@@ -209,7 +215,7 @@ mod tests {
 
         for _ in 0..10 {
             state.phi = 0.6;
-            sub.process_cycle(&mut state, &inputs);
+            sub.process_cycle(&mut state, &inputs).unwrap();
         }
 
         // Topological unity should converge toward 0.6
@@ -228,12 +234,12 @@ mod tests {
         // Before 5 cycles, topological_unity should remain at default
         state.phi = 0.5;
         for _ in 0..4 {
-            sub.process_cycle(&mut state, &inputs);
+            sub.process_cycle(&mut state, &inputs).unwrap();
         }
         assert_eq!(state.topological_unity, initial_topo, "Topological unity should not change before optimization cycle");
 
         // After 5th cycle, it should be updated
-        sub.process_cycle(&mut state, &inputs);
+        sub.process_cycle(&mut state, &inputs).unwrap();
         assert!(state.topological_unity != initial_topo || state.phi_trend != 0.0,
             "Either topological_unity or phi_trend should change on optimization cycle");
     }

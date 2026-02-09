@@ -8,10 +8,29 @@
 use super::binary_hv::BinaryHV;
 use super::consciousness_integration::ConsciousnessState;
 
+/// Error type for subsystem processing failures.
+#[derive(Debug, Clone)]
+pub struct SubsystemError {
+    /// Name of the subsystem that failed.
+    pub subsystem: String,
+    /// Human-readable error message.
+    pub message: String,
+}
+
+impl std::fmt::Display for SubsystemError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "subsystem '{}': {}", self.subsystem, self.message)
+    }
+}
+
+impl std::error::Error for SubsystemError {}
+
 /// A pluggable consciousness subsystem that processes one aspect of consciousness.
 ///
 /// Subsystems are registered with `ConsciousnessPipeline::register_subsystem()`
 /// and are called during each `process()` cycle after the built-in systems.
+/// They execute in priority order (higher priority first), and errors are
+/// collected rather than halting the pipeline.
 ///
 /// # Examples
 ///
@@ -22,8 +41,11 @@ use super::consciousness_integration::ConsciousnessState;
 ///
 /// impl ConsciousnessSubsystem for MySubsystem {
 ///     fn name(&self) -> &str { "my_subsystem" }
-///     fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV]) {
+///     fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV])
+///         -> Result<(), SubsystemError>
+///     {
 ///         state.phi = (state.phi + 0.01).min(1.0);
+///         Ok(())
 ///     }
 ///     fn is_enabled(&self) -> bool { self.enabled }
 /// }
@@ -33,8 +55,27 @@ pub trait ConsciousnessSubsystem: Send + Sync {
     fn name(&self) -> &str;
 
     /// Process one cycle, mutating the consciousness state.
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV]);
+    ///
+    /// Returns `Ok(())` on success, or a `SubsystemError` if processing fails.
+    /// The pipeline collects errors and continues with remaining subsystems.
+    fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV])
+        -> Result<(), SubsystemError>;
 
     /// Whether this subsystem is currently active.
     fn is_enabled(&self) -> bool;
+
+    /// Execution priority. Higher values run first. Default is 0.
+    fn priority(&self) -> i32 {
+        0
+    }
+
+    /// Called when the subsystem is registered with a pipeline.
+    ///
+    /// Override to perform one-time initialization.
+    fn on_register(&mut self) {}
+
+    /// Called when the pipeline is being shut down or the subsystem is removed.
+    ///
+    /// Override to release resources.
+    fn on_shutdown(&mut self) {}
 }

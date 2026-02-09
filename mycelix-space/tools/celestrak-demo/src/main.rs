@@ -82,7 +82,7 @@ enum Commands {
     /// Demonstrate conjunction analysis
     ConjunctionDemo,
 
-    /// Ingest TLE data into Holochain network
+    /// Ingest TLE data — writes JSON files for Holochain batch import
     Ingest {
         /// Source: "iss", "starlink", "debris", or "all"
         #[arg(short, long, default_value = "iss")]
@@ -92,13 +92,9 @@ enum Commands {
         #[arg(short, long, default_value = "10")]
         limit: usize,
 
-        /// Holochain conductor WebSocket URL
-        #[arg(long, default_value = "ws://localhost:8888")]
-        conductor_url: String,
-
-        /// Dry run (prepare data but don't send to Holochain)
-        #[arg(long, default_value = "false")]
-        dry_run: bool,
+        /// Output directory for batch JSON files
+        #[arg(long, default_value = "import_batch")]
+        batch_dir: String,
     },
 
     /// Export TLE data as JSON for offline ingestion
@@ -127,10 +123,8 @@ fn main() -> Result<()> {
         Commands::Propagate { hours, step } => propagate_iss(hours, step)?,
         Commands::Screen { threshold, debris_count } => screen_iss(threshold, debris_count)?,
         Commands::ConjunctionDemo => conjunction_demo()?,
-        Commands::Ingest { source, limit, conductor_url, dry_run } => {
-            // Use tokio runtime for async operations
-            let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(ingest_data(&source, limit, &conductor_url, dry_run))?;
+        Commands::Ingest { source, limit, batch_dir } => {
+            ingest_data(&source, limit, &batch_dir)?;
         }
         Commands::Export { source, limit, output } => export_data(&source, limit, &output)?,
     }
@@ -487,26 +481,23 @@ fn conjunction_demo() -> Result<()> {
     Ok(())
 }
 
-/// Ingest TLE data into Holochain
-async fn ingest_data(source: &str, limit: usize, conductor_url: &str, dry_run: bool) -> Result<()> {
-    println!("{}", format!("=== Ingesting {} data into Holochain ===", source).green().bold());
+/// Ingest TLE data — writes JSON files for Holochain batch import
+fn ingest_data(source: &str, limit: usize, batch_dir: &str) -> Result<()> {
+    println!("{}", format!("=== Ingesting {} data (writing to {}) ===", source, batch_dir).green().bold());
 
-    // Collect TLEs based on source (using spawn_blocking for blocking HTTP calls)
-    let source_owned = source.to_lowercase();
-    let tles = tokio::task::spawn_blocking(move || -> Result<Vec<(String, TwoLineElement)>> {
-        match source_owned.as_str() {
-            "iss" => fetch_tles_for_ingest("CATNR=25544", 1),
-            "starlink" => fetch_tles_for_ingest("GROUP=starlink", limit),
-            "debris" => fetch_tles_for_ingest("GROUP=cosmos-1408-debris", limit),
-            "all" => {
-                let mut all = fetch_tles_for_ingest("CATNR=25544", 1)?;
-                all.extend(fetch_tles_for_ingest("GROUP=starlink", limit / 2)?);
-                all.extend(fetch_tles_for_ingest("GROUP=cosmos-1408-debris", limit / 2)?);
-                Ok(all)
-            }
-            _ => anyhow::bail!("Unknown source. Use 'iss', 'starlink', 'debris', or 'all'"),
+    // Collect TLEs based on source
+    let tles = match source.to_lowercase().as_str() {
+        "iss" => fetch_tles_for_ingest("CATNR=25544", 1)?,
+        "starlink" => fetch_tles_for_ingest("GROUP=starlink", limit)?,
+        "debris" => fetch_tles_for_ingest("GROUP=cosmos-1408-debris", limit)?,
+        "all" => {
+            let mut all = fetch_tles_for_ingest("CATNR=25544", 1)?;
+            all.extend(fetch_tles_for_ingest("GROUP=starlink", limit / 2)?);
+            all.extend(fetch_tles_for_ingest("GROUP=cosmos-1408-debris", limit / 2)?);
+            all
         }
-    }).await??;
+        _ => anyhow::bail!("Unknown source. Use 'iss', 'starlink', 'debris', or 'all'"),
+    };
 
     println!("\nFetched {} TLEs from CelesTrak", tles.len());
 
@@ -514,7 +505,6 @@ async fn ingest_data(source: &str, limit: usize, conductor_url: &str, dry_run: b
     let mut batch = IngestionBatch::new();
 
     for (name, tle) in &tles {
-        // Determine object type based on name
         let object_type = if name.contains("DEB") || name.contains("debris") {
             "Debris"
         } else if name.contains("R/B") {
@@ -523,19 +513,17 @@ async fn ingest_data(source: &str, limit: usize, conductor_url: &str, dry_run: b
             "Payload"
         };
 
-        // Add orbital object
         batch = batch.add_object(OrbitalObjectInput {
             norad_id: tle.norad_id,
             name: name.clone(),
             object_type: object_type.to_string(),
-            launch_date: None,  // Could parse from international designator
+            launch_date: None,
             decay_date: None,
             owner_country: None,
             data_source: "CelesTrak".to_string(),
             metadata: HashMap::new(),
         });
 
-        // Add TLE
         batch = batch.add_tle(TleInput {
             norad_id: tle.norad_id,
             line1: tle.line1.clone(),
@@ -544,7 +532,6 @@ async fn ingest_data(source: &str, limit: usize, conductor_url: &str, dry_run: b
             source: "CelesTrak".to_string(),
         });
 
-        // Propagate to get current state vector
         if let Ok(propagator) = Propagator::from_tle(tle) {
             if let Ok(state) = propagator.propagate_to(Utc::now()) {
                 batch = batch.add_state_vector(StateVectorInput {
@@ -554,7 +541,7 @@ async fn ingest_data(source: &str, limit: usize, conductor_url: &str, dry_run: b
                     velocity_kms: [state.state.vx, state.state.vy, state.state.vz],
                     covariance: None,
                     reference_frame: "Teme".to_string(),
-                    quality: 0.9,  // CelesTrak data is generally good quality
+                    quality: 0.9,
                     source: "CelesTrak".to_string(),
                 });
             }
@@ -566,25 +553,16 @@ async fn ingest_data(source: &str, limit: usize, conductor_url: &str, dry_run: b
     println!("  TLEs: {}", batch.tle_count());
     println!("  State Vectors: {}", batch.state_vector_count());
 
-    if dry_run {
-        println!("\n{}", "DRY RUN - Not sending to Holochain".yellow());
-        println!("\nSample entries:");
-        for obj in batch.objects().iter().take(3) {
-            println!("  - {} (NORAD {}): {}", obj.name, obj.norad_id, obj.object_type);
-        }
-        return Ok(());
-    }
-
-    // Connect to Holochain and ingest
+    // Initialize client and write batch files
     let config = HolochainConfig {
-        conductor_url: conductor_url.to_string(),
+        batch_dir: std::path::PathBuf::from(batch_dir),
         ..Default::default()
     };
 
     let mut client = HolochainClient::new(config);
-    client.connect().await?;
+    client.init()?;
 
-    let report = batch.ingest(&client).await?;
+    let report = batch.write_batch(&client)?;
     report.print_summary();
 
     Ok(())

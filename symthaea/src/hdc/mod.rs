@@ -219,6 +219,10 @@ pub use symthaea_core::hdc::consciousness_perf;
 pub use symthaea_core::hdc::consciousness_verifier;
 pub use symthaea_core::hdc::semantic_bridge;
 pub use symthaea_core::hdc::phi_feedback;
+pub use symthaea_core::hdc::consciousness_subsystem;
+pub use symthaea_core::hdc::consciousness_metacognitive;
+pub use symthaea_core::hdc::consciousness_self_awareness;
+pub use symthaea_core::hdc::consciousness_phi_optimization;
 pub use symthaea_core::hdc::hdc_ltc_unified as core_hdc_ltc_unified;
 
 // Re-export unified HDC-LTC types (revolutionary closed-form dynamics)

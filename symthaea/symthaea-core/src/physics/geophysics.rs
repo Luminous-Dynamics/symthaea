@@ -233,7 +233,7 @@ impl GeophysicsEncoder {
 
     /// Magnitude from seismic moment
     pub fn moment_to_magnitude(&self, moment_nm: f64) -> f64 {
-        (moment_nm.log10() - 9.1) / 1.5
+        (2.0 / 3.0) * moment_nm.log10() - 10.7
     }
 
     // ============================================================
