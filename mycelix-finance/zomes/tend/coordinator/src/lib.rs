@@ -1575,47 +1575,182 @@ pub struct GetBilateralInput {
     pub dao_b_did: String,
 }
 
-/// Settle a bilateral balance by resetting it to zero.
+/// Payload for cross-zome treasury SAP transfer call.
 ///
-/// In production, this triggers a SAP transfer from the debtor DAO's
-/// commons pool to the creditor DAO's commons pool via the treasury zome.
-/// Returns the settled amount (positive = DAO-A was owed, negative = DAO-B was owed).
+/// Sent to the treasury zome's `transfer_commons_sap` function to move
+/// SAP from one DAO's commons pool to another during bilateral settlement.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TransferPayload {
+    pub from_dao: String,
+    pub to_dao: String,
+    pub amount: i32,
+    pub reason: String,
+}
+
+/// Input for settle_bilateral_balance
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SettleBilateralInput {
+    pub dao_a_did: String,
+    pub dao_b_did: String,
+}
+
+/// Settle a bilateral balance using a two-phase commit pattern.
 ///
-/// NOTE: Governance operation — should be called quarterly by an authorized agent.
+/// Phase 1 (Prepare): Create a BilateralSettlement entry with status Pending,
+/// recording the amount to settle. The bilateral balance is NOT zeroed yet.
+///
+/// Phase 2 (Commit): Call treasury to transfer SAP from the debtor DAO's
+/// commons pool to the creditor DAO's commons pool.
+/// - If the transfer SUCCEEDS: update settlement to Completed, zero the
+///   bilateral balance.
+/// - If the transfer FAILS: update settlement to Failed, the bilateral
+///   balance remains unchanged (no debt is lost).
+///
+/// Returns the settlement Record on success.
+///
+/// NOTE: Governance operation -- should be called quarterly by an authorized agent.
 #[hdk_extern]
-pub fn settle_bilateral_balance(input: GetBilateralInput) -> ExternResult<i32> {
+pub fn settle_bilateral_balance(input: SettleBilateralInput) -> ExternResult<Record> {
     let (dao_a, dao_b) = if input.dao_a_did < input.dao_b_did {
-        (&input.dao_a_did, &input.dao_b_did)
+        (input.dao_a_did.clone(), input.dao_b_did.clone())
     } else {
-        (&input.dao_b_did, &input.dao_a_did)
+        (input.dao_b_did.clone(), input.dao_a_did.clone())
     };
 
     let anchor_key = format!("bilateral:{}:{}", dao_a, dao_b);
     let now = sys_time()?;
+
+    // Step 1: Find the bilateral balance
     let links = get_links(
         LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::DaoToBilateralBalance)?,
         GetStrategy::default(),
     )?;
 
-    if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(bal) = record.entry().to_app_option::<BilateralBalance>().ok().flatten() {
-                    let settled_amount = bal.net_balance;
-                    let zeroed = BilateralBalance {
-                        net_balance: 0,
-                        last_settled_at: now,
-                        last_updated_at: now,
-                        ..bal
-                    };
-                    update_entry(action_hash, &zeroed)?;
-                    return Ok(settled_amount);
-                }
-            }
-        }
+    let (balance_action_hash, bal) = {
+        let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+            "No bilateral balance found between these DAOs".into()
+        )))?;
+        let action_hash = link.target.clone().into_action_hash().ok_or(
+            wasm_error!(WasmErrorInner::Guest("Invalid bilateral balance link target".into())),
+        )?;
+        let record = get(action_hash.clone(), GetOptions::default())?.ok_or(
+            wasm_error!(WasmErrorInner::Guest("Bilateral balance record not found".into())),
+        )?;
+        let bal = record
+            .entry()
+            .to_app_option::<BilateralBalance>()
+            .ok()
+            .flatten()
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Failed to deserialize bilateral balance".into()
+            )))?;
+        (action_hash, bal)
+    };
+
+    if bal.net_balance == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Bilateral balance is already zero, nothing to settle".into()
+        )));
     }
 
-    Ok(0) // No balance to settle
+    // Determine debtor and creditor based on net_balance sign
+    // Positive net_balance means DAO-A is owed by DAO-B (DAO-B is debtor)
+    // Negative net_balance means DAO-B is owed by DAO-A (DAO-A is debtor)
+    let (debtor_dao, creditor_dao) = if bal.net_balance > 0 {
+        (dao_b.clone(), dao_a.clone())
+    } else {
+        (dao_a.clone(), dao_b.clone())
+    };
+    let settle_amount = bal.net_balance.abs();
+
+    // Step 2: Phase 1 (Prepare) -- create BilateralSettlement with status Pending
+    let settlement_id = format!("settlement:{}:{}:{}", dao_a, dao_b, now.as_micros());
+    let settlement = BilateralSettlement {
+        id: settlement_id.clone(),
+        debtor_dao_did: debtor_dao.clone(),
+        creditor_dao_did: creditor_dao.clone(),
+        amount: settle_amount,
+        status: SettlementStatus::Pending,
+        created_at: now,
+        completed_at: None,
+    };
+
+    let settlement_hash = create_entry(&EntryTypes::BilateralSettlement(settlement.clone()))?;
+
+    // Link from settlement registry anchor
+    create_link(
+        anchor_hash(&format!("settlements:{}:{}", dao_a, dao_b))?,
+        settlement_hash.clone(),
+        LinkTypes::SettlementRegistry,
+        (),
+    )?;
+
+    // Step 3: Phase 2 (Commit) -- attempt treasury SAP transfer
+    let transfer_payload = TransferPayload {
+        from_dao: debtor_dao.clone(),
+        to_dao: creditor_dao.clone(),
+        amount: settle_amount,
+        reason: format!(
+            "Bilateral TEND settlement: {} TEND-hours from {} to {}",
+            settle_amount, debtor_dao, creditor_dao
+        ),
+    };
+
+    let treasury_result = call(
+        CallTargetCell::Local,
+        ZomeName::from("treasury"),
+        FunctionName::from("transfer_commons_sap"),
+        None,
+        transfer_payload,
+    );
+
+    let transfer_succeeded = match treasury_result {
+        Ok(ZomeCallResponse::Ok(_)) => true,
+        _ => false,
+    };
+
+    if transfer_succeeded {
+        // Step 4a: Transfer succeeded -- update settlement to Completed, zero bilateral balance
+        let completed_at = sys_time()?;
+        let completed_settlement = BilateralSettlement {
+            status: SettlementStatus::Completed,
+            completed_at: Some(completed_at),
+            ..settlement
+        };
+        update_entry(settlement_hash.clone(), &completed_settlement)?;
+
+        // Zero the bilateral balance
+        let zeroed = BilateralBalance {
+            net_balance: 0,
+            last_settled_at: completed_at,
+            last_updated_at: completed_at,
+            ..bal
+        };
+        update_entry(balance_action_hash, &zeroed)?;
+    } else {
+        // Step 4b: Transfer failed -- update settlement to Failed, balance unchanged
+        let failed_at = sys_time()?;
+        let failed_settlement = BilateralSettlement {
+            status: SettlementStatus::Failed,
+            completed_at: Some(failed_at),
+            ..settlement
+        };
+        update_entry(settlement_hash.clone(), &failed_settlement)?;
+
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Treasury SAP transfer failed. Settlement marked as Failed. \
+             Bilateral balance remains unchanged -- no debt was lost.".into()
+        )));
+    }
+
+    // Step 5: Return the settlement record
+    let record = get(settlement_hash, GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest(
+            "Failed to retrieve settlement record".into()
+        )),
+    )?;
+
+    Ok(record)
 }
 
 // =============================================================================

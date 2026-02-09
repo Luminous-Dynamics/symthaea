@@ -368,6 +368,47 @@ impl OracleState {
 #[derive(Clone, PartialEq)]
 pub struct Anchor(pub String);
 
+/// Status of a bilateral settlement (two-phase commit pattern).
+///
+/// Settlements transition: Pending -> Completed (if treasury transfer succeeds)
+///                         Pending -> Failed (if treasury transfer fails)
+/// No other transitions are valid.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum SettlementStatus {
+    /// Phase 1: Settlement created, awaiting treasury SAP transfer
+    Pending,
+    /// Phase 2 success: Treasury transfer completed, bilateral balance zeroed
+    Completed,
+    /// Phase 2 failure: Treasury transfer failed, bilateral balance unchanged
+    Failed,
+}
+
+/// A bilateral settlement record (two-phase commit for TEND clearing).
+///
+/// When settling inter-DAO TEND imbalances, the settlement is created in
+/// Pending status BEFORE the treasury SAP transfer. Only after the transfer
+/// succeeds is the bilateral balance zeroed and the settlement marked Completed.
+/// If the transfer fails, the settlement is marked Failed and the bilateral
+/// balance remains unchanged -- no debt is lost.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct BilateralSettlement {
+    /// Unique identifier for this settlement
+    pub id: String,
+    /// DID of the debtor DAO (the DAO that owes TEND-hours)
+    pub debtor_dao_did: String,
+    /// DID of the creditor DAO (the DAO that is owed TEND-hours)
+    pub creditor_dao_did: String,
+    /// Amount of TEND-hours to settle (always positive)
+    pub amount: i32,
+    /// Current status of the settlement
+    pub status: SettlementStatus,
+    /// When the settlement was created (Phase 1)
+    pub created_at: Timestamp,
+    /// When the settlement completed or failed (Phase 2), if applicable
+    pub completed_at: Option<Timestamp>,
+}
+
 /// Bilateral balance between two DAOs for inter-community TEND clearing.
 ///
 /// When a member from DAO-A provides service to a member of DAO-B,
@@ -405,6 +446,7 @@ pub enum EntryTypes {
     DisputeCase(DisputeCase),
     OracleState(OracleState),
     BilateralBalance(BilateralBalance),
+    BilateralSettlement(BilateralSettlement),
 }
 
 #[hdk_link_types]
@@ -437,6 +479,8 @@ pub enum LinkTypes {
     ExchangeToDispute,
     /// Link from DAO-pair anchor to bilateral balance
     DaoToBilateralBalance,
+    /// Link from settlement registry anchor to settlement entries
+    SettlementRegistry,
 }
 
 // =============================================================================
@@ -492,6 +536,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                             Ok(ValidateCallbackResult::Valid)
                         }
                     }
+                    EntryTypes::BilateralSettlement(settlement) => {
+                        validate_create_bilateral_settlement(settlement)
+                    }
                     // Anchors are always valid (just hash placeholders)
                     EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 }
@@ -531,6 +578,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::BilateralBalance(_) => {
                         Ok(ValidateCallbackResult::Valid)
                     }
+                    EntryTypes::BilateralSettlement(settlement) => {
+                        validate_update_bilateral_settlement(settlement)
+                    }
                     // Anchors cannot be updated
                     EntryTypes::Anchor(_) => {
                         Ok(ValidateCallbackResult::Invalid(
@@ -557,6 +607,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::MemberToDisputes => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::ExchangeToDispute => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::DaoToBilateralBalance => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::SettlementRegistry => Ok(ValidateCallbackResult::Valid),
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -825,6 +876,86 @@ fn validate_create_dispute_case(
     if dispute.stage != DisputeStage::DirectNegotiation {
         return Ok(ValidateCallbackResult::Invalid(
             "New disputes must start at DirectNegotiation stage".into(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_create_bilateral_settlement(
+    settlement: BilateralSettlement,
+) -> ExternResult<ValidateCallbackResult> {
+    // Amount must be positive
+    if settlement.amount <= 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Settlement amount must be positive".into(),
+        ));
+    }
+
+    // DIDs must be valid
+    if !settlement.debtor_dao_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Debtor DAO DID must be a valid DID".into(),
+        ));
+    }
+    if !settlement.creditor_dao_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Creditor DAO DID must be a valid DID".into(),
+        ));
+    }
+
+    // New settlements must start in Pending status
+    if settlement.status != SettlementStatus::Pending {
+        return Ok(ValidateCallbackResult::Invalid(
+            "New settlements must start in Pending status".into(),
+        ));
+    }
+
+    // ID must not be empty
+    if settlement.id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Settlement ID is required".into(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_bilateral_settlement(
+    settlement: BilateralSettlement,
+) -> ExternResult<ValidateCallbackResult> {
+    // Amount must remain positive
+    if settlement.amount <= 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Settlement amount must be positive".into(),
+        ));
+    }
+
+    // Only Completed and Failed are valid terminal statuses for updates.
+    // Pending -> Completed and Pending -> Failed are the only valid transitions,
+    // but we cannot access the original entry in integrity validation (no DHT reads),
+    // so we validate that the status is a valid terminal state.
+    match settlement.status {
+        SettlementStatus::Completed | SettlementStatus::Failed => {
+            // Valid terminal states
+        }
+        SettlementStatus::Pending => {
+            // Updating to Pending is not a valid transition (already starts Pending)
+            return Ok(ValidateCallbackResult::Invalid(
+                "Cannot update settlement to Pending status (already starts Pending)".into(),
+            ));
+        }
+    }
+
+    // DIDs must remain valid
+    if !settlement.debtor_dao_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Debtor DAO DID must be a valid DID".into(),
+        ));
+    }
+    if !settlement.creditor_dao_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Creditor DAO DID must be a valid DID".into(),
         ));
     }
 

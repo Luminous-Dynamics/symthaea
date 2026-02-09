@@ -980,6 +980,21 @@ mod unit_tests {
     }
 
     #[test]
+    fn test_settlement_status_serialization() {
+        let statuses = vec![
+            SettlementStatus::Pending,
+            SettlementStatus::Completed,
+            SettlementStatus::Failed,
+        ];
+
+        for status in statuses {
+            let json = serde_json::to_string(&status).expect("Serialize failed");
+            let deserialized: SettlementStatus = serde_json::from_str(&json).expect("Deserialize failed");
+            assert_eq!(status, deserialized, "SettlementStatus round-trip failed");
+        }
+    }
+
+    #[test]
     fn test_zero_sum_property() {
         // Verify that TEND maintains zero-sum property
         // For any exchange: provider_change + receiver_change = 0
@@ -1308,11 +1323,15 @@ mod cross_dao_clearing {
         println!("Test 9.2 PASSED: Bilateral balance uses canonical alphabetical order");
     }
 
-    /// Test 9.3: Settle bilateral balance
+    /// Test 9.3: Settle bilateral balance (two-phase commit)
+    ///
+    /// Settlement now uses two-phase commit: a BilateralSettlement record is
+    /// created before the treasury transfer. Without a treasury zome, the
+    /// transfer fails and the bilateral balance is preserved (no debt lost).
     #[tokio::test]
     #[ignore]
     async fn test_settle_bilateral_balance() {
-        println!("Test 9.3: Settle Bilateral Balance");
+        println!("Test 9.3: Settle Bilateral Balance (Two-Phase Commit)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
         let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
@@ -1350,25 +1369,20 @@ mod cross_dao_clearing {
 
         println!("  - 3 exchanges recorded");
 
-        // Settle the bilateral balance
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct SettleBilateralInput {
+            pub dao_a_did: String,
+            pub dao_b_did: String,
+        }
+
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct GetBilateralInput {
             pub dao_a_did: String,
             pub dao_b_did: String,
         }
 
-        let settled_amount: i32 = conductor
-            .call(&alice_cell.zome("tend"), "settle_bilateral_balance", GetBilateralInput {
-                dao_a_did: dao_a.clone(),
-                dao_b_did: dao_b.clone(),
-            })
-            .await
-            .expect("Failed to settle bilateral balance");
-
-        println!("  - Settled amount: {}", settled_amount);
-
-        // After settlement, balance should be zeroed
-        let post_balance: Option<BilateralBalance> = conductor
+        // Get pre-settlement balance
+        let pre_balance: Option<BilateralBalance> = conductor
             .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
                 dao_a_did: dao_a.clone(),
                 dao_b_did: dao_b.clone(),
@@ -1376,12 +1390,72 @@ mod cross_dao_clearing {
             .await
             .expect("Failed to get balance");
 
-        if let Some(bal) = &post_balance {
-            assert_eq!(bal.net_balance, 0, "Net balance should be 0 after settlement");
-            println!("  - Post-settlement net balance: {}", bal.net_balance);
+        let pre_net = pre_balance.as_ref().map(|b| b.net_balance).unwrap_or(0);
+        println!("  - Pre-settlement net balance: {}", pre_net);
+
+        // Attempt settlement (may fail without treasury zome -- that's correct)
+        let settle_result: Result<Record, _> = conductor
+            .call_fallible(
+                alice_cell.zome("tend"),
+                "settle_bilateral_balance",
+                SettleBilateralInput {
+                    dao_a_did: dao_a.clone(),
+                    dao_b_did: dao_b.clone(),
+                },
+            )
+            .await;
+
+        match settle_result {
+            Ok(settlement_record) => {
+                // Treasury available: settlement succeeded, balance zeroed
+                let settlement: BilateralSettlement = settlement_record
+                    .entry()
+                    .to_app_option()
+                    .expect("Failed to deserialize")
+                    .expect("No entry found");
+
+                assert_eq!(settlement.status, SettlementStatus::Completed);
+                println!("  - Settlement completed: {} TEND-hours", settlement.amount);
+
+                let post_balance: Option<BilateralBalance> = conductor
+                    .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
+                        dao_a_did: dao_a.clone(),
+                        dao_b_did: dao_b.clone(),
+                    })
+                    .await
+                    .expect("Failed to get balance");
+
+                if let Some(bal) = &post_balance {
+                    assert_eq!(bal.net_balance, 0, "Net balance should be 0 after settlement");
+                    println!("  - Post-settlement net balance: {}", bal.net_balance);
+                }
+            }
+            Err(e) => {
+                // Treasury unavailable: settlement Failed, balance preserved
+                let error_msg = format!("{:?}", e);
+                assert!(
+                    error_msg.contains("Treasury") || error_msg.contains("Failed"),
+                    "Should indicate treasury failure, got: {}", error_msg
+                );
+                println!("  - Settlement failed (no treasury zome): balance preserved");
+
+                let post_balance: Option<BilateralBalance> = conductor
+                    .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
+                        dao_a_did: dao_a.clone(),
+                        dao_b_did: dao_b.clone(),
+                    })
+                    .await
+                    .expect("Failed to get balance");
+
+                if let Some(bal) = &post_balance {
+                    assert_eq!(bal.net_balance, pre_net,
+                        "Balance should be unchanged after failed settlement");
+                    println!("  - Post-settlement net balance: {} (preserved)", bal.net_balance);
+                }
+            }
         }
 
-        println!("Test 9.3 PASSED: Bilateral balance settlement works");
+        println!("Test 9.3 PASSED: Bilateral balance settlement works (two-phase commit)");
     }
 }
 
@@ -1810,30 +1884,36 @@ mod tend_lifecycle_edge_cases {
 }
 
 // ============================================================================
-// Section 14: Bilateral Settlement Atomicity
+// Section 14: Bilateral Settlement Two-Phase Commit
 // ============================================================================
 
 #[cfg(test)]
-mod bilateral_settlement_atomicity {
+mod bilateral_settlement_two_phase {
     use super::*;
 
-    /// Test 14.1: Bilateral settlement creates a zeroed record
+    /// Test 14.1: Bilateral settlement uses two-phase commit pattern
     ///
-    /// Record a cross-DAO exchange, settle the bilateral balance, and verify
-    /// the balance is zeroed. The settlement function returns the settled amount
-    /// and zeros the BilateralBalance record.
+    /// Record cross-DAO exchanges, settle the bilateral balance, and verify:
+    /// 1. A BilateralSettlement record is created with status information
+    /// 2. The settlement contains debtor/creditor DAO DIDs and amount
+    /// 3. The settlement has a valid status (Completed or Failed)
     ///
-    /// NOTE: In production, settlement triggers a SAP transfer from the debtor
-    /// DAO's commons pool to the creditor DAO's commons pool via the treasury zome.
-    /// This cross-zome call cannot be fully tested without a treasury zome setup.
-    /// The atomicity gap is that settle_bilateral_balance zeros the balance record
-    /// independently of the SAP transfer -- if the treasury call fails, the
-    /// balance is zeroed but funds are not transferred. This should be verified
-    /// in full integration testing with the treasury zome.
+    /// Two-phase commit pattern:
+    ///   Phase 1 (Prepare): Create BilateralSettlement with status=Pending.
+    ///     The bilateral balance is NOT zeroed yet.
+    ///   Phase 2 (Commit): Call treasury to transfer SAP.
+    ///     Success -> settlement=Completed, balance zeroed.
+    ///     Failure -> settlement=Failed, balance unchanged (no debt lost).
+    ///
+    /// NOTE: Full two-phase verification requires both tend + treasury zomes
+    /// deployed together. Without a treasury zome, the cross-zome call to
+    /// transfer_commons_sap will fail, resulting in a Failed settlement and
+    /// the bilateral balance remaining unchanged. This is the CORRECT behavior
+    /// of the two-phase commit pattern -- it protects against debt loss.
     #[tokio::test]
     #[ignore]
     async fn test_bilateral_settlement_creates_record() {
-        println!("Test 14.1: Bilateral Settlement Creates Zeroed Record");
+        println!("Test 14.1: Bilateral Settlement Two-Phase Commit");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
         let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
@@ -1873,6 +1953,12 @@ mod bilateral_settlement_atomicity {
 
         // Check pre-settlement balance
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct SettleBilateralInput {
+            pub dao_a_did: String,
+            pub dao_b_did: String,
+        }
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct GetBilateralInput {
             pub dao_a_did: String,
             pub dao_b_did: String,
@@ -1887,47 +1973,101 @@ mod bilateral_settlement_atomicity {
             .expect("Failed to get pre-settlement balance");
 
         assert!(pre_balance.is_some(), "Should have a bilateral balance before settlement");
-        if let Some(ref bal) = pre_balance {
-            assert_ne!(bal.net_balance, 0, "Net balance should be non-zero before settlement");
-            println!("  - Pre-settlement net balance: {}", bal.net_balance);
+        let pre_net = pre_balance.as_ref().unwrap().net_balance;
+        assert_ne!(pre_net, 0, "Net balance should be non-zero before settlement");
+        println!("  - Pre-settlement net balance: {}", pre_net);
+
+        // Attempt to settle the bilateral balance
+        // Without a treasury zome, the cross-zome call will fail, which means:
+        //   - A BilateralSettlement record IS created (Phase 1 always succeeds)
+        //   - The settlement status will be Failed (treasury call fails)
+        //   - The bilateral balance will remain UNCHANGED (two-phase commit protection)
+        let settle_result: Result<Record, _> = conductor
+            .call_fallible(
+                alice_cell.zome("tend"),
+                "settle_bilateral_balance",
+                SettleBilateralInput {
+                    dao_a_did: dao_a.clone(),
+                    dao_b_did: dao_b.clone(),
+                },
+            )
+            .await;
+
+        match settle_result {
+            Ok(settlement_record) => {
+                // Treasury zome was available and transfer succeeded
+                let settlement: BilateralSettlement = settlement_record
+                    .entry()
+                    .to_app_option()
+                    .expect("Failed to deserialize")
+                    .expect("No entry found");
+
+                // Verify settlement record has required fields
+                assert!(!settlement.id.is_empty(), "Settlement should have an ID");
+                assert!(settlement.debtor_dao_did.starts_with("did:"),
+                    "Debtor DAO DID should be valid");
+                assert!(settlement.creditor_dao_did.starts_with("did:"),
+                    "Creditor DAO DID should be valid");
+                assert!(settlement.amount > 0, "Settlement amount should be positive");
+                assert_eq!(settlement.status, SettlementStatus::Completed,
+                    "Settlement should be Completed when treasury succeeds");
+                assert!(settlement.completed_at.is_some(),
+                    "Completed settlement should have completion timestamp");
+
+                println!("  - Settlement ID: {}", settlement.id);
+                println!("  - Debtor: {}", settlement.debtor_dao_did);
+                println!("  - Creditor: {}", settlement.creditor_dao_did);
+                println!("  - Amount: {} TEND-hours", settlement.amount);
+                println!("  - Status: {:?}", settlement.status);
+
+                // Verify post-settlement balance is zeroed
+                let post_balance: Option<BilateralBalance> = conductor
+                    .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
+                        dao_a_did: dao_a.clone(),
+                        dao_b_did: dao_b.clone(),
+                    })
+                    .await
+                    .expect("Failed to get post-settlement balance");
+
+                if let Some(bal) = &post_balance {
+                    assert_eq!(bal.net_balance, 0,
+                        "Net balance should be 0 after successful settlement");
+                    println!("  - Post-settlement net balance: {} (zeroed)", bal.net_balance);
+                }
+
+                println!("Test 14.1 PASSED: Two-phase commit succeeded (treasury available)");
+            }
+            Err(e) => {
+                // Treasury zome not available -- this is expected in unit tests.
+                // The two-phase commit pattern protects the bilateral balance.
+                let error_msg = format!("{:?}", e);
+                assert!(
+                    error_msg.contains("Treasury SAP transfer failed")
+                        || error_msg.contains("Failed"),
+                    "Error should indicate treasury transfer failure, got: {}", error_msg
+                );
+                println!("  - Treasury transfer failed (expected without treasury zome)");
+
+                // CRITICAL: Verify the bilateral balance was NOT zeroed
+                let post_balance: Option<BilateralBalance> = conductor
+                    .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
+                        dao_a_did: dao_a.clone(),
+                        dao_b_did: dao_b.clone(),
+                    })
+                    .await
+                    .expect("Failed to get post-settlement balance");
+
+                if let Some(bal) = &post_balance {
+                    assert_eq!(bal.net_balance, pre_net,
+                        "Net balance should be UNCHANGED after failed settlement \
+                         (two-phase commit protection)");
+                    println!("  - Post-settlement net balance: {} (unchanged, debt preserved)",
+                        bal.net_balance);
+                }
+
+                println!("Test 14.1 PASSED: Two-phase commit protected bilateral balance");
+                println!("  NOTE: Full two-phase verification requires both tend + treasury zomes");
+            }
         }
-
-        // Settle the bilateral balance
-        let settled_amount: i32 = conductor
-            .call(&alice_cell.zome("tend"), "settle_bilateral_balance", GetBilateralInput {
-                dao_a_did: dao_a.clone(),
-                dao_b_did: dao_b.clone(),
-            })
-            .await
-            .expect("Failed to settle bilateral balance");
-
-        assert_ne!(settled_amount, 0, "Settled amount should be non-zero");
-        println!("  - Settled amount: {}", settled_amount);
-
-        // Verify post-settlement balance is zeroed
-        let post_balance: Option<BilateralBalance> = conductor
-            .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
-                dao_a_did: dao_a.clone(),
-                dao_b_did: dao_b.clone(),
-            })
-            .await
-            .expect("Failed to get post-settlement balance");
-
-        if let Some(bal) = &post_balance {
-            assert_eq!(bal.net_balance, 0, "Net balance should be 0 after settlement");
-            println!("  - Post-settlement net balance: {} (zeroed)", bal.net_balance);
-        }
-
-        // Atomicity gap documentation:
-        // settle_bilateral_balance zeros the BilateralBalance entry but does NOT
-        // perform the treasury SAP transfer atomically. If the treasury zome
-        // call were to fail, the balance would be zeroed without funds moving.
-        // Full atomicity verification requires integration testing with:
-        //   1. Treasury zome deployed and initialized
-        //   2. DAO commons pools funded with SAP
-        //   3. Verify SAP transfer matches settled_amount
-        //   4. Verify rollback on treasury failure
-
-        println!("Test 14.1 PASSED: Bilateral settlement zeroes balance record");
     }
 }

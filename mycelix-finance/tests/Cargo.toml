@@ -101,3 +101,8 @@ path = "treasury_test.rs"
 [[test]]
 name = "sweettest_integration"
 path = "sweettest_integration.rs"
+
+# Pure-Rust economics stress & property tests (no Holochain conductor)
+[[test]]
+name = "economics_stress_test"
+path = "economics_stress_test.rs"
