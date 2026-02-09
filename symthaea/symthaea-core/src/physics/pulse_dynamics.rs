@@ -406,7 +406,7 @@ impl PulseDynamics {
             }
         }
 
-        best_result.expect("Should find at least one configuration")
+        best_result.expect("pulse optimizer: no valid configuration in profile set")
     }
 
     /// Analyze continuous operation

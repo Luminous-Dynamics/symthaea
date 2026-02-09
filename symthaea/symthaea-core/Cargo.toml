@@ -79,6 +79,10 @@ harness = false
 name = "physics_benchmarks"
 harness = false
 
+[[bench]]
+name = "consciousness_benchmarks"
+harness = false
+
 [features]
 default = []
 embeddings = []       # Enable embedding model integration

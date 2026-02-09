@@ -436,6 +436,8 @@ impl QIEncoder {
     pub fn von_neumann_entropy(&self, purity: f64) -> f64 {
         if purity >= 1.0 {
             0.0
+        } else if purity <= 0.0 {
+            0.0
         } else {
             -purity * purity.log2() - (1.0 - purity) * (1.0 - purity).log2()
         }

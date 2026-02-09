@@ -331,6 +331,64 @@ impl TunnelingCalculator {
         )
     }
 
+    /// Exact Eckart barrier transmission (Kemble formula)
+    ///
+    /// Closed-form solution for symmetric Eckart barrier V(x) = V₀ sech²(x/a):
+    /// T = sinh²(πka) / (sinh²(πka) + cosh²(π√(2mV₀a²/ℏ² - 1/4)))
+    /// where k = √(2mE)/ℏ
+    ///
+    /// # Arguments
+    /// * `energy` - Particle energy (J)
+    /// * `barrier_height` - Maximum barrier height V₀ (J)
+    /// * `barrier_width` - Characteristic width a (m)
+    pub fn eckart_barrier_exact(&self, energy: f64, barrier_height: f64, barrier_width: f64) -> TunnelingResult {
+        let k = (2.0 * self.mass * energy).sqrt() / self.hbar;
+        let ka = k * barrier_width;
+
+        let lambda_sq = 2.0 * self.mass * barrier_height * barrier_width * barrier_width
+            / (self.hbar * self.hbar);
+        // Argument under sqrt can go negative for very thin/low barriers
+        let mu = if lambda_sq > 0.25 {
+            (lambda_sq - 0.25).sqrt()
+        } else {
+            0.0
+        };
+
+        let sinh_ka = (std::f64::consts::PI * ka).sinh();
+        let cosh_mu = (std::f64::consts::PI * mu).cosh();
+
+        let transmission = if sinh_ka.abs() < 1e-300 {
+            0.0
+        } else {
+            let numer = sinh_ka * sinh_ka;
+            let denom = numer + cosh_mu * cosh_mu;
+            numer / denom
+        };
+
+        let transmission = transmission.clamp(0.0, 1.0);
+
+        let action = if transmission > 0.0 && transmission < 1.0 {
+            -transmission.ln()
+        } else if transmission == 0.0 {
+            f64::INFINITY
+        } else {
+            0.0
+        };
+
+        let gamma = if barrier_width > 0.0 {
+            action / (2.0 * barrier_width)
+        } else {
+            0.0
+        };
+
+        TunnelingResult {
+            transmission,
+            reflection: 1.0 - transmission,
+            gamma,
+            action,
+        }
+    }
+
     /// Parabolic barrier transmission coefficient
     ///
     /// For an inverted parabola V(x) = V₀ - ½mω²x², the exact

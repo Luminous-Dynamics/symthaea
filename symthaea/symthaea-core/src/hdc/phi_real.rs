@@ -32,6 +32,7 @@
 //! ❌ IIT Φ approximation
 //! ❌ Integrated information estimation
 
+#![allow(deprecated)]
 #![deprecated(since = "0.5.0", note = "Module renamed to spectral_connectivity - this measures λ₂, NOT IIT Φ. See docs/METRIC_CLARIFICATION.md")]
 
 // Re-export everything from spectral_connectivity for backward compatibility

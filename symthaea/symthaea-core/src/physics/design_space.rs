@@ -339,7 +339,7 @@ impl DesignSpaceMapper {
                     .min_by(|a, b| {
                         let da = (a.power_kw - x_val).abs();
                         let db = (b.power_kw - x_val).abs();
-                        da.partial_cmp(&db).unwrap()
+                        da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
                     });
 
                 if let Some(point) = nearest {
@@ -672,16 +672,16 @@ impl ParetoOptimizer {
 
         let best_by_objective = BestByObjective {
             min_mass: feasible.iter()
-                .min_by(|a, b| a.mass_kg.partial_cmp(&b.mass_kg).unwrap())
+                .min_by(|a, b| a.mass_kg.partial_cmp(&b.mass_kg).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|d| (*d).clone()),
             min_cost: feasible.iter()
-                .min_by(|a, b| a.cost_per_kw.partial_cmp(&b.cost_per_kw).unwrap())
+                .min_by(|a, b| a.cost_per_kw.partial_cmp(&b.cost_per_kw).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|d| (*d).clone()),
             min_dose: feasible.iter()
-                .min_by(|a, b| a.dose_rate.partial_cmp(&b.dose_rate).unwrap())
+                .min_by(|a, b| a.dose_rate.partial_cmp(&b.dose_rate).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|d| (*d).clone()),
             max_lifetime: feasible.iter()
-                .max_by(|a, b| a.lifetime_years.partial_cmp(&b.lifetime_years).unwrap())
+                .max_by(|a, b| a.lifetime_years.partial_cmp(&b.lifetime_years).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|d| (*d).clone()),
         };
 
@@ -777,7 +777,7 @@ impl ParetoOptimizer {
                 indices.sort_by(|&a, &b| {
                     let va = designs[a].objectives_normalized(&ranges)[obj];
                     let vb = designs[b].objectives_normalized(&ranges)[obj];
-                    va.partial_cmp(&vb).unwrap()
+                    va.partial_cmp(&vb).unwrap_or(std::cmp::Ordering::Equal)
                 });
 
                 // Boundary points get infinite distance

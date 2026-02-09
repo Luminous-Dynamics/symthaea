@@ -29,6 +29,11 @@
 //! - **[`observability`]** — Metrics, tracing, and introspection
 
 #![allow(clippy::needless_range_loop)]
+// Suppress test-harness-generated deprecated warnings for phi_real module tests.
+// phi_real is #![deprecated] (renamed to spectral_connectivity), but the linter
+// hook restores its tests; the test harness references deprecated test constants
+// at crate level which cannot be suppressed locally.
+#![cfg_attr(test, allow(deprecated))]
 
 pub mod core;
 pub mod genesis;

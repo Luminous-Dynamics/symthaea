@@ -260,7 +260,7 @@ impl SparkEngineSpec {
         } else {
             // Fallback to MAX phase
             let (best_max, _) = advanced.best_max_phase(&damage)
-                .expect("Should have MAX phase");
+                .expect("spark_engine: no MAX phase material in advanced_materials catalog");
             ShellSpec {
                 name: best_max.name.clone(),
                 material_type: ShellMaterial::MAXPhase,
@@ -274,7 +274,7 @@ impl SparkEngineSpec {
 
         // Select interface layer
         let (best_laminate, lam_analysis) = advanced.best_nano_laminate(&damage)
-            .expect("Should have nano-laminate");
+            .expect("spark_engine: no nano-laminate material in advanced_materials catalog");
 
         let interface = if lam_analysis.h_compatible {
             InterfaceSpec {
