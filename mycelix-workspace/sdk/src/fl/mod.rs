@@ -50,6 +50,7 @@ mod epistemic_fl_bridge;
 mod advanced_integrations;
 pub mod matl_feedback;
 pub mod prover_integration;
+pub mod unified_pipeline;
 
 #[cfg(test)]
 mod byzantine_stress_tests;
@@ -91,13 +92,13 @@ pub use zkproof_bridge::{
     VerifiedAggregationMethod, VerifiedAggregationResult,
 };
 
-// RB-BFT integration for 45% Byzantine tolerance
+// RB-BFT integration for 34% validated Byzantine tolerance
 pub use rbbft_bridge::{
     RbbftFLBridge, RbbftFLConfig, RbbftFLError, RbbftFLStats,
     RbbftParticipant, RbbftVote, RoundState as RbbftRoundState, RoundInfo as RbbftRoundInfo,
 };
 
-// Unified ZK + RB-BFT integration (ZK proofs + 45% Byzantine tolerance)
+// Unified ZK + RB-BFT integration (ZK proofs + 34% validated Byzantine tolerance)
 #[cfg(any(feature = "simulation", feature = "risc0"))]
 pub use unified_zkrbbft_bridge::UnifiedZkRbbftBridge;
 
@@ -144,6 +145,21 @@ pub use advanced_integrations::{
     FLMerkleNode, FLMerkleLeaf, FLRoundArchive, StorageReceipt, StorageBackend,
     build_gradient_merkle_tree, create_round_archive,
     generate_merkle_proof, verify_merkle_proof,
+};
+
+// Unified FL Pipeline (shared with Symthaea via mycelix-fl-core)
+pub use unified_pipeline::{
+    UnifiedPipelineF64, PipelineConfigF64, PipelineResultF64,
+};
+
+// Re-export core pipeline types for direct access
+pub use mycelix_fl_core::{
+    pipeline::{UnifiedPipeline, PipelineConfig, PipelineResult, PipelineStats,
+               ExternalWeightMap, ParticipantWeightAdjustment},
+    privacy::{DifferentialPrivacyConfig, RdpBudgetTracker, PrivacyReport},
+    hybrid_bft::{HybridBftConfig, HybridAggregationResult},
+    byzantine::{MultiSignalByzantineDetector as CoreMultiSignalDetector},
+    types::{MAX_BYZANTINE_TOLERANCE},
 };
 
 // MATL Feedback Loop (#184-185)
