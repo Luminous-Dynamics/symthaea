@@ -619,13 +619,53 @@ fn compute_emission_probs_enhanced(
     };
     let pac = PacAnalyzer::new(pac_config);
 
+    // Compute band powers DIRECTLY from raw EEG via FFT (not from IntegrationMetrics)
+    use symthaea::dynamics::spectral_analysis::{SpectralAnalyzer, SpectralConfig, WindowType};
+    let spectral = SpectralAnalyzer::new(SpectralConfig {
+        window_size: 512,
+        overlap: 0.5,
+        window_type: WindowType::Hann,
+        sample_rate,
+    });
+
     metrics.iter().zip(signals.iter()).map(|(m, signal)| {
-        let total_power = (m.delta_power + m.theta_power + m.alpha_power + m.beta_power + m.gamma_power).max(1e-10);
-        let delta_ratio = m.delta_power as f64 / total_power as f64;
-        let theta_ratio = m.theta_power as f64 / total_power as f64;
-        let alpha_ratio = m.alpha_power as f64 / total_power as f64;
-        let beta_ratio = m.beta_power as f64 / total_power as f64;
-        let entropy = m.spectral_entropy as f64;
+        // Compute band powers from raw EEG signal via Welch PSD.
+        // IntegrationMetrics come from CfC network state and don't reflect
+        // epoch-to-epoch frequency variation needed for classification.
+        let (delta_ratio, theta_ratio, alpha_ratio, beta_ratio, entropy) = if signal.len() >= 256 {
+            let spectrum = spectral.welch(signal);
+
+            let mut delta = 0.0f64;
+            let mut theta = 0.0f64;
+            let mut alpha = 0.0f64;
+            let mut beta = 0.0f64;
+            let mut total = 0.0f64;
+            for (i, &p) in spectrum.psd.iter().enumerate() {
+                let f = spectrum.frequencies[i];
+                let pv = p.max(0.0);
+                total += pv;
+                if f >= 0.5 && f < 4.0 { delta += pv; }
+                else if f >= 4.0 && f < 8.0 { theta += pv; }
+                else if f >= 8.0 && f < 12.0 { alpha += pv; }
+                else if f >= 12.0 && f < 30.0 { beta += pv; }
+            }
+            let t = total.max(1e-10);
+            // Spectral entropy from PSD
+            let ent: f64 = spectrum.psd.iter().map(|&p| {
+                let n = (p.max(0.0) / t).max(1e-20);
+                -n * n.ln()
+            }).sum::<f64>() / (spectrum.psd.len() as f64).ln().max(1.0);
+
+            (delta / t, theta / t, alpha / t, beta / t, ent)
+        } else {
+            // Fallback to IntegrationMetrics for short signals
+            let total_power = (m.delta_power + m.theta_power + m.alpha_power + m.beta_power + m.gamma_power).max(1e-10);
+            (m.delta_power as f64 / total_power as f64,
+             m.theta_power as f64 / total_power as f64,
+             m.alpha_power as f64 / total_power as f64,
+             m.beta_power as f64 / total_power as f64,
+             m.spectral_entropy as f64)
+        };
 
         // --- Wavelet features ---
         // Spindle count (12-14 Hz bursts characteristic of N2)
@@ -649,30 +689,51 @@ fn compute_emission_probs_enhanced(
         let pac_score = (delta_beta_mi / 0.3).min(1.0);
 
         // --- Compute enhanced scores ---
+        // Use thresholded features, not linear scaling.
+        // Delta dominates in most EEG epochs; linear weighting biases everything to N3.
         let mut scores = [0.0f64; 5];
 
-        // Wake: high alpha+beta, high entropy, low PAC, no spindles
-        scores[0] = (alpha_ratio + beta_ratio) * 2.0 + entropy * 0.5
+        // Sigmoid-like threshold: sharp transition at cutoff
+        let sigmoid = |x: f64, center: f64, sharpness: f64| -> f64 {
+            1.0 / (1.0 + (-(x - center) * sharpness).exp())
+        };
+
+        // Wake: alpha relatively high, delta NOT dominant, high entropy
+        // Alpha power should be noticeable (>10%), delta should be low (<40%)
+        let wake_alpha = sigmoid(alpha_ratio, 0.08, 30.0); // sharp at 8%
+        let wake_low_delta = sigmoid(-delta_ratio, -0.40, 15.0); // penalize delta > 40%
+        scores[0] = wake_alpha * 2.0 + wake_low_delta * 1.5 + entropy * 0.8
+            + beta_ratio * 1.0 + (1.0 - spindle_score) * 0.3;
+
+        // N1: theta dominant relative to alpha, moderate delta (25-50%)
+        let n1_theta = sigmoid(theta_ratio, 0.10, 25.0);
+        let n1_mod_delta = 1.0 - (delta_ratio - 0.35).abs() * 3.0; // peaks at delta=35%
+        let n1_low_alpha = sigmoid(-alpha_ratio, -0.10, 20.0); // penalize alpha > 10%
+        scores[1] = n1_theta * 2.0 + n1_mod_delta.max(0.0) * 1.0 + n1_low_alpha * 0.8
+            + (1.0 - spindle_score) * 0.3;
+
+        // N2: moderate delta (30-55%), spindles are the hallmark
+        let n2_mod_delta = 1.0 - (delta_ratio - 0.42).abs() * 2.5;
+        scores[2] = n2_mod_delta.max(0.0) * 1.5 + theta_ratio * 1.0
+            + spindle_score * 2.5 // Spindles are THE N2 marker
+            + (1.0 - wake_alpha) * 0.3; // Not awake
+
+        // N3: delta MUST be dominant (>55%), low entropy, low alpha/beta
+        let n3_high_delta = sigmoid(delta_ratio, 0.55, 20.0); // sharp at 55%
+        let n3_low_fast = sigmoid(-(alpha_ratio + beta_ratio), -0.10, 20.0);
+        scores[3] = n3_high_delta * 3.0 + n3_low_fast * 1.0
+            + (1.0 - entropy) * 0.5
+            + pac_score * 0.8
+            + (1.0 - w_entropy) * 0.3;
+
+        // REM: theta high, delta NOT dominant (<50%), beta present, no spindles
+        let rem_theta = sigmoid(theta_ratio, 0.12, 25.0);
+        let rem_low_delta = sigmoid(-delta_ratio, -0.50, 15.0);
+        let rem_beta = sigmoid(beta_ratio, 0.05, 30.0);
+        scores[4] = rem_theta * 1.5 + rem_low_delta * 1.5 + rem_beta * 1.0
+            + entropy * 0.5
+            + (1.0 - spindle_score) * 0.3
             + (1.0 - pac_score) * 0.3;
-
-        // N1: theta dominant, moderate entropy, no spindles
-        scores[1] = theta_ratio * 2.5 + (1.0 - delta_ratio) * 0.5
-            + (1.0 - spindle_score) * 0.2;
-
-        // N2: spindles are the hallmark + moderate delta/theta
-        scores[2] = theta_ratio * 1.5 + delta_ratio * 0.8 + beta_ratio * 0.5
-            + spindle_score * 1.5; // Strong spindle bonus
-
-        // N3: delta dominant, low entropy, high delta-beta PAC
-        scores[3] = delta_ratio * 3.0 + (1.0 - entropy) * 0.5
-            + pac_score * 1.0 // Delta-beta coupling bonus
-            + (1.0 - w_entropy) * 0.3; // Low wavelet entropy = concentrated energy
-
-        // REM: theta+beta, low delta, high entropy, low PAC, no spindles
-        let theta_to_delta = if delta_ratio > 0.01 { theta_ratio / delta_ratio } else { theta_ratio * 10.0 };
-        scores[4] = theta_to_delta.min(3.0) * 0.8 + beta_ratio * 1.5 + entropy * 0.3
-            + (1.0 - pac_score) * 0.2
-            + (1.0 - spindle_score) * 0.2;
 
         // Normalize to proper probability distribution
         let sum: f64 = scores.iter().sum();
