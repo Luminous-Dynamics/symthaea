@@ -166,7 +166,10 @@ pub use mycelix_fl_core::{
 // Plugin adapters (wrap SDK bridges as core plugin traits)
 pub use plugin_adapters::{
     HyperFeelCompressionPlugin, ChecksumVerificationPlugin, EpistemicByzantinePlugin,
+    MatlByzantinePlugin, HyperFeelByzantinePlugin,
 };
+#[cfg(any(feature = "simulation", feature = "risc0"))]
+pub use plugin_adapters::ZkVerificationPlugin;
 
 // Re-export core plugin traits and types for ergonomic use
 pub use mycelix_fl_core::plugins::{

@@ -20,8 +20,13 @@ use mycelix_fl_core::plugins::{
 };
 use mycelix_fl_core::types::GradientUpdate as CoreGradientUpdate;
 
-use super::hyperfeel_bridge::{HyperFeelFLBridge, HyperFeelFLConfig};
+use super::hyperfeel_bridge::{
+    CompressedSubmission, HyperFeelFLBridge, HyperFeelFLConfig,
+};
+#[cfg(any(feature = "simulation", feature = "risc0"))]
+use super::zkproof_bridge::ZKProofFLBridge;
 use super::epistemic_fl_bridge::{EpistemicGradientUpdate, GradientEpistemicClassification};
+use super::matl_feedback::{GradientQualityConfig, GradientQualitySignals, QualityTier};
 
 // ============================================================================
 // HyperFeel Compression Plugin
@@ -183,7 +188,7 @@ impl VerificationPlugin for ChecksumVerificationPlugin {
             } else {
                 None
             },
-            verifier: "sha256-checksum".to_string(),
+            verifier: "fnv1a-checksum".to_string(),
         }
     }
 
@@ -364,6 +369,323 @@ impl ByzantinePlugin for EpistemicByzantinePlugin {
     }
 }
 
+// ============================================================================
+// MATL Quality Byzantine Plugin
+// ============================================================================
+
+/// Wraps MATL gradient quality analysis as a [`ByzantinePlugin`].
+///
+/// Computes per-gradient quality signals (norm, magnitude, variance, convergence)
+/// and maps [`QualityTier`] to weight adjustments:
+///
+/// | Tier | Weight |
+/// |------|--------|
+/// | Excellent | 1.2 |
+/// | Good | 1.0 |
+/// | Acceptable | 0.7 |
+/// | Poor | 0.3 |
+/// | Invalid | 0.0 (veto) |
+///
+/// Uses the global gradient mean (computed across all updates) to measure
+/// convergence alignment — participants whose gradients diverge significantly
+/// from the group average receive lower quality scores.
+pub struct MatlByzantinePlugin {
+    config: GradientQualityConfig,
+    rounds_processed: u64,
+}
+
+impl MatlByzantinePlugin {
+    /// Create with default quality thresholds.
+    pub fn new() -> Self {
+        Self {
+            config: GradientQualityConfig::default(),
+            rounds_processed: 0,
+        }
+    }
+
+    /// Create with custom quality configuration.
+    pub fn with_config(config: GradientQualityConfig) -> Self {
+        Self {
+            config,
+            rounds_processed: 0,
+        }
+    }
+}
+
+impl ByzantinePlugin for MatlByzantinePlugin {
+    fn analyze(&mut self, updates: &[CoreGradientUpdate]) -> ExternalWeightMap {
+        let mut weights = ExternalWeightMap::new();
+
+        if updates.is_empty() {
+            return weights;
+        }
+
+        // Compute global mean gradient (f64 for precision)
+        let dim = updates[0].gradients.len();
+        let n = updates.len() as f64;
+        let mut global_mean = vec![0.0f64; dim];
+        for update in updates {
+            for (i, &g) in update.gradients.iter().enumerate() {
+                if i < dim {
+                    global_mean[i] += g as f64 / n;
+                }
+            }
+        }
+
+        // Analyze each participant's gradient quality
+        for update in updates {
+            let f64_grads: Vec<f64> = update.gradients.iter().map(|&g| g as f64).collect();
+            let signals = GradientQualitySignals::analyze_with_global(
+                &f64_grads,
+                &global_mean,
+                &self.config,
+            );
+            let tier = signals.quality_tier();
+
+            let multiplier = match tier {
+                QualityTier::Excellent => 1.2,
+                QualityTier::Good => 1.0,
+                QualityTier::Acceptable => 0.7,
+                QualityTier::Poor => 0.3,
+                QualityTier::Invalid => 0.01,
+            };
+            let veto = matches!(tier, QualityTier::Invalid);
+
+            weights.insert(
+                update.participant_id.clone(),
+                vec![ParticipantWeightAdjustment {
+                    weight_multiplier: multiplier,
+                    veto,
+                    source: "matl_quality".to_string(),
+                }],
+            );
+        }
+
+        weights
+    }
+
+    fn name(&self) -> &str {
+        "matl_quality"
+    }
+
+    fn record_outcome(&mut self, _round: u64, _excluded_ids: &[String]) {
+        self.rounds_processed += 1;
+    }
+}
+
+// ============================================================================
+// HyperFeel Similarity Byzantine Plugin
+// ============================================================================
+
+/// Wraps [`HyperFeelFLBridge`] cosine similarity analysis as a [`ByzantinePlugin`].
+///
+/// Compresses each gradient to a hypervector (2KB) and computes
+/// cosine similarity to the centroid. Nodes whose similarity falls
+/// below the threshold are vetoed; others get their similarity
+/// score as a weight multiplier.
+///
+/// This provides a fundamentally different detection signal from
+/// the core's multi-signal detector: instead of analyzing raw
+/// gradient statistics, it operates in the compressed hypervector
+/// space where Byzantine perturbations manifest as directional outliers.
+pub struct HyperFeelByzantinePlugin {
+    bridge: HyperFeelFLBridge,
+    round: u32,
+}
+
+impl HyperFeelByzantinePlugin {
+    /// Create with default configuration (similarity threshold = 0.5).
+    pub fn new() -> Self {
+        Self {
+            bridge: HyperFeelFLBridge::default_bridge(),
+            round: 0,
+        }
+    }
+
+    /// Create with custom HyperFeel configuration.
+    pub fn with_config(config: HyperFeelFLConfig) -> Self {
+        Self {
+            bridge: HyperFeelFLBridge::new(config),
+            round: 0,
+        }
+    }
+
+    /// Set the current round number.
+    pub fn set_round(&mut self, round: u32) {
+        self.round = round;
+    }
+}
+
+impl ByzantinePlugin for HyperFeelByzantinePlugin {
+    fn analyze(&mut self, updates: &[CoreGradientUpdate]) -> ExternalWeightMap {
+        let mut weights = ExternalWeightMap::new();
+
+        if updates.is_empty() {
+            return weights;
+        }
+
+        // Clear previous round's data
+        self.bridge.start_new_round();
+
+        // Submit all gradients as compressed hypergradients
+        for update in updates {
+            let hg = self.bridge.compress_gradient(
+                &update.gradients,
+                self.round,
+                &update.participant_id,
+            );
+            self.bridge.submit_compressed(CompressedSubmission {
+                hypergradient: hg,
+                batch_size: update.metadata.batch_size as usize,
+                loss: update.metadata.loss as f64,
+                accuracy: None,
+            });
+        }
+
+        // Run Byzantine analysis in hypervector space
+        let analysis = self.bridge.analyze_byzantine();
+
+        // Map similarity scores to weight adjustments
+        for update in updates {
+            let flagged = analysis
+                .byzantine_flags
+                .get(&update.participant_id)
+                .copied()
+                .unwrap_or(false);
+            let similarity = analysis
+                .similarity_scores
+                .get(&update.participant_id)
+                .copied()
+                .unwrap_or(1.0);
+
+            // Use similarity as weight multiplier (higher = more trusted)
+            // Flagged nodes get vetoed
+            weights.insert(
+                update.participant_id.clone(),
+                vec![ParticipantWeightAdjustment {
+                    weight_multiplier: if flagged { 0.01 } else { similarity.max(0.1) },
+                    veto: flagged,
+                    source: "hyperfeel_similarity".to_string(),
+                }],
+            );
+        }
+
+        self.round += 1;
+        weights
+    }
+
+    fn name(&self) -> &str {
+        "hyperfeel_similarity"
+    }
+
+    fn record_outcome(&mut self, _round: u64, _excluded_ids: &[String]) {
+        // Could adapt similarity threshold based on outcome
+    }
+}
+
+// ============================================================================
+// ZK Proof Verification Plugin (feature-gated)
+// ============================================================================
+
+/// Wraps [`ZKProofFLBridge`] as a [`VerificationPlugin`] for the unified pipeline.
+///
+/// Generates ZK proofs for each input gradient, verifies them, and returns
+/// the verification result with proof hashes. If any proof fails, the
+/// overall verification is marked as failed.
+///
+/// Requires the `simulation` or `risc0` feature.
+///
+/// # Notes
+///
+/// This is heavier than [`ChecksumVerificationPlugin`] — it generates
+/// a cryptographic proof per gradient. Use `ChecksumVerificationPlugin`
+/// for lightweight tamper detection and this plugin when cryptographic
+/// guarantees are needed.
+#[cfg(any(feature = "simulation", feature = "risc0"))]
+pub struct ZkVerificationPlugin {
+    bridge: ZKProofFLBridge,
+    round: u32,
+    model_hash: [u8; 32],
+}
+
+#[cfg(any(feature = "simulation", feature = "risc0"))]
+impl ZkVerificationPlugin {
+    /// Create with default prover.
+    pub fn new() -> Self {
+        Self {
+            bridge: ZKProofFLBridge::new(),
+            round: 0,
+            model_hash: [0u8; 32],
+        }
+    }
+
+    /// Set the current round and model hash.
+    pub fn set_round(&mut self, round: u32, model_hash: [u8; 32]) {
+        self.round = round;
+        self.model_hash = model_hash;
+        self.bridge.start_round(round, model_hash);
+    }
+
+    /// Access the underlying bridge for statistics.
+    pub fn stats(&self) -> &super::zkproof_bridge::ZKFLStats {
+        self.bridge.stats()
+    }
+}
+
+#[cfg(any(feature = "simulation", feature = "risc0"))]
+impl VerificationPlugin for ZkVerificationPlugin {
+    fn verify(
+        &mut self,
+        inputs: &[CoreGradientUpdate],
+        aggregated: &[f32],
+        _reputations: &HashMap<String, f32>,
+    ) -> VerificationResult {
+        // Submit each input gradient, generating ZK proofs
+        for input in inputs {
+            let _ = self.bridge.submit_with_proof(
+                &input.participant_id,
+                &input.gradients,
+                1,     // epochs (metadata — not critical for verification)
+                0.01,  // learning_rate
+                input.metadata.batch_size as usize,
+                input.metadata.loss as f64,
+            );
+        }
+
+        // Verify all proofs
+        let failed = self.bridge.verify_all();
+
+        // Collect proof hashes from verified updates
+        let mut proof_hashes: Vec<u8> = Vec::new();
+        for update in self.bridge.pending_updates() {
+            if update.verified && update.is_valid() {
+                proof_hashes.extend_from_slice(update.gradient_hash());
+            }
+        }
+
+        // Bind aggregated output into proof data
+        for &g in aggregated {
+            proof_hashes.extend_from_slice(&g.to_le_bytes());
+        }
+
+        let verified = failed.is_empty();
+
+        // Clear for next round
+        self.bridge.clear();
+        self.round += 1;
+
+        VerificationResult {
+            verified,
+            proof_data: Some(proof_hashes),
+            verifier: "zk-gradient-proof".to_string(),
+        }
+    }
+
+    fn name(&self) -> &str {
+        "zk_proof"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -432,7 +754,7 @@ mod tests {
 
         let result = plugin.verify(&inputs, &aggregated, &reps);
         assert!(result.verified);
-        assert_eq!(result.verifier, "sha256-checksum");
+        assert_eq!(result.verifier, "fnv1a-checksum");
         assert!(result.proof_data.is_some());
         assert_eq!(result.proof_data.unwrap().len(), 8);
     }
@@ -602,6 +924,144 @@ mod tests {
 
         plugin.clear();
         assert!(plugin.analyze(&core_updates).is_empty());
+    }
+
+    // ========================================================================
+    // MATL Byzantine Plugin Tests
+    // ========================================================================
+
+    #[test]
+    fn test_matl_plugin_honest_gradients() {
+        // Use config matching gradient dimension (3)
+        let config = GradientQualityConfig {
+            expected_dimension: 3,
+            ..Default::default()
+        };
+        let mut plugin = MatlByzantinePlugin::with_config(config);
+
+        let updates = vec![
+            core_update("p1", vec![0.1, 0.2, 0.3]),
+            core_update("p2", vec![0.12, 0.18, 0.31]),
+            core_update("p3", vec![0.11, 0.19, 0.29]),
+        ];
+
+        let weights = plugin.analyze(&updates);
+
+        // All honest gradients should pass quality checks (no veto)
+        for update in &updates {
+            if let Some(adj) = weights.get(&update.participant_id) {
+                assert!(!adj[0].veto, "Honest gradient should not be vetoed");
+                assert!(adj[0].weight_multiplier > 0.5, "weight={}", adj[0].weight_multiplier);
+            }
+        }
+    }
+
+    #[test]
+    fn test_matl_plugin_byzantine_gradient() {
+        let config = GradientQualityConfig {
+            expected_dimension: 3,
+            ..Default::default()
+        };
+        let mut plugin = MatlByzantinePlugin::with_config(config);
+
+        let updates = vec![
+            core_update("honest1", vec![0.1, 0.2, 0.3]),
+            core_update("honest2", vec![0.12, 0.18, 0.31]),
+            core_update("honest3", vec![0.11, 0.19, 0.29]),
+            core_update("byzantine", vec![500.0, -300.0, 800.0]),
+        ];
+
+        let weights = plugin.analyze(&updates);
+
+        // Byzantine gradient should get lower weight than honest ones
+        let byz_weight = weights.get("byzantine")
+            .map(|a| a[0].weight_multiplier)
+            .unwrap_or(1.0);
+        let honest_weight = weights.get("honest1")
+            .map(|a| a[0].weight_multiplier)
+            .unwrap_or(0.0);
+
+        assert!(byz_weight <= honest_weight,
+            "Byzantine ({}) should not outweigh honest ({})", byz_weight, honest_weight);
+    }
+
+    #[test]
+    fn test_matl_plugin_empty() {
+        let mut plugin = MatlByzantinePlugin::new();
+        let weights = plugin.analyze(&[]);
+        assert!(weights.is_empty());
+    }
+
+    // ========================================================================
+    // HyperFeel Similarity Byzantine Plugin Tests
+    // ========================================================================
+
+    #[test]
+    fn test_hyperfeel_byz_plugin_honest() {
+        let mut plugin = HyperFeelByzantinePlugin::new();
+
+        let updates = vec![
+            core_update("p1", vec![0.1; 100]),
+            core_update("p2", vec![0.1; 100]),
+            core_update("p3", vec![0.1; 100]),
+            core_update("p4", vec![0.1; 100]),
+        ];
+
+        let weights = plugin.analyze(&updates);
+
+        // All similar gradients should have high similarity → no veto
+        for update in &updates {
+            if let Some(adj) = weights.get(&update.participant_id) {
+                assert!(!adj[0].veto, "{} should not be vetoed", update.participant_id);
+                assert_eq!(adj[0].source, "hyperfeel_similarity");
+            }
+        }
+    }
+
+    #[test]
+    fn test_hyperfeel_byz_plugin_detects_outlier() {
+        let mut plugin = HyperFeelByzantinePlugin::new();
+
+        let mut updates = Vec::new();
+        // 5 honest nodes with similar gradients
+        for i in 0..5 {
+            updates.push(core_update(&format!("h{}", i), vec![0.1; 200]));
+        }
+        // 1 Byzantine node with opposite gradients
+        updates.push(core_update("byz", vec![-10.0; 200]));
+
+        let weights = plugin.analyze(&updates);
+
+        // Byzantine should have lower weight or be vetoed
+        let byz_weight = weights.get("byz")
+            .map(|a| a[0].weight_multiplier)
+            .unwrap_or(1.0);
+        let honest_weight = weights.get("h0")
+            .map(|a| a[0].weight_multiplier)
+            .unwrap_or(0.0);
+
+        assert!(byz_weight < honest_weight,
+            "Byzantine ({}) should have lower weight than honest ({})", byz_weight, honest_weight);
+    }
+
+    #[test]
+    fn test_hyperfeel_byz_plugin_round_tracking() {
+        let mut plugin = HyperFeelByzantinePlugin::new();
+        assert_eq!(plugin.round, 0);
+
+        let updates = vec![core_update("p1", vec![0.5; 50])];
+        let _ = plugin.analyze(&updates);
+        assert_eq!(plugin.round, 1);
+
+        let _ = plugin.analyze(&updates);
+        assert_eq!(plugin.round, 2);
+    }
+
+    #[test]
+    fn test_hyperfeel_byz_plugin_empty() {
+        let mut plugin = HyperFeelByzantinePlugin::new();
+        let weights = plugin.analyze(&[]);
+        assert!(weights.is_empty());
     }
 
     // ========================================================================
