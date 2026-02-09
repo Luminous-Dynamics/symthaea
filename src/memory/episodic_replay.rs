@@ -385,12 +385,11 @@ impl EpisodicMemory {
         self.total_stored += 1;
 
         // Evict if over capacity
-        while self.episodes.len() > self.config.capacity {
+        if self.episodes.len() > self.config.capacity {
             // Remove lowest priority (we need to rebuild to get min)
             // For efficiency, we'll let it grow slightly over capacity
             // Real eviction happens during sampling
             self.total_evicted += 1;
-            break;
         }
 
         true

@@ -15,11 +15,10 @@
 //! cargo run --example benchmark_emotion_eeg --release
 //! ```
 
-use std::time::Instant;
-
+use symthaea::dynamics::wavelet::{WaveletAnalyzer, DwtConfig, WaveletFamily, ExtensionMode};
+use symthaea::dynamics::phase_amplitude_coupling::{PacAnalyzer, PacConfig};
 use symthaea::perception::physio::{
     EmotionSentinel, EmotionSimulator, EmotionCategory, EmotionChannel,
-    EmotionEEG, FrequencyBand,
 };
 
 fn main() {
@@ -229,6 +228,93 @@ fn main() {
     println!("  Smoothed within valid range: {}", smoothed_within_range);
 
     // ═══════════════════════════════════════════════════════════════
+    // Test 6: PAC-Enhanced Emotion Classification
+    // ═══════════════════════════════════════════════════════════════
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("Test 6: PAC + Wavelet Enhanced Quadrant Classification");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+    let pac_config = PacConfig {
+        sample_rate,
+        n_phase_bins: 18,
+        n_surrogates: 0, // Skip surrogates for speed
+        significance_level: 0.05,
+        filter_order: 128,
+    };
+    let pac = PacAnalyzer::new(pac_config);
+
+    let wavelet_config = DwtConfig {
+        wavelet: WaveletFamily::Db4,
+        max_level: None,
+        extension: ExtensionMode::Symmetric,
+    };
+    let wavelet_analyzer = WaveletAnalyzer::new(wavelet_config, sample_rate);
+
+    let mut pac_quadrant_correct = 0;
+    let mut pac_total = 0;
+
+    for &target in &all_emotions {
+        for trial in 0..n_trials {
+            sentinel.reset();
+            let mut sim = EmotionSimulator::new(sample_rate);
+            for _ in 0..trial {
+                sim.generate(EmotionCategory::Neutral, 0.5);
+            }
+
+            let eeg = sim.generate(target, window_sec);
+            let state = sentinel.detect(&eeg);
+
+            // Extract PAC features from frontal channel
+            let frontal_signal = eeg.channels.get(&EmotionChannel::Fz)
+                .or_else(|| eeg.channels.get(&EmotionChannel::F3))
+                .cloned()
+                .unwrap_or_default();
+
+            // Alpha-gamma PAC: higher for positive valence / engaged states
+            let ag_mi = if frontal_signal.len() >= 256 {
+                let r = pac.compute_pac(&frontal_signal, (8.0, 13.0), (30.0, 80.0));
+                r.modulation_index
+            } else {
+                0.0
+            };
+
+            // Wavelet entropy: higher for high arousal (broadband activation)
+            let w_entropy = if !frontal_signal.is_empty() {
+                wavelet_analyzer.wavelet_entropy(&frontal_signal)
+            } else {
+                0.5
+            };
+
+            // Enhanced classification: combine base V/A with PAC+wavelet
+            // PAC adjusts valence: high alpha-gamma MI → positive bias
+            let pac_valence_adj = (ag_mi - 0.05) * 2.0; // center around typical MI
+            let enhanced_valence = state.valence + pac_valence_adj * 0.3;
+
+            // Wavelet entropy adjusts arousal: high entropy → high arousal
+            let entropy_arousal_adj = (w_entropy - 0.5) * 2.0;
+            let enhanced_arousal = state.arousal + entropy_arousal_adj * 0.2;
+
+            let (tv, ta) = target.target_va();
+            let target_quadrant = (tv >= 0.0, ta >= 0.0);
+            let enhanced_quadrant = (enhanced_valence >= 0.0, enhanced_arousal >= 0.0);
+
+            if target_quadrant == enhanced_quadrant {
+                pac_quadrant_correct += 1;
+            }
+            pac_total += 1;
+        }
+    }
+
+    let pac_quadrant_accuracy = pac_quadrant_correct as f64 / pac_total as f64;
+    let pac_improved = pac_quadrant_accuracy > quadrant_accuracy;
+
+    println!("  Base quadrant accuracy:     {:.1}% ({}/{})",
+        quadrant_accuracy * 100.0, quadrant_correct, total);
+    println!("  PAC-enhanced accuracy:      {:.1}% ({}/{})",
+        pac_quadrant_accuracy * 100.0, pac_quadrant_correct, pac_total);
+    println!("  PAC improvement:            {}", if pac_improved { "YES" } else { "NO" });
+
+    // ═══════════════════════════════════════════════════════════════
     // Summary
     // ═══════════════════════════════════════════════════════════════
     println!("\n╔══════════════════════════════════════════════════════════════╗");
@@ -241,6 +327,7 @@ fn main() {
         ("Quadrant accuracy > 40%", quadrant_accuracy > 0.40),
         ("Spectral alpha matches theory", alpha_higher_relaxed),
         ("Temporal smoothing stable", smoothed_within_range),
+        ("PAC-enhanced quadrant > 50%", pac_quadrant_accuracy > 0.50),
     ];
 
     let mut passed = 0;
@@ -260,6 +347,7 @@ fn main() {
         "arousal_separates": arousal_separates,
         "exact_accuracy": exact_accuracy,
         "quadrant_accuracy": quadrant_accuracy,
+        "pac_enhanced_quadrant_accuracy": pac_quadrant_accuracy,
         "spectral_valid": alpha_higher_relaxed && beta_higher_excited,
         "tests_passed": passed,
         "tests_total": checks.len(),

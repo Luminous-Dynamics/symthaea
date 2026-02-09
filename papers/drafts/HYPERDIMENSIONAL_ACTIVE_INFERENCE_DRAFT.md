@@ -330,7 +330,7 @@ The Sleep Staging benchmark uses real clinical polysomnography recordings in Eur
 | PCI Validation | 4/5 | Φ ordering correct; Φ-PCI correlation low (expected, §6.4) |
 | Emotion EEG | 4/5 | Valence/arousal separation validated |
 | MNIST HDC | 2/3 | 87.6% with retrain (8K dim, 5 iter); baseline 81.6% without retrain |
-| Ethics HDC | 4/4 | Deontology 91.6%, Commonsense 95.4%, Justice 89.4%, Virtue 63.8% (81.7% overall) |
+| Ethics HDC | 4/4 | Commonsense 95.6%, Justice 92.4%, Deontology 91.0%, Virtue 78.0% (85.0% overall) |
 | λ₂-Φ Proxy | 3/5 | λ₂ shows meaningful topology variation; system_phi returns 0 for small weighted graphs (§6.3) |
 
 **Federated Byzantine tolerance:** Validated at 34% via the unified FL pipeline (§6.7). Testing at 45% Byzantine fraction showed zero convergence (mean_weight=0.0, positive_dims=0/20). With reputation disparity (honest rep ≥ 0.85, Byzantine rep ≤ 0.15), the effective tolerance exceeds 34% because the reputation gate removes low-reputation adversaries before aggregation. The phase diagram (7 scenarios from 10-34% at varying reputation disparity) shows convergence in all tested configurations.
@@ -438,7 +438,7 @@ The Closed-form Continuous-time (CfC) neural ODE cells exhibit gradient vanishin
 
 3. **HDC-Φ correspondence:** HDC-based cosine similarity matrices do not produce meaningful exact IIT Φ values. In high dimensions (d ≥ 256), cosine similarities between random HVs converge to ~0 regardless of topology structure. Even with explicit adjacency matrices, our `system_phi` implementation returns 0 for all weighted graphs at n ≤ 7 due to MIP degeneracy (see Section 6.3). The spectral proxy λ₂ provides useful relative ordering but should not be treated as a quantitative Φ substitute.
 
-4. **ETHICS benchmark:** Enhanced moral parsing with obligation/excuse extraction (deontology), effort/reward proportionality (justice), and negation-aware intent detection (commonsense) raised overall accuracy from 59.1% to 81.7%. Per-category HDC classifiers trained on labeled examples now achieve Deontology 91.6%, Commonsense 95.4%, Justice 89.4%. Virtue classification dropped from 80% to 63.8%—the trained classifier overrides the simpler keyword polarity that previously worked well for trait-word sentiment. Future work: a hybrid approach combining keyword matching for Virtue with trained classifiers for the other categories, and richer semantic parsing (sentence embeddings or lightweight LLM front-end) to further improve the text-to-moral-structure pipeline.
+4. **ETHICS benchmark:** Enhanced moral parsing with obligation/excuse extraction (deontology), effort/reward proportionality (justice), and negation-aware intent detection (commonsense), combined with per-category HDC classifiers, raised overall accuracy from 59.1% to 85.0%. A hybrid classification strategy uses trained HDC classifiers for Commonsense (95.6%), Justice (92.4%), and Deontology (91.0%), while Virtue (78.0%) uses keyword-only trait matching because social-norms-trained prototypes degrade trait adjective classification. The remaining gap in Virtue (78% vs 90%+ for other categories) stems from ambiguous trait words that appear in both positive and negative contexts. Future work: sentence-level semantic features (embeddings or lightweight LLM front-end) to disambiguate trait applicability.
 
 ### 6.7 Unified Federated Learning Pipeline
 

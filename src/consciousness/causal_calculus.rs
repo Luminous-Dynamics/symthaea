@@ -702,11 +702,9 @@ impl StructuralCausalModel {
     fn all_directed_paths_pass_through(&self, x: usize, y: usize, m_set: &HashSet<usize>) -> bool {
         // BFS/DFS for directed paths from x to y, check each passes through m_set
         let mut stack: Vec<(usize, Vec<usize>)> = vec![(x, vec![x])];
-        let mut found_path = false;
 
         while let Some((current, path)) = stack.pop() {
             if current == y {
-                found_path = true;
                 // Check this path contains at least one node in m_set
                 let passes_through = path.iter().any(|n| m_set.contains(n));
                 if !passes_through {
@@ -724,8 +722,8 @@ impl StructuralCausalModel {
             }
         }
 
-        // If no directed path exists, vacuously true
-        found_path || true
+        // All paths pass through m_set (or no path exists — vacuously true)
+        true
     }
 
     // ========================================================================
