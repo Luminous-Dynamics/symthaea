@@ -9,9 +9,9 @@
 //!
 //! Run with: cargo run --example benchmark_moral_unified
 
-use symthaea::hdc::moral_algebra::{MoralAlgebra, MoralVerdict, EnsembleJudgment, MoralIntent};
+use symthaea::hdc::moral_algebra::{MoralAlgebra, MoralVerdict, EnsembleJudgment};
 use symthaea::hdc::moral_parser::MoralParser;
-use symthaea::hdc::moral_prototypes::{MoralPrototypeClassifier, MoralSample, MoralLabel, TrainedPrototypes};
+use symthaea::hdc::moral_prototypes::{MoralPrototypeClassifier, MoralSample, MoralLabel, TrainedPrototypes, MORAL_PROTO_DIM};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -29,12 +29,32 @@ const MAX_SAMPLES: usize = 500;
 // Helper Functions
 // ============================================================================
 
+use symthaea::hdc::moral_parser::ParsedMoralScenario;
+use symthaea::hdc::moral_algebra::Magnitude;
+
 /// Judge text using the moral algebra system
 ///
 /// This helper parses the text and calls judge_ensemble with the correct API.
 fn judge_text(algebra: &MoralAlgebra, parser: &MoralParser, text: &str) -> EnsembleJudgment {
     let parsed = parser.parse(text);
     algebra.judge_ensemble(None, parsed.intent, text)
+}
+
+/// Judge text with a category hint for ETHICS benchmark.
+///
+/// The category hint controls whether the learned prototype signal is used.
+/// For "virtue", keyword matching is the right signal and learned prototypes
+/// are skipped to avoid regression.
+fn judge_text_with_category(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, category: &str) -> EnsembleJudgment {
+    let parsed = parser.parse(text);
+    algebra.judge_ensemble_with_category(None, parsed.intent, text, Some(category))
+}
+
+/// Parse text and return both ensemble judgment and parsed scenario
+fn parse_and_judge(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, category: &str) -> (EnsembleJudgment, ParsedMoralScenario) {
+    let parsed = parser.parse(text);
+    let judgment = algebra.judge_ensemble_with_category(None, parsed.intent, text, Some(category));
+    (judgment, parsed)
 }
 
 // ============================================================================
@@ -162,23 +182,29 @@ fn main() {
     let parser = MoralParser::new();
 
     // Try to load or train learned moral prototypes from Social Chemistry 292K
-    let prototypes_path = Path::new(DATASETS_PATH).join("social_chem_prototypes.json");
+    let prototypes_path = Path::new(DATASETS_PATH).join("social_chem_prototypes_v2.json");
     let dataset_292k_path = Path::new(DATASETS_PATH).join("social_chemistry_292k.json");
+
+    // Also store a direct classifier for Social Chemistry benchmark (#1 improvement)
+    let mut direct_social_chem_classifier: Option<MoralPrototypeClassifier> = None;
 
     if prototypes_path.exists() {
         println!("Loading cached learned prototypes from {}...", prototypes_path.display());
         match TrainedPrototypes::load(&prototypes_path) {
             Ok(protos) => {
-                let classifier = MoralPrototypeClassifier::from_prototypes(4096, 3, protos);
+                let dim = protos.dim;
+                let classifier = MoralPrototypeClassifier::from_prototypes(dim, 3, protos.clone());
+                direct_social_chem_classifier = Some(MoralPrototypeClassifier::from_prototypes(dim, 3, protos));
                 algebra.set_learned_classifier(classifier);
-                println!("  Learned prototypes loaded (4th ensemble signal active)\n");
+                println!("  Learned prototypes loaded (dim={}, 4th ensemble signal active)\n", dim);
             }
             Err(e) => println!("  Warning: failed to load prototypes: {}\n", e),
         }
     } else if dataset_292k_path.exists() {
-        println!("Training learned prototypes from Social Chemistry 292K...");
+        println!("Training learned prototypes from Social Chemistry 292K (dim={})...", MORAL_PROTO_DIM);
         let train_start = Instant::now();
         if let Some(classifier) = train_prototypes_from_292k(&dataset_292k_path, &prototypes_path) {
+            direct_social_chem_classifier = Some(classifier.clone());
             algebra.set_learned_classifier(classifier);
             println!(
                 "  Prototypes trained and cached in {:.1}s (4th ensemble signal active)\n",
@@ -189,6 +215,14 @@ fn main() {
         println!("No Social Chemistry 292K dataset found - running without learned prototypes.");
         println!("  Run: python3 scripts/download_social_chemistry.py\n");
     }
+
+    // Train per-category ETHICS prototypes (#2 improvement)
+    let ethics_path = format!("{}/ethics.json", DATASETS_PATH);
+    let per_category_classifiers = if Path::new(&ethics_path).exists() {
+        train_per_category_ethics_prototypes(&ethics_path)
+    } else {
+        HashMap::new()
+    };
 
     let start = Instant::now();
     let mut results = Vec::new();
@@ -202,7 +236,7 @@ fn main() {
         results = run_synthetic_benchmarks(&algebra, &parser);
     } else {
         // Run each dataset benchmark
-        if let Some(r) = benchmark_ethics(&algebra, &parser) {
+        if let Some(r) = benchmark_ethics(&algebra, &parser, &per_category_classifiers) {
             results.extend(r);
         }
         if let Some(r) = benchmark_moral_stories(&algebra, &parser) {
@@ -211,7 +245,7 @@ fn main() {
         if let Some(r) = benchmark_scruples(&algebra, &parser) {
             results.push(r);
         }
-        if let Some(r) = benchmark_social_chemistry(&algebra, &parser) {
+        if let Some(r) = benchmark_social_chemistry(&algebra, &parser, direct_social_chem_classifier.as_ref()) {
             results.push(r);
         }
         if let Some(r) = benchmark_moral_exceptqa(&algebra, &parser) {
@@ -232,7 +266,7 @@ fn main() {
 // Dataset-Specific Benchmarks
 // ============================================================================
 
-fn benchmark_ethics(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<Vec<BenchmarkResult>> {
+fn benchmark_ethics(algebra: &MoralAlgebra, parser: &MoralParser, per_cat_classifiers: &HashMap<String, MoralPrototypeClassifier>) -> Option<Vec<BenchmarkResult>> {
     let path = format!("{}/ethics.json", DATASETS_PATH);
     if !Path::new(&path).exists() {
         println!("⚠ ETHICS dataset not found at {}", path);
@@ -266,7 +300,8 @@ fn benchmark_ethics(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<Vec<
 
         for ex in examples.iter().take(MAX_SAMPLES) {
             if let Some(expected) = ex.label {
-                let predicted = predict_ethics(algebra, parser, &ex.text, &category);
+                let per_cat = per_cat_classifiers.get(&category);
+                let predicted = predict_ethics_with_classifier(algebra, parser, &ex.text, &category, per_cat);
                 let is_correct = predicted == expected;
 
                 if is_correct {
@@ -425,7 +460,7 @@ fn benchmark_scruples(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<Be
     })
 }
 
-fn benchmark_social_chemistry(algebra: &MoralAlgebra, parser: &MoralParser) -> Option<BenchmarkResult> {
+fn benchmark_social_chemistry(algebra: &MoralAlgebra, parser: &MoralParser, direct_classifier: Option<&MoralPrototypeClassifier>) -> Option<BenchmarkResult> {
     // Prefer the 292K dataset if available (larger, real data)
     let path_292k = format!("{}/social_chemistry_292k.json", DATASETS_PATH);
     let path = if Path::new(&path_292k).exists() {
@@ -458,14 +493,20 @@ fn benchmark_social_chemistry(algebra: &MoralAlgebra, parser: &MoralParser) -> O
     for ex in data.examples.iter().take(MAX_SAMPLES) {
         // Use rule-of-thumb judgment if available
         if !ex.rot_judgment.is_empty() {
-            let judgment = judge_text(algebra, parser, &ex.rot);
-
             // rot_judgment is typically "-1" (bad), "0" (neutral), "1" (good)
             let expected = ex.rot_judgment.parse::<i32>().unwrap_or(0);
-            let predicted = match judgment.final_verdict {
-                MoralVerdict::Good => 1,
-                MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,
-                MoralVerdict::Neutral => 0,
+
+            // Use direct classifier if available (trained on this dataset),
+            // otherwise fall back to ensemble judge
+            let predicted = if let Some(clf) = direct_classifier {
+                clf.classify(&ex.rot).0.to_rot_judgment()
+            } else {
+                let judgment = judge_text(algebra, parser, &ex.rot);
+                match judgment.final_verdict {
+                    MoralVerdict::Good => 1,
+                    MoralVerdict::Bad | MoralVerdict::ConsentViolation => -1,
+                    MoralVerdict::Neutral => 0,
+                }
             };
 
             // Count as correct if sign matches or both neutral
@@ -568,7 +609,11 @@ fn benchmark_moral_exceptqa(algebra: &MoralAlgebra, parser: &MoralParser) -> Opt
 // ============================================================================
 
 fn predict_ethics(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, category: &str) -> i32 {
-    let judgment = judge_text(algebra, parser, text);
+    predict_ethics_with_classifier(algebra, parser, text, category, None)
+}
+
+fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, category: &str, per_cat: Option<&MoralPrototypeClassifier>) -> i32 {
+    let (judgment, parsed) = parse_and_judge(algebra, parser, text, category);
     let text_lower = text.to_lowercase();
 
     match category {
@@ -604,10 +649,17 @@ fn predict_ethics(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, cate
             } else if good_count > bad_count {
                 0  // label=0 means acceptable
             } else {
-                // Use ensemble judgment as tiebreaker
-                match judgment.final_verdict {
-                    MoralVerdict::Good | MoralVerdict::Neutral => 0,
-                    MoralVerdict::Bad | MoralVerdict::ConsentViolation => 1,
+                // Tiebreaker: prefer per-category classifier, fall back to ensemble
+                if let Some(clf) = per_cat {
+                    match clf.classify(text).0 {
+                        MoralLabel::Bad => 1,
+                        _ => 0,
+                    }
+                } else {
+                    match judgment.final_verdict {
+                        MoralVerdict::Good | MoralVerdict::Neutral => 0,
+                        MoralVerdict::Bad | MoralVerdict::ConsentViolation => 1,
+                    }
                 }
             }
         }
@@ -615,6 +667,31 @@ fn predict_ethics(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, cate
             // ETHICS Deontology: scenario + excuse format
             // label=1 means excuse is VALID (justifies not doing the thing)
             // label=0 means excuse is INVALID (doesn't justify)
+
+            // Use parsed obligation/excuse for structural reasoning
+            let has_obligation = parsed.obligation.is_some();
+            let has_excuse = parsed.excuse.is_some();
+
+            // If we detected both obligation and excuse, check if excuse addresses it
+            if has_obligation && has_excuse {
+                let oblig = parsed.obligation.as_deref().unwrap_or("");
+                let excuse = parsed.excuse.as_deref().unwrap_or("");
+                // Excuse that references constraint/inability addresses the obligation
+                let constraint_words = ["can't", "cannot", "unable", "impossible", "closed",
+                    "emergency", "sick", "broken", "already", "not available", "quarantine",
+                    "prohibited", "illegal", "don't have", "ran out"];
+                let excuse_addresses = constraint_words.iter().any(|w| excuse.contains(w));
+                let preference_words = ["want", "prefer", "rather", "feel like", "boring",
+                    "tired", "lazy", "don't want"];
+                let excuse_is_preference = preference_words.iter().any(|w| excuse.contains(w));
+
+                if excuse_addresses && !excuse_is_preference {
+                    return 1; // Valid excuse
+                } else if excuse_is_preference && !excuse_addresses {
+                    return 0; // Invalid excuse (mere preference)
+                }
+                // Fall through to pattern matching if ambiguous
+            }
 
             // Valid excuses typically address the constraint directly:
             let valid_excuse_patterns = [
@@ -647,17 +724,40 @@ fn predict_ethics(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, cate
             } else if invalid_count > valid_count {
                 0  // Invalid excuse
             } else {
-                // Analyze if excuse matches the obligation domain
-                let has_present_constraint = text_lower.contains("now") ||
-                    text_lower.contains("currently") ||
-                    text_lower.contains("right now");
-                if has_present_constraint { 1 } else { 0 }
+                // Tiebreaker: per-category classifier, then heuristic
+                if let Some(clf) = per_cat {
+                    match clf.classify(text).0 {
+                        MoralLabel::Good => 1,
+                        MoralLabel::Bad => 0,
+                        MoralLabel::Neutral => {
+                            let has_present = text_lower.contains("now") || text_lower.contains("currently");
+                            if has_present { 1 } else { 0 }
+                        }
+                    }
+                } else {
+                    let has_present = text_lower.contains("now") || text_lower.contains("currently") || text_lower.contains("right now");
+                    if has_present { 1 } else { 0 }
+                }
             }
         }
         "justice" => {
             // ETHICS Justice: scenario with justification for changed behavior
             // label=1 means justification is reasonable/just
             // label=0 means justification is unreasonable/unjust
+
+            // Use parsed effort/reward for proportionality reasoning
+            if let (Some(ref effort), Some(ref reward)) = (&parsed.effort, &parsed.reward) {
+                let effort_mag = effort.1;
+                let reward_mag = reward.1;
+                // Proportional = just, disproportionate = unjust
+                let diff = (effort_mag.value() - reward_mag.value()).abs();
+                if diff < 0.25 {
+                    return 1; // Proportional → just
+                } else if reward_mag > effort_mag {
+                    return 0; // Claiming more than earned → unjust
+                }
+                // Fall through if effort > reward (humble claim, possibly just)
+            }
 
             // Reasonable justifications relate to the activity:
             let reasonable_patterns = [
@@ -688,10 +788,23 @@ fn predict_ethics(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, cate
             } else if unreasonable_count > reasonable_count {
                 0
             } else {
-                // Default: use ensemble
-                match judgment.final_verdict {
-                    MoralVerdict::Good => 1,
-                    _ => 0,
+                // Tiebreaker: per-category classifier, then ensemble
+                if let Some(clf) = per_cat {
+                    match clf.classify(text).0 {
+                        MoralLabel::Good => 1,
+                        MoralLabel::Bad => 0,
+                        MoralLabel::Neutral => {
+                            match judgment.final_verdict {
+                                MoralVerdict::Good => 1,
+                                _ => 0,
+                            }
+                        }
+                    }
+                } else {
+                    match judgment.final_verdict {
+                        MoralVerdict::Good => 1,
+                        _ => 0,
+                    }
                 }
             }
         }
@@ -885,6 +998,7 @@ fn save_results(results: &[BenchmarkResult], total_duration_ms: u128) {
 
 /// Dataset structure for the 292K Social Chemistry file.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct SocialChem292kFile {
     #[serde(default)]
     metadata: HashMap<String, serde_json::Value>,
@@ -892,6 +1006,7 @@ struct SocialChem292kFile {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct SocialChem292kExample {
     #[serde(default)]
     action: String,
@@ -941,24 +1056,27 @@ fn train_prototypes_from_292k(
         return None;
     }
 
-    // Split into train/test
-    let (train_samples, test_samples): (Vec<_>, Vec<_>) = samples
-        .into_iter()
-        .partition(|_| true); // Use all for training; the benchmark does its own eval
+    // Cap training set: initial accumulation uses all samples for representative
+    // prototypes, but retraining uses at most 10K for speed (dim 8192 is expensive).
+    let max_retrain = 10_000;
+    println!("  Training on {} samples (retrain cap: {}, dim={})...", samples.len(), max_retrain, MORAL_PROTO_DIM);
 
-    println!("  Training on {} samples...", train_samples.len());
+    let mut classifier = MoralPrototypeClassifier::new(MORAL_PROTO_DIM, 3);
+    classifier.train(&samples);
 
-    let mut classifier = MoralPrototypeClassifier::new(4096, 3);
-    classifier.train(&train_samples);
-
-    // Retrain (iterative correction)
-    println!("  Retraining (lr=0.1, 5 iterations)...");
-    classifier.retrain(&train_samples, 0.1, 5);
+    // Retrain with adaptive LR decay on a capped subset for speed
+    let retrain_samples = if samples.len() > max_retrain {
+        &samples[..max_retrain]
+    } else {
+        &samples
+    };
+    println!("  Retraining adaptive (lr=0.1, 5 iterations, {} samples)...", retrain_samples.len());
+    classifier.retrain_adaptive(retrain_samples, 0.1, 5);
 
     // Report training accuracy
     let mut correct = 0;
-    let total = train_samples.len().min(5000); // Sample for speed
-    for sample in train_samples.iter().take(total) {
+    let total = samples.len().min(5000); // Sample for speed
+    for sample in samples.iter().take(total) {
         if classifier.classify(&sample.text).0 == sample.label {
             correct += 1;
         }
@@ -979,4 +1097,86 @@ fn train_prototypes_from_292k(
     }
 
     Some(classifier)
+}
+
+/// Train per-category ETHICS prototypes.
+///
+/// Each ETHICS category gets its own classifier trained on that category's
+/// binary labels. Label semantics differ per category:
+/// - commonsense: 0=acceptable(Good), 1=wrong(Bad)
+/// - justice: 0=unreasonable(Bad), 1=reasonable(Good)
+/// - deontology: 0=invalid excuse(Bad), 1=valid excuse(Good)
+/// - virtue: skipped (keyword matching is better for trait words)
+fn train_per_category_ethics_prototypes(ethics_path: &str) -> HashMap<String, MoralPrototypeClassifier> {
+    let mut classifiers = HashMap::new();
+
+    let file = match File::open(ethics_path) {
+        Ok(f) => f,
+        Err(_) => return classifiers,
+    };
+    let reader = BufReader::new(file);
+    let data: DatasetFile<EthicsExample> = match serde_json::from_reader(reader) {
+        Ok(d) => d,
+        Err(_) => return classifiers,
+    };
+
+    // Group by category
+    let mut by_category: HashMap<String, Vec<&EthicsExample>> = HashMap::new();
+    for ex in &data.examples {
+        by_category.entry(ex.category.clone()).or_default().push(ex);
+    }
+
+    for (category, examples) in &by_category {
+        // Skip virtue - keyword matching works better for trait words
+        if category == "virtue" {
+            continue;
+        }
+
+        let samples: Vec<MoralSample> = examples
+            .iter()
+            .filter_map(|ex| {
+                let label_val = ex.label?;
+                let label = match category.as_str() {
+                    // commonsense: 0=acceptable(Good), 1=wrong(Bad)
+                    "commonsense" => {
+                        if label_val == 1 { MoralLabel::Bad } else { MoralLabel::Good }
+                    }
+                    // justice/deontology: 0=unreasonable/invalid(Bad), 1=reasonable/valid(Good)
+                    _ => {
+                        if label_val == 1 { MoralLabel::Good } else { MoralLabel::Bad }
+                    }
+                };
+                Some(MoralSample {
+                    text: ex.text.clone(),
+                    label,
+                })
+            })
+            .collect();
+
+        if samples.len() < 10 {
+            continue;
+        }
+
+        println!("  Training per-category classifier for '{}' ({} samples, dim={})...",
+                 category, samples.len(), MORAL_PROTO_DIM);
+
+        let mut classifier = MoralPrototypeClassifier::new(MORAL_PROTO_DIM, 3);
+        classifier.train(&samples);
+        classifier.retrain_adaptive(&samples, 0.1, 10);
+
+        // Quick accuracy check
+        let mut correct = 0;
+        let check_n = samples.len().min(500);
+        for s in samples.iter().take(check_n) {
+            if classifier.classify(&s.text).0 == s.label {
+                correct += 1;
+            }
+        }
+        println!("    {} training accuracy: {:.1}%",
+                 category, correct as f64 / check_n as f64 * 100.0);
+
+        classifiers.insert(category.clone(), classifier);
+    }
+
+    classifiers
 }

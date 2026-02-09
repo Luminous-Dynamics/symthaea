@@ -263,6 +263,9 @@ pub struct MoralAlgebra {
 
     /// Dimension
     dim: usize,
+
+    /// Optional learned moral prototype classifier (trained on Social Chemistry etc.)
+    learned_classifier: Option<super::moral_prototypes::MoralPrototypeClassifier>,
 }
 
 impl MoralAlgebra {
@@ -300,6 +303,7 @@ impl MoralAlgebra {
             magnitude_hvs,
             consent_hvs,
             dim,
+            learned_classifier: None,
         }
     }
 
@@ -311,6 +315,16 @@ impl MoralAlgebra {
     /// Get dimension
     pub fn dim(&self) -> usize {
         self.dim
+    }
+
+    /// Set a learned moral prototype classifier for the 4th ensemble signal.
+    pub fn set_learned_classifier(&mut self, c: super::moral_prototypes::MoralPrototypeClassifier) {
+        self.learned_classifier = Some(c);
+    }
+
+    /// Whether a learned classifier is available.
+    pub fn has_learned_classifier(&self) -> bool {
+        self.learned_classifier.is_some()
     }
 
     // ========================================================================
@@ -812,6 +826,21 @@ impl MoralAlgebra {
         parsed_intent: MoralIntent,
         text: &str,
     ) -> EnsembleJudgment {
+        self.judge_ensemble_with_category(action_hv, parsed_intent, text, None)
+    }
+
+    /// Like `judge_ensemble`, but accepts an optional ETHICS category hint.
+    ///
+    /// When `category_hint` is `Some("virtue")`, the learned prototype signal
+    /// is excluded because virtue classification relies on trait-word keyword
+    /// matching, and social-norms-trained prototypes degrade virtue accuracy.
+    pub fn judge_ensemble_with_category(
+        &self,
+        action_hv: Option<&ContinuousHV>,
+        parsed_intent: MoralIntent,
+        text: &str,
+        category_hint: Option<&str>,
+    ) -> EnsembleJudgment {
         // 1. HDC similarity signal (if we have an action HV)
         let hdc_verdict = action_hv.map(|hv| {
             let judgment = self.judge_action(hv);
@@ -834,12 +863,52 @@ impl MoralAlgebra {
             DeontologicalVerdict::Neutral => MoralVerdict::Neutral,
         };
 
-        // Voting: count votes for each verdict
+        // 4. Learned prototype signal (if classifier is available)
+        // Skip for "virtue" category: trait-word matching is the right signal there,
+        // and social-norms prototypes trained on action descriptions degrade accuracy.
+        let skip_learned = category_hint.map(|c| c == "virtue").unwrap_or(false);
+        let (learned_verdict, learned_confidence) = if !skip_learned {
+            if let Some(ref classifier) = self.learned_classifier {
+                let (label, conf) = classifier.classify(text);
+                let verdict = match label {
+                    super::moral_prototypes::MoralLabel::Good => MoralVerdict::Good,
+                    super::moral_prototypes::MoralLabel::Neutral => MoralVerdict::Neutral,
+                    super::moral_prototypes::MoralLabel::Bad => MoralVerdict::Bad,
+                };
+                (Some(verdict), Some(conf))
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+
+        let has_learned = learned_verdict.is_some();
+
+        // Voting: per-category weight tuning
+        // Different ETHICS categories benefit from different signal balance.
+        let (w_hdc, w_intent, w_deonto, w_learned) = if has_learned {
+            match category_hint {
+                // Commonsense: intent is strongest, learned adds social norms context
+                Some("commonsense") => (0.15, 0.35, 0.15, 0.35),
+                // Justice: deontological rules + learned norms are key signals
+                Some("justice") => (0.15, 0.20, 0.30, 0.35),
+                // Deontology: rule-based + learned, intent less reliable
+                Some("deontology") => (0.15, 0.20, 0.30, 0.35),
+                // Virtue: never reaches here (skip_learned), but just in case
+                Some("virtue") => (0.3, 0.4, 0.3, 0.0),
+                // Default (Social Chemistry, Moral Stories, etc.)
+                _ => (0.15, 0.25, 0.20, 0.40),
+            }
+        } else {
+            (0.3, 0.4, 0.3, 0.0)
+        };
+
         let mut votes: std::collections::HashMap<&str, f32> = std::collections::HashMap::new();
 
-        // HDC vote (weight: 0.3 if available, adjusted by confidence)
+        // HDC vote (adjusted by confidence)
         if let Some((verdict, confidence)) = &hdc_verdict {
-            let weight = 0.3 * (1.0 + confidence.abs().min(0.5)); // Scale by confidence
+            let weight = w_hdc * (1.0 + confidence.abs().min(0.5));
             let key = match verdict {
                 MoralVerdict::Good => "good",
                 MoralVerdict::Bad => "bad",
@@ -849,23 +918,34 @@ impl MoralAlgebra {
             *votes.entry(key).or_insert(0.0) += weight;
         }
 
-        // Intent vote (weight: 0.4 - most reliable signal)
+        // Intent vote
         let intent_key = match intent_verdict {
             MoralVerdict::Good => "good",
             MoralVerdict::Bad => "bad",
             MoralVerdict::Neutral => "neutral",
             MoralVerdict::ConsentViolation => "consent_violation",
         };
-        *votes.entry(intent_key).or_insert(0.0) += 0.4;
+        *votes.entry(intent_key).or_insert(0.0) += w_intent;
 
-        // Deontological vote (weight: 0.3)
+        // Deontological vote
         let deonto_key = match deonto_verdict {
             MoralVerdict::Good => "good",
             MoralVerdict::Bad => "bad",
             MoralVerdict::Neutral => "neutral",
             MoralVerdict::ConsentViolation => "consent_violation",
         };
-        *votes.entry(deonto_key).or_insert(0.0) += 0.3;
+        *votes.entry(deonto_key).or_insert(0.0) += w_deonto;
+
+        // Learned prototype vote
+        if let Some(lv) = &learned_verdict {
+            let learned_key = match lv {
+                MoralVerdict::Good => "good",
+                MoralVerdict::Bad => "bad",
+                MoralVerdict::Neutral => "neutral",
+                MoralVerdict::ConsentViolation => "consent_violation",
+            };
+            *votes.entry(learned_key).or_insert(0.0) += w_learned;
+        }
 
         // Determine winner
         let (winner, max_vote) = votes.iter()
@@ -891,6 +971,8 @@ impl MoralAlgebra {
             deonto_score: deonto.score,
             violations: deonto.violations,
             satisfactions: deonto.satisfactions,
+            learned_verdict,
+            learned_confidence,
             final_verdict,
             confidence,
         }
@@ -1015,6 +1097,10 @@ pub struct EnsembleJudgment {
     pub violations: Vec<ObligationViolation>,
     /// Deontological satisfactions detected
     pub satisfactions: Vec<ObligationSatisfaction>,
+    /// Learned prototype verdict (if classifier was available)
+    pub learned_verdict: Option<MoralVerdict>,
+    /// Learned prototype confidence (best - second-best similarity)
+    pub learned_confidence: Option<f32>,
     /// Final ensemble verdict (weighted vote)
     pub final_verdict: MoralVerdict,
     /// Confidence in final verdict (0.0 to 1.0)
@@ -1027,7 +1113,8 @@ impl EnsembleJudgment {
         let intent_matches = self.intent_verdict == self.final_verdict;
         let deonto_matches = self.deonto_verdict == self.final_verdict;
         let hdc_matches = self.hdc_verdict.map(|v| v == self.final_verdict).unwrap_or(true);
-        intent_matches && deonto_matches && hdc_matches
+        let learned_matches = self.learned_verdict.map(|v| v == self.final_verdict).unwrap_or(true);
+        intent_matches && deonto_matches && hdc_matches && learned_matches
     }
 
     /// Get a human-readable explanation of the verdict
@@ -1054,6 +1141,12 @@ impl EnsembleJudgment {
         // HDC signal
         if let Some(conf) = self.hdc_confidence {
             parts.push(format!("HDC: {:+.3}", conf));
+        }
+
+        // Learned prototype signal
+        if let Some(lv) = self.learned_verdict {
+            let conf = self.learned_confidence.unwrap_or(0.0);
+            parts.push(format!("Learned: {:?} ({:.3})", lv, conf));
         }
 
         format!("{} ({})",
