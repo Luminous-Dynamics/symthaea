@@ -447,6 +447,58 @@ impl FederatedAggregator {
         Some(aggregated)
     }
 
+    /// Aggregate using the unified mycelix-fl-core pipeline with plugin support.
+    ///
+    /// Converts Symthaea's `GradientMessage` contributions to core `GradientUpdate`
+    /// types, runs the full pipeline (validate → DP → detect → trim → aggregate),
+    /// and returns the aggregated gradient.
+    ///
+    /// This is the recommended aggregation path for production use, as it provides
+    /// multi-signal Byzantine detection, hybrid BFT, and plugin extensibility.
+    pub fn aggregate_with_pipeline(
+        &mut self,
+        pipeline: &mut mycelix_fl_core::UnifiedPipeline,
+    ) -> Option<mycelix_fl_core::PipelineResult> {
+        if self.peer_contributions.is_empty() {
+            return None;
+        }
+
+        // Convert GradientMessage → GradientUpdate
+        let updates: Vec<mycelix_fl_core::GradientUpdate> = self
+            .peer_contributions
+            .iter()
+            .map(|(msg, _weight)| {
+                let pid = hex::encode(&msg.source_id[..8]);
+                mycelix_fl_core::GradientUpdate::new(
+                    pid,
+                    msg.model_version,
+                    msg.gradient_data.clone(),
+                    msg.sample_count as u32,
+                    0.5, // loss not tracked in GradientMessage
+                )
+            })
+            .collect();
+
+        // Build reputation map from trust scores
+        let reputations: std::collections::HashMap<String, f32> = self
+            .peer_contributions
+            .iter()
+            .map(|(msg, _weight)| {
+                let pid = hex::encode(&msg.source_id[..8]);
+                (pid, msg.trust_score)
+            })
+            .collect();
+
+        match pipeline.aggregate(&updates, &reputations) {
+            Ok(result) => {
+                self.peer_contributions.clear();
+                self.aggregation_round += 1;
+                Some(result)
+            }
+            Err(_) => None,
+        }
+    }
+
     /// Apply trimmed mean for Byzantine fault tolerance
     ///
     /// This removes the top and bottom `trim_fraction` of values for each
