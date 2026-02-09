@@ -105,6 +105,24 @@ impl PipelineConfig {
         }
     }
 
+    /// Create an adaptive configuration that learns from Byzantine detection history.
+    ///
+    /// Uses MetaLearningByzantinePlugin to adapt signal weights and track
+    /// per-participant exclusion rates across rounds. Best for long-running
+    /// federated sessions where attack patterns evolve.
+    pub fn adaptive() -> Self {
+        Self {
+            min_reputation: 0.3,
+            max_byzantine_tolerance: MAX_BYZANTINE_TOLERANCE,
+            aggregation_method: AggregationMethod::TrustWeighted,
+            dp_config: None,
+            trim_fraction: 0.15,
+            reputation_exponent: 2.0,
+            multi_signal_detection: true,
+            trust_threshold: 0.5,
+        }
+    }
+
     /// Create a performance-optimized configuration
     pub fn performance() -> Self {
         Self {
@@ -151,6 +169,13 @@ pub struct PipelineResult {
 }
 
 /// The unified FL pipeline
+///
+/// # Presets
+///
+/// - `PipelineConfig::default()` — balanced defaults
+/// - `PipelineConfig::high_security()` — Krum + DP, 30% BFT limit
+/// - `PipelineConfig::adaptive()` — for use with `MetaLearningByzantinePlugin`
+/// - `PipelineConfig::performance()` — FedAvg, no detection, fastest
 pub struct UnifiedPipeline {
     pub config: PipelineConfig,
     rdp_tracker: Option<RdpBudgetTracker>,
@@ -853,5 +878,48 @@ mod tests {
         // 2 low-rep should be gated out by hybrid BFT
         assert!(result.aggregated.participant_count <= 8,
             "At most 8 should survive, got {}", result.aggregated.participant_count);
+    }
+
+    #[test]
+    fn test_adaptive_preset() {
+        let config = PipelineConfig::adaptive();
+        assert_eq!(config.trim_fraction, 0.15);
+        assert!(config.multi_signal_detection);
+        assert_eq!(config.aggregation_method, AggregationMethod::TrustWeighted);
+
+        // Should work with the pipeline
+        let (updates, reps) = test_contributions(10, 2);
+        let mut pipeline = UnifiedPipeline::new(config);
+        let result = pipeline.aggregate(&updates, &reps).unwrap();
+        assert!(result.aggregated.participant_count > 0);
+    }
+
+    #[test]
+    fn test_adaptive_preset_with_meta_learning_plugin() {
+        use crate::meta_learning::MetaLearningByzantinePlugin;
+        use crate::plugins::PipelinePlugins;
+
+        let config = PipelineConfig::adaptive();
+        let mut pipeline = UnifiedPipeline::new(config);
+        let mut meta_plugin = MetaLearningByzantinePlugin::new();
+
+        // Run 3 rounds — meta-learning should track participant behavior
+        for round in 0..3 {
+            let (updates, reps) = test_contributions(8, 2);
+            let mut plugins = PipelinePlugins {
+                compression: None,
+                byzantine: vec![&mut meta_plugin],
+                verification: None,
+            };
+            let result = pipeline.aggregate_with_plugins(&updates, &reps, &mut plugins).unwrap();
+            assert!(result.result.aggregated.participant_count > 0,
+                "Round {} should produce results", round);
+        }
+
+        // After 3 rounds, the plugin should have learned something
+        // test_contributions uses "b0" for Byzantine IDs
+        let profile = meta_plugin.get_participant_profile("b0");
+        assert!(profile.is_some(), "Should have tracked Byzantine participant");
+        assert!(profile.unwrap().rounds_seen > 0, "Should have seen rounds");
     }
 }
