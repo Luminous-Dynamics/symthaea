@@ -60,7 +60,7 @@ coordinator:
       dependencies:
         - name: finance_bridge_integrity
     - name: staking
-      path: ../target/wasm32-unknown-unknown/release/staking.wasm
+      path: ../target/wasm32-unknown-unknown/release/staking_coordinator.wasm
       dependencies:
         - name: staking_integrity
     - name: tend

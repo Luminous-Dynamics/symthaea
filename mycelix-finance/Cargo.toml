@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+    "types",
     "zomes/shared",
     "zomes/payments/integrity",
     "zomes/payments/coordinator",

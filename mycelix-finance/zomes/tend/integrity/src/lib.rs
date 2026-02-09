@@ -13,6 +13,7 @@
 //! MIP Template Reference: MIP-C-042
 
 use hdi::prelude::*;
+pub use mycelix_finance_types::TendLimitTier;
 
 // =============================================================================
 // CONSTANTS (Per MIP-C-042 Template)
@@ -41,39 +42,6 @@ pub const BALANCE_LIMIT_EMERGENCY: i32 = 120;
 
 /// Apprentice balance limit
 pub const APPRENTICE_BALANCE_LIMIT: i32 = 10;
-
-// =============================================================================
-// TEND LIMIT TIERS
-// =============================================================================
-
-/// Tiered balance limits based on community/member state.
-///
-/// Normal operation uses ±40, but elevated tiers allow wider limits
-/// during periods of community stress or emergency. The coordinator
-/// zome is responsible for determining which tier applies dynamically.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum TendLimitTier {
-    /// Normal operation: ±40 TEND
-    Normal,
-    /// Stressed state: ±60 TEND
-    Elevated,
-    /// Critical state: ±80 TEND
-    High,
-    /// Failing state: ±120 TEND
-    Emergency,
-}
-
-impl TendLimitTier {
-    /// Returns the balance limit for this tier.
-    pub fn limit(&self) -> i32 {
-        match self {
-            TendLimitTier::Normal => BALANCE_LIMIT,
-            TendLimitTier::Elevated => BALANCE_LIMIT_ELEVATED,
-            TendLimitTier::High => BALANCE_LIMIT_HIGH,
-            TendLimitTier::Emergency => BALANCE_LIMIT_EMERGENCY,
-        }
-    }
-}
 
 // =============================================================================
 // ENTRY TYPES
@@ -373,10 +341,57 @@ pub struct DisputeCase {
 // ENTRY & LINK TYPE ENUMS
 // =============================================================================
 
+/// Oracle state for counter-cyclical TEND limit adjustments.
+///
+/// Updated by the metabolic oracle (or governance) to signal network health.
+/// The TEND coordinator reads this to determine dynamic balance limits.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct OracleState {
+    /// Network vitality score (0-100)
+    pub vitality: u32,
+    /// Current TEND limit tier (derived from vitality)
+    pub tier: TendLimitTier,
+    /// When this state was last updated
+    pub updated_at: Timestamp,
+}
+
+impl OracleState {
+    /// Derive the limit tier from a vitality score
+    pub fn tier_from_vitality(vitality: u32) -> TendLimitTier {
+        TendLimitTier::from_vitality(vitality)
+    }
+}
+
 /// Anchor entry for deterministic link bases
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Anchor(pub String);
+
+/// Bilateral balance between two DAOs for inter-community TEND clearing.
+///
+/// When a member from DAO-A provides service to a member of DAO-B,
+/// the exchange is recorded locally in each DAO's zero-sum ledger,
+/// but the inter-DAO imbalance is tracked here.
+///
+/// Bilateral balances are settled quarterly via SAP transfer from
+/// the debtor DAO's commons pool to the creditor DAO's commons pool.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct BilateralBalance {
+    /// DID of one DAO (the "left" side, alphabetically first)
+    pub dao_a_did: String,
+    /// DID of the other DAO (the "right" side)
+    pub dao_b_did: String,
+    /// Net balance in TEND-hours. Positive = DAO-A is owed by DAO-B.
+    pub net_balance: i32,
+    /// Running total of exchanges crossing this bilateral pair
+    pub total_exchanges: u32,
+    /// Last time this balance was settled (or created)
+    pub last_settled_at: Timestamp,
+    /// Last time this balance was updated
+    pub last_updated_at: Timestamp,
+}
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
@@ -388,6 +403,8 @@ pub enum EntryTypes {
     Anchor(Anchor),
     QualityRating(QualityRating),
     DisputeCase(DisputeCase),
+    OracleState(OracleState),
+    BilateralBalance(BilateralBalance),
 }
 
 #[hdk_link_types]
@@ -418,6 +435,8 @@ pub enum LinkTypes {
     MemberToDisputes,
     /// Link from exchange to its dispute case
     ExchangeToDispute,
+    /// Link from DAO-pair anchor to bilateral balance
+    DaoToBilateralBalance,
 }
 
 // =============================================================================
@@ -453,6 +472,26 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::DisputeCase(dispute) => {
                         validate_create_dispute_case(EntryCreationAction::Create(action), dispute)
                     }
+                    EntryTypes::OracleState(state) => {
+                        if state.vitality > 100 {
+                            Ok(ValidateCallbackResult::Invalid(
+                                "Vitality must be 0-100".into(),
+                            ))
+                        } else {
+                            Ok(ValidateCallbackResult::Valid)
+                        }
+                    }
+                    EntryTypes::BilateralBalance(bal) => {
+                        if !bal.dao_a_did.starts_with("did:") || !bal.dao_b_did.starts_with("did:") {
+                            Ok(ValidateCallbackResult::Invalid("DAO DIDs must be valid".into()))
+                        } else if bal.dao_a_did >= bal.dao_b_did {
+                            Ok(ValidateCallbackResult::Invalid(
+                                "dao_a_did must be alphabetically before dao_b_did (canonical ordering)".into(),
+                            ))
+                        } else {
+                            Ok(ValidateCallbackResult::Valid)
+                        }
+                    }
                     // Anchors are always valid (just hash placeholders)
                     EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 }
@@ -480,6 +519,18 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::DisputeCase(dispute) => {
                         validate_update_dispute_case(action, dispute)
                     }
+                    EntryTypes::OracleState(state) => {
+                        if state.vitality > 100 {
+                            Ok(ValidateCallbackResult::Invalid(
+                                "Vitality must be 0-100".into(),
+                            ))
+                        } else {
+                            Ok(ValidateCallbackResult::Valid)
+                        }
+                    }
+                    EntryTypes::BilateralBalance(_) => {
+                        Ok(ValidateCallbackResult::Valid)
+                    }
                     // Anchors cannot be updated
                     EntryTypes::Anchor(_) => {
                         Ok(ValidateCallbackResult::Invalid(
@@ -505,6 +556,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::ExchangeToRating => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::MemberToDisputes => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::ExchangeToDispute => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::DaoToBilateralBalance => Ok(ValidateCallbackResult::Valid),
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -592,10 +644,11 @@ fn validate_create_balance(
         return Ok(ValidateCallbackResult::Invalid("DAO must be a valid DID".into()));
     }
 
-    // Balance must be within limits
-    if balance.balance.abs() > BALANCE_LIMIT {
+    // Balance must be within the constitutional maximum (Emergency tier ±120).
+    // The coordinator enforces the tighter dynamic limit based on oracle state.
+    if balance.balance.abs() > BALANCE_LIMIT_EMERGENCY {
         return Ok(ValidateCallbackResult::Invalid(
-            format!("Balance exceeds limit of ±{}", BALANCE_LIMIT),
+            format!("Balance exceeds constitutional maximum of ±{}", BALANCE_LIMIT_EMERGENCY),
         ));
     }
 
@@ -606,10 +659,10 @@ fn validate_update_balance(
     _action: Update,
     balance: TendBalance,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Balance must stay within limits
-    if balance.balance.abs() > BALANCE_LIMIT {
+    // Constitutional maximum — coordinator enforces dynamic limit
+    if balance.balance.abs() > BALANCE_LIMIT_EMERGENCY {
         return Ok(ValidateCallbackResult::Invalid(
-            format!("Balance would exceed limit of ±{}", BALANCE_LIMIT),
+            format!("Balance would exceed constitutional maximum of ±{}", BALANCE_LIMIT_EMERGENCY),
         ));
     }
     Ok(ValidateCallbackResult::Valid)

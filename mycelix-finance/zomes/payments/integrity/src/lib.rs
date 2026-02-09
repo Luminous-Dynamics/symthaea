@@ -1,6 +1,7 @@
 //! Payments Integrity Zome
 //! Updated to use HDI 0.7 patterns with FlatOp validation
 use hdi::prelude::*;
+pub use mycelix_finance_types::SuccessionPreference;
 
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -69,15 +70,16 @@ pub struct Receipt {
     pub signature: String,
 }
 
-/// How SAP should be handled when a member exits
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum SuccessionPreference {
-    /// Default: remaining SAP goes to member's local commons pool
-    Commons,
-    /// SAP transferred to a designated DID
-    Designee(String),
-    /// SAP redeemed for collateral through the bridge
-    Redemption,
+/// On-chain SAP balance with lazy demurrage tracking.
+/// Demurrage is applied on every balance read/mutation — no cron needed.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct SapBalance {
+    pub member_did: String,
+    /// Raw balance in SAP micro-units (1 SAP = 1_000_000 micro-SAP)
+    pub balance: u64,
+    /// Timestamp of last demurrage application
+    pub last_demurrage_at: Timestamp,
 }
 
 /// Record of a member exit, coordinating across all currencies
@@ -105,6 +107,7 @@ pub enum EntryTypes {
     PaymentChannel(PaymentChannel),
     Receipt(Receipt),
     ExitRecord(ExitRecord),
+    SapBalance(SapBalance),
 }
 
 #[hdk_link_types]
@@ -114,6 +117,7 @@ pub enum LinkTypes {
     PaymentToReceipt,
     ChannelPartyA,
     ChannelPartyB,
+    DidToSapBalance,
 }
 
 /// Genesis self-check
@@ -141,6 +145,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::ExitRecord(exit) => {
                         validate_create_exit_record(EntryCreationAction::Create(action), exit)
                     }
+                    EntryTypes::SapBalance(bal) => {
+                        validate_sap_balance(&bal)
+                    }
                 }
             }
             OpEntry::UpdateEntry { app_entry, action, .. } => {
@@ -160,6 +167,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         Ok(ValidateCallbackResult::Invalid(
                             "Exit records cannot be updated".into(),
                         ))
+                    }
+                    EntryTypes::SapBalance(bal) => {
+                        validate_sap_balance(&bal)
                     }
                 }
             }
@@ -196,6 +206,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     if target_address.as_ref().len() != 39 {
                         return Ok(ValidateCallbackResult::Invalid(
                             "Link target must be a valid entry hash".into()
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::DidToSapBalance => {
+                    if base_address.as_ref().len() != 39 || target_address.as_ref().len() != 39 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "DidToSapBalance link must connect valid hashes".into()
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)
@@ -325,6 +343,13 @@ fn validate_create_receipt(
     // which would be fetched from the identity zome in production.
     // The signature should cover: payment_id | from_did | to_did | amount | currency | timestamp
 
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_sap_balance(bal: &SapBalance) -> ExternResult<ValidateCallbackResult> {
+    if !bal.member_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid("Member must be a valid DID".into()));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 

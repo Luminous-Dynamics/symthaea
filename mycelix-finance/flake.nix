@@ -1,6 +1,6 @@
 # Mycelix Finance - Holochain Development Environment
-# CGC (Civic Gifting Credits), TEND (Time Exchange), HEARTH (Commons Pool)
-# Treasury, Payments, Lending, Staking, Credit Scoring
+# Three-Currency Economic System: MYCEL (reputation), SAP (circulation), TEND (time exchange)
+# Zomes: Payments, Treasury, Bridge, Staking, TEND, Recognition
 #
 # Usage:
 #   nix develop              # Enter dev shell
@@ -64,14 +64,13 @@
             name = "finance";
             extraBuildInputs = financeExtraInputs;
             extraShellHook = ''
-              echo "Zomes:"
-              echo "  cgc/      - Civic Gifting Credits (10/month recognition)"
-              echo "  tend/     - Time Exchange (mutual credit, +-40 limit)"
-              echo "  hearth/   - Commons Pool (democratic allocation)"
-              echo "  payments/ - P2P payments & channels"
-              echo "  lending/  - Trust-based lending"
-              echo "  treasury/ - DAO treasury management"
-              echo "  staking/  - Tri-asset staking"
+              echo "Zomes (Three-Currency Model: MYCEL / SAP / TEND):"
+              echo "  recognition/ - MYCEL reputation (weighted recognition, apprentice lifecycle)"
+              echo "  tend/        - TEND time exchange (mutual credit, counter-cyclical limits)"
+              echo "  payments/    - SAP/TEND payments with demurrage & progressive fees"
+              echo "  treasury/    - Commons pools with inalienable reserves"
+              echo "  bridge/      - Collateral bridge (ETH/USDC → SAP, rate-limited)"
+              echo "  staking/     - SAP collateral staking (MYCEL-weighted)"
               echo ""
               echo "Commands:"
               echo "  cargo build              - Build library crates"

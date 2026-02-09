@@ -1,66 +1,320 @@
 //! Payments Coordinator Zome
 use hdk::prelude::*;
 use payments_integrity::*;
+use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
+use mycelix_finance_types::{
+    compute_demurrage_deduction, SuccessionPreference, FeeTier,
+    DEMURRAGE_RATE, DEMURRAGE_EXEMPT_FLOOR,
+    COMPOST_LOCAL_PCT, COMPOST_REGIONAL_PCT,
+};
 
-/// Helper to create anchor hash from string
-fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+// ---------------------------------------------------------------------------
+// SAP Balance Management (on-chain balance with enforced demurrage)
+// ---------------------------------------------------------------------------
 
-    let mut hasher = DefaultHasher::new();
-    anchor_str.hash(&mut hasher);
-    let h1 = hasher.finish();
-    hasher.write_u64(h1);
-    let h2 = hasher.finish();
-    hasher.write_u64(h2);
-    let h3 = hasher.finish();
-    hasher.write_u64(h3);
-    let h4 = hasher.finish();
+/// Initialize a SAP balance for a new member (zero balance).
+#[hdk_extern]
+pub fn initialize_sap_balance(member_did: String) -> ExternResult<Record> {
+    verify_caller_is_did(&member_did)?;
 
-    let mut result = [0u8; 32];
-    result[0..8].copy_from_slice(&h1.to_le_bytes());
-    result[8..16].copy_from_slice(&h2.to_le_bytes());
-    result[16..24].copy_from_slice(&h3.to_le_bytes());
-    result[24..32].copy_from_slice(&h4.to_le_bytes());
+    // Check if balance already exists
+    if find_sap_balance_record(&member_did)?.is_some() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "SAP balance already initialized for this member".into()
+        )));
+    }
 
-    Ok(EntryHash::from_raw_32(result.to_vec()))
+    let now = sys_time()?;
+    let balance = SapBalance {
+        member_did: member_did.clone(),
+        balance: 0,
+        last_demurrage_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::SapBalance(balance))?;
+    create_link(
+        anchor_hash(&format!("sap:{}", member_did))?,
+        action_hash.clone(),
+        LinkTypes::DidToSapBalance,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
-/// Compute demurrage deduction on SAP balances.
-///
-/// Implements: eligible * (1 - e^(-rate * years))
-/// where eligible = max(balance - exempt_floor, 0) and years = seconds_elapsed / 31_536_000.
-///
-/// Returns the amount to deduct (in the same integer unit as balance).
-pub fn compute_demurrage_deduction(balance: u64, exempt_floor: u64, rate: f64, seconds_elapsed: u64) -> u64 {
-    if balance <= exempt_floor || seconds_elapsed == 0 {
-        return 0;
-    }
-    let eligible = (balance - exempt_floor) as f64;
-    let years = seconds_elapsed as f64 / 31_536_000.0;
-    let decay = 1.0 - (-rate * years).exp();
-    let deduction = eligible * decay;
-    // Clamp to eligible amount and floor at zero
-    if deduction < 0.0 {
-        0
-    } else if deduction > eligible {
-        eligible as u64
-    } else {
-        deduction as u64
-    }
+/// Get the effective SAP balance for a member (after applying demurrage).
+/// This is a read-only query — it does NOT persist the demurrage deduction.
+#[hdk_extern]
+pub fn get_sap_balance(member_did: String) -> ExternResult<SapBalanceResponse> {
+    let (record, bal) = get_sap_balance_inner(&member_did)?;
+    let now = sys_time()?;
+    let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
+    let deduction = compute_demurrage_deduction(
+        bal.balance,
+        DEMURRAGE_EXEMPT_FLOOR,
+        DEMURRAGE_RATE,
+        elapsed,
+    );
+    let _ = record; // used only for existence check
+    Ok(SapBalanceResponse {
+        member_did: bal.member_did,
+        raw_balance: bal.balance,
+        effective_balance: bal.balance.saturating_sub(deduction),
+        pending_demurrage: deduction,
+        last_demurrage_at: bal.last_demurrage_at,
+    })
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct DemurrageOnSendInput {
-    pub balance: u64,
-    pub exempt_floor: u64,
-    pub rate: f64,
-    pub last_demurrage_at: u64, // epoch seconds of last demurrage computation
-    pub now: u64,               // current epoch seconds
+pub struct SapBalanceResponse {
+    pub member_did: String,
+    pub raw_balance: u64,
+    pub effective_balance: u64,
+    pub pending_demurrage: u64,
+    pub last_demurrage_at: Timestamp,
+}
+
+/// Apply demurrage to a member's SAP balance and redistribute the deducted
+/// amount as compost to commons pools (70% local, 20% regional, 10% global).
+///
+/// Returns the amount deducted. If 0, no update is persisted.
+#[hdk_extern]
+pub fn apply_demurrage(input: ApplyDemurrageInput) -> ExternResult<DemurrageResult> {
+    let (record, bal) = get_sap_balance_inner(&input.member_did)?;
+    let now = sys_time()?;
+    let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
+    let deduction = compute_demurrage_deduction(
+        bal.balance,
+        DEMURRAGE_EXEMPT_FLOOR,
+        DEMURRAGE_RATE,
+        elapsed,
+    );
+
+    if deduction == 0 {
+        return Ok(DemurrageResult { deducted: 0, redistributed: true });
+    }
+
+    // Update balance
+    let updated = SapBalance {
+        balance: bal.balance.saturating_sub(deduction),
+        last_demurrage_at: now,
+        ..bal
+    };
+    update_entry(record.action_address().clone(), &EntryTypes::SapBalance(updated))?;
+
+    // Redistribute as compost: 70% local, 20% regional, 10% global
+    let local_amount = deduction * COMPOST_LOCAL_PCT / 100;
+    let regional_amount = deduction * COMPOST_REGIONAL_PCT / 100;
+    let global_amount = deduction - local_amount - regional_amount; // remainder to global
+
+    // Redistribute via treasury zome cross-zome calls
+    if let Some(ref pool_id) = input.local_commons_pool_id {
+        let _ = call(
+            CallTargetCell::Local,
+            ZomeName::from("treasury"),
+            FunctionName::from("receive_compost"),
+            None,
+            ReceiveCompostPayload {
+                commons_pool_id: pool_id.clone(),
+                amount: local_amount,
+                source_member_did: input.member_did.clone(),
+            },
+        );
+    }
+    if let Some(ref pool_id) = input.regional_commons_pool_id {
+        let _ = call(
+            CallTargetCell::Local,
+            ZomeName::from("treasury"),
+            FunctionName::from("receive_compost"),
+            None,
+            ReceiveCompostPayload {
+                commons_pool_id: pool_id.clone(),
+                amount: regional_amount,
+                source_member_did: input.member_did.clone(),
+            },
+        );
+    }
+    if let Some(ref pool_id) = input.global_commons_pool_id {
+        let _ = call(
+            CallTargetCell::Local,
+            ZomeName::from("treasury"),
+            FunctionName::from("receive_compost"),
+            None,
+            ReceiveCompostPayload {
+                commons_pool_id: pool_id.clone(),
+                amount: global_amount,
+                source_member_did: input.member_did.clone(),
+            },
+        );
+    }
+
+    Ok(DemurrageResult { deducted: deduction, redistributed: true })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ApplyDemurrageInput {
+    pub member_did: String,
+    pub local_commons_pool_id: Option<String>,
+    pub regional_commons_pool_id: Option<String>,
+    pub global_commons_pool_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct ReceiveCompostPayload {
+    pub commons_pool_id: String,
+    pub amount: u64,
+    pub source_member_did: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DemurrageResult {
+    pub deducted: u64,
+    pub redistributed: bool,
+}
+
+/// Credit SAP to a member's balance (used by bridge deposits and community issuance).
+#[hdk_extern]
+pub fn credit_sap(input: CreditSapInput) -> ExternResult<Record> {
+    let (record, bal) = get_sap_balance_inner(&input.member_did)?;
+    let now = sys_time()?;
+
+    // Apply pending demurrage first, then credit
+    let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
+    let deduction = compute_demurrage_deduction(
+        bal.balance,
+        DEMURRAGE_EXEMPT_FLOOR,
+        DEMURRAGE_RATE,
+        elapsed,
+    );
+    let post_demurrage = bal.balance.saturating_sub(deduction);
+
+    let updated = SapBalance {
+        balance: post_demurrage + input.amount,
+        last_demurrage_at: now,
+        ..bal
+    };
+    let action_hash = update_entry(record.action_address().clone(), &EntryTypes::SapBalance(updated))?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreditSapInput {
+    pub member_did: String,
+    pub amount: u64,
+    pub reason: String,
+}
+
+/// Debit SAP from a member's balance (enforces demurrage + sufficient balance).
+#[hdk_extern]
+pub fn debit_sap(input: DebitSapInput) -> ExternResult<Record> {
+    let (record, bal) = get_sap_balance_inner(&input.member_did)?;
+    let now = sys_time()?;
+
+    // Apply pending demurrage first
+    let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
+    let deduction = compute_demurrage_deduction(
+        bal.balance,
+        DEMURRAGE_EXEMPT_FLOOR,
+        DEMURRAGE_RATE,
+        elapsed,
+    );
+    let effective = bal.balance.saturating_sub(deduction);
+
+    if input.amount > effective {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Insufficient SAP balance: effective {} (raw {} - demurrage {}), need {}",
+            effective, bal.balance, deduction, input.amount
+        ))));
+    }
+
+    let updated = SapBalance {
+        balance: effective - input.amount,
+        last_demurrage_at: now,
+        ..bal
+    };
+    let action_hash = update_entry(record.action_address().clone(), &EntryTypes::SapBalance(updated))?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DebitSapInput {
+    pub member_did: String,
+    pub amount: u64,
+    pub reason: String,
+}
+
+// --- Internal helpers ---
+
+fn find_sap_balance_record(member_did: &str) -> ExternResult<Option<(Record, SapBalance)>> {
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::SapBalance)?))
+        .include_entries(true);
+
+    for record in query(filter)? {
+        if let Some(bal) = record.entry().to_app_option::<SapBalance>().ok().flatten() {
+            if bal.member_did == member_did {
+                return Ok(Some((record, bal)));
+            }
+        }
+    }
+    Ok(None)
+}
+
+fn get_sap_balance_inner(member_did: &str) -> ExternResult<(Record, SapBalance)> {
+    find_sap_balance_record(member_did)?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "No SAP balance found for {}. Call initialize_sap_balance first.",
+            member_did
+        ))))
+}
+
+/// Compute the progressive SAP fee for a payment based on sender's MYCEL score.
+///
+/// Fetches the sender's MYCEL score via cross-zome call to recognition,
+/// determines their FeeTier, and computes the fee in micro-SAP.
+/// Falls back to Newcomer tier (0.10%) if MYCEL lookup fails.
+fn compute_sap_fee(sender_did: &str, micro_amount: u64) -> ExternResult<u64> {
+    let mycel_score = match call(
+        CallTargetCell::Local,
+        ZomeName::from("recognition"),
+        FunctionName::from("get_mycel_score"),
+        None,
+        sender_did.to_string(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            #[derive(Debug, Deserialize)]
+            struct MycelState { mycel_score: f64 }
+            match result.decode::<MycelState>() {
+                Ok(state) => state.mycel_score,
+                Err(_) => 0.0, // Fallback: Newcomer tier
+            }
+        }
+        _ => 0.0, // Recognition zome unreachable → Newcomer tier
+    };
+
+    let tier = FeeTier::from_mycel(mycel_score);
+    let fee = (micro_amount as f64 * tier.base_fee_rate()) as u64;
+    Ok(fee)
+}
+
+fn elapsed_seconds(from: Timestamp, to: Timestamp) -> u64 {
+    let from_us = from.as_micros();
+    let to_us = to.as_micros();
+    if to_us > from_us {
+        ((to_us - from_us) / 1_000_000) as u64
+    } else {
+        0
+    }
 }
 
 #[hdk_extern]
 pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
+    // Verify caller is the sender (prevents DID spoofing)
+    verify_caller_is_did(&input.from_did)?;
+
     // Validate currency before creating any entries
     if input.currency != "SAP" && input.currency != "TEND" {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -70,37 +324,48 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
 
     let now = sys_time()?;
 
-    // If sending SAP, compute informational demurrage note for memo
-    let memo = if input.currency == "SAP" {
-        if let Some(ref demurrage) = input.demurrage {
-            let seconds_elapsed = if demurrage.now > demurrage.last_demurrage_at {
-                demurrage.now - demurrage.last_demurrage_at
-            } else {
-                0
-            };
-            let deduction = compute_demurrage_deduction(
-                demurrage.balance,
-                demurrage.exempt_floor,
-                demurrage.rate,
-                seconds_elapsed,
+    // If sending SAP, enforce on-chain balance with demurrage + progressive fee
+    let (memo, _fee_amount) = if input.currency == "SAP" {
+        // Convert f64 amount to micro-SAP (u64)
+        let micro_amount = (input.amount * 1_000_000.0) as u64;
+
+        // Compute progressive fee based on sender's MYCEL score
+        let fee_micro = compute_sap_fee(&input.from_did, micro_amount)?;
+        let total_debit = micro_amount + fee_micro;
+
+        // Debit sender's SAP balance (amount + fee, applies demurrage)
+        debit_sap(DebitSapInput {
+            member_did: input.from_did.clone(),
+            amount: total_debit,
+            reason: format!("Payment to {} (includes fee {})", input.to_did, fee_micro),
+        })?;
+
+        // Credit receiver's SAP balance (amount only, fee goes to commons)
+        credit_sap(CreditSapInput {
+            member_did: input.to_did.clone(),
+            amount: micro_amount,
+            reason: format!("Payment from {}", input.from_did),
+        })?;
+
+        // Route fee to commons via treasury (if fee > 0)
+        if fee_micro > 0 {
+            let _ = call(
+                CallTargetCell::Local,
+                ZomeName::from("treasury"),
+                FunctionName::from("receive_compost"),
+                None,
+                ReceiveCompostPayload {
+                    commons_pool_id: "global-fee-pool".to_string(),
+                    amount: fee_micro,
+                    source_member_did: input.from_did.clone(),
+                },
             );
-            if deduction > 0 {
-                let base_memo = input.memo.clone().unwrap_or_default();
-                Some(format!(
-                    "{}{}[demurrage: {} SAP pending deduction over {}s]",
-                    base_memo,
-                    if base_memo.is_empty() { "" } else { " " },
-                    deduction,
-                    seconds_elapsed
-                ))
-            } else {
-                input.memo.clone()
-            }
-        } else {
-            input.memo.clone()
         }
+
+        let fee_f64 = fee_micro as f64 / 1_000_000.0;
+        (input.memo.clone(), fee_f64)
     } else {
-        input.memo.clone()
+        (input.memo.clone(), 0.0)
     };
 
     let payment = Payment {
@@ -144,7 +409,6 @@ pub struct SendPaymentInput {
     pub currency: String,
     pub payment_type: PaymentType,
     pub memo: Option<String>,
-    pub demurrage: Option<DemurrageOnSendInput>,
 }
 
 #[hdk_extern]
@@ -393,7 +657,7 @@ pub struct InitiateExitInput {
     /// DID of the exiting member
     pub member_did: String,
     /// How to handle remaining SAP balance
-    pub succession_preference: payments_integrity::SuccessionPreference,
+    pub succession_preference: SuccessionPreference,
     /// Current SAP balance (caller must provide; on-chain accounting is external)
     pub sap_balance: f64,
 }
@@ -406,9 +670,8 @@ pub struct InitiateExitInput {
 /// - TEND: all balances forgiven (returned to zero)
 #[hdk_extern]
 pub fn initiate_exit(input: InitiateExitInput) -> ExternResult<Record> {
-    if !input.member_did.starts_with("did:") {
-        return Err(wasm_error!(WasmErrorInner::Guest("Member must be a valid DID".into())));
-    }
+    // Verify caller is the exiting member
+    verify_caller_is_did(&input.member_did)?;
 
     let now = sys_time()?;
 
@@ -430,7 +693,7 @@ pub fn initiate_exit(input: InitiateExitInput) -> ExternResult<Record> {
     // Step 2: Handle SAP succession
     if input.sap_balance > 0.0 {
         match &input.succession_preference {
-            payments_integrity::SuccessionPreference::Commons => {
+            SuccessionPreference::Commons => {
                 // For commons succession, we record a payment to the commons pool.
                 // The actual treasury contribution requires a pool ID which is
                 // external state — the caller should handle that via the treasury zome.
@@ -441,10 +704,9 @@ pub fn initiate_exit(input: InitiateExitInput) -> ExternResult<Record> {
                     currency: "SAP".to_string(),
                     payment_type: PaymentType::CommonsContribution("exit-succession".to_string()),
                     memo: Some("Exit succession: SAP to local commons pool".to_string()),
-                    demurrage: None,
                 })?;
             }
-            payments_integrity::SuccessionPreference::Designee(designee_did) => {
+            SuccessionPreference::Designee(designee_did) => {
                 send_payment(SendPaymentInput {
                     from_did: input.member_did.clone(),
                     to_did: designee_did.clone(),
@@ -452,10 +714,9 @@ pub fn initiate_exit(input: InitiateExitInput) -> ExternResult<Record> {
                     currency: "SAP".to_string(),
                     payment_type: PaymentType::Direct,
                     memo: Some("Exit succession to designated heir".to_string()),
-                    demurrage: None,
                 })?;
             }
-            payments_integrity::SuccessionPreference::Redemption => {
+            SuccessionPreference::Redemption => {
                 // For redemption, record the intent. Actual bridge redemption
                 // requires deposit IDs and oracle rates which are bridge-zome state.
                 send_payment(SendPaymentInput {
@@ -465,7 +726,6 @@ pub fn initiate_exit(input: InitiateExitInput) -> ExternResult<Record> {
                     currency: "SAP".to_string(),
                     payment_type: PaymentType::Direct,
                     memo: Some("Exit succession: SAP queued for collateral redemption".to_string()),
-                    demurrage: None,
                 })?;
             }
         }

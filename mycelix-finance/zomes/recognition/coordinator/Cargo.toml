@@ -13,3 +13,5 @@ holochain_serialized_bytes = { workspace = true }
 hdk = { workspace = true }
 serde = { workspace = true }
 recognition_integrity = { path = "../integrity" }
+mycelix_finance_shared = { path = "../../shared" }
+mycelix_finance_types = { path = "../../../types" }

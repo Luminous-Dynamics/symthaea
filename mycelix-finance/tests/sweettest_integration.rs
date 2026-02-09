@@ -87,7 +87,7 @@ pub struct UpdateMycelInput {
     pub member_did: String,
     pub participation: f64,
     pub recognition: f64,
-    pub validation: f64,
+    pub validation_override: Option<f64>,
     pub active_months: u32,
 }
 
@@ -206,7 +206,6 @@ pub struct SendPaymentInput {
     pub currency: String,
     pub payment_type: PaymentType,
     pub memo: Option<String>,
-    pub demurrage: Option<()>, // Simplified for test mirror
 }
 
 // --- TEND Mirror Types ---
@@ -638,7 +637,7 @@ mod recognition_tests {
             member_did: member_did.clone(),
             participation: 0.8,
             recognition: 0.6,
-            validation: 0.5,
+            validation_override: Some(0.5),
             active_months: 12,
         };
 
@@ -979,7 +978,6 @@ mod three_currency_lifecycle {
             currency: "SAP".to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Lifecycle test SAP payment".to_string()),
-            demurrage: None,
         };
 
         let payment_record: Record = conductor

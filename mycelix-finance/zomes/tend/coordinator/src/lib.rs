@@ -14,6 +14,7 @@
 //! This radical equality is the foundation of time banking.
 
 use hdk::prelude::*;
+use mycelix_finance_shared::anchor_hash;
 
 // Re-export integrity types for external use
 pub use tend_integrity::*;
@@ -125,6 +126,72 @@ pub struct ResolveDisputeInput {
 #[hdk_extern]
 pub fn get_current_tend_limit(tier: TendLimitTier) -> ExternResult<i32> {
     Ok(tier.limit())
+}
+
+const ORACLE_STATE_ANCHOR: &str = "tend:oracle_state";
+
+/// Update the oracle state (sets current vitality and limit tier).
+///
+/// In production, restrict to authorized oracle agents via capability tokens.
+/// The oracle agent monitors network health metrics and calls this periodically.
+#[hdk_extern]
+pub fn update_oracle_state(vitality: u32) -> ExternResult<OracleState> {
+    if vitality > 100 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Vitality must be 0-100".into())));
+    }
+
+    let now = sys_time()?;
+    let tier = OracleState::tier_from_vitality(vitality);
+    let state = OracleState { vitality, tier, updated_at: now };
+
+    // Check for existing state to update
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(ORACLE_STATE_ANCHOR)?, LinkTypes::AnchorLinks)?,
+        GetStrategy::default(),
+    )?;
+
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            update_entry(action_hash, &EntryTypes::OracleState(state.clone()))?;
+            return Ok(state);
+        }
+    }
+
+    // Create new oracle state
+    let hash = create_entry(&EntryTypes::OracleState(state.clone()))?;
+    create_link(anchor_hash(ORACLE_STATE_ANCHOR)?, hash, LinkTypes::AnchorLinks, ())?;
+
+    Ok(state)
+}
+
+/// Get the dynamic TEND limit based on current oracle state.
+///
+/// Returns the limit for the current network condition (Normal=±40, Elevated=±60, etc.).
+/// Falls back to Normal (±40) if no oracle state exists.
+#[hdk_extern]
+pub fn get_dynamic_tend_limit(_: ()) -> ExternResult<i32> {
+    Ok(read_current_tier()?.limit())
+}
+
+/// Internal: read the current tier from oracle state
+fn read_current_tier() -> ExternResult<TendLimitTier> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(ORACLE_STATE_ANCHOR)?, LinkTypes::AnchorLinks)?,
+        GetStrategy::default(),
+    )?;
+
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(state) = record.entry().to_app_option::<OracleState>().ok().flatten() {
+                    return Ok(state.tier);
+                }
+            }
+        }
+    }
+
+    // Default to Normal if no oracle state
+    Ok(TendLimitTier::Normal)
 }
 
 // =============================================================================
@@ -657,15 +724,34 @@ pub fn open_dispute(input: OpenDisputeInput) -> ExternResult<Record> {
     Ok(record)
 }
 
+/// Minimum MYCEL score required to serve as a mediator
+const MEDIATOR_MIN_MYCEL: f64 = 0.5;
+/// Number of mediators assigned per dispute panel
+const MEDIATOR_PANEL_SIZE: usize = 3;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EscalateDisputeInput {
+    pub dispute_id: String,
+    /// Candidate mediator DIDs. Required when escalating to MediationPanel.
+    /// Must provide at least 3 candidates with MYCEL > 0.5.
+    /// 3 are selected (first 3 that pass validation).
+    pub candidate_mediators: Option<Vec<String>>,
+}
+
 /// Escalate a dispute to the next resolution stage
 ///
 /// Escalation path:
 ///   DirectNegotiation -> MediationPanel -> GovernanceVote
 ///
+/// When escalating to MediationPanel, candidate_mediators must be provided.
+/// Each candidate is validated via cross-zome call to recognition to confirm
+/// MYCEL > 0.5. The first 3 valid candidates are assigned as mediators.
+///
 /// Only dispute participants can escalate. A dispute that is already
 /// at GovernanceVote cannot be escalated further.
 #[hdk_extern]
-pub fn escalate_dispute(dispute_id: String) -> ExternResult<Record> {
+pub fn escalate_dispute(input: EscalateDisputeInput) -> ExternResult<Record> {
+    let dispute_id = &input.dispute_id;
     if dispute_id.is_empty() || dispute_id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Dispute ID must be 1-256 characters".into()
@@ -676,7 +762,7 @@ pub fn escalate_dispute(dispute_id: String) -> ExternResult<Record> {
     let caller_did = format!("did:mycelix:{}", caller);
 
     // Find the dispute
-    let (dispute_case, action_hash) = find_dispute_by_id(&dispute_id)?
+    let (dispute_case, action_hash) = find_dispute_by_id(dispute_id)?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Dispute not found".into())))?;
 
     // Verify caller is a participant
@@ -697,10 +783,46 @@ pub fn escalate_dispute(dispute_id: String) -> ExternResult<Record> {
         }
     };
 
+    // If escalating to MediationPanel, validate and assign mediators
+    let mediator_dids = if next_stage == DisputeStage::MediationPanel {
+        let candidates = input.candidate_mediators.ok_or(wasm_error!(
+            WasmErrorInner::Guest(
+                "candidate_mediators required when escalating to MediationPanel".into()
+            )
+        ))?;
+
+        let mut valid_mediators = Vec::new();
+        for candidate in &candidates {
+            // Exclude dispute parties
+            if *candidate == dispute_case.complainant_did || *candidate == dispute_case.respondent_did {
+                continue;
+            }
+            // Validate MYCEL score via cross-zome call
+            if check_mediator_eligible(candidate)? {
+                valid_mediators.push(candidate.clone());
+                if valid_mediators.len() >= MEDIATOR_PANEL_SIZE {
+                    break;
+                }
+            }
+        }
+
+        if valid_mediators.len() < MEDIATOR_PANEL_SIZE {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Need {} eligible mediators (MYCEL > {}), only found {}",
+                MEDIATOR_PANEL_SIZE, MEDIATOR_MIN_MYCEL, valid_mediators.len()
+            ))));
+        }
+
+        valid_mediators
+    } else {
+        dispute_case.mediator_dids.clone()
+    };
+
     let now = sys_time()?;
     let updated_dispute = DisputeCase {
         stage: next_stage,
         escalated_at: Some(now),
+        mediator_dids,
         ..dispute_case
     };
 
@@ -1091,12 +1213,62 @@ pub fn get_dao_requests(dao_did: String) -> ExternResult<Vec<ServiceRequest>> {
 }
 
 // =============================================================================
-// HELPER FUNCTIONS
+// VALIDATION SCORE (for MYCEL component)
 // =============================================================================
 
-fn anchor_hash(anchor: &str) -> ExternResult<EntryHash> {
-    hash_entry(&Anchor(anchor.to_string()))
+/// Get aggregate validation score for a member based on their quality ratings.
+///
+/// Returns a score between 0.0 and 1.0 derived from the average of all
+/// QualityRating entries linked to this member. This is called cross-zome
+/// by the recognition coordinator to compute the MYCEL Validation component.
+///
+/// Scoring: average rating (1-5) mapped to 0.0-1.0 → (avg - 1) / 4
+/// Minimum 3 ratings required for a non-zero score (prevents gaming with
+/// a single 5-star rating).
+#[hdk_extern]
+pub fn get_validation_score(member_did: String) -> ExternResult<f64> {
+    if member_did.is_empty() || member_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Member DID must be 1-256 characters".into()
+        )));
+    }
+
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("ratings_for:{}", member_did))?,
+            LinkTypes::ExchangeToRating,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut total: f64 = 0.0;
+    let mut count: u32 = 0;
+
+    for link in links {
+        if let Some(action_hash) = link.target.into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(rating) = record.entry().to_app_option::<QualityRating>().ok().flatten() {
+                    total += rating.rating as f64;
+                    count += 1;
+                }
+            }
+        }
+    }
+
+    // Minimum 3 ratings for a non-zero score
+    if count < 3 {
+        return Ok(0.0);
+    }
+
+    let avg = total / count as f64;
+    // Map 1-5 to 0.0-1.0
+    let score = ((avg - 1.0) / 4.0).clamp(0.0, 1.0);
+    Ok(score)
 }
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
 
 fn find_balance(member_did: &str, dao_did: &str) -> ExternResult<Option<TendBalance>> {
     let links = get_links(
@@ -1198,6 +1370,29 @@ fn update_exchange_entry(exchange_id: &str, exchange: &TendExchange) -> ExternRe
     ))))
 }
 
+/// Check if a candidate mediator meets the MYCEL threshold (> 0.5)
+/// via cross-zome call to the recognition zome.
+fn check_mediator_eligible(mediator_did: &str) -> ExternResult<bool> {
+    #[derive(Debug, serde::Deserialize)]
+    struct MycelState { mycel_score: f64 }
+
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("recognition"),
+        FunctionName::from("get_mycel_score"),
+        None,
+        mediator_did.to_string(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            match result.decode::<MycelState>() {
+                Ok(state) => Ok(state.mycel_score > MEDIATOR_MIN_MYCEL),
+                Err(_) => Ok(false),
+            }
+        }
+        _ => Ok(false), // Recognition zome unreachable → ineligible
+    }
+}
+
 /// Find a dispute case by its ID, returning both the deserialized case and the action hash
 fn find_dispute_by_id(dispute_id: &str) -> ExternResult<Option<(DisputeCase, ActionHash)>> {
     let links = get_links(
@@ -1237,11 +1432,11 @@ fn get_effective_limit_for_member(member_did: &str) -> ExternResult<i32> {
     )?;
 
     if !links.is_empty() {
+        // Apprentice limit is always ±10 regardless of oracle state
         Ok(APPRENTICE_BALANCE_LIMIT)
     } else {
-        // Default to standard limit
-        // In production, dynamic limit would come from the oracle
-        Ok(BALANCE_LIMIT)
+        // Dynamic limit from oracle state (counter-cyclical TEND expansion)
+        Ok(read_current_tier()?.limit())
     }
 }
 
@@ -1269,6 +1464,158 @@ fn exchange_to_record(exchange: &TendExchange) -> ExchangeRecord {
         status: exchange.status.clone(),
         timestamp: exchange.timestamp,
     }
+}
+
+// =============================================================================
+// CROSS-COMMUNITY TEND CLEARING
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RecordCrossDAOExchangeInput {
+    /// DID of the provider's DAO
+    pub provider_dao_did: String,
+    /// DID of the receiver's DAO
+    pub receiver_dao_did: String,
+    /// Hours exchanged
+    pub hours: f32,
+}
+
+/// Record an inter-DAO TEND exchange by updating the bilateral balance.
+///
+/// Provider's DAO gains credit, receiver's DAO gains debt.
+/// DAOs are stored in canonical alphabetical order.
+#[hdk_extern]
+pub fn record_cross_dao_exchange(input: RecordCrossDAOExchangeInput) -> ExternResult<BilateralBalance> {
+    if input.provider_dao_did == input.receiver_dao_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cross-DAO exchange requires two different DAOs".into()
+        )));
+    }
+    if input.hours <= 0.0 || input.hours > 168.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Hours must be between 0 and 168".into()
+        )));
+    }
+
+    // Canonical ordering: dao_a < dao_b alphabetically
+    let (dao_a, dao_b, direction) = if input.provider_dao_did < input.receiver_dao_did {
+        (&input.provider_dao_did, &input.receiver_dao_did, 1) // A provided → positive net
+    } else {
+        (&input.receiver_dao_did, &input.provider_dao_did, -1) // B provided → negative net
+    };
+
+    let anchor_key = format!("bilateral:{}:{}", dao_a, dao_b);
+    let now = sys_time()?;
+    let delta = (input.hours as i32) * direction;
+
+    // Try to find existing bilateral balance
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::DaoToBilateralBalance)?,
+        GetStrategy::default(),
+    )?;
+
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(mut bal) = record.entry().to_app_option::<BilateralBalance>().ok().flatten() {
+                    bal.net_balance += delta;
+                    bal.total_exchanges += 1;
+                    bal.last_updated_at = now;
+                    update_entry(action_hash, &bal)?;
+                    return Ok(bal);
+                }
+            }
+        }
+    }
+
+    // Create new bilateral balance
+    let bal = BilateralBalance {
+        dao_a_did: dao_a.clone(),
+        dao_b_did: dao_b.clone(),
+        net_balance: delta,
+        total_exchanges: 1,
+        last_settled_at: now,
+        last_updated_at: now,
+    };
+
+    let hash = create_entry(&EntryTypes::BilateralBalance(bal.clone()))?;
+    create_link(anchor_hash(&anchor_key)?, hash, LinkTypes::DaoToBilateralBalance, ())?;
+
+    Ok(bal)
+}
+
+/// Get the bilateral balance between two DAOs.
+#[hdk_extern]
+pub fn get_bilateral_balance(input: GetBilateralInput) -> ExternResult<Option<BilateralBalance>> {
+    let (dao_a, dao_b) = if input.dao_a_did < input.dao_b_did {
+        (&input.dao_a_did, &input.dao_b_did)
+    } else {
+        (&input.dao_b_did, &input.dao_a_did)
+    };
+
+    let anchor_key = format!("bilateral:{}:{}", dao_a, dao_b);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::DaoToBilateralBalance)?,
+        GetStrategy::default(),
+    )?;
+
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                return Ok(record.entry().to_app_option::<BilateralBalance>().ok().flatten());
+            }
+        }
+    }
+    Ok(None)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetBilateralInput {
+    pub dao_a_did: String,
+    pub dao_b_did: String,
+}
+
+/// Settle a bilateral balance by resetting it to zero.
+///
+/// In production, this triggers a SAP transfer from the debtor DAO's
+/// commons pool to the creditor DAO's commons pool via the treasury zome.
+/// Returns the settled amount (positive = DAO-A was owed, negative = DAO-B was owed).
+///
+/// NOTE: Governance operation — should be called quarterly by an authorized agent.
+#[hdk_extern]
+pub fn settle_bilateral_balance(input: GetBilateralInput) -> ExternResult<i32> {
+    let (dao_a, dao_b) = if input.dao_a_did < input.dao_b_did {
+        (&input.dao_a_did, &input.dao_b_did)
+    } else {
+        (&input.dao_b_did, &input.dao_a_did)
+    };
+
+    let anchor_key = format!("bilateral:{}:{}", dao_a, dao_b);
+    let now = sys_time()?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&anchor_key)?, LinkTypes::DaoToBilateralBalance)?,
+        GetStrategy::default(),
+    )?;
+
+    if let Some(link) = links.first() {
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+                if let Some(bal) = record.entry().to_app_option::<BilateralBalance>().ok().flatten() {
+                    let settled_amount = bal.net_balance;
+                    let zeroed = BilateralBalance {
+                        net_balance: 0,
+                        last_settled_at: now,
+                        last_updated_at: now,
+                        ..bal
+                    };
+                    update_entry(action_hash, &zeroed)?;
+                    return Ok(settled_amount);
+                }
+            }
+        }
+    }
+
+    Ok(0) // No balance to settle
 }
 
 // =============================================================================

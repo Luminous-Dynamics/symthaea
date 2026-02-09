@@ -14,3 +14,5 @@ hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 finance_bridge_integrity = { path = "../integrity" }
+mycelix_finance_shared = { path = "../../shared" }
+mycelix_finance_types = { path = "../../../types" }

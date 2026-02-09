@@ -32,86 +32,47 @@ pub use decay_garden::{
 };
 pub use recognition::{
     RecognitionEvent, RecognitionConfig, calculate_recognition_score,
+    ContributionType,
 };
 
 use serde::{Deserialize, Serialize};
 
-/// Currency identifiers — Three-Currency Model
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Currency {
-    /// MYCEL — Soulbound reputation substrate (non-transferable)
-    Mycel,
-    /// SAP — Circulation medium with continuous demurrage
-    Sap,
-    /// TEND — Mutual credit time exchange
-    Tend,
+// Re-export canonical types from shared types crate (used by both SDK and Holochain zomes)
+pub use mycelix_finance_types::{
+    Currency, FeeTier, SuccessionPreference,
+    compute_demurrage_deduction,
+    DEMURRAGE_RATE, DEMURRAGE_EXEMPT_FLOOR,
+    COMPOST_LOCAL_PCT, COMPOST_REGIONAL_PCT, COMPOST_GLOBAL_PCT,
+};
+
+/// Extension trait for Currency with SDK-specific convenience methods
+pub trait CurrencyExt {
+    /// Get the technical identifier (same as display_name for our currencies)
+    fn technical_id(&self) -> &'static str;
 }
 
-impl Currency {
-    /// Get the display name for this currency
-    pub fn display_name(&self) -> &'static str {
-        match self {
-            Currency::Mycel => "MYCEL",
-            Currency::Sap => "SAP",
-            Currency::Tend => "TEND",
-        }
-    }
-
-    /// Get the technical identifier
-    pub fn technical_id(&self) -> &'static str {
-        match self {
-            Currency::Mycel => "MYCEL",
-            Currency::Sap => "SAP",
-            Currency::Tend => "TEND",
-        }
-    }
-
-    /// Check if currency is transferable
-    pub fn is_transferable(&self) -> bool {
-        match self {
-            Currency::Mycel => false, // Soulbound — never transferable
-            Currency::Sap => true,
-            Currency::Tend => true,
-        }
+impl CurrencyExt for Currency {
+    fn technical_id(&self) -> &'static str {
+        self.display_name()
     }
 }
 
-/// Progressive fee tier based on MYCEL score
-///
-/// Simplified from 5 tiers to 3. Constitutional: progressive fees must exist.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum FeeTier {
-    /// MYCEL < 0.3: 0.10% base fee
-    Newcomer,
-    /// MYCEL 0.3-0.7: 0.03% base fee
-    Member,
-    /// MYCEL > 0.7: 0.01% base fee
-    Steward,
+/// Extension trait for FeeTier with SDK-specific progressive scaling
+pub trait FeeTierExt {
+    /// Alias for base_fee_rate() (backward compatibility)
+    fn base_rate(&self) -> f64;
+    /// Calculate effective fee with anti-plutocracy scaling.
+    /// Large transactions pay progressively higher rates.
+    fn effective_rate(&self, tx_value: u64, median_tx: u64) -> f64;
 }
 
-impl FeeTier {
-    /// Determine fee tier from MYCEL score
-    pub fn from_mycel(mycel: f64) -> Self {
-        match mycel {
-            m if m < 0.3 => FeeTier::Newcomer,
-            m if m <= 0.7 => FeeTier::Member,
-            _ => FeeTier::Steward,
-        }
+impl FeeTierExt for FeeTier {
+    fn base_rate(&self) -> f64 {
+        self.base_fee_rate()
     }
 
-    /// Get base fee rate (as fraction, not percentage)
-    pub fn base_rate(&self) -> f64 {
-        match self {
-            FeeTier::Newcomer => 0.0010, // 0.10%
-            FeeTier::Member => 0.0003,   // 0.03%
-            FeeTier::Steward => 0.0001,  // 0.01%
-        }
-    }
-
-    /// Calculate effective fee with anti-plutocracy scaling
-    /// Large transactions pay progressively higher rates
-    pub fn effective_rate(&self, tx_value: u64, median_tx: u64) -> f64 {
-        let base = self.base_rate();
+    fn effective_rate(&self, tx_value: u64, median_tx: u64) -> f64 {
+        let base = self.base_fee_rate();
         if tx_value <= median_tx || median_tx == 0 {
             base
         } else {
@@ -119,23 +80,6 @@ impl FeeTier {
             let ratio = tx_value as f64 / median_tx as f64;
             base * (1.0 + ratio.log10())
         }
-    }
-}
-
-/// Succession preference for SAP on exit/death
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub enum SuccessionPreference {
-    /// SAP goes to member's local commons pool (default)
-    Commons,
-    /// SAP goes to a designated member
-    Designee(String),
-    /// SAP is redeemed through collateral bridge
-    Redemption,
-}
-
-impl Default for SuccessionPreference {
-    fn default() -> Self {
-        SuccessionPreference::Commons
     }
 }
 

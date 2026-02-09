@@ -8,34 +8,10 @@
 
 use hdk::prelude::*;
 use staking_integrity::*;
+use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
 
 /// Anchor for active stakes
 const ACTIVE_STAKES_ANCHOR: &str = "active_stakes";
-
-/// Helper to get an anchor entry hash
-fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
-    // Create a deterministic entry hash from the anchor string
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-
-    let mut hasher = DefaultHasher::new();
-    anchor_str.hash(&mut hasher);
-    let h1 = hasher.finish();
-    hasher.write_u64(h1);
-    let h2 = hasher.finish();
-    hasher.write_u64(h2);
-    let h3 = hasher.finish();
-    hasher.write_u64(h3);
-    let h4 = hasher.finish();
-
-    let mut result = [0u8; 32];
-    result[0..8].copy_from_slice(&h1.to_le_bytes());
-    result[8..16].copy_from_slice(&h2.to_le_bytes());
-    result[16..24].copy_from_slice(&h3.to_le_bytes());
-    result[24..32].copy_from_slice(&h4.to_le_bytes());
-
-    Ok(EntryHash::from_raw_32(result.to_vec()))
-}
 
 /// Compute a 32-byte hash from arbitrary bytes
 fn compute_bytes_hash(data: &[u8]) -> Vec<u8> {
@@ -78,6 +54,7 @@ pub struct CreateStakeInput {
 /// Stake weight = 1.0 + mycel_score (range: 1.0-2.0).
 #[hdk_extern]
 pub fn create_stake(input: CreateStakeInput) -> ExternResult<Record> {
+    verify_caller_is_did(&input.staker_did)?;
     let now = sys_time()?;
     let stake_id = format!("stake:{}:{}", input.staker_did, now.as_micros());
 
@@ -358,6 +335,7 @@ pub struct CreateEscrowInput {
 /// Create a crypto escrow with release conditions
 #[hdk_extern]
 pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
+    verify_caller_is_did(&input.depositor_did)?;
     let now = sys_time()?;
     let escrow_id = format!("escrow:{}:{}:{}", input.depositor_did, input.beneficiary_did, now.as_micros());
 

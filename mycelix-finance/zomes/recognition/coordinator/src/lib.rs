@@ -12,6 +12,7 @@
 //! - jubilee_normalize: Apply 4-year jubilee compression
 
 use hdk::prelude::*;
+use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
 
 // Re-export integrity types for external use
 pub use recognition_integrity::*;
@@ -39,7 +40,9 @@ pub struct UpdateMycelInput {
     pub member_did: String,
     pub participation: f64,
     pub recognition: f64,
-    pub validation: f64,
+    /// If None, validation is auto-fetched from TEND quality ratings via cross-zome call.
+    /// If Some, uses the provided value (useful for testing or offline computation).
+    pub validation_override: Option<f64>,
     pub active_months: u32,
 }
 
@@ -213,11 +216,8 @@ pub fn get_mycel_score(member_did: String) -> ExternResult<MemberMycelState> {
 /// Apprentices start at MYCEL 0.1, full members start at 0.3.
 #[hdk_extern]
 pub fn initialize_member(input: InitializeMemberInput) -> ExternResult<Record> {
-    if input.member_did.is_empty() || input.member_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Member DID must be 1-256 characters".into()
-        )));
-    }
+    // Verify caller is the member being initialized (prevents spoofing)
+    verify_caller_is_did(&input.member_did)?;
 
     if input.is_apprentice {
         let mentor = input.mentor_did.as_ref().ok_or(wasm_error!(
@@ -278,13 +278,13 @@ pub fn initialize_member(input: InitializeMemberInput) -> ExternResult<Record> {
 ///
 /// Recalculates the composite MYCEL score from the 4 components:
 /// Participation (40%), Recognition (20%), Validation (20%), Longevity (20%)
+///
+/// The Validation component is auto-fetched from TEND quality ratings via
+/// cross-zome call unless `validation_override` is provided.
 #[hdk_extern]
 pub fn update_mycel_score(input: UpdateMycelInput) -> ExternResult<MemberMycelState> {
-    if input.member_did.is_empty() || input.member_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Member DID must be 1-256 characters".into()
-        )));
-    }
+    // Verify caller is the member (prevents score manipulation by others)
+    verify_caller_is_did(&input.member_did)?;
 
     let (current_state, action_hash) = find_mycel_state_with_hash(&input.member_did)?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -294,7 +294,14 @@ pub fn update_mycel_score(input: UpdateMycelInput) -> ExternResult<MemberMycelSt
     let now = sys_time()?;
     let participation = input.participation.clamp(0.0, 1.0);
     let recognition = input.recognition.clamp(0.0, 1.0);
-    let validation = input.validation.clamp(0.0, 1.0);
+
+    // Fetch validation from TEND quality ratings, or use override
+    let validation = if let Some(v) = input.validation_override {
+        v.clamp(0.0, 1.0)
+    } else {
+        fetch_validation_from_tend(&input.member_did)?
+    };
+
     let longevity = (input.active_months as f64 / 24.0).min(1.0);
 
     let composite = participation * 0.40
@@ -330,6 +337,9 @@ pub fn update_mycel_score(input: UpdateMycelInput) -> ExternResult<MemberMycelSt
 ///
 /// `new_mycel = 0.3 + (current - 0.3) * 0.8`
 /// Compresses toward mean without resetting. Active members recover quickly.
+///
+/// NOTE: This is a governance operation — callable on any member.
+/// In production, restrict to governance/oracle agents via capability tokens.
 #[hdk_extern]
 pub fn jubilee_normalize(member_did: String) -> ExternResult<MemberMycelState> {
     if member_did.is_empty() || member_did.len() > 256 {
@@ -362,6 +372,9 @@ pub fn jubilee_normalize(member_did: String) -> ExternResult<MemberMycelState> {
 ///
 /// MYCEL dissolves immediately. Contribution history is preserved via
 /// immutable RecognitionEvent entries in the DHT.
+///
+/// NOTE: This is called cross-zome by the exit protocol (payments coordinator).
+/// In production, restrict to authorized callers via capability tokens.
 #[hdk_extern]
 pub fn dissolve_mycel(member_did: String) -> ExternResult<()> {
     if member_did.is_empty() || member_did.len() > 256 {
@@ -399,12 +412,196 @@ pub fn dissolve_mycel(member_did: String) -> ExternResult<()> {
 }
 
 // =============================================================================
-// HELPER FUNCTIONS
+// PASSIVE DECAY
 // =============================================================================
 
-fn anchor_hash(anchor: &str) -> ExternResult<EntryHash> {
-    hash_entry(&Anchor(anchor.to_string()))
+/// Apply passive MYCEL decay for non-participation.
+///
+/// Per the Three-Currency Spec: 5% annual linear decay for non-participation.
+/// Decay is proportional to time elapsed since last update.
+///
+/// `new_score = score - score * PASSIVE_DECAY_RATE * (elapsed_seconds / seconds_per_year)`
+///
+/// NOTE: This is a governance/oracle operation — should be called periodically
+/// (e.g., monthly) by an authorized agent. In production, restrict via capability tokens.
+#[hdk_extern]
+pub fn apply_passive_decay(member_did: String) -> ExternResult<MemberMycelState> {
+    if member_did.is_empty() || member_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Member DID must be 1-256 characters".into()
+        )));
+    }
+
+    let (current_state, action_hash) = find_mycel_state_with_hash(&member_did)?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Member MYCEL state not found".into()
+        )))?;
+
+    // Don't decay dissolved members (score already 0)
+    if current_state.mycel_score <= 0.0 {
+        return Ok(current_state);
+    }
+
+    let now = sys_time()?;
+    let elapsed_us = now.as_micros() - current_state.last_updated.as_micros();
+    if elapsed_us <= 0 {
+        return Ok(current_state);
+    }
+
+    let elapsed_seconds = elapsed_us as f64 / 1_000_000.0;
+    let seconds_per_year = 365.25 * 24.0 * 60.0 * 60.0;
+    let years_elapsed = elapsed_seconds / seconds_per_year;
+
+    // Linear decay: score -= score * rate * years
+    let decay_amount = current_state.mycel_score * PASSIVE_DECAY_RATE * years_elapsed;
+    let new_score = (current_state.mycel_score - decay_amount).max(0.0);
+
+    // If decay is negligible, skip the update
+    if (new_score - current_state.mycel_score).abs() < 1e-9 {
+        return Ok(current_state);
+    }
+
+    let updated_state = MemberMycelState {
+        mycel_score: new_score,
+        last_updated: now,
+        ..current_state
+    };
+
+    update_entry(action_hash, &updated_state)?;
+
+    Ok(updated_state)
 }
+
+// =============================================================================
+// APPRENTICE LIFECYCLE
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct OnboardApprenticeInput {
+    /// DID of the new apprentice
+    pub apprentice_did: String,
+}
+
+/// Onboard a new apprentice — the caller becomes the vouching mentor.
+///
+/// Per the Three-Currency Spec:
+/// - Mentor must have MYCEL >= 0.3
+/// - Apprentice starts at MYCEL 0.1
+/// - Apprentice has limited TEND capacity (±10)
+/// - Can receive recognition but cannot give
+/// - Mentor shares MYCEL penalty if apprentice is slashed during onboarding
+#[hdk_extern]
+pub fn onboard_apprentice(input: OnboardApprenticeInput) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let mentor_did = format!("did:mycelix:{}", caller);
+
+    // Validate apprentice DID
+    if !input.apprentice_did.starts_with("did:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Apprentice must be a valid DID".into()
+        )));
+    }
+    if mentor_did == input.apprentice_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cannot mentor yourself".into()
+        )));
+    }
+
+    // Verify mentor has sufficient MYCEL
+    let mentor_state = get_mycel_state(&mentor_did)?;
+    if mentor_state.mycel_score < MYCEL_APPRENTICE_MAX {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Mentor MYCEL ({:.2}) must be at least {} to vouch for an apprentice",
+            mentor_state.mycel_score, MYCEL_APPRENTICE_MAX
+        ))));
+    }
+
+    // Check apprentice doesn't already have a state
+    if find_mycel_state(&input.apprentice_did)?.is_some() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Member already has a MYCEL state — cannot onboard as apprentice".into()
+        )));
+    }
+
+    let now = sys_time()?;
+    let state = MemberMycelState {
+        member_did: input.apprentice_did.clone(),
+        mycel_score: 0.1,
+        participation: 0.1,
+        recognition: 0.0,
+        validation: 0.0,
+        longevity: 0.0,
+        active_months: 0,
+        is_apprentice: true,
+        mentor_did: Some(mentor_did),
+        recognitions_given_this_cycle: 0,
+        current_cycle_id: String::new(),
+        last_updated: now,
+    };
+
+    let state_hash = create_entry(&EntryTypes::MemberMycelState(state))?;
+    create_link(
+        anchor_hash(&format!("mycel:{}", input.apprentice_did))?,
+        state_hash.clone(),
+        LinkTypes::MemberToMycelState,
+        (),
+    )?;
+
+    get(state_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+}
+
+/// Graduate an apprentice to full member status.
+///
+/// Can be called when the apprentice's composite MYCEL score >= 0.3.
+/// The caller must be the apprentice themselves or their mentor.
+#[hdk_extern]
+pub fn graduate_apprentice(apprentice_did: String) -> ExternResult<MemberMycelState> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+
+    let (current_state, action_hash) = find_mycel_state_with_hash(&apprentice_did)?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Apprentice MYCEL state not found".into()
+        )))?;
+
+    if !current_state.is_apprentice {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Member is not an apprentice".into()
+        )));
+    }
+
+    // Caller must be the apprentice or their mentor
+    let is_apprentice = caller_did == apprentice_did;
+    let is_mentor = current_state.mentor_did.as_ref() == Some(&caller_did);
+    if !is_apprentice && !is_mentor {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the apprentice or their mentor can trigger graduation".into()
+        )));
+    }
+
+    if current_state.mycel_score < MYCEL_APPRENTICE_MAX {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "MYCEL score ({:.2}) must reach {} to graduate",
+            current_state.mycel_score, MYCEL_APPRENTICE_MAX
+        ))));
+    }
+
+    let now = sys_time()?;
+    let graduated = MemberMycelState {
+        is_apprentice: false,
+        mentor_did: None, // Mentor relationship ends at graduation
+        last_updated: now,
+        ..current_state
+    };
+
+    update_entry(action_hash, &graduated)?;
+    Ok(graduated)
+}
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
 
 /// Get a member's MYCEL state, creating an apprentice state if not found
 fn get_mycel_state(member_did: &str) -> ExternResult<MemberMycelState> {
@@ -521,4 +718,36 @@ fn increment_allocation(recognizer_did: &str, cycle_id: &str) -> ExternResult<()
     }
 
     Ok(())
+}
+
+/// Fetch validation score from TEND quality ratings via cross-zome call.
+///
+/// Calls TEND coordinator's `get_validation_score` to aggregate quality
+/// ratings for the member. Falls back to 0.0 if the TEND zome is
+/// unreachable (e.g., in unit tests without full DNA).
+fn fetch_validation_from_tend(member_did: &str) -> ExternResult<f64> {
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("tend"),
+        FunctionName::from("get_validation_score"),
+        None,
+        member_did.to_string(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            result.decode::<f64>().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode TEND validation score: {:?}", e
+                )))
+            })
+        }
+        Ok(other) => {
+            // Zome call was routed but returned non-Ok (e.g., Unauthorized)
+            debug!("TEND validation cross-zome call returned {:?}, defaulting to 0.0", other);
+            Ok(0.0)
+        }
+        Err(_) => {
+            // TEND zome unreachable — default to 0.0
+            Ok(0.0)
+        }
+    }
 }

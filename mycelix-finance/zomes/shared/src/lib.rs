@@ -24,9 +24,14 @@
 use hdk::prelude::*;
 use serde::{Deserialize, Serialize};
 
+// Re-export the types crate for downstream consumers
+pub use mycelix_finance_types;
+
 // Re-export all modules
 pub use batch::*;
 pub use anchors::*;
+pub use economics::*;
+pub use identity::*;
 pub use types::*;
 pub use validation::*;
 
@@ -301,6 +306,10 @@ pub mod anchors {
 
     /// Create a deterministic entry hash for an anchor string.
     /// Uses blake2b-256 for cryptographic safety.
+    ///
+    /// All coordinator zomes MUST use this function for anchor hashing.
+    /// Do NOT use std::collections::hash_map::DefaultHasher — it's not
+    /// cryptographically sound and produces different hashes across Rust versions.
     pub fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
         let hash = holo_hash::blake2b_256(anchor_str.as_bytes());
         Ok(EntryHash::from_raw_32(hash.to_vec()))
@@ -431,6 +440,45 @@ pub mod types {
         fn from(err: FinanceError) -> Self {
             wasm_error!(WasmErrorInner::Guest(err.to_string()))
         }
+    }
+}
+
+/// Shared economic types used across all Mycelix Finance zomes.
+///
+/// These canonical type definitions are now provided by `mycelix_finance_types`.
+/// This module re-exports them for backward compatibility.
+pub mod economics {
+    pub use mycelix_finance_types::*;
+}
+
+/// Agent identity helpers
+pub mod identity {
+    use super::*;
+
+    /// Derive the canonical DID for the calling agent.
+    ///
+    /// Returns `did:mycelix:<agent_pubkey_base64url>`.
+    /// All zomes MUST use this to verify caller identity instead of trusting
+    /// user-supplied DIDs. This prevents DID spoofing attacks.
+    pub fn caller_did() -> ExternResult<String> {
+        let agent = agent_info()?.agent_initial_pubkey;
+        Ok(format!("did:mycelix:{}", agent))
+    }
+
+    /// Verify that a claimed DID matches the calling agent.
+    ///
+    /// Returns Ok(()) if the DID matches, or an error if it doesn't.
+    /// Use this at the top of any extern that takes a DID as input
+    /// to prevent agents from acting as other members.
+    pub fn verify_caller_is_did(claimed_did: &str) -> ExternResult<()> {
+        let actual = caller_did()?;
+        if claimed_did != actual {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Caller DID mismatch: claimed {} but agent is {}",
+                claimed_did, actual
+            ))));
+        }
+        Ok(())
     }
 }
 

@@ -5,32 +5,15 @@
 
 use hdk::prelude::*;
 use finance_bridge_integrity::*;
+use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
 
 const FINANCE_HAPP_ID: &str = "mycelix-finance";
 
-/// Helper to create anchor hash from string
-fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+/// Maximum percentage of vault that any single member can deposit/redeem per day
+const DAILY_RATE_LIMIT_PCT: f64 = 0.05; // 5%
 
-    let mut hasher = DefaultHasher::new();
-    anchor_str.hash(&mut hasher);
-    let h1 = hasher.finish();
-    hasher.write_u64(h1);
-    let h2 = hasher.finish();
-    hasher.write_u64(h2);
-    let h3 = hasher.finish();
-    hasher.write_u64(h3);
-    let h4 = hasher.finish();
-
-    let mut result = [0u8; 32];
-    result[0..8].copy_from_slice(&h1.to_le_bytes());
-    result[8..16].copy_from_slice(&h2.to_le_bytes());
-    result[16..24].copy_from_slice(&h3.to_le_bytes());
-    result[24..32].copy_from_slice(&h4.to_le_bytes());
-
-    Ok(EntryHash::from_raw_32(result.to_vec()))
-}
+/// 24 hours in microseconds
+const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
 
 /// Process a cross-hApp payment
 #[hdk_extern]
@@ -190,11 +173,17 @@ pub fn get_payment_history(did: String) -> ExternResult<Vec<Record>> {
 
 /// Deposit collateral to mint SAP.
 /// Creates a CollateralBridgeDeposit entry recording the collateral-to-SAP conversion.
+///
+/// Rate-limited: max 5% of total vault value per day per member.
 #[hdk_extern]
 pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record> {
+    verify_caller_is_did(&input.depositor_did)?;
     let now = sys_time()?;
 
     let sap_minted = (input.collateral_amount as f64 * input.oracle_rate) as u64;
+
+    // Enforce rate limit: max 5% of vault per day per member
+    enforce_rate_limit(&input.depositor_did, sap_minted, now)?;
 
     let deposit = CollateralBridgeDeposit {
         id: format!("deposit:{}:{}:{}", input.depositor_did, input.collateral_type, now.as_micros()),
@@ -243,6 +232,8 @@ pub struct DepositCollateralInput {
 }
 
 /// Redeem collateral by marking a deposit as redeemed (SAP returned, collateral released).
+///
+/// Rate-limited: max 5% of total vault value per day per member.
 #[hdk_extern]
 pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
     let filter = ChainQueryFilter::new()
@@ -257,6 +248,10 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
                         "Only confirmed deposits can be redeemed".into()
                     )));
                 }
+
+                // Enforce rate limit on redemption
+                let now = sys_time()?;
+                enforce_rate_limit(&deposit.depositor_did, deposit.sap_minted, now)?;
 
                 let now = sys_time()?;
                 let redeemed = CollateralBridgeDeposit {
@@ -288,4 +283,54 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
         }
     }
     Err(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))
+}
+
+// ---------------------------------------------------------------------------
+// Rate Limiting Helpers
+// ---------------------------------------------------------------------------
+
+/// Enforce the daily rate limit: no member may deposit/redeem more than
+/// 5% of total vault value in any rolling 24-hour period.
+///
+/// Vault value = sum of `sap_minted` for all Confirmed deposits.
+/// Daily activity = sum of `sap_minted` for this member's deposits/redemptions
+/// created within the last 24 hours.
+fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp) -> ExternResult<()> {
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CollateralBridgeDeposit)?))
+        .include_entries(true);
+
+    let deposits: Vec<CollateralBridgeDeposit> = query(filter)?
+        .into_iter()
+        .filter_map(|r| r.entry().to_app_option::<CollateralBridgeDeposit>().ok().flatten())
+        .collect();
+
+    // Total vault = sum of all confirmed deposit SAP
+    let vault_total: u64 = deposits.iter()
+        .filter(|d| d.status == BridgeDepositStatus::Confirmed)
+        .map(|d| d.sap_minted)
+        .sum();
+
+    // If vault is empty, allow the first deposit (bootstrap case)
+    if vault_total == 0 {
+        return Ok(());
+    }
+
+    let daily_limit = (vault_total as f64 * DAILY_RATE_LIMIT_PCT) as u64;
+
+    // Sum this member's activity in the last 24 hours
+    let cutoff = now.as_micros() - DAY_MICROS;
+    let daily_activity: u64 = deposits.iter()
+        .filter(|d| d.depositor_did == member_did && d.created_at.as_micros() > cutoff)
+        .map(|d| d.sap_minted)
+        .sum();
+
+    if daily_activity + new_amount > daily_limit {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Rate limit exceeded: max {} SAP/day (5% of vault {}). Already used {} today, requesting {}.",
+            daily_limit, vault_total, daily_activity, new_amount
+        ))));
+    }
+
+    Ok(())
 }

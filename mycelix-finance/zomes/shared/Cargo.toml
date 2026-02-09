@@ -12,6 +12,7 @@ name = "mycelix_finance_shared"
 hdk.workspace = true
 serde = { workspace = true }
 serde_json = { workspace = true }
+mycelix_finance_types = { path = "../../types" }
 
 [dev-dependencies]
 

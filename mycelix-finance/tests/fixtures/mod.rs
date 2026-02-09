@@ -104,7 +104,6 @@ pub fn create_test_payment_input(
         currency: TEST_CURRENCY_SAP.to_string(),
         payment_type,
         memo: Some("Test payment".to_string()),
-        demurrage: None,
     }
 }
 

@@ -612,9 +612,23 @@ mod dispute_tests {
 
         let dispute_id = dispute_case.id.clone();
 
-        // Step 2: Escalate to MediationPanel
+        // Step 2: Escalate to MediationPanel (provide candidate mediators)
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct EscalateDisputeInput {
+            pub dispute_id: String,
+            pub candidate_mediators: Option<Vec<String>>,
+        }
+
+        let escalate_input = EscalateDisputeInput {
+            dispute_id: dispute_id.clone(),
+            candidate_mediators: Some(vec![
+                "did:mycelix:test:mediator_1".to_string(),
+                "did:mycelix:test:mediator_2".to_string(),
+                "did:mycelix:test:mediator_3".to_string(),
+            ]),
+        };
         let escalated_record: Record = conductor
-            .call(&bob_cell.zome("tend"), "escalate_dispute", dispute_id.clone())
+            .call(&bob_cell.zome("tend"), "escalate_dispute", escalate_input)
             .await
             .expect("Failed to escalate dispute");
 

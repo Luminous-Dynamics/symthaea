@@ -8,6 +8,7 @@
 //! Constitutional: MYCEL is non-transferable (soulbound).
 
 use hdi::prelude::*;
+pub use mycelix_finance_types::ContributionType;
 
 // =============================================================================
 // CONSTANTS
@@ -63,25 +64,6 @@ pub struct RecognitionEvent {
 
     /// Timestamp
     pub timestamp: Timestamp,
-}
-
-/// Types of contribution that can be recognized
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub enum ContributionType {
-    /// Technical work (code, infrastructure)
-    Technical,
-    /// Community building and facilitation
-    Community,
-    /// Care work and mutual aid
-    Care,
-    /// Governance participation
-    Governance,
-    /// Creative and cultural contribution
-    Creative,
-    /// Education and mentorship
-    Education,
-    /// General contribution
-    General,
 }
 
 /// A member's MYCEL state — soulbound, non-transferable reputation

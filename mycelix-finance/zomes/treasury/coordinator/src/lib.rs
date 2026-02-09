@@ -1,30 +1,7 @@
 //! Treasury Coordinator Zome
 use hdk::prelude::*;
 use treasury_integrity::*;
-
-/// Helper to create anchor hash from string
-fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-
-    let mut hasher = DefaultHasher::new();
-    anchor_str.hash(&mut hasher);
-    let h1 = hasher.finish();
-    hasher.write_u64(h1);
-    let h2 = hasher.finish();
-    hasher.write_u64(h2);
-    let h3 = hasher.finish();
-    hasher.write_u64(h3);
-    let h4 = hasher.finish();
-
-    let mut result = [0u8; 32];
-    result[0..8].copy_from_slice(&h1.to_le_bytes());
-    result[8..16].copy_from_slice(&h2.to_le_bytes());
-    result[16..24].copy_from_slice(&h3.to_le_bytes());
-    result[24..32].copy_from_slice(&h4.to_le_bytes());
-
-    Ok(EntryHash::from_raw_32(result.to_vec()))
-}
+use mycelix_finance_shared::anchor_hash;
 
 #[hdk_extern]
 pub fn create_treasury(input: CreateTreasuryInput) -> ExternResult<Record> {

@@ -35,6 +35,7 @@ use std::time::Duration;
 // Import zome types
 use payments_integrity::*;
 use payments::*;
+use mycelix_finance_types::compute_demurrage_deduction;
 
 // Test utilities
 mod test_helpers {
@@ -99,7 +100,6 @@ mod payment_creation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Test payment from Alice to Bob".to_string()),
-            demurrage: None,
         };
 
         // Send payment
@@ -172,8 +172,7 @@ mod payment_creation {
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: payment_type.clone(),
                 memo: Some(format!("Test {} payment", type_name)),
-                demurrage: None,
-            };
+                };
 
             let result: Record = conductor
                 .call(&alice_cell.zome("payments"), "send_payment", input)
@@ -228,7 +227,6 @@ mod payment_creation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Recurring(recurring_config.clone()),
             memo: Some("Monthly subscription".to_string()),
-            demurrage: None,
         };
 
         let result: Record = conductor
@@ -289,7 +287,6 @@ mod payment_validation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
-            demurrage: None,
         };
 
         let result: Result<Record, _> = conductor
@@ -317,7 +314,6 @@ mod payment_validation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
-            demurrage: None,
         };
 
         let result: Result<Record, _> = conductor
@@ -368,7 +364,6 @@ mod payment_validation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
-            demurrage: None,
         };
 
         let result: Result<Record, _> = conductor
@@ -395,7 +390,6 @@ mod payment_validation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
-            demurrage: None,
         };
 
         let result: Result<Record, _> = conductor
@@ -444,7 +438,6 @@ mod payment_validation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Self payment attempt".to_string()),
-            demurrage: None,
         };
 
         let result: Result<Record, _> = conductor
@@ -497,8 +490,7 @@ mod payment_validation {
                 currency: currency.to_string(),
                 payment_type: PaymentType::Direct,
                 memo: None,
-                demurrage: None,
-            };
+                };
 
             let result: Result<Record, _> = conductor
                 .call_fallible(&alice_cell.zome("payments"), "send_payment", input)
@@ -561,8 +553,7 @@ mod double_spend_prevention {
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: PaymentType::Direct,
                 memo: Some(format!("Payment {}", i)),
-                demurrage: None,
-            };
+                };
 
             let result: Record = conductor
                 .call(&alice_cell.zome("payments"), "send_payment", input)
@@ -625,7 +616,6 @@ mod double_spend_prevention {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Payment with receipt".to_string()),
-            demurrage: None,
         };
 
         let payment_record: Record = conductor
@@ -843,7 +833,6 @@ mod transaction_confirmation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
-            demurrage: None,
         };
 
         let result: Record = conductor
@@ -905,7 +894,6 @@ mod transaction_confirmation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Alice to Bob".to_string()),
-            demurrage: None,
         };
 
         let _: Record = conductor
@@ -922,7 +910,6 @@ mod transaction_confirmation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Charlie to Alice".to_string()),
-            demurrage: None,
         };
 
         let _: Record = conductor
@@ -939,7 +926,6 @@ mod transaction_confirmation {
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Alice to Charlie".to_string()),
-            demurrage: None,
         };
 
         let _: Record = conductor
@@ -1008,7 +994,6 @@ mod currency_tests {
             currency: "SAP".to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("SAP payment".to_string()),
-            demurrage: None,
         };
 
         let result: Record = conductor
@@ -1056,7 +1041,6 @@ mod currency_tests {
             currency: "TEND".to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("TEND payment".to_string()),
-            demurrage: None,
         };
 
         let result: Record = conductor
@@ -1104,7 +1088,6 @@ mod currency_tests {
             currency: "SAP".to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
-            demurrage: None,
         };
 
         let _: Record = conductor
@@ -1121,7 +1104,6 @@ mod currency_tests {
             currency: "TEND".to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
-            demurrage: None,
         };
 
         let _: Record = conductor
@@ -1138,7 +1120,6 @@ mod currency_tests {
             currency: "MYC".to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
-            demurrage: None,
         };
 
         let result: Result<Record, _> = conductor
@@ -1704,8 +1685,7 @@ mod performance_benchmarks {
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: PaymentType::Direct,
                 memo: Some(format!("Benchmark payment {}", i)),
-                demurrage: None,
-            };
+                };
 
             let start = std::time::Instant::now();
 

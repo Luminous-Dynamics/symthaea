@@ -12,3 +12,4 @@ name = "recognition_integrity"
 holochain_serialized_bytes = { workspace = true }
 hdi = { workspace = true }
 serde = { workspace = true }
+mycelix_finance_types = { path = "../../../types" }

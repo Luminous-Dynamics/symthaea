@@ -11,33 +11,32 @@ autotests = false
 [workspace]
 
 [dependencies]
+# Shared types
+mycelix_finance_types = { path = "../types" }
+
 # Payments zome dependencies
 payments_integrity = { path = "../zomes/payments/integrity" }
 payments = { path = "../zomes/payments/coordinator" }
-
-# Lending zome dependencies
-lending_integrity = { path = "../zomes/lending/integrity" }
-lending = { path = "../zomes/lending/coordinator" }
-
-# Credit scoring zome dependencies
-credit_scoring_integrity = { path = "../zomes/credit_scoring/integrity" }
-credit_scoring = { path = "../zomes/credit_scoring/coordinator" }
 
 # Treasury zome dependencies
 treasury_integrity = { path = "../zomes/treasury/integrity" }
 treasury = { path = "../zomes/treasury/coordinator" }
 
-# CGC (Civic Gifting Credits) zome dependencies
-cgc_integrity = { path = "../zomes/cgc/integrity" }
-cgc = { path = "../zomes/cgc/coordinator" }
+# Bridge zome dependencies
+finance_bridge_integrity = { path = "../zomes/bridge/integrity" }
+finance_bridge = { path = "../zomes/bridge/coordinator" }
+
+# Staking zome dependencies
+staking_integrity = { path = "../zomes/staking/integrity" }
+staking_coordinator = { path = "../zomes/staking/coordinator" }
 
 # TEND (Time Exchange) zome dependencies
 tend_integrity = { path = "../zomes/tend/integrity" }
 tend = { path = "../zomes/tend/coordinator" }
 
-# HEARTH (Commons Pool) zome dependencies
-hearth_integrity = { path = "../zomes/hearth/integrity" }
-hearth = { path = "../zomes/hearth/coordinator" }
+# Recognition zome dependencies
+recognition_integrity = { path = "../zomes/recognition/integrity" }
+recognition = { path = "../zomes/recognition/coordinator" }
 
 # Holochain dependencies (0.6 compatible)
 hdk = "0.6"
@@ -70,40 +69,20 @@ path = "fixtures/mod.rs"
 name = "payments_test"
 path = "payments_test.rs"
 
-# Lending Integration Tests
-[[test]]
-name = "lending_test"
-path = "lending_test.rs"
-
-# Credit Scoring Integration Tests
-[[test]]
-name = "credit_scoring_test"
-path = "credit_scoring_test.rs"
-
-# Treasury Integration Tests
-[[test]]
-name = "treasury_test"
-path = "treasury_test.rs"
-
-# Full Flow Integration Tests
-[[test]]
-name = "full_flow_test"
-path = "full_flow_test.rs"
-
-# CGC (Civic Gifting Credits) Tests
-[[test]]
-name = "cgc_test"
-path = "cgc_test.rs"
-
 # TEND (Time Exchange) Tests
 [[test]]
 name = "tend_test"
 path = "tend_test.rs"
 
-# HEARTH (Commons Pool) Tests
+# Bridge (Collateral Deposit + Rate Limiting) Tests
 [[test]]
-name = "hearth_test"
-path = "hearth_test.rs"
+name = "bridge_test"
+path = "bridge_test.rs"
+
+# Recognition (MYCEL, Apprentice, Fees, Ratings) Tests
+[[test]]
+name = "recognition_test"
+path = "recognition_test.rs"
 
 # Sweettest Integration Tests (conductor-based)
 [[test]]

@@ -65,15 +65,18 @@ jobs:
       - name: Build all zomes (WASM)
         run: |
           cargo build --release --target wasm32-unknown-unknown \
-            --package cgc \
-            --package tend \
-            --package hearth \
             --package payments \
-            --package lending \
+            --package payments_integrity \
             --package treasury \
-            --package staking \
-            --package bridge \
-            --package credit_scoring
+            --package treasury_integrity \
+            --package finance_bridge \
+            --package finance_bridge_integrity \
+            --package staking_coordinator \
+            --package staking_integrity \
+            --package tend \
+            --package tend_integrity \
+            --package recognition \
+            --package recognition_integrity
 
   test-unit:
     name: Unit Tests

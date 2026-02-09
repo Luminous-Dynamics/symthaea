@@ -7,6 +7,7 @@
 //! Constitutional: Recognition weighted by recognizer's MYCEL (prevents Sybil attacks).
 
 use serde::{Deserialize, Serialize};
+pub use mycelix_finance_types::ContributionType;
 
 /// A recognition event from one member to another
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,25 +24,6 @@ pub struct RecognitionEvent {
     pub cycle_id: String,
     /// Timestamp
     pub timestamp: u64,
-}
-
-/// Types of contribution that can be recognized
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ContributionType {
-    /// Technical work (code, infrastructure)
-    Technical,
-    /// Community building and facilitation
-    Community,
-    /// Care work and mutual aid
-    Care,
-    /// Governance participation
-    Governance,
-    /// Creative and cultural contribution
-    Creative,
-    /// Education and mentorship
-    Education,
-    /// General contribution
-    General,
 }
 
 /// Configuration for the recognition system
