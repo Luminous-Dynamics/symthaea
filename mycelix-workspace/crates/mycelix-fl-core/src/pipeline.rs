@@ -412,10 +412,91 @@ impl UnifiedPipeline {
         self.aggregate(contributions, &agg_reps)
     }
 
+    /// Execute the pipeline with all plugin stages.
+    ///
+    /// This is the full-capability entry point that runs:
+    /// 1. Standard pipeline (validate → DP → gate → detect → trim → aggregate)
+    /// 2. Byzantine plugins contribute to `ExternalWeightMap`
+    /// 3. Post-aggregation verification (if plugin provided)
+    ///
+    /// Compression plugins are not applied inside the pipeline — they should
+    /// be used by callers to compress/decompress before/after pipeline execution.
+    /// This keeps the pipeline operating on raw gradients for maximum accuracy.
+    pub fn aggregate_with_plugins(
+        &mut self,
+        contributions: &[GradientUpdate],
+        reputations: &HashMap<String, f32>,
+        plugins: &mut crate::plugins::PipelinePlugins<'_>,
+    ) -> Result<PluginPipelineResult, AggregationError> {
+        // Collect external weights from all Byzantine plugins
+        let mut merged_weights = ExternalWeightMap::new();
+        for plugin in &mut plugins.byzantine {
+            let weights = plugin.analyze(contributions);
+            for (pid, adjustments) in weights {
+                merged_weights
+                    .entry(pid)
+                    .or_insert_with(Vec::new)
+                    .extend(adjustments);
+            }
+        }
+
+        // Run the pipeline with merged external weights
+        let result = if merged_weights.is_empty() {
+            self.aggregate(contributions, reputations)?
+        } else {
+            self.aggregate_with_external_weights(contributions, reputations, &merged_weights)?
+        };
+
+        // Post-aggregation verification
+        let verification = if let Some(verifier) = &mut plugins.verification {
+            Some(verifier.verify(
+                contributions,
+                &result.aggregated.gradients,
+                reputations,
+            ))
+        } else {
+            None
+        };
+
+        // Record outcome for meta-learning plugins
+        let excluded: Vec<String> = if let Some(ref det) = result.detection {
+            det.byzantine_indices
+                .iter()
+                .filter_map(|&i| contributions.get(i).map(|u| u.participant_id.clone()))
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        for plugin in &mut plugins.byzantine {
+            plugin.record_outcome(
+                result.aggregated.model_version,
+                &excluded,
+            );
+        }
+
+        Ok(PluginPipelineResult {
+            result,
+            verification,
+            plugin_weights_applied: !merged_weights.is_empty(),
+        })
+    }
+
     /// Get current privacy epsilon estimate
     pub fn current_epsilon(&self) -> Option<f64> {
         self.rdp_tracker.as_ref().map(|t| t.epsilon())
     }
+}
+
+/// Extended pipeline result including plugin outputs.
+#[derive(Debug)]
+pub struct PluginPipelineResult {
+    /// Standard pipeline result
+    pub result: PipelineResult,
+    /// Post-aggregation verification (if plugin was provided)
+    pub verification: Option<crate::plugins::VerificationResult>,
+    /// Whether any Byzantine plugin weights were applied
+    pub plugin_weights_applied: bool,
 }
 
 #[cfg(test)]
@@ -615,5 +696,159 @@ mod tests {
 
         let eps = pipeline.current_epsilon().unwrap();
         assert!(eps > 0.0, "Epsilon should increase with rounds");
+    }
+
+    /// Byzantine phase diagram: sweep Byzantine% × reputation disparity.
+    ///
+    /// Validates that the pipeline converges to honest mean when:
+    /// - Byzantine fraction ≤ 34% AND Byzantine reputation < honest reputation
+    /// - Byzantine nodes are gated out by min_reputation
+    ///
+    /// This is the core safety property of the unified pipeline.
+    #[test]
+    fn test_byzantine_phase_diagram() {
+        let target = 0.5_f32;
+        let dim = 20;
+
+        // Sweep: (byzantine_pct, byzantine_rep, honest_rep)
+        let scenarios: Vec<(usize, f32, f32, bool)> = vec![
+            // (byz_count out of 100, byz_rep, honest_rep, should_converge)
+            (10, 0.15, 0.85, true),   // 10% low-rep: trivially safe
+            (20, 0.15, 0.85, true),   // 20% low-rep: safe
+            (30, 0.15, 0.85, true),   // 30% low-rep: safe (gated)
+            (34, 0.15, 0.85, true),   // 34% low-rep: safe (gated)
+            (34, 0.50, 0.85, true),   // 34% medium-rep: safe (trimming helps)
+            (10, 0.85, 0.85, true),   // 10% same-rep: classical BFT handles
+            (20, 0.85, 0.85, true),   // 20% same-rep: trimmed mean handles
+            (30, 0.85, 0.85, true),   // 30% same-rep: at limit but works
+        ];
+
+        for (byz_count, byz_rep, honest_rep, should_converge) in &scenarios {
+            let honest_count = 100 - byz_count;
+
+            let mut updates = Vec::new();
+            let mut reps = HashMap::new();
+
+            for i in 0..honest_count {
+                let val = target + (i as f32 * 0.001);
+                updates.push(GradientUpdate::new(
+                    format!("h{}", i), 1, vec![val; dim], 100, 0.5,
+                ));
+                reps.insert(format!("h{}", i), *honest_rep);
+            }
+
+            for i in 0..*byz_count {
+                let val = if i % 2 == 0 { 100.0 } else { -100.0 };
+                updates.push(GradientUpdate::new(
+                    format!("b{}", i), 1, vec![val; dim], 100, 0.5,
+                ));
+                reps.insert(format!("b{}", i), *byz_rep);
+            }
+
+            let config = PipelineConfig {
+                min_reputation: 0.3,
+                trim_fraction: 0.2,
+                multi_signal_detection: true,
+                ..Default::default()
+            };
+            let mut pipeline = UnifiedPipeline::new(config);
+            let result = pipeline.aggregate(&updates, &reps);
+
+            if *should_converge {
+                let result = result.unwrap_or_else(|e| panic!(
+                    "Scenario byz={}% rep={}/{} should converge, got: {:?}",
+                    byz_count, byz_rep, honest_rep, e
+                ));
+                let max_error = result.aggregated.gradients.iter()
+                    .map(|v| (v - target).abs())
+                    .fold(0.0_f32, f32::max);
+                assert!(
+                    max_error < 0.5,
+                    "Scenario byz={}% rep={}/{}: max_error={:.4} (should be <0.5)",
+                    byz_count, byz_rep, honest_rep, max_error
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_pipeline_with_byzantine_plugin() {
+        use crate::plugins::{ByzantinePlugin, PipelinePlugins};
+
+        struct FlagBadPlugin;
+        impl ByzantinePlugin for FlagBadPlugin {
+            fn analyze(&mut self, updates: &[GradientUpdate]) -> ExternalWeightMap {
+                let mut weights = ExternalWeightMap::new();
+                for u in updates {
+                    if u.participant_id.starts_with("b") {
+                        weights.insert(u.participant_id.clone(), vec![
+                            ParticipantWeightAdjustment {
+                                weight_multiplier: 0.0,
+                                veto: true,
+                                source: "test_plugin".into(),
+                            }
+                        ]);
+                    }
+                }
+                weights
+            }
+            fn name(&self) -> &str { "test_flag_bad" }
+        }
+
+        let (updates, reps) = test_contributions(8, 2);
+        let config = PipelineConfig {
+            multi_signal_detection: false, // Disable to isolate plugin effect
+            ..Default::default()
+        };
+        let mut pipeline = UnifiedPipeline::new(config);
+
+        let mut plugin = FlagBadPlugin;
+        let mut plugins = PipelinePlugins {
+            compression: None,
+            byzantine: vec![&mut plugin],
+            verification: None,
+        };
+
+        let result = pipeline.aggregate_with_plugins(&updates, &reps, &mut plugins).unwrap();
+        assert!(result.plugin_weights_applied);
+        // Byzantine nodes should be vetoed
+        for val in &result.result.aggregated.gradients {
+            assert!((*val - 0.5).abs() < 0.2, "Should be near 0.5, got {}", val);
+        }
+    }
+
+    /// Verify the pipeline correctly reports the number of gated/trimmed nodes.
+    #[test]
+    fn test_pipeline_gating_counts() {
+        let mut updates = Vec::new();
+        let mut reps = HashMap::new();
+
+        // 8 honest high-rep
+        for i in 0..8 {
+            updates.push(GradientUpdate::new(
+                format!("h{}", i), 1, vec![0.5; 10], 100, 0.5,
+            ));
+            reps.insert(format!("h{}", i), 0.9);
+        }
+
+        // 2 low-rep outliers (25% < 34% so multi-signal won't reject)
+        for i in 0..2 {
+            updates.push(GradientUpdate::new(
+                format!("l{}", i), 1, vec![50.0; 10], 100, 0.5,
+            ));
+            reps.insert(format!("l{}", i), 0.1);
+        }
+
+        let config = PipelineConfig {
+            min_reputation: 0.3,
+            ..Default::default()
+        };
+        let mut pipeline = UnifiedPipeline::new(config);
+        let result = pipeline.aggregate(&updates, &reps).unwrap();
+
+        assert_eq!(result.stats.total_contributions, 10);
+        // 2 low-rep should be gated out by hybrid BFT
+        assert!(result.aggregated.participant_count <= 8,
+            "At most 8 should survive, got {}", result.aggregated.participant_count);
     }
 }

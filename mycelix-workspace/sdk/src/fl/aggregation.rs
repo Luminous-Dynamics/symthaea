@@ -16,6 +16,44 @@ use thiserror::Error;
 use super::types::{GradientUpdate, AggregatedGradient, AggregationMethod, Participant};
 use crate::matl::ProofOfGradientQuality;
 
+// ---- Core crate delegation helpers ----
+
+/// Convert SDK GradientUpdate (f64) to core GradientUpdate (f32)
+fn sdk_to_core_updates(updates: &[GradientUpdate]) -> Vec<mycelix_fl_core::types::GradientUpdate> {
+    updates
+        .iter()
+        .map(|u| {
+            mycelix_fl_core::convert::update_to_f32(
+                u.participant_id.clone(),
+                u.model_version,
+                &u.gradients,
+                u.metadata.batch_size as u32,
+                u.metadata.loss,
+                u.metadata.accuracy,
+                u.metadata.timestamp,
+            )
+        })
+        .collect()
+}
+
+/// Map core AggregationError to SDK AggregationError
+fn map_core_error(e: mycelix_fl_core::aggregation::AggregationError) -> AggregationError {
+    use mycelix_fl_core::aggregation::AggregationError as CoreErr;
+    match e {
+        CoreErr::NoUpdates => AggregationError::NoUpdates,
+        CoreErr::EmptyGradients(id) => AggregationError::EmptyGradients(id),
+        CoreErr::GradientSizeMismatch { participant_id, expected, actual } =>
+            AggregationError::GradientSizeMismatch { participant_id, expected, actual },
+        CoreErr::InvalidTrimPercentage(p) => AggregationError::InvalidTrimPercentage(p as f64),
+        CoreErr::NotEnoughForKrum(n) => AggregationError::NotEnoughForKrum(n),
+        CoreErr::InvalidKrumSelect(n) => AggregationError::InvalidKrumSelect(n),
+        CoreErr::InvalidBatchSize(n) => AggregationError::InvalidBatchSize(n as usize),
+        CoreErr::InvalidLoss(id) => AggregationError::InvalidLoss(id),
+        CoreErr::NoTrustedParticipants => AggregationError::NoTrustedParticipants,
+        CoreErr::TooManyByzantine => AggregationError::NoTrustedParticipants,
+    }
+}
+
 /// FL Aggregation errors
 #[derive(Debug, Error)]
 pub enum AggregationError {
@@ -102,27 +140,9 @@ fn validate_update_metadata(update: &GradientUpdate) -> Result<(), AggregationEr
 /// # Returns
 /// Aggregated gradient vector
 pub fn fedavg(updates: &[GradientUpdate]) -> Result<Vec<f64>, AggregationError> {
-    validate_gradient_consistency(updates)?;
-    for update in updates {
-        validate_update_metadata(update)?;
-    }
-
-    let gradient_size = updates[0].gradients.len();
-    let mut result = vec![0.0; gradient_size];
-    let total_samples: usize = updates.iter().map(|u| u.metadata.batch_size).sum();
-
-    if total_samples == 0 {
-        return Err(AggregationError::InvalidBatchSize(0));
-    }
-
-    for update in updates {
-        let weight = update.metadata.batch_size as f64 / total_samples as f64;
-        for (i, grad) in update.gradients.iter().enumerate() {
-            result[i] += grad * weight;
-        }
-    }
-
-    Ok(result)
+    let core_updates = sdk_to_core_updates(updates);
+    let result = mycelix_fl_core::aggregation::fedavg(&core_updates).map_err(map_core_error)?;
+    Ok(mycelix_fl_core::convert::gradients_to_f64(&result))
 }
 
 /// Trimmed Mean Aggregation
@@ -137,35 +157,10 @@ pub fn trimmed_mean(
     updates: &[GradientUpdate],
     trim_percentage: f64,
 ) -> Result<Vec<f64>, AggregationError> {
-    validate_gradient_consistency(updates)?;
-
-    if !(0.0..0.5).contains(&trim_percentage) {
-        return Err(AggregationError::InvalidTrimPercentage(trim_percentage));
-    }
-
-    let gradient_size = updates[0].gradients.len();
-    let mut result = vec![0.0; gradient_size];
-    let trim_count = (updates.len() as f64 * trim_percentage).floor() as usize;
-
-    // Pre-allocate buffer once to avoid repeated allocations
-    let mut values: Vec<f64> = Vec::with_capacity(updates.len());
-
-    for (i, res) in result.iter_mut().enumerate() {
-        values.clear();
-        values.extend(updates.iter().map(|u| u.gradients[i]));
-        values.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Trim top and bottom
-        let trimmed = &values[trim_count..values.len().saturating_sub(trim_count)];
-
-        if trimmed.is_empty() {
-            *res = 0.0;
-        } else {
-            *res = trimmed.iter().sum::<f64>() / trimmed.len() as f64;
-        }
-    }
-
-    Ok(result)
+    let core_updates = sdk_to_core_updates(updates);
+    let result = mycelix_fl_core::aggregation::trimmed_mean(&core_updates, trim_percentage as f32)
+        .map_err(map_core_error)?;
+    Ok(mycelix_fl_core::convert::gradients_to_f64(&result))
 }
 
 /// Coordinate-wise Median
@@ -175,30 +170,10 @@ pub fn trimmed_mean(
 /// # Arguments
 /// * `updates` - Gradient updates from participants
 pub fn coordinate_median(updates: &[GradientUpdate]) -> Result<Vec<f64>, AggregationError> {
-    validate_gradient_consistency(updates)?;
-
-    let gradient_size = updates[0].gradients.len();
-    let mut result = vec![0.0; gradient_size];
-
-    // Pre-allocate buffer once to avoid repeated allocations
-    let mut values: Vec<f64> = Vec::with_capacity(updates.len());
-    let mid = updates.len() / 2;
-    let is_even = updates.len().is_multiple_of(2);
-
-    for (i, res) in result.iter_mut().enumerate() {
-        values.clear();
-        values.extend(updates.iter().map(|u| u.gradients[i]));
-        // Use sort_unstable for better performance (doesn't preserve equal element order)
-        values.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-        if is_even {
-            *res = (values[mid - 1] + values[mid]) / 2.0;
-        } else {
-            *res = values[mid];
-        }
-    }
-
-    Ok(result)
+    let core_updates = sdk_to_core_updates(updates);
+    let result = mycelix_fl_core::aggregation::coordinate_median(&core_updates)
+        .map_err(map_core_error)?;
+    Ok(mycelix_fl_core::convert::gradients_to_f64(&result))
 }
 
 /// Krum Aggregation
@@ -210,66 +185,10 @@ pub fn coordinate_median(updates: &[GradientUpdate]) -> Result<Vec<f64>, Aggrega
 /// * `updates` - Gradient updates from participants
 /// * `num_select` - Number of gradients to select and average (default: 1)
 pub fn krum(updates: &[GradientUpdate], num_select: usize) -> Result<Vec<f64>, AggregationError> {
-    validate_gradient_consistency(updates)?;
-
-    let n = updates.len();
-    if n < 3 {
-        return Err(AggregationError::NotEnoughForKrum(n));
-    }
-    if num_select < 1 || num_select > n {
-        return Err(AggregationError::InvalidKrumSelect(num_select));
-    }
-
-    let num_neighbors = n - 2; // Number of closest neighbors to consider
-
-    // Calculate pairwise distances (store as flat array for cache efficiency)
-    // Only store upper triangle: distances[i * n + j] for j > i
-    let mut distances_flat: Vec<f64> = vec![0.0; n * n];
-    for i in 0..n {
-        for j in (i + 1)..n {
-            let dist = euclidean_distance(&updates[i].gradients, &updates[j].gradients);
-            distances_flat[i * n + j] = dist;
-            distances_flat[j * n + i] = dist;
-        }
-    }
-
-    // Calculate Krum scores (sum of distances to closest neighbors)
-    // Reuse buffer for sorting distances
-    let mut sorted_distances: Vec<f64> = Vec::with_capacity(n);
-    let mut scores: Vec<(usize, f64)> = Vec::with_capacity(n);
-
-    for i in 0..n {
-        sorted_distances.clear();
-        sorted_distances.extend((0..n).filter(|&j| j != i).map(|j| distances_flat[i * n + j]));
-        sorted_distances.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-        let score: f64 = sorted_distances[..num_neighbors].iter().sum();
-        scores.push((i, score));
-    }
-
-    // Select updates with lowest scores
-    scores.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-
-    // Average selected updates directly without cloning
-    let gradient_size = updates[0].gradients.len();
-    let mut result = vec![0.0; gradient_size];
-    let total_samples: usize = scores[..num_select]
-        .iter()
-        .map(|(idx, _)| updates[*idx].metadata.batch_size)
-        .sum();
-
-    if total_samples == 0 {
-        return Err(AggregationError::InvalidBatchSize(0));
-    }
-
-    for (idx, _) in &scores[..num_select] {
-        let update = &updates[*idx];
-        let weight = update.metadata.batch_size as f64 / total_samples as f64;
-        for (i, grad) in update.gradients.iter().enumerate() {
-            result[i] += grad * weight;
-        }
-    }
-
-    Ok(result)
+    let core_updates = sdk_to_core_updates(updates);
+    let result = mycelix_fl_core::aggregation::krum(&core_updates, num_select)
+        .map_err(map_core_error)?;
+    Ok(mycelix_fl_core::convert::gradients_to_f64(&result))
 }
 
 /// Trust-Weighted Aggregation (MATL Integration)
@@ -620,24 +539,7 @@ impl Default for EarlyByzantineDetector {
 ///
 /// More memory-efficient than standard fedavg for large gradient vectors.
 pub fn fedavg_optimized(updates: &[GradientUpdate]) -> Result<Vec<f64>, AggregationError> {
-    validate_gradient_consistency(updates)?;
-    for update in updates {
-        validate_update_metadata(update)?;
-    }
-
-    let total_samples: usize = updates.iter().map(|u| u.metadata.batch_size).sum();
-    if total_samples == 0 {
-        return Err(AggregationError::InvalidBatchSize(0));
-    }
-
-    let mut accumulator = GradientAccumulator::new(updates[0].gradients.len());
-
-    for update in updates {
-        let weight = update.metadata.batch_size as f64 / total_samples as f64;
-        accumulator.accumulate(update, weight);
-    }
-
-    Ok(accumulator.finalize())
+    fedavg(updates) // Delegates to core which handles optimization
 }
 
 /// Aggregation with early Byzantine termination

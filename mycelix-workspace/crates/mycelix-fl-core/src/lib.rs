@@ -26,6 +26,7 @@ pub mod hybrid_bft;
 pub mod privacy;
 pub mod pipeline;
 pub mod convert;
+pub mod plugins;
 
 pub use types::*;
 pub use aggregation::*;
