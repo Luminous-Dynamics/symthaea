@@ -484,6 +484,23 @@ impl IncrementalBind {
 mod tests {
     use super::*;
 
+    // ===== IncrementalBundle Construction =====
+
+    #[test]
+    fn test_incremental_bundle_new() {
+        let bundle = IncrementalBundle::new();
+        assert!(bundle.is_empty());
+        assert_eq!(bundle.len(), 0);
+    }
+
+    #[test]
+    fn test_incremental_bundle_default() {
+        let bundle = IncrementalBundle::default();
+        assert!(bundle.is_empty());
+    }
+
+    // ===== IncrementalBundle Correctness =====
+
     #[test]
     fn test_incremental_bundle_correctness() {
         let vectors = vec![
@@ -502,38 +519,123 @@ mod tests {
     }
 
     #[test]
+    fn test_incremental_bundle_single_vector() {
+        let v = BinaryHV::random(42);
+        let mut bundle = IncrementalBundle::new();
+        bundle.add(vec![v]);
+
+        // Single vector bundle: majority vote means bit=1 if count>0 (count=1 for each 1-bit, -1 for each 0-bit)
+        let result = bundle.get_bundle();
+        assert_eq!(result.0, v.0, "Bundle of single vector should return that vector");
+    }
+
+    #[test]
+    fn test_incremental_bundle_add_multiple_batches() {
+        let mut bundle = IncrementalBundle::new();
+        bundle.add(vec![BinaryHV::random(0), BinaryHV::random(1)]);
+        bundle.add(vec![BinaryHV::random(2)]);
+
+        assert_eq!(bundle.len(), 3);
+
+        let all_vectors = vec![BinaryHV::random(0), BinaryHV::random(1), BinaryHV::random(2)];
+        let expected = simd_bundle(&all_vectors);
+        let actual = bundle.get_bundle();
+        assert_eq!(actual.0, expected.0, "Incremental add should match batch bundle");
+    }
+
+    // ===== IncrementalBundle Update =====
+
+    #[test]
     fn test_incremental_bundle_update() {
         let mut bundle = IncrementalBundle::new();
         bundle.add(vec![BinaryHV::random(0), BinaryHV::random(1), BinaryHV::random(2)]);
 
         let before = bundle.get_bundle();
-
-        // Update one vector
         bundle.update(1, BinaryHV::random(10));
-
         let after = bundle.get_bundle();
 
-        // Results should differ (updated)
         assert_ne!(before.0, after.0, "Bundle should change after update");
 
-        // Verify correctness
         let expected = simd_bundle(bundle.vectors());
         assert_eq!(expected.0, after.0, "Updated bundle must be correct");
     }
 
     #[test]
-    fn test_similarity_cache() {
+    fn test_incremental_bundle_update_out_of_bounds() {
+        let mut bundle = IncrementalBundle::new();
+        bundle.add(vec![BinaryHV::random(0)]);
+
+        let before = bundle.get_bundle();
+        bundle.update(999, BinaryHV::random(42)); // Out of bounds, should be no-op
+        let after = bundle.get_bundle();
+
+        assert_eq!(before.0, after.0, "Out-of-bounds update should be no-op");
+    }
+
+    #[test]
+    fn test_incremental_bundle_update_preserves_len() {
+        let mut bundle = IncrementalBundle::new();
+        bundle.add(vec![BinaryHV::random(0), BinaryHV::random(1)]);
+        assert_eq!(bundle.len(), 2);
+
+        bundle.update(0, BinaryHV::random(99));
+        assert_eq!(bundle.len(), 2, "Update should not change length");
+    }
+
+    // ===== IncrementalBundle Remove =====
+
+    #[test]
+    fn test_incremental_bundle_remove() {
+        let v0 = BinaryHV::random(0);
+        let v1 = BinaryHV::random(1);
+        let v2 = BinaryHV::random(2);
+
+        let mut bundle = IncrementalBundle::new();
+        bundle.add(vec![v0, v1, v2]);
+
+        let removed = bundle.remove(1);
+        assert!(removed.is_some());
+        assert_eq!(bundle.len(), 2);
+
+        let expected = simd_bundle(bundle.vectors());
+        let actual = bundle.get_bundle();
+        assert_eq!(expected.0, actual.0, "Bundle after removal should be correct");
+    }
+
+    #[test]
+    fn test_incremental_bundle_remove_out_of_bounds() {
+        let mut bundle = IncrementalBundle::new();
+        bundle.add(vec![BinaryHV::random(0)]);
+
+        let removed = bundle.remove(5);
+        assert!(removed.is_none());
+        assert_eq!(bundle.len(), 1);
+    }
+
+    // ===== IncrementalBundle Caching =====
+
+    #[test]
+    fn test_incremental_bundle_caching() {
+        let mut bundle = IncrementalBundle::new();
+        bundle.add(vec![BinaryHV::random(0), BinaryHV::random(1)]);
+
+        let first = bundle.get_bundle();
+        let cached = bundle.get_bundle(); // Should return cached
+        assert_eq!(first.0, cached.0, "Cached result should be identical");
+    }
+
+    // ===== SimilarityCache =====
+
+    #[test]
+    fn test_similarity_cache_basic() {
         let mut cache = SimilarityCache::new();
 
         let query = BinaryHV::random(42);
         let target = BinaryHV::random(43);
 
-        let qid = cache.register_query(query.clone());
+        let qid = cache.register_query(query);
 
-        // First call - miss
         let sim1 = cache.get_similarity(qid, 0, &target);
-
-        // Second call - hit
         let sim2 = cache.get_similarity(qid, 0, &target);
 
         assert_eq!(sim1, sim2, "Cached similarity must match");
@@ -545,19 +647,133 @@ mod tests {
     }
 
     #[test]
-    fn test_incremental_bind() {
+    fn test_similarity_cache_multiple_queries() {
+        let mut cache = SimilarityCache::new();
+        let target = BinaryHV::random(100);
+
+        let q1 = cache.register_query(BinaryHV::random(1));
+        let q2 = cache.register_query(BinaryHV::random(2));
+
+        let sim1 = cache.get_similarity(q1, 0, &target);
+        let sim2 = cache.get_similarity(q2, 0, &target);
+
+        // Different queries should (likely) have different similarities
+        // But both should be valid
+        assert!(sim1 >= 0.0 && sim1 <= 1.0);
+        assert!(sim2 >= 0.0 && sim2 <= 1.0);
+    }
+
+    #[test]
+    fn test_similarity_cache_invalidate_query() {
+        let mut cache = SimilarityCache::new();
+        let target = BinaryHV::random(100);
+
+        let qid = cache.register_query(BinaryHV::random(1));
+        let _sim = cache.get_similarity(qid, 0, &target);
+
+        assert_eq!(cache.stats().cache_size, 1);
+        cache.invalidate_query(qid);
+        assert_eq!(cache.stats().cache_size, 0, "Invalidation should clear entries");
+    }
+
+    #[test]
+    fn test_similarity_cache_invalidate_target() {
+        let mut cache = SimilarityCache::new();
+        let target = BinaryHV::random(100);
+
+        let qid = cache.register_query(BinaryHV::random(1));
+        let _sim = cache.get_similarity(qid, 0, &target);
+
+        cache.invalidate_target(0);
+        assert_eq!(cache.stats().cache_size, 0, "Target invalidation should clear entries");
+    }
+
+    #[test]
+    fn test_similarity_cache_clear() {
+        let mut cache = SimilarityCache::new();
+        let target = BinaryHV::random(100);
+
+        let qid = cache.register_query(BinaryHV::random(1));
+        let _ = cache.get_similarity(qid, 0, &target);
+        let _ = cache.get_similarity(qid, 1, &target);
+
+        assert_eq!(cache.stats().cache_size, 2);
+        cache.clear();
+        assert_eq!(cache.stats().cache_size, 0);
+    }
+
+    #[test]
+    fn test_similarity_cache_unknown_query() {
+        let mut cache = SimilarityCache::new();
+        let target = BinaryHV::random(100);
+
+        // Query ID 999 not registered
+        let sim = cache.get_similarity(999, 0, &target);
+        assert_eq!(sim, 0.0, "Unknown query should return 0.0");
+    }
+
+    // ===== IncrementalBind =====
+
+    #[test]
+    fn test_incremental_bind_correctness() {
         let queries = vec![BinaryHV::random(0), BinaryHV::random(1), BinaryHV::random(2)];
         let key = BinaryHV::random(999);
 
-        let mut inc_bind = IncrementalBind::new(key.clone());
+        let mut inc_bind = IncrementalBind::new(key);
         inc_bind.add_queries(queries.clone());
 
         let results = inc_bind.get_bound_results();
 
-        // Verify correctness
         for (i, result) in results.iter().enumerate() {
             let expected = simd_bind(&queries[i], &key);
             assert_eq!(expected.0, result.0, "Incremental bind must match traditional");
         }
+    }
+
+    #[test]
+    fn test_incremental_bind_update_query() {
+        let queries = vec![BinaryHV::random(0), BinaryHV::random(1)];
+        let key = BinaryHV::random(999);
+
+        let mut inc_bind = IncrementalBind::new(key);
+        inc_bind.add_queries(queries);
+
+        let before = inc_bind.get_bound_results();
+
+        let new_query = BinaryHV::random(50);
+        inc_bind.update_query(0, new_query);
+        let after = inc_bind.get_bound_results();
+
+        assert_ne!(before[0].0, after[0].0, "Updated query should produce different result");
+        assert_eq!(before[1].0, after[1].0, "Unchanged query should produce same result");
+        assert_eq!(after[0].0, simd_bind(&new_query, &key).0);
+    }
+
+    #[test]
+    fn test_incremental_bind_update_key() {
+        let queries = vec![BinaryHV::random(0), BinaryHV::random(1)];
+        let key1 = BinaryHV::random(100);
+        let key2 = BinaryHV::random(200);
+
+        let mut inc_bind = IncrementalBind::new(key1);
+        inc_bind.add_queries(queries.clone());
+        let _before = inc_bind.get_bound_results();
+
+        inc_bind.update_key(key2);
+        let after = inc_bind.get_bound_results();
+
+        for (i, result) in after.iter().enumerate() {
+            let expected = simd_bind(&queries[i], &key2);
+            assert_eq!(expected.0, result.0, "All bindings should use new key");
+        }
+    }
+
+    #[test]
+    fn test_incremental_bind_empty() {
+        let mut inc_bind = IncrementalBind::new(BinaryHV::random(42));
+        assert!(inc_bind.is_empty());
+        assert_eq!(inc_bind.len(), 0);
+        let results = inc_bind.get_bound_results();
+        assert!(results.is_empty());
     }
 }

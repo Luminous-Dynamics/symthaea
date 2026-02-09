@@ -552,18 +552,77 @@ impl std::fmt::Display for SimdCapabilities {
 mod tests {
     use super::*;
 
+    // ===== Construction & Basic Properties =====
+
+    #[test]
+    fn test_simd_bind_zero_vectors() {
+        let a = BinaryHV::zero();
+        let b = BinaryHV::zero();
+        let result = simd_bind(&a, &b);
+        assert_eq!(result, BinaryHV::zero(), "XOR of two zero vectors should be zero");
+    }
+
+    #[test]
+    fn test_simd_bind_with_ones() {
+        let a = BinaryHV::ones();
+        let b = BinaryHV::ones();
+        let result = simd_bind(&a, &b);
+        assert_eq!(result, BinaryHV::zero(), "XOR of two all-ones vectors should be zero");
+    }
+
+    #[test]
+    fn test_simd_bind_zero_identity() {
+        let a = BinaryHV::random(42);
+        let zero = BinaryHV::zero();
+        let result = simd_bind(&a, &zero);
+        assert_eq!(result.0, a.0, "XOR with zero should return original");
+    }
+
+    #[test]
+    fn test_simd_bind_self_inverse() {
+        let a = BinaryHV::random(99);
+        let result = simd_bind(&a, &a);
+        assert_eq!(result, BinaryHV::zero(), "XOR of vector with itself should be zero");
+    }
+
+    // ===== SIMD Bind Correctness =====
+
     #[test]
     fn test_simd_bind_correctness() {
         let a = BinaryHV::random(1);
         let b = BinaryHV::random(2);
 
-        // Compare SIMD result with scalar
         let simd_result = simd_bind(&a, &b);
         let scalar_result = a.bind(&b);
 
         assert_eq!(simd_result.0, scalar_result.0,
             "SIMD bind should produce identical results to scalar");
     }
+
+    #[test]
+    fn test_simd_bind_commutativity() {
+        let a = BinaryHV::random(10);
+        let b = BinaryHV::random(20);
+
+        let ab = simd_bind(&a, &b);
+        let ba = simd_bind(&b, &a);
+
+        assert_eq!(ab.0, ba.0, "XOR bind should be commutative");
+    }
+
+    #[test]
+    fn test_simd_bind_associativity() {
+        let a = BinaryHV::random(30);
+        let b = BinaryHV::random(40);
+        let c = BinaryHV::random(50);
+
+        let ab_c = simd_bind(&simd_bind(&a, &b), &c);
+        let a_bc = simd_bind(&a, &simd_bind(&b, &c));
+
+        assert_eq!(ab_c.0, a_bc.0, "XOR bind should be associative");
+    }
+
+    // ===== SIMD Similarity =====
 
     #[test]
     fn test_simd_similarity_correctness() {
@@ -578,56 +637,176 @@ mod tests {
     }
 
     #[test]
-    fn test_simd_bundle_correctness() {
-        let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i + 10)).collect();
-
-        let simd_result = simd_bundle(&vectors);
-        let scalar_result = BinaryHV::bundle(&vectors);
-
-        // Bundle may have ties resolved differently, so check similarity
-        let sim = simd_similarity(&simd_result, &scalar_result);
-        assert!(sim > 0.95,
-            "SIMD bundle should be similar to scalar: {}", sim);
+    fn test_simd_similarity_self() {
+        let a = BinaryHV::random(77);
+        let sim = simd_similarity(&a, &a);
+        assert!((sim - 1.0).abs() < 0.001, "Self-similarity should be 1.0, got {}", sim);
     }
+
+    #[test]
+    fn test_simd_similarity_complement() {
+        let a = BinaryHV::random(88);
+        let b = a.invert();
+        let sim = simd_similarity(&a, &b);
+        assert!((sim - 0.0).abs() < 0.001,
+            "Similarity with complement should be ~0.0, got {}", sim);
+    }
+
+    #[test]
+    fn test_simd_similarity_range() {
+        for seed in 0..20 {
+            let a = BinaryHV::random(seed);
+            let b = BinaryHV::random(seed + 1000);
+            let sim = simd_similarity(&a, &b);
+            assert!(sim >= 0.0 && sim <= 1.0,
+                "Similarity should be in [0, 1], got {}", sim);
+        }
+    }
+
+    // ===== SIMD Hamming Distance =====
 
     #[test]
     fn test_simd_hamming_distance() {
         let a = BinaryHV::zero();
         let b = BinaryHV::random(20);
 
-        // Hamming distance from zero = number of 1 bits in b
         let expected: u32 = b.0.iter().map(|byte| byte.count_ones()).sum();
         let actual = simd_hamming_distance(&a, &b);
 
-        assert_eq!(actual, expected,
-            "Hamming distance should count differing bits");
+        assert_eq!(actual, expected, "Hamming distance should count differing bits");
     }
 
     #[test]
-    fn test_simd_capabilities() {
-        let caps = simd_capabilities();
-        println!("CPU SIMD capabilities: {}", caps);
-
-        // On x86_64, SSE2 should always be available
-        #[cfg(target_arch = "x86_64")]
-        assert!(caps.sse2, "SSE2 should be available on x86_64");
+    fn test_simd_hamming_self_is_zero() {
+        let a = BinaryHV::random(55);
+        let dist = simd_hamming_distance(&a, &a);
+        assert_eq!(dist, 0, "Hamming distance to self should be 0");
     }
+
+    #[test]
+    fn test_simd_hamming_complement_is_max() {
+        let a = BinaryHV::random(66);
+        let b = a.invert();
+        let dist = simd_hamming_distance(&a, &b);
+        assert_eq!(dist, BinaryHV::DIM as u32,
+            "Hamming distance to complement should be DIM={}", BinaryHV::DIM);
+    }
+
+    #[test]
+    fn test_simd_hamming_symmetry() {
+        let a = BinaryHV::random(11);
+        let b = BinaryHV::random(12);
+        assert_eq!(simd_hamming_distance(&a, &b), simd_hamming_distance(&b, &a),
+            "Hamming distance should be symmetric");
+    }
+
+    // ===== SIMD Bundle =====
+
+    #[test]
+    fn test_simd_bundle_correctness() {
+        let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i + 10)).collect();
+
+        let simd_result = simd_bundle(&vectors);
+        let scalar_result = BinaryHV::bundle(&vectors);
+
+        let sim = simd_similarity(&simd_result, &scalar_result);
+        assert!(sim > 0.95, "SIMD bundle should be similar to scalar: {}", sim);
+    }
+
+    #[test]
+    fn test_simd_bundle_empty() {
+        let result = simd_bundle(&[]);
+        assert_eq!(result, BinaryHV::zero(), "Bundle of empty set should be zero");
+    }
+
+    #[test]
+    fn test_simd_bundle_single() {
+        let v = BinaryHV::random(42);
+        let result = simd_bundle(&[v]);
+        assert_eq!(result.0, v.0, "Bundle of single vector should return that vector");
+    }
+
+    #[test]
+    fn test_simd_bundle_majority_vote() {
+        // Bundle of 3 copies of A and 2 copies of B should be closer to A
+        let a = BinaryHV::random(100);
+        let b = BinaryHV::random(200);
+        let vectors = vec![a, a, a, b, b];
+        let result = simd_bundle(&vectors);
+
+        let sim_a = simd_similarity(&result, &a);
+        let sim_b = simd_similarity(&result, &b);
+        assert!(sim_a > sim_b,
+            "Bundle should be closer to majority: sim_a={}, sim_b={}", sim_a, sim_b);
+    }
+
+    // ===== Batch Operations =====
+
+    #[test]
+    fn test_simd_bind_batch() {
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
+        let c = BinaryHV::random(3);
+        let d = BinaryHV::random(4);
+        let pairs: Vec<(&BinaryHV, &BinaryHV)> = vec![(&a, &b), (&c, &d)];
+
+        let results = simd_bind_batch(&pairs);
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].0, simd_bind(&a, &b).0);
+        assert_eq!(results[1].0, simd_bind(&c, &d).0);
+    }
+
+    #[test]
+    fn test_simd_similarity_batch() {
+        let query = BinaryHV::random(100);
+        let targets: Vec<BinaryHV> = (0..50).map(|i| BinaryHV::random(i + 200)).collect();
+
+        let batch_result = simd_similarity_batch(&query, &targets);
+        assert_eq!(batch_result.len(), 50);
+
+        for (i, &sim) in batch_result.iter().enumerate() {
+            let expected = simd_similarity(&query, &targets[i]);
+            assert!((sim - expected).abs() < 0.001,
+                "Batch similarity[{}] mismatch: {} vs {}", i, sim, expected);
+        }
+    }
+
+    #[test]
+    fn test_simd_similarity_batch_empty() {
+        let query = BinaryHV::random(100);
+        let result = simd_similarity_batch(&query, &[]);
+        assert!(result.is_empty(), "Batch similarity of empty targets should be empty");
+    }
+
+    // ===== Search Operations =====
 
     #[test]
     fn test_simd_find_most_similar() {
         let query = BinaryHV::random(100);
         let targets: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i + 200)).collect();
 
-        // Add query itself to targets
         let mut targets_with_query = targets.clone();
         targets_with_query.push(query);
 
         let (idx, sim) = simd_find_most_similar(&query, &targets_with_query).unwrap();
 
-        assert_eq!(idx, targets_with_query.len() - 1,
-            "Should find the query itself as most similar");
-        assert!((sim - 1.0).abs() < 0.001,
-            "Self-similarity should be 1.0");
+        assert_eq!(idx, targets_with_query.len() - 1, "Should find query itself");
+        assert!((sim - 1.0).abs() < 0.001, "Self-similarity should be 1.0");
+    }
+
+    #[test]
+    fn test_simd_find_most_similar_empty() {
+        let query = BinaryHV::random(100);
+        assert!(simd_find_most_similar(&query, &[]).is_none(),
+            "Should return None for empty targets");
+    }
+
+    #[test]
+    fn test_simd_find_most_similar_single() {
+        let query = BinaryHV::random(100);
+        let target = BinaryHV::random(200);
+        let (idx, _) = simd_find_most_similar(&query, &[target]).unwrap();
+        assert_eq!(idx, 0, "Single target should return index 0");
     }
 
     #[test]
@@ -639,12 +818,40 @@ mod tests {
 
         assert_eq!(top5.len(), 5, "Should return k results");
 
-        // Verify sorted descending
         for i in 1..top5.len() {
             assert!(top5[i - 1].1 >= top5[i].1,
-                "Results should be sorted by similarity descending");
+                "Results should be sorted descending");
         }
     }
+
+    #[test]
+    fn test_simd_find_top_k_larger_than_targets() {
+        let query = BinaryHV::random(300);
+        let targets: Vec<BinaryHV> = (0..3).map(|i| BinaryHV::random(i + 400)).collect();
+
+        let top10 = simd_find_top_k(&query, &targets, 10);
+        assert_eq!(top10.len(), 3, "Should return min(k, n) results");
+    }
+
+    #[test]
+    fn test_simd_find_top_k_empty() {
+        let query = BinaryHV::random(300);
+        let result = simd_find_top_k(&query, &[], 5);
+        assert!(result.is_empty(), "Top-k of empty targets should be empty");
+    }
+
+    // ===== Diagnostics =====
+
+    #[test]
+    fn test_simd_capabilities() {
+        let caps = simd_capabilities();
+        println!("CPU SIMD capabilities: {}", caps);
+
+        #[cfg(target_arch = "x86_64")]
+        assert!(caps.sse2, "SSE2 should be available on x86_64");
+    }
+
+    // ===== Performance sanity =====
 
     #[test]
     fn test_simd_bind_performance() {
@@ -658,7 +865,6 @@ mod tests {
             let _ = simd_bind(&a, &b);
         }
 
-        // Benchmark
         let iterations = 10000;
         let start = Instant::now();
         for _ in 0..iterations {
@@ -669,7 +875,6 @@ mod tests {
         let ns_per_op = elapsed.as_nanos() as f64 / iterations as f64;
         println!("SIMD bind: {:.1}ns/op (target: <25ns)", ns_per_op);
 
-        // Should be significantly faster than 400ns
         #[cfg(not(debug_assertions))]
         assert!(ns_per_op < 100.0,
             "SIMD bind should be <100ns, got {:.1}ns", ns_per_op);

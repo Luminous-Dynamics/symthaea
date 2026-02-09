@@ -448,6 +448,8 @@ impl std::fmt::Display for ParallelismInfo {
 mod tests {
     use super::*;
 
+    // ===== Parallel Bind =====
+
     #[test]
     fn test_parallel_bind_correctness() {
         let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
@@ -461,6 +463,39 @@ mod tests {
             assert_eq!(seq.0, par.0, "Parallel bind must match sequential");
         }
     }
+
+    #[test]
+    fn test_parallel_bind_empty() {
+        let key = BinaryHV::random(42);
+        let result = parallel_batch_bind(&[], &key);
+        assert!(result.is_empty(), "Parallel bind of empty input should be empty");
+    }
+
+    #[test]
+    fn test_parallel_bind_single() {
+        let v = BinaryHV::random(1);
+        let key = BinaryHV::random(2);
+        let result = parallel_batch_bind(&[v], &key);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].0, simd_bind(&v, &key).0);
+    }
+
+    #[test]
+    fn test_parallel_bind_pairs_correctness() {
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
+        let c = BinaryHV::random(3);
+        let d = BinaryHV::random(4);
+
+        let pairs: Vec<(&BinaryHV, &BinaryHV)> = vec![(&a, &b), (&c, &d)];
+        let results = parallel_batch_bind_pairs(&pairs);
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].0, simd_bind(&a, &b).0);
+        assert_eq!(results[1].0, simd_bind(&c, &d).0);
+    }
+
+    // ===== Parallel Similarity =====
 
     #[test]
     fn test_parallel_similarity_correctness() {
@@ -477,19 +512,194 @@ mod tests {
     }
 
     #[test]
+    fn test_parallel_similarity_empty() {
+        let query = BinaryHV::random(42);
+        let result = parallel_batch_similarity(&query, &[]);
+        assert!(result.is_empty(), "Parallel similarity of empty targets should be empty");
+    }
+
+    #[test]
+    fn test_parallel_similarity_self_included() {
+        let query = BinaryHV::random(42);
+        let targets = vec![BinaryHV::random(100), query, BinaryHV::random(200)];
+        let sims = parallel_batch_similarity(&query, &targets);
+
+        assert_eq!(sims.len(), 3);
+        assert!((sims[1] - 1.0).abs() < 0.001,
+            "Self-similarity in batch should be 1.0, got {}", sims[1]);
+    }
+
+    // ===== All-Pairs Similarity =====
+
+    #[test]
+    fn test_parallel_all_pairs_similarity() {
+        let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
+        let matrix = parallel_all_pairs_similarity(&vectors);
+
+        assert_eq!(matrix.len(), 10);
+        for row in &matrix {
+            assert_eq!(row.len(), 10);
+        }
+
+        // Diagonal should be 1.0 (self-similarity)
+        for i in 0..10 {
+            assert!((matrix[i][i] - 1.0).abs() < 0.001,
+                "Self-similarity should be 1.0, got {}", matrix[i][i]);
+        }
+
+        // Should be symmetric
+        for i in 0..10 {
+            for j in i+1..10 {
+                assert!((matrix[i][j] - matrix[j][i]).abs() < 0.001,
+                    "Similarity matrix should be symmetric");
+            }
+        }
+    }
+
+    #[test]
+    fn test_parallel_all_pairs_empty() {
+        let result = parallel_all_pairs_similarity(&[]);
+        assert!(result.is_empty());
+    }
+
+    // ===== Parallel Bundle =====
+
+    #[test]
+    fn test_parallel_batch_bundle() {
+        let sets: Vec<Vec<BinaryHV>> = (0..5)
+            .map(|s| (0..10).map(|i| BinaryHV::random(s * 100 + i)).collect())
+            .collect();
+
+        let parallel_results = parallel_batch_bundle(&sets);
+        assert_eq!(parallel_results.len(), 5);
+
+        for (i, result) in parallel_results.iter().enumerate() {
+            let expected = simd_bundle(&sets[i]);
+            assert_eq!(result.0, expected.0,
+                "Parallel bundle set {} must match sequential", i);
+        }
+    }
+
+    #[test]
+    fn test_parallel_batch_bundle_slices() {
+        let sets: Vec<Vec<BinaryHV>> = (0..3)
+            .map(|s| (0..5).map(|i| BinaryHV::random(s * 50 + i)).collect())
+            .collect();
+
+        let slice_refs: Vec<&[BinaryHV]> = sets.iter().map(|s| s.as_slice()).collect();
+        let results = parallel_batch_bundle_slices(&slice_refs);
+        assert_eq!(results.len(), 3);
+    }
+
+    // ===== Parallel Search =====
+
+    #[test]
+    fn test_parallel_batch_find_most_similar() {
+        let queries: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
+        let memory: Vec<BinaryHV> = (0..50).map(|i| BinaryHV::random(i + 1000)).collect();
+
+        let results = parallel_batch_find_most_similar(&queries, &memory);
+        assert_eq!(results.len(), 10);
+
+        for result in &results {
+            assert!(result.is_some(), "Should find match for each query");
+            let (idx, sim) = result.unwrap();
+            assert!(idx < memory.len(), "Index should be valid");
+            assert!(sim >= 0.0 && sim <= 1.0, "Similarity should be in [0, 1]");
+        }
+    }
+
+    #[test]
+    fn test_parallel_batch_find_top_k() {
+        let queries: Vec<BinaryHV> = (0..5).map(|i| BinaryHV::random(i)).collect();
+        let memory: Vec<BinaryHV> = (0..50).map(|i| BinaryHV::random(i + 500)).collect();
+
+        let results = parallel_batch_find_top_k(&queries, &memory, 3);
+        assert_eq!(results.len(), 5);
+
+        for top_k in &results {
+            assert_eq!(top_k.len(), 3, "Should return k results");
+            // Verify sorted descending
+            for w in top_k.windows(2) {
+                assert!(w[0].1 >= w[1].1, "Top-k should be sorted descending");
+            }
+        }
+    }
+
+    // ===== Similar Pairs =====
+
+    #[test]
+    fn test_parallel_find_similar_pairs() {
+        // Use identical vectors to guarantee a high-sim pair
+        let a = BinaryHV::random(1);
+        let b = BinaryHV::random(2);
+        let vectors = vec![a, a, b];
+
+        let pairs = parallel_find_similar_pairs(&vectors, 0.99);
+        // The pair (0, 1) should have sim=1.0 and be found
+        assert!(!pairs.is_empty(), "Should find identical vectors as similar pair");
+        assert!(pairs.iter().any(|&(i, j, sim)| i == 0 && j == 1 && sim > 0.99),
+            "Should find pair (0,1) with sim=1.0");
+    }
+
+    #[test]
+    fn test_parallel_find_similar_pairs_no_matches() {
+        // Random vectors are unlikely to have sim > 0.9
+        let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i * 1000)).collect();
+        let pairs = parallel_find_similar_pairs(&vectors, 0.9);
+        // Could be 0 or a few, but we just check it doesn't panic
+        for &(i, j, sim) in &pairs {
+            assert!(i < j, "Pairs should have i < j");
+            assert!(sim >= 0.9, "All returned pairs should meet threshold");
+        }
+    }
+
+    // ===== Adaptive Dispatch =====
+
+    #[test]
     fn test_adaptive_dispatch() {
         let query = BinaryHV::random(42);
 
-        // Small workload (should use sequential)
         let small_targets: Vec<BinaryHV> = (0..50).map(|i| BinaryHV::random(i)).collect();
         let small_result = adaptive_batch_similarity(&query, &small_targets);
         assert_eq!(small_result.len(), 50);
 
-        // Large workload (should use parallel)
         let large_targets: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i)).collect();
         let large_result = adaptive_batch_similarity(&query, &large_targets);
         assert_eq!(large_result.len(), 1000);
     }
+
+    #[test]
+    fn test_adaptive_bind() {
+        let key = BinaryHV::random(42);
+
+        let small: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
+        let result = adaptive_batch_bind(&small, &key);
+        assert_eq!(result.len(), 10);
+
+        for (i, r) in result.iter().enumerate() {
+            let expected = simd_bind(&small[i], &key);
+            assert_eq!(r.0, expected.0, "Adaptive bind[{}] must match", i);
+        }
+    }
+
+    // ===== Chunked Similarity =====
+
+    #[test]
+    fn test_parallel_chunked_similarity() {
+        let query = BinaryHV::random(42);
+        let targets: Vec<BinaryHV> = (0..500).map(|i| BinaryHV::random(i)).collect();
+
+        let chunked = parallel_chunked_similarity(&query, &targets, 64);
+        let sequential: Vec<f32> = targets.iter().map(|t| simd_similarity(&query, t)).collect();
+
+        assert_eq!(chunked.len(), sequential.len());
+        for (c, s) in chunked.iter().zip(sequential.iter()) {
+            assert!((c - s).abs() < 0.001, "Chunked result must match sequential");
+        }
+    }
+
+    // ===== Diagnostics =====
 
     #[test]
     fn test_parallelism_info() {

@@ -38,23 +38,53 @@ pub use crate::hdc::consciousness_topology_generators::{
     TopologyType,
 };
 
-// Master Consciousness Equation v2.0
-// DISABLED: crate::consciousness doesn't exist in symthaea-core
-// pub use crate::consciousness::consciousness_equation_v2::{
-//     ConsciousnessEquationV2,
-//     ConsciousnessStateV2,
-//     CoreComponent,
-// };
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSCIOUSNESS PIPELINE — from hdc::consciousness_integration
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// Unified consciousness pipeline (minimal loop)
-// DISABLED: crate::consciousness doesn't exist in symthaea-core
-// pub use crate::consciousness::unified_consciousness_pipeline::{
-//     UnifiedConsciousnessPipeline,
-//     PipelineConfig,
-//     ConsciousMoment,
-//     PipelineStatistics,
-// };
+// Note: ConsciousnessState struct is re-exported as ConsciousnessStateData to
+// avoid collision with the ConsciousnessState trait from core::traits.
+pub use crate::hdc::consciousness_integration::{
+    ConsciousnessState as ConsciousnessStateData,
+    ConsciousnessPipeline,
+    IntegrationConfig,
+    ConsciousnessMetricsReport,
+    IntegrationAssessment,
+    WorkspaceItem,
+    MetaThought,
+    BoundObject,
+    BindingLevel,
+    AlteredStateIndex,
+};
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSCIOUSNESS DASHBOARD — from hdc::consciousness_dashboard
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pub use crate::hdc::consciousness_dashboard::{
+    ConsciousnessDashboard,
+    DashboardConfig,
+    DashboardStatus,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MATH BRIDGE — from hdc::math_bridge
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pub use crate::hdc::math_bridge::{
+    UnifiedMathEngine,
+    MathValue,
+    MathResult,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHYSICS SIMULATION BRIDGE — from physics::simulation_bridge
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pub use crate::physics::simulation_bridge::{
+    PhysicsSimulator,
+    SimulationAnalysis,
+};
 
 // Consciousness API traits
 pub mod traits;
@@ -88,44 +118,3 @@ pub use domain_traits::{
     DomainActor,
     ActorObservation,
 };
-
-// GridWorld domain adapter (Generalization Refactoring validation)
-// A simple 2D grid world to validate domain-agnostic infrastructure
-// DISABLED: depends on crate::consciousness which doesn't exist in symthaea-core
-// pub mod gridworld;
-// pub use gridworld::{
-//     GridState,
-//     GridAction,
-//     GridGoal,
-//     GridWorldAdapter,
-// };
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// CONSCIOUSNESS DOMAIN TYPES (Generalization Refactoring Phase 1)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Re-export consciousness-specific types that implement the domain traits
-// DISABLED: crate::consciousness doesn't exist in symthaea-core
-// pub use crate::consciousness::recursive_improvement::world_model::{
-//     // State implementation
-//     LatentConsciousnessState,
-//     // Action implementation
-//     ConsciousnessAction,
-//     // Goal implementations
-//     PhiMaximizationGoal,
-//     CoherenceGoal,
-//     // Transition type
-//     ConsciousnessTransition,
-// };
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TYPE ALIASES FOR BACKWARD COMPATIBILITY
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// DISABLED: types below depend on crate::consciousness
-// /// Type alias: ConsciousnessState is an alias for types implementing State trait.
-// /// This provides backward compatibility with code using the old name.
-// pub type ConsciousnessStateAlias = LatentConsciousnessState;
-//
-// /// Type alias for consciousness-specific world model.
-// pub type ConsciousnessWorldModel = crate::consciousness::recursive_improvement::world_model::ConsciousnessWorldModel;

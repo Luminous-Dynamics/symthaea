@@ -332,6 +332,19 @@ pub mod moral_algebra;
 /// keyword analysis optimized for the ETHICS benchmark format.
 pub mod moral_parser;
 
+/// Character n-gram HDC text encoder for moral reasoning.
+///
+/// Deterministic trigram-binding encoder: each character is bound with a
+/// positional HV, n-grams are bundled, and the result is L2-normalized.
+/// (Named `moral_text_encoder` to avoid conflict with symthaea_core::hdc::text_encoder.)
+pub mod moral_text_encoder;
+
+/// Learned moral prototype classifier (Good/Neutral/Bad).
+///
+/// Trains 3-class HDC prototypes from labeled text using accumulate→retrain,
+/// the same loop that achieved 87.6% on MNIST and 91.7% on ISOLET.
+pub mod moral_prototypes;
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL MODULES - Testing
 // ═══════════════════════════════════════════════════════════════════════════════

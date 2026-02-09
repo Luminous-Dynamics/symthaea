@@ -929,6 +929,8 @@ mod tests {
         a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum()
     }
 
+    // ===== Dot Product =====
+
     #[test]
     fn test_dot_product_correctness() {
         let a = random_vec(HDC_DIM, 42);
@@ -955,6 +957,44 @@ mod tests {
     }
 
     #[test]
+    fn test_dot_product_zero_vector() {
+        let a = random_vec(HDC_DIM, 42);
+        let zero = vec![0.0f32; HDC_DIM];
+
+        let result = dot_product_simd(&a, &zero);
+        assert!(result.abs() < 1e-6, "Dot with zero should be 0, got {}", result);
+    }
+
+    #[test]
+    fn test_dot_product_orthogonal_unit() {
+        // Create two orthogonal unit vectors
+        let mut a = vec![0.0f32; 100];
+        let mut b = vec![0.0f32; 100];
+        a[0] = 1.0;
+        b[1] = 1.0;
+
+        let result = dot_product_simd(&a, &b);
+        assert!(result.abs() < EPSILON, "Orthogonal dot product should be 0, got {}", result);
+    }
+
+    #[test]
+    fn test_dot_product_parallel_unit() {
+        let mut a = vec![0.0f32; 100];
+        a[0] = 1.0;
+
+        let result = dot_product_simd(&a, &a);
+        assert!((result - 1.0).abs() < EPSILON, "Parallel unit dot should be 1.0, got {}", result);
+    }
+
+    #[test]
+    fn test_dot_product_empty() {
+        let result = dot_product_simd(&[], &[]);
+        assert_eq!(result, 0.0, "Empty dot product should be 0.0");
+    }
+
+    // ===== Bind =====
+
+    #[test]
     fn test_bind_correctness() {
         let a = random_vec(HDC_DIM, 42);
         let b = random_vec(HDC_DIM, 43);
@@ -969,6 +1009,45 @@ mod tests {
     }
 
     #[test]
+    fn test_bind_identity() {
+        let a = random_vec(HDC_DIM, 42);
+        let ones = vec![1.0f32; HDC_DIM];
+
+        let result = bind_simd(&a, &ones);
+        for i in 0..HDC_DIM {
+            assert!((result[i] - a[i]).abs() < EPSILON,
+                "Multiply by 1 should preserve: {} vs {}", result[i], a[i]);
+        }
+    }
+
+    #[test]
+    fn test_bind_with_zero() {
+        let a = random_vec(HDC_DIM, 42);
+        let zero = vec![0.0f32; HDC_DIM];
+
+        let result = bind_simd(&a, &zero);
+        for &val in &result {
+            assert!(val.abs() < EPSILON, "Multiply by 0 should be 0, got {}", val);
+        }
+    }
+
+    #[test]
+    fn test_bind_commutativity() {
+        let a = random_vec(100, 42);
+        let b = random_vec(100, 43);
+
+        let ab = bind_simd(&a, &b);
+        let ba = bind_simd(&b, &a);
+
+        for i in 0..100 {
+            assert!((ab[i] - ba[i]).abs() < EPSILON,
+                "Elementwise multiplication should be commutative");
+        }
+    }
+
+    // ===== Bundle =====
+
+    #[test]
     fn test_bundle_uniform_weights() {
         let vecs: Vec<Vec<f32>> = (0..5).map(|i| random_vec(HDC_DIM, i + 100)).collect();
         let refs: Vec<&[f32]> = vecs.iter().map(|v| v.as_slice()).collect();
@@ -976,7 +1055,6 @@ mod tests {
 
         let simd_result = bundle_simd(&refs, &weights);
 
-        // Manual scalar computation
         let mut expected = vec![0.0f32; HDC_DIM];
         for i in 0..HDC_DIM {
             for vec in &vecs {
@@ -1000,7 +1078,6 @@ mod tests {
 
         let simd_result = bundle_simd(&refs, &weights);
 
-        // Manual scalar computation
         let mut expected = vec![0.0f32; HDC_DIM];
         for i in 0..HDC_DIM {
             for (vec, &w) in vecs.iter().zip(weights.iter()) {
@@ -1016,6 +1093,45 @@ mod tests {
     }
 
     #[test]
+    fn test_bundle_single_vector() {
+        let v = random_vec(100, 42);
+        let refs: Vec<&[f32]> = vec![v.as_slice()];
+        let weights = vec![1.0];
+
+        let result = bundle_simd(&refs, &weights);
+        for i in 0..100 {
+            assert!((result[i] - v[i]).abs() < EPSILON,
+                "Single vector bundle should return that vector");
+        }
+    }
+
+    #[test]
+    fn test_bundle_empty_input() {
+        let result = bundle_simd(&[], &[]);
+        assert!(result.is_empty(), "Bundle of empty should be empty");
+    }
+
+    #[test]
+    fn test_bundle_dominant_weight() {
+        // If one weight is very large, result should be close to that vector
+        let vecs: Vec<Vec<f32>> = (0..3).map(|i| random_vec(100, i + 100)).collect();
+        let refs: Vec<&[f32]> = vecs.iter().map(|v| v.as_slice()).collect();
+        let weights = vec![0.01, 100.0, 0.01];
+
+        let result = bundle_simd(&refs, &weights);
+
+        // Result should be very close to vecs[1]
+        let mut max_diff = 0.0f32;
+        for i in 0..100 {
+            max_diff = max_diff.max((result[i] - vecs[1][i]).abs());
+        }
+        assert!(max_diff < 0.01,
+            "Dominant weight should make result close to that vector, max_diff={}", max_diff);
+    }
+
+    // ===== Similarity =====
+
+    #[test]
     fn test_similarity_self() {
         let a = random_vec(HDC_DIM, 42);
 
@@ -1029,9 +1145,40 @@ mod tests {
         let b = random_vec(HDC_DIM, 43);
 
         let sim = similarity_simd(&a, &b);
-        // Random high-dimensional vectors should be nearly orthogonal
         assert!(sim.abs() < 0.1, "Random vectors should be nearly orthogonal, got {}", sim);
     }
+
+    #[test]
+    fn test_similarity_negated() {
+        let a = random_vec(100, 42);
+        let neg_a: Vec<f32> = a.iter().map(|&x| -x).collect();
+
+        let sim = similarity_simd(&a, &neg_a);
+        assert!((sim - (-1.0)).abs() < EPSILON,
+            "Negated vector should have similarity -1.0, got {}", sim);
+    }
+
+    #[test]
+    fn test_similarity_range() {
+        for seed in 0..20 {
+            let a = random_vec(100, seed);
+            let b = random_vec(100, seed + 1000);
+            let sim = similarity_simd(&a, &b);
+            assert!(sim >= -1.0 && sim <= 1.0,
+                "Similarity should be in [-1, 1], got {}", sim);
+        }
+    }
+
+    #[test]
+    fn test_similarity_zero_vector() {
+        let a = random_vec(100, 42);
+        let zero = vec![0.0f32; 100];
+
+        let sim = similarity_simd(&a, &zero);
+        assert_eq!(sim, 0.0, "Similarity with zero vector should be 0, got {}", sim);
+    }
+
+    // ===== Norm =====
 
     #[test]
     fn test_norm() {
@@ -1045,8 +1192,24 @@ mod tests {
     }
 
     #[test]
+    fn test_norm_zero() {
+        let zero = vec![0.0f32; 100];
+        let norm = norm_simd(&zero);
+        assert_eq!(norm, 0.0, "Norm of zero vector should be 0");
+    }
+
+    #[test]
+    fn test_norm_unit() {
+        let mut unit = vec![0.0f32; 100];
+        unit[0] = 1.0;
+        let norm = norm_simd(&unit);
+        assert!((norm - 1.0).abs() < EPSILON, "Norm of unit vector should be 1.0, got {}", norm);
+    }
+
+    // ===== Small/non-aligned vectors =====
+
+    #[test]
     fn test_small_vectors() {
-        // Test with non-aligned sizes
         for size in [1, 3, 7, 15, 31, 100, 1000] {
             let a = random_vec(size, 42);
             let b = random_vec(size, 43);
@@ -1059,6 +1222,34 @@ mod tests {
                     "Size {} dot product error: {}", size, relative_error);
         }
     }
+
+    #[test]
+    fn test_small_bind() {
+        for size in [1, 3, 7, 15] {
+            let a = random_vec(size, 42);
+            let b = random_vec(size, 43);
+
+            let result = bind_simd(&a, &b);
+            assert_eq!(result.len(), size, "Bind should preserve dimension");
+
+            for i in 0..size {
+                assert!((result[i] - a[i] * b[i]).abs() < EPSILON,
+                    "Bind mismatch at size={}, index={}", size, i);
+            }
+        }
+    }
+
+    #[test]
+    fn test_small_similarity() {
+        for size in [2, 5, 10, 50] {
+            let a = random_vec(size, 42);
+            let sim = similarity_simd(&a, &a);
+            assert!((sim - 1.0).abs() < 0.01,
+                "Self-similarity at size={} should be ~1.0, got {}", size, sim);
+        }
+    }
+
+    // ===== Capabilities =====
 
     #[test]
     fn test_capabilities_report() {
