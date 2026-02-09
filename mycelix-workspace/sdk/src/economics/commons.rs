@@ -12,9 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-
-/// Minimum inalienable reserve ratio (constitutional floor)
-pub const INALIENABLE_RESERVE_RATIO: f64 = 0.25;
+use mycelix_finance_types::INALIENABLE_RESERVE_RATIO;
 
 /// Commons pool state
 #[derive(Debug, Clone, Serialize, Deserialize)]

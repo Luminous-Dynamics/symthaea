@@ -218,16 +218,42 @@ fn validate_update_cross_happ_payment(
 
 fn validate_create_collateral_registration(
     _action: EntryCreationAction,
-    _collateral: CollateralRegistration,
+    collateral: CollateralRegistration,
 ) -> ExternResult<ValidateCallbackResult> {
+    // Validate owner DID format
+    if !collateral.owner_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid("Owner must be a valid DID".into()));
+    }
+    // Validate positive value estimate
+    if collateral.value_estimate == 0 {
+        return Ok(ValidateCallbackResult::Invalid("Value estimate must be positive".into()));
+    }
+    // Validate asset_id is non-empty
+    if collateral.asset_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Asset ID is required".into()));
+    }
+    // Validate source_happ is non-empty
+    if collateral.source_happ.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Source hApp is required".into()));
+    }
+    // Validate currency is non-empty
+    if collateral.currency.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Currency is required".into()));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_update_collateral_registration(
     _action: Update,
-    _collateral: CollateralRegistration,
+    collateral: CollateralRegistration,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Status can be updated
+    // Re-validate core invariants on update
+    if !collateral.owner_did.starts_with("did:") {
+        return Ok(ValidateCallbackResult::Invalid("Owner must be a valid DID".into()));
+    }
+    if collateral.value_estimate == 0 {
+        return Ok(ValidateCallbackResult::Invalid("Value estimate must be positive".into()));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 

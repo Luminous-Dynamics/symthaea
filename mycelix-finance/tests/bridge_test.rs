@@ -578,3 +578,274 @@ mod unit_tests {
         assert_eq!(empty_limit, 0); // But code has bootstrap bypass
     }
 }
+
+// ============================================================================
+// Section 4: Collateral Registration Tests
+// ============================================================================
+
+#[cfg(test)]
+mod collateral_registration {
+    use super::*;
+
+    /// Test 4.1: Register a RealEstate collateral asset
+    #[tokio::test]
+    #[ignore]
+    async fn test_register_collateral() {
+        println!("Test 4.1: Register Collateral");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_did = test_did("alice");
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct RegisterCollateralInput {
+            pub owner_did: String,
+            pub source_happ: String,
+            pub asset_type: AssetType,
+            pub asset_id: String,
+            pub value_estimate: u64,
+            pub currency: String,
+        }
+
+        let input = RegisterCollateralInput {
+            owner_did: alice_did.clone(),
+            source_happ: "mycelix-property".to_string(),
+            asset_type: AssetType::RealEstate,
+            asset_id: "property:lot:42".to_string(),
+            value_estimate: 500_000_000, // 500k SAP in micro-units
+            currency: "SAP".to_string(),
+        };
+
+        let result: Record = conductor
+            .call(&alice_cell.zome("finance_bridge"), "register_collateral", input)
+            .await
+            .expect("Failed to register collateral");
+
+        let collateral: CollateralRegistration = result
+            .entry()
+            .to_app_option()
+            .expect("Deserialize failed")
+            .expect("No entry");
+
+        assert_eq!(collateral.owner_did, alice_did, "Owner DID mismatch");
+        assert!(matches!(collateral.asset_type, AssetType::RealEstate), "Asset type should be RealEstate");
+        assert_eq!(collateral.asset_id, "property:lot:42", "Asset ID mismatch");
+        assert_eq!(collateral.value_estimate, 500_000_000, "Value estimate mismatch");
+        assert!(matches!(collateral.status, CollateralStatus::Available), "Status should be Available");
+
+        println!("  - Collateral registered: {}", collateral.id);
+        println!("  - Asset type: {:?}", collateral.asset_type);
+        println!("  - Asset ID: {}", collateral.asset_id);
+        println!("  - Value: {}", collateral.value_estimate);
+        println!("Test 4.1 PASSED: Collateral registration works");
+    }
+
+    /// Test 4.2: Invalid collateral registration with empty asset_id
+    #[tokio::test]
+    #[ignore]
+    async fn test_invalid_collateral_registration() {
+        println!("Test 4.2: Invalid Collateral Registration");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct RegisterCollateralInput {
+            pub owner_did: String,
+            pub source_happ: String,
+            pub asset_type: AssetType,
+            pub asset_id: String,
+            pub value_estimate: u64,
+            pub currency: String,
+        }
+
+        let input = RegisterCollateralInput {
+            owner_did: test_did("alice"),
+            source_happ: "mycelix-property".to_string(),
+            asset_type: AssetType::RealEstate,
+            asset_id: "".to_string(), // Empty asset_id - should fail validation
+            value_estimate: 100_000,
+            currency: "SAP".to_string(),
+        };
+
+        let result: Result<Record, _> = conductor
+            .call_fallible(alice_cell.zome("finance_bridge"), "register_collateral", input)
+            .await;
+
+        match result {
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                assert!(
+                    error_msg.contains("asset") || error_msg.contains("empty") || error_msg.contains("Invalid") || error_msg.contains("validation"),
+                    "Should reject empty asset_id, got: {}", error_msg
+                );
+                println!("  - Empty asset_id rejected: OK");
+            }
+            Ok(_) => panic!("Should have rejected registration with empty asset_id"),
+        }
+
+        println!("Test 4.2 PASSED: Invalid collateral registration is rejected");
+    }
+}
+
+// ============================================================================
+// Section 5: Redemption Tests
+// ============================================================================
+
+#[cfg(test)]
+mod redemption_tests {
+    use super::*;
+
+    /// Test 5.1: Deposit ETH and redeem collateral
+    #[tokio::test]
+    #[ignore]
+    async fn test_redeem_collateral() {
+        println!("Test 5.1: Redeem Collateral");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_did = test_did("alice");
+
+        // Deposit ETH collateral
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct DepositCollateralInput {
+            pub depositor_did: String,
+            pub collateral_type: String,
+            pub collateral_amount: u64,
+            pub oracle_rate: f64,
+        }
+
+        let deposit_input = DepositCollateralInput {
+            depositor_did: alice_did.clone(),
+            collateral_type: "ETH".to_string(),
+            collateral_amount: 500_000, // 0.5 ETH in micro-units
+            oracle_rate: 2000.0,
+        };
+
+        let deposit_record: Record = conductor
+            .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", deposit_input)
+            .await
+            .expect("Failed to deposit ETH");
+
+        let deposit: CollateralBridgeDeposit = deposit_record
+            .entry()
+            .to_app_option()
+            .expect("Deserialize failed")
+            .expect("No entry");
+
+        let deposit_id = deposit.id.clone();
+        println!("  - Deposit ID: {}", deposit_id);
+        println!("  - SAP minted: {}", deposit.sap_minted);
+
+        // Redeem the collateral
+        let redeemed_record: Record = conductor
+            .call(&alice_cell.zome("finance_bridge"), "redeem_collateral", deposit_id.clone())
+            .await
+            .expect("Failed to redeem collateral");
+
+        let redeemed: CollateralBridgeDeposit = redeemed_record
+            .entry()
+            .to_app_option()
+            .expect("Deserialize failed")
+            .expect("No entry");
+
+        assert!(matches!(redeemed.status, BridgeDepositStatus::Redeemed),
+            "Redeemed deposit should have Redeemed status");
+
+        println!("  - Redemption status: {:?}", redeemed.status);
+        println!("Test 5.1 PASSED: Collateral redemption works");
+    }
+
+    /// Test 5.2: Make 3 cross-hApp payments and query payment history
+    #[tokio::test]
+    #[ignore]
+    async fn test_payment_history() {
+        println!("Test 5.2: Payment History");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_did = test_did("alice");
+        let bob_did = test_did("bob");
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct ProcessPaymentInput {
+            pub source_happ: String,
+            pub from_did: String,
+            pub to_did: String,
+            pub amount: u64,
+            pub currency: String,
+            pub reference: String,
+        }
+
+        // Make 3 cross-hApp payments
+        for i in 0..3 {
+            let input = ProcessPaymentInput {
+                source_happ: "mycelix-property".to_string(),
+                from_did: alice_did.clone(),
+                to_did: bob_did.clone(),
+                amount: 100 * (i + 1),
+                currency: "SAP".to_string(),
+                reference: format!("property:rent:2026-0{}", i + 1),
+            };
+
+            let _: Record = conductor
+                .call(&alice_cell.zome("finance_bridge"), "process_payment", input)
+                .await
+                .expect(&format!("Failed to process payment {}", i));
+
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+
+        println!("  - 3 cross-hApp payments processed");
+
+        // Wait for DHT consistency
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        // Query payment history for Alice
+        let history: Vec<Record> = conductor
+            .call(&alice_cell.zome("finance_bridge"), "get_payment_history", alice_did.clone())
+            .await
+            .expect("Failed to get payment history");
+
+        assert_eq!(history.len(), 3, "Should have 3 payments in history");
+
+        println!("  - Payment history count: {}", history.len());
+        println!("Test 5.2 PASSED: Payment history returns correct count");
+    }
+}

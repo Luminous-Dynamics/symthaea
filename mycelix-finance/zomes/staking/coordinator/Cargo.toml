@@ -15,6 +15,7 @@ holochain_serialized_bytes = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 mycelix_finance_types = { path = "../../../types" }
+blake2b_simd = "1.0"
 
 [features]
 default = []

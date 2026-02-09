@@ -43,6 +43,7 @@ pub use mycelix_finance_types::{
     compute_demurrage_deduction,
     DEMURRAGE_RATE, DEMURRAGE_EXEMPT_FLOOR,
     COMPOST_LOCAL_PCT, COMPOST_REGIONAL_PCT, COMPOST_GLOBAL_PCT,
+    INALIENABLE_RESERVE_RATIO,
 };
 
 /// Extension trait for Currency with SDK-specific convenience methods

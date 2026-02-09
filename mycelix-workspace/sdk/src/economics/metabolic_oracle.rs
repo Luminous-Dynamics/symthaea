@@ -87,26 +87,27 @@ pub struct VitalityIndex {
 /// Metabolic state classification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MetabolicState {
-    /// Score 70-100: Network thriving
+    /// Score 80-100: Network thriving
     Thriving,
-    /// Score 40-70: Normal operation
+    /// Score 60-80: Normal operation
     Healthy,
-    /// Score 20-40: Auto-healing activates
+    /// Score 40-60: Auto-healing activates
     Stressed,
-    /// Score 10-20: Emergency response
+    /// Score 20-40: Emergency response
     Critical,
-    /// Score 0-10: Circuit breaker
+    /// Score 0-20: Circuit breaker
     Failing,
 }
 
 impl MetabolicState {
-    /// Determine state from vitality score
+    /// Determine state from vitality score.
+    /// Thresholds aligned with canonical types crate (mycelix_finance_types).
     pub fn from_score(score: f64) -> Self {
         match score {
-            s if s >= 70.0 => MetabolicState::Thriving,
-            s if s >= 40.0 => MetabolicState::Healthy,
-            s if s >= 20.0 => MetabolicState::Stressed,
-            s if s >= 10.0 => MetabolicState::Critical,
+            s if s >= 80.0 => MetabolicState::Thriving,
+            s if s >= 60.0 => MetabolicState::Healthy,
+            s if s >= 40.0 => MetabolicState::Stressed,
+            s if s >= 20.0 => MetabolicState::Critical,
             _ => MetabolicState::Failing,
         }
     }
@@ -425,20 +426,24 @@ mod tests {
     use super::*;
 
     fn healthy_components() -> VitalityComponents {
+        // Target vitality ~70 (Healthy tier: 60-80)
+        // 0.75*0.40 + 0.70*0.30 + 0.65*0.20 + 0.55*0.10 = 0.30+0.21+0.13+0.055 = 0.695 → 69.5
         VitalityComponents {
-            circulation: 0.65,
-            relationship: 0.55,
-            commons: 0.60,
-            resilience: 0.45,
+            circulation: 0.75,
+            relationship: 0.70,
+            commons: 0.65,
+            resilience: 0.55,
         }
     }
 
     fn stressed_components() -> VitalityComponents {
+        // Target vitality ~45 (Stressed tier: 40-60)
+        // 0.45*0.40 + 0.50*0.30 + 0.40*0.20 + 0.35*0.10 = 0.18+0.15+0.08+0.035 = 0.445 → 44.5
         VitalityComponents {
-            circulation: 0.30,
-            relationship: 0.35,
-            commons: 0.25,
-            resilience: 0.30,
+            circulation: 0.45,
+            relationship: 0.50,
+            commons: 0.40,
+            resilience: 0.35,
         }
     }
 
@@ -446,16 +451,22 @@ mod tests {
     fn test_vitality_calculation() {
         let healthy = healthy_components();
         let vitality = healthy.calculate_vitality();
-        // 0.65*0.40 + 0.55*0.30 + 0.60*0.20 + 0.45*0.10 = 59
-        assert!(vitality > 55.0 && vitality < 65.0);
+        // 0.75*0.40 + 0.70*0.30 + 0.65*0.20 + 0.55*0.10 = 69.5
+        assert!(vitality > 65.0 && vitality < 75.0, "Expected ~69.5, got {}", vitality);
     }
 
     #[test]
     fn test_state_classification() {
+        // Thresholds aligned with mycelix_finance_types::MetabolicState::from_vitality
         assert_eq!(MetabolicState::from_score(85.0), MetabolicState::Thriving);
-        assert_eq!(MetabolicState::from_score(55.0), MetabolicState::Healthy);
-        assert_eq!(MetabolicState::from_score(30.0), MetabolicState::Stressed);
-        assert_eq!(MetabolicState::from_score(15.0), MetabolicState::Critical);
+        assert_eq!(MetabolicState::from_score(80.0), MetabolicState::Thriving);
+        assert_eq!(MetabolicState::from_score(79.9), MetabolicState::Healthy);
+        assert_eq!(MetabolicState::from_score(60.0), MetabolicState::Healthy);
+        assert_eq!(MetabolicState::from_score(55.0), MetabolicState::Stressed);
+        assert_eq!(MetabolicState::from_score(40.0), MetabolicState::Stressed);
+        assert_eq!(MetabolicState::from_score(30.0), MetabolicState::Critical);
+        assert_eq!(MetabolicState::from_score(20.0), MetabolicState::Critical);
+        assert_eq!(MetabolicState::from_score(15.0), MetabolicState::Failing);
         assert_eq!(MetabolicState::from_score(5.0), MetabolicState::Failing);
     }
 

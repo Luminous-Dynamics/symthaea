@@ -60,6 +60,9 @@ rmp-serde = "1.1"
 chrono = "0.4"
 uuid = { version = "1.6", features = ["v4"] }
 
+# Cryptographic hashing (used by staking tests for Blake2b evidence hashes)
+blake2b_simd = "1.0"
+
 [lib]
 name = "test_fixtures"
 path = "fixtures/mod.rs"
@@ -83,6 +86,16 @@ path = "bridge_test.rs"
 [[test]]
 name = "recognition_test"
 path = "recognition_test.rs"
+
+# Staking (Collateral, Slashing, Escrow) Tests
+[[test]]
+name = "staking_test"
+path = "staking_test.rs"
+
+# Treasury (Allocation Governance, Commons Pool, Savings) Tests
+[[test]]
+name = "treasury_test"
+path = "treasury_test.rs"
 
 # Sweettest Integration Tests (conductor-based)
 [[test]]

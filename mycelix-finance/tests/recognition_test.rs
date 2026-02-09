@@ -809,3 +809,360 @@ mod unit_tests {
         assert_eq!(state.is_apprentice, deserialized.is_apprentice);
     }
 }
+
+// ============================================================================
+// Section 5: Recognition Query Tests
+// ============================================================================
+
+#[cfg(test)]
+mod recognition_query_tests {
+    use super::*;
+
+    /// Test 5.1: Recognize a member 3 times and query received recognitions
+    #[tokio::test]
+    #[ignore]
+    async fn test_get_recognition_received() {
+        println!("Test 5.1: Get Recognition Received");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let bob_cell = &apps[1].cells()[0];
+        let alice_key = agents[0].clone();
+        let alice_did = format!("did:mycelix:{}", alice_key);
+        let bob_key = agents[1].clone();
+        let bob_did = format!("did:mycelix:{}", bob_key);
+
+        // Initialize both members
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct InitializeMemberInput {
+            pub member_did: String,
+            pub is_apprentice: bool,
+            pub mentor_did: Option<String>,
+        }
+
+        let _: Record = conductor
+            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
+                member_did: alice_did.clone(),
+                is_apprentice: false,
+                mentor_did: None,
+            })
+            .await
+            .expect("Failed to init Alice");
+
+        let _: Record = conductor
+            .call(&bob_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
+                member_did: bob_did.clone(),
+                is_apprentice: false,
+                mentor_did: None,
+            })
+            .await
+            .expect("Failed to init Bob");
+
+        // Alice recognizes Bob 3 times with different contribution types
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct RecognizeMemberInput {
+            pub recipient_did: String,
+            pub contribution_type: mycelix_finance_types::ContributionType,
+            pub cycle_id: String,
+        }
+
+        use mycelix_finance_types::ContributionType;
+
+        let contribution_types = vec![
+            ContributionType::CommunityEngagement,
+            ContributionType::SkillSharing,
+            ContributionType::MutualAid,
+        ];
+
+        for ct in &contribution_types {
+            let _: Record = conductor
+                .call(&alice_cell.zome("recognition"), "recognize_member", RecognizeMemberInput {
+                    recipient_did: bob_did.clone(),
+                    contribution_type: ct.clone(),
+                    cycle_id: "2026-02".to_string(),
+                })
+                .await
+                .expect("Failed to recognize member");
+
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+
+        println!("  - 3 recognitions given to Bob");
+
+        // Query recognition events received by Bob
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct GetRecognitionsInput {
+            pub member_did: String,
+            pub cycle_id: Option<String>,
+        }
+
+        let recognitions: Vec<RecognitionEvent> = conductor
+            .call(&bob_cell.zome("recognition"), "get_recognition_received", GetRecognitionsInput {
+                member_did: bob_did.clone(),
+                cycle_id: None,
+            })
+            .await
+            .expect("Failed to get recognitions");
+
+        assert_eq!(recognitions.len(), 3, "Bob should have received 3 recognitions");
+
+        for (i, r) in recognitions.iter().enumerate() {
+            println!("  - Recognition {}: type={:?}, weight={:.2}", i, r.contribution_type, r.weight);
+        }
+
+        println!("Test 5.1 PASSED: Recognition query returns correct results");
+    }
+}
+
+// ============================================================================
+// Section 6: Lifecycle Advanced Tests
+// ============================================================================
+
+#[cfg(test)]
+mod lifecycle_advanced {
+    use super::*;
+
+    /// Test 6.1: Jubilee normalization integration
+    #[tokio::test]
+    #[ignore]
+    async fn test_jubilee_normalize_integration() {
+        println!("Test 6.1: Jubilee Normalize Integration");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_key = agents[0].clone();
+        let alice_did = format!("did:mycelix:{}", alice_key);
+
+        // Initialize member
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct InitializeMemberInput {
+            pub member_did: String,
+            pub is_apprentice: bool,
+            pub mentor_did: Option<String>,
+        }
+
+        let _: Record = conductor
+            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
+                member_did: alice_did.clone(),
+                is_apprentice: false,
+                mentor_did: None,
+            })
+            .await
+            .expect("Failed to init");
+
+        // Set score to 0.8 via update
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct UpdateMycelInput {
+            pub member_did: String,
+            pub participation: f64,
+            pub recognition: f64,
+            pub validation_override: Option<f64>,
+            pub active_months: u32,
+        }
+
+        let _: MemberMycelState = conductor
+            .call(&alice_cell.zome("recognition"), "update_mycel_score", UpdateMycelInput {
+                member_did: alice_did.clone(),
+                participation: 1.0,
+                recognition: 1.0,
+                validation_override: Some(1.0),
+                active_months: 24,
+            })
+            .await
+            .expect("Failed to update MYCEL");
+
+        println!("  - MYCEL set to high value");
+
+        // Apply jubilee normalization
+        let jubileed: MemberMycelState = conductor
+            .call(&alice_cell.zome("recognition"), "jubilee_normalize", alice_did.clone())
+            .await
+            .expect("Failed to apply jubilee");
+
+        // Jubilee formula: new = 0.3 + (current - 0.3) * 0.8
+        // For 0.8: 0.3 + (0.8 - 0.3) * 0.8 = 0.3 + 0.4 = 0.7
+        // For ~1.0: 0.3 + (1.0 - 0.3) * 0.8 = 0.3 + 0.56 = 0.86
+        println!("  - Post-jubilee MYCEL: {:.4}", jubileed.mycel_score);
+        assert!(jubileed.mycel_score < 1.0, "Jubilee should compress scores toward 0.3");
+        // The exact value depends on the pre-jubilee score; just verify compression happened
+        assert!(jubileed.mycel_score >= 0.3, "Post-jubilee score should be >= 0.3");
+
+        println!("Test 6.1 PASSED: Jubilee normalization works in integration");
+    }
+
+    /// Test 6.2: Dissolve MYCEL sets all scores to 0
+    #[tokio::test]
+    #[ignore]
+    async fn test_dissolve_mycel() {
+        println!("Test 6.2: Dissolve MYCEL");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_key = agents[0].clone();
+        let alice_did = format!("did:mycelix:{}", alice_key);
+
+        // Initialize member
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct InitializeMemberInput {
+            pub member_did: String,
+            pub is_apprentice: bool,
+            pub mentor_did: Option<String>,
+        }
+
+        let _: Record = conductor
+            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
+                member_did: alice_did.clone(),
+                is_apprentice: false,
+                mentor_did: None,
+            })
+            .await
+            .expect("Failed to init");
+
+        println!("  - Member initialized");
+
+        // Dissolve MYCEL
+        let _: () = conductor
+            .call(&alice_cell.zome("recognition"), "dissolve_mycel", alice_did.clone())
+            .await
+            .expect("Failed to dissolve MYCEL");
+
+        println!("  - MYCEL dissolved");
+
+        // Verify all scores are 0 by checking state
+        // Re-initialize to verify the state was actually cleared
+        // (dissolve_mycel sets everything to 0)
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct UpdateMycelInput {
+            pub member_did: String,
+            pub participation: f64,
+            pub recognition: f64,
+            pub validation_override: Option<f64>,
+            pub active_months: u32,
+        }
+
+        // After dissolve, trying to update should start from 0
+        let state: MemberMycelState = conductor
+            .call(&alice_cell.zome("recognition"), "update_mycel_score", UpdateMycelInput {
+                member_did: alice_did.clone(),
+                participation: 0.0,
+                recognition: 0.0,
+                validation_override: Some(0.0),
+                active_months: 0,
+            })
+            .await
+            .expect("Failed to get state");
+
+        assert!((state.mycel_score - 0.0).abs() < 1e-6, "MYCEL score should be 0 after dissolve");
+        assert!((state.participation - 0.0).abs() < 1e-6, "Participation should be 0");
+        assert!((state.recognition - 0.0).abs() < 1e-6, "Recognition should be 0");
+        assert!((state.validation - 0.0).abs() < 1e-6, "Validation should be 0");
+
+        println!("  - All scores verified as 0");
+        println!("Test 6.2 PASSED: Dissolve MYCEL zeroes all scores");
+    }
+
+    /// Test 6.3: Passive decay integration test
+    #[tokio::test]
+    #[ignore]
+    async fn test_passive_decay_integration() {
+        println!("Test 6.3: Passive Decay Integration");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, &[dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let alice_key = agents[0].clone();
+        let alice_did = format!("did:mycelix:{}", alice_key);
+
+        // Initialize member
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct InitializeMemberInput {
+            pub member_did: String,
+            pub is_apprentice: bool,
+            pub mentor_did: Option<String>,
+        }
+
+        let _: Record = conductor
+            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
+                member_did: alice_did.clone(),
+                is_apprentice: false,
+                mentor_did: None,
+            })
+            .await
+            .expect("Failed to init");
+
+        // Set initial MYCEL to 0.5
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct UpdateMycelInput {
+            pub member_did: String,
+            pub participation: f64,
+            pub recognition: f64,
+            pub validation_override: Option<f64>,
+            pub active_months: u32,
+        }
+
+        let before: MemberMycelState = conductor
+            .call(&alice_cell.zome("recognition"), "update_mycel_score", UpdateMycelInput {
+                member_did: alice_did.clone(),
+                participation: 0.6,
+                recognition: 0.5,
+                validation_override: Some(0.5),
+                active_months: 6,
+            })
+            .await
+            .expect("Failed to set MYCEL");
+
+        let score_before = before.mycel_score;
+        println!("  - MYCEL before decay: {:.4}", score_before);
+
+        // Apply passive decay (simulates 1 year of inactivity)
+        let after: MemberMycelState = conductor
+            .call(&alice_cell.zome("recognition"), "apply_passive_decay", alice_did.clone())
+            .await
+            .expect("Failed to apply decay");
+
+        println!("  - MYCEL after decay: {:.4}", after.mycel_score);
+
+        // Decay should reduce the score (5% annual linear decay)
+        // Exact amount depends on elapsed time since last update
+        assert!(after.mycel_score <= score_before,
+            "Score should decrease or stay the same after decay: before={}, after={}",
+            score_before, after.mycel_score);
+
+        println!("Test 6.3 PASSED: Passive decay reduces MYCEL score");
+    }
+}

@@ -110,7 +110,7 @@ pub fn apply_demurrage(input: ApplyDemurrageInput) -> ExternResult<DemurrageResu
 
     // Redistribute via treasury zome cross-zome calls
     if let Some(ref pool_id) = input.local_commons_pool_id {
-        let _ = call(
+        if let Err(e) = call(
             CallTargetCell::Local,
             ZomeName::from("treasury"),
             FunctionName::from("receive_compost"),
@@ -120,10 +120,12 @@ pub fn apply_demurrage(input: ApplyDemurrageInput) -> ExternResult<DemurrageResu
                 amount: local_amount,
                 source_member_did: input.member_did.clone(),
             },
-        );
+        ) {
+            debug!("Compost redistribution to local pool {} failed: {:?}", pool_id, e);
+        }
     }
     if let Some(ref pool_id) = input.regional_commons_pool_id {
-        let _ = call(
+        if let Err(e) = call(
             CallTargetCell::Local,
             ZomeName::from("treasury"),
             FunctionName::from("receive_compost"),
@@ -133,10 +135,12 @@ pub fn apply_demurrage(input: ApplyDemurrageInput) -> ExternResult<DemurrageResu
                 amount: regional_amount,
                 source_member_did: input.member_did.clone(),
             },
-        );
+        ) {
+            debug!("Compost redistribution to regional pool {} failed: {:?}", pool_id, e);
+        }
     }
     if let Some(ref pool_id) = input.global_commons_pool_id {
-        let _ = call(
+        if let Err(e) = call(
             CallTargetCell::Local,
             ZomeName::from("treasury"),
             FunctionName::from("receive_compost"),
@@ -146,7 +150,9 @@ pub fn apply_demurrage(input: ApplyDemurrageInput) -> ExternResult<DemurrageResu
                 amount: global_amount,
                 source_member_did: input.member_did.clone(),
             },
-        );
+        ) {
+            debug!("Compost redistribution to global pool {} failed: {:?}", pool_id, e);
+        }
     }
 
     Ok(DemurrageResult { deducted: deduction, redistributed: true })
@@ -349,7 +355,7 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
 
         // Route fee to commons via treasury (if fee > 0)
         if fee_micro > 0 {
-            let _ = call(
+            if let Err(e) = call(
                 CallTargetCell::Local,
                 ZomeName::from("treasury"),
                 FunctionName::from("receive_compost"),
@@ -359,7 +365,9 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
                     amount: fee_micro,
                     source_member_did: input.from_did.clone(),
                 },
-            );
+            ) {
+                debug!("Fee routing to global-fee-pool failed: {:?}", e);
+            }
         }
 
         let fee_f64 = fee_micro as f64 / 1_000_000.0;

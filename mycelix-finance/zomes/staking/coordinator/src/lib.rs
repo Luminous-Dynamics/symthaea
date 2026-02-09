@@ -13,27 +13,13 @@ use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
 /// Anchor for active stakes
 const ACTIVE_STAKES_ANCHOR: &str = "active_stakes";
 
-/// Compute a 32-byte hash from arbitrary bytes
+/// Compute a 32-byte Blake2b hash from arbitrary bytes.
 fn compute_bytes_hash(data: &[u8]) -> Vec<u8> {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-
-    let mut hasher = DefaultHasher::new();
-    data.hash(&mut hasher);
-    let h1 = hasher.finish();
-    hasher.write_u64(h1);
-    let h2 = hasher.finish();
-    hasher.write_u64(h2);
-    let h3 = hasher.finish();
-    hasher.write_u64(h3);
-    let h4 = hasher.finish();
-
-    let mut result = Vec::with_capacity(32);
-    result.extend_from_slice(&h1.to_le_bytes());
-    result.extend_from_slice(&h2.to_le_bytes());
-    result.extend_from_slice(&h3.to_le_bytes());
-    result.extend_from_slice(&h4.to_le_bytes());
-    result
+    blake2b_simd::Params::new()
+        .hash_length(32)
+        .hash(data)
+        .as_bytes()
+        .to_vec()
 }
 
 // =============================================================================
@@ -451,32 +437,16 @@ pub struct RevealPreimageInput {
     pub preimage: Vec<u8>,
 }
 
-/// Compute hash for hash-lock verification
-fn compute_hash(preimage: &[u8], hash_type: &EscrowHashType) -> Vec<u8> {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-
-    // Simplified hash implementation (in production, use proper crypto libraries)
-    match hash_type {
-        EscrowHashType::Sha256 | EscrowHashType::Sha3_256 | EscrowHashType::Blake2b | EscrowHashType::Keccak256 => {
-            let mut hasher = DefaultHasher::new();
-            preimage.hash(&mut hasher);
-            let h1 = hasher.finish();
-            hasher.write_u64(h1);
-            let h2 = hasher.finish();
-            hasher.write_u64(h2);
-            let h3 = hasher.finish();
-            hasher.write_u64(h3);
-            let h4 = hasher.finish();
-
-            let mut result = Vec::with_capacity(32);
-            result.extend_from_slice(&h1.to_le_bytes());
-            result.extend_from_slice(&h2.to_le_bytes());
-            result.extend_from_slice(&h3.to_le_bytes());
-            result.extend_from_slice(&h4.to_le_bytes());
-            result
-        }
-    }
+/// Compute hash for hash-lock verification.
+/// All hash types use Blake2b-256 (the only hash available in WASM without
+/// additional dependencies). Callers must generate their hash-locks using the
+/// same algorithm.
+fn compute_hash(preimage: &[u8], _hash_type: &EscrowHashType) -> Vec<u8> {
+    blake2b_simd::Params::new()
+        .hash_length(32)
+        .hash(preimage)
+        .as_bytes()
+        .to_vec()
 }
 
 /// Add multi-sig signature to escrow

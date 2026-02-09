@@ -990,3 +990,509 @@ mod unit_tests {
         assert_eq!(provider_change + receiver_change, 0, "Must be zero-sum");
     }
 }
+
+// ============================================================================
+// Section 7: Oracle Management Tests
+// ============================================================================
+
+#[cfg(test)]
+mod oracle_management {
+    use super::*;
+
+    /// Test 7.1: Update oracle state and verify TEND limit tier changes
+    #[tokio::test]
+    #[ignore]
+    async fn test_update_oracle_state() {
+        println!("Test 7.1: Update Oracle State");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+
+        // Update vitality to 30 -> should map to Elevated tier (21-40)
+        let oracle_state: OracleState = conductor
+            .call(&alice_cell.zome("tend"), "update_oracle_state", 30u32)
+            .await
+            .expect("Failed to update oracle state");
+
+        assert_eq!(oracle_state.vitality, 30, "Vitality should be 30");
+        assert!(matches!(oracle_state.tier, TendLimitTier::Elevated),
+            "Vitality 30 should map to Elevated tier");
+        assert_eq!(oracle_state.tier.limit(), 60, "Elevated tier limit should be 60");
+
+        println!("  - Vitality: {}", oracle_state.vitality);
+        println!("  - Tier: {:?} (limit: {})", oracle_state.tier, oracle_state.tier.limit());
+        println!("Test 7.1 PASSED: Oracle state update changes TEND limit tier");
+    }
+
+    /// Test 7.2: Dynamic limit tiers from different vitality values
+    #[tokio::test]
+    #[ignore]
+    async fn test_dynamic_limit_tiers() {
+        println!("Test 7.2: Dynamic Limit Tiers");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+
+        // Vitality 5 -> Emergency (0-10 range) -> limit 120
+        let state_emergency: OracleState = conductor
+            .call(&alice_cell.zome("tend"), "update_oracle_state", 5u32)
+            .await
+            .expect("Failed to update oracle");
+        assert!(matches!(state_emergency.tier, TendLimitTier::Emergency));
+        assert_eq!(state_emergency.tier.limit(), 120);
+        println!("  - Vitality 5 -> {:?} (limit: {})", state_emergency.tier, state_emergency.tier.limit());
+
+        // Vitality 15 -> High (11-20 range) -> limit 80
+        let state_high: OracleState = conductor
+            .call(&alice_cell.zome("tend"), "update_oracle_state", 15u32)
+            .await
+            .expect("Failed to update oracle");
+        assert!(matches!(state_high.tier, TendLimitTier::High));
+        assert_eq!(state_high.tier.limit(), 80);
+        println!("  - Vitality 15 -> {:?} (limit: {})", state_high.tier, state_high.tier.limit());
+
+        // Vitality 50 -> Normal (41+ range) -> limit 40
+        let state_normal: OracleState = conductor
+            .call(&alice_cell.zome("tend"), "update_oracle_state", 50u32)
+            .await
+            .expect("Failed to update oracle");
+        assert!(matches!(state_normal.tier, TendLimitTier::Normal));
+        assert_eq!(state_normal.tier.limit(), 40);
+        println!("  - Vitality 50 -> {:?} (limit: {})", state_normal.tier, state_normal.tier.limit());
+
+        println!("Test 7.2 PASSED: Dynamic limit tiers map correctly from vitality");
+    }
+}
+
+// ============================================================================
+// Section 8: Exchange Cancellation Tests
+// ============================================================================
+
+#[cfg(test)]
+mod exchange_cancellation {
+    use super::*;
+
+    /// Test 8.1: Cancel a proposed exchange
+    #[tokio::test]
+    #[ignore]
+    async fn test_cancel_proposed_exchange() {
+        println!("Test 8.1: Cancel Proposed Exchange");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let bob_did = test_did("bob");
+
+        // Alice records exchange (Proposed status)
+        let exchange: ExchangeRecord = conductor
+            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
+                receiver_did: bob_did.clone(),
+                dao_did: TEST_DAO.to_string(),
+                hours: 2.0,
+                service_description: "Web design work".to_string(),
+                service_category: ServiceCategory::TechSupport,
+                cultural_alias: None,
+                service_date: None,
+            })
+            .await
+            .expect("Failed to record exchange");
+
+        assert!(matches!(exchange.status, ExchangeStatus::Proposed));
+        println!("  - Exchange recorded: {} (Proposed)", exchange.id);
+
+        // Alice (provider) cancels the exchange
+        let cancelled: ExchangeRecord = conductor
+            .call(&alice_cell.zome("tend"), "cancel_exchange", exchange.id.clone())
+            .await
+            .expect("Failed to cancel exchange");
+
+        assert!(matches!(cancelled.status, ExchangeStatus::Cancelled),
+            "Cancelled exchange should have Cancelled status");
+        println!("  - Exchange cancelled: {:?}", cancelled.status);
+        println!("Test 8.1 PASSED: Cancel proposed exchange works");
+    }
+
+    /// Test 8.2: Cannot cancel a confirmed exchange
+    #[tokio::test]
+    #[ignore]
+    async fn test_cannot_cancel_confirmed() {
+        println!("Test 8.2: Cannot Cancel Confirmed Exchange");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let bob_cell = &apps[1].cells()[0];
+        let bob_did = test_did("bob");
+
+        // Alice records, Bob confirms
+        let exchange: ExchangeRecord = conductor
+            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
+                receiver_did: bob_did.clone(),
+                dao_did: TEST_DAO.to_string(),
+                hours: 1.5,
+                service_description: "Photography session".to_string(),
+                service_category: ServiceCategory::Creative,
+                cultural_alias: None,
+                service_date: None,
+            })
+            .await
+            .expect("Failed to record exchange");
+
+        let _confirmed: ExchangeRecord = conductor
+            .call(&bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
+            .await
+            .expect("Failed to confirm exchange");
+
+        println!("  - Exchange confirmed");
+
+        // Try to cancel confirmed exchange
+        let result: Result<ExchangeRecord, _> = conductor
+            .call_fallible(alice_cell.zome("tend"), "cancel_exchange", exchange.id.clone())
+            .await;
+
+        match result {
+            Err(e) => {
+                let error_msg = format!("{:?}", e);
+                assert!(
+                    error_msg.contains("Proposed") || error_msg.contains("cancel") || error_msg.contains("status"),
+                    "Should reject cancelling confirmed exchange, got: {}", error_msg
+                );
+                println!("  - Cancel of confirmed exchange rejected: OK");
+            }
+            Ok(_) => panic!("Should have rejected cancellation of confirmed exchange"),
+        }
+
+        println!("Test 8.2 PASSED: Cannot cancel confirmed exchange");
+    }
+}
+
+// ============================================================================
+// Section 9: Cross-DAO Clearing Tests
+// ============================================================================
+
+#[cfg(test)]
+mod cross_dao_clearing {
+    use super::*;
+
+    /// Test 9.1: Record a cross-DAO exchange
+    #[tokio::test]
+    #[ignore]
+    async fn test_record_cross_dao_exchange() {
+        println!("Test 9.1: Record Cross-DAO Exchange");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+
+        let dao_a = "did:mycelix:dao:alpha_community".to_string();
+        let dao_b = "did:mycelix:dao:beta_community".to_string();
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct RecordCrossDAOExchangeInput {
+            pub provider_dao_did: String,
+            pub receiver_dao_did: String,
+            pub hours: f32,
+        }
+
+        let input = RecordCrossDAOExchangeInput {
+            provider_dao_did: dao_a.clone(),
+            receiver_dao_did: dao_b.clone(),
+            hours: 3.0,
+        };
+
+        let balance: BilateralBalance = conductor
+            .call(&alice_cell.zome("tend"), "record_cross_dao_exchange", input)
+            .await
+            .expect("Failed to record cross-DAO exchange");
+
+        assert!(balance.total_exchanges >= 1, "Should have at least 1 exchange");
+        assert!(balance.net_balance != 0, "Net balance should be non-zero after exchange");
+
+        println!("  - DAO A: {}", balance.dao_a_did);
+        println!("  - DAO B: {}", balance.dao_b_did);
+        println!("  - Net balance: {}", balance.net_balance);
+        println!("  - Total exchanges: {}", balance.total_exchanges);
+        println!("Test 9.1 PASSED: Cross-DAO exchange recorded");
+    }
+
+    /// Test 9.2: Bilateral balance uses canonical alphabetical order
+    #[tokio::test]
+    #[ignore]
+    async fn test_bilateral_balance_canonical_order() {
+        println!("Test 9.2: Bilateral Balance Canonical Order");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+
+        // Use two DAOs where alphabetical order is clear: "alpha" < "beta"
+        let dao_alpha = "did:mycelix:dao:alpha".to_string();
+        let dao_beta = "did:mycelix:dao:beta".to_string();
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct RecordCrossDAOExchangeInput {
+            pub provider_dao_did: String,
+            pub receiver_dao_did: String,
+            pub hours: f32,
+        }
+
+        // Record with beta as provider, alpha as receiver (reversed from alphabetical)
+        let input = RecordCrossDAOExchangeInput {
+            provider_dao_did: dao_beta.clone(),
+            receiver_dao_did: dao_alpha.clone(),
+            hours: 2.0,
+        };
+
+        let balance: BilateralBalance = conductor
+            .call(&alice_cell.zome("tend"), "record_cross_dao_exchange", input)
+            .await
+            .expect("Failed to record");
+
+        // dao_a should always be the alphabetically first (alpha < beta)
+        assert!(balance.dao_a_did < balance.dao_b_did,
+            "dao_a_did should be alphabetically before dao_b_did: {} vs {}",
+            balance.dao_a_did, balance.dao_b_did);
+
+        println!("  - dao_a: {} (alphabetically first)", balance.dao_a_did);
+        println!("  - dao_b: {} (alphabetically second)", balance.dao_b_did);
+        println!("Test 9.2 PASSED: Bilateral balance uses canonical alphabetical order");
+    }
+
+    /// Test 9.3: Settle bilateral balance
+    #[tokio::test]
+    #[ignore]
+    async fn test_settle_bilateral_balance() {
+        println!("Test 9.3: Settle Bilateral Balance");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 1).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+
+        let dao_a = "did:mycelix:dao:gamma_community".to_string();
+        let dao_b = "did:mycelix:dao:delta_community".to_string();
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct RecordCrossDAOExchangeInput {
+            pub provider_dao_did: String,
+            pub receiver_dao_did: String,
+            pub hours: f32,
+        }
+
+        // Record several exchanges
+        for _ in 0..3 {
+            let _: BilateralBalance = conductor
+                .call(&alice_cell.zome("tend"), "record_cross_dao_exchange", RecordCrossDAOExchangeInput {
+                    provider_dao_did: dao_a.clone(),
+                    receiver_dao_did: dao_b.clone(),
+                    hours: 2.0,
+                })
+                .await
+                .expect("Failed to record exchange");
+        }
+
+        println!("  - 3 exchanges recorded");
+
+        // Settle the bilateral balance
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct GetBilateralInput {
+            pub dao_a_did: String,
+            pub dao_b_did: String,
+        }
+
+        let settled_amount: i32 = conductor
+            .call(&alice_cell.zome("tend"), "settle_bilateral_balance", GetBilateralInput {
+                dao_a_did: dao_a.clone(),
+                dao_b_did: dao_b.clone(),
+            })
+            .await
+            .expect("Failed to settle bilateral balance");
+
+        println!("  - Settled amount: {}", settled_amount);
+
+        // After settlement, balance should be zeroed
+        let post_balance: Option<BilateralBalance> = conductor
+            .call(&alice_cell.zome("tend"), "get_bilateral_balance", GetBilateralInput {
+                dao_a_did: dao_a.clone(),
+                dao_b_did: dao_b.clone(),
+            })
+            .await
+            .expect("Failed to get balance");
+
+        if let Some(bal) = &post_balance {
+            assert_eq!(bal.net_balance, 0, "Net balance should be 0 after settlement");
+            println!("  - Post-settlement net balance: {}", bal.net_balance);
+        }
+
+        println!("Test 9.3 PASSED: Bilateral balance settlement works");
+    }
+}
+
+// ============================================================================
+// Section 10: TEND Forgiveness Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tend_forgiveness {
+    use super::*;
+
+    /// Test 10.1: Forgive balance on exit
+    #[tokio::test]
+    #[ignore]
+    async fn test_forgive_balance_on_exit() {
+        println!("Test 10.1: Forgive Balance on Exit");
+
+        let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
+        let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
+        let mut conductor = SweetConductor::from_standard_config().await;
+
+        let agents = SweetAgents::get(conductor.keystore(), 2).await;
+        let apps = conductor
+            .setup_app_for_agents("mycelix-finance", &agents, [&dna])
+            .await
+            .expect("Failed to install app");
+
+        let alice_cell = &apps[0].cells()[0];
+        let bob_cell = &apps[1].cells()[0];
+        let alice_did = test_did("alice");
+        let bob_did = test_did("bob");
+
+        // Create a TEND balance by recording and confirming an exchange
+        let exchange: ExchangeRecord = conductor
+            .call(&alice_cell.zome("tend"), "record_exchange", RecordExchangeInput {
+                receiver_did: bob_did.clone(),
+                dao_did: TEST_DAO.to_string(),
+                hours: 5.0,
+                service_description: "Extensive tutoring".to_string(),
+                service_category: ServiceCategory::Education,
+                cultural_alias: None,
+                service_date: None,
+            })
+            .await
+            .expect("Failed to record exchange");
+
+        let _: ExchangeRecord = conductor
+            .call(&bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
+            .await
+            .expect("Failed to confirm exchange");
+
+        println!("  - Exchange confirmed (5 hours)");
+
+        // Forgive Alice's balance (as part of exit flow)
+        let forgiven: Vec<(String, i32)> = conductor
+            .call(&alice_cell.zome("tend"), "forgive_balance", alice_did.clone())
+            .await
+            .expect("Failed to forgive balance");
+
+        println!("  - Forgiven balances: {:?}", forgiven);
+
+        // Verify balance is zeroed
+        let balance: BalanceInfo = conductor
+            .call(&alice_cell.zome("tend"), "get_balance", GetBalanceInput {
+                member_did: alice_did.clone(),
+                dao_did: TEST_DAO.to_string(),
+            })
+            .await
+            .expect("Failed to get balance");
+
+        assert_eq!(balance.balance, 0, "Balance should be zeroed after forgiveness");
+        println!("  - Post-forgiveness balance: {}", balance.balance);
+        println!("Test 10.1 PASSED: Balance forgiveness works on exit");
+    }
+}
+
+// ============================================================================
+// Section 11: Additional TEND Unit Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tend_additional_unit_tests {
+    use super::*;
+    use mycelix_finance_types::TendLimitTier;
+
+    /// Test TEND limit tier values
+    #[test]
+    fn test_tend_limit_tier_values() {
+        assert_eq!(TendLimitTier::Normal.limit(), 40, "Normal limit should be 40");
+        assert_eq!(TendLimitTier::Elevated.limit(), 60, "Elevated limit should be 60");
+        assert_eq!(TendLimitTier::High.limit(), 80, "High limit should be 80");
+        assert_eq!(TendLimitTier::Emergency.limit(), 120, "Emergency limit should be 120");
+    }
+
+    /// Test TEND limit tier from vitality score mapping
+    #[test]
+    fn test_tend_limit_from_vitality() {
+        // Vitality 5 (0-10) -> Emergency
+        assert_eq!(TendLimitTier::from_vitality(5), TendLimitTier::Emergency,
+            "Vitality 5 should map to Emergency");
+
+        // Vitality 15 (11-20) -> High
+        assert_eq!(TendLimitTier::from_vitality(15), TendLimitTier::High,
+            "Vitality 15 should map to High");
+
+        // Vitality 30 (21-40) -> Elevated
+        assert_eq!(TendLimitTier::from_vitality(30), TendLimitTier::Elevated,
+            "Vitality 30 should map to Elevated");
+
+        // Vitality 50 (41+) -> Normal
+        assert_eq!(TendLimitTier::from_vitality(50), TendLimitTier::Normal,
+            "Vitality 50 should map to Normal");
+    }
+}
