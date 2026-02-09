@@ -238,6 +238,8 @@ pub struct SlashStakeInput {
 /// Slash a stake with cryptographic evidence
 #[hdk_extern]
 pub fn slash_stake(input: SlashStakeInput) -> ExternResult<Record> {
+    // WARNING: In production, restrict to authorized validator committee
+    // via capability tokens. Currently callable by any agent.
     let now = sys_time()?;
 
     // Serialize and hash evidence
@@ -252,6 +254,12 @@ pub fn slash_stake(input: SlashStakeInput) -> ExternResult<Record> {
     for record in query(filter)? {
         if let Some(stake) = record.entry().to_app_option::<CollateralStake>().ok().flatten() {
             if stake.id == input.stake_id {
+                if stake.status != StakeStatus::Active && stake.status != StakeStatus::Unbonding {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        format!("Cannot slash a {:?} stake — only Active or Unbonding stakes can be slashed", stake.status)
+                    )));
+                }
+
                 let slash_pct = input.custom_slash_percentage
                     .unwrap_or_else(|| input.reason.default_slash_percentage());
 

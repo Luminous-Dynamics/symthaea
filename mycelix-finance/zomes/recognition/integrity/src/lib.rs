@@ -33,6 +33,10 @@ pub const JUBILEE_COMPRESSION: f64 = 0.8;
 /// Passive decay rate (5% annual)
 pub const PASSIVE_DECAY_RATE: f64 = 0.05;
 
+// String length limits — prevent DHT bloat attacks
+const MAX_DID_LEN: usize = 256;
+const MAX_CYCLE_ID_LEN: usize = 32;
+
 // =============================================================================
 // ENTRY TYPES
 // =============================================================================
@@ -233,6 +237,14 @@ fn validate_create_recognition(
     _action: EntryCreationAction,
     event: RecognitionEvent,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if event.recognizer_did.len() > MAX_DID_LEN || event.recipient_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if event.cycle_id.len() > MAX_CYCLE_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Cycle ID exceeds maximum length".into()));
+    }
+
     // Validate recognizer DID
     if !event.recognizer_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Recognizer must be a valid DID".into()));
@@ -281,6 +293,19 @@ fn validate_create_mycel_state(
     _action: EntryCreationAction,
     state: MemberMycelState,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if state.member_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if state.current_cycle_id.len() > MAX_CYCLE_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Cycle ID exceeds maximum length".into()));
+    }
+    if let Some(ref mentor) = state.mentor_did {
+        if mentor.len() > MAX_DID_LEN {
+            return Ok(ValidateCallbackResult::Invalid("Mentor DID exceeds maximum length".into()));
+        }
+    }
+
     // Validate member DID
     if !state.member_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Member must be a valid DID".into()));
@@ -379,6 +404,14 @@ fn validate_create_allocation(
     _action: EntryCreationAction,
     alloc: RecognitionAllocation,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if alloc.recognizer_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if alloc.cycle_id.len() > MAX_CYCLE_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Cycle ID exceeds maximum length".into()));
+    }
+
     if !alloc.recognizer_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Recognizer must be a valid DID".into()));
     }

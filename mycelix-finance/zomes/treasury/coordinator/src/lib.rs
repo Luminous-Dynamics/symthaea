@@ -36,6 +36,7 @@ pub struct CreateTreasuryInput {
 
 #[hdk_extern]
 pub fn contribute(input: ContributeInput) -> ExternResult<Record> {
+    verify_caller_is_did(&input.contributor_did)?;
     let now = sys_time()?;
     let contribution = Contribution {
         id: format!("contrib:{}:{}", input.contributor_did, now.as_micros()),
@@ -457,6 +458,7 @@ pub fn get_savings_pool(pool_id: String) -> ExternResult<Option<Record>> {
 /// Join a savings pool
 #[hdk_extern]
 pub fn join_savings_pool(input: JoinPoolInput) -> ExternResult<Record> {
+    verify_caller_is_did(&input.member_did)?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::SavingsPool)?))
         .include_entries(true);
@@ -654,6 +656,7 @@ pub struct CreateCommonsPoolInput {
 /// 25% goes to the inalienable reserve, 75% goes to available balance.
 #[hdk_extern]
 pub fn contribute_to_commons(input: ContributeToCommonsInput) -> ExternResult<Record> {
+    verify_caller_is_did(&input.contributor_did)?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CommonsPool)?))
         .include_entries(true);

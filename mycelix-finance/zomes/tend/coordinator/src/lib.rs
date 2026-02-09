@@ -136,6 +136,8 @@ const ORACLE_STATE_ANCHOR: &str = "tend:oracle_state";
 /// The oracle agent monitors network health metrics and calls this periodically.
 #[hdk_extern]
 pub fn update_oracle_state(vitality: u32) -> ExternResult<OracleState> {
+    // WARNING: This function lacks caller verification. In production,
+    // restrict to authorized oracle agents via capability tokens.
     if vitality > 100 {
         return Err(wasm_error!(WasmErrorInner::Guest("Vitality must be 0-100".into())));
     }
@@ -215,8 +217,13 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecor
     if input.receiver_did.is_empty() || input.receiver_did.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("Receiver DID must be 1-256 characters".into())));
     }
-    if input.hours <= 0.0 || input.hours > 168.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Hours must be between 0 and 168 (one week)".into())));
+    if input.hours <= 0.0 || input.hours > 8.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Hours must be between 0 and 8 (MAX_SERVICE_HOURS)".into())));
+    }
+    if input.hours < 0.25 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Minimum service time is 15 minutes (0.25 hours)".into()
+        )));
     }
     if input.service_description.is_empty() || input.service_description.len() > 1024 {
         return Err(wasm_error!(WasmErrorInner::Guest("Service description must be 1-1024 characters".into())));
@@ -243,7 +250,7 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecor
 
     // Check provider's balance (can still earn if below +limit)
     let provider_balance = get_or_create_balance(provider_did.clone(), input.dao_did.clone())?;
-    let new_provider_balance = provider_balance.balance + (input.hours as i32);
+    let new_provider_balance = provider_balance.balance + (input.hours.round() as i32);
     if new_provider_balance > provider_limit {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Exchange would exceed your credit limit of +{}. Current balance: {}",
@@ -253,7 +260,7 @@ pub fn record_exchange(input: RecordExchangeInput) -> ExternResult<ExchangeRecor
 
     // Check receiver's balance (can still receive if above -limit)
     let receiver_balance = get_or_create_balance(input.receiver_did.clone(), input.dao_did.clone())?;
-    let new_receiver_balance = receiver_balance.balance - (input.hours as i32);
+    let new_receiver_balance = receiver_balance.balance - (input.hours.round() as i32);
     if new_receiver_balance < -receiver_limit {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Receiver would exceed debt limit of -{}. Their balance: {}",
@@ -356,7 +363,7 @@ pub fn confirm_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
     let receiver_limit = get_effective_limit_for_member(&exchange.receiver_did)?;
 
     let provider_balance = get_or_create_balance(exchange.provider_did.clone(), exchange.dao_did.clone())?;
-    let new_provider_balance = provider_balance.balance + (exchange.hours as i32);
+    let new_provider_balance = provider_balance.balance + (exchange.hours.round() as i32);
     if new_provider_balance > provider_limit {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Cannot confirm: provider would exceed credit limit of +{}. Current balance: {}",
@@ -365,7 +372,7 @@ pub fn confirm_exchange(exchange_id: String) -> ExternResult<ExchangeRecord> {
     }
 
     let receiver_balance = get_or_create_balance(exchange.receiver_did.clone(), exchange.dao_did.clone())?;
-    let new_receiver_balance = receiver_balance.balance - (exchange.hours as i32);
+    let new_receiver_balance = receiver_balance.balance - (exchange.hours.round() as i32);
     if new_receiver_balance < -receiver_limit {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Cannot confirm: receiver would exceed debt limit of -{}. Current balance: {}",
@@ -1309,10 +1316,10 @@ fn update_balance_after_exchange(
                 let now = sys_time()?;
 
                 if is_provider {
-                    balance.balance += hours as i32;
+                    balance.balance += hours.round() as i32;
                     balance.total_provided += hours;
                 } else {
-                    balance.balance -= hours as i32;
+                    balance.balance -= hours.round() as i32;
                     balance.total_received += hours;
                 }
                 balance.exchange_count += 1;
@@ -1486,6 +1493,8 @@ pub struct RecordCrossDAOExchangeInput {
 /// DAOs are stored in canonical alphabetical order.
 #[hdk_extern]
 pub fn record_cross_dao_exchange(input: RecordCrossDAOExchangeInput) -> ExternResult<BilateralBalance> {
+    // WARNING: In production, restrict to authorized governance/exit-protocol callers
+    // via capability tokens. Currently callable by any agent.
     if input.provider_dao_did == input.receiver_dao_did {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Cross-DAO exchange requires two different DAOs".into()
@@ -1506,7 +1515,7 @@ pub fn record_cross_dao_exchange(input: RecordCrossDAOExchangeInput) -> ExternRe
 
     let anchor_key = format!("bilateral:{}:{}", dao_a, dao_b);
     let now = sys_time()?;
-    let delta = (input.hours as i32) * direction;
+    let delta = (input.hours.round() as i32) * direction;
 
     // Try to find existing bilateral balance
     let links = get_links(
@@ -1611,6 +1620,8 @@ pub struct SettleBilateralInput {
 /// NOTE: Governance operation -- should be called quarterly by an authorized agent.
 #[hdk_extern]
 pub fn settle_bilateral_balance(input: SettleBilateralInput) -> ExternResult<Record> {
+    // WARNING: In production, restrict to authorized governance/exit-protocol callers
+    // via capability tokens. Currently callable by any agent.
     let (dao_a, dao_b) = if input.dao_a_did < input.dao_b_did {
         (input.dao_a_did.clone(), input.dao_b_did.clone())
     } else {
@@ -1783,6 +1794,8 @@ pub fn get_tend_reputation_input(input: GetBalanceInput) -> ExternResult<f32> {
 /// Returns the list of (dao_did, forgiven_amount) pairs.
 #[hdk_extern]
 pub fn forgive_balance(member_did: String) -> ExternResult<Vec<(String, i32)>> {
+    // WARNING: In production, restrict to authorized governance/exit-protocol callers
+    // via capability tokens. Currently callable by any agent.
     if member_did.is_empty() || member_did.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("Member DID must be 1-256 characters".into())));
     }

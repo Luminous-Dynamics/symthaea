@@ -6,6 +6,19 @@
 
 use hdi::prelude::*;
 
+// =============================================================================
+// STRING LENGTH LIMITS — Prevent DHT bloat attacks
+// =============================================================================
+
+/// Maximum length for DID strings
+const MAX_DID_LEN: usize = 256;
+/// Maximum length for reference/ID strings
+const MAX_REFERENCE_LEN: usize = 1024;
+/// Maximum length for event payloads
+const MAX_PAYLOAD_LEN: usize = 4096;
+/// Maximum length for hApp ID strings
+const MAX_HAPP_ID_LEN: usize = 256;
+
 /// Cross-hApp payment request
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -221,6 +234,20 @@ fn validate_create_cross_happ_payment(
     _action: EntryCreationAction,
     payment: CrossHappPayment,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if payment.from_did.len() > MAX_DID_LEN || payment.to_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if payment.source_happ.len() > MAX_HAPP_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Source hApp ID exceeds maximum length".into()));
+    }
+    if payment.reference.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Reference exceeds maximum length".into()));
+    }
+    if payment.id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Payment ID exceeds maximum length".into()));
+    }
+
     if payment.amount == 0 {
         return Ok(ValidateCallbackResult::Invalid("Amount must be positive".into()));
     }
@@ -244,6 +271,20 @@ fn validate_create_collateral_registration(
     _action: EntryCreationAction,
     collateral: CollateralRegistration,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if collateral.owner_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if collateral.asset_id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Asset ID exceeds maximum length".into()));
+    }
+    if collateral.id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Registration ID exceeds maximum length".into()));
+    }
+    if collateral.source_happ.len() > MAX_HAPP_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Source hApp ID exceeds maximum length".into()));
+    }
+
     // Validate owner DID format
     if !collateral.owner_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Owner must be a valid DID".into()));
@@ -285,6 +326,20 @@ fn validate_create_finance_bridge_event(
     _action: EntryCreationAction,
     event: FinanceBridgeEvent,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if event.payload.len() > MAX_PAYLOAD_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Event payload exceeds maximum length".into()));
+    }
+    if event.subject_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if event.source_happ.len() > MAX_HAPP_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Source hApp ID exceeds maximum length".into()));
+    }
+    if event.id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Event ID exceeds maximum length".into()));
+    }
+
     if event.source_happ.is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Source hApp required".into()));
     }
@@ -295,6 +350,17 @@ fn validate_create_collateral_bridge_deposit(
     _action: EntryCreationAction,
     deposit: CollateralBridgeDeposit,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if deposit.depositor_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if deposit.collateral_type.len() > MAX_HAPP_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Collateral type exceeds maximum length".into()));
+    }
+    if deposit.id.len() > MAX_REFERENCE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Deposit ID exceeds maximum length".into()));
+    }
+
     if !deposit.depositor_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Depositor must be a valid DID".into()));
     }

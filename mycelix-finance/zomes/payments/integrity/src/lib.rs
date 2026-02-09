@@ -12,6 +12,13 @@ pub use mycelix_finance_types::SuccessionPreference;
 /// Using f64: fee >= amount / 10_000.0.
 pub const SAP_STEWARD_MIN_FEE_DIVISOR: f64 = 10_000.0;
 
+// String length limits — prevent DHT bloat attacks
+const MAX_DID_LEN: usize = 256;
+const MAX_MEMO_LEN: usize = 1024;
+const MAX_ID_LEN: usize = 256;
+/// Maximum length for receipt signatures (hex-encoded Ed25519 = 128 chars, with margin)
+const MAX_SIGNATURE_LEN: usize = 256;
+
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Payment {
@@ -252,6 +259,21 @@ fn validate_create_payment(
     _action: EntryCreationAction,
     payment: Payment,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if payment.from_did.len() > MAX_DID_LEN || payment.to_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if payment.id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Payment ID exceeds maximum length".into()));
+    }
+    if let Some(ref memo) = payment.memo {
+        if memo.len() > MAX_MEMO_LEN {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Memo exceeds maximum length of 1024 characters".into(),
+            ));
+        }
+    }
+
     if !payment.from_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Sender must be a valid DID".into()));
     }
@@ -316,6 +338,14 @@ fn validate_create_payment_channel(
     _action: EntryCreationAction,
     channel: PaymentChannel,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if channel.party_a.len() > MAX_DID_LEN || channel.party_b.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if channel.id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Channel ID exceeds maximum length".into()));
+    }
+
     if !channel.party_a.starts_with("did:") || !channel.party_b.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Parties must be valid DIDs".into()));
     }
@@ -339,6 +369,17 @@ fn validate_create_receipt(
     _action: EntryCreationAction,
     receipt: Receipt,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if receipt.from_did.len() > MAX_DID_LEN || receipt.to_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if receipt.payment_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Payment ID exceeds maximum length".into()));
+    }
+    if receipt.signature.len() > MAX_SIGNATURE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Signature exceeds maximum length".into()));
+    }
+
     // Validate DIDs
     if !receipt.from_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Sender must be a valid DID".into()));
@@ -385,6 +426,11 @@ fn validate_create_receipt(
 }
 
 fn validate_sap_balance(bal: &SapBalance) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if bal.member_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+
     if !bal.member_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Member must be a valid DID".into()));
     }
@@ -395,6 +441,11 @@ fn validate_create_exit_record(
     _action: EntryCreationAction,
     exit: ExitRecord,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if exit.member_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+
     if !exit.member_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Member must be a valid DID".into()));
     }

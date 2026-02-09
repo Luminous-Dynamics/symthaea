@@ -8,6 +8,16 @@
 
 use hdi::prelude::*;
 
+// =============================================================================
+// STRING LENGTH LIMITS — Prevent DHT bloat attacks
+// =============================================================================
+
+const MAX_DID_LEN: usize = 256;
+const MAX_ID_LEN: usize = 256;
+const MAX_PURPOSE_LEN: usize = 1024;
+/// Maximum size for serialized slashing evidence (64KB)
+const MAX_EVIDENCE_BYTES: usize = 65536;
+
 /// Collateral Stake Position
 ///
 /// Represents a validator's stake using SAP collateral with MYCEL weighting.
@@ -333,6 +343,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 /// Validate stake creation
 fn validate_create_stake(_action: Create, stake: CollateralStake) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if stake.staker_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if stake.id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Stake ID exceeds maximum length".into()));
+    }
+
     // Validate DID format
     if !stake.staker_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
@@ -400,6 +418,19 @@ fn validate_update_stake(_action: Update, stake: CollateralStake) -> ExternResul
 
 /// Validate slashing event
 fn validate_slashing_event(_action: Create, event: SlashingEvent) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if event.staker_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if event.id.len() > MAX_ID_LEN || event.stake_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+    }
+    if event.evidence.len() > MAX_EVIDENCE_BYTES {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Slashing evidence exceeds maximum size of 64KB".into(),
+        ));
+    }
+
     // Slash percentage must be valid
     if event.slash_percentage > 100 {
         return Ok(ValidateCallbackResult::Invalid(
@@ -426,6 +457,22 @@ fn validate_slashing_event(_action: Create, event: SlashingEvent) -> ExternResul
 
 /// Validate escrow
 fn validate_escrow(_action: Create, escrow: CryptoEscrow) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if escrow.depositor_did.len() > MAX_DID_LEN || escrow.beneficiary_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if escrow.id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Escrow ID exceeds maximum length".into()));
+    }
+    if escrow.purpose.len() > MAX_PURPOSE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Purpose exceeds maximum length".into()));
+    }
+    for signer in &escrow.multisig_signers {
+        if signer.len() > MAX_DID_LEN {
+            return Ok(ValidateCallbackResult::Invalid("Signer DID exceeds maximum length".into()));
+        }
+    }
+
     // Depositor must be a valid DID
     if !escrow.depositor_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
@@ -484,6 +531,18 @@ fn validate_update_escrow(_action: Update, escrow: CryptoEscrow) -> ExternResult
 
 /// Validate reward distribution
 fn validate_reward_distribution(_action: Create, dist: RewardDistribution) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if dist.id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Distribution ID exceeds maximum length".into()));
+    }
+    for alloc in &dist.allocations {
+        if alloc.stake_id.len() > MAX_ID_LEN || alloc.staker_did.len() > MAX_DID_LEN {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Allocation contains oversized ID or DID".into(),
+            ));
+        }
+    }
+
     // Merkle root must be 32 bytes
     if dist.merkle_root.len() != 32 {
         return Ok(ValidateCallbackResult::Invalid(

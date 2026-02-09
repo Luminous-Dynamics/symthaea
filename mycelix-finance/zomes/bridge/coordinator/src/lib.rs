@@ -18,6 +18,12 @@ const DAY_MICROS: i64 = 24 * 60 * 60 * 1_000_000;
 /// Process a cross-hApp payment
 #[hdk_extern]
 pub fn process_payment(input: ProcessPaymentInput) -> ExternResult<Record> {
+    verify_caller_is_did(&input.from_did)?;
+    if input.currency != "SAP" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cross-hApp payments must use SAP currency".into()
+        )));
+    }
     let now = sys_time()?;
 
     let payment = CrossHappPayment {
@@ -76,6 +82,7 @@ pub struct ProcessPaymentInput {
 /// Register collateral from another hApp
 #[hdk_extern]
 pub fn register_collateral(input: RegisterCollateralInput) -> ExternResult<Record> {
+    verify_caller_is_did(&input.owner_did)?;
     let now = sys_time()?;
 
     let collateral = CollateralRegistration {
@@ -116,6 +123,7 @@ pub struct RegisterCollateralInput {
 /// Broadcast finance event
 #[hdk_extern]
 pub fn broadcast_finance_event(input: BroadcastFinanceEventInput) -> ExternResult<Record> {
+    verify_caller_is_did(&input.subject_did)?;
     let now = sys_time()?;
 
     let event = FinanceBridgeEvent {
@@ -180,6 +188,22 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
     verify_caller_is_did(&input.depositor_did)?;
     let now = sys_time()?;
 
+    if input.oracle_rate.is_nan() || input.oracle_rate.is_infinite() || input.oracle_rate <= 0.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Oracle rate must be a finite positive number".into()
+        )));
+    }
+    if input.collateral_amount == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Collateral amount must be greater than zero".into()
+        )));
+    }
+    if input.collateral_type != "ETH" && input.collateral_type != "USDC" {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Collateral type must be \"ETH\" or \"USDC\"".into()
+        )));
+    }
+
     let sap_minted = (input.collateral_amount as f64 * input.oracle_rate) as u64;
 
     // Enforce rate limit: max 5% of vault per day per member
@@ -213,7 +237,7 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
         amount: u64,
         reason: String,
     }
-    if let Err(e) = call(
+    match call(
         CallTargetCell::Local,
         ZomeName::from("payments"),
         FunctionName::from("credit_sap"),
@@ -224,7 +248,17 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
             reason: format!("Collateral bridge deposit: {} {}", input.collateral_amount, input.collateral_type),
         },
     ) {
-        debug!("Failed to credit SAP for deposit {}: {:?}", input.depositor_did, e);
+        Ok(ZomeCallResponse::Ok(_)) => {},
+        Ok(other) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                format!("Failed to credit SAP: unexpected response {:?}", other)
+            )));
+        }
+        Err(e) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                format!("Failed to credit SAP for deposit: {:?}", e)
+            )));
+        }
     }
 
     // Broadcast the deposit event
@@ -304,6 +338,8 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
     for record in query(filter)? {
         if let Some(deposit) = record.entry().to_app_option::<CollateralBridgeDeposit>().ok().flatten() {
             if deposit.id == deposit_id {
+                verify_caller_is_did(&deposit.depositor_did)?;
+
                 if deposit.status != BridgeDepositStatus::Confirmed {
                     return Err(wasm_error!(WasmErrorInner::Guest(
                         "Only confirmed deposits can be redeemed".into()
@@ -392,7 +428,7 @@ fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp) -> Exte
     let vault_total: u64 = deposits.iter()
         .filter(|d| d.status == BridgeDepositStatus::Confirmed)
         .map(|d| d.sap_minted)
-        .sum();
+        .fold(0u64, |acc, v| acc.saturating_add(v));
 
     // If vault is empty, allow the first deposit (bootstrap case)
     if vault_total == 0 {
@@ -406,9 +442,9 @@ fn enforce_rate_limit(member_did: &str, new_amount: u64, now: Timestamp) -> Exte
     let daily_activity: u64 = deposits.iter()
         .filter(|d| d.depositor_did == member_did && d.created_at.as_micros() > cutoff)
         .map(|d| d.sap_minted)
-        .sum();
+        .fold(0u64, |acc, v| acc.saturating_add(v));
 
-    if daily_activity + new_amount > daily_limit {
+    if daily_activity.saturating_add(new_amount) > daily_limit {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Rate limit exceeded: max {} SAP/day (5% of vault {}). Already used {} today, requesting {}.",
             daily_limit, vault_total, daily_activity, new_amount

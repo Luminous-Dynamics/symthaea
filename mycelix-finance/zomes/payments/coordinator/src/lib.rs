@@ -423,7 +423,13 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
         amount: input.amount,
         currency: payment.currency,
         timestamp: now,
-        signature: format!("sig:{}", now.as_micros()), // Simplified
+        signature: {
+            // Placeholder: 88 hex chars derived from timestamp
+            // Production: real Ed25519 signature over payment fields
+            let ts = now.as_micros();
+            let hex = format!("{:016x}{:016x}{:016x}{:016x}{:016x}{:08x}", ts, ts, ts, ts, ts, ts as u32);
+            hex[..88].to_string()
+        },
     };
     let receipt_hash = create_entry(&EntryTypes::Receipt(receipt))?;
     create_link(action_hash.clone(), receipt_hash, LinkTypes::PaymentToReceipt, ())?;
@@ -443,6 +449,8 @@ pub struct SendPaymentInput {
 
 #[hdk_extern]
 pub fn open_payment_channel(input: OpenChannelInput) -> ExternResult<Record> {
+    verify_caller_is_did(&input.party_a)?;
+
     let now = sys_time()?;
     let channel = PaymentChannel {
         id: format!("channel:{}:{}:{}", input.party_a, input.party_b, now.as_micros()),
@@ -591,6 +599,9 @@ pub fn refund_payment(payment_id: String) -> ExternResult<Record> {
     let original_payment = original.entry().to_app_option::<Payment>().ok().flatten()
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid payment".into())))?;
 
+    // Only the original receiver (who is the refund sender) can initiate a refund
+    verify_caller_is_did(&original_payment.to_did)?;
+
     if matches!(original_payment.status, TransferStatus::Refunded) {
         return Err(wasm_error!(WasmErrorInner::Guest("Payment already refunded".into())));
     }
@@ -650,6 +661,8 @@ pub fn get_channels(did: String) -> ExternResult<Vec<Record>> {
 /// Create an escrow payment (held until release)
 #[hdk_extern]
 pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
+    verify_caller_is_did(&input.from_did)?;
+
     let now = sys_time()?;
     // Compute fee for escrow (SAP: progressive fee; TEND: zero)
     let escrow_fee = if input.currency == "SAP" {

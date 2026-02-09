@@ -452,7 +452,7 @@ fn test_inalienable_reserve_withdrawal_bounds() {
     // Start with a pool of 10,000 SAP (2,500 reserve, 7,500 available).
     // Attempt to withdraw amounts from 1 to 7,500 SAP.
     // Verify that no withdrawal drops reserve below 25% of remaining total.
-    let initial_total: u64 = 10_000_000_000; // 10,000 SAP in micro
+    let _initial_total: u64 = 10_000_000_000; // 10,000 SAP in micro
     let initial_reserve: u64 = 2_500_000_000; // 2,500 SAP
     let initial_available: u64 = 7_500_000_000; // 7,500 SAP
 

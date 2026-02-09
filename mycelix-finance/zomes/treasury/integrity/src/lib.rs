@@ -2,6 +2,16 @@
 //! Updated to use HDI 0.7 patterns with FlatOp validation
 use hdi::prelude::*;
 
+// =============================================================================
+// STRING LENGTH LIMITS — Prevent DHT bloat attacks
+// =============================================================================
+
+const MAX_DID_LEN: usize = 256;
+const MAX_ID_LEN: usize = 256;
+const MAX_NAME_LEN: usize = 200;
+const MAX_DESCRIPTION_LEN: usize = 4096;
+const MAX_PURPOSE_LEN: usize = 1024;
+
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct Treasury {
@@ -264,6 +274,22 @@ fn validate_create_treasury(
     _action: EntryCreationAction,
     treasury: Treasury,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if treasury.name.len() > MAX_NAME_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Treasury name exceeds maximum length of 200".into()));
+    }
+    if treasury.description.len() > MAX_DESCRIPTION_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Treasury description exceeds maximum length of 4096".into()));
+    }
+    if treasury.id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Treasury ID exceeds maximum length".into()));
+    }
+    for manager in &treasury.managers {
+        if manager.len() > MAX_DID_LEN {
+            return Ok(ValidateCallbackResult::Invalid("Manager DID exceeds maximum length".into()));
+        }
+    }
+
     if treasury.managers.is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Treasury must have at least one manager".into()));
     }
@@ -292,6 +318,14 @@ fn validate_create_contribution(
     _action: EntryCreationAction,
     contribution: Contribution,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if contribution.contributor_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if contribution.id.len() > MAX_ID_LEN || contribution.treasury_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+    }
+
     if !contribution.contributor_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Contributor must be a valid DID".into()));
     }
@@ -305,6 +339,22 @@ fn validate_create_allocation(
     _action: EntryCreationAction,
     allocation: Allocation,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if allocation.recipient_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if allocation.purpose.len() > MAX_PURPOSE_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Purpose exceeds maximum length of 1024".into()));
+    }
+    if allocation.id.len() > MAX_ID_LEN || allocation.treasury_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+    }
+    for approver in &allocation.approved_by {
+        if approver.len() > MAX_DID_LEN {
+            return Ok(ValidateCallbackResult::Invalid("Approver DID exceeds maximum length".into()));
+        }
+    }
+
     if !allocation.recipient_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Recipient must be a valid DID".into()));
     }
@@ -328,6 +378,19 @@ fn validate_create_savings_pool(
     _action: EntryCreationAction,
     pool: SavingsPool,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if pool.name.len() > MAX_NAME_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Pool name exceeds maximum length of 200".into()));
+    }
+    if pool.id.len() > MAX_ID_LEN || pool.treasury_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+    }
+    for member in &pool.members {
+        if member.len() > MAX_DID_LEN {
+            return Ok(ValidateCallbackResult::Invalid("Member DID exceeds maximum length".into()));
+        }
+    }
+
     if pool.target_amount <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Target amount must be positive".into()));
     }
@@ -369,6 +432,14 @@ fn validate_create_commons_pool(
     _action: EntryCreationAction,
     pool: CommonsPool,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if pool.dao_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if pool.id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Pool ID exceeds maximum length".into()));
+    }
+
     if !pool.dao_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("DAO DID must be a valid DID".into()));
     }
@@ -396,6 +467,14 @@ fn validate_create_compost_receival(
     _action: EntryCreationAction,
     receival: CompostReceival,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if receival.source_member_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if receival.id.len() > MAX_ID_LEN || receival.commons_pool_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+    }
+
     if receival.amount == 0 {
         return Ok(ValidateCallbackResult::Invalid("Compost receival amount must be positive".into()));
     }

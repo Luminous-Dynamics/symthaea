@@ -43,6 +43,15 @@ pub const BALANCE_LIMIT_EMERGENCY: i32 = 120;
 /// Apprentice balance limit
 pub const APPRENTICE_BALANCE_LIMIT: i32 = 10;
 
+// String length limits — prevent DHT bloat attacks
+const MAX_DID_LEN: usize = 256;
+const MAX_ID_LEN: usize = 256;
+const MAX_TITLE_LEN: usize = 200;
+const MAX_DESCRIPTION_LEN: usize = 2000;
+const MAX_AVAILABILITY_LEN: usize = 1024;
+const MAX_RESOLUTION_LEN: usize = 4096;
+const MAX_CULTURAL_ALIAS_LEN: usize = 64;
+
 // =============================================================================
 // ENTRY TYPES
 // =============================================================================
@@ -526,6 +535,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         }
                     }
                     EntryTypes::BilateralBalance(bal) => {
+                        if bal.dao_a_did.len() > MAX_DID_LEN || bal.dao_b_did.len() > MAX_DID_LEN {
+                            return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+                        }
                         if !bal.dao_a_did.starts_with("did:") || !bal.dao_b_did.starts_with("did:") {
                             Ok(ValidateCallbackResult::Invalid("DAO DIDs must be valid".into()))
                         } else if bal.dao_a_did >= bal.dao_b_did {
@@ -622,6 +634,22 @@ fn validate_create_exchange(
     _action: EntryCreationAction,
     exchange: TendExchange,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if exchange.provider_did.len() > MAX_DID_LEN
+        || exchange.receiver_did.len() > MAX_DID_LEN
+        || exchange.dao_did.len() > MAX_DID_LEN
+    {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if exchange.id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Exchange ID exceeds maximum length".into()));
+    }
+    if let Some(ref alias) = exchange.cultural_alias {
+        if alias.len() > MAX_CULTURAL_ALIAS_LEN {
+            return Ok(ValidateCallbackResult::Invalid("Cultural alias exceeds maximum length".into()));
+        }
+    }
+
     // Validate DIDs
     if !exchange.provider_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Provider must be a valid DID".into()));
@@ -688,6 +716,11 @@ fn validate_create_balance(
     _action: EntryCreationAction,
     balance: TendBalance,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if balance.member_did.len() > MAX_DID_LEN || balance.dao_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+
     if !balance.member_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Member must be a valid DID".into()));
     }
@@ -723,13 +756,29 @@ fn validate_create_listing(
     _action: EntryCreationAction,
     listing: ServiceListing,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if listing.provider_did.len() > MAX_DID_LEN || listing.dao_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if listing.id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Listing ID exceeds maximum length".into()));
+    }
+    if listing.description.len() > MAX_DESCRIPTION_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Description exceeds maximum length of 2000".into()));
+    }
+    if let Some(ref avail) = listing.availability {
+        if avail.len() > MAX_AVAILABILITY_LEN {
+            return Ok(ValidateCallbackResult::Invalid("Availability exceeds maximum length".into()));
+        }
+    }
+
     if !listing.provider_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Provider must be a valid DID".into()));
     }
     if !listing.dao_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("DAO must be a valid DID".into()));
     }
-    if listing.title.is_empty() || listing.title.len() > 200 {
+    if listing.title.is_empty() || listing.title.len() > MAX_TITLE_LEN {
         return Ok(ValidateCallbackResult::Invalid("Title must be 1-200 chars".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -746,13 +795,24 @@ fn validate_create_request(
     _action: EntryCreationAction,
     request: ServiceRequest,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if request.requester_did.len() > MAX_DID_LEN || request.dao_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if request.id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Request ID exceeds maximum length".into()));
+    }
+    if request.description.len() > MAX_DESCRIPTION_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Description exceeds maximum length of 2000".into()));
+    }
+
     if !request.requester_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Requester must be a valid DID".into()));
     }
     if !request.dao_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("DAO must be a valid DID".into()));
     }
-    if request.title.is_empty() || request.title.len() > 200 {
+    if request.title.is_empty() || request.title.len() > MAX_TITLE_LEN {
         return Ok(ValidateCallbackResult::Invalid("Title must be 1-200 chars".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -769,6 +829,14 @@ fn validate_create_quality_rating(
     _action: EntryCreationAction,
     rating: QualityRating,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if rating.rater_did.len() > MAX_DID_LEN || rating.provider_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if rating.exchange_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Exchange ID exceeds maximum length".into()));
+    }
+
     // Validate rater DID
     if !rating.rater_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Rater must be a valid DID".into()));
@@ -816,6 +884,24 @@ fn validate_create_dispute_case(
     _action: EntryCreationAction,
     dispute: DisputeCase,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if dispute.complainant_did.len() > MAX_DID_LEN || dispute.respondent_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if dispute.id.len() > MAX_ID_LEN || dispute.exchange_id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("ID exceeds maximum length".into()));
+    }
+    if let Some(ref resolution) = dispute.resolution {
+        if resolution.len() > MAX_RESOLUTION_LEN {
+            return Ok(ValidateCallbackResult::Invalid("Resolution exceeds maximum length".into()));
+        }
+    }
+    for mediator_did in &dispute.mediator_dids {
+        if mediator_did.len() > MAX_DID_LEN {
+            return Ok(ValidateCallbackResult::Invalid("Mediator DID exceeds maximum length".into()));
+        }
+    }
+
     // Validate complainant DID
     if !dispute.complainant_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(
@@ -885,6 +971,14 @@ fn validate_create_dispute_case(
 fn validate_create_bilateral_settlement(
     settlement: BilateralSettlement,
 ) -> ExternResult<ValidateCallbackResult> {
+    // String length checks — prevent DHT bloat
+    if settlement.debtor_dao_did.len() > MAX_DID_LEN || settlement.creditor_dao_did.len() > MAX_DID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("DID exceeds maximum length".into()));
+    }
+    if settlement.id.len() > MAX_ID_LEN {
+        return Ok(ValidateCallbackResult::Invalid("Settlement ID exceeds maximum length".into()));
+    }
+
     // Amount must be positive
     if settlement.amount <= 0 {
         return Ok(ValidateCallbackResult::Invalid(
