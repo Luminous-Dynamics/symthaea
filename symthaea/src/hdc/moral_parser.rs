@@ -60,6 +60,18 @@ pub struct ParsedMoralScenario {
 
     /// Confidence score (0.0 - 1.0)
     pub confidence: f32,
+
+    /// Detected obligation/duty (for deontology): "supposed to X", "should have X"
+    pub obligation: Option<String>,
+
+    /// Detected excuse clause (for deontology): clause after "because", "but", etc.
+    pub excuse: Option<String>,
+
+    /// Detected effort with magnitude (for justice): "I worked X", "I spent Y"
+    pub effort: Option<(String, Magnitude)>,
+
+    /// Detected reward with magnitude (for justice): "I deserve X", "I should get Y"
+    pub reward: Option<(String, Magnitude)>,
 }
 
 impl Default for ParsedMoralScenario {
@@ -74,6 +86,10 @@ impl Default for ParsedMoralScenario {
             magnitude: None,
             has_negation: false,
             confidence: 0.0,
+            obligation: None,
+            excuse: None,
+            effort: None,
+            reward: None,
         }
     }
 }
@@ -148,6 +164,24 @@ impl MoralParser {
                 "kind", "kindly", "generous", "generously",
                 "compassion", "compassionate", "empathy",
                 "love", "loved", "loving",
+                // Gratitude & encouragement
+                "thank", "thanked", "thanking",
+                "comfort", "comforted", "comforting",
+                "encourage", "encouraged", "encouraging",
+                "praise", "praised", "praising",
+                "forgive", "forgave", "forgiving",
+                // Prosocial actions
+                "donate", "donated", "donating",
+                "volunteer", "volunteered", "volunteering",
+                "teach", "taught", "teaching",
+                "nurture", "nurtured", "nurturing",
+                "welcome", "welcomed", "welcoming",
+                "appreciate", "appreciated",
+                // Character traits
+                "gentle", "gently", "considerate", "thoughtful",
+                "selfless", "selflessly", "grateful", "gracious",
+                "polite", "politely", "respectful", "charitable",
+                "honest", "honestly", "fair", "fairly",
             ].iter().map(|s| s.to_string()).collect(),
 
             bad_intent_words: [
@@ -161,6 +195,36 @@ impl MoralParser {
                 "abuse", "abused", "abusing",
                 "cruel", "cruelly", "malicious",
                 "selfish", "selfishly",
+                // Violence
+                "hate", "hated", "hating",
+                "kill", "killed", "killing",
+                "punch", "punched", "punching",
+                "kick", "kicked", "kicking",
+                "slap", "slapped", "slapping",
+                "shove", "shoved", "shoving",
+                "strangle", "strangled",
+                "stab", "stabbed",
+                "murder", "murdered",
+                "torture", "tortured",
+                "toss", "tossed", "tossing",
+                // Verbal/social aggression
+                "threaten", "threatened", "threatening",
+                "bully", "bullied", "bullying",
+                "humiliate", "humiliated", "humiliating",
+                "insult", "insulted", "insulting",
+                "mock", "mocked", "mocking",
+                "yell", "yelled", "yelling",
+                "scream", "screamed", "screaming",
+                // Neglect & destruction
+                "neglect", "neglected", "neglecting",
+                "destroy", "destroyed", "destroying",
+                "vandalize", "vandalized",
+                "sabotage", "sabotaged",
+                // Character traits
+                "violent", "violently", "hostile",
+                "rude", "rudely", "nasty", "spiteful",
+                "vicious", "vindictive", "greedy",
+                "manipulate", "manipulated", "exploit", "exploited",
             ].iter().map(|s| s.to_string()).collect(),
 
             consent_given_words: [
@@ -428,6 +492,15 @@ impl MoralParser {
         scenario.agent = agent;
         scenario.patient = patient;
 
+        // Detect obligation and excuse (for deontology)
+        scenario.obligation = self.detect_obligation(&lower);
+        scenario.excuse = self.detect_excuse(&lower);
+
+        // Detect effort and reward (for justice)
+        let (effort, reward) = self.detect_effort_reward(&lower);
+        scenario.effort = effort;
+        scenario.reward = reward;
+
         // Calculate confidence based on what was detected
         scenario.confidence = self.calculate_confidence(&scenario);
 
@@ -459,20 +532,39 @@ impl MoralParser {
         words.iter().any(|w| self.negation_words.contains(*w))
     }
 
-    /// Detect intent from words
+    /// Detect intent from words with negation awareness
+    ///
+    /// If a word at position i is preceded by a negation word at i-1,
+    /// its signal is flipped with a 0.7 multiplier (negation is weaker evidence).
     fn detect_intent(&self, words: &[&str]) -> MoralIntent {
-        let good_count = words.iter()
-            .filter(|w| self.good_intent_words.contains(**w))
-            .count();
-        let bad_count = words.iter()
-            .filter(|w| self.bad_intent_words.contains(**w))
-            .count();
+        let mut good_score: f32 = 0.0;
+        let mut bad_score: f32 = 0.0;
 
-        if good_count > bad_count && good_count > 0 {
+        for (i, w) in words.iter().enumerate() {
+            let is_negated = i > 0 && self.negation_words.contains(words[i - 1]);
+
+            if self.good_intent_words.contains(*w) {
+                if is_negated {
+                    // "not help" → weak bad signal
+                    bad_score += 0.7;
+                } else {
+                    good_score += 1.0;
+                }
+            } else if self.bad_intent_words.contains(*w) {
+                if is_negated {
+                    // "not steal" → weak good signal
+                    good_score += 0.7;
+                } else {
+                    bad_score += 1.0;
+                }
+            }
+        }
+
+        if good_score > bad_score && good_score > 0.0 {
             MoralIntent::Good
-        } else if bad_count > good_count && bad_count > 0 {
+        } else if bad_score > good_score && bad_score > 0.0 {
             MoralIntent::Bad
-        } else if good_count == 0 && bad_count == 0 {
+        } else if good_score == 0.0 && bad_score == 0.0 {
             MoralIntent::Neutral
         } else {
             MoralIntent::Unknown
@@ -538,14 +630,111 @@ impl MoralParser {
     fn calculate_confidence(&self, scenario: &ParsedMoralScenario) -> f32 {
         let mut score = 0.0;
 
-        if scenario.agent.is_some() { score += 0.15; }
-        if scenario.action.is_some() { score += 0.25; }
-        if scenario.patient.is_some() { score += 0.15; }
-        if scenario.intent != MoralIntent::Unknown { score += 0.20; }
-        if scenario.consent != ConsentState::Implied { score += 0.15; }
-        if scenario.magnitude.is_some() { score += 0.10; }
+        if scenario.agent.is_some() { score += 0.12; }
+        if scenario.action.is_some() { score += 0.20; }
+        if scenario.patient.is_some() { score += 0.12; }
+        if scenario.intent != MoralIntent::Unknown { score += 0.18; }
+        if scenario.consent != ConsentState::Implied { score += 0.12; }
+        if scenario.magnitude.is_some() { score += 0.08; }
+        if scenario.obligation.is_some() { score += 0.08; }
+        if scenario.excuse.is_some() { score += 0.05; }
+        if scenario.effort.is_some() || scenario.reward.is_some() { score += 0.05; }
 
         score
+    }
+
+    /// Detect an obligation/duty phrase in text (for deontology)
+    ///
+    /// Patterns: "supposed to", "should have", "duty to", "expected to",
+    /// "ought to", "obligated to", "required to"
+    fn detect_obligation(&self, text: &str) -> Option<String> {
+        let patterns = [
+            "supposed to", "should have", "duty to", "expected to",
+            "ought to", "obligated to", "required to", "need to",
+            "have to", "must", "responsible for",
+        ];
+
+        for pattern in &patterns {
+            if let Some(pos) = text.find(pattern) {
+                let start = pos + pattern.len();
+                let rest = text[start..].trim_start();
+                // Extract clause up to next separator
+                let end = rest.find(|c: char| c == ',' || c == '.' || c == ';')
+                    .unwrap_or(rest.len());
+                let clause = rest[..end.min(80)].trim();
+                if !clause.is_empty() {
+                    return Some(format!("{} {}", pattern, clause));
+                }
+            }
+        }
+        None
+    }
+
+    /// Detect an excuse clause in text (for deontology)
+    ///
+    /// Extracts the subordinate clause after "because", "since", "but", "however"
+    fn detect_excuse(&self, text: &str) -> Option<String> {
+        let patterns = [
+            "because ", "since ", " but ", "however ", "although ",
+        ];
+
+        for pattern in &patterns {
+            if let Some(pos) = text.find(pattern) {
+                let start = pos + pattern.len();
+                let rest = text[start..].trim_start();
+                let end = rest.find(|c: char| c == '.' || c == ';')
+                    .unwrap_or(rest.len());
+                let clause = rest[..end.min(120)].trim();
+                if !clause.is_empty() {
+                    return Some(clause.to_string());
+                }
+            }
+        }
+        None
+    }
+
+    /// Detect effort and reward phrases with magnitude (for justice)
+    ///
+    /// Effort patterns: "i did", "i worked", "i spent", "i earned", "i contributed"
+    /// Reward patterns: "i deserve", "i should get", "i expect", "give me"
+    fn detect_effort_reward(&self, text: &str) -> (Option<(String, Magnitude)>, Option<(String, Magnitude)>) {
+        let effort_patterns = [
+            "i did", "i worked", "i spent", "i earned", "i contributed",
+            "i helped", "i completed", "i finished", "i put in",
+        ];
+        let reward_patterns = [
+            "i deserve", "i should get", "i expect", "give me",
+            "i should receive", "i want", "i am owed", "i'm owed",
+        ];
+
+        let effort = self.detect_role_with_magnitude(text, &effort_patterns);
+        let reward = self.detect_role_with_magnitude(text, &reward_patterns);
+
+        (effort, reward)
+    }
+
+    /// Helper: detect a role phrase and estimate its magnitude from surrounding words
+    fn detect_role_with_magnitude(&self, text: &str, patterns: &[&str]) -> Option<(String, Magnitude)> {
+        for pattern in patterns {
+            if let Some(pos) = text.find(pattern) {
+                let start = pos + pattern.len();
+                let rest = text[start..].trim_start();
+                let end = rest.find(|c: char| c == ',' || c == '.' || c == ';')
+                    .unwrap_or(rest.len());
+                let clause = rest[..end.min(80)].trim();
+                if clause.is_empty() {
+                    continue;
+                }
+
+                // Estimate magnitude from words in this clause
+                let clause_words: Vec<&str> = clause.split_whitespace().collect();
+                let magnitude = self.detect_magnitude(&clause_words)
+                    .unwrap_or(Magnitude::Medium);
+
+                return Some((format!("{} {}", pattern, clause), magnitude));
+            }
+        }
+        None
     }
 
     /// Parse and encode a scenario using the moral algebra
@@ -1036,6 +1225,52 @@ mod tests {
 
         let result = parser.parse("I deserve a raise because I work hard");
         assert_eq!(result.action, Some("deserve".to_string()));
+    }
+
+    #[test]
+    fn test_obligation_detection() {
+        let parser = MoralParser::new();
+
+        let result = parser.parse("I am supposed to return the book by Friday");
+        assert!(result.obligation.is_some());
+        assert!(result.obligation.unwrap().contains("supposed to"));
+
+        let result = parser.parse("I walked to the store");
+        assert!(result.obligation.is_none());
+    }
+
+    #[test]
+    fn test_excuse_detection() {
+        let parser = MoralParser::new();
+
+        let result = parser.parse("I broke my promise because an emergency arose");
+        assert!(result.excuse.is_some());
+        assert!(result.excuse.unwrap().contains("emergency"));
+
+        let result = parser.parse("I helped my friend");
+        assert!(result.excuse.is_none());
+    }
+
+    #[test]
+    fn test_effort_reward_detection() {
+        let parser = MoralParser::new();
+
+        let result = parser.parse("I worked hard daily but I deserve a small raise");
+        assert!(result.effort.is_some());
+        assert!(result.reward.is_some());
+    }
+
+    #[test]
+    fn test_negation_aware_intent() {
+        let parser = MoralParser::new();
+
+        // "not steal" should be detected as good intent (negated bad)
+        let result = parser.parse("I did not steal the money");
+        assert_eq!(result.intent, MoralIntent::Good);
+
+        // "not help" should be detected as bad intent (negated good)
+        let result = parser.parse("I did not help my neighbor");
+        assert_eq!(result.intent, MoralIntent::Bad);
     }
 
     #[test]

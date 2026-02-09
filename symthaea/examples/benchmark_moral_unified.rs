@@ -11,7 +11,10 @@
 
 use symthaea::hdc::moral_algebra::{MoralAlgebra, MoralVerdict, EnsembleJudgment};
 use symthaea::hdc::moral_parser::MoralParser;
-use symthaea::hdc::moral_prototypes::{MoralPrototypeClassifier, MoralSample, MoralLabel, TrainedPrototypes, MORAL_PROTO_DIM};
+use symthaea::hdc::moral_prototypes::{
+    MoralPrototypeClassifier, MoralSample, MoralLabel, TrainedPrototypes, MORAL_PROTO_DIM,
+    VirtueMatchClassifier, VirtueSample, VirtueLabel, TrainedVirtuePrototypes,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -182,34 +185,51 @@ fn main() {
     let parser = MoralParser::new();
 
     // Try to load or train learned moral prototypes from Social Chemistry 292K
-    let prototypes_path = Path::new(DATASETS_PATH).join("social_chem_prototypes_v2.json");
+    let prototypes_path = Path::new(DATASETS_PATH).join("social_chem_prototypes_v3.json");
+    let prototypes_path_v2 = Path::new(DATASETS_PATH).join("social_chem_prototypes_v2.json");
     let dataset_292k_path = Path::new(DATASETS_PATH).join("social_chemistry_292k.json");
 
     // Also store a direct classifier for Social Chemistry benchmark (#1 improvement)
     let mut direct_social_chem_classifier: Option<MoralPrototypeClassifier> = None;
 
+    // Sentiment weight for the third encoder channel
+    let sentiment_weight = 0.15;
+
     if prototypes_path.exists() {
-        println!("Loading cached learned prototypes from {}...", prototypes_path.display());
+        println!("Loading cached v3 learned prototypes from {}...", prototypes_path.display());
         match TrainedPrototypes::load(&prototypes_path) {
             Ok(protos) => {
                 let dim = protos.dim;
-                let classifier = MoralPrototypeClassifier::from_prototypes(dim, 3, protos.clone());
-                direct_social_chem_classifier = Some(MoralPrototypeClassifier::from_prototypes(dim, 3, protos));
+                let classifier = MoralPrototypeClassifier::from_prototypes_with_sentiment(dim, 3, sentiment_weight, protos.clone());
+                direct_social_chem_classifier = Some(MoralPrototypeClassifier::from_prototypes_with_sentiment(dim, 3, sentiment_weight, protos));
                 algebra.set_learned_classifier(classifier);
-                println!("  Learned prototypes loaded (dim={}, 4th ensemble signal active)\n", dim);
+                println!("  Learned v3 prototypes loaded (dim={}, sentiment={}, 4th ensemble signal active)\n", dim, sentiment_weight);
             }
             Err(e) => println!("  Warning: failed to load prototypes: {}\n", e),
         }
     } else if dataset_292k_path.exists() {
-        println!("Training learned prototypes from Social Chemistry 292K (dim={})...", MORAL_PROTO_DIM);
+        println!("Training v3 learned prototypes from Social Chemistry 292K (dim={}, sentiment={})...", MORAL_PROTO_DIM, sentiment_weight);
         let train_start = Instant::now();
         if let Some(classifier) = train_prototypes_from_292k(&dataset_292k_path, &prototypes_path) {
             direct_social_chem_classifier = Some(classifier.clone());
             algebra.set_learned_classifier(classifier);
             println!(
-                "  Prototypes trained and cached in {:.1}s (4th ensemble signal active)\n",
+                "  v3 prototypes trained and cached in {:.1}s (4th ensemble signal active)\n",
                 train_start.elapsed().as_secs_f64()
             );
+        }
+    } else if prototypes_path_v2.exists() {
+        // Fall back to v2 if no 292K dataset available for retraining
+        println!("Loading cached v2 learned prototypes from {}...", prototypes_path_v2.display());
+        match TrainedPrototypes::load(&prototypes_path_v2) {
+            Ok(protos) => {
+                let dim = protos.dim;
+                let classifier = MoralPrototypeClassifier::from_prototypes(dim, 3, protos.clone());
+                direct_social_chem_classifier = Some(MoralPrototypeClassifier::from_prototypes(dim, 3, protos));
+                algebra.set_learned_classifier(classifier);
+                println!("  Learned v2 prototypes loaded (dim={}, no sentiment, 4th ensemble signal active)\n", dim);
+            }
+            Err(e) => println!("  Warning: failed to load prototypes: {}\n", e),
         }
     } else {
         println!("No Social Chemistry 292K dataset found - running without learned prototypes.");
@@ -224,6 +244,13 @@ fn main() {
         HashMap::new()
     };
 
+    // Train virtue match classifier (#3 improvement)
+    let virtue_classifier = if Path::new(&ethics_path).exists() {
+        train_virtue_classifier(&ethics_path)
+    } else {
+        None
+    };
+
     let start = Instant::now();
     let mut results = Vec::new();
 
@@ -236,7 +263,7 @@ fn main() {
         results = run_synthetic_benchmarks(&algebra, &parser);
     } else {
         // Run each dataset benchmark
-        if let Some(r) = benchmark_ethics(&algebra, &parser, &per_category_classifiers) {
+        if let Some(r) = benchmark_ethics(&algebra, &parser, &per_category_classifiers, virtue_classifier.as_ref()) {
             results.extend(r);
         }
         if let Some(r) = benchmark_moral_stories(&algebra, &parser) {
@@ -266,7 +293,7 @@ fn main() {
 // Dataset-Specific Benchmarks
 // ============================================================================
 
-fn benchmark_ethics(algebra: &MoralAlgebra, parser: &MoralParser, per_cat_classifiers: &HashMap<String, MoralPrototypeClassifier>) -> Option<Vec<BenchmarkResult>> {
+fn benchmark_ethics(algebra: &MoralAlgebra, parser: &MoralParser, per_cat_classifiers: &HashMap<String, MoralPrototypeClassifier>, virtue_classifier: Option<&VirtueMatchClassifier>) -> Option<Vec<BenchmarkResult>> {
     let path = format!("{}/ethics.json", DATASETS_PATH);
     if !Path::new(&path).exists() {
         println!("⚠ ETHICS dataset not found at {}", path);
@@ -301,7 +328,7 @@ fn benchmark_ethics(algebra: &MoralAlgebra, parser: &MoralParser, per_cat_classi
         for ex in examples.iter().take(MAX_SAMPLES) {
             if let Some(expected) = ex.label {
                 let per_cat = per_cat_classifiers.get(&category);
-                let predicted = predict_ethics_with_classifier(algebra, parser, &ex.text, &category, per_cat);
+                let predicted = predict_ethics_with_classifier(algebra, parser, &ex.text, &category, per_cat, virtue_classifier);
                 let is_correct = predicted == expected;
 
                 if is_correct {
@@ -609,10 +636,10 @@ fn benchmark_moral_exceptqa(algebra: &MoralAlgebra, parser: &MoralParser) -> Opt
 // ============================================================================
 
 fn predict_ethics(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, category: &str) -> i32 {
-    predict_ethics_with_classifier(algebra, parser, text, category, None)
+    predict_ethics_with_classifier(algebra, parser, text, category, None, None)
 }
 
-fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, category: &str, per_cat: Option<&MoralPrototypeClassifier>) -> i32 {
+fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, text: &str, category: &str, per_cat: Option<&MoralPrototypeClassifier>, virtue_clf: Option<&VirtueMatchClassifier>) -> i32 {
     let (judgment, parsed) = parse_and_judge(algebra, parser, text, category);
     let text_lower = text.to_lowercase();
 
@@ -809,8 +836,23 @@ fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, 
             }
         }
         "virtue" => {
-            // ETHICS Virtue: trait words - virtue (1) or vice (0)
-            // Comprehensive virtue list
+            // ETHICS Virtue: "scenario [SEP] trait" — does trait apply to scenario?
+            // label=1 = trait applies, label=0 = trait does not apply
+            // Uses VirtueMatchClassifier (pair encoding) when available and confident,
+            // then falls back to keyword matching, then per-category classifier.
+            if let Some(vcl) = virtue_clf {
+                if let Some(sep_idx) = text.find(" [SEP] ") {
+                    let scen = &text[..sep_idx];
+                    let tw = &text[sep_idx + 7..];
+                    let (vl, vc) = vcl.classify(scen, tw);
+                    if vc > 0.01 {
+                        return match vl {
+                            VirtueLabel::Applies => 1,
+                            VirtueLabel::NotApplies => 0,
+                        };
+                    }
+                }
+            }
             let virtues = [
                 "generous", "kind", "compassionate", "loving", "honest", "helpful",
                 "brave", "courageous", "humble", "modest", "patient", "prudent",
@@ -825,8 +867,6 @@ fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, 
                 "thoughtful", "considerate", "tactful", "diplomatic", "cooperative",
                 "collaborative", "supportive", "encouraging", "inspiring", "motivating",
             ];
-
-            // Comprehensive vice list
             let vices = [
                 "cruel", "mean", "selfish", "greedy", "dishonest", "deceitful",
                 "cowardly", "arrogant", "impatient", "reckless", "foolish",
@@ -841,20 +881,34 @@ fn predict_ethics_with_classifier(algebra: &MoralAlgebra, parser: &MoralParser, 
                 "manipulative", "controlling", "domineering", "aggressive", "violent",
                 "vain", "narcissistic", "self-importance", "self-centered",
             ];
-
-            let is_virtue = virtues.iter().any(|v| text_lower.contains(v));
-            let is_vice = vices.iter().any(|v| text_lower.contains(v));
-
+            // For [SEP]-format, check the trait word specifically
+            let check_text = if let Some(sep_pos) = text_lower.find(" [sep] ") {
+                text_lower[sep_pos + 7..].to_string()
+            } else {
+                text_lower.clone()
+            };
+            let is_virtue = virtues.iter().any(|v| check_text.contains(v));
+            let is_vice = vices.iter().any(|v| check_text.contains(v));
             if is_virtue && !is_vice {
                 1
             } else if is_vice && !is_virtue {
                 0
+            } else if let Some(clf) = per_cat {
+                match clf.classify(text).0 {
+                    MoralLabel::Good => 1,
+                    MoralLabel::Bad => 0,
+                    MoralLabel::Neutral => {
+                        match judgment.final_verdict {
+                            MoralVerdict::Good => 1,
+                            _ => 0,
+                        }
+                    }
+                }
             } else {
-                // Fallback: use ensemble
                 match judgment.final_verdict {
                     MoralVerdict::Good => 1,
                     MoralVerdict::Bad => 0,
-                    _ => 0,  // Default to vice for neutral
+                    _ => 0,
                 }
             }
         }
@@ -1057,21 +1111,38 @@ fn train_prototypes_from_292k(
     }
 
     // Cap training set: initial accumulation uses all samples for representative
-    // prototypes, but retraining uses at most 10K for speed (dim 8192 is expensive).
-    let max_retrain = 10_000;
-    println!("  Training on {} samples (retrain cap: {}, dim={})...", samples.len(), max_retrain, MORAL_PROTO_DIM);
+    // prototypes, but retraining uses at most 25K (up from 10K in v2).
+    let max_retrain = 25_000;
+    let sentiment_weight = 0.15;
+    println!("  Training on {} samples (retrain cap: {}, dim={}, sentiment={})...",
+             samples.len(), max_retrain, MORAL_PROTO_DIM, sentiment_weight);
 
-    let mut classifier = MoralPrototypeClassifier::new(MORAL_PROTO_DIM, 3);
+    let mut classifier = MoralPrototypeClassifier::with_sentiment(MORAL_PROTO_DIM, 3, sentiment_weight);
     classifier.train(&samples);
 
-    // Retrain with adaptive LR decay on a capped subset for speed
-    let retrain_samples = if samples.len() > max_retrain {
-        &samples[..max_retrain]
-    } else {
-        &samples
-    };
-    println!("  Retraining adaptive (lr=0.1, 5 iterations, {} samples)...", retrain_samples.len());
-    classifier.retrain_adaptive(retrain_samples, 0.1, 5);
+    // Deterministic shuffle before slicing retrain subset to avoid sequential ordering bias.
+    // Uses xorshift for speed and determinism.
+    let mut retrain_indices: Vec<usize> = (0..samples.len()).collect();
+    let mut rng_state: u64 = 42;
+    for i in (1..retrain_indices.len()).rev() {
+        rng_state ^= rng_state << 13;
+        rng_state ^= rng_state >> 7;
+        rng_state ^= rng_state << 17;
+        let j = (rng_state as usize) % (i + 1);
+        retrain_indices.swap(i, j);
+    }
+
+    let retrain_count = samples.len().min(max_retrain);
+    let retrain_samples: Vec<MoralSample> = retrain_indices[..retrain_count]
+        .iter()
+        .map(|&idx| MoralSample {
+            text: samples[idx].text.clone(),
+            label: samples[idx].label,
+        })
+        .collect();
+
+    println!("  Retraining adaptive (lr=0.1, 10 iterations, {} samples)...", retrain_samples.len());
+    classifier.retrain_adaptive(&retrain_samples, 0.1, 10);
 
     // Report training accuracy
     let mut correct = 0;
@@ -1106,7 +1177,7 @@ fn train_prototypes_from_292k(
 /// - commonsense: 0=acceptable(Good), 1=wrong(Bad)
 /// - justice: 0=unreasonable(Bad), 1=reasonable(Good)
 /// - deontology: 0=invalid excuse(Bad), 1=valid excuse(Good)
-/// - virtue: skipped (keyword matching is better for trait words)
+/// - virtue: 1=trait applies(Good), 0=trait doesn't apply(Bad) — used as fallback
 fn train_per_category_ethics_prototypes(ethics_path: &str) -> HashMap<String, MoralPrototypeClassifier> {
     let mut classifiers = HashMap::new();
 
@@ -1126,12 +1197,9 @@ fn train_per_category_ethics_prototypes(ethics_path: &str) -> HashMap<String, Mo
         by_category.entry(ex.category.clone()).or_default().push(ex);
     }
 
-    for (category, examples) in &by_category {
-        // Skip virtue - keyword matching works better for trait words
-        if category == "virtue" {
-            continue;
-        }
+    let sentiment_weight = 0.15;
 
+    for (category, examples) in &by_category {
         let samples: Vec<MoralSample> = examples
             .iter()
             .filter_map(|ex| {
@@ -1141,7 +1209,7 @@ fn train_per_category_ethics_prototypes(ethics_path: &str) -> HashMap<String, Mo
                     "commonsense" => {
                         if label_val == 1 { MoralLabel::Bad } else { MoralLabel::Good }
                     }
-                    // justice/deontology: 0=unreasonable/invalid(Bad), 1=reasonable/valid(Good)
+                    // justice/deontology/virtue: 0=Bad, 1=Good
                     _ => {
                         if label_val == 1 { MoralLabel::Good } else { MoralLabel::Bad }
                     }
@@ -1157,10 +1225,10 @@ fn train_per_category_ethics_prototypes(ethics_path: &str) -> HashMap<String, Mo
             continue;
         }
 
-        println!("  Training per-category classifier for '{}' ({} samples, dim={})...",
-                 category, samples.len(), MORAL_PROTO_DIM);
+        println!("  Training per-category classifier for '{}' ({} samples, dim={}, sentiment={})...",
+                 category, samples.len(), MORAL_PROTO_DIM, sentiment_weight);
 
-        let mut classifier = MoralPrototypeClassifier::new(MORAL_PROTO_DIM, 3);
+        let mut classifier = MoralPrototypeClassifier::with_sentiment(MORAL_PROTO_DIM, 3, sentiment_weight);
         classifier.train(&samples);
         classifier.retrain_adaptive(&samples, 0.1, 10);
 
@@ -1179,4 +1247,85 @@ fn train_per_category_ethics_prototypes(ethics_path: &str) -> HashMap<String, Mo
     }
 
     classifiers
+}
+
+/// Train virtue match classifier from ETHICS virtue examples.
+///
+/// Loads virtue examples (format: "scenario [SEP] trait_word"),
+/// trains a VirtueMatchClassifier on pair encodings.
+fn train_virtue_classifier(ethics_path: &str) -> Option<VirtueMatchClassifier> {
+    let virtue_cache_path = Path::new(DATASETS_PATH).join("virtue_prototypes_v1.json");
+
+    // Try loading cached prototypes first
+    if virtue_cache_path.exists() {
+        println!("  Loading cached virtue prototypes from {}...", virtue_cache_path.display());
+        match TrainedVirtuePrototypes::load(&virtue_cache_path) {
+            Ok(protos) => {
+                println!("    Virtue prototypes loaded (dim={})", protos.dim);
+                return Some(VirtueMatchClassifier::from_prototypes(protos));
+            }
+            Err(e) => println!("    Warning: failed to load virtue prototypes: {}", e),
+        }
+    }
+
+    let file = File::open(ethics_path).ok()?;
+    let reader = BufReader::new(file);
+    let data: DatasetFile<EthicsExample> = serde_json::from_reader(reader).ok()?;
+
+    let samples: Vec<VirtueSample> = data
+        .examples
+        .iter()
+        .filter(|ex| ex.category == "virtue")
+        .filter_map(|ex| {
+            let label_val = ex.label?;
+            // Split on " [SEP] " to get scenario + trait_word
+            let sep_pos = ex.text.find(" [SEP] ")?;
+            let scenario = ex.text[..sep_pos].to_string();
+            let trait_word = ex.text[sep_pos + 7..].to_string();
+
+            let label = if label_val == 1 {
+                VirtueLabel::Applies
+            } else {
+                VirtueLabel::NotApplies
+            };
+
+            Some(VirtueSample { scenario, trait_word, label })
+        })
+        .collect();
+
+    if samples.len() < 10 {
+        println!("  Not enough virtue samples for pair classifier ({} found)", samples.len());
+        return None;
+    }
+
+    println!("  Training VirtueMatchClassifier ({} samples, dim={})...", samples.len(), MORAL_PROTO_DIM);
+    let train_start = Instant::now();
+
+    let mut classifier = VirtueMatchClassifier::new(MORAL_PROTO_DIM);
+    classifier.train(&samples);
+    classifier.retrain_adaptive(&samples, 0.1, 10);
+
+    // Report training accuracy
+    let mut correct = 0;
+    let check_n = samples.len().min(500);
+    for s in samples.iter().take(check_n) {
+        let (pred, _) = classifier.classify(&s.scenario, &s.trait_word);
+        if pred == s.label {
+            correct += 1;
+        }
+    }
+    println!("    Virtue pair training accuracy: {:.1}% ({:.1}s)",
+             correct as f64 / check_n as f64 * 100.0,
+             train_start.elapsed().as_secs_f64());
+
+    // Cache prototypes
+    if let Some(protos) = classifier.prototypes() {
+        if let Err(e) = protos.save(&virtue_cache_path) {
+            println!("    Warning: failed to cache virtue prototypes: {}", e);
+        } else {
+            println!("    Virtue prototypes cached to {}", virtue_cache_path.display());
+        }
+    }
+
+    Some(classifier)
 }

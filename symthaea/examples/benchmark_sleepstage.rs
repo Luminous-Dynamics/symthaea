@@ -28,8 +28,12 @@
 use std::path::Path;
 use std::time::Instant;
 
+use symthaea::dynamics::hmm::HiddenMarkovModel;
+use symthaea::dynamics::wavelet::{WaveletAnalyzer, DwtConfig, WaveletFamily, ExtensionMode};
+use symthaea::dynamics::phase_amplitude_coupling::{PacAnalyzer, PacConfig};
 use symthaea::perception::physio::{
-    EdfFile, SleepSentinel, SleepSentinelConfig, SleepStage, ConsciousnessState,
+    EdfFile, IntegrationMetrics, SleepSentinel, SleepSentinelConfig, SleepStage,
+    ConsciousnessState,
 };
 
 const DATA_DIR: &str = "data/benchmarks/sleep-edf";
@@ -150,8 +154,12 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let test_start = Instant::now();
-    let mut confusion = vec![vec![0usize; 5]; 5]; // 5 classes: W, N1, N2, N3, REM
+    let mut confusion_raw = vec![vec![0usize; 5]; 5]; // Raw (no HMM)
+    let mut confusion_hmm = vec![vec![0usize; 5]; 5]; // HMM-smoothed
     let mut total_test_epochs = 0;
+
+    // Build HMM with physiological sleep transition constraints
+    let hmm = build_sleep_hmm();
 
     for (i, psg_path) in psg_files[n_train..n_train + n_test].iter().enumerate() {
         // Sleep-EDF naming: SC4001E0-PSG.edf -> SC4001E*-Hypnogram.edf
@@ -174,7 +182,12 @@ fn main() {
         }
 
         let n_epochs = edf.num_epochs();
-        let mut correct = 0;
+
+        // Collect all predictions + metrics for this recording
+        let mut actual_indices = Vec::new();
+        let mut raw_predictions = Vec::new();
+        let mut epoch_metrics = Vec::new();
+        let mut epoch_signals: Vec<Vec<f64>> = Vec::new();
 
         for epoch_idx in 0..n_epochs {
             if let Some((frontal, occipital, stage)) = edf.get_labeled_epoch(epoch_idx) {
@@ -183,34 +196,60 @@ fn main() {
                     continue; // skip Movement/Unknown
                 }
 
-                let (predicted_state, _metrics) = sentinel.process_epoch(&frontal, &occipital);
+                let (predicted_state, metrics) = sentinel.process_epoch(&frontal, &occipital);
                 let predicted_idx = consciousness_to_idx(&predicted_state);
 
-                confusion[actual_idx][predicted_idx] += 1;
-                if actual_idx == predicted_idx {
-                    correct += 1;
-                }
-                total_test_epochs += 1;
+                actual_indices.push(actual_idx);
+                raw_predictions.push(predicted_idx);
+                epoch_metrics.push(metrics);
+                epoch_signals.push(frontal);
             }
         }
 
-        let acc = if total_test_epochs > 0 {
-            correct as f64 / n_epochs as f64 * 100.0
-        } else {
-            0.0
-        };
+        // Compute emission probabilities from spectral metrics + wavelet/PAC features
+        let emission_sequence = compute_emission_probs_enhanced(&epoch_metrics, &epoch_signals, 100.0);
+
+        // Run Viterbi smoothing on the full recording
+        let smoothed = hmm.viterbi(&emission_sequence);
+
+        // Score both raw and HMM-smoothed
+        let mut correct_raw = 0;
+        let mut correct_hmm = 0;
+
+        for j in 0..actual_indices.len() {
+            let actual = actual_indices[j];
+            let raw_pred = raw_predictions[j];
+            let hmm_pred = smoothed[j];
+
+            confusion_raw[actual][raw_pred] += 1;
+            confusion_hmm[actual][hmm_pred] += 1;
+
+            if actual == raw_pred { correct_raw += 1; }
+            if actual == hmm_pred { correct_hmm += 1; }
+        }
+
+        total_test_epochs += actual_indices.len();
+
+        let n_valid = actual_indices.len();
+        let acc_raw = if n_valid > 0 { correct_raw as f64 / n_valid as f64 * 100.0 } else { 0.0 };
+        let acc_hmm = if n_valid > 0 { correct_hmm as f64 / n_valid as f64 * 100.0 } else { 0.0 };
         println!(
-            "  [{}/{}] {} - {:.1}% ({} epochs)",
+            "  [{}/{}] {} - raw {:.1}% / HMM {:.1}% ({} epochs)",
             i + 1,
             n_test,
             psg_path.file_name().unwrap().to_str().unwrap(),
-            acc,
-            n_epochs
+            acc_raw,
+            acc_hmm,
+            n_valid
         );
     }
 
     let test_time = test_start.elapsed().as_secs_f64();
-    print_results(&confusion, total_test_epochs, test_time);
+
+    println!("\n--- Raw (no HMM) ---");
+    print_results(&confusion_raw, total_test_epochs, test_time);
+    println!("--- HMM Viterbi Smoothed ---");
+    print_results(&confusion_hmm, total_test_epochs, test_time);
 }
 
 fn stage_to_idx(stage: &SleepStage) -> usize {
@@ -342,27 +381,55 @@ fn run_synthetic_benchmark() {
     println!("Testing...");
     let test_start = Instant::now();
     let test_epochs_per_stage = 10;
-    let mut confusion = vec![vec![0usize; 5]; 5];
+    let mut confusion_raw = vec![vec![0usize; 5]; 5];
+    let mut confusion_hmm = vec![vec![0usize; 5]; 5];
+
+    // Build HMM for Viterbi smoothing
+    let hmm = build_sleep_hmm();
+
+    // Collect all predictions and metrics first (simulating a full night recording)
+    let mut all_actual = Vec::new();
+    let mut all_raw_pred = Vec::new();
+    let mut all_metrics = Vec::new();
+    let mut all_signals: Vec<Vec<f64>> = Vec::new();
 
     for (stage_idx, (stage, _name)) in stages.iter().enumerate() {
         for epoch_i in 0..test_epochs_per_stage {
             let seed = 10000 + epoch_i as u64;
             let (frontal, occipital) =
                 generate_synthetic_eeg(stage, epoch_len, sample_rate, seed);
-            let (predicted, _metrics) = sentinel.process_epoch(&frontal, &occipital);
+            let (predicted, metrics) = sentinel.process_epoch(&frontal, &occipital);
             let pred_idx = consciousness_to_idx(&predicted);
-            confusion[stage_idx][pred_idx] += 1;
+
+            all_actual.push(stage_idx);
+            all_raw_pred.push(pred_idx);
+            all_metrics.push(metrics);
+            all_signals.push(frontal);
         }
+    }
+
+    // Compute emission probabilities with wavelet/PAC enhancement
+    let emission_sequence = compute_emission_probs_enhanced(&all_metrics, &all_signals, sample_rate);
+    let smoothed = hmm.viterbi(&emission_sequence);
+
+    // Score both raw and HMM-smoothed
+    for j in 0..all_actual.len() {
+        confusion_raw[all_actual[j]][all_raw_pred[j]] += 1;
+        confusion_hmm[all_actual[j]][smoothed[j]] += 1;
     }
 
     let total = test_epochs_per_stage * 5;
     let test_time = test_start.elapsed().as_secs_f64();
-    print_results(&confusion, total, test_time);
 
-    // Save results
+    println!("\n--- Raw (no HMM) ---");
+    print_results(&confusion_raw, total, test_time);
+    println!("--- HMM Viterbi Smoothed ---");
+    print_results(&confusion_hmm, total, test_time);
+
+    // Save results (use HMM-smoothed accuracy)
     let mut total_correct = 0;
     for i in 0..5 {
-        total_correct += confusion[i][i];
+        total_correct += confusion_hmm[i][i];
     }
     let overall = total_correct as f64 / total as f64;
 
@@ -485,6 +552,136 @@ fn generate_synthetic_eeg(
     }
 
     (frontal, occipital)
+}
+
+/// Build a physiologically-constrained HMM for sleep staging.
+///
+/// States: 0=Wake, 1=N1, 2=N2, 3=N3, 4=REM
+/// Transition constraints encode AASM sleep physiology:
+/// - Sleep progresses Wake→N1→N2→N3 (descent) and reverses (ascent)
+/// - REM follows light sleep (N1/N2), not deep sleep (N3 rarely→REM)
+/// - Adjacent stage transitions are most probable
+/// - No jumps across >1 stage (e.g., Wake→N3 is near-zero)
+fn build_sleep_hmm() -> HiddenMarkovModel {
+    // Transition matrix: A[i][j] = P(state j | state i)
+    // States: 0=Wake, 1=N1, 2=N2, 3=N3, 4=REM
+    // Encodes AASM sleep physiology:
+    // - Sleep progresses Wake→N1→N2→N3 (descent) and reverses (ascent)
+    // - REM follows light sleep (N1/N2), not deep sleep (N3 rarely→REM)
+    // - Adjacent stage transitions are most probable
+    // - No jumps across >1 stage (e.g., Wake→N3 is near-zero)
+    #[rustfmt::skip]
+    let transitions = vec![
+        //  Wake    N1      N2      N3      REM
+        vec![0.70,  0.20,   0.05,   0.00,   0.05],   // Wake → mostly stays, can enter N1
+        vec![0.10,  0.50,   0.30,   0.02,   0.08],   // N1 → can go to Wake, N2, or REM
+        vec![0.02,  0.10,   0.60,   0.20,   0.08],   // N2 → mostly stays, descend to N3 or ascend
+        vec![0.00,  0.02,   0.20,   0.75,   0.03],   // N3 → mostly stays, ascend through N2
+        vec![0.05,  0.15,   0.10,   0.00,   0.70],   // REM → can go to Wake/N1/N2, not N3
+    ];
+
+    // Initial state: most likely Wake or N2 (depends on recording start)
+    let initial = vec![0.40, 0.15, 0.25, 0.10, 0.10];
+
+    let state_names = vec![
+        "Wake".into(), "N1".into(), "N2".into(), "N3".into(), "REM".into(),
+    ];
+
+    HiddenMarkovModel::with_params(initial, transitions, state_names)
+}
+
+/// Enhanced emission probabilities combining spectral, wavelet, and PAC features.
+///
+/// Adds to the base spectral ratios:
+/// 1. Wavelet spindle detection → boosts N2 confidence
+/// 2. Wavelet entropy → multi-scale complexity measure
+/// 3. PAC delta-beta coupling → distinguishes N3 from lighter stages
+fn compute_emission_probs_enhanced(
+    metrics: &[IntegrationMetrics],
+    signals: &[Vec<f64>],
+    sample_rate: f64,
+) -> Vec<Vec<f64>> {
+    // Initialize wavelet analyzer for EEG
+    let wavelet_config = DwtConfig {
+        wavelet: WaveletFamily::Db4,
+        max_level: None,
+        extension: ExtensionMode::Symmetric,
+    };
+    let wavelet = WaveletAnalyzer::new(wavelet_config, sample_rate);
+
+    // Initialize PAC analyzer (fast: no surrogates for emission probs)
+    let pac_config = PacConfig {
+        sample_rate,
+        n_phase_bins: 18,
+        n_surrogates: 0, // Skip surrogates for speed (not testing significance here)
+        significance_level: 0.05,
+        filter_order: 128, // Shorter filter for 100 Hz data
+    };
+    let pac = PacAnalyzer::new(pac_config);
+
+    metrics.iter().zip(signals.iter()).map(|(m, signal)| {
+        let total_power = (m.delta_power + m.theta_power + m.alpha_power + m.beta_power + m.gamma_power).max(1e-10);
+        let delta_ratio = m.delta_power as f64 / total_power as f64;
+        let theta_ratio = m.theta_power as f64 / total_power as f64;
+        let alpha_ratio = m.alpha_power as f64 / total_power as f64;
+        let beta_ratio = m.beta_power as f64 / total_power as f64;
+        let entropy = m.spectral_entropy as f64;
+
+        // --- Wavelet features ---
+        // Spindle count (12-14 Hz bursts characteristic of N2)
+        let spindles = wavelet.detect_spindles(signal);
+        let spindle_count = spindles.len() as f64;
+        // Normalized: 0-3+ spindles per 30s epoch
+        let spindle_score = (spindle_count / 3.0).min(1.0);
+
+        // Wavelet entropy (multi-scale complexity)
+        let w_entropy = wavelet.wavelet_entropy(signal);
+
+        // --- PAC features ---
+        // Delta-beta coupling: strong in deep sleep, weak in light/REM
+        let delta_beta_mi = if signal.len() >= 256 {
+            let pac_result = pac.compute_pac(signal, (0.5, 4.0), (13.0, 30.0));
+            pac_result.modulation_index
+        } else {
+            0.0
+        };
+        // Normalize MI (typically 0-0.3 range for EEG)
+        let pac_score = (delta_beta_mi / 0.3).min(1.0);
+
+        // --- Compute enhanced scores ---
+        let mut scores = [0.0f64; 5];
+
+        // Wake: high alpha+beta, high entropy, low PAC, no spindles
+        scores[0] = (alpha_ratio + beta_ratio) * 2.0 + entropy * 0.5
+            + (1.0 - pac_score) * 0.3;
+
+        // N1: theta dominant, moderate entropy, no spindles
+        scores[1] = theta_ratio * 2.5 + (1.0 - delta_ratio) * 0.5
+            + (1.0 - spindle_score) * 0.2;
+
+        // N2: spindles are the hallmark + moderate delta/theta
+        scores[2] = theta_ratio * 1.5 + delta_ratio * 0.8 + beta_ratio * 0.5
+            + spindle_score * 1.5; // Strong spindle bonus
+
+        // N3: delta dominant, low entropy, high delta-beta PAC
+        scores[3] = delta_ratio * 3.0 + (1.0 - entropy) * 0.5
+            + pac_score * 1.0 // Delta-beta coupling bonus
+            + (1.0 - w_entropy) * 0.3; // Low wavelet entropy = concentrated energy
+
+        // REM: theta+beta, low delta, high entropy, low PAC, no spindles
+        let theta_to_delta = if delta_ratio > 0.01 { theta_ratio / delta_ratio } else { theta_ratio * 10.0 };
+        scores[4] = theta_to_delta.min(3.0) * 0.8 + beta_ratio * 1.5 + entropy * 0.3
+            + (1.0 - pac_score) * 0.2
+            + (1.0 - spindle_score) * 0.2;
+
+        // Normalize to proper probability distribution
+        let sum: f64 = scores.iter().sum();
+        if sum > 0.0 {
+            scores.iter().map(|&s| (s / sum).max(0.01)).collect()
+        } else {
+            vec![0.2; 5] // uniform fallback
+        }
+    }).collect()
 }
 
 /// Find the hypnogram file for a PSG file in Sleep-EDF format.
