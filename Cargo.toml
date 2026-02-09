@@ -73,9 +73,8 @@ candle-transformers = { version = "0.8", optional = true }
 half = { version = "2.6", optional = true }  # f16 support for GPU inference (>=2.6 for burn+candle compat)
 
 # Phase 11: Database Trinity (Deferred to Week 11+)
-# lancedb = { version = "0.4", features = ["remote"] }  # Vector database
-# duckdb = { version = "0.10", features = ["bundled"] }  # Analytical queries
-# cozo = "0.7"  # Datalog reasoning
+# Blocked deps (link conflicts): lancedb (xz2), cozo (graph_builder rayon), qdrant (lzma)
+# DuckDB is the active database backend (unconditional dep below)
 
 # Phase 11: Swarm Intelligence - Hybrid Iroh + Holochain Architecture
 # REMOVED: libp2p (declared but never used - 0 integration lines)
@@ -225,24 +224,18 @@ semantic-burn = ["burn", "burn-ndarray"]  # Pure Rust semantic encoder
 embeddings = ["tokenizers", "ort", "hf-hub"]  # Qwen3/BGE text embeddings via ONNX
 vision = ["ort", "hf-hub"]  # SigLIP image embeddings via ONNX
 perception = ["embeddings", "vision"]  # Full multimodal perception stack
-webcam = []  # Live webcam capture for video perception
+webcam = []  # deferred (live webcam capture for video perception - gates cfg blocks in source)
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
 neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub", "safetensors", "half"]
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
-# Database backends (compile guards only - DuckDB active via duckdb crate, others deferred)
-# qdrant: blocked (no viable crate without lzma conflict)
-# datalog/cozo: blocked (graph_builder 0.4.1 rayon compat)
-# lance: blocked (lancedb xz2 conflicts with burn-ndarray liblzma-sys)
-# duck: active via duckdb dep, flag kept for conditional compilation
-qdrant = []
-datalog = []
-lance = []
-duck = []
-# Data loading (deferred - requires system HDF5 library)
-hdf5 = []     # HDF5 file loading for C-Mod plasma data (add hdf5 crate when ready)
+# Database backends: DuckDB is active (unconditional dep). Others deferred:
+# - qdrant: blocked (lzma link conflict with burn-ndarray)
+# - cozo: blocked (graph_builder 0.4.1 rayon compat)
+# - lancedb: blocked (xz2 link conflict with burn-ndarray)
+hdf5 = []     # deferred (requires system HDF5 library - gates cfg blocks in cmod_adapter.rs)
 # Swarm Intelligence - Hybrid Iroh + Holochain
 swarm = ["iroh"]  # Real-time P2P tensor streaming via Iroh 0.95+
-holochain = []    # Holochain conductor connectivity (real integration in symthaea-mycelix-bridge)
+holochain = []    # gate only (real integration in symthaea-mycelix-bridge; rmp-serde conflict prevents in-tree dep)
 # Desktop integration features
 notifications = ["zbus"]  # E1: D-Bus desktop notifications
 systemd = ["libsystemd"]  # D1: Systemd socket activation
