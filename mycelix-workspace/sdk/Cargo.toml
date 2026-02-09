@@ -46,7 +46,9 @@ bincode = "1.3"
 ndarray = "0.15"
 
 # Timestamps
-chrono = { version = "0.4", features = ["serde"] }
+# IMPORTANT: default-features = false to avoid pulling in wasm-bindgen via chrono's
+# "wasmbind" default feature, which breaks Holochain WASM zomes that depend on this SDK.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 
 # UUID generation
 uuid = { version = "1.0", features = ["v4", "serde"] }

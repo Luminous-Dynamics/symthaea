@@ -77,6 +77,21 @@ impl TestAgent {
         let zome = self.zome(zome_name);
         self.conductor.call(&zome, fn_name, input).await
     }
+
+    /// Make a zome call that may fail, returning the ConductorApiResult.
+    pub async fn call_zome_fn_fallible<I, O>(
+        &self,
+        zome_name: &str,
+        fn_name: &str,
+        input: I,
+    ) -> Result<O, holochain::conductor::api::error::ConductorApiError>
+    where
+        I: serde::Serialize + std::fmt::Debug,
+        O: serde::de::DeserializeOwned + std::fmt::Debug,
+    {
+        let zome = self.zome(zome_name);
+        self.conductor.call_fallible(&zome, fn_name, input).await
+    }
 }
 
 /// Set up N test agents sharing a DNA, with peer exchange for DHT sync.

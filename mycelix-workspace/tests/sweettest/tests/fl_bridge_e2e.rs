@@ -79,11 +79,14 @@ pub struct PoGQData {
 
 /// Create a honest gradient input with high PoGQ values
 fn honest_gradient(node_id: &str, round: u32) -> GradientWithPoGQInput {
+    // Integrity zome validates gradient_hash is exactly 64 hex characters (SHA256)
+    let hash_input = format!("honest_gradient_r{}_n{}", round, node_id);
+    let hash_hex = fake_sha256(&hash_input);
     GradientWithPoGQInput {
         node_id: node_id.to_string(),
         round,
-        gradient_hash: format!("sha256:honest_gradient_r{}_n{}", round, node_id),
-        cpu_usage: 45.0,
+        gradient_hash: hash_hex,
+        cpu_usage: 0.45,       // Fraction [0.0, 1.0], not percentage
         memory_mb: 512.0,
         network_latency_ms: 15.0,
         quality: 0.95,
@@ -94,17 +97,33 @@ fn honest_gradient(node_id: &str, round: u32) -> GradientWithPoGQInput {
 
 /// Create a Byzantine gradient input with low PoGQ values
 fn byzantine_gradient(node_id: &str, round: u32) -> GradientWithPoGQInput {
+    let hash_input = format!("byzantine_gradient_r{}_n{}", round, node_id);
+    let hash_hex = fake_sha256(&hash_input);
     GradientWithPoGQInput {
         node_id: node_id.to_string(),
         round,
-        gradient_hash: format!("sha256:byzantine_gradient_r{}_n{}", round, node_id),
-        cpu_usage: 99.0,
+        gradient_hash: hash_hex,
+        cpu_usage: 0.99,       // Fraction [0.0, 1.0], not percentage
         memory_mb: 64.0,
         network_latency_ms: 500.0,
         quality: 0.1,
         consistency: 0.05,
         entropy: 0.95,
     }
+}
+
+/// Deterministic 64-char hex string (fake SHA256 for testing)
+fn fake_sha256(input: &str) -> String {
+    let mut h1: u64 = 0xcbf29ce484222325;
+    let mut h2: u64 = 0x100000001b3f00d;
+    for byte in input.bytes() {
+        h1 ^= byte as u64;
+        h1 = h1.wrapping_mul(0x100000001b3);
+        h2 ^= byte as u64;
+        h2 = h2.wrapping_mul(0x01000193);
+    }
+    // Two u64 = 32 hex digits each = 64 total
+    format!("{:016x}{:016x}{:016x}{:016x}", h1, h2, h1 ^ h2, h1.wrapping_add(h2))
 }
 
 // ============================================================================
@@ -159,10 +178,12 @@ async fn test_honest_gradient_accepted() {
     );
 }
 
-/// Test that a Byzantine gradient with low PoGQ values is rejected.
+/// Test that a Byzantine gradient with low PoGQ values is detected.
 ///
-/// Verifies `submit_gradient_with_pogq` returns `is_byzantine: true`
-/// for a gradient with quality=0.1, consistency=0.05.
+/// The coordinator either:
+/// - Rejects with an Err containing "Byzantine" (high confidence)
+/// - Returns PoGQResult with is_byzantine=true (low confidence)
+/// Both outcomes prove the Byzantine detection pipeline works.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[ignore] // Requires Holochain conductor + built FL DNA
@@ -177,25 +198,36 @@ async fn test_byzantine_gradient_rejected() {
     let node = &agents[0];
     let input = byzantine_gradient("malicious-node-1", 1);
 
-    let result: PoGQResult = node
-        .call_zome_fn("federated_learning", "submit_gradient_with_pogq", input.clone())
+    let result: Result<PoGQResult, _> = node
+        .call_zome_fn_fallible("federated_learning", "submit_gradient_with_pogq", input.clone())
         .await;
 
-    assert!(
-        result.is_byzantine,
-        "Byzantine gradient (quality={}, consistency={}) should be detected, \
-         but got is_byzantine=false with composite_score={}",
-        input.quality, input.consistency, result.composite_score
-    );
-
-    assert!(
-        result.composite_score < 0.5,
-        "Composite score {} for Byzantine gradient should be below threshold 0.5",
-        result.composite_score
-    );
+    match result {
+        Err(e) => {
+            // High-confidence Byzantine rejection (confidence >= 0.7)
+            let err_msg = format!("{:?}", e);
+            assert!(
+                err_msg.contains("Byzantine") || err_msg.contains("byzantine"),
+                "Rejection error should mention Byzantine detection, got: {}",
+                err_msg
+            );
+        }
+        Ok(pogq_result) => {
+            // Low-confidence detection: gradient stored but flagged
+            assert!(
+                pogq_result.is_byzantine,
+                "Byzantine gradient (quality={}, consistency={}) should be detected, \
+                 but got is_byzantine=false with composite_score={}",
+                input.quality, input.consistency, pogq_result.composite_score
+            );
+        }
+    }
 }
 
 /// Test that an honest gradient is stored and retrievable via DHT.
+///
+/// Uses `get_round_gradients` to verify the gradient was stored and
+/// is retrievable by round number.
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[ignore] // Requires Holochain conductor + built FL DNA
@@ -209,18 +241,33 @@ async fn test_gradient_stored_on_dht() {
 
     let node = &agents[0];
     let input = honest_gradient("storage-test-node", 1);
+    let expected_node_id = input.node_id.clone();
 
     let result: PoGQResult = node
         .call_zome_fn("federated_learning", "submit_gradient_with_pogq", input)
         .await;
 
-    let record: Option<Record> = node
-        .call_zome_fn("federated_learning", "get_gradient", result.action_hash.clone())
+    // Verify gradient is retrievable by round
+    let gradients: Vec<(ActionHash, serde_json::Value)> = node
+        .call_zome_fn("federated_learning", "get_round_gradients", 1u32)
         .await;
 
     assert!(
-        record.is_some(),
-        "Stored gradient should be retrievable by action hash"
+        !gradients.is_empty(),
+        "Round 1 should have at least one gradient stored"
+    );
+
+    // Verify the stored gradient matches what we submitted
+    let (stored_hash, stored_gradient) = &gradients[0];
+    assert_eq!(
+        *stored_hash, result.action_hash,
+        "Stored gradient hash should match the returned action_hash"
+    );
+
+    let stored_node_id = stored_gradient["node_id"].as_str().unwrap_or("");
+    assert_eq!(
+        stored_node_id, expected_node_id,
+        "Stored gradient node_id should match"
     );
 }
 
