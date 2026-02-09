@@ -1,7 +1,7 @@
 # Mycelix hApp Portfolio Strategy
 
-**Date**: 2026-02-08
-**Status**: Approved plan, pending implementation
+**Date**: 2026-02-09 (Updated)
+**Status**: Assessment complete, merges deferred to post-beta
 
 ---
 
@@ -13,7 +13,7 @@ These four hApps form the foundation. All other hApps depend on at least one.
 |----------|------|--------|----------|
 | 1 | **Identity** | Most mature (15 sweettests, MFA, DID, recovery, Ed25519 hardened) | Foundation for all agent authentication |
 | 2 | **Governance** | Beta (3 sweettests, proposals, voting, delegation) | Required for ecosystem self-management |
-| 3 | **Core (FL)** | Production (62 tests, 6 zomes, PoGQ pipeline) | Federated learning foundation with MATL |
+| 3 | **Core (FL)** | Production (62 tests, 6 zomes, PoGQ pipeline, E2E tests exist) | Federated learning foundation with MATL |
 | 4 | **LUCID** | Beta (8 zomes, Tauri UI, Symthaea bridge 85% wired) | Flagship Symthaea+Holochain integration |
 
 ### LUCID Bridge Status
@@ -32,56 +32,86 @@ The LUCID Tauri bridge to Symthaea is **architecturally complete** (85%):
 
 ---
 
-## hApp Merger Decisions
+## hApp Merger Assessment (2026-02-09)
 
-### Merge: Climate + Energy -> "Environment" (PROCEED)
+### Climate + Energy -> "Environment" — DEFER
 
-**Feasibility: 8/10**
+**Feasibility: 7/10**
 
-| Metric | Climate | Energy | Combined |
-|--------|---------|--------|----------|
-| Zomes | 3 | 6 | 9 |
-| LOC | 89K | 133K | 222K |
-| Tests | 7,218 | 10,900 | 18,118 |
-| Status | Scaffold | Scaffold | Scaffold |
+| Metric | Climate | Energy |
+|--------|---------|--------|
+| Zomes | 6 (carbon, monitoring, attestation, targets, bridge, reporting) | 7 (projects, participants, trading, credits, investments, grid, bridge) |
+| Status | Scaffold | Scaffold |
+| SDK | TS integration exists (`sdk-ts/src/integrations/energy/`) | Full TS client (`sdk-ts/src/energy/`) |
 
-**Rationale**: Complementary domains (carbon credits + renewable energy certificates), both restored from archive, natural market overlap. Strongest merge candidate.
+**Overlap**: Carbon credits implemented in both. Bridge zomes overlap.
+**Unique**: Climate has footprint tracking (scope 1/2/3), Energy has P2P trading and community investment.
 
-**Implementation**: Create unified `shared` zome with common types (Project, Verification, Certificate), add `project_type` enum (Carbon, Renewable, WaterConservation).
+**Decision**: DEFER. Both are scaffold-quality. The carbon credit duplication should be resolved but doesn't warrant a full merge until either reaches beta quality with real users and sweettest coverage.
 
-### Defer: Finance + Marketplace -> "Economy"
+### MutualAid + Care -> "Community" — DEFER
 
-**Feasibility: 6/10**
+**Feasibility: 8/10** (corrected: Care hApp EXISTS at `/srv/luminous-dynamics/mycelix-care`)
 
-Finance (56K LOC, 3,530 tests) handles debt instruments (loans, credit scoring, treasury). Marketplace (94K LOC, 7,170 tests) handles commodity sales (listings, arbitration, reputation). Different domain semantics make premature merging risky. **Defer until Climate+Energy merge stabilizes.**
+| Metric | MutualAid | Care |
+|--------|-----------|------|
+| Zomes | 8 (requests, pools, timebank, circles, resources, needs, governance, bridge) | 6 (care-plans, circles, timebank, matching, credentials, bridge) |
+| Functions | 70+ coordinator functions | 50+ coordinator functions |
+| Status | Dormant (restored from archive) | Scaffold (all 6 zomes in DNA) |
+| SDK | None | Full TS client (`sdk-ts/src/clients/care/`) |
 
-### Do Not Merge: Media + Music -> "Creative"
+**Critical blockers**:
+1. **Entry type conflicts**: Both define `ServiceOffer`, `ServiceRequest`, `TimeExchange`, `TimeCredit` with different field sets
+2. **ServiceOffer incompatible**: MutualAid has `hours_available`, `skills_required`, `active`; Care doesn't
+3. **SDK breaking change**: Care's TS client is published and in use
+4. **Version pinning**: Care strict `hdk = "0.6.0"`, MutualAid flexible `hdk = "0.6"`
 
-**Feasibility: 3/10**
+**Recommended merge approach** (when ready): Option C — Selective Merge
+- Shared types crate for `circles_core`, `timebank_core`, `matching_core`
+- Namespace domain zomes: `care_plans`, `care_credentials`, `mutual_requests`, `mutual_pools`
+- `CommunityClient` SDK wrapping both, `CareClient` kept as compat layer
+- Estimated effort: 4-6 weeks
 
-Music has 0 traditional zomes (uses Solidity contracts), 153 tests vs Media's 5,504. Technology mismatch (hybrid Ethereum/Holochain vs native Holochain). Would destabilize Media. **Keep separate; refactor Music to HDK zomes first.**
+**Decision**: DEFER. Neither hApp has users or sweettest coverage. Engineering investment not justified until at least one is actively developed.
 
-### Blocked: MutualAid + Care -> "Community"
+### Finance + Marketplace -> "Economy" — NOT FEASIBLE
 
-Care hApp **does not exist** (listed as scaffold in status docs but never created). MutualAid is solid standalone (8 zomes, 49K LOC, 3,489 tests). **Create Care independently if needed; do not force merge.**
+**Finding**: Marketplace is a Node.js/Solidity project, NOT a Holochain hApp. Cannot merge with Finance (Holochain). Keep separate.
+
+### Media + Music -> "Creative" — NOT FEASIBLE
+
+**Finding**: Music is a Node.js/Solidity project, NOT a Holochain hApp. Cannot merge with Media (Holochain). Keep separate.
 
 ---
 
-## hApp Count Projection
+## Portfolio Summary
 
-| Phase | Count | Change |
-|-------|-------|--------|
-| Current | 22 hApps | - |
-| After Climate+Energy merge | 21 hApps | -1 |
-| After Music HDK refactor | 21 hApps | 0 (quality improvement) |
+| Current | Target | Change |
+|---------|--------|--------|
+| 24 hApps | 24 hApps (no merges) | Focus on quality over quantity |
 
-The original target of 18->14 was overly aggressive. **21 hApps** is the realistic near-term target, with potential for further consolidation after the Finance+Marketplace and Music maturation.
+**Rationale**: All feasible merges involve scaffold/dormant hApps. The 4-6 week investment per merge is better spent hardening the Core Four and proving E2E integration. Revisit merges when:
+- Climate OR Energy reaches beta with 3+ sweettest-proven coordinator functions
+- MutualAid is revived from dormancy with active development
+- A real user need requires combined functionality
+
+---
+
+## E2E Integration (Symthaea-Mycelix Bridge)
+
+**Status**: Proven at SDK level, conductor tests exist
+
+- FL bridge `pogq_from_quality_score()` converts consciousness assessment to PoGQ values
+- FL E2E test crate at `tests/sweettest/tests/fl_bridge_e2e.rs`
+- 3 SDK tests pass (composite formula, round-trip values, boundary values)
+- 3 conductor tests written (honest accepted, Byzantine rejected, DHT storage)
+- FL DNA bundle built (1.4MB)
 
 ---
 
 ## Novel hApps Leveraging Symthaea
 
-### Epistemic Garden (replaces Knowledge scaffold)
+### Epistemic Garden (extends LUCID)
 
 Consciousness-aware knowledge evolution using Symthaea's HDC+CfC+IIT stack:
 - Claims carry epistemic classification (E-N-M from Epistemic Charter)
@@ -89,7 +119,7 @@ Consciousness-aware knowledge evolution using Symthaea's HDC+CfC+IIT stack:
 - Phi-based contradiction detection
 - Built on LUCID's existing temporal-consciousness and reasoning zomes
 
-**Implementation**: Extend LUCID rather than creating standalone hApp. The temporal-consciousness zome already stores BeliefSnapshots with phi, coherence, and epistemic_code.
+**Implementation**: Extend LUCID rather than creating standalone hApp.
 
 ### Mycelial Sense (future, post-LUCID stabilization)
 
@@ -103,22 +133,13 @@ Distributed consciousness monitoring across the network:
 
 ## DeSci: Keep Standalone
 
-DeSci is a REST API service (Actix-web, 141 tests, 400K claims/sec), not a Holochain hApp. Create a lightweight bridge zome in LUCID instead of converting. This preserves DeSci's performance characteristics while enabling DHT-based claim verification.
+DeSci is a REST API service (Actix-web, 141 tests, 400K claims/sec), not a Holochain hApp. Create a lightweight bridge zome in LUCID instead of converting.
 
 ---
 
 ## Immediate Actions
 
-1. **Complete LUCID bridge verification** - test Symthaea v0.5.0 API compatibility
-2. **Begin Climate+Energy merge** - create `environment` workspace, unified types
-3. **Update ECOSYSTEM_STATUS.md** - reflect Core Four priority and merger decisions
-4. **Sweettest expansion** - add LUCID integration tests to sweettest suite
-
----
-
-## Success Criteria
-
-- [ ] LUCID bridge compiles and runs with Symthaea v0.5.0
-- [ ] Climate+Energy merged into "Environment" hApp
-- [ ] Core Four hApps all have sweettest coverage
-- [ ] ECOSYSTEM_STATUS.md reflects updated portfolio
+1. **Harden Core Four** - expand sweettest coverage for Identity, Governance, Core FL
+2. **Complete LUCID bridge verification** - test Symthaea v0.5.0 API compatibility
+3. **Run FL conductor tests** - prove honest/Byzantine gradient acceptance
+4. **Update ECOSYSTEM_STATUS.md** - reflect Core Four priority and corrected assessments
