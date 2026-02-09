@@ -252,6 +252,46 @@ pub struct DepositCollateralInput {
     pub oracle_rate: f64,
 }
 
+/// Confirm a pending deposit after collateral has been verified.
+///
+/// Only the original depositor can confirm. Transitions Pending → Confirmed.
+#[hdk_extern]
+pub fn confirm_deposit(deposit_id: String) -> ExternResult<Record> {
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CollateralBridgeDeposit)?))
+        .include_entries(true);
+
+    for record in query(filter)? {
+        if let Some(deposit) = record.entry().to_app_option::<CollateralBridgeDeposit>().ok().flatten() {
+            if deposit.id == deposit_id {
+                verify_caller_is_did(&deposit.depositor_did)?;
+
+                if deposit.status != BridgeDepositStatus::Pending {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        format!("Deposit is {:?}, only Pending deposits can be confirmed", deposit.status)
+                    )));
+                }
+
+                let now = sys_time()?;
+                let confirmed = CollateralBridgeDeposit {
+                    status: BridgeDepositStatus::Confirmed,
+                    completed_at: Some(now),
+                    ..deposit
+                };
+
+                let action_hash = update_entry(
+                    record.action_address().clone(),
+                    &EntryTypes::CollateralBridgeDeposit(confirmed),
+                )?;
+
+                return get(action_hash, GetOptions::default())?
+                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
+            }
+        }
+    }
+    Err(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))
+}
+
 /// Redeem collateral by marking a deposit as redeemed (SAP returned, collateral released).
 ///
 /// Rate-limited: max 5% of total vault value per day per member.

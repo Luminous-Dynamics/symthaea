@@ -180,29 +180,50 @@ pub struct DemurrageResult {
 }
 
 /// Credit SAP to a member's balance (used by bridge deposits and community issuance).
+/// Auto-initializes the SapBalance entry if the member has none yet.
 #[hdk_extern]
 pub fn credit_sap(input: CreditSapInput) -> ExternResult<Record> {
-    let (record, bal) = get_sap_balance_inner(&input.member_did)?;
     let now = sys_time()?;
 
-    // Apply pending demurrage first, then credit
-    let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
-    let deduction = compute_demurrage_deduction(
-        bal.balance,
-        DEMURRAGE_EXEMPT_FLOOR,
-        DEMURRAGE_RATE,
-        elapsed,
-    );
-    let post_demurrage = bal.balance.saturating_sub(deduction);
+    match find_sap_balance_record(&input.member_did)? {
+        Some((record, bal)) => {
+            // Existing balance: apply pending demurrage first, then credit
+            let elapsed = elapsed_seconds(bal.last_demurrage_at, now);
+            let deduction = compute_demurrage_deduction(
+                bal.balance,
+                DEMURRAGE_EXEMPT_FLOOR,
+                DEMURRAGE_RATE,
+                elapsed,
+            );
+            let post_demurrage = bal.balance.saturating_sub(deduction);
 
-    let updated = SapBalance {
-        balance: post_demurrage + input.amount,
-        last_demurrage_at: now,
-        ..bal
-    };
-    let action_hash = update_entry(record.action_address().clone(), &EntryTypes::SapBalance(updated))?;
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+            let updated = SapBalance {
+                balance: post_demurrage + input.amount,
+                last_demurrage_at: now,
+                ..bal
+            };
+            let action_hash = update_entry(record.action_address().clone(), &EntryTypes::SapBalance(updated))?;
+            get(action_hash, GetOptions::default())?
+                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        }
+        None => {
+            // First-time credit: auto-initialize balance with credited amount
+            let balance = SapBalance {
+                member_did: input.member_did.clone(),
+                balance: input.amount,
+                last_demurrage_at: now,
+            };
+            let action_hash = create_entry(&EntryTypes::SapBalance(balance))?;
+            create_link(
+                anchor_hash(&format!("sap:{}", input.member_did))?,
+                action_hash.clone(),
+                LinkTypes::DidToSapBalance,
+                (),
+            )?;
+            get(action_hash, GetOptions::default())?
+                .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

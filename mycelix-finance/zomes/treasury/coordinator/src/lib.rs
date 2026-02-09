@@ -1,7 +1,7 @@
 //! Treasury Coordinator Zome
 use hdk::prelude::*;
 use treasury_integrity::*;
-use mycelix_finance_shared::anchor_hash;
+use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
 
 #[hdk_extern]
 pub fn create_treasury(input: CreateTreasuryInput) -> ExternResult<Record> {
@@ -190,6 +190,9 @@ pub fn approve_allocation(input: ApproveAllocationInput) -> ExternResult<Record>
                     return Err(wasm_error!(WasmErrorInner::Guest("Can only approve proposed allocations".into())));
                 }
 
+                // Verify caller is the approver
+                verify_caller_is_did(&input.approver_did)?;
+
                 // Verify approver is a treasury manager
                 let treasury = get_treasury(alloc.treasury_id.clone())?
                     .ok_or(wasm_error!(WasmErrorInner::Guest("Treasury not found".into())))?;
@@ -247,6 +250,9 @@ pub fn reject_allocation(input: RejectAllocationInput) -> ExternResult<Record> {
                 if alloc.status != AllocationStatus::Proposed {
                     return Err(wasm_error!(WasmErrorInner::Guest("Can only reject proposed allocations".into())));
                 }
+
+                // Verify caller is the rejector
+                verify_caller_is_did(&input.rejector_did)?;
 
                 // Verify rejector is a treasury manager
                 let treasury = get_treasury(alloc.treasury_id.clone())?
@@ -313,7 +319,9 @@ pub fn add_manager(input: AddManagerInput) -> ExternResult<Record> {
     for record in query(filter)? {
         if let Some(treasury) = record.entry().to_app_option::<Treasury>().ok().flatten() {
             if treasury.id == input.treasury_id {
-                // Verify caller is a manager
+                // Verify caller is the adding manager
+                verify_caller_is_did(&input.added_by_did)?;
+
                 if !treasury.managers.contains(&input.added_by_did) {
                     return Err(wasm_error!(WasmErrorInner::Guest("Only managers can add new managers".into())));
                 }
@@ -359,7 +367,9 @@ pub fn remove_manager(input: RemoveManagerInput) -> ExternResult<Record> {
     for record in query(filter)? {
         if let Some(treasury) = record.entry().to_app_option::<Treasury>().ok().flatten() {
             if treasury.id == input.treasury_id {
-                // Verify caller is a manager
+                // Verify caller is the removing manager
+                verify_caller_is_did(&input.removed_by_did)?;
+
                 if !treasury.managers.contains(&input.removed_by_did) {
                     return Err(wasm_error!(WasmErrorInner::Guest("Only managers can remove managers".into())));
                 }
@@ -555,7 +565,9 @@ pub fn cancel_allocation(input: CancelAllocationInput) -> ExternResult<Record> {
                     return Err(wasm_error!(WasmErrorInner::Guest("Can only cancel proposed allocations".into())));
                 }
 
-                // Verify caller is a treasury manager
+                // Verify caller is the cancelling manager
+                verify_caller_is_did(&input.cancelled_by_did)?;
+
                 let treasury = get_treasury(alloc.treasury_id.clone())?
                     .ok_or(wasm_error!(WasmErrorInner::Guest("Treasury not found".into())))?;
                 let treasury_data = treasury.entry().to_app_option::<Treasury>().ok().flatten()
