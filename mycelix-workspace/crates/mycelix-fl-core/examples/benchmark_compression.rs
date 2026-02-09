@@ -6,7 +6,7 @@
 //!
 //! Run: `cargo run --example benchmark_compression --release`
 
-use mycelix_fl_core::plugins::{CompressedGradient, CompressionPlugin};
+use mycelix_fl_core::plugins::{CompressedGradient, CompressionPlugin, RandomProjectionPlugin};
 use mycelix_fl_core::*;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
@@ -50,135 +50,6 @@ impl CompressionPlugin for IdentityCompressionPlugin {
     }
 }
 
-/// Simulated HyperFeel compression using random projection.
-///
-/// Reduces gradients to HV_SIZE bytes (2,048) using:
-/// 1. Random projection matrix (sparse, seeded)
-/// 2. Quantization to bytes
-///
-/// This approximates HyperFeel without depending on Symthaea.
-struct SimulatedHyperFeelPlugin {
-    seed: u64,
-}
-
-impl SimulatedHyperFeelPlugin {
-    fn new(seed: u64) -> Self {
-        Self { seed }
-    }
-
-    fn generate_projection_row(&self, row: usize, dim: usize) -> Vec<f32> {
-        let mut rng = StdRng::seed_from_u64(self.seed.wrapping_add(row as u64));
-        let mut proj = vec![0.0f32; dim];
-        // Sparse random projection: ~10% non-zero entries
-        let scale = (10.0 / dim as f32).sqrt();
-        for val in proj.iter_mut() {
-            let r: f32 = rng.gen();
-            if r < 0.05 {
-                *val = scale;
-            } else if r < 0.10 {
-                *val = -scale;
-            }
-        }
-        proj
-    }
-}
-
-impl CompressionPlugin for SimulatedHyperFeelPlugin {
-    fn compress(&mut self, update: &GradientUpdate) -> CompressedGradient {
-        let dim = update.gradients.len();
-        let n_proj = HV_SIZE; // one byte per projection
-
-        // Project: for each output dimension, dot product with random vector
-        let mut projected = Vec::with_capacity(n_proj);
-        for row in 0..n_proj {
-            let proj_vec = self.generate_projection_row(row, dim);
-            let dot: f32 = update
-                .gradients
-                .iter()
-                .zip(proj_vec.iter())
-                .map(|(g, p)| g * p)
-                .sum();
-            projected.push(dot);
-        }
-
-        // Quantize to bytes: map range to [0, 255]
-        let min_val = projected
-            .iter()
-            .cloned()
-            .fold(f32::INFINITY, f32::min);
-        let max_val = projected
-            .iter()
-            .cloned()
-            .fold(f32::NEG_INFINITY, f32::max);
-        let range = (max_val - min_val).max(1e-10);
-
-        let mut data = Vec::with_capacity(n_proj + 8);
-        // Store min/max for dequantization (8 bytes overhead)
-        data.extend_from_slice(&min_val.to_le_bytes());
-        data.extend_from_slice(&range.to_le_bytes());
-        for &v in &projected {
-            let normalized = ((v - min_val) / range * 255.0).round() as u8;
-            data.push(normalized);
-        }
-
-        let original_bytes = dim * 4; // f32 = 4 bytes
-        let ratio = original_bytes as f32 / data.len() as f32;
-
-        CompressedGradient {
-            participant_id: update.participant_id.clone(),
-            data,
-            compression_ratio: ratio,
-        }
-    }
-
-    fn decompress(&mut self, compressed: &CompressedGradient, output_dim: usize) -> Vec<f32> {
-        if compressed.data.len() < 8 {
-            return vec![0.0; output_dim];
-        }
-
-        // Extract min/range
-        let min_bytes: [u8; 4] = compressed.data[0..4].try_into().unwrap();
-        let range_bytes: [u8; 4] = compressed.data[4..8].try_into().unwrap();
-        let min_val = f32::from_le_bytes(min_bytes);
-        let range = f32::from_le_bytes(range_bytes);
-
-        // Dequantize projected values
-        let quantized = &compressed.data[8..];
-        let n_proj = quantized.len();
-        let mut projected = Vec::with_capacity(n_proj);
-        for &byte in quantized {
-            let val = min_val + (byte as f32 / 255.0) * range;
-            projected.push(val);
-        }
-
-        // Pseudo-inverse reconstruction via transpose projection
-        let mut result = vec![0.0f32; output_dim];
-        for (row, &proj_val) in projected.iter().enumerate() {
-            let proj_vec = self.generate_projection_row(row, output_dim);
-            for (i, &p) in proj_vec.iter().enumerate() {
-                result[i] += proj_val * p;
-            }
-        }
-
-        // Normalize by number of projections
-        let scale = 1.0 / (n_proj as f32).sqrt();
-        for val in result.iter_mut() {
-            *val *= scale;
-        }
-
-        result
-    }
-
-    fn name(&self) -> &str {
-        "simulated_hyperfeel"
-    }
-
-    fn compression_ratio(&self) -> f32 {
-        // Depends on input size; return nominal
-        1000.0
-    }
-}
-
 fn mse(a: &[f32], b: &[f32]) -> f32 {
     assert_eq!(a.len(), b.len());
     a.iter()
@@ -192,7 +63,7 @@ fn main() {
     println!("=== HyperFeel Compression Measurement Benchmark ===\n");
 
     let mut rng = StdRng::seed_from_u64(42);
-    let mut hyperfeel = SimulatedHyperFeelPlugin::new(42);
+    let mut hyperfeel = RandomProjectionPlugin::new();
     let mut identity = IdentityCompressionPlugin;
 
     let sizes = [1_000, 10_000, 100_000, 1_000_000];
