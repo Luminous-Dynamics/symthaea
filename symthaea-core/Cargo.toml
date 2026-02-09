@@ -75,6 +75,10 @@ harness = false
 name = "bridge_integration"
 harness = false
 
+[[bench]]
+name = "physics_benchmarks"
+harness = false
+
 [features]
 default = []
 embeddings = []       # Enable embedding model integration

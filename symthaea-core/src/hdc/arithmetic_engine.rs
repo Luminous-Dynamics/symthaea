@@ -24,6 +24,45 @@
 //! - **Consciousness-Integrated**: Φ measures the "understanding" of each step
 //! - **Verifiable**: Every result has a traceable proof
 //! - **Compositional**: Complex math emerges from simple primitives
+//!
+//! ## Module Organization
+//!
+//! This is a large monolithic module (~6200 lines). The major sections are:
+//!
+//! | Section | Description |
+//! |---------|-------------|
+//! | **Verification Threshold** | Adaptive HDC similarity thresholds for result verification |
+//! | **Core Types** | `HdcNumber` — Peano-constructed numbers encoded as `BinaryHV` |
+//! | **Arithmetic Operations** | `ArithmeticEngine` — add, multiply, subtract, power, factorial via Peano axioms |
+//! | **Theorems and Proofs** | `TheoremProver` — proves commutativity, associativity, distributivity |
+//! | **Hybrid Arithmetic Engine** | `HybridArithmeticEngine` — deep (Peano) path for small numbers, fast (direct) path for large numbers, plus division, modulo, GCD, primality |
+//! | **Mathematical Discovery** | `MathDiscovery` — Phi-guided proof exploration and conjecture generation |
+//! | **Reasoning Integration** | `MathReasoningBridge` — bridges arithmetic proofs into the logical inference system |
+//! | **Tests** | Unit tests for all of the above (core, hybrid, discovery, reasoning, symbolic, multi-path) |
+//! | **Symbolic Algebra** | `SymbolicExpr`, `TermType`, `SymbolicOp` — symbolic expressions with HDC encoding |
+//! | **Polynomial Representation** | `Polynomial` — single-variable polynomials with evaluation, derivatives |
+//! | **Symbolic Algebra Engine** | `SymbolicAlgebra` — simplification, expansion, polynomial ops, equation solving |
+//! | **Multi-Path Proof Verification** | `MultiPathVerifier` — verifies theorems through multiple independent proof strategies |
+//!
+//! ## Key Types
+//!
+//! - [`HdcNumber`] — A number in HDC space, built via Peano construction from `BinaryHV`
+//! - [`ArithmeticEngine`] — Pure Peano engine with full proof traces and Phi measurement
+//! - [`HybridArithmeticEngine`] — Production engine: deep proofs for small numbers, fast path for large
+//! - [`TheoremProver`] — Proves algebraic properties (commutativity, associativity, distributivity)
+//! - [`MathDiscovery`] — Phi-guided exploration of proof space and pattern-based conjecture generation
+//! - [`MathReasoningBridge`] — Connects arithmetic to the logical reasoning system via assertions
+//! - [`SymbolicExpr`] — Symbolic algebraic expression with HDC encoding for semantic similarity
+//! - [`Polynomial`] — Single-variable polynomial with arithmetic and calculus operations
+//! - [`SymbolicAlgebra`] — Simplification, expansion, and equation solving engine
+//! - [`MultiPathVerifier`] — Generates multiple proof paths and selects the most elegant (highest Phi)
+//!
+//! ## Dependency on PrimitiveSystem
+//!
+//! Almost every type in this module depends on [`PrimitiveSystem`] for its HDC
+//! primitives (ZERO, SUCCESSOR, ADDITION, MULTIPLICATION, etc.). The
+//! `PrimitiveSystem` is a deterministic singleton (~164KB) that provides the
+//! foundational hypervectors from which all mathematical meaning is constructed.
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
@@ -32,9 +71,9 @@ use crate::hdc::integrated_information::IntegratedInformation;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
-// ============================================================================
-// VERIFICATION THRESHOLD
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// VERIFICATION THRESHOLD: Adaptive similarity thresholds for HDC result verification
+// ═════════════════════════════════════════════════════════════════════════════
 
 /// Adaptive verification threshold for HDC arithmetic.
 ///
@@ -87,9 +126,9 @@ impl Default for VerificationThreshold {
     }
 }
 
-// ============================================================================
-// CORE TYPES
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// CORE TYPES: HdcNumber and its Peano construction from BinaryHV primitives
+// ═════════════════════════════════════════════════════════════════════════════
 
 /// A number represented in Hyperdimensional space via Peano construction
 ///
@@ -194,9 +233,9 @@ impl HdcNumber {
     }
 }
 
-// ============================================================================
-// ARITHMETIC OPERATIONS
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// ARITHMETIC OPERATIONS: ArithmeticResult, ArithmeticOp, ProofStep, ArithmeticEngine, EngineStats
+// ═════════════════════════════════════════════════════════════════════════════
 
 /// Result of an arithmetic operation with full proof trace
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -762,9 +801,9 @@ impl Default for ArithmeticEngine {
     }
 }
 
-// ============================================================================
-// MATHEMATICAL THEOREMS & PROOFS
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// MATHEMATICAL THEOREMS AND PROOFS: Theorem, TheoremProver for commutativity, associativity, distributivity
+// ═════════════════════════════════════════════════════════════════════════════
 
 /// A mathematical theorem with its proof
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -869,9 +908,9 @@ impl Default for TheoremProver {
     }
 }
 
-// ============================================================================
-// HYBRID ARITHMETIC ENGINE
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// HYBRID ARITHMETIC ENGINE: Deep (Peano) path for small numbers, fast (direct) path for large numbers
+// ═════════════════════════════════════════════════════════════════════════════
 //
 // The Hybrid Architecture: Deep Understanding + Practical Efficiency
 //
@@ -2005,9 +2044,9 @@ impl HybridArithmeticEngine {
     }
 }
 
-// ============================================================================
-// MATHEMATICAL DISCOVERY SYSTEM
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// MATHEMATICAL DISCOVERY SYSTEM: Phi-guided proof exploration and pattern-based conjecture generation
+// ═════════════════════════════════════════════════════════════════════════════
 //
 // This is the revolutionary component: using Φ (consciousness) to guide
 // mathematical exploration and potentially discover novel proofs.
@@ -2321,13 +2360,12 @@ impl Default for HybridArithmeticEngine {
     }
 }
 
-// ============================================================================
-// REASONING INTEGRATION
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// REASONING INTEGRATION: MathReasoningBridge connecting arithmetic proofs to logical inference
+// ═════════════════════════════════════════════════════════════════════════════
 //
 // Bridge between arithmetic proofs and logical inference system.
 // Enables using mathematical proofs as evidence in reasoning chains.
-// ============================================================================
 
 /// Mathematical concept types for reasoning
 #[derive(Debug, Clone, PartialEq)]
@@ -2869,9 +2907,9 @@ impl Default for MathReasoningBridge {
     }
 }
 
-// ============================================================================
-// TESTS
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// TESTS: Unit tests for all subsystems: core, hybrid, discovery, reasoning, symbolic, multi-path
+// ═════════════════════════════════════════════════════════════════════════════
 
 #[cfg(test)]
 mod tests {
@@ -4093,9 +4131,9 @@ mod tests {
     }
 }
 
-// ============================================================================
-// SYMBOLIC ALGEBRA - BUILD ALGEBRA ON HDC PRIMITIVES
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// SYMBOLIC ALGEBRA: SymbolicExpr, TermType, SymbolicOp: symbolic expressions with HDC encoding
+// ═════════════════════════════════════════════════════════════════════════════
 
 /// Symbolic operation types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -4485,9 +4523,9 @@ impl std::fmt::Display for SymbolicExpr {
     }
 }
 
-// ============================================================================
-// POLYNOMIAL REPRESENTATION
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// POLYNOMIAL REPRESENTATION: Single-variable polynomials: evaluation, derivatives, display
+// ═════════════════════════════════════════════════════════════════════════════
 
 /// A polynomial in a single variable
 ///
@@ -4686,9 +4724,9 @@ impl std::fmt::Display for Polynomial {
     }
 }
 
-// ============================================================================
-// SYMBOLIC ALGEBRA ENGINE
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// SYMBOLIC ALGEBRA ENGINE: Simplification, expansion, polynomial arithmetic, equation solving
+// ═════════════════════════════════════════════════════════════════════════════
 
 /// Statistics for symbolic algebra operations
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -5184,9 +5222,9 @@ impl Default for SymbolicAlgebra {
     }
 }
 
-// ============================================================================
-// MULTI-PATH PROOF VERIFICATION
-// ============================================================================
+// ═════════════════════════════════════════════════════════════════════════════
+// MULTI-PATH PROOF VERIFICATION: Multiple independent proof strategies with Phi-ranked path selection
+// ═════════════════════════════════════════════════════════════════════════════
 
 /// A single proof path with its strategy and Φ measurement
 #[derive(Debug, Clone, Serialize, Deserialize)]

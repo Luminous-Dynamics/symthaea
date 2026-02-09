@@ -713,7 +713,7 @@ mod tests {
 
     #[test]
     fn test_large_numbers() {
-        let mut engine = IntegerArithmeticEngine::new();
+        let engine = IntegerArithmeticEngine::new();
         // Test encoding of large numbers (> 20, should use deterministic random)
         let large = engine.encode(1000);
         assert_eq!(large.value, 1000);

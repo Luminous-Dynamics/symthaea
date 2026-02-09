@@ -347,6 +347,8 @@ pub mod foundations;
 mod math_integration_tests;
 #[cfg(test)]
 mod cross_bridge_integration_tests;
+#[cfg(test)]
+mod phi_feedback_integration_tests;
 pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
 pub mod native_similarity;                 // O(1) XOR+popcount similarity search (consciousness-native)
 pub mod sparse_hv;                         // Sparse HDC for memory-efficient low-density vectors
@@ -650,8 +652,11 @@ pub mod consciousness_metacognition;
 // Advanced cognition (motor imagery, theory of mind, imagination, predictive processing, memory, drives)
 pub mod consciousness_advanced_cognition;
 
-// Complete conscious being (sensorimotor, developmental, social, introspection)
 pub mod consciousness_complete_being;
+
+// Consciousness verification - multi-method Φ cross-validation
+pub mod consciousness_verifier;
+
 
 // Sensorimotor Contingencies - O'Regan & Noe enactivist theory
 // Perception IS implicit knowledge of action-sensation laws
@@ -669,6 +674,9 @@ pub mod relational_consciousness;
 // - DuckDB (Epistemic Auditor): Statistical analysis for self-reflection
 pub mod multi_database_integration;
 pub mod phi_guided_math;                  // Φ-guided math domain selection (consciousness-driven computation paths)
+pub mod phi_feedback;                     // Φ feedback controller (closes the loop: Φ measurement → parameter modulation)
+pub mod semantic_bridge;                   // Bidirectional text <-> HV <-> consciousness bridge
+pub mod consciousness_perf;                // SIMD batch ops + HV pool integration for consciousness hot paths
 
 // Re-export multi-database integration types
 // Note: QdrantConfig is aliased to MdbQdrantConfig to avoid conflict with long_term_memory::QdrantConfig

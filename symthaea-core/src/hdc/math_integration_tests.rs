@@ -12,13 +12,12 @@
 mod tests {
     use crate::hdc::binary_hv::BinaryHV;
     use crate::hdc::primitive_system::PrimitiveSystem;
-    use crate::hdc::arithmetic_engine::HybridArithmeticEngine;
     use crate::hdc::integer::IntegerArithmeticEngine;
     use crate::hdc::rational::RationalArithmeticEngine;
     use crate::hdc::real_arithmetic::{PeanoPhysicsBridge, MathConstants};
     use crate::hdc::number_theory::{NumberTheoryEngine, ModularRing};
     use crate::hdc::algebraic_structures::{AlgebraicElement, BinaryOperation, GroupVerifier, RingVerifier, FieldVerifier};
-    use crate::hdc::calculus::{SymbolicDifferentiator, SymbolicIntegrator, FundamentalTheoremVerifier};
+    use crate::hdc::calculus::{SymbolicIntegrator, FundamentalTheoremVerifier};
     use crate::hdc::foundations::InductionEngine;
     use crate::hdc::primitive_system::seed_from_name;
 

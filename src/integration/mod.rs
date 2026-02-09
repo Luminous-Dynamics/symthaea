@@ -39,3 +39,11 @@
 mod conscious_pipeline;
 
 pub use conscious_pipeline::*;
+
+/// NixOS mind integration bridges (Hippocampus + Pipeline).
+#[cfg(feature = "nix-mind")]
+pub mod nix_integration;
+#[cfg(feature = "nix-mind")]
+pub use nix_integration::{
+    NixHippocampusBridge, NixPipelineHookImpl, register_nix_actors,
+};

@@ -92,6 +92,10 @@ use super::collective_consciousness::{
     CollectiveConsciousness, CollectiveConfig, CollectiveAgent, CollectiveAssessment,
 };
 
+// 16. Phi Feedback Controller - Closes the Φ loop
+use super::phi_feedback::{PhiFeedbackController, PhiFeedbackConfig, FeedbackModulation};
+use super::consciousness_perf;
+
 // Re-export SubstrateType from substrate_independence
 pub use super::substrate_independence::SubstrateType;
 
@@ -797,12 +801,20 @@ pub struct ConsciousnessPipeline {
     collective_assessment: Option<CollectiveAssessment>,
     /// Enable collective consciousness
     collective_enabled: bool,
+
+    // 16. Phi Feedback Controller - Closes the Φ loop
+    /// Φ feedback controller for adaptive parameter modulation
+    phi_feedback: Option<PhiFeedbackController>,
+    /// Latest modulation signals from Φ feedback
+    latest_modulation: Option<FeedbackModulation>,
+    /// Enable Φ feedback loop
+    phi_feedback_enabled: bool,
 }
 
 impl ConsciousnessPipeline {
     /// Create new pipeline with config
     pub fn new(config: IntegrationConfig) -> Self {
-        Self {
+        let pipeline = Self {
             config,
             state: ConsciousnessState::default(),
             history: Vec::new(),
@@ -877,7 +889,17 @@ impl ConsciousnessPipeline {
             collective_agent_id: None,
             collective_assessment: None,
             collective_enabled: false,
-        }
+
+            // Φ feedback controller
+            phi_feedback: None,
+            latest_modulation: None,
+            phi_feedback_enabled: false,
+        };
+
+        // Pre-warm HV pools for consciousness pipeline operation
+        consciousness_perf::prewarm_consciousness_pools();
+
+        pipeline
     }
 
     /// Enable all integrated consciousness systems
@@ -1274,7 +1296,10 @@ impl ConsciousnessPipeline {
         }
     }
 
-    /// Convert BinaryHV binary vector to ContinuousHV for self-aware processing
+    /// Convert BinaryHV binary vector to ContinuousHV for self-aware processing.
+    ///
+    /// Uses pooled ContinuousHV allocation when dimension matches full BinaryHV::DIM,
+    /// falls back to manual conversion for custom dimensions.
     fn hv16_to_real_hv(&self, hv: &BinaryHV) -> ContinuousHV {
         // Get the dimension from self-aware consciousness or use default
         let dim = if let Some(ref sac) = self.self_aware_consciousness {
@@ -1283,7 +1308,12 @@ impl ConsciousnessPipeline {
             1024 // Default dimension
         };
 
-        // Create ContinuousHV by mapping binary bits to [-1, 1] values
+        // For full-dimension conversion, use the pool-optimized path
+        if dim == BinaryHV::DIM {
+            return consciousness_perf::binary_to_continuous_pooled(hv).into_continuous_hv();
+        }
+
+        // Custom dimension: manual conversion (handles dimension mismatch)
         let mut values = Vec::with_capacity(dim);
         let bytes = &hv.0;
 
@@ -1730,6 +1760,70 @@ impl ConsciousnessPipeline {
     }
 
     // ==========================================
+    // 16. Φ FEEDBACK CONTROLLER
+    // ==========================================
+
+    /// Enable Φ feedback loop with default configuration
+    ///
+    /// The feedback controller uses Φ measurements to dynamically modulate:
+    /// - Binding threshold (rising Φ → more selective, falling → more exploratory)
+    /// - Workspace capacity (high Φ → expanded, low Φ → contracted)
+    /// - Attention gain (positive trend → exploit, negative → explore)
+    /// - Consciousness threshold (adapts to natural operating point)
+    pub fn enable_phi_feedback(&mut self) -> &mut Self {
+        self.phi_feedback = Some(PhiFeedbackController::new());
+        self.phi_feedback_enabled = true;
+        self
+    }
+
+    /// Enable Φ feedback with custom configuration
+    pub fn enable_phi_feedback_with_config(&mut self, config: PhiFeedbackConfig) -> &mut Self {
+        self.phi_feedback = Some(PhiFeedbackController::with_config(config));
+        self.phi_feedback_enabled = true;
+        self
+    }
+
+    /// Check if Φ feedback is enabled
+    pub fn has_phi_feedback(&self) -> bool {
+        self.phi_feedback_enabled && self.phi_feedback.is_some()
+    }
+
+    /// Get latest feedback modulation signals
+    pub fn latest_modulation(&self) -> Option<&FeedbackModulation> {
+        self.latest_modulation.as_ref()
+    }
+
+    /// Get the Φ feedback controller (for inspection)
+    pub fn phi_feedback_controller(&self) -> Option<&PhiFeedbackController> {
+        self.phi_feedback.as_ref()
+    }
+
+    /// Get SIMD capabilities for this CPU (for diagnostics/logging).
+    pub fn simd_capabilities(&self) -> consciousness_perf::SimdCapabilities {
+        consciousness_perf::simd_capabilities()
+    }
+
+    /// Get HV pool statistics for monitoring.
+    pub fn pool_stats(&self) -> super::hv_pool::PoolStats {
+        consciousness_perf::pool_stats()
+    }
+
+    /// Process Φ feedback: feed current Φ into controller, apply modulation
+    fn process_phi_feedback(&mut self) {
+        if let Some(ref mut controller) = self.phi_feedback {
+            let modulation = controller.step(self.state.phi);
+
+            // Apply modulation to pipeline parameters
+            self.config.binding_threshold = modulation.binding_threshold;
+            self.config.workspace_capacity = modulation.workspace_capacity;
+            self.config.consciousness_threshold = modulation.consciousness_threshold;
+
+            // Store modulation for inspection
+            self.latest_modulation = Some(modulation);
+        }
+    }
+
+    // ==========================================
     // UNIFIED CONSCIOUSNESS OPTIMIZER
     // ==========================================
 
@@ -1769,6 +1863,7 @@ impl ConsciousnessPipeline {
         self.enable_epistemic(8);                // 8 components for belief tracking
         self.enable_fractal(3);                  // 3 scales for fractal Φ
         self.enable_collective("primary");       // Primary agent in collective
+        self.enable_phi_feedback();              // Φ feedback loop (closes the loop)
 
         self
     }
@@ -1795,6 +1890,7 @@ impl ConsciousnessPipeline {
         self.enable_epistemic(phi_nodes);
         self.enable_fractal(3);
         self.enable_collective("primary");
+        self.enable_phi_feedback();              // Φ feedback loop (closes the loop)
 
         self
     }
@@ -1814,6 +1910,7 @@ impl ConsciousnessPipeline {
             && self.has_epistemic()
             && self.has_fractal()
             && self.has_collective()
+            && self.has_phi_feedback()
     }
 
     /// Check how many consciousness systems are active
@@ -1830,6 +1927,7 @@ impl ConsciousnessPipeline {
         if self.has_epistemic() { count += 1; }
         if self.has_fractal() { count += 1; }
         if self.has_collective() { count += 1; }
+        if self.has_phi_feedback() { count += 1; }
         count
     }
 
@@ -1847,7 +1945,8 @@ impl ConsciousnessPipeline {
         if self.has_epistemic() { systems.push("Epistemic"); }
         if self.has_fractal() { systems.push("Fractal"); }
         if self.has_collective() { systems.push("Collective"); }
-        format!("{}/{} systems: [{}]", systems.len(), 11, systems.join(", "))
+        if self.has_phi_feedback() { systems.push("Φ-Feedback"); }
+        format!("{}/{} systems: [{}]", systems.len(), 12, systems.join(", "))
     }
 
     /// Get a unified consciousness metrics report
@@ -2372,6 +2471,13 @@ impl ConsciousnessPipeline {
         // Collective consciousness: Multi-agent awareness
         if self.collective_enabled {
             self.process_collective(&input);
+        }
+
+        // === Φ FEEDBACK LOOP ===
+        // Feed current Φ into the feedback controller to modulate parameters
+        // for the NEXT processing cycle (adaptive binding, workspace, attention)
+        if self.phi_feedback_enabled {
+            self.process_phi_feedback();
         }
 
         // Store in history

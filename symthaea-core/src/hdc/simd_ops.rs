@@ -53,42 +53,42 @@ static HAS_POPCNT: OnceLock<bool> = OnceLock::new();
 /// Get cached AVX-512F availability
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]
-fn has_avx512f() -> bool {
+pub fn has_avx512f() -> bool {
     *HAS_AVX512F.get_or_init(|| is_x86_feature_detected!("avx512f"))
 }
 
 /// Get cached AVX-512BW availability
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]
-fn has_avx512bw() -> bool {
+pub fn has_avx512bw() -> bool {
     *HAS_AVX512BW.get_or_init(|| is_x86_feature_detected!("avx512bw"))
 }
 
 /// Get cached AVX-512 VPOPCNTDQ availability
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]
-fn has_avx512_vpopcntdq() -> bool {
+pub fn has_avx512_vpopcntdq() -> bool {
     *HAS_AVX512VPOPCNTDQ.get_or_init(|| is_x86_feature_detected!("avx512vpopcntdq"))
 }
 
 /// Get cached AVX2 availability (2-3x faster than repeated macro calls)
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]
-fn has_avx2() -> bool {
+pub fn has_avx2() -> bool {
     *HAS_AVX2.get_or_init(|| is_x86_feature_detected!("avx2"))
 }
 
 /// Get cached SSE4.1 availability
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]
-fn has_sse41() -> bool {
+pub fn has_sse41() -> bool {
     *HAS_SSE41.get_or_init(|| is_x86_feature_detected!("sse4.1"))
 }
 
 /// Get cached POPCNT availability
 #[cfg(target_arch = "x86_64")]
 #[inline(always)]
-fn has_popcnt() -> bool {
+pub fn has_popcnt() -> bool {
     *HAS_POPCNT.get_or_init(|| is_x86_feature_detected!("popcnt"))
 }
 
