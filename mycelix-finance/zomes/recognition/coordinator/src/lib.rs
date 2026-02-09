@@ -17,6 +17,11 @@ use mycelix_finance_shared::{anchor_hash, verify_caller_is_did};
 // Re-export integrity types for external use
 pub use recognition_integrity::*;
 
+/// DID method prefix for Mycelix identities
+const DID_METHOD_PREFIX: &str = "did:mycelix:";
+/// Maximum length for a DID string
+const MAX_DID_LENGTH: usize = 256;
+
 // =============================================================================
 // INPUT/OUTPUT TYPES
 // =============================================================================
@@ -63,7 +68,7 @@ pub struct GetRecognitionsInput {
 /// Apprentices (MYCEL < 0.3) cannot give recognition.
 #[hdk_extern]
 pub fn recognize_member(input: RecognizeMemberInput) -> ExternResult<Record> {
-    if input.recipient_did.is_empty() || input.recipient_did.len() > 256 {
+    if input.recipient_did.is_empty() || input.recipient_did.len() > MAX_DID_LENGTH {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Recipient DID must be 1-256 characters".into()
         )));
@@ -75,7 +80,7 @@ pub fn recognize_member(input: RecognizeMemberInput) -> ExternResult<Record> {
     }
 
     let caller = agent_info()?.agent_initial_pubkey;
-    let caller_did = format!("did:mycelix:{}", caller);
+    let caller_did = format!("{}{}", DID_METHOD_PREFIX, caller);
 
     // Cannot recognize yourself
     if caller_did == input.recipient_did {
@@ -158,7 +163,7 @@ pub fn recognize_member(input: RecognizeMemberInput) -> ExternResult<Record> {
 /// Get all recognitions received by a member, optionally filtered by cycle
 #[hdk_extern]
 pub fn get_recognition_received(input: GetRecognitionsInput) -> ExternResult<Vec<RecognitionEvent>> {
-    if input.member_did.is_empty() || input.member_did.len() > 256 {
+    if input.member_did.is_empty() || input.member_did.len() > MAX_DID_LENGTH {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Member DID must be 1-256 characters".into()
         )));
@@ -202,7 +207,7 @@ pub fn get_recognition_received(input: GetRecognitionsInput) -> ExternResult<Vec
 /// Get a member's current MYCEL score
 #[hdk_extern]
 pub fn get_mycel_score(member_did: String) -> ExternResult<MemberMycelState> {
-    if member_did.is_empty() || member_did.len() > 256 {
+    if member_did.is_empty() || member_did.len() > MAX_DID_LENGTH {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Member DID must be 1-256 characters".into()
         )));
@@ -223,7 +228,7 @@ pub fn initialize_member(input: InitializeMemberInput) -> ExternResult<Record> {
         let mentor = input.mentor_did.as_ref().ok_or(wasm_error!(
             WasmErrorInner::Guest("Apprentices must have a mentor DID".into())
         ))?;
-        if mentor.is_empty() || mentor.len() > 256 {
+        if mentor.is_empty() || mentor.len() > MAX_DID_LENGTH {
             return Err(wasm_error!(WasmErrorInner::Guest(
                 "Mentor DID must be 1-256 characters".into()
             )));
@@ -342,7 +347,7 @@ pub fn update_mycel_score(input: UpdateMycelInput) -> ExternResult<MemberMycelSt
 /// In production, restrict to governance/oracle agents via capability tokens.
 #[hdk_extern]
 pub fn jubilee_normalize(member_did: String) -> ExternResult<MemberMycelState> {
-    if member_did.is_empty() || member_did.len() > 256 {
+    if member_did.is_empty() || member_did.len() > MAX_DID_LENGTH {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Member DID must be 1-256 characters".into()
         )));
@@ -377,7 +382,7 @@ pub fn jubilee_normalize(member_did: String) -> ExternResult<MemberMycelState> {
 /// In production, restrict to authorized callers via capability tokens.
 #[hdk_extern]
 pub fn dissolve_mycel(member_did: String) -> ExternResult<()> {
-    if member_did.is_empty() || member_did.len() > 256 {
+    if member_did.is_empty() || member_did.len() > MAX_DID_LENGTH {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Member DID must be 1-256 characters".into()
         )));
@@ -426,7 +431,7 @@ pub fn dissolve_mycel(member_did: String) -> ExternResult<()> {
 /// (e.g., monthly) by an authorized agent. In production, restrict via capability tokens.
 #[hdk_extern]
 pub fn apply_passive_decay(member_did: String) -> ExternResult<MemberMycelState> {
-    if member_did.is_empty() || member_did.len() > 256 {
+    if member_did.is_empty() || member_did.len() > MAX_DID_LENGTH {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Member DID must be 1-256 characters".into()
         )));
@@ -493,7 +498,7 @@ pub struct OnboardApprenticeInput {
 #[hdk_extern]
 pub fn onboard_apprentice(input: OnboardApprenticeInput) -> ExternResult<Record> {
     let caller = agent_info()?.agent_initial_pubkey;
-    let mentor_did = format!("did:mycelix:{}", caller);
+    let mentor_did = format!("{}{}", DID_METHOD_PREFIX, caller);
 
     // Validate apprentice DID
     if !input.apprentice_did.starts_with("did:") {
@@ -558,7 +563,7 @@ pub fn onboard_apprentice(input: OnboardApprenticeInput) -> ExternResult<Record>
 #[hdk_extern]
 pub fn graduate_apprentice(apprentice_did: String) -> ExternResult<MemberMycelState> {
     let caller = agent_info()?.agent_initial_pubkey;
-    let caller_did = format!("did:mycelix:{}", caller);
+    let caller_did = format!("{}{}", DID_METHOD_PREFIX, caller);
 
     let (current_state, action_hash) = find_mycel_state_with_hash(&apprentice_did)?
         .ok_or(wasm_error!(WasmErrorInner::Guest(

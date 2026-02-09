@@ -253,7 +253,6 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
                 let now = sys_time()?;
                 enforce_rate_limit(&deposit.depositor_did, deposit.sap_minted, now)?;
 
-                let now = sys_time()?;
                 let redeemed = CollateralBridgeDeposit {
                     status: BridgeDepositStatus::Redeemed,
                     completed_at: Some(now),

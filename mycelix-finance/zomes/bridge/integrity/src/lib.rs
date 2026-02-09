@@ -176,13 +176,37 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => {
+        FlatOp::RegisterCreateLink { link_type, base_address, target_address, .. } => {
             match link_type {
-                LinkTypes::DidToPayments => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::HappToPayments => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::CollateralRegistry => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::RecentEvents => Ok(ValidateCallbackResult::Valid),
-                LinkTypes::DidToDeposits => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::DidToPayments | LinkTypes::DidToDeposits => {
+                    if base_address.as_ref().len() != 39 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link base must be a valid agent pubkey".into()
+                        ));
+                    }
+                    if target_address.as_ref().len() != 39 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link target must be a valid entry hash".into()
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::HappToPayments | LinkTypes::CollateralRegistry => {
+                    if base_address.as_ref().len() != 39 || target_address.as_ref().len() != 39 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link must connect valid hashes".into()
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::RecentEvents => {
+                    if target_address.as_ref().len() != 39 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link target must be a valid entry hash".into()
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),

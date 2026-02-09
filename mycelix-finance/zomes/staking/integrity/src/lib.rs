@@ -310,7 +310,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::UpdateEntry { app_entry, action, .. } => match app_entry {
                 EntryTypes::CollateralStake(stake) => validate_update_stake(action, stake),
                 EntryTypes::CryptoEscrow(escrow) => validate_update_escrow(action, escrow),
-                _ => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::SlashingEvent(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Slashing events are immutable".into()
+                )),
+                EntryTypes::RewardDistribution(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Reward distributions are immutable".into()
+                )),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
