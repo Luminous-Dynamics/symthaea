@@ -35,6 +35,7 @@ use symthaea::perception::physio::{
     EdfFile, IntegrationMetrics, SleepSentinel, SleepSentinelConfig, SleepStage,
     ConsciousnessState,
 };
+use symthaea::dynamics::spectral_analysis::{SpectralAnalyzer, SpectralConfig, WindowType};
 
 const DATA_DIR: &str = "data/benchmarks/sleep-edf";
 
@@ -95,6 +96,15 @@ fn main() {
 
     let mut sentinel = SleepSentinel::new(config);
 
+    // Spectral analyzer for feature extraction (same config as emission model)
+    let train_spectral = SpectralAnalyzer::new(SpectralConfig {
+        window_size: 512,
+        overlap: 0.5,
+        window_type: WindowType::Hann,
+        sample_rate: 100.0, // Sleep-EDF is 100 Hz
+    });
+    let mut training_features: Vec<(usize, [f64; N_FEAT])> = Vec::new();
+
     // Training phase
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("Training Phase ({} recordings)", n_train);
@@ -132,10 +142,38 @@ fn main() {
             n_epochs
         );
 
+        // Collect raw features for this recording (will z-normalize per recording)
+        let mut recording_features: Vec<(usize, [f64; N_FEAT])> = Vec::new();
+
         for epoch_idx in 0..n_epochs {
             if let Some((frontal, occipital, stage)) = edf.get_labeled_epoch(epoch_idx) {
+                let stage_idx = stage_to_idx(&stage);
                 sentinel.train_epoch(&frontal, &occipital, stage);
                 total_train_epochs += 1;
+                if stage_idx < 5 {
+                    let features = extract_spectral_features(&frontal, &train_spectral);
+                    recording_features.push((stage_idx, features));
+                }
+            }
+        }
+
+        // Z-normalize features within this recording to remove subject-specific
+        // baseline and amplify within-recording stage differences
+        if !recording_features.is_empty() {
+            let nr = recording_features.len() as f64;
+            let mut feat_mean = [0.0f64; N_FEAT];
+            let mut feat_sq = [0.0f64; N_FEAT];
+            for &(_, ref feats) in &recording_features {
+                for f in 0..N_FEAT { feat_mean[f] += feats[f]; feat_sq[f] += feats[f] * feats[f]; }
+            }
+            for f in 0..N_FEAT {
+                feat_mean[f] /= nr;
+                feat_sq[f] = ((feat_sq[f] / nr - feat_mean[f] * feat_mean[f]).max(1e-10)).sqrt();
+            }
+            for (stage_idx, feats) in recording_features {
+                let mut z = [0.0f64; N_FEAT];
+                for f in 0..N_FEAT { z[f] = (feats[f] - feat_mean[f]) / feat_sq[f]; }
+                training_features.push((stage_idx, z));
             }
         }
     }
@@ -147,6 +185,21 @@ fn main() {
         train_time,
         total_train_epochs as f64 / train_time
     );
+
+    // Build learned emission model from training spectral features
+    let stage_stats = StageFeatureStats::from_training_data(&training_features);
+    let feat_stage_names = ["Wake", "N1", "N2", "N3", "REM"];
+    println!("\n  Learned feature distributions (mean):");
+    println!("  {:>5} {:>4} {:>6} {:>6} {:>6} {:>6} {:>8} {:>7} {:>6}",
+        "", "n", "delta", "theta", "alpha", "beta", "logPow", "logRMS", "ZCR");
+    for s in 0..5 {
+        println!("  {:>5} {:>4} {:>6.3} {:>6.3} {:>6.3} {:>6.3} {:>8.2} {:>7.2} {:>6.4}",
+            feat_stage_names[s], stage_stats.counts[s],
+            stage_stats.means[s][0], stage_stats.means[s][1],
+            stage_stats.means[s][2], stage_stats.means[s][3],
+            stage_stats.means[s][4], stage_stats.means[s][5],
+            stage_stats.means[s][6]);
+    }
 
     // Testing phase
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -206,8 +259,25 @@ fn main() {
             }
         }
 
-        // Compute emission probabilities from spectral metrics + wavelet/PAC features
-        let emission_sequence = compute_emission_probs_enhanced(&epoch_metrics, &epoch_signals, 100.0);
+        // Ensemble: combine learned Gaussian model + rule-based emission probs
+        // Gaussian model is good at Wake detection (z-normalized features)
+        // Rule-based model is good at N2/N3 separation (sigmoid thresholds)
+        let emission_gaussian = compute_emission_probs_learned(&epoch_signals, &stage_stats, 100.0);
+        let emission_rules = compute_emission_probs_enhanced(&epoch_metrics, &epoch_signals, 100.0);
+        let emission_sequence: Vec<Vec<f64>> = emission_gaussian.iter().zip(emission_rules.iter())
+            .map(|(g, r)| {
+                // Geometric mean gives balanced combination
+                let mut combined: Vec<f64> = g.iter().zip(r.iter())
+                    .map(|(&gp, &rp)| (gp * rp).sqrt())
+                    .collect();
+                let sum: f64 = combined.iter().sum();
+                if sum > 0.0 {
+                    for p in combined.iter_mut() { *p = (*p / sum).max(0.01); }
+                    let sum2: f64 = combined.iter().sum();
+                    for p in combined.iter_mut() { *p /= sum2; }
+                }
+                combined
+            }).collect();
 
         // Run Viterbi smoothing on the full recording
         let smoothed = hmm.viterbi(&emission_sequence);
@@ -588,6 +658,164 @@ fn build_sleep_hmm() -> HiddenMarkovModel {
     ];
 
     HiddenMarkovModel::with_params(initial, transitions, state_names)
+}
+
+/// Number of spectral features per epoch.
+const N_FEAT: usize = 7;
+
+/// Extract discriminative EEG features from a raw signal using Welch PSD.
+///
+/// Returns [delta_ratio, theta_ratio, alpha_ratio, beta_ratio, log_total_power, log_rms, zcr]
+/// - Band ratios are normalized within 0.5-30 Hz only (not full spectrum)
+/// - log_total_power: absolute power level (differs greatly across stages)
+/// - log_rms: signal amplitude (N3 >> Wake)
+/// - zcr: zero crossing rate (Wake > N3, fast vs slow EEG)
+fn extract_spectral_features(signal: &[f64], spectral: &SpectralAnalyzer) -> [f64; N_FEAT] {
+    if signal.len() < 256 {
+        return [0.25, 0.25, 0.25, 0.25, 0.0, 0.0, 0.1];
+    }
+    let spectrum = spectral.welch(signal);
+
+    // Compute band powers (only 0.5-30 Hz for EEG)
+    let mut delta = 0.0f64;
+    let mut theta = 0.0f64;
+    let mut alpha = 0.0f64;
+    let mut beta = 0.0f64;
+    for (i, &p) in spectrum.psd.iter().enumerate() {
+        let f = spectrum.frequencies[i];
+        let pv = p.max(0.0);
+        if f >= 0.5 && f < 4.0 { delta += pv; }
+        else if f >= 4.0 && f < 8.0 { theta += pv; }
+        else if f >= 8.0 && f < 12.0 { alpha += pv; }
+        else if f >= 12.0 && f < 30.0 { beta += pv; }
+    }
+
+    // Normalize within EEG bands only (0.5-30 Hz), not full spectrum
+    let total_eeg = (delta + theta + alpha + beta).max(1e-10);
+
+    // Log total power — captures amplitude differences between stages
+    let log_power = total_eeg.max(1e-20).ln();
+
+    // RMS amplitude (N3: high amplitude delta; Wake: low amplitude fast)
+    let rms = (signal.iter().map(|&x| x * x).sum::<f64>() / signal.len() as f64).sqrt();
+    let log_rms = rms.max(1e-20).ln();
+
+    // Zero crossing rate (fraction of samples with sign change)
+    // Higher for fast EEG (Wake/REM) than slow EEG (N3)
+    let mut zero_crossings = 0usize;
+    for i in 1..signal.len() {
+        if (signal[i] >= 0.0) != (signal[i - 1] >= 0.0) {
+            zero_crossings += 1;
+        }
+    }
+    let zcr = zero_crossings as f64 / signal.len() as f64;
+
+    [delta / total_eeg, theta / total_eeg, alpha / total_eeg, beta / total_eeg,
+     log_power, log_rms, zcr]
+}
+
+/// Per-stage feature statistics learned from training data.
+/// Uses diagonal Gaussian model for emission probability computation.
+struct StageFeatureStats {
+    means: [[f64; N_FEAT]; 5],   // [stage][feature]
+    vars: [[f64; N_FEAT]; 5],    // [stage][feature]
+    counts: [usize; 5],
+}
+
+impl StageFeatureStats {
+    fn from_training_data(features: &[(usize, [f64; N_FEAT])]) -> Self {
+        let mut sums = [[0.0f64; N_FEAT]; 5];
+        let mut sq_sums = [[0.0f64; N_FEAT]; 5];
+        let mut counts = [0usize; 5];
+
+        for &(stage, ref feats) in features {
+            if stage >= 5 { continue; }
+            counts[stage] += 1;
+            for f in 0..N_FEAT {
+                sums[stage][f] += feats[f];
+                sq_sums[stage][f] += feats[f] * feats[f];
+            }
+        }
+
+        let mut means = [[0.0; N_FEAT]; 5];
+        let mut vars = [[0.0; N_FEAT]; 5];
+        for s in 0..5 {
+            let n = counts[s].max(1) as f64;
+            for f in 0..N_FEAT {
+                means[s][f] = sums[s][f] / n;
+                vars[s][f] = (sq_sums[s][f] / n - means[s][f] * means[s][f]).max(1e-6);
+            }
+        }
+
+        Self { means, vars, counts }
+    }
+
+    /// Compute emission probability vector for all 5 stages given observed features.
+    fn emission_probs(&self, features: &[f64; N_FEAT]) -> Vec<f64> {
+        let mut log_likes = [0.0f64; 5];
+        for s in 0..5 {
+            if self.counts[s] == 0 {
+                log_likes[s] = -100.0;
+                continue;
+            }
+            for f in 0..N_FEAT {
+                let diff = features[f] - self.means[s][f];
+                log_likes[s] += -0.5 * diff * diff / self.vars[s][f];
+                log_likes[s] += -0.5 * self.vars[s][f].ln();
+            }
+        }
+        // Softmax with numerical stability
+        let max_ll = log_likes.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let mut probs: Vec<f64> = log_likes.iter().map(|&ll| (ll - max_ll).exp()).collect();
+        let sum: f64 = probs.iter().sum();
+        if sum > 0.0 {
+            for p in probs.iter_mut() { *p = (*p / sum).max(0.01); }
+            let sum2: f64 = probs.iter().sum();
+            for p in probs.iter_mut() { *p /= sum2; }
+        } else {
+            probs = vec![0.2; 5];
+        }
+        probs
+    }
+}
+
+/// Compute emission probabilities using learned per-stage Gaussian distributions.
+/// Applies per-recording z-normalization to match the training normalization.
+fn compute_emission_probs_learned(
+    signals: &[Vec<f64>],
+    stats: &StageFeatureStats,
+    sample_rate: f64,
+) -> Vec<Vec<f64>> {
+    let spectral = SpectralAnalyzer::new(SpectralConfig {
+        window_size: 512,
+        overlap: 0.5,
+        window_type: WindowType::Hann,
+        sample_rate,
+    });
+
+    // First pass: extract raw features for all epochs
+    let raw_features: Vec<[f64; N_FEAT]> = signals.iter()
+        .map(|signal| extract_spectral_features(signal, &spectral))
+        .collect();
+
+    // Compute per-recording mean and std for z-normalization
+    let n = raw_features.len() as f64;
+    let mut mean = [0.0f64; N_FEAT];
+    let mut sq = [0.0f64; N_FEAT];
+    for feats in &raw_features {
+        for f in 0..N_FEAT { mean[f] += feats[f]; sq[f] += feats[f] * feats[f]; }
+    }
+    for f in 0..N_FEAT {
+        mean[f] /= n;
+        sq[f] = ((sq[f] / n - mean[f] * mean[f]).max(1e-10)).sqrt();
+    }
+
+    // Z-normalize and compute emission probabilities
+    raw_features.iter().map(|feats| {
+        let mut z = [0.0f64; N_FEAT];
+        for f in 0..N_FEAT { z[f] = (feats[f] - mean[f]) / sq[f]; }
+        stats.emission_probs(&z)
+    }).collect()
 }
 
 /// Enhanced emission probabilities combining spectral, wavelet, and PAC features.
