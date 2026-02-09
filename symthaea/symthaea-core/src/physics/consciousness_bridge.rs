@@ -674,6 +674,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_phenomenal_index() {
         let (_, _, _, _, bridge, _) = setup();
 
@@ -729,6 +730,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_embody_qualia() {
         let (model, _, _, _, bridge, _) = setup();
 

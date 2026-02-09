@@ -465,16 +465,16 @@ mod tests {
     fn test_antihydrogen() {
         let (_, hadrons, antimatter, _) = setup();
 
-        let antiH = antimatter.antihydrogen();
+        let anti_h = antimatter.antihydrogen();
 
-        assert_eq!(antiH.antiprotons, 1);
-        assert_eq!(antiH.antineutrons, 0);
-        assert_eq!(antiH.positrons, 1);
+        assert_eq!(anti_h.antiprotons, 1);
+        assert_eq!(anti_h.antineutrons, 0);
+        assert_eq!(anti_h.positrons, 1);
 
         // Should be distinct from regular hydrogen-like structure
         // (hypothetically comparing to matter hydrogen)
         let matter_h_approx = ContinuousHV::bundle(&[&hadrons.proton, &antimatter.positron]);
-        let sim = antiH.vector.similarity(&matter_h_approx);
+        let sim = anti_h.vector.similarity(&matter_h_approx);
 
         // They should share some structure but not be identical
         assert!(sim < 0.95, "AntiH should differ from approx matter H");
@@ -484,17 +484,17 @@ mod tests {
     fn test_antihelium() {
         let (_, _, antimatter, _) = setup();
 
-        let antiHe3 = antimatter.antihelium3();
-        let antiHe4 = antimatter.antihelium4();
+        let anti_he3 = antimatter.antihelium3();
+        let anti_he4 = antimatter.antihelium4();
 
-        assert_eq!(antiHe3.antiprotons, 2);
-        assert_eq!(antiHe3.antineutrons, 1);
+        assert_eq!(anti_he3.antiprotons, 2);
+        assert_eq!(anti_he3.antineutrons, 1);
 
-        assert_eq!(antiHe4.antiprotons, 2);
-        assert_eq!(antiHe4.antineutrons, 2);
+        assert_eq!(anti_he4.antiprotons, 2);
+        assert_eq!(anti_he4.antineutrons, 2);
 
         // Isotopes should be similar
-        let sim = antiHe3.vector.similarity(&antiHe4.vector);
+        let sim = anti_he3.vector.similarity(&anti_he4.vector);
         assert!(
             sim > 0.5,
             "Anti-helium isotopes should be similar: {}",

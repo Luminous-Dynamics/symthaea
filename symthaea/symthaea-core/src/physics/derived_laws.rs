@@ -1,5 +1,7 @@
 //! # Derived Laws: Physical Laws Emerging from HDC Composition
 //!
+//! **Status**: Exploratory module — HDC encodings for physical law derivation via HDC composition.
+//!
 //! This module demonstrates the **generative** power of HDC: physical laws
 //! aren't just encoded, they **emerge** from composing primitive concepts.
 //!
@@ -734,8 +736,8 @@ mod tests {
         let energy_cons = engine.derive_energy_conservation();
 
         // The law vector should encode both symmetry and conserved quantity
-        let time_sim = energy_cons.vector.similarity(&engine.time_translation);
-        let energy_sim = energy_cons.vector.similarity(&engine.energy);
+        let _time_sim = energy_cons.vector.similarity(&engine.time_translation);
+        let _energy_sim = energy_cons.vector.similarity(&engine.energy);
 
         // Both should contribute (via binding)
         assert!(energy_cons.vector.norm() > 0.0);
@@ -814,7 +816,7 @@ mod tests {
         let random_consistency = engine.check_consistency(&random);
 
         // Known law should have decent consistency
-        let energy_cons = engine.derive_energy_conservation();
+        let _energy_cons = engine.derive_energy_conservation();
 
         // Random should be less connected than derived law
         assert!(random_consistency < 0.8);
@@ -838,8 +840,8 @@ mod tests {
         let de_broglie = engine.derive_de_broglie();
 
         // Both should be in quantum regime
-        let u_quantum_sim = uncertainty.vector.similarity(&engine.quantum);
-        let d_quantum_sim = de_broglie.vector.similarity(&engine.quantum);
+        let _u_quantum_sim = uncertainty.vector.similarity(&engine.quantum);
+        let _d_quantum_sim = de_broglie.vector.similarity(&engine.quantum);
 
         // Hard to check similarity directly due to binding, but laws should be valid
         assert!(uncertainty.confidence == 1.0);

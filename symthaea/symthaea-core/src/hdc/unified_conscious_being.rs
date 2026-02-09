@@ -74,6 +74,8 @@ use super::consciousness_metacognition::{
 use super::consciousness_advanced_cognition::AdvancedCognitionEngine;
 use super::adaptive_topology::CognitiveMode;
 use super::binary_hv::BinaryHV;
+use super::math_bridge::{UnifiedMathEngine, MathValue, MathResult};
+use crate::physics::simulation_bridge::{PhysicsSimulator, SimulationAnalysis, state_to_binary_hv};
 use std::collections::{HashMap, VecDeque};
 
 // =============================================================================
@@ -774,6 +776,32 @@ pub struct ConsciousnessStats {
 }
 
 /// The complete unified conscious being
+/// A physics simulation result that has been processed through consciousness.
+#[derive(Debug, Clone)]
+pub struct PhysicsInsight {
+    /// Name of the physical system simulated.
+    pub system_name: String,
+    /// Φ measured during conscious processing of this simulation.
+    pub phi: f64,
+    /// Whether the system was classified as chaotic.
+    pub is_chaotic: bool,
+    /// Energy drift (if applicable).
+    pub energy_drift: Option<f64>,
+    /// Number of trajectory states processed.
+    pub num_states: usize,
+}
+
+/// Result of a conscious mathematical computation.
+#[derive(Debug, Clone)]
+pub struct MathInsight {
+    /// The computed value.
+    pub result: MathResult,
+    /// Φ from the consciousness pipeline processing this computation.
+    pub consciousness_phi: f64,
+    /// Domain promotions that occurred.
+    pub promotions: Vec<String>,
+}
+
 pub struct UnifiedConsciousBeing {
     /// Full stack consciousness (understanding + inference + memory + counterfactuals)
     full_stack: FullStackConsciousness,
@@ -811,6 +839,10 @@ pub struct UnifiedConsciousBeing {
     stats: ConsciousnessStats,
     /// Configuration
     config: BeingConfig,
+    /// Unified math engine (lazy-initialized via enable_math_bridge)
+    math_engine: Option<UnifiedMathEngine>,
+    /// Physics simulation insights accumulated across interactions
+    physics_insights: Vec<PhysicsInsight>,
 }
 
 #[derive(Debug, Clone)]
@@ -888,6 +920,8 @@ impl UnifiedConsciousBeing {
                 counterfactuals_explored: 0,
             },
             config,
+            math_engine: None,
+            physics_insights: Vec::new(),
         }
     }
 
@@ -1049,6 +1083,7 @@ impl UnifiedConsciousBeing {
         self.cognitive_core = UnifiedCognitiveCore::new();
         self.phi_history.clear();
         self.flow_state = 0.5;
+        self.physics_insights.clear();
     }
 
     /// Ask a Pearl counterfactual question
@@ -2239,6 +2274,147 @@ impl UnifiedConsciousBeing {
     /// Process a dream through all metacognition systems
     pub fn process_dream_metacognitively(&mut self, dream: &super::sleep_and_altered_states::DreamScenario, insights: &[DreamInsight]) {
         self.metacognition.process_dream(dream, insights);
+    }
+
+    // =========================================================================
+    // PHYSICS & MATH BRIDGE INTEGRATION
+    // =========================================================================
+
+    /// Enable the math bridge, initializing the UnifiedMathEngine.
+    ///
+    /// This creates the engine (which allocates a PrimitiveSystem singleton)
+    /// so the being can perform conscious mathematical computation.
+    pub fn enable_math_bridge(&mut self) -> &mut Self {
+        if self.math_engine.is_none() {
+            self.math_engine = Some(UnifiedMathEngine::new());
+        }
+        self
+    }
+
+    /// Perform a conscious mathematical computation.
+    ///
+    /// Runs the operation through the UnifiedMathEngine, then routes the
+    /// resulting BinaryHV encoding through the attention router as a
+    /// Semantic modality input. Returns the math result enriched with
+    /// consciousness Φ from the being's current state.
+    ///
+    /// Auto-enables the math bridge if not yet initialized.
+    pub fn conscious_compute(&mut self, op: &str, a: &MathValue, b: &MathValue) -> Option<MathInsight> {
+        if self.math_engine.is_none() {
+            self.enable_math_bridge();
+        }
+        let engine = self.math_engine.as_ref()?;
+
+        let result = match op {
+            "add" | "+" => Some(engine.add(a, b)),
+            "subtract" | "-" => Some(engine.subtract(a, b)),
+            "multiply" | "*" => Some(engine.multiply(a, b)),
+            "divide" | "/" => engine.divide(a, b),
+            "sqrt" => Some(engine.sqrt(a)),
+            "power" | "^" => Some(engine.power(a, b)),
+            _ => None,
+        }?;
+
+        // Route through attention as Semantic input
+        let input = ModalityInput {
+            modality: Modality::Semantic,
+            hv: result.encoding,
+            salience: result.phi.min(1.0),
+            confidence: 0.9,
+            timestamp: 0,
+            label: Some(format!("{} {} {} = {}", a, op, b, result.value)),
+        };
+        let current_phi = self.phi_history.back().copied().unwrap_or(0.5);
+        let routing = self.attention_router.route(&[input], current_phi);
+
+        // Update phi history with the math operation's Φ
+        let consciousness_phi = result.phi * 0.6 + routing.effective_phi * 0.4;
+        self.phi_history.push_back(consciousness_phi);
+        while self.phi_history.len() > 50 {
+            self.phi_history.pop_front();
+        }
+        self.update_flow_state();
+
+        Some(MathInsight {
+            promotions: result.domain_promotions.clone(),
+            consciousness_phi,
+            result,
+        })
+    }
+
+    /// Simulate a physical system and process the trajectory through consciousness.
+    ///
+    /// Creates a PhysicsSimulator, runs the simulation, encodes trajectory
+    /// states as BinaryHV, and routes them through the attention router as
+    /// Proprioceptive (embodied physics) inputs. Returns a PhysicsInsight
+    /// with consciousness metrics.
+    pub fn conscious_simulate(
+        &mut self,
+        simulator: PhysicsSimulator,
+        t_end: f64,
+        dt: f64,
+        sample_count: usize,
+    ) -> PhysicsInsight {
+        let system_name = simulator.name.clone();
+
+        // 1. Run simulation
+        let result = simulator.simulate(t_end, dt);
+
+        // 2. Analyze trajectory
+        let analysis = SimulationAnalysis::from_result(&result);
+        let is_chaotic = analysis.is_chaotic().unwrap_or(false);
+
+        // 3. Sample and encode as BinaryHV
+        let step = (result.states.len() / sample_count.max(1)).max(1);
+        let binary_hvs: Vec<BinaryHV> = result.states.iter()
+            .step_by(step)
+            .take(sample_count)
+            .map(|state| state_to_binary_hv(state))
+            .collect();
+
+        // 4. Route through attention as Proprioceptive (embodied physics)
+        let inputs: Vec<ModalityInput> = binary_hvs.iter().enumerate().map(|(i, hv)| {
+            ModalityInput {
+                modality: Modality::Proprioceptive,
+                hv: *hv,
+                salience: 0.7 + 0.3 * (i as f64 / sample_count.max(1) as f64),
+                confidence: 0.85,
+                timestamp: i as u64,
+                label: Some(format!("{}[t={}]", system_name, i)),
+            }
+        }).collect();
+
+        let current_phi = self.phi_history.back().copied().unwrap_or(0.5);
+        let routing = self.attention_router.route(&inputs, current_phi);
+
+        // 5. Update consciousness state
+        let phi = routing.effective_phi;
+        self.phi_history.push_back(phi);
+        while self.phi_history.len() > 50 {
+            self.phi_history.pop_front();
+        }
+        self.update_flow_state();
+
+        let insight = PhysicsInsight {
+            system_name,
+            phi,
+            is_chaotic,
+            energy_drift: analysis.energy_drift,
+            num_states: binary_hvs.len(),
+        };
+
+        self.physics_insights.push(insight.clone());
+        insight
+    }
+
+    /// Get accumulated physics insights.
+    pub fn physics_insights(&self) -> &[PhysicsInsight] {
+        &self.physics_insights
+    }
+
+    /// Check if the math bridge is enabled.
+    pub fn has_math_bridge(&self) -> bool {
+        self.math_engine.is_some()
     }
 }
 

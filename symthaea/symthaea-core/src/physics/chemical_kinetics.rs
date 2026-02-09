@@ -1,5 +1,8 @@
 //! # Chemical Kinetics
 //!
+//! **Status**: Exploratory module — HDC encodings for chemical kinetics (rate laws, mechanisms, catalysis).
+//! Not re-exported due to name conflicts with chemistry.
+//!
 //! This module encodes reaction rates, mechanisms, and catalysis.
 //!
 //! ## Rate Laws

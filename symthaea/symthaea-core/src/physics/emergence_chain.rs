@@ -751,6 +751,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_phenomenal_index_increases_with_level() {
         let chain = setup();
         let test_vec = chain.genesis.hv("test::concept", PHYSICS_DIM);
@@ -824,6 +825,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_circuit_to_consciousness() {
         let chain = setup();
         let circuit = chain.genesis.hv("test::circuit", PHYSICS_DIM);

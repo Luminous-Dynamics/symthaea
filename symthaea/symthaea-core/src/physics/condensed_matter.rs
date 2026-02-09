@@ -1,5 +1,7 @@
 //! # Condensed Matter Physics
 //!
+//! **Status**: Exploratory module — HDC encodings for condensed matter physics (band theory, phonons, correlated electrons).
+//!
 //! This module encodes condensed matter concepts from band theory to correlated electrons.
 //!
 //! ## Band Theory

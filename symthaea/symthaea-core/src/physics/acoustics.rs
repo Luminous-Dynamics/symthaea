@@ -1,5 +1,7 @@
 //! # Acoustics
 //!
+//! **Status**: Exploratory module — HDC encodings for acoustics (sound waves, resonators, metamaterials).
+//!
 //! This module encodes acoustic phenomena: sound waves, vibrations,
 //! phonon transport, and acoustic metamaterials.
 //!

@@ -4467,7 +4467,7 @@ mod tests {
         let phi_b = calc.compute_true_phi(&part_b);
 
         // Sum of partition Φs should be related to cross-partition information
-        let partition_total = phi_a.phi + phi_b.phi;
+        let _partition_total = phi_a.phi + phi_b.phi;
 
         println!("Full Φ: {:.4}, Part A Φ: {:.4}, Part B Φ: {:.4}",
             full_result.phi, phi_a.phi, phi_b.phi);

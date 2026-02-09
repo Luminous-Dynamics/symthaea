@@ -82,6 +82,9 @@ pub struct HardLocation {
 
     /// Number of times this location has been written to
     pub write_count: usize,
+
+    /// Monotonic tick of the last write to this location (for age-based eviction)
+    pub last_write_tick: u64,
 }
 
 impl HardLocation {
@@ -95,6 +98,7 @@ impl HardLocation {
             address,
             counters: vec![0i16; dimension],
             write_count: 0,
+            last_write_tick: 0,
         }
     }
 
@@ -105,6 +109,7 @@ impl HardLocation {
             address,
             counters: vec![0i16; dimension],
             write_count: 0,
+            last_write_tick: 0,
         }
     }
 
@@ -155,6 +160,7 @@ impl HardLocation {
     pub fn reset(&mut self) {
         self.counters.fill(0);
         self.write_count = 0;
+        self.last_write_tick = 0;
     }
 }
 
@@ -175,6 +181,10 @@ pub struct SDMConfig {
 
     /// Minimum locations that must activate for valid read
     pub min_activation_count: usize,
+
+    /// Maximum number of write operations before eviction triggers.
+    /// When `None`, eviction is disabled (unlimited writes).
+    pub max_writes: Option<usize>,
 }
 
 impl Default for SDMConfig {
@@ -185,6 +195,7 @@ impl Default for SDMConfig {
             activation_radius: DEFAULT_ACTIVATION_RADIUS,
             weighted_read: true,
             min_activation_count: 10,
+            max_writes: None,
         }
     }
 }
@@ -196,6 +207,7 @@ impl SDMConfig {
             dimension,
             num_hard_locations: num_locations,
             activation_radius: radius,
+            max_writes: None,
             ..Default::default()
         }
     }
@@ -208,6 +220,7 @@ impl SDMConfig {
             activation_radius: 0.45,
             weighted_read: true,
             min_activation_count: 3,
+            max_writes: None,
         }
     }
 }
@@ -266,12 +279,13 @@ pub struct SparseDistributedMemory {
     stats: SDMStats,
 
     /// Creation timestamp
-    ///
-    /// TODO(future): Implement age-based eviction for SDM entries.
-    /// When memory pressure is high, older entries should be evicted first.
-    /// Use this timestamp to calculate entry age and prioritize eviction.
-    #[allow(dead_code)] // Reserved for age-based eviction
     created_at: Instant,
+
+    /// Monotonic tick counter, incremented on every write.
+    /// Used for age-based eviction: each hard location records the tick
+    /// of its most recent write, and eviction targets the locations with
+    /// the smallest (oldest) ticks.
+    write_tick: u64,
 }
 
 impl SparseDistributedMemory {
@@ -287,6 +301,7 @@ impl SparseDistributedMemory {
             hard_locations,
             stats: SDMStats::default(),
             created_at: Instant::now(),
+            write_tick: 0,
         }
     }
 
@@ -299,16 +314,31 @@ impl SparseDistributedMemory {
     ///
     /// The pattern is written to all hard locations that activate
     /// (are within activation radius of the address).
+    ///
+    /// When `max_writes` is configured and capacity is reached, the
+    /// oldest hard locations (lowest `last_write_tick`) are evicted
+    /// (reset) before the new write proceeds.
     pub fn write(&mut self, address: &[i8], data: &[i8]) -> WriteResult {
         if address.len() != self.config.dimension || data.len() != self.config.dimension {
             return WriteResult::DimensionMismatch;
         }
+
+        // Age-based eviction: if we have reached capacity, evict oldest entries
+        if let Some(max) = self.config.max_writes {
+            if self.stats.writes >= max {
+                self.evict_oldest();
+            }
+        }
+
+        self.write_tick += 1;
+        let current_tick = self.write_tick;
 
         let mut activated_count = 0;
 
         for loc in &mut self.hard_locations {
             if loc.activates(address, self.config.activation_radius) {
                 loc.write(data);
+                loc.last_write_tick = current_tick;
                 activated_count += 1;
             }
         }
@@ -320,6 +350,62 @@ impl SparseDistributedMemory {
         } else {
             WriteResult::Success { activated: activated_count }
         }
+    }
+
+    /// Evict the oldest hard locations by resetting them.
+    ///
+    /// "Oldest" is determined by `last_write_tick` — the locations whose
+    /// most-recent write happened the longest ago.  The bottom quartile
+    /// of written-to locations is evicted.
+    fn evict_oldest(&mut self) {
+        // Collect indices of locations that have been written to, sorted by age (oldest first)
+        let mut written_indices: Vec<(usize, u64)> = self.hard_locations.iter()
+            .enumerate()
+            .filter(|(_, loc)| loc.write_count > 0)
+            .map(|(i, loc)| (i, loc.last_write_tick))
+            .collect();
+
+        if written_indices.is_empty() {
+            return;
+        }
+
+        // Sort by tick ascending (oldest first)
+        written_indices.sort_by_key(|&(_, tick)| tick);
+
+        // Evict bottom quartile (at least 1)
+        let evict_count = (written_indices.len() / 4).max(1);
+        for &(idx, _) in &written_indices[..evict_count] {
+            self.hard_locations[idx].reset();
+        }
+    }
+
+    /// Manually trigger age-based eviction of the `count` oldest locations.
+    ///
+    /// Returns the number of locations actually evicted.
+    pub fn evict_n_oldest(&mut self, count: usize) -> usize {
+        let mut written_indices: Vec<(usize, u64)> = self.hard_locations.iter()
+            .enumerate()
+            .filter(|(_, loc)| loc.write_count > 0)
+            .map(|(i, loc)| (i, loc.last_write_tick))
+            .collect();
+
+        if written_indices.is_empty() {
+            return 0;
+        }
+
+        written_indices.sort_by_key(|&(_, tick)| tick);
+
+        let evict_count = count.min(written_indices.len());
+        for &(idx, _) in &written_indices[..evict_count] {
+            self.hard_locations[idx].reset();
+        }
+
+        evict_count
+    }
+
+    /// Get the current write tick (monotonic counter).
+    pub fn write_tick(&self) -> u64 {
+        self.write_tick
     }
 
     /// Read pattern from SDM at given address
@@ -554,10 +640,24 @@ pub fn add_noise(vector: &[i8], noise_fraction: f32) -> Vec<i8> {
 // EPISODIC MEMORY EXTENSION
 // ============================================================================
 
+/// Metadata for a stored episode, kept outside the SDM for temporal queries.
+#[derive(Debug, Clone)]
+pub struct EpisodeMeta {
+    /// Sequential episode number (1-based)
+    pub episode_id: usize,
+
+    /// The raw content vector that was stored
+    pub content: Vec<i8>,
+
+    /// The write tick at the time the episode was stored
+    pub write_tick: u64,
+}
+
 /// Episodic Memory built on SDM
 ///
 /// Stores timestamped episodes with temporal context.
-/// Enables queries like "what happened around time T?"
+/// Enables queries like "what happened around time T?" or
+/// "retrieve the N most recent episodes".
 #[derive(Debug)]
 pub struct EpisodicSDM {
     /// Core SDM for content storage
@@ -566,14 +666,11 @@ pub struct EpisodicSDM {
     /// Episode count for temporal ordering
     episode_count: usize,
 
-    /// Temporal context binding dimension
-    ///
-    /// TODO(future): Implement temporal queries using this dimension.
-    /// Should enable queries like "what was active at time T?" or
-    /// "find memories near temporal context X". Bind episode vectors
-    /// with temporal position vectors for time-aware retrieval.
-    #[allow(dead_code)] // Reserved for temporal queries
+    /// Temporal context binding dimension (number of bits used for temporal encoding)
     temporal_dim: usize,
+
+    /// Chronological log of stored episodes for temporal queries
+    episodes: Vec<EpisodeMeta>,
 }
 
 impl EpisodicSDM {
@@ -583,6 +680,7 @@ impl EpisodicSDM {
             sdm: SparseDistributedMemory::new(config),
             episode_count: 0,
             temporal_dim: 100, // Bits used for temporal context
+            episodes: Vec::new(),
         }
     }
 
@@ -597,12 +695,75 @@ impl EpisodicSDM {
         let episodic_pattern = bind_vectors(content, &temporal_context);
 
         // Store as auto-associative pattern
-        self.sdm.write_auto(&episodic_pattern)
+        let result = self.sdm.write_auto(&episodic_pattern);
+
+        // Record metadata for temporal queries
+        self.episodes.push(EpisodeMeta {
+            episode_id: self.episode_count,
+            content: content.to_vec(),
+            write_tick: self.sdm.write_tick(),
+        });
+
+        result
     }
 
     /// Recall episode by content cue
     pub fn recall_by_content(&mut self, content_cue: &[i8]) -> ReadResult {
         self.sdm.read(content_cue)
+    }
+
+    // ------------------------------------------------------------------
+    // Temporal query methods
+    // ------------------------------------------------------------------
+
+    /// Retrieve episodes whose IDs fall within a time range (inclusive).
+    ///
+    /// Episode IDs are sequential: episode 1 was stored first, episode N last.
+    /// `from` and `to` are 1-based episode IDs.
+    pub fn query_time_range(&self, from: usize, to: usize) -> Vec<&EpisodeMeta> {
+        self.episodes.iter()
+            .filter(|ep| ep.episode_id >= from && ep.episode_id <= to)
+            .collect()
+    }
+
+    /// Retrieve the `n` most recent episodes (newest first).
+    pub fn query_most_recent(&self, n: usize) -> Vec<&EpisodeMeta> {
+        let start = self.episodes.len().saturating_sub(n);
+        let mut result: Vec<&EpisodeMeta> = self.episodes[start..].iter().collect();
+        result.reverse(); // newest first
+        result
+    }
+
+    /// Recall an episode at a specific time step from SDM using temporal context.
+    ///
+    /// Encodes the requested time as a temporal vector, unbinds it from
+    /// the stored episodic pattern, and returns the recovered content.
+    pub fn recall_by_time(&mut self, time: usize) -> ReadResult {
+        let temporal_context = self.encode_time(time);
+
+        // Read from SDM using the temporal context as cue
+        match self.sdm.read(&temporal_context) {
+            ReadResult::Success { pattern, activated, confidence } => {
+                // Unbind temporal context to recover content
+                let content = bind_vectors(&pattern, &temporal_context);
+                ReadResult::Success {
+                    pattern: content,
+                    activated,
+                    confidence,
+                }
+            }
+            other => other,
+        }
+    }
+
+    /// Find episodes near a given time step.
+    ///
+    /// Returns episodes within `window` steps of `time` (i.e.,
+    /// episode IDs in `[time - window, time + window]`).
+    pub fn query_near_time(&self, time: usize, window: usize) -> Vec<&EpisodeMeta> {
+        let from = time.saturating_sub(window);
+        let to = time.saturating_add(window);
+        self.query_time_range(from, to)
     }
 
     /// Simple temporal encoding
@@ -624,6 +785,11 @@ impl EpisodicSDM {
     /// Get episode count
     pub fn episode_count(&self) -> usize {
         self.episode_count
+    }
+
+    /// Get reference to all stored episode metadata
+    pub fn all_episodes(&self) -> &[EpisodeMeta] {
+        &self.episodes
     }
 }
 
@@ -650,6 +816,7 @@ mod tests {
             activation_radius: 0.42,
             weighted_read: true,
             min_activation_count: 3,
+            max_writes: None,
         }
     }
 
@@ -718,6 +885,7 @@ mod tests {
             activation_radius: 0.40,   // Lower threshold for more activations
             weighted_read: true,
             min_activation_count: 5,
+            max_writes: None,
         });
 
         let address = random_bipolar_vector(256);
@@ -750,6 +918,7 @@ mod tests {
             activation_radius: 0.40,
             weighted_read: true,
             min_activation_count: 5,
+            max_writes: None,
         });
 
         let address = random_bipolar_vector(256);
@@ -780,6 +949,7 @@ mod tests {
             activation_radius: 0.40,   // Lower threshold for more activations
             weighted_read: true,
             min_activation_count: 5,
+            max_writes: None,
         });
 
         let pattern = random_bipolar_vector(256);
@@ -806,6 +976,7 @@ mod tests {
             activation_radius: 0.40,
             weighted_read: true,
             min_activation_count: 5,
+            max_writes: None,
         });
 
         // Store multiple patterns
@@ -839,6 +1010,7 @@ mod tests {
             activation_radius: 0.40,
             weighted_read: true,
             min_activation_count: 5,
+            max_writes: None,
         });
 
         let pattern = random_bipolar_vector(256);
@@ -957,6 +1129,7 @@ mod tests {
             activation_radius: 0.40,
             weighted_read: true,
             min_activation_count: 3,
+            max_writes: None,
         };
         let mut episodic = EpisodicSDM::new(config);
 
@@ -1000,6 +1173,325 @@ mod tests {
         assert_eq!(read, pattern);
     }
 
+    // ====================================================================
+    // Age-based eviction tests
+    // ====================================================================
+
+    #[test]
+    fn test_write_tick_increments() {
+        let mut sdm = SparseDistributedMemory::new(test_config());
+        assert_eq!(sdm.write_tick(), 0);
+
+        let pattern = random_bipolar_vector(500);
+        sdm.write_auto(&pattern);
+        assert_eq!(sdm.write_tick(), 1);
+
+        sdm.write_auto(&pattern);
+        assert_eq!(sdm.write_tick(), 2);
+    }
+
+    #[test]
+    fn test_last_write_tick_on_hard_location() {
+        let mut sdm = SparseDistributedMemory::new(SDMConfig {
+            dimension: 100,
+            num_hard_locations: 200,
+            activation_radius: 0.40,
+            weighted_read: true,
+            min_activation_count: 1,
+            max_writes: None,
+        });
+
+        let pattern = random_bipolar_vector(100);
+        sdm.write_auto(&pattern);
+
+        // At least some locations should have last_write_tick == 1
+        let has_tick_1 = sdm.hard_locations.iter().any(|loc| loc.last_write_tick == 1);
+        assert!(has_tick_1, "Some locations should be stamped with tick 1");
+    }
+
+    #[test]
+    fn test_evict_n_oldest() {
+        let mut sdm = SparseDistributedMemory::new(SDMConfig {
+            dimension: 100,
+            num_hard_locations: 200,
+            activation_radius: 0.40,
+            weighted_read: true,
+            min_activation_count: 1,
+            max_writes: None,
+        });
+
+        // Write several patterns to populate locations
+        for _ in 0..5 {
+            let p = random_bipolar_vector(100);
+            sdm.write_auto(&p);
+        }
+
+        let used_before = sdm.locations_used();
+        assert!(used_before > 0);
+
+        // Evict 10 oldest
+        let evicted = sdm.evict_n_oldest(10);
+        assert!(evicted > 0, "Should evict at least some locations");
+        assert!(evicted <= 10);
+
+        let used_after = sdm.locations_used();
+        assert!(used_after < used_before, "Should have fewer used locations after eviction");
+    }
+
+    #[test]
+    fn test_age_based_eviction_triggers_on_capacity() {
+        let mut sdm = SparseDistributedMemory::new(SDMConfig {
+            dimension: 100,
+            num_hard_locations: 200,
+            activation_radius: 0.40,
+            weighted_read: true,
+            min_activation_count: 1,
+            max_writes: Some(5), // Eviction triggers after 5 writes
+        });
+
+        // Perform 5 writes to reach capacity
+        for _ in 0..5 {
+            let p = random_bipolar_vector(100);
+            sdm.write_auto(&p);
+        }
+
+        let used_at_capacity = sdm.locations_used();
+
+        // The 6th write should trigger eviction first
+        let p = random_bipolar_vector(100);
+        sdm.write_auto(&p);
+
+        // After eviction + new write, the used count should not exceed
+        // what it was before (some were evicted, some re-written)
+        // The key assertion: eviction ran without panic and writes still work
+        assert_eq!(sdm.stats().writes, 6);
+        assert!(sdm.locations_used() <= used_at_capacity,
+            "Eviction should keep usage in check: {} vs {}",
+            sdm.locations_used(), used_at_capacity);
+    }
+
+    #[test]
+    fn test_eviction_targets_oldest_locations() {
+        let mut sdm = SparseDistributedMemory::new(SDMConfig {
+            dimension: 100,
+            num_hard_locations: 200,
+            activation_radius: 0.40,
+            weighted_read: true,
+            min_activation_count: 1,
+            max_writes: None,
+        });
+
+        // Write several patterns so locations accumulate different ticks
+        for _ in 0..10 {
+            let p = random_bipolar_vector(100);
+            sdm.write_auto(&p);
+        }
+
+        let used_before = sdm.locations_used();
+        assert!(used_before > 0, "Some locations should be used");
+
+        // Find the minimum tick among used locations (the "oldest")
+        let min_tick = sdm.hard_locations.iter()
+            .filter(|loc| loc.write_count > 0)
+            .map(|loc| loc.last_write_tick)
+            .min()
+            .unwrap();
+
+        // Count how many locations have the minimum tick
+        let oldest_count = sdm.hard_locations.iter()
+            .filter(|loc| loc.last_write_tick == min_tick && loc.write_count > 0)
+            .count();
+        assert!(oldest_count > 0);
+
+        // Evict exactly that many oldest locations
+        let evicted = sdm.evict_n_oldest(oldest_count);
+        assert_eq!(evicted, oldest_count);
+
+        // After eviction, no location should still have the old minimum tick
+        // (because eviction targets lowest ticks, and we evicted exactly that many)
+        let remaining_at_min = sdm.hard_locations.iter()
+            .filter(|loc| loc.last_write_tick == min_tick && loc.write_count > 0)
+            .count();
+        assert_eq!(remaining_at_min, 0,
+            "Evicted locations should no longer have the oldest tick");
+    }
+
+    // ====================================================================
+    // Temporal query tests
+    // ====================================================================
+
+    #[test]
+    fn test_episodic_query_time_range() {
+        let config = SDMConfig {
+            dimension: 100,
+            num_hard_locations: 200,
+            activation_radius: 0.40,
+            weighted_read: true,
+            min_activation_count: 1,
+            max_writes: None,
+        };
+        let mut episodic = EpisodicSDM::new(config);
+
+        // Store 10 episodes
+        for _ in 0..10 {
+            let content = random_bipolar_vector(100);
+            episodic.store_episode(&content);
+        }
+
+        assert_eq!(episodic.episode_count(), 10);
+
+        // Query episodes 3..7
+        let results = episodic.query_time_range(3, 7);
+        assert_eq!(results.len(), 5);
+        assert_eq!(results[0].episode_id, 3);
+        assert_eq!(results[4].episode_id, 7);
+    }
+
+    #[test]
+    fn test_episodic_query_most_recent() {
+        let config = SDMConfig {
+            dimension: 100,
+            num_hard_locations: 200,
+            activation_radius: 0.40,
+            weighted_read: true,
+            min_activation_count: 1,
+            max_writes: None,
+        };
+        let mut episodic = EpisodicSDM::new(config);
+
+        for _ in 0..10 {
+            let content = random_bipolar_vector(100);
+            episodic.store_episode(&content);
+        }
+
+        // Get 3 most recent (newest first)
+        let recent = episodic.query_most_recent(3);
+        assert_eq!(recent.len(), 3);
+        assert_eq!(recent[0].episode_id, 10); // newest
+        assert_eq!(recent[1].episode_id, 9);
+        assert_eq!(recent[2].episode_id, 8);
+    }
+
+    #[test]
+    fn test_episodic_query_most_recent_more_than_available() {
+        let config = SDMConfig {
+            dimension: 100,
+            num_hard_locations: 200,
+            activation_radius: 0.40,
+            weighted_read: true,
+            min_activation_count: 1,
+            max_writes: None,
+        };
+        let mut episodic = EpisodicSDM::new(config);
+
+        for _ in 0..3 {
+            let content = random_bipolar_vector(100);
+            episodic.store_episode(&content);
+        }
+
+        // Request more than available
+        let recent = episodic.query_most_recent(10);
+        assert_eq!(recent.len(), 3);
+        assert_eq!(recent[0].episode_id, 3);
+    }
+
+    #[test]
+    fn test_episodic_query_near_time() {
+        let config = SDMConfig {
+            dimension: 100,
+            num_hard_locations: 200,
+            activation_radius: 0.40,
+            weighted_read: true,
+            min_activation_count: 1,
+            max_writes: None,
+        };
+        let mut episodic = EpisodicSDM::new(config);
+
+        for _ in 0..20 {
+            let content = random_bipolar_vector(100);
+            episodic.store_episode(&content);
+        }
+
+        // Query near time 10, window 2 => episodes 8,9,10,11,12
+        let near = episodic.query_near_time(10, 2);
+        assert_eq!(near.len(), 5);
+        for ep in &near {
+            assert!(ep.episode_id >= 8 && ep.episode_id <= 12);
+        }
+    }
+
+    #[test]
+    fn test_episodic_query_near_time_edge() {
+        let config = SDMConfig {
+            dimension: 100,
+            num_hard_locations: 200,
+            activation_radius: 0.40,
+            weighted_read: true,
+            min_activation_count: 1,
+            max_writes: None,
+        };
+        let mut episodic = EpisodicSDM::new(config);
+
+        for _ in 0..5 {
+            let content = random_bipolar_vector(100);
+            episodic.store_episode(&content);
+        }
+
+        // Query near time 1, window 1 => episodes 1,2 (0 is clamped to 0, but no ep 0)
+        let near = episodic.query_near_time(1, 1);
+        // Should contain episode_id 1 and 2 (from..to = 0..2, but ep IDs start at 1)
+        assert!(near.len() >= 1);
+        assert!(near.iter().all(|ep| ep.episode_id <= 2));
+    }
+
+    #[test]
+    fn test_episodic_all_episodes() {
+        let config = SDMConfig {
+            dimension: 100,
+            num_hard_locations: 200,
+            activation_radius: 0.40,
+            weighted_read: true,
+            min_activation_count: 1,
+            max_writes: None,
+        };
+        let mut episodic = EpisodicSDM::new(config);
+
+        let contents: Vec<Vec<i8>> = (0..5)
+            .map(|_| random_bipolar_vector(100))
+            .collect();
+
+        for c in &contents {
+            episodic.store_episode(c);
+        }
+
+        let all = episodic.all_episodes();
+        assert_eq!(all.len(), 5);
+
+        // Verify content is preserved
+        for (i, ep) in all.iter().enumerate() {
+            assert_eq!(ep.content, contents[i]);
+            assert_eq!(ep.episode_id, i + 1);
+        }
+    }
+
+    #[test]
+    fn test_episodic_empty_queries() {
+        let config = SDMConfig {
+            dimension: 100,
+            num_hard_locations: 200,
+            activation_radius: 0.40,
+            weighted_read: true,
+            min_activation_count: 1,
+            max_writes: None,
+        };
+        let episodic = EpisodicSDM::new(config);
+
+        assert!(episodic.query_time_range(1, 10).is_empty());
+        assert!(episodic.query_most_recent(5).is_empty());
+        assert!(episodic.query_near_time(5, 2).is_empty());
+        assert!(episodic.all_episodes().is_empty());
+    }
+
     #[test]
     fn test_sdm_stats_tracking() {
         let mut sdm = SparseDistributedMemory::new(test_config());
@@ -1030,6 +1522,7 @@ mod tests {
             activation_radius: 0.42,
             weighted_read: true,
             min_activation_count: 3,
+            max_writes: None,
         };
         let mut sdm = SparseDistributedMemory::new(config);
 

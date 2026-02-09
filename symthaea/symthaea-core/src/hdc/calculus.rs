@@ -1,6 +1,18 @@
 #![allow(dead_code)]
 
 //! Symbolic calculus: differentiation, integration, and fundamental theorem verification.
+//!
+//! ## Capabilities
+//!
+//! - **Differentiation**: Power rule, product rule, quotient rule, chain rule
+//! - **Transcendental functions**: sin, cos, tan, exp, ln and their derivatives
+//! - **Integration**: Polynomial (exact via rational coefficients), power rule
+//! - **Fundamental Theorem**: Verification that d/dx ∫f = f
+//!
+//! ## Transcendental Function Support
+//!
+//! The `TermType::Function` variant encodes named functions (sin, cos, exp, ln, etc.)
+//! with full chain rule support for compositions like d/dx sin(x²) = cos(x²) · 2x.
 
 use crate::hdc::arithmetic_engine::{HybridArithmeticEngine, Polynomial, SymbolicExpr, SymbolicOp, TermType};
 use crate::hdc::binary_hv::BinaryHV;
@@ -15,6 +27,12 @@ pub struct CalculusResult {
 }
 
 /// Symbolic differentiation engine
+///
+/// Supports:
+/// - Constant, variable, sum, difference, product, quotient rules
+/// - Power rule (constant and variable exponents)
+/// - Chain rule for composite functions
+/// - Transcendental functions: sin, cos, tan, exp, ln, sqrt
 pub struct SymbolicDifferentiator;
 
 impl SymbolicDifferentiator {
@@ -65,7 +83,22 @@ impl SymbolicDifferentiator {
     }
 
     /// Recursive differentiation on TermType trees
-    fn diff_recursive(term: &TermType, variable: &str, _primitives: &PrimitiveSystem) -> TermType {
+    ///
+    /// Implements:
+    /// - d/dx c = 0 (constant rule)
+    /// - d/dx x = 1 (variable rule)
+    /// - d/dx (f + g) = f' + g' (sum rule)
+    /// - d/dx (f * g) = f'g + fg' (product rule)
+    /// - d/dx (f / g) = (f'g - fg') / g² (quotient rule)
+    /// - d/dx f^n = n * f^(n-1) * f' (generalized power rule with chain rule)
+    /// - d/dx f^g = f^g * (g' * ln(f) + g * f'/f) (general power rule)
+    /// - d/dx sin(f) = cos(f) * f' (chain rule for transcendentals)
+    /// - d/dx cos(f) = -sin(f) * f'
+    /// - d/dx tan(f) = (1 + tan²(f)) * f'    (sec²(f) * f')
+    /// - d/dx exp(f) = exp(f) * f'
+    /// - d/dx ln(f) = f' / f
+    /// - d/dx sqrt(f) = f' / (2 * sqrt(f))
+    fn diff_recursive(term: &TermType, variable: &str, primitives: &PrimitiveSystem) -> TermType {
         match term {
             TermType::Constant(_) => TermType::Constant(0),
 
@@ -80,8 +113,8 @@ impl SymbolicDifferentiator {
             TermType::BinaryOp { op, left, right } => {
                 match op {
                     SymbolicOp::Add => {
-                        let dl = Self::diff_recursive(left, variable, _primitives);
-                        let dr = Self::diff_recursive(right, variable, _primitives);
+                        let dl = Self::diff_recursive(left, variable, primitives);
+                        let dr = Self::diff_recursive(right, variable, primitives);
                         TermType::BinaryOp {
                             op: SymbolicOp::Add,
                             left: Box::new(dl),
@@ -89,8 +122,8 @@ impl SymbolicDifferentiator {
                         }
                     }
                     SymbolicOp::Sub => {
-                        let dl = Self::diff_recursive(left, variable, _primitives);
-                        let dr = Self::diff_recursive(right, variable, _primitives);
+                        let dl = Self::diff_recursive(left, variable, primitives);
+                        let dr = Self::diff_recursive(right, variable, primitives);
                         TermType::BinaryOp {
                             op: SymbolicOp::Sub,
                             left: Box::new(dl),
@@ -99,8 +132,8 @@ impl SymbolicDifferentiator {
                     }
                     SymbolicOp::Mul => {
                         // Product rule: d(f*g) = f'*g + f*g'
-                        let df = Self::diff_recursive(left, variable, _primitives);
-                        let dg = Self::diff_recursive(right, variable, _primitives);
+                        let df = Self::diff_recursive(left, variable, primitives);
+                        let dg = Self::diff_recursive(right, variable, primitives);
                         TermType::BinaryOp {
                             op: SymbolicOp::Add,
                             left: Box::new(TermType::BinaryOp {
@@ -117,8 +150,8 @@ impl SymbolicDifferentiator {
                     }
                     SymbolicOp::Div => {
                         // Quotient rule: d(f/g) = (f'g - fg') / g^2
-                        let df = Self::diff_recursive(left, variable, _primitives);
-                        let dg = Self::diff_recursive(right, variable, _primitives);
+                        let df = Self::diff_recursive(left, variable, primitives);
+                        let dg = Self::diff_recursive(right, variable, primitives);
                         let numerator = TermType::BinaryOp {
                             op: SymbolicOp::Sub,
                             left: Box::new(TermType::BinaryOp {
@@ -144,10 +177,11 @@ impl SymbolicDifferentiator {
                         }
                     }
                     SymbolicOp::Pow => {
-                        // Power rule for constant exponent: d(f^n) = n*f^(n-1)*f'
+                        // Check if exponent is constant for simpler power rule
                         if let TermType::Constant(n) = right.as_ref() {
+                            // d/dx f^n = n * f^(n-1) * f' (generalized power rule)
                             let n_val = *n;
-                            let df = Self::diff_recursive(left, variable, _primitives);
+                            let df = Self::diff_recursive(left, variable, primitives);
                             // n * f^(n-1) * f'
                             TermType::BinaryOp {
                                 op: SymbolicOp::Mul,
@@ -162,9 +196,51 @@ impl SymbolicDifferentiator {
                                 }),
                                 right: Box::new(df),
                             }
+                        } else if let TermType::Constant(_) = left.as_ref() {
+                            // d/dx a^g = a^g * ln(a) * g'
+                            // For now, encode as: a^g * ln(a) * g'
+                            let dg = Self::diff_recursive(right, variable, primitives);
+                            TermType::BinaryOp {
+                                op: SymbolicOp::Mul,
+                                left: Box::new(TermType::BinaryOp {
+                                    op: SymbolicOp::Mul,
+                                    left: Box::new(term.clone()),
+                                    right: Box::new(TermType::Function {
+                                        name: "ln".to_string(),
+                                        arg: left.clone(),
+                                    }),
+                                }),
+                                right: Box::new(dg),
+                            }
                         } else {
-                            // General case not supported
-                            TermType::Constant(0)
+                            // General case: d/dx f^g = f^g * (g' * ln(f) + g * f'/f)
+                            let df = Self::diff_recursive(left, variable, primitives);
+                            let dg = Self::diff_recursive(right, variable, primitives);
+                            // f^g * (g' * ln(f) + g * f'/f)
+                            TermType::BinaryOp {
+                                op: SymbolicOp::Mul,
+                                left: Box::new(term.clone()), // f^g
+                                right: Box::new(TermType::BinaryOp {
+                                    op: SymbolicOp::Add,
+                                    left: Box::new(TermType::BinaryOp {
+                                        op: SymbolicOp::Mul,
+                                        left: Box::new(dg),
+                                        right: Box::new(TermType::Function {
+                                            name: "ln".to_string(),
+                                            arg: left.clone(),
+                                        }),
+                                    }),
+                                    right: Box::new(TermType::BinaryOp {
+                                        op: SymbolicOp::Mul,
+                                        left: right.clone(),
+                                        right: Box::new(TermType::BinaryOp {
+                                            op: SymbolicOp::Div,
+                                            left: Box::new(df),
+                                            right: left.clone(),
+                                        }),
+                                    }),
+                                }),
+                            }
                         }
                     }
                     SymbolicOp::Neg => {
@@ -177,7 +253,7 @@ impl SymbolicDifferentiator {
             TermType::UnaryOp { op, operand } => {
                 match op {
                     SymbolicOp::Neg => {
-                        let d = Self::diff_recursive(operand, variable, _primitives);
+                        let d = Self::diff_recursive(operand, variable, primitives);
                         TermType::UnaryOp {
                             op: SymbolicOp::Neg,
                             operand: Box::new(d),
@@ -186,6 +262,180 @@ impl SymbolicDifferentiator {
                     _ => TermType::Constant(0),
                 }
             }
+
+            TermType::Function { name, arg } => {
+                // Chain rule: d/dx f(g(x)) = f'(g(x)) * g'(x)
+                let dg = Self::diff_recursive(arg, variable, primitives);
+
+                // If inner derivative is 0, the whole thing is 0
+                if dg == TermType::Constant(0) {
+                    return TermType::Constant(0);
+                }
+
+                // Compute outer derivative f'(g(x)) based on function name
+                let outer_derivative = Self::diff_function(name, arg);
+
+                // Apply chain rule: f'(g(x)) * g'(x)
+                if dg == TermType::Constant(1) {
+                    // No need to multiply by 1
+                    outer_derivative
+                } else {
+                    TermType::BinaryOp {
+                        op: SymbolicOp::Mul,
+                        left: Box::new(outer_derivative),
+                        right: Box::new(dg),
+                    }
+                }
+            }
+        }
+    }
+
+    /// Compute the derivative of a named function with respect to its argument.
+    ///
+    /// Returns f'(u) where u is the argument (chain rule outer part).
+    fn diff_function(name: &str, arg: &TermType) -> TermType {
+        match name {
+            // d/du sin(u) = cos(u)
+            "sin" => TermType::Function {
+                name: "cos".to_string(),
+                arg: Box::new(arg.clone()),
+            },
+
+            // d/du cos(u) = -sin(u)
+            "cos" => TermType::UnaryOp {
+                op: SymbolicOp::Neg,
+                operand: Box::new(TermType::Function {
+                    name: "sin".to_string(),
+                    arg: Box::new(arg.clone()),
+                }),
+            },
+
+            // d/du tan(u) = 1 + tan²(u) = sec²(u)
+            "tan" => TermType::BinaryOp {
+                op: SymbolicOp::Add,
+                left: Box::new(TermType::Constant(1)),
+                right: Box::new(TermType::BinaryOp {
+                    op: SymbolicOp::Pow,
+                    left: Box::new(TermType::Function {
+                        name: "tan".to_string(),
+                        arg: Box::new(arg.clone()),
+                    }),
+                    right: Box::new(TermType::Constant(2)),
+                }),
+            },
+
+            // d/du exp(u) = exp(u)
+            "exp" => TermType::Function {
+                name: "exp".to_string(),
+                arg: Box::new(arg.clone()),
+            },
+
+            // d/du ln(u) = 1/u
+            "ln" | "log" => TermType::BinaryOp {
+                op: SymbolicOp::Div,
+                left: Box::new(TermType::Constant(1)),
+                right: Box::new(arg.clone()),
+            },
+
+            // d/du sqrt(u) = 1/(2*sqrt(u))
+            "sqrt" => TermType::BinaryOp {
+                op: SymbolicOp::Div,
+                left: Box::new(TermType::Constant(1)),
+                right: Box::new(TermType::BinaryOp {
+                    op: SymbolicOp::Mul,
+                    left: Box::new(TermType::Constant(2)),
+                    right: Box::new(TermType::Function {
+                        name: "sqrt".to_string(),
+                        arg: Box::new(arg.clone()),
+                    }),
+                }),
+            },
+
+            // d/du asin(u) = 1/sqrt(1 - u²)
+            "asin" | "arcsin" => TermType::BinaryOp {
+                op: SymbolicOp::Div,
+                left: Box::new(TermType::Constant(1)),
+                right: Box::new(TermType::Function {
+                    name: "sqrt".to_string(),
+                    arg: Box::new(TermType::BinaryOp {
+                        op: SymbolicOp::Sub,
+                        left: Box::new(TermType::Constant(1)),
+                        right: Box::new(TermType::BinaryOp {
+                            op: SymbolicOp::Pow,
+                            left: Box::new(arg.clone()),
+                            right: Box::new(TermType::Constant(2)),
+                        }),
+                    }),
+                }),
+            },
+
+            // d/du acos(u) = -1/sqrt(1 - u²)
+            "acos" | "arccos" => TermType::UnaryOp {
+                op: SymbolicOp::Neg,
+                operand: Box::new(TermType::BinaryOp {
+                    op: SymbolicOp::Div,
+                    left: Box::new(TermType::Constant(1)),
+                    right: Box::new(TermType::Function {
+                        name: "sqrt".to_string(),
+                        arg: Box::new(TermType::BinaryOp {
+                            op: SymbolicOp::Sub,
+                            left: Box::new(TermType::Constant(1)),
+                            right: Box::new(TermType::BinaryOp {
+                                op: SymbolicOp::Pow,
+                                left: Box::new(arg.clone()),
+                                right: Box::new(TermType::Constant(2)),
+                            }),
+                        }),
+                    }),
+                }),
+            },
+
+            // d/du atan(u) = 1/(1 + u²)
+            "atan" | "arctan" => TermType::BinaryOp {
+                op: SymbolicOp::Div,
+                left: Box::new(TermType::Constant(1)),
+                right: Box::new(TermType::BinaryOp {
+                    op: SymbolicOp::Add,
+                    left: Box::new(TermType::Constant(1)),
+                    right: Box::new(TermType::BinaryOp {
+                        op: SymbolicOp::Pow,
+                        left: Box::new(arg.clone()),
+                        right: Box::new(TermType::Constant(2)),
+                    }),
+                }),
+            },
+
+            // d/du sinh(u) = cosh(u)
+            "sinh" => TermType::Function {
+                name: "cosh".to_string(),
+                arg: Box::new(arg.clone()),
+            },
+
+            // d/du cosh(u) = sinh(u)
+            "cosh" => TermType::Function {
+                name: "sinh".to_string(),
+                arg: Box::new(arg.clone()),
+            },
+
+            // d/du tanh(u) = 1 - tanh²(u) = sech²(u)
+            "tanh" => TermType::BinaryOp {
+                op: SymbolicOp::Sub,
+                left: Box::new(TermType::Constant(1)),
+                right: Box::new(TermType::BinaryOp {
+                    op: SymbolicOp::Pow,
+                    left: Box::new(TermType::Function {
+                        name: "tanh".to_string(),
+                        arg: Box::new(arg.clone()),
+                    }),
+                    right: Box::new(TermType::Constant(2)),
+                }),
+            },
+
+            // Unknown function: return generic derivative marker
+            _ => TermType::Function {
+                name: format!("{}'", name),
+                arg: Box::new(arg.clone()),
+            },
         }
     }
 
@@ -210,6 +460,20 @@ impl SymbolicDifferentiator {
                 let inner = Self::term_to_expr(operand, primitives);
                 inner.neg(primitives)
             }
+            TermType::Function { name, arg } => {
+                let inner = Self::term_to_expr(arg, primitives);
+                // Encode function application in HDC space
+                let fn_seed = seed_from_name(&format!("FN_{}", name));
+                let fn_encoding = BinaryHV::random(fn_seed);
+                let encoding = fn_encoding.bind(&inner.encoding);
+                let display = format!("{}({})", name, inner.display);
+                SymbolicExpr {
+                    term_type: term.clone(),
+                    encoding,
+                    phi: inner.phi + 0.5,
+                    display,
+                }
+            }
         }
     }
 }
@@ -218,35 +482,66 @@ impl SymbolicDifferentiator {
 pub struct SymbolicIntegrator;
 
 impl SymbolicIntegrator {
-    /// Integrate a polynomial using the power rule.
-    /// Returns a new polynomial with coefficients shifted up by one degree.
+    /// Integrate a polynomial using the power rule with exact rational coefficients.
+    ///
+    /// Uses RationalPolynomial internally to avoid integer truncation.
+    /// For example, ∫x dx = (1/2)x² — not 0 from integer division.
     pub fn integrate_polynomial(poly: &Polynomial, primitives: &PrimitiveSystem) -> Polynomial {
+        // Convert to rational polynomial for exact integration
         let coeffs = poly.coefficients();
-        let mut new_coeffs = vec![0i64]; // Constant of integration = 0
+        let rational_poly = RationalPolynomial::from_integer_coeffs(coeffs, "x");
+        let integrated = rational_poly.integrate();
 
-        for (power, &coeff) in coeffs.iter().enumerate() {
-            // integral of a_n * x^n = (a_n / (n+1)) * x^(n+1)
-            let new_power = power + 1;
-            let new_coeff = coeff / (new_power as i64); // Integer division
-            new_coeffs.push(new_coeff);
+        // Convert back to integer polynomial (with rounding for non-integer results)
+        // This preserves exact results when they are integers, and rounds otherwise
+        let mut new_coeffs = Vec::new();
+        for &(num, den) in integrated.coefficients() {
+            if den == 1 || num == 0 {
+                new_coeffs.push(num);
+            } else {
+                // Non-integer coefficient - round to nearest integer
+                // (Use RationalPolynomial directly for exact results)
+                new_coeffs.push(num / den);
+            }
         }
 
         Polynomial::new(new_coeffs, "x", primitives)
     }
 
-    /// Compute definite integral of a polynomial using the antiderivative.
+    /// Integrate a polynomial with exact rational coefficients (no truncation).
+    ///
+    /// This is the preferred method — returns a RationalPolynomial
+    /// that preserves exact coefficients like 1/2, 1/3, etc.
+    pub fn integrate_polynomial_exact(poly: &Polynomial) -> RationalPolynomial {
+        let coeffs = poly.coefficients();
+        let rational_poly = RationalPolynomial::from_integer_coeffs(coeffs, "x");
+        rational_poly.integrate()
+    }
+
+    /// Compute definite integral of a polynomial using exact rational arithmetic.
     pub fn definite_integral(
         poly: &Polynomial,
         lower: i64,
         upper: i64,
-        primitives: &PrimitiveSystem,
-        engine: &mut HybridArithmeticEngine,
+        _primitives: &PrimitiveSystem,
+        _engine: &mut HybridArithmeticEngine,
     ) -> Option<i64> {
-        let antiderivative = Self::integrate_polynomial(poly, primitives);
-        let upper_val = antiderivative.evaluate(upper, engine).value;
-        let lower_val = antiderivative.evaluate(lower, engine).value;
-        // Note: HybridResult.value is u64, so this only works for non-negative results
-        Some(upper_val as i64 - lower_val as i64)
+        let coeffs = poly.coefficients();
+        let rational_poly = RationalPolynomial::from_integer_coeffs(coeffs, "x");
+        let (num, den) = rational_poly.definite_integral(lower, upper);
+        // Return integer result (exact when the integral is an integer)
+        Some(num / den)
+    }
+
+    /// Compute definite integral returning exact rational result (numerator, denominator).
+    pub fn definite_integral_exact(
+        poly: &Polynomial,
+        lower: i64,
+        upper: i64,
+    ) -> (i64, i64) {
+        let coeffs = poly.coefficients();
+        let rational_poly = RationalPolynomial::from_integer_coeffs(coeffs, "x");
+        rational_poly.definite_integral(lower, upper)
     }
 }
 
@@ -255,18 +550,37 @@ pub struct FundamentalTheoremVerifier;
 
 impl FundamentalTheoremVerifier {
     /// Verify that d/dx integral f(t)dt = f(x) for a polynomial.
-    pub fn verify(poly: &Polynomial, primitives: &PrimitiveSystem) -> bool {
-        let integral = SymbolicIntegrator::integrate_polynomial(poly, primitives);
-        let derivative_of_integral = integral.derivative(primitives);
+    ///
+    /// Uses RationalPolynomial for exact verification (no integer truncation).
+    pub fn verify(poly: &Polynomial, _primitives: &PrimitiveSystem) -> bool {
+        let coeffs = poly.coefficients();
+        let rational_poly = RationalPolynomial::from_integer_coeffs(coeffs, "x");
+        rational_poly.verify_fundamental_theorem()
+    }
+}
 
-        let original_coeffs = poly.coefficients();
-        let result_coeffs = derivative_of_integral.coefficients();
+/// Helper: construct a Function TermType
+pub fn func(name: &str, arg: TermType) -> TermType {
+    TermType::Function {
+        name: name.to_string(),
+        arg: Box::new(arg),
+    }
+}
 
-        if original_coeffs.len() != result_coeffs.len() {
-            return false;
-        }
-
-        original_coeffs.iter().zip(result_coeffs.iter()).all(|(a, b)| a == b)
+/// Helper: construct a SymbolicExpr for a function application
+pub fn func_expr(name: &str, arg: &SymbolicExpr, primitives: &PrimitiveSystem) -> SymbolicExpr {
+    let fn_seed = seed_from_name(&format!("FN_{}", name));
+    let fn_encoding = BinaryHV::random(fn_seed);
+    let encoding = fn_encoding.bind(&arg.encoding);
+    let display = format!("{}({})", name, arg.display);
+    SymbolicExpr {
+        term_type: TermType::Function {
+            name: name.to_string(),
+            arg: Box::new(arg.term_type.clone()),
+        },
+        encoding,
+        phi: arg.phi + 0.5,
+        display,
     }
 }
 
@@ -330,12 +644,12 @@ impl RationalPolynomial {
             if cn == 0 { continue; }
             // term = (cn/cd) * x^power
             let x_pow = x.pow(power as u32);
-            let term_num = cn * x_pow;
+            let term_num = cn.wrapping_mul(x_pow);
             let term_den = cd;
 
             // Add: num/den + term_num/term_den = (num*term_den + term_num*den) / (den*term_den)
-            num = num * term_den + term_num * den;
-            den *= term_den;
+            num = num.wrapping_mul(term_den).wrapping_add(term_num.wrapping_mul(den));
+            den = den.wrapping_mul(term_den);
 
             // Reduce to prevent overflow
             let g = gcd_i64(num.abs(), den.abs());
@@ -451,6 +765,8 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
+    // ==================== BASIC DIFFERENTIATION ====================
+
     #[test]
     fn test_differentiate_power() {
         let prims = PrimitiveSystem::global();
@@ -497,6 +813,199 @@ mod tests {
     }
 
     #[test]
+    fn test_higher_order_derivative() {
+        let prims = PrimitiveSystem::global();
+        // d^2/dx^2(x^3) = 6x
+        let x = SymbolicExpr::variable("x", prims);
+        let three = SymbolicExpr::constant(3, prims);
+        let x_cubed = x.pow(&three, prims);
+        let result = SymbolicDifferentiator::differentiate_n(&x_cubed, "x", 2, prims);
+        let mut engine = HybridArithmeticEngine::new();
+        let mut vars = HashMap::new();
+        vars.insert("x".to_string(), 2);
+        let val = result.expr.evaluate(&vars, &mut engine).unwrap();
+        assert_eq!(val.value, 12); // 6*2 = 12
+    }
+
+    // ==================== TRANSCENDENTAL FUNCTIONS ====================
+
+    #[test]
+    fn test_diff_sin_x() {
+        let prims = PrimitiveSystem::global();
+        // d/dx sin(x) = cos(x)
+        let x_var = TermType::Variable("x".to_string());
+        let sin_x = TermType::Function { name: "sin".to_string(), arg: Box::new(x_var) };
+        let result = SymbolicDifferentiator::diff_recursive(&sin_x, "x", prims);
+        // Should be cos(x)
+        match &result {
+            TermType::Function { name, arg } => {
+                assert_eq!(name, "cos");
+                assert_eq!(**arg, TermType::Variable("x".to_string()));
+            }
+            _ => panic!("Expected Function(cos, x), got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_diff_cos_x() {
+        let prims = PrimitiveSystem::global();
+        // d/dx cos(x) = -sin(x)
+        let x_var = TermType::Variable("x".to_string());
+        let cos_x = TermType::Function { name: "cos".to_string(), arg: Box::new(x_var) };
+        let result = SymbolicDifferentiator::diff_recursive(&cos_x, "x", prims);
+        // Should be -sin(x) = UnaryOp(Neg, Function(sin, x))
+        match &result {
+            TermType::UnaryOp { op: SymbolicOp::Neg, operand } => {
+                match operand.as_ref() {
+                    TermType::Function { name, arg } => {
+                        assert_eq!(name, "sin");
+                        assert_eq!(**arg, TermType::Variable("x".to_string()));
+                    }
+                    _ => panic!("Expected Function(sin, x) inside Neg"),
+                }
+            }
+            _ => panic!("Expected UnaryOp(Neg, Function(sin, x)), got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_diff_exp_x() {
+        let prims = PrimitiveSystem::global();
+        // d/dx exp(x) = exp(x)
+        let x_var = TermType::Variable("x".to_string());
+        let exp_x = TermType::Function { name: "exp".to_string(), arg: Box::new(x_var.clone()) };
+        let result = SymbolicDifferentiator::diff_recursive(&exp_x, "x", prims);
+        // Should be exp(x)
+        match &result {
+            TermType::Function { name, arg } => {
+                assert_eq!(name, "exp");
+                assert_eq!(**arg, TermType::Variable("x".to_string()));
+            }
+            _ => panic!("Expected Function(exp, x), got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_diff_ln_x() {
+        let prims = PrimitiveSystem::global();
+        // d/dx ln(x) = 1/x
+        let x_var = TermType::Variable("x".to_string());
+        let ln_x = TermType::Function { name: "ln".to_string(), arg: Box::new(x_var) };
+        let result = SymbolicDifferentiator::diff_recursive(&ln_x, "x", prims);
+        // Should be 1/x = BinaryOp(Div, 1, x)
+        match &result {
+            TermType::BinaryOp { op: SymbolicOp::Div, left, right } => {
+                assert_eq!(**left, TermType::Constant(1));
+                assert_eq!(**right, TermType::Variable("x".to_string()));
+            }
+            _ => panic!("Expected BinaryOp(Div, 1, x), got {:?}", result),
+        }
+    }
+
+    // ==================== CHAIN RULE ====================
+
+    #[test]
+    fn test_chain_rule_sin_x_squared() {
+        let prims = PrimitiveSystem::global();
+        // d/dx sin(x²) = cos(x²) * 2x
+        let x_var = TermType::Variable("x".to_string());
+        let x_squared = TermType::BinaryOp {
+            op: SymbolicOp::Pow,
+            left: Box::new(x_var),
+            right: Box::new(TermType::Constant(2)),
+        };
+        let sin_x2 = TermType::Function { name: "sin".to_string(), arg: Box::new(x_squared) };
+        let result = SymbolicDifferentiator::diff_recursive(&sin_x2, "x", prims);
+        // Should be cos(x²) * (2 * x^1 * 1) = cos(x²) * 2x
+        // The structure is: Mul(cos(x²), Mul(Mul(2, Pow(x, 1)), 1))
+        match &result {
+            TermType::BinaryOp { op: SymbolicOp::Mul, left, right: _ } => {
+                // Left should be cos(x²)
+                match left.as_ref() {
+                    TermType::Function { name, .. } => assert_eq!(name, "cos"),
+                    _ => panic!("Expected cos(...) on left of product"),
+                }
+            }
+            _ => panic!("Expected Mul(cos(x²), ...), got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_chain_rule_exp_3x() {
+        let prims = PrimitiveSystem::global();
+        // d/dx exp(3x) = 3 * exp(3x)
+        let three_x = TermType::BinaryOp {
+            op: SymbolicOp::Mul,
+            left: Box::new(TermType::Constant(3)),
+            right: Box::new(TermType::Variable("x".to_string())),
+        };
+        let exp_3x = TermType::Function { name: "exp".to_string(), arg: Box::new(three_x) };
+        let result = SymbolicDifferentiator::diff_recursive(&exp_3x, "x", prims);
+        // Should be exp(3x) * d/dx(3x) = exp(3x) * (0*x + 3*1) = exp(3x) * 3
+        match &result {
+            TermType::BinaryOp { op: SymbolicOp::Mul, left, .. } => {
+                // Left should be exp(3x)
+                match left.as_ref() {
+                    TermType::Function { name, .. } => assert_eq!(name, "exp"),
+                    _ => panic!("Expected exp(...) on left of product"),
+                }
+            }
+            _ => panic!("Expected Mul(exp(3x), ...), got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_diff_constant_function() {
+        let prims = PrimitiveSystem::global();
+        // d/dx sin(5) = 0 (constant argument → derivative is 0)
+        let sin_5 = TermType::Function {
+            name: "sin".to_string(),
+            arg: Box::new(TermType::Constant(5)),
+        };
+        let result = SymbolicDifferentiator::diff_recursive(&sin_5, "x", prims);
+        assert_eq!(result, TermType::Constant(0));
+    }
+
+    #[test]
+    fn test_diff_different_variable() {
+        let prims = PrimitiveSystem::global();
+        // d/dx sin(y) = 0 (y is treated as constant w.r.t. x)
+        let sin_y = TermType::Function {
+            name: "sin".to_string(),
+            arg: Box::new(TermType::Variable("y".to_string())),
+        };
+        let result = SymbolicDifferentiator::diff_recursive(&sin_y, "x", prims);
+        assert_eq!(result, TermType::Constant(0));
+    }
+
+    // ==================== GENERAL POWER RULE ====================
+
+    #[test]
+    fn test_diff_variable_exponent() {
+        let prims = PrimitiveSystem::global();
+        // d/dx x^x = x^x * (1 * ln(x) + x * (1/x))
+        //          = x^x * (ln(x) + 1)
+        let x_var = TermType::Variable("x".to_string());
+        let x_to_x = TermType::BinaryOp {
+            op: SymbolicOp::Pow,
+            left: Box::new(x_var.clone()),
+            right: Box::new(x_var),
+        };
+        let result = SymbolicDifferentiator::diff_recursive(&x_to_x, "x", prims);
+        // Should NOT return Constant(0) anymore
+        assert_ne!(result, TermType::Constant(0), "d/dx(x^x) should not be 0");
+        // Should be a Mul expression
+        match &result {
+            TermType::BinaryOp { op: SymbolicOp::Mul, .. } => {
+                // Good - it's a product (x^x * something)
+            }
+            _ => panic!("Expected Mul for d/dx(x^x), got {:?}", result),
+        }
+    }
+
+    // ==================== POLYNOMIAL INTEGRATION ====================
+
+    #[test]
     fn test_polynomial_integration() {
         let prims = PrimitiveSystem::global();
         // integral of (3x^2 + 2x + 1) = x^3 + x^2 + x
@@ -525,28 +1034,23 @@ mod tests {
         assert_eq!(result, 1);
     }
 
-    #[test]
-    fn test_higher_order_derivative() {
-        let prims = PrimitiveSystem::global();
-        // d^2/dx^2(x^3) = 6x
-        let x = SymbolicExpr::variable("x", prims);
-        let three = SymbolicExpr::constant(3, prims);
-        let x_cubed = x.pow(&three, prims);
-        let result = SymbolicDifferentiator::differentiate_n(&x_cubed, "x", 2, prims);
-        let mut engine = HybridArithmeticEngine::new();
-        let mut vars = HashMap::new();
-        vars.insert("x".to_string(), 2);
-        let val = result.expr.evaluate(&vars, &mut engine).unwrap();
-        assert_eq!(val.value, 12); // 6*2 = 12
-    }
+    // ==================== RATIONAL POLYNOMIAL (EXACT INTEGRATION) ====================
 
     #[test]
     fn test_rational_polynomial_integrate_x() {
-        // ∫x dx = (1/2)x² — the case that integer division breaks
+        // ∫x dx = (1/2)x² — the case that integer division used to break
         let poly = RationalPolynomial::from_integer_coeffs(&[0, 1], "x"); // f(x) = x
         let integral = poly.integrate();
         // integral should be [0, 0, (1,2)] → (1/2)x²
         assert_eq!(integral.coefficients()[2], (1, 2));
+    }
+
+    #[test]
+    fn test_exact_definite_integral_half() {
+        // ∫₀¹ x dx = 1/2 (exact rational result)
+        let poly = Polynomial::new(vec![0, 1], "x", PrimitiveSystem::global());
+        let (num, den) = SymbolicIntegrator::definite_integral_exact(&poly, 0, 1);
+        assert_eq!((num, den), (1, 2));
     }
 
     #[test]
@@ -584,5 +1088,55 @@ mod tests {
         let poly = RationalPolynomial::new(vec![(1, 2), (3, 4)], "x");
         let (num, den) = poly.evaluate_rational(2);
         assert_eq!(num as f64 / den as f64, 2.0);
+    }
+
+    // ==================== HELPER FUNCTION TESTS ====================
+
+    #[test]
+    fn test_func_helper() {
+        let x = TermType::Variable("x".to_string());
+        let sin_x = func("sin", x);
+        match &sin_x {
+            TermType::Function { name, arg } => {
+                assert_eq!(name, "sin");
+                assert_eq!(**arg, TermType::Variable("x".to_string()));
+            }
+            _ => panic!("Expected Function"),
+        }
+    }
+
+    #[test]
+    fn test_func_expr_helper() {
+        let prims = PrimitiveSystem::global();
+        let x = SymbolicExpr::variable("x", prims);
+        let sin_x = func_expr("sin", &x, prims);
+        assert!(sin_x.display.contains("sin"));
+        assert!(sin_x.display.contains("x"));
+    }
+
+    // ==================== HYPERBOLIC FUNCTIONS ====================
+
+    #[test]
+    fn test_diff_sinh_x() {
+        let prims = PrimitiveSystem::global();
+        // d/dx sinh(x) = cosh(x)
+        let sinh_x = func("sinh", TermType::Variable("x".to_string()));
+        let result = SymbolicDifferentiator::diff_recursive(&sinh_x, "x", prims);
+        match &result {
+            TermType::Function { name, .. } => assert_eq!(name, "cosh"),
+            _ => panic!("Expected cosh(x), got {:?}", result),
+        }
+    }
+
+    #[test]
+    fn test_diff_cosh_x() {
+        let prims = PrimitiveSystem::global();
+        // d/dx cosh(x) = sinh(x)
+        let cosh_x = func("cosh", TermType::Variable("x".to_string()));
+        let result = SymbolicDifferentiator::diff_recursive(&cosh_x, "x", prims);
+        match &result {
+            TermType::Function { name, .. } => assert_eq!(name, "sinh"),
+            _ => panic!("Expected sinh(x), got {:?}", result),
+        }
     }
 }

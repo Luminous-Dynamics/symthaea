@@ -21,7 +21,7 @@ mod thermal_transport;
 mod neutron_shielding;
 mod geometry;
 mod pulse_dynamics;
-#[allow(dead_code)]
+#[allow(dead_code)] // Most items unused; LcfPhysicsConstants, GamowIntegrationResult, DDChannelResult used by coupled_physics
 mod trigger_systems;
 mod coupled_physics;
 mod spark_prototype_spec;
@@ -38,10 +38,9 @@ mod antimatter;
 mod thermodynamics;
 mod astrophysics;
 mod phase_transitions;
-#[allow(dead_code)]
+#[allow(dead_code)] // Exploratory: QFT Feynman diagrams, propagators, vertices
 mod qft;
 mod molecular_biology;
-#[allow(dead_code)]
 mod neuroscience;
 mod quantum_gravity;
 mod emergence_chain;
@@ -49,6 +48,9 @@ mod true_phi;
 mod hdc_emergence_metrics;
 
 // Phase 2: Additional physics domains (pub mod to avoid glob conflicts)
+// Exploratory modules - HDC encodings for fundamental physics domains.
+// Items are publicly exported; allow(dead_code) suppresses warnings for
+// items not yet consumed within the crate itself.
 #[allow(dead_code)]
 pub mod general_relativity;
 mod quantum_information;
@@ -62,6 +64,9 @@ pub mod plasma_physics;
 mod cosmology;
 
 // Phase 3: Laws derivation, classical mechanics, and more domains
+// Exploratory modules - HDC encodings for classical and statistical physics.
+// Public APIs are re-exported below; allow(dead_code) suppresses warnings
+// for items not yet consumed within the crate.
 #[allow(dead_code)]
 mod derived_laws;
 #[allow(dead_code)]
@@ -74,6 +79,8 @@ mod chemical_kinetics;
 mod acoustics;
 
 // Phase 4: Specialized domains and analogy discovery
+// Exploratory modules - HDC encodings for specialized physics and cross-domain
+// analogy discovery. Public APIs are re-exported below.
 #[allow(dead_code)]
 mod optics;
 #[allow(dead_code)]
@@ -90,9 +97,16 @@ mod tensor_algebra;
 mod chaos_dynamics;
 mod nonequilibrium;
 
+// Phase 6: Simulation bridge (connects encoding modules to dynamical system framework)
+pub mod simulation_bridge;
+
 // Integration examples showing cross-module usage
 #[cfg(test)]
 mod physics_integration_examples;
+#[cfg(test)]
+mod physics_numerical_validation;
+#[cfg(test)]
+mod physics_proptest_validation;
 
 // Demonstration module
 #[cfg(test)]

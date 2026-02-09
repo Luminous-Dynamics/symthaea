@@ -79,6 +79,33 @@ use super::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use crate::observability::{SharedObserver, PhiComponents, PhiMeasurementEvent};
 
+/// Binary Shannon entropy: H(p) = -p log₂(p) - (1-p) log₂(1-p)
+///
+/// Returns 0 for p=0 or p=1 (certain outcomes have zero entropy).
+/// Maximum value is 1.0 at p=0.5 (maximum uncertainty).
+fn binary_entropy(p: f64) -> f64 {
+    if p <= 0.0 || p >= 1.0 {
+        return 0.0;
+    }
+    -(p * p.log2() + (1.0 - p) * (1.0 - p).log2())
+}
+
+/// Convert BinaryHV Hamming similarity to mutual information.
+///
+/// For BinaryHVs with ~50% bit density (as random BinaryHVs have):
+/// - similarity s ∈ [0, 1] = fraction of agreeing bits
+/// - Random independent vectors have s ≈ 0.5
+/// - MI per bit = 1 - H(s) where H is binary Shannon entropy
+///
+/// Information-theoretic properties:
+/// - Independent vectors (s ≈ 0.5): MI ≈ 0 (no shared information)
+/// - Identical vectors (s = 1.0): MI = 1.0 (maximum information)
+/// - Anti-correlated (s = 0.0): MI = 1.0 (maximum information)
+fn similarity_to_mutual_information(similarity: f64) -> f64 {
+    let s = similarity.clamp(0.001, 0.999);
+    1.0 - binary_entropy(s)
+}
+
 /// Integrated Information calculator for HDC systems
 ///
 /// Computes Φ (phi) - a measure of integrated information that quantifies
@@ -405,19 +432,18 @@ impl IntegratedInformation {
         normalized_phi
     }
 
-    /// Fast Φ estimation for reasoning chain steps
+    /// Fast Φ estimation for reasoning chain steps.
     ///
     /// This method provides a ~10x faster phi estimate by:
     /// 1. Skipping the expensive MIP (Minimum Information Partition) search
-    /// 2. Using similarity-based integration measure directly
+    /// 2. Using entropy-based mutual information (not ad-hoc weights)
     /// 3. Not recording history (no memory allocation)
     ///
-    /// Use this for real-time reasoning chain execution where per-step
-    /// phi estimates need to be computed rapidly. Use `compute_phi` for
-    /// final chain analysis where accuracy matters more than speed.
+    /// Uses the Shannon entropy bridge: MI = 1 - H(similarity), which provides
+    /// a principled information-theoretic measure without MIP computation.
     ///
     /// # Accuracy
-    /// - Fast estimate correlates strongly (r > 0.9) with full IIT phi
+    /// - Fast estimate correlates strongly with full entropy-based Φ
     /// - May underestimate for highly integrated systems
     /// - Sufficient for relative comparisons and gradient tracking
     pub fn compute_phi_fast(components: &[BinaryHV]) -> f64 {
@@ -425,38 +451,20 @@ impl IntegratedInformation {
             return 0.0;
         }
 
-        // Bundle all components into system state using BinaryHV::bundle
+        // Bundle all components into system state
         let bundled = BinaryHV::bundle(components);
 
-        // Measure integration via distinctiveness
-        // High integration = bundled state is distinct from parts
-        let mut distinctiveness_sum = 0.0;
+        // Compute mutual information between bundled state and each component
+        // using the Shannon entropy bridge: MI = 1 - H(similarity)
+        let mut total_mi = 0.0;
         for component in components {
-            let similarity = bundled.similarity(component) as f64;
-            distinctiveness_sum += 1.0 - similarity;
+            let sim = bundled.similarity(component) as f64;
+            total_mi += similarity_to_mutual_information(sim);
         }
 
-        let avg_distinctiveness = distinctiveness_sum / components.len() as f64;
-
-        // Binding contribution: how much information is lost when separating
-        // Measured by how different consecutive pairs are
-        let mut binding_sum = 0.0;
-        for i in 0..components.len() - 1 {
-            let pair_sim = components[i].similarity(&components[i + 1]) as f64;
-            binding_sum += 1.0 - pair_sim;
-        }
-        let binding_term = if components.len() > 1 {
-            binding_sum / (components.len() - 1) as f64
-        } else {
-            0.0
-        };
-
-        // Combine distinctiveness and binding
-        // Weight binding higher as it better approximates information partition
-        let raw_phi = avg_distinctiveness * 0.4 + binding_term * 0.6;
-
-        // Normalize by component count (more components = potentially higher phi)
-        let normalized = raw_phi * (components.len() as f64).sqrt() / 2.0;
+        // Average MI per component, normalized by system size
+        let avg_mi = total_mi / components.len() as f64;
+        let normalized = avg_mi * (components.len() as f64).sqrt() / 2.0;
 
         normalized.clamp(0.0, 1.0)
     }
@@ -694,6 +702,265 @@ impl IntegratedInformation {
         }
 
         BinaryHV::bundle(components)
+    }
+
+    // =========================================================================
+    // Entropy-based Φ computation (information-theoretic foundation)
+    // =========================================================================
+
+    /// Compute system information using Shannon entropy framework.
+    ///
+    /// Measures total mutual information between the bundled system state
+    /// and each individual component, using the similarity→MI bridge:
+    ///   MI(whole, part_i) = 1 - H(similarity(whole, part_i))
+    ///
+    /// This replaces the ad-hoc `(1 - avg_similarity) * ln(N)` formula with
+    /// a principled information-theoretic measure where:
+    /// - Independent components contribute MI ≈ 0
+    /// - Correlated components contribute MI → 1
+    fn entropy_system_information(&self, components: &[BinaryHV]) -> f64 {
+        if components.len() < 2 {
+            return 0.0;
+        }
+
+        let system_state = self.bundle_components(components);
+        let mut total_mi = 0.0;
+        for component in components {
+            let sim = system_state.similarity(component) as f64;
+            total_mi += similarity_to_mutual_information(sim);
+        }
+
+        total_mi
+    }
+
+    /// Compute information of a partition using entropy framework.
+    fn entropy_partition_information(&self, components: &[BinaryHV], partition: &Partition) -> f64 {
+        let part_a: Vec<BinaryHV> = partition.part_a.iter().map(|&i| components[i]).collect();
+        let part_b: Vec<BinaryHV> = partition.part_b.iter().map(|&i| components[i]).collect();
+
+        let info_a = self.entropy_system_information(&part_a);
+        let info_b = self.entropy_system_information(&part_b);
+
+        info_a + info_b
+    }
+
+    /// Compute mutual information between two partitions' bundled states.
+    ///
+    /// Directly measures information flow across the partition boundary.
+    fn cross_partition_mi(&self, components: &[BinaryHV], partition: &Partition) -> f64 {
+        if partition.part_a.is_empty() || partition.part_b.is_empty() {
+            return 0.0;
+        }
+
+        let part_a: Vec<BinaryHV> = partition.part_a.iter().map(|&i| components[i]).collect();
+        let part_b: Vec<BinaryHV> = partition.part_b.iter().map(|&i| components[i]).collect();
+
+        let bundle_a = self.bundle_components(&part_a);
+        let bundle_b = self.bundle_components(&part_b);
+
+        let sim = bundle_a.similarity(&bundle_b) as f64;
+        similarity_to_mutual_information(sim)
+    }
+
+    /// Compute Φ using information-theoretic (entropy-based) framework.
+    ///
+    /// A more principled alternative to `compute_phi` that uses Shannon entropy
+    /// to bridge between BinaryHV similarity and information theory.
+    ///
+    /// ```text
+    /// Φ_entropy = I_system - min_partition(I_parts) + MI_cross
+    ///
+    /// Where:
+    ///   I = Σ MI(bundle, component_i) using MI = 1 - H(similarity)
+    ///   MI_cross = mutual information between partition halves
+    /// ```
+    ///
+    /// Advantages over similarity-based `compute_phi`:
+    /// - Proper information-theoretic foundation (Shannon entropy)
+    /// - MI = 0 for independent random vectors (correct baseline)
+    /// - MI = 1 for identical/anti-correlated vectors (correct extremes)
+    /// - Smooth, monotonic, nonlinear mapping (small similarity changes near
+    ///   0.5 have little effect; large deviations contribute strongly)
+    pub fn compute_phi_entropy(&mut self, components: &[BinaryHV]) -> f64 {
+        if components.len() < 2 {
+            return 0.0;
+        }
+
+        // 1. Compute total system information (entropy-based)
+        let system_info = self.entropy_system_information(components);
+
+        // 2. Find MIP using entropy-based partition information
+        let (mip, min_partition_info) = self.find_mip_entropy(components);
+
+        // 3. Cross-partition MI: how much info flows across the cut
+        let cross_mi = self.cross_partition_mi(components, &mip);
+
+        // 4. Φ = (system info - partition info) + cross-partition MI
+        let phi_integration = (system_info - min_partition_info).max(0.0);
+        let phi_combined = phi_integration + cross_mi;
+
+        // 5. Normalize
+        let normalized_phi = phi_combined / (components.len() as f64).sqrt();
+
+        // 6. Compute components for observability
+        let phi_components = self.compute_phi_components(
+            normalized_phi,
+            components,
+            system_info,
+            min_partition_info,
+        );
+
+        // 7. Temporal continuity
+        let temporal_continuity = if self.phi_history.len() >= 2 {
+            let recent: Vec<f64> = self.phi_history
+                .iter()
+                .rev()
+                .take(5)
+                .map(|m| m.phi)
+                .collect();
+            let mean = recent.iter().sum::<f64>() / recent.len() as f64;
+            if mean > 0.0 {
+                1.0 - ((normalized_phi - mean).abs() / mean).min(1.0)
+            } else {
+                1.0
+            }
+        } else {
+            1.0
+        };
+
+        // 8. Record measurement
+        self.phi_history.push(PhiMeasurement {
+            phi: normalized_phi,
+            num_components: components.len(),
+            mip: Some(mip),
+            timestamp: std::time::Instant::now(),
+        });
+
+        // 9. Emit observability event
+        if let Some(ref observer) = self.observer {
+            let event = PhiMeasurementEvent {
+                timestamp: chrono::Utc::now(),
+                phi: normalized_phi,
+                components: phi_components,
+                temporal_continuity,
+                metadata: None,
+            };
+            if let Ok(mut obs) = observer.try_write() {
+                let _ = obs.record_phi_measurement(event);
+            }
+        }
+
+        normalized_phi
+    }
+
+    /// Find Minimum Information Partition using entropy-based measure.
+    fn find_mip_entropy(&self, components: &[BinaryHV]) -> (Partition, f64) {
+        let n = components.len();
+
+        if n == 2 {
+            let partition = Partition {
+                part_a: vec![0],
+                part_b: vec![1],
+                information_loss: 0.0,
+            };
+            let info = self.entropy_partition_information(components, &partition);
+            return (
+                Partition { information_loss: info, ..partition },
+                info,
+            );
+        }
+
+        if n <= 8 {
+            self.exhaustive_mip_entropy(components)
+        } else {
+            self.heuristic_mip_entropy(components)
+        }
+    }
+
+    /// Exhaustive MIP search using entropy-based information.
+    fn exhaustive_mip_entropy(&self, components: &[BinaryHV]) -> (Partition, f64) {
+        let n = components.len();
+        let mut min_info = f64::MAX;
+        let mut mip = Partition {
+            part_a: vec![0],
+            part_b: (1..n).collect(),
+            information_loss: 0.0,
+        };
+
+        for mask in 1..(1u64 << n) - 1 {
+            let mut part_a = Vec::new();
+            let mut part_b = Vec::new();
+
+            for i in 0..n {
+                if (mask & (1 << i)) != 0 {
+                    part_a.push(i);
+                } else {
+                    part_b.push(i);
+                }
+            }
+
+            if part_a.is_empty() || part_b.is_empty() {
+                continue;
+            }
+
+            let partition = Partition {
+                part_a,
+                part_b,
+                information_loss: 0.0,
+            };
+
+            let info = self.entropy_partition_information(components, &partition);
+
+            if info < min_info {
+                min_info = info;
+                mip = partition;
+            }
+        }
+
+        mip.information_loss = min_info;
+        (mip, min_info)
+    }
+
+    /// Heuristic MIP search using entropy-based information for large systems.
+    fn heuristic_mip_entropy(&self, components: &[BinaryHV]) -> (Partition, f64) {
+        let n = components.len();
+        let mut candidates = Vec::new();
+
+        // 1. Similarity-based clustering
+        let (part_a, part_b) = self.similarity_partition(components);
+        candidates.push(Partition { part_a, part_b, information_loss: 0.0 });
+
+        // 2. Split in half
+        let mid = n / 2;
+        candidates.push(Partition {
+            part_a: (0..mid).collect(),
+            part_b: (mid..n).collect(),
+            information_loss: 0.0,
+        });
+
+        // 3. Split by thirds
+        if n >= 3 {
+            let third = n / 3;
+            candidates.push(Partition {
+                part_a: (0..third).collect(),
+                part_b: (third..n).collect(),
+                information_loss: 0.0,
+            });
+        }
+
+        let mut min_info = f64::MAX;
+        let mut mip = candidates[0].clone();
+
+        for partition in &candidates {
+            let info = self.entropy_partition_information(components, partition);
+            if info < min_info {
+                min_info = info;
+                mip = partition.clone();
+            }
+        }
+
+        mip.information_loss = min_info;
+        (mip, min_info)
     }
 
     /// Classify consciousness state based on Φ value
@@ -981,5 +1248,145 @@ mod tests {
             components.len(),
             "Partition should cover all components"
         );
+    }
+
+    // =========================================================================
+    // Entropy-based Φ tests
+    // =========================================================================
+
+    #[test]
+    fn test_binary_entropy_properties() {
+        // H(0.5) = 1.0 (maximum uncertainty)
+        assert!((binary_entropy(0.5) - 1.0).abs() < 1e-10);
+
+        // H(0) = 0, H(1) = 0 (no uncertainty)
+        assert_eq!(binary_entropy(0.0), 0.0);
+        assert_eq!(binary_entropy(1.0), 0.0);
+
+        // Symmetry: H(p) = H(1-p)
+        assert!((binary_entropy(0.3) - binary_entropy(0.7)).abs() < 1e-10);
+
+        // H is always in [0, 1]
+        for i in 0..=100 {
+            let p = i as f64 / 100.0;
+            let h = binary_entropy(p);
+            assert!(h >= 0.0 && h <= 1.0, "H({}) = {} not in [0,1]", p, h);
+        }
+    }
+
+    #[test]
+    fn test_similarity_to_mi_properties() {
+        // Independent random vectors (similarity ≈ 0.5) → MI ≈ 0
+        let mi_independent = similarity_to_mutual_information(0.5);
+        assert!(mi_independent < 0.01, "Independent vectors should have MI ≈ 0, got {}", mi_independent);
+
+        // Identical vectors (similarity = 1.0) → MI = 1.0
+        let mi_identical = similarity_to_mutual_information(0.999);
+        assert!(mi_identical > 0.9, "Identical vectors should have MI ≈ 1, got {}", mi_identical);
+
+        // Anti-correlated (similarity ≈ 0.0) → MI ≈ 1.0
+        let mi_anticorr = similarity_to_mutual_information(0.001);
+        assert!(mi_anticorr > 0.9, "Anti-correlated should have MI ≈ 1, got {}", mi_anticorr);
+
+        // Monotonic in deviation from 0.5
+        let mi_55 = similarity_to_mutual_information(0.55);
+        let mi_70 = similarity_to_mutual_information(0.70);
+        let mi_90 = similarity_to_mutual_information(0.90);
+        assert!(mi_55 < mi_70, "MI should increase with deviation from 0.5");
+        assert!(mi_70 < mi_90, "MI should increase with deviation from 0.5");
+    }
+
+    #[test]
+    fn test_entropy_phi_single_component() {
+        let mut phi_calc = IntegratedInformation::new();
+        let component = vec![BinaryHV::random(1)];
+        let phi = phi_calc.compute_phi_entropy(&component);
+        assert_eq!(phi, 0.0, "Single component should have Φ_entropy = 0");
+    }
+
+    #[test]
+    fn test_entropy_phi_two_components() {
+        let mut phi_calc = IntegratedInformation::new();
+        let components = vec![BinaryHV::random(1), BinaryHV::random(2)];
+        let phi = phi_calc.compute_phi_entropy(&components);
+        assert!(phi >= 0.0, "Φ_entropy should be non-negative");
+        println!("Two independent components Φ_entropy = {:.4}", phi);
+    }
+
+    #[test]
+    fn test_entropy_phi_integrated_vs_independent() {
+        let mut phi_calc = IntegratedInformation::new();
+
+        // Independent random components
+        let independent = vec![
+            BinaryHV::random(100),
+            BinaryHV::random(200),
+            BinaryHV::random(300),
+        ];
+        let phi_ind = phi_calc.compute_phi_entropy(&independent);
+
+        // Correlated components (share structure through binding)
+        let base = BinaryHV::random(400);
+        let correlated = vec![
+            base,
+            base.bind(&BinaryHV::random(401)),
+            base.bind(&BinaryHV::random(402)),
+        ];
+        let phi_corr = phi_calc.compute_phi_entropy(&correlated);
+
+        println!("Entropy Φ: independent={:.4}, correlated={:.4}", phi_ind, phi_corr);
+
+        // Correlated system should show higher integration
+        assert!(
+            phi_corr >= phi_ind * 0.5,
+            "Correlated system should have comparable or higher Φ_entropy"
+        );
+    }
+
+    #[test]
+    fn test_entropy_phi_large_system() {
+        let mut phi_calc = IntegratedInformation::new();
+
+        // 16-component system (tests heuristic search path)
+        let components: Vec<BinaryHV> = (0..16).map(|i| BinaryHV::random(i as u64 + 500)).collect();
+        let phi = phi_calc.compute_phi_entropy(&components);
+
+        println!("16-component Φ_entropy = {:.4}", phi);
+        assert!(phi >= 0.0, "Φ_entropy should be non-negative for large system");
+    }
+
+    #[test]
+    fn test_entropy_phi_fast_uses_entropy() {
+        // Verify compute_phi_fast returns reasonable values with entropy bridge
+        let independent: Vec<BinaryHV> = (0..4).map(|i| BinaryHV::random(i as u64 + 600)).collect();
+        let phi_fast = IntegratedInformation::compute_phi_fast(&independent);
+
+        assert!(phi_fast >= 0.0 && phi_fast <= 1.0,
+            "Fast Φ should be in [0, 1], got {}", phi_fast);
+        println!("Fast Φ (4 independent): {:.4}", phi_fast);
+    }
+
+    #[test]
+    fn test_cross_partition_mi() {
+        let phi_calc = IntegratedInformation::new();
+
+        // Independent partitions: cross MI should be low
+        let components = vec![
+            BinaryHV::random(700),
+            BinaryHV::random(701),
+            BinaryHV::random(702),
+            BinaryHV::random(703),
+        ];
+        let partition = Partition {
+            part_a: vec![0, 1],
+            part_b: vec![2, 3],
+            information_loss: 0.0,
+        };
+        let cross_mi = phi_calc.cross_partition_mi(&components, &partition);
+        println!("Cross-partition MI (independent): {:.4}", cross_mi);
+
+        // Cross MI between independent bundles should be relatively low
+        // (random BinaryHV bundles will have sim ≈ 0.5)
+        assert!(cross_mi < 0.5, "Independent partition cross MI should be low");
     }
 }

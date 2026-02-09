@@ -62,6 +62,43 @@ fn normalize(num: i64, den: i64) -> (i64, i64) {
     (num / g, den / g)
 }
 
+/// Error type for rational arithmetic overflow
+#[derive(Debug, Clone)]
+pub struct RationalOverflow {
+    pub operation: String,
+    pub detail: String,
+}
+
+impl std::fmt::Display for RationalOverflow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Rational overflow in {}: {}", self.operation, self.detail)
+    }
+}
+
+/// Checked multiplication that detects overflow
+fn checked_mul_i64(a: i64, b: i64) -> Result<i64, RationalOverflow> {
+    a.checked_mul(b).ok_or_else(|| RationalOverflow {
+        operation: "multiply".to_string(),
+        detail: format!("{} * {} overflows i64", a, b),
+    })
+}
+
+/// Checked addition that detects overflow
+fn checked_add_i64(a: i64, b: i64) -> Result<i64, RationalOverflow> {
+    a.checked_add(b).ok_or_else(|| RationalOverflow {
+        operation: "add".to_string(),
+        detail: format!("{} + {} overflows i64", a, b),
+    })
+}
+
+/// Checked subtraction that detects overflow
+fn checked_sub_i64(a: i64, b: i64) -> Result<i64, RationalOverflow> {
+    a.checked_sub(b).ok_or_else(|| RationalOverflow {
+        operation: "subtract".to_string(),
+        detail: format!("{} - {} overflows i64", a, b),
+    })
+}
+
 /// Engine for rational arithmetic in HDC space
 pub struct RationalArithmeticEngine {
     primitives: &'static PrimitiveSystem,
@@ -327,6 +364,77 @@ impl RationalArithmeticEngine {
         }
     }
 
+    // ===== CHECKED (OVERFLOW-SAFE) ARITHMETIC =====
+
+    /// Add two rational numbers with overflow detection.
+    /// Returns Err if intermediate computation overflows i64.
+    pub fn checked_add(&self, a: &HdcRational, b: &HdcRational) -> Result<RationalResult, RationalOverflow> {
+        // a/b + c/d = (ad + bc) / bd
+        // Pre-reduce to minimize overflow: divide by GCD of denominators
+        let g = gcd(a.denominator as u64, b.denominator as u64) as i64;
+        let a_den_reduced = a.denominator / g;
+        let b_den_reduced = b.denominator / g;
+
+        let num_left = checked_mul_i64(a.numerator, b_den_reduced)?;
+        let num_right = checked_mul_i64(b.numerator, a_den_reduced)?;
+        let num = checked_add_i64(num_left, num_right)?;
+        let den = checked_mul_i64(a_den_reduced, b.denominator)?;
+
+        Ok(self.add(&self.encode(num, den), &self.encode(0, 1)))
+            .map(|_| {
+                let rational = self.encode(num, den);
+                RationalResult {
+                    rational: rational.clone(),
+                    operation: format!("{}/{} + {}/{} = {}/{}", a.numerator, a.denominator, b.numerator, b.denominator, rational.numerator, rational.denominator),
+                    proof_trace: vec!["Checked add (overflow-safe)".to_string()],
+                    phi: rational.construction_phi,
+                }
+            })
+    }
+
+    /// Multiply two rational numbers with overflow detection.
+    pub fn checked_multiply(&self, a: &HdcRational, b: &HdcRational) -> Result<RationalResult, RationalOverflow> {
+        // Pre-reduce cross-terms to minimize overflow
+        let g1 = gcd(a.numerator.unsigned_abs(), b.denominator as u64) as i64;
+        let g2 = gcd(b.numerator.unsigned_abs(), a.denominator as u64) as i64;
+
+        let a_num = a.numerator / g1.max(1);
+        let b_den = b.denominator / g1.max(1);
+        let b_num = b.numerator / g2.max(1);
+        let a_den = a.denominator / g2.max(1);
+
+        let num = checked_mul_i64(a_num, b_num)?;
+        let den = checked_mul_i64(a_den, b_den)?;
+
+        let rational = self.encode(num, den);
+        Ok(RationalResult {
+            rational: rational.clone(),
+            operation: format!("{}/{} × {}/{} = {}/{}", a.numerator, a.denominator, b.numerator, b.denominator, rational.numerator, rational.denominator),
+            proof_trace: vec!["Checked multiply (overflow-safe)".to_string()],
+            phi: rational.construction_phi,
+        })
+    }
+
+    /// Subtract two rational numbers with overflow detection.
+    pub fn checked_subtract(&self, a: &HdcRational, b: &HdcRational) -> Result<RationalResult, RationalOverflow> {
+        let g = gcd(a.denominator as u64, b.denominator as u64) as i64;
+        let a_den_reduced = a.denominator / g;
+        let b_den_reduced = b.denominator / g;
+
+        let num_left = checked_mul_i64(a.numerator, b_den_reduced)?;
+        let num_right = checked_mul_i64(b.numerator, a_den_reduced)?;
+        let num = checked_sub_i64(num_left, num_right)?;
+        let den = checked_mul_i64(a_den_reduced, b.denominator)?;
+
+        let rational = self.encode(num, den);
+        Ok(RationalResult {
+            rational: rational.clone(),
+            operation: format!("{}/{} - {}/{} = {}/{}", a.numerator, a.denominator, b.numerator, b.denominator, rational.numerator, rational.denominator),
+            proof_trace: vec!["Checked subtract (overflow-safe)".to_string()],
+            phi: rational.construction_phi,
+        })
+    }
+
     /// Create a rational from an integer n (represented as n/1)
     pub fn from_integer(&self, n: i64) -> HdcRational {
         self.encode(n, 1)
@@ -419,5 +527,50 @@ mod tests {
         let a = engine.encode(1, 3);
         let b = engine.encode(1, 2);
         assert_eq!(engine.compare(&a, &b), std::cmp::Ordering::Less);
+    }
+
+    // ===== OVERFLOW DETECTION TESTS =====
+
+    #[test]
+    fn test_checked_add_normal() {
+        let engine = RationalArithmeticEngine::new();
+        let a = engine.encode(1, 2);
+        let b = engine.encode(1, 3);
+        let result = engine.checked_add(&a, &b);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_checked_multiply_normal() {
+        let engine = RationalArithmeticEngine::new();
+        let a = engine.encode(2, 3);
+        let b = engine.encode(3, 4);
+        let result = engine.checked_multiply(&a, &b);
+        assert!(result.is_ok());
+        let r = result.unwrap();
+        assert_eq!(r.rational.numerator, 1);
+        assert_eq!(r.rational.denominator, 2);
+    }
+
+    #[test]
+    fn test_checked_multiply_large_detects_overflow() {
+        let engine = RationalArithmeticEngine::new();
+        // These large values would silently overflow with unchecked multiply
+        let a = engine.encode(i64::MAX / 2, 1);
+        let b = engine.encode(3, 1);
+        let result = engine.checked_multiply(&a, &b);
+        assert!(result.is_err(), "Should detect overflow for large multiplication");
+    }
+
+    #[test]
+    fn test_checked_subtract_normal() {
+        let engine = RationalArithmeticEngine::new();
+        let a = engine.encode(3, 4);
+        let b = engine.encode(1, 4);
+        let result = engine.checked_subtract(&a, &b);
+        assert!(result.is_ok());
+        let r = result.unwrap();
+        assert_eq!(r.rational.numerator, 1);
+        assert_eq!(r.rational.denominator, 2);
     }
 }

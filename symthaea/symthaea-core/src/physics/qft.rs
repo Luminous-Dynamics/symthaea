@@ -1,5 +1,7 @@
 //! # Quantum Field Theory
 //!
+//! **Status**: Exploratory module — HDC encodings for quantum field theory (Feynman diagrams, propagators, vertices).
+//!
 //! This module encodes QFT concepts including Feynman diagrams, propagators,
 //! and vertices for the Standard Model interactions.
 //!
