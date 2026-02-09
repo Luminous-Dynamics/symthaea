@@ -8,5 +8,10 @@ license = "MIT"
 # Minimal dependencies — no holochain, no burn, no conflicts
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", optional = true }
 rand = "0.8"
 thiserror = "1"
+
+[features]
+default = []
+holochain = ["serde_json"]

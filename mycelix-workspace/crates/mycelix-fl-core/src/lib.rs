@@ -27,6 +27,10 @@ pub mod privacy;
 pub mod pipeline;
 pub mod convert;
 pub mod plugins;
+pub mod meta_learning;
+
+#[cfg(feature = "holochain")]
+pub mod holochain_bridge;
 
 pub use types::*;
 pub use aggregation::*;

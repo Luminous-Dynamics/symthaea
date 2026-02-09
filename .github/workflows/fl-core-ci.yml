@@ -79,3 +79,48 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-fl-core-clippy-
       - run: cargo clippy -- -D warnings
+
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/crates/mycelix-fl-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-workspace/crates/mycelix-fl-core/target
+          key: ${{ runner.os }}-fl-core-bench-${{ hashFiles('mycelix-workspace/crates/mycelix-fl-core/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-fl-core-bench-
+      - name: Run unified pipeline benchmark
+        run: cargo run --example benchmark_unified_pipeline --release
+      - name: Run model training benchmark
+        run: cargo run --example benchmark_model_training --release
+      - name: Run compression benchmark
+        run: cargo run --example benchmark_compression --release
+
+  holochain-bridge:
+    name: Holochain Bridge
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/crates/mycelix-fl-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-workspace/crates/mycelix-fl-core/target
+          key: ${{ runner.os }}-fl-core-holo-${{ hashFiles('mycelix-workspace/crates/mycelix-fl-core/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-fl-core-holo-
+      - run: cargo test --features holochain
