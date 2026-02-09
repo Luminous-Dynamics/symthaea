@@ -1,0 +1,37 @@
+[package]
+name = "mycelix-wasm"
+version = "0.2.0"
+edition = "2021"
+authors = ["Luminous Dynamics <dev@luminousdynamics.org>"]
+license = "MIT"
+description = "Mycelix SDK for WebAssembly - MATL, Epistemic, and Bridge in the browser"
+repository = "https://github.com/Luminous-Dynamics/mycelix"
+keywords = ["mycelix", "wasm", "webassembly", "trust", "holochain"]
+categories = ["wasm", "web-programming"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = ["console_error_panic_hook"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = ["console"] }
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+console_error_panic_hook = { version = "0.1", optional = true }
+getrandom = { version = "0.2", features = ["js"] }
+mycelix-fl-core = { path = "../crates/mycelix-fl-core" }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+opt-level = "s"
+lto = true
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ["-Os", "--enable-mutable-globals"]

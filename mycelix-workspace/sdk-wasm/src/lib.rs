@@ -215,7 +215,7 @@ pub fn calculate_composite(pogq: &PoGQ, reputation: &Reputation) -> CompositeSco
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct AdaptiveThreshold {
-    node_id: String,
+    _node_id: String,
     history: Vec<f64>,
     window_size: usize,
     min_threshold: f64,
@@ -282,7 +282,7 @@ pub fn create_adaptive_threshold(
     sigma_multiplier: Option<f64>,
 ) -> AdaptiveThreshold {
     AdaptiveThreshold {
-        node_id: node_id.to_string(),
+        _node_id: node_id.to_string(),
         history: Vec::new(),
         window_size: window_size.unwrap_or(100),
         min_threshold: min_threshold.unwrap_or(0.5),
@@ -515,7 +515,7 @@ fn clamp(value: f64) -> f64 {
 /// Get current timestamp. Uses js_sys in WASM, mock in native tests.
 #[cfg(target_arch = "wasm32")]
 fn current_timestamp() -> f64 {
-    current_timestamp()
+    js_sys::Date::now()
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -554,6 +554,185 @@ fn generate_id(prefix: &str) -> String {
 #[wasm_bindgen]
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
+}
+
+// ============================================================================
+// Federated Learning (delegating to mycelix-fl-core)
+// ============================================================================
+
+/// Create a gradient update for federated learning.
+///
+/// # Arguments
+/// * `participant_id` - Unique ID of the contributing node
+/// * `model_version` - Model version this gradient was computed against
+/// * `gradients` - Float64Array of gradient values
+/// * `batch_size` - Number of samples used to compute the gradient
+/// * `loss` - Training loss for this batch
+#[wasm_bindgen(js_name = "createGradientUpdate")]
+pub fn create_gradient_update(
+    participant_id: &str,
+    model_version: u32,
+    gradients: &[f64],
+    batch_size: u32,
+    loss: f64,
+) -> JsValue {
+    let grads_f32: Vec<f32> = gradients.iter().map(|&g| g as f32).collect();
+    let update = mycelix_fl_core::GradientUpdate::new(
+        participant_id.into(),
+        model_version as u64,
+        grads_f32,
+        batch_size,
+        loss as f32,
+    );
+    serde_wasm_bindgen::to_value(&update).unwrap_or(JsValue::NULL)
+}
+
+/// Run FedAvg aggregation on an array of gradient updates.
+///
+/// Returns a Float64Array of the aggregated gradient.
+#[wasm_bindgen(js_name = "flFedAvg")]
+pub fn fl_fed_avg(updates_js: JsValue) -> Result<Vec<f64>, JsValue> {
+    let updates: Vec<mycelix_fl_core::GradientUpdate> =
+        serde_wasm_bindgen::from_value(updates_js)
+            .map_err(|e| JsValue::from_str(&format!("Invalid updates: {}", e)))?;
+    let grads = mycelix_fl_core::fedavg(&updates)
+        .map_err(|e| JsValue::from_str(&format!("FedAvg error: {}", e)))?;
+    Ok(grads.iter().map(|&g| g as f64).collect())
+}
+
+/// Run Trimmed Mean aggregation.
+///
+/// * `trim_fraction` - Fraction of extreme values to trim (e.g. 0.2 for 20%)
+#[wasm_bindgen(js_name = "flTrimmedMean")]
+pub fn fl_trimmed_mean(updates_js: JsValue, trim_fraction: f64) -> Result<Vec<f64>, JsValue> {
+    let updates: Vec<mycelix_fl_core::GradientUpdate> =
+        serde_wasm_bindgen::from_value(updates_js)
+            .map_err(|e| JsValue::from_str(&format!("Invalid updates: {}", e)))?;
+    let grads = mycelix_fl_core::trimmed_mean(&updates, trim_fraction as f32)
+        .map_err(|e| JsValue::from_str(&format!("TrimmedMean error: {}", e)))?;
+    Ok(grads.iter().map(|&g| g as f64).collect())
+}
+
+/// Run Coordinate-wise Median aggregation.
+#[wasm_bindgen(js_name = "flCoordinateMedian")]
+pub fn fl_coordinate_median(updates_js: JsValue) -> Result<Vec<f64>, JsValue> {
+    let updates: Vec<mycelix_fl_core::GradientUpdate> =
+        serde_wasm_bindgen::from_value(updates_js)
+            .map_err(|e| JsValue::from_str(&format!("Invalid updates: {}", e)))?;
+    let grads = mycelix_fl_core::coordinate_median(&updates)
+        .map_err(|e| JsValue::from_str(&format!("CoordinateMedian error: {}", e)))?;
+    Ok(grads.iter().map(|&g| g as f64).collect())
+}
+
+/// Run Krum aggregation.
+///
+/// * `num_select` - Number of updates to select (k nearest neighbors)
+#[wasm_bindgen(js_name = "flKrum")]
+pub fn fl_krum(updates_js: JsValue, num_select: u32) -> Result<Vec<f64>, JsValue> {
+    let updates: Vec<mycelix_fl_core::GradientUpdate> =
+        serde_wasm_bindgen::from_value(updates_js)
+            .map_err(|e| JsValue::from_str(&format!("Invalid updates: {}", e)))?;
+    let grads = mycelix_fl_core::krum(&updates, num_select as usize)
+        .map_err(|e| JsValue::from_str(&format!("Krum error: {}", e)))?;
+    Ok(grads.iter().map(|&g| g as f64).collect())
+}
+
+/// Detect Byzantine nodes in a set of gradient updates.
+///
+/// Returns a JSON object with `byzantine_indices` (array of indices)
+/// and `signal_breakdown` (per-participant anomaly scores).
+#[wasm_bindgen(js_name = "flDetectByzantine")]
+pub fn fl_detect_byzantine(updates_js: JsValue) -> Result<JsValue, JsValue> {
+    let updates: Vec<mycelix_fl_core::GradientUpdate> =
+        serde_wasm_bindgen::from_value(updates_js)
+            .map_err(|e| JsValue::from_str(&format!("Invalid updates: {}", e)))?;
+    let detector = mycelix_fl_core::MultiSignalByzantineDetector::new();
+    let result = detector.detect(&updates);
+
+    // Convert to serializable form (MultiSignalDetectionResult doesn't derive Serialize)
+    let summary = FlByzantineResult {
+        byzantine_indices: result.byzantine_indices,
+        early_terminated: result.early_terminated,
+        method: result.method,
+        participants_analyzed: result.stats.participants_analyzed,
+        signals_triggered: result.stats.signals_triggered,
+        signal_breakdown: result.signal_breakdown.iter().map(|s| FlSignalBreakdown {
+            participant_idx: s.participant_idx,
+            magnitude_score: s.magnitude_score,
+            direction_score: s.direction_score,
+            cross_validation_score: s.cross_validation_score,
+            coordinate_score: s.coordinate_score,
+            combined_score: s.combined_score,
+        }).collect(),
+    };
+    serde_wasm_bindgen::to_value(&summary)
+        .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+}
+
+#[derive(Serialize, Deserialize)]
+struct FlByzantineResult {
+    byzantine_indices: Vec<usize>,
+    early_terminated: bool,
+    method: String,
+    participants_analyzed: usize,
+    signals_triggered: usize,
+    signal_breakdown: Vec<FlSignalBreakdown>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct FlSignalBreakdown {
+    participant_idx: usize,
+    magnitude_score: f32,
+    direction_score: f32,
+    cross_validation_score: f32,
+    coordinate_score: f32,
+    combined_score: f32,
+}
+
+/// Run the full unified pipeline aggregation.
+///
+/// * `updates_js` - Array of GradientUpdate objects
+/// * `reputations_js` - Object mapping participant_id → reputation (f64)
+///
+/// Returns a JSON object with `aggregated`, `detection`, and `pipeline_stats`.
+#[wasm_bindgen(js_name = "flAggregate")]
+pub fn fl_aggregate(updates_js: JsValue, reputations_js: JsValue) -> Result<JsValue, JsValue> {
+    let updates: Vec<mycelix_fl_core::GradientUpdate> =
+        serde_wasm_bindgen::from_value(updates_js)
+            .map_err(|e| JsValue::from_str(&format!("Invalid updates: {}", e)))?;
+    let reputations: std::collections::HashMap<String, f32> =
+        serde_wasm_bindgen::from_value(reputations_js)
+            .map_err(|e| JsValue::from_str(&format!("Invalid reputations: {}", e)))?;
+
+    let mut pipeline = mycelix_fl_core::UnifiedPipeline::new(
+        mycelix_fl_core::PipelineConfig::default(),
+    );
+    let result = pipeline.aggregate(&updates, &reputations)
+        .map_err(|e| JsValue::from_str(&format!("Pipeline error: {}", e)))?;
+
+    // Convert to a serializable summary
+    let byzantine_detected = result.detection
+        .as_ref()
+        .map(|d| d.byzantine_indices.clone())
+        .unwrap_or_default();
+    let summary = FlAggregateResult {
+        gradients: result.aggregated.gradients.iter().map(|&g| g as f64).collect(),
+        participant_count: result.aggregated.participant_count,
+        excluded_count: result.aggregated.excluded_count,
+        method: format!("{:?}", result.aggregated.method),
+        byzantine_detected,
+    };
+    serde_wasm_bindgen::to_value(&summary)
+        .map_err(|e| JsValue::from_str(&format!("Serialization error: {}", e)))
+}
+
+#[derive(Serialize, Deserialize)]
+struct FlAggregateResult {
+    gradients: Vec<f64>,
+    participant_count: usize,
+    excluded_count: usize,
+    method: String,
+    byzantine_detected: Vec<usize>,
 }
 
 // ============================================================================
@@ -759,7 +938,6 @@ mod tests {
         assert!(threshold2.is_anomaly(0.2));
 
         // Score close to mean should not be anomaly (threshold is mean - 2*std)
-        let th = threshold2.get_threshold();
         assert!(threshold2.get_threshold() < 0.9); // Should have a threshold below mean
     }
 
@@ -977,5 +1155,99 @@ mod tests {
         assert!(!v.is_empty());
         // Should be semver format
         assert!(v.contains('.'));
+    }
+
+    // =========================================================================
+    // FL Core Integration Tests
+    // =========================================================================
+
+    #[test]
+    fn test_fl_fedavg_via_core() {
+        use mycelix_fl_core::{GradientUpdate, fedavg};
+
+        let updates = vec![
+            GradientUpdate::new("n1".into(), 1, vec![0.1, 0.2, 0.3], 100, 0.5),
+            GradientUpdate::new("n2".into(), 1, vec![0.3, 0.2, 0.1], 100, 0.5),
+        ];
+        let grads = fedavg(&updates).unwrap();
+        assert_eq!(grads.len(), 3);
+        // Batch-size weighted average (equal weights here)
+        assert!((grads[0] - 0.2).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_fl_trimmed_mean_via_core() {
+        use mycelix_fl_core::{GradientUpdate, trimmed_mean};
+
+        let updates = vec![
+            GradientUpdate::new("n1".into(), 1, vec![0.5; 5], 100, 0.5),
+            GradientUpdate::new("n2".into(), 1, vec![0.5; 5], 100, 0.5),
+            GradientUpdate::new("n3".into(), 1, vec![0.5; 5], 100, 0.5),
+            GradientUpdate::new("byz".into(), 1, vec![100.0; 5], 100, 0.9),
+        ];
+        let grads = trimmed_mean(&updates, 0.25).unwrap();
+        // Should trim the Byzantine outlier
+        for &g in &grads {
+            assert!(g < 10.0, "Trimmed mean should resist outlier, got {}", g);
+        }
+    }
+
+    #[test]
+    fn test_fl_byzantine_detection_via_core() {
+        use mycelix_fl_core::{GradientUpdate, MultiSignalByzantineDetector};
+
+        let mut updates = Vec::new();
+        for i in 0..8 {
+            updates.push(GradientUpdate::new(
+                format!("h{}", i), 1, vec![0.5; 20], 100, 0.5,
+            ));
+        }
+        updates.push(GradientUpdate::new("byz".into(), 1, vec![100.0; 20], 100, 0.9));
+
+        let detector = MultiSignalByzantineDetector::new();
+        let result = detector.detect(&updates);
+        assert!(
+            result.byzantine_indices.contains(&8),
+            "Should detect Byzantine node at index 8: {:?}",
+            result.byzantine_indices
+        );
+    }
+
+    #[test]
+    fn test_fl_pipeline_via_core() {
+        use mycelix_fl_core::{GradientUpdate, UnifiedPipeline, PipelineConfig};
+        use std::collections::HashMap;
+
+        let updates = vec![
+            GradientUpdate::new("n1".into(), 1, vec![0.1, 0.2], 100, 0.5),
+            GradientUpdate::new("n2".into(), 1, vec![0.3, 0.2], 100, 0.5),
+            GradientUpdate::new("n3".into(), 1, vec![0.2, 0.3], 100, 0.5),
+        ];
+        let mut reputations = HashMap::new();
+        reputations.insert("n1".into(), 0.8_f32);
+        reputations.insert("n2".into(), 0.8);
+        reputations.insert("n3".into(), 0.8);
+
+        let mut pipeline = UnifiedPipeline::new(PipelineConfig::default());
+        let result = pipeline.aggregate(&updates, &reputations).unwrap();
+        assert_eq!(result.aggregated.gradients.len(), 2);
+        assert_eq!(result.aggregated.participant_count, 3);
+    }
+
+    #[test]
+    fn test_fl_krum_via_core() {
+        use mycelix_fl_core::{GradientUpdate, krum};
+
+        let updates = vec![
+            GradientUpdate::new("n1".into(), 1, vec![0.5; 10], 100, 0.5),
+            GradientUpdate::new("n2".into(), 1, vec![0.5; 10], 100, 0.5),
+            GradientUpdate::new("n3".into(), 1, vec![0.5; 10], 100, 0.5),
+            GradientUpdate::new("byz".into(), 1, vec![100.0; 10], 100, 0.9),
+        ];
+        let grads = krum(&updates, 2).unwrap();
+        // Krum should select honest nodes (closest neighbors)
+        for &g in &grads {
+            assert!(g < 10.0, "Krum should avoid outlier, got {}", g);
+        }
     }
 }
