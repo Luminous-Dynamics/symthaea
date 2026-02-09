@@ -31,21 +31,21 @@ fn compute_bytes_hash(data: &[u8]) -> Vec<u8> {
 pub struct CreateStakeInput {
     pub staker_did: String,
     pub sap_amount: u64,
-    pub mycel_score: f32,
 }
 
 /// Create a new collateral stake
 ///
 /// SAP collateral with MYCEL-weighted influence.
 /// Stake weight = 1.0 + mycel_score (range: 1.0-2.0).
+/// MYCEL score is fetched from the recognition zome (not caller-provided).
 #[hdk_extern]
 pub fn create_stake(input: CreateStakeInput) -> ExternResult<Record> {
     verify_caller_is_did(&input.staker_did)?;
     let now = sys_time()?;
     let stake_id = format!("stake:{}:{}", input.staker_did, now.as_micros());
 
-    // Clamp mycel_score to [0.0, 1.0]
-    let mycel_score = input.mycel_score.clamp(0.0, 1.0);
+    // Fetch verified MYCEL score from recognition zome
+    let mycel_score = fetch_verified_mycel_score(&input.staker_did)?;
 
     // Calculate stake weight: 1.0 + mycel_score (range: 1.0-2.0)
     let stake_weight = 1.0 + mycel_score;
@@ -171,7 +171,8 @@ pub fn update_stake_mycel(input: UpdateMycelInput) -> ExternResult<Record> {
     for record in query(filter)? {
         if let Some(stake) = record.entry().to_app_option::<CollateralStake>().ok().flatten() {
             if stake.id == input.stake_id && stake.status == StakeStatus::Active {
-                let mycel_score = input.new_mycel_score.clamp(0.0, 1.0);
+                // Fetch verified MYCEL score from recognition zome
+                let mycel_score = fetch_verified_mycel_score(&stake.staker_did)?;
                 let new_weight = 1.0 + mycel_score;
                 let updated = CollateralStake {
                     mycel_score,
@@ -196,7 +197,28 @@ pub fn update_stake_mycel(input: UpdateMycelInput) -> ExternResult<Record> {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateMycelInput {
     pub stake_id: String,
-    pub new_mycel_score: f32,
+}
+
+/// Fetch a member's verified MYCEL score from the recognition zome.
+/// Falls back to 0.0 (minimum weight) if recognition zome is unreachable.
+fn fetch_verified_mycel_score(staker_did: &str) -> ExternResult<f32> {
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from("recognition"),
+        FunctionName::from("get_mycel_score"),
+        None,
+        staker_did.to_string(),
+    ) {
+        Ok(ZomeCallResponse::Ok(result)) => {
+            #[derive(Debug, Deserialize)]
+            struct MycelState { mycel_score: f64 }
+            match result.decode::<MycelState>() {
+                Ok(state) => Ok((state.mycel_score as f32).clamp(0.0, 1.0)),
+                Err(_) => Ok(0.0),
+            }
+        }
+        _ => Ok(0.0), // Recognition unreachable → minimum weight
+    }
 }
 
 // =============================================================================

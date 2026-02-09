@@ -206,6 +206,27 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
         (),
     )?;
 
+    // Credit minted SAP to depositor's balance via payments zome
+    #[derive(Serialize, Debug)]
+    struct CreditSapPayload {
+        member_did: String,
+        amount: u64,
+        reason: String,
+    }
+    if let Err(e) = call(
+        CallTargetCell::Local,
+        ZomeName::from("payments"),
+        FunctionName::from("credit_sap"),
+        None,
+        CreditSapPayload {
+            member_did: input.depositor_did.clone(),
+            amount: sap_minted,
+            reason: format!("Collateral bridge deposit: {} {}", input.collateral_amount, input.collateral_type),
+        },
+    ) {
+        debug!("Failed to credit SAP for deposit {}: {:?}", input.depositor_did, e);
+    }
+
     // Broadcast the deposit event
     broadcast_finance_event(BroadcastFinanceEventInput {
         event_type: FinanceEventType::CollateralDeposited,
@@ -263,6 +284,29 @@ pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
                     record.action_address().clone(),
                     &EntryTypes::CollateralBridgeDeposit(redeemed),
                 )?;
+
+                // Debit SAP from depositor's balance via payments zome
+                #[derive(Serialize, Debug)]
+                struct DebitSapPayload {
+                    member_did: String,
+                    amount: u64,
+                    reason: String,
+                }
+                if let Err(e) = call(
+                    CallTargetCell::Local,
+                    ZomeName::from("payments"),
+                    FunctionName::from("debit_sap"),
+                    None,
+                    DebitSapPayload {
+                        member_did: deposit.depositor_did.clone(),
+                        amount: deposit.sap_minted,
+                        reason: format!("Collateral bridge redemption: {}", deposit.collateral_type),
+                    },
+                ) {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        format!("Cannot redeem: failed to debit SAP — {:?}", e)
+                    )));
+                }
 
                 // Broadcast the redemption event
                 broadcast_finance_event(BroadcastFinanceEventInput {

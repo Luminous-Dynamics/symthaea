@@ -153,7 +153,6 @@ pub struct CollateralStake {
 pub struct CreateStakeInput {
     pub staker_did: String,
     pub sap_amount: u64,
-    pub mycel_score: f32,
 }
 
 // --- Payments Mirror Types ---

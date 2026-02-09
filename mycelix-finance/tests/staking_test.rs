@@ -39,6 +39,7 @@ mod stake_lifecycle {
     use super::*;
 
     /// Test 1.1: Create a stake with MYCEL weighting, verify weight = 1.0 + mycel_score
+    /// MYCEL score is fetched from recognition zome (not caller-provided).
     #[tokio::test]
     #[ignore]
     async fn test_create_stake_with_mycel_weighting() {
@@ -57,17 +58,32 @@ mod stake_lifecycle {
         let alice_cell = &apps[0].cells()[0];
         let alice_did = test_did("alice");
 
+        // Initialize member in recognition zome first (sets MYCEL via components)
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct InitializeMemberInput {
+            pub member_did: String,
+            pub is_apprentice: bool,
+            pub mentor_did: Option<String>,
+        }
+
+        let _: Record = conductor
+            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
+                member_did: alice_did.clone(),
+                is_apprentice: false,
+                mentor_did: None,
+            })
+            .await
+            .expect("Failed to init member");
+
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreateStakeInput {
             pub staker_did: String,
             pub sap_amount: u64,
-            pub mycel_score: f32,
         }
 
         let input = CreateStakeInput {
             staker_did: alice_did.clone(),
             sap_amount: 10_000,
-            mycel_score: 0.7,
         };
 
         let result: Record = conductor
@@ -83,8 +99,10 @@ mod stake_lifecycle {
 
         assert_eq!(stake.staker_did, alice_did);
         assert_eq!(stake.sap_amount, 10_000);
-        assert!((stake.mycel_score - 0.7).abs() < 0.001, "MYCEL score should be 0.7");
-        assert!((stake.stake_weight - 1.7).abs() < 0.001, "Weight should be 1.0 + 0.7 = 1.7");
+        // MYCEL score is fetched from recognition; verify it's in valid range
+        assert!(stake.mycel_score >= 0.0 && stake.mycel_score <= 1.0, "MYCEL score in [0,1]");
+        assert!((stake.stake_weight - (1.0 + stake.mycel_score)).abs() < 0.001,
+            "Weight should be 1.0 + mycel_score");
         assert!(matches!(stake.status, StakeStatus::Active));
         assert_eq!(stake.pending_rewards, 0);
         assert!(stake.unbonding_until.is_none());
@@ -121,13 +139,11 @@ mod stake_lifecycle {
         struct CreateStakeInput {
             pub staker_did: String,
             pub sap_amount: u64,
-            pub mycel_score: f32,
         }
 
         let input = CreateStakeInput {
             staker_did: alice_did.clone(),
             sap_amount: 5_000,
-            mycel_score: 0.5,
         };
 
         let result: Record = conductor
@@ -203,13 +219,11 @@ mod stake_lifecycle {
         struct CreateStakeInput {
             pub staker_did: String,
             pub sap_amount: u64,
-            pub mycel_score: f32,
         }
 
         let input = CreateStakeInput {
             staker_did: alice_did.clone(),
             sap_amount: 8_000,
-            mycel_score: 0.4,
         };
 
         let result: Record = conductor
@@ -255,10 +269,11 @@ mod stake_lifecycle {
     }
 
     /// Test 1.4: Update MYCEL score on an active stake
+    /// Score is re-fetched from recognition zome (not caller-provided).
     #[tokio::test]
     #[ignore]
     async fn test_update_mycel_score() {
-        println!("Test 1.4: Update MYCEL Score");
+        println!("Test 1.4: Update MYCEL Score (fetched from recognition)");
 
         let dna_path = std::path::PathBuf::from("../dna/mycelix_finance.dna");
         let dna = SweetDnaFile::from_bundle(&dna_path).await.expect("Load DNA");
@@ -273,18 +288,33 @@ mod stake_lifecycle {
         let alice_cell = &apps[0].cells()[0];
         let alice_did = test_did("alice");
 
-        // Create stake with initial MYCEL 0.3
+        // Initialize member in recognition zome
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct InitializeMemberInput {
+            pub member_did: String,
+            pub is_apprentice: bool,
+            pub mentor_did: Option<String>,
+        }
+
+        let _: Record = conductor
+            .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
+                member_did: alice_did.clone(),
+                is_apprentice: false,
+                mentor_did: None,
+            })
+            .await
+            .expect("Failed to init member");
+
+        // Create stake — MYCEL fetched from recognition
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreateStakeInput {
             pub staker_did: String,
             pub sap_amount: u64,
-            pub mycel_score: f32,
         }
 
         let input = CreateStakeInput {
             staker_did: alice_did.clone(),
             sap_amount: 12_000,
-            mycel_score: 0.3,
         };
 
         let result: Record = conductor
@@ -298,19 +328,17 @@ mod stake_lifecycle {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert!((stake.stake_weight - 1.3).abs() < 0.001, "Initial weight should be 1.3");
+        let initial_weight = stake.stake_weight;
         println!("  - Initial MYCEL: {}, weight: {}", stake.mycel_score, stake.stake_weight);
 
-        // Update to MYCEL 0.8
+        // Update stake — re-fetches MYCEL from recognition
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct UpdateMycelInput {
             pub stake_id: String,
-            pub new_mycel_score: f32,
         }
 
         let update_input = UpdateMycelInput {
             stake_id: stake.id.clone(),
-            new_mycel_score: 0.8,
         };
 
         let updated_result: Record = conductor
@@ -324,13 +352,14 @@ mod stake_lifecycle {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert!((updated_stake.mycel_score - 0.8).abs() < 0.001, "MYCEL should be 0.8");
-        assert!((updated_stake.stake_weight - 1.8).abs() < 0.001, "Weight should be 1.8");
+        // Verify weight = 1.0 + mycel_score (whatever recognition returns)
+        assert!((updated_stake.stake_weight - (1.0 + updated_stake.mycel_score)).abs() < 0.001,
+            "Weight should be 1.0 + mycel_score");
         assert_eq!(updated_stake.sap_amount, 12_000, "SAP amount should be unchanged");
         assert!(matches!(updated_stake.status, StakeStatus::Active), "Should still be Active");
 
         println!("  - Updated MYCEL: {}, weight: {}", updated_stake.mycel_score, updated_stake.stake_weight);
-        println!("Test 1.4 PASSED: MYCEL score update changes weight correctly");
+        println!("Test 1.4 PASSED: MYCEL score update re-fetches from recognition");
     }
 }
 
@@ -385,13 +414,11 @@ mod slashing_tests {
         struct CreateStakeInput {
             pub staker_did: String,
             pub sap_amount: u64,
-            pub mycel_score: f32,
         }
 
         let create_input = CreateStakeInput {
             staker_did: alice_did.clone(),
             sap_amount: 20_000,
-            mycel_score: 0.5,
         };
 
         let stake_record: Record = conductor
@@ -476,13 +503,11 @@ mod slashing_tests {
         struct CreateStakeInput {
             pub staker_did: String,
             pub sap_amount: u64,
-            pub mycel_score: f32,
         }
 
         let create_input = CreateStakeInput {
             staker_did: alice_did.clone(),
             sap_amount: 100_000,
-            mycel_score: 0.6,
         };
 
         let stake_record: Record = conductor
@@ -565,13 +590,11 @@ mod slashing_tests {
         struct CreateStakeInput {
             pub staker_did: String,
             pub sap_amount: u64,
-            pub mycel_score: f32,
         }
 
         let create_input = CreateStakeInput {
             staker_did: alice_did.clone(),
             sap_amount: 50_000,
-            mycel_score: 0.9,
         };
 
         let stake_record: Record = conductor
