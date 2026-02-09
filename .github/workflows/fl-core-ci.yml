@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - "mycelix-workspace/crates/mycelix-fl-core/**"
+      - "mycelix-workspace/sdk-wasm/**"
   pull_request:
     branches: [main]
     paths:
       - "mycelix-workspace/crates/mycelix-fl-core/**"
+      - "mycelix-workspace/sdk-wasm/**"
 
 env:
   CARGO_TERM_COLOR: always
@@ -102,8 +104,18 @@ jobs:
         run: cargo run --example benchmark_unified_pipeline --release
       - name: Run model training benchmark
         run: cargo run --example benchmark_model_training --release
+      - name: Run MNIST federated benchmark
+        run: cargo run --example benchmark_mnist_federated --release
+      - name: Run meta-learning benchmark
+        run: cargo run --example benchmark_meta_learning --release
+      - name: Run privacy budget benchmark
+        run: cargo run --example benchmark_privacy_budget --release
       - name: Run compression benchmark
         run: cargo run --example benchmark_compression --release
+      - name: Run Byzantine sweep benchmark
+        run: cargo run --example benchmark_byzantine_sweep --release
+      - name: Run FEMNIST benchmark
+        run: cargo run --example benchmark_femnist --release
 
   holochain-bridge:
     name: Holochain Bridge
@@ -124,3 +136,28 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-fl-core-holo-
       - run: cargo test --features holochain
+
+  wasm-sdk:
+    name: WASM SDK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace/sdk-wasm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            mycelix-workspace/sdk-wasm/target
+          key: ${{ runner.os }}-wasm-sdk-${{ hashFiles('mycelix-workspace/sdk-wasm/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-wasm-sdk-
+      - name: Run native tests
+        run: cargo test
+      - name: Verify WASM compilation
+        run: cargo build --target wasm32-unknown-unknown --release
