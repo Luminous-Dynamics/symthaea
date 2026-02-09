@@ -1,0 +1,277 @@
+//! Working Memory — 7-Item Context with Activation Decay
+//!
+//! Maintains the current focus of attention during NixOS management.
+//! Items have activation levels that decay over time; when capacity is
+//! exceeded, the lowest-activation item is evicted (biological constraint
+//! from Miller's 7±2 law).
+
+use symthaea_core::hdc::ContinuousHV;
+
+/// Default capacity (Miller's number).
+const DEFAULT_CAPACITY: usize = 7;
+
+/// Activation decay rate per step.
+const DECAY_RATE: f64 = 0.9;
+
+/// Source of a working memory item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MemorySource {
+    /// From user input text.
+    UserInput,
+    /// From system observation.
+    SystemObservation,
+    /// From action execution result.
+    ActionResult,
+    /// From causal reasoning insight.
+    CausalInsight,
+    /// From goal inference.
+    GoalState,
+}
+
+/// A single item in working memory.
+#[derive(Debug, Clone)]
+pub struct MemoryItem {
+    /// HDC content vector.
+    pub content: ContinuousHV,
+    /// Current activation level (0.0–1.0). Decays over time.
+    pub activation: f64,
+    /// Where this item came from.
+    pub source: MemorySource,
+    /// Human-readable label for debugging.
+    pub label: String,
+    /// Step at which this item was added.
+    pub added_at: u64,
+}
+
+/// Working memory with capacity-limited, activation-gated storage.
+pub struct WorkingMemory {
+    /// Active items, sorted by activation (highest first).
+    items: Vec<MemoryItem>,
+    /// Maximum number of items.
+    capacity: usize,
+    /// Current time step (increments with each operation).
+    step: u64,
+}
+
+impl WorkingMemory {
+    /// Create with default capacity (7).
+    pub fn new() -> Self {
+        Self {
+            items: Vec::new(),
+            capacity: DEFAULT_CAPACITY,
+            step: 0,
+        }
+    }
+
+    /// Create with custom capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: Vec::new(),
+            capacity: capacity.max(1),
+            step: 0,
+        }
+    }
+
+    /// Add an item to working memory.
+    ///
+    /// If capacity is exceeded, the lowest-activation item is evicted.
+    /// New items start with activation = 1.0.
+    pub fn push(&mut self, content: ContinuousHV, source: MemorySource, label: String) {
+        self.step += 1;
+
+        // Decay existing items
+        for item in &mut self.items {
+            item.activation *= DECAY_RATE;
+        }
+
+        let item = MemoryItem {
+            content,
+            activation: 1.0,
+            source,
+            label,
+            added_at: self.step,
+        };
+
+        self.items.push(item);
+
+        // Evict lowest-activation if over capacity
+        if self.items.len() > self.capacity {
+            // Find index of minimum activation
+            let min_idx = self.items
+                .iter()
+                .enumerate()
+                .min_by(|(_, a), (_, b)| a.activation.partial_cmp(&b.activation).unwrap())
+                .map(|(i, _)| i)
+                .unwrap();
+            self.items.remove(min_idx);
+        }
+
+        // Sort by activation (highest first)
+        self.items.sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
+    }
+
+    /// Boost activation of items similar to the query.
+    ///
+    /// Items with high similarity get their activation refreshed,
+    /// implementing associative retrieval.
+    pub fn attend(&mut self, query: &ContinuousHV, boost: f64) {
+        for item in &mut self.items {
+            let sim = item.content.similarity(query).max(0.0) as f64;
+            if sim > 0.3 {
+                item.activation = (item.activation + sim * boost).min(1.0);
+            }
+        }
+        self.items.sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
+    }
+
+    /// Get the bundled context vector — weighted bundle of all items.
+    ///
+    /// This is the "gist" of current working memory, used for goal
+    /// inference and action selection.
+    pub fn context_vector(&self) -> ContinuousHV {
+        if self.items.is_empty() {
+            return ContinuousHV::zero(symthaea_core::hdc::HDC_DIMENSION);
+        }
+
+        let refs: Vec<&ContinuousHV> = self.items.iter().map(|i| &i.content).collect();
+        let weights: Vec<f32> = self.items.iter().map(|i| i.activation as f32).collect();
+        ContinuousHV::weighted_bundle(&refs, &weights)
+    }
+
+    /// Retrieve the most similar item to a query.
+    pub fn retrieve(&self, query: &ContinuousHV) -> Option<&MemoryItem> {
+        self.items
+            .iter()
+            .max_by(|a, b| {
+                let sim_a = a.content.similarity(query);
+                let sim_b = b.content.similarity(query);
+                sim_a.partial_cmp(&sim_b).unwrap()
+            })
+    }
+
+    /// Get all current items (highest activation first).
+    pub fn items(&self) -> &[MemoryItem] {
+        &self.items
+    }
+
+    /// Current number of items.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
+
+    /// Whether working memory is empty.
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    /// Clear all items.
+    pub fn clear(&mut self) {
+        self.items.clear();
+    }
+
+    /// Current time step.
+    pub fn step(&self) -> u64 {
+        self.step
+    }
+
+    /// Average activation across all items.
+    pub fn mean_activation(&self) -> f64 {
+        if self.items.is_empty() {
+            return 0.0;
+        }
+        let sum: f64 = self.items.iter().map(|i| i.activation).sum();
+        sum / self.items.len() as f64
+    }
+}
+
+impl Default for WorkingMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_hv(seed: u64) -> ContinuousHV {
+        ContinuousHV::random(1024, seed) // Smaller dim for test speed
+    }
+
+    #[test]
+    fn test_capacity_eviction() {
+        let mut wm = WorkingMemory::with_capacity(3);
+        wm.push(make_hv(1), MemorySource::UserInput, "a".into());
+        wm.push(make_hv(2), MemorySource::UserInput, "b".into());
+        wm.push(make_hv(3), MemorySource::UserInput, "c".into());
+        assert_eq!(wm.len(), 3);
+
+        // Adding 4th should evict the lowest-activation (which is "a" due to decay)
+        wm.push(make_hv(4), MemorySource::UserInput, "d".into());
+        assert_eq!(wm.len(), 3);
+
+        // "a" should have been evicted (lowest activation after 3 rounds of decay)
+        let labels: Vec<&str> = wm.items().iter().map(|i| i.label.as_str()).collect();
+        assert!(!labels.contains(&"a"), "Oldest item should be evicted");
+    }
+
+    #[test]
+    fn test_activation_decay() {
+        let mut wm = WorkingMemory::with_capacity(7);
+        wm.push(make_hv(1), MemorySource::UserInput, "first".into());
+
+        let initial = wm.items()[0].activation;
+        assert!((initial - 1.0).abs() < 1e-6);
+
+        // Adding another item causes decay on the first
+        wm.push(make_hv(2), MemorySource::UserInput, "second".into());
+
+        let first_activation = wm.items().iter()
+            .find(|i| i.label == "first")
+            .unwrap()
+            .activation;
+        assert!(first_activation < 1.0, "First item should have decayed");
+        assert!(first_activation > 0.8, "Should not have decayed too much: {}", first_activation);
+    }
+
+    #[test]
+    fn test_attend_boosts_similar() {
+        let mut wm = WorkingMemory::with_capacity(7);
+        let hv1 = make_hv(1);
+        let hv2 = make_hv(2);
+        wm.push(hv1.clone(), MemorySource::UserInput, "target".into());
+        wm.push(hv2, MemorySource::UserInput, "other".into());
+
+        // Attend to something similar to hv1
+        let activation_before = wm.items().iter()
+            .find(|i| i.label == "target")
+            .unwrap()
+            .activation;
+
+        wm.attend(&hv1, 0.5);
+
+        let activation_after = wm.items().iter()
+            .find(|i| i.label == "target")
+            .unwrap()
+            .activation;
+
+        assert!(activation_after >= activation_before);
+    }
+
+    #[test]
+    fn test_context_vector() {
+        let mut wm = WorkingMemory::with_capacity(7);
+        wm.push(make_hv(1), MemorySource::UserInput, "a".into());
+        wm.push(make_hv(2), MemorySource::SystemObservation, "b".into());
+
+        let ctx = wm.context_vector();
+        assert!(ctx.norm() > 0.0);
+    }
+
+    #[test]
+    fn test_empty_context() {
+        let wm = WorkingMemory::new();
+        let ctx = wm.context_vector();
+        assert!(ctx.norm() < 1e-6, "Empty WM should produce zero context");
+    }
+}

@@ -1,0 +1,68 @@
+[package]
+name = "symthaea-nix"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Symthaea NixOS: A conscious mind for NixOS system management via HDC and active inference"
+license = "MIT"
+
+[lib]
+name = "symthaea_nix"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nix-mind"
+path = "src/bin/nix_mind.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "nix-mind-tui"
+path = "src/bin/nix_mind_tui.rs"
+required-features = ["tui"]
+
+[[bin]]
+name = "nix-mind-daemon"
+path = "src/bin/nix_mind_daemon.rs"
+required-features = ["daemon"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+tree-sitter = "0.24"
+tree-sitter-nix = "0.3"
+petgraph = { version = "0.6", features = ["serde-1"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.35", features = ["full"] }
+regex = "1.10"
+strsim = "0.11"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+lru = "0.16"
+dashmap = "5.5"
+nix = "0.27"
+rusqlite = { version = "0.37", features = ["bundled"] }
+
+# CLI (optional)
+clap = { version = "4.4", features = ["derive"], optional = true }
+clap_complete = { version = "4.4", optional = true }
+
+# TUI (optional)
+crossterm = { version = "0.27", optional = true }
+ratatui = { version = "0.30", optional = true }
+
+# Systemd (optional)
+zbus = { version = "4.0", optional = true }
+libsystemd = { version = "0.7", optional = true }
+
+[dev-dependencies]
+tempfile = "3.10"
+
+[features]
+default = []
+cli = ["clap", "clap_complete"]
+tui = ["crossterm", "ratatui", "cli"]
+daemon = ["tokio/full"]
+systemd = ["zbus", "libsystemd"]
+full = ["cli", "tui", "daemon", "systemd"]
