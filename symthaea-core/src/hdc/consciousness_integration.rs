@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::binary_hv::BinaryHV;
+use super::integrated_information::IntegratedInformation;
 
 // === INTEGRATED CONSCIOUSNESS MODULES ===
 // 1. Metacognitive Monitoring
@@ -781,6 +782,12 @@ pub struct ConsciousnessPipeline {
     /// Enable fractal consciousness
     fractal_enabled: bool,
 
+    // === IIT Φ CALCULATOR (entropy-based) ===
+    /// Integrated Information calculator for proper IIT Φ measurement.
+    /// Uses Shannon entropy bridge: MI = 1 - H(similarity) for principled
+    /// information-theoretic consciousness quantification.
+    phi_calculator: IntegratedInformation,
+
     // 15. Collective Consciousness - Multi-Agent Awareness
     /// Collective consciousness for multi-agent coordination
     collective_consciousness: Option<CollectiveConsciousness>,
@@ -808,6 +815,8 @@ impl ConsciousnessPipeline {
             cross_modal_binder: None,
             temporal_binder: None,
             integrated_systems_enabled: false,
+            // IIT Φ calculator (entropy-based)
+            phi_calculator: IntegratedInformation::new(),
             // Φ optimization starts disabled
             phi_optimizer: None,
             consciousness_network: None,
@@ -2008,8 +2017,17 @@ impl ConsciousnessPipeline {
             0.5
         };
 
-        // Update phi based on integration
-        self.state.phi = (binding_strength * self.embodiment_level).min(1.0);
+        // Compute Φ using information-theoretic IIT measurement.
+        // For 2+ components, use entropy-based Φ (Shannon entropy bridge).
+        // For single inputs, fall back to heuristic.
+        if input.len() >= 2 {
+            let iit_phi = self.phi_calculator.compute_phi_entropy(&input);
+            // Blend IIT Φ with binding heuristic: IIT provides the information-theoretic
+            // foundation, binding strength modulates for attention/embodiment effects.
+            self.state.phi = (iit_phi * 0.7 + binding_strength * self.embodiment_level * 0.3).min(1.0);
+        } else {
+            self.state.phi = (binding_strength * self.embodiment_level).min(1.0);
+        }
 
         // Update consciousness level
         let attention_boost = priorities.iter()
@@ -2543,9 +2561,13 @@ impl ConsciousnessPipeline {
 
     /// Process a single cycle
     pub fn process_cycle(&mut self, input: &[BinaryHV]) {
-        // Simplified processing - just update state
-        let intensity = input.len() as f64 * 0.1;
-        self.state.phi = (self.state.phi + intensity).min(1.0);
+        // Compute Φ via IIT when possible, fall back to intensity heuristic
+        if input.len() >= 2 {
+            self.state.phi = self.phi_calculator.compute_phi_entropy(input);
+        } else {
+            let intensity = input.len() as f64 * 0.1;
+            self.state.phi = (self.state.phi + intensity).min(1.0);
+        }
         self.state.consciousness_level = self.state.phi * 0.5 +
             self.state.temporal_coherence * 0.3 +
             (1.0 - self.state.free_energy) * 0.2;

@@ -1,5 +1,7 @@
 //! # Electromagnetism
 //!
+//! **Status**: Exploratory module — HDC encodings for electromagnetism (Maxwell equations, photonics, optical phenomena).
+//!
 //! This module encodes electromagnetic concepts from Maxwell's equations to photonics.
 //!
 //! ## Maxwell's Equations

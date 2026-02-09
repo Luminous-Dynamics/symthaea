@@ -1,5 +1,8 @@
 //! # Statistical Mechanics
 //!
+//! **Status**: Exploratory module — HDC encodings for statistical mechanics (ensembles, Ising model, partition functions).
+//! Not re-exported due to name conflicts with thermodynamics.
+//!
 //! This module encodes statistical mechanics: the bridge between
 //! microscopic dynamics and macroscopic thermodynamics.
 //!
@@ -533,7 +536,7 @@ mod tests {
         let s = encoder.boltzmann_entropy();
 
         // Should be in microcanonical context
-        let sim = s.similarity(&encoder.microcanonical);
+        let _sim = s.similarity(&encoder.microcanonical);
         // After binding, similarity is indirect
         assert!(s.norm() > 0.0);
     }

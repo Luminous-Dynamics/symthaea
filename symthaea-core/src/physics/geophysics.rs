@@ -1,5 +1,7 @@
 //! # Geophysics
 //!
+//! **Status**: Exploratory module — HDC encodings for geophysics (seismology, Earth layers, plate tectonics).
+//!
 //! This module encodes geophysical phenomena: the physics of Earth
 //! and planetary systems.
 //!

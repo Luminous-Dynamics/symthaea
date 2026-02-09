@@ -102,12 +102,18 @@ pub struct ResonatorNetwork {
 
     /// Current resonator states (one per unknown)
     ///
-    /// TODO(future): Expose resonator state inspection API.
-    /// This would allow debugging and visualization of the resonator's
-    /// internal dynamics - useful for understanding convergence behavior,
-    /// detecting oscillations, and optimizing parameters.
-    #[allow(dead_code)] // Reserved for future state inspection
+    /// Exposed via the state inspection API: [`snapshot()`](Self::snapshot),
+    /// [`oscillator_phases()`](Self::oscillator_phases), etc.
     states: Vec<ResonatorState>,
+
+    /// Coupling strengths between resonator pairs (flattened upper triangle)
+    ///
+    /// For N resonators, stores N*(N-1)/2 coupling values.
+    /// Index for pair (i,j) where i < j: i*N - i*(i+1)/2 + j - i - 1
+    coupling_strengths: Vec<f32>,
+
+    /// Total iterations performed across all solve calls
+    iteration_count: usize,
 
     /// Convergence parameters
     config: ResonatorConfig,
@@ -246,6 +252,8 @@ impl ResonatorNetwork {
             codebook: Vec::new(),
             symbol_names: HashMap::new(),
             states: Vec::new(),
+            coupling_strengths: Vec::new(),
+            iteration_count: 0,
             config: ResonatorConfig::default(),
             energy_history: Vec::new(),
         })
@@ -258,6 +266,8 @@ impl ResonatorNetwork {
             codebook: Vec::new(),
             symbol_names: HashMap::new(),
             states: Vec::new(),
+            coupling_strengths: Vec::new(),
+            iteration_count: 0,
             config,
             energy_history: Vec::new(),
         })
@@ -320,6 +330,16 @@ impl ResonatorNetwork {
         let mut previous = estimate.clone();
         let mut velocity = vec![0.0f32; self.dimension];
 
+        // Initialize resonator state for introspection
+        self.states = vec![ResonatorState {
+            estimate: estimate.clone(),
+            previous: previous.clone(),
+            confidence: 0.0,
+            name: "x".to_string(),
+            converged: false,
+        }];
+        self.coupling_strengths = Vec::new();
+
         for iteration in 0..max_iterations {
             // Compute update from all constraints
             let mut update = vec![0.0f32; self.dimension];
@@ -373,14 +393,34 @@ impl ResonatorNetwork {
             let energy = self.compute_energy(&estimate, constraints);
             self.energy_history.push(energy);
 
+            // Update introspection state
+            self.iteration_count += 1;
+            if let Some(state) = self.states.first_mut() {
+                state.estimate = estimate.clone();
+                state.previous = previous.clone();
+                state.confidence = if !self.codebook.is_empty() {
+                    self.codebook.iter()
+                        .map(|e| cosine_similarity(&estimate, &e.vector))
+                        .fold(f32::NEG_INFINITY, f32::max)
+                } else {
+                    1.0 - energy
+                };
+            }
+
             // Check convergence
             let similarity = cosine_similarity(&estimate, &previous);
             if similarity > self.config.convergence_threshold {
+                if let Some(state) = self.states.first_mut() {
+                    state.converged = true;
+                }
                 return Ok(self.create_solution(estimate, iteration + 1, true));
             }
 
             // Check energy threshold
             if energy < self.config.energy_threshold {
+                if let Some(state) = self.states.first_mut() {
+                    state.converged = true;
+                }
                 return Ok(self.create_solution(estimate, iteration + 1, true));
             }
         }
@@ -415,6 +455,22 @@ impl ResonatorNetwork {
                 (name.to_string(), v)
             })
             .collect();
+
+        // Initialize resonator states for introspection
+        self.states = unknowns.iter().map(|&name| {
+            let est = estimates.get(name).unwrap().clone();
+            ResonatorState {
+                estimate: est.clone(),
+                previous: est,
+                confidence: 0.0,
+                name: name.to_string(),
+                converged: false,
+            }
+        }).collect();
+
+        // Initialize coupling strengths (pairwise between unknowns)
+        let n = unknowns.len();
+        self.coupling_strengths = vec![0.0f32; n * (n.saturating_sub(1)) / 2];
 
         let mut velocities: HashMap<String, Vec<f32>> = unknowns
             .iter()
@@ -489,7 +545,41 @@ impl ResonatorNetwork {
                 }
             }
 
+            // Update introspection state
+            self.iteration_count += 1;
+            for (idx, &name_str) in unknowns.iter().enumerate() {
+                if let Some(est) = estimates.get(name_str) {
+                    if let Some(state) = self.states.get_mut(idx) {
+                        state.estimate = est.clone();
+                        state.confidence = if !self.codebook.is_empty() {
+                            self.codebook.iter()
+                                .map(|e| cosine_similarity(est, &e.vector))
+                                .fold(f32::NEG_INFINITY, f32::max)
+                        } else {
+                            0.5 // default confidence without codebook
+                        };
+                    }
+                }
+            }
+
+            // Update coupling strengths between resonator pairs
+            let n = unknowns.len();
+            for i in 0..n {
+                for j in (i + 1)..n {
+                    let ci = i * n - i * (i + 1) / 2 + j - i - 1;
+                    if let (Some(ei), Some(ej)) = (estimates.get(unknowns[i]), estimates.get(unknowns[j])) {
+                        if ci < self.coupling_strengths.len() {
+                            self.coupling_strengths[ci] = cosine_similarity(ei, ej).abs();
+                        }
+                    }
+                }
+            }
+
             if all_converged {
+                // Mark all states as converged
+                for state in &mut self.states {
+                    state.converged = true;
+                }
                 break;
             }
         }
@@ -632,6 +722,141 @@ impl ResonatorNetwork {
     /// Get codebook size
     pub fn codebook_size(&self) -> usize {
         self.codebook.len()
+    }
+}
+
+/// Snapshot of the resonator network's internal state for debugging/introspection.
+///
+/// Captures oscillator phases, coupling strengths, convergence metrics,
+/// iteration count, and energy levels at a point in time.
+#[derive(Debug, Clone)]
+pub struct ResonatorSnapshot {
+    /// Current oscillator phases (estimate vectors for each resonator)
+    pub oscillator_phases: Vec<Vec<f32>>,
+    /// Coupling strengths between resonator pairs
+    pub coupling_strengths: Vec<f32>,
+    /// Per-resonator convergence metrics: (name, confidence, converged)
+    pub convergence_metrics: Vec<ConvergenceMetric>,
+    /// Total iterations performed so far
+    pub iteration_count: usize,
+    /// Energy history over all iterations
+    pub energy_history: Vec<f32>,
+    /// Current energy level (last recorded)
+    pub current_energy: f32,
+    /// Network dimensionality
+    pub dimension: usize,
+    /// Number of symbols in codebook
+    pub codebook_size: usize,
+}
+
+/// Per-resonator convergence information
+#[derive(Debug, Clone)]
+pub struct ConvergenceMetric {
+    /// Name of the resonator / unknown variable
+    pub name: String,
+    /// Confidence in current estimate (0.0 to 1.0)
+    pub confidence: f32,
+    /// Whether this resonator has converged
+    pub converged: bool,
+    /// Cosine similarity between current and previous estimate
+    pub stability: f32,
+}
+
+impl ResonatorNetwork {
+    /// Capture a snapshot of the network's current internal state.
+    ///
+    /// Returns a [`ResonatorSnapshot`] containing oscillator phases,
+    /// coupling strengths, convergence metrics, iteration count, and
+    /// energy levels. Useful for debugging, visualization, and
+    /// understanding convergence behavior.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// let mut network = ResonatorNetwork::new(1000)?;
+    /// // ... add symbols, solve constraints ...
+    /// let snap = network.snapshot();
+    /// println!("Iterations: {}", snap.iteration_count);
+    /// println!("Current energy: {}", snap.current_energy);
+    /// for metric in &snap.convergence_metrics {
+    ///     println!("{}: confidence={:.3}, converged={}", metric.name, metric.confidence, metric.converged);
+    /// }
+    /// ```
+    pub fn snapshot(&self) -> ResonatorSnapshot {
+        let convergence_metrics: Vec<ConvergenceMetric> = self.states.iter().map(|s| {
+            let stability = cosine_similarity(&s.estimate, &s.previous);
+            ConvergenceMetric {
+                name: s.name.clone(),
+                confidence: s.confidence,
+                converged: s.converged,
+                stability,
+            }
+        }).collect();
+
+        let current_energy = self.energy_history.last().copied().unwrap_or(1.0);
+
+        ResonatorSnapshot {
+            oscillator_phases: self.states.iter().map(|s| s.estimate.clone()).collect(),
+            coupling_strengths: self.coupling_strengths.clone(),
+            convergence_metrics,
+            iteration_count: self.iteration_count,
+            energy_history: self.energy_history.clone(),
+            current_energy,
+            dimension: self.dimension,
+            codebook_size: self.codebook.len(),
+        }
+    }
+
+    /// Get current oscillator phase vectors (estimate for each resonator).
+    ///
+    /// Each entry is the current estimate vector for one unknown variable.
+    /// Returns an empty slice if no solve has been performed yet.
+    pub fn oscillator_phases(&self) -> Vec<&[f32]> {
+        self.states.iter().map(|s| s.estimate.as_slice()).collect()
+    }
+
+    /// Get coupling strengths between resonator pairs.
+    ///
+    /// For a single-unknown solve, this is empty. For multi-unknown
+    /// systems, contains the pairwise coupling values.
+    pub fn coupling_strengths(&self) -> &[f32] {
+        &self.coupling_strengths
+    }
+
+    /// Get per-resonator convergence metrics.
+    pub fn convergence_metrics(&self) -> Vec<ConvergenceMetric> {
+        self.states.iter().map(|s| {
+            let stability = cosine_similarity(&s.estimate, &s.previous);
+            ConvergenceMetric {
+                name: s.name.clone(),
+                confidence: s.confidence,
+                converged: s.converged,
+                stability,
+            }
+        }).collect()
+    }
+
+    /// Get the total number of iterations performed across all solve calls.
+    pub fn total_iteration_count(&self) -> usize {
+        self.iteration_count
+    }
+
+    /// Get the current energy level (last recorded energy, or 1.0 if none).
+    pub fn current_energy(&self) -> f32 {
+        self.energy_history.last().copied().unwrap_or(1.0)
+    }
+
+    /// Get a read-only view of the internal resonator states.
+    pub fn resonator_states(&self) -> &[ResonatorState] {
+        &self.states
+    }
+
+    /// Reset iteration count and internal state (but preserve codebook and config).
+    pub fn reset_state(&mut self) {
+        self.states.clear();
+        self.coupling_strengths.clear();
+        self.iteration_count = 0;
+        self.energy_history.clear();
     }
 }
 
@@ -988,6 +1213,203 @@ mod tests {
 
         assert!(sim_to_sym1 >= noisy_sim_to_sym1 - 0.1,
                 "Cleanup should increase similarity to nearest symbol");
+    }
+
+    #[test]
+    fn test_snapshot_after_solve() {
+        let dim = 500;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+
+        // Before solve: snapshot should have defaults
+        let snap = network.snapshot();
+        assert_eq!(snap.iteration_count, 0);
+        assert_eq!(snap.oscillator_phases.len(), 0);
+        assert_eq!(snap.current_energy, 1.0);
+        assert_eq!(snap.dimension, dim);
+        assert_eq!(snap.codebook_size, 0);
+
+        // Add symbol and solve
+        let target = normalized_random_vector(dim);
+        network.add_symbol("target", target.clone()).unwrap();
+
+        let a = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(target.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = Constraint::new(a, b);
+        let _solution = network.solve(&[constraint], Some(30)).unwrap();
+
+        // After solve: snapshot should have populated state
+        let snap = network.snapshot();
+        assert!(snap.iteration_count > 0, "iteration_count should be positive after solve");
+        assert_eq!(snap.oscillator_phases.len(), 1, "should have one resonator phase");
+        assert_eq!(snap.oscillator_phases[0].len(), dim, "phase vector should match dimension");
+        assert!(!snap.energy_history.is_empty(), "energy history should be non-empty");
+        assert!(snap.current_energy.is_finite(), "current energy should be finite");
+        assert_eq!(snap.codebook_size, 1);
+        assert_eq!(snap.convergence_metrics.len(), 1);
+
+        let metric = &snap.convergence_metrics[0];
+        assert_eq!(metric.name, "x");
+        assert!(metric.confidence >= 0.0 && metric.confidence <= 1.0,
+                "confidence should be in [0,1], got {}", metric.confidence);
+        assert!(metric.stability.is_finite(), "stability should be finite");
+    }
+
+    #[test]
+    fn test_oscillator_phases_api() {
+        let dim = 200;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+
+        // No phases before solve
+        assert!(network.oscillator_phases().is_empty());
+
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = Constraint::new(a, b);
+        let _solution = network.solve(&[constraint], Some(10)).unwrap();
+
+        let phases = network.oscillator_phases();
+        assert_eq!(phases.len(), 1);
+        assert_eq!(phases[0].len(), dim);
+        // Phase should be normalized
+        let norm: f32 = phases[0].iter().map(|v| v * v).sum::<f32>().sqrt();
+        assert!((norm - 1.0).abs() < 0.15, "phase should be approx normalized, got norm={}", norm);
+    }
+
+    #[test]
+    fn test_convergence_metrics_api() {
+        let dim = 300;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = Constraint::new(a, b);
+        let _solution = network.solve(&[constraint], Some(20)).unwrap();
+
+        let metrics = network.convergence_metrics();
+        assert_eq!(metrics.len(), 1, "should have one convergence metric");
+        let m = &metrics[0];
+        assert_eq!(m.name, "x");
+        // Stability is cosine sim between current and previous estimate
+        assert!(m.stability >= -1.0 && m.stability <= 1.0,
+                "stability should be a valid cosine similarity, got {}", m.stability);
+    }
+
+    #[test]
+    fn test_iteration_count_accumulates() {
+        let dim = 200;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+        assert_eq!(network.total_iteration_count(), 0);
+
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = Constraint::new(a, b);
+
+        // First solve
+        let _s1 = network.solve(&[constraint.clone()], Some(10)).unwrap();
+        let count_after_first = network.total_iteration_count();
+        assert!(count_after_first > 0, "should have iterated");
+
+        // Second solve accumulates
+        let _s2 = network.solve(&[constraint], Some(10)).unwrap();
+        let count_after_second = network.total_iteration_count();
+        assert!(count_after_second > count_after_first,
+                "iteration count should accumulate: {} > {}", count_after_second, count_after_first);
+    }
+
+    #[test]
+    fn test_current_energy_api() {
+        let dim = 300;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+
+        // Before solve, default energy is 1.0
+        assert_eq!(network.current_energy(), 1.0);
+
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = Constraint::new(a, b);
+        let _solution = network.solve(&[constraint], Some(20)).unwrap();
+
+        let energy = network.current_energy();
+        assert!(energy.is_finite(), "energy should be finite");
+        assert!(energy >= 0.0, "energy should be non-negative, got {}", energy);
+    }
+
+    #[test]
+    fn test_resonator_states_api() {
+        let dim = 200;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+
+        assert!(network.resonator_states().is_empty());
+
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = Constraint::new(a, b);
+        let _solution = network.solve(&[constraint], Some(10)).unwrap();
+
+        let states = network.resonator_states();
+        assert_eq!(states.len(), 1);
+        assert_eq!(states[0].name, "x");
+        assert_eq!(states[0].estimate.len(), dim);
+        assert_eq!(states[0].previous.len(), dim);
+    }
+
+    #[test]
+    fn test_reset_state() {
+        let dim = 200;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+
+        // Add a symbol (should survive reset)
+        network.add_symbol("sym", normalized_random_vector(dim)).unwrap();
+
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = Constraint::new(a, b);
+        let _solution = network.solve(&[constraint], Some(10)).unwrap();
+
+        assert!(network.total_iteration_count() > 0);
+        assert!(!network.resonator_states().is_empty());
+
+        network.reset_state();
+
+        assert_eq!(network.total_iteration_count(), 0);
+        assert!(network.resonator_states().is_empty());
+        assert!(network.energy_history().is_empty());
+        assert!(network.coupling_strengths().is_empty());
+        // Codebook should be preserved
+        assert_eq!(network.codebook_size(), 1);
+        assert!(network.get_symbol("sym").is_some());
+    }
+
+    #[test]
+    fn test_snapshot_energy_history_matches() {
+        let dim = 300;
+        let mut network = ResonatorNetwork::new(dim).unwrap();
+
+        let a = normalized_random_vector(dim);
+        let x = normalized_random_vector(dim);
+        let b: Vec<f32> = a.iter().zip(x.iter()).map(|(ai, xi)| ai * xi).collect();
+        let constraint = Constraint::new(a, b);
+        let _solution = network.solve(&[constraint], Some(15)).unwrap();
+
+        let snap = network.snapshot();
+        let direct_history = network.energy_history();
+
+        // Snapshot energy history should match direct accessor
+        assert_eq!(snap.energy_history.len(), direct_history.len());
+        for (a, b) in snap.energy_history.iter().zip(direct_history.iter()) {
+            assert!((a - b).abs() < 1e-9, "energy histories should match");
+        }
+
+        // current_energy should match last entry
+        if let Some(&last) = direct_history.last() {
+            assert!((snap.current_energy - last).abs() < 1e-9);
+        }
     }
 
     #[test]

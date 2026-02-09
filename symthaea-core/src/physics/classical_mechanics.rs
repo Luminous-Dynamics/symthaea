@@ -1,5 +1,7 @@
 //! # Classical Mechanics
 //!
+//! **Status**: Exploratory module — HDC encodings for classical mechanics (Newton to Hamilton, Noether symmetries).
+//!
 //! This module encodes classical mechanics from Newton to Hamilton,
 //! including Noether's theorem connecting symmetries to conservation laws.
 //!
@@ -523,7 +525,7 @@ mod tests {
     fn test_phase_space() {
         let encoder = setup();
 
-        let ps = encoder.phase_space.clone();
+        let _ps = encoder.phase_space.clone();
         let canonical = encoder.canonical_transform();
 
         // Canonical transformation preserves phase space structure

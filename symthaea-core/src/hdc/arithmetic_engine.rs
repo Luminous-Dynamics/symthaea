@@ -27,6 +27,7 @@
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
+use crate::hdc::deterministic_seeds::seed_from_name;
 use crate::hdc::integrated_information::IntegratedInformation;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
@@ -4138,6 +4139,12 @@ pub enum TermType {
         op: SymbolicOp,
         operand: Box<TermType>,
     },
+    /// Named function application (sin, cos, exp, ln, tan, etc.)
+    /// Enables transcendental function differentiation with chain rule.
+    Function {
+        name: String,
+        arg: Box<TermType>,
+    },
 }
 
 /// A symbolic algebraic expression with HDC encoding
@@ -4402,6 +4409,13 @@ impl SymbolicExpr {
                     _ => Some(val),
                 }
             }
+            TermType::Function { name: _, arg } => {
+                // Functions evaluate to approximate integer values
+                let arg_expr = SymbolicExpr::from_term_type(*arg.clone(), &self.encoding);
+                let _val = arg_expr.evaluate(bindings, engine)?;
+                // Cannot exactly evaluate transcendental functions in integer domain
+                None
+            }
         }
     }
 
@@ -4418,6 +4432,10 @@ impl SymbolicExpr {
             TermType::UnaryOp { op, operand } => {
                 let o = Self::from_term_type(*operand.clone(), encoding);
                 format!("({}{})", op, o.display)
+            }
+            TermType::Function { name, arg } => {
+                let a = Self::from_term_type(*arg.clone(), encoding);
+                format!("{}({})", name, a.display)
             }
         };
 
@@ -4448,6 +4466,9 @@ impl SymbolicExpr {
             }
             TermType::UnaryOp { operand, .. } => {
                 self.collect_variables(operand, vars);
+            }
+            TermType::Function { arg, .. } => {
+                self.collect_variables(arg, vars);
             }
         }
     }
@@ -4531,11 +4552,16 @@ impl Polynomial {
 
     /// Get the degree of the polynomial
     pub fn degree(&self) -> usize {
-        if self.coefficients.is_empty() || (self.coefficients.len() == 1 && self.coefficients[0] == 0) {
-            0
-        } else {
-            self.coefficients.len() - 1
+        if self.coefficients.is_empty() {
+            return 0;
         }
+        // Find the highest non-zero coefficient
+        for i in (0..self.coefficients.len()).rev() {
+            if self.coefficients[i] != 0 {
+                return i;
+            }
+        }
+        0 // All-zero polynomial has degree 0
     }
 
     /// Get coefficients
@@ -4758,6 +4784,22 @@ impl SymbolicAlgebra {
                     _ => inner,
                 }
             }
+
+            TermType::Function { name, arg } => {
+                let simplified_arg = self.simplify_recursive(arg, primitives);
+                // Build a SymbolicExpr for the function with simplified argument
+                let encoding = BinaryHV::random(seed_from_name(&format!("FN_{}", name)));
+                let display = format!("{}({})", name, simplified_arg.display);
+                SymbolicExpr {
+                    term_type: TermType::Function {
+                        name: name.clone(),
+                        arg: Box::new(simplified_arg.term_type),
+                    },
+                    encoding,
+                    phi: simplified_arg.phi + 0.1,
+                    display,
+                }
+            }
         }
     }
 
@@ -4956,6 +4998,21 @@ impl SymbolicAlgebra {
 
             TermType::UnaryOp { operand, .. } => {
                 self.expand_recursive(operand, primitives)
+            }
+
+            TermType::Function { name, arg } => {
+                let expanded_arg = self.expand_recursive(arg, primitives);
+                let encoding = BinaryHV::random(seed_from_name(&format!("FN_{}", name)));
+                let display = format!("{}({})", name, expanded_arg.display);
+                SymbolicExpr {
+                    term_type: TermType::Function {
+                        name: name.clone(),
+                        arg: Box::new(expanded_arg.term_type),
+                    },
+                    encoding,
+                    display,
+                    phi: expanded_arg.phi,
+                }
             }
         }
     }

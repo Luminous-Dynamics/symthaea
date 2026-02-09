@@ -1,5 +1,7 @@
 //! # Biophysics
 //!
+//! **Status**: Exploratory module — HDC encodings for biophysics (molecular motors, biomolecules, membrane physics).
+//!
 //! This module bridges physics and biology: the physical principles
 //! underlying life at molecular, cellular, and systems levels.
 //!

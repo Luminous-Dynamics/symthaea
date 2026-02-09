@@ -1,5 +1,7 @@
 //! # General Relativity
 //!
+//! **Status**: Exploratory module — HDC encodings for general relativity (spacetime geometry, gravitational waves).
+//!
 //! This module encodes general relativistic concepts from spacetime geometry
 //! to gravitational waves.
 //!

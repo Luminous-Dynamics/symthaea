@@ -15,7 +15,6 @@ use super::derived_laws::LawsDerivationEngine;
 use super::analogy_engine::AnalogyEngine;
 use super::inverse_search::{CausalReasoningEngine, CausalCategory};
 use super::emergence_chain::{EmergenceChain, EmergenceLevel};
-use super::standard_model::PHYSICS_DIM;
 
 /// Print a section header
 fn section(title: &str) {
@@ -390,7 +389,7 @@ pub fn demo_comprehensive() {
     // 3. Causal analysis
     subsection("3. What Causes Laser Action?");
 
-    let causal = CausalReasoningEngine::from_genesis(&genesis);
+    let _causal = CausalReasoningEngine::from_genesis(&genesis);
 
     println!("  Causal factors for laser operation:");
     println!("    - Population inversion (QuantumEffect)");

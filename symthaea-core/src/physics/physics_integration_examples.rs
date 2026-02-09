@@ -8,8 +8,10 @@
 //!
 //! These examples show practical applications and cross-module integration.
 
+#![allow(dead_code)]
+
 use super::chaos_dynamics::{systems, AttractorAnalyzer, LyapunovCalculator};
-use super::constants::{C, G, K_BOLTZMANN, M_ELECTRON};
+use super::constants::{C, G};
 use super::decoherence::DensityMatrix;
 use super::nonequilibrium::{
     FluctuationDissipation, JarzynskiEstimator, OnsagerCoefficients,

@@ -1,5 +1,7 @@
 //! # Optics
 //!
+//! **Status**: Exploratory module — HDC encodings for optics (nonlinear, quantum, fiber optics, holography).
+//!
 //! This module encodes optical phenomena beyond basic electromagnetism:
 //! nonlinear optics, quantum optics, fiber optics, and holography.
 //!

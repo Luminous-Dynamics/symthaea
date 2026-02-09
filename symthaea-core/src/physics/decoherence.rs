@@ -407,78 +407,6 @@ impl DensityMatrix {
         (0..n).map(|i| re[i][i]).collect()
     }
 
-    /// Approximate eigenvalues using power iteration
-    fn approximate_eigenvalues(&self, max_eigenvalues: usize) -> Vec<f64> {
-        let mut eigenvalues = Vec::new();
-        let mut remaining = self.clone();
-
-        for _ in 0..max_eigenvalues.min(self.dim) {
-            let (lambda, v) = remaining.power_iteration(50);
-            if lambda < 1e-10 {
-                break;
-            }
-            eigenvalues.push(lambda);
-
-            // Deflate: A = A - λ|v⟩⟨v|
-            for i in 0..self.dim {
-                for j in 0..self.dim {
-                    let current = remaining.get(i, j);
-                    let deflation = v[i].mul(&v[j].conj()).scale(lambda);
-                    remaining.set(i, j, current.sub(&deflation));
-                }
-            }
-        }
-
-        eigenvalues
-    }
-
-    /// Power iteration for largest eigenvalue
-    fn power_iteration(&self, max_iter: usize) -> (f64, Vec<Complex64>) {
-        let mut v: Vec<Complex64> = (0..self.dim)
-            .map(|i| Complex64::from_real((i as f64 + 1.0) / self.dim as f64))
-            .collect();
-
-        // Normalize
-        let norm: f64 = v.iter().map(|c| c.norm_sqr()).sum::<f64>().sqrt();
-        if norm > 1e-10 {
-            for c in &mut v {
-                *c = c.scale(1.0 / norm);
-            }
-        }
-
-        let mut lambda = 0.0;
-
-        for _ in 0..max_iter {
-            // v' = ρv
-            let mut v_new = vec![Complex64::zero(); self.dim];
-            for i in 0..self.dim {
-                for j in 0..self.dim {
-                    v_new[i] = v_new[i].add(&self.get(i, j).mul(&v[j]));
-                }
-            }
-
-            // Compute eigenvalue (Rayleigh quotient)
-            let mut numerator = Complex64::zero();
-            for i in 0..self.dim {
-                numerator = numerator.add(&v[i].conj().mul(&v_new[i]));
-            }
-            lambda = numerator.re;
-
-            // Normalize
-            let norm: f64 = v_new.iter().map(|c| c.norm_sqr()).sum::<f64>().sqrt();
-            if norm < 1e-10 {
-                break;
-            }
-            for c in &mut v_new {
-                *c = c.scale(1.0 / norm);
-            }
-
-            v = v_new;
-        }
-
-        (lambda.abs(), v)
-    }
-
     /// Add another density matrix
     pub fn add(&self, other: &DensityMatrix) -> DensityMatrix {
         assert_eq!(self.dim, other.dim);
@@ -545,6 +473,11 @@ impl DensityMatrix {
         result
     }
 
+    /// Frobenius norm ||ρ||_F = √(Σᵢⱼ |ρᵢⱼ|²)
+    pub fn frobenius_norm(&self) -> f64 {
+        self.elements.iter().map(|c| c.norm_sqr()).sum::<f64>().sqrt()
+    }
+
     /// Hermitian conjugate (dagger)
     pub fn dagger(&self) -> DensityMatrix {
         let mut result = DensityMatrix::new(self.dim);
@@ -591,10 +524,16 @@ impl LindbladEvolution {
 
     /// Evolve the density matrix by time dt
     ///
-    /// Uses simple Euler method for integration
+    /// Uses 4th-order Runge-Kutta for integration
     pub fn evolve(&self, rho: &DensityMatrix, dt: f64) -> DensityMatrix {
-        let drho = self.derivative(rho);
-        rho.add(&drho.scale(dt))
+        let k1 = self.derivative(rho).scale(dt);
+        let rho2 = rho.add(&k1.scale(0.5));
+        let k2 = self.derivative(&rho2).scale(dt);
+        let rho3 = rho.add(&k2.scale(0.5));
+        let k3 = self.derivative(&rho3).scale(dt);
+        let rho4 = rho.add(&k3);
+        let k4 = self.derivative(&rho4).scale(dt);
+        rho.add(&k1.add(&k2.scale(2.0)).add(&k3.scale(2.0)).add(&k4).scale(1.0 / 6.0))
     }
 
     /// Compute dρ/dt from Lindblad equation
@@ -665,6 +604,109 @@ impl LindbladEvolution {
 
         trajectory
     }
+
+    /// Adaptive Dormand-Prince RK45 integrator with error control.
+    ///
+    /// Returns a trajectory at accepted time steps. Step size is adapted
+    /// based on local truncation error estimated from embedded 4th and 5th
+    /// order solutions.
+    ///
+    /// # Arguments
+    /// * `rho` — Initial density matrix
+    /// * `t_end` — End time
+    /// * `rtol` — Relative tolerance
+    /// * `atol` — Absolute tolerance
+    pub fn evolve_adaptive(
+        &self,
+        rho: &DensityMatrix,
+        t_end: f64,
+        rtol: f64,
+        atol: f64,
+    ) -> Vec<DensityMatrix> {
+        // Dormand-Prince coefficients (Butcher tableau)
+        let a21 = 1.0 / 5.0;
+        let a31 = 3.0 / 40.0; let a32 = 9.0 / 40.0;
+        let a41 = 44.0 / 45.0; let a42 = -56.0 / 15.0; let a43 = 32.0 / 9.0;
+        let a51 = 19372.0 / 6561.0; let a52 = -25360.0 / 2187.0; let a53 = 64448.0 / 6561.0; let a54 = -212.0 / 729.0;
+        let a61 = 9017.0 / 3168.0; let a62 = -355.0 / 33.0; let a63 = 46732.0 / 5247.0; let a64 = 49.0 / 176.0; let a65 = -5103.0 / 18656.0;
+
+        // 5th-order weights
+        let b1 = 35.0 / 384.0; let b3 = 500.0 / 1113.0; let b4 = 125.0 / 192.0; let b5 = -2187.0 / 6784.0; let b6 = 11.0 / 84.0;
+
+        // 4th-order weights (for error estimate)
+        let e1 = 71.0 / 57600.0; let e3 = -71.0 / 16695.0; let e4 = 71.0 / 1920.0; let e5 = -17253.0 / 339200.0; let e6 = 22.0 / 525.0; let e7 = -1.0 / 40.0;
+
+        let mut trajectory = Vec::new();
+        let mut current = rho.clone();
+        trajectory.push(current.clone());
+
+        let mut t = 0.0;
+        let mut h = t_end / 100.0;
+        let h_min = 1e-15;
+        let h_max = t_end;
+
+        while t < t_end {
+            if t + h > t_end {
+                h = t_end - t;
+            }
+            if h < h_min {
+                h = h_min;
+            }
+
+            // Compute stages
+            let k1 = self.derivative(&current);
+            let s2 = current.add(&k1.scale(h * a21));
+            let k2 = self.derivative(&s2);
+            let s3 = current.add(&k1.scale(h * a31)).add(&k2.scale(h * a32));
+            let k3 = self.derivative(&s3);
+            let s4 = current.add(&k1.scale(h * a41)).add(&k2.scale(h * a42)).add(&k3.scale(h * a43));
+            let k4 = self.derivative(&s4);
+            let s5 = current.add(&k1.scale(h * a51)).add(&k2.scale(h * a52)).add(&k3.scale(h * a53)).add(&k4.scale(h * a54));
+            let k5 = self.derivative(&s5);
+            let s6 = current.add(&k1.scale(h * a61)).add(&k2.scale(h * a62)).add(&k3.scale(h * a63)).add(&k4.scale(h * a64)).add(&k5.scale(h * a65));
+            let k6 = self.derivative(&s6);
+
+            // 5th-order solution
+            let y5 = current.add(
+                &k1.scale(h * b1)
+                    .add(&k3.scale(h * b3))
+                    .add(&k4.scale(h * b4))
+                    .add(&k5.scale(h * b5))
+                    .add(&k6.scale(h * b6)),
+            );
+
+            // Error estimate: difference between 5th and 4th order
+            let k7 = self.derivative(&y5);
+            let err_mat = k1.scale(h * e1)
+                .add(&k3.scale(h * e3))
+                .add(&k4.scale(h * e4))
+                .add(&k5.scale(h * e5))
+                .add(&k6.scale(h * e6))
+                .add(&k7.scale(h * e7));
+
+            let err_norm = err_mat.frobenius_norm();
+            let scale = atol + rtol * current.frobenius_norm();
+            let err = err_norm / scale;
+
+            if err <= 1.0 || h <= h_min {
+                // Accept step
+                t += h;
+                current = y5;
+                trajectory.push(current.clone());
+            }
+
+            // Adjust step size
+            let factor = if err > 0.0 {
+                0.9 * err.powf(-0.2)
+            } else {
+                5.0
+            };
+            h *= factor.clamp(0.2, 5.0);
+            h = h.clamp(h_min, h_max);
+        }
+
+        trajectory
+    }
 }
 
 /// Common decoherence channels
@@ -676,8 +718,8 @@ pub enum DecoherenceChannel {
     AmplitudeDamping { gamma: f64 },
     /// Depolarizing channel (uniform noise)
     Depolarizing { p: f64 },
-    /// Thermal relaxation (T₁ and T₂ at temperature)
-    ThermalRelaxation { t1: f64, t2: f64, temperature: f64 },
+    /// Thermal relaxation (T₁ and T₂ at temperature with explicit energy gap)
+    ThermalRelaxation { t1: f64, t2: f64, temperature: f64, energy_gap: f64 },
 }
 
 impl DecoherenceChannel {
@@ -727,14 +769,13 @@ impl DecoherenceChannel {
 
                 vec![(sigma_x, gamma), (sigma_y, gamma), (sigma_z, gamma)]
             }
-            DecoherenceChannel::ThermalRelaxation { t1, t2, temperature } => {
+            DecoherenceChannel::ThermalRelaxation { t1, t2, temperature, energy_gap } => {
                 // Combine amplitude damping and dephasing
                 let gamma1 = 1.0 / t1;
                 let gamma_phi = 1.0 / t2 - 0.5 / t1; // Pure dephasing rate
 
-                // Thermal occupation
-                let energy = 1e-23; // Typical energy scale
-                let n_th = 1.0 / ((energy / (K_BOLTZMANN * temperature)).exp() - 1.0);
+                // Thermal occupation number from Bose-Einstein distribution
+                let n_th = 1.0 / ((energy_gap / (K_BOLTZMANN * temperature)).exp() - 1.0);
 
                 let mut sigma_minus = DensityMatrix::new(2);
                 sigma_minus.set(0, 1, Complex64::from_real(1.0));
@@ -913,7 +954,7 @@ mod tests {
         let rho = DensityMatrix::pure_state(&psi);
 
         // Pure state should have purity = 1
-        assert!((rho.purity() - 1.0).abs() < 0.1, "Pure state purity = {}", rho.purity());
+        assert!((rho.purity() - 1.0).abs() < 1e-10, "Pure state purity = {}", rho.purity());
 
         // Trace should be 1
         assert!((rho.trace().re - 1.0).abs() < 1e-10);
@@ -936,7 +977,7 @@ mod tests {
         let psi = vec![Complex64::from_real(1.0), Complex64::zero()];
         let pure = DensityMatrix::pure_state(&psi);
         let s_pure = pure.von_neumann_entropy();
-        assert!(s_pure < 0.1, "Pure state entropy = {}", s_pure);
+        assert!(s_pure < 1e-6, "Pure state entropy = {}", s_pure);
 
         // Maximally mixed should have S = log(d) = 1 bit
         // Note: power iteration may not find all equal eigenvalues perfectly
@@ -945,7 +986,7 @@ mod tests {
         let purity = mixed.purity();
         // For d=2 maximally mixed: purity = 1/d = 0.5
         assert!(
-            (purity - 0.5).abs() < 0.1,
+            (purity - 0.5).abs() < 1e-10,
             "Mixed state purity = {}, expected 0.5",
             purity
         );
@@ -979,7 +1020,7 @@ mod tests {
         // Trace should be preserved (approximately)
         let tr_initial = rho.trace().re;
         let tr_final = rho_final.trace().re;
-        assert!((tr_final - tr_initial).abs() < 0.1);
+        assert!((tr_final - tr_initial).abs() < 1e-6);
     }
 
     #[test]

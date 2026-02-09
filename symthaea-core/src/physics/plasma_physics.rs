@@ -1,5 +1,8 @@
 //! # Plasma Physics
 //!
+//! **Status**: Exploratory module — HDC encodings for plasma physics (Debye shielding, MHD, fusion confinement).
+//! Used by physics_numerical_validation tests.
+//!
 //! This module encodes plasma physics concepts from Debye shielding to MHD.
 //!
 //! ## Plasma Parameters

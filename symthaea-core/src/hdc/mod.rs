@@ -285,6 +285,7 @@ pub mod cincinnati_enhanced;  // Enhanced Cincinnati-LTC: multi-scale, amplitude
 pub mod cincinnati_advanced;  // Advanced Cincinnati-LTC: chaos detection, adaptive weights, memory horizon
 pub mod reservoir;            // Reservoir Computing (Echo State Network) for chaotic signal prediction
 pub mod predictor;            // Unified predictor trait for Symthaea integration (links prediction to Φ)
+pub mod dynamical_system;     // Generic dynamical system framework with ODE integrators (Euler, RK4, RK45, Verlet)
 pub mod sdm;
 pub mod text_encoder;  // Revolutionary Enhancement: Text → HDC encoding
 pub mod semantic_encoder;  // Universal semantic encoding with embeddings support
@@ -338,9 +339,14 @@ pub mod algebraic_structures;
 pub mod calculus;
 pub mod real_arithmetic;
 pub mod number_theory;
+pub mod numeric_tower;                       // Unified numeric tower (N -> Z -> Q -> R) with auto-promotion
+pub mod complex;                             // Complex number support (ℂ) with HDC encoding
+pub mod math_bridge;                         // Unified math bridge (NumericTower + Complex → single API)
 pub mod foundations;
 #[cfg(test)]
 mod math_integration_tests;
+#[cfg(test)]
+mod cross_bridge_integration_tests;
 pub mod celegans_connectome;               // Revolutionary #100: C. elegans connectome validation (302 neurons)
 pub mod native_similarity;                 // O(1) XOR+popcount similarity search (consciousness-native)
 pub mod sparse_hv;                         // Sparse HDC for memory-efficient low-density vectors
@@ -351,6 +357,8 @@ pub mod hv_pool;                           // Thread-local memory pools for Bina
 mod proptest_hdc;
 #[cfg(test)]
 mod proptest_math;
+#[cfg(test)]
+mod proptest_continuous;
 
 // Track 6: Consciousness integration for awakening module
 pub mod substrate_independence;            // Substrate type definitions
@@ -414,6 +422,8 @@ pub mod topology_synergy;                  // Topology-consciousness synergy
 // pub mod integrated_conscious_agent;        // Complete conscious agent with Symthaea integration
 pub mod consciousness_visualizer;          // Consciousness visualization tools
 pub mod deep_integration;                   // Deep integration bridge for Φ-guided processing
+pub mod consciousness_physics;             // Consciousness-aware physics simulation observer (Φ + emergence + active inference)
+pub mod quantum_circuit;                   // Quantum circuit simulation engine with HDC bridge
 
 // Re-export BinaryHV at module level for convenience (used by language/nix_* modules)
 pub use binary_hv::BinaryHV;
@@ -630,6 +640,7 @@ pub mod consciousness_feedback_dynamics;
 // Advanced consciousness systems
 pub mod meta_consciousness;              // Meta-Consciousness - Φ of Φ, Strange Loops
 pub mod temporal_consciousness;          // Temporal Consciousness - Multi-scale Time
+pub mod temporal_simulation_bridge;     // Temporal Simulation Bridge - Physics trajectory → temporal consciousness
 pub mod consciousness_phase_transitions; // Phase Transitions - Consciousness State Changes
 pub mod epistemic_consciousness;         // Epistemic Consciousness - Belief/Knowledge Tracking
 
@@ -657,6 +668,7 @@ pub mod relational_consciousness;
 // - LanceDB (Long-Term Memory): Multimodal embeddings storage
 // - DuckDB (Epistemic Auditor): Statistical analysis for self-reflection
 pub mod multi_database_integration;
+pub mod phi_guided_math;                  // Φ-guided math domain selection (consciousness-driven computation paths)
 
 // Re-export multi-database integration types
 // Note: QdrantConfig is aliased to MdbQdrantConfig to avoid conflict with long_term_memory::QdrantConfig

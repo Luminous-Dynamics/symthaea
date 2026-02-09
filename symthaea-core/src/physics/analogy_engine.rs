@@ -1,5 +1,7 @@
 //! # Cross-Domain Analogy Engine
 //!
+//! **Status**: Exploratory module — HDC encodings for cross-domain analogy discovery via HDC vector similarity.
+//!
 //! This module discovers unexpected connections between physics domains
 //! by finding concepts with similar HDC vector representations.
 //!
@@ -576,6 +578,6 @@ mod tests {
 
         // May find wave-related concepts (depends on similarity)
         // At minimum should not crash
-        assert!(wave_concepts.len() >= 0);
+        let _ = wave_concepts; // May be empty
     }
 }

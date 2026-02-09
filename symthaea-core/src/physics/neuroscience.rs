@@ -116,7 +116,9 @@ pub struct NeuroEncoder {
     // Gating types
     voltage_gating: ContinuousHV,
     ligand_gating: ContinuousHV,
+    #[allow(dead_code)] // reserved for future mechanotransduction encoding
     mechanical_gating: ContinuousHV,
+    #[allow(dead_code)] // reserved for future leak channel encoding
     leak_gating: ContinuousHV,
 
     // Neurotransmitters
@@ -226,6 +228,7 @@ impl NeuroEncoder {
         }
     }
 
+    #[allow(dead_code)] // internal helper, may be used in future neuron composition
     fn ion_vector(&self, ion: IonType) -> &ContinuousHV {
         match ion {
             IonType::Sodium => &self.na_ion,
@@ -235,6 +238,7 @@ impl NeuroEncoder {
         }
     }
 
+    #[allow(dead_code)] // internal helper, may be used in future gating composition
     fn gating_vector(&self, gating: GatingType) -> &ContinuousHV {
         match gating {
             GatingType::Voltage => &self.voltage_gating,
