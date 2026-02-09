@@ -668,83 +668,22 @@ impl FederatedAggregator {
 // DIFFERENTIAL PRIVACY HELPERS
 // ============================================================================
 
-/// Clip gradient to have at most the specified L2 norm
-///
-/// If the gradient's L2 norm exceeds `clip_norm`, it is scaled down
-/// proportionally to have exactly `clip_norm` as its norm.
-///
-/// # Arguments
-///
-/// * `gradient` - The gradient to clip (modified in place)
-/// * `clip_norm` - Maximum allowed L2 norm
+// Delegate DP helpers to mycelix-fl-core (canonical implementation)
+
+/// Clip gradient to have at most the specified L2 norm (in-place)
 fn clip_gradient(gradient: &mut [f32], clip_norm: f32) {
-    let norm: f32 = gradient.iter().map(|g| g * g).sum::<f32>().sqrt();
-
-    if norm > clip_norm {
-        let scale = clip_norm / norm;
-        for g in gradient.iter_mut() {
-            *g *= scale;
-        }
-    }
+    mycelix_fl_core::privacy::clip_gradient(gradient, clip_norm);
 }
 
-/// Add Gaussian noise to gradient for differential privacy
-///
-/// Uses the Box-Muller transform to generate Gaussian noise from uniform
-/// random numbers, avoiding the need for external distribution crates.
-///
-/// # Arguments
-///
-/// * `gradient` - The gradient to add noise to (modified in place)
-/// * `sigma` - Standard deviation of the Gaussian noise
+/// Add Gaussian noise to gradient for differential privacy (in-place)
 fn add_gaussian_noise(gradient: &mut [f32], sigma: f32) {
-    if sigma <= 0.0 {
-        return;
-    }
-
-    let mut rng = rand::thread_rng();
-
-    // Process two elements at a time using Box-Muller transform
-    let mut i = 0;
-    while i + 1 < gradient.len() {
-        let (n1, n2) = box_muller_pair(&mut rng, sigma);
-        gradient[i] += n1;
-        gradient[i + 1] += n2;
-        i += 2;
-    }
-
-    // Handle odd element if present
-    if i < gradient.len() {
-        let (n1, _) = box_muller_pair(&mut rng, sigma);
-        gradient[i] += n1;
-    }
-}
-
-/// Generate a pair of Gaussian random numbers using Box-Muller transform
-///
-/// Given two uniform random numbers u1 and u2 in (0, 1), the Box-Muller
-/// transform produces two independent standard normal random numbers:
-///
-/// z1 = sqrt(-2 * ln(u1)) * cos(2 * pi * u2)
-/// z2 = sqrt(-2 * ln(u1)) * sin(2 * pi * u2)
-fn box_muller_pair<R: Rng>(rng: &mut R, sigma: f32) -> (f32, f32) {
-    // Generate uniform (0, 1) avoiding exactly 0 to prevent ln(0)
-    let u1: f32 = rng.gen_range(1e-10_f32..1.0);
-    let u2: f32 = rng.gen();
-
-    let r = (-2.0 * u1.ln()).sqrt();
-    let theta = 2.0 * std::f32::consts::PI * u2;
-
-    let z1 = r * theta.cos() * sigma;
-    let z2 = r * theta.sin() * sigma;
-
-    (z1, z2)
+    mycelix_fl_core::privacy::add_gaussian_noise(gradient, sigma);
 }
 
 /// Compute the L2 norm of a vector
 #[allow(dead_code)]
 fn l2_norm(v: &[f32]) -> f32 {
-    v.iter().map(|x| x * x).sum::<f32>().sqrt()
+    mycelix_fl_core::privacy::l2_norm(v)
 }
 
 // ============================================================================
