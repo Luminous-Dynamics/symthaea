@@ -817,7 +817,7 @@ pub fn initiate_exit(input: InitiateExitInput) -> ExternResult<Record> {
     create_link(
         anchor_hash(&input.member_did)?,
         action_hash.clone(),
-        LinkTypes::SenderToPayments,
+        LinkTypes::MemberToExitRecord,
         (),
     )?;
 

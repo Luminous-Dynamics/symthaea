@@ -135,6 +135,7 @@ pub enum LinkTypes {
     ChannelPartyA,
     ChannelPartyB,
     DidToSapBalance,
+    MemberToExitRecord,
 }
 
 /// Genesis self-check
@@ -231,6 +232,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     if base_address.as_ref().len() != 39 || target_address.as_ref().len() != 39 {
                         return Ok(ValidateCallbackResult::Invalid(
                             "DidToSapBalance link must connect valid hashes".into()
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::MemberToExitRecord => {
+                    if base_address.as_ref().len() != 39 || target_address.as_ref().len() != 39 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "MemberToExitRecord link must connect valid hashes".into()
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)
@@ -352,6 +361,11 @@ fn validate_create_payment_channel(
     if channel.balance_a < 0.0 || channel.balance_b < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Balances cannot be negative".into()));
     }
+    if channel.currency != "SAP" && channel.currency != "TEND" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Currency must be \"SAP\" or \"TEND\"".into()
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -391,6 +405,13 @@ fn validate_create_receipt(
     // Validate amount
     if receipt.amount <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Amount must be positive".into()));
+    }
+
+    // Validate currency
+    if receipt.currency != "SAP" && receipt.currency != "TEND" {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Currency must be \"SAP\" or \"TEND\"".into()
+        ));
     }
 
     // Validate signature is present and properly formatted

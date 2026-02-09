@@ -949,7 +949,8 @@ pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
 fn get_or_create_balance(member_did: String, dao_did: String) -> ExternResult<BalanceInfo> {
     // Try to find existing balance
     if let Some(balance) = find_balance(&member_did, &dao_did)? {
-        return Ok(balance_to_info(&balance));
+        let limit = get_effective_limit_for_member(&member_did)?;
+        return Ok(balance_to_info(&balance, limit));
     }
 
     // Create new balance (starts at 0)
@@ -973,7 +974,8 @@ fn get_or_create_balance(member_did: String, dao_did: String) -> ExternResult<Ba
         (),
     )?;
 
-    Ok(balance_to_info(&balance))
+    let limit = get_effective_limit_for_member(&member_did)?;
+    Ok(balance_to_info(&balance, limit))
 }
 
 /// Get balance info for a member
@@ -1287,7 +1289,9 @@ fn find_balance(member_did: &str, dao_did: &str) -> ExternResult<Option<TendBala
     )?;
 
     if let Some(link) = links.first() {
-        if let Some(record) = get(link.target.clone().into_action_hash().unwrap(), GetOptions::default())? {
+        let action_hash = link.target.clone().into_action_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target: expected ActionHash".into())))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
             return Ok(record.entry().to_app_option::<TendBalance>().ok().flatten());
         }
     }
@@ -1447,13 +1451,13 @@ fn get_effective_limit_for_member(member_did: &str) -> ExternResult<i32> {
     }
 }
 
-fn balance_to_info(balance: &TendBalance) -> BalanceInfo {
+fn balance_to_info(balance: &TendBalance, effective_limit: i32) -> BalanceInfo {
     BalanceInfo {
         member_did: balance.member_did.clone(),
         dao_did: balance.dao_did.clone(),
         balance: balance.balance,
-        can_provide: balance.balance < BALANCE_LIMIT,
-        can_receive: balance.balance > -BALANCE_LIMIT,
+        can_provide: balance.balance < effective_limit,
+        can_receive: balance.balance > -effective_limit,
         total_provided: balance.total_provided,
         total_received: balance.total_received,
         exchange_count: balance.exchange_count,
