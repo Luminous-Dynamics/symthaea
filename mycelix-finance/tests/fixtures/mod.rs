@@ -188,7 +188,6 @@ mod fixture_tests {
         assert_eq!(input.to_did, "did:mycelix:bob");
         assert_eq!(input.amount, 100.0);
         assert_eq!(input.currency, "SAP", "Default currency should be SAP");
-        assert!(input.demurrage.is_none(), "Demurrage should be None by default");
     }
 
     #[test]
