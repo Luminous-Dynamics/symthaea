@@ -204,7 +204,7 @@ pub fn get_disaster_triage(disaster_hash: ActionHash) -> ExternResult<Vec<Record
         }
     }
 
-    records.sort_by(|a, b| a.action().timestamp().cmp(&b.action().timestamp()));
+    records.sort_by_key(|a| a.action().timestamp());
     Ok(records)
 }
 
@@ -257,6 +257,6 @@ pub fn get_patient_triage_history(patient_id: String) -> ExternResult<Vec<Record
         }
     }
 
-    records.sort_by(|a, b| a.action().timestamp().cmp(&b.action().timestamp()));
+    records.sort_by_key(|a| a.action().timestamp());
     Ok(records)
 }

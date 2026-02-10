@@ -172,12 +172,12 @@ fn validate_create_message(
         ));
     }
     if let Some((lat, lon)) = msg.location {
-        if lat < -90.0 || lat > 90.0 {
+        if !(-90.0..=90.0).contains(&lat) {
             return Ok(ValidateCallbackResult::Invalid(
                 "Latitude must be between -90 and 90".into(),
             ));
         }
-        if lon < -180.0 || lon > 180.0 {
+        if !(-180.0..=180.0).contains(&lon) {
             return Ok(ValidateCallbackResult::Invalid(
                 "Longitude must be between -180 and 180".into(),
             ));
@@ -213,12 +213,12 @@ fn validate_create_broadcast(
         ));
     }
     let (lat, lon, radius) = broadcast.target_area;
-    if lat < -90.0 || lat > 90.0 {
+    if !(-90.0..=90.0).contains(&lat) {
         return Ok(ValidateCallbackResult::Invalid(
             "Target area latitude must be between -90 and 90".into(),
         ));
     }
-    if lon < -180.0 || lon > 180.0 {
+    if !(-180.0..=180.0).contains(&lon) {
         return Ok(ValidateCallbackResult::Invalid(
             "Target area longitude must be between -180 and 180".into(),
         ));

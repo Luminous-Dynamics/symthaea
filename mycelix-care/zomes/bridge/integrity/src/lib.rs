@@ -173,12 +173,12 @@ fn validate_create_query(
             "Parameters must be 8192 characters or fewer".into(),
         ));
     }
-    if !query.parameters.is_empty() {
-        if serde_json::from_str::<serde_json::Value>(&query.parameters).is_err() {
-            return Ok(ValidateCallbackResult::Invalid(
-                "Parameters must be valid JSON".into(),
-            ));
-        }
+    if !query.parameters.is_empty()
+        && serde_json::from_str::<serde_json::Value>(&query.parameters).is_err()
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Parameters must be valid JSON".into(),
+        ));
     }
     if let Some(ref result) = query.result {
         if result.len() > 8192 {
@@ -199,12 +199,12 @@ fn validate_create_event(
             "Payload must be 8192 characters or fewer".into(),
         ));
     }
-    if !event.payload.is_empty() {
-        if serde_json::from_str::<serde_json::Value>(&event.payload).is_err() {
-            return Ok(ValidateCallbackResult::Invalid(
-                "Payload must be valid JSON".into(),
-            ));
-        }
+    if !event.payload.is_empty()
+        && serde_json::from_str::<serde_json::Value>(&event.payload).is_err()
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Payload must be valid JSON".into(),
+        ));
     }
     if event.related_hashes.len() > 20 {
         return Ok(ValidateCallbackResult::Invalid(

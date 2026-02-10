@@ -202,7 +202,7 @@ pub fn get_channel_messages(channel_hash: ActionHash) -> ExternResult<Vec<Record
         }
     }
 
-    messages.sort_by(|a, b| a.action().timestamp().cmp(&b.action().timestamp()));
+    messages.sort_by_key(|a| a.action().timestamp());
     Ok(messages)
 }
 
@@ -262,7 +262,7 @@ pub fn get_unsynced_messages(_: ()) -> ExternResult<Vec<Record>> {
         }
     }
 
-    messages.sort_by(|a, b| a.action().timestamp().cmp(&b.action().timestamp()));
+    messages.sort_by_key(|a| a.action().timestamp());
     Ok(messages)
 }
 

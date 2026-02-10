@@ -194,7 +194,7 @@ fn validate_create_building(
         ));
     }
     if let Some(year) = building.year_built {
-        if year < 1800 || year > 2100 {
+        if !(1800..=2100).contains(&year) {
             return Ok(ValidateCallbackResult::Invalid(
                 "Year built must be between 1800 and 2100".into(),
             ));

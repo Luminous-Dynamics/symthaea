@@ -168,12 +168,12 @@ fn validate_create_credential(
         ));
     }
     // If metadata is non-empty, validate it is valid JSON
-    if !cred.metadata.is_empty() {
-        if serde_json::from_str::<serde_json::Value>(&cred.metadata).is_err() {
-            return Ok(ValidateCallbackResult::Invalid(
-                "Metadata must be valid JSON".into(),
-            ));
-        }
+    if !cred.metadata.is_empty()
+        && serde_json::from_str::<serde_json::Value>(&cred.metadata).is_err()
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Metadata must be valid JSON".into(),
+        ));
     }
     // If expires_at is set, it must be after issued_at
     if let Some(expires) = cred.expires_at {
