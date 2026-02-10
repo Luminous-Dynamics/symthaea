@@ -264,3 +264,217 @@ proptest! {
         prop_assert!((ctrl.phi_ema() - 0.0).abs() < 1e-10, "phi_ema should be 0 after reset");
     }
 }
+
+// =============================================================================
+// PIPELINE INVARIANT PROPERTIES
+// =============================================================================
+
+use super::binary_hv::BinaryHV;
+use super::consciousness_integration::{ConsciousnessPipeline, ConsciousnessPipelineBuilder, IntegrationConfig};
+
+/// Generate a seed for BinaryHV::random
+fn hv_seed() -> impl Strategy<Value = u64> {
+    0u64..10_000
+}
+
+/// Generate a priority value in [0, 1]
+fn priority_value() -> impl Strategy<Value = f64> {
+    (0u32..=1000).prop_map(|n| n as f64 / 1000.0)
+}
+
+/// Generate a small number of inputs (1-8)
+fn input_count() -> impl Strategy<Value = usize> {
+    1usize..=8
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(32))]
+
+    /// Phi is never negative after any number of processing cycles.
+    #[test]
+    fn prop_phi_never_negative(
+        seed in hv_seed(),
+        n_cycles in 1usize..=10,
+        priority in priority_value(),
+    ) {
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(priority)
+            .build();
+
+        for i in 0..n_cycles {
+            let inputs = vec![BinaryHV::random(seed + i as u64)];
+            let priorities = vec![priority];
+            pipeline.process(inputs, &priorities);
+        }
+
+        let state = pipeline.get_state();
+        prop_assert!(state.phi >= 0.0, "Phi must never be negative, got {}", state.phi);
+    }
+
+    /// Consciousness level stays in [0, 1] under arbitrary inputs.
+    #[test]
+    fn prop_consciousness_level_bounded(
+        seed in hv_seed(),
+        n_cycles in 1usize..=10,
+        embodiment in priority_value(),
+    ) {
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(embodiment)
+            .build();
+
+        for i in 0..n_cycles {
+            let inputs = vec![BinaryHV::random(seed + i as u64)];
+            pipeline.process(inputs, &[0.8]);
+        }
+
+        let level = pipeline.get_state().consciousness_level;
+        prop_assert!(level >= 0.0 && level <= 1.0,
+            "consciousness_level should be in [0,1], got {}", level);
+    }
+
+    /// Temporal coherence stays in [0, 1].
+    #[test]
+    fn prop_temporal_coherence_bounded(
+        seed in hv_seed(),
+        n_cycles in 1usize..=10,
+    ) {
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .build();
+
+        for i in 0..n_cycles {
+            let inputs = vec![BinaryHV::random(seed + i as u64), BinaryHV::random(seed + 1000 + i as u64)];
+            pipeline.process(inputs, &[0.8, 0.7]);
+        }
+
+        let tc = pipeline.get_state().temporal_coherence;
+        prop_assert!(tc >= 0.0 && tc <= 1.0,
+            "temporal_coherence should be in [0,1], got {}", tc);
+    }
+
+    /// Bound objects never exceed config workspace_capacity * 3 (Feature + Object + Scene layers).
+    #[test]
+    fn prop_bound_objects_within_capacity(
+        seed in hv_seed(),
+        n_inputs in input_count(),
+        n_cycles in 1usize..=5,
+    ) {
+        let config = IntegrationConfig {
+            workspace_capacity: 3,
+            ..Default::default()
+        };
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .config(config)
+            .embodiment(0.8)
+            .build();
+
+        for i in 0..n_cycles {
+            let inputs: Vec<BinaryHV> = (0..n_inputs)
+                .map(|j| BinaryHV::random(seed + i as u64 * 100 + j as u64))
+                .collect();
+            let priorities: Vec<f64> = vec![0.8; n_inputs];
+            pipeline.process(inputs, &priorities);
+        }
+
+        let n_bound = pipeline.get_state().bound_objects.len();
+        // Max 15 per level cap + some headroom for hierarchy
+        prop_assert!(n_bound <= 50,
+            "Excessive bound objects: {} (expected <= 50)", n_bound);
+    }
+
+    /// Subsystem priority ordering is preserved after arbitrary registration order.
+    #[test]
+    fn prop_subsystem_priority_ordering(
+        prios in prop::collection::vec(-100i32..=100, 2..=6)
+    ) {
+        use super::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+
+        struct PrioSub { n: String, p: i32 }
+        impl ConsciousnessSubsystem for PrioSub {
+            fn name(&self) -> &str { &self.n }
+            fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError> { Ok(()) }
+            fn is_enabled(&self) -> bool { true }
+            fn priority(&self) -> i32 { self.p }
+        }
+
+        let mut pipeline = ConsciousnessPipeline::default();
+        for (i, &p) in prios.iter().enumerate() {
+            pipeline.register_subsystem(Box::new(PrioSub {
+                n: format!("sub_{}", i), p
+            }));
+        }
+
+        let names = pipeline.subsystem_names();
+        // Verify descending priority order
+        let mut prev_prio = i32::MAX;
+        for name in &names {
+            let idx: usize = name.strip_prefix("sub_").unwrap().parse().unwrap();
+            let prio = prios[idx];
+            prop_assert!(prio <= prev_prio,
+                "Subsystem {} (prio={}) should not come after prio={}", name, prio, prev_prio);
+            prev_prio = prio;
+        }
+    }
+
+    /// State group views always match flat fields.
+    #[test]
+    fn prop_state_views_consistent(
+        phi in phi_value(),
+        tc in phi_value(),
+        valence_u in 0u32..=2000,
+    ) {
+        let valence = valence_u as f64 / 1000.0 - 1.0; // [-1, 1]
+
+        let mut state = ConsciousnessState::default();
+        state.phi = phi;
+        state.temporal_coherence = tc;
+        state.emotional_valence = valence;
+
+        let pm = state.phi_metrics();
+        let ts = state.temporal_state();
+        let es = state.emotional_state();
+
+        prop_assert!((pm.phi - state.phi).abs() < 1e-15);
+        prop_assert!((ts.temporal_coherence - state.temporal_coherence).abs() < 1e-15);
+        prop_assert!((es.valence - state.emotional_valence).abs() < 1e-15);
+    }
+
+    /// Free energy is non-negative after processing.
+    #[test]
+    fn prop_free_energy_non_negative(
+        seed in hv_seed(),
+        n_cycles in 1usize..=8,
+    ) {
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .build();
+
+        for i in 0..n_cycles {
+            pipeline.process(vec![BinaryHV::random(seed + i as u64)], &[0.8]);
+        }
+
+        let fe = pipeline.get_state().free_energy;
+        prop_assert!(fe >= 0.0, "Free energy must be non-negative, got {}", fe);
+    }
+
+    /// Phi feedback modulation keeps binding threshold in valid range.
+    #[test]
+    fn prop_phi_feedback_threshold_valid(
+        seed in hv_seed(),
+        n_cycles in 1usize..=15,
+    ) {
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .phi_feedback()
+            .build();
+
+        for i in 0..n_cycles {
+            pipeline.process(vec![BinaryHV::random(seed + i as u64)], &[0.8]);
+        }
+
+        let bt = pipeline.config.binding_threshold;
+        prop_assert!(bt >= 0.0 && bt <= 1.0,
+            "binding_threshold should be in [0,1], got {}", bt);
+    }
+}

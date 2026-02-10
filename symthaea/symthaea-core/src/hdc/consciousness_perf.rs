@@ -102,10 +102,11 @@ pub fn mean_similarity(reference: &BinaryHV, others: &[&BinaryHV]) -> f64 {
 /// sorted by descending similarity. More efficient than calling `find_similar` per query
 /// because it avoids repeated allocation of the candidate iteration setup.
 ///
+/// Takes references to avoid copying 2KB BinaryHVs.
 /// Returns a Vec of length `queries.len()`, where each entry is the results for that query.
 pub fn batch_find_similar(
-    queries: &[BinaryHV],
-    candidates: &[BinaryHV],
+    queries: &[&BinaryHV],
+    candidates: &[&BinaryHV],
     threshold: f32,
 ) -> Vec<Vec<(usize, f32)>> {
     queries.iter().map(|query| {
@@ -468,8 +469,9 @@ mod tests {
             BinaryHV::random(100),
             BinaryHV::random(200),
         ];
+        let cand_refs: Vec<&BinaryHV> = candidates.iter().collect();
 
-        let results = batch_find_similar(&[q1, q2], &candidates, 0.9);
+        let results = batch_find_similar(&[&q1, &q2], &cand_refs, 0.9);
         assert_eq!(results.len(), 2);
         // q1 should find itself at index 0
         assert!(!results[0].is_empty());
@@ -486,7 +488,9 @@ mod tests {
         let queries: Vec<BinaryHV> = (0..5).map(|s| BinaryHV::random(s)).collect();
         let candidates: Vec<BinaryHV> = (10..30).map(|s| BinaryHV::random(s)).collect();
 
-        let batch = batch_find_similar(&queries, &candidates, 0.55);
+        let query_refs: Vec<&BinaryHV> = queries.iter().collect();
+        let cand_refs: Vec<&BinaryHV> = candidates.iter().collect();
+        let batch = batch_find_similar(&query_refs, &cand_refs, 0.55);
         for (i, query) in queries.iter().enumerate() {
             let individual = find_similar(query, &candidates, 0.55);
             assert_eq!(batch[i].len(), individual.len(),
