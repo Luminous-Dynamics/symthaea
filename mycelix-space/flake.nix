@@ -42,6 +42,9 @@
               # Additional tools
               cargo-watch
               cargo-expand
+              # Required for sweettest/bindgen (datachannel-sys)
+              llvmPackages.libclang
+              llvmPackages.clang
             ];
             shellHook = ''
               echo "=== Mycelix Space Development Environment ==="
@@ -58,6 +61,7 @@
               echo "  cargo test --workspace   - Run tests"
               echo ""
             '';
+            LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
           }
         else
           # Fallback shell without holochain tools
