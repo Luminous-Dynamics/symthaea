@@ -18,8 +18,8 @@ use chrono::{DateTime, Duration, Utc};
 use clap::{Parser, Subcommand};
 use colored::*;
 use holochain_client::{
-    HolochainClient, HolochainConfig, IngestionBatch, OrbitalObjectInput, StateVectorInput,
-    TleInput,
+    GroundLocation, HolochainClient, HolochainConfig, IngestionBatch, Measurement,
+    OrbitalObjectInput, SpaceTimestamp, StateVectorInput, SubmitObservationCall, TleInput,
 };
 use orbital_mechanics::{
     conjunction::{ConjunctionAnalyzer, RiskLevel},
@@ -784,15 +784,38 @@ fn ingest_data(source: &str, limit: usize, batch_dir: &str) -> Result<()> {
 
         if let Ok(propagator) = Propagator::from_tle(tle) {
             if let Ok(state) = propagator.propagate_to(Utc::now()) {
+                let pos = [state.state.x, state.state.y, state.state.z];
+                let vel = [state.state.vx, state.state.vy, state.state.vz];
+
                 batch = batch.add_state_vector(StateVectorInput {
                     norad_id: tle.norad_id,
                     epoch: Utc::now(),
-                    position_km: [state.state.x, state.state.y, state.state.z],
-                    velocity_kms: [state.state.vx, state.state.vy, state.state.vz],
+                    position_km: pos,
+                    velocity_kms: vel,
                     covariance: None,
                     reference_frame: "Teme".to_string(),
                     quality: 0.9,
                     source: "CelesTrak".to_string(),
+                });
+
+                // Also generate an observation for the observations zome
+                batch = batch.add_observation(SubmitObservationCall {
+                    norad_id: Some(tle.norad_id),
+                    observation_time: SpaceTimestamp::from_datetime(Utc::now()),
+                    observer_location: Some(GroundLocation {
+                        latitude_deg: 0.0,
+                        longitude_deg: 0.0,
+                        altitude_m: 0.0,
+                        name: Some("CelesTrak SGP4".to_string()),
+                    }),
+                    observation_type: "Radar".to_string(),
+                    measurement: Measurement::StateVector {
+                        position_km: pos,
+                        velocity_kms: Some(vel),
+                        covariance: None,
+                    },
+                    quality: 85,
+                    sensor_id: "celestrak-sgp4".to_string(),
                 });
             }
         }
@@ -802,6 +825,7 @@ fn ingest_data(source: &str, limit: usize, batch_dir: &str) -> Result<()> {
     println!("  Orbital Objects: {}", batch.object_count());
     println!("  TLEs: {}", batch.tle_count());
     println!("  State Vectors: {}", batch.state_vector_count());
+    println!("  Observations: {}", batch.observation_count());
 
     // Initialize client and write batch files
     let config = HolochainConfig {

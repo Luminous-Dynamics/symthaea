@@ -87,6 +87,68 @@ pub struct StateVectorInput {
     pub source: String,
 }
 
+/// Input matching the `submit_observation` zome function in observations coordinator.
+/// Fields match the observations integrity `Observation` entry type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubmitObservationCall {
+    pub norad_id: Option<u32>,
+    pub observation_time: SpaceTimestamp,
+    pub observer_location: Option<GroundLocation>,
+    pub observation_type: String, // "Radar" — serialized ObservationType variant
+    pub measurement: Measurement,
+    pub quality: u8,
+    pub sensor_id: String,
+}
+
+/// SpaceTimestamp matching shared zome type (microseconds since epoch)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpaceTimestamp {
+    pub micros: i64,
+}
+
+impl SpaceTimestamp {
+    pub fn from_datetime(dt: DateTime<Utc>) -> Self {
+        Self {
+            micros: dt.timestamp_micros(),
+        }
+    }
+}
+
+/// GroundLocation matching shared zome type
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroundLocation {
+    pub latitude_deg: f64,
+    pub longitude_deg: f64,
+    pub altitude_m: f64,
+    pub name: Option<String>,
+}
+
+/// Measurement enum matching observations integrity zome
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Measurement {
+    StateVector {
+        position_km: [f64; 3],
+        velocity_kms: Option<[f64; 3]>,
+        covariance: Option<[f64; 21]>,
+    },
+    Range {
+        range_km: f64,
+        range_rate_kms: Option<f64>,
+        range_sigma_km: Option<f64>,
+    },
+    AnglesOnly {
+        ra_deg: f64,
+        dec_deg: f64,
+        ra_sigma_deg: Option<f64>,
+        dec_sigma_deg: Option<f64>,
+    },
+    Photometric {
+        magnitude: f64,
+        magnitude_sigma: Option<f64>,
+        filter: Option<String>,
+    },
+}
+
 /// Result from writing a batch file
 #[derive(Debug, Clone)]
 pub struct ZomeCallResult {
@@ -202,6 +264,29 @@ impl HolochainClient {
         })
     }
 
+    /// Write a submit_observation zome call as JSON (observations coordinator)
+    pub fn create_observation(&self, call: SubmitObservationCall) -> Result<ZomeCallResult> {
+        if !self.initialized {
+            anyhow::bail!("Client not initialized — call init() first");
+        }
+
+        let norad_suffix = call.norad_id.unwrap_or(0);
+        let filename = format!(
+            "submit_observation_{}_{}.json",
+            norad_suffix,
+            call.observation_time.micros
+        );
+        let path = self.config.batch_dir.join(&filename);
+        let json = serde_json::to_string_pretty(&call)?;
+        std::fs::write(&path, &json)?;
+
+        Ok(ZomeCallResult {
+            file_path: path.display().to_string(),
+            _zome_name: "observations_coordinator".to_string(),
+            _fn_name: "submit_observation".to_string(),
+        })
+    }
+
     /// Batch create orbital objects
     pub fn batch_create_objects(
         &self,
@@ -220,6 +305,7 @@ pub struct IngestionBatch {
     objects: Vec<OrbitalObjectInput>,
     tles: Vec<TleInput>,
     state_vectors: Vec<StateVectorInput>,
+    observations: Vec<SubmitObservationCall>,
 }
 
 impl IngestionBatch {
@@ -228,6 +314,7 @@ impl IngestionBatch {
             objects: Vec::new(),
             tles: Vec::new(),
             state_vectors: Vec::new(),
+            observations: Vec::new(),
         }
     }
 
@@ -256,6 +343,15 @@ impl IngestionBatch {
 
     pub fn state_vector_count(&self) -> usize {
         self.state_vectors.len()
+    }
+
+    pub fn observation_count(&self) -> usize {
+        self.observations.len()
+    }
+
+    pub fn add_observation(mut self, obs: SubmitObservationCall) -> Self {
+        self.observations.push(obs);
+        self
     }
 
     pub fn objects(&self) -> &[OrbitalObjectInput] {
@@ -317,6 +413,21 @@ impl IngestionBatch {
             }
         }
 
+        for obs in &self.observations {
+            match client.create_observation(obs.clone()) {
+                Ok(result) => {
+                    report.observations_created += 1;
+                    report.files_written.push(result.file_path);
+                }
+                Err(e) => {
+                    let norad = obs.norad_id.unwrap_or(0);
+                    report
+                        .errors
+                        .push(format!("Failed to write observation {}: {}", norad, e));
+                }
+            }
+        }
+
         Ok(report)
     }
 }
@@ -333,6 +444,7 @@ pub struct IngestionReport {
     pub objects_created: usize,
     pub tles_created: usize,
     pub state_vectors_created: usize,
+    pub observations_created: usize,
     pub files_written: Vec<String>,
     pub errors: Vec<String>,
 }
@@ -343,7 +455,7 @@ impl IngestionReport {
     }
 
     pub fn total_created(&self) -> usize {
-        self.objects_created + self.tles_created + self.state_vectors_created
+        self.objects_created + self.tles_created + self.state_vectors_created + self.observations_created
     }
 
     pub fn has_errors(&self) -> bool {
@@ -355,6 +467,7 @@ impl IngestionReport {
         println!("Orbital Objects: {}", self.objects_created);
         println!("TLEs: {}", self.tles_created);
         println!("State Vectors: {}", self.state_vectors_created);
+        println!("Observations: {}", self.observations_created);
         println!("Total Files Written: {}", self.files_written.len());
 
         if self.has_errors() {
