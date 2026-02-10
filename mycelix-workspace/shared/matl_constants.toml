@@ -10,6 +10,6 @@ default_quality_weight = 0.4
 default_consistency_weight = 0.3
 default_reputation_weight = 0.3
 
-max_byzantine_tolerance = 0.45
+max_byzantine_tolerance = 0.34
 default_byzantine_threshold = 0.5
 
