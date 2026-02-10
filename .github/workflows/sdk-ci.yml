@@ -1,18 +1,21 @@
 name: Mycelix SDK CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
       - "mycelix-workspace/sdk/**"
       - "mycelix-workspace/shared/**"
       - "mycelix-workspace/crates/mycelix-fl-core/**"
+      - ".github/workflows/sdk-ci.yml"
   pull_request:
     branches: [main]
     paths:
       - "mycelix-workspace/sdk/**"
       - "mycelix-workspace/shared/**"
       - "mycelix-workspace/crates/mycelix-fl-core/**"
+      - ".github/workflows/sdk-ci.yml"
 
 env:
   CARGO_TERM_COLOR: always
