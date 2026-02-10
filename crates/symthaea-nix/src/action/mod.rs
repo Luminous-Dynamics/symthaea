@@ -11,6 +11,7 @@ pub mod flake_ops;
 pub mod service_manager;
 pub mod generation_manager;
 pub mod gc_manager;
+pub mod plan_executor;
 
 pub use executor::{
     NixOSCommand, NixOSExecutor, ExecutionResult, ExecutionRecord,
@@ -22,3 +23,4 @@ pub use flake_ops::{FlakeOps, FlakeMetadata, FlakeCheckResult};
 pub use service_manager::{ServiceManager, ServiceStatus};
 pub use generation_manager::{GenerationManager, Generation, GenerationDiff};
 pub use gc_manager::{GcManager, GcAnalysis, GcRecommendation};
+pub use plan_executor::{PlanExecutor, PlanStep, PlanExecutionResult, StepStatus};

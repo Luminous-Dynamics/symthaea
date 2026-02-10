@@ -308,6 +308,7 @@ mod tests {
 
         // Query near seed 1 should predict positive valence
         let valence = mem.predict_valence(&make_hv(1));
+        assert!(valence.is_finite());
         // With random vectors this might not be strongly positive,
         // but at least the mechanism works
         assert!(mem.len() == 10);

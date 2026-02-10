@@ -198,6 +198,7 @@ impl NixPipelineProcessor {
     }
 
     /// Process user input through the full NixOS cognition pipeline.
+    #[tracing::instrument(skip(self), fields(phi = %phi, confidence = %confidence))]
     pub fn process(&mut self, input: &str, phi: f64, confidence: f64) -> NixPipelineResult {
         // Stage 1: Observe (skip if configured, e.g. in tests)
         if !self.skip_observe {

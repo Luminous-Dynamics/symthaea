@@ -86,6 +86,7 @@ impl NixActiveInference {
     /// Process user input and select the best action plan.
     ///
     /// This is the main entry point: natural language in → action plan out.
+    #[tracing::instrument(skip(self), fields(input_len = input.len()))]
     pub fn process_input(&mut self, input: &str) -> ActionPlan {
         // 1. Infer the user's goal (desired system state)
         let goal = self.goal_inference.infer(input, &mut self.codebook);
@@ -368,7 +369,7 @@ mod tests {
         let mut engine = NixActiveInference::new();
 
         let state_before = ContinuousHV::random(dim, 1);
-        let state_after = ContinuousHV::random(dim, 2);
+        let _state_after = ContinuousHV::random(dim, 2);
 
         // Observe initial state
         engine.observe_state(state_before.clone());

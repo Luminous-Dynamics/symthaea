@@ -388,6 +388,26 @@ impl CausalMindBridge {
         }
     }
 
+    /// Seed a CausalMind with edges derived from NixOS option schemas.
+    pub fn seed_from_schemas(
+        mind: &mut symthaea_core::hdc::causal_mind::CausalMind,
+        schemas: &[crate::parser::option_schema::NixOptionSchema],
+    ) {
+        // Build a temporary causal graph and bootstrap from schemas
+        let mut graph = crate::mind::causal_graph::NixCausalGraph::new(42);
+        graph.bootstrap_from_schemas(schemas);
+        // The structural edges are in the graph; predict side effects
+        // to enumerate them and sync into CausalMind
+        for schema in schemas {
+            if schema.is_enable_option() {
+                let effects = graph.predict_side_effects(&schema.name);
+                for effect in effects {
+                    mind.add_causal_link(&schema.name, &effect.affected_variable, effect.confidence);
+                }
+            }
+        }
+    }
+
     /// Query the CausalMind for causal explanations.
     pub fn query_why(
         mind: &symthaea_core::hdc::causal_mind::CausalMind,
