@@ -422,9 +422,10 @@ impl VerificationEngine {
         self.register_invariant(Invariant {
             invariant_id: "byzantine_tolerance".to_string(),
             name: "Byzantine Tolerance".to_string(),
-            description: "Byzantine agents must not exceed 45% of network".to_string(),
+            description: "Byzantine agents must not exceed 34% of network (validated threshold)"
+                .to_string(),
             invariant_type: InvariantType::ByzantineTolerance {
-                max_byzantine_fraction: 0.45,
+                max_byzantine_fraction: 0.34,
             },
             severity: ViolationSeverity::Fatal,
         });
@@ -441,7 +442,9 @@ impl VerificationEngine {
         });
 
         // K-Vector bounds
-        for dim in ["k_r", "k_a", "k_i", "k_p", "k_m", "k_s", "k_h", "k_topo", "k_v", "k_phi"] {
+        for dim in [
+            "k_r", "k_a", "k_i", "k_p", "k_m", "k_s", "k_h", "k_topo", "k_v", "k_phi",
+        ] {
             self.register_invariant(Invariant {
                 invariant_id: format!("{}_bounds", dim),
                 name: format!("{} Bounds", dim.to_uppercase()),
@@ -482,12 +485,12 @@ impl VerificationEngine {
                     name: "malicious_behavior".to_string(),
                     params: HashMap::new(),
                 })),
-                Box::new(PropertyFormula::Eventually(Box::new(PropertyFormula::Atomic(
-                    AtomicPredicate::Custom {
+                Box::new(PropertyFormula::Eventually(Box::new(
+                    PropertyFormula::Atomic(AtomicPredicate::Custom {
                         name: "detected".to_string(),
                         params: HashMap::new(),
-                    },
-                )))),
+                    }),
+                ))),
             ),
             property_kind: PropertyKind::Liveness,
         });
@@ -561,7 +564,9 @@ impl VerificationEngine {
                 (holds, violation)
             }
 
-            InvariantType::ByzantineTolerance { max_byzantine_fraction } => {
+            InvariantType::ByzantineTolerance {
+                max_byzantine_fraction,
+            } => {
                 let total = state.trust_scores.len();
                 if total == 0 {
                     (true, None)
@@ -610,7 +615,11 @@ impl VerificationEngine {
                 (true, None)
             }
 
-            InvariantType::KVectorBounds { dimension, min, max } => {
+            InvariantType::KVectorBounds {
+                dimension,
+                min,
+                max,
+            } => {
                 // Check K-Vector dimension bounds from state variables
                 let key = format!("kvector_{}", dimension);
                 if let Some(value_str) = state.variables.get(&key) {
@@ -633,15 +642,17 @@ impl VerificationEngine {
                 (true, None)
             }
 
-            InvariantType::Monotonicity { property, direction } => {
+            InvariantType::Monotonicity {
+                property,
+                direction,
+            } => {
                 // Check monotonicity from history
                 // This is a simplified check - real implementation would track history
                 let key = format!("prev_{}", property);
                 if let (Some(prev_str), Some(curr_str)) =
                     (state.variables.get(&key), state.variables.get(property))
                 {
-                    if let (Ok(prev), Ok(curr)) =
-                        (prev_str.parse::<f64>(), curr_str.parse::<f64>())
+                    if let (Ok(prev), Ok(curr)) = (prev_str.parse::<f64>(), curr_str.parse::<f64>())
                     {
                         let violated = match direction {
                             MonotonicityDirection::NonDecreasing => curr < prev,
@@ -668,7 +679,10 @@ impl VerificationEngine {
                 (true, None)
             }
 
-            InvariantType::Conservation { property, tolerance } => {
+            InvariantType::Conservation {
+                property,
+                tolerance,
+            } => {
                 // Check conservation from state variables
                 let key = format!("{}_total", property);
                 let prev_key = format!("prev_{}_total", property);
@@ -676,8 +690,7 @@ impl VerificationEngine {
                 if let (Some(curr_str), Some(prev_str)) =
                     (state.variables.get(&key), state.variables.get(&prev_key))
                 {
-                    if let (Ok(curr), Ok(prev)) =
-                        (curr_str.parse::<f64>(), prev_str.parse::<f64>())
+                    if let (Ok(curr), Ok(prev)) = (curr_str.parse::<f64>(), prev_str.parse::<f64>())
                     {
                         let diff = (curr - prev).abs();
                         if diff > *tolerance {
@@ -732,7 +745,10 @@ impl VerificationEngine {
 
     /// Create a proof obligation for a property
     pub fn create_obligation(&mut self, property_id: &str) -> Option<String> {
-        let property = self.properties.iter().find(|p| p.property_id == property_id)?;
+        let property = self
+            .properties
+            .iter()
+            .find(|p| p.property_id == property_id)?;
 
         let obligation_id = format!("obl_{}_{}", property_id, self.obligations.len());
 
@@ -957,12 +973,11 @@ mod tests {
     #[test]
     fn test_property_formula_construction() {
         // Safety: Always(trust_valid)
-        let safety = PropertyFormula::Always(Box::new(PropertyFormula::Atomic(
-            AtomicPredicate::Custom {
+        let safety =
+            PropertyFormula::Always(Box::new(PropertyFormula::Atomic(AtomicPredicate::Custom {
                 name: "trust_valid".to_string(),
                 params: HashMap::new(),
-            },
-        )));
+            })));
 
         // Check structure
         if let PropertyFormula::Always(inner) = safety {
@@ -999,8 +1014,12 @@ mod tests {
         };
 
         let mut state = create_test_state();
-        state.variables.insert("prev_value".to_string(), "0.5".to_string());
-        state.variables.insert("value".to_string(), "0.3".to_string()); // Decreased!
+        state
+            .variables
+            .insert("prev_value".to_string(), "0.5".to_string());
+        state
+            .variables
+            .insert("value".to_string(), "0.3".to_string()); // Decreased!
 
         let result = engine.check_invariant(&invariant, &state, 1000);
         assert!(!result.holds);

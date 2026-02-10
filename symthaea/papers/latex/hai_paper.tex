@@ -114,10 +114,11 @@ F = D_{\mathrm{KL}}[q(s) \| p(s)] - \mathbb{E}_q[\ln p(o|s)]
 where the first term (complexity) measures divergence from priors, and the second (accuracy) measures fit to observations.
 
 Active inference extends this to action selection via \textbf{expected free energy} $G(a)$:
-\begin{equation}
-G(a) = \underbrace{\mathbb{E}_{q(o,s|a)}[D_{\mathrm{KL}}[q(s|o,a) \| q(s|a)]]}_{\text{epistemic value}} + \underbrace{\mathbb{E}_{q(o,s|a)}[D_{\mathrm{KL}}[q(o|a) \| \tilde{p}(o)]]}_{\text{pragmatic value}}
+\begin{multline}
+G(a) = \underbrace{\mathbb{E}_{q(o,s|a)}[D_{\mathrm{KL}}[q(s|o,a) \| q(s|a)]]}_{\text{epistemic value}} \\
+  + \underbrace{\mathbb{E}_{q(o,s|a)}[D_{\mathrm{KL}}[q(o|a) \| \tilde{p}(o)]]}_{\text{pragmatic value}}
 \label{eq:efe}
-\end{equation}
+\end{multline}
 The first term captures information gain; the second captures goal satisfaction.
 Actions minimizing $G(a)$ naturally balance exploration and exploitation.
 \textbf{Precision} $\pi$ (inverse variance) weights prediction errors, acting as an attention mechanism~\citep{feldman2010attention}.
@@ -142,6 +143,7 @@ Symthaea implements 14 mathematical foundation modules grounding the HAI framewo
 \caption{Mathematical foundation modules and their theoretical contributions.}
 \label{tab:foundations}
 \small
+\resizebox{\textwidth}{!}{%
 \begin{tabular}{@{}lll@{}}
 \toprule
 Module & Theory & Contribution \\
@@ -161,7 +163,8 @@ causal\_calculus & Pearl's do-calculus, SCM & Interventional reasoning \\
 hodge\_laplacian & Algebraic topology (Betti numbers) & Topological analysis of causal structures \\
 primitive\_lattice & Order theory (join/meet semilattice) & Fixed-point computation over hierarchies \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table*}
 
 These modules connect at five key integration points:
@@ -176,7 +179,7 @@ These modules connect at five key integration points:
 
 \begin{figure*}[t]
 \centering
-\includegraphics[width=0.85\textwidth]{fig1_architecture.pdf}
+\includegraphics[width=\textwidth]{fig1_architecture.pdf}
 \caption{\textbf{HAI architecture overview.} Observations are encoded into 16,384-dimensional hypervectors via learned encoding.
 The active inference loop (center) performs belief updating via gradient descent on HDC free energy, with precision-weighted binding modulating the accuracy-complexity tradeoff.
 Expected free energy computation produces eight motor command types.
@@ -222,10 +225,11 @@ Beliefs update via gradient descent on free energy:
 \end{equation}
 
 The gradient decomposes into:
-\begin{equation}
-\nabla_{\hvec{q}} F = \pi_s(\hvec{o} - \hvec{q}\cos(\hvec{q}, \hvec{o})) + \pi_p(\hvec{p} - \hvec{q}\cos(\hvec{q}, \hvec{p}))
+\begin{multline}
+\nabla_{\hvec{q}} F = \pi_s(\hvec{o} - \hvec{q}\cos(\hvec{q}, \hvec{o})) \\
+  + \pi_p(\hvec{p} - \hvec{q}\cos(\hvec{q}, \hvec{p}))
 \label{eq:gradient}
-\end{equation}
+\end{multline}
 
 This pulls the belief toward observations (weighted by sensory precision) and priors (weighted by prior precision).
 
@@ -244,6 +248,7 @@ The eight motor command types derived from EFE minimization are shown in Table~\
 \caption{Motor command types from EFE minimization.}
 \label{tab:motor}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lll@{}}
 \toprule
 Idx & Command & Trigger Condition \\
@@ -257,7 +262,8 @@ Idx & Command & Trigger Condition \\
 6 & MotorOutput & External action required \\
 7 & NoOp & System at equilibrium \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 Action selection uses softmax over negative EFE:
@@ -330,6 +336,7 @@ Precision dynamics correctly implement the trust-observations-vs-predictions tra
 \caption{Precision response to prediction error magnitude.}
 \label{tab:precision}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lcc@{}}
 \toprule
 Error & Sensory $\pi_s$ Change & Prior $\pi_p$ Change \\
@@ -338,7 +345,8 @@ $\varepsilon = 0.2$ (low) & $-2\%$ & $+3\%$ \\
 $\varepsilon = 0.5$ (medium) & $+5\%$ & $-8\%$ \\
 $\varepsilon = 0.8$ (high) & $+12\%$ & $-15\%$ \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 
@@ -351,6 +359,7 @@ We compare against pymdp v0.0.8~\citep{heins2022pymdp}, the reference Python imp
 \caption{HAI vs.\ pymdp benchmark results.}
 \label{tab:benchmark}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}llcccc@{}}
 \toprule
 Task & Method & Inf.\ (ms) & Act.\ (ms) & FE & Success \\
@@ -361,7 +370,8 @@ Grid 3$\times$3 & pymdp & 0.318 & 1.812 & $-9.42$ & 16\% \\
 Grid 5$\times$5 & HAI & 0.191 & 0.148 & $-2.98$ & 88\% \\
 Grid 5$\times$5 & pymdp & 0.356 & 2.338 & $-9.24$ & 10\% \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \begin{table}[h]
@@ -369,6 +379,7 @@ Grid 5$\times$5 & pymdp & 0.356 & 2.338 & $-9.24$ & 10\% \\
 \caption{Aggregate speedups with 95\% confidence intervals.}
 \label{tab:speedups}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lcccc@{}}
 \toprule
 Metric & Speedup & 95\% CI & $p$-value & Cohen's $d$ \\
@@ -377,7 +388,8 @@ Belief Inference & 1.9$\times$ & [1.7, 2.1] & $1.4{\times}10^{-26}$ & 1.87 \\
 Action Selection & 15.8$\times$ & [12.3, 19.4] & $1.3{\times}10^{-35}$ & 2.75 \\
 Total & 7.9$\times$ & [6.4, 9.5] & --- & --- \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 All differences are statistically significant at $p < 0.001$ with large effect sizes (Cohen's $d > 1.8$). HAI achieves substantially higher success rates (88--100\% vs.\ 10--16\%) with lower free energy, suggesting HDC-based precision weighting provides more effective exploration-exploitation balance.
@@ -528,6 +540,7 @@ Table~\ref{tab:fl-pipeline} shows unified pipeline results.
 \caption{Unified pipeline benchmark (100-node network).}
 \label{tab:fl-pipeline}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}llc@{}}
 \toprule
 Scenario & Configuration & Max Error \\
@@ -540,7 +553,8 @@ External wt.\ boost & Consciousness-aware & --- \\
 Plugin pipeline & Norm + hash & 0.005 \\
 Phase diagram (7$\times$) & 10--34\% $\times$ rep & 0.001--0.45 \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 The pipeline supports \textbf{consciousness-aware aggregation} via external weight maps:
@@ -559,6 +573,8 @@ Three defense tiers emerge: (1)~equal-reputation fails at 5\% Byzantine, (2)~rep
 \caption{Feature comparison with existing FL frameworks.}
 \label{tab:fl-comparison}
 \small
+\setlength{\tabcolsep}{3pt}
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lccccc@{}}
 \toprule
 Capability & Ours & Google FL & PySyft & Flower & FATE \\
@@ -572,7 +588,8 @@ Differential privacy + RDP & \checkmark & \checkmark & \checkmark & Partial & \c
 Plugin extensibility & \checkmark & --- & Partial & \checkmark & --- \\
 Validated 34\% BFT & \checkmark & --- & --- & --- & --- \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 Table~\ref{tab:fed-mnist} shows federated MNIST convergence across attack and privacy scenarios.
@@ -582,6 +599,7 @@ Table~\ref{tab:fed-mnist} shows federated MNIST convergence across attack and pr
 \caption{Federated MNIST convergence (softmax $784 \to 10$, 15 nodes, 20 rounds).}
 \label{tab:fed-mnist}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lcc@{}}
 \toprule
 Scenario & Final Accuracy & Converged \\
@@ -595,7 +613,8 @@ IID + DP (low noise) & 99\% & \checkmark \\
 IID + DP (moderate noise) & 90\% & \checkmark \\
 IID + DP (high noise) & 62\% & \checkmark \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 The unified pipeline resists up to 30\% Byzantine nodes on a real classification task (10-class softmax, 7,850 parameters). Differential privacy shows the expected accuracy-privacy tradeoff.
@@ -607,6 +626,7 @@ Table~\ref{tab:meta-learn} demonstrates meta-learning signal weight adaptation.
 \caption{Meta-learning signal weight adaptation (35 rounds, 8 honest + 3 Byzantine).}
 \label{tab:meta-learn}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lll@{}}
 \toprule
 Attack Type & Dominant Signal & Exclusion Decay \\
@@ -615,7 +635,8 @@ Magnitude ($\pm 100$) & mag: $0.250 \to 0.334$ & $0.96 \to 0.035$ \\
 Direction (opposite) & dir: $0.350 \to 0.400$ & $0.96 \to 0.035$ \\
 Subtle ($2\times$ honest) & dir: $0.350 \to 0.272$ & $0.96 \to 0.084$ \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 After attackers reform (20 honest rounds), EMA exclusion rates decay below the suspicion threshold (0.25), demonstrating forgiveness of reformed participants.
@@ -627,6 +648,7 @@ Table~\ref{tab:hyperfeel} shows HyperFeel compression ratios.
 \caption{HyperFeel compression ratios (honest measurement).}
 \label{tab:hyperfeel}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}rrrrc@{}}
 \toprule
 Model Size & Input & Output & Ratio & Cosine Sim. \\
@@ -636,7 +658,8 @@ Model Size & Input & Output & Ratio & Cosine Sim. \\
 100K params & 400 KB & 2 KB & 194.6$\times$ & 0.141 \\
 1M params & 4 MB & 2 KB & 1,945$\times$ & 0.044 \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 Compression ratio scales linearly with model size because the output (2~KB HV16 + header) is fixed. Reconstruction is lossy---cosine similarity degrades with higher compression ratios.
@@ -648,6 +671,7 @@ Table~\ref{tab:rdp} tracks R\'{e}nyi DP privacy budgets.
 \caption{RDP privacy budget tracking ($\delta = 10^{-5}$).}
 \label{tab:rdp}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lcccr@{}}
 \toprule
 Noise Level & $\sigma$ & $\varepsilon$ at 10 rds & $\varepsilon$ at 50 rds & Rds to $\varepsilon{=}10$ \\
@@ -656,7 +680,8 @@ High privacy & 1.0 & 3.20 & 16.97 & 5 \\
 Moderate & 1.1 & 2.74 & 14.28 & 6 \\
 Low privacy & 1.0 & 3.20 & 16.97 & 5 \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 Table~\ref{tab:byz-phase} presents the Byzantine tolerance phase diagram.
@@ -666,21 +691,25 @@ Table~\ref{tab:byz-phase} presents the Byzantine tolerance phase diagram.
 \caption{Byzantine tolerance phase diagram (20 nodes, MSE threshold $< 1.0$).}
 \label{tab:byz-phase}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}rccc@{}}
 \toprule
 Byz.\ \% & Equal-Rep & Low-Rep ($\text{rep}^2$) & Krum ($k{=}1$) \\
 \midrule
 0\% & 0.000 & 0.000 & 0.000 \\
-5\% & 30.56 \textcolor{red}{FAIL} & 0.000 & 0.000 \\
-10\% & 122.2 \textcolor{red}{FAIL} & 0.000 & 0.000 \\
-15\% & 275.0 \textcolor{red}{FAIL} & 0.000 & 0.000 \\
-20\% & 488.9 \textcolor{red}{FAIL} & 0.000 & 0.000 \\
-25\% & 763.9 \textcolor{red}{FAIL} & 0.535 & 0.000 \\
-30\% & 1100 \textcolor{red}{FAIL} & 2.42 \textcolor{red}{FAIL} & 0.000 \\
-34\% & Error & 6.19 \textcolor{red}{FAIL} & 0.000 \\
-40\% & Error & 12.6 \textcolor{red}{FAIL} & 0.000 \\
+5\% & 30.56$^\dagger$ & 0.000 & 0.000 \\
+10\% & 122.2$^\dagger$ & 0.000 & 0.000 \\
+15\% & 275.0$^\dagger$ & 0.000 & 0.000 \\
+20\% & 488.9$^\dagger$ & 0.000 & 0.000 \\
+25\% & 763.9$^\dagger$ & 0.535$^\dagger$ & 0.000 \\
+30\% & 1100$^\dagger$ & 2.42$^\dagger$ & 0.000 \\
+34\% & --- & 6.19$^\dagger$ & 0.000 \\
+40\% & --- & 12.6$^\dagger$ & 0.000 \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
+\vspace{2pt}
+\raggedright\scriptsize{$^\dagger$MSE $\geq 1.0$ (aggregation failure). --- indicates non-convergence.}
 \end{table}
 
 Three defense tiers emerge: (1)~Equal-reputation aggregation fails at 5\% Byzantine. (2)~Reputation-squared weighting extends the safety boundary to 25\%, reducing effective Byzantine voting power from 34\% to ${\sim}2.7\%$. (3)~Krum selection withstands 40\%+ by choosing the single gradient closest to its neighbors.
@@ -692,6 +721,7 @@ Table~\ref{tab:real-mnist} shows real MNIST federated training results.
 \caption{Real MNIST federated training (linear softmax $784 \to 10$, 20 nodes, 40 rounds).}
 \label{tab:real-mnist}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lcc@{}}
 \toprule
 Experiment & Accuracy & Per-class range \\
@@ -704,7 +734,8 @@ IID + 20\% Byzantine & 67.4\% & --- \\
 Non-IID + 20\% Byzantine & 54.9\% & --- \\
 High-security (DP) + 20\% Byz & 47.8\% & --- \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 Real MNIST confirms: (1)~the pipeline completely neutralizes 20\% Byzantine nodes (identical accuracy to clean), (2)~non-IID partitioning degrades accuracy proportionally to class heterogeneity, (3)~differential privacy trades ${\sim}20\%$ accuracy for formal privacy guarantees.
@@ -723,6 +754,7 @@ Results are shown in Table~\ref{tab:ethics}.
 \caption{ETHICS benchmark results (500 test examples/category).}
 \label{tab:ethics}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lccc@{}}
 \toprule
 Category & Rule-based & + Prototypes & + Per-cat.\ Tuning \\
@@ -734,7 +766,8 @@ Virtue & 63.8\% & 63.8\% & 92.8\% \\
 \midrule
 \textbf{ETHICS Overall} & \textbf{55.2\%} & \textbf{85.1\%} & \textbf{92.9\%} \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \textbf{Key findings:} (1)~Compositional HDC algebra is necessary but insufficient---rule-based parsing alone achieves only 55\%. (2)~Per-category dimension tuning matters: virtue improved from 63.8\% to 92.8\% at 16,384-D. (3)~The 92.9\% accuracy approaches GPT-3 zero-shot (${\sim}82$--85\%, \citealt{hendrycks2021aligning}) using only hypervector operations---no transformer, no pretraining.
@@ -746,6 +779,7 @@ Social Chemistry 101 results are shown in Table~\ref{tab:socialchem}.
 \caption{Social Chemistry 101 results (500 test examples, 3-class).}
 \label{tab:socialchem}
 \small
+\resizebox{\columnwidth}{!}{%
 \begin{tabular}{@{}lcc@{}}
 \toprule
 Configuration & Accuracy & Training Data \\
@@ -754,7 +788,8 @@ Rule-based ensemble & 44.0\% & None \\
 Learned prototypes (8,192-D, 10 iter) & 69.6\% & 50K norms \\
 Learned prototypes (8,192-D, 20 iter) & 85.4\% & 50K norms \\
 \bottomrule
-\end{tabular}
+\end{tabular}%
+}
 \end{table}
 
 \textbf{Virtue task insight.} The virtue category tests whether a trait adjective applies to a described scenario (label=1 means ``trait describes person,'' not ``trait is a virtue''). At 16,384-D, the per-category classifier succeeds (92.8\%) because higher-dimensional space provides sufficient capacity for the ${\sim}200$ distinct trait words. Additional retrain iterations significantly help: Social Chemistry accuracy jumped from 69.6\% (10~iter) to 85.4\% (20~iter), approaching the ${\sim}85\%$ human annotator agreement ceiling.

@@ -13,8 +13,8 @@
 
 use std::collections::VecDeque;
 
-/// Maximum Byzantine tolerance (theoretical limit from BFT)
-pub const MAX_BYZANTINE_TOLERANCE: f64 = 0.45;
+/// Maximum validated Byzantine tolerance (empirically verified to 34%)
+pub const MAX_BYZANTINE_TOLERANCE: f64 = 0.34;
 
 // =============================================================================
 // FIND-006 Mitigation: Safe threshold checking with NaN/Infinity guards
@@ -198,19 +198,22 @@ impl AdaptiveByzantineThreshold {
         // 4. Recovery toward default during calm periods
         // If no attacks and low Byzantine activity, ensure threshold doesn't drop too low
         // Use the MAX of base_target and a recovery floor to ensure recovery after attacks
-        let recovery_bias = if self.attack_count == 0 && avg_byzantine < 0.15 && self.safety_margin == 0.0 {
-            // During calm periods, don't let threshold drop below DEFAULT
-            // This ensures recovery after attacks
-            base_target.max(DEFAULT_THRESHOLD)
-        } else {
-            base_target
-        };
+        let recovery_bias =
+            if self.attack_count == 0 && avg_byzantine < 0.15 && self.safety_margin == 0.0 {
+                // During calm periods, don't let threshold drop below DEFAULT
+                // This ensures recovery after attacks
+                base_target.max(DEFAULT_THRESHOLD)
+            } else {
+                base_target
+            };
 
         // 5. Apply exponential moving average
         self.threshold = self.alpha * recovery_bias + (1.0 - self.alpha) * self.threshold;
 
         // 6. Clamp to bounds
-        self.threshold = self.threshold.clamp(MIN_BYZANTINE_TOLERANCE, MAX_BYZANTINE_TOLERANCE);
+        self.threshold = self
+            .threshold
+            .clamp(MIN_BYZANTINE_TOLERANCE, MAX_BYZANTINE_TOLERANCE);
     }
 
     /// Compute size adjustment factor
@@ -220,11 +223,11 @@ impl AdaptiveByzantineThreshold {
     /// - Harder for adversaries to control large fraction
     fn compute_size_factor(&self) -> f64 {
         match self.network_size {
-            0..=10 => 0.85,      // Small network: conservative
-            11..=50 => 0.90,    // Medium network: slightly conservative
-            51..=100 => 0.95,   // Larger network: near standard
-            101..=500 => 1.0,   // Standard network: full tolerance
-            _ => 1.05,          // Very large: slightly relaxed (but capped at MAX)
+            0..=10 => 0.85,   // Small network: conservative
+            11..=50 => 0.90,  // Medium network: slightly conservative
+            51..=100 => 0.95, // Larger network: near standard
+            101..=500 => 1.0, // Standard network: full tolerance
+            _ => 1.05,        // Very large: slightly relaxed (but capped at MAX)
         }
     }
 
@@ -409,9 +412,9 @@ mod tests {
     #[test]
     fn test_safe_threshold_check_normal_values() {
         // Normal comparisons should work as expected
-        assert!(safe_threshold_check(0.5, 0.3));  // 0.5 >= 0.3
+        assert!(safe_threshold_check(0.5, 0.3)); // 0.5 >= 0.3
         assert!(!safe_threshold_check(0.2, 0.3)); // 0.2 < 0.3
-        assert!(safe_threshold_check(0.3, 0.3));  // 0.3 >= 0.3 (equal)
+        assert!(safe_threshold_check(0.3, 0.3)); // 0.3 >= 0.3 (equal)
     }
 
     #[test]
@@ -442,9 +445,9 @@ mod tests {
     #[test]
     fn test_safe_below_threshold_normal_values() {
         // Normal comparisons should work as expected
-        assert!(safe_below_threshold(0.2, 0.3));  // 0.2 <= 0.3
+        assert!(safe_below_threshold(0.2, 0.3)); // 0.2 <= 0.3
         assert!(!safe_below_threshold(0.5, 0.3)); // 0.5 > 0.3
-        assert!(safe_below_threshold(0.3, 0.3));  // 0.3 <= 0.3 (equal)
+        assert!(safe_below_threshold(0.3, 0.3)); // 0.3 <= 0.3 (equal)
     }
 
     #[test]

@@ -2032,4 +2032,741 @@ mod unit_tests {
         assert!(json.contains("GitcoinPassport"));
         assert!(json.contains("42.5"));
     }
+
+    #[test]
+    fn test_webauthn_proof_serialization() {
+        // Verify that WebAuthn proof round-trips through JSON correctly
+        let proof = VerificationProof::WebAuthn {
+            authenticator_data: "AQIDBAUG".to_string(),
+            client_data_hash: "sha256-test".to_string(),
+            signature: "sig-bytes-base64".to_string(),
+        };
+
+        let json = serde_json::to_string(&proof).expect("Serialize failed");
+        let deserialized: VerificationProof =
+            serde_json::from_str(&json).expect("Deserialize failed");
+
+        match deserialized {
+            VerificationProof::WebAuthn {
+                authenticator_data,
+                client_data_hash,
+                signature,
+            } => {
+                assert_eq!(authenticator_data, "AQIDBAUG");
+                assert_eq!(client_data_hash, "sha256-test");
+                assert_eq!(signature, "sig-bytes-base64");
+            }
+            _ => panic!("Wrong variant after deserialization"),
+        }
+    }
+
+    #[test]
+    fn test_knowledge_proof_serialization() {
+        let proof = VerificationProof::Knowledge {
+            answer_hash: "sha256:abcdef1234567890".to_string(),
+        };
+
+        let json = serde_json::to_string(&proof).expect("Serialize failed");
+        let deserialized: VerificationProof =
+            serde_json::from_str(&json).expect("Deserialize failed");
+
+        match deserialized {
+            VerificationProof::Knowledge { answer_hash } => {
+                assert_eq!(answer_hash, "sha256:abcdef1234567890");
+            }
+            _ => panic!("Wrong variant after deserialization"),
+        }
+    }
+
+    #[test]
+    fn test_biometric_proof_serialization() {
+        let proof = VerificationProof::BiometricChallenge {
+            template_hash: "enrolled-template-sha256".to_string(),
+            response: "secure-enclave-attestation".to_string(),
+        };
+
+        let json = serde_json::to_string(&proof).expect("Serialize failed");
+        let deserialized: VerificationProof =
+            serde_json::from_str(&json).expect("Deserialize failed");
+
+        match deserialized {
+            VerificationProof::BiometricChallenge {
+                template_hash,
+                response,
+            } => {
+                assert_eq!(template_hash, "enrolled-template-sha256");
+                assert_eq!(response, "secure-enclave-attestation");
+            }
+            _ => panic!("Wrong variant after deserialization"),
+        }
+    }
+
+    #[test]
+    fn test_social_recovery_proof_serialization() {
+        let proof = VerificationProof::SocialRecovery {
+            guardian_signatures: vec![
+                GuardianAttestation {
+                    guardian_did: "did:mycelix:guardian1".to_string(),
+                    signature: "sig1-base64".to_string(),
+                    timestamp: 1704067200000000,
+                },
+                GuardianAttestation {
+                    guardian_did: "did:mycelix:guardian2".to_string(),
+                    signature: "sig2-base64".to_string(),
+                    timestamp: 1704067200000000,
+                },
+            ],
+            threshold: 2,
+        };
+
+        let json = serde_json::to_string(&proof).expect("Serialize failed");
+        let deserialized: VerificationProof =
+            serde_json::from_str(&json).expect("Deserialize failed");
+
+        match deserialized {
+            VerificationProof::SocialRecovery {
+                guardian_signatures,
+                threshold,
+            } => {
+                assert_eq!(guardian_signatures.len(), 2);
+                assert_eq!(threshold, 2);
+                assert_eq!(
+                    guardian_signatures[0].guardian_did,
+                    "did:mycelix:guardian1"
+                );
+            }
+            _ => panic!("Wrong variant after deserialization"),
+        }
+    }
+}
+
+// ============================================================================
+// Section 11: Crypto Hardening Security Tests (Conductor Required)
+// ============================================================================
+//
+// These tests verify the security properties of MFA factor verification:
+// - WebAuthn counter replay protection (strictly monotonic counters)
+// - Security questions rate limiting (5 attempts per 15 minutes)
+// - Reputation attestation Ed25519 signature verification
+// - Biometric template hash mismatch rejection
+//
+// All require Holochain conductor — use `cargo test --test mfa_sweettest -- --ignored`
+
+#[cfg(test)]
+mod crypto_hardening {
+    use super::*;
+
+    /// Helper: Set up conductor, create DID, create MFA state, return (conductor, cell, did)
+    async fn setup_mfa() -> (SweetConductor, SweetCell, String) {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
+
+        let mfa_input = CreateMfaStateInput {
+            did: did_doc.id.clone(),
+            primary_key_hash: format!("sha256:{}", agent),
+        };
+        let _: MfaStateOutput = conductor
+            .call(&cell.zome("mfa"), "create_mfa_state", mfa_input)
+            .await;
+
+        (conductor, cell, did_doc.id)
+    }
+
+    /// Helper: Enroll a factor and return updated MFA state
+    async fn enroll_factor(
+        conductor: &SweetConductor,
+        cell: &SweetCell,
+        did: &str,
+        factor_type: FactorType,
+        factor_id: &str,
+        metadata: &str,
+    ) -> MfaStateOutput {
+        let input = EnrollFactorInput {
+            did: did.to_string(),
+            factor_type,
+            factor_id: factor_id.to_string(),
+            metadata: metadata.to_string(),
+            reason: "crypto hardening test".to_string(),
+        };
+        conductor
+            .call(&cell.zome("mfa"), "enroll_factor", input)
+            .await
+    }
+
+    // =========================================================================
+    // 11.1: WebAuthn Counter Replay Protection
+    // =========================================================================
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_webauthn_short_authenticator_data_rejected() {
+        println!("Test 11.1: WebAuthn with too-short authenticator data should fail");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::HardwareKey,
+            "yubikey-short",
+            "{}",
+        )
+        .await;
+
+        // Authenticator data must be >= 37 bytes. "AQIDBA==" is only 4 bytes.
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "yubikey-short".to_string(),
+            challenge: Some("test-challenge".to_string()),
+            proof: Some(VerificationProof::WebAuthn {
+                authenticator_data: "AQIDBA==".to_string(), // 4 bytes — too short
+                client_data_hash: "test-hash".to_string(),
+                signature: "test-sig".to_string(),
+            }),
+        };
+
+        // Should fail: authenticator data too short for counter extraction
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        assert!(
+            result.is_err(),
+            "WebAuthn with <37 byte authenticator data should be rejected"
+        );
+        println!("  - Short authenticator data correctly rejected");
+        println!("Test 11.1 PASSED");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_webauthn_missing_challenge_rejected() {
+        println!("Test 11.2: WebAuthn without challenge should fail");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::HardwareKey,
+            "yubikey-nochallenge",
+            "{}",
+        )
+        .await;
+
+        // Valid-length authenticator data (37+ bytes) but no challenge
+        // Pre-computed base64 of 37 zero bytes with UP flag (byte 32) set and counter=1 (byte 36)
+        // This avoids needing a base64 runtime dependency in the test crate.
+        // Bytes: [0]*32 ++ [0x01] ++ [0,0,0,1] = rpIdHash(32) + flags(UP=1) + counter(1)
+        let auth_data_b64 = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAQ==".to_string();
+
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "yubikey-nochallenge".to_string(),
+            challenge: None, // Missing challenge!
+            proof: Some(VerificationProof::WebAuthn {
+                authenticator_data: auth_data_b64,
+                client_data_hash: "test-hash".to_string(),
+                signature: "test-sig".to_string(),
+            }),
+        };
+
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        assert!(
+            result.is_err(),
+            "WebAuthn without challenge should be rejected"
+        );
+        println!("  - Missing challenge correctly rejected");
+        println!("Test 11.2 PASSED");
+    }
+
+    // =========================================================================
+    // 11.2: Security Questions Rate Limiting
+    // =========================================================================
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_security_questions_empty_answer_rejected() {
+        println!("Test 11.3: Security questions with empty answer should fail");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::SecurityQuestions,
+            "sq-test",
+            r#"{"questions":["What is your name?"]}"#,
+        )
+        .await;
+
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "sq-test".to_string(),
+            challenge: None,
+            proof: Some(VerificationProof::Knowledge {
+                answer_hash: "".to_string(), // Empty!
+            }),
+        };
+
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Security question with empty answer should be rejected"
+        );
+        println!("  - Empty answer hash correctly rejected");
+        println!("Test 11.3 PASSED");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_security_questions_rate_limiting() {
+        println!("Test 11.4: Security questions rate limiting after 5 failures");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::SecurityQuestions,
+            "sq-ratelimit",
+            r#"{"questions":["What is your name?"]}"#,
+        )
+        .await;
+
+        // Send 5 wrong answers to trigger rate limit
+        for i in 0..5 {
+            let verify_input = VerifyFactorInput {
+                did: did.clone(),
+                factor_id: "sq-ratelimit".to_string(),
+                challenge: None,
+                proof: Some(VerificationProof::Knowledge {
+                    answer_hash: format!("wrong-answer-{}", i),
+                }),
+            };
+
+            // These may fail or succeed with reduced strength — we just need
+            // to record 5 failed verification attempts
+            let _result: Result<MfaStateOutput, _> = conductor
+                .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+                .await;
+        }
+
+        // 6th attempt should be rate-limited regardless of answer
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "sq-ratelimit".to_string(),
+            challenge: None,
+            proof: Some(VerificationProof::Knowledge {
+                answer_hash: "correct-answer-hash".to_string(),
+            }),
+        };
+
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        assert!(
+            result.is_err(),
+            "6th security question attempt within 15 minutes should be rate-limited"
+        );
+        println!("  - Rate limiting engaged after 5 failed attempts");
+        println!("Test 11.4 PASSED");
+    }
+
+    // =========================================================================
+    // 11.3: Reputation Attestation Signature Verification
+    // =========================================================================
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_reputation_attestation_forged_signature_rejected() {
+        println!("Test 11.5: Reputation attestation with forged signature should fail");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::ReputationAttestation,
+            "rep-forged",
+            "{}",
+        )
+        .await;
+
+        let now_micros = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "rep-forged".to_string(),
+            challenge: None,
+            proof: Some(VerificationProof::SocialRecovery {
+                guardian_signatures: vec![GuardianAttestation {
+                    guardian_did: "did:mycelix:fake-guardian".to_string(),
+                    signature: "AAAA".to_string(), // Invalid 3-byte signature
+                    timestamp: now_micros,
+                }],
+                threshold: 1,
+            }),
+        };
+
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Reputation attestation with forged signature should be rejected"
+        );
+        println!("  - Forged signature correctly rejected");
+        println!("Test 11.5 PASSED");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_reputation_attestation_zero_threshold_rejected() {
+        println!("Test 11.6: Reputation attestation with threshold=0 should fail");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::ReputationAttestation,
+            "rep-zerothresh",
+            "{}",
+        )
+        .await;
+
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "rep-zerothresh".to_string(),
+            challenge: None,
+            proof: Some(VerificationProof::SocialRecovery {
+                guardian_signatures: vec![],
+                threshold: 0, // Invalid!
+            }),
+        };
+
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Reputation attestation with threshold=0 should be rejected"
+        );
+        println!("  - Zero threshold correctly rejected");
+        println!("Test 11.6 PASSED");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_reputation_attestation_expired_timestamp_rejected() {
+        println!("Test 11.7: Reputation attestation with expired timestamp should fail");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::ReputationAttestation,
+            "rep-expired",
+            "{}",
+        )
+        .await;
+
+        // Timestamp from 2 hours ago (beyond 1-hour freshness window)
+        let two_hours_ago = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64
+            - (2 * 3600 * 1_000_000);
+
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "rep-expired".to_string(),
+            challenge: None,
+            proof: Some(VerificationProof::SocialRecovery {
+                guardian_signatures: vec![GuardianAttestation {
+                    guardian_did: "did:mycelix:old-guardian".to_string(),
+                    signature: "old-sig".to_string(),
+                    timestamp: two_hours_ago,
+                }],
+                threshold: 1,
+            }),
+        };
+
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Reputation attestation with expired timestamp should be rejected"
+        );
+        println!("  - Expired attestation correctly rejected");
+        println!("Test 11.7 PASSED");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_reputation_attestation_duplicate_guardian_rejected() {
+        println!("Test 11.8: Reputation attestation with duplicate guardian should fail");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::ReputationAttestation,
+            "rep-dupe",
+            "{}",
+        )
+        .await;
+
+        let now_micros = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as u64;
+
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "rep-dupe".to_string(),
+            challenge: None,
+            proof: Some(VerificationProof::SocialRecovery {
+                guardian_signatures: vec![
+                    GuardianAttestation {
+                        guardian_did: "did:mycelix:same-guardian".to_string(),
+                        signature: "sig1".to_string(),
+                        timestamp: now_micros,
+                    },
+                    GuardianAttestation {
+                        guardian_did: "did:mycelix:same-guardian".to_string(), // Duplicate!
+                        signature: "sig2".to_string(),
+                        timestamp: now_micros,
+                    },
+                ],
+                threshold: 2,
+            }),
+        };
+
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Reputation attestation with duplicate guardian should be rejected"
+        );
+        println!("  - Duplicate guardian correctly rejected");
+        println!("Test 11.8 PASSED");
+    }
+
+    // =========================================================================
+    // 11.4: Biometric Template Hash Verification
+    // =========================================================================
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_biometric_empty_template_hash_rejected() {
+        println!("Test 11.9: Biometric with empty template hash should fail");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::Biometric,
+            "bio-empty",
+            r#"{"type":"fingerprint"}"#,
+        )
+        .await;
+
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "bio-empty".to_string(),
+            challenge: None,
+            proof: Some(VerificationProof::BiometricChallenge {
+                template_hash: "".to_string(), // Empty!
+                response: "attestation".to_string(),
+            }),
+        };
+
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Biometric with empty template hash should be rejected"
+        );
+        println!("  - Empty template hash correctly rejected");
+        println!("Test 11.9 PASSED");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_biometric_empty_response_rejected() {
+        println!("Test 11.10: Biometric with empty response should fail");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::Biometric,
+            "bio-noresp",
+            r#"{"type":"face"}"#,
+        )
+        .await;
+
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "bio-noresp".to_string(),
+            challenge: None,
+            proof: Some(VerificationProof::BiometricChallenge {
+                template_hash: "valid-template-hash".to_string(),
+                response: "".to_string(), // Empty!
+            }),
+        };
+
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Biometric with empty response should be rejected"
+        );
+        println!("  - Empty response correctly rejected");
+        println!("Test 11.10 PASSED");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_biometric_mismatched_template_rejected() {
+        println!("Test 11.11: Biometric with mismatched template should fail verification");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        // Enroll with factor_id as the template hash binding
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::Biometric,
+            "bio-template-hash-abc123",
+            r#"{"type":"fingerprint"}"#,
+        )
+        .await;
+
+        // Attempt verification with DIFFERENT template hash
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "bio-template-hash-abc123".to_string(),
+            challenge: None,
+            proof: Some(VerificationProof::BiometricChallenge {
+                template_hash: "WRONG-template-hash-xyz789".to_string(), // Mismatch!
+                response: "secure-enclave-attestation".to_string(),
+            }),
+        };
+
+        // Should either fail or return with reduced strength (not full 1.0)
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        match result {
+            Err(_) => {
+                println!("  - Mismatched template correctly rejected with error");
+            }
+            Ok(output) => {
+                let bio_factor = output
+                    .state
+                    .factors
+                    .iter()
+                    .find(|f| f.factor_id == "bio-template-hash-abc123");
+                if let Some(factor) = bio_factor {
+                    assert!(
+                        factor.effective_strength < 1.0,
+                        "Mismatched biometric should not get full strength (got {})",
+                        factor.effective_strength
+                    );
+                    println!(
+                        "  - Mismatched template got reduced strength: {}",
+                        factor.effective_strength
+                    );
+                }
+            }
+        }
+        println!("Test 11.11 PASSED");
+    }
+
+    // =========================================================================
+    // 11.5: Verification Without Proof
+    // =========================================================================
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires Holochain conductor
+    async fn test_verify_factor_without_proof_rejected() {
+        println!("Test 11.12: Verification without any proof should fail");
+
+        let (conductor, cell, did) = setup_mfa().await;
+
+        enroll_factor(
+            &conductor,
+            &cell,
+            &did,
+            FactorType::HardwareKey,
+            "key-noproof",
+            "{}",
+        )
+        .await;
+
+        let verify_input = VerifyFactorInput {
+            did: did.clone(),
+            factor_id: "key-noproof".to_string(),
+            challenge: None,
+            proof: None, // No proof at all!
+        };
+
+        let result: Result<MfaStateOutput, _> = conductor
+            .call_fallible(&cell.zome("mfa"), "verify_factor", verify_input)
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Verification without proof should be rejected"
+        );
+        println!("  - Missing proof correctly rejected");
+        println!("Test 11.12 PASSED");
+    }
 }

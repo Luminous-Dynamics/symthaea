@@ -1,0 +1,18 @@
+[submodule "11-meta-consciousness/luminous-nix"]
+	path = 11-meta-consciousness/luminous-nix
+	url = https://github.com/Luminous-Dynamics/luminous-nix.git
+[submodule "Mycelix-Core"]
+	path = Mycelix-Core
+	url = https://github.com/Luminous-Dynamics/Mycelix-Core.git
+[submodule "Mycelix-Mail"]
+	path = Mycelix-Mail
+	url = https://github.com/Luminous-Dynamics/Mycelix-Mail.git
+[submodule "mycelix-desci"]
+	path = mycelix-desci
+	url = https://github.com/Luminous-Dynamics/mycelix-desci.git
+[submodule "mycelix-health"]
+	path = mycelix-health
+	url = https://github.com/Luminous-Dynamics/mycelix-health.git
+[submodule "terra-atlas-mvp"]
+	path = terra-atlas-mvp
+	url = https://github.com/Luminous-Dynamics/terra-atlas-mvp.git
