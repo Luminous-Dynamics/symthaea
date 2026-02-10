@@ -313,7 +313,15 @@ impl SparkEngineSpec {
         };
 
         // Calculate performance metrics
-        let energy_density = reaction.total_energy_mev() * 1.602e-13 * 6.022e23 / 1e9; // GJ/g
+        // Energy density: E_mev × J/MeV × N_A/mol / (fuel_mass_g_per_mol × 1e9 J/GJ)
+        let fuel_mass_g_mol = match reaction {
+            FusionReaction::DD => 4.028,    // 2 deuterium atoms
+            FusionReaction::DT => 5.030,    // deuterium + tritium
+            FusionReaction::DHe3 => 5.008,  // deuterium + He-3
+            _ => 5.0,                       // conservative default
+        };
+        let energy_density = reaction.total_energy_mev() * super::constants::MEV_TO_J
+            * super::constants::N_AVOGADRO / (fuel_mass_g_mol * 1e9); // GJ/g
         let fuel_rate = target.power_kw * 3.15e7 / (energy_density * 1e9); // g/year
 
         let lifetime = target.lifetime_years * shell.lifetime_factor.min(100.0) / 10.0;

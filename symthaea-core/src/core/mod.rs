@@ -122,6 +122,7 @@ pub use crate::hdc::consciousness_perf::{
     simd_capabilities,
     batch_similarity_matrix,
     find_similar,
+    batch_find_similar,
     cluster_by_similarity,
 };
 
@@ -156,6 +157,7 @@ pub use crate::hdc::consciousness_phi_optimization::{
 };
 
 pub use crate::hdc::consciousness_integration::PipelineCheckpoint;
+pub use crate::hdc::consciousness_integration::ConsciousnessPipelineBuilder;
 
 // Consciousness API traits
 pub mod traits;

@@ -52,3 +52,6 @@ pub const K_COULOMB: f64 = 8.987_551_792_3e9;
 
 /// Atomic mass unit (kg)
 pub const AMU: f64 = 1.660_539_066_60e-27;
+
+/// MeV to Joules conversion factor (E_CHARGE × 1e6)
+pub const MEV_TO_J: f64 = 1.602_176_634e-13;

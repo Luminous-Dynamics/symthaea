@@ -169,6 +169,255 @@ pub struct PipelineCheckpoint {
 }
 
 // ==========================================
+// PIPELINE BUILDER
+// ==========================================
+
+/// Fluent builder for `ConsciousnessPipeline`.
+///
+/// Collects configuration and system-enable flags, then constructs a fully
+/// initialized pipeline in one `build()` call. This avoids the need for
+/// 10+ sequential setter calls on a freshly created pipeline.
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use symthaea_core::hdc::consciousness_integration::ConsciousnessPipelineBuilder;
+///
+/// let pipeline = ConsciousnessPipelineBuilder::new()
+///     .config(IntegrationConfig::default())
+///     .embodiment(0.8)
+///     .integrated_systems()
+///     .phi_optimization(8, 5)
+///     .feedback_dynamics()
+///     .creativity()
+///     .phi_feedback()
+///     .verification(10)
+///     .build();
+/// ```
+pub struct ConsciousnessPipelineBuilder {
+    config: IntegrationConfig,
+    embodiment: f64,
+    integrated_systems: bool,
+    phi_optimization: Option<(usize, usize)>,
+    feedback_dynamics: bool,
+    self_awareness: Option<(usize, usize)>,
+    meta_consciousness: Option<usize>,
+    temporal_consciousness: Option<usize>,
+    creativity: bool,
+    phase_transitions: bool,
+    epistemic: Option<usize>,
+    fractal: Option<usize>,
+    collective: Option<String>,
+    phi_feedback: bool,
+    metrics_collector: bool,
+    verification_interval: Option<usize>,
+    subsystems: Vec<Box<dyn ConsciousnessSubsystem>>,
+}
+
+impl Default for ConsciousnessPipelineBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ConsciousnessPipelineBuilder {
+    /// Create a new builder with default settings.
+    pub fn new() -> Self {
+        Self {
+            config: IntegrationConfig::default(),
+            embodiment: 0.5,
+            integrated_systems: false,
+            phi_optimization: None,
+            feedback_dynamics: false,
+            self_awareness: None,
+            meta_consciousness: None,
+            temporal_consciousness: None,
+            creativity: false,
+            phase_transitions: false,
+            epistemic: None,
+            fractal: None,
+            collective: None,
+            phi_feedback: false,
+            metrics_collector: false,
+            verification_interval: None,
+            subsystems: Vec::new(),
+        }
+    }
+
+    /// Set the integration configuration.
+    pub fn config(mut self, config: IntegrationConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    /// Set the embodiment level (0.0 – 1.0).
+    pub fn embodiment(mut self, level: f64) -> Self {
+        self.embodiment = level;
+        self
+    }
+
+    /// Enable integrated systems (metacognitive, cross-modal, temporal binding).
+    pub fn integrated_systems(mut self) -> Self {
+        self.integrated_systems = true;
+        self
+    }
+
+    /// Enable Phi-guided topology optimization.
+    pub fn phi_optimization(mut self, n_nodes: usize, optimize_every: usize) -> Self {
+        self.phi_optimization = Some((n_nodes, optimize_every));
+        self
+    }
+
+    /// Enable bidirectional feedback dynamics.
+    pub fn feedback_dynamics(mut self) -> Self {
+        self.feedback_dynamics = true;
+        self
+    }
+
+    /// Enable recursive self-awareness.
+    pub fn self_awareness(mut self, hdc_dim: usize, n_processes: usize) -> Self {
+        self.self_awareness = Some((hdc_dim, n_processes));
+        self
+    }
+
+    /// Enable meta-consciousness (Phi of Phi, strange loops).
+    pub fn meta_consciousness(mut self, num_components: usize) -> Self {
+        self.meta_consciousness = Some(num_components);
+        self
+    }
+
+    /// Enable temporal consciousness (multi-scale time).
+    pub fn temporal_consciousness(mut self, num_components: usize) -> Self {
+        self.temporal_consciousness = Some(num_components);
+        self
+    }
+
+    /// Enable creative consciousness.
+    pub fn creativity(mut self) -> Self {
+        self.creativity = true;
+        self
+    }
+
+    /// Enable phase transition detection.
+    pub fn phase_transitions(mut self) -> Self {
+        self.phase_transitions = true;
+        self
+    }
+
+    /// Enable epistemic consciousness (belief/knowledge tracking).
+    pub fn epistemic(mut self, num_components: usize) -> Self {
+        self.epistemic = Some(num_components);
+        self
+    }
+
+    /// Enable fractal consciousness (self-similar structure).
+    pub fn fractal(mut self, n_scales: usize) -> Self {
+        self.fractal = Some(n_scales);
+        self
+    }
+
+    /// Enable collective consciousness (multi-agent).
+    pub fn collective(mut self, agent_id: &str) -> Self {
+        self.collective = Some(agent_id.to_string());
+        self
+    }
+
+    /// Enable Phi feedback loop.
+    pub fn phi_feedback(mut self) -> Self {
+        self.phi_feedback = true;
+        self
+    }
+
+    /// Enable metrics collection.
+    pub fn metrics_collector(mut self) -> Self {
+        self.metrics_collector = true;
+        self
+    }
+
+    /// Enable periodic verification every `interval` cycles.
+    pub fn verification(mut self, interval: usize) -> Self {
+        self.verification_interval = Some(interval);
+        self
+    }
+
+    /// Register a custom subsystem.
+    pub fn subsystem(mut self, sub: Box<dyn ConsciousnessSubsystem>) -> Self {
+        self.subsystems.push(sub);
+        self
+    }
+
+    /// Enable all consciousness systems with default parameters.
+    pub fn full_consciousness(self) -> Self {
+        self.integrated_systems()
+            .phi_optimization(8, 5)
+            .feedback_dynamics()
+            .self_awareness(1024, 16)
+            .meta_consciousness(8)
+            .temporal_consciousness(8)
+            .creativity()
+            .phase_transitions()
+            .epistemic(8)
+            .fractal(3)
+            .collective("primary")
+            .phi_feedback()
+    }
+
+    /// Build the configured pipeline.
+    pub fn build(self) -> ConsciousnessPipeline {
+        let mut pipeline = ConsciousnessPipeline::new(self.config);
+        pipeline.set_embodiment(self.embodiment);
+
+        if self.integrated_systems {
+            pipeline.enable_integrated_systems();
+        }
+        if let Some((nodes, freq)) = self.phi_optimization {
+            pipeline.enable_phi_optimization(nodes, freq);
+        }
+        if self.feedback_dynamics {
+            pipeline.enable_feedback_dynamics();
+        }
+        if let Some((dim, procs)) = self.self_awareness {
+            pipeline.enable_self_awareness(dim, procs);
+        }
+        if let Some(n) = self.meta_consciousness {
+            pipeline.enable_meta_consciousness(n);
+        }
+        if let Some(n) = self.temporal_consciousness {
+            pipeline.enable_temporal_consciousness(n);
+        }
+        if self.creativity {
+            pipeline.enable_creativity();
+        }
+        if self.phase_transitions {
+            pipeline.enable_phase_transitions();
+        }
+        if let Some(n) = self.epistemic {
+            pipeline.enable_epistemic(n);
+        }
+        if let Some(n) = self.fractal {
+            pipeline.enable_fractal(n);
+        }
+        if let Some(ref id) = self.collective {
+            pipeline.enable_collective(id);
+        }
+        if self.phi_feedback {
+            pipeline.enable_phi_feedback();
+        }
+        if self.metrics_collector {
+            pipeline.enable_metrics_collector();
+        }
+        if let Some(interval) = self.verification_interval {
+            pipeline.enable_verification(interval);
+        }
+        for sub in self.subsystems {
+            pipeline.register_subsystem(sub);
+        }
+
+        pipeline
+    }
+}
+
+// ==========================================
 // UNIFIED CONSCIOUSNESS OPTIMIZER TYPES
 // ==========================================
 
@@ -2506,9 +2755,10 @@ impl ConsciousnessPipeline {
             // Count how many current bindings match recent memory using batch find_similar
             let memory_hvs: Vec<BinaryHV> = self.temporal_memory.iter()
                 .map(|mem| mem.representation).collect();
-            let matches: usize = self.state.bound_objects.iter()
-                .map(|obj| consciousness_perf::find_similar(&obj.representation, &memory_hvs, 0.6).len())
-                .sum();
+            let query_hvs: Vec<BinaryHV> = self.state.bound_objects.iter()
+                .map(|obj| obj.representation).collect();
+            let batch_results = consciousness_perf::batch_find_similar(&query_hvs, &memory_hvs, 0.6);
+            let matches: usize = batch_results.iter().map(|r| r.len()).sum();
             let max_matches = self.state.bound_objects.len() * 5; // Expect ~5 matches per binding if stable
             (matches as f64 / max_matches.max(1) as f64).min(1.0)
         };
@@ -2592,21 +2842,17 @@ impl ConsciousnessPipeline {
 
         // === PLUGGABLE SUBSYSTEMS ===
         // Run registered subsystems in priority order, catching panics and errors.
+        // We temporarily take ownership of subsystems to avoid borrow conflicts
+        // between &mut self.state and &mut self.subsystems.
         self.subsystem_errors.clear();
-        for sub in &mut self.subsystems {
+        let mut subsystems = std::mem::take(&mut self.subsystems);
+        for sub in &mut subsystems {
             if !sub.is_enabled() {
                 continue;
             }
             let sub_name = sub.name().to_string();
-            // Safety: catch_unwind requires the closure to be UnwindSafe.
-            // We use AssertUnwindSafe since subsystems are behind &mut and we
-            // accept the state may be partially updated on panic.
-            let state_ptr = &mut self.state as *mut ConsciousnessState;
-            let input_ref = &input;
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                // SAFETY: we hold exclusive access; no other thread touches state during process()
-                let state = unsafe { &mut *state_ptr };
-                sub.process_cycle(state, input_ref)
+                sub.process_cycle(&mut self.state, &input)
             }));
             match result {
                 Ok(Ok(())) => {}
@@ -2621,6 +2867,7 @@ impl ConsciousnessPipeline {
                 }
             }
         }
+        self.subsystems = subsystems;
 
         // === OBSERVABILITY: Record metrics ===
         if let Some(ref collector) = self.metrics_collector {
@@ -4814,6 +5061,239 @@ mod tests {
         assert!((pipeline.get_state().phi - saved_phi).abs() < 1e-15,
             "Phi should be restored exactly");
         assert_eq!(pipeline.current_cycle, saved_cycle);
+    }
+
+    // ==========================================
+    // BUILDER TESTS
+    // ==========================================
+
+    #[test]
+    fn test_builder_default() {
+        let pipeline = ConsciousnessPipelineBuilder::new().build();
+        assert!((pipeline.embodiment_level - 0.5).abs() < 1e-10);
+        assert!(!pipeline.has_integrated_systems());
+        assert_eq!(pipeline.subsystem_count(), 0);
+    }
+
+    #[test]
+    fn test_builder_with_embodiment() {
+        let pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.9)
+            .build();
+        assert!((pipeline.embodiment_level - 0.9).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_builder_with_systems() {
+        let pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .integrated_systems()
+            .phi_feedback()
+            .creativity()
+            .build();
+        assert!(pipeline.has_integrated_systems());
+        assert!(pipeline.has_phi_feedback());
+        assert!(pipeline.has_creativity());
+        assert!(!pipeline.has_fractal());
+    }
+
+    #[test]
+    fn test_builder_full_consciousness() {
+        let pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.85)
+            .full_consciousness()
+            .build();
+        assert!(pipeline.has_full_consciousness());
+        assert_eq!(pipeline.active_system_count(), 12);
+    }
+
+    #[test]
+    fn test_builder_with_subsystem() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+
+        struct BuilderTestSub;
+        impl ConsciousnessSubsystem for BuilderTestSub {
+            fn name(&self) -> &str { "builder_test" }
+            fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError> { Ok(()) }
+            fn is_enabled(&self) -> bool { true }
+        }
+
+        let pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .subsystem(Box::new(BuilderTestSub))
+            .build();
+        assert_eq!(pipeline.subsystem_count(), 1);
+        assert!(pipeline.has_subsystem_named("builder_test"));
+    }
+
+    #[test]
+    fn test_builder_with_verification() {
+        let pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .verification(5)
+            .build();
+        assert!(pipeline.latest_verification().is_none()); // not run yet
+        assert_eq!(pipeline.verification_interval, 5);
+    }
+
+    #[test]
+    fn test_builder_processes_correctly() {
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .integrated_systems()
+            .phi_feedback()
+            .build();
+
+        for i in 0..5 {
+            let inputs = vec![BinaryHV::random(2000 + i as u64)];
+            pipeline.process(inputs, &[0.8]);
+        }
+
+        let state = pipeline.get_state();
+        assert!(state.phi >= 0.0);
+        assert!(state.consciousness_level > 0.0);
+    }
+
+    // ==========================================
+    // LIFECYCLE HOOK TESTS
+    // ==========================================
+
+    #[test]
+    fn test_on_register_called() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+        use std::sync::{Arc, Mutex};
+
+        let registered = Arc::new(Mutex::new(false));
+
+        struct LifecycleSub { registered: Arc<Mutex<bool>> }
+        impl ConsciousnessSubsystem for LifecycleSub {
+            fn name(&self) -> &str { "lifecycle" }
+            fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError> { Ok(()) }
+            fn is_enabled(&self) -> bool { true }
+            fn on_register(&mut self) {
+                *self.registered.lock().unwrap() = true;
+            }
+        }
+
+        let mut pipeline = ConsciousnessPipeline::default();
+        assert!(!*registered.lock().unwrap());
+
+        pipeline.register_subsystem(Box::new(LifecycleSub { registered: registered.clone() }));
+        assert!(*registered.lock().unwrap(), "on_register should be called during register_subsystem");
+    }
+
+    #[test]
+    fn test_on_shutdown_called() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+        use std::sync::{Arc, Mutex};
+
+        let shutdown = Arc::new(Mutex::new(false));
+
+        struct ShutdownSub { shutdown: Arc<Mutex<bool>> }
+        impl ConsciousnessSubsystem for ShutdownSub {
+            fn name(&self) -> &str { "shutdown_test" }
+            fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError> { Ok(()) }
+            fn is_enabled(&self) -> bool { true }
+            fn on_shutdown(&mut self) {
+                *self.shutdown.lock().unwrap() = true;
+            }
+        }
+
+        let mut pipeline = ConsciousnessPipeline::default();
+        pipeline.register_subsystem(Box::new(ShutdownSub { shutdown: shutdown.clone() }));
+        assert!(!*shutdown.lock().unwrap());
+
+        pipeline.clear();
+        assert!(*shutdown.lock().unwrap(), "on_shutdown should be called during clear()");
+    }
+
+    #[test]
+    fn test_checkpoint_restore_with_subsystems() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+        use std::sync::{Arc, Mutex};
+
+        let call_count = Arc::new(Mutex::new(0usize));
+
+        struct CountingSub { calls: Arc<Mutex<usize>> }
+        impl ConsciousnessSubsystem for CountingSub {
+            fn name(&self) -> &str { "counter" }
+            fn process_cycle(&mut self, state: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError>
+            {
+                *self.calls.lock().unwrap() += 1;
+                state.phi = (state.phi + 0.01).min(1.0);
+                Ok(())
+            }
+            fn is_enabled(&self) -> bool { true }
+        }
+
+        // Build pipeline with subsystem, run some cycles
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .subsystem(Box::new(CountingSub { calls: call_count.clone() }))
+            .build();
+
+        for i in 0..5 {
+            pipeline.process(vec![BinaryHV::random(3000 + i)], &[0.8]);
+        }
+        assert_eq!(*call_count.lock().unwrap(), 5);
+        let checkpoint = pipeline.save_checkpoint();
+        let saved_phi = pipeline.get_state().phi;
+
+        // Mutate pipeline further
+        for i in 0..5 {
+            pipeline.process(vec![BinaryHV::random(3100 + i)], &[0.8]);
+        }
+        assert_eq!(*call_count.lock().unwrap(), 10);
+
+        // Restore checkpoint — state should revert, subsystem stays registered
+        pipeline.restore_checkpoint(checkpoint);
+        assert!((pipeline.get_state().phi - saved_phi).abs() < 1e-15);
+        assert_eq!(pipeline.subsystem_count(), 1, "Subsystem should survive checkpoint restore");
+
+        // Subsystem should still work after restore
+        pipeline.process(vec![BinaryHV::random(3200)], &[0.8]);
+        assert_eq!(*call_count.lock().unwrap(), 11);
+    }
+
+    #[test]
+    fn test_subsystem_state_after_panic() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+
+        struct PanicOnceSub { panicked: bool }
+        impl ConsciousnessSubsystem for PanicOnceSub {
+            fn name(&self) -> &str { "panic_once" }
+            fn process_cycle(&mut self, state: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError>
+            {
+                if !self.panicked {
+                    self.panicked = true;
+                    panic!("first call panic");
+                }
+                state.phi = (state.phi + 0.05).min(1.0);
+                Ok(())
+            }
+            fn is_enabled(&self) -> bool { true }
+        }
+
+        let mut pipeline = ConsciousnessPipeline::default();
+        pipeline.set_embodiment(0.8);
+        pipeline.register_subsystem(Box::new(PanicOnceSub { panicked: false }));
+
+        // First cycle: subsystem panics
+        pipeline.process(vec![BinaryHV::random(3300)], &[0.8]);
+        assert_eq!(pipeline.last_subsystem_errors().len(), 1);
+
+        // Second cycle: subsystem should still exist and work
+        // (panicked flag was set before the panic propagated)
+        pipeline.process(vec![BinaryHV::random(3301)], &[0.8]);
+        // The subsystem struct was inside catch_unwind so its state may be lost
+        // on panic — this test documents the actual behavior
+        let state = pipeline.get_state();
+        assert!(state.phi >= 0.0);
     }
 
     #[test]

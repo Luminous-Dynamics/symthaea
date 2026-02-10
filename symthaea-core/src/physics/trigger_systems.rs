@@ -838,7 +838,7 @@ pub fn estimate_fusion_yield(
     // Number of D atoms in target
     // Assume Pd: 106.4 g/mol, so moles = mass / 106.4
     let pd_moles = target_mass_g / 106.4;
-    let d_atoms = pd_moles * d_loading_ratio * 6.022e23;
+    let d_atoms = pd_moles * d_loading_ratio * super::constants::N_AVOGADRO;
 
     // D-D pairs that could fuse (rough estimate)
     let d_pairs = d_atoms * d_loading_ratio / 2.0;
@@ -868,7 +868,7 @@ pub fn estimate_fusion_yield(
 
     // Energy per D-D fusion: ~3.65 MeV average (D-D has two branches)
     let mev_per_fusion = 3.65;
-    let j_per_fusion = mev_per_fusion * 1.6e-13;
+    let j_per_fusion = mev_per_fusion * super::constants::MEV_TO_J;
 
     let thermal_power_w = fusions_per_second * j_per_fusion;
 
@@ -1460,7 +1460,7 @@ impl LcfPhysicsConstants {
         let proton_rate = total_reaction_rate_s * r_proton;
 
         // Energy per reaction (MeV → J)
-        let mev_to_j = 1.602e-13;
+        let mev_to_j = super::constants::MEV_TO_J;
 
         let neutron_channel = DDChannelDetail {
             name: "D+D → He3 + n".to_string(),
