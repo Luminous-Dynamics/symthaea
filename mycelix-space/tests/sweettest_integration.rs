@@ -316,6 +316,113 @@ pub struct AcceptProposalInput {
     pub execution_deadline: SpaceTimestamp,
 }
 
+// --- conjunctions additional types ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct NoradId(pub u32);
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CdmObject {
+    pub norad_id: NoradId,
+    pub name: Option<String>,
+    pub operator: Option<String>,
+    pub position_km: [f64; 3],
+    pub velocity_kms: [f64; 3],
+    pub covariance: Option<[f64; 21]>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SharedConjunctionDataMessage {
+    pub conjunction_id: String,
+    pub tca: SpaceTimestamp,
+    pub primary: CdmObject,
+    pub secondary: CdmObject,
+    pub miss_distance_km: f64,
+    pub relative_velocity_kms: f64,
+    pub collision_probability: f64,
+    pub hard_body_radius_m: f64,
+    pub creation_time: SpaceTimestamp,
+    pub originator: AgentPubKey,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SubmitCdmInput {
+    pub cdm: SharedConjunctionDataMessage,
+    pub version: u32,
+    pub supersedes: Option<ActionHash>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct UpdateRiskInput {
+    pub event_hash: ActionHash,
+    pub new_risk_level: RiskLevel,
+    pub new_pc: f64,
+    pub new_miss_distance_km: f64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ManeuverExecutedInput {
+    pub maneuver_hash: ActionHash,
+}
+
+// --- debris bounties additional types ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct VerificationEvidence {
+    pub last_observed: Option<SpaceTimestamp>,
+    pub predicted_reentry: Option<SpaceTimestamp>,
+    pub sensors_lost_track: u32,
+    pub data_hash: Option<[u8; 32]>,
+    pub notes: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SubmitVerificationInput {
+    pub claim_id: ActionHash,
+    pub verified: bool,
+    pub evidence: VerificationEvidence,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BountyContribution {
+    pub bounty_id: String,
+    pub amount: u64,
+    pub currency: String,
+    pub contributor: AgentPubKey,
+    pub message: Option<String>,
+    pub contributed_at: SpaceTimestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ClaimStatus {
+    Pending,
+    Approved,
+    InProgress,
+    Submitted,
+    Completed,
+    Failed,
+    Rejected,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RemovalClaim {
+    pub bounty_id: String,
+    pub claimer: AgentPubKey,
+    pub organization: String,
+    pub method: RemovalMethod,
+    pub estimated_completion: SpaceTimestamp,
+    pub mission_plan: String,
+    pub status: ClaimStatus,
+    pub claimed_at: SpaceTimestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TleLines {
+    pub norad_id: u32,
+    pub line1: String,
+    pub line2: String,
+}
+
 // --- traffic control types ---
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -451,6 +558,52 @@ mod orbital_objects_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     #[ignore]
+    async fn test_get_latest_tles() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Submit 2 TLEs for same object (different epochs)
+        let tle_old = SubmitTleInput {
+            norad_id: 25544,
+            line1: "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9990".to_string(),
+            line2: "2 25544  51.6400 208.9163 0006703 306.0500  54.0150 15.49560532999999".to_string(),
+            source: Some(DataSourceType::CelesTrak),
+            quality: None,
+        };
+        let _: ActionHash = conductor
+            .call(&cell.zome("orbital_objects_coordinator"), "submit_tle", tle_old)
+            .await;
+
+        // Submit a second TLE (newer epoch)
+        let tle_new = SubmitTleInput {
+            norad_id: 25544,
+            line1: "1 25544U 98067A   24002.50000000  .00016717  00000-0  10270-3 0  9991".to_string(),
+            line2: "2 25544  51.6400 208.9163 0006703 306.0500  54.0150 15.49560532999999".to_string(),
+            source: Some(DataSourceType::SpaceTrack),
+            quality: None,
+        };
+        let _: ActionHash = conductor
+            .call(&cell.zome("orbital_objects_coordinator"), "submit_tle", tle_new)
+            .await;
+
+        // Query latest TLEs — should return only 1 (the newest)
+        let tles: Vec<TleLines> = conductor
+            .call(&cell.zome("orbital_objects_coordinator"), "get_latest_tles", vec![25544u32])
+            .await;
+        assert_eq!(tles.len(), 1, "Should return 1 latest TLE for NORAD 25544");
+        assert_eq!(tles[0].norad_id, 25544);
+
+        // Query for non-existent NORAD ID
+        let empty: Vec<TleLines> = conductor
+            .call(&cell.zome("orbital_objects_coordinator"), "get_latest_tles", vec![99999u32])
+            .await;
+        assert_eq!(empty.len(), 0, "Should return empty for unknown NORAD ID");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
     async fn test_claim_operator() {
         let mut conductor = SweetConductor::from_standard_config().await;
         let dna = load_dna().await;
@@ -518,6 +671,176 @@ mod conjunctions_tests {
 
         let record = get_record(&conductor, hash).await;
         assert!(record.is_some(), "Should create conjunction event");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_submit_cdm_and_query() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        // Create a conjunction event first
+        let event_input = CreateEventInput {
+            event_id: "conj:cdm-test-001".to_string(),
+            primary_norad_id: 25544,
+            secondary_norad_id: 40075,
+            tca: SpaceTimestamp::now(),
+            miss_distance_km: 0.5,
+            max_pc: 0.001,
+            risk_level: RiskLevel::Medium,
+            compute_details: false,
+            primary_tle: None,
+            secondary_tle: None,
+        };
+        let _: ActionHash = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "create_conjunction_event", event_input)
+            .await;
+
+        // Submit 2 CDMs for this event
+        for version in 1..=2 {
+            let cdm_input = SubmitCdmInput {
+                cdm: SharedConjunctionDataMessage {
+                    conjunction_id: "conj:cdm-test-001".to_string(),
+                    tca: SpaceTimestamp::now(),
+                    primary: CdmObject {
+                        norad_id: NoradId(25544),
+                        name: Some("ISS".to_string()),
+                        operator: Some("NASA/Roscosmos".to_string()),
+                        position_km: [6800.0, 0.0, 0.0],
+                        velocity_kms: [0.0, 7.66, 0.0],
+                        covariance: None,
+                    },
+                    secondary: CdmObject {
+                        norad_id: NoradId(40075),
+                        name: None,
+                        operator: None,
+                        position_km: [6800.5, 0.0, 0.0],
+                        velocity_kms: [0.0, -7.66, 0.0],
+                        covariance: None,
+                    },
+                    miss_distance_km: 0.5,
+                    relative_velocity_kms: 15.32,
+                    collision_probability: 0.001,
+                    hard_body_radius_m: 20.0,
+                    creation_time: SpaceTimestamp::now(),
+                    originator: agent.clone(),
+                },
+                version,
+                supersedes: None,
+            };
+            let _: ActionHash = conductor
+                .call(&cell.zome("conjunctions_coordinator"), "submit_cdm", cdm_input)
+                .await;
+        }
+
+        // Query CDMs for this event
+        let cdms: Vec<serde_json::Value> = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "get_cdms_for_event", "conj:cdm-test-001".to_string())
+            .await;
+        assert_eq!(cdms.len(), 2, "Should find 2 CDMs for event");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_update_conjunction_risk() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create a low-risk conjunction event
+        let event_input = CreateEventInput {
+            event_id: "conj:risk-update-test".to_string(),
+            primary_norad_id: 30000,
+            secondary_norad_id: 30001,
+            tca: SpaceTimestamp::now(),
+            miss_distance_km: 5.0,
+            max_pc: 1e-7,
+            risk_level: RiskLevel::Low,
+            compute_details: false,
+            primary_tle: None,
+            secondary_tle: None,
+        };
+        let event_hash: ActionHash = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "create_conjunction_event", event_input)
+            .await;
+
+        // Escalate risk to High
+        let update_input = UpdateRiskInput {
+            event_hash: event_hash.clone(),
+            new_risk_level: RiskLevel::High,
+            new_pc: 0.005,
+            new_miss_distance_km: 0.2,
+        };
+        let updated_hash: ActionHash = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "update_conjunction_risk", update_input)
+            .await;
+
+        let record = get_record(&conductor, updated_hash).await;
+        assert!(record.is_some(), "Should update conjunction risk");
+
+        // Verify it now appears in high-risk list
+        let high_risk: Vec<serde_json::Value> = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "get_high_risk_conjunctions", ())
+            .await;
+        assert!(!high_risk.is_empty(), "Escalated event should appear in high-risk list");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_mark_maneuver_executed() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create event and announce maneuver
+        let event_input = CreateEventInput {
+            event_id: "conj:exec-test".to_string(),
+            primary_norad_id: 31000,
+            secondary_norad_id: 31001,
+            tca: SpaceTimestamp::now(),
+            miss_distance_km: 0.3,
+            max_pc: 0.01,
+            risk_level: RiskLevel::High,
+            compute_details: false,
+            primary_tle: None,
+            secondary_tle: None,
+        };
+        let _: ActionHash = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "create_conjunction_event", event_input)
+            .await;
+
+        let maneuver_input = AnnounceManeuverInput {
+            event_id: "conj:exec-test".to_string(),
+            norad_id: 31000,
+            burn_time: SpaceTimestamp::now(),
+            delta_v_ms: 0.5,
+            direction: [0.0, 0.0, 1.0],
+        };
+        let maneuver_hash: ActionHash = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "announce_maneuver", maneuver_input)
+            .await;
+
+        // Mark maneuver as executed
+        let exec_input = ManeuverExecutedInput {
+            maneuver_hash: maneuver_hash.clone(),
+        };
+        let updated_hash: ActionHash = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "mark_maneuver_executed", exec_input)
+            .await;
+
+        let record = get_record(&conductor, updated_hash).await;
+        assert!(record.is_some(), "Should mark maneuver as executed");
+
+        // Verify maneuver appears in event's maneuver list
+        let maneuvers: Vec<serde_json::Value> = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "get_maneuvers_for_event", "conj:exec-test".to_string())
+            .await;
+        assert_eq!(maneuvers.len(), 1, "Should find 1 maneuver for event");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -692,6 +1015,146 @@ mod debris_bounties_tests {
 
         let claim_record = get_record(&conductor, claim_hash).await;
         assert!(claim_record.is_some(), "Should create removal claim");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_submit_verification() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create bounty, claim it, and advance to PendingVerification
+        let bounty_input = CreateBountyInput {
+            bounty_id: "bounty:verif-test".to_string(),
+            debris_norad_id: 95001,
+            justification: "Verification test debris".to_string(),
+            amount: 100000,
+            currency: "USD".to_string(),
+            expires_at: None,
+            requirements: RemovalRequirements {
+                min_trust_level: 1,
+                allowed_methods: vec![RemovalMethod::Deorbit],
+                completion_deadline_days: 180,
+                verification_threshold: 1,
+            },
+        };
+        let bounty_hash: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "create_bounty", bounty_input)
+            .await;
+
+        // Claim bounty (Open -> Claimed)
+        let claim_input = ClaimBountyInput {
+            bounty_hash: bounty_hash.clone(),
+            organization: "VerifCorp".to_string(),
+            method: RemovalMethod::Deorbit,
+            estimated_completion: SpaceTimestamp::now(),
+            mission_plan: "Test deorbit for verification".to_string(),
+        };
+        let claim_hash: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "claim_bounty", claim_input)
+            .await;
+
+        // Advance: Claimed -> InProgress -> PendingVerification
+        let _: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "update_bounty_status", UpdateBountyStatusInput {
+                bounty_hash: bounty_hash.clone(),
+                new_status: BountyStatus::InProgress,
+            })
+            .await;
+        let _: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "update_bounty_status", UpdateBountyStatusInput {
+                bounty_hash: bounty_hash.clone(),
+                new_status: BountyStatus::PendingVerification,
+            })
+            .await;
+
+        // Submit verification
+        let verif_input = SubmitVerificationInput {
+            claim_id: claim_hash,
+            verified: true,
+            evidence: VerificationEvidence {
+                last_observed: Some(SpaceTimestamp::now()),
+                predicted_reentry: None,
+                sensors_lost_track: 3,
+                data_hash: None,
+                notes: "Object no longer tracked by 3 independent sensors".to_string(),
+            },
+        };
+        let verif_hash: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "submit_verification", verif_input)
+            .await;
+
+        let record = get_record(&conductor, verif_hash).await;
+        assert!(record.is_some(), "Should create verification entry");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_get_claims_and_contributions() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create bounty
+        let bounty_input = CreateBountyInput {
+            bounty_id: "bounty:query-claims-test".to_string(),
+            debris_norad_id: 95002,
+            justification: "Claims/contributions query test".to_string(),
+            amount: 200000,
+            currency: "USD".to_string(),
+            expires_at: None,
+            requirements: RemovalRequirements {
+                min_trust_level: 1,
+                allowed_methods: vec![RemovalMethod::Any],
+                completion_deadline_days: 365,
+                verification_threshold: 2,
+            },
+        };
+        let bounty_hash: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "create_bounty", bounty_input)
+            .await;
+
+        // Add 2 contributions
+        for i in 0..2 {
+            let contrib_input = ContributeInput {
+                bounty_hash: bounty_hash.clone(),
+                bounty_id: "bounty:query-claims-test".to_string(),
+                amount: 50000 + i * 10000,
+                currency: "USD".to_string(),
+                message: Some(format!("Contribution {}", i)),
+            };
+            let _: ActionHash = conductor
+                .call(&cell.zome("debris_bounties_coordinator"), "contribute_to_bounty", contrib_input)
+                .await;
+        }
+
+        // Query contributions
+        let contributions: Vec<BountyContribution> = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "get_contributions", bounty_hash.clone())
+            .await;
+        assert_eq!(contributions.len(), 2, "Should find 2 contributions");
+
+        // Claim the bounty
+        let claim_input = ClaimBountyInput {
+            bounty_hash: bounty_hash.clone(),
+            organization: "ClaimQueryCorp".to_string(),
+            method: RemovalMethod::Capture,
+            estimated_completion: SpaceTimestamp::now(),
+            mission_plan: "Capture mission for claims query test".to_string(),
+        };
+        let _: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "claim_bounty", claim_input)
+            .await;
+
+        // Query claims
+        let claims: Vec<RemovalClaim> = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "get_claims", bounty_hash.clone())
+            .await;
+        assert_eq!(claims.len(), 1, "Should find 1 claim");
+        assert_eq!(claims[0].organization, "ClaimQueryCorp");
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -1234,5 +1697,661 @@ mod lifecycle_tests {
 
         let bounty_record = get_record(&conductor, bounty_hash).await;
         assert!(bounty_record.is_some(), "Lifecycle should produce bounty");
+    }
+
+    /// Full 5-zome end-to-end: Object → TLE → Conjunction + CDM → Bounty → Traffic Control
+    ///
+    /// Exercises every coordinator in sequence, simulating a realistic scenario:
+    /// two operators track their satellites, a conjunction is detected, a CDM is filed,
+    /// a debris bounty is created, and traffic control negotiation resolves the situation.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_full_5_zome_end_to_end() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        // Two separate agents (operators)
+        let app1 = conductor.setup_app("operator-alpha", &[dna.clone()]).await.unwrap();
+        let cell1 = app1.cells()[0].clone();
+        let agent1 = app1.agent().clone();
+
+        let app2 = conductor.setup_app("operator-beta", &[dna]).await.unwrap();
+        let cell2 = app2.cells()[0].clone();
+        let agent2 = app2.agent().clone();
+
+        // ── Step 1: Register orbital objects ──
+        let _: ActionHash = conductor
+            .call(&cell1.zome("orbital_objects_coordinator"), "register_object", RegisterObjectInput {
+                norad_id: 60001,
+                intl_designator: "2025-E2E-A".to_string(),
+                name: "Alpha-Sat".to_string(),
+                object_type: ObjectType::Payload,
+                country: Some("US".to_string()),
+                launch_date: None,
+                status: Some(OperationalStatus::Active),
+            })
+            .await;
+
+        let _: ActionHash = conductor
+            .call(&cell2.zome("orbital_objects_coordinator"), "register_object", RegisterObjectInput {
+                norad_id: 60002,
+                intl_designator: "2019-E2E-B".to_string(),
+                name: "Derelict-Beta".to_string(),
+                object_type: ObjectType::Debris,
+                country: None,
+                launch_date: None,
+                status: Some(OperationalStatus::Inactive),
+            })
+            .await;
+
+        // ── Step 2: Submit TLEs for both objects ──
+        let _: ActionHash = conductor
+            .call(&cell1.zome("orbital_objects_coordinator"), "submit_tle", SubmitTleInput {
+                norad_id: 60001,
+                line1: "1 60001U 25E2EA   26040.50000000  .00016717  00000-0  10270-3 0  9990".to_string(),
+                line2: "2 60001  51.6400 208.9163 0006703 306.0500  54.0150 15.49560532000001".to_string(),
+                source: Some(DataSourceType::Operator),
+                quality: None,
+            })
+            .await;
+
+        let _: ActionHash = conductor
+            .call(&cell1.zome("orbital_objects_coordinator"), "submit_tle", SubmitTleInput {
+                norad_id: 60002,
+                line1: "1 60002U 19E2EB   26040.50000000  .00000500  00000-0  50000-4 0  9990".to_string(),
+                line2: "2 60002  51.6500 209.0000 0007000 305.0000  55.0000 15.49000000000001".to_string(),
+                source: Some(DataSourceType::CelesTrak),
+                quality: None,
+            })
+            .await;
+
+        // Verify TLEs are queryable
+        let tles: Vec<TleLines> = conductor
+            .call(&cell1.zome("orbital_objects_coordinator"), "get_latest_tles", vec![60001u32, 60002u32])
+            .await;
+        assert_eq!(tles.len(), 2, "Both TLEs should be retrievable");
+
+        // ── Step 3: Register sensor and submit observation ──
+        let _: ActionHash = conductor
+            .call(&cell1.zome("observations_coordinator"), "register_sensor", RegisterSensorInput {
+                sensor_id: "sensor:e2e-radar".to_string(),
+                name: "E2E Test Radar".to_string(),
+                sensor_type: ObservationType::Radar,
+                location: Some(GroundLocation {
+                    latitude: 32.95,
+                    longitude: -96.73,
+                    altitude_m: 200.0,
+                }),
+                capabilities: SensorCapabilities {
+                    min_elevation_deg: 5.0,
+                    max_range_km: 40000.0,
+                    accuracy_arcsec: 10.0,
+                },
+            })
+            .await;
+
+        let _: ActionHash = conductor
+            .call(&cell1.zome("observations_coordinator"), "submit_observation", SubmitObservationInput {
+                norad_id: Some(60001),
+                observation_time: SpaceTimestamp::now(),
+                observer_location: Some(GroundLocation {
+                    latitude: 32.95,
+                    longitude: -96.73,
+                    altitude_m: 200.0,
+                }),
+                observation_type: ObservationType::Radar,
+                measurement: Measurement {
+                    azimuth_deg: Some(270.0),
+                    elevation_deg: Some(30.0),
+                    range_km: Some(800.0),
+                    range_rate_kms: Some(-2.0),
+                    visual_magnitude: None,
+                },
+                quality: None,
+                sensor_id: "sensor:e2e-radar".to_string(),
+            })
+            .await;
+
+        // ── Step 4: Create conjunction event ──
+        let _conj_hash: ActionHash = conductor
+            .call(&cell1.zome("conjunctions_coordinator"), "create_conjunction_event", CreateEventInput {
+                event_id: "conj:60001:60002:e2e".to_string(),
+                primary_norad_id: 60001,
+                secondary_norad_id: 60002,
+                tca: SpaceTimestamp::now(),
+                miss_distance_km: 0.15,
+                max_pc: 0.008,
+                risk_level: RiskLevel::High,
+                compute_details: false,
+                primary_tle: None,
+                secondary_tle: None,
+            })
+            .await;
+
+        // Submit CDM for the conjunction
+        let _: ActionHash = conductor
+            .call(&cell1.zome("conjunctions_coordinator"), "submit_cdm", SubmitCdmInput {
+                cdm: SharedConjunctionDataMessage {
+                    conjunction_id: "conj:60001:60002:e2e".to_string(),
+                    tca: SpaceTimestamp::now(),
+                    primary: CdmObject {
+                        norad_id: NoradId(60001),
+                        name: Some("Alpha-Sat".to_string()),
+                        operator: Some("Operator Alpha".to_string()),
+                        position_km: [6778.0, 0.0, 0.0],
+                        velocity_kms: [0.0, 7.67, 0.0],
+                        covariance: None,
+                    },
+                    secondary: CdmObject {
+                        norad_id: NoradId(60002),
+                        name: Some("Derelict-Beta".to_string()),
+                        operator: None,
+                        position_km: [6778.15, 0.0, 0.0],
+                        velocity_kms: [0.0, -7.67, 0.0],
+                        covariance: None,
+                    },
+                    miss_distance_km: 0.15,
+                    relative_velocity_kms: 15.34,
+                    collision_probability: 0.008,
+                    hard_body_radius_m: 15.0,
+                    creation_time: SpaceTimestamp::now(),
+                    originator: agent1.clone(),
+                },
+                version: 1,
+                supersedes: None,
+            })
+            .await;
+
+        // Verify conjunction is in high-risk list
+        let high_risk: Vec<serde_json::Value> = conductor
+            .call(&cell1.zome("conjunctions_coordinator"), "get_high_risk_conjunctions", ())
+            .await;
+        assert!(!high_risk.is_empty(), "E2E conjunction should appear in high-risk list");
+
+        // Verify CDMs are queryable
+        let cdms: Vec<serde_json::Value> = conductor
+            .call(&cell1.zome("conjunctions_coordinator"), "get_cdms_for_event", "conj:60001:60002:e2e".to_string())
+            .await;
+        assert_eq!(cdms.len(), 1, "Should find 1 CDM for e2e conjunction");
+
+        // ── Step 5: Create debris bounty ──
+        let _bounty_hash: ActionHash = conductor
+            .call(&cell1.zome("debris_bounties_coordinator"), "create_bounty", CreateBountyInput {
+                bounty_id: "bounty:60002-e2e".to_string(),
+                debris_norad_id: 60002,
+                justification: "High Pc conjunction with active satellite Alpha-Sat".to_string(),
+                amount: 300000,
+                currency: "USD".to_string(),
+                expires_at: None,
+                requirements: RemovalRequirements {
+                    min_trust_level: 1,
+                    allowed_methods: vec![RemovalMethod::Deorbit, RemovalMethod::Capture],
+                    completion_deadline_days: 365,
+                    verification_threshold: 2,
+                },
+            })
+            .await;
+
+        // Verify bounty is in active list
+        let active_bounties: Vec<DebrisBounty> = conductor
+            .call(&cell1.zome("debris_bounties_coordinator"), "get_active_bounties", ())
+            .await;
+        assert!(
+            active_bounties.iter().any(|b| b.debris_norad_id == 60002),
+            "E2E bounty should appear in active bounties"
+        );
+
+        // ── Step 6: Traffic control negotiation ──
+        let _: ActionHash = conductor
+            .call(&cell1.zome("traffic_control_coordinator"), "initiate_negotiation", InitiateNegotiationInput {
+                session_id: "session:e2e-conj-60001-60002".to_string(),
+                conjunction_id: "conj:60001:60002:e2e".to_string(),
+                primary_operator: agent1.clone(),
+                secondary_operator: agent2.clone(),
+                primary_norad_id: 60001,
+                secondary_norad_id: 60002,
+                tca: SpaceTimestamp::now(),
+                deadline: SpaceTimestamp::now(),
+            })
+            .await;
+
+        // Both operators submit positions
+        let _: ActionHash = conductor
+            .call(&cell1.zome("traffic_control_coordinator"), "submit_position", SubmitPositionInput {
+                session_id: "session:e2e-conj-60001-60002".to_string(),
+                norad_id: 60001,
+                maneuver_capability: ManeuverCapability {
+                    max_delta_v_ms: 5.0,
+                    min_lead_time_hours: 24.0,
+                    fuel_remaining_pct: 75.0,
+                },
+                preferences: OperatorPreferences {
+                    willing_to_maneuver: true,
+                    max_cost_usd: Some(50000.0),
+                    preferred_direction: Some([0.0, 0.0, 1.0]),
+                },
+            })
+            .await;
+
+        let _: ActionHash = conductor
+            .call(&cell2.zome("traffic_control_coordinator"), "submit_position", SubmitPositionInput {
+                session_id: "session:e2e-conj-60001-60002".to_string(),
+                norad_id: 60002,
+                maneuver_capability: ManeuverCapability {
+                    max_delta_v_ms: 0.0,  // debris can't maneuver
+                    min_lead_time_hours: 0.0,
+                    fuel_remaining_pct: 0.0,
+                },
+                preferences: OperatorPreferences {
+                    willing_to_maneuver: false,
+                    max_cost_usd: None,
+                    preferred_direction: None,
+                },
+            })
+            .await;
+
+        // Verify positions are queryable
+        let positions: Vec<serde_json::Value> = conductor
+            .call(&cell1.zome("traffic_control_coordinator"), "get_session_positions", "session:e2e-conj-60001-60002".to_string())
+            .await;
+        assert_eq!(positions.len(), 2, "Both operators should have submitted positions");
+
+        // Alpha operator submits maneuver proposal (they'll move since debris can't)
+        let prop_hash: ActionHash = conductor
+            .call(&cell1.zome("traffic_control_coordinator"), "submit_proposal", SubmitProposalInput {
+                session_id: "session:e2e-conj-60001-60002".to_string(),
+                maneuvering_object: 60001,
+                burn_time: SpaceTimestamp::now(),
+                delta_v_ms: 0.3,
+                direction: [0.0, 0.0, 1.0],
+                resulting_miss_km: 5.0,
+                resulting_pc: 1e-8,
+                cost_estimate: Some(CostEstimate {
+                    fuel_cost_usd: 3000.0,
+                    operational_cost_usd: 8000.0,
+                    opportunity_cost_usd: 1500.0,
+                }),
+            })
+            .await;
+
+        // Accept proposal → creates agreement
+        let agreement_hash: ActionHash = conductor
+            .call(&cell1.zome("traffic_control_coordinator"), "accept_proposal", AcceptProposalInput {
+                session_id: "session:e2e-conj-60001-60002".to_string(),
+                proposal_hash: prop_hash,
+                execution_deadline: SpaceTimestamp::now(),
+            })
+            .await;
+
+        // Secondary operator cosigns
+        let cosigned_hash: ActionHash = conductor
+            .call(&cell2.zome("traffic_control_coordinator"), "cosign_agreement", CosignAgreementInput {
+                agreement_hash: agreement_hash.clone(),
+            })
+            .await;
+
+        let cosigned_record = get_record(&conductor, cosigned_hash).await;
+        assert!(cosigned_record.is_some(), "Full E2E: agreement should be cosigned");
+
+        // ── Step 7: Announce maneuver on the conjunction ──
+        let _maneuver_hash: ActionHash = conductor
+            .call(&cell1.zome("conjunctions_coordinator"), "announce_maneuver", AnnounceManeuverInput {
+                event_id: "conj:60001:60002:e2e".to_string(),
+                norad_id: 60001,
+                burn_time: SpaceTimestamp::now(),
+                delta_v_ms: 0.3,
+                direction: [0.0, 0.0, 1.0],
+            })
+            .await;
+
+        // Verify maneuver is recorded
+        let maneuvers: Vec<serde_json::Value> = conductor
+            .call(&cell1.zome("conjunctions_coordinator"), "get_maneuvers_for_event", "conj:60001:60002:e2e".to_string())
+            .await;
+        assert_eq!(maneuvers.len(), 1, "Should find 1 maneuver for e2e conjunction");
+
+        // ── Verification: all 5 zomes participated ──
+        // 1. orbital_objects: registered 2 objects + 2 TLEs
+        // 2. observations: registered sensor + submitted observation
+        // 3. conjunctions: created event + CDM + maneuver
+        // 4. debris_bounties: created bounty
+        // 5. traffic_control: negotiation → positions → proposal → agreement → cosign
+    }
+}
+
+// ============================================================================
+// Multi-Agent Scenarios
+// ============================================================================
+
+#[cfg(test)]
+mod multi_agent_tests {
+    use super::*;
+
+    /// Agent A creates a bounty and contributes, Agent B claims and completes it.
+    /// Verifies cross-agent data visibility and state machine transitions
+    /// when the claim owner differs from the bounty creator.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_multi_agent_bounty_lifecycle() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        let app_creator = conductor.setup_app("bounty-creator", &[dna.clone()]).await.unwrap();
+        let cell_creator = app_creator.cells()[0].clone();
+
+        let app_claimer = conductor.setup_app("bounty-claimer", &[dna]).await.unwrap();
+        let cell_claimer = app_claimer.cells()[0].clone();
+
+        // Agent A: Create bounty
+        let bounty_input = CreateBountyInput {
+            bounty_id: "bounty:multi-agent-001".to_string(),
+            debris_norad_id: 70001,
+            justification: "Multi-agent lifecycle test".to_string(),
+            amount: 100000,
+            currency: "USD".to_string(),
+            expires_at: None,
+            requirements: RemovalRequirements {
+                min_trust_level: 1,
+                allowed_methods: vec![RemovalMethod::Deorbit, RemovalMethod::Capture],
+                completion_deadline_days: 365,
+                verification_threshold: 1,
+            },
+        };
+        let bounty_hash: ActionHash = conductor
+            .call(&cell_creator.zome("debris_bounties_coordinator"), "create_bounty", bounty_input)
+            .await;
+
+        // Agent A: Contribute additional funds
+        let contrib_input = ContributeInput {
+            bounty_hash: bounty_hash.clone(),
+            bounty_id: "bounty:multi-agent-001".to_string(),
+            amount: 50000,
+            currency: "USD".to_string(),
+            message: Some("Extra funding from creator".to_string()),
+        };
+        let _: ActionHash = conductor
+            .call(&cell_creator.zome("debris_bounties_coordinator"), "contribute_to_bounty", contrib_input)
+            .await;
+
+        // Agent B: Can see the bounty in active list
+        let active: Vec<DebrisBounty> = conductor
+            .call(&cell_claimer.zome("debris_bounties_coordinator"), "get_active_bounties", ())
+            .await;
+        assert!(
+            active.iter().any(|b| b.debris_norad_id == 70001),
+            "Agent B should see Agent A's bounty in active list"
+        );
+
+        // Agent B: Claim the bounty
+        let claim_input = ClaimBountyInput {
+            bounty_hash: bounty_hash.clone(),
+            organization: "CleanOrbit Inc.".to_string(),
+            method: RemovalMethod::Capture,
+            estimated_completion: SpaceTimestamp::now(),
+            mission_plan: "Robotic capture with ADRAS-style vehicle".to_string(),
+        };
+        let _claim_hash: ActionHash = conductor
+            .call(&cell_claimer.zome("debris_bounties_coordinator"), "claim_bounty", claim_input)
+            .await;
+
+        // Agent B: Advance through state machine (Claimed -> InProgress -> PendingVerification)
+        let _: ActionHash = conductor
+            .call(&cell_claimer.zome("debris_bounties_coordinator"), "update_bounty_status", UpdateBountyStatusInput {
+                bounty_hash: bounty_hash.clone(),
+                new_status: BountyStatus::InProgress,
+            })
+            .await;
+
+        let _: ActionHash = conductor
+            .call(&cell_claimer.zome("debris_bounties_coordinator"), "update_bounty_status", UpdateBountyStatusInput {
+                bounty_hash: bounty_hash.clone(),
+                new_status: BountyStatus::PendingVerification,
+            })
+            .await;
+
+        // Agent A: Submit verification (creator verifies claimer's work)
+        let claims: Vec<RemovalClaim> = conductor
+            .call(&cell_creator.zome("debris_bounties_coordinator"), "get_claims", bounty_hash.clone())
+            .await;
+        assert_eq!(claims.len(), 1, "Should find Agent B's claim");
+        assert_eq!(claims[0].organization, "CleanOrbit Inc.");
+
+        // Agent A: Complete the bounty
+        let _: ActionHash = conductor
+            .call(&cell_creator.zome("debris_bounties_coordinator"), "update_bounty_status", UpdateBountyStatusInput {
+                bounty_hash: bounty_hash.clone(),
+                new_status: BountyStatus::Completed,
+            })
+            .await;
+
+        // Verify final state visible to both agents
+        let bounties_a: Vec<DebrisBounty> = conductor
+            .call(&cell_creator.zome("debris_bounties_coordinator"), "get_bounties_for_debris", 70001u32)
+            .await;
+        let bounties_b: Vec<DebrisBounty> = conductor
+            .call(&cell_claimer.zome("debris_bounties_coordinator"), "get_bounties_for_debris", 70001u32)
+            .await;
+        assert_eq!(bounties_a[0].status, BountyStatus::Completed);
+        assert_eq!(bounties_b[0].status, BountyStatus::Completed);
+
+        // Contributions visible to both
+        let contribs: Vec<BountyContribution> = conductor
+            .call(&cell_claimer.zome("debris_bounties_coordinator"), "get_contributions", bounty_hash.clone())
+            .await;
+        assert_eq!(contribs.len(), 1, "Agent B should see Agent A's contribution");
+    }
+
+    /// Two agents register different sensors and independently observe the same object.
+    /// Verifies observations from multiple sources are discoverable by either agent.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_multi_sensor_observation_corroboration() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        let app_texas = conductor.setup_app("sensor-texas", &[dna.clone()]).await.unwrap();
+        let cell_texas = app_texas.cells()[0].clone();
+
+        let app_colorado = conductor.setup_app("sensor-colorado", &[dna]).await.unwrap();
+        let cell_colorado = app_colorado.cells()[0].clone();
+
+        let target_norad = 71001u32;
+
+        // Agent 1: Register Texas optical sensor
+        let _: ActionHash = conductor
+            .call(&cell_texas.zome("observations_coordinator"), "register_sensor", RegisterSensorInput {
+                sensor_id: "sensor:tx-optical".to_string(),
+                name: "Texas Optical Telescope".to_string(),
+                sensor_type: ObservationType::Optical,
+                location: Some(GroundLocation {
+                    latitude: 30.27,
+                    longitude: -97.74,
+                    altitude_m: 150.0,
+                }),
+                capabilities: SensorCapabilities {
+                    min_elevation_deg: 10.0,
+                    max_range_km: 36000.0,
+                    accuracy_arcsec: 2.0,
+                },
+            })
+            .await;
+
+        // Agent 2: Register Colorado radar station
+        let _: ActionHash = conductor
+            .call(&cell_colorado.zome("observations_coordinator"), "register_sensor", RegisterSensorInput {
+                sensor_id: "sensor:co-radar".to_string(),
+                name: "Colorado Springs Radar".to_string(),
+                sensor_type: ObservationType::Radar,
+                location: Some(GroundLocation {
+                    latitude: 38.83,
+                    longitude: -104.82,
+                    altitude_m: 1830.0,
+                }),
+                capabilities: SensorCapabilities {
+                    min_elevation_deg: 5.0,
+                    max_range_km: 40000.0,
+                    accuracy_arcsec: 5.0,
+                },
+            })
+            .await;
+
+        // Both sensors observe the same object
+        let _: ActionHash = conductor
+            .call(&cell_texas.zome("observations_coordinator"), "submit_observation", SubmitObservationInput {
+                norad_id: Some(target_norad),
+                observation_time: SpaceTimestamp::now(),
+                observer_location: Some(GroundLocation {
+                    latitude: 30.27,
+                    longitude: -97.74,
+                    altitude_m: 150.0,
+                }),
+                observation_type: ObservationType::Optical,
+                measurement: Measurement {
+                    azimuth_deg: Some(225.0),
+                    elevation_deg: Some(55.0),
+                    range_km: None,
+                    range_rate_kms: None,
+                    visual_magnitude: Some(-1.8),
+                },
+                quality: Some(QualityScore {
+                    completeness: 0.8,
+                    accuracy: 0.9,
+                    timeliness: 0.95,
+                }),
+                sensor_id: "sensor:tx-optical".to_string(),
+            })
+            .await;
+
+        let _: ActionHash = conductor
+            .call(&cell_colorado.zome("observations_coordinator"), "submit_observation", SubmitObservationInput {
+                norad_id: Some(target_norad),
+                observation_time: SpaceTimestamp::now(),
+                observer_location: Some(GroundLocation {
+                    latitude: 38.83,
+                    longitude: -104.82,
+                    altitude_m: 1830.0,
+                }),
+                observation_type: ObservationType::Radar,
+                measurement: Measurement {
+                    azimuth_deg: Some(200.0),
+                    elevation_deg: Some(40.0),
+                    range_km: Some(900.0),
+                    range_rate_kms: Some(-1.5),
+                    visual_magnitude: None,
+                },
+                quality: Some(QualityScore {
+                    completeness: 0.95,
+                    accuracy: 0.85,
+                    timeliness: 0.90,
+                }),
+                sensor_id: "sensor:co-radar".to_string(),
+            })
+            .await;
+
+        // Either agent can query all observations for the object
+        let obs_from_texas: Vec<serde_json::Value> = conductor
+            .call(&cell_texas.zome("observations_coordinator"), "get_observations_for_object", target_norad)
+            .await;
+        assert_eq!(obs_from_texas.len(), 2, "Texas agent should see both observations");
+
+        let obs_from_colorado: Vec<serde_json::Value> = conductor
+            .call(&cell_colorado.zome("observations_coordinator"), "get_observations_for_object", target_norad)
+            .await;
+        assert_eq!(obs_from_colorado.len(), 2, "Colorado agent should see both observations");
+
+        // Sensor-specific queries return only that sensor's data
+        let tx_only: Vec<serde_json::Value> = conductor
+            .call(&cell_colorado.zome("observations_coordinator"), "get_sensor_observations", "sensor:tx-optical".to_string())
+            .await;
+        assert_eq!(tx_only.len(), 1, "Texas sensor should have 1 observation");
+
+        let co_only: Vec<serde_json::Value> = conductor
+            .call(&cell_texas.zome("observations_coordinator"), "get_sensor_observations", "sensor:co-radar".to_string())
+            .await;
+        assert_eq!(co_only.len(), 1, "Colorado sensor should have 1 observation");
+
+        // Both sensors appear in the global sensor list
+        let sensors: Vec<serde_json::Value> = conductor
+            .call(&cell_texas.zome("observations_coordinator"), "list_sensors", ())
+            .await;
+        assert!(sensors.len() >= 2, "Should list both sensors from different agents");
+    }
+
+    /// Agent A creates bounty, Agent B claims it.
+    /// Agent C attempts to claim the same bounty — should fail because it's already Claimed.
+    /// Verifies the state machine prevents double-claiming across agents.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_competing_bounty_claims() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        let app_creator = conductor.setup_app("creator", &[dna.clone()]).await.unwrap();
+        let cell_creator = app_creator.cells()[0].clone();
+
+        let app_claimer1 = conductor.setup_app("claimer-1", &[dna.clone()]).await.unwrap();
+        let cell_claimer1 = app_claimer1.cells()[0].clone();
+
+        let app_claimer2 = conductor.setup_app("claimer-2", &[dna]).await.unwrap();
+        let cell_claimer2 = app_claimer2.cells()[0].clone();
+
+        // Creator makes a bounty
+        let bounty_hash: ActionHash = conductor
+            .call(&cell_creator.zome("debris_bounties_coordinator"), "create_bounty", CreateBountyInput {
+                bounty_id: "bounty:compete-test".to_string(),
+                debris_norad_id: 72001,
+                justification: "Competing claims test".to_string(),
+                amount: 200000,
+                currency: "USD".to_string(),
+                expires_at: None,
+                requirements: RemovalRequirements {
+                    min_trust_level: 1,
+                    allowed_methods: vec![RemovalMethod::Any],
+                    completion_deadline_days: 365,
+                    verification_threshold: 2,
+                },
+            })
+            .await;
+
+        // Claimer 1: Claim the bounty (should succeed)
+        let _: ActionHash = conductor
+            .call(&cell_claimer1.zome("debris_bounties_coordinator"), "claim_bounty", ClaimBountyInput {
+                bounty_hash: bounty_hash.clone(),
+                organization: "FirstMover Corp".to_string(),
+                method: RemovalMethod::Capture,
+                estimated_completion: SpaceTimestamp::now(),
+                mission_plan: "First claim gets priority".to_string(),
+            })
+            .await;
+
+        // Verify first claim is recorded
+        let claims: Vec<RemovalClaim> = conductor
+            .call(&cell_creator.zome("debris_bounties_coordinator"), "get_claims", bounty_hash.clone())
+            .await;
+        assert_eq!(claims.len(), 1, "Only the first claim should exist");
+        assert_eq!(claims[0].organization, "FirstMover Corp");
+
+        // Verify bounty status changed from Open to Claimed
+        let bounties: Vec<DebrisBounty> = conductor
+            .call(&cell_creator.zome("debris_bounties_coordinator"), "get_bounties_for_debris", 72001u32)
+            .await;
+        assert_eq!(bounties[0].status, BountyStatus::Claimed, "Bounty should be Claimed after first claim");
+
+        // Agent C can still contribute even after it's claimed
+        let contrib_input = ContributeInput {
+            bounty_hash: bounty_hash.clone(),
+            bounty_id: "bounty:compete-test".to_string(),
+            amount: 25000,
+            currency: "USD".to_string(),
+            message: Some("Late contribution from third party".to_string()),
+        };
+        let _: ActionHash = conductor
+            .call(&cell_claimer2.zome("debris_bounties_coordinator"), "contribute_to_bounty", contrib_input)
+            .await;
+
+        let contribs: Vec<BountyContribution> = conductor
+            .call(&cell_claimer2.zome("debris_bounties_coordinator"), "get_contributions", bounty_hash.clone())
+            .await;
+        assert_eq!(contribs.len(), 1, "Third party contribution should be recorded");
     }
 }

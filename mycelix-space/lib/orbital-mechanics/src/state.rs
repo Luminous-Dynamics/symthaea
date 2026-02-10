@@ -3,15 +3,16 @@
 //! Represents the complete state of an orbital object: position, velocity,
 //! and uncertainty (covariance matrix).
 
+use crate::covariance::CovarianceMatrix;
+use chrono::{DateTime, Utc};
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
-use crate::covariance::CovarianceMatrix;
 
 /// Reference frame for state vectors
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum ReferenceFrame {
     /// True Equator Mean Equinox (J2000)
+    #[default]
     TEME,
     /// Earth-Centered Inertial (J2000)
     ECI,
@@ -19,12 +20,6 @@ pub enum ReferenceFrame {
     ECEF,
     /// International Celestial Reference Frame
     ICRF,
-}
-
-impl Default for ReferenceFrame {
-    fn default() -> Self {
-        ReferenceFrame::TEME  // SGP4 native frame
-    }
 }
 
 /// 6-element state vector (position + velocity)
@@ -46,7 +41,14 @@ pub struct StateVector {
 
 impl StateVector {
     pub fn new(x: f64, y: f64, z: f64, vx: f64, vy: f64, vz: f64) -> Self {
-        Self { x, y, z, vx, vy, vz }
+        Self {
+            x,
+            y,
+            z,
+            vx,
+            vy,
+            vz,
+        }
     }
 
     /// Create from position and velocity vectors
@@ -144,15 +146,11 @@ pub enum DataSource {
         sensor_type: SensorType,
     },
     /// Space-based observation
-    SpaceObservation {
-        observer_norad_id: u32,
-    },
+    SpaceObservation { observer_norad_id: u32 },
     /// Operator-provided ephemeris
     OperatorEphemeris,
     /// Fused from multiple sources
-    Fused {
-        source_count: u32,
-    },
+    Fused { source_count: u32 },
     /// Mycelix network consensus
     NetworkConsensus {
         observation_count: u32,

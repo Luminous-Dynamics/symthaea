@@ -24,7 +24,7 @@
 //! Lower-right 3x3: Velocity covariance (km²/s²)
 //! Off-diagonal 3x3s: Position-velocity cross-covariance (km²/s)
 
-use nalgebra::{Matrix3, Matrix6, Vector3, Vector6, SymmetricEigen};
+use nalgebra::{Matrix3, Matrix6, SymmetricEigen, Vector3, Vector6};
 use serde::{Deserialize, Serialize};
 
 /// 6x6 Covariance matrix for orbital state uncertainty
@@ -42,20 +42,15 @@ pub struct CovarianceMatrix {
 }
 
 /// Reference frame for covariance
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub enum CovarianceFrame {
     /// Earth-Centered Inertial (most common for conjunction)
+    #[default]
     ECI,
     /// Radial-Transverse-Normal (along-track frame)
     RTN,
     /// UVW frame (similar to RTN but different convention)
     UVW,
-}
-
-impl Default for CovarianceFrame {
-    fn default() -> Self {
-        CovarianceFrame::ECI
-    }
 }
 
 /// Source of covariance data
@@ -64,17 +59,11 @@ pub enum CovarianceSource {
     /// From Space-Track CDM or similar authoritative source
     Official,
     /// Computed from TLE age and propagation
-    Estimated {
-        tle_age_hours: f64,
-    },
+    Estimated { tle_age_hours: f64 },
     /// From sensor observations with known characteristics
-    Observed {
-        sensor_accuracy_km: f64,
-    },
+    Observed { sensor_accuracy_km: f64 },
     /// Fused from multiple sources
-    Fused {
-        source_count: u32,
-    },
+    Fused { source_count: u32 },
     /// Default/unknown (high uncertainty assumed)
     Unknown,
 }
@@ -122,21 +111,22 @@ impl CovarianceMatrix {
         // Velocity uncertainty grows more slowly
 
         // Base uncertainty for fresh TLE (from Space-Track accuracy)
-        let base_pos_km = 1.0;  // ~1 km position uncertainty
-        let base_vel_kms = 0.001;  // ~1 m/s velocity uncertainty
+        let base_pos_km = 1.0; // ~1 km position uncertainty
+        let base_vel_kms = 0.001; // ~1 m/s velocity uncertainty
 
         // Growth rates (km/day for position, km/s/day for velocity)
-        let pos_growth_rate = 5.0 / 24.0;  // ~5 km/day
-        let vel_growth_rate = 0.01 / 24.0;  // ~10 m/s/day
+        let pos_growth_rate = 5.0 / 24.0; // ~5 km/day
+        let vel_growth_rate = 0.01 / 24.0; // ~10 m/s/day
 
         let pos_sigma = base_pos_km + pos_growth_rate * age_hours;
         let vel_sigma = base_vel_kms + vel_growth_rate * age_hours;
 
         let mut cov = Self::diagonal([
-            pos_sigma, pos_sigma, pos_sigma,
-            vel_sigma, vel_sigma, vel_sigma,
+            pos_sigma, pos_sigma, pos_sigma, vel_sigma, vel_sigma, vel_sigma,
         ]);
-        cov.source = CovarianceSource::Estimated { tle_age_hours: age_hours };
+        cov.source = CovarianceSource::Estimated {
+            tle_age_hours: age_hours,
+        };
         cov
     }
 
@@ -210,11 +200,7 @@ impl CovarianceMatrix {
         let t_hat = n_hat.cross(&r_hat);
 
         // Build rotation matrix (ECI to RTN)
-        let rot = Matrix3::from_rows(&[
-            r_hat.transpose(),
-            t_hat.transpose(),
-            n_hat.transpose(),
-        ]);
+        let rot = Matrix3::from_rows(&[r_hat.transpose(), t_hat.transpose(), n_hat.transpose()]);
 
         // Build 6x6 rotation matrix
         let mut rot6 = Matrix6::zeros();
@@ -222,7 +208,7 @@ impl CovarianceMatrix {
         rot6.fixed_view_mut::<3, 3>(3, 3).copy_from(&rot);
 
         // Transform: C_rtn = R * C_eci * R^T
-        let new_data = &rot6 * &self.data * rot6.transpose();
+        let new_data = rot6 * self.data * rot6.transpose();
 
         Self {
             data: new_data,
@@ -244,7 +230,7 @@ impl CovarianceMatrix {
         phi[(2, 5)] = dt_seconds;
 
         // Transform: C(t+dt) = Phi * C(t) * Phi^T
-        let new_data = &phi * &self.data * phi.transpose();
+        let new_data = phi * self.data * phi.transpose();
 
         Self {
             data: new_data,
@@ -307,8 +293,8 @@ mod tests {
         // Check diagonal elements are variances (sigma squared)
         let mat = cov.matrix();
         assert!((mat[(0, 0)] - 1.0).abs() < 0.001);
-        assert!((mat[(1, 1)] - 4.0).abs() < 0.001);  // 2^2
-        assert!((mat[(2, 2)] - 9.0).abs() < 0.001);  // 3^2
+        assert!((mat[(1, 1)] - 4.0).abs() < 0.001); // 2^2
+        assert!((mat[(2, 2)] - 9.0).abs() < 0.001); // 3^2
     }
 
     #[test]

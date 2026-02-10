@@ -11,9 +11,9 @@
 //! - Validation helpers
 //! - Trust and reputation primitives
 
+use chrono::{DateTime, Utc};
 use hdi::prelude::*;
 use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
 /// NORAD Catalog Number - unique identifier for tracked space objects
@@ -24,9 +24,10 @@ pub struct NoradId(pub u32);
 impl NoradId {
     pub fn new(id: u32) -> ExternResult<Self> {
         if id == 0 || id > 999999 {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Invalid NORAD ID: {}. Must be 1-999999", id)
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid NORAD ID: {}. Must be 1-999999",
+                id
+            ))));
         }
         Ok(Self(id))
     }
@@ -59,8 +60,7 @@ impl SpaceTimestamp {
     }
 
     pub fn to_datetime(&self) -> DateTime<Utc> {
-        DateTime::from_timestamp_micros(self.micros)
-            .unwrap_or_else(|| Utc::now())
+        DateTime::from_timestamp_micros(self.micros).unwrap_or_else(Utc::now)
     }
 
     /// Age in seconds from now
@@ -98,6 +98,98 @@ impl Default for QualityScore {
     }
 }
 
+// =============================================================================
+// TLE Staleness Detection
+// =============================================================================
+
+/// Default staleness threshold: 30 days in seconds.
+pub const TLE_STALE_THRESHOLD_SECS: i64 = 30 * 24 * 3600;
+
+/// Configuration for TLE staleness checks.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StalenessConfig {
+    /// Seconds after which a TLE is considered stale (default: 30 days)
+    pub stale_threshold_secs: i64,
+    /// Quality score below which a TLE is rejected (default: 20)
+    pub min_quality: u8,
+}
+
+impl Default for StalenessConfig {
+    fn default() -> Self {
+        Self {
+            stale_threshold_secs: TLE_STALE_THRESHOLD_SECS,
+            min_quality: 20,
+        }
+    }
+}
+
+/// Staleness assessment result for a TLE.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct TleStaleness {
+    /// Age of the TLE epoch in seconds
+    pub age_secs: i64,
+    /// Whether the TLE exceeds the staleness threshold
+    pub is_stale: bool,
+    /// Original quality score (as submitted)
+    pub original_quality: QualityScore,
+    /// Effective quality after age-based degradation
+    pub effective_quality: QualityScore,
+    /// Confidence multiplier for Pc calculations (1.0 = full, 0.0 = no confidence)
+    pub confidence: f64,
+}
+
+/// Compute age-degraded quality and confidence for a TLE.
+///
+/// Quality degrades linearly: loses ~1 point per day after 7 days.
+/// Confidence drops from 1.0 at epoch to 0.3 at the stale threshold,
+/// and continues to 0.1 at 2x the threshold.
+pub fn compute_staleness(
+    epoch: &SpaceTimestamp,
+    quality: &QualityScore,
+    config: &StalenessConfig,
+) -> TleStaleness {
+    let age_secs = epoch.age_seconds();
+
+    // Quality degrades: ~1 point per day after 7 days of age
+    let grace_period_secs: i64 = 7 * 24 * 3600;
+    let days_past_grace = ((age_secs - grace_period_secs).max(0) as f64) / 86400.0;
+    let degraded = (quality.value() as f64 - days_past_grace).max(0.0) as u8;
+    let effective_quality = QualityScore::new(degraded);
+
+    // Confidence: 1.0 for fresh TLEs, decays towards 0.1 for very old ones
+    let threshold = config.stale_threshold_secs as f64;
+    let age_f = age_secs.max(0) as f64;
+    let confidence = if threshold <= 0.0 {
+        1.0
+    } else {
+        (1.0 - 0.7 * (age_f / threshold).min(2.0) / 2.0).max(0.1)
+    };
+
+    let is_stale = age_secs > config.stale_threshold_secs;
+
+    TleStaleness {
+        age_secs,
+        is_stale,
+        original_quality: *quality,
+        effective_quality,
+        confidence,
+    }
+}
+
+/// TLE data with full metadata (epoch, quality, staleness).
+/// Used by staleness-aware query endpoints.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TleWithMetadata {
+    pub norad_id: u32,
+    pub line1: String,
+    pub line2: String,
+    pub epoch: SpaceTimestamp,
+    pub quality: QualityScore,
+    pub source: DataSourceType,
+    pub submitted_at: SpaceTimestamp,
+    pub staleness: TleStaleness,
+}
+
 /// Source of orbital data
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum DataSourceType {
@@ -114,20 +206,13 @@ pub enum DataSourceType {
     },
 
     /// Space-based observation (from another satellite)
-    SpaceSensor {
-        observer_norad_id: NoradId,
-    },
+    SpaceSensor { observer_norad_id: NoradId },
 
     /// Operator-provided ephemeris (highest trust for own assets)
-    OperatorEphemeris {
-        operator: AgentPubKey,
-    },
+    OperatorEphemeris { operator: AgentPubKey },
 
     /// Fused from multiple sources in the network
-    NetworkFusion {
-        source_count: u32,
-        node_count: u32,
-    },
+    NetworkFusion { source_count: u32, node_count: u32 },
 }
 
 /// Ground sensor location
@@ -140,9 +225,10 @@ pub struct GroundLocation {
 }
 
 /// Trust level for an agent in the network
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum TrustLevel {
     /// New/unknown agent
+    #[default]
     Unverified,
     /// Agent has some history but limited track record
     BasicTrust,
@@ -163,12 +249,6 @@ impl TrustLevel {
             TrustLevel::Verified => 0.9,
             TrustLevel::FoundingMember => 1.0,
         }
-    }
-}
-
-impl Default for TrustLevel {
-    fn default() -> Self {
-        TrustLevel::Unverified
     }
 }
 
@@ -439,6 +519,23 @@ pub struct ConjunctionAssessment {
     pub screening_volume_km: f64,
 }
 
+/// Staleness-enriched conjunction assessment.
+/// Wraps a standard ConjunctionAssessment with TLE quality metadata.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct StalenessAwareAssessment {
+    /// The conjunction assessment (miss distance, Pc, risk level, etc.)
+    pub assessment: ConjunctionAssessment,
+    /// Staleness of the primary object's TLE
+    pub primary_staleness: TleStaleness,
+    /// Staleness of the secondary object's TLE
+    pub secondary_staleness: TleStaleness,
+    /// Combined confidence (product of both TLE confidences).
+    /// Values below 0.5 mean at least one TLE is significantly stale.
+    pub combined_confidence: f64,
+    /// Whether either TLE is stale (convenience flag)
+    pub has_stale_data: bool,
+}
+
 // =============================================================================
 // Observation Types
 // =============================================================================
@@ -640,9 +737,15 @@ impl ConjunctionAlert {
     /// Create a new conjunction detected alert
     pub fn new_conjunction(assessment: &ConjunctionAssessment) -> Self {
         let recommendation = match assessment.risk_level {
-            RiskLevel::Emergency => Some("IMMEDIATE ACTION REQUIRED: Initiate collision avoidance maneuver".to_string()),
-            RiskLevel::High => Some("Prepare collision avoidance maneuver, monitor closely".to_string()),
-            RiskLevel::Medium => Some("Increase monitoring frequency, prepare contingency plans".to_string()),
+            RiskLevel::Emergency => {
+                Some("IMMEDIATE ACTION REQUIRED: Initiate collision avoidance maneuver".to_string())
+            }
+            RiskLevel::High => {
+                Some("Prepare collision avoidance maneuver, monitor closely".to_string())
+            }
+            RiskLevel::Medium => {
+                Some("Increase monitoring frequency, prepare contingency plans".to_string())
+            }
             RiskLevel::Low => Some("Continue monitoring, no immediate action required".to_string()),
             RiskLevel::Negligible => None,
         };
@@ -663,10 +766,7 @@ impl ConjunctionAlert {
     }
 
     /// Create a risk escalation alert
-    pub fn risk_escalation(
-        assessment: &ConjunctionAssessment,
-        previous_level: RiskLevel,
-    ) -> Self {
+    pub fn risk_escalation(assessment: &ConjunctionAssessment, previous_level: RiskLevel) -> Self {
         let mut alert = Self::new_conjunction(assessment);
         alert.alert_type = AlertType::RiskEscalation;
         alert.previous_risk_level = Some(previous_level);
@@ -773,6 +873,55 @@ impl SpaceSignal {
 // Helper Functions
 // =============================================================================
 
+/// Validate a string field: non-empty and within max length.
+pub fn validate_string_field(
+    value: &str,
+    field_name: &str,
+    max_len: usize,
+) -> Result<(), SpaceError> {
+    if value.is_empty() {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            format!("{} must not be empty", field_name),
+        ));
+    }
+    if value.len() > max_len {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            format!(
+                "{} exceeds maximum length of {} characters",
+                field_name, max_len
+            ),
+        )
+        .with_context(format!("length: {}", value.len())));
+    }
+    Ok(())
+}
+
+/// Validate a geographic latitude (-90 to 90).
+pub fn validate_latitude(lat: f64) -> Result<(), SpaceError> {
+    if !(-90.0..=90.0).contains(&lat) || lat.is_nan() {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidLocation,
+            "Latitude must be between -90 and 90 degrees",
+        )
+        .with_context(format!("got: {}", lat)));
+    }
+    Ok(())
+}
+
+/// Validate a geographic longitude (-180 to 180).
+pub fn validate_longitude(lon: f64) -> Result<(), SpaceError> {
+    if !(-180.0..=180.0).contains(&lon) || lon.is_nan() {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidLocation,
+            "Longitude must be between -180 and 180 degrees",
+        )
+        .with_context(format!("got: {}", lon)));
+    }
+    Ok(())
+}
+
 /// Validate that a vector is a unit vector (within tolerance)
 pub fn is_unit_vector(v: &[f64; 3], tolerance: f64) -> bool {
     let magnitude = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
@@ -796,7 +945,7 @@ mod tests {
 
     #[test]
     fn test_norad_id_validation() {
-        assert!(NoradId::new(25544).is_ok());  // ISS
+        assert!(NoradId::new(25544).is_ok()); // ISS
         assert!(NoradId::new(1).is_ok());
         assert!(NoradId::new(999999).is_ok());
         assert!(NoradId::new(0).is_err());
@@ -826,8 +975,8 @@ mod tests {
     fn test_unit_vector() {
         assert!(is_unit_vector(&[1.0, 0.0, 0.0], 0.01));
         assert!(is_unit_vector(&[0.0, 1.0, 0.0], 0.01));
-        assert!(is_unit_vector(&[0.577, 0.577, 0.577], 0.01));  // ~1/sqrt(3)
-        assert!(!is_unit_vector(&[1.0, 1.0, 0.0], 0.01));  // magnitude sqrt(2)
+        assert!(is_unit_vector(&[0.577, 0.577, 0.577], 0.01)); // ~1/sqrt(3)
+        assert!(!is_unit_vector(&[1.0, 1.0, 0.0], 0.01)); // magnitude sqrt(2)
     }
 
     #[test]
@@ -883,7 +1032,8 @@ mod tests {
         };
 
         let json = serde_json::to_string(&obj).expect("Failed to serialize");
-        let parsed: OrbitalObjectEntry = serde_json::from_str(&json).expect("Failed to deserialize");
+        let parsed: OrbitalObjectEntry =
+            serde_json::from_str(&json).expect("Failed to deserialize");
         assert_eq!(parsed.norad_id, 25544);
         assert_eq!(parsed.name, "ISS (ZARYA)");
     }
@@ -892,8 +1042,10 @@ mod tests {
     fn test_tle_data_serialization() {
         let tle = TleData {
             norad_id: 25544,
-            line1: "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9997".to_string(),
-            line2: "2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391424577".to_string(),
+            line1: "1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9997"
+                .to_string(),
+            line2: "2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391424577"
+                .to_string(),
             epoch: Utc::now(),
             source: DataSourceSimple::SpaceTrack,
         };
@@ -920,7 +1072,8 @@ mod tests {
         };
 
         let json = serde_json::to_string(&assessment).expect("Failed to serialize");
-        let parsed: ConjunctionAssessment = serde_json::from_str(&json).expect("Failed to deserialize");
+        let parsed: ConjunctionAssessment =
+            serde_json::from_str(&json).expect("Failed to deserialize");
         assert_eq!(parsed.primary_norad_id, 25544);
         assert_eq!(parsed.secondary_norad_id, 49863);
         assert_eq!(parsed.risk_level, RiskLevel::Medium);
@@ -947,6 +1100,309 @@ mod tests {
         let parsed: BountyEntry = serde_json::from_str(&json).expect("Failed to deserialize");
         assert_eq!(parsed.debris_norad_id, 49863);
         assert_eq!(parsed.bounty_amount, 100000);
+    }
+}
+
+// =============================================================================
+// Zero-Knowledge Orbit Proofs
+// =============================================================================
+
+/// Hash commitment to orbital data.
+///
+/// An operator commits to their orbital state by publishing a hash of their
+/// ephemeris data + a random nonce. Later, they can reveal the data and nonce
+/// to prove the commitment, or provide ZK proofs about properties of the
+/// committed orbit without revealing the data itself.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct OrbitCommitment {
+    /// SHA3-256 hash of (ephemeris_data || nonce)
+    pub commitment: [u8; 32],
+    /// Object this commitment is for
+    pub norad_id: u32,
+    /// Epoch of the committed orbital state
+    pub epoch: SpaceTimestamp,
+    /// Agent who created the commitment
+    pub committer: AgentPubKey,
+    /// When this commitment was published
+    pub created_at: SpaceTimestamp,
+    /// Optional expiration (commitments become stale)
+    pub expires_at: Option<SpaceTimestamp>,
+}
+
+/// Proof that an orbit satisfies certain properties without revealing the orbit.
+///
+/// This is the on-chain attestation structure. The actual ZK proof blob is
+/// opaque to Holochain — it gets verified by calling `verify_orbit_proof`
+/// which checks the proof against the commitment.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OrbitProof {
+    /// Which commitment this proof refers to
+    pub commitment: [u8; 32],
+    /// What property is being proven
+    pub claim: OrbitClaim,
+    /// The opaque proof blob (format depends on `proof_system`)
+    pub proof_data: Vec<u8>,
+    /// Which proof system generated this proof
+    pub proof_system: ProofSystem,
+    /// Agent who generated the proof
+    pub prover: AgentPubKey,
+    /// When the proof was generated
+    pub created_at: SpaceTimestamp,
+}
+
+/// Claims that can be proven about an orbit without revealing the orbit.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum OrbitClaim {
+    /// Prove altitude is within a range (km) at a given time.
+    /// Does NOT reveal the exact altitude.
+    AltitudeRange {
+        min_km: f64,
+        max_km: f64,
+        at_time: SpaceTimestamp,
+    },
+
+    /// Prove inclination is within a range (degrees).
+    InclinationRange { min_deg: f64, max_deg: f64 },
+
+    /// Prove minimum miss distance from another object exceeds a threshold.
+    /// The core use case: "I won't come closer than X km to object Y."
+    CollisionFreedom {
+        other_norad_id: u32,
+        /// Other object's commitment (so we can verify both sides)
+        other_commitment: Option<[u8; 32]>,
+        min_miss_distance_km: f64,
+        window_start: SpaceTimestamp,
+        window_end: SpaceTimestamp,
+    },
+
+    /// Prove the orbit will decay below a threshold altitude by a deadline.
+    /// Used for post-mission disposal compliance.
+    DisposalCompliance {
+        max_altitude_km: f64,
+        by_time: SpaceTimestamp,
+    },
+
+    /// Prove the orbit is within a licensed orbital slot (GEO operators).
+    SlotCompliance {
+        longitude_deg: f64,
+        tolerance_deg: f64,
+    },
+
+    /// Prove the orbit avoids a protected zone (e.g., ISS corridor).
+    ZoneAvoidance {
+        zone_id: String,
+        min_altitude_km: f64,
+        max_altitude_km: f64,
+        min_inclination_deg: f64,
+        max_inclination_deg: f64,
+        window_start: SpaceTimestamp,
+        window_end: SpaceTimestamp,
+    },
+}
+
+/// Supported zero-knowledge proof systems.
+///
+/// The actual proof generation/verification is off-chain. These tags tell
+/// verifiers which library to use for checking the proof blob.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ProofSystem {
+    /// Hash-based commitment reveal (not truly ZK, but useful for bootstrapping)
+    HashReveal,
+    /// Bulletproofs range proofs (good for altitude/distance bounds)
+    Bulletproofs,
+    /// Groth16 SNARKs (succinct, constant-size proofs)
+    Groth16,
+    /// PLONK (universal trusted setup)
+    Plonk,
+}
+
+/// Result of verifying an orbit proof.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ProofVerification {
+    /// Proof is valid — the claim holds
+    Valid,
+    /// Proof is invalid — either the math doesn't check out or it doesn't
+    /// match the commitment
+    Invalid { reason: String },
+    /// The proof system is not supported by this verifier
+    UnsupportedSystem,
+    /// The commitment has expired
+    CommitmentExpired,
+}
+
+/// A collision-freedom certificate: a verified proof that two objects
+/// will not collide within a time window.
+///
+/// This is the "receipt" that traffic coordination can use to skip
+/// full conjunction screening between two objects whose operators have
+/// both provided valid collision-freedom proofs.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CollisionFreedomCertificate {
+    /// Primary object
+    pub primary_norad_id: u32,
+    /// Secondary object
+    pub secondary_norad_id: u32,
+    /// Primary operator's commitment
+    pub primary_commitment: [u8; 32],
+    /// Secondary operator's commitment
+    pub secondary_commitment: [u8; 32],
+    /// Minimum guaranteed miss distance (km)
+    pub min_miss_distance_km: f64,
+    /// Time window this certificate covers
+    pub window_start: SpaceTimestamp,
+    pub window_end: SpaceTimestamp,
+    /// Hash of the proof that was verified
+    pub proof_hash: [u8; 32],
+    /// Who verified this certificate
+    pub verifier: AgentPubKey,
+    /// Verification timestamp
+    pub verified_at: SpaceTimestamp,
+    /// Verification result
+    pub status: ProofVerification,
+}
+
+/// Input for creating an orbit commitment on-chain.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CreateCommitmentInput {
+    /// The orbital data being committed to (will be hashed, NOT stored)
+    pub ephemeris_data: Vec<u8>,
+    /// Random nonce for the commitment
+    pub nonce: [u8; 32],
+    /// Object this commitment is for
+    pub norad_id: u32,
+    /// Epoch of the orbital state
+    pub epoch: SpaceTimestamp,
+    /// Optional expiration
+    pub expires_at: Option<SpaceTimestamp>,
+}
+
+impl CreateCommitmentInput {
+    /// Compute the commitment hash: SHA3-256(ephemeris_data || nonce)
+    pub fn compute_commitment(&self) -> [u8; 32] {
+        let mut data = self.ephemeris_data.clone();
+        data.extend_from_slice(&self.nonce);
+        hash_data(&data)
+    }
+}
+
+/// Input for submitting an orbit proof on-chain.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SubmitProofInput {
+    /// The commitment this proof is for
+    pub commitment_hash: ActionHash,
+    /// What is being claimed
+    pub claim: OrbitClaim,
+    /// The proof blob
+    pub proof_data: Vec<u8>,
+    /// Which proof system
+    pub proof_system: ProofSystem,
+}
+
+/// Input for verifying a collision-freedom proof.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct VerifyCollisionFreedomInput {
+    /// Primary object's proof hash
+    pub primary_proof_hash: ActionHash,
+    /// Secondary object's proof hash
+    pub secondary_proof_hash: ActionHash,
+}
+
+// =============================================================================
+// Structured Error Types
+// =============================================================================
+
+/// Machine-readable error codes for mycelix-space coordinator zomes.
+///
+/// Clients can match on the `code` field of the JSON-serialized error to
+/// handle specific failure modes without parsing human-readable messages.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SpaceError {
+    /// Machine-readable error code (e.g. "INVALID_NORAD_ID")
+    pub code: SpaceErrorCode,
+    /// Human-readable description
+    pub message: String,
+    /// Optional context (field name, value, etc.)
+    pub context: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SpaceErrorCode {
+    // --- General ---
+    NotFound,
+    Unauthorized,
+    InvalidInput,
+
+    // --- Orbital Objects ---
+    InvalidNoradId,
+    InvalidDesignator,
+    TleParseError,
+    DuplicateObject,
+
+    // --- Observations ---
+    InvalidMeasurement,
+    InvalidLocation,
+    InvalidSensorConfig,
+    SensorNotFound,
+
+    // --- Conjunctions ---
+    SelfConjunction,
+    InvalidProbability,
+    InvalidMissDistance,
+    EventNotFound,
+
+    // --- Debris Bounties ---
+    InvalidBountyAmount,
+    InvalidStateTransition,
+    BountyNotFound,
+    BountyNotOpen,
+    AlreadyClaimed,
+
+    // --- Traffic Control ---
+    SessionNotFound,
+    InvalidProposal,
+    AlreadySigned,
+    SameSignerError,
+    ConjunctionNotVerified,
+
+    // --- Rate Limiting ---
+    RateLimited,
+}
+
+impl SpaceError {
+    pub fn new(code: SpaceErrorCode, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+            context: None,
+        }
+    }
+
+    pub fn with_context(mut self, ctx: impl Into<String>) -> Self {
+        self.context = Some(ctx.into());
+        self
+    }
+
+    /// Convert to a Holochain WasmError for use in coordinator externs.
+    pub fn into_wasm_error(self) -> WasmError {
+        let json = serde_json::to_string(&self).unwrap_or_else(|_| self.message.clone());
+        wasm_error!(WasmErrorInner::Guest(json))
+    }
+
+    /// Convert to a ValidateCallbackResult::Invalid for use in integrity validation.
+    pub fn into_invalid(self) -> ValidateCallbackResult {
+        ValidateCallbackResult::Invalid(
+            serde_json::to_string(&self).unwrap_or_else(|_| self.message.clone()),
+        )
+    }
+}
+
+impl std::fmt::Display for SpaceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[{:?}] {}", self.code, self.message)?;
+        if let Some(ref ctx) = self.context {
+            write!(f, " ({})", ctx)?;
+        }
+        Ok(())
     }
 }
 

@@ -16,8 +16,8 @@
 //!
 //! Proper transformations are essential for accurate conjunction analysis.
 
-use chrono::{DateTime, Utc, Datelike, Timelike};
-use nalgebra::{Vector3, Matrix3};
+use chrono::{DateTime, Datelike, Timelike, Utc};
+use nalgebra::{Matrix3, Vector3};
 
 use crate::state::StateVector;
 
@@ -163,11 +163,7 @@ pub fn julian_date(year: i32, month: u32, day: u32, ut_hours: f64) -> f64 {
     let a = (y / 100.0).floor();
     let b = 2.0 - a + (a / 4.0).floor();
 
-    (365.25 * (y + 4716.0)).floor()
-        + (30.6001 * (m + 1.0)).floor()
-        + day as f64
-        + b
-        - 1524.5
+    (365.25 * (y + 4716.0)).floor() + (30.6001 * (m + 1.0)).floor() + day as f64 + b - 1524.5
         + ut_hours / 24.0
 }
 
@@ -229,18 +225,12 @@ fn rotation_z(angle: f64) -> Matrix3<f64> {
     let c = angle.cos();
     let s = angle.sin();
 
-    Matrix3::new(
-        c, s, 0.0,
-        -s, c, 0.0,
-        0.0, 0.0, 1.0,
-    )
+    Matrix3::new(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0)
 }
 
 /// Calculate azimuth and elevation from ground station to satellite
-pub fn look_angles(
-    station: &GeodeticCoord,
-    satellite_ecef: &Vector3<f64>,
-) -> (f64, f64, f64) {  // (azimuth_deg, elevation_deg, range_km)
+pub fn look_angles(station: &GeodeticCoord, satellite_ecef: &Vector3<f64>) -> (f64, f64, f64) {
+    // (azimuth_deg, elevation_deg, range_km)
     let station_ecef = station.to_ecef();
     let range_vec = satellite_ecef - station_ecef;
     let range = range_vec.norm();
@@ -256,9 +246,15 @@ pub fn look_angles(
 
     // Rotation matrix from ECEF to ENU
     let rot = Matrix3::new(
-        -sin_lon, cos_lon, 0.0,
-        -sin_lat * cos_lon, -sin_lat * sin_lon, cos_lat,
-        cos_lat * cos_lon, cos_lat * sin_lon, sin_lat,
+        -sin_lon,
+        cos_lon,
+        0.0,
+        -sin_lat * cos_lon,
+        -sin_lat * sin_lon,
+        cos_lat,
+        cos_lat * cos_lon,
+        cos_lat * sin_lon,
+        sin_lat,
     );
 
     let enu = rot * range_vec;
@@ -321,8 +317,16 @@ mod tests {
         let ecef = original.to_ecef();
         let recovered = GeodeticCoord::from_ecef(&ecef);
 
-        assert_relative_eq!(original.latitude_deg, recovered.latitude_deg, epsilon = 0.0001);
-        assert_relative_eq!(original.longitude_deg, recovered.longitude_deg, epsilon = 0.0001);
+        assert_relative_eq!(
+            original.latitude_deg,
+            recovered.latitude_deg,
+            epsilon = 0.0001
+        );
+        assert_relative_eq!(
+            original.longitude_deg,
+            recovered.longitude_deg,
+            epsilon = 0.0001
+        );
         assert_relative_eq!(original.altitude_km, recovered.altitude_km, epsilon = 0.001);
     }
 
@@ -345,7 +349,7 @@ mod tests {
         let station = GeodeticCoord::new(0.0, 0.0, 0.0);
         let satellite = station.to_ecef() + Vector3::new(400.0, 0.0, 0.0);
 
-        let (az, el, range) = look_angles(&station, &satellite);
+        let (_az, el, range) = look_angles(&station, &satellite);
 
         // Elevation should be ~90 degrees (directly overhead)
         // Range should be ~400 km

@@ -10,9 +10,9 @@
 //! Line 2: 2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391424573
 //! ```
 
+use chrono::{DateTime, Duration, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use chrono::{DateTime, Utc, NaiveDate, Duration};
 
 #[derive(Error, Debug)]
 pub enum TleParseError {
@@ -96,17 +96,23 @@ impl TwoLineElement {
         let (name, line1, line2) = match lines.len() {
             2 => (None, lines[0], lines[1]),
             3 => (Some(lines[0].trim().to_string()), lines[1], lines[2]),
-            _ => return Err(TleParseError::FieldParseError {
-                field: "input".to_string(),
-                message: format!("Expected 2 or 3 lines, got {}", lines.len()),
-            }),
+            _ => {
+                return Err(TleParseError::FieldParseError {
+                    field: "input".to_string(),
+                    message: format!("Expected 2 or 3 lines, got {}", lines.len()),
+                })
+            }
         };
 
         Self::parse_lines(name, line1, line2)
     }
 
     /// Parse from separate line strings
-    pub fn parse_lines(name: Option<String>, line1: &str, line2: &str) -> Result<Self, TleParseError> {
+    pub fn parse_lines(
+        name: Option<String>,
+        line1: &str,
+        line2: &str,
+    ) -> Result<Self, TleParseError> {
         // Validate line lengths
         if line1.len() != 69 {
             return Err(TleParseError::InvalidLineLength(line1.len()));
@@ -137,7 +143,9 @@ impl TwoLineElement {
         Self::validate_checksum(line2, 2)?;
 
         // Parse Line 1 fields
-        let norad_id = line1[2..7].trim().parse::<u32>()
+        let norad_id = line1[2..7]
+            .trim()
+            .parse::<u32>()
             .map_err(|_| TleParseError::InvalidNoradId(line1[2..7].to_string()))?;
 
         let classification = line1.chars().nth(7).unwrap_or('U');
@@ -151,8 +159,7 @@ impl TwoLineElement {
         let mean_motion_ddot = Self::parse_exponential(&line1[44..52], "mean_motion_ddot")?;
         let bstar = Self::parse_exponential(&line1[53..61], "bstar")?;
 
-        let element_set_number = line1[64..68].trim().parse::<u16>()
-            .unwrap_or(0);
+        let element_set_number = line1[64..68].trim().parse::<u16>().unwrap_or(0);
 
         // Parse Line 2 fields
         let inclination_deg = Self::parse_float(&line2[8..16], "inclination")?;
@@ -160,7 +167,8 @@ impl TwoLineElement {
 
         // Eccentricity has implied decimal point
         let ecc_str = format!("0.{}", line2[26..33].trim());
-        let eccentricity = ecc_str.parse::<f64>()
+        let eccentricity = ecc_str
+            .parse::<f64>()
             .map_err(|_| TleParseError::FieldParseError {
                 field: "eccentricity".to_string(),
                 message: format!("Cannot parse '{}'", ecc_str),
@@ -170,8 +178,7 @@ impl TwoLineElement {
         let mean_anomaly_deg = Self::parse_float(&line2[43..51], "mean_anomaly")?;
         let mean_motion = Self::parse_float(&line2[52..63], "mean_motion")?;
 
-        let rev_at_epoch = line2[63..68].trim().parse::<u32>()
-            .unwrap_or(0);
+        let rev_at_epoch = line2[63..68].trim().parse::<u32>().unwrap_or(0);
 
         Ok(TwoLineElement {
             name,
@@ -197,7 +204,9 @@ impl TwoLineElement {
 
     /// Validate TLE checksum (modulo 10 of sum of digits, with '-' counting as 1)
     fn validate_checksum(line: &str, line_num: u8) -> Result<(), TleParseError> {
-        let expected = line.chars().last()
+        let expected = line
+            .chars()
+            .last()
             .and_then(|c| c.to_digit(10))
             .unwrap_or(0) as u8;
 
@@ -227,23 +236,27 @@ impl TwoLineElement {
     fn parse_epoch(s: &str) -> Result<DateTime<Utc>, TleParseError> {
         let s = s.trim();
 
-        let year_2digit: i32 = s[0..2].parse()
+        let year_2digit: i32 = s[0..2]
+            .parse()
             .map_err(|_| TleParseError::FieldParseError {
                 field: "epoch_year".to_string(),
                 message: format!("Cannot parse '{}'", &s[0..2]),
             })?;
 
         // Y2K handling: 00-56 = 2000-2056, 57-99 = 1957-1999
-        let year = if year_2digit < 57 { 2000 + year_2digit } else { 1900 + year_2digit };
+        let year = if year_2digit < 57 {
+            2000 + year_2digit
+        } else {
+            1900 + year_2digit
+        };
 
-        let day_of_year: f64 = s[2..].parse()
-            .map_err(|_| TleParseError::FieldParseError {
-                field: "epoch_day".to_string(),
-                message: format!("Cannot parse '{}'", &s[2..]),
-            })?;
+        let day_of_year: f64 = s[2..].parse().map_err(|_| TleParseError::FieldParseError {
+            field: "epoch_day".to_string(),
+            message: format!("Cannot parse '{}'", &s[2..]),
+        })?;
 
-        let base_date = NaiveDate::from_ymd_opt(year, 1, 1)
-            .ok_or_else(|| TleParseError::FieldParseError {
+        let base_date =
+            NaiveDate::from_ymd_opt(year, 1, 1).ok_or_else(|| TleParseError::FieldParseError {
                 field: "epoch".to_string(),
                 message: format!("Invalid year: {}", year),
             })?;
@@ -253,7 +266,8 @@ impl TwoLineElement {
         let seconds = (fraction * 86400.0) as i64;
 
         let date = base_date + Duration::days(days);
-        let datetime = date.and_hms_opt(0, 0, 0)
+        let datetime = date
+            .and_hms_opt(0, 0, 0)
             .ok_or_else(|| TleParseError::FieldParseError {
                 field: "epoch".to_string(),
                 message: "Invalid time".to_string(),
@@ -264,7 +278,8 @@ impl TwoLineElement {
 
     /// Parse a simple float field
     fn parse_float(s: &str, field: &str) -> Result<f64, TleParseError> {
-        s.trim().parse::<f64>()
+        s.trim()
+            .parse::<f64>()
             .map_err(|_| TleParseError::FieldParseError {
                 field: field.to_string(),
                 message: format!("Cannot parse '{}'", s.trim()),
@@ -279,35 +294,45 @@ impl TwoLineElement {
         }
 
         // Find the sign of the exponent
-        let exp_sign_pos = s.rfind(|c| c == '-' || c == '+');
+        let exp_sign_pos = s.rfind(['-', '+']);
 
         if let Some(pos) = exp_sign_pos {
             if pos == 0 {
                 // Sign at start is mantissa sign, not exponent
-                return s.parse::<f64>().map_err(|_| TleParseError::FieldParseError {
-                    field: field.to_string(),
-                    message: format!("Cannot parse '{}'", s),
-                });
+                return s
+                    .parse::<f64>()
+                    .map_err(|_| TleParseError::FieldParseError {
+                        field: field.to_string(),
+                        message: format!("Cannot parse '{}'", s),
+                    });
             }
 
             let mantissa_str = &s[..pos];
             let exp_str = &s[pos..];
 
             // TLE format has implied decimal point at start of mantissa
-            let mantissa: f64 = format!("0.{}", mantissa_str.trim_start_matches(&['-', '+', ' '][..]))
-                .parse()
-                .map_err(|_| TleParseError::FieldParseError {
-                    field: field.to_string(),
-                    message: format!("Cannot parse mantissa '{}'", mantissa_str),
-                })?;
+            let mantissa: f64 = format!(
+                "0.{}",
+                mantissa_str.trim_start_matches(&['-', '+', ' '][..])
+            )
+            .parse()
+            .map_err(|_| TleParseError::FieldParseError {
+                field: field.to_string(),
+                message: format!("Cannot parse mantissa '{}'", mantissa_str),
+            })?;
 
-            let exp: i32 = exp_str.parse()
+            let exp: i32 = exp_str
+                .parse()
                 .map_err(|_| TleParseError::FieldParseError {
                     field: field.to_string(),
                     message: format!("Cannot parse exponent '{}'", exp_str),
                 })?;
 
-            let sign = if mantissa_str.starts_with('-') { -1.0 } else { 1.0 };
+            let sign = if mantissa_str.starts_with('-') {
+                -1.0
+            } else {
+                1.0
+            };
 
             Ok(sign * mantissa * 10.0_f64.powi(exp))
         } else {
@@ -318,7 +343,7 @@ impl TwoLineElement {
 
     /// Get orbital period in minutes
     pub fn period_minutes(&self) -> f64 {
-        1440.0 / self.mean_motion  // 1440 minutes per day
+        1440.0 / self.mean_motion // 1440 minutes per day
     }
 
     /// Get semi-major axis in km (approximate)
@@ -375,9 +400,13 @@ mod tests {
         let perigee = tle.perigee_km();
         let apogee = tle.apogee_km();
         // Allow 340-460 km range for variations in synthetic TLE
-        assert!(perigee > 340.0 && perigee < 460.0,
-                "Perigee: {} km, SMA: {} km, ecc: {}", perigee, sma, tle.eccentricity);
-        assert!(apogee > 340.0 && apogee < 460.0,
-                "Apogee: {} km", apogee);
+        assert!(
+            perigee > 340.0 && perigee < 460.0,
+            "Perigee: {} km, SMA: {} km, ecc: {}",
+            perigee,
+            sma,
+            tle.eccentricity
+        );
+        assert!(apogee > 340.0 && apogee < 460.0, "Apogee: {} km", apogee);
     }
 }

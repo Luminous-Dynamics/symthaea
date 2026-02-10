@@ -353,10 +353,8 @@ jobs:
               fi
             done
 
-            # SDK clippy: exclude benches (criterion not in Nix env) and risc0 feature
-            echo "Linting sdk..."
-            cargo clippy --lib --tests --manifest-path mycelix-workspace/sdk/Cargo.toml \
-              --features "simulation,parallel,webauthn-full,stub-webauthn" -- -D warnings
+            # SDK clippy is handled by the dedicated SDK CI (sdk-ci.yml)
+            echo "SDK clippy: skipped (covered by SDK CI)"
           '
 
   # ============================================================================
@@ -664,7 +662,7 @@ jobs:
 
             echo ""
             echo "=== SDK Integration Tests ==="
-            cargo test integration --all-features --manifest-path mycelix-workspace/sdk/Cargo.toml -- --test-threads=1
+            cargo test integration --features "simulation,parallel,webauthn-full,stub-webauthn" --manifest-path mycelix-workspace/sdk/Cargo.toml -- --test-threads=1
           '
 
       - name: Run multi-conductor tests

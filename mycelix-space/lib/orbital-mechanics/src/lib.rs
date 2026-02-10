@@ -38,17 +38,36 @@
 //! └─────────────────────────────────────────────────────────────────┘
 //! ```
 
-pub mod tle;
-pub mod state;
-pub mod propagator;
-pub mod covariance;
+pub mod cdm;
+pub mod cdm_parser;
 pub mod conjunction;
 pub mod coordinates;
-pub mod cdm;
+pub mod covariance;
+pub mod fusion;
+pub mod keplerian;
+pub mod lambert;
+pub mod orbit_determination;
+pub mod propagator;
+pub mod state;
+pub mod tle;
 
-pub use tle::{TwoLineElement, TleParseError};
-pub use state::{OrbitalState, StateVector};
-pub use propagator::{Propagator, PropagationError};
+pub use cdm::{
+    CdmBuilder, CdmCovariance, CdmObjectMetadata, CdmRefFrame, CdmStateVector,
+    ConjunctionDataMessage, Maneuverable,
+};
+pub use cdm_parser::{parse_cdm_kvn, CdmParseError};
+pub use conjunction::{CollisionProbability, ConjunctionAssessment};
 pub use covariance::CovarianceMatrix;
-pub use conjunction::{ConjunctionAssessment, CollisionProbability};
-pub use cdm::{ConjunctionDataMessage, CdmBuilder, CdmObjectMetadata, CdmStateVector, CdmCovariance, CdmRefFrame, Maneuverable};
+pub use fusion::{FusedEstimate, FusionPipeline, SensorMeasurement};
+pub use keplerian::{
+    collision_avoidance_maneuver, hohmann_transfer, ImpulsiveManeuver, KeplerianElements,
+    KeplerianError,
+};
+pub use lambert::{solve_lambert, LambertSolution, TransferType};
+pub use orbit_determination::{gauss_iod, ObservationRecord, ObservationType, OrbitDetermination};
+pub use propagator::{PropagationError, Propagator};
+pub use state::{OrbitalState, StateVector};
+pub use tle::{TleParseError, TwoLineElement};
+
+#[cfg(test)]
+mod validation;

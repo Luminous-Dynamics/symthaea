@@ -11,11 +11,11 @@
 //! let state = propagator.propagate_to(future_time)?;
 //! ```
 
-use chrono::{DateTime, Utc, Duration};
-use thiserror::Error;
-use crate::tle::TwoLineElement;
-use crate::state::{OrbitalState, StateVector, DataSource, ReferenceFrame};
 use crate::covariance::CovarianceMatrix;
+use crate::state::{DataSource, OrbitalState, ReferenceFrame, StateVector};
+use crate::tle::TwoLineElement;
+use chrono::{DateTime, Duration, Utc};
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum PropagationError {
@@ -23,10 +23,7 @@ pub enum PropagationError {
     InitializationFailed(String),
 
     #[error("Propagation failed at time {time}: {message}")]
-    PropagationFailed {
-        time: String,
-        message: String,
-    },
+    PropagationFailed { time: String, message: String },
 
     #[error("Object has decayed (below Earth surface)")]
     ObjectDecayed,
@@ -53,11 +50,9 @@ impl Propagator {
     /// Create a propagator from a TLE
     pub fn from_tle(tle: &TwoLineElement) -> Result<Self, PropagationError> {
         // Parse TLE into SGP4 elements
-        let elements = sgp4::Elements::from_tle(
-            tle.name.clone(),
-            tle.line1.as_bytes(),
-            tle.line2.as_bytes(),
-        ).map_err(|e| PropagationError::InitializationFailed(format!("{:?}", e)))?;
+        let elements =
+            sgp4::Elements::from_tle(tle.name.clone(), tle.line1.as_bytes(), tle.line2.as_bytes())
+                .map_err(|e| PropagationError::InitializationFailed(format!("{:?}", e)))?;
 
         Ok(Self {
             elements,
@@ -102,11 +97,12 @@ impl Propagator {
             .map_err(|e| PropagationError::InitializationFailed(format!("{:?}", e)))?;
 
         // Propagate
-        let prediction = constants.propagate(minutes_since_epoch)
-            .map_err(|e| PropagationError::PropagationFailed {
+        let prediction = constants.propagate(minutes_since_epoch).map_err(|e| {
+            PropagationError::PropagationFailed {
                 time: time.to_rfc3339(),
                 message: format!("{:?}", e),
-            })?;
+            }
+        })?;
 
         // Extract position and velocity (in km and km/s)
         let state = StateVector::new(
@@ -131,7 +127,7 @@ impl Propagator {
             norad_id: self.tle.norad_id,
             name: self.tle.name.clone(),
             epoch: time,
-            frame: ReferenceFrame::TEME,  // SGP4 outputs TEME
+            frame: ReferenceFrame::TEME, // SGP4 outputs TEME
             state,
             covariance: Some(covariance),
             source: DataSource::SpaceTrack,
@@ -157,7 +153,7 @@ impl Propagator {
 
         while current <= end {
             results.push(self.propagate_to(current));
-            current = current + Duration::seconds(step_seconds);
+            current += Duration::seconds(step_seconds);
         }
 
         results
@@ -172,7 +168,7 @@ impl Propagator {
         max_search_hours: f64,
         rising: bool,
     ) -> Option<DateTime<Utc>> {
-        let step_seconds = 60;  // 1-minute steps
+        let step_seconds = 60; // 1-minute steps
         let max_steps = (max_search_hours * 3600.0 / step_seconds as f64) as usize;
 
         let mut prev_alt = None;
@@ -240,7 +236,10 @@ impl BatchPropagator {
     }
 
     /// Propagate all objects to a given time
-    pub fn propagate_all(&self, time: DateTime<Utc>) -> Vec<(u32, Result<OrbitalState, PropagationError>)> {
+    pub fn propagate_all(
+        &self,
+        time: DateTime<Utc>,
+    ) -> Vec<(u32, Result<OrbitalState, PropagationError>)> {
         self.propagators
             .iter()
             .map(|(id, prop)| (*id, prop.propagate_to(time)))
@@ -295,7 +294,11 @@ mod tests {
         // At epoch, should be at approximately the right altitude (LEO range)
         // Note: synthetic TLE may give slightly different values
         let alt = state.state.altitude_km();
-        assert!(alt > 330.0 && alt < 460.0, "ISS altitude should be LEO range, got {}", alt);
+        assert!(
+            alt > 330.0 && alt < 460.0,
+            "ISS altitude should be LEO range, got {}",
+            alt
+        );
     }
 
     #[test]
@@ -310,7 +313,11 @@ mod tests {
 
         // Position should be similar after one orbit
         let distance = state_epoch.state.distance_to(&state_period.state);
-        assert!(distance < 100.0, "After one orbit, should be near start. Distance: {} km", distance);
+        assert!(
+            distance < 100.0,
+            "After one orbit, should be near start. Distance: {} km",
+            distance
+        );
     }
 
     #[test]
@@ -320,7 +327,7 @@ mod tests {
 
         let start = tle.epoch;
         let end = tle.epoch + Duration::hours(1);
-        let eph = prop.ephemeris(start, end, 600);  // 10-minute steps
+        let eph = prop.ephemeris(start, end, 600); // 10-minute steps
 
         // Should have 7 points (0, 10, 20, 30, 40, 50, 60 minutes)
         assert_eq!(eph.len(), 7);

@@ -19,11 +19,11 @@
 //! Typically 5-50 meters depending on object sizes.
 
 use chrono::{DateTime, Utc};
-use nalgebra::{Vector3, Matrix2};
+use nalgebra::{Matrix2, Vector3};
 use serde::{Deserialize, Serialize};
 
-use crate::state::{OrbitalState, StateVector};
 use crate::covariance::CovarianceMatrix;
+use crate::state::{OrbitalState, StateVector};
 
 /// Result of conjunction screening
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -144,15 +144,15 @@ pub struct ConjunctionAnalyzer {
     screening_threshold_km: f64,
 
     /// Time step for TCA refinement (seconds)
-    tca_refinement_step_s: f64,
+    _tca_refinement_step_s: f64,
 }
 
 impl Default for ConjunctionAnalyzer {
     fn default() -> Self {
         Self {
-            default_hbr_m: 20.0,  // 20 meters combined radius
-            screening_threshold_km: 5.0,  // Screen for approaches within 5 km
-            tca_refinement_step_s: 1.0,  // 1-second refinement
+            default_hbr_m: 20.0,         // 20 meters combined radius
+            screening_threshold_km: 5.0, // Screen for approaches within 5 km
+            _tca_refinement_step_s: 1.0, // 1-second refinement
         }
     }
 }
@@ -184,12 +184,8 @@ impl ConjunctionAnalyzer {
         let relative_velocity = primary.state.relative_velocity(&secondary.state);
 
         // Calculate Pc
-        let collision_probability = self.calculate_pc(
-            primary,
-            secondary,
-            miss_distance,
-            self.default_hbr_m,
-        );
+        let collision_probability =
+            self.calculate_pc(primary, secondary, miss_distance, self.default_hbr_m);
 
         let risk_level = RiskLevel::from_pc(collision_probability.pc);
 
@@ -235,14 +231,12 @@ impl ConjunctionAnalyzer {
         }
 
         // Get combined covariance in encounter frame
-        let cov_primary = primary.covariance.as_ref().cloned()
-            .unwrap_or_default();
-        let cov_secondary = secondary.covariance.as_ref().cloned()
-            .unwrap_or_default();
+        let cov_primary = primary.covariance.as_ref().cloned().unwrap_or_default();
+        let cov_secondary = secondary.covariance.as_ref().cloned().unwrap_or_default();
 
         // Combined position covariance
-        let combined_pos_cov = cov_primary.position_covariance()
-            + cov_secondary.position_covariance();
+        let combined_pos_cov =
+            cov_primary.position_covariance() + cov_secondary.position_covariance();
 
         // Relative position (miss vector)
         let miss_vector = secondary.state.position() - primary.state.position();
@@ -251,11 +245,8 @@ impl ConjunctionAnalyzer {
         let rel_vel = secondary.state.velocity() - primary.state.velocity();
 
         // Project to 2D encounter plane (perpendicular to relative velocity)
-        let (projected_miss, cov_2d) = self.project_to_encounter_plane(
-            miss_vector,
-            rel_vel,
-            combined_pos_cov,
-        );
+        let (projected_miss, cov_2d) =
+            self.project_to_encounter_plane(miss_vector, rel_vel, combined_pos_cov);
 
         // Alfano's 2D Pc calculation
         let pc = self.alfano_2d_pc(projected_miss, cov_2d, hbr_km);
@@ -277,7 +268,7 @@ impl ConjunctionAnalyzer {
     fn pc_from_miss_distance(&self, miss_km: f64, hbr_km: f64) -> CollisionProbability {
         // Very rough approximation assuming typical LEO uncertainties
         // This should be used only as a screening metric
-        let assumed_sigma_km = 1.0;  // Assume 1 km 1-sigma position uncertainty
+        let assumed_sigma_km = 1.0; // Assume 1 km 1-sigma position uncertainty
 
         // Simple Gaussian approximation
         let x = miss_km / assumed_sigma_km;
@@ -285,7 +276,7 @@ impl ConjunctionAnalyzer {
 
         CollisionProbability {
             pc: pc.min(1.0),
-            pc_lower: pc / 100.0,  // Very uncertain
+            pc_lower: pc / 100.0, // Very uncertain
             pc_upper: (pc * 100.0).min(1.0),
             method: PcMethod::MissDistanceOnly,
             has_covariance: false,
@@ -300,7 +291,17 @@ impl ConjunctionAnalyzer {
         cov_3d: nalgebra::Matrix3<f64>,
     ) -> (nalgebra::Vector2<f64>, Matrix2<f64>) {
         // Build encounter frame basis
-        let v_hat = rel_velocity.normalize();
+        // Guard against zero relative velocity (co-moving objects)
+        let v_hat = if rel_velocity.norm() < 1e-10 {
+            // Fall back to miss vector direction, or arbitrary axis
+            if miss_vector.norm() < 1e-10 {
+                Vector3::new(0.0, 0.0, 1.0)
+            } else {
+                miss_vector.normalize()
+            }
+        } else {
+            rel_velocity.normalize()
+        };
 
         // Choose arbitrary perpendicular vector
         let temp = if v_hat.x.abs() < 0.9 {
@@ -313,17 +314,11 @@ impl ConjunctionAnalyzer {
         let u2 = v_hat.cross(&u1);
 
         // Project miss vector to encounter plane
-        let miss_2d = nalgebra::Vector2::new(
-            miss_vector.dot(&u1),
-            miss_vector.dot(&u2),
-        );
+        let miss_2d = nalgebra::Vector2::new(miss_vector.dot(&u1), miss_vector.dot(&u2));
 
         // Project covariance to encounter plane
         // C_2d = P * C_3d * P^T where P is 2x3 projection matrix
-        let proj = nalgebra::Matrix2x3::from_rows(&[
-            u1.transpose(),
-            u2.transpose(),
-        ]);
+        let proj = nalgebra::Matrix2x3::from_rows(&[u1.transpose(), u2.transpose()]);
 
         let cov_2d = proj * cov_3d * proj.transpose();
 
@@ -340,7 +335,7 @@ impl ConjunctionAnalyzer {
         // Eigendecomposition of covariance
         let det = cov_2d.determinant();
         if det <= 0.0 {
-            return 0.0;  // Invalid covariance
+            return 0.0; // Invalid covariance
         }
 
         let trace = cov_2d.trace();
@@ -364,7 +359,7 @@ impl ConjunctionAnalyzer {
         // Pc ≈ (π * r²) / (2π * σ1 * σ2) * exp(-d²/2)
         let pc = (r_norm * r_norm) * (-d_squared / 2.0).exp() / 2.0;
 
-        pc.min(1.0).max(0.0)
+        pc.clamp(0.0, 1.0)
     }
 }
 
@@ -410,8 +405,8 @@ mod tests {
 
     #[test]
     fn test_conjunction_assessment() {
-        use chrono::Utc;
         use crate::state::DataSource;
+        use chrono::Utc;
 
         let now = Utc::now();
 
@@ -421,14 +416,20 @@ mod tests {
             now,
             StateVector::new(7000.0, 0.0, 0.0, 0.0, 7.5, 0.0),
             DataSource::SpaceTrack,
-        ).with_covariance(CovarianceMatrix::diagonal([0.5, 0.5, 0.5, 0.001, 0.001, 0.001]));
+        )
+        .with_covariance(CovarianceMatrix::diagonal([
+            0.5, 0.5, 0.5, 0.001, 0.001, 0.001,
+        ]));
 
         let secondary = OrbitalState::new(
             12345,
             now,
             StateVector::new(7001.0, 0.0, 0.0, 0.0, 7.5, 0.0),
             DataSource::SpaceTrack,
-        ).with_covariance(CovarianceMatrix::diagonal([0.5, 0.5, 0.5, 0.001, 0.001, 0.001]));
+        )
+        .with_covariance(CovarianceMatrix::diagonal([
+            0.5, 0.5, 0.5, 0.001, 0.001, 0.001,
+        ]));
 
         let analyzer = ConjunctionAnalyzer::new();
         let assessment = analyzer.assess(&primary, &secondary);
@@ -440,23 +441,25 @@ mod tests {
     /// End-to-end pipeline test: TLE parse -> SGP4 propagate -> conjunction assess
     #[test]
     fn test_tle_to_conjunction_pipeline() {
-        use crate::tle::TwoLineElement;
         use crate::propagator::Propagator;
+        use crate::tle::TwoLineElement;
         use chrono::Duration;
 
         // ISS TLE
         let iss_tle = TwoLineElement::parse(
             "ISS (ZARYA)\n\
              1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9997\n\
-             2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391424577"
-        ).expect("Failed to parse ISS TLE");
+             2 25544  51.6416 247.4627 0006703 130.5360 325.0288 15.72125391424577",
+        )
+        .expect("Failed to parse ISS TLE");
 
         // Fictional debris TLE (same epoch, slightly different orbit)
         let debris_tle = TwoLineElement::parse(
             "DEBRIS\n\
              1 49863U 21999A   24001.50000000  .00001000  00000-0  50000-4 0  9992\n\
-             2 49863  51.6500 247.5000 0007000 131.0000 325.0000 15.72000000 10005"
-        ).expect("Failed to parse debris TLE");
+             2 49863  51.6500 247.5000 0007000 131.0000 325.0000 15.72000000 10005",
+        )
+        .expect("Failed to parse debris TLE");
 
         // Create propagators
         let iss_prop = Propagator::from_tle(&iss_tle).expect("ISS propagator failed");
@@ -464,8 +467,12 @@ mod tests {
 
         // Propagate both to 1 hour after epoch
         let screen_time = iss_tle.epoch + Duration::hours(1);
-        let iss_state = iss_prop.propagate_to(screen_time).expect("ISS propagation failed");
-        let debris_state = debris_prop.propagate_to(screen_time).expect("Debris propagation failed");
+        let iss_state = iss_prop
+            .propagate_to(screen_time)
+            .expect("ISS propagation failed");
+        let debris_state = debris_prop
+            .propagate_to(screen_time)
+            .expect("Debris propagation failed");
 
         // Assess conjunction
         let analyzer = ConjunctionAnalyzer::new();
@@ -474,10 +481,22 @@ mod tests {
         // Verify the pipeline produced meaningful results
         assert_eq!(assessment.primary_norad_id, 25544);
         assert_eq!(assessment.secondary_norad_id, 49863);
-        assert!(assessment.miss_distance_km >= 0.0, "Miss distance must be non-negative");
-        assert!(assessment.relative_velocity_kms >= 0.0, "Relative velocity must be non-negative");
-        assert!(assessment.collision_probability.pc >= 0.0, "Pc must be non-negative");
-        assert!(assessment.collision_probability.pc <= 1.0, "Pc must be <= 1.0");
+        assert!(
+            assessment.miss_distance_km >= 0.0,
+            "Miss distance must be non-negative"
+        );
+        assert!(
+            assessment.relative_velocity_kms >= 0.0,
+            "Relative velocity must be non-negative"
+        );
+        assert!(
+            assessment.collision_probability.pc >= 0.0,
+            "Pc must be non-negative"
+        );
+        assert!(
+            assessment.collision_probability.pc <= 1.0,
+            "Pc must be <= 1.0"
+        );
         assert!(assessment.hard_body_radius_m > 0.0, "HBR must be positive");
 
         // The assessment should have covariance (propagator estimates it from TLE age)
@@ -490,19 +509,21 @@ mod tests {
 
     #[test]
     fn test_screening() {
-        use chrono::Utc;
         use crate::state::DataSource;
+        use chrono::Utc;
 
         let now = Utc::now();
 
-        let objects: Vec<OrbitalState> = (0..5).map(|i| {
-            OrbitalState::new(
-                25544 + i,
-                now,
-                StateVector::new(7000.0 + i as f64, 0.0, 0.0, 0.0, 7.5, 0.0),
-                DataSource::SpaceTrack,
-            )
-        }).collect();
+        let objects: Vec<OrbitalState> = (0..5)
+            .map(|i| {
+                OrbitalState::new(
+                    25544 + i,
+                    now,
+                    StateVector::new(7000.0 + i as f64, 0.0, 0.0, 0.0, 7.5, 0.0),
+                    DataSource::SpaceTrack,
+                )
+            })
+            .collect();
 
         let conjunctions = screen_catalog(&objects[0..1], &objects, 2.0);
 

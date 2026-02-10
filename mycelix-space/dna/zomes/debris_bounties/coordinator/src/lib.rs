@@ -3,9 +3,12 @@
 //! Functions for the Kessler Cleanup Market.
 //! Includes a state machine for bounty lifecycle management.
 
-use hdk::prelude::*;
 use debris_bounties_integrity::*;
-use mycelix_space_shared::{SpaceTimestamp, PaginationParams, PaginatedResponse};
+use hdk::prelude::*;
+use mycelix_space_shared::{
+    validate_string_field, PaginatedResponse, PaginationParams, SpaceError, SpaceErrorCode,
+    SpaceTimestamp,
+};
 
 // =============================================================================
 // Signal types
@@ -110,6 +113,14 @@ fn anchor_for_bounty_claims(bounty_hash: &ActionHash) -> ExternResult<AnyLinkabl
     Ok(typed.path_entry_hash()?.into())
 }
 
+/// Anchor for all verifications of a specific claim.
+fn anchor_for_claim_verifications(claim_hash: &ActionHash) -> ExternResult<AnyLinkableHash> {
+    let path = Path::from(format!("verifications_for.{}", claim_hash));
+    let typed = path.typed(LinkTypes::ClaimVerifications)?;
+    typed.ensure()?;
+    Ok(typed.path_entry_hash()?.into())
+}
+
 /// Anchor for all bounties a given agent has contributed to.
 fn anchor_for_contributor(agent: &AgentPubKey) -> ExternResult<AnyLinkableHash> {
     let path = Path::from(format!("contributor.{}", agent));
@@ -130,6 +141,33 @@ fn anchor_for_contributor(agent: &AgentPubKey) -> ExternResult<AnyLinkableHash> 
 /// target debris is being tracked (useful for UI warnings).
 #[hdk_extern]
 pub fn create_bounty(input: CreateBountyInput) -> ExternResult<ActionHash> {
+    // --- Input validation ---
+    validate_string_field(&input.bounty_id, "bounty_id", 256).map_err(|e| e.into_wasm_error())?;
+    validate_string_field(&input.justification, "justification", 2048)
+        .map_err(|e| e.into_wasm_error())?;
+    validate_string_field(&input.currency, "currency", 16).map_err(|e| e.into_wasm_error())?;
+
+    if input.amount == 0 {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidBountyAmount,
+            "Bounty amount must be greater than zero",
+        )
+        .into_wasm_error());
+    }
+    if input.debris_norad_id == 0 || input.debris_norad_id > 999999 {
+        return Err(
+            SpaceError::new(SpaceErrorCode::InvalidInput, "NORAD ID must be 1-999999")
+                .into_wasm_error(),
+        );
+    }
+    if input.requirements.verification_threshold == 0 {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidInput,
+            "verification_threshold must be at least 1",
+        )
+        .into_wasm_error());
+    }
+
     // Cross-zome check: does the debris object have tracking data?
     let has_tracking = match call(
         CallTargetCell::Local,
@@ -203,9 +241,32 @@ pub struct CreateBountyInput {
     pub requirements: RemovalRequirements,
 }
 
-/// Contribute to an existing bounty
+/// Contribute additional funds to an existing bounty.
+///
+/// Links the contribution to both the bounty's contributions anchor and the
+/// contributor's personal bounty index. Emits a `BountyContributed` signal.
 #[hdk_extern]
 pub fn contribute_to_bounty(input: ContributeInput) -> ExternResult<ActionHash> {
+    // --- Input validation ---
+    validate_string_field(&input.bounty_id, "bounty_id", 256).map_err(|e| e.into_wasm_error())?;
+    validate_string_field(&input.currency, "currency", 16).map_err(|e| e.into_wasm_error())?;
+    if input.amount == 0 {
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidBountyAmount,
+            "Contribution amount must be greater than zero",
+        )
+        .into_wasm_error());
+    }
+    if let Some(ref msg) = input.message {
+        if msg.len() > 1024 {
+            return Err(SpaceError::new(
+                SpaceErrorCode::InvalidInput,
+                "Message exceeds 1024 characters",
+            )
+            .into_wasm_error());
+        }
+    }
+
     let agent = agent_info()?.agent_initial_pubkey;
 
     let contribution = BountyContribution {
@@ -261,20 +322,41 @@ pub struct ContributeInput {
 /// Validates that the bounty is currently Open, then transitions to Claimed.
 #[hdk_extern]
 pub fn claim_bounty(input: ClaimBountyInput) -> ExternResult<ActionHash> {
+    // --- Input validation ---
+    validate_string_field(&input.organization, "organization", 256)
+        .map_err(|e| e.into_wasm_error())?;
+    validate_string_field(&input.mission_plan, "mission_plan", 4096)
+        .map_err(|e| e.into_wasm_error())?;
+
     // Fetch the bounty and validate its status
-    let record = get(input.bounty_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Bounty not found".to_string())))?;
+    let record = get(input.bounty_hash.clone(), GetOptions::default())?.ok_or(
+        SpaceError::new(SpaceErrorCode::BountyNotFound, "Bounty not found")
+            .with_context(format!("hash: {}", input.bounty_hash))
+            .into_wasm_error(),
+    )?;
 
     let mut bounty: DebrisBounty = record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize bounty: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Entry is not a DebrisBounty".to_string())))?;
+        .map_err(|e| {
+            SpaceError::new(
+                SpaceErrorCode::InvalidInput,
+                format!("Failed to deserialize bounty: {:?}", e),
+            )
+            .into_wasm_error()
+        })?
+        .ok_or(
+            SpaceError::new(SpaceErrorCode::InvalidInput, "Entry is not a DebrisBounty")
+                .into_wasm_error(),
+        )?;
 
     if !is_valid_transition(&bounty.status, &BountyStatus::Claimed) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Cannot claim bounty in {:?} status", bounty.status)
-        )));
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidStateTransition,
+            format!("Cannot claim bounty in {:?} status", bounty.status),
+        )
+        .with_context(format!("expected: Open, got: {:?}", bounty.status))
+        .into_wasm_error());
     }
 
     // Update bounty status to Claimed
@@ -326,7 +408,12 @@ pub struct ClaimBountyInput {
     pub mission_plan: String,
 }
 
-/// Submit verification of debris removal
+/// Submit verification evidence for a debris removal claim.
+///
+/// Verifiers independently attest whether the debris has been removed.
+/// When the number of positive verifications meets the bounty's
+/// `verification_threshold`, the bounty can transition to Completed.
+/// Emits a `VerificationSubmitted` signal.
 #[hdk_extern]
 pub fn submit_verification(input: SubmitVerificationInput) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_initial_pubkey;
@@ -341,6 +428,15 @@ pub fn submit_verification(input: SubmitVerificationInput) -> ExternResult<Actio
     };
 
     let action_hash = create_entry(&EntryTypes::RemovalVerification(verification))?;
+
+    // Link verification to claim's verifications anchor
+    let verif_anchor = anchor_for_claim_verifications(&signal_claim_id)?;
+    create_link(
+        verif_anchor,
+        action_hash.clone(),
+        LinkTypes::ClaimVerifications,
+        LinkTag::new(format!("verif:{}", signal_claim_id)),
+    )?;
 
     // Emit signal
     emit_signal(BountySignal::VerificationSubmitted {
@@ -366,19 +462,52 @@ pub struct SubmitVerificationInput {
 /// Manages the ActiveBounties link: removes it when transitioning to a terminal state.
 #[hdk_extern]
 pub fn update_bounty_status(input: UpdateBountyStatusInput) -> ExternResult<ActionHash> {
-    let record = get(input.bounty_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Bounty not found".to_string())))?;
+    let record = get(input.bounty_hash.clone(), GetOptions::default())?.ok_or(
+        SpaceError::new(SpaceErrorCode::BountyNotFound, "Bounty not found")
+            .with_context(format!("hash: {}", input.bounty_hash))
+            .into_wasm_error(),
+    )?;
 
     let mut bounty: DebrisBounty = record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to deserialize: {:?}", e))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Entry is not a DebrisBounty".to_string())))?;
+        .map_err(|e| {
+            SpaceError::new(
+                SpaceErrorCode::InvalidInput,
+                format!("Failed to deserialize: {:?}", e),
+            )
+            .into_wasm_error()
+        })?
+        .ok_or(
+            SpaceError::new(SpaceErrorCode::InvalidInput, "Entry is not a DebrisBounty")
+                .into_wasm_error(),
+        )?;
 
     if !is_valid_transition(&bounty.status, &input.new_status) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid transition: {:?} -> {:?}", bounty.status, input.new_status)
-        )));
+        return Err(SpaceError::new(
+            SpaceErrorCode::InvalidStateTransition,
+            format!(
+                "Invalid transition: {:?} -> {:?}",
+                bounty.status, input.new_status
+            ),
+        )
+        .with_context(format!(
+            "from: {:?}, to: {:?}",
+            bounty.status, input.new_status
+        ))
+        .into_wasm_error());
+    }
+
+    // --- Authorization: only creator can cancel their own bounty ---
+    if input.new_status == BountyStatus::Cancelled {
+        let agent = agent_info()?.agent_initial_pubkey;
+        if agent != bounty.creator {
+            return Err(SpaceError::new(
+                SpaceErrorCode::Unauthorized,
+                "Only the bounty creator can cancel a bounty",
+            )
+            .into_wasm_error());
+        }
     }
 
     let old_status = bounty.status.clone();
@@ -424,7 +553,10 @@ pub struct UpdateBountyStatusInput {
 // Query operations
 // =============================================================================
 
-/// Get all bounties targeting a given debris NORAD ID
+/// Get all bounties targeting a given debris NORAD ID.
+///
+/// Queries the `bounties_for_debris.{norad_id}` anchor. Returns bounties
+/// in all states (including terminal).
 #[hdk_extern]
 pub fn get_bounties_for_debris(norad_id: u32) -> ExternResult<Vec<DebrisBounty>> {
     let anchor = anchor_for_object_bounties(norad_id)?;
@@ -454,7 +586,10 @@ pub fn get_bounties_for_debris(norad_id: u32) -> ExternResult<Vec<DebrisBounty>>
     Ok(bounties)
 }
 
-/// Get all currently active (non-terminal) bounties
+/// Get all currently active (non-terminal) bounties on the network.
+///
+/// Bounties are removed from this index when they reach a terminal state
+/// (Completed, Expired, Cancelled).
 #[hdk_extern]
 pub fn get_active_bounties(_: ()) -> ExternResult<Vec<DebrisBounty>> {
     let anchor = anchor_for_active_bounties()?;
@@ -484,7 +619,9 @@ pub fn get_active_bounties(_: ()) -> ExternResult<Vec<DebrisBounty>> {
     Ok(bounties)
 }
 
-/// Get all contributions for a bounty
+/// Get all contributions for a bounty by its `ActionHash`.
+///
+/// Queries the `contributions_for.{hash}` anchor.
 #[hdk_extern]
 pub fn get_contributions(bounty_hash: ActionHash) -> ExternResult<Vec<BountyContribution>> {
     let anchor = anchor_for_bounty_contributions(&bounty_hash)?;
@@ -514,7 +651,9 @@ pub fn get_contributions(bounty_hash: ActionHash) -> ExternResult<Vec<BountyCont
     Ok(contributions)
 }
 
-/// Get all claims on a bounty
+/// Get all removal claims on a bounty by its `ActionHash`.
+///
+/// Queries the `claims_for.{hash}` anchor.
 #[hdk_extern]
 pub fn get_claims(bounty_hash: ActionHash) -> ExternResult<Vec<RemovalClaim>> {
     let anchor = anchor_for_bounty_claims(&bounty_hash)?;
@@ -544,6 +683,40 @@ pub fn get_claims(bounty_hash: ActionHash) -> ExternResult<Vec<RemovalClaim>> {
     Ok(claims)
 }
 
+/// Get all verifications for a specific removal claim.
+///
+/// Queries the `verifications_for.{hash}` anchor.
+#[hdk_extern]
+pub fn get_verifications_for_claim(
+    claim_hash: ActionHash,
+) -> ExternResult<Vec<RemovalVerification>> {
+    let anchor = anchor_for_claim_verifications(&claim_hash)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::ClaimVerifications)?,
+        GetStrategy::Network,
+    )?;
+
+    let mut verifications = Vec::new();
+    for link in links {
+        let Some(target) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(target, GetOptions::default())? else {
+            continue;
+        };
+        if let Some(verif) = record
+            .entry()
+            .to_app_option::<RemovalVerification>()
+            .ok()
+            .flatten()
+        {
+            verifications.push(verif);
+        }
+    }
+
+    Ok(verifications)
+}
+
 // =============================================================================
 // Paginated query operations
 // =============================================================================
@@ -558,7 +731,9 @@ pub struct PaginatedDebrisQuery {
 
 /// Get bounties for a debris object with pagination
 #[hdk_extern]
-pub fn get_bounties_for_debris_paginated(input: PaginatedDebrisQuery) -> ExternResult<PaginatedResponse<DebrisBounty>> {
+pub fn get_bounties_for_debris_paginated(
+    input: PaginatedDebrisQuery,
+) -> ExternResult<PaginatedResponse<DebrisBounty>> {
     let anchor = anchor_for_object_bounties(input.norad_id)?;
     let links = get_links(
         LinkQuery::try_new(anchor, LinkTypes::ObjectBounties)?,
@@ -569,7 +744,9 @@ pub fn get_bounties_for_debris_paginated(input: PaginatedDebrisQuery) -> ExternR
 
 /// Get active bounties with pagination
 #[hdk_extern]
-pub fn get_active_bounties_paginated(pagination: PaginationParams) -> ExternResult<PaginatedResponse<DebrisBounty>> {
+pub fn get_active_bounties_paginated(
+    pagination: PaginationParams,
+) -> ExternResult<PaginatedResponse<DebrisBounty>> {
     let anchor = anchor_for_active_bounties()?;
     let links = get_links(
         LinkQuery::try_new(anchor, LinkTypes::ActiveBounties)?,

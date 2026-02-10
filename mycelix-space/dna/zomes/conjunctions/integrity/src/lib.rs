@@ -4,10 +4,11 @@
 //! and Conjunction Data Messages (CDMs).
 
 use hdi::prelude::*;
-use mycelix_space_shared::{SpaceTimestamp, ConjunctionDataMessage};
+use mycelix_space_shared::{ConjunctionDataMessage, SpaceTimestamp};
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
+#[allow(clippy::large_enum_variant)]
 pub enum EntryTypes {
     /// Conjunction event between two objects
     ConjunctionEvent(ConjunctionEvent),
@@ -154,15 +155,10 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, .. } => {
-                match app_entry {
-                    EntryTypes::ConjunctionEvent(event) => validate_event(&event),
-                    EntryTypes::Cdm(cdm) => validate_cdm(&cdm),
-                    EntryTypes::AvoidanceManeuver(maneuver) => validate_maneuver(&maneuver),
-                }
-            }
-            _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
+            EntryTypes::ConjunctionEvent(event) => validate_event(&event),
+            EntryTypes::Cdm(cdm) => validate_cdm(&cdm),
+            EntryTypes::AvoidanceManeuver(maneuver) => validate_maneuver(&maneuver),
         },
         _ => Ok(ValidateCallbackResult::Valid),
     }
@@ -172,33 +168,33 @@ fn validate_event(event: &ConjunctionEvent) -> ExternResult<ValidateCallbackResu
     // Both objects must have valid NORAD IDs
     if event.primary_norad_id == 0 || event.primary_norad_id > 999999 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Invalid primary NORAD ID".to_string()
+            "Invalid primary NORAD ID".to_string(),
         ));
     }
     if event.secondary_norad_id == 0 || event.secondary_norad_id > 999999 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Invalid secondary NORAD ID".to_string()
+            "Invalid secondary NORAD ID".to_string(),
         ));
     }
 
     // Can't have conjunction with self
     if event.primary_norad_id == event.secondary_norad_id {
         return Ok(ValidateCallbackResult::Invalid(
-            "Object cannot have conjunction with itself".to_string()
+            "Object cannot have conjunction with itself".to_string(),
         ));
     }
 
     // Miss distance must be positive
     if event.miss_distance_km < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Miss distance cannot be negative".to_string()
+            "Miss distance cannot be negative".to_string(),
         ));
     }
 
     // Pc must be 0-1
     if event.max_pc < 0.0 || event.max_pc > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Collision probability must be between 0 and 1".to_string()
+            "Collision probability must be between 0 and 1".to_string(),
         ));
     }
 
@@ -209,7 +205,7 @@ fn validate_cdm(cdm: &CdmEntry) -> ExternResult<ValidateCallbackResult> {
     // Basic CDM validation
     if cdm.cdm.collision_probability < 0.0 || cdm.cdm.collision_probability > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Invalid collision probability in CDM".to_string()
+            "Invalid collision probability in CDM".to_string(),
         ));
     }
 
@@ -220,7 +216,7 @@ fn validate_maneuver(maneuver: &AvoidanceManeuver) -> ExternResult<ValidateCallb
     // Delta-V must be positive
     if maneuver.delta_v_ms <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Delta-V must be positive".to_string()
+            "Delta-V must be positive".to_string(),
         ));
     }
 
@@ -228,7 +224,7 @@ fn validate_maneuver(maneuver: &AvoidanceManeuver) -> ExternResult<ValidateCallb
     let mag_sq = maneuver.direction.iter().map(|x| x * x).sum::<f64>();
     if (mag_sq - 1.0).abs() > 0.01 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Direction must be a unit vector".to_string()
+            "Direction must be a unit vector".to_string(),
         ));
     }
 

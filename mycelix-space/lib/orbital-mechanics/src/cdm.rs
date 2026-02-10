@@ -156,11 +156,27 @@ pub struct CdmCovariance {
 impl Default for CdmCovariance {
     fn default() -> Self {
         Self {
-            cr_r: 0.0, ct_r: 0.0, ct_t: 0.0,
-            cn_r: 0.0, cn_t: 0.0, cn_n: 0.0,
-            crdot_r: 0.0, crdot_t: 0.0, crdot_n: 0.0, crdot_rdot: 0.0,
-            ctdot_r: 0.0, ctdot_t: 0.0, ctdot_n: 0.0, ctdot_rdot: 0.0, ctdot_tdot: 0.0,
-            cndot_r: 0.0, cndot_t: 0.0, cndot_n: 0.0, cndot_rdot: 0.0, cndot_tdot: 0.0, cndot_ndot: 0.0,
+            cr_r: 0.0,
+            ct_r: 0.0,
+            ct_t: 0.0,
+            cn_r: 0.0,
+            cn_t: 0.0,
+            cn_n: 0.0,
+            crdot_r: 0.0,
+            crdot_t: 0.0,
+            crdot_n: 0.0,
+            crdot_rdot: 0.0,
+            ctdot_r: 0.0,
+            ctdot_t: 0.0,
+            ctdot_n: 0.0,
+            ctdot_rdot: 0.0,
+            ctdot_tdot: 0.0,
+            cndot_r: 0.0,
+            cndot_t: 0.0,
+            cndot_n: 0.0,
+            cndot_rdot: 0.0,
+            cndot_tdot: 0.0,
+            cndot_ndot: 0.0,
         }
     }
 }
@@ -242,32 +258,65 @@ impl ConjunctionDataMessage {
 
         // Header
         kvn.push_str(&format!("CCSDS_CDM_VERS = {}\n", self.ccsds_cdm_vers));
-        kvn.push_str(&format!("CREATION_DATE = {}\n", self.creation_date.format("%Y-%m-%dT%H:%M:%S%.3f")));
+        kvn.push_str(&format!(
+            "CREATION_DATE = {}\n",
+            self.creation_date.format("%Y-%m-%dT%H:%M:%S%.3f")
+        ));
         kvn.push_str(&format!("ORIGINATOR = {}\n", self.originator));
         kvn.push_str(&format!("MESSAGE_ID = {}\n", self.message_id));
-        kvn.push_str("\n");
+        kvn.push('\n');
 
         // Relative Metadata
-        kvn.push_str(&format!("TCA = {}\n", self.tca.format("%Y-%m-%dT%H:%M:%S%.3f")));
+        kvn.push_str(&format!(
+            "TCA = {}\n",
+            self.tca.format("%Y-%m-%dT%H:%M:%S%.3f")
+        ));
         kvn.push_str(&format!("MISS_DISTANCE = {:.6} [km]\n", self.miss_distance));
-        kvn.push_str(&format!("RELATIVE_SPEED = {:.6} [m/s]\n", self.relative_speed));
-        kvn.push_str(&format!("RELATIVE_POSITION_R = {:.6} [m]\n", self.relative_position_r));
-        kvn.push_str(&format!("RELATIVE_POSITION_T = {:.6} [m]\n", self.relative_position_t));
-        kvn.push_str(&format!("RELATIVE_POSITION_N = {:.6} [m]\n", self.relative_position_n));
-        kvn.push_str(&format!("RELATIVE_VELOCITY_R = {:.6} [m/s]\n", self.relative_velocity_r));
-        kvn.push_str(&format!("RELATIVE_VELOCITY_T = {:.6} [m/s]\n", self.relative_velocity_t));
-        kvn.push_str(&format!("RELATIVE_VELOCITY_N = {:.6} [m/s]\n", self.relative_velocity_n));
-        kvn.push_str("\n");
+        kvn.push_str(&format!(
+            "RELATIVE_SPEED = {:.6} [m/s]\n",
+            self.relative_speed
+        ));
+        kvn.push_str(&format!(
+            "RELATIVE_POSITION_R = {:.6} [m]\n",
+            self.relative_position_r
+        ));
+        kvn.push_str(&format!(
+            "RELATIVE_POSITION_T = {:.6} [m]\n",
+            self.relative_position_t
+        ));
+        kvn.push_str(&format!(
+            "RELATIVE_POSITION_N = {:.6} [m]\n",
+            self.relative_position_n
+        ));
+        kvn.push_str(&format!(
+            "RELATIVE_VELOCITY_R = {:.6} [m/s]\n",
+            self.relative_velocity_r
+        ));
+        kvn.push_str(&format!(
+            "RELATIVE_VELOCITY_T = {:.6} [m/s]\n",
+            self.relative_velocity_t
+        ));
+        kvn.push_str(&format!(
+            "RELATIVE_VELOCITY_N = {:.6} [m/s]\n",
+            self.relative_velocity_n
+        ));
+        kvn.push('\n');
 
         // Collision Probability
-        kvn.push_str(&format!("COLLISION_PROBABILITY = {:.6e}\n", self.collision_probability));
-        kvn.push_str(&format!("COLLISION_PROBABILITY_METHOD = {}\n", self.collision_probability_method));
-        kvn.push_str("\n");
+        kvn.push_str(&format!(
+            "COLLISION_PROBABILITY = {:.6e}\n",
+            self.collision_probability
+        ));
+        kvn.push_str(&format!(
+            "COLLISION_PROBABILITY_METHOD = {}\n",
+            self.collision_probability_method
+        ));
+        kvn.push('\n');
 
         // Object 1
         kvn.push_str("COMMENT Object 1 (Primary)\n");
         kvn.push_str(&self.format_object_kvn(&self.object1, "OBJECT1"));
-        kvn.push_str("\n");
+        kvn.push('\n');
 
         // Object 2
         kvn.push_str("COMMENT Object 2 (Secondary)\n");
@@ -280,23 +329,59 @@ impl ConjunctionDataMessage {
         let mut kvn = String::new();
 
         // Metadata
-        kvn.push_str(&format!("{}_OBJECT_DESIGNATOR = {}\n", prefix, obj.metadata.object_designator));
-        kvn.push_str(&format!("{}_CATALOG_NAME = {}\n", prefix, obj.metadata.catalog_name));
-        kvn.push_str(&format!("{}_OBJECT_NAME = {}\n", prefix, obj.metadata.object_name));
-        kvn.push_str(&format!("{}_INTERNATIONAL_DESIGNATOR = {}\n", prefix, obj.metadata.international_designator));
-        kvn.push_str(&format!("{}_OBJECT_TYPE = {}\n", prefix, obj.metadata.object_type));
-        kvn.push_str(&format!("{}_EPHEMERIS_NAME = {}\n", prefix, obj.metadata.ephemeris_name));
-        kvn.push_str(&format!("{}_COVARIANCE_METHOD = {}\n", prefix, obj.metadata.covariance_method));
-        kvn.push_str(&format!("{}_MANEUVERABLE = {}\n", prefix, obj.metadata.maneuverable));
-        kvn.push_str(&format!("{}_REF_FRAME = {}\n", prefix, obj.metadata.ref_frame));
+        kvn.push_str(&format!(
+            "{}_OBJECT_DESIGNATOR = {}\n",
+            prefix, obj.metadata.object_designator
+        ));
+        kvn.push_str(&format!(
+            "{}_CATALOG_NAME = {}\n",
+            prefix, obj.metadata.catalog_name
+        ));
+        kvn.push_str(&format!(
+            "{}_OBJECT_NAME = {}\n",
+            prefix, obj.metadata.object_name
+        ));
+        kvn.push_str(&format!(
+            "{}_INTERNATIONAL_DESIGNATOR = {}\n",
+            prefix, obj.metadata.international_designator
+        ));
+        kvn.push_str(&format!(
+            "{}_OBJECT_TYPE = {}\n",
+            prefix, obj.metadata.object_type
+        ));
+        kvn.push_str(&format!(
+            "{}_EPHEMERIS_NAME = {}\n",
+            prefix, obj.metadata.ephemeris_name
+        ));
+        kvn.push_str(&format!(
+            "{}_COVARIANCE_METHOD = {}\n",
+            prefix, obj.metadata.covariance_method
+        ));
+        kvn.push_str(&format!(
+            "{}_MANEUVERABLE = {}\n",
+            prefix, obj.metadata.maneuverable
+        ));
+        kvn.push_str(&format!(
+            "{}_REF_FRAME = {}\n",
+            prefix, obj.metadata.ref_frame
+        ));
 
         // State Vector
         kvn.push_str(&format!("{}_X = {:.6} [km]\n", prefix, obj.state_vector.x));
         kvn.push_str(&format!("{}_Y = {:.6} [km]\n", prefix, obj.state_vector.y));
         kvn.push_str(&format!("{}_Z = {:.6} [km]\n", prefix, obj.state_vector.z));
-        kvn.push_str(&format!("{}_X_DOT = {:.9} [km/s]\n", prefix, obj.state_vector.x_dot));
-        kvn.push_str(&format!("{}_Y_DOT = {:.9} [km/s]\n", prefix, obj.state_vector.y_dot));
-        kvn.push_str(&format!("{}_Z_DOT = {:.9} [km/s]\n", prefix, obj.state_vector.z_dot));
+        kvn.push_str(&format!(
+            "{}_X_DOT = {:.9} [km/s]\n",
+            prefix, obj.state_vector.x_dot
+        ));
+        kvn.push_str(&format!(
+            "{}_Y_DOT = {:.9} [km/s]\n",
+            prefix, obj.state_vector.y_dot
+        ));
+        kvn.push_str(&format!(
+            "{}_Z_DOT = {:.9} [km/s]\n",
+            prefix, obj.state_vector.z_dot
+        ));
 
         // Covariance (if present)
         if let Some(cov) = &obj.covariance {

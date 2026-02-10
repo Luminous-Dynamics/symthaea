@@ -25,6 +25,7 @@ rmp-serde = "1.1"
 # Testing utilities
 anyhow = "1.0"
 pretty_assertions = "1.4"
+proptest = "1.4"
 
 # Orbital mechanics library
 orbital-mechanics = { path = "../lib/orbital-mechanics" }
@@ -57,6 +58,14 @@ path = "integration/zome_tests.rs"
 [[test]]
 name = "edge_cases"
 path = "edge_case_tests.rs"
+
+[[test]]
+name = "property_tests"
+path = "property_tests.rs"
+
+[[test]]
+name = "proptest_orbital"
+path = "proptest_orbital.rs"
 
 # Sweettest Integration Tests (conductor-based)
 [[test]]

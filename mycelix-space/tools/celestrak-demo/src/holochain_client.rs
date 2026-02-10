@@ -16,14 +16,14 @@ pub struct HolochainConfig {
     /// Output directory for JSON batch files
     pub batch_dir: PathBuf,
     /// Cell role name
-    pub role_name: String,
+    pub _role_name: String,
 }
 
 impl Default for HolochainConfig {
     fn default() -> Self {
         Self {
             batch_dir: PathBuf::from("import_batch"),
-            role_name: "space_operator".to_string(),
+            _role_name: "space_operator".to_string(),
         }
     }
 }
@@ -91,8 +91,8 @@ pub struct StateVectorInput {
 #[derive(Debug, Clone)]
 pub struct ZomeCallResult {
     pub file_path: String,
-    pub zome_name: String,
-    pub fn_name: String,
+    pub _zome_name: String,
+    pub _fn_name: String,
 }
 
 /// Holochain client that writes JSON files for batch import
@@ -153,8 +153,8 @@ impl HolochainClient {
 
         Ok(ZomeCallResult {
             file_path: path.display().to_string(),
-            zome_name: "orbital_objects".to_string(),
-            fn_name: "register_object".to_string(),
+            _zome_name: "orbital_objects".to_string(),
+            _fn_name: "register_object".to_string(),
         })
     }
 
@@ -179,8 +179,8 @@ impl HolochainClient {
 
         Ok(ZomeCallResult {
             file_path: path.display().to_string(),
-            zome_name: "orbital_objects".to_string(),
-            fn_name: "submit_tle".to_string(),
+            _zome_name: "orbital_objects".to_string(),
+            _fn_name: "submit_tle".to_string(),
         })
     }
 
@@ -197,13 +197,16 @@ impl HolochainClient {
 
         Ok(ZomeCallResult {
             file_path: path.display().to_string(),
-            zome_name: "orbital_objects".to_string(),
-            fn_name: "state_vector_reference".to_string(),
+            _zome_name: "orbital_objects".to_string(),
+            _fn_name: "state_vector_reference".to_string(),
         })
     }
 
     /// Batch create orbital objects
-    pub fn batch_create_objects(&self, objects: Vec<OrbitalObjectInput>) -> Result<Vec<ZomeCallResult>> {
+    pub fn batch_create_objects(
+        &self,
+        objects: Vec<OrbitalObjectInput>,
+    ) -> Result<Vec<ZomeCallResult>> {
         let mut results = Vec::new();
         for obj in objects {
             results.push(self.create_orbital_object(obj)?);
@@ -278,7 +281,9 @@ impl IngestionBatch {
                     report.files_written.push(result.file_path);
                 }
                 Err(e) => {
-                    report.errors.push(format!("Failed to write object {}: {}", obj.norad_id, e));
+                    report
+                        .errors
+                        .push(format!("Failed to write object {}: {}", obj.norad_id, e));
                 }
             }
         }
@@ -290,7 +295,9 @@ impl IngestionBatch {
                     report.files_written.push(result.file_path);
                 }
                 Err(e) => {
-                    report.errors.push(format!("Failed to write TLE {}: {}", tle.norad_id, e));
+                    report
+                        .errors
+                        .push(format!("Failed to write TLE {}: {}", tle.norad_id, e));
                 }
             }
         }
@@ -302,7 +309,10 @@ impl IngestionBatch {
                     report.files_written.push(result.file_path);
                 }
                 Err(e) => {
-                    report.errors.push(format!("Failed to write state vector {}: {}", sv.norad_id, e));
+                    report.errors.push(format!(
+                        "Failed to write state vector {}: {}",
+                        sv.norad_id, e
+                    ));
                 }
             }
         }
@@ -358,9 +368,15 @@ impl IngestionReport {
 
         if !self.files_written.is_empty() {
             println!("\nTo import into Holochain, run:");
-            println!("  ./tools/import-batch.sh {}",
-                self.files_written.first()
-                    .map(|f| Path::new(f).parent().unwrap_or(Path::new(".")).display().to_string())
+            println!(
+                "  ./tools/import-batch.sh {}",
+                self.files_written
+                    .first()
+                    .map(|f| Path::new(f)
+                        .parent()
+                        .unwrap_or(Path::new("."))
+                        .display()
+                        .to_string())
                     .unwrap_or_default()
             );
         }
