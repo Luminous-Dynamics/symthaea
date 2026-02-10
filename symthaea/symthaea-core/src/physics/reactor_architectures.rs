@@ -894,8 +894,10 @@ impl ReactorDesigner {
         let volume = 0.1 + params.target_power_w / 100_000.0;
         let mass = 100.0 + params.target_power_w * 0.01;
 
-        // He3 cost dominates
-        let he3_consumption_g_year = params.target_power_w * 3.15e7 / (18.3e6 * 1.6e-13 * 6.022e23);
+        // He3 cost dominates — power × time / (energy per gram of He-3)
+        // He-3 molar mass = 3.016 g/mol
+        let he3_consumption_g_year = params.target_power_w * 3.15e7 * 3.016
+            / (18.3e6 * super::constants::MEV_TO_J * super::constants::N_AVOGADRO);
         let fuel_cost_year = he3_consumption_g_year * FuelType::Helium3.cost_per_gram_usd();
 
         let yield_estimate = estimate_fusion_yield(&trigger, 10.0, 0.5);

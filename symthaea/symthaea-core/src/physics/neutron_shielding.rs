@@ -385,7 +385,7 @@ impl NeutronShielding {
 
         // Total fusion reactions per second
         // Power (W) = reactions/s * energy/reaction
-        let reactions_per_s = power_kw * 1000.0 / (total_energy * 1.602e-13);
+        let reactions_per_s = power_kw * 1000.0 / (total_energy * super::constants::MEV_TO_J);
 
         // Apply neutron yield fraction (branching ratio)
         // D-D: only ~50% of reactions produce neutrons (He-3+n branch)

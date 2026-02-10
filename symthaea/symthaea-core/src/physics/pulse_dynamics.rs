@@ -318,7 +318,7 @@ impl PulseDynamics {
         thermal_tau: f64,     // Thermal time constant (s)
     ) -> PulseOptimization {
         // Estimate neutron flux from power
-        let energy_per_fusion = reaction.total_energy_mev() * 1.602e-13;
+        let energy_per_fusion = reaction.total_energy_mev() * super::constants::MEV_TO_J;
         let fusions_per_s = target_power_kw * 1000.0 / energy_per_fusion;
         let neutron_flux = fusions_per_s / 1e4; // Approximate n/cm²/s at shell
 

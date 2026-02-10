@@ -374,10 +374,10 @@ impl ElectronNuclearCoupling {
         // E = 13.6 * (Z - σ)² / n² eV
         let z_eff = z as f64;
 
-        let k_energy = 13.6 * (z_eff - 2.0).max(1.0).powi(2);       // n=1
-        let l_energy = 13.6 * (z_eff - 7.0).max(1.0).powi(2) / 4.0; // n=2
-        let m_energy = 13.6 * (z_eff - 15.0).max(1.0).powi(2) / 9.0; // n=3
-        let n_energy = 13.6 * (z_eff - 25.0).max(1.0).powi(2) / 16.0; // n=4
+        let k_energy = 13.6 * (z_eff - 0.3).max(1.0).powi(2);         // n=1, σ≈0.3 (Slater)
+        let l_energy = 13.6 * (z_eff - 4.15).max(1.0).powi(2) / 4.0;  // n=2, σ≈4.15
+        let m_energy = 13.6 * (z_eff - 11.25).max(1.0).powi(2) / 9.0; // n=3, σ≈11.25
+        let n_energy = 13.6 * (z_eff - 21.15).max(1.0).powi(2) / 16.0; // n=4, σ≈21.15
 
         let shells = [
             ('K', &self.k_shell, k_energy),

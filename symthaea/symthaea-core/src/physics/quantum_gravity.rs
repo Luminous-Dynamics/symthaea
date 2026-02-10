@@ -68,8 +68,8 @@ impl PlanckUnits {
 
     /// Check self-consistency: l_P = c × t_P
     pub fn is_self_consistent(&self) -> bool {
-        let c = 2.998e8;  // Speed of light
-        let ratio = self.length_m / (c * self.time_s);
+        use super::constants::C;
+        let ratio = self.length_m / (C * self.time_s);
         (ratio - 1.0).abs() < 0.01
     }
 }
@@ -395,9 +395,8 @@ impl QuantumGravityEncoder {
 
     /// Schwarzschild radius: r_s = 2GM/c²
     pub fn schwarzschild_radius(&self, mass_kg: f64) -> f64 {
-        let g = 6.674e-11;  // Gravitational constant
-        let c = 2.998e8;    // Speed of light
-        2.0 * g * mass_kg / (c * c)
+        use super::constants::{G, C};
+        2.0 * G * mass_kg / (C * C)
     }
 }
 

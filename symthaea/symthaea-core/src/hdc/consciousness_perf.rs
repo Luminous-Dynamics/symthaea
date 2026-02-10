@@ -96,6 +96,29 @@ pub fn mean_similarity(reference: &BinaryHV, others: &[&BinaryHV]) -> f64 {
     sum / others.len() as f64
 }
 
+/// Find similar candidates for multiple queries in a single pass.
+///
+/// For each query, returns indices and similarity values of candidates above threshold,
+/// sorted by descending similarity. More efficient than calling `find_similar` per query
+/// because it avoids repeated allocation of the candidate iteration setup.
+///
+/// Returns a Vec of length `queries.len()`, where each entry is the results for that query.
+pub fn batch_find_similar(
+    queries: &[BinaryHV],
+    candidates: &[BinaryHV],
+    threshold: f32,
+) -> Vec<Vec<(usize, f32)>> {
+    queries.iter().map(|query| {
+        let mut results: Vec<(usize, f32)> = candidates.iter()
+            .enumerate()
+            .map(|(i, hv)| (i, query.similarity(hv)))
+            .filter(|(_, sim)| *sim > threshold)
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results
+    }).collect()
+}
+
 // =============================================================================
 // SIMD CAPABILITY REPORTING
 // =============================================================================
@@ -433,6 +456,42 @@ mod tests {
     fn test_cluster_by_similarity_empty() {
         let clusters = cluster_by_similarity(&[], 0.5);
         assert!(clusters.is_empty());
+    }
+
+    #[test]
+    fn test_batch_find_similar() {
+        let q1 = BinaryHV::random(1);
+        let q2 = BinaryHV::random(2);
+        let candidates = vec![
+            q1,           // exact match for q1
+            q2,           // exact match for q2
+            BinaryHV::random(100),
+            BinaryHV::random(200),
+        ];
+
+        let results = batch_find_similar(&[q1, q2], &candidates, 0.9);
+        assert_eq!(results.len(), 2);
+        // q1 should find itself at index 0
+        assert!(!results[0].is_empty());
+        assert_eq!(results[0][0].0, 0);
+        assert!((results[0][0].1 - 1.0).abs() < 0.001);
+        // q2 should find itself at index 1
+        assert!(!results[1].is_empty());
+        assert_eq!(results[1][0].0, 1);
+        assert!((results[1][0].1 - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_batch_find_similar_matches_individual() {
+        let queries: Vec<BinaryHV> = (0..5).map(|s| BinaryHV::random(s)).collect();
+        let candidates: Vec<BinaryHV> = (10..30).map(|s| BinaryHV::random(s)).collect();
+
+        let batch = batch_find_similar(&queries, &candidates, 0.55);
+        for (i, query) in queries.iter().enumerate() {
+            let individual = find_similar(query, &candidates, 0.55);
+            assert_eq!(batch[i].len(), individual.len(),
+                "batch and individual should find same count for query {}", i);
+        }
     }
 
     #[test]

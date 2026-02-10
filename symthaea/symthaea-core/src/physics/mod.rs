@@ -117,6 +117,8 @@ mod physics_cross_validation;
 mod physics_benchmark_gates;
 #[cfg(test)]
 mod physics_proptest_validation;
+#[cfg(test)]
+mod physics_correctness_audit;
 
 // Demonstration module
 #[cfg(test)]

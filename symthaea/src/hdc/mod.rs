@@ -223,6 +223,35 @@ pub use symthaea_core::hdc::consciousness_subsystem;
 pub use symthaea_core::hdc::consciousness_metacognitive;
 pub use symthaea_core::hdc::consciousness_self_awareness;
 pub use symthaea_core::hdc::consciousness_phi_optimization;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RE-EXPORTS FROM SYMTHAEA-CORE - Mathematics
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pub use symthaea_core::hdc::integer;
+pub use symthaea_core::hdc::rational;
+pub use symthaea_core::hdc::algebraic_structures;
+pub use symthaea_core::hdc::calculus;
+pub use symthaea_core::hdc::real_arithmetic;
+pub use symthaea_core::hdc::number_theory;
+pub use symthaea_core::hdc::numeric_tower;
+pub use symthaea_core::hdc::complex;
+pub use symthaea_core::hdc::math_bridge;
+pub use symthaea_core::hdc::foundations;
+pub use symthaea_core::hdc::phi_guided_math;
+pub use symthaea_core::hdc::phi_guided_search;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RE-EXPORTS FROM SYMTHAEA-CORE - Performance & Similarity Search
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pub use symthaea_core::hdc::incremental_hv;
+pub use symthaea_core::hdc::parallel_hv;
+pub use symthaea_core::hdc::lsh_simhash;
+pub use symthaea_core::hdc::lsh_similarity;
+pub use symthaea_core::hdc::lsh_index;
+pub use symthaea_core::hdc::dynamical_system;
+
 pub use symthaea_core::hdc::hdc_ltc_unified as core_hdc_ltc_unified;
 
 // Re-export unified HDC-LTC types (revolutionary closed-form dynamics)

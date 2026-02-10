@@ -462,7 +462,7 @@ fn geo_magnitude_from_moment() {
     let encoder = GeophysicsEncoder::from_genesis(&genesis);
     let m0 = 1e16;
     let mw = encoder.moment_to_magnitude(m0);
-    let expected = (2.0 / 3.0) * m0.log10() - 10.7;
+    let expected = (2.0 / 3.0) * (m0.log10() - 9.1);
     assert_relative_eq(mw, expected, 1e-6, "Mw from seismic moment");
 }
 
@@ -470,7 +470,7 @@ fn geo_magnitude_from_moment() {
 fn geo_magnitude_5_moment() {
     let genesis = GenesisSeed::from_phrase("r7_geo_m5");
     let encoder = GeophysicsEncoder::from_genesis(&genesis);
-    let m0 = 10.0_f64.powf(23.55);
+    let m0 = 10.0_f64.powf(1.5 * 5.0 + 9.1);
     let mw = encoder.moment_to_magnitude(m0);
     assert_relative_eq(mw, 5.0, 0.01, "Magnitude 5 from moment");
 }
