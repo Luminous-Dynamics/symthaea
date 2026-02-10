@@ -4,6 +4,7 @@
 name: Holochain
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -20,6 +21,7 @@ on:
       - 'mycelix-water/zomes/**'
       - 'mycelix-housing/zomes/**'
       - '.github/workflows/holochain.yml'
+      - '.gitmodules'
   pull_request:
     branches: [main]
     paths:
