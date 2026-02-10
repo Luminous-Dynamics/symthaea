@@ -40,10 +40,12 @@ impl SpaceTimestamp {
 }
 
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct QualityScore {
-    pub completeness: f64,
-    pub accuracy: f64,
-    pub timeliness: f64,
+pub struct QualityScore(pub u8);
+
+impl QualityScore {
+    pub fn new(score: u8) -> Self {
+        Self(score.min(100))
+    }
 }
 
 // --- orbital_objects types ---
@@ -178,25 +180,43 @@ pub struct AnnounceManeuverInput {
 pub enum ObservationType {
     Optical,
     Radar,
-    LaserRanging,
-    RadioFrequency,
-    Passive,
+    Rf,
+    Laser,
+    PassiveRf,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct GroundLocation {
-    pub latitude: f64,
-    pub longitude: f64,
+    pub latitude_deg: f64,
+    pub longitude_deg: f64,
     pub altitude_m: f64,
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct Measurement {
-    pub azimuth_deg: Option<f64>,
-    pub elevation_deg: Option<f64>,
-    pub range_km: Option<f64>,
-    pub range_rate_kms: Option<f64>,
-    pub visual_magnitude: Option<f64>,
+pub enum Measurement {
+    AnglesOnly {
+        ra_deg: f64,
+        dec_deg: f64,
+        ra_sigma_deg: Option<f64>,
+        dec_sigma_deg: Option<f64>,
+    },
+    Range {
+        range_km: f64,
+        range_rate_kms: Option<f64>,
+        range_sigma_km: Option<f64>,
+    },
+    StateVector {
+        position_km: [f64; 3],
+        velocity_kms: Option<[f64; 3]>,
+        covariance: Option<[f64; 21]>,
+    },
+    Photometric {
+        magnitude: f64,
+        magnitude_sigma: Option<f64>,
+        filter: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -212,9 +232,10 @@ pub struct SubmitObservationInput {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct SensorCapabilities {
-    pub min_elevation_deg: f64,
-    pub max_range_km: f64,
-    pub accuracy_arcsec: f64,
+    pub min_size_m: Option<f64>,
+    pub max_range_km: Option<f64>,
+    pub fov_deg: Option<f64>,
+    pub accuracy_arcsec: Option<f64>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -476,6 +497,44 @@ pub struct SubmitProposalInput {
     pub resulting_miss_km: f64,
     pub resulting_pc: f64,
     pub cost_estimate: Option<CostEstimate>,
+}
+
+// --- fusion types (observations coordinator) ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct FusedEstimate {
+    pub norad_id: u32,
+    pub epoch: SpaceTimestamp,
+    pub state_vector: Vec<f64>,
+    pub covariance_diagonal: Vec<f64>,
+    pub contributing_sensors: Vec<String>,
+    pub fused_quality: f64,
+    pub chi_square_consistency: f64,
+}
+
+// --- avoidance types (traffic control coordinator) ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AvoidanceInput {
+    pub session_id: String,
+    pub primary_tle_line1: String,
+    pub primary_tle_line2: String,
+    pub secondary_tle_line1: String,
+    pub secondary_tle_line2: String,
+    pub tca: SpaceTimestamp,
+    pub max_delta_v_ms: f64,
+    pub lead_time_hours: f64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AvoidanceOption {
+    pub session_id: String,
+    pub maneuver_time: SpaceTimestamp,
+    pub delta_v: Vec<f64>,
+    pub delta_v_magnitude_ms: f64,
+    pub resulting_miss_distance_km: f64,
+    pub resulting_pc: f64,
+    pub transfer_type: String,
 }
 
 // ============================================================================
@@ -888,17 +947,16 @@ mod observations_tests {
             norad_id: Some(25544),
             observation_time: SpaceTimestamp::now(),
             observer_location: Some(GroundLocation {
-                latitude: 32.95,
-                longitude: -96.73,
+                latitude_deg: 32.95,
+                longitude_deg: -96.73,
                 altitude_m: 200.0,
+                name: None,
             }),
             observation_type: ObservationType::Optical,
-            measurement: Measurement {
-                azimuth_deg: Some(180.0),
-                elevation_deg: Some(45.0),
-                range_km: None,
-                range_rate_kms: None,
-                visual_magnitude: Some(-2.5),
+            measurement: Measurement::Photometric {
+                magnitude: -2.5,
+                magnitude_sigma: None,
+                filter: None,
             },
             quality: None,
             sensor_id: "sensor:texas-optical-01".to_string(),
@@ -925,14 +983,16 @@ mod observations_tests {
             name: "Test Radar Station".to_string(),
             sensor_type: ObservationType::Radar,
             location: Some(GroundLocation {
-                latitude: 34.0,
-                longitude: -118.0,
+                latitude_deg: 34.0,
+                longitude_deg: -118.0,
                 altitude_m: 500.0,
+                name: None,
             }),
             capabilities: SensorCapabilities {
-                min_elevation_deg: 5.0,
-                max_range_km: 40000.0,
-                accuracy_arcsec: 10.0,
+                min_size_m: None,
+                max_range_km: Some(40000.0),
+                fov_deg: None,
+                accuracy_arcsec: Some(10.0),
             },
         };
 
@@ -1296,17 +1356,16 @@ mod query_tests {
                 norad_id: Some(77001),
                 observation_time: SpaceTimestamp::now(),
                 observer_location: Some(GroundLocation {
-                    latitude: 40.0 + i as f64,
-                    longitude: -105.0,
+                    latitude_deg: 40.0 + i as f64,
+                    longitude_deg: -105.0,
                     altitude_m: 1600.0,
+                    name: None,
                 }),
                 observation_type: ObservationType::Optical,
-                measurement: Measurement {
-                    azimuth_deg: Some(180.0),
-                    elevation_deg: Some(45.0),
-                    range_km: None,
-                    range_rate_kms: None,
-                    visual_magnitude: Some(-1.5),
+                measurement: Measurement::Photometric {
+                    magnitude: -1.5,
+                    magnitude_sigma: None,
+                    filter: None,
                 },
                 quality: None,
                 sensor_id: format!("sensor:query-test-{}", i),
@@ -1344,14 +1403,16 @@ mod query_tests {
                 name: format!("List Test Sensor {}", i),
                 sensor_type: ObservationType::Radar,
                 location: Some(GroundLocation {
-                    latitude: 50.0 + i as f64,
-                    longitude: 10.0,
+                    latitude_deg: 50.0 + i as f64,
+                    longitude_deg: 10.0,
                     altitude_m: 200.0,
+                    name: None,
                 }),
                 capabilities: SensorCapabilities {
-                    min_elevation_deg: 5.0,
-                    max_range_km: 40000.0,
-                    accuracy_arcsec: 10.0,
+                    min_size_m: None,
+                    max_range_km: Some(40000.0),
+                    fov_deg: None,
+                    accuracy_arcsec: Some(10.0),
                 },
             };
             let _: ActionHash = conductor
@@ -1637,17 +1698,16 @@ mod lifecycle_tests {
             norad_id: Some(50001),
             observation_time: SpaceTimestamp::now(),
             observer_location: Some(GroundLocation {
-                latitude: 28.5,
-                longitude: -80.6,
+                latitude_deg: 28.5,
+                longitude_deg: -80.6,
                 altitude_m: 10.0,
+                name: None,
             }),
             observation_type: ObservationType::Radar,
-            measurement: Measurement {
-                azimuth_deg: Some(270.0),
-                elevation_deg: Some(30.0),
-                range_km: Some(800.0),
+            measurement: Measurement::Range {
+                range_km: 800.0,
                 range_rate_kms: Some(-2.0),
-                visual_magnitude: None,
+                range_sigma_km: None,
             },
             quality: None,
             sensor_id: "sensor:cape-canaveral".to_string(),
@@ -1778,14 +1838,16 @@ mod lifecycle_tests {
                 name: "E2E Test Radar".to_string(),
                 sensor_type: ObservationType::Radar,
                 location: Some(GroundLocation {
-                    latitude: 32.95,
-                    longitude: -96.73,
+                    latitude_deg: 32.95,
+                    longitude_deg: -96.73,
                     altitude_m: 200.0,
+                    name: None,
                 }),
                 capabilities: SensorCapabilities {
-                    min_elevation_deg: 5.0,
-                    max_range_km: 40000.0,
-                    accuracy_arcsec: 10.0,
+                    min_size_m: None,
+                    max_range_km: Some(40000.0),
+                    fov_deg: None,
+                    accuracy_arcsec: Some(10.0),
                 },
             })
             .await;
@@ -1795,17 +1857,16 @@ mod lifecycle_tests {
                 norad_id: Some(60001),
                 observation_time: SpaceTimestamp::now(),
                 observer_location: Some(GroundLocation {
-                    latitude: 32.95,
-                    longitude: -96.73,
+                    latitude_deg: 32.95,
+                    longitude_deg: -96.73,
                     altitude_m: 200.0,
+                    name: None,
                 }),
                 observation_type: ObservationType::Radar,
-                measurement: Measurement {
-                    azimuth_deg: Some(270.0),
-                    elevation_deg: Some(30.0),
-                    range_km: Some(800.0),
+                measurement: Measurement::Range {
+                    range_km: 800.0,
                     range_rate_kms: Some(-2.0),
-                    visual_magnitude: None,
+                    range_sigma_km: None,
                 },
                 quality: None,
                 sensor_id: "sensor:e2e-radar".to_string(),
@@ -2164,14 +2225,16 @@ mod multi_agent_tests {
                 name: "Texas Optical Telescope".to_string(),
                 sensor_type: ObservationType::Optical,
                 location: Some(GroundLocation {
-                    latitude: 30.27,
-                    longitude: -97.74,
+                    latitude_deg: 30.27,
+                    longitude_deg: -97.74,
                     altitude_m: 150.0,
+                    name: None,
                 }),
                 capabilities: SensorCapabilities {
-                    min_elevation_deg: 10.0,
-                    max_range_km: 36000.0,
-                    accuracy_arcsec: 2.0,
+                    min_size_m: None,
+                    max_range_km: Some(36000.0),
+                    fov_deg: None,
+                    accuracy_arcsec: Some(2.0),
                 },
             })
             .await;
@@ -2183,14 +2246,16 @@ mod multi_agent_tests {
                 name: "Colorado Springs Radar".to_string(),
                 sensor_type: ObservationType::Radar,
                 location: Some(GroundLocation {
-                    latitude: 38.83,
-                    longitude: -104.82,
+                    latitude_deg: 38.83,
+                    longitude_deg: -104.82,
                     altitude_m: 1830.0,
+                    name: None,
                 }),
                 capabilities: SensorCapabilities {
-                    min_elevation_deg: 5.0,
-                    max_range_km: 40000.0,
-                    accuracy_arcsec: 5.0,
+                    min_size_m: None,
+                    max_range_km: Some(40000.0),
+                    fov_deg: None,
+                    accuracy_arcsec: Some(5.0),
                 },
             })
             .await;
@@ -2201,23 +2266,18 @@ mod multi_agent_tests {
                 norad_id: Some(target_norad),
                 observation_time: SpaceTimestamp::now(),
                 observer_location: Some(GroundLocation {
-                    latitude: 30.27,
-                    longitude: -97.74,
+                    latitude_deg: 30.27,
+                    longitude_deg: -97.74,
                     altitude_m: 150.0,
+                    name: None,
                 }),
                 observation_type: ObservationType::Optical,
-                measurement: Measurement {
-                    azimuth_deg: Some(225.0),
-                    elevation_deg: Some(55.0),
-                    range_km: None,
-                    range_rate_kms: None,
-                    visual_magnitude: Some(-1.8),
+                measurement: Measurement::Photometric {
+                    magnitude: -1.8,
+                    magnitude_sigma: None,
+                    filter: None,
                 },
-                quality: Some(QualityScore {
-                    completeness: 0.8,
-                    accuracy: 0.9,
-                    timeliness: 0.95,
-                }),
+                quality: Some(QualityScore::new(88)),
                 sensor_id: "sensor:tx-optical".to_string(),
             })
             .await;
@@ -2227,23 +2287,18 @@ mod multi_agent_tests {
                 norad_id: Some(target_norad),
                 observation_time: SpaceTimestamp::now(),
                 observer_location: Some(GroundLocation {
-                    latitude: 38.83,
-                    longitude: -104.82,
+                    latitude_deg: 38.83,
+                    longitude_deg: -104.82,
                     altitude_m: 1830.0,
+                    name: None,
                 }),
                 observation_type: ObservationType::Radar,
-                measurement: Measurement {
-                    azimuth_deg: Some(200.0),
-                    elevation_deg: Some(40.0),
-                    range_km: Some(900.0),
+                measurement: Measurement::Range {
+                    range_km: 900.0,
                     range_rate_kms: Some(-1.5),
-                    visual_magnitude: None,
+                    range_sigma_km: None,
                 },
-                quality: Some(QualityScore {
-                    completeness: 0.95,
-                    accuracy: 0.85,
-                    timeliness: 0.90,
-                }),
+                quality: Some(QualityScore::new(90)),
                 sensor_id: "sensor:co-radar".to_string(),
             })
             .await;
@@ -2353,5 +2408,518 @@ mod multi_agent_tests {
             .call(&cell_claimer2.zome("debris_bounties_coordinator"), "get_contributions", bounty_hash.clone())
             .await;
         assert_eq!(contribs.len(), 1, "Third party contribution should be recorded");
+    }
+}
+
+// ============================================================================
+// Fusion Tests (observations coordinator)
+// ============================================================================
+
+#[cfg(test)]
+mod fusion_tests {
+    use super::*;
+
+    /// Submit multiple StateVector observations from different sensors,
+    /// then call `fuse_observations_for_object`. The fused estimate should
+    /// combine all contributing sensors into a single best-estimate state.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_fuse_observations_for_object() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        let target_norad = 80001u32;
+
+        // Register two sensors
+        for (id, name) in [
+            ("sensor:fusion-radar-1", "Fusion Radar Alpha"),
+            ("sensor:fusion-radar-2", "Fusion Radar Beta"),
+        ] {
+            let _: ActionHash = conductor
+                .call(
+                    &cell.zome("observations_coordinator"),
+                    "register_sensor",
+                    RegisterSensorInput {
+                        sensor_id: id.to_string(),
+                        name: name.to_string(),
+                        sensor_type: ObservationType::Radar,
+                        location: Some(GroundLocation {
+                            latitude_deg: 35.0,
+                            longitude_deg: -106.0,
+                            altitude_m: 1500.0,
+                            name: None,
+                        }),
+                        capabilities: SensorCapabilities {
+                            min_size_m: None,
+                            max_range_km: Some(40000.0),
+                            fov_deg: None,
+                            accuracy_arcsec: Some(5.0),
+                        },
+                    },
+                )
+                .await;
+        }
+
+        // Submit StateVector observations from both sensors (slightly different)
+        // Sensor 1: ISS-like orbit
+        let _: ActionHash = conductor
+            .call(
+                &cell.zome("observations_coordinator"),
+                "submit_observation",
+                SubmitObservationInput {
+                    norad_id: Some(target_norad),
+                    observation_time: SpaceTimestamp::now(),
+                    observer_location: None,
+                    observation_type: ObservationType::Radar,
+                    measurement: Measurement::StateVector {
+                        position_km: [6778.0, 0.0, 0.0],
+                        velocity_kms: Some([0.0, 7.67, 0.0]),
+                        covariance: None,
+                    },
+                    quality: Some(QualityScore::new(85)),
+                    sensor_id: "sensor:fusion-radar-1".to_string(),
+                },
+            )
+            .await;
+
+        // Sensor 2: Same object, slightly different measurement (noise)
+        let _: ActionHash = conductor
+            .call(
+                &cell.zome("observations_coordinator"),
+                "submit_observation",
+                SubmitObservationInput {
+                    norad_id: Some(target_norad),
+                    observation_time: SpaceTimestamp::now(),
+                    observer_location: None,
+                    observation_type: ObservationType::Radar,
+                    measurement: Measurement::StateVector {
+                        position_km: [6778.5, 0.1, -0.1],
+                        velocity_kms: Some([0.001, 7.669, 0.001]),
+                        covariance: None,
+                    },
+                    quality: Some(QualityScore::new(90)),
+                    sensor_id: "sensor:fusion-radar-2".to_string(),
+                },
+            )
+            .await;
+
+        // Fuse observations
+        let fused: FusedEstimate = conductor
+            .call(
+                &cell.zome("observations_coordinator"),
+                "fuse_observations_for_object",
+                target_norad,
+            )
+            .await;
+
+        // Validate fused estimate structure
+        assert_eq!(fused.norad_id, target_norad);
+        assert_eq!(fused.state_vector.len(), 6, "State vector must have 6 elements");
+        assert_eq!(
+            fused.covariance_diagonal.len(),
+            6,
+            "Covariance diagonal must have 6 elements"
+        );
+        assert!(
+            fused.contributing_sensors.len() >= 2,
+            "Should have at least 2 contributing sensors, got {}",
+            fused.contributing_sensors.len()
+        );
+        assert!(
+            fused.fused_quality >= 0.0 && fused.fused_quality <= 1.0,
+            "Fused quality {} should be in [0, 1]",
+            fused.fused_quality
+        );
+        assert!(
+            fused.chi_square_consistency >= 0.0,
+            "Chi-square should be non-negative"
+        );
+
+        // Fused position should be near the average of the two inputs
+        let fused_x = fused.state_vector[0];
+        assert!(
+            (fused_x - 6778.25).abs() < 1.0,
+            "Fused X position {} should be near 6778.25 km",
+            fused_x
+        );
+    }
+
+    /// After fusion, `get_fused_state` should return the stored estimate.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_get_fused_state() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        let target_norad = 80002u32;
+
+        // Register sensor and submit one StateVector observation
+        let _: ActionHash = conductor
+            .call(
+                &cell.zome("observations_coordinator"),
+                "register_sensor",
+                RegisterSensorInput {
+                    sensor_id: "sensor:fused-state-test".to_string(),
+                    name: "Fused State Test Sensor".to_string(),
+                    sensor_type: ObservationType::Radar,
+                    location: None,
+                    capabilities: SensorCapabilities {
+                        min_size_m: None,
+                        max_range_km: Some(40000.0),
+                        fov_deg: None,
+                        accuracy_arcsec: Some(5.0),
+                    },
+                },
+            )
+            .await;
+
+        let _: ActionHash = conductor
+            .call(
+                &cell.zome("observations_coordinator"),
+                "submit_observation",
+                SubmitObservationInput {
+                    norad_id: Some(target_norad),
+                    observation_time: SpaceTimestamp::now(),
+                    observer_location: None,
+                    observation_type: ObservationType::Radar,
+                    measurement: Measurement::StateVector {
+                        position_km: [7000.0, 100.0, 50.0],
+                        velocity_kms: Some([0.1, 7.5, 0.05]),
+                        covariance: None,
+                    },
+                    quality: Some(QualityScore::new(80)),
+                    sensor_id: "sensor:fused-state-test".to_string(),
+                },
+            )
+            .await;
+
+        // Fuse (creates and stores the estimate)
+        let _fused: FusedEstimate = conductor
+            .call(
+                &cell.zome("observations_coordinator"),
+                "fuse_observations_for_object",
+                target_norad,
+            )
+            .await;
+
+        // Query the stored fused state
+        let retrieved: Option<FusedEstimate> = conductor
+            .call(
+                &cell.zome("observations_coordinator"),
+                "get_fused_state",
+                target_norad,
+            )
+            .await;
+
+        assert!(retrieved.is_some(), "Should retrieve stored fused estimate");
+        let est = retrieved.unwrap();
+        assert_eq!(est.norad_id, target_norad);
+        assert_eq!(est.state_vector.len(), 6);
+    }
+
+    /// Observations without StateVector/Range data (e.g., Photometric only)
+    /// should cause `fuse_observations_for_object` to fail gracefully since
+    /// the fusion pipeline requires position/velocity data.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_fusion_requires_state_observations() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        let target_norad = 80003u32;
+
+        // Register sensor
+        let _: ActionHash = conductor
+            .call(
+                &cell.zome("observations_coordinator"),
+                "register_sensor",
+                RegisterSensorInput {
+                    sensor_id: "sensor:photometric-only".to_string(),
+                    name: "Photometric Only Sensor".to_string(),
+                    sensor_type: ObservationType::Optical,
+                    location: None,
+                    capabilities: SensorCapabilities {
+                        min_size_m: None,
+                        max_range_km: Some(36000.0),
+                        fov_deg: None,
+                        accuracy_arcsec: Some(2.0),
+                    },
+                },
+            )
+            .await;
+
+        // Submit only Photometric observation (no position/velocity)
+        let _: ActionHash = conductor
+            .call(
+                &cell.zome("observations_coordinator"),
+                "submit_observation",
+                SubmitObservationInput {
+                    norad_id: Some(target_norad),
+                    observation_time: SpaceTimestamp::now(),
+                    observer_location: None,
+                    observation_type: ObservationType::Optical,
+                    measurement: Measurement::Photometric {
+                        magnitude: -1.5,
+                        magnitude_sigma: Some(0.3),
+                        filter: Some("V".to_string()),
+                    },
+                    quality: Some(QualityScore::new(75)),
+                    sensor_id: "sensor:photometric-only".to_string(),
+                },
+            )
+            .await;
+
+        // Fuse should fail — no StateVector/Range observations available
+        // The fusion pipeline filters to only fusable measurement types,
+        // so with only Photometric data it should return an error.
+        let result: Result<FusedEstimate, _> = conductor
+            .call_fallible(
+                &cell.zome("observations_coordinator"),
+                "fuse_observations_for_object",
+                target_norad,
+            )
+            .await;
+
+        assert!(
+            result.is_err(),
+            "Fusion should fail when only Photometric observations are available"
+        );
+    }
+
+    /// Query fused state for a NORAD ID with no observations should return None.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_get_fused_state_empty() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        let retrieved: Option<FusedEstimate> = conductor
+            .call(
+                &cell.zome("observations_coordinator"),
+                "get_fused_state",
+                99999u32,
+            )
+            .await;
+
+        assert!(
+            retrieved.is_none(),
+            "Should return None for NORAD ID with no fused estimates"
+        );
+    }
+}
+
+// ============================================================================
+// Avoidance Planning Tests (traffic control coordinator)
+// ============================================================================
+
+#[cfg(test)]
+mod avoidance_tests {
+    use super::*;
+
+    // ISS-like TLE for test use
+    const PRIMARY_TLE_LINE1: &str =
+        "1 80101U 26AVD-A  26040.50000000  .00016717  00000-0  10270-3 0  9990";
+    const PRIMARY_TLE_LINE2: &str =
+        "2 80101  51.6400 208.9163 0006703 306.0500  54.0150 15.49560532000001";
+    const SECONDARY_TLE_LINE1: &str =
+        "1 80102U 19AVD-B  26040.50000000  .00000500  00000-0  50000-4 0  9990";
+    const SECONDARY_TLE_LINE2: &str =
+        "2 80102  51.6500 209.0000 0007000 305.0000  55.0000 15.49000000000001";
+
+    /// Generate avoidance options for a conjunction using Lambert-based
+    /// maneuver planning. Verifies that the traffic control coordinator
+    /// produces valid avoidance maneuvers.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_generate_avoidance_options() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        let input = AvoidanceInput {
+            session_id: "session:avoidance-test-001".to_string(),
+            primary_tle_line1: PRIMARY_TLE_LINE1.to_string(),
+            primary_tle_line2: PRIMARY_TLE_LINE2.to_string(),
+            secondary_tle_line1: SECONDARY_TLE_LINE1.to_string(),
+            secondary_tle_line2: SECONDARY_TLE_LINE2.to_string(),
+            tca: SpaceTimestamp::now(),
+            max_delta_v_ms: 5.0,
+            lead_time_hours: 24.0,
+        };
+
+        let options: Vec<AvoidanceOption> = conductor
+            .call(
+                &cell.zome("traffic_control_coordinator"),
+                "generate_avoidance_options",
+                input,
+            )
+            .await;
+
+        // Should produce at least one valid avoidance option
+        assert!(
+            !options.is_empty(),
+            "Should generate at least 1 avoidance option"
+        );
+
+        for opt in &options {
+            // Each option should have a valid delta-v
+            assert_eq!(
+                opt.delta_v.len(),
+                3,
+                "Delta-v vector must have 3 components"
+            );
+            assert!(
+                opt.delta_v_magnitude_ms > 0.0,
+                "Delta-v magnitude should be positive"
+            );
+            assert!(
+                opt.delta_v_magnitude_ms <= 5.0,
+                "Delta-v {} m/s exceeds budget of 5.0 m/s",
+                opt.delta_v_magnitude_ms
+            );
+
+            // Miss distance should be improved (> 0 km)
+            assert!(
+                opt.resulting_miss_distance_km > 0.0,
+                "Resulting miss distance should be positive"
+            );
+
+            // Pc should be reduced (< 1)
+            assert!(
+                opt.resulting_pc < 1.0 && opt.resulting_pc >= 0.0,
+                "Resulting Pc {} should be in [0, 1)",
+                opt.resulting_pc
+            );
+
+            // Transfer type should be one of the standard types
+            assert!(
+                ["prograde", "retrograde", "radial", "normal"]
+                    .contains(&opt.transfer_type.as_str()),
+                "Unknown transfer type: {}",
+                opt.transfer_type
+            );
+
+            // Session ID should match
+            assert_eq!(opt.session_id, "session:avoidance-test-001");
+        }
+    }
+
+    /// Generated avoidance options should be queryable by session ID.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_get_avoidance_options() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        let session_id = "session:avoidance-query-test".to_string();
+
+        // Generate options
+        let input = AvoidanceInput {
+            session_id: session_id.clone(),
+            primary_tle_line1: PRIMARY_TLE_LINE1.to_string(),
+            primary_tle_line2: PRIMARY_TLE_LINE2.to_string(),
+            secondary_tle_line1: SECONDARY_TLE_LINE1.to_string(),
+            secondary_tle_line2: SECONDARY_TLE_LINE2.to_string(),
+            tca: SpaceTimestamp::now(),
+            max_delta_v_ms: 3.0,
+            lead_time_hours: 12.0,
+        };
+
+        let generated: Vec<AvoidanceOption> = conductor
+            .call(
+                &cell.zome("traffic_control_coordinator"),
+                "generate_avoidance_options",
+                input,
+            )
+            .await;
+
+        // Query back by session ID
+        let queried: Vec<AvoidanceOption> = conductor
+            .call(
+                &cell.zome("traffic_control_coordinator"),
+                "get_avoidance_options",
+                session_id.clone(),
+            )
+            .await;
+
+        assert_eq!(
+            queried.len(),
+            generated.len(),
+            "Queried options count should match generated count"
+        );
+
+        // All queried options should have the correct session ID
+        for opt in &queried {
+            assert_eq!(opt.session_id, session_id);
+        }
+    }
+
+    /// Avoidance with zero fuel budget should produce no valid options.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_avoidance_zero_fuel_budget() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        let input = AvoidanceInput {
+            session_id: "session:zero-fuel-test".to_string(),
+            primary_tle_line1: PRIMARY_TLE_LINE1.to_string(),
+            primary_tle_line2: PRIMARY_TLE_LINE2.to_string(),
+            secondary_tle_line1: SECONDARY_TLE_LINE1.to_string(),
+            secondary_tle_line2: SECONDARY_TLE_LINE2.to_string(),
+            tca: SpaceTimestamp::now(),
+            max_delta_v_ms: 0.0, // Zero fuel budget
+            lead_time_hours: 24.0,
+        };
+
+        let options: Vec<AvoidanceOption> = conductor
+            .call(
+                &cell.zome("traffic_control_coordinator"),
+                "generate_avoidance_options",
+                input,
+            )
+            .await;
+
+        assert!(
+            options.is_empty(),
+            "Zero fuel budget should produce no avoidance options, got {}",
+            options.len()
+        );
+    }
+
+    /// Query avoidance options for a non-existent session should return empty.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_get_avoidance_options_empty() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        let options: Vec<AvoidanceOption> = conductor
+            .call(
+                &cell.zome("traffic_control_coordinator"),
+                "get_avoidance_options",
+                "session:nonexistent".to_string(),
+            )
+            .await;
+
+        assert!(
+            options.is_empty(),
+            "Non-existent session should return empty"
+        );
     }
 }
