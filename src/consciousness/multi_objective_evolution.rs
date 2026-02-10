@@ -74,7 +74,7 @@ impl PrimitiveWithProfile {
     /// Create from primitive (computes profile)
     pub fn from_primitive(primitive: CandidatePrimitive) -> Self {
         // For now, use encoding as component for profile
-        let components = vec![primitive.encoding.clone()];
+        let components = vec![primitive.encoding];
         let profile = ConsciousnessProfile::from_components(&components);
 
         Self { primitive, profile }
@@ -112,7 +112,7 @@ impl MultiObjectiveEvolution {
         // Convert to profiles
         self.population = initial_result.final_primitives
             .into_iter()
-            .map(|p| PrimitiveWithProfile::from_primitive(p))
+            .map(PrimitiveWithProfile::from_primitive)
             .collect();
 
         println!("   Initial population: {} primitives", self.population.len());

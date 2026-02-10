@@ -298,6 +298,7 @@ pub struct FlowTemporalSummary {
 /// 2. Previous reward (stick with success, avoid failure)
 /// 3. Φ-gating (high Φ → Exploratory, low Φ → Supportive)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ResponseStrategy {
     /// Elaborate explanations with detail
     Detailed,
@@ -306,16 +307,12 @@ pub enum ResponseStrategy {
     /// Ask clarifying questions
     Clarifying,
     /// Acknowledge and validate
+    #[default]
     Supportive,
     /// Offer new perspectives
     Exploratory,
 }
 
-impl Default for ResponseStrategy {
-    fn default() -> Self {
-        Self::Supportive
-    }
-}
 
 impl ResponseStrategy {
     /// Get the opposite strategy (for switching after negative feedback)

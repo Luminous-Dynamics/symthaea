@@ -659,7 +659,7 @@ impl CheckpointManager {
     pub fn should_checkpoint(&self, current_round: u64) -> bool {
         current_round > 0
             && current_round != self.last_checkpoint_round
-            && (current_round as usize) % self.config.checkpoint_interval == 0
+            && (current_round as usize).is_multiple_of(self.config.checkpoint_interval)
     }
 
     /// Record a contribution from a node

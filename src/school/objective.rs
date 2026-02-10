@@ -14,6 +14,7 @@ use std::hash::{Hash, Hasher};
 
 /// Difficulty level of a learning objective
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Default)]
 pub enum Difficulty {
     /// Very easy, foundational concepts (0.0 - 0.2)
     Beginner,
@@ -22,6 +23,7 @@ pub enum Difficulty {
     Elementary,
 
     /// Intermediate concepts (0.4 - 0.6)
+    #[default]
     Intermediate,
 
     /// Advanced concepts requiring significant background (0.6 - 0.8)
@@ -55,11 +57,6 @@ impl Difficulty {
     }
 }
 
-impl Default for Difficulty {
-    fn default() -> Self {
-        Difficulty::Intermediate
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DOMAIN
@@ -67,8 +64,10 @@ impl Default for Difficulty {
 
 /// Knowledge domain for categorizing objectives
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Default)]
 pub enum Domain {
     /// NixOS system administration
+    #[default]
     NixOS,
 
     /// Nix expression language
@@ -147,11 +146,6 @@ impl Domain {
     }
 }
 
-impl Default for Domain {
-    fn default() -> Self {
-        Domain::NixOS
-    }
-}
 
 impl From<&str> for Domain {
     fn from(s: &str) -> Self {

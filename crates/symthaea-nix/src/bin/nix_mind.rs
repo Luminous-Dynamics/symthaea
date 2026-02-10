@@ -274,21 +274,53 @@ fn cmd_observe(domain: Option<ObserveDomain>, format: OutputFormat) {
     match domain {
         Some(ObserveDomain::Services) => {
             match symthaea_nix::observe::systemd::SystemdObserver::list_units() {
-                Ok(units) => {
-                    for unit in &units {
-                        println!("  {} {} {} {}", unit.name, unit.active_state, unit.sub_state, unit.description);
+                Ok(units) => match format {
+                    OutputFormat::Json => {
+                        let json: Vec<serde_json::Value> = units.iter().map(|u| {
+                            serde_json::json!({
+                                "name": u.name,
+                                "active_state": u.active_state,
+                                "sub_state": u.sub_state,
+                                "description": u.description,
+                            })
+                        }).collect();
+                        println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
                     }
-                    println!("  {} units total", units.len());
-                }
+                    OutputFormat::Minimal => {
+                        for unit in &units {
+                            println!("{}\t{}\t{}", unit.name, unit.active_state, unit.sub_state);
+                        }
+                    }
+                    _ => {
+                        for unit in &units {
+                            println!("  {} {} {} {}", unit.name, unit.active_state, unit.sub_state, unit.description);
+                        }
+                        println!("  {} units total", units.len());
+                    }
+                },
                 Err(e) => eprintln!("  Failed to list services: {}", e),
             }
         }
         Some(ObserveDomain::Store) => {
             match symthaea_nix::observe::store::StoreObserver::store_info() {
-                Ok(info) => {
-                    println!("  Store paths: {}", info.path_count);
-                    println!("  Total size: {} bytes", info.total_size_bytes);
-                }
+                Ok(info) => match format {
+                    OutputFormat::Json => {
+                        let json = serde_json::json!({
+                            "store_path": info.store_path,
+                            "path_count": info.path_count,
+                            "total_size_bytes": info.total_size_bytes,
+                            "deriver_count": info.deriver_count,
+                        });
+                        println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+                    }
+                    OutputFormat::Minimal => {
+                        println!("{}\t{}", info.path_count, info.total_size_bytes);
+                    }
+                    _ => {
+                        println!("  Store paths: {}", info.path_count);
+                        println!("  Total size: {} bytes", info.total_size_bytes);
+                    }
+                },
                 Err(e) => eprintln!("  Failed to query store: {}", e),
             }
         }
@@ -297,94 +329,233 @@ fn cmd_observe(domain: Option<ObserveDomain>, format: OutputFormat) {
         }
         Some(ObserveDomain::Hardware) => {
             match symthaea_nix::observe::hardware::HardwareObserver::probe() {
-                Ok(info) => {
-                    println!("  CPU: {} ({} cores)", info.cpu_model, info.cpu_cores);
-                    println!("  Memory: {} MiB", info.memory_total_mb);
-                    for gpu in &info.gpus {
-                        let driver = gpu.driver.as_deref().unwrap_or("unknown");
-                        println!("  GPU: {} ({})", gpu.name, driver);
+                Ok(info) => match format {
+                    OutputFormat::Json => {
+                        let gpus: Vec<serde_json::Value> = info.gpus.iter().map(|g| {
+                            serde_json::json!({
+                                "name": g.name,
+                                "driver": g.driver,
+                            })
+                        }).collect();
+                        let json = serde_json::json!({
+                            "cpu_model": info.cpu_model,
+                            "cpu_cores": info.cpu_cores,
+                            "memory_total_mb": info.memory_total_mb,
+                            "gpus": gpus,
+                        });
+                        println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
                     }
-                }
+                    _ => {
+                        println!("  CPU: {} ({} cores)", info.cpu_model, info.cpu_cores);
+                        println!("  Memory: {} MiB", info.memory_total_mb);
+                        for gpu in &info.gpus {
+                            let driver = gpu.driver.as_deref().unwrap_or("unknown");
+                            println!("  GPU: {} ({})", gpu.name, driver);
+                        }
+                    }
+                },
                 Err(e) => eprintln!("  Failed to probe hardware: {}", e),
             }
         }
         _ => {
-            println!("  Taking system snapshot...");
             match symthaea_nix::observe::SystemObserver::snapshot() {
-                Ok(snap) => {
-                    println!("  Services: {}", snap.services.len());
-                    println!("  Packages: {}", snap.packages.len());
-                    if let Some(gen) = snap.generation {
-                        println!("  Generation: {}", gen);
+                Ok(snap) => match format {
+                    OutputFormat::Json => {
+                        let services: Vec<serde_json::Value> = snap.services.iter().map(|(n, s)| {
+                            serde_json::json!({"name": n, "state": format!("{:?}", s)})
+                        }).collect();
+                        let json = serde_json::json!({
+                            "services": services,
+                            "service_count": snap.services.len(),
+                            "package_count": snap.packages.len(),
+                            "generation": snap.generation,
+                            "store_size_bytes": snap.store_size_bytes,
+                            "store_path_count": snap.store_path_count,
+                        });
+                        println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
                     }
-                    if let Some(size) = snap.store_size_bytes {
-                        println!("  Store size: {} bytes", size);
+                    OutputFormat::Minimal => {
+                        println!("services={} gen={} store={}",
+                            snap.services.len(),
+                            snap.generation.map_or("?".into(), |g| g.to_string()),
+                            snap.store_size_bytes.unwrap_or(0),
+                        );
                     }
-                }
+                    _ => {
+                        println!("  Taking system snapshot...");
+                        println!("  Services: {}", snap.services.len());
+                        println!("  Packages: {}", snap.packages.len());
+                        if let Some(gen) = snap.generation {
+                            println!("  Generation: {}", gen);
+                        }
+                        if let Some(size) = snap.store_size_bytes {
+                            println!("  Store size: {} bytes", size);
+                        }
+                    }
+                },
                 Err(e) => eprintln!("  Failed to snapshot: {}", e),
             }
         }
     }
 }
 
-fn cmd_doctor(_format: OutputFormat) {
-    println!("  Running system diagnostics...");
-    println!();
+fn cmd_doctor(format: OutputFormat) {
+    // Collect all diagnostic data
+    let failed_services: Vec<serde_json::Value> =
+        match symthaea_nix::observe::systemd::SystemdObserver::list_units() {
+            Ok(units) => units
+                .iter()
+                .filter(|u| u.active_state == "failed")
+                .map(|u| serde_json::json!({"name": u.name, "sub_state": u.sub_state}))
+                .collect(),
+            Err(_) => Vec::new(),
+        };
 
-    // Check failed services
-    match symthaea_nix::observe::systemd::SystemdObserver::list_units() {
-        Ok(units) => {
-            let failed: Vec<_> = units.iter().filter(|u| u.active_state == "failed").collect();
-            if failed.is_empty() {
+    let store_info = GcManager::analyze().ok();
+    let gen_count = GenerationManager::list().map(|g| g.len()).unwrap_or(0);
+
+    let journal_anomalies: Vec<serde_json::Value> =
+        match symthaea_nix::observe::journal::JournalObserver::recent_entries(50) {
+            Ok(entries) => {
+                let mut detector = symthaea_nix::mind::JournalAnomalyDetector::new();
+                detector
+                    .process_entries(&entries)
+                    .iter()
+                    .map(|a| {
+                        serde_json::json!({
+                            "reason": a.reason,
+                            "score": a.anomaly_score,
+                            "unit": a.entry.unit,
+                        })
+                    })
+                    .collect()
+            }
+            Err(_) => Vec::new(),
+        };
+
+    // Analyze configuration module structure if available
+    let module_info = {
+        let config_path = std::path::Path::new("/etc/nixos/configuration.nix");
+        if config_path.exists() {
+            let mut mp = symthaea_nix::parser::module_parser::ModuleParser::new();
+            mp.parse_file(config_path).ok()
+        } else {
+            None
+        }
+    };
+
+    match format {
+        OutputFormat::Json => {
+            let json = serde_json::json!({
+                "failed_services": failed_services,
+                "store": store_info.as_ref().map(|a| serde_json::json!({
+                    "total": a.total_store_human(),
+                    "reclaimable": a.reclaimable_human(),
+                })),
+                "generation_count": gen_count,
+                "journal_anomalies": journal_anomalies,
+                "module_info": module_info.as_ref().map(|m| serde_json::json!({
+                    "is_nixos_module": m.is_nixos_module,
+                    "imports": m.imports,
+                    "option_declarations": m.option_decls.len(),
+                    "config_settings": m.config_settings.len(),
+                })),
+            });
+            println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+        }
+        _ => {
+            println!("  Running system diagnostics...");
+            println!();
+
+            if failed_services.is_empty() {
                 println!("  Services: All OK");
             } else {
-                println!("  Services: {} FAILED", failed.len());
-                for unit in &failed {
-                    println!("    - {} ({})", unit.name, unit.sub_state);
+                println!("  Services: {} FAILED", failed_services.len());
+                for svc in &failed_services {
+                    println!(
+                        "    - {} ({})",
+                        svc["name"].as_str().unwrap_or("?"),
+                        svc["sub_state"].as_str().unwrap_or("?")
+                    );
                 }
             }
-        }
-        Err(_) => println!("  Services: Could not query systemd"),
-    }
 
-    // Check store health
-    match GcManager::analyze() {
-        Ok(analysis) => {
-            let rec = GcManager::recommend(&analysis);
-            println!("  Store: {} total, {} reclaimable", analysis.total_store_human(), analysis.reclaimable_human());
-            if rec.recommended {
-                println!("    Recommendation: {}", rec.reason);
+            if let Some(ref analysis) = store_info {
+                let rec = GcManager::recommend(analysis);
+                println!(
+                    "  Store: {} total, {} reclaimable",
+                    analysis.total_store_human(),
+                    analysis.reclaimable_human()
+                );
+                if rec.recommended {
+                    println!("    Recommendation: {}", rec.reason);
+                }
+            } else {
+                println!("  Store: Could not analyze");
             }
-        }
-        Err(_) => println!("  Store: Could not analyze"),
-    }
 
-    // Check generations
-    match GenerationManager::list() {
-        Ok(gens) => {
-            println!("  Generations: {} total", gens.len());
-            if gens.len() > 20 {
+            println!("  Generations: {} total", gen_count);
+            if gen_count > 20 {
                 println!("    Consider cleaning up old generations");
             }
-        }
-        Err(_) => println!("  Generations: Could not list"),
-    }
 
-    println!();
-}
+            if journal_anomalies.is_empty() {
+                println!("  Journal: No anomalies in recent entries");
+            } else {
+                println!("  Journal: {} anomalies detected", journal_anomalies.len());
+                for a in journal_anomalies.iter().take(3) {
+                    println!(
+                        "    - {} (score: {:.2})",
+                        a["reason"].as_str().unwrap_or("?"),
+                        a["score"].as_f64().unwrap_or(0.0)
+                    );
+                }
+            }
 
-fn cmd_generations_list(_format: OutputFormat) {
-    match GenerationManager::list() {
-        Ok(gens) => {
-            for gen in &gens {
-                let current = if gen.current { " (current)" } else { "" };
+            if let Some(ref mi) = module_info {
                 println!(
-                    "  {}  {}  {}  {}{}",
-                    gen.number, gen.date, gen.nixos_version, gen.kernel_version, current
+                    "  Config: {} imports, {} option decls, {} settings",
+                    mi.imports.len(), mi.option_decls.len(), mi.config_settings.len()
                 );
             }
-            println!("  {} generations total", gens.len());
+
+            println!();
         }
+    }
+}
+
+fn cmd_generations_list(format: OutputFormat) {
+    match GenerationManager::list() {
+        Ok(gens) => match format {
+            OutputFormat::Json => {
+                let json: Vec<serde_json::Value> = gens.iter().map(|g| {
+                    serde_json::json!({
+                        "number": g.number,
+                        "date": g.date,
+                        "nixos_version": g.nixos_version,
+                        "kernel_version": g.kernel_version,
+                        "current": g.current,
+                    })
+                }).collect();
+                println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+            }
+            OutputFormat::Minimal => {
+                for gen in &gens {
+                    let cur = if gen.current { "*" } else { "" };
+                    println!("{}{}\t{}\t{}", gen.number, cur, gen.nixos_version, gen.kernel_version);
+                }
+            }
+            _ => {
+                for gen in &gens {
+                    let current = if gen.current { " (current)" } else { "" };
+                    println!(
+                        "  {}  {}  {}  {}{}",
+                        gen.number, gen.date, gen.nixos_version, gen.kernel_version, current
+                    );
+                }
+                println!("  {} generations total", gens.len());
+            }
+        },
         Err(e) => eprintln!("  Failed to list generations: {}", e),
     }
 }
@@ -479,23 +650,57 @@ fn cmd_flake_info() {
         return;
     }
 
+    // Parse local flake.nix with tree-sitter for structural info
+    let mut flake_parser = symthaea_nix::parser::flake_parser::FlakeParser::new();
+    if let Ok(project) = flake_parser.parse_dir(&cwd) {
+        let info = &project.flake_info;
+        if let Some(ref desc) = info.description {
+            println!("  Description: {}", desc);
+        }
+        if !info.inputs.is_empty() {
+            println!("  Declared inputs ({}):", info.inputs.len());
+            for input in &info.inputs {
+                let extra = match (&input.url, &input.follows) {
+                    (Some(url), _) => format!(" ({})", url),
+                    (_, Some(f)) => format!(" (follows {})", f),
+                    _ => String::new(),
+                };
+                println!("    {}{}", input.name, extra);
+            }
+        }
+        if !info.output_attrs.is_empty() {
+            println!("  Output types: {}", info.output_attrs.join(", "));
+        }
+
+        // Show lock info if available
+        if let Some(ref lock) = project.lock_info {
+            println!("  Locked inputs ({}, lock v{}):", lock.inputs.len(), lock.version);
+            for input in &lock.inputs {
+                let rev_short = input.rev.as_deref()
+                    .map(|r| if r.len() > 8 { &r[..8] } else { r })
+                    .unwrap_or("?");
+                let source = match (&input.owner, &input.repo) {
+                    (Some(o), Some(r)) => format!("{}:{}/{}", input.source_type, o, r),
+                    _ => input.source_type.clone(),
+                };
+                println!("    {} ({} @ {})", input.name, source, rev_short);
+            }
+        }
+    }
+
+    // Also try nix flake metadata for resolved URLs
     match FlakeOps::metadata(&cwd) {
         Ok(meta) => {
-            println!("  Flake: {}", meta.url);
-            if !meta.description.is_empty() {
-                println!("  Description: {}", meta.description);
+            if !meta.url.is_empty() {
+                println!("  Resolved URL: {}", meta.url);
             }
             if let Some(modified) = &meta.last_modified {
                 println!("  Last modified: {}", modified);
             }
-            if !meta.inputs.is_empty() {
-                println!("  Inputs:");
-                for (name, url) in &meta.inputs {
-                    println!("    {}: {}", name, url);
-                }
-            }
         }
-        Err(e) => eprintln!("  Failed to get flake metadata: {}", e),
+        Err(_) => {
+            // nix flake metadata not available — tree-sitter parse above is sufficient
+        }
     }
 }
 
@@ -525,18 +730,35 @@ fn cmd_service_status(name: &str, format: OutputFormat) {
     }
 }
 
-fn cmd_service_failed(_format: OutputFormat) {
+fn cmd_service_failed(format: OutputFormat) {
     match symthaea_nix::observe::systemd::SystemdObserver::failed_units() {
-        Ok(units) => {
-            if units.is_empty() {
-                println!("  No failed services.");
-            } else {
-                println!("  Failed services:");
+        Ok(units) => match format {
+            OutputFormat::Json => {
+                let json: Vec<serde_json::Value> = units.iter().map(|u| {
+                    serde_json::json!({
+                        "name": u.name,
+                        "description": u.description,
+                        "sub_state": u.sub_state,
+                    })
+                }).collect();
+                println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+            }
+            OutputFormat::Minimal => {
                 for unit in &units {
-                    println!("    {} ({})", unit.name, unit.description);
+                    println!("{}", unit.name);
                 }
             }
-        }
+            _ => {
+                if units.is_empty() {
+                    println!("  No failed services.");
+                } else {
+                    println!("  Failed services:");
+                    for unit in &units {
+                        println!("    {} ({})", unit.name, unit.description);
+                    }
+                }
+            }
+        },
         Err(e) => eprintln!("  Failed to list failed services: {}", e),
     }
 }

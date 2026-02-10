@@ -20,8 +20,10 @@ use crate::cognitive_loop::ConsciousnessSnapshot;
 
 /// Operating mode for the REPL orchestrator
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum OrchestratorMode {
     /// Standalone: Run cognitive loop locally
+    #[default]
     Standalone,
     /// Client: Connect to remote symthaea service via IPC
     Client,
@@ -31,11 +33,6 @@ pub enum OrchestratorMode {
     Hybrid,
 }
 
-impl Default for OrchestratorMode {
-    fn default() -> Self {
-        Self::Standalone
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ORCHESTRATOR CONFIGURATION

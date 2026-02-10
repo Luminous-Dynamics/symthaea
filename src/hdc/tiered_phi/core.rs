@@ -37,6 +37,7 @@ use rayon::prelude::*;
 /// For topology validation (Star > Random), use `ExhaustivePartition` tier or
 /// `phi_topology_validation.rs` with probabilistic binarization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ApproximationTier {
     /// O(1) - Deterministic baseline values for testing
     /// Returns predictable values based on component count
@@ -46,6 +47,7 @@ pub enum ApproximationTier {
     /// O(n) - Partition sampling approximation
     /// Good for real-time applications, but IIT correlation unvalidated
     #[serde(alias = "Heuristic")]
+    #[default]
     SampledPartition,
 
     /// O(n²) - Spectral approximation using algebraic connectivity
@@ -64,12 +66,6 @@ pub enum ApproximationTier {
     ExhaustivePartition,
 }
 
-impl Default for ApproximationTier {
-    fn default() -> Self {
-        // Default to SampledPartition for best speed/accuracy tradeoff
-        ApproximationTier::SampledPartition
-    }
-}
 
 impl ApproximationTier {
     /// Get the computational complexity class

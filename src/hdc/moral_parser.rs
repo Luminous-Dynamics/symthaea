@@ -613,11 +613,11 @@ impl MoralParser {
         // Look for possessive patterns for patient: "my X's Y" or "the X"
         let patient = if let Some(pos) = text.find("my ") {
             let rest = &text[pos + 3..];
-            let end = rest.find(|c: char| c == ',' || c == '.' || c == ' ').unwrap_or(rest.len());
+            let end = rest.find([',', '.', ' ']).unwrap_or(rest.len());
             Some(rest[..end.min(30)].to_string())
         } else if let Some(pos) = text.find("the ") {
             let rest = &text[pos + 4..];
-            let end = rest.find(|c: char| c == ',' || c == '.' || c == ' ').unwrap_or(rest.len());
+            let end = rest.find([',', '.', ' ']).unwrap_or(rest.len());
             Some(rest[..end.min(30)].to_string())
         } else {
             None
@@ -659,7 +659,7 @@ impl MoralParser {
                 let start = pos + pattern.len();
                 let rest = text[start..].trim_start();
                 // Extract clause up to next separator
-                let end = rest.find(|c: char| c == ',' || c == '.' || c == ';')
+                let end = rest.find([',', '.', ';'])
                     .unwrap_or(rest.len());
                 let clause = rest[..end.min(80)].trim();
                 if !clause.is_empty() {
@@ -682,7 +682,7 @@ impl MoralParser {
             if let Some(pos) = text.find(pattern) {
                 let start = pos + pattern.len();
                 let rest = text[start..].trim_start();
-                let end = rest.find(|c: char| c == '.' || c == ';')
+                let end = rest.find(['.', ';'])
                     .unwrap_or(rest.len());
                 let clause = rest[..end.min(120)].trim();
                 if !clause.is_empty() {
@@ -719,7 +719,7 @@ impl MoralParser {
             if let Some(pos) = text.find(pattern) {
                 let start = pos + pattern.len();
                 let rest = text[start..].trim_start();
-                let end = rest.find(|c: char| c == ',' || c == '.' || c == ';')
+                let end = rest.find([',', '.', ';'])
                     .unwrap_or(rest.len());
                 let clause = rest[..end.min(80)].trim();
                 if clause.is_empty() {

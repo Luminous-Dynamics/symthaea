@@ -5,6 +5,7 @@
 //! exceeded, the lowest-activation item is evicted (biological constraint
 //! from Miller's 7±2 law).
 
+use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::ContinuousHV;
 
 /// Default capacity (Miller's number).
@@ -14,7 +15,7 @@ const DEFAULT_CAPACITY: usize = 7;
 const DECAY_RATE: f64 = 0.9;
 
 /// Source of a working memory item.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MemorySource {
     /// From user input text.
     UserInput,
@@ -182,6 +183,71 @@ impl WorkingMemory {
         let sum: f64 = self.items.iter().map(|i| i.activation).sum();
         sum / self.items.len() as f64
     }
+
+    /// Save working memory labels and metadata to JSON.
+    ///
+    /// HDC vectors are NOT saved (they're reconstructed from the codebook on load).
+    /// Only labels, activation levels, sources, and step counts are persisted.
+    pub fn save(&self) -> SavedWorkingMemory {
+        SavedWorkingMemory {
+            step: self.step,
+            items: self
+                .items
+                .iter()
+                .map(|item| SavedItem {
+                    label: item.label.clone(),
+                    activation: item.activation,
+                    source: item.source.clone(),
+                    added_at: item.added_at,
+                })
+                .collect(),
+        }
+    }
+
+    /// Restore working memory from saved state, reconstructing HDC vectors
+    /// from the codebook.
+    pub fn load(
+        saved: &SavedWorkingMemory,
+        codebook: &mut crate::encoding::NixCodebook,
+    ) -> Self {
+        let mut wm = Self::with_capacity(DEFAULT_CAPACITY);
+        wm.step = saved.step;
+
+        for saved_item in &saved.items {
+            let content = codebook.get_or_create(&saved_item.label).clone();
+            wm.items.push(MemoryItem {
+                content,
+                activation: saved_item.activation,
+                source: saved_item.source.clone(),
+                label: saved_item.label.clone(),
+                added_at: saved_item.added_at,
+            });
+        }
+
+        // Sort by activation (highest first)
+        wm.items.sort_by(|a, b| {
+            b.activation
+                .partial_cmp(&a.activation)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        wm
+    }
+}
+
+/// Serializable representation of a working memory item (no HDC vectors).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SavedItem {
+    pub label: String,
+    pub activation: f64,
+    pub source: MemorySource,
+    pub added_at: u64,
+}
+
+/// Serializable snapshot of working memory state.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SavedWorkingMemory {
+    pub step: u64,
+    pub items: Vec<SavedItem>,
 }
 
 impl Default for WorkingMemory {
@@ -273,5 +339,37 @@ mod tests {
         let wm = WorkingMemory::new();
         let ctx = wm.context_vector();
         assert!(ctx.norm() < 1e-6, "Empty WM should produce zero context");
+    }
+
+    #[test]
+    fn test_save_and_load() {
+        use crate::encoding::NixCodebook;
+
+        let mut wm = WorkingMemory::with_capacity(7);
+        wm.push(make_hv(1), MemorySource::UserInput, "service-failed".into());
+        wm.push(make_hv(2), MemorySource::SystemObservation, "store-growth".into());
+
+        let saved = wm.save();
+        assert_eq!(saved.items.len(), 2);
+
+        // Serialize and deserialize
+        let json = serde_json::to_string(&saved).unwrap();
+        let restored_saved: SavedWorkingMemory = serde_json::from_str(&json).unwrap();
+
+        let mut cb = NixCodebook::new();
+        let loaded = WorkingMemory::load(&restored_saved, &mut cb);
+        assert_eq!(loaded.len(), 2);
+
+        // Check labels preserved
+        let labels: Vec<&str> = loaded.items().iter().map(|i| i.label.as_str()).collect();
+        assert!(labels.contains(&"service-failed"));
+        assert!(labels.contains(&"store-growth"));
+
+        // Check activation preserved
+        let svc_activation = loaded.items().iter()
+            .find(|i| i.label == "service-failed")
+            .unwrap()
+            .activation;
+        assert!(svc_activation < 1.0, "Should preserve decayed activation: {}", svc_activation);
     }
 }

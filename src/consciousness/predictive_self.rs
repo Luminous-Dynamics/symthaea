@@ -143,7 +143,7 @@ impl SelfState {
             core_coherence: report.core_coherence,
             autobio_coherence: report.autobio_coherence,
             active_goals: report.active_goals,
-            unified_self: model.unified_self().clone(),
+            unified_self: *model.unified_self(),
             timestamp: Instant::now(),
             causal_action: None,
         }
@@ -283,7 +283,7 @@ impl SelfPredictor {
             core_coherence: current.core_coherence * (coherence_pred.last().unwrap_or(&1.0) / current.coherence.max(0.01)),
             autobio_coherence: current.autobio_coherence * (coherence_pred.last().unwrap_or(&1.0) / current.coherence.max(0.01)),
             active_goals: current.active_goals,
-            unified_self: current.unified_self.clone(),
+            unified_self: current.unified_self,
             timestamp: Instant::now(),
             causal_action: Some(action.to_string()),
         }

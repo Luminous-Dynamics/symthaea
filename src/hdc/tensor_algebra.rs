@@ -776,7 +776,7 @@ impl Multivector {
         for (blade_idx, component) in result.components.iter_mut().enumerate() {
             let k = GeometricAlgebra::grade_of_blade(blade_idx);
             // Sign is (-1)^{k(k-1)/2}
-            let sign = if (k * (k.wrapping_sub(1)) / 2) % 2 == 0 {
+            let sign = if (k * (k.wrapping_sub(1)) / 2).is_multiple_of(2) {
                 1.0
             } else {
                 -1.0
@@ -822,7 +822,7 @@ impl Multivector {
         // For the pseudoscalar: reverse(e1...en) = (-1)^{n(n-1)/2} e1...en
         // and |I|^2 = product of all metric entries.
         let metric_product: f64 = self.algebra.metric.iter().product();
-        let rev_sign = if (n * n.wrapping_sub(1) / 2) % 2 == 0 {
+        let rev_sign = if (n * n.wrapping_sub(1) / 2).is_multiple_of(2) {
             1.0
         } else {
             -1.0
@@ -1097,10 +1097,8 @@ impl TensorNetwork {
         }
 
         // Return the first remaining tensor
-        for t in tensors {
-            if let Some(tensor) = t {
-                return tensor;
-            }
+        if let Some(tensor) = tensors.into_iter().flatten().next() {
+            return tensor;
         }
 
         unreachable!("Network had nodes but no tensor survived contraction")

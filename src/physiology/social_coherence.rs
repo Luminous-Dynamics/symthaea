@@ -438,7 +438,7 @@ impl CollectiveLearning {
         for (complexity, observations) in &other.threshold_observations {
             self.threshold_observations
                 .entry(complexity.clone())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .extend(observations.iter().cloned());
         }
 

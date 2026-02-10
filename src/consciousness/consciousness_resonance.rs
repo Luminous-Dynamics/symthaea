@@ -142,7 +142,7 @@ impl FrequencyBandPrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
@@ -282,7 +282,7 @@ impl ResonanceModePrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
@@ -396,7 +396,7 @@ impl CouplingTypePrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {

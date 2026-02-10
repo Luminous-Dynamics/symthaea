@@ -139,13 +139,13 @@ impl GenerativeModel {
             let similarity = cause.similarity(c) as f64;
             if similarity > 0.6 {
                 let score = similarity * strength;
-                if best_match.map_or(true, |(s, _, _)| score > s) {
+                if best_match.is_none_or(|(s, _, _)| score > s) {
                     best_match = Some((score, effect, *strength));
                 }
             }
         }
 
-        best_match.map(|(_, effect, confidence)| (effect.clone(), confidence))
+        best_match.map(|(_, effect, confidence)| (*effect, confidence))
     }
 
     fn learn(&mut self, cause: BinaryHV, effect: BinaryHV, strength: f64) {
@@ -187,13 +187,13 @@ impl RecognitionModel {
             let similarity = observation.similarity(obs) as f64;
             if similarity > 0.6 {
                 let score = similarity * strength;
-                if best_match.map_or(true, |(s, _, _)| score > s) {
+                if best_match.is_none_or(|(s, _, _)| score > s) {
                     best_match = Some((score, cause, *strength));
                 }
             }
         }
 
-        best_match.map(|(_, cause, confidence)| (cause.clone(), confidence))
+        best_match.map(|(_, cause, confidence)| (*cause, confidence))
     }
 
     fn learn(&mut self, observation: BinaryHV, cause: BinaryHV, strength: f64) {
@@ -206,13 +206,11 @@ impl RecognitionModel {
 
         if self.inferences.len() < self.capacity {
             self.inferences.push((observation, cause, strength));
-        } else {
-            if let Some((idx, _)) = self.inferences.iter()
-                .enumerate()
-                .min_by(|(_, a), (_, b)| a.2.partial_cmp(&b.2).unwrap())
-            {
-                self.inferences[idx] = (observation, cause, strength);
-            }
+        } else if let Some((idx, _)) = self.inferences.iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| a.2.partial_cmp(&b.2).unwrap())
+        {
+            self.inferences[idx] = (observation, cause, strength);
         }
     }
 }
@@ -235,7 +233,7 @@ impl PredictiveLayer {
     pub fn generate_prediction(&self) -> Prediction {
         let content = self.generative_weights.predict(&self.belief)
             .map(|(c, _)| c)
-            .unwrap_or_else(|| self.belief.clone());
+            .unwrap_or_else(|| self.belief);
 
         Prediction {
             content,
@@ -243,7 +241,7 @@ impl PredictiveLayer {
             timestamp: Instant::now(),
             horizon: 1,
             level: self.level,
-            context: self.belief.clone(),
+            context: self.belief,
         }
     }
 
@@ -286,18 +284,18 @@ impl PredictiveLayer {
 
     /// Learn association between cause and effect
     pub fn learn_association(&mut self, cause: BinaryHV, effect: BinaryHV, success: f64) {
-        self.generative_weights.learn(cause.clone(), effect.clone(), success);
+        self.generative_weights.learn(cause, effect, success);
         self.recognition_weights.learn(effect, cause, success);
     }
 
     fn blend_beliefs(&self, a: &BinaryHV, b: &BinaryHV, factor: f64) -> BinaryHV {
         // Simple blending: XOR introduces variation, similarity-based selection
         if factor > 0.5 {
-            b.clone()
+            *b
         } else if factor > 0.3 {
             a.bind(b)  // Combine
         } else {
-            a.clone()
+            *a
         }
     }
 }
@@ -375,7 +373,7 @@ impl PredictiveHierarchy {
 
     /// Process sensory input through the hierarchy
     pub fn process_sensory_input(&mut self, input: &BinaryHV) -> PredictionResult {
-        let mut current_signal = input.clone();
+        let mut current_signal = *input;
         let mut total_error = 0.0;
         let mut errors = Vec::new();
 
@@ -387,7 +385,7 @@ impl PredictiveHierarchy {
             } else {
                 // Sensory level predicts directly
                 Prediction {
-                    content: self.layers[0].belief.clone(),
+                    content: self.layers[0].belief,
                     precision: self.layers[0].precision,
                     timestamp: Instant::now(),
                     horizon: 0,
@@ -404,8 +402,8 @@ impl PredictiveHierarchy {
             total_error += weighted_error;
 
             let error = PredictionError {
-                prediction: prediction.content.clone(),
-                actual: current_signal.clone(),
+                prediction: prediction.content,
+                actual: current_signal,
                 magnitude: error_magnitude,
                 weighted_error,
                 level: level as u32,
@@ -422,7 +420,7 @@ impl PredictiveHierarchy {
             self.layers[level].process_bottom_up_error(error);
 
             // Pass error to next level (as signal to explain)
-            current_signal = self.layers[level].belief.clone();
+            current_signal = self.layers[level].belief;
         }
 
         // Top-down pass: send predictions down
@@ -463,7 +461,7 @@ impl PredictiveHierarchy {
         let success_score = if success { 0.9 } else { 0.3 };
 
         for layer in &mut self.layers {
-            layer.learn_association(action.clone(), outcome.clone(), success_score);
+            layer.learn_association(*action, *outcome, success_score);
         }
 
         // Adjust action bias
@@ -490,7 +488,7 @@ impl PredictiveHierarchy {
 
     /// Get the highest level belief (closest to "conscious" content)
     pub fn highest_level_belief(&self) -> BinaryHV {
-        self.layers.last().map(|l| l.belief.clone()).unwrap_or_else(|| BinaryHV::random(100))
+        self.layers.last().map(|l| l.belief).unwrap_or_else(|| BinaryHV::random(100))
     }
 
     /// Get accuracy statistics
@@ -703,14 +701,14 @@ impl ActiveInferenceEngine {
 
             // Update expected outcome
             if success {
-                action.expected_outcome = actual_outcome.clone();
+                action.expected_outcome = *actual_outcome;
             }
         }
 
         // Update motor hierarchy
         self.motor_hierarchy.learn_from_action(
             &self.action_repertoire.get(action_id as usize)
-                .map(|a| a.motor_command.clone())
+                .map(|a| a.motor_command)
                 .unwrap_or_else(|| BinaryHV::random(100)),
             actual_outcome,
             success

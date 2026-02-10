@@ -320,7 +320,7 @@ impl CausalLoopEnhancer {
     /// Check if it's time to run causal discovery
     pub fn should_discover(&self) -> bool {
         self.history.len() >= self.config.min_pairs_for_discovery
-            && self.current_cycle % self.config.discovery_interval == 0
+            && self.current_cycle.is_multiple_of(self.config.discovery_interval)
     }
 
     /// Detect causal structure from accumulated history

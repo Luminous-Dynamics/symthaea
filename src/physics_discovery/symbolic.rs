@@ -262,8 +262,8 @@ impl SymbolicRegressor {
                 r_squared: fitness.accuracy,
                 complexity: expr.complexity(),
                 interpretation: self.interpret(&expr, var_names),
-                variables: var_names.iter().enumerate()
-                    .map(|(_i, name)| (name.clone(), PhysicalQuantity::Other))
+                variables: var_names.iter()
+                    .map(|name| (name.clone(), PhysicalQuantity::Other))
                     .collect(),
             }
         })

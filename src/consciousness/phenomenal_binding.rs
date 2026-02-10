@@ -400,9 +400,9 @@ impl TemporalSynchronizationAnalyzer {
         // Phase advances based on value (higher value = faster oscillation)
         // This models active neural processing
         let phase_velocity = value * PI; // 0-π radians per step
-        let new_phase = (prev_phase + phase_velocity) % (2.0 * PI);
+        
 
-        new_phase
+        (prev_phase + phase_velocity) % (2.0 * PI)
     }
 
     /// Update the coherence matrix
@@ -706,12 +706,11 @@ impl TemporalSynchronizationAnalyzer {
         for dim in &dims {
             let mut all_coherent = true;
             for other in &dims {
-                if dim != other {
-                    if self.get_coherence(*dim, *other) < 0.7 {
+                if dim != other
+                    && self.get_coherence(*dim, *other) < 0.7 {
                         all_coherent = false;
                         break;
                     }
-                }
             }
             if all_coherent {
                 locked.push(*dim);

@@ -825,7 +825,7 @@ impl HdcCfcBridge {
 
         // Gradient estimation via finite differences for encode_2 only (most direct impact)
         let eps = 1e-4;
-        let grad = self.numerical_gradient_encode_target(&hv, target_temporal, eps);
+        let grad = self.numerical_gradient_encode_target(hv, target_temporal, eps);
         self.adam_encode_2.update(&mut self.w_encode_2, &grad, lr);
 
         self.total_steps += 1;
@@ -1046,13 +1046,13 @@ impl HdcCfcBridge {
             // Compute loss with +eps
             let mut w_plus = self.w_encode_2.clone();
             w_plus[[i, j]] += eps;
-            let encoded_plus = self.encode_with_weight(&hv, &w_plus);
+            let encoded_plus = self.encode_with_weight(hv, &w_plus);
             let loss_plus = Self::mse(&encoded_plus, target);
 
             // Compute loss with -eps
             let mut w_minus = self.w_encode_2.clone();
             w_minus[[i, j]] -= eps;
-            let encoded_minus = self.encode_with_weight(&hv, &w_minus);
+            let encoded_minus = self.encode_with_weight(hv, &w_minus);
             let loss_minus = Self::mse(&encoded_minus, target);
 
             grad[[i, j]] = (loss_plus - loss_minus) / (2.0 * eps);

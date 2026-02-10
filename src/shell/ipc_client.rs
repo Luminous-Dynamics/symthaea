@@ -34,8 +34,10 @@ use anyhow::{Result, Context};
 
 /// Connection state for visual indicators
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum ConnectionState {
     /// Not connected to service
+    #[default]
     Disconnected,
     /// Attempting to connect
     Connecting,
@@ -47,11 +49,6 @@ pub enum ConnectionState {
     Reconnecting,
 }
 
-impl Default for ConnectionState {
-    fn default() -> Self {
-        Self::Disconnected
-    }
-}
 
 impl ConnectionState {
     /// Get visual indicator for this state

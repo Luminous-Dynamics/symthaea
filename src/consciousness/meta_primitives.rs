@@ -79,14 +79,12 @@ impl CompositeTransformation {
         let mut rng = rand::thread_rng();
         let length = rng.gen_range(min_length..=max_length);
 
-        let all_transformations = vec![
-            TransformationType::Bind,
+        let all_transformations = [TransformationType::Bind,
             TransformationType::Bundle,
             TransformationType::Permute,
             TransformationType::Resonate,
             TransformationType::Abstract,
-            TransformationType::Ground,
-        ];
+            TransformationType::Ground];
 
         let sequence: Vec<_> = (0..length)
             .map(|_| {
@@ -100,7 +98,7 @@ impl CompositeTransformation {
 
     /// Apply this composite transformation
     pub fn apply(&self, input: &BinaryHV, primitive: &Primitive) -> Result<BinaryHV> {
-        let mut current = input.clone();
+        let mut current = *input;
 
         for transformation in &self.sequence {
             current = self.apply_single(&current, primitive, transformation)?;
@@ -122,7 +120,7 @@ impl CompositeTransformation {
             }
 
             TransformationType::Bundle => {
-                Ok(BinaryHV::bundle(&[input.clone(), primitive.encoding.clone()]))
+                Ok(BinaryHV::bundle(&[*input, primitive.encoding]))
             }
 
             TransformationType::Permute => {
@@ -133,9 +131,9 @@ impl CompositeTransformation {
             TransformationType::Resonate => {
                 let similarity = input.similarity(&primitive.encoding);
                 if similarity > 0.7 {
-                    Ok(BinaryHV::bundle(&[input.clone(), primitive.encoding.clone()]))
+                    Ok(BinaryHV::bundle(&[*input, primitive.encoding]))
                 } else {
-                    Ok(input.clone())
+                    Ok(*input)
                 }
             }
 
@@ -162,14 +160,12 @@ impl CompositeTransformation {
             0 => {
                 // Add transformation
                 if new_sequence.len() < 8 {
-                    let all_transformations = vec![
-                        TransformationType::Bind,
+                    let all_transformations = [TransformationType::Bind,
                         TransformationType::Bundle,
                         TransformationType::Permute,
                         TransformationType::Resonate,
                         TransformationType::Abstract,
-                        TransformationType::Ground,
-                    ];
+                        TransformationType::Ground];
                     let idx = rng.gen_range(0..all_transformations.len());
                     let pos = rng.gen_range(0..=new_sequence.len());
                     new_sequence.insert(pos, all_transformations[idx]);
@@ -187,14 +183,12 @@ impl CompositeTransformation {
             2 => {
                 // Replace transformation
                 if !new_sequence.is_empty() {
-                    let all_transformations = vec![
-                        TransformationType::Bind,
+                    let all_transformations = [TransformationType::Bind,
                         TransformationType::Bundle,
                         TransformationType::Permute,
                         TransformationType::Resonate,
                         TransformationType::Abstract,
-                        TransformationType::Ground,
-                    ];
+                        TransformationType::Ground];
                     let pos = rng.gen_range(0..new_sequence.len());
                     let idx = rng.gen_range(0..all_transformations.len());
                     new_sequence[pos] = all_transformations[idx];
@@ -371,7 +365,7 @@ impl MetaPrimitiveEvolution {
             let parent2 = self.tournament_select();
 
             let mut offspring = if rand::thread_rng().gen::<f64>() < self.crossover_rate {
-                parent1.crossover(&parent2)
+                parent1.crossover(parent2)
             } else {
                 parent1.clone()
             };
@@ -406,7 +400,7 @@ impl MetaPrimitiveEvolution {
         // Measure Φ
         use crate::hdc::integrated_information::IntegratedInformation;
         let mut phi_computer = IntegratedInformation::new();
-        let components = vec![problem.clone(), output];
+        let components = vec![*problem, output];
         let phi = phi_computer.compute_phi(&components);
 
         Ok(phi)

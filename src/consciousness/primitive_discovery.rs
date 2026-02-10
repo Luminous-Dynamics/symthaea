@@ -526,13 +526,12 @@ impl PrimitiveDiscoveryService {
                     accepted.push(discovery.clone());
 
                     // Auto-integrate high-phi discoveries
-                    if self.config.auto_integrate && discovery.phi_score >= self.config.auto_integrate_threshold {
-                        if self.try_integrate(&discovery, primitive_system) {
+                    if self.config.auto_integrate && discovery.phi_score >= self.config.auto_integrate_threshold
+                        && self.try_integrate(&discovery, primitive_system) {
                             self.emit_event(DiscoveryEventType::Integrated, Some(discovery.clone()));
                             self.stats.auto_integrated += 1;
                             self.stats.record_integration(discovery.phi_score);
                         }
-                    }
                 } else {
                     self.stats.record_rejection();
                     self.emit_event(DiscoveryEventType::Rejected, Some(discovery.clone()));

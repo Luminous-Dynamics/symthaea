@@ -679,4 +679,170 @@ mod tests {
             _ => panic!("Expected pending confirmation"),
         }
     }
+
+    #[test]
+    fn test_rebuild_with_flake_to_command() {
+        let cmd = NixOSCommand::RebuildSwitch {
+            flake: Some(".#myhost".to_string()),
+            extra_args: vec!["--show-trace".to_string()],
+        };
+        let (bin, args) = cmd.to_command();
+        assert_eq!(bin, "nixos-rebuild");
+        assert!(args.contains(&"switch".to_string()));
+        assert!(args.contains(&"--flake".to_string()));
+        assert!(args.contains(&".#myhost".to_string()));
+        assert!(args.contains(&"--show-trace".to_string()));
+    }
+
+    #[test]
+    fn test_rebuild_test_and_boot_to_command() {
+        let test_cmd = NixOSCommand::RebuildTest { flake: None, extra_args: vec![] };
+        let (bin, args) = test_cmd.to_command();
+        assert_eq!(bin, "nixos-rebuild");
+        assert_eq!(args[0], "test");
+
+        let boot_cmd = NixOSCommand::RebuildBoot { flake: None, extra_args: vec![] };
+        let (bin, args) = boot_cmd.to_command();
+        assert_eq!(bin, "nixos-rebuild");
+        assert_eq!(args[0], "boot");
+    }
+
+    #[test]
+    fn test_channel_operations_to_command() {
+        let list = NixOSCommand::Channel { operation: ChannelOperation::List };
+        let (bin, args) = list.to_command();
+        assert_eq!(bin, "nix-channel");
+        assert!(args.contains(&"--list".to_string()));
+
+        let update = NixOSCommand::Channel { operation: ChannelOperation::Update { channel: Some("nixos".into()) } };
+        let (bin, args) = update.to_command();
+        assert_eq!(bin, "nix-channel");
+        assert!(args.contains(&"--update".to_string()));
+        assert!(args.contains(&"nixos".to_string()));
+
+        let add = NixOSCommand::Channel { operation: ChannelOperation::Add { url: "https://nixos.org/channels/nixpkgs-unstable".into(), name: "nixpkgs".into() } };
+        let (bin, args) = add.to_command();
+        assert_eq!(bin, "nix-channel");
+        assert!(args.contains(&"--add".to_string()));
+
+        let remove = NixOSCommand::Channel { operation: ChannelOperation::Remove { name: "nixpkgs".into() } };
+        let (bin, args) = remove.to_command();
+        assert_eq!(bin, "nix-channel");
+        assert!(args.contains(&"--remove".to_string()));
+    }
+
+    #[test]
+    fn test_flake_operations_to_command() {
+        let update = NixOSCommand::Flake { operation: FlakeOperation::Update { inputs: vec!["nixpkgs".into()] } };
+        let (bin, args) = update.to_command();
+        assert_eq!(bin, "nix");
+        assert!(args.contains(&"flake".to_string()));
+        assert!(args.contains(&"update".to_string()));
+        assert!(args.contains(&"nixpkgs".to_string()));
+
+        let lock = NixOSCommand::Flake { operation: FlakeOperation::Lock { inputs: vec!["nixpkgs".into()] } };
+        let (bin, args) = lock.to_command();
+        assert_eq!(bin, "nix");
+        assert!(args.contains(&"lock".to_string()));
+        assert!(args.contains(&"--update-input".to_string()));
+    }
+
+    #[test]
+    fn test_home_manager_to_command() {
+        let hm = NixOSCommand::HomeManagerSwitch { flake: Some(".".into()) };
+        let (bin, args) = hm.to_command();
+        assert_eq!(bin, "home-manager");
+        assert!(args.contains(&"switch".to_string()));
+        assert!(args.contains(&"--flake".to_string()));
+    }
+
+    #[test]
+    fn test_gc_to_command() {
+        let gc = NixOSCommand::CollectGarbage { older_than_days: Some(30), delete_all: false };
+        let (bin, args) = gc.to_command();
+        assert_eq!(bin, "nix-collect-garbage");
+        assert!(args.contains(&"--delete-older-than".to_string()));
+        assert!(args.contains(&"30d".to_string()));
+
+        let gc_all = NixOSCommand::CollectGarbage { older_than_days: None, delete_all: true };
+        let (_, args) = gc_all.to_command();
+        assert!(args.contains(&"--delete-old".to_string()));
+    }
+
+    #[test]
+    fn test_custom_command_safety() {
+        let custom = NixOSCommand::Custom {
+            command: "echo".to_string(),
+            args: vec!["hello".to_string()],
+            safety_level: SafetyLevel::ReadOnly,
+        };
+        assert_eq!(custom.safety_level(), SafetyLevel::ReadOnly);
+        let (bin, args) = custom.to_command();
+        assert_eq!(bin, "echo");
+        assert_eq!(args, vec!["hello"]);
+    }
+
+    #[test]
+    fn test_all_safety_levels_complete() {
+        // Verify every safety level maps to a valid action type
+        for level in [SafetyLevel::ReadOnly, SafetyLevel::UserModify, SafetyLevel::SystemModify, SafetyLevel::SystemCritical, SafetyLevel::Destructive] {
+            let phi = level.required_phi();
+            assert!(phi >= 0.0 && phi <= 1.0, "Phi for {:?} out of range: {}", level, phi);
+        }
+    }
+
+    #[test]
+    fn test_rollback_all_rebuild_variants() {
+        let switch = NixOSCommand::RebuildSwitch { flake: None, extra_args: vec![] };
+        let test = NixOSCommand::RebuildTest { flake: None, extra_args: vec![] };
+        let boot = NixOSCommand::RebuildBoot { flake: None, extra_args: vec![] };
+        let hm = NixOSCommand::HomeManagerSwitch { flake: None };
+        let gc = NixOSCommand::CollectGarbage { older_than_days: None, delete_all: false };
+
+        assert!(switch.rollback_command().is_some());
+        assert!(test.rollback_command().is_some());
+        assert!(boot.rollback_command().is_some());
+        assert!(hm.rollback_command().is_some());
+        assert!(gc.rollback_command().is_none(), "GC should not have rollback");
+    }
+
+    #[tokio::test]
+    async fn test_dry_run_skips_history() {
+        // Dry-run returns before recording to history (by design)
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        assert!(executor.history().is_empty());
+
+        let cmd = NixOSCommand::Search { query: "test".into(), json: false };
+        executor.execute(cmd, 0.5).await;
+        assert!(executor.history().is_empty(), "Dry-run should not record to history");
+    }
+
+    #[tokio::test]
+    async fn test_phi_gated_skips_history() {
+        // Phi-gated PendingConfirmation also doesn't record
+        let mut executor = NixOSExecutor::new().with_dry_run(true);
+        let cmd = NixOSCommand::RebuildSwitch { flake: None, extra_args: vec![] };
+        executor.execute(cmd, 0.1).await; // phi=0.1 < 0.4 required
+        assert!(executor.history().is_empty(), "Phi-gated should not record to history");
+    }
+
+    #[test]
+    fn test_success_rate_no_history() {
+        let executor = NixOSExecutor::new();
+        assert!(executor.success_rate(SafetyLevel::ReadOnly).is_none());
+        assert!(executor.success_rate(SafetyLevel::UserModify).is_none());
+    }
+
+    #[test]
+    fn test_command_serde_roundtrip() {
+        let cmd = NixOSCommand::RebuildSwitch {
+            flake: Some(".#host".into()),
+            extra_args: vec!["--show-trace".into()],
+        };
+        let json = serde_json::to_string(&cmd).unwrap();
+        let restored: NixOSCommand = serde_json::from_str(&json).unwrap();
+        let (bin, args) = restored.to_command();
+        assert_eq!(bin, "nixos-rebuild");
+        assert!(args.contains(&".#host".to_string()));
+    }
 }

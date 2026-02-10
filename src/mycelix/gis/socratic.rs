@@ -281,8 +281,8 @@ impl SocraticDefense {
         let found_in_history = self.interaction_history.iter()
             .any(|i| i.content.contains(alleged_prior));
 
-        if claim.contains("you never said") || claim.contains("you didn't say") {
-            if found_in_history {
+        if (claim.contains("you never said") || claim.contains("you didn't say"))
+            && found_in_history {
                 return GaslightingDetection {
                     detected: true,
                     confidence: 0.9,
@@ -297,7 +297,6 @@ impl SocraticDefense {
                     ],
                 };
             }
-        }
 
         if claim.contains("that's not what I meant") && self.recent_repetition_count(claim) > 2 {
             return GaslightingDetection {

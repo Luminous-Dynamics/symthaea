@@ -149,6 +149,7 @@ impl ConfigCategory {
 
 /// Synchronization state between GUI and Nix
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct SyncState {
     /// Current widget states (widget_id -> value)
     pub widget_states: HashMap<WidgetId, WidgetValue>,
@@ -166,17 +167,6 @@ pub struct SyncState {
     pub nix_dirty: bool,
 }
 
-impl Default for SyncState {
-    fn default() -> Self {
-        Self {
-            widget_states: HashMap::new(),
-            pending_changes: Vec::new(),
-            validation_errors: Vec::new(),
-            last_sync_ms: 0,
-            nix_dirty: false,
-        }
-    }
-}
 
 /// A pending change to be applied
 #[derive(Debug, Clone)]

@@ -94,6 +94,7 @@ use std::time::Instant;
 /// Lightweight HDC-style encoding for sensorimotor patterns
 /// Uses 256-bit vectors for efficient similarity search
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ContingencyHV {
     /// Binary hypervector (256 bits = 32 bytes)
     bits: [u64; 4],
@@ -207,11 +208,6 @@ impl ContingencyHV {
     }
 }
 
-impl Default for ContingencyHV {
-    fn default() -> Self {
-        Self { bits: [0; 4] }
-    }
-}
 
 // ============================================================================
 // SENSORIMOTOR CONTINGENCY - Core Data Structure
@@ -756,7 +752,7 @@ impl ContingencyLearner {
     ) -> SensorimotorContingency {
         let contingencies = self.contingencies
             .entry(action.action_type)
-            .or_insert_with(Vec::new);
+            .or_default();
 
         // Find matching contingency
         let matching = contingencies.iter_mut()

@@ -799,11 +799,10 @@ pub fn get_rollback_hint(program: &str, args: &[String]) -> Option<String> {
     let args_str = args.join(" ");
 
     // NixOS-specific rollback hints
-    if program.contains("nixos-rebuild") {
-        if args_str.contains("switch") || args_str.contains("boot") {
+    if program.contains("nixos-rebuild")
+        && (args_str.contains("switch") || args_str.contains("boot")) {
             return Some("nixos-rebuild switch --rollback".to_string());
         }
-    }
 
     if program.contains("nix-env") && (args_str.contains("-i") || args_str.contains("--install")) {
         // Extract package name from args

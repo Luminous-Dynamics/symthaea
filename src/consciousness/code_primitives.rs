@@ -359,8 +359,8 @@ impl CodePrimitiveExecutor {
             .enumerate()
             .map(|(i, p)| PrimitiveExecution {
                 primitive: p.clone(),
-                input: p.encoding.clone(),
-                output: primitives.first().map(|f| f.encoding.clone()).unwrap_or_else(|| p.encoding.clone()),
+                input: p.encoding,
+                output: primitives.first().map(|f| f.encoding).unwrap_or_else(|| p.encoding),
                 transformation: TransformationType::Bundle,
                 phi_contribution: 1.0 / (i + 1) as f64, // Decaying contribution
                 timestamp: i as f64 * 0.1,

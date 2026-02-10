@@ -28,6 +28,7 @@ use super::widgets::{
     WorldModelView, WorldModelSnapshot,
     CausalExplorer, CausalLink,
 };
+use crate::ipc::{self, DaemonSnapshot};
 use crate::mind::active_inference::NixActiveInference;
 
 /// Which panel is focused.
@@ -69,6 +70,10 @@ pub struct App {
     tick: u64,
     /// Dry-run mode.
     _dry_run: bool,
+    /// Path to daemon IPC snapshot.
+    daemon_snapshot_path: std::path::PathBuf,
+    /// Last daemon snapshot (if available).
+    daemon_snapshot: Option<DaemonSnapshot>,
 }
 
 impl App {
@@ -88,6 +93,8 @@ impl App {
             should_quit: false,
             tick: 0,
             _dry_run: dry_run,
+            daemon_snapshot_path: ipc::default_snapshot_path(),
+            daemon_snapshot: None,
         }
     }
 
@@ -223,15 +230,67 @@ impl App {
         }
     }
 
-    /// Refresh system data.
+    /// Refresh system data — first from daemon IPC, then direct queries as fallback.
     fn refresh_data(&mut self) {
-        // Refresh health
+        // Try to read daemon snapshot (preferred — richer data from continuous awareness)
+        self.daemon_snapshot = DaemonSnapshot::read_from(&self.daemon_snapshot_path)
+            .filter(|snap| snap.is_fresh(120) && snap.daemon_alive());
+
+        if let Some(snap) = self.daemon_snapshot.clone() {
+            self.apply_daemon_snapshot(&snap);
+        } else {
+            // Fallback: direct system queries (less rich, no prediction data)
+            self.refresh_data_direct();
+        }
+    }
+
+    /// Apply daemon snapshot data to TUI state.
+    fn apply_daemon_snapshot(&mut self, snap: &DaemonSnapshot) {
+        // Consciousness state from daemon's predictive hierarchy
+        self.consciousness = ConsciousnessState {
+            phi: snap.free_energy.min(1.0),
+            confidence: 1.0 - snap.free_energy, // higher FE = lower confidence
+            free_energy: snap.free_energy,
+        };
+
+        // World model from daemon
+        self.world_model = WorldModelSnapshot {
+            level_errors: snap.hierarchy_errors,
+            free_energy: snap.free_energy,
+            learned_actions: snap.causal_edge_count,
+            total_observations: snap.observation_count as usize,
+            is_surprised: snap.is_surprised,
+            memory_items: snap.concerns.iter()
+                .map(|c| (c.label.clone(), c.activation))
+                .collect(),
+            ..Default::default()
+        };
+
+        // Causal links — show recent anomalies as causal concerns
+        self.causal_links = snap.recent_anomalies.iter().map(|a| CausalLink {
+            from: a.unit.clone(),
+            to: a.reason.clone(),
+            confidence: a.score,
+            relationship: "anomaly".to_string(),
+        }).collect();
+
+        // Health: merge daemon stats with direct service queries
+        self.health.services_failed = snap.anomaly_count as usize;
+        self.refresh_generations();
+    }
+
+    /// Direct system queries (fallback when daemon not running).
+    fn refresh_data_direct(&mut self) {
         if let Ok(units) = crate::observe::systemd::SystemdObserver::list_units() {
             self.health.services_total = units.len();
             self.health.services_running = units.iter().filter(|u| u.active_state == "active").count();
             self.health.services_failed = units.iter().filter(|u| u.active_state == "failed").count();
         }
+        self.refresh_generations();
+    }
 
+    /// Refresh generation data (shared by both daemon and direct paths).
+    fn refresh_generations(&mut self) {
         if let Ok(gens) = crate::action::generation_manager::GenerationManager::list() {
             self.health.total_generations = gens.len();
             self.health.current_generation = gens.iter().find(|g| g.current).map(|g| g.number);
@@ -335,9 +394,14 @@ impl App {
             ])
             .split(main_chunks[1]);
 
-        // Input
+        // Input — show daemon connection status
+        let daemon_status = match &self.daemon_snapshot {
+            Some(snap) => format!(" [daemon pid {} | {} obs | {} anomalies]",
+                snap.daemon_pid, snap.observation_count, snap.anomaly_count),
+            None => " [daemon offline]".to_string(),
+        };
         let input_block = Block::default()
-            .title(" Input (Tab to switch, Esc to quit) ")
+            .title(format!(" Input (Tab/Esc){} ", daemon_status))
             .borders(Borders::ALL)
             .border_style(self.border_style(FocusPanel::Input));
         let cursor = if self.focus == FocusPanel::Input { "_" } else { "" };
@@ -374,6 +438,7 @@ mod tests {
         assert!(!app.should_quit);
         assert_eq!(app.focus, FocusPanel::Input);
         assert!(app._dry_run);
+        assert!(app.daemon_snapshot.is_none());
     }
 
     #[test]
@@ -445,5 +510,47 @@ mod tests {
         app.focus = FocusPanel::Health;
         app.handle_key(KeyCode::Char('q'));
         assert!(app.should_quit);
+    }
+
+    #[test]
+    fn test_apply_daemon_snapshot() {
+        let mut app = App::new(true);
+        let snap = DaemonSnapshot {
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+            observation_count: 100,
+            anomaly_count: 5,
+            hierarchy_errors: [0.1, 0.2, 0.15, 0.05],
+            free_energy: 0.35,
+            is_surprised: true,
+            drift_similarity: 0.95,
+            causal_edge_count: 200,
+            episodic_count: 10,
+            concerns: vec![ipc::ConcernEntry {
+                label: "high memory".into(),
+                activation: 0.9,
+                source: "system".into(),
+            }],
+            recent_anomalies: vec![ipc::AnomalyEntry {
+                score: 0.8,
+                reason: "OOM killer".into(),
+                unit: "kernel".into(),
+            }],
+            daemon_running: true,
+            daemon_pid: 1,
+        };
+
+        app.apply_daemon_snapshot(&snap);
+
+        assert!((app.consciousness.free_energy - 0.35).abs() < 1e-6);
+        assert!((app.world_model.free_energy - 0.35).abs() < 1e-6);
+        assert_eq!(app.world_model.total_observations, 100);
+        assert!(app.world_model.is_surprised);
+        assert_eq!(app.world_model.memory_items.len(), 1);
+        assert_eq!(app.world_model.memory_items[0].0, "high memory");
+        assert_eq!(app.causal_links.len(), 1);
+        assert_eq!(app.causal_links[0].from, "kernel");
     }
 }
