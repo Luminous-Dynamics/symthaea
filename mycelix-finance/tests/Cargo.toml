@@ -102,7 +102,6 @@ path = "treasury_test.rs"
 name = "sweettest_integration"
 path = "sweettest_integration.rs"
 
-# Pure-Rust economics stress & property tests (no Holochain conductor)
-[[test]]
-name = "economics_stress_test"
-path = "economics_stress_test.rs"
+# NOTE: economics_stress_test has been moved to types/tests/ where it compiles
+# without the heavy Holochain dependency. Run with:
+#   cargo test -p mycelix_finance_types --test economics_stress_test

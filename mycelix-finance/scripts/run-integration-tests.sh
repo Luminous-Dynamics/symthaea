@@ -86,7 +86,7 @@ done
 
 log "Running economics stress tests"
 
-if cargo test --test economics_stress_test; then
+if cargo test -p mycelix_finance_types --test economics_stress_test; then
     pass
     printf "  PASS: economics_stress_test\n"
 else
