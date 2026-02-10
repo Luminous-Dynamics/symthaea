@@ -68,6 +68,9 @@
               cargo-expand
               pkg-config
               openssl
+              # Required for holochain's bindgen (integration tests)
+              llvmPackages.libclang
+              llvmPackages.clang
             ];
             shellHook = ''
               echo "=== Mycelix Space Development Environment (No Holochain) ==="
@@ -83,6 +86,7 @@
               echo ""
             '';
             RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
+            LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
           };
 
         # Alternative shell using holochain's holonix directly
@@ -103,6 +107,9 @@
             cargo-expand
             pkg-config
             openssl
+            # Required for holochain's bindgen (integration tests)
+            llvmPackages.libclang
+            llvmPackages.clang
           ];
           shellHook = ''
             echo "=== Mycelix Space Rust Development ==="
@@ -110,6 +117,7 @@
             echo ""
           '';
           RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
+          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
         };
 
         # Package the orbital-mechanics library (non-Holochain, can be used standalone)

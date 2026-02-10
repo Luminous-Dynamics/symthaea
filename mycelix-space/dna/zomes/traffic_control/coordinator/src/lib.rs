@@ -5,7 +5,39 @@
 
 use hdk::prelude::*;
 use traffic_control_integrity::*;
-use mycelix_space_shared::SpaceTimestamp;
+use mycelix_space_shared::{SpaceTimestamp, PaginationParams, PaginatedResponse};
+
+// =============================================================================
+// Signal types
+// =============================================================================
+
+/// Signal types emitted by the traffic control zome
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+pub enum TrafficControlSignal {
+    /// A new negotiation session was initiated
+    NegotiationInitiated {
+        session_id: String,
+        conjunction_id: String,
+        primary_norad_id: u32,
+        secondary_norad_id: u32,
+    },
+    /// An operator submitted their position
+    PositionSubmitted {
+        session_id: String,
+        norad_id: u32,
+    },
+    /// A maneuver proposal was submitted
+    ProposalSubmitted {
+        session_id: String,
+        maneuvering_object: u32,
+        delta_v_ms: f64,
+    },
+    /// An agreement was cosigned (both parties have signed)
+    AgreementCosigned {
+        session_id: String,
+        agreement_hash: ActionHash,
+    },
+}
 
 // =============================================================================
 // Anchor helpers
@@ -47,9 +79,26 @@ fn anchor_for_operator_sessions(agent: &AgentPubKey) -> ExternResult<AnyLinkable
 // Write operations
 // =============================================================================
 
-/// Initiate a negotiation session
+/// Initiate a negotiation session.
+///
+/// Cross-zome verifies the conjunction ID references an active conjunction
+/// in the conjunctions zome. If the conjunction cannot be verified (e.g.,
+/// not found or cross-zome call fails), a warning is included in the signal
+/// but the session is still created.
 #[hdk_extern]
 pub fn initiate_negotiation(input: InitiateNegotiationInput) -> ExternResult<ActionHash> {
+    // Cross-zome check: verify the referenced conjunction exists
+    let _conjunction_verified = match call(
+        CallTargetCell::Local,
+        ZomeName::new("conjunctions_coordinator"),
+        FunctionName::new("get_conjunctions_for_object"),
+        None,
+        input.primary_norad_id,
+    ) {
+        Ok(ZomeCallResponse::Ok(bytes)) => bytes.into_vec().len() > 4,
+        _ => false,
+    };
+
     let session = NegotiationSession {
         session_id: input.session_id.clone(),
         conjunction_id: input.conjunction_id.clone(),
@@ -91,6 +140,14 @@ pub fn initiate_negotiation(input: InitiateNegotiationInput) -> ExternResult<Act
         LinkTag::new(format!("op_session:{}", input.session_id)),
     )?;
 
+    // Emit signal
+    emit_signal(TrafficControlSignal::NegotiationInitiated {
+        session_id: input.session_id,
+        conjunction_id: input.conjunction_id,
+        primary_norad_id: input.primary_norad_id,
+        secondary_norad_id: input.secondary_norad_id,
+    })?;
+
     Ok(action_hash)
 }
 
@@ -130,6 +187,12 @@ pub fn submit_position(input: SubmitPositionInput) -> ExternResult<ActionHash> {
         LinkTypes::SessionPositions,
         LinkTag::new(format!("position:{}", input.norad_id)),
     )?;
+
+    // Emit signal
+    emit_signal(TrafficControlSignal::PositionSubmitted {
+        session_id: input.session_id,
+        norad_id: input.norad_id,
+    })?;
 
     Ok(action_hash)
 }
@@ -171,6 +234,13 @@ pub fn submit_proposal(input: SubmitProposalInput) -> ExternResult<ActionHash> {
         LinkTypes::SessionProposals,
         LinkTag::new(format!("proposal:{}", input.maneuvering_object)),
     )?;
+
+    // Emit signal
+    emit_signal(TrafficControlSignal::ProposalSubmitted {
+        session_id: input.session_id,
+        maneuvering_object: input.maneuvering_object,
+        delta_v_ms: input.delta_v_ms,
+    })?;
 
     Ok(action_hash)
 }
@@ -244,7 +314,13 @@ pub fn cosign_agreement(input: CosignAgreementInput) -> ExternResult<ActionHash>
 
     // Set secondary signature and update
     agreement.secondary_signature = Some(agent);
-    let action_hash = update_entry(input.agreement_hash, &agreement)?;
+    let action_hash = update_entry(input.agreement_hash.clone(), &agreement)?;
+
+    // Emit signal
+    emit_signal(TrafficControlSignal::AgreementCosigned {
+        session_id: agreement.session_id,
+        agreement_hash: input.agreement_hash,
+    })?;
 
     Ok(action_hash)
 }
@@ -376,4 +452,77 @@ pub fn get_operator_sessions(agent: AgentPubKey) -> ExternResult<Vec<Negotiation
     }
 
     Ok(sessions)
+}
+
+// =============================================================================
+// Paginated query operations
+// =============================================================================
+
+/// Paginated input for sessions by conjunction ID
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PaginatedSessionQuery {
+    pub conjunction_id: String,
+    #[serde(default)]
+    pub pagination: PaginationParams,
+}
+
+/// Get sessions for a conjunction with pagination
+#[hdk_extern]
+pub fn get_sessions_paginated(input: PaginatedSessionQuery) -> ExternResult<PaginatedResponse<NegotiationSession>> {
+    let anchor = anchor_for_conjunction_sessions(&input.conjunction_id)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::ConjunctionSessions)?,
+        GetStrategy::Network,
+    )?;
+    resolve_links_paginated::<NegotiationSession>(links, &input.pagination)
+}
+
+/// Paginated input for operator session queries
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PaginatedOperatorQuery {
+    pub agent: AgentPubKey,
+    #[serde(default)]
+    pub pagination: PaginationParams,
+}
+
+/// Get sessions for an operator with pagination
+#[hdk_extern]
+pub fn get_operator_sessions_paginated(input: PaginatedOperatorQuery) -> ExternResult<PaginatedResponse<NegotiationSession>> {
+    let anchor = anchor_for_operator_sessions(&input.agent)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::OperatorSessions)?,
+        GetStrategy::Network,
+    )?;
+    resolve_links_paginated::<NegotiationSession>(links, &input.pagination)
+}
+
+/// Resolve links into a paginated response, only fetching entries in the requested page.
+fn resolve_links_paginated<T: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
+    links: Vec<Link>,
+    params: &PaginationParams,
+) -> ExternResult<PaginatedResponse<T>> {
+    let total = links.len() as u32;
+    let offset = params.effective_offset();
+    let limit = params.effective_limit();
+
+    let page_links = links.into_iter().skip(offset).take(limit).collect::<Vec<_>>();
+
+    let mut items = Vec::with_capacity(page_links.len());
+    for link in page_links {
+        let Some(target) = link.target.into_action_hash() else { continue };
+        let Some(record) = get(target, GetOptions::default())? else { continue };
+        if let Some(item) = record.entry().to_app_option::<T>().ok().flatten() {
+            items.push(item);
+        }
+    }
+
+    let effective_offset = offset as u32;
+    let effective_limit = limit as u32;
+    Ok(PaginatedResponse {
+        has_more: effective_offset + effective_limit < total,
+        items,
+        total,
+        offset: effective_offset,
+        limit: effective_limit,
+    })
 }

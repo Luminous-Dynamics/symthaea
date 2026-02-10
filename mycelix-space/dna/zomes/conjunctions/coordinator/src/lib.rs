@@ -9,6 +9,7 @@ use mycelix_space_shared::{
     SpaceTimestamp, ConjunctionDataMessage, ConjunctionAssessment,
     ConjunctionAlert, ManeuverAlert, SpaceSignal, AlertType, AlertPriority,
     ManeuverType as SharedManeuverType, ScreenInput,
+    PaginationParams, PaginatedResponse,
 };
 use orbital_mechanics::tle::TwoLineElement;
 use orbital_mechanics::propagator::Propagator;
@@ -854,4 +855,69 @@ fn convert_risk_level(level: RiskLevel) -> mycelix_space_shared::RiskLevel {
         RiskLevel::High => mycelix_space_shared::RiskLevel::High,
         RiskLevel::Emergency => mycelix_space_shared::RiskLevel::Emergency,
     }
+}
+
+// =============================================================================
+// Paginated query operations
+// =============================================================================
+
+/// Paginated input for conjunction queries by NORAD ID
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PaginatedConjunctionQuery {
+    pub norad_id: u32,
+    #[serde(default)]
+    pub pagination: PaginationParams,
+}
+
+/// Get conjunctions for an object with pagination
+#[hdk_extern]
+pub fn get_conjunctions_for_object_paginated(input: PaginatedConjunctionQuery) -> ExternResult<PaginatedResponse<ConjunctionEvent>> {
+    let anchor = anchor_for_object_conjunctions(input.norad_id)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::ObjectConjunctions)?,
+        GetStrategy::Network,
+    )?;
+    resolve_links_paginated::<ConjunctionEvent>(links, &input.pagination)
+}
+
+/// Get active conjunctions with pagination
+#[hdk_extern]
+pub fn get_high_risk_conjunctions_paginated(pagination: PaginationParams) -> ExternResult<PaginatedResponse<ConjunctionEvent>> {
+    let anchor = anchor_for_active_conjunctions()?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::ActiveConjunctions)?,
+        GetStrategy::Network,
+    )?;
+    resolve_links_paginated::<ConjunctionEvent>(links, &pagination)
+}
+
+/// Resolve links into a paginated response, only fetching entries in the requested page.
+fn resolve_links_paginated<T: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
+    links: Vec<Link>,
+    params: &PaginationParams,
+) -> ExternResult<PaginatedResponse<T>> {
+    let total = links.len() as u32;
+    let offset = params.effective_offset();
+    let limit = params.effective_limit();
+
+    let page_links = links.into_iter().skip(offset).take(limit).collect::<Vec<_>>();
+
+    let mut items = Vec::with_capacity(page_links.len());
+    for link in page_links {
+        let Some(target) = link.target.into_action_hash() else { continue };
+        let Some(record) = get(target, GetOptions::default())? else { continue };
+        if let Some(item) = record.entry().to_app_option::<T>().ok().flatten() {
+            items.push(item);
+        }
+    }
+
+    let effective_offset = offset as u32;
+    let effective_limit = limit as u32;
+    Ok(PaginatedResponse {
+        has_more: effective_offset + effective_limit < total,
+        items,
+        total,
+        offset: effective_offset,
+        limit: effective_limit,
+    })
 }

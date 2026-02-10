@@ -5,7 +5,47 @@
 
 use hdk::prelude::*;
 use debris_bounties_integrity::*;
-use mycelix_space_shared::SpaceTimestamp;
+use mycelix_space_shared::{SpaceTimestamp, PaginationParams, PaginatedResponse};
+
+// =============================================================================
+// Signal types
+// =============================================================================
+
+/// Signal types emitted by the debris bounties zome
+#[derive(Clone, Debug, Serialize, Deserialize, SerializedBytes)]
+pub enum BountySignal {
+    /// A new bounty was created
+    BountyCreated {
+        bounty_id: String,
+        debris_norad_id: u32,
+        amount: u64,
+        /// Whether the target debris has tracking data in orbital_objects
+        has_tracking_data: bool,
+    },
+    /// Someone contributed to a bounty
+    BountyContributed {
+        bounty_id: String,
+        amount: u64,
+        contributor: AgentPubKey,
+    },
+    /// A bounty was claimed by a removal service
+    BountyClaimed {
+        bounty_id: String,
+        organization: String,
+        method: RemovalMethod,
+    },
+    /// A bounty's status changed
+    BountyStatusChanged {
+        bounty_id: String,
+        old_status: BountyStatus,
+        new_status: BountyStatus,
+    },
+    /// Removal verification submitted
+    VerificationSubmitted {
+        claim_id: ActionHash,
+        verified: bool,
+    },
+}
 
 // =============================================================================
 // State Machine
@@ -82,9 +122,30 @@ fn anchor_for_contributor(agent: &AgentPubKey) -> ExternResult<AnyLinkableHash> 
 // Write operations
 // =============================================================================
 
-/// Create a new debris bounty
+/// Create a new debris bounty.
+///
+/// Cross-zome checks whether the debris NORAD ID has tracking data in
+/// orbital_objects. The bounty is always created regardless, but the
+/// `has_tracking_data` field in the emitted signal indicates whether the
+/// target debris is being tracked (useful for UI warnings).
 #[hdk_extern]
 pub fn create_bounty(input: CreateBountyInput) -> ExternResult<ActionHash> {
+    // Cross-zome check: does the debris object have tracking data?
+    let has_tracking = match call(
+        CallTargetCell::Local,
+        ZomeName::new("orbital_objects_coordinator"),
+        FunctionName::new("get_latest_tles"),
+        None,
+        vec![input.debris_norad_id],
+    ) {
+        Ok(ZomeCallResponse::Ok(bytes)) => {
+            // Non-empty response means tracking data exists.
+            // We check byte length rather than deserializing the foreign type.
+            bytes.into_vec().len() > 4 // msgpack empty array is ~1 byte
+        }
+        _ => false,
+    };
+
     let agent = agent_info()?.agent_initial_pubkey;
 
     let bounty = DebrisBounty {
@@ -119,6 +180,14 @@ pub fn create_bounty(input: CreateBountyInput) -> ExternResult<ActionHash> {
         LinkTypes::ActiveBounties,
         LinkTag::new(format!("active:{}", input.bounty_id)),
     )?;
+
+    // Emit signal (includes cross-zome tracking status)
+    emit_signal(BountySignal::BountyCreated {
+        bounty_id: input.bounty_id,
+        debris_norad_id: input.debris_norad_id,
+        amount: input.amount,
+        has_tracking_data: has_tracking,
+    })?;
 
     Ok(action_hash)
 }
@@ -169,6 +238,13 @@ pub fn contribute_to_bounty(input: ContributeInput) -> ExternResult<ActionHash> 
         LinkTag::new(format!("contributed:{}", input.bounty_id)),
     )?;
 
+    // Emit signal
+    emit_signal(BountySignal::BountyContributed {
+        bounty_id: input.bounty_id,
+        amount: input.amount,
+        contributor: agent,
+    })?;
+
     Ok(action_hash)
 }
 
@@ -207,6 +283,8 @@ pub fn claim_bounty(input: ClaimBountyInput) -> ExternResult<ActionHash> {
 
     // Create the removal claim entry
     let agent = agent_info()?.agent_initial_pubkey;
+    let signal_org = input.organization.clone();
+    let signal_method = input.method.clone();
     let claim = RemovalClaim {
         bounty_id: bounty.bounty_id.clone(),
         claimer: agent,
@@ -229,6 +307,13 @@ pub fn claim_bounty(input: ClaimBountyInput) -> ExternResult<ActionHash> {
         LinkTag::new(format!("claim:{}", bounty.bounty_id)),
     )?;
 
+    // Emit signal
+    emit_signal(BountySignal::BountyClaimed {
+        bounty_id: bounty.bounty_id,
+        organization: signal_org,
+        method: signal_method,
+    })?;
+
     Ok(claim_hash)
 }
 
@@ -246,6 +331,7 @@ pub struct ClaimBountyInput {
 pub fn submit_verification(input: SubmitVerificationInput) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_initial_pubkey;
 
+    let signal_claim_id = input.claim_id.clone();
     let verification = RemovalVerification {
         claim_id: input.claim_id,
         verifier: agent,
@@ -254,7 +340,15 @@ pub fn submit_verification(input: SubmitVerificationInput) -> ExternResult<Actio
         verified_at: SpaceTimestamp::now(),
     };
 
-    create_entry(&EntryTypes::RemovalVerification(verification))
+    let action_hash = create_entry(&EntryTypes::RemovalVerification(verification))?;
+
+    // Emit signal
+    emit_signal(BountySignal::VerificationSubmitted {
+        claim_id: signal_claim_id,
+        verified: input.verified,
+    })?;
+
+    Ok(action_hash)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -287,6 +381,7 @@ pub fn update_bounty_status(input: UpdateBountyStatusInput) -> ExternResult<Acti
         )));
     }
 
+    let old_status = bounty.status.clone();
     bounty.status = input.new_status.clone();
     let action_hash = update_entry(input.bounty_hash.clone(), &bounty)?;
 
@@ -308,6 +403,13 @@ pub fn update_bounty_status(input: UpdateBountyStatusInput) -> ExternResult<Acti
             }
         }
     }
+
+    // Emit signal
+    emit_signal(BountySignal::BountyStatusChanged {
+        bounty_id: bounty.bounty_id,
+        old_status,
+        new_status: input.new_status,
+    })?;
 
     Ok(action_hash)
 }
@@ -440,4 +542,77 @@ pub fn get_claims(bounty_hash: ActionHash) -> ExternResult<Vec<RemovalClaim>> {
     }
 
     Ok(claims)
+}
+
+// =============================================================================
+// Paginated query operations
+// =============================================================================
+
+/// Paginated input for debris bounty queries
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PaginatedDebrisQuery {
+    pub norad_id: u32,
+    #[serde(default)]
+    pub pagination: PaginationParams,
+}
+
+/// Get bounties for a debris object with pagination
+#[hdk_extern]
+pub fn get_bounties_for_debris_paginated(input: PaginatedDebrisQuery) -> ExternResult<PaginatedResponse<DebrisBounty>> {
+    let anchor = anchor_for_object_bounties(input.norad_id)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::ObjectBounties)?,
+        GetStrategy::Network,
+    )?;
+    resolve_links_paginated::<DebrisBounty>(links, &input.pagination)
+}
+
+/// Get active bounties with pagination
+#[hdk_extern]
+pub fn get_active_bounties_paginated(pagination: PaginationParams) -> ExternResult<PaginatedResponse<DebrisBounty>> {
+    let anchor = anchor_for_active_bounties()?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::ActiveBounties)?,
+        GetStrategy::Network,
+    )?;
+    resolve_links_paginated::<DebrisBounty>(links, &pagination)
+}
+
+/// Resolve a set of links into a paginated response, only fetching entries in the requested page.
+fn resolve_links_paginated<T: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
+    links: Vec<Link>,
+    params: &PaginationParams,
+) -> ExternResult<PaginatedResponse<T>> {
+    let total = links.len() as u32;
+    let offset = params.effective_offset();
+    let limit = params.effective_limit();
+
+    let page_links = links
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .collect::<Vec<_>>();
+
+    let mut items = Vec::with_capacity(page_links.len());
+    for link in page_links {
+        let Some(target) = link.target.into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(target, GetOptions::default())? else {
+            continue;
+        };
+        if let Some(item) = record.entry().to_app_option::<T>().ok().flatten() {
+            items.push(item);
+        }
+    }
+
+    let effective_offset = offset as u32;
+    let effective_limit = limit as u32;
+    Ok(PaginatedResponse {
+        has_more: effective_offset + effective_limit < total,
+        items,
+        total,
+        offset: effective_offset,
+        limit: effective_limit,
+    })
 }

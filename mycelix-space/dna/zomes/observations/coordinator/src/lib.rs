@@ -4,7 +4,7 @@
 
 use hdk::prelude::*;
 use observations_integrity::*;
-use mycelix_space_shared::{SpaceTimestamp, QualityScore, GroundLocation};
+use mycelix_space_shared::{SpaceTimestamp, QualityScore, GroundLocation, PaginationParams, PaginatedResponse};
 
 // =============================================================================
 // Anchor helpers (deterministic DHT-discoverable paths)
@@ -221,4 +221,88 @@ pub fn list_sensors(_: ()) -> ExternResult<Vec<Sensor>> {
     }
 
     Ok(sensors)
+}
+
+// =============================================================================
+// Paginated query operations
+// =============================================================================
+
+/// Paginated input for observation queries by NORAD ID
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PaginatedObjectObsQuery {
+    pub norad_id: u32,
+    #[serde(default)]
+    pub pagination: PaginationParams,
+}
+
+/// Get observations for a NORAD ID with pagination
+#[hdk_extern]
+pub fn get_observations_paginated(input: PaginatedObjectObsQuery) -> ExternResult<PaginatedResponse<Observation>> {
+    let anchor = anchor_for_object_observations(input.norad_id)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::ObjectObservations)?,
+        GetStrategy::Network,
+    )?;
+    resolve_links_paginated::<Observation>(links, &input.pagination)
+}
+
+/// Paginated input for sensor observation queries
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PaginatedSensorObsQuery {
+    pub sensor_id: String,
+    #[serde(default)]
+    pub pagination: PaginationParams,
+}
+
+/// Get observations from a sensor with pagination
+#[hdk_extern]
+pub fn get_sensor_observations_paginated(input: PaginatedSensorObsQuery) -> ExternResult<PaginatedResponse<Observation>> {
+    let anchor = anchor_for_sensor_observations(&input.sensor_id)?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::SensorObservations)?,
+        GetStrategy::Network,
+    )?;
+    resolve_links_paginated::<Observation>(links, &input.pagination)
+}
+
+/// List sensors with pagination
+#[hdk_extern]
+pub fn list_sensors_paginated(pagination: PaginationParams) -> ExternResult<PaginatedResponse<Sensor>> {
+    let anchor = anchor_for_all_sensors()?;
+    let links = get_links(
+        LinkQuery::try_new(anchor, LinkTypes::AllSensors)?,
+        GetStrategy::Network,
+    )?;
+    resolve_links_paginated::<Sensor>(links, &pagination)
+}
+
+/// Resolve links into a paginated response, only fetching entries in the requested page.
+fn resolve_links_paginated<T: TryFrom<SerializedBytes, Error = SerializedBytesError>>(
+    links: Vec<Link>,
+    params: &PaginationParams,
+) -> ExternResult<PaginatedResponse<T>> {
+    let total = links.len() as u32;
+    let offset = params.effective_offset();
+    let limit = params.effective_limit();
+
+    let page_links = links.into_iter().skip(offset).take(limit).collect::<Vec<_>>();
+
+    let mut items = Vec::with_capacity(page_links.len());
+    for link in page_links {
+        let Some(target) = link.target.into_action_hash() else { continue };
+        let Some(record) = get(target, GetOptions::default())? else { continue };
+        if let Some(item) = record.entry().to_app_option::<T>().ok().flatten() {
+            items.push(item);
+        }
+    }
+
+    let effective_offset = offset as u32;
+    let effective_limit = limit as u32;
+    Ok(PaginatedResponse {
+        has_more: effective_offset + effective_limit < total,
+        items,
+        total,
+        offset: effective_offset,
+        limit: effective_limit,
+    })
 }

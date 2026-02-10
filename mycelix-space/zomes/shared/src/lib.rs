@@ -949,3 +949,45 @@ mod tests {
         assert_eq!(parsed.bounty_amount, 100000);
     }
 }
+
+// =============================================================================
+// Pagination primitives
+// =============================================================================
+
+/// Pagination parameters for link-based queries.
+///
+/// Holochain `get_links` returns all links at once. Pagination is applied
+/// after fetching links but *before* resolving individual entries, so we
+/// avoid unnecessary DHT gets for pages we don't need.
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct PaginationParams {
+    /// Maximum number of entries to return (default: 50)
+    pub limit: Option<u32>,
+    /// Number of links to skip before collecting results
+    pub offset: Option<u32>,
+}
+
+impl PaginationParams {
+    pub fn effective_limit(&self) -> usize {
+        self.limit.unwrap_or(50).min(500) as usize
+    }
+
+    pub fn effective_offset(&self) -> usize {
+        self.offset.unwrap_or(0) as usize
+    }
+}
+
+/// Paginated response wrapper.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PaginatedResponse<T> {
+    /// The page of results
+    pub items: Vec<T>,
+    /// Total number of links available (before pagination)
+    pub total: u32,
+    /// Offset used for this page
+    pub offset: u32,
+    /// Limit used for this page
+    pub limit: u32,
+    /// Whether there are more results after this page
+    pub has_more: bool,
+}

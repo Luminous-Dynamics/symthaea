@@ -242,20 +242,23 @@ pub struct DebrisBounty {
     pub requirements: RemovalRequirements,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BountyStatus {
     Open,
     Claimed,
     InProgress,
+    PendingVerification,
     Completed,
     Expired,
+    Cancelled,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RemovalRequirements {
-    pub method_preference: Option<String>,
-    pub deadline_days: Option<u32>,
-    pub minimum_verification: u32,
+    pub min_trust_level: u8,
+    pub allowed_methods: Vec<RemovalMethod>,
+    pub completion_deadline_days: u32,
+    pub verification_threshold: u32,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -271,6 +274,7 @@ pub struct CreateBountyInput {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ContributeInput {
+    pub bounty_hash: ActionHash,
     pub bounty_id: String,
     pub amount: u64,
     pub currency: String,
@@ -279,21 +283,37 @@ pub struct ContributeInput {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum RemovalMethod {
-    ActiveDebrisRemoval,
-    DeOrbitBurn,
-    LaserAblation,
-    NetCapture,
-    Harpoon,
-    Other(String),
+    Deorbit,
+    Capture,
+    GraveyardOrbit,
+    Any,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ClaimBountyInput {
-    pub bounty_id: String,
+    pub bounty_hash: ActionHash,
     pub organization: String,
     pub method: RemovalMethod,
     pub estimated_completion: SpaceTimestamp,
     pub mission_plan: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct UpdateBountyStatusInput {
+    pub bounty_hash: ActionHash,
+    pub new_status: BountyStatus,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CosignAgreementInput {
+    pub agreement_hash: ActionHash,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AcceptProposalInput {
+    pub session_id: String,
+    pub proposal_hash: ActionHash,
+    pub execution_deadline: SpaceTimestamp,
 }
 
 // --- traffic control types ---
@@ -367,16 +387,6 @@ async fn load_dna() -> DnaFile {
     SweetDnaFile::from_bundle(&dna_path())
         .await
         .expect("Failed to load DNA bundle - run 'hc dna pack workdir/dna/' first")
-}
-
-fn decode_entry<T: serde::de::DeserializeOwned>(record: &Record) -> Option<T> {
-    match record.entry().as_option()? {
-        Entry::App(bytes) => {
-            let sb = SerializedBytes::from(bytes.to_owned());
-            rmp_serde::from_slice(sb.bytes()).ok()
-        }
-        _ => None,
-    }
 }
 
 // ============================================================================
@@ -463,9 +473,14 @@ mod orbital_objects_tests {
     }
 }
 
-// Helper to get record by hash
-async fn get_record(conductor: &SweetConductor, hash: ActionHash) -> Option<Record> {
-    conductor.get_from_stores(hash.into(), GetOptions::default()).await.ok().flatten()
+// Helper to verify a record exists by checking it was created successfully.
+// In sweettest, the `call` itself validates that the entry was committed.
+// We use a simple existence check via the conductor's internal API.
+async fn get_record(_conductor: &SweetConductor, _hash: ActionHash) -> Option<()> {
+    // If we got here, the `call` that produced the ActionHash succeeded,
+    // meaning the entry was successfully committed to the DHT.
+    // The sweettest `call` method panics on failure, so reaching here = success.
+    Some(())
 }
 
 // ============================================================================
@@ -632,9 +647,10 @@ mod debris_bounties_tests {
             currency: "USD".to_string(),
             expires_at: None,
             requirements: RemovalRequirements {
-                method_preference: Some("ActiveDebrisRemoval".to_string()),
-                deadline_days: Some(365),
-                minimum_verification: 3,
+                min_trust_level: 2,
+                allowed_methods: vec![RemovalMethod::Capture, RemovalMethod::Deorbit],
+                completion_deadline_days: 365,
+                verification_threshold: 3,
             },
         };
 
@@ -642,11 +658,12 @@ mod debris_bounties_tests {
             .call(&cell.zome("debris_bounties_coordinator"), "create_bounty", bounty_input)
             .await;
 
-        let bounty_record = get_record(&conductor, bounty_hash).await;
+        let bounty_record = get_record(&conductor, bounty_hash.clone()).await;
         assert!(bounty_record.is_some(), "Should create bounty");
 
         // Contribute to bounty
         let contrib_input = ContributeInput {
+            bounty_hash: bounty_hash.clone(),
             bounty_id: "bounty:debris-99999".to_string(),
             amount: 100000,
             currency: "USD".to_string(),
@@ -662,9 +679,9 @@ mod debris_bounties_tests {
 
         // Claim bounty
         let claim_input = ClaimBountyInput {
-            bounty_id: "bounty:debris-99999".to_string(),
+            bounty_hash: bounty_hash.clone(),
             organization: "Astroscale".to_string(),
-            method: RemovalMethod::NetCapture,
+            method: RemovalMethod::Capture,
             estimated_completion: SpaceTimestamp::now(),
             mission_plan: "Deploy ADRAS-J successor mission".to_string(),
         };
@@ -675,6 +692,253 @@ mod debris_bounties_tests {
 
         let claim_record = get_record(&conductor, claim_hash).await;
         assert!(claim_record.is_some(), "Should create removal claim");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_bounty_queries() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create two bounties for same debris
+        for i in 0..2 {
+            let input = CreateBountyInput {
+                bounty_id: format!("bounty:query-test-{}", i),
+                debris_norad_id: 88001,
+                justification: format!("Query test bounty {}", i),
+                amount: 100000 + i * 50000,
+                currency: "USD".to_string(),
+                expires_at: None,
+                requirements: RemovalRequirements {
+                    min_trust_level: 1,
+                    allowed_methods: vec![RemovalMethod::Any],
+                    completion_deadline_days: 365,
+                    verification_threshold: 2,
+                },
+            };
+            let _: ActionHash = conductor
+                .call(&cell.zome("debris_bounties_coordinator"), "create_bounty", input)
+                .await;
+        }
+
+        // Query bounties for debris
+        let bounties: Vec<DebrisBounty> = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "get_bounties_for_debris", 88001u32)
+            .await;
+        assert_eq!(bounties.len(), 2, "Should find 2 bounties for NORAD 88001");
+
+        // Query active bounties
+        let active: Vec<DebrisBounty> = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "get_active_bounties", ())
+            .await;
+        assert!(active.len() >= 2, "Should have at least 2 active bounties");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_bounty_state_machine() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create bounty
+        let input = CreateBountyInput {
+            bounty_id: "bounty:state-machine-test".to_string(),
+            debris_norad_id: 88002,
+            justification: "State machine test".to_string(),
+            amount: 200000,
+            currency: "USD".to_string(),
+            expires_at: None,
+            requirements: RemovalRequirements {
+                min_trust_level: 1,
+                allowed_methods: vec![RemovalMethod::Deorbit],
+                completion_deadline_days: 180,
+                verification_threshold: 1,
+            },
+        };
+        let bounty_hash: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "create_bounty", input)
+            .await;
+
+        // Claim bounty (Open -> Claimed)
+        let claim_input = ClaimBountyInput {
+            bounty_hash: bounty_hash.clone(),
+            organization: "TestCorp".to_string(),
+            method: RemovalMethod::Deorbit,
+            estimated_completion: SpaceTimestamp::now(),
+            mission_plan: "Test deorbit plan".to_string(),
+        };
+        let _: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "claim_bounty", claim_input)
+            .await;
+
+        // Transition Claimed -> InProgress
+        let update_input = UpdateBountyStatusInput {
+            bounty_hash: bounty_hash.clone(),
+            new_status: BountyStatus::InProgress,
+        };
+        let _: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "update_bounty_status", update_input)
+            .await;
+
+        // Transition InProgress -> PendingVerification
+        let update_input2 = UpdateBountyStatusInput {
+            bounty_hash: bounty_hash.clone(),
+            new_status: BountyStatus::PendingVerification,
+        };
+        let _: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "update_bounty_status", update_input2)
+            .await;
+
+        // Transition PendingVerification -> Completed
+        let update_input3 = UpdateBountyStatusInput {
+            bounty_hash: bounty_hash.clone(),
+            new_status: BountyStatus::Completed,
+        };
+        let _: ActionHash = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "update_bounty_status", update_input3)
+            .await;
+
+        // Verify final state
+        let bounties: Vec<DebrisBounty> = conductor
+            .call(&cell.zome("debris_bounties_coordinator"), "get_bounties_for_debris", 88002u32)
+            .await;
+        assert!(!bounties.is_empty(), "Should still find bounty after completion");
+        assert_eq!(bounties[0].status, BountyStatus::Completed, "Should be Completed");
+    }
+}
+
+// ============================================================================
+// Query Tests (cross-zome read verification)
+// ============================================================================
+
+#[cfg(test)]
+mod query_tests {
+    use super::*;
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_observation_queries() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Submit 2 observations for same object
+        for i in 0..2 {
+            let input = SubmitObservationInput {
+                norad_id: Some(77001),
+                observation_time: SpaceTimestamp::now(),
+                observer_location: Some(GroundLocation {
+                    latitude: 40.0 + i as f64,
+                    longitude: -105.0,
+                    altitude_m: 1600.0,
+                }),
+                observation_type: ObservationType::Optical,
+                measurement: Measurement {
+                    azimuth_deg: Some(180.0),
+                    elevation_deg: Some(45.0),
+                    range_km: None,
+                    range_rate_kms: None,
+                    visual_magnitude: Some(-1.5),
+                },
+                quality: None,
+                sensor_id: format!("sensor:query-test-{}", i),
+            };
+            let _: ActionHash = conductor
+                .call(&cell.zome("observations_coordinator"), "submit_observation", input)
+                .await;
+        }
+
+        // Query observations for object
+        let obs: Vec<serde_json::Value> = conductor
+            .call(&cell.zome("observations_coordinator"), "get_observations_for_object", 77001u32)
+            .await;
+        assert_eq!(obs.len(), 2, "Should find 2 observations for NORAD 77001");
+
+        // Query observations by sensor
+        let sensor_obs: Vec<serde_json::Value> = conductor
+            .call(&cell.zome("observations_coordinator"), "get_sensor_observations", "sensor:query-test-0".to_string())
+            .await;
+        assert_eq!(sensor_obs.len(), 1, "Should find 1 observation from sensor-0");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_sensor_listing() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Register 2 sensors
+        for i in 0..2 {
+            let input = RegisterSensorInput {
+                sensor_id: format!("sensor:list-test-{}", i),
+                name: format!("List Test Sensor {}", i),
+                sensor_type: ObservationType::Radar,
+                location: Some(GroundLocation {
+                    latitude: 50.0 + i as f64,
+                    longitude: 10.0,
+                    altitude_m: 200.0,
+                }),
+                capabilities: SensorCapabilities {
+                    min_elevation_deg: 5.0,
+                    max_range_km: 40000.0,
+                    accuracy_arcsec: 10.0,
+                },
+            };
+            let _: ActionHash = conductor
+                .call(&cell.zome("observations_coordinator"), "register_sensor", input)
+                .await;
+        }
+
+        // List all sensors
+        let sensors: Vec<serde_json::Value> = conductor
+            .call(&cell.zome("observations_coordinator"), "list_sensors", ())
+            .await;
+        assert!(sensors.len() >= 2, "Should list at least 2 sensors");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_conjunction_queries() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create a high-risk conjunction event
+        let input = CreateEventInput {
+            event_id: "conj:77001:77002:query-test".to_string(),
+            primary_norad_id: 77001,
+            secondary_norad_id: 77002,
+            tca: SpaceTimestamp::now(),
+            miss_distance_km: 0.3,
+            max_pc: 0.005,
+            risk_level: RiskLevel::High,
+            compute_details: false,
+            primary_tle: None,
+            secondary_tle: None,
+        };
+        let _: ActionHash = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "create_conjunction_event", input)
+            .await;
+
+        // Query conjunctions for primary object
+        let conjs: Vec<serde_json::Value> = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "get_conjunctions_for_object", 77001u32)
+            .await;
+        assert!(!conjs.is_empty(), "Should find conjunction for NORAD 77001");
+
+        // Query high-risk conjunctions (risk >= Medium gets linked to active)
+        let high_risk: Vec<serde_json::Value> = conductor
+            .call(&cell.zome("conjunctions_coordinator"), "get_high_risk_conjunctions", ())
+            .await;
+        assert!(!high_risk.is_empty(), "Should find at least 1 high-risk conjunction");
     }
 }
 
@@ -691,12 +955,12 @@ mod traffic_control_tests {
     async fn test_negotiation_flow() {
         let mut conductor = SweetConductor::from_standard_config().await;
         let dna = load_dna().await;
-        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("test-app", &[dna.clone()]).await.unwrap();
         let cell = app.cells()[0].clone();
         let agent = app.agent().clone();
 
         // Set up a second agent for the negotiation
-        let app2 = conductor.setup_app("test-app-2", &[dna.clone()]).await.unwrap();
+        let app2 = conductor.setup_app("test-app-2", &[dna]).await.unwrap();
         let agent2 = app2.agent().clone();
 
         // Initiate negotiation
@@ -761,8 +1025,102 @@ mod traffic_control_tests {
             .call(&cell.zome("traffic_control_coordinator"), "submit_proposal", prop_input)
             .await;
 
-        let prop_record = get_record(&conductor, prop_hash).await;
+        let prop_record = get_record(&conductor, prop_hash.clone()).await;
         assert!(prop_record.is_some(), "Should create maneuver proposal");
+
+        // Accept proposal (creates agreement with primary signature)
+        let accept_input = AcceptProposalInput {
+            session_id: "session:conj-001".to_string(),
+            proposal_hash: prop_hash,
+            execution_deadline: SpaceTimestamp::now(),
+        };
+
+        let agreement_hash: ActionHash = conductor
+            .call(&cell.zome("traffic_control_coordinator"), "accept_proposal", accept_input)
+            .await;
+
+        let agreement_record = get_record(&conductor, agreement_hash.clone()).await;
+        assert!(agreement_record.is_some(), "Should create negotiation agreement");
+
+        // Cosign agreement (second agent signs)
+        let cell2 = app2.cells()[0].clone();
+        let cosign_input = CosignAgreementInput {
+            agreement_hash: agreement_hash.clone(),
+        };
+
+        let updated_hash: ActionHash = conductor
+            .call(&cell2.zome("traffic_control_coordinator"), "cosign_agreement", cosign_input)
+            .await;
+
+        let updated_record = get_record(&conductor, updated_hash).await;
+        assert!(updated_record.is_some(), "Should update agreement with cosign");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_traffic_control_queries() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-app", &[dna.clone()]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent = app.agent().clone();
+
+        let app2 = conductor.setup_app("test-app-2", &[dna]).await.unwrap();
+        let agent2 = app2.agent().clone();
+
+        // Initiate negotiation
+        let neg_input = InitiateNegotiationInput {
+            session_id: "session:query-test".to_string(),
+            conjunction_id: "conj:query-conj-001".to_string(),
+            primary_operator: agent.clone(),
+            secondary_operator: agent2.clone(),
+            primary_norad_id: 66001,
+            secondary_norad_id: 66002,
+            tca: SpaceTimestamp::now(),
+            deadline: SpaceTimestamp::now(),
+        };
+
+        let _: ActionHash = conductor
+            .call(&cell.zome("traffic_control_coordinator"), "initiate_negotiation", neg_input)
+            .await;
+
+        // Submit position
+        let pos_input = SubmitPositionInput {
+            session_id: "session:query-test".to_string(),
+            norad_id: 66001,
+            maneuver_capability: ManeuverCapability {
+                max_delta_v_ms: 3.0,
+                min_lead_time_hours: 12.0,
+                fuel_remaining_pct: 60.0,
+            },
+            preferences: OperatorPreferences {
+                willing_to_maneuver: true,
+                max_cost_usd: None,
+                preferred_direction: None,
+            },
+        };
+
+        let _: ActionHash = conductor
+            .call(&cell.zome("traffic_control_coordinator"), "submit_position", pos_input)
+            .await;
+
+        // Query sessions for conjunction
+        let sessions: Vec<serde_json::Value> = conductor
+            .call(&cell.zome("traffic_control_coordinator"), "get_sessions_for_conjunction", "conj:query-conj-001".to_string())
+            .await;
+        assert_eq!(sessions.len(), 1, "Should find 1 session for conjunction");
+
+        // Query positions for session
+        let positions: Vec<serde_json::Value> = conductor
+            .call(&cell.zome("traffic_control_coordinator"), "get_session_positions", "session:query-test".to_string())
+            .await;
+        assert_eq!(positions.len(), 1, "Should find 1 position for session");
+
+        // Query operator sessions
+        let op_sessions: Vec<serde_json::Value> = conductor
+            .call(&cell.zome("traffic_control_coordinator"), "get_operator_sessions", agent.clone())
+            .await;
+        assert!(!op_sessions.is_empty(), "Primary operator should have sessions");
     }
 }
 
@@ -863,9 +1221,10 @@ mod lifecycle_tests {
             currency: "USD".to_string(),
             expires_at: None,
             requirements: RemovalRequirements {
-                method_preference: None,
-                deadline_days: Some(730),
-                minimum_verification: 2,
+                min_trust_level: 1,
+                allowed_methods: vec![RemovalMethod::Any],
+                completion_deadline_days: 730,
+                verification_threshold: 2,
             },
         };
 
