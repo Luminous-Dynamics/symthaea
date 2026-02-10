@@ -389,7 +389,7 @@ proptest! {
             );
 
             // Verify fused position is close to input (both sensors see same object)
-            let pos_err = (fused.state.position() - sv.position()).norm();
+            let pos_err = (fused.state.state.position() - sv.position()).norm();
             prop_assert!(
                 pos_err < sigma1.max(sigma2) * 3.0,
                 "Fused position error {:.4} km exceeds 3-sigma bound",
