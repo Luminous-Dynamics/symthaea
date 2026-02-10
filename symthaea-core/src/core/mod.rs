@@ -139,6 +139,7 @@ pub use crate::observability::{
 pub use crate::hdc::consciousness_subsystem::{
     ConsciousnessSubsystem,
     SubsystemError,
+    SubsystemContext,
 };
 
 pub use crate::hdc::consciousness_metacognitive::{
@@ -158,6 +159,11 @@ pub use crate::hdc::consciousness_phi_optimization::{
 
 pub use crate::hdc::consciousness_integration::PipelineCheckpoint;
 pub use crate::hdc::consciousness_integration::ConsciousnessPipelineBuilder;
+pub use crate::hdc::consciousness_integration::SubsystemCycleReport;
+pub use crate::hdc::consciousness_integration::{
+    PhiMetrics, TemporalState, SelfModelState, EmotionalState,
+    PredictiveState, IntegrationMetrics,
+};
 
 // Consciousness API traits
 pub mod traits;

@@ -818,6 +818,143 @@ pub struct ConsciousnessState {
     pub integration_score: f64,
 }
 
+// ==========================================
+// SUBSYSTEM CYCLE REPORT
+// ==========================================
+
+/// Per-subsystem report from a single `process()` cycle.
+#[derive(Debug, Clone)]
+pub struct SubsystemCycleReport {
+    /// Name of the subsystem.
+    pub name: String,
+    /// Whether the subsystem was enabled and actually ran.
+    pub ran: bool,
+    /// Wall-clock duration in microseconds (0 if skipped).
+    pub duration_us: u64,
+    /// Change in Phi caused by this subsystem (phi_after - phi_before).
+    pub phi_delta: f64,
+    /// Error from this subsystem, if any.
+    pub error: Option<super::consciousness_subsystem::SubsystemError>,
+}
+
+// ==========================================
+// STATE GROUP VIEWS
+// ==========================================
+
+/// Grouped view of Phi-related metrics from [`ConsciousnessState`].
+#[derive(Debug, Clone, Copy)]
+pub struct PhiMetrics {
+    pub phi: f64,
+    pub free_energy: f64,
+    pub topological_unity: f64,
+    pub predicted_phi: Option<f64>,
+    pub phi_trend: f64,
+}
+
+/// Grouped view of temporal binding state from [`ConsciousnessState`].
+#[derive(Debug, Clone, Copy)]
+pub struct TemporalState {
+    pub temporal_coherence: f64,
+    pub theta_phase: f64,
+    pub narrative_coherence: f64,
+    pub present_window_length: usize,
+}
+
+/// Grouped view of self-model state from [`ConsciousnessState`].
+#[derive(Debug, Clone, Copy)]
+pub struct SelfModelState {
+    pub confidence: f64,
+    pub accuracy: f64,
+    pub cognitive_mode: CognitiveMode,
+    pub mode_appropriateness: f64,
+}
+
+/// Grouped view of emotional state from [`ConsciousnessState`].
+#[derive(Debug, Clone, Copy)]
+pub struct EmotionalState {
+    pub valence: f64,
+    pub arousal: Option<f64>,
+    pub uncertainty: f64,
+    pub integration_score: f64,
+}
+
+/// Grouped view of predictive processing state from [`ConsciousnessState`].
+#[derive(Debug, Clone, Copy)]
+pub struct PredictiveState {
+    pub precision: f64,
+    pub surprise_level: f64,
+    pub inference_mode: PredictiveMode,
+}
+
+/// Grouped view of integration quality metrics from [`ConsciousnessState`].
+#[derive(Debug, Clone, Copy)]
+pub struct IntegrationMetrics {
+    pub metacognitive_confidence: f64,
+    pub metacognitive_coherence: f64,
+    pub cross_modal_coherence: f64,
+}
+
+impl ConsciousnessState {
+    /// Phi-related metrics as a grouped view.
+    pub fn phi_metrics(&self) -> PhiMetrics {
+        PhiMetrics {
+            phi: self.phi,
+            free_energy: self.free_energy,
+            topological_unity: self.topological_unity,
+            predicted_phi: self.predicted_phi,
+            phi_trend: self.phi_trend,
+        }
+    }
+
+    /// Temporal binding state as a grouped view.
+    pub fn temporal_state(&self) -> TemporalState {
+        TemporalState {
+            temporal_coherence: self.temporal_coherence,
+            theta_phase: self.theta_phase,
+            narrative_coherence: self.narrative_coherence,
+            present_window_length: self.present_window_length,
+        }
+    }
+
+    /// Self-model state as a grouped view.
+    pub fn self_model_state(&self) -> SelfModelState {
+        SelfModelState {
+            confidence: self.self_model_confidence,
+            accuracy: self.self_model_accuracy,
+            cognitive_mode: self.cognitive_mode,
+            mode_appropriateness: self.mode_appropriateness,
+        }
+    }
+
+    /// Emotional state as a grouped view.
+    pub fn emotional_state(&self) -> EmotionalState {
+        EmotionalState {
+            valence: self.emotional_valence,
+            arousal: self.emotional_arousal,
+            uncertainty: self.uncertainty,
+            integration_score: self.integration_score,
+        }
+    }
+
+    /// Predictive processing state as a grouped view.
+    pub fn predictive_state(&self) -> PredictiveState {
+        PredictiveState {
+            precision: self.predictive_precision,
+            surprise_level: self.surprise_level,
+            inference_mode: self.inference_mode,
+        }
+    }
+
+    /// Integration quality metrics as a grouped view.
+    pub fn integration_metrics(&self) -> IntegrationMetrics {
+        IntegrationMetrics {
+            metacognitive_confidence: self.metacognitive_confidence,
+            metacognitive_coherence: self.metacognitive_coherence,
+            cross_modal_coherence: self.cross_modal_coherence,
+        }
+    }
+}
+
 /// Predictive processing mode (from active inference)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum PredictiveMode {
@@ -1104,6 +1241,10 @@ pub struct ConsciousnessPipeline {
     subsystems: Vec<Box<dyn ConsciousnessSubsystem>>,
     /// Errors from subsystem dispatch in the most recent process() cycle
     subsystem_errors: Vec<super::consciousness_subsystem::SubsystemError>,
+    /// Per-subsystem cycle reports from the most recent process() cycle
+    subsystem_reports: Vec<SubsystemCycleReport>,
+    /// Shared context for inter-subsystem data passing (cleared each cycle)
+    subsystem_context: super::consciousness_subsystem::SubsystemContext,
 }
 
 impl ConsciousnessPipeline {
@@ -1200,6 +1341,8 @@ impl ConsciousnessPipeline {
             // Pluggable subsystems
             subsystems: Vec::new(),
             subsystem_errors: Vec::new(),
+            subsystem_reports: Vec::new(),
+            subsystem_context: super::consciousness_subsystem::SubsystemContext::new(),
         };
 
         // Pre-warm HV pools for consciousness pipeline operation
@@ -2182,6 +2325,24 @@ impl ConsciousnessPipeline {
         self.subsystems.iter().any(|s| s.name() == name)
     }
 
+    /// Get names of all registered subsystems in priority order (highest first).
+    pub fn subsystem_names(&self) -> Vec<&str> {
+        self.subsystems.iter().map(|s| s.name()).collect()
+    }
+
+    /// Get per-subsystem reports from the most recent `process()` cycle.
+    ///
+    /// Each report includes name, whether it ran, duration in microseconds,
+    /// Phi delta, and any error that occurred.
+    pub fn last_cycle_reports(&self) -> &[SubsystemCycleReport] {
+        &self.subsystem_reports
+    }
+
+    /// Get the shared inter-subsystem context (for inspection between cycles).
+    pub fn subsystem_context(&self) -> &super::consciousness_subsystem::SubsystemContext {
+        &self.subsystem_context
+    }
+
     /// Process Φ feedback: feed current Φ into controller, apply modulation
     fn process_phi_feedback(&mut self) {
         if let Some(ref mut controller) = self.phi_feedback {
@@ -2753,11 +2914,11 @@ impl ConsciousnessPipeline {
             0.5
         } else {
             // Count how many current bindings match recent memory using batch find_similar
-            let memory_hvs: Vec<BinaryHV> = self.temporal_memory.iter()
-                .map(|mem| mem.representation).collect();
-            let query_hvs: Vec<BinaryHV> = self.state.bound_objects.iter()
-                .map(|obj| obj.representation).collect();
-            let batch_results = consciousness_perf::batch_find_similar(&query_hvs, &memory_hvs, 0.6);
+            let memory_refs: Vec<&BinaryHV> = self.temporal_memory.iter()
+                .map(|mem| &mem.representation).collect();
+            let query_refs: Vec<&BinaryHV> = self.state.bound_objects.iter()
+                .map(|obj| &obj.representation).collect();
+            let batch_results = consciousness_perf::batch_find_similar(&query_refs, &memory_refs, 0.6);
             let matches: usize = batch_results.iter().map(|r| r.len()).sum();
             let max_matches = self.state.bound_objects.len() * 5; // Expect ~5 matches per binding if stable
             (matches as f64 / max_matches.max(1) as f64).min(1.0)
@@ -2845,25 +3006,61 @@ impl ConsciousnessPipeline {
         // We temporarily take ownership of subsystems to avoid borrow conflicts
         // between &mut self.state and &mut self.subsystems.
         self.subsystem_errors.clear();
+        self.subsystem_reports.clear();
+        self.subsystem_context.clear();
         let mut subsystems = std::mem::take(&mut self.subsystems);
         for sub in &mut subsystems {
+            let sub_name = sub.name().to_string();
             if !sub.is_enabled() {
+                self.subsystem_reports.push(SubsystemCycleReport {
+                    name: sub_name,
+                    ran: false,
+                    duration_us: 0,
+                    phi_delta: 0.0,
+                    error: None,
+                });
                 continue;
             }
-            let sub_name = sub.name().to_string();
+            let phi_before = self.state.phi;
+            let start = std::time::Instant::now();
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                sub.process_cycle(&mut self.state, &input)
+                sub.process_cycle_with_context(&mut self.state, &input, &mut self.subsystem_context)
             }));
+            let duration_us = start.elapsed().as_micros() as u64;
+            let phi_after = self.state.phi;
             match result {
-                Ok(Ok(())) => {}
+                Ok(Ok(())) => {
+                    self.subsystem_reports.push(SubsystemCycleReport {
+                        name: sub_name,
+                        ran: true,
+                        duration_us,
+                        phi_delta: phi_after - phi_before,
+                        error: None,
+                    });
+                }
                 Ok(Err(e)) => {
+                    self.subsystem_reports.push(SubsystemCycleReport {
+                        name: sub_name.clone(),
+                        ran: true,
+                        duration_us,
+                        phi_delta: phi_after - phi_before,
+                        error: Some(e.clone()),
+                    });
                     self.subsystem_errors.push(e);
                 }
                 Err(_panic) => {
-                    self.subsystem_errors.push(super::consciousness_subsystem::SubsystemError {
-                        subsystem: sub_name,
+                    let err = super::consciousness_subsystem::SubsystemError {
+                        subsystem: sub_name.clone(),
                         message: "subsystem panicked during process_cycle".to_string(),
+                    };
+                    self.subsystem_reports.push(SubsystemCycleReport {
+                        name: sub_name,
+                        ran: true,
+                        duration_us,
+                        phi_delta: 0.0,
+                        error: Some(err.clone()),
                     });
+                    self.subsystem_errors.push(err);
                 }
             }
         }
@@ -5317,5 +5514,275 @@ mod tests {
             .expect("checkpoint should deserialize");
         assert!((restored.state.phi - checkpoint.state.phi).abs() < 1e-15);
         assert_eq!(restored.current_cycle, checkpoint.current_cycle);
+    }
+
+    // ==========================================
+    // SUBSYSTEM TIMING & INTROSPECTION TESTS
+    // ==========================================
+
+    #[test]
+    fn test_subsystem_cycle_reports() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+
+        struct SlowSub;
+        impl ConsciousnessSubsystem for SlowSub {
+            fn name(&self) -> &str { "slow" }
+            fn process_cycle(&mut self, state: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError>
+            {
+                state.phi = (state.phi + 0.05).min(1.0);
+                Ok(())
+            }
+            fn is_enabled(&self) -> bool { true }
+        }
+
+        struct DisabledSub;
+        impl ConsciousnessSubsystem for DisabledSub {
+            fn name(&self) -> &str { "disabled" }
+            fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError> { Ok(()) }
+            fn is_enabled(&self) -> bool { false }
+        }
+
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .subsystem(Box::new(SlowSub))
+            .subsystem(Box::new(DisabledSub))
+            .build();
+
+        pipeline.process(vec![BinaryHV::random(4000)], &[0.8]);
+
+        let reports = pipeline.last_cycle_reports();
+        assert_eq!(reports.len(), 2);
+
+        // "slow" should have ran
+        let slow_report = reports.iter().find(|r| r.name == "slow").unwrap();
+        assert!(slow_report.ran);
+        assert!(slow_report.duration_us >= 0);
+        assert!(slow_report.phi_delta > 0.0, "slow sub increases phi");
+        assert!(slow_report.error.is_none());
+
+        // "disabled" should NOT have ran
+        let disabled_report = reports.iter().find(|r| r.name == "disabled").unwrap();
+        assert!(!disabled_report.ran);
+        assert_eq!(disabled_report.duration_us, 0);
+    }
+
+    #[test]
+    fn test_subsystem_names() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+
+        struct Sub { n: &'static str }
+        impl ConsciousnessSubsystem for Sub {
+            fn name(&self) -> &str { self.n }
+            fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError> { Ok(()) }
+            fn is_enabled(&self) -> bool { true }
+            fn priority(&self) -> i32 {
+                match self.n { "alpha" => 10, "beta" => 5, "gamma" => 0, _ => 0 }
+            }
+        }
+
+        let pipeline = ConsciousnessPipelineBuilder::new()
+            .subsystem(Box::new(Sub { n: "gamma" }))
+            .subsystem(Box::new(Sub { n: "alpha" }))
+            .subsystem(Box::new(Sub { n: "beta" }))
+            .build();
+
+        let names = pipeline.subsystem_names();
+        assert_eq!(names, vec!["alpha", "beta", "gamma"]);
+    }
+
+    #[test]
+    fn test_subsystem_error_in_report() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError};
+
+        struct FailSub;
+        impl ConsciousnessSubsystem for FailSub {
+            fn name(&self) -> &str { "fail_report" }
+            fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError>
+            {
+                Err(SubsystemError { subsystem: "fail_report".into(), message: "oops".into() })
+            }
+            fn is_enabled(&self) -> bool { true }
+        }
+
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .subsystem(Box::new(FailSub))
+            .build();
+
+        pipeline.process(vec![BinaryHV::random(4100)], &[0.8]);
+
+        let reports = pipeline.last_cycle_reports();
+        assert_eq!(reports.len(), 1);
+        assert!(reports[0].ran);
+        assert!(reports[0].error.is_some());
+        assert_eq!(reports[0].error.as_ref().unwrap().message, "oops");
+    }
+
+    // ==========================================
+    // SUBSYSTEM CONTEXT TESTS
+    // ==========================================
+
+    #[test]
+    fn test_subsystem_context_data_passing() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError, SubsystemContext};
+
+        struct Producer;
+        impl ConsciousnessSubsystem for Producer {
+            fn name(&self) -> &str { "producer" }
+            fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError> { Ok(()) }
+            fn is_enabled(&self) -> bool { true }
+            fn priority(&self) -> i32 { 100 } // runs first
+            fn process_cycle_with_context(
+                &mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV],
+                context: &mut SubsystemContext,
+            ) -> Result<(), SubsystemError> {
+                context.set("shared_value", 42.0_f64);
+                self.process_cycle(state, inputs)
+            }
+        }
+
+        struct Consumer { received: Option<f64> }
+        impl ConsciousnessSubsystem for Consumer {
+            fn name(&self) -> &str { "consumer" }
+            fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError> { Ok(()) }
+            fn is_enabled(&self) -> bool { true }
+            fn priority(&self) -> i32 { 0 } // runs second
+            fn process_cycle_with_context(
+                &mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV],
+                context: &mut SubsystemContext,
+            ) -> Result<(), SubsystemError> {
+                self.received = context.get::<f64>("shared_value").copied();
+                self.process_cycle(state, inputs)
+            }
+        }
+
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .subsystem(Box::new(Producer))
+            .subsystem(Box::new(Consumer { received: None }))
+            .build();
+
+        pipeline.process(vec![BinaryHV::random(4200)], &[0.8]);
+
+        // Context should have the value after cycle
+        let ctx = pipeline.subsystem_context();
+        assert!(ctx.contains("shared_value"));
+        assert_eq!(*ctx.get::<f64>("shared_value").unwrap(), 42.0);
+    }
+
+    #[test]
+    fn test_subsystem_context_cleared_each_cycle() {
+        use crate::hdc::consciousness_subsystem::{ConsciousnessSubsystem, SubsystemError, SubsystemContext};
+
+        struct Writer;
+        impl ConsciousnessSubsystem for Writer {
+            fn name(&self) -> &str { "writer" }
+            fn process_cycle(&mut self, _s: &mut ConsciousnessState, _i: &[BinaryHV])
+                -> Result<(), SubsystemError> { Ok(()) }
+            fn is_enabled(&self) -> bool { true }
+            fn process_cycle_with_context(
+                &mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV],
+                context: &mut SubsystemContext,
+            ) -> Result<(), SubsystemError> {
+                context.set("cycle_data", "hello".to_string());
+                self.process_cycle(state, inputs)
+            }
+        }
+
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .subsystem(Box::new(Writer))
+            .build();
+
+        pipeline.process(vec![BinaryHV::random(4300)], &[0.8]);
+        assert!(pipeline.subsystem_context().contains("cycle_data"));
+
+        // Context should be cleared at start of next cycle, then repopulated
+        pipeline.process(vec![BinaryHV::random(4301)], &[0.8]);
+        assert!(pipeline.subsystem_context().contains("cycle_data"));
+    }
+
+    // ==========================================
+    // STATE GROUP VIEW TESTS
+    // ==========================================
+
+    #[test]
+    fn test_phi_metrics_view() {
+        let mut state = ConsciousnessState::default();
+        state.phi = 0.75;
+        state.free_energy = 0.3;
+        state.topological_unity = 0.8;
+        state.phi_trend = 0.02;
+        state.predicted_phi = Some(0.78);
+
+        let pm = state.phi_metrics();
+        assert!((pm.phi - 0.75).abs() < 1e-10);
+        assert!((pm.free_energy - 0.3).abs() < 1e-10);
+        assert!((pm.topological_unity - 0.8).abs() < 1e-10);
+        assert!((pm.phi_trend - 0.02).abs() < 1e-10);
+        assert!((pm.predicted_phi.unwrap() - 0.78).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_temporal_state_view() {
+        let mut state = ConsciousnessState::default();
+        state.temporal_coherence = 0.9;
+        state.theta_phase = 1.57;
+        state.narrative_coherence = 0.85;
+        state.present_window_length = 5;
+
+        let ts = state.temporal_state();
+        assert!((ts.temporal_coherence - 0.9).abs() < 1e-10);
+        assert!((ts.theta_phase - 1.57).abs() < 1e-10);
+        assert_eq!(ts.present_window_length, 5);
+    }
+
+    #[test]
+    fn test_emotional_state_view() {
+        let mut state = ConsciousnessState::default();
+        state.emotional_valence = -0.3;
+        state.emotional_arousal = Some(0.7);
+        state.uncertainty = 0.4;
+        state.integration_score = 0.6;
+
+        let es = state.emotional_state();
+        assert!((es.valence - (-0.3)).abs() < 1e-10);
+        assert!((es.arousal.unwrap() - 0.7).abs() < 1e-10);
+        assert!((es.uncertainty - 0.4).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_all_state_views_from_pipeline() {
+        let mut pipeline = ConsciousnessPipelineBuilder::new()
+            .embodiment(0.8)
+            .integrated_systems()
+            .phi_feedback()
+            .build();
+
+        for i in 0..5 {
+            pipeline.process(vec![BinaryHV::random(4400 + i)], &[0.8]);
+        }
+
+        let state = pipeline.get_state();
+        let pm = state.phi_metrics();
+        let ts = state.temporal_state();
+        let sm = state.self_model_state();
+        let es = state.emotional_state();
+        let ps = state.predictive_state();
+        let im = state.integration_metrics();
+
+        // All views should reflect the state
+        assert_eq!(pm.phi, state.phi);
+        assert_eq!(ts.temporal_coherence, state.temporal_coherence);
+        assert_eq!(sm.confidence, state.self_model_confidence);
+        assert_eq!(es.valence, state.emotional_valence);
+        assert_eq!(ps.precision, state.predictive_precision);
+        assert_eq!(im.metacognitive_confidence, state.metacognitive_confidence);
     }
 }

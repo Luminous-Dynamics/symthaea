@@ -5,8 +5,74 @@
 //! `ConsciousnessPipeline` into modular, testable subsystems while maintaining
 //! backward compatibility.
 
+use std::any::Any;
+use std::collections::HashMap;
+
 use super::binary_hv::BinaryHV;
 use super::consciousness_integration::ConsciousnessState;
+
+/// Shared context for passing data between subsystems within a single cycle.
+///
+/// Each subsystem can publish named values that later subsystems (lower priority)
+/// can read. The context is cleared at the start of each `process()` cycle.
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// // In a high-priority subsystem:
+/// context.set("topology_embedding", my_embedding_vec);
+///
+/// // In a lower-priority subsystem:
+/// if let Some(embedding) = context.get::<Vec<f32>>("topology_embedding") {
+///     // use the embedding without recomputing
+/// }
+/// ```
+pub struct SubsystemContext {
+    data: HashMap<String, Box<dyn Any + Send + Sync>>,
+}
+
+impl SubsystemContext {
+    /// Create an empty context.
+    pub fn new() -> Self {
+        Self { data: HashMap::new() }
+    }
+
+    /// Store a value. Overwrites any previous value with the same key.
+    pub fn set<T: Any + Send + Sync>(&mut self, key: &str, value: T) {
+        self.data.insert(key.to_string(), Box::new(value));
+    }
+
+    /// Retrieve a value by key and type. Returns `None` if missing or wrong type.
+    pub fn get<T: Any + Send + Sync>(&self, key: &str) -> Option<&T> {
+        self.data.get(key).and_then(|v| v.downcast_ref::<T>())
+    }
+
+    /// Check if a key exists.
+    pub fn contains(&self, key: &str) -> bool {
+        self.data.contains_key(key)
+    }
+
+    /// Remove all entries.
+    pub fn clear(&mut self) {
+        self.data.clear();
+    }
+
+    /// Number of entries.
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Whether the context is empty.
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+}
+
+impl Default for SubsystemContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Error type for subsystem processing failures.
 #[derive(Debug, Clone)]
@@ -78,4 +144,18 @@ pub trait ConsciousnessSubsystem: Send + Sync {
     ///
     /// Override to release resources.
     fn on_shutdown(&mut self) {}
+
+    /// Process one cycle with access to the inter-subsystem context.
+    ///
+    /// The default implementation ignores the context and delegates to
+    /// [`process_cycle`]. Override this to publish or consume shared data
+    /// between subsystems within a single cycle.
+    fn process_cycle_with_context(
+        &mut self,
+        state: &mut ConsciousnessState,
+        inputs: &[BinaryHV],
+        _context: &mut SubsystemContext,
+    ) -> Result<(), SubsystemError> {
+        self.process_cycle(state, inputs)
+    }
 }
