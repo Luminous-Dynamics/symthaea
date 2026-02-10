@@ -385,19 +385,17 @@ proptest! {
             let fused_sigma = fused.state.covariance
                 .as_ref()
                 .map(|c| c.position_sigma())
-                .unwrap_or([f64::MAX; 3]);
+                .unwrap_or(f64::MAX);
 
             let max_individual_sigma = sigma1.max(sigma2);
 
-            // Fused position uncertainty should be ≤ minimum of individual uncertainties
-            // (inverse-variance weighting: 1/σ² = 1/σ₁² + 1/σ₂²)
-            for i in 0..3 {
-                prop_assert!(
-                    fused_sigma[i] <= max_individual_sigma + 0.01,
-                    "Fused sigma[{}]={:.4} > max individual sigma={:.4}",
-                    i, fused_sigma[i], max_individual_sigma
-                );
-            }
+            // Fused position uncertainty (RSS) should be ≤ max of individual uncertainties
+            // (inverse-variance weighting reduces combined uncertainty)
+            prop_assert!(
+                fused_sigma <= max_individual_sigma + 0.01,
+                "Fused sigma={:.4} > max individual sigma={:.4}",
+                fused_sigma, max_individual_sigma
+            );
         }
     }
 
