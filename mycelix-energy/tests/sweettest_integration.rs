@@ -52,13 +52,16 @@ pub enum ProjectType {
     PumpedHydro,
     Hydrogen,
     Biomass,
+    Other(String),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum ProjectStatus {
     Proposed,
-    Approved,
-    UnderConstruction,
+    Planning,
+    Permitting,
+    Financing,
+    Construction,
     Operational,
     Decommissioned,
 }
@@ -67,17 +70,19 @@ pub enum ProjectStatus {
 pub struct ProjectLocation {
     pub latitude: f64,
     pub longitude: f64,
-    pub region: String,
     pub country: String,
+    pub region: String,
+    pub address: Option<String>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ProjectFinancials {
-    pub total_cost: u64,
-    pub funded_amount: u64,
+    pub total_cost: f64,
+    pub funded_amount: f64,
     pub currency: String,
-    pub expected_roi: f64,
+    pub target_irr: f64,
     pub payback_years: f64,
+    pub annual_revenue_estimate: f64,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -100,8 +105,8 @@ pub struct ProjectMilestone {
     pub name: String,
     pub description: String,
     pub target_date: Timestamp,
-    pub completed: bool,
-    pub completed_at: Option<Timestamp>,
+    pub completed_date: Option<Timestamp>,
+    pub verification_evidence: Option<String>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -117,29 +122,30 @@ pub struct AddMilestoneInput {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct EnergyProduction {
     pub id: String,
-    pub project_id: String,
     pub producer_did: String,
-    pub energy_kwh: f64,
-    pub period_start: Timestamp,
-    pub period_end: Timestamp,
+    pub project_id: String,
+    pub amount_kwh: f64,
+    pub timestamp: Timestamp,
+    pub period_hours: f64,
+    pub meter_reading: Option<f64>,
     pub verified: bool,
-    pub recorded_at: Timestamp,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RecordProductionInput {
-    pub project_id: String,
     pub producer_did: String,
-    pub energy_kwh: f64,
-    pub period_start: Timestamp,
-    pub period_end: Timestamp,
+    pub project_id: String,
+    pub amount_kwh: f64,
+    pub period_hours: f64,
+    pub meter_reading: Option<f64>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TradeOffer {
     pub id: String,
     pub seller_did: String,
-    pub energy_kwh: f64,
+    pub project_id: Option<String>,
+    pub amount_kwh: f64,
     pub price_per_kwh: f64,
     pub currency: String,
     pub available_from: Timestamp,
@@ -151,15 +157,17 @@ pub struct TradeOffer {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum OfferStatus {
     Active,
-    Filled,
     PartiallyFilled,
+    Filled,
+    Expired,
     Cancelled,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateOfferInput {
     pub seller_did: String,
-    pub energy_kwh: f64,
+    pub project_id: Option<String>,
+    pub amount_kwh: f64,
     pub price_per_kwh: f64,
     pub currency: String,
     pub available_from: Timestamp,
@@ -170,7 +178,7 @@ pub struct CreateOfferInput {
 pub struct ExecuteTradeInput {
     pub offer_id: String,
     pub buyer_did: String,
-    pub quantity_kwh: f64,
+    pub amount_kwh: f64,
 }
 
 // --- investments types ---
@@ -180,12 +188,14 @@ pub struct Investment {
     pub id: String,
     pub project_id: String,
     pub investor_did: String,
-    pub amount: u64,
+    pub amount: f64,
     pub currency: String,
+    pub shares: f64,
+    pub share_percentage: f64,
     pub investment_type: InvestmentType,
     pub status: InvestmentStatus,
-    pub pledged_at: Timestamp,
-    pub confirmed_at: Option<Timestamp>,
+    pub pledged: Timestamp,
+    pub confirmed: Option<Timestamp>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -200,27 +210,31 @@ pub enum InvestmentType {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum InvestmentStatus {
     Pledged,
+    PendingPayment,
     Confirmed,
-    Active,
-    Returned,
-    Defaulted,
+    Cancelled,
+    Transferred,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PledgeInput {
     pub project_id: String,
     pub investor_did: String,
-    pub amount: u64,
+    pub amount: f64,
     pub currency: String,
+    pub shares: f64,
+    pub share_percentage: f64,
     pub investment_type: InvestmentType,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PortfolioSummary {
     pub investor_did: String,
-    pub total_invested: u64,
-    pub active_investments: u32,
-    pub total_returns: u64,
+    pub total_invested: f64,
+    pub total_shares: f64,
+    pub project_count: u32,
+    pub unique_projects: u32,
+    pub total_dividends_received: f64,
 }
 
 // --- regenerative types ---
@@ -229,14 +243,15 @@ pub struct PortfolioSummary {
 pub struct RegenerativeContract {
     pub id: String,
     pub project_id: String,
-    pub developer_did: String,
     pub community_did: String,
-    pub ownership_target: f64,
-    pub transition_years: u32,
-    pub status: ContractStatus,
     pub conditions: Vec<TransitionCondition>,
+    pub current_ownership_percentage: f64,
+    pub target_ownership_percentage: f64,
+    pub reserve_account_balance: f64,
+    pub currency: String,
+    pub status: ContractStatus,
     pub created: Timestamp,
-    pub updated: Timestamp,
+    pub last_assessment: Timestamp,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -251,59 +266,109 @@ pub enum ContractStatus {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TransitionCondition {
     pub condition_type: ConditionType,
-    pub description: String,
     pub threshold: f64,
     pub current_value: f64,
+    pub weight: f64,
+    pub satisfied: bool,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum ConditionType {
-    FinancialReadiness,
-    TechnicalCapability,
+    CommunityReadiness,
+    FinancialSustainability,
+    OperationalCompetence,
     GovernanceMaturity,
-    CommunityEngagement,
-    RegulatoryCompliance,
+    InvestorReturns,
+    ReserveAccountFunded,
+    MinimumOperatingHistory,
+    Custom(String),
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateContractInput {
     pub project_id: String,
-    pub developer_did: String,
     pub community_did: String,
-    pub ownership_target: f64,
-    pub transition_years: u32,
     pub conditions: Vec<TransitionCondition>,
+    pub target_ownership_percentage: f64,
+    pub currency: String,
 }
 
 // --- bridge types ---
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct SyncProjectInput {
-    pub terra_atlas_id: String,
-    pub project_name: String,
-    pub project_type: String,
+pub enum EnergyType {
+    Solar,
+    Wind,
+    Hydro,
+    Geothermal,
+    Nuclear,
+    Storage,
+    Mixed,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct GeoLocation {
     pub latitude: f64,
     pub longitude: f64,
+    pub region: String,
+    pub country: String,
+}
+
+/// Bridge-specific project status (different from projects zome ProjectStatus)
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum BridgeProjectStatus {
+    Discovery,
+    Funding,
+    Development,
+    Operational,
+    Transitioning,
+    CommunityOwned,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TerraAtlasProject {
+    pub id: String,
+    pub terra_atlas_id: String,
+    pub name: String,
+    pub project_type: EnergyType,
+    pub location: GeoLocation,
     pub capacity_mw: f64,
-    pub status: String,
+    pub total_investment: u64,
+    pub current_investment: u64,
+    pub status: BridgeProjectStatus,
+    pub regenerative_progress: f64,
+    pub synced_at: Timestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SyncProjectInput {
+    pub terra_atlas_id: String,
+    pub name: String,
+    pub project_type: EnergyType,
+    pub location: GeoLocation,
+    pub capacity_mw: f64,
+    pub total_investment: u64,
+    pub current_investment: u64,
+    pub status: BridgeProjectStatus,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct BroadcastEnergyEventInput {
     pub event_type: EnergyEventType,
     pub project_id: String,
-    pub subject_did: String,
     pub payload: String,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum EnergyEventType {
-    ProjectRegistered,
+    ProjectDiscovered,
     InvestmentReceived,
-    MilestoneCompleted,
-    ProductionRecorded,
+    MilestoneAchieved,
     TransitionInitiated,
-    TransitionCompleted,
+    CommunityOwnershipComplete,
+    ProductionUpdate,
+    StatusChanged,
+    SyncPending,
 }
 
 // ============================================================================
@@ -357,18 +422,20 @@ mod projects_tests {
             location: ProjectLocation {
                 latitude: 31.5,
                 longitude: -103.5,
-                region: "West Texas".to_string(),
                 country: "US".to_string(),
+                region: "West Texas".to_string(),
+                address: None,
             },
             capacity_mw: 100.0,
             developer_did: "did:mycelix:solar-dev".to_string(),
             community_did: Some("did:mycelix:pecos-county".to_string()),
             financials: ProjectFinancials {
-                total_cost: 150_000_000,
-                funded_amount: 0,
+                total_cost: 150_000_000.0,
+                funded_amount: 0.0,
                 currency: "USD".to_string(),
-                expected_roi: 0.12,
+                target_irr: 0.12,
                 payback_years: 8.0,
+                annual_revenue_estimate: 18_750_000.0,
             },
         };
 
@@ -405,18 +472,20 @@ mod projects_tests {
             location: ProjectLocation {
                 latitude: 35.0,
                 longitude: -100.0,
-                region: "Oklahoma".to_string(),
                 country: "US".to_string(),
+                region: "Oklahoma".to_string(),
+                address: None,
             },
             capacity_mw: 50.0,
             developer_did: "did:mycelix:wind-dev".to_string(),
             community_did: None,
             financials: ProjectFinancials {
-                total_cost: 75_000_000,
-                funded_amount: 0,
+                total_cost: 75_000_000.0,
+                funded_amount: 0.0,
                 currency: "USD".to_string(),
-                expected_roi: 0.10,
+                target_irr: 0.10,
                 payback_years: 10.0,
+                annual_revenue_estimate: 7_500_000.0,
             },
         };
 
@@ -439,7 +508,7 @@ mod projects_tests {
 
         let milestone: ProjectMilestone = decode_entry(&ms_record).expect("decode milestone");
         assert_eq!(milestone.project_id, project.id);
-        assert!(!milestone.completed);
+        assert!(milestone.completed_date.is_none());
     }
 }
 
@@ -463,11 +532,11 @@ mod grid_tests {
 
         // Record production
         let prod_input = RecordProductionInput {
-            project_id: "proj:solar-1".to_string(),
             producer_did: "did:mycelix:producer".to_string(),
-            energy_kwh: 5000.0,
-            period_start: now,
-            period_end: now,
+            project_id: "proj:solar-1".to_string(),
+            amount_kwh: 5000.0,
+            period_hours: 24.0,
+            meter_reading: Some(12345.0),
         };
 
         let prod_record: Record = conductor
@@ -475,12 +544,13 @@ mod grid_tests {
             .await;
 
         let production: EnergyProduction = decode_entry(&prod_record).expect("decode production");
-        assert_eq!(production.energy_kwh, 5000.0);
+        assert_eq!(production.amount_kwh, 5000.0);
 
         // Create trade offer
         let offer_input = CreateOfferInput {
             seller_did: "did:mycelix:producer".to_string(),
-            energy_kwh: 2000.0,
+            project_id: Some("proj:solar-1".to_string()),
+            amount_kwh: 2000.0,
             price_per_kwh: 0.08,
             currency: "USD".to_string(),
             available_from: now,
@@ -492,7 +562,7 @@ mod grid_tests {
             .await;
 
         let offer: TradeOffer = decode_entry(&offer_record).expect("decode offer");
-        assert_eq!(offer.energy_kwh, 2000.0);
+        assert_eq!(offer.amount_kwh, 2000.0);
 
         // Get active offers
         let active: Vec<Record> = conductor
@@ -522,8 +592,10 @@ mod investments_tests {
         let pledge_input = PledgeInput {
             project_id: "proj:solar-1".to_string(),
             investor_did: "did:mycelix:investor".to_string(),
-            amount: 50000,
+            amount: 50000.0,
             currency: "USD".to_string(),
+            shares: 500.0,
+            share_percentage: 5.0,
             investment_type: InvestmentType::CommunityShare,
         };
 
@@ -532,8 +604,8 @@ mod investments_tests {
             .await;
 
         let investment: Investment = decode_entry(&record).expect("decode investment");
-        assert_eq!(investment.amount, 50000);
-        assert!(investment.confirmed_at.is_none());
+        assert!((investment.amount - 50000.0).abs() < 0.01);
+        assert!(investment.confirmed.is_none());
 
         // Confirm investment
         let confirmed: Record = conductor
@@ -541,7 +613,7 @@ mod investments_tests {
             .await;
 
         let confirmed_inv: Investment = decode_entry(&confirmed).expect("decode confirmed");
-        assert!(confirmed_inv.confirmed_at.is_some());
+        assert!(confirmed_inv.confirmed.is_some());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -555,12 +627,14 @@ mod investments_tests {
         let investor = "did:mycelix:portfolio-investor".to_string();
 
         // Pledge multiple investments
-        for i in 0..3 {
+        for i in 0..3u32 {
             let pledge_input = PledgeInput {
                 project_id: format!("proj:energy-{}", i),
                 investor_did: investor.clone(),
-                amount: 10000 * (i + 1) as u64,
+                amount: 10000.0 * (i + 1) as f64,
                 currency: "USD".to_string(),
+                shares: 100.0 * (i + 1) as f64,
+                share_percentage: 1.0 * (i + 1) as f64,
                 investment_type: InvestmentType::Equity,
             };
             let _: Record = conductor
@@ -573,7 +647,7 @@ mod investments_tests {
             .await;
 
         assert_eq!(summary.investor_did, investor);
-        assert!(summary.total_invested > 0, "Should have total invested amount");
+        assert!(summary.total_invested > 0.0, "Should have total invested amount");
     }
 }
 
@@ -595,22 +669,23 @@ mod regenerative_tests {
 
         let input = CreateContractInput {
             project_id: "proj:solar-community".to_string(),
-            developer_did: "did:mycelix:developer".to_string(),
             community_did: "did:mycelix:community".to_string(),
-            ownership_target: 0.51,
-            transition_years: 10,
+            target_ownership_percentage: 0.51,
+            currency: "USD".to_string(),
             conditions: vec![
                 TransitionCondition {
-                    condition_type: ConditionType::FinancialReadiness,
-                    description: "Community fund reaches threshold".to_string(),
+                    condition_type: ConditionType::FinancialSustainability,
                     threshold: 0.8,
                     current_value: 0.0,
+                    weight: 0.4,
+                    satisfied: false,
                 },
                 TransitionCondition {
-                    condition_type: ConditionType::TechnicalCapability,
-                    description: "Trained local operators available".to_string(),
+                    condition_type: ConditionType::OperationalCompetence,
                     threshold: 1.0,
                     current_value: 0.0,
+                    weight: 0.3,
+                    satisfied: false,
                 },
             ],
         };
@@ -620,8 +695,7 @@ mod regenerative_tests {
             .await;
 
         let contract: RegenerativeContract = decode_entry(&record).expect("decode contract");
-        assert_eq!(contract.ownership_target, 0.51);
-        assert_eq!(contract.transition_years, 10);
+        assert_eq!(contract.target_ownership_percentage, 0.51);
         assert_eq!(contract.conditions.len(), 2);
     }
 }
@@ -644,12 +718,18 @@ mod bridge_tests {
 
         let input = SyncProjectInput {
             terra_atlas_id: "terra:nuclear-smr-001".to_string(),
-            project_name: "Community SMR".to_string(),
-            project_type: "Nuclear".to_string(),
-            latitude: 33.0,
-            longitude: -97.0,
+            name: "Community SMR".to_string(),
+            project_type: EnergyType::Nuclear,
+            location: GeoLocation {
+                latitude: 33.0,
+                longitude: -97.0,
+                region: "North Texas".to_string(),
+                country: "US".to_string(),
+            },
             capacity_mw: 300.0,
-            status: "Development".to_string(),
+            total_investment: 500_000_000,
+            current_investment: 50_000_000,
+            status: BridgeProjectStatus::Development,
         };
 
         let record: Record = conductor
@@ -668,9 +748,8 @@ mod bridge_tests {
         let cell = app.cells()[0].clone();
 
         let input = BroadcastEnergyEventInput {
-            event_type: EnergyEventType::ProjectRegistered,
+            event_type: EnergyEventType::ProjectDiscovered,
             project_id: "proj:test-event".to_string(),
-            subject_did: "did:mycelix:developer".to_string(),
             payload: serde_json::json!({"capacity_mw": 50.0}).to_string(),
         };
 
@@ -707,18 +786,20 @@ mod lifecycle_tests {
             location: ProjectLocation {
                 latitude: 32.0,
                 longitude: -97.0,
-                region: "North Texas".to_string(),
                 country: "US".to_string(),
+                region: "North Texas".to_string(),
+                address: None,
             },
             capacity_mw: 25.0,
             developer_did: "did:mycelix:lc-developer".to_string(),
             community_did: Some("did:mycelix:lc-community".to_string()),
             financials: ProjectFinancials {
-                total_cost: 30_000_000,
-                funded_amount: 0,
+                total_cost: 30_000_000.0,
+                funded_amount: 0.0,
                 currency: "USD".to_string(),
-                expected_roi: 0.11,
+                target_irr: 0.11,
                 payback_years: 9.0,
+                annual_revenue_estimate: 3_300_000.0,
             },
         };
 
@@ -731,8 +812,10 @@ mod lifecycle_tests {
         let pledge_input = PledgeInput {
             project_id: project.id.clone(),
             investor_did: "did:mycelix:lc-investor".to_string(),
-            amount: 100000,
+            amount: 100000.0,
             currency: "USD".to_string(),
+            shares: 1000.0,
+            share_percentage: 10.0,
             investment_type: InvestmentType::CommunityShare,
         };
 
@@ -741,13 +824,12 @@ mod lifecycle_tests {
             .await;
 
         // 3. Record production
-        let now = Timestamp::now();
         let prod_input = RecordProductionInput {
-            project_id: project.id.clone(),
             producer_did: "did:mycelix:lc-developer".to_string(),
-            energy_kwh: 10000.0,
-            period_start: now,
-            period_end: now,
+            project_id: project.id.clone(),
+            amount_kwh: 10000.0,
+            period_hours: 24.0,
+            meter_reading: None,
         };
 
         let _: Record = conductor
@@ -757,15 +839,15 @@ mod lifecycle_tests {
         // 4. Create regenerative contract
         let contract_input = CreateContractInput {
             project_id: project.id.clone(),
-            developer_did: "did:mycelix:lc-developer".to_string(),
             community_did: "did:mycelix:lc-community".to_string(),
-            ownership_target: 0.51,
-            transition_years: 10,
+            target_ownership_percentage: 0.51,
+            currency: "USD".to_string(),
             conditions: vec![TransitionCondition {
-                condition_type: ConditionType::CommunityEngagement,
-                description: "Community participation threshold".to_string(),
+                condition_type: ConditionType::CommunityReadiness,
                 threshold: 0.75,
                 current_value: 0.0,
+                weight: 0.5,
+                satisfied: false,
             }],
         };
 

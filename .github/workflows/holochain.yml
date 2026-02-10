@@ -127,25 +127,25 @@ jobs:
             echo ""
             echo "=== Building Mycelix-Care Zomes ==="
             for pkg in timebank_integrity timebank circles_integrity circles matching_integrity matching care_plans_integrity care_plans credentials_integrity credentials care_bridge_integrity care_bridge; do
-              cd mycelix-care && cargo build --release --target wasm32-unknown-unknown -p "$pkg" && cd -
+              cargo build --release --target wasm32-unknown-unknown -p "$pkg" --manifest-path mycelix-care/Cargo.toml
             done
 
             echo ""
             echo "=== Building Mycelix-Emergency Zomes ==="
             for pkg in incidents_integrity incidents triage_integrity triage resources_integrity resources coordination_integrity coordination shelters_integrity shelters comms_integrity comms emergency_bridge_integrity emergency_bridge; do
-              cd mycelix-emergency && cargo build --release --target wasm32-unknown-unknown -p "$pkg" && cd -
+              cargo build --release --target wasm32-unknown-unknown -p "$pkg" --manifest-path mycelix-emergency/Cargo.toml
             done
 
             echo ""
             echo "=== Building Mycelix-Water Zomes ==="
             for pkg in flow_integrity flow purity_integrity purity capture_integrity capture steward_integrity steward wisdom_integrity wisdom water_bridge_integrity water_bridge; do
-              cd mycelix-water && cargo build --release --target wasm32-unknown-unknown -p "$pkg" && cd -
+              cargo build --release --target wasm32-unknown-unknown -p "$pkg" --manifest-path mycelix-water/Cargo.toml
             done
 
             echo ""
             echo "=== Building Mycelix-Housing Zomes ==="
             for pkg in units_integrity units membership_integrity membership finances_integrity finances maintenance_integrity maintenance clt_integrity clt housing_governance_integrity housing_governance housing_bridge_integrity housing_bridge; do
-              cd mycelix-housing && cargo build --release --target wasm32-unknown-unknown -p "$pkg" && cd -
+              cargo build --release --target wasm32-unknown-unknown -p "$pkg" --manifest-path mycelix-housing/Cargo.toml
             done
 
             echo ""
@@ -340,9 +340,7 @@ jobs:
             for dir in Mycelix-Core/dna/*/ mycelix-workspace/sdk/ mycelix-care/ mycelix-emergency/ mycelix-water/ mycelix-housing/; do
               if [ -f "${dir}Cargo.toml" ]; then
                 echo "Checking $(basename $dir)..."
-                cd "$dir"
-                cargo fmt --check
-                cd -
+                cargo fmt --check --manifest-path "${dir}Cargo.toml"
               fi
             done
           '
@@ -355,9 +353,7 @@ jobs:
             for dir in Mycelix-Core/dna/*/ mycelix-workspace/sdk/ mycelix-care/ mycelix-emergency/ mycelix-water/ mycelix-housing/; do
               if [ -f "${dir}Cargo.toml" ]; then
                 echo "Linting $(basename $dir)..."
-                cd "$dir"
-                cargo clippy --all-targets -- -D warnings
-                cd -
+                cargo clippy --all-targets --manifest-path "${dir}Cargo.toml" -- -D warnings
               fi
             done
           '
@@ -632,55 +628,42 @@ jobs:
           nix develop ./mycelix-workspace#holochain --command bash -c '
             echo "=== Mycelix-Core Integration Tests ==="
             if [ -d "Mycelix-Core/tests/integration" ]; then
-              cd Mycelix-Core
-              cargo test -p mycelix-integration-tests --all-features -- --test-threads=1
-              cd -
+              cargo test -p mycelix-integration-tests --all-features --manifest-path Mycelix-Core/Cargo.toml -- --test-threads=1
             fi
 
             echo ""
             echo "=== Governance Zome Integration Tests ==="
-            if [ -d "mycelix-governance" ]; then
-              cd mycelix-governance
-              cargo test --all-features -- --test-threads=1
-              cd -
+            if [ -f "mycelix-governance/Cargo.toml" ]; then
+              cargo test --all-features --manifest-path mycelix-governance/Cargo.toml -- --test-threads=1
             fi
 
             echo ""
             echo "=== Mycelix-Care Integration Tests ==="
-            if [ -d "mycelix-care" ]; then
-              cd mycelix-care
-              cargo test --all-features -- --test-threads=1
-              cd -
+            if [ -f "mycelix-care/Cargo.toml" ]; then
+              cargo test --all-features --manifest-path mycelix-care/Cargo.toml -- --test-threads=1
             fi
 
             echo ""
             echo "=== Mycelix-Emergency Integration Tests ==="
-            if [ -d "mycelix-emergency" ]; then
-              cd mycelix-emergency
-              cargo test --all-features -- --test-threads=1
-              cd -
+            if [ -f "mycelix-emergency/Cargo.toml" ]; then
+              cargo test --all-features --manifest-path mycelix-emergency/Cargo.toml -- --test-threads=1
             fi
 
             echo ""
             echo "=== Mycelix-Water Integration Tests ==="
-            if [ -d "mycelix-water" ]; then
-              cd mycelix-water
-              cargo test --all-features -- --test-threads=1
-              cd -
+            if [ -f "mycelix-water/Cargo.toml" ]; then
+              cargo test --all-features --manifest-path mycelix-water/Cargo.toml -- --test-threads=1
             fi
 
             echo ""
             echo "=== Mycelix-Housing Integration Tests ==="
-            if [ -d "mycelix-housing" ]; then
-              cd mycelix-housing
-              cargo test --all-features -- --test-threads=1
-              cd -
+            if [ -f "mycelix-housing/Cargo.toml" ]; then
+              cargo test --all-features --manifest-path mycelix-housing/Cargo.toml -- --test-threads=1
             fi
 
             echo ""
             echo "=== SDK Integration Tests ==="
-            cd mycelix-workspace/sdk
-            cargo test integration --all-features -- --test-threads=1
+            cargo test integration --all-features --manifest-path mycelix-workspace/sdk/Cargo.toml -- --test-threads=1
           '
 
       - name: Run multi-conductor tests

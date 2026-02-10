@@ -160,6 +160,8 @@ sacred.txt
 *token*
 !mycelix-health/services/ehr-gateway/**
 !mycelix-health/zomes/verifiable_credentials/**
+!mycelix-care/zomes/credentials/
+!mycelix-care/zomes/credentials/**
 !mycelix-workspace/sdk/src/credentials/**
 *secret*
 *password*

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { createThought } from '../stores/thoughts';
+  import { createThought, coherenceStatus } from '../stores/thoughts';
+  import type { ThoughtCoherenceStatus } from '../stores/thoughts';
   import { EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel, ThoughtType } from '@mycelix/lucid-client';
   import { createEventDispatcher, onMount } from 'svelte';
   import { autoClassify, isOllamaAvailable, isSymthaeaClassificationAvailable } from '../services/ai-classifier';
@@ -27,6 +28,12 @@
   let hasSymthaea = false;
   let useLLM = false;
   let aiReasoning = '';
+  let classificationPhi: number | undefined = undefined;
+  let classificationCoherence: number | undefined = undefined;
+
+  // Coherence toast
+  let coherenceToast: { message: string; type: 'success' | 'warning' | 'info'; phi?: number } | null = null;
+  let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
   onMount(async () => {
     hasOllama = await isOllamaAvailable();
@@ -57,6 +64,8 @@
       }
 
       aiReasoning = suggestion.reasoning || '';
+      classificationPhi = suggestion.phi;
+      classificationCoherence = suggestion.coherence;
       expanded = true;
     } catch (err) {
       console.error('Classification failed:', err);
@@ -96,11 +105,26 @@
     });
 
     if (thought) {
+      const createdThoughtId = thought.id;
       content = '';
       tagsInput = '';
       domain = '';
       expanded = false;
+      classificationPhi = undefined;
+      classificationCoherence = undefined;
+      aiReasoning = '';
       dispatch('created', thought);
+
+      // Watch coherenceStatus for the new thought's results (async from checkCoherenceForNewThought)
+      const unsubscribe = coherenceStatus.subscribe(($status) => {
+        const result: ThoughtCoherenceStatus | undefined = $status.get(createdThoughtId);
+        if (result) {
+          unsubscribe();
+          showCoherenceToast(result);
+        }
+      });
+      // Auto-unsubscribe after 10s if no result arrives
+      setTimeout(() => { try { unsubscribe(); } catch (_) {} }, 10000);
     }
 
     isSubmitting = false;
@@ -110,6 +134,39 @@
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
       handleSubmit();
     }
+  }
+
+  function showCoherenceToast(result: ThoughtCoherenceStatus) {
+    if (toastTimeout) clearTimeout(toastTimeout);
+
+    if (result.contradictions.length > 0) {
+      const first = result.contradictions[0];
+      coherenceToast = {
+        message: `Potential contradiction with: "${first.conflictingContentPreview}"`,
+        type: 'warning',
+        phi: result.phiScore,
+      };
+    } else if (result.isCoherent) {
+      coherenceToast = {
+        message: `Coherent with your worldview`,
+        type: 'success',
+        phi: result.phiScore,
+      };
+    } else {
+      coherenceToast = {
+        message: `Coherence check complete`,
+        type: 'info',
+        phi: result.phiScore,
+      };
+    }
+
+    toastTimeout = setTimeout(() => { coherenceToast = null; }, 6000);
+  }
+
+  function phiColor(phi: number): string {
+    if (phi >= 0.6) return '#10b981';
+    if (phi >= 0.3) return '#f59e0b';
+    return '#ef4444';
   }
 </script>
 
@@ -170,6 +227,24 @@
   {#if aiReasoning}
     <div class="ai-reasoning">
       <span class="label">AI:</span> {aiReasoning}
+      {#if classificationPhi !== undefined}
+        <span class="phi-badge" style="background: {phiColor(classificationPhi)}" title="Integration score: how well this thought connects with your worldview ({classificationPhi.toFixed(2)})">
+          &Phi; {classificationPhi.toFixed(2)}
+        </span>
+      {/if}
+    </div>
+  {/if}
+
+  {#if coherenceToast}
+    <div class="coherence-toast toast-{coherenceToast.type}" role="status" aria-live="polite">
+      <span class="toast-icon">
+        {#if coherenceToast.type === 'success'}&#10003;{:else if coherenceToast.type === 'warning'}&#9888;{:else}&#8505;{/if}
+      </span>
+      <span class="toast-message">{coherenceToast.message}</span>
+      {#if coherenceToast.phi !== undefined}
+        <span class="toast-phi" style="color: {phiColor(coherenceToast.phi)}">&Phi; {coherenceToast.phi.toFixed(2)}</span>
+      {/if}
+      <button class="toast-dismiss" on:click={() => coherenceToast = null} aria-label="Dismiss">&times;</button>
     </div>
   {/if}
 
@@ -219,7 +294,7 @@
         <h4>Epistemic Classification</h4>
         <div class="epistemic-grid">
           <label>
-            <span>Empirical (E)</span>
+            <span title="E0=Subjective, E1=Anecdotal, E2=Observational, E3=Peer-reviewed, E4=Reproducible">Empirical (E)</span>
             <select bind:value={empirical}>
               {#each empiricalLevels as level}
                 <option value={level}>{level}</option>
@@ -228,7 +303,7 @@
           </label>
 
           <label>
-            <span>Normative (N)</span>
+            <span title="N0=Personal, N1=Community, N2=Universal, N3=Axiomatic">Normative (N)</span>
             <select bind:value={normative}>
               {#each normativeLevels as level}
                 <option value={level}>{level}</option>
@@ -237,7 +312,7 @@
           </label>
 
           <label>
-            <span>Materiality (M)</span>
+            <span title="M0=Ephemeral, M1=Situational, M2=Structural, M3=Foundational">Materiality (M)</span>
             <select bind:value={materiality}>
               {#each materialityLevels as level}
                 <option value={level}>{level}</option>
@@ -246,7 +321,7 @@
           </label>
 
           <label>
-            <span>Harmonic (H)</span>
+            <span title="H0=Dissonant, H1=Uncertain, H2=Partial, H3=Resonant, H4=Harmonic">Harmonic (H)</span>
             <select bind:value={harmonic}>
               {#each harmonicLevels as level}
                 <option value={level}>{level}</option>
@@ -484,6 +559,82 @@
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
+  }
+
+  .phi-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: monospace;
+    vertical-align: middle;
+  }
+
+  .coherence-toast {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .toast-success {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #6ee7b7;
+  }
+
+  .toast-warning {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    color: #fcd34d;
+  }
+
+  .toast-info {
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #93c5fd;
+  }
+
+  .toast-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .toast-message {
+    flex: 1;
+  }
+
+  .toast-phi {
+    font-family: monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .toast-dismiss {
+    background: none;
+    border: none;
+    color: inherit;
+    opacity: 0.6;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+
+  .toast-dismiss:hover {
+    opacity: 1;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
   @media (max-width: 600px) {

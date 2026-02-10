@@ -26,6 +26,8 @@ interface ClassificationSuggestion {
   tags: string[];
   confidence: number;
   reasoning?: string;
+  phi?: number;        // Integrated information score (Symthaea only)
+  coherence?: number;  // Worldview coherence score (Symthaea only)
 }
 
 interface RelationshipSuggestion {
@@ -252,6 +254,8 @@ export async function classifyWithSymthaea(content: string): Promise<Classificat
     tags: analyzed.tags || [],
     confidence: analyzed.confidence,
     reasoning: `Symthaea HDC analysis (\u03A6=${analyzed.phi.toFixed(2)}, coherence=${analyzed.coherence.toFixed(2)})`,
+    phi: analyzed.phi,
+    coherence: analyzed.coherence,
   };
 }
 
