@@ -179,6 +179,112 @@ function estimatePc(missKm) {
 }
 
 /**
+ * Screen a large catalog by grouping satellites into altitude bands first,
+ * then only pair-wise screening within overlapping bands.
+ *
+ * This reduces O(n²) to O(n * k) where k = avg satellites per band,
+ * making it feasible to screen 1000+ satellites.
+ *
+ * @param {Array<{ satrec: object, name: string, norad_id: number }>} satellites
+ * @param {object} [params]
+ * @param {number} [params.windowHours=24]
+ * @param {number} [params.thresholdKm=50]
+ * @param {number} [params.maxResults=30]
+ * @param {number} [params.bandWidthKm=200] - Altitude band width for spatial binning
+ * @param {number} [params.maxPerBand=200] - Max satellites per band to screen
+ * @param {function} [params.onProgress] - Callback(pct: number, msg: string)
+ * @returns {ScreenedConjunction[]}
+ */
+export function screenConjunctionsProgressive(satellites, params = {}) {
+  const cfg = {
+    windowHours: 24,
+    stepMinutes: 10,
+    fineStepMinutes: 0.5,
+    thresholdKm: 50,
+    maxResults: 30,
+    bandWidthKm: 200,
+    maxPerBand: 200,
+    onProgress: null,
+    ...params,
+  };
+
+  const now = new Date();
+  const report = (pct, msg) => cfg.onProgress && cfg.onProgress(pct, msg);
+
+  // Step 1: Compute current altitude for each satellite to bin them
+  report(0, 'Computing altitudes...');
+  const EARTH_RADIUS_KM = 6371;
+  const satsWithAlt = [];
+
+  for (const sat of satellites) {
+    const result = CelestrakClient.propagateToECI(sat.satrec, now);
+    if (!result) continue;
+    const [x, y, z] = result.position;
+    const alt = Math.sqrt(x * x + y * y + z * z) - EARTH_RADIUS_KM;
+    satsWithAlt.push({ ...sat, altKm: alt });
+  }
+
+  report(10, `${satsWithAlt.length} satellites propagated`);
+
+  // Step 2: Bin by altitude bands (overlapping by thresholdKm)
+  const overlap = cfg.thresholdKm;
+  /** @type {Map<number, typeof satsWithAlt>} bandIndex -> satellites */
+  const bands = new Map();
+
+  for (const sat of satsWithAlt) {
+    const bandIdx = Math.floor(sat.altKm / cfg.bandWidthKm);
+    // Place in this band and adjacent bands (overlap)
+    for (let b = bandIdx - 1; b <= bandIdx + 1; b++) {
+      if (!bands.has(b)) bands.set(b, []);
+      const band = bands.get(b);
+      if (band.length < cfg.maxPerBand) {
+        band.push(sat);
+      }
+    }
+  }
+
+  report(20, `${bands.size} altitude bands created`);
+
+  // Step 3: Screen within each band
+  const allResults = [];
+  const seenPairs = new Set();
+  let bandsProcessed = 0;
+
+  for (const [bandIdx, bandSats] of bands) {
+    // Deduplicate — only screen unique pairs globally
+    const results = screenConjunctions(bandSats, {
+      windowHours: cfg.windowHours,
+      stepMinutes: cfg.stepMinutes,
+      fineStepMinutes: cfg.fineStepMinutes,
+      thresholdKm: cfg.thresholdKm,
+      maxSatellites: cfg.maxPerBand,
+      maxResults: cfg.maxResults,
+    });
+
+    for (const r of results) {
+      const pairKey = [r.primaryId, r.secondaryId].sort().join('-');
+      if (!seenPairs.has(pairKey)) {
+        seenPairs.add(pairKey);
+        allResults.push(r);
+      }
+    }
+
+    bandsProcessed++;
+    report(20 + 70 * (bandsProcessed / bands.size),
+      `Band ${bandsProcessed}/${bands.size}: ${results.length} conjunctions`);
+  }
+
+  report(95, `Sorting ${allResults.length} results...`);
+
+  // Sort by miss distance, limit results
+  allResults.sort((a, b) => a.missDistanceKm - b.missDistanceKm);
+  const final = allResults.slice(0, cfg.maxResults);
+
+  report(100, `Done: ${final.length} conjunctions found from ${satsWithAlt.length} satellites`);
+  return final;
+}
+
+/**
  * Classify risk level from collision probability.
  *
  * @param {number} pc

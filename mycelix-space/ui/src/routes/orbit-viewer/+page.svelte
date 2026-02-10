@@ -3,7 +3,8 @@
 	import { SpaceScene } from '$lib/three/SpaceScene.js';
 	import { TimeController } from '$lib/three/TimeController.js';
 	import { CelestrakClient, CATEGORIES } from '$lib/three/CelestrakClient.js';
-	import { screenConjunctions } from '$lib/three/ConjunctionScreener.js';
+	import { screenConjunctions, screenConjunctionsProgressive } from '$lib/three/ConjunctionScreener.js';
+	import { HolochainBridge } from '$lib/three/HolochainBridge.js';
 
 	// ── Reactive state (Svelte 5) ────────────────────────────────────
 
@@ -42,6 +43,20 @@
 
 	/** @type {number} */
 	let satCount = $state(0);
+
+	// ── Holochain bridge state ──────────────────────────────────────
+
+	/** @type {HolochainBridge} */
+	let bridge = new HolochainBridge();
+
+	/** @type {string} */
+	let bridgeStatus = $state('offline');
+
+	/** @type {boolean} */
+	let isDeepScreening = $state(false);
+
+	/** @type {string} */
+	let screeningProgress = $state('');
 
 	// ── Derived state ────────────────────────────────────────────────
 
@@ -222,6 +237,12 @@
 			objectList = spaceScene.orbits.listSatellites();
 		});
 
+		// Attempt Holochain conductor connection (non-blocking)
+		bridge.onStatusChange((status) => { bridgeStatus = status; });
+		bridge.connect().then((ok) => {
+			bridgeStatus = ok ? 'connected' : 'offline';
+		});
+
 		// Selection callback
 		spaceScene.onSatelliteSelect((id, _name) => {
 			selectedId = id;
@@ -238,6 +259,7 @@
 		return () => {
 			timeUnsub();
 			spaceScene.dispose();
+			bridge.disconnect();
 			scene = null;
 		};
 	});
@@ -278,6 +300,112 @@
 				objectList = scene.orbits.listSatellites();
 			});
 		}
+	}
+
+	async function handleDeepScreen() {
+		if (!scene || isDeepScreening) return;
+		isDeepScreening = true;
+		screeningProgress = 'Fetching active catalog...';
+
+		try {
+			const client = new CelestrakClient();
+			const allSats = await client.fetchCategory('active');
+			screeningProgress = `${allSats.length} satellites loaded. Screening...`;
+
+			const screened = screenConjunctionsProgressive(allSats, {
+				windowHours: 24,
+				thresholdKm: 50,
+				maxResults: 30,
+				bandWidthKm: 200,
+				maxPerBand: 150,
+				onProgress: (pct, msg) => {
+					screeningProgress = `${Math.round(pct)}% — ${msg}`;
+				},
+			});
+
+			// Clear existing conjunction visuals
+			for (const c of conjunctionWarnings) {
+				scene.conjunctionRenderer.removeConjunction(c.id);
+			}
+
+			// Add new conjunctions to 3D scene
+			for (const c of screened) {
+				scene.addConjunction({
+					id: c.id,
+					pos1Km: c.pos1Km,
+					pos2Km: c.pos2Km,
+					pc: c.pc,
+					tca: c.tca,
+				});
+			}
+
+			// Update sidebar
+			conjunctionWarnings = screened.map((c) => ({
+				id: c.id,
+				primary: c.primaryName,
+				secondary: c.secondaryName,
+				pc: c.pc,
+				tca: c.tca.toISOString(),
+				risk: c.risk,
+				missDistanceKm: c.missDistanceKm,
+			})).sort((a, b) => {
+				const riskOrder = { Emergency: 0, High: 1, Medium: 2, Low: 3, Negligible: 4 };
+				return (riskOrder[a.risk] ?? 5) - (riskOrder[b.risk] ?? 5);
+			});
+
+			screeningProgress = `Done: ${screened.length} conjunctions from ${allSats.length} satellites`;
+		} catch (err) {
+			screeningProgress = `Deep screening failed: ${err.message}`;
+		} finally {
+			isDeepScreening = false;
+		}
+	}
+
+	async function handleSubmitToDht(conjId) {
+		const conj = conjunctionWarnings.find((c) => c.id === conjId);
+		if (!conj) return;
+
+		// Build a ScreenedConjunction-like object for the bridge
+		const screened = {
+			id: conj.id,
+			primaryName: conj.primary,
+			secondaryName: conj.secondary,
+			primaryId: parseInt(conj.id.split('-')[1]) || 0,
+			secondaryId: parseInt(conj.id.split('-')[2]) || 0,
+			missDistanceKm: conj.missDistanceKm || 0,
+			pc: conj.pc,
+			tca: new Date(conj.tca),
+			risk: conj.risk,
+		};
+
+		const result = await bridge.submitConjunction(screened);
+		if (result.submitted) {
+			bridgeStatus = 'submitted';
+		} else if (result.queued) {
+			bridgeStatus = `queued (${bridge.queueLength})`;
+		}
+	}
+
+	async function handleSubmitAllToDht() {
+		const mediumOrHigher = conjunctionWarnings.filter((c) =>
+			['Emergency', 'High', 'Medium'].includes(c.risk)
+		);
+		if (mediumOrHigher.length === 0) return;
+
+		const batch = mediumOrHigher.map((c) => ({
+			id: c.id,
+			primaryName: c.primary,
+			secondaryName: c.secondary,
+			primaryId: parseInt(c.id.split('-')[1]) || 0,
+			secondaryId: parseInt(c.id.split('-')[2]) || 0,
+			missDistanceKm: c.missDistanceKm || 0,
+			pc: c.pc,
+			tca: new Date(c.tca),
+			risk: c.risk,
+		}));
+
+		const result = await bridge.submitBatch(batch);
+		bridgeStatus = `${result.submitted} submitted, ${result.queued} queued`;
 	}
 
 	function riskColor(risk) {
@@ -333,11 +461,31 @@
 			{/each}
 		</div>
 
-		<button class="refresh-btn" onclick={handleRefresh} disabled={isLoading}>
-			Refresh
-		</button>
+		<div class="action-row">
+			<button class="refresh-btn" onclick={handleRefresh} disabled={isLoading}>
+				Refresh
+			</button>
+			<button class="refresh-btn deep-btn" onclick={handleDeepScreen} disabled={isLoading || isDeepScreening}>
+				{isDeepScreening ? 'Screening...' : 'Deep Screen'}
+			</button>
+		</div>
+
+		{#if screeningProgress}
+			<div class="screening-status">{screeningProgress}</div>
+		{/if}
 
 		<h3>Conjunction Warnings</h3>
+
+		<div class="dht-row">
+			<span class="bridge-status" class:connected={bridgeStatus === 'connected'}>
+				DHT: {bridgeStatus}
+			</span>
+			{#if conjunctionWarnings.some((c) => ['Emergency', 'High', 'Medium'].includes(c.risk))}
+				<button class="dht-btn" onclick={handleSubmitAllToDht} disabled={bridgeStatus === 'offline'}>
+					Submit to DHT
+				</button>
+			{/if}
+		</div>
 		{#each conjunctionWarnings as c (c.id)}
 			<div class="conj-card">
 				<div class="conj-header">
@@ -351,6 +499,16 @@
 					<span>Pc: <strong class="mono">{formatPc(c.pc)}</strong></span>
 					<span>TCA: {new Date(c.tca).toLocaleTimeString()}</span>
 				</div>
+				{#if bridge.getStatus(c.id) === 'submitted'}
+					<div class="conj-submitted">On DHT</div>
+				{:else if bridge.getStatus(c.id) === 'queued'}
+					<div class="conj-queued">Queued</div>
+				{:else if ['Emergency', 'High', 'Medium'].includes(c.risk)}
+					<button class="conj-submit-btn" onclick={() => handleSubmitToDht(c.id)}
+						disabled={bridgeStatus === 'offline'}>
+						Submit
+					</button>
+				{/if}
 			</div>
 		{/each}
 	</aside>
@@ -586,6 +744,72 @@
 		cursor: not-allowed;
 	}
 
+	.action-row {
+		display: flex;
+		gap: 0.3rem;
+	}
+
+	.action-row .refresh-btn {
+		flex: 1;
+	}
+
+	.deep-btn {
+		background: #1e293b !important;
+		border-color: #f59e0b !important;
+		color: #f59e0b !important;
+	}
+
+	.deep-btn:hover:not(:disabled) {
+		background: #334155 !important;
+	}
+
+	.screening-status {
+		font-size: 0.68rem;
+		color: #60a5fa;
+		padding: 0.2rem 0.4rem;
+		background: rgba(96, 165, 250, 0.1);
+		border-radius: 0.2rem;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.dht-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.3rem;
+	}
+
+	.bridge-status {
+		font-size: 0.65rem;
+		color: #64748b;
+	}
+
+	.bridge-status.connected {
+		color: #22c55e;
+	}
+
+	.dht-btn {
+		background: #1e293b;
+		border: 1px solid #22c55e;
+		border-radius: 0.25rem;
+		color: #22c55e;
+		padding: 0.2rem 0.5rem;
+		font-size: 0.65rem;
+		cursor: pointer;
+		font-weight: 600;
+	}
+
+	.dht-btn:hover:not(:disabled) {
+		background: rgba(34, 197, 94, 0.1);
+	}
+
+	.dht-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
 	/* ── Conjunction cards ───────────────────────────────────────── */
 
 	.conj-card {
@@ -632,6 +856,39 @@
 
 	.conj-detail strong {
 		color: #f1f5f9;
+	}
+
+	.conj-submit-btn {
+		background: transparent;
+		border: 1px solid #334155;
+		border-radius: 0.2rem;
+		color: #60a5fa;
+		padding: 0.15rem 0.4rem;
+		font-size: 0.6rem;
+		cursor: pointer;
+		margin-top: 0.2rem;
+	}
+
+	.conj-submit-btn:hover:not(:disabled) {
+		background: rgba(96, 165, 250, 0.1);
+		border-color: #60a5fa;
+	}
+
+	.conj-submit-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+	}
+
+	.conj-submitted {
+		font-size: 0.6rem;
+		color: #22c55e;
+		margin-top: 0.2rem;
+	}
+
+	.conj-queued {
+		font-size: 0.6rem;
+		color: #f59e0b;
+		margin-top: 0.2rem;
 	}
 
 	/* ── Object list ────────────────────────────────────────────── */
