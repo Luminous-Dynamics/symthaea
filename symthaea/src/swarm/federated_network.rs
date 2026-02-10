@@ -1032,7 +1032,7 @@ impl NetworkBackend for TcpBackend {
 
         let result = {
             let mut guard = writer.lock().await;
-            write_framed(&mut *guard, &message).await
+            write_framed(&mut guard, &message).await
         };
 
         if result.is_err() {
@@ -1260,7 +1260,7 @@ impl FederatedCoordinator {
             .with_max_staleness(config.max_gradient_staleness_ms);
 
         if config.enable_dp {
-            if let Some(dp_config) = config.dp_config.clone() {
+            if let Some(dp_config) = config.dp_config {
                 aggregator = aggregator.with_differential_privacy(dp_config);
             }
         }

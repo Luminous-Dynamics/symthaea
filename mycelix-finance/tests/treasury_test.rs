@@ -15,7 +15,7 @@
 //! cargo test --test treasury_test -- --ignored     # Full integration tests
 //! ```
 
-use holochain::sweettest::{SweetConductor, SweetDnaFile, SweetAgents};
+use holochain::sweettest::*;
 use holochain::prelude::*;
 use std::time::Duration;
 
@@ -80,8 +80,7 @@ mod treasury_lifecycle {
 
         let result: Record = conductor
             .call(&alice_cell.zome("treasury"), "create_treasury", input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = result
             .entry()
@@ -143,8 +142,7 @@ mod treasury_lifecycle {
 
         let create_result: Record = conductor
             .call(&alice_cell.zome("treasury"), "create_treasury", create_input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = create_result
             .entry()
@@ -175,8 +173,7 @@ mod treasury_lifecycle {
 
         let contrib_result: Record = conductor
             .call(&alice_cell.zome("treasury"), "contribute", contribute_input)
-            .await
-            .expect("Failed to contribute");
+            .await;
 
         let contribution: Contribution = contrib_result
             .entry()
@@ -191,8 +188,7 @@ mod treasury_lifecycle {
         // Step 3: Verify treasury balance updated
         let updated_treasury: Option<Record> = conductor
             .call(&alice_cell.zome("treasury"), "get_treasury", treasury_id.clone())
-            .await
-            .expect("Failed to get treasury");
+            .await;
 
         let updated: Treasury = updated_treasury
             .expect("Treasury should exist")
@@ -242,8 +238,7 @@ mod allocation_governance {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "create_treasury", input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = result
             .entry()
@@ -284,8 +279,7 @@ mod allocation_governance {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "propose_allocation", input)
-            .await
-            .expect("Failed to propose allocation");
+            .await;
 
         let allocation: Allocation = result
             .entry()
@@ -348,8 +342,7 @@ mod allocation_governance {
 
         let _: Record = conductor
             .call(&cell.zome("treasury"), "contribute", fund_input)
-            .await
-            .expect("Failed to fund treasury");
+            .await;
 
         // Propose allocation of 200 SAP
         let alloc_id = propose_allocation_helper(
@@ -376,8 +369,7 @@ mod allocation_governance {
 
         let approve_result_1: Record = conductor
             .call(&cell.zome("treasury"), "approve_allocation", approve_1)
-            .await
-            .expect("First approval failed");
+            .await;
 
         let after_first: Allocation = approve_result_1
             .entry()
@@ -398,8 +390,7 @@ mod allocation_governance {
 
         let approve_result_2: Record = conductor
             .call(&cell.zome("treasury"), "approve_allocation", approve_2)
-            .await
-            .expect("Second approval failed");
+            .await;
 
         let after_second: Allocation = approve_result_2
             .entry()
@@ -414,8 +405,7 @@ mod allocation_governance {
         // Execute the approved allocation
         let exec_result: Record = conductor
             .call(&cell.zome("treasury"), "execute_allocation", alloc_id.clone())
-            .await
-            .expect("Execute allocation failed");
+            .await;
 
         let executed: Allocation = exec_result
             .entry()
@@ -429,8 +419,7 @@ mod allocation_governance {
         // Verify treasury balance decreased
         let updated_treasury: Option<Record> = conductor
             .call(&cell.zome("treasury"), "get_treasury", treasury_id.clone())
-            .await
-            .expect("Failed to get treasury");
+            .await;
 
         let treasury_data: Treasury = updated_treasury
             .expect("Treasury should exist")
@@ -490,8 +479,7 @@ mod allocation_governance {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "reject_allocation", reject_input)
-            .await
-            .expect("Reject allocation failed");
+            .await;
 
         let rejected: Allocation = result
             .entry()
@@ -550,8 +538,7 @@ mod allocation_governance {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "cancel_allocation", cancel_input)
-            .await
-            .expect("Cancel allocation failed");
+            .await;
 
         let cancelled: Allocation = result
             .entry()
@@ -610,7 +597,7 @@ mod allocation_governance {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(cell.zome("treasury"), "approve_allocation", approve_input)
+            .call_fallible(&cell.zome("treasury"), "approve_allocation", approve_input)
             .await;
 
         assert!(result.is_err(), "Non-manager approval should be rejected");
@@ -644,8 +631,7 @@ mod commons_pool_tests {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "create_commons_pool", input)
-            .await
-            .expect("Failed to create commons pool");
+            .await;
 
         let pool: CommonsPool = result
             .entry()
@@ -686,8 +672,7 @@ mod commons_pool_tests {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "create_commons_pool", input)
-            .await
-            .expect("Failed to create commons pool");
+            .await;
 
         let pool: CommonsPool = result
             .entry()
@@ -744,8 +729,7 @@ mod commons_pool_tests {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_commons", input)
-            .await
-            .expect("Failed to contribute to commons");
+            .await;
 
         let pool: CommonsPool = result
             .entry()
@@ -802,8 +786,7 @@ mod commons_pool_tests {
 
         let _: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_commons", contrib_input)
-            .await
-            .expect("Failed to contribute");
+            .await;
 
         // Attempt to allocate MORE than available (751 > 750)
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -822,7 +805,7 @@ mod commons_pool_tests {
         };
 
         let over_result: Result<Record, _> = conductor
-            .call_fallible(cell.zome("treasury"), "request_allocation", over_alloc)
+            .call_fallible(&cell.zome("treasury"), "request_allocation", over_alloc)
             .await;
 
         assert!(over_result.is_err(), "Allocating more than available should fail");
@@ -842,8 +825,7 @@ mod commons_pool_tests {
 
         let exact_result: Record = conductor
             .call(&cell.zome("treasury"), "request_allocation", exact_alloc)
-            .await
-            .expect("Allocating exact available should succeed");
+            .await;
 
         let pool_after: CommonsPool = exact_result
             .entry()
@@ -895,8 +877,7 @@ mod commons_pool_tests {
 
         let _: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_commons", contrib_input)
-            .await
-            .expect("Failed to contribute");
+            .await;
 
         // Now receive compost (demurrage redistribution) of 200
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -914,8 +895,7 @@ mod commons_pool_tests {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "receive_compost", compost_input)
-            .await
-            .expect("Failed to receive compost");
+            .await;
 
         let pool: CommonsPool = result
             .entry()
@@ -970,8 +950,7 @@ mod commons_pool_tests {
 
         let _: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_commons", contrib_input)
-            .await
-            .expect("Failed to contribute");
+            .await;
 
         // Allocate 400 from available -- should succeed
         // After: reserve=250, available=350, total=600, ratio=250/600=0.4167 >= 0.25
@@ -992,8 +971,7 @@ mod commons_pool_tests {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "request_allocation", alloc_ok)
-            .await
-            .expect("Allocation of 400 should succeed");
+            .await;
 
         let pool_after: CommonsPool = result
             .entry()
@@ -1041,8 +1019,7 @@ mod commons_pool_tests {
 
         let _: Record = conductor
             .call(&cell.zome("treasury"), "receive_compost", compost_input)
-            .await
-            .expect("Failed to receive compost");
+            .await;
 
         // Now: reserve=250, available=350+750=1100, total=1350
         // Try allocating 1100 -> new_available=0, new_total=250, ratio=1.0 (passes)
@@ -1058,8 +1035,7 @@ mod commons_pool_tests {
         // Verify current state after compost
         let pool_state: Option<Record> = conductor
             .call(&cell.zome("treasury"), "get_commons_pool", pool_id.clone())
-            .await
-            .expect("Failed to get pool");
+            .await;
 
         let current: CommonsPool = pool_state
             .expect("Pool should exist")
@@ -1124,8 +1100,7 @@ mod savings_pool_tests {
 
         let treasury_result: Record = conductor
             .call(&cell.zome("treasury"), "create_treasury", treasury_input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = treasury_result
             .entry()
@@ -1158,8 +1133,7 @@ mod savings_pool_tests {
 
         let pool_result: Record = conductor
             .call(&cell.zome("treasury"), "create_savings_pool", pool_input)
-            .await
-            .expect("Failed to create savings pool");
+            .await;
 
         let pool: SavingsPool = pool_result
             .entry()
@@ -1192,8 +1166,7 @@ mod savings_pool_tests {
 
         let join_result: Record = conductor
             .call(&cell.zome("treasury"), "join_savings_pool", join_input)
-            .await
-            .expect("Failed to join pool");
+            .await;
 
         let updated_pool: SavingsPool = join_result
             .entry()
@@ -1248,8 +1221,7 @@ mod savings_pool_tests {
 
         let treasury_result: Record = conductor
             .call(&cell.zome("treasury"), "create_treasury", treasury_input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = treasury_result
             .entry()
@@ -1280,8 +1252,7 @@ mod savings_pool_tests {
 
         let pool_result: Record = conductor
             .call(&cell.zome("treasury"), "create_savings_pool", pool_input)
-            .await
-            .expect("Failed to create pool");
+            .await;
 
         let pool: SavingsPool = pool_result
             .entry()
@@ -1308,8 +1279,7 @@ mod savings_pool_tests {
 
         let contrib_result: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_pool", contrib_input)
-            .await
-            .expect("Failed to contribute to pool");
+            .await;
 
         let updated: SavingsPool = contrib_result
             .entry()
@@ -1328,8 +1298,7 @@ mod savings_pool_tests {
 
         let contrib_result_2: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_pool", contrib_2)
-            .await
-            .expect("Failed to contribute again");
+            .await;
 
         let final_pool: SavingsPool = contrib_result_2
             .entry()
@@ -1378,8 +1347,7 @@ mod manager_operations {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "create_treasury", input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = result
             .entry()
@@ -1428,8 +1396,7 @@ mod manager_operations {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "add_manager", add_input)
-            .await
-            .expect("Failed to add manager");
+            .await;
 
         let updated: Treasury = result
             .entry()
@@ -1488,8 +1455,7 @@ mod manager_operations {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "remove_manager", remove_input)
-            .await
-            .expect("Failed to remove manager");
+            .await;
 
         let updated: Treasury = result
             .entry()
@@ -1541,7 +1507,7 @@ mod manager_operations {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(cell.zome("treasury"), "remove_manager", remove_input)
+            .call_fallible(&cell.zome("treasury"), "remove_manager", remove_input)
             .await;
 
         assert!(result.is_err(), "Removing last manager should fail");

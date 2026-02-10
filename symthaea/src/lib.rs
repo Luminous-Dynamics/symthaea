@@ -186,6 +186,31 @@ Key types are re-exported at the crate root for convenience:
 
 // HDC code uses index-based iteration for element-wise vector operations.
 #![allow(clippy::needless_range_loop)]
+// Ported consciousness modules have patterns that are intentional or too costly to refactor.
+#![allow(
+    clippy::collapsible_if,
+    clippy::field_reassign_with_default,
+    clippy::if_same_then_else,
+    clippy::inherent_to_string,
+    clippy::large_enum_variant,
+    clippy::manual_clamp,
+    clippy::manual_memcpy,
+    clippy::manual_strip,
+    clippy::new_ret_no_self,
+    clippy::new_without_default,
+    clippy::ptr_arg,
+    clippy::redundant_closure,
+    clippy::should_implement_trait,
+    clippy::too_many_arguments,
+    clippy::type_complexity,
+    clippy::unnecessary_filter_map,
+    clippy::unnecessary_unwrap,
+    clippy::vec_init_then_push,
+    clippy::wrong_self_convention,
+    clippy::await_holding_lock,
+    clippy::cloned_ref_to_slice_refs,
+    clippy::doc_overindented_list_items,
+)]
 
 // ============================================================================
 // Symthaea Facade (Primary Entry Point)

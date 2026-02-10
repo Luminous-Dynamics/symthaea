@@ -509,7 +509,7 @@ impl NarrativeGWTIntegration {
     /// This ensures the self is always represented in the workspace
     fn submit_standing_coalition(&mut self) {
         // Create representation from unified self
-        let self_representation = vec![self.narrative_self.unified_self().clone()];
+        let self_representation = vec![*self.narrative_self.unified_self()];
 
         // Standing coalition members: all self-levels
         let members = vec![
@@ -919,8 +919,7 @@ impl NarrativeGWTIntegration {
                 let winner_rep = gwt_result.workspace_assessment.conscious_contents
                     .iter()
                     .find(|c| c.source.contains(winner))
-                    .map(|c| c.representation.first().cloned())
-                    .flatten()
+                    .and_then(|c| c.representation.first().cloned())
                     .unwrap_or_else(BinaryHV::zero);
 
                 self.narrative_self.process_experience(
@@ -975,7 +974,7 @@ impl NarrativeGWTIntegration {
             // **REVOLUTIONARY IMPROVEMENT #75**: Update temporal consciousness
             // Observe current state with full context from narrative and predictive selves
             if let Some(ref mut temporal) = self.temporal_analyzer {
-                let current_state = self.narrative_self.unified_self().clone();
+                let current_state = *self.narrative_self.unified_self();
                 temporal.observe(
                     &current_state,
                     phi_after,
@@ -990,7 +989,7 @@ impl NarrativeGWTIntegration {
             // Update linguistic modality with narrative content
             cross_modal.update_modality(
                 Modality::Linguistic,
-                self.narrative_self.unified_self().clone(),
+                *self.narrative_self.unified_self(),
             );
             cross_modal.set_attention(Modality::Linguistic, 0.8);
             cross_modal.bind();

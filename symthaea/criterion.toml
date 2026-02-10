@@ -1,0 +1,3 @@
+[profile.default]
+warm_up_time = 3
+measurement_time = 5

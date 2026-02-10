@@ -557,7 +557,7 @@ impl CompositionalityEngine {
 
         // Fallback uses weighted bundle - primary is weighted higher
         // We simulate this by bundling primary twice
-        let weighted = BinaryHV::bundle(&[p_enc.clone(), p_enc, f_enc]);
+        let weighted = BinaryHV::bundle(&[p_enc, p_enc, f_enc]);
         let encoding = op_enc.bind(&weighted);
 
         let composed = ComposedPrimitive {
@@ -666,11 +666,11 @@ impl CompositionalityEngine {
 
             CompositionType::FixedPoint { max_iterations, convergence_threshold } => {
                 let threshold_f = *convergence_threshold as f32 / 1000.0;
-                let mut current = input.clone();
+                let mut current = *input;
                 let mut iterations = 0;
 
                 for i in 0..*max_iterations {
-                    let prev = current.clone();  // Loop-local: save current before transforming
+                    let prev = current;  // Loop-local: save current before transforming
                     let result = self.execute(&composed.operand_a, &current)?;
                     current = result.output;
                     iterations = i + 1;
@@ -741,12 +741,12 @@ impl CompositionalityEngine {
     fn get_encoding(&self, id: &str) -> Result<BinaryHV> {
         // Check composed first
         if let Some(composed) = self.composed_primitives.get(id) {
-            return Ok(composed.encoding.clone());
+            return Ok(composed.encoding);
         }
 
         // Check base primitives
         if let Some(base) = self.get_base_primitive(id) {
-            return Ok(base.encoding.clone());
+            return Ok(base.encoding);
         }
 
         anyhow::bail!("Unknown primitive: {}", id)

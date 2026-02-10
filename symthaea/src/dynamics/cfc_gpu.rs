@@ -49,8 +49,10 @@ use super::cfc::{ActivationType, CfCNetworkConfig};
 
 /// Available GPU backends for CfC acceleration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum GpuBackend {
     /// Automatic selection (CUDA > WebGPU > CPU)
+    #[default]
     Auto,
     /// NVIDIA CUDA backend (requires CUDA toolkit)
     #[cfg(feature = "cuda")]
@@ -62,11 +64,6 @@ pub enum GpuBackend {
     Cpu,
 }
 
-impl Default for GpuBackend {
-    fn default() -> Self {
-        GpuBackend::Auto
-    }
-}
 
 impl GpuBackend {
     /// Check if GPU acceleration is available

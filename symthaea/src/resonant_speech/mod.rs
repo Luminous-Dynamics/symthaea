@@ -29,10 +29,12 @@ pub use crate::user_state_inference::{
 
 /// Cognitive load level for response adaptation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum CognitiveLoad {
     /// Low cognitive load - user can handle detailed information
     Low,
     /// Medium cognitive load - balanced responses
+    #[default]
     Medium,
     /// High cognitive load - simplified, focused responses
     High,
@@ -99,11 +101,6 @@ impl CognitiveLoad {
     }
 }
 
-impl Default for CognitiveLoad {
-    fn default() -> Self {
-        CognitiveLoad::Medium
-    }
-}
 
 /// User state for resonant speech (simplified version)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -305,13 +302,12 @@ impl ResonantSpeech {
         }
 
         // Add encouraging suffix for learning contexts
-        if self.user_state.is_learning && self.user_state.confidence < 0.5 {
-            if !self.templates.encouraging_suffixes.is_empty() {
+        if self.user_state.is_learning && self.user_state.confidence < 0.5
+            && !self.templates.encouraging_suffixes.is_empty() {
                 let idx = (self.stats.total_responses as usize) % self.templates.encouraging_suffixes.len();
                 response.push(' ');
                 response.push_str(&self.templates.encouraging_suffixes[idx]);
             }
-        }
 
         // Update stats
         self.stats.total_responses += 1;

@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-mycelix-bridge"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <dev@luminousdynamics.org>"]
+description = "Bridge crate between Symthaea-HLB and Mycelix SDK for consciousness-guided federated learning"
+license = "Apache-2.0"
+repository = "https://github.com/Luminous-Dynamics"
+keywords = ["consciousness", "federated-learning", "byzantine", "epistemic"]
+categories = ["science", "cryptography"]
+
+[dependencies]
+symthaea-core = { path = "../symthaea-core" }
+mycelix-sdk = { path = "../mycelix-workspace/sdk", default-features = false, features = ["standalone"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"

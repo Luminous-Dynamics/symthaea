@@ -89,6 +89,7 @@ pub struct AttentionState {
 
 /// Attention modes (how attention is deployed)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum AttentionMode {
     /// Focused (narrow, deep attention on single target)
     Focused,
@@ -97,6 +98,7 @@ pub enum AttentionMode {
     Divided,
 
     /// Diffuse (broad, shallow attention across many targets)
+    #[default]
     Diffuse,
 
     /// Vigilant (sustained readiness for specific stimulus)
@@ -112,11 +114,6 @@ pub enum AttentionMode {
     Inhibited,
 }
 
-impl Default for AttentionMode {
-    fn default() -> Self {
-        AttentionMode::Diffuse
-    }
-}
 
 /// Attention channel (where attention can be deployed)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -581,7 +578,7 @@ impl AttentionSchema {
         // Update attention state
         let old_state = self.current_state.clone();
         self.current_state = AttentionState {
-            focus_target: new_target.clone(),
+            focus_target: new_target,
             intensity: self.compute_intensity(salience, is_shift),
             mode: self.determine_mode(is_shift, salience),
             active_channels: self.infer_channels(&new_target),
@@ -729,7 +726,7 @@ impl AttentionSchema {
         };
 
         self.attention_prediction.push(AttentionState {
-            focus_target: self.focus_content.clone(),
+            focus_target: self.focus_content,
             intensity: predicted_intensity,
             mode: predicted_mode,
             active_channels: self.current_state.active_channels.clone(),
@@ -912,7 +909,7 @@ impl AttentionSchema {
 
         // Update focus to first target (primary)
         if let Some(first) = targets.first() {
-            self.focus_content = first.clone();
+            self.focus_content = *first;
         }
 
         Ok(intensities)

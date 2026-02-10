@@ -27,7 +27,7 @@
 //! cargo test --test payments_test -- --ignored
 //! ```
 
-use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetAgents, SweetCell};
+use holochain::sweettest::*;
 use holochain::prelude::*;
 use holochain_types::prelude::*;
 use std::time::Duration;
@@ -105,12 +105,11 @@ mod payment_creation {
         // Send payment
         let payment_record: Record = conductor
             .call(
-                alice_cell.zome("payments"),
+                &alice_cell.zome("payments"),
                 "send_payment",
-                payment_input.clone(),
+                payment_input,
             )
-            .await
-            .expect("Failed to send payment");
+            .await;
 
         println!("  - Payment created successfully");
 
@@ -176,8 +175,7 @@ mod payment_creation {
 
             let result: Record = conductor
                 .call(&alice_cell.zome("payments"), "send_payment", input)
-                .await
-                .expect(&format!("Failed to send {} payment", type_name));
+                .await;
 
             let payment: Payment = result
                 .entry()
@@ -231,8 +229,7 @@ mod payment_creation {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to create recurring payment");
+            .await;
 
         let payment: Payment = result
             .entry()
@@ -534,8 +531,7 @@ mod double_spend_prevention {
 
             let result: Record = conductor
                 .call(&alice_cell.zome("payments"), "send_payment", input)
-                .await
-                .expect("Failed to send payment");
+                .await;
 
             let payment: Payment = result
                 .entry()
@@ -597,8 +593,7 @@ mod double_spend_prevention {
 
         let payment_record: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send payment");
+            .await;
 
         let payment: Payment = payment_record
             .entry()
@@ -612,8 +607,7 @@ mod double_spend_prevention {
                 did: alice_did.clone(),
                 limit: None,
             })
-            .await
-            .expect("Failed to get payment history");
+            .await;
 
         assert!(!history.is_empty(), "Payment history should not be empty");
 
@@ -660,8 +654,7 @@ mod double_spend_prevention {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -686,8 +679,7 @@ mod double_spend_prevention {
 
         let updated_channel: Record = conductor
             .call(&alice_cell.zome("payments"), "channel_transfer", transfer_input)
-            .await
-            .expect("Failed to transfer");
+            .await;
 
         let channel_after: PaymentChannel = updated_channel
             .entry()
@@ -740,8 +732,7 @@ mod double_spend_prevention {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -817,8 +808,7 @@ mod transaction_confirmation {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send payment");
+            .await;
 
         let payment: Payment = result
             .entry()
@@ -878,8 +868,7 @@ mod transaction_confirmation {
 
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input1)
-            .await
-            .expect("Failed payment 1");
+            .await;
         println!("  - Payment 1: Alice -> Bob (50)");
 
         // Charlie sends to Alice
@@ -894,8 +883,7 @@ mod transaction_confirmation {
 
         let _: Record = conductor
             .call(&charlie_cell.zome("payments"), "send_payment", input2)
-            .await
-            .expect("Failed payment 2");
+            .await;
         println!("  - Payment 2: Charlie -> Alice (30)");
 
         // Alice sends to Charlie
@@ -910,8 +898,7 @@ mod transaction_confirmation {
 
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input3)
-            .await
-            .expect("Failed payment 3");
+            .await;
         println!("  - Payment 3: Alice -> Charlie (20)");
 
         // Wait for DHT consistency
@@ -923,8 +910,7 @@ mod transaction_confirmation {
                 did: alice_did.clone(),
                 limit: None,
             })
-            .await
-            .expect("Failed to get Alice's history");
+            .await;
 
         println!("  - Alice's history: {} payments", alice_history.len());
         assert!(alice_history.len() >= 2, "Alice should have at least 2 payments");
@@ -935,8 +921,7 @@ mod transaction_confirmation {
                 did: bob_did.clone(),
                 limit: None,
             })
-            .await
-            .expect("Failed to get Bob's history");
+            .await;
 
         println!("  - Bob's history: {} payments", bob_history.len());
         assert!(!bob_history.is_empty(), "Bob should have at least 1 payment");
@@ -984,8 +969,7 @@ mod currency_tests {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send SAP payment");
+            .await;
 
         let payment: Payment = result
             .entry()
@@ -1031,8 +1015,7 @@ mod currency_tests {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send TEND payment");
+            .await;
 
         let payment: Payment = result
             .entry()
@@ -1078,8 +1061,7 @@ mod currency_tests {
 
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", sap_input)
-            .await
-            .expect("SAP payment should succeed");
+            .await;
         println!("  - SAP accepted: OK");
 
         // Valid: TEND
@@ -1094,8 +1076,7 @@ mod currency_tests {
 
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", tend_input)
-            .await
-            .expect("TEND payment should succeed");
+            .await;
         println!("  - TEND accepted: OK");
 
         // Invalid: MYC (old currency, no longer accepted)
@@ -1197,8 +1178,7 @@ mod failed_transaction_handling {
                 did: new_user_did,
                 limit: None,
             })
-            .await
-            .expect("Failed to get history");
+            .await;
 
         assert!(history.is_empty(), "New user should have empty history");
         println!("  - Empty history returned: OK");
@@ -1239,8 +1219,7 @@ mod failed_transaction_handling {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -1267,8 +1246,7 @@ mod failed_transaction_handling {
 
             let result: Record = conductor
                 .call(&alice_cell.zome("payments"), "channel_transfer", transfer_input)
-                .await
-                .expect(&format!("Failed transfer {}", i));
+                .await;
 
             let updated_channel: PaymentChannel = result
                 .entry()
@@ -1341,8 +1319,7 @@ mod payment_channels {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = result
             .entry()
@@ -1398,8 +1375,7 @@ mod payment_channels {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -1419,8 +1395,7 @@ mod payment_channels {
 
         let result1: Record = conductor
             .call(&alice_cell.zome("payments"), "channel_transfer", transfer1)
-            .await
-            .expect("Failed transfer A->B");
+            .await;
 
         let channel1: PaymentChannel = result1
             .entry()
@@ -1441,8 +1416,7 @@ mod payment_channels {
 
         let result2: Record = conductor
             .call(&bob_cell.zome("payments"), "channel_transfer", transfer2)
-            .await
-            .expect("Failed transfer B->A");
+            .await;
 
         let channel2: PaymentChannel = result2
             .entry()
@@ -1657,8 +1631,7 @@ mod performance_benchmarks {
 
             let _: Record = conductor
                 .call(&alice_cell.zome("payments"), "send_payment", input)
-                .await
-                .expect("Failed to send payment");
+                .await;
 
             let elapsed = start.elapsed();
             latencies.push(elapsed.as_millis());
@@ -1711,16 +1684,14 @@ mod sap_balance_management {
         // Initialize SAP balance
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to initialize SAP balance");
+            .await;
 
         println!("  - SAP balance initialized");
 
         // Get balance and verify zero
         let balance: SapBalanceResponse = conductor
             .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to get SAP balance");
+            .await;
 
         assert_eq!(balance.raw_balance, 0, "Initial raw balance should be 0");
         assert_eq!(balance.effective_balance, 0, "Initial effective balance should be 0");
@@ -1755,8 +1726,7 @@ mod sap_balance_management {
         // Initialize
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to initialize");
+            .await;
 
         // Credit 5000
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -1772,8 +1742,7 @@ mod sap_balance_management {
                 amount: 5000,
                 reason: "Test credit".to_string(),
             })
-            .await
-            .expect("Failed to credit SAP");
+            .await;
 
         println!("  - Credited 5000 SAP");
 
@@ -1791,16 +1760,14 @@ mod sap_balance_management {
                 amount: 2000,
                 reason: "Test debit".to_string(),
             })
-            .await
-            .expect("Failed to debit SAP");
+            .await;
 
         println!("  - Debited 2000 SAP");
 
         // Verify remaining balance is 3000
         let balance: SapBalanceResponse = conductor
             .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to get balance");
+            .await;
 
         assert_eq!(balance.raw_balance, 3000, "Balance should be 3000 after credit 5000 and debit 2000");
 
@@ -1831,8 +1798,7 @@ mod sap_balance_management {
         // Initialize and credit 1000
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to initialize");
+            .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreditSapInput {
@@ -1847,8 +1813,7 @@ mod sap_balance_management {
                 amount: 1000,
                 reason: "Test credit".to_string(),
             })
-            .await
-            .expect("Failed to credit");
+            .await;
 
         // Try to debit 2000 (exceeds 1000 balance)
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -1904,8 +1869,7 @@ mod sap_balance_management {
         // Initialize and credit a large balance (above exempt floor)
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to initialize");
+            .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreditSapInput {
@@ -1920,8 +1884,7 @@ mod sap_balance_management {
                 amount: 10_000_000_000, // 10B micro-SAP (well above exempt floor)
                 reason: "Test large credit".to_string(),
             })
-            .await
-            .expect("Failed to credit");
+            .await;
 
         // Wait to allow time to pass for demurrage calculation
         tokio::time::sleep(Duration::from_secs(2)).await;
@@ -1929,8 +1892,7 @@ mod sap_balance_management {
         // Read balance - pending_demurrage should be > 0 (time has elapsed)
         let balance: SapBalanceResponse = conductor
             .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to get balance");
+            .await;
 
         println!("  - Raw balance: {}", balance.raw_balance);
         println!("  - Effective balance: {}", balance.effective_balance);
@@ -1987,8 +1949,7 @@ mod exit_protocol {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "initiate_exit", input)
-            .await
-            .expect("Failed to initiate exit");
+            .await;
 
         let exit: ExitRecord = result
             .entry()
@@ -2042,8 +2003,7 @@ mod exit_protocol {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "initiate_exit", input)
-            .await
-            .expect("Failed to initiate exit");
+            .await;
 
         let exit: ExitRecord = result
             .entry()
@@ -2114,8 +2074,7 @@ mod escrow_tests {
 
         let escrow_record: Record = conductor
             .call(&alice_cell.zome("payments"), "create_escrow", escrow_input)
-            .await
-            .expect("Failed to create escrow");
+            .await;
 
         let escrow: Payment = escrow_record
             .entry()
@@ -2129,8 +2088,7 @@ mod escrow_tests {
         // Release escrow
         let released_record: Record = conductor
             .call(&alice_cell.zome("payments"), "release_escrow", escrow.id.clone())
-            .await
-            .expect("Failed to release escrow");
+            .await;
 
         let released: Payment = released_record
             .entry()
@@ -2175,8 +2133,7 @@ mod escrow_tests {
 
         let payment_record: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send payment");
+            .await;
 
         let payment: Payment = payment_record
             .entry()
@@ -2189,8 +2146,7 @@ mod escrow_tests {
         // Refund
         let refunded_record: Record = conductor
             .call(&alice_cell.zome("payments"), "refund_payment", payment.id.clone())
-            .await
-            .expect("Failed to refund payment");
+            .await;
 
         let refunded: Payment = refunded_record
             .entry()
@@ -2235,8 +2191,7 @@ mod escrow_tests {
 
         let payment_record: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send payment");
+            .await;
 
         let payment: Payment = payment_record
             .entry()
@@ -2247,8 +2202,7 @@ mod escrow_tests {
         // First refund - should succeed
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "refund_payment", payment.id.clone())
-            .await
-            .expect("Failed to refund");
+            .await;
 
         println!("  - First refund succeeded");
 
@@ -2312,8 +2266,7 @@ mod channel_close_tests {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -2328,8 +2281,7 @@ mod channel_close_tests {
         // Close channel
         let closed_record: Record = conductor
             .call(&alice_cell.zome("payments"), "close_payment_channel", channel_id.clone())
-            .await
-            .expect("Failed to close channel");
+            .await;
 
         let closed_channel: PaymentChannel = closed_record
             .entry()
@@ -2373,8 +2325,7 @@ mod channel_close_tests {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -2387,8 +2338,7 @@ mod channel_close_tests {
         // First close
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "close_payment_channel", channel_id.clone())
-            .await
-            .expect("Failed to close channel");
+            .await;
 
         println!("  - First close succeeded");
 
@@ -2528,8 +2478,7 @@ mod fee_tier_tests {
         // Initialize Alice's SAP balance and credit 10M micro-SAP
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to initialize Alice SAP balance");
+            .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreditSapInput {
@@ -2544,22 +2493,19 @@ mod fee_tier_tests {
                 amount: 10_000_000, // 10M micro-SAP
                 reason: "Test credit for fee test".to_string(),
             })
-            .await
-            .expect("Failed to credit Alice SAP");
+            .await;
 
         // Initialize Bob's SAP balance (so credit_sap on receive works)
         let _: Record = conductor
             .call(&bob_cell.zome("payments"), "initialize_sap_balance", bob_did.clone())
-            .await
-            .expect("Failed to initialize Bob SAP balance");
+            .await;
 
         println!("  - Alice funded with 10M micro-SAP");
 
         // Get Alice's balance before payment
         let balance_before: SapBalanceResponse = conductor
             .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to get Alice balance before");
+            .await;
 
         // Send 1.0 SAP (= 1_000_000 micro-SAP) from Alice to Bob
         let input = SendPaymentInput {
@@ -2573,8 +2519,7 @@ mod fee_tier_tests {
 
         let payment_record: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send SAP payment");
+            .await;
 
         let payment: Payment = payment_record
             .entry()
@@ -2588,8 +2533,7 @@ mod fee_tier_tests {
         // Check Alice's balance after -- should be reduced by amount + fee
         let balance_after: SapBalanceResponse = conductor
             .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to get Alice balance after");
+            .await;
 
         // Total debit = amount (1M) + fee (Newcomer 0.001 * 1M = 1000) = 1_001_000
         // Note: demurrage may also apply, so we check the balance decrease is >= amount + fee
@@ -2606,8 +2550,7 @@ mod fee_tier_tests {
         // Verify Bob received the amount (without fee)
         let bob_balance: SapBalanceResponse = conductor
             .call(&bob_cell.zome("payments"), "get_sap_balance", bob_did.clone())
-            .await
-            .expect("Failed to get Bob balance");
+            .await;
 
         assert_eq!(bob_balance.raw_balance, micro_amount,
             "Bob should receive exactly the payment amount (no fee)");
@@ -2651,8 +2594,7 @@ mod fee_tier_tests {
 
         let payment_record: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send TEND payment");
+            .await;
 
         let payment: Payment = payment_record
             .entry()

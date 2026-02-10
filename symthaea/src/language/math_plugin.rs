@@ -120,14 +120,13 @@ impl DomainPlugin for MathPlugin {
                 // Single-char operators: match directly
                 for (idx, _) in text.match_indices(op) {
                     // Avoid matching '-' as operator if it's part of a number
-                    if *op == "-" {
-                        if idx + 1 < text.len() {
+                    if *op == "-"
+                        && idx + 1 < text.len() {
                             let next_char = text.as_bytes()[idx + 1];
                             if next_char.is_ascii_digit() && (idx == 0 || !text.as_bytes()[idx - 1].is_ascii_digit()) {
                                 continue;
                             }
                         }
-                    }
                     entities.push(
                         Entity::new("operator", *op, idx, idx + op.len())
                             .with_confidence(0.9),

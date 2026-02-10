@@ -2919,7 +2919,7 @@ mod tests {
 
 
     fn test_number_construction() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
 
         let zero = HdcNumber::zero(&primitives);
         assert_eq!(zero.value, 0);
@@ -2933,7 +2933,7 @@ mod tests {
 
 
     fn test_successor() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
 
         let three = HdcNumber::from_value(3, &primitives);
         let four = three.successor(&primitives);
@@ -3614,7 +3614,7 @@ mod tests {
 
 
     fn test_symbolic_expr_constant() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let expr = SymbolicExpr::constant(5, &primitives);
         assert_eq!(expr.term_type, TermType::Constant(5));
         assert_eq!(expr.to_string(), "5");
@@ -3624,7 +3624,7 @@ mod tests {
 
 
     fn test_symbolic_expr_variable() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let x = SymbolicExpr::variable("x", &primitives);
         assert_eq!(x.term_type, TermType::Variable("x".to_string()));
         assert_eq!(x.to_string(), "x");
@@ -3634,7 +3634,7 @@ mod tests {
 
 
     fn test_symbolic_addition() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let x = SymbolicExpr::variable("x", &primitives);
         let five = SymbolicExpr::constant(5, &primitives);
         let sum = x.add(&five, &primitives);
@@ -3647,7 +3647,7 @@ mod tests {
 
 
     fn test_symbolic_multiplication() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let x = SymbolicExpr::variable("x", &primitives);
         let three = SymbolicExpr::constant(3, &primitives);
         let prod = three.mul(&x, &primitives);
@@ -3660,7 +3660,7 @@ mod tests {
 
 
     fn test_symbolic_evaluation() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut engine = HybridArithmeticEngine::new();
 
         // Build: 2x + 3
@@ -3683,7 +3683,7 @@ mod tests {
 
 
     fn test_symbolic_simplify_like_terms() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut algebra = SymbolicAlgebra::new();
 
         // Build: 2x + 3x = 5x
@@ -3704,7 +3704,7 @@ mod tests {
 
 
     fn test_symbolic_constant_folding() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut algebra = SymbolicAlgebra::new();
 
         // Build: 3 + 4 should fold to 7
@@ -3721,7 +3721,7 @@ mod tests {
 
 
     fn test_symbolic_multiply_by_zero() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut algebra = SymbolicAlgebra::new();
 
         // Build: 0 * x = 0
@@ -3737,7 +3737,7 @@ mod tests {
 
 
     fn test_symbolic_multiply_by_one() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut algebra = SymbolicAlgebra::new();
 
         // Build: 1 * x = x
@@ -3753,7 +3753,7 @@ mod tests {
 
 
     fn test_symbolic_add_zero() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut algebra = SymbolicAlgebra::new();
 
         // Build: x + 0 = x
@@ -3769,7 +3769,7 @@ mod tests {
 
 
     fn test_symbolic_expand_distribution() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut algebra = SymbolicAlgebra::new();
 
         // Build: 2 * (x + 3) should expand to (2*x) + (2*3)
@@ -3788,7 +3788,7 @@ mod tests {
 
 
     fn test_polynomial_creation() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
 
         // Create 2x^2 + 3x + 1
         let poly = Polynomial::new(vec![1, 3, 2], "x", &primitives);
@@ -3800,7 +3800,7 @@ mod tests {
 
 
     fn test_polynomial_evaluation() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut engine = HybridArithmeticEngine::new();
 
         // 2x^2 + 3x + 1, evaluate at x = 2
@@ -3814,7 +3814,7 @@ mod tests {
 
 
     fn test_polynomial_addition() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let algebra = SymbolicAlgebra::new();
 
         // (2x + 1) + (3x + 2) = 5x + 3
@@ -3829,7 +3829,7 @@ mod tests {
 
 
     fn test_polynomial_multiplication() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let algebra = SymbolicAlgebra::new();
 
         // (x + 1) * (x + 2) = x^2 + 3x + 2
@@ -3844,7 +3844,7 @@ mod tests {
 
 
     fn test_linear_equation_solver() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut algebra = SymbolicAlgebra::new();
 
         // Solve: 2x + 6 = 0 => x = -3
@@ -3859,7 +3859,7 @@ mod tests {
 
 
     fn test_quadratic_equation_solver() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut algebra = SymbolicAlgebra::new();
 
         // Solve: x^2 - 5x + 6 = 0 => x = 2 or x = 3
@@ -3877,7 +3877,7 @@ mod tests {
 
 
     fn test_symbolic_algebra_stats() {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut algebra = SymbolicAlgebra::new();
 
         // Do some operations

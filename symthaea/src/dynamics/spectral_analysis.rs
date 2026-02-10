@@ -339,7 +339,7 @@ impl SpectralAnalyzer {
         let mut buf: Vec<Complex> = signal
             .iter()
             .map(|&x| Complex::new(x, 0.0))
-            .chain(std::iter::repeat(Complex::zero()).take(n - signal.len()))
+            .chain(std::iter::repeat_n(Complex::zero(), n - signal.len()))
             .collect();
         Self::fft_in_place(&mut buf);
         buf
@@ -355,7 +355,7 @@ impl SpectralAnalyzer {
         let mut buf: Vec<Complex> = spectrum
             .iter()
             .map(|z| z.conj())
-            .chain(std::iter::repeat(Complex::zero()).take(n - spectrum.len()))
+            .chain(std::iter::repeat_n(Complex::zero(), n - spectrum.len()))
             .collect();
         Self::fft_in_place(&mut buf);
         let inv = 1.0 / n as f64;
@@ -688,15 +688,15 @@ impl SpectralAnalyzer {
 
         for (i, &freq) in spectrum.frequencies.iter().enumerate() {
             let power = spectrum.psd[i] * df;
-            if freq >= 0.5 && freq < 4.0 {
+            if (0.5..4.0).contains(&freq) {
                 delta += power;
-            } else if freq >= 4.0 && freq < 8.0 {
+            } else if (4.0..8.0).contains(&freq) {
                 theta += power;
-            } else if freq >= 8.0 && freq < 13.0 {
+            } else if (8.0..13.0).contains(&freq) {
                 alpha += power;
-            } else if freq >= 13.0 && freq < 30.0 {
+            } else if (13.0..30.0).contains(&freq) {
                 beta += power;
-            } else if freq >= 30.0 && freq <= 100.0 {
+            } else if (30.0..=100.0).contains(&freq) {
                 gamma += power;
             }
         }

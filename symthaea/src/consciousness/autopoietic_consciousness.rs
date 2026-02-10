@@ -109,7 +109,7 @@ impl AutopoieticPhasePrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
@@ -237,7 +237,7 @@ impl ComponentTypePrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
@@ -414,10 +414,12 @@ pub enum AutopoieticPhase {
 ///
 /// Describes the overall vitality and operational state of the system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum LifeState {
     /// System is thriving and expanding capabilities
     Flourishing,
     /// System is maintaining itself at steady state
+    #[default]
     Stable,
     /// System is experiencing difficulty maintaining organization
     Struggling,
@@ -427,11 +429,6 @@ pub enum LifeState {
     Dead,
 }
 
-impl Default for LifeState {
-    fn default() -> Self {
-        Self::Stable
-    }
-}
 
 /// A perturbation from the environment
 #[derive(Debug, Clone)]

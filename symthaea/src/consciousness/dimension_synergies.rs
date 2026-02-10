@@ -386,7 +386,7 @@ impl SynergyFrontier {
     pub fn from_base_profiles(base_profiles: Vec<ConsciousnessProfile>) -> Self {
         let synergy_profiles: Vec<SynergyProfile> = base_profiles
             .into_iter()
-            .map(|base| SynergyProfile::from_base(base))
+            .map(SynergyProfile::from_base)
             .collect();
 
         // Filter to non-dominated (using enhanced composite + emergent properties)

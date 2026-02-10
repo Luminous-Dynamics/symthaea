@@ -570,7 +570,7 @@ impl CandidatePrimitive {
             definition: self.definition.clone(),
             fitness: 0.0,
             encoding,
-            epistemic_coordinate: self.epistemic_coordinate.clone(),
+            epistemic_coordinate: self.epistemic_coordinate,
             harmonic_alignment: self.harmonic_alignment,
         }
     }
@@ -581,7 +581,7 @@ impl CandidatePrimitive {
         let b2 = &parent2.encoding.0;
         let mut child_bytes = [0u8; BinaryHV::BYTES];
         for i in 0..BinaryHV::BYTES {
-            child_bytes[i] = if (i + generation) % 2 == 0 { b1[i] } else { b2[i] };
+            child_bytes[i] = if (i + generation).is_multiple_of(2) { b1[i] } else { b2[i] };
         }
         Self {
             name: format!("cross_g{}", generation),
@@ -589,7 +589,7 @@ impl CandidatePrimitive {
             definition: parent1.definition.clone(),
             fitness: 0.0,
             encoding: BinaryHV(child_bytes),
-            epistemic_coordinate: parent1.epistemic_coordinate.clone(),
+            epistemic_coordinate: parent1.epistemic_coordinate,
             harmonic_alignment: (parent1.harmonic_alignment + parent2.harmonic_alignment) / 2.0,
         }
     }

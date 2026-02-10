@@ -111,7 +111,7 @@ impl EntropyMethodPrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
@@ -239,7 +239,7 @@ impl ConsciousnessPhasePrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
@@ -340,7 +340,7 @@ impl TransitionOrderPrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
@@ -455,7 +455,7 @@ impl FreeEnergyStatusPrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
@@ -570,7 +570,7 @@ impl EquilibriumStatusPrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
@@ -1747,7 +1747,7 @@ impl ConsciousnessThermodynamicsAnalyzer {
     /// Extract work from the system (goal-directed activity)
     pub fn extract_work(&mut self, dims: &mut [f64; 7], work: f64) -> f64 {
         // Work extraction reduces free energy
-        let current_state = self.analyze(dims.clone());
+        let current_state = self.analyze(*dims);
 
         // Can only extract work if free energy is positive
         let extractable = current_state.free_energy.min(work);
@@ -1776,7 +1776,7 @@ impl ConsciousnessThermodynamicsAnalyzer {
             }
 
             // Add thermal fluctuations
-            let current = self.analyze(dims.clone());
+            let current = self.analyze(*dims);
             let noise_amplitude = (current.temperature * 0.01).sqrt();
 
             for d in dims.iter_mut() {

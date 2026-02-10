@@ -511,7 +511,7 @@ impl TwoTrackProcessor {
         let loss = if let Some(target_emb) = target {
             // Get the HDC projection of the target
             let target_hv = self.hdc_projector.project(target_emb);
-            let target_vec: Vec<f32> = target_hv.values.iter().cloned().collect();
+            let target_vec: Vec<f32> = target_hv.values.to_vec();
 
             // Use fused output as prediction, target_hv as ground truth
             // But we need to match dimensions - use CfC output vs projected target
@@ -808,7 +808,7 @@ impl TwoTrackProcessor {
             let sem: Vec<f32> = if sem_norm > 1e-6 {
                 sem_values.iter().map(|x| x / sem_norm).collect()
             } else {
-                sem_values.iter().cloned().collect()
+                sem_values.to_vec()
             };
 
             let temp: Vec<f32> = if temp_norm > 1e-6 {
@@ -819,7 +819,7 @@ impl TwoTrackProcessor {
 
             (sem, temp)
         } else {
-            (sem_values.iter().cloned().collect(), temporal_hdc)
+            (sem_values.to_vec(), temporal_hdc)
         };
 
         // Weighted combination

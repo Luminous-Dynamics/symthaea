@@ -285,9 +285,9 @@ impl StateTypePrimitiveGrounding {
             .map(|name| {
                 // Try to get primitive from system by name
                 if let Some(p) = system.get(name) {
-                    p.encoding.clone()
+                    p.encoding
                 } else if let Some(p) = system.get(&name.to_lowercase()) {
-                    p.encoding.clone()
+                    p.encoding
                 } else {
                     // Fallback: create deterministic vector from name
                     let seed = name
@@ -303,7 +303,7 @@ impl StateTypePrimitiveGrounding {
         }
 
         // Compose through sequential binding (order-preserving)
-        let mut result = vectors[0].clone();
+        let mut result = vectors[0];
         for v in &vectors[1..] {
             result = BinaryHV::bind(&result, v);
         }
@@ -462,7 +462,7 @@ impl SyntheticStateGenerator {
         let mut components = Vec::new();
 
         // First component is the hub itself
-        components.push(hub_pattern.clone());
+        components.push(hub_pattern);
 
         // Remaining components are spokes bound to hub
         for _ in 1..self.num_components {
@@ -511,15 +511,15 @@ impl SyntheticStateGenerator {
         let mut components = Vec::new();
 
         for i in 0..n {
-            let curr = node_patterns[i].clone();
-            let next = node_patterns[(i + 1) % n].clone();
+            let curr = node_patterns[i];
+            let next = node_patterns[(i + 1) % n];
 
             // Create ring connection
             let mut component = BinaryHV::bind(&curr, &next);
 
             // Add shortcut every 2 nodes
             if i % 2 == 0 && n > 3 {
-                let shortcut = node_patterns[(i + n / 2) % n].clone();
+                let shortcut = node_patterns[(i + n / 2) % n];
                 component = BinaryHV::bind(&component, &shortcut);
             }
 
@@ -541,8 +541,8 @@ impl SyntheticStateGenerator {
         let mut components = Vec::new();
 
         for i in 0..n {
-            let curr = node_patterns[i].clone();
-            let next = node_patterns[(i + 1) % n].clone();
+            let curr = node_patterns[i];
+            let next = node_patterns[(i + 1) % n];
             // Bind current node to next in ring
             components.push(BinaryHV::bind(&curr, &next));
         }
@@ -565,7 +565,7 @@ impl SyntheticStateGenerator {
 
         for i in 0..self.num_components {
             let module_idx = i % num_modules;
-            let hub = module_hubs[module_idx].clone();
+            let hub = module_hubs[module_idx];
             let spoke = BinaryHV::random(self.next_seed());
             // Bind to local module hub
             components.push(BinaryHV::bind(&hub, &spoke));
@@ -589,7 +589,7 @@ impl SyntheticStateGenerator {
                 components.push(pair_pattern);
             } else {
                 // Odd: bind to previous (creating pair)
-                let prev = components[i - 1].clone();
+                let prev = components[i - 1];
                 let unique = BinaryHV::random(self.next_seed());
                 components.push(BinaryHV::bind(&prev, &unique));
             }
@@ -612,7 +612,7 @@ impl SyntheticStateGenerator {
             let variation = BinaryHV::random(self.next_seed());
 
             // First element of pair
-            components.push(base.clone());
+            components.push(base);
             // Second element bound to first
             components.push(BinaryHV::bind(&base, &variation));
         }

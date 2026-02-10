@@ -944,7 +944,7 @@ mod tests {
 
     #[test]
     fn test_hdc_encode_deterministic() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let z = Complex::new(3.0, 4.0);
 
         let enc1 = HdcComplex::encode(z, &system);
@@ -958,7 +958,7 @@ mod tests {
 
     #[test]
     fn test_hdc_different_values_different_encodings() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let z1 = HdcComplex::encode(Complex::new(1.0, 0.0), &system);
         let z2 = HdcComplex::encode(Complex::new(0.0, 1.0), &system);
 
@@ -971,7 +971,7 @@ mod tests {
 
     #[test]
     fn test_hdc_conjugate_different_encoding() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let z = Complex::new(3.0, 4.0);
         let enc_z = HdcComplex::encode(z, &system);
         let enc_conj = HdcComplex::encode(z.conjugate(), &system);
@@ -985,7 +985,7 @@ mod tests {
 
     #[test]
     fn test_to_continuous_hv_dimension() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let z = Complex::new(3.0, 4.0);
         let hdc = HdcComplex::encode(z, &system);
         let chv = hdc.to_continuous_hv();
@@ -998,7 +998,7 @@ mod tests {
 
     #[test]
     fn test_to_continuous_hv_nonzero() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let z = Complex::new(2.0, 3.0);
         let hdc = HdcComplex::encode(z, &system);
         let chv = hdc.to_continuous_hv();
@@ -1015,7 +1015,7 @@ mod tests {
 
     #[test]
     fn test_engine_add() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let mut engine = ComplexArithmeticEngine::new(&system);
 
         let a = HdcComplex::encode(Complex::new(1.0, 2.0), &system);
@@ -1029,7 +1029,7 @@ mod tests {
 
     #[test]
     fn test_engine_mul() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let mut engine = ComplexArithmeticEngine::new(&system);
 
         let a = HdcComplex::encode(Complex::new(1.0, 2.0), &system);
@@ -1043,7 +1043,7 @@ mod tests {
 
     #[test]
     fn test_engine_div() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let mut engine = ComplexArithmeticEngine::new(&system);
 
         let a = HdcComplex::encode(Complex::new(1.0, 2.0), &system);
@@ -1056,7 +1056,7 @@ mod tests {
 
     #[test]
     fn test_engine_conjugate() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let mut engine = ComplexArithmeticEngine::new(&system);
 
         let z = HdcComplex::encode(Complex::new(3.0, 4.0), &system);
@@ -1068,7 +1068,7 @@ mod tests {
 
     #[test]
     fn test_engine_exp_eulers() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let mut engine = ComplexArithmeticEngine::new(&system);
 
         let i_pi = HdcComplex::encode(Complex::new(0.0, PI), &system);
@@ -1084,7 +1084,7 @@ mod tests {
 
     #[test]
     fn test_engine_magnitude() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let mut engine = ComplexArithmeticEngine::new(&system);
 
         let z = HdcComplex::encode(Complex::new(3.0, 4.0), &system);
@@ -1098,7 +1098,7 @@ mod tests {
 
     #[test]
     fn test_engine_average_fidelity() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let mut engine = ComplexArithmeticEngine::new(&system);
 
         let a = HdcComplex::encode(Complex::new(1.0, 0.0), &system);
@@ -1114,7 +1114,7 @@ mod tests {
 
     #[test]
     fn test_engine_sub() {
-        let system = PrimitiveSystem::new();
+        let system = PrimitiveSystem::global();
         let mut engine = ComplexArithmeticEngine::new(&system);
 
         let a = HdcComplex::encode(Complex::new(5.0, 3.0), &system);

@@ -864,11 +864,10 @@ impl PhiAttractor {
         for i in 1..trajectory.len() - 1 {
             let is_local_min = trajectory[i] < trajectory[i - 1] && trajectory[i] < trajectory[i + 1];
             let is_local_max = trajectory[i] > trajectory[i - 1] && trajectory[i] > trajectory[i + 1];
-            if is_local_min || is_local_max {
-                if (trajectory[i] - final_phi).abs() > tolerance {
+            if (is_local_min || is_local_max)
+                && (trajectory[i] - final_phi).abs() > tolerance {
                     neighbors.push(trajectory[i]);
                 }
-            }
         }
 
         neighbors.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));

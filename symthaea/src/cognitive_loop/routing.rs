@@ -18,6 +18,7 @@ use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 /// - Cortical: Standard cognitive cycle, 50-200ms
 /// - DeepThought: Full deliberation with causal reasoning, 200ms+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum CognitiveDepth {
     /// Fast pattern matching, minimal processing
     /// Used for: Familiar inputs, low novelty, low urgency
@@ -25,6 +26,7 @@ pub enum CognitiveDepth {
 
     /// Standard cognitive cycle with prediction and learning
     /// Used for: Normal conversation, moderate complexity
+    #[default]
     Cortical,
 
     /// Deep deliberation with causal reasoning and counterfactuals
@@ -32,11 +34,6 @@ pub enum CognitiveDepth {
     DeepThought,
 }
 
-impl Default for CognitiveDepth {
-    fn default() -> Self {
-        Self::Cortical
-    }
-}
 
 /// Thalamic router - determines cognitive depth before processing
 ///
@@ -428,11 +425,10 @@ impl CodeTaskDetector {
             if self.code_verbs.iter().any(|v| word.starts_with(v)) {
                 // Check if next few words contain a code keyword
                 for j in 1..=4 {
-                    if i + j < words.len() {
-                        if self.code_keywords.iter().any(|kw| words[i + j].contains(kw)) {
+                    if i + j < words.len()
+                        && self.code_keywords.iter().any(|kw| words[i + j].contains(kw)) {
                             return true;
                         }
-                    }
                 }
             }
         }

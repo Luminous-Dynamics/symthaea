@@ -14,7 +14,7 @@
 //! cargo test --test bridge_test -- --ignored  # Full integration tests
 //! ```
 
-use holochain::sweettest::{SweetConductor, SweetDnaFile, SweetAgents};
+use holochain::sweettest::*;
 use holochain::prelude::*;
 use std::time::Duration;
 
@@ -82,8 +82,7 @@ mod bridge_deposits {
 
         let result: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
-            .await
-            .expect("Failed to deposit ETH");
+            .await;
 
         let deposit: CollateralBridgeDeposit = result
             .entry()
@@ -137,8 +136,7 @@ mod bridge_deposits {
 
         let result: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
-            .await
-            .expect("Failed to deposit USDC");
+            .await;
 
         let deposit: CollateralBridgeDeposit = result
             .entry()
@@ -188,7 +186,7 @@ mod bridge_deposits {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .call_fallible(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
             .await;
 
         assert!(result.is_err(), "BTC collateral should be rejected");
@@ -230,7 +228,7 @@ mod bridge_deposits {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .call_fallible(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
             .await;
 
         assert!(result.is_err(), "Invalid DID should be rejected");
@@ -272,7 +270,7 @@ mod bridge_deposits {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("finance_bridge"), "deposit_collateral", input)
+            .call_fallible(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
             .await;
 
         assert!(result.is_err(), "Zero amount should be rejected");
@@ -328,8 +326,7 @@ mod cross_happ_payments {
 
         let result: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "process_payment", input)
-            .await
-            .expect("Failed to process cross-hApp payment");
+            .await;
 
         let payment: CrossHappPayment = result
             .entry()
@@ -384,7 +381,7 @@ mod cross_happ_payments {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("finance_bridge"), "process_payment", input)
+            .call_fallible(&alice_cell.zome("finance_bridge"), "process_payment", input)
             .await;
 
         assert!(result.is_err(), "Non-SAP cross-hApp payment should be rejected");
@@ -436,8 +433,7 @@ mod finance_events {
 
         let result: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "broadcast_finance_event", input)
-            .await
-            .expect("Failed to broadcast event");
+            .await;
 
         let event: FinanceBridgeEvent = result
             .entry()
@@ -634,8 +630,7 @@ mod collateral_registration {
 
         let result: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "register_collateral", input)
-            .await
-            .expect("Failed to register collateral");
+            .await;
 
         let collateral: CollateralRegistration = result
             .entry()
@@ -694,7 +689,7 @@ mod collateral_registration {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("finance_bridge"), "register_collateral", input)
+            .call_fallible(&alice_cell.zome("finance_bridge"), "register_collateral", input)
             .await;
 
         match result {
@@ -758,8 +753,7 @@ mod redemption_tests {
 
         let deposit_record: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", deposit_input)
-            .await
-            .expect("Failed to deposit ETH");
+            .await;
 
         let deposit: CollateralBridgeDeposit = deposit_record
             .entry()
@@ -774,8 +768,7 @@ mod redemption_tests {
         // Redeem the collateral
         let redeemed_record: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "redeem_collateral", deposit_id.clone())
-            .await
-            .expect("Failed to redeem collateral");
+            .await;
 
         let redeemed: CollateralBridgeDeposit = redeemed_record
             .entry()
@@ -830,8 +823,7 @@ mod redemption_tests {
 
         let record1: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input1)
-            .await
-            .expect("First deposit should succeed (bootstrap)");
+            .await;
 
         let deposit1: CollateralBridgeDeposit = record1
             .entry()
@@ -843,8 +835,7 @@ mod redemption_tests {
         // Confirm the first deposit so it counts toward vault total
         let _: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "confirm_deposit", deposit1.id.clone())
-            .await
-            .expect("Failed to confirm first deposit");
+            .await;
         println!("  - First deposit confirmed (vault now has confirmed SAP)");
 
         // Second deposit: should succeed if within 5% of vault
@@ -857,8 +848,7 @@ mod redemption_tests {
 
         let _: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input2)
-            .await
-            .expect("Second deposit should succeed (within rate limit)");
+            .await;
         println!("  - Second deposit succeeded (within daily limit)");
 
         // Third deposit: attempt a huge amount that exceeds 5% of vault
@@ -872,7 +862,7 @@ mod redemption_tests {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("finance_bridge"), "deposit_collateral", input3)
+            .call_fallible(&alice_cell.zome("finance_bridge"), "deposit_collateral", input3)
             .await;
 
         match result {
@@ -930,8 +920,7 @@ mod redemption_tests {
 
         let record: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
-            .await
-            .expect("Failed to deposit");
+            .await;
 
         let deposit: CollateralBridgeDeposit = record
             .entry()
@@ -946,8 +935,7 @@ mod redemption_tests {
         // Confirm the deposit
         let confirmed_record: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "confirm_deposit", deposit.id.clone())
-            .await
-            .expect("Failed to confirm deposit");
+            .await;
 
         let confirmed: CollateralBridgeDeposit = confirmed_record
             .entry()
@@ -962,7 +950,7 @@ mod redemption_tests {
 
         // Try to confirm again -- should fail
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("finance_bridge"), "confirm_deposit", deposit.id.clone())
+            .call_fallible(&alice_cell.zome("finance_bridge"), "confirm_deposit", deposit.id.clone())
             .await;
 
         match result {
@@ -1022,8 +1010,7 @@ mod redemption_tests {
 
         let record: Record = conductor
             .call(&alice_cell.zome("finance_bridge"), "deposit_collateral", input)
-            .await
-            .expect("Failed to deposit");
+            .await;
 
         let deposit: CollateralBridgeDeposit = record
             .entry()
@@ -1037,7 +1024,7 @@ mod redemption_tests {
 
         // Attempt to redeem the Pending deposit -- should fail
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("finance_bridge"), "redeem_collateral", deposit.id.clone())
+            .call_fallible(&alice_cell.zome("finance_bridge"), "redeem_collateral", deposit.id.clone())
             .await;
 
         match result {
@@ -1100,8 +1087,7 @@ mod redemption_tests {
 
             let _: Record = conductor
                 .call(&alice_cell.zome("finance_bridge"), "process_payment", input)
-                .await
-                .expect(&format!("Failed to process payment {}", i));
+                .await;
 
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
@@ -1117,8 +1103,7 @@ mod redemption_tests {
                 did: alice_did.clone(),
                 limit: None,
             })
-            .await
-            .expect("Failed to get payment history");
+            .await;
 
         assert_eq!(history.len(), 3, "Should have 3 payments in history");
 

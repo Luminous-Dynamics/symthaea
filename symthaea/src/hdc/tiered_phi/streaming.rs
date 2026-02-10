@@ -53,20 +53,17 @@ use symthaea_core::hdc::binary_hv::BinaryHV;
 
 /// Gradient computation precision levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum GradientPrecision {
     /// O(n): Fast centrality-based approximation
     Fast,
     /// O(n²): Medium precision using cached similarity matrix
+    #[default]
     Medium,
     /// O(n³): High precision using leave-one-out on similarity
     High,
 }
 
-impl Default for GradientPrecision {
-    fn default() -> Self {
-        GradientPrecision::Medium
-    }
-}
 
 /// Configuration for streaming gradients
 #[derive(Debug, Clone, Serialize, Deserialize)]

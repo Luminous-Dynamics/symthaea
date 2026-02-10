@@ -83,8 +83,10 @@ impl Default for LearningAlgorithm {
 
 /// Connectivity mode for network weights
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Connectivity {
     /// Fully connected (all-to-all)
+    #[default]
     Dense,
     /// Sparse connectivity with packed bit mask
     Sparse {
@@ -94,15 +96,12 @@ pub enum Connectivity {
     },
 }
 
-impl Default for Connectivity {
-    fn default() -> Self {
-        Self::Dense
-    }
-}
 
 /// Activation function for neurons
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum Activation {
+    #[default]
     Tanh,
     Sigmoid,
     Softplus,
@@ -110,11 +109,6 @@ pub enum Activation {
     Identity,
 }
 
-impl Default for Activation {
-    fn default() -> Self {
-        Self::Tanh
-    }
-}
 
 impl Activation {
     /// Apply activation to scalar
@@ -158,33 +152,27 @@ impl Activation {
 
 /// State type for unified LTC
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum StateType {
     /// Scalar state per neuron (traditional LTC)
+    #[default]
     Scalar,
     /// Hyperdimensional state per neuron (HDC-LTC fusion)
     HDC { dimension: usize },
 }
 
-impl Default for StateType {
-    fn default() -> Self {
-        Self::Scalar
-    }
-}
 
 /// Integration method for ODE solving
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum IntegrationMethod {
     /// First-order Euler (fast, O(dt) error)
+    #[default]
     Euler,
     /// Fourth-order Runge-Kutta (accurate, O(dt^4) error)
     RK4,
 }
 
-impl Default for IntegrationMethod {
-    fn default() -> Self {
-        Self::Euler
-    }
-}
 
 /// Unified LTC configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

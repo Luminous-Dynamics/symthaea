@@ -14,7 +14,7 @@
 //! cargo test --test recognition_test -- --ignored  # Full integration tests
 //! ```
 
-use holochain::sweettest::{SweetConductor, SweetDnaFile, SweetAgents};
+use holochain::sweettest::*;
 use holochain::prelude::*;
 use std::time::Duration;
 
@@ -83,8 +83,7 @@ mod apprentice_lifecycle {
 
         let _: Record = conductor
             .call(&mentor_cell.zome("recognition"), "initialize_member", init_mentor)
-            .await
-            .expect("Failed to initialize mentor");
+            .await;
 
         // Now onboard apprentice
         let apprentice_did = test_did("apprentice_1");
@@ -100,8 +99,7 @@ mod apprentice_lifecycle {
 
         let result: Record = conductor
             .call(&mentor_cell.zome("recognition"), "onboard_apprentice", onboard_input)
-            .await
-            .expect("Failed to onboard apprentice");
+            .await;
 
         let state: MemberMycelState = result
             .entry()
@@ -154,8 +152,7 @@ mod apprentice_lifecycle {
 
         let _: Record = conductor
             .call(&low_mycel_cell.zome("recognition"), "initialize_member", init)
-            .await
-            .expect("Failed to initialize");
+            .await;
 
         // Try to onboard an apprentice (should fail - caller MYCEL too low)
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -165,7 +162,7 @@ mod apprentice_lifecycle {
 
         let result: Result<Record, _> = conductor
             .call_fallible(
-                low_mycel_cell.zome("recognition"),
+                &low_mycel_cell.zome("recognition"),
                 "onboard_apprentice",
                 OnboardApprenticeInput {
                     apprentice_did: test_did("new_apprentice"),
@@ -225,8 +222,7 @@ mod apprentice_lifecycle {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init mentor");
+            .await;
 
         // Initialize apprentice via onboarding
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -238,8 +234,7 @@ mod apprentice_lifecycle {
             .call(&mentor_cell.zome("recognition"), "onboard_apprentice", OnboardApprenticeInput {
                 apprentice_did: apprentice_did.clone(),
             })
-            .await
-            .expect("Failed to onboard");
+            .await;
 
         // Update apprentice's MYCEL to >= 0.3 by providing high component scores
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -261,8 +256,7 @@ mod apprentice_lifecycle {
 
         let updated: MemberMycelState = conductor
             .call(&apprentice_cell.zome("recognition"), "update_mycel_score", update)
-            .await
-            .expect("Failed to update MYCEL");
+            .await;
 
         println!("  - Updated MYCEL: {:.2}", updated.mycel_score);
         assert!(updated.mycel_score >= 0.3, "MYCEL should be >= 0.3 for graduation");
@@ -270,8 +264,7 @@ mod apprentice_lifecycle {
         // Graduate
         let graduated: MemberMycelState = conductor
             .call(&apprentice_cell.zome("recognition"), "graduate_apprentice", apprentice_did.clone())
-            .await
-            .expect("Failed to graduate");
+            .await;
 
         assert!(!graduated.is_apprentice, "Should no longer be apprentice");
         assert!(graduated.mentor_did.is_none(), "Mentor relationship should end");
@@ -318,8 +311,7 @@ mod apprentice_lifecycle {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init mentor");
+            .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct OnboardApprenticeInput {
@@ -330,13 +322,12 @@ mod apprentice_lifecycle {
             .call(&mentor_cell.zome("recognition"), "onboard_apprentice", OnboardApprenticeInput {
                 apprentice_did: apprentice_did.clone(),
             })
-            .await
-            .expect("Failed to onboard");
+            .await;
 
         // Try to graduate without reaching 0.3 (starts at 0.1)
         let result: Result<MemberMycelState, _> = conductor
             .call_fallible(
-                apprentice_cell.zome("recognition"),
+                &apprentice_cell.zome("recognition"),
                 "graduate_apprentice",
                 apprentice_did.clone(),
             )
@@ -409,8 +400,7 @@ mod quality_rating_integration {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init Alice");
+            .await;
 
         let _: Record = conductor
             .call(&bob_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
@@ -418,14 +408,14 @@ mod quality_rating_integration {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init Bob");
+            .await;
 
         let dao_did = "did:mycelix:dao:test_community".to_string();
 
         // Step 1: Alice provides services and Bob rates them highly
         // We need 3 confirmed+rated exchanges for the validation score to be non-zero
-        use tend_integrity::{ServiceCategory, RecordExchangeInput, ExchangeRecord, RateExchangeInput, QualityRating};
+        use tend_integrity::ServiceCategory;
+        use tend::{RecordExchangeInput, ExchangeRecord, RateExchangeInput};
 
         for i in 0..3 {
             // Alice records exchange with Bob
@@ -439,14 +429,12 @@ mod quality_rating_integration {
                     cultural_alias: None,
                     service_date: None,
                 })
-                .await
-                .expect("Failed to record exchange");
+                .await;
 
             // Bob confirms
             let _: ExchangeRecord = conductor
                 .call(&bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
-                .await
-                .expect("Failed to confirm");
+                .await;
 
             // Bob rates 5 stars
             let _: Record = conductor
@@ -455,8 +443,7 @@ mod quality_rating_integration {
                     rating: 5,
                     comment: Some(format!("Excellent service {}", i)),
                 })
-                .await
-                .expect("Failed to rate");
+                .await;
 
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
@@ -469,8 +456,7 @@ mod quality_rating_integration {
                 member_did: alice_did.clone(),
                 limit: None,
             })
-            .await
-            .expect("Failed to get validation score");
+            .await;
 
         // 5/5 average maps to (5-1)/4 = 1.0
         assert!(validation_score > 0.9, "With all 5-star ratings, validation should be high, got: {}", validation_score);
@@ -494,8 +480,7 @@ mod quality_rating_integration {
                 validation_override: None, // Auto-fetch from TEND!
                 active_months: 12,
             })
-            .await
-            .expect("Failed to update MYCEL");
+            .await;
 
         // With validation auto-fetched: 0.5*0.4 + 0.5*0.2 + ~1.0*0.2 + 0.5*0.2
         // = 0.20 + 0.10 + 0.20 + 0.10 = 0.60
@@ -542,19 +527,18 @@ mod quality_rating_integration {
             .call(&alice_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
                 member_did: alice_did.clone(), is_apprentice: false, mentor_did: None,
             })
-            .await
-            .expect("Init failed");
+            .await;
 
         let _: Record = conductor
             .call(&bob_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
                 member_did: bob_did.clone(), is_apprentice: false, mentor_did: None,
             })
-            .await
-            .expect("Init failed");
+            .await;
 
         let dao_did = "did:mycelix:dao:test_community".to_string();
 
-        use tend_integrity::{ServiceCategory, RecordExchangeInput, ExchangeRecord, RateExchangeInput};
+        use tend_integrity::ServiceCategory;
+        use tend::{RecordExchangeInput, ExchangeRecord, RateExchangeInput};
 
         // 3 exchanges, all rated 1/5 (poor quality)
         for i in 0..3 {
@@ -568,13 +552,11 @@ mod quality_rating_integration {
                     cultural_alias: None,
                     service_date: None,
                 })
-                .await
-                .expect("Failed to record");
+                .await;
 
             let _: ExchangeRecord = conductor
                 .call(&bob_cell.zome("tend"), "confirm_exchange", exchange.id.clone())
-                .await
-                .expect("Failed to confirm");
+                .await;
 
             let _: Record = conductor
                 .call(&bob_cell.zome("tend"), "rate_exchange", RateExchangeInput {
@@ -582,20 +564,18 @@ mod quality_rating_integration {
                     rating: 1, // Low rating
                     comment: Some("Poor service".to_string()),
                 })
-                .await
-                .expect("Failed to rate");
+                .await;
 
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
 
-        // Get validation score — 1/5 avg maps to (1-1)/4 = 0.0
+        // Get validation score -- 1/5 avg maps to (1-1)/4 = 0.0
         let validation_score: f64 = conductor
             .call(&alice_cell.zome("tend"), "get_validation_score", GetValidationScoreInput {
                 member_did: alice_did.clone(),
                 limit: None,
             })
-            .await
-            .expect("Failed to get validation score");
+            .await;
 
         assert!(validation_score < 0.1, "With all 1-star ratings, validation should be near 0, got: {}", validation_score);
         println!("  - Validation with low ratings: {:.2}", validation_score);
@@ -693,7 +673,7 @@ mod jubilee_and_decay {
     #[test]
     fn test_jubilee_normalization_formula() {
         // new_mycel = 0.3 + (current - 0.3) * 0.8
-        let test_cases = vec![
+        let test_cases: Vec<(f64, f64)> = vec![
             (1.0, 0.3 + (1.0 - 0.3) * 0.8), // High -> compressed
             (0.5, 0.3 + (0.5 - 0.3) * 0.8), // Medium -> slightly compressed
             (0.3, 0.3 + (0.3 - 0.3) * 0.8), // At threshold -> no change
@@ -701,7 +681,7 @@ mod jubilee_and_decay {
         ];
 
         for (input, expected) in test_cases {
-            let result = 0.3 + (input - 0.3) * 0.8;
+            let result: f64 = 0.3 + (input - 0.3) * 0.8;
             assert!(
                 (result - expected).abs() < 1e-6,
                 "Jubilee({}) = {}, expected {}", input, result, expected
@@ -714,19 +694,19 @@ mod jubilee_and_decay {
     #[test]
     fn test_passive_decay_formula() {
         // 5% annual linear decay
-        let score = 0.8;
-        let rate = 0.05;
+        let score: f64 = 0.8;
+        let rate: f64 = 0.05;
 
         // After 1 year: 0.8 - 0.8 * 0.05 * 1.0 = 0.76
-        let after_1yr = score - score * rate * 1.0;
-        assert!((after_1yr - 0.76).abs() < 1e-6, "1yr decay: got {}", after_1yr);
+        let after_1yr: f64 = score - score * rate * 1.0;
+        assert!((after_1yr - 0.76_f64).abs() < 1e-6, "1yr decay: got {}", after_1yr);
 
         // After 6 months: 0.8 - 0.8 * 0.05 * 0.5 = 0.78
-        let after_6mo = score - score * rate * 0.5;
-        assert!((after_6mo - 0.78).abs() < 1e-6, "6mo decay: got {}", after_6mo);
+        let after_6mo: f64 = score - score * rate * 0.5;
+        assert!((after_6mo - 0.78_f64).abs() < 1e-6, "6mo decay: got {}", after_6mo);
 
         // After 0 time: no change
-        let after_0 = score - score * rate * 0.0;
+        let after_0: f64 = score - score * rate * 0.0;
         assert!((after_0 - score).abs() < 1e-6, "0 decay: got {}", after_0);
     }
 
@@ -734,25 +714,25 @@ mod jubilee_and_decay {
     #[test]
     fn test_mycel_component_weights() {
         // Participation (40%), Recognition (20%), Validation (20%), Longevity (20%)
-        let participation = 1.0;
-        let recognition = 1.0;
-        let validation = 1.0;
-        let longevity = 1.0;
+        let participation: f64 = 1.0;
+        let recognition: f64 = 1.0;
+        let validation: f64 = 1.0;
+        let longevity: f64 = 1.0;
 
-        let composite = participation * 0.40
+        let composite: f64 = participation * 0.40
             + recognition * 0.20
             + validation * 0.20
             + longevity * 0.20;
 
-        assert!((composite - 1.0).abs() < 1e-6, "Max composite should be 1.0");
+        assert!((composite - 1.0_f64).abs() < 1e-6, "Max composite should be 1.0");
 
         // All zeros -> 0.0
-        let zero_composite = 0.0 * 0.40 + 0.0 * 0.20 + 0.0 * 0.20 + 0.0 * 0.20;
-        assert!((zero_composite - 0.0).abs() < 1e-6, "Zero composite should be 0.0");
+        let zero_composite: f64 = 0.0 * 0.40 + 0.0 * 0.20 + 0.0 * 0.20 + 0.0 * 0.20;
+        assert!((zero_composite - 0.0_f64).abs() < 1e-6, "Zero composite should be 0.0");
 
         // Participation dominates
-        let participation_only = 1.0 * 0.40 + 0.0 * 0.20 + 0.0 * 0.20 + 0.0 * 0.20;
-        assert!((participation_only - 0.40).abs() < 1e-6, "Participation-only = 0.40");
+        let participation_only: f64 = 1.0 * 0.40 + 0.0 * 0.20 + 0.0 * 0.20 + 0.0 * 0.20;
+        assert!((participation_only - 0.40_f64).abs() < 1e-6, "Participation-only = 0.40");
     }
 }
 
@@ -779,13 +759,13 @@ mod unit_tests {
         use mycelix_finance_types::ContributionType;
 
         let types = vec![
-            ContributionType::CommunityEngagement,
-            ContributionType::GovernanceParticipation,
-            ContributionType::MutualAid,
-            ContributionType::SkillSharing,
-            ContributionType::ProjectCompletion,
-            ContributionType::CommonsContribution,
-            ContributionType::MentorshipProvided,
+            ContributionType::Community,
+            ContributionType::Governance,
+            ContributionType::Care,
+            ContributionType::Education,
+            ContributionType::Technical,
+            ContributionType::Community,
+            ContributionType::Education,
         ];
 
         for ct in types {
@@ -868,8 +848,7 @@ mod recognition_query_tests {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init Alice");
+            .await;
 
         let _: Record = conductor
             .call(&bob_cell.zome("recognition"), "initialize_member", InitializeMemberInput {
@@ -877,8 +856,7 @@ mod recognition_query_tests {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init Bob");
+            .await;
 
         // Alice recognizes Bob 3 times with different contribution types
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -891,9 +869,9 @@ mod recognition_query_tests {
         use mycelix_finance_types::ContributionType;
 
         let contribution_types = vec![
-            ContributionType::CommunityEngagement,
-            ContributionType::SkillSharing,
-            ContributionType::MutualAid,
+            ContributionType::Community,
+            ContributionType::Education,
+            ContributionType::Care,
         ];
 
         for ct in &contribution_types {
@@ -903,8 +881,7 @@ mod recognition_query_tests {
                     contribution_type: ct.clone(),
                     cycle_id: "2026-02".to_string(),
                 })
-                .await
-                .expect("Failed to recognize member");
+                .await;
 
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
@@ -923,8 +900,7 @@ mod recognition_query_tests {
                 member_did: bob_did.clone(),
                 cycle_id: None,
             })
-            .await
-            .expect("Failed to get recognitions");
+            .await;
 
         assert_eq!(recognitions.len(), 3, "Bob should have received 3 recognitions");
 
@@ -978,8 +954,7 @@ mod lifecycle_advanced {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init");
+            .await;
 
         // Set score to 0.8 via update
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -999,16 +974,14 @@ mod lifecycle_advanced {
                 validation_override: Some(1.0),
                 active_months: 24,
             })
-            .await
-            .expect("Failed to update MYCEL");
+            .await;
 
         println!("  - MYCEL set to high value");
 
         // Apply jubilee normalization
         let jubileed: MemberMycelState = conductor
             .call(&alice_cell.zome("recognition"), "jubilee_normalize", alice_did.clone())
-            .await
-            .expect("Failed to apply jubilee");
+            .await;
 
         // Jubilee formula: new = 0.3 + (current - 0.3) * 0.8
         // For 0.8: 0.3 + (0.8 - 0.3) * 0.8 = 0.3 + 0.4 = 0.7
@@ -1055,16 +1028,14 @@ mod lifecycle_advanced {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init");
+            .await;
 
         println!("  - Member initialized");
 
         // Dissolve MYCEL
         let _: () = conductor
             .call(&alice_cell.zome("recognition"), "dissolve_mycel", alice_did.clone())
-            .await
-            .expect("Failed to dissolve MYCEL");
+            .await;
 
         println!("  - MYCEL dissolved");
 
@@ -1089,8 +1060,7 @@ mod lifecycle_advanced {
                 validation_override: Some(0.0),
                 active_months: 0,
             })
-            .await
-            .expect("Failed to get state");
+            .await;
 
         assert!((state.mycel_score - 0.0).abs() < 1e-6, "MYCEL score should be 0 after dissolve");
         assert!((state.participation - 0.0).abs() < 1e-6, "Participation should be 0");
@@ -1135,8 +1105,7 @@ mod lifecycle_advanced {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init");
+            .await;
 
         // Set initial MYCEL to 0.5
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -1156,8 +1125,7 @@ mod lifecycle_advanced {
                 validation_override: Some(0.5),
                 active_months: 6,
             })
-            .await
-            .expect("Failed to set MYCEL");
+            .await;
 
         let score_before = before.mycel_score;
         println!("  - MYCEL before decay: {:.4}", score_before);
@@ -1165,8 +1133,7 @@ mod lifecycle_advanced {
         // Apply passive decay (simulates 1 year of inactivity)
         let after: MemberMycelState = conductor
             .call(&alice_cell.zome("recognition"), "apply_passive_decay", alice_did.clone())
-            .await
-            .expect("Failed to apply decay");
+            .await;
 
         println!("  - MYCEL after decay: {:.4}", after.mycel_score);
 

@@ -519,7 +519,7 @@ mod recognition_tests {
     async fn test_initialize_member() {
         let mut conductor = SweetConductor::from_standard_config().await;
         let dna = load_dna().await;
-        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("test-app", &[dna.clone()]).await.unwrap();
         let cell = app.cells()[0].clone();
         let agent = app.agent().clone();
 

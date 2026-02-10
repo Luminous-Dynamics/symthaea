@@ -730,28 +730,26 @@ impl Symthaea {
 
         // Check 2: MustInclude constraints
         for constraint in &thought.constraints {
-            if constraint.constraint_type == ConstraintType::MustInclude {
-                if !text_lower.contains(&constraint.instruction.to_lowercase()) {
+            if constraint.constraint_type == ConstraintType::MustInclude
+                && !text_lower.contains(&constraint.instruction.to_lowercase()) {
                     tracing::debug!(
                         "Translation verification: Missing required content: {}",
                         constraint.instruction
                     );
                     verified = false;
                 }
-            }
         }
 
         // Check 3: MustExclude constraints
         for constraint in &thought.constraints {
-            if constraint.constraint_type == ConstraintType::MustExclude {
-                if text_lower.contains(&constraint.instruction.to_lowercase()) {
+            if constraint.constraint_type == ConstraintType::MustExclude
+                && text_lower.contains(&constraint.instruction.to_lowercase()) {
                     tracing::debug!(
                         "Translation verification: Contains forbidden content: {}",
                         constraint.instruction
                     );
                     verified = false;
                 }
-            }
         }
 
         // Check 4: Unknown status should NOT contain factual assertions

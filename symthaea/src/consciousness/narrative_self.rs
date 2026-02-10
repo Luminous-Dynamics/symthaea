@@ -95,7 +95,7 @@ impl ProtoSelf {
     /// Update proto-self with new sensory input
     pub fn update(&mut self, input: &BinaryHV, success: bool, effort: f64) {
         // Blend new sensory input with existing
-        self.sensory_now = BinaryHV::bundle(&[self.sensory_now.clone(), input.clone()]);
+        self.sensory_now = BinaryHV::bundle(&[self.sensory_now, *input]);
 
         // Update valence based on success/failure
         self.valence = 0.9 * self.valence + 0.1 * if success { 0.5 } else { -0.3 };
@@ -198,13 +198,13 @@ impl CoreSelf {
     /// Update context with new information
     pub fn update_context(&mut self, new_info: &BinaryHV) {
         // Blend new context with existing (recent bias)
-        self.context = BinaryHV::bundle(&[self.context.clone(), new_info.clone(), new_info.clone()]);
+        self.context = BinaryHV::bundle(&[self.context, *new_info, *new_info]);
 
         // Add to working memory
         if self.working_memory.len() >= 7 {
             self.working_memory.pop_front();
         }
-        self.working_memory.push_back(new_info.clone());
+        self.working_memory.push_back(*new_info);
     }
 
     /// Set attention focus
@@ -229,7 +229,7 @@ impl CoreSelf {
         }
 
         // Goal-context alignment
-        let goal_context_sim = if let Some(ref goal) = self.goals.first() {
+        let goal_context_sim = if let Some(goal) = self.goals.first() {
             goal.encoding.similarity(&self.context) as f64
         } else {
             0.0
@@ -386,8 +386,8 @@ impl AutobiographicalSelf {
         // Update self-concept by integrating significant episodes
         if significance > 0.5 {
             self.self_concept = BinaryHV::bundle(&[
-                self.self_concept.clone(),
-                self.life_story.last().unwrap().encoding.clone()
+                self.self_concept,
+                self.life_story.last().unwrap().encoding
             ]);
         }
 
@@ -426,7 +426,7 @@ impl AutobiographicalSelf {
 
         // Compute temporal consistency (similar episodes should be near each other in time)
         let mut consistency = 0.0;
-        for (_i, ep) in self.life_story.iter().enumerate() {
+        for ep in self.life_story.iter() {
             for &link_idx in &ep.causal_links {
                 if let Some(linked_ep) = self.life_story.get(link_idx) {
                     let time_diff = (ep.timestamp_secs - linked_ep.timestamp_secs).abs();
@@ -445,7 +445,7 @@ impl AutobiographicalSelf {
         // Future self is blend of current self-concept and strongest values
         let value_encodings: Vec<BinaryHV> = self.values.iter()
             .filter(|v| v.importance > 0.5)
-            .map(|v| v.encoding.clone())
+            .map(|v| v.encoding)
             .collect();
         let value_blend = if value_encodings.is_empty() {
             BinaryHV::zero()
@@ -453,13 +453,13 @@ impl AutobiographicalSelf {
             BinaryHV::bundle(&value_encodings)
         };
 
-        self.future_self = BinaryHV::bundle(&[self.self_concept.clone(), value_blend]);
+        self.future_self = BinaryHV::bundle(&[self.self_concept, value_blend]);
 
         // Adjust for time horizon (further future = more uncertainty)
         let uncertainty = (time_horizon_secs / 86400.0).min(1.0); // Max at 1 day
         let noise = BinaryHV::random((time_horizon_secs * 1000.0) as u64);
         if uncertainty > 0.3 {
-            self.future_self = BinaryHV::bundle(&[self.future_self.clone(), noise]);
+            self.future_self = BinaryHV::bundle(&[self.future_self, noise]);
         }
     }
 
@@ -703,9 +703,9 @@ impl NarrativeSelfModel {
     /// Update the unified self encoding
     fn update_unified_self(&mut self) {
         // Weighted bundle of all self-levels
-        let proto_contrib = self.proto.sensory_now.clone();
-        let core_contrib = self.core.context.clone();
-        let autobio_contrib = self.autobio.self_concept.clone();
+        let proto_contrib = self.proto.sensory_now;
+        let core_contrib = self.core.context;
+        let autobio_contrib = self.autobio.self_concept;
 
         // Create weighted blend
         let mut components = Vec::new();
@@ -713,19 +713,19 @@ impl NarrativeSelfModel {
         // Add proto-self contributions (weight via repetition)
         let proto_count = (self.config.proto_weight * 10.0) as usize;
         for _ in 0..proto_count {
-            components.push(proto_contrib.clone());
+            components.push(proto_contrib);
         }
 
         // Add core-self contributions
         let core_count = (self.config.core_weight * 10.0) as usize;
         for _ in 0..core_count {
-            components.push(core_contrib.clone());
+            components.push(core_contrib);
         }
 
         // Add autobiographical contributions
         let autobio_count = (self.config.autobio_weight * 10.0) as usize;
         for _ in 0..autobio_count {
-            components.push(autobio_contrib.clone());
+            components.push(autobio_contrib);
         }
 
         self.unified_self = BinaryHV::bundle(&components);

@@ -14,7 +14,7 @@
 //! cargo test --test staking_test -- --ignored      # Full integration tests
 //! ```
 
-use holochain::sweettest::{SweetConductor, SweetDnaFile, SweetAgents};
+use holochain::sweettest::*;
 use holochain::prelude::*;
 use std::time::Duration;
 
@@ -72,8 +72,7 @@ mod stake_lifecycle {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init member");
+            .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreateStakeInput {
@@ -88,8 +87,7 @@ mod stake_lifecycle {
 
         let result: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = result
             .entry()
@@ -148,8 +146,7 @@ mod stake_lifecycle {
 
         let result: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = result
             .entry()
@@ -164,8 +161,7 @@ mod stake_lifecycle {
         // Step 2: Begin unbonding
         let unbonding_result: Record = conductor
             .call(&alice_cell.zome("staking"), "begin_unbonding", stake_id.clone())
-            .await
-            .expect("Failed to begin unbonding");
+            .await;
 
         let unbonding_stake: CollateralStake = unbonding_result
             .entry()
@@ -182,7 +178,7 @@ mod stake_lifecycle {
         // The 21-day unbonding period means we cannot withdraw immediately in a real
         // test. We verify the mechanism is in place by trying and expecting failure.
         let withdraw_result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("staking"), "withdraw_stake", stake_id.clone())
+            .call_fallible(&alice_cell.zome("staking"), "withdraw_stake", stake_id.clone())
             .await;
 
         // Withdrawal should fail because unbonding period is not complete
@@ -228,8 +224,7 @@ mod stake_lifecycle {
 
         let result: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = result
             .entry()
@@ -242,12 +237,11 @@ mod stake_lifecycle {
         // Begin unbonding
         let _: Record = conductor
             .call(&alice_cell.zome("staking"), "begin_unbonding", stake_id.clone())
-            .await
-            .expect("Failed to begin unbonding");
+            .await;
 
         // Try to withdraw immediately (within 21-day window)
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("staking"), "withdraw_stake", stake_id.clone())
+            .call_fallible(&alice_cell.zome("staking"), "withdraw_stake", stake_id.clone())
             .await;
 
         match result {
@@ -302,8 +296,7 @@ mod stake_lifecycle {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init member");
+            .await;
 
         // Create stake — MYCEL fetched from recognition
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -319,8 +312,7 @@ mod stake_lifecycle {
 
         let result: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = result
             .entry()
@@ -343,8 +335,7 @@ mod stake_lifecycle {
 
         let updated_result: Record = conductor
             .call(&alice_cell.zome("staking"), "update_stake_mycel", update_input)
-            .await
-            .expect("Failed to update MYCEL score");
+            .await;
 
         let updated_stake: CollateralStake = updated_result
             .entry()
@@ -423,8 +414,7 @@ mod slashing_tests {
 
         let stake_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", create_input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = stake_record
             .entry()
@@ -456,8 +446,7 @@ mod slashing_tests {
 
         let slash_result: Record = conductor
             .call(&alice_cell.zome("staking"), "slash_stake", slash_input)
-            .await
-            .expect("Failed to slash stake");
+            .await;
 
         let slashing_event: SlashingEvent = slash_result
             .entry()
@@ -512,8 +501,7 @@ mod slashing_tests {
 
         let stake_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", create_input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = stake_record
             .entry()
@@ -544,8 +532,7 @@ mod slashing_tests {
 
         let slash_result: Record = conductor
             .call(&alice_cell.zome("staking"), "slash_stake", slash_input)
-            .await
-            .expect("Failed to slash stake");
+            .await;
 
         let slashing_event: SlashingEvent = slash_result
             .entry()
@@ -599,8 +586,7 @@ mod slashing_tests {
 
         let stake_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", create_input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = stake_record
             .entry()
@@ -631,8 +617,7 @@ mod slashing_tests {
 
         let slash_result: Record = conductor
             .call(&alice_cell.zome("staking"), "slash_stake", slash_input)
-            .await
-            .expect("Failed to slash stake");
+            .await;
 
         let slashing_event: SlashingEvent = slash_result
             .entry()
@@ -722,8 +707,7 @@ mod escrow_tests {
 
         let escrow_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_escrow", escrow_input)
-            .await
-            .expect("Failed to create escrow");
+            .await;
 
         let escrow: CryptoEscrow = escrow_record
             .entry()
@@ -755,8 +739,7 @@ mod escrow_tests {
 
         let reveal_result: Record = conductor
             .call(&alice_cell.zome("staking"), "reveal_hash_preimage", reveal_input)
-            .await
-            .expect("Failed to reveal preimage");
+            .await;
 
         let revealed_escrow: CryptoEscrow = reveal_result
             .entry()
@@ -774,8 +757,7 @@ mod escrow_tests {
         // Release escrow
         let release_result: Record = conductor
             .call(&alice_cell.zome("staking"), "release_escrow", escrow_id.clone())
-            .await
-            .expect("Failed to release escrow");
+            .await;
 
         let released_escrow: CryptoEscrow = release_result
             .entry()
@@ -847,8 +829,7 @@ mod escrow_tests {
 
         let escrow_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_escrow", escrow_input)
-            .await
-            .expect("Failed to create escrow");
+            .await;
 
         let escrow: CryptoEscrow = escrow_record
             .entry()
@@ -876,8 +857,7 @@ mod escrow_tests {
 
         let sig_1_result: Record = conductor
             .call(&alice_cell.zome("staking"), "add_escrow_signature", sig_1_input)
-            .await
-            .expect("Failed to add first signature");
+            .await;
 
         let after_sig_1: CryptoEscrow = sig_1_result
             .entry()
@@ -902,8 +882,7 @@ mod escrow_tests {
 
         let sig_2_result: Record = conductor
             .call(&alice_cell.zome("staking"), "add_escrow_signature", sig_2_input)
-            .await
-            .expect("Failed to add second signature");
+            .await;
 
         let after_sig_2: CryptoEscrow = sig_2_result
             .entry()
@@ -921,8 +900,7 @@ mod escrow_tests {
         // Release escrow
         let release_result: Record = conductor
             .call(&alice_cell.zome("staking"), "release_escrow", escrow_id.clone())
-            .await
-            .expect("Failed to release escrow");
+            .await;
 
         let released: CryptoEscrow = release_result
             .entry()
@@ -994,8 +972,7 @@ mod escrow_tests {
 
         let escrow_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_escrow", escrow_input)
-            .await
-            .expect("Failed to create escrow");
+            .await;
 
         let escrow: CryptoEscrow = escrow_record
             .entry()
@@ -1020,7 +997,7 @@ mod escrow_tests {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("staking"), "add_escrow_signature", bad_sig)
+            .call_fallible(&alice_cell.zome("staking"), "add_escrow_signature", bad_sig)
             .await;
 
         match result {

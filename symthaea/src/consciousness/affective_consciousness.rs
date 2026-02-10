@@ -394,9 +394,9 @@ impl EmotionPrimitiveGrounding {
             .map(|name| {
                 // Try to get primitive from system by name
                 if let Some(p) = system.get(name) {
-                    p.encoding.clone()
+                    p.encoding
                 } else if let Some(p) = system.get(&name.to_lowercase()) {
-                    p.encoding.clone()
+                    p.encoding
                 } else {
                     // Fallback: create deterministic vector from name
                     let seed = name
@@ -411,7 +411,7 @@ impl EmotionPrimitiveGrounding {
             return BinaryHV::zero();
         }
 
-        let mut result = vectors[0].clone();
+        let mut result = vectors[0];
         for v in &vectors[1..] {
             result = BinaryHV::bind(&result, v);
         }
@@ -442,7 +442,7 @@ impl AffectiveNSMGrounding {
         let mut emotion_groundings = HashMap::new();
 
         for emotion in EmotionCategory::all() {
-            let grounding = EmotionPrimitiveGrounding::new(emotion.clone(), primitive_system);
+            let grounding = EmotionPrimitiveGrounding::new(emotion, primitive_system);
             emotion_groundings.insert(emotion, grounding);
         }
 

@@ -140,7 +140,7 @@ impl FiduciaryHarmonicPrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
@@ -269,7 +269,7 @@ impl ResolutionStrategyPrimitiveGrounding {
 
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {

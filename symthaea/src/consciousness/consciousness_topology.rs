@@ -421,7 +421,7 @@ impl ConsciousnessTopologyAnalyzer {
         self.point_window.push_back(point);
 
         // Rebuild complex periodically
-        if self.point_counter % 10 == 0 {
+        if self.point_counter.is_multiple_of(10) {
             self.rebuild_complex();
         }
     }
