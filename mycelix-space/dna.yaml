@@ -1,0 +1,44 @@
+# Mycelix Space DNA Manifest
+# Decentralized Space Domain Awareness Network
+---
+manifest_version: "0"
+name: mycelix_space
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: orbital_objects_integrity
+      path: target/wasm32-unknown-unknown/release/orbital_objects_integrity.wasm
+    - name: observations_integrity
+      path: target/wasm32-unknown-unknown/release/observations_integrity.wasm
+    - name: conjunctions_integrity
+      path: target/wasm32-unknown-unknown/release/conjunctions_integrity.wasm
+    - name: debris_bounties_integrity
+      path: target/wasm32-unknown-unknown/release/debris_bounties_integrity.wasm
+    - name: traffic_control_integrity
+      path: target/wasm32-unknown-unknown/release/traffic_control_integrity.wasm
+coordinator:
+  zomes:
+    - name: orbital_objects_coordinator
+      path: target/wasm32-unknown-unknown/release/orbital_objects_coordinator.wasm
+      dependencies:
+        - name: orbital_objects_integrity
+    - name: observations_coordinator
+      path: target/wasm32-unknown-unknown/release/observations_coordinator.wasm
+      dependencies:
+        - name: observations_integrity
+    - name: conjunctions_coordinator
+      path: target/wasm32-unknown-unknown/release/conjunctions_coordinator.wasm
+      dependencies:
+        - name: conjunctions_integrity
+        - name: orbital_objects_integrity  # needs access to orbital objects
+    - name: debris_bounties_coordinator
+      path: target/wasm32-unknown-unknown/release/debris_bounties_coordinator.wasm
+      dependencies:
+        - name: debris_bounties_integrity
+        - name: orbital_objects_integrity  # needs access to debris objects
+    - name: traffic_control_coordinator
+      path: target/wasm32-unknown-unknown/release/traffic_control_coordinator.wasm
+      dependencies:
+        - name: traffic_control_integrity
+        - name: conjunctions_integrity  # needs conjunction data for decisions

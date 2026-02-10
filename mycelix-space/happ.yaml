@@ -1,0 +1,13 @@
+# Mycelix Space hApp Manifest
+# Decentralized Space Domain Awareness Network
+---
+manifest_version: "0"
+name: mycelix_space
+description: "Decentralized Space Domain Awareness - Collision avoidance and space traffic coordination"
+roles:
+  - name: space_operator
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: workdir/dna/mycelix_space.dna
