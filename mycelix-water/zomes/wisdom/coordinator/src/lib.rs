@@ -70,9 +70,7 @@ pub fn record_practice(practice: TraditionalPractice) -> ExternResult<Record> {
 
     // If public, also link to public practices anchor
     if practice.access_level == AccessLevel::Public {
-        create_entry(&EntryTypes::Anchor(Anchor(
-            "public_practices".to_string(),
-        )))?;
+        create_entry(&EntryTypes::Anchor(Anchor("public_practices".to_string())))?;
         create_link(
             anchor_hash("public_practices")?,
             action_hash.clone(),
@@ -81,10 +79,9 @@ pub fn record_practice(practice: TraditionalPractice) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created practice".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created practice".into()
+    )))
 }
 
 /// Get practices by type
@@ -102,10 +99,7 @@ pub fn get_practices_by_type(practice_type: PracticeType) -> ExternResult<Vec<Re
 #[hdk_extern]
 pub fn get_public_practices(_: ()) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        LinkQuery::try_new(
-            anchor_hash("public_practices")?,
-            LinkTypes::PublicPractices,
-        )?,
+        LinkQuery::try_new(anchor_hash("public_practices")?, LinkTypes::PublicPractices)?,
         GetStrategy::default(),
     )?;
     records_from_links(links)
@@ -162,10 +156,9 @@ pub fn share_conservation_method(method: ConservationMethod) -> ExternResult<Rec
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created conservation method".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created conservation method".into()
+    )))
 }
 
 /// Get all conservation methods
@@ -240,10 +233,9 @@ pub fn record_climate_pattern(pattern: ClimateWaterPattern) -> ExternResult<Reco
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created climate pattern".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created climate pattern".into()
+    )))
 }
 
 /// Get climate patterns for a specific region

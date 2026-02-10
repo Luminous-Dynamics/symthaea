@@ -39,10 +39,9 @@ pub fn submit_request(req: MaintenanceRequest) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created request".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created request".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -53,10 +52,9 @@ pub struct AcknowledgeRequestInput {
 /// Acknowledge a maintenance request
 #[hdk_extern]
 pub fn acknowledge_request(input: AcknowledgeRequestInput) -> ExternResult<Record> {
-    let record = get(input.request_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Request not found".into()
-        )))?;
+    let record = get(input.request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Request not found".into())
+    ))?;
 
     let mut req: MaintenanceRequest = record
         .entry()
@@ -74,15 +72,11 @@ pub fn acknowledge_request(input: AcknowledgeRequestInput) -> ExternResult<Recor
 
     req.status = MaintenanceStatus::Acknowledged;
 
-    let new_hash = update_entry(
-        input.request_hash,
-        &EntryTypes::MaintenanceRequest(req),
-    )?;
+    let new_hash = update_entry(input.request_hash, &EntryTypes::MaintenanceRequest(req))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated request".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated request".into()
+    )))
 }
 
 /// Create a work order for a maintenance request
@@ -95,10 +89,9 @@ pub fn create_work_order(order: WorkOrder) -> ExternResult<Record> {
     }
 
     // Update the request status to Scheduled
-    let req_record = get(order.request_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Request not found".into()
-        )))?;
+    let req_record = get(order.request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Request not found".into())
+    ))?;
 
     let mut req: MaintenanceRequest = req_record
         .entry()
@@ -124,10 +117,9 @@ pub fn create_work_order(order: WorkOrder) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created work order".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created work order".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -140,10 +132,9 @@ pub struct CompleteWorkOrderInput {
 /// Complete a work order and mark the request as completed
 #[hdk_extern]
 pub fn complete_work_order(input: CompleteWorkOrderInput) -> ExternResult<Record> {
-    let record = get(input.work_order_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Work order not found".into()
-        )))?;
+    let record = get(input.work_order_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Work order not found".into())
+    ))?;
 
     let mut order: WorkOrder = record
         .entry()
@@ -160,16 +151,12 @@ pub fn complete_work_order(input: CompleteWorkOrderInput) -> ExternResult<Record
         order.notes = input.notes;
     }
 
-    let new_hash = update_entry(
-        input.work_order_hash,
-        &EntryTypes::WorkOrder(order.clone()),
-    )?;
+    let new_hash = update_entry(input.work_order_hash, &EntryTypes::WorkOrder(order.clone()))?;
 
     // Update the maintenance request status to Completed
-    let req_record = get(order.request_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Original request not found".into()
-        )))?;
+    let req_record = get(order.request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Original request not found".into())
+    ))?;
 
     let mut req: MaintenanceRequest = req_record
         .entry()
@@ -199,7 +186,9 @@ pub fn complete_work_order(input: CompleteWorkOrderInput) -> ExternResult<Record
         }
     }
 
-    create_entry(&EntryTypes::Anchor(Anchor("completed_requests".to_string())))?;
+    create_entry(&EntryTypes::Anchor(Anchor(
+        "completed_requests".to_string(),
+    )))?;
     create_link(
         anchor_hash("completed_requests")?,
         order.request_hash,
@@ -207,10 +196,9 @@ pub fn complete_work_order(input: CompleteWorkOrderInput) -> ExternResult<Record
         (),
     )?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated work order".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated work order".into()
+    )))
 }
 
 /// Schedule a building inspection
@@ -225,10 +213,9 @@ pub fn schedule_inspection(inspection: Inspection) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created inspection".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created inspection".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -242,10 +229,9 @@ pub struct RecordInspectionInput {
 /// Record the results of an inspection
 #[hdk_extern]
 pub fn record_inspection(input: RecordInspectionInput) -> ExternResult<Record> {
-    let record = get(input.inspection_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Inspection not found".into()
-        )))?;
+    let record = get(input.inspection_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Inspection not found".into())
+    ))?;
 
     let mut inspection: Inspection = record
         .entry()
@@ -259,15 +245,11 @@ pub fn record_inspection(input: RecordInspectionInput) -> ExternResult<Record> {
     inspection.passed = input.passed;
     inspection.next_due = input.next_due;
 
-    let new_hash = update_entry(
-        input.inspection_hash,
-        &EntryTypes::Inspection(inspection),
-    )?;
+    let new_hash = update_entry(input.inspection_hash, &EntryTypes::Inspection(inspection))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated inspection".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated inspection".into()
+    )))
 }
 
 /// Get all open maintenance requests

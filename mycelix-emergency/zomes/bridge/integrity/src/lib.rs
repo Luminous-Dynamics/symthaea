@@ -133,13 +133,19 @@ fn validate_create_query(
     query: EmergencyQuery,
 ) -> ExternResult<ValidateCallbackResult> {
     if query.query_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Query ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Query ID cannot be empty".into(),
+        ));
     }
     if query.source_happ.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Source hApp cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Source hApp cannot be empty".into(),
+        ));
     }
     if query.parameters.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Query parameters cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Query parameters cannot be empty".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -149,13 +155,19 @@ fn validate_create_event(
     event: EmergencyEvent,
 ) -> ExternResult<ValidateCallbackResult> {
     if event.event_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Event ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Event ID cannot be empty".into(),
+        ));
     }
     if event.payload.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Event payload cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Event payload cannot be empty".into(),
+        ));
     }
     if event.target_happs.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Event must target at least one hApp".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Event must target at least one hApp".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }

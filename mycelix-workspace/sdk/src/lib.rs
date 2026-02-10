@@ -68,36 +68,63 @@
 #![warn(missing_docs)]
 #![deny(clippy::unwrap_used)]
 
+// === Core modules (always compiled) ===
 pub mod crypto;
-pub mod dkg;
-pub mod fl;
-pub mod matl;
-
-// TypeScript binding generation (ts-export feature only)
-pub mod agentic;
-pub mod bridge;
-pub mod credentials;
-pub mod economics;
-pub mod epistemic;
-pub mod error;
-#[cfg(feature = "ts-export")]
-mod export_bindings;
 pub mod hyperfeel;
-pub mod identity;
-pub mod intentions;
-pub mod pagination;
-pub mod pog;
-pub mod storage;
-pub mod temporal;
+pub mod matl;
 pub mod zkproof;
 
-// WASM bindings (wasm feature only)
-#[cfg(feature = "wasm")]
+// === Full SDK modules (excluded by `zome` feature to reduce WASM binary size) ===
+#[cfg(not(feature = "zome"))]
+pub mod agentic;
+#[cfg(not(feature = "zome"))]
+pub mod bridge;
+#[cfg(not(feature = "zome"))]
+pub mod credentials;
+#[cfg(not(feature = "zome"))]
+pub mod dkg;
+#[cfg(not(feature = "zome"))]
+pub mod economics;
+#[cfg(not(feature = "zome"))]
+pub mod epistemic;
+#[cfg(not(feature = "zome"))]
+pub mod error;
+#[cfg(not(feature = "zome"))]
+pub mod fl;
+#[cfg(not(feature = "zome"))]
+pub mod identity;
+#[cfg(not(feature = "zome"))]
+pub mod intentions;
+#[cfg(not(feature = "zome"))]
+pub mod pagination;
+#[cfg(not(feature = "zome"))]
+pub mod pog;
+#[cfg(not(feature = "zome"))]
+pub mod storage;
+#[cfg(not(feature = "zome"))]
+pub mod temporal;
+
+// TypeScript binding generation (ts-export feature only, excluded by zome)
+#[cfg(all(feature = "ts-export", not(feature = "zome")))]
+mod export_bindings;
+
+// WASM bindings (wasm feature only, excluded by zome)
+#[cfg(all(feature = "wasm", not(feature = "zome")))]
 pub mod wasm;
 
-// Re-exports for convenience
+// === Re-exports: always available (core modules) ===
+pub use hyperfeel::{EncodingConfig, HyperFeelEncoder, HyperGradient};
+pub use matl::{AdaptiveThreshold, CompositeScore, ProofOfGradientQuality, ReputationScore};
+pub use matl::{ConsensusResult, RbBftConfig, RbBftConsensus, RoundState, Vote, VoteType};
+pub use matl::{GovernanceTier, KVector, KVectorDimension, KVectorWeights, KVECTOR_WEIGHTS};
+pub use zkproof::{GradientProof, GradientProofCircuit, PublicInputs};
+
+// === Re-exports: full SDK only (gated behind not(zome)) ===
+#[cfg(not(feature = "zome"))]
 pub use bridge::{BridgeMessage, CrossHappReputation};
+#[cfg(not(feature = "zome"))]
 pub use credentials::{CredentialBuilder, VerifiableCredential};
+#[cfg(not(feature = "zome"))]
 pub use dkg::{
     calculate_confidence, meets_threshold, query_by_predicate, query_by_subject, query_triples,
     Attestation, AttestationCounts, AttestationSet, AttestationType, ConfidenceFactors,
@@ -105,27 +132,30 @@ pub use dkg::{
     EpistemicType as DkgEpistemicType, ObjectFilter, QueryFilter, StoredTriple, TripleValue,
     VerifiableTriple, URI,
 };
+#[cfg(not(feature = "zome"))]
 pub use epistemic::EpistemicClassificationExtended;
+#[cfg(not(feature = "zome"))]
 pub use epistemic::{
     EmpiricalLevel, EpistemicClaim, HarmonicLevel, MaterialityLevel, NormativeLevel,
 };
+#[cfg(not(feature = "zome"))]
 pub use error::{
     contains_sensitive_data, sanitize_message, SanitizeExt, SanitizedError, SanitizedResult,
 };
+#[cfg(not(feature = "zome"))]
 pub use fl::{AggregatedGradient, AggregationMethod, FLConfig, FLCoordinator, GradientUpdate};
-pub use hyperfeel::{EncodingConfig, HyperFeelEncoder, HyperGradient};
+#[cfg(not(feature = "zome"))]
 pub use identity::{
     BridgeError as HardwareKeyBridgeError, HardwareKeyBridge, HardwareKeyBridgeConfig,
     WebAuthnCredential, WebAuthnError, WebAuthnService,
 };
-pub use matl::{AdaptiveThreshold, CompositeScore, ProofOfGradientQuality, ReputationScore};
-pub use matl::{ConsensusResult, RbBftConfig, RbBftConsensus, RoundState, Vote, VoteType};
-pub use matl::{GovernanceTier, KVector, KVectorDimension, KVectorWeights, KVECTOR_WEIGHTS};
+#[cfg(not(feature = "zome"))]
 pub use pagination::{paginate_vec, PaginatedResponse, PaginationRequest};
+#[cfg(not(feature = "zome"))]
 pub use storage::{EpistemicStorage, StorageConfig, StorageError, StorageReceipt, StorageRouter};
-pub use zkproof::{GradientProof, GradientProofCircuit, PublicInputs};
 
 // Agentic Economy exports (MIP-E-004: Epistemic-Aware AI Agency)
+#[cfg(not(feature = "zome"))]
 pub use agentic::{
     calculate_kredit_from_trust,
     compute_trust_score,

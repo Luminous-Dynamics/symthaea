@@ -66,10 +66,9 @@ pub fn query_water(input: QueryWaterInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created query".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created query".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -112,10 +111,9 @@ pub fn answer_query(input: AnswerQueryInput) -> ExternResult<Record> {
         &EntryTypes::WaterQuery(query),
     )?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated query".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated query".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -179,10 +177,9 @@ pub fn broadcast_event(input: BroadcastEventInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created event".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created event".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -226,7 +223,9 @@ pub fn get_events_by_type(event_type: WaterEventType) -> ExternResult<Vec<Record
 /// Check property rights for a location (calls property hApp via bridge)
 /// Returns a JSON string with the property rights status
 #[hdk_extern]
-pub fn check_property_rights(input: PropertyRightsCheckInput) -> ExternResult<PropertyRightsResult> {
+pub fn check_property_rights(
+    input: PropertyRightsCheckInput,
+) -> ExternResult<PropertyRightsResult> {
     // In production, this would call the property hApp via bridge call.
     // For now, we record the check and return a stub that can be replaced
     // when the property hApp bridge is configured.

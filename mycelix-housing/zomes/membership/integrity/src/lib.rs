@@ -162,9 +162,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Member(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::MemberApplication(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::WaitListEntry(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::RentToOwnAgreement(agreement) => {
-                    validate_update_agreement(agreement)
-                }
+                EntryTypes::RentToOwnAgreement(agreement) => validate_update_agreement(agreement),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -198,10 +196,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_create_member(
-    _action: Create,
-    member: Member,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_member(_action: Create, member: Member) -> ExternResult<ValidateCallbackResult> {
     if member.monthly_charge_cents == 0 && member.membership_type != MembershipType::Associate {
         return Ok(ValidateCallbackResult::Invalid(
             "Non-associate members must have a monthly charge".into(),

@@ -1,8 +1,8 @@
 //! Coordination Coordinator Zome
 //! Team management, zone assignments, SITREPs, and agent check-ins
 
-use hdk::prelude::*;
 use coordination_integrity::*;
+use hdk::prelude::*;
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -14,13 +14,19 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 #[hdk_extern]
 pub fn form_team(input: FormTeamInput) -> ExternResult<Record> {
     if input.name.is_empty() || input.name.len() > 128 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Team name must be 1-128 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Team name must be 1-128 characters".into()
+        )));
     }
     if input.members.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Team must have at least one member".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Team must have at least one member".into()
+        )));
     }
     if !input.members.contains(&input.lead) {
-        return Err(wasm_error!(WasmErrorInner::Guest("Team lead must be a member".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Team lead must be a member".into()
+        )));
     }
 
     let team = Team {
@@ -63,8 +69,9 @@ pub fn form_team(input: FormTeamInput) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created team".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created team".into()
+    )))
 }
 
 /// Input for forming a team
@@ -81,7 +88,9 @@ pub struct FormTeamInput {
 #[hdk_extern]
 pub fn assign_to_zone(input: AssignToZoneInput) -> ExternResult<Record> {
     if input.objective.is_empty() || input.objective.len() > 1024 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Objective must be 1-1024 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Objective must be 1-1024 characters".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -122,7 +131,9 @@ pub fn assign_to_zone(input: AssignToZoneInput) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid team entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid team entry".into()
+        )))?;
 
     let updated_team = Team {
         assigned_zone: Some(input.zone_hash_for_team),
@@ -135,8 +146,9 @@ pub fn assign_to_zone(input: AssignToZoneInput) -> ExternResult<Record> {
         &EntryTypes::Team(updated_team),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created assignment".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created assignment".into()
+    )))
 }
 
 /// Input for assigning a team to a zone
@@ -152,7 +164,9 @@ pub struct AssignToZoneInput {
 #[hdk_extern]
 pub fn submit_sitrep(input: SubmitSitrepInput) -> ExternResult<Record> {
     if input.conditions.is_empty() || input.conditions.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Conditions must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Conditions must be 1-4096 characters".into()
+        )));
     }
 
     let now = sys_time()?;
@@ -179,8 +193,9 @@ pub fn submit_sitrep(input: SubmitSitrepInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created SITREP".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created SITREP".into()
+    )))
 }
 
 /// Input for submitting a SITREP
@@ -200,10 +215,14 @@ pub struct SubmitSitrepInput {
 #[hdk_extern]
 pub fn checkin(input: CheckinInput) -> ExternResult<Record> {
     if input.lat < -90.0 || input.lat > 90.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Latitude must be between -90 and 90".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Latitude must be between -90 and 90".into()
+        )));
     }
     if input.lon < -180.0 || input.lon > 180.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Longitude must be between -180 and 180".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Longitude must be between -180 and 180".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -229,8 +248,9 @@ pub fn checkin(input: CheckinInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created checkpoint".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created checkpoint".into()
+    )))
 }
 
 /// Input for agent check-in

@@ -2,8 +2,8 @@
 //! Business logic for land trusts, ground leases, resale calculations,
 //! and affordability reporting.
 
-use hdk::prelude::*;
 use clt_integrity::*;
+use hdk::prelude::*;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -29,10 +29,9 @@ pub fn create_land_trust(trust: LandTrust) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created trust".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created trust".into()
+    )))
 }
 
 /// Issue a ground lease for a unit under the trust
@@ -64,10 +63,9 @@ pub fn issue_ground_lease(lease: GroundLease) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created lease".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created lease".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -102,8 +100,7 @@ pub fn calculate_max_resale_price(input: CalculateResaleInput) -> ExternResult<R
 
     let formula = &lease.resale_formula;
     let improvement_credit_pct = formula.improvement_credit_percent.unwrap_or(0) as u64;
-    let improvement_credit =
-        input.improvements_value_cents * improvement_credit_pct / 100;
+    let improvement_credit = input.improvements_value_cents * improvement_credit_pct / 100;
 
     let calculated_max_price_cents = match formula.formula_type {
         FormulaType::AppreciationCap => {
@@ -128,8 +125,8 @@ pub fn calculate_max_resale_price(input: CalculateResaleInput) -> ExternResult<R
         }
         FormulaType::ConsumerPriceIndex => {
             // Use 3% as assumed CPI rate
-            let appreciated = input.original_price_cents as f64
-                * (1.03_f64).powi(input.years_held as i32);
+            let appreciated =
+                input.original_price_cents as f64 * (1.03_f64).powi(input.years_held as i32);
             appreciated as u64 + improvement_credit
         }
         FormulaType::Hybrid => {
@@ -169,10 +166,9 @@ pub fn calculate_max_resale_price(input: CalculateResaleInput) -> ExternResult<R
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created resale calculation".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created resale calculation".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -222,10 +218,9 @@ pub fn transfer_lease(input: TransferLeaseInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated lease".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated lease".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -239,9 +234,7 @@ pub struct GenerateAffordabilityInput {
 
 /// Generate an affordability report for a trust
 #[hdk_extern]
-pub fn generate_affordability_report(
-    input: GenerateAffordabilityInput,
-) -> ExternResult<Record> {
+pub fn generate_affordability_report(input: GenerateAffordabilityInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     // Affordability ratio = (average monthly cost * 12) / median annual income
@@ -272,10 +265,9 @@ pub fn generate_affordability_report(
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created report".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created report".into()
+    )))
 }
 
 /// Get all ground leases for a trust
@@ -328,8 +320,7 @@ pub fn update_trust_board(input: UpdateTrustBoardInput) -> ExternResult<Record> 
 
     let new_hash = update_entry(input.trust_hash, &EntryTypes::LandTrust(trust))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated trust".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated trust".into()
+    )))
 }

@@ -225,17 +225,14 @@ jobs:
             for zome_dir in Mycelix-Core/dna/*/; do
               if [ -f "${zome_dir}Cargo.toml" ]; then
                 echo "Testing $(basename $zome_dir)..."
-                cd "$zome_dir"
-                cargo test --all-features
-                cd -
+                cargo test --all-features --manifest-path "${zome_dir}Cargo.toml"
               fi
             done
 
-            # Test SDK
+            # Test SDK (exclude risc0 feature — requires external risc0-zkvm installation)
             echo ""
             echo "=== Running SDK Tests ==="
-            cd mycelix-workspace/sdk
-            cargo test --all-features
+            cargo test --features "simulation,full,parallel,webauthn-full,stub-webauthn" --manifest-path mycelix-workspace/sdk/Cargo.toml
           '
 
       - name: Run integration tests
@@ -244,8 +241,7 @@ jobs:
             echo "=== Running Integration Tests ==="
 
             if [ -d "mycelix-workspace/sdk/tests" ]; then
-              cd mycelix-workspace/sdk
-              cargo test --test "*" -- --test-threads=1
+              cargo test --manifest-path mycelix-workspace/sdk/Cargo.toml --test "*" -- --test-threads=1
             fi
           '
 
@@ -340,7 +336,7 @@ jobs:
             for dir in Mycelix-Core/dna/*/ mycelix-workspace/sdk/ mycelix-care/ mycelix-emergency/ mycelix-water/ mycelix-housing/; do
               if [ -f "${dir}Cargo.toml" ]; then
                 echo "Checking $(basename $dir)..."
-                cargo fmt --check --manifest-path "${dir}Cargo.toml"
+                cargo fmt --all --check --manifest-path "${dir}Cargo.toml"
               fi
             done
           '

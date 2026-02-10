@@ -205,9 +205,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::HarvestSystem(system) => validate_create_harvest_system(action, system),
                 EntryTypes::StorageTank(tank) => validate_create_storage_tank(action, tank),
-                EntryTypes::HarvestRecord(record) => {
-                    validate_create_harvest_record(action, record)
-                }
+                EntryTypes::HarvestRecord(record) => validate_create_harvest_record(action, record),
                 EntryTypes::RechargeProject(project) => {
                     validate_create_recharge_project(action, project)
                 }

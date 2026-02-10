@@ -121,31 +121,50 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_create_match(_action: Create, care_match: CareMatch) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_match(
+    _action: Create,
+    care_match: CareMatch,
+) -> ExternResult<ValidateCallbackResult> {
     if care_match.score < 0.0 || care_match.score > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Match score must be between 0.0 and 1.0".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Match score must be between 0.0 and 1.0".into(),
+        ));
     }
     if care_match.factors.proximity_score < 0.0 || care_match.factors.proximity_score > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Proximity score must be between 0.0 and 1.0".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Proximity score must be between 0.0 and 1.0".into(),
+        ));
     }
     if care_match.factors.skill_alignment < 0.0 || care_match.factors.skill_alignment > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Skill alignment must be between 0.0 and 1.0".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Skill alignment must be between 0.0 and 1.0".into(),
+        ));
     }
-    if care_match.factors.schedule_compatibility < 0.0 || care_match.factors.schedule_compatibility > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Schedule compatibility must be between 0.0 and 1.0".into()));
+    if care_match.factors.schedule_compatibility < 0.0
+        || care_match.factors.schedule_compatibility > 1.0
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schedule compatibility must be between 0.0 and 1.0".into(),
+        ));
     }
     if care_match.factors.trust_score < 0.0 || care_match.factors.trust_score > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Trust score must be between 0.0 and 1.0".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Trust score must be between 0.0 and 1.0".into(),
+        ));
     }
     if care_match.provider == care_match.requester {
-        return Ok(ValidateCallbackResult::Invalid("Provider and requester cannot be the same agent".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Provider and requester cannot be the same agent".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_update_match(care_match: CareMatch) -> ExternResult<ValidateCallbackResult> {
     if care_match.score < 0.0 || care_match.score > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid("Match score must be between 0.0 and 1.0".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Match score must be between 0.0 and 1.0".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }

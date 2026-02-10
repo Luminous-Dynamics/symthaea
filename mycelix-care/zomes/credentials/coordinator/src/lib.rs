@@ -1,8 +1,8 @@
 //! Credentials Coordinator Zome
 //! Business logic for credential issuance, verification, and reference management.
 
-use hdk::prelude::*;
 use credentials_integrity::*;
+use hdk::prelude::*;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -34,20 +34,39 @@ pub fn issue_credential(credential: CareCredential) -> ExternResult<Record> {
 
     // Link holder to credential
     let holder_anchor = ensure_anchor(&format!("agent_credentials:{}", credential.holder))?;
-    create_link(holder_anchor, action_hash.clone(), LinkTypes::AgentToCredential, ())?;
+    create_link(
+        holder_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToCredential,
+        (),
+    )?;
 
     // Link credential type to credential
-    let type_anchor = ensure_anchor(&format!("cred_type:{}", credential.credential_type.anchor_key()))?;
-    create_link(type_anchor, action_hash.clone(), LinkTypes::TypeToCredential, ())?;
+    let type_anchor = ensure_anchor(&format!(
+        "cred_type:{}",
+        credential.credential_type.anchor_key()
+    ))?;
+    create_link(
+        type_anchor,
+        action_hash.clone(),
+        LinkTypes::TypeToCredential,
+        (),
+    )?;
 
     // If verified, link to all verified credentials
     if credential.verified {
         let verified_anchor = ensure_anchor("all_verified_credentials")?;
-        create_link(verified_anchor, action_hash.clone(), LinkTypes::AllVerifiedCredentials, ())?;
+        create_link(
+            verified_anchor,
+            action_hash.clone(),
+            LinkTypes::AllVerifiedCredentials,
+            (),
+        )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created credential".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created credential".into()
+    )))
 }
 
 /// Input for verifying a credential
@@ -59,29 +78,43 @@ pub struct VerifyCredentialInput {
 /// Mark a credential as verified
 #[hdk_extern]
 pub fn verify_credential(input: VerifyCredentialInput) -> ExternResult<Record> {
-    let record = get(input.credential_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Credential not found".into())))?;
+    let record = get(input.credential_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Credential not found".into())
+    ))?;
 
     let mut credential: CareCredential = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid credential entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid credential entry".into()
+        )))?;
 
     if credential.verified {
-        return Err(wasm_error!(WasmErrorInner::Guest("Credential is already verified".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential is already verified".into()
+        )));
     }
 
     credential.verified = true;
 
-    let updated_hash = update_entry(input.credential_hash, &EntryTypes::CareCredential(credential.clone()))?;
+    let updated_hash = update_entry(
+        input.credential_hash,
+        &EntryTypes::CareCredential(credential.clone()),
+    )?;
 
     // Link to verified credentials
     let verified_anchor = ensure_anchor("all_verified_credentials")?;
-    create_link(verified_anchor, updated_hash.clone(), LinkTypes::AllVerifiedCredentials, ())?;
+    create_link(
+        verified_anchor,
+        updated_hash.clone(),
+        LinkTypes::AllVerifiedCredentials,
+        (),
+    )?;
 
-    get(updated_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated credential".into())))
+    get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated credential".into()
+    )))
 }
 
 /// Add a reference for a care provider
@@ -100,14 +133,25 @@ pub fn add_reference(reference: CareReference) -> ExternResult<Record> {
 
     // Link provider to received reference
     let provider_anchor = ensure_anchor(&format!("agent_references:{}", reference.provider))?;
-    create_link(provider_anchor, action_hash.clone(), LinkTypes::AgentToReference, ())?;
+    create_link(
+        provider_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToReference,
+        (),
+    )?;
 
     // Link recipient to given reference
     let giver_anchor = ensure_anchor(&format!("agent_given_refs:{}", reference.from_recipient))?;
-    create_link(giver_anchor, action_hash.clone(), LinkTypes::AgentGivenReferences, ())?;
+    create_link(
+        giver_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentGivenReferences,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created reference".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created reference".into()
+    )))
 }
 
 /// Get all credentials for a provider

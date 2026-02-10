@@ -148,9 +148,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::Team(team) => validate_create_team(action, team),
-                EntryTypes::Assignment(assignment) => validate_create_assignment(action, assignment),
+                EntryTypes::Assignment(assignment) => {
+                    validate_create_assignment(action, assignment)
+                }
                 EntryTypes::SituationReport(sitrep) => validate_create_sitrep(action, sitrep),
-                EntryTypes::Checkpoint(checkpoint) => validate_create_checkpoint(action, checkpoint),
+                EntryTypes::Checkpoint(checkpoint) => {
+                    validate_create_checkpoint(action, checkpoint)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -202,21 +206,26 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_create_team(
-    _action: Create,
-    team: Team,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_team(_action: Create, team: Team) -> ExternResult<ValidateCallbackResult> {
     if team.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Team ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Team ID cannot be empty".into(),
+        ));
     }
     if team.name.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Team name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Team name cannot be empty".into(),
+        ));
     }
     if team.members.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Team must have at least one member".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Team must have at least one member".into(),
+        ));
     }
     if !team.members.contains(&team.lead) {
-        return Ok(ValidateCallbackResult::Invalid("Team lead must be a member".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Team lead must be a member".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -226,7 +235,9 @@ fn validate_create_assignment(
     assignment: Assignment,
 ) -> ExternResult<ValidateCallbackResult> {
     if assignment.objective.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Assignment objective cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Assignment objective cannot be empty".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -236,7 +247,9 @@ fn validate_create_sitrep(
     sitrep: SituationReport,
 ) -> ExternResult<ValidateCallbackResult> {
     if sitrep.conditions.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("SITREP conditions cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "SITREP conditions cannot be empty".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -246,14 +259,20 @@ fn validate_create_checkpoint(
     checkpoint: Checkpoint,
 ) -> ExternResult<ValidateCallbackResult> {
     if checkpoint.lat < -90.0 || checkpoint.lat > 90.0 {
-        return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be between -90 and 90".into(),
+        ));
     }
     if checkpoint.lon < -180.0 || checkpoint.lon > 180.0 {
-        return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be between -180 and 180".into(),
+        ));
     }
     if let Some(battery) = checkpoint.battery_level {
         if battery > 100 {
-            return Ok(ValidateCallbackResult::Invalid("Battery level cannot exceed 100".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Battery level cannot exceed 100".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)

@@ -263,116 +263,184 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_create_offer(_action: Create, offer: ServiceOffer) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_offer(
+    _action: Create,
+    offer: ServiceOffer,
+) -> ExternResult<ValidateCallbackResult> {
     if offer.title.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Offer title cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Offer title cannot be empty".into(),
+        ));
     }
     if offer.title.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Offer title must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Offer title must be 256 characters or fewer".into(),
+        ));
     }
     if offer.description.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Offer description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Offer description cannot be empty".into(),
+        ));
     }
     if offer.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Offer description must be 4096 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Offer description must be 4096 characters or fewer".into(),
+        ));
     }
     if offer.hours_available <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Hours available must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours available must be positive".into(),
+        ));
     }
     if offer.hours_available > 168.0 {
-        return Ok(ValidateCallbackResult::Invalid("Hours available cannot exceed 168 per week".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours available cannot exceed 168 per week".into(),
+        ));
     }
     if offer.location.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Location cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Location cannot be empty".into(),
+        ));
     }
     if offer.location.len() > 512 {
-        return Ok(ValidateCallbackResult::Invalid("Location must be 512 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Location must be 512 characters or fewer".into(),
+        ));
     }
     if offer.availability.len() > 512 {
-        return Ok(ValidateCallbackResult::Invalid("Availability must be 512 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Availability must be 512 characters or fewer".into(),
+        ));
     }
     if offer.skills_required.len() > 20 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot list more than 20 skills".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot list more than 20 skills".into(),
+        ));
     }
     for skill in &offer.skills_required {
         if skill.len() > 128 {
-            return Ok(ValidateCallbackResult::Invalid("Each skill must be 128 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each skill must be 128 characters or fewer".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_create_request(_action: Create, request: ServiceRequest) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_request(
+    _action: Create,
+    request: ServiceRequest,
+) -> ExternResult<ValidateCallbackResult> {
     if request.title.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Request title cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request title cannot be empty".into(),
+        ));
     }
     if request.title.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Request title must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request title must be 256 characters or fewer".into(),
+        ));
     }
     if request.description.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Request description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request description cannot be empty".into(),
+        ));
     }
     if request.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Request description must be 4096 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request description must be 4096 characters or fewer".into(),
+        ));
     }
     if request.hours_needed <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Hours needed must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours needed must be positive".into(),
+        ));
     }
     if request.hours_needed > 168.0 {
-        return Ok(ValidateCallbackResult::Invalid("Hours needed cannot exceed 168".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours needed cannot exceed 168".into(),
+        ));
     }
     if request.location.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Location cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Location cannot be empty".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_create_exchange(_action: Create, exchange: TimeExchange) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_exchange(
+    _action: Create,
+    exchange: TimeExchange,
+) -> ExternResult<ValidateCallbackResult> {
     if exchange.hours <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Exchange hours must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Exchange hours must be positive".into(),
+        ));
     }
     if exchange.hours > 168.0 {
-        return Ok(ValidateCallbackResult::Invalid("Exchange hours cannot exceed 168".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Exchange hours cannot exceed 168".into(),
+        ));
     }
     if exchange.provider == exchange.recipient {
-        return Ok(ValidateCallbackResult::Invalid("Provider and recipient cannot be the same agent".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Provider and recipient cannot be the same agent".into(),
+        ));
     }
     if let Some(rating) = exchange.rating_provider {
         if rating < 1 || rating > 5 {
-            return Ok(ValidateCallbackResult::Invalid("Provider rating must be 1-5".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Provider rating must be 1-5".into(),
+            ));
         }
     }
     if let Some(rating) = exchange.rating_recipient {
         if rating < 1 || rating > 5 {
-            return Ok(ValidateCallbackResult::Invalid("Recipient rating must be 1-5".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Recipient rating must be 1-5".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_create_credit(_action: Create, credit: TimeCredit) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_credit(
+    _action: Create,
+    credit: TimeCredit,
+) -> ExternResult<ValidateCallbackResult> {
     if credit.total_earned < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Total earned cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Total earned cannot be negative".into(),
+        ));
     }
     if credit.total_spent < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Total spent cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Total spent cannot be negative".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_update_offer(offer: ServiceOffer) -> ExternResult<ValidateCallbackResult> {
     if offer.title.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Offer title cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Offer title cannot be empty".into(),
+        ));
     }
     if offer.hours_available < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Hours available cannot be negative".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours available cannot be negative".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_update_request(request: ServiceRequest) -> ExternResult<ValidateCallbackResult> {
     if request.title.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Request title cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request title cannot be empty".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -380,12 +448,16 @@ fn validate_update_request(request: ServiceRequest) -> ExternResult<ValidateCall
 fn validate_update_exchange(exchange: TimeExchange) -> ExternResult<ValidateCallbackResult> {
     if let Some(rating) = exchange.rating_provider {
         if rating < 1 || rating > 5 {
-            return Ok(ValidateCallbackResult::Invalid("Provider rating must be 1-5".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Provider rating must be 1-5".into(),
+            ));
         }
     }
     if let Some(rating) = exchange.rating_recipient {
         if rating < 1 || rating > 5 {
-            return Ok(ValidateCallbackResult::Invalid("Recipient rating must be 1-5".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Recipient rating must be 1-5".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)

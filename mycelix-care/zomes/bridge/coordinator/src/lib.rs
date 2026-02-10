@@ -1,8 +1,8 @@
 //! Care Bridge Coordinator Zome
 //! Cross-hApp query dispatch, event broadcasting, and integration functions.
 
-use hdk::prelude::*;
 use care_bridge_integrity::*;
+use hdk::prelude::*;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -38,10 +38,16 @@ pub fn query_care(query: CareQuery) -> ExternResult<Record> {
 
     // Link agent to query
     let agent_anchor = ensure_anchor(&format!("agent_queries:{}", query.requester))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToQuery, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToQuery,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created query".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created query".into()
+    )))
 }
 
 /// Input for resolving a query with a result
@@ -62,7 +68,9 @@ pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid query entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid query entry".into()
+        )))?;
 
     let now = sys_time()?;
     query.result = Some(input.result);
@@ -71,8 +79,9 @@ pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
 
     let updated_hash = update_entry(input.query_hash, &EntryTypes::CareQuery(query))?;
 
-    get(updated_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated query".into())))
+    get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated query".into()
+    )))
 }
 
 /// Broadcast a care event to the network
@@ -96,14 +105,25 @@ pub fn broadcast_event(event: CareEvent) -> ExternResult<Record> {
         CareEventType::ExchangeCompleted => "exchange_completed",
     };
     let type_anchor = ensure_anchor(&format!("event_type:{}", type_key))?;
-    create_link(type_anchor, action_hash.clone(), LinkTypes::EventTypeToEvent, ())?;
+    create_link(
+        type_anchor,
+        action_hash.clone(),
+        LinkTypes::EventTypeToEvent,
+        (),
+    )?;
 
     // Link agent to event
     let agent_anchor = ensure_anchor(&format!("agent_events:{}", event.source_agent))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToEvent, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToEvent,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created event".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created event".into()
+    )))
 }
 
 /// Verify identity link - queries the identity hApp to verify an agent's identity
@@ -119,7 +139,8 @@ pub fn verify_identity_link(target_agent: AgentPubKey) -> ExternResult<Record> {
         parameters: serde_json::json!({
             "agent": target_agent.to_string(),
             "verification_type": "basic"
-        }).to_string(),
+        })
+        .to_string(),
         result: None,
         created_at: now,
         resolved_at: None,
@@ -142,7 +163,8 @@ pub fn check_health_needs(target_agent: AgentPubKey) -> ExternResult<Record> {
         parameters: serde_json::json!({
             "agent": target_agent.to_string(),
             "query": "care_needs"
-        }).to_string(),
+        })
+        .to_string(),
         result: None,
         created_at: now,
         resolved_at: None,

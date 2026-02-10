@@ -154,44 +154,68 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_create_query(_action: Create, query: CareQuery) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_query(
+    _action: Create,
+    query: CareQuery,
+) -> ExternResult<ValidateCallbackResult> {
     if query.target_happ.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Target hApp cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Target hApp cannot be empty".into(),
+        ));
     }
     if query.target_happ.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Target hApp must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Target hApp must be 256 characters or fewer".into(),
+        ));
     }
     if query.parameters.len() > 8192 {
-        return Ok(ValidateCallbackResult::Invalid("Parameters must be 8192 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Parameters must be 8192 characters or fewer".into(),
+        ));
     }
     if !query.parameters.is_empty() {
         if serde_json::from_str::<serde_json::Value>(&query.parameters).is_err() {
-            return Ok(ValidateCallbackResult::Invalid("Parameters must be valid JSON".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Parameters must be valid JSON".into(),
+            ));
         }
     }
     if let Some(ref result) = query.result {
         if result.len() > 8192 {
-            return Ok(ValidateCallbackResult::Invalid("Result must be 8192 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Result must be 8192 characters or fewer".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_create_event(_action: Create, event: CareEvent) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_event(
+    _action: Create,
+    event: CareEvent,
+) -> ExternResult<ValidateCallbackResult> {
     if event.payload.len() > 8192 {
-        return Ok(ValidateCallbackResult::Invalid("Payload must be 8192 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Payload must be 8192 characters or fewer".into(),
+        ));
     }
     if !event.payload.is_empty() {
         if serde_json::from_str::<serde_json::Value>(&event.payload).is_err() {
-            return Ok(ValidateCallbackResult::Invalid("Payload must be valid JSON".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Payload must be valid JSON".into(),
+            ));
         }
     }
     if event.related_hashes.len() > 20 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 20 related hashes".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 20 related hashes".into(),
+        ));
     }
     for hash in &event.related_hashes {
         if hash.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Each related hash must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each related hash must be 256 characters or fewer".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)

@@ -1,8 +1,8 @@
 //! Flow Coordinator Zome
 //! Business logic for water allocation, H2O credits, and transactions
 
-use hdk::prelude::*;
 use flow_integrity::*;
+use hdk::prelude::*;
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -70,10 +70,9 @@ pub fn register_source(source: WaterSource) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created water source".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created water source".into()
+    )))
 }
 
 /// Get a water source record by action hash
@@ -95,8 +94,9 @@ pub fn get_all_sources(_: ()) -> ExternResult<Vec<Record>> {
 /// Get the current status of a water source
 #[hdk_extern]
 pub fn get_source_status(action_hash: ActionHash) -> ExternResult<SourceStatus> {
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Source not found".into())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Source not found".into())
+    ))?;
     let source: WaterSource = record
         .entry()
         .to_app_option()
@@ -111,8 +111,9 @@ pub fn get_source_status(action_hash: ActionHash) -> ExternResult<SourceStatus> 
 #[hdk_extern]
 pub fn update_source_status(input: UpdateSourceStatusInput) -> ExternResult<Record> {
     let agent_info = agent_info()?;
-    let record = get(input.source_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Source not found".into())))?;
+    let record = get(input.source_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Source not found".into())
+    ))?;
     let mut source: WaterSource = record
         .entry()
         .to_app_option()
@@ -133,10 +134,9 @@ pub fn update_source_status(input: UpdateSourceStatusInput) -> ExternResult<Reco
         &EntryTypes::WaterSource(source),
     )?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated source".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated source".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -155,10 +155,9 @@ pub fn allocate_shares(share: WaterShare) -> ExternResult<Record> {
     let agent_info = agent_info()?;
 
     // Verify caller is steward of the source
-    let source_record = get(share.source_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Water source not found".into()
-        )))?;
+    let source_record = get(share.source_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Water source not found".into())),
+    )?;
     let source: WaterSource = source_record
         .entry()
         .to_app_option()
@@ -197,10 +196,9 @@ pub fn allocate_shares(share: WaterShare) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created share".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created share".into()
+    )))
 }
 
 /// Get all allocations for a given water source
@@ -231,10 +229,9 @@ pub fn get_my_balance(_: ()) -> ExternResult<H2OCredit> {
     if let Some(link) = links.into_iter().last() {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        let record = get(action_hash, GetOptions::default())?
-            .ok_or(wasm_error!(WasmErrorInner::Guest(
-                "Credit record not found".into()
-            )))?;
+        let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+            WasmErrorInner::Guest("Credit record not found".into())
+        ))?;
         let credit: H2OCredit = record
             .entry()
             .to_app_option()
@@ -252,12 +249,7 @@ pub fn get_my_balance(_: ()) -> ExternResult<H2OCredit> {
             total_spent: 0,
         };
         let action_hash = create_entry(&EntryTypes::H2OCredit(credit.clone()))?;
-        create_link(
-            agent_key,
-            action_hash,
-            LinkTypes::AgentToCredit,
-            (),
-        )?;
+        create_link(agent_key, action_hash, LinkTypes::AgentToCredit, ())?;
         Ok(credit)
     }
 }
@@ -323,10 +315,9 @@ pub fn transfer_credits(input: TransferCreditsInput) -> ExternResult<Record> {
     };
     update_agent_credit(&from_agent, updated_sender)?;
 
-    get(tx_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created transaction".into()
-        )))
+    get(tx_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created transaction".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -381,10 +372,9 @@ pub fn record_usage(input: RecordUsageInput) -> ExternResult<Record> {
     };
     update_agent_credit(&agent_key, updated)?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created usage record".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created usage record".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -413,12 +403,7 @@ fn update_agent_credit(agent: &AgentPubKey, new_credit: H2OCredit) -> ExternResu
         update_entry(old_hash, &EntryTypes::H2OCredit(new_credit))?
     } else {
         let h = create_entry(&EntryTypes::H2OCredit(new_credit))?;
-        create_link(
-            agent.clone(),
-            h.clone(),
-            LinkTypes::AgentToCredit,
-            (),
-        )?;
+        create_link(agent.clone(), h.clone(), LinkTypes::AgentToCredit, ())?;
         h
     };
 

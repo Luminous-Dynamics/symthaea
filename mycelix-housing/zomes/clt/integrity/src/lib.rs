@@ -208,9 +208,7 @@ fn validate_create_trust(
             "Trust must have at least one stewardship board member".into(),
         ));
     }
-    if trust.affordability_target_ami_percent == 0
-        || trust.affordability_target_ami_percent > 200
-    {
+    if trust.affordability_target_ami_percent == 0 || trust.affordability_target_ami_percent > 200 {
         return Ok(ValidateCallbackResult::Invalid(
             "Affordability target must be between 1 and 200 percent of AMI".into(),
         ));
@@ -240,7 +238,11 @@ fn validate_create_lease(
     // Validate resale formula consistency
     match lease.resale_formula.formula_type {
         FormulaType::AppreciationCap => {
-            if lease.resale_formula.max_appreciation_percent_annual.is_none() {
+            if lease
+                .resale_formula
+                .max_appreciation_percent_annual
+                .is_none()
+            {
                 return Ok(ValidateCallbackResult::Invalid(
                     "AppreciationCap formula requires max_appreciation_percent_annual".into(),
                 ));
@@ -255,7 +257,10 @@ fn validate_create_lease(
         }
         FormulaType::ConsumerPriceIndex => {}
         FormulaType::Hybrid => {
-            if lease.resale_formula.max_appreciation_percent_annual.is_none()
+            if lease
+                .resale_formula
+                .max_appreciation_percent_annual
+                .is_none()
                 && lease.resale_formula.ami_cap_percent.is_none()
             {
                 return Ok(ValidateCallbackResult::Invalid(

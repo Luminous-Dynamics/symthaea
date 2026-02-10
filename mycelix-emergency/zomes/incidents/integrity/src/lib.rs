@@ -234,9 +234,7 @@ fn validate_create_disaster(
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_update_disaster(
-    disaster: Disaster,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_update_disaster(disaster: Disaster) -> ExternResult<ValidateCallbackResult> {
     if disaster.id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Disaster ID cannot be empty".into(),

@@ -106,7 +106,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreEntry(store_entry) => match store_entry {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::EmergencyResource(resource) => validate_create_resource(action, resource),
+                EntryTypes::EmergencyResource(resource) => {
+                    validate_create_resource(action, resource)
+                }
                 EntryTypes::ResourceRequest(request) => validate_create_request(action, request),
             },
             OpEntry::UpdateEntry {
@@ -158,25 +160,33 @@ fn validate_create_resource(
     resource: EmergencyResource,
 ) -> ExternResult<ValidateCallbackResult> {
     if resource.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Resource ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource ID cannot be empty".into(),
+        ));
     }
     if resource.name.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Resource name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource name cannot be empty".into(),
+        ));
     }
     if resource.unit.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Resource unit cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource unit cannot be empty".into(),
+        ));
     }
     if resource.location.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Resource location cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource location cannot be empty".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_update_resource(
-    resource: EmergencyResource,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_update_resource(resource: EmergencyResource) -> ExternResult<ValidateCallbackResult> {
     if resource.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Resource ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource ID cannot be empty".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -186,19 +196,23 @@ fn validate_create_request(
     request: ResourceRequest,
 ) -> ExternResult<ValidateCallbackResult> {
     if request.quantity_needed == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Quantity needed must be greater than 0".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Quantity needed must be greater than 0".into(),
+        ));
     }
     if request.location.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Request location cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request location cannot be empty".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_update_request(
-    request: ResourceRequest,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_update_request(request: ResourceRequest) -> ExternResult<ValidateCallbackResult> {
     if request.location.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Request location cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request location cannot be empty".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }

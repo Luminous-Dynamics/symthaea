@@ -1,8 +1,8 @@
 //! Circles Coordinator Zome
 //! Business logic for care circle creation, membership, and discovery.
 
-use hdk::prelude::*;
 use circles_integrity::*;
+use hdk::prelude::*;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -38,11 +38,21 @@ pub fn create_circle(circle: CareCircle) -> ExternResult<Record> {
 
     // Link by type
     let type_anchor = ensure_anchor(&format!("circle_type:{}", circle.circle_type.anchor_key()))?;
-    create_link(type_anchor, action_hash.clone(), LinkTypes::TypeToCircle, ())?;
+    create_link(
+        type_anchor,
+        action_hash.clone(),
+        LinkTypes::TypeToCircle,
+        (),
+    )?;
 
     // Link creator to circle
     let creator_anchor = ensure_anchor(&format!("agent_created_circles:{}", circle.created_by))?;
-    create_link(creator_anchor, action_hash.clone(), LinkTypes::AgentToCreatedCircle, ())?;
+    create_link(
+        creator_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToCreatedCircle,
+        (),
+    )?;
 
     // Auto-join creator as Organizer
     let now = sys_time()?;
@@ -57,14 +67,26 @@ pub fn create_circle(circle: CareCircle) -> ExternResult<Record> {
 
     // Link circle to membership
     let circle_members_anchor = ensure_anchor(&format!("circle_members:{}", action_hash))?;
-    create_link(circle_members_anchor, membership_hash.clone(), LinkTypes::CircleToMembership, ())?;
+    create_link(
+        circle_members_anchor,
+        membership_hash.clone(),
+        LinkTypes::CircleToMembership,
+        (),
+    )?;
 
     // Link agent to membership
-    let agent_membership_anchor = ensure_anchor(&format!("agent_memberships:{}", circle.created_by))?;
-    create_link(agent_membership_anchor, membership_hash, LinkTypes::AgentToMembership, ())?;
+    let agent_membership_anchor =
+        ensure_anchor(&format!("agent_memberships:{}", circle.created_by))?;
+    create_link(
+        agent_membership_anchor,
+        membership_hash,
+        LinkTypes::AgentToMembership,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created circle".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created circle".into()
+    )))
 }
 
 /// Input for joining a circle
@@ -80,17 +102,22 @@ pub fn join_circle(input: JoinCircleInput) -> ExternResult<Record> {
     let caller = agent_info()?.agent_initial_pubkey;
 
     // Verify circle exists
-    let circle_record = get(input.circle_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Circle not found".into())))?;
+    let circle_record = get(input.circle_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Circle not found".into())),
+    )?;
 
     let circle: CareCircle = circle_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid circle entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid circle entry".into()
+        )))?;
 
     if !circle.active {
-        return Err(wasm_error!(WasmErrorInner::Guest("Cannot join an inactive circle".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cannot join an inactive circle".into()
+        )));
     }
 
     // Check member count
@@ -113,7 +140,9 @@ pub fn join_circle(input: JoinCircleInput) -> ExternResult<Record> {
             {
                 if m.active {
                     if m.member == caller {
-                        return Err(wasm_error!(WasmErrorInner::Guest("Already a member of this circle".into())));
+                        return Err(wasm_error!(WasmErrorInner::Guest(
+                            "Already a member of this circle".into()
+                        )));
                     }
                     active_count += 1;
                 }
@@ -144,13 +173,24 @@ pub fn join_circle(input: JoinCircleInput) -> ExternResult<Record> {
     let membership_hash = create_entry(&EntryTypes::CircleMembership(membership))?;
 
     let cm_anchor = ensure_anchor(&format!("circle_members:{}", input.circle_hash))?;
-    create_link(cm_anchor, membership_hash.clone(), LinkTypes::CircleToMembership, ())?;
+    create_link(
+        cm_anchor,
+        membership_hash.clone(),
+        LinkTypes::CircleToMembership,
+        (),
+    )?;
 
     let am_anchor = ensure_anchor(&format!("agent_memberships:{}", caller))?;
-    create_link(am_anchor, membership_hash.clone(), LinkTypes::AgentToMembership, ())?;
+    create_link(
+        am_anchor,
+        membership_hash.clone(),
+        LinkTypes::AgentToMembership,
+        (),
+    )?;
 
-    get(membership_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created membership".into())))
+    get(membership_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created membership".into()
+    )))
 }
 
 /// Leave a care circle by deactivating membership

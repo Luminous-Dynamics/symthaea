@@ -110,14 +110,17 @@ pub struct FindMatchesInput {
 #[hdk_extern]
 pub fn find_matches_for_request(input: FindMatchesInput) -> ExternResult<Vec<Record>> {
     // Get the request
-    let request_record = get(input.request_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Request not found".into())))?;
+    let request_record = get(input.request_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Request not found".into())),
+    )?;
 
     let request: ServiceRequest = request_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid request entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid request entry".into()
+        )))?;
 
     let now = sys_time()?;
     let mut matches: Vec<(f32, Record)> = Vec::new();
@@ -160,19 +163,43 @@ pub fn find_matches_for_request(input: FindMatchesInput) -> ExternResult<Vec<Rec
                     let match_hash = create_entry(&EntryTypes::CareMatch(care_match))?;
 
                     // Link request to match
-                    let req_anchor = ensure_anchor(&format!("request_matches:{}", input.request_hash))?;
-                    create_link(req_anchor, match_hash.clone(), LinkTypes::RequestToMatch, ())?;
+                    let req_anchor =
+                        ensure_anchor(&format!("request_matches:{}", input.request_hash))?;
+                    create_link(
+                        req_anchor,
+                        match_hash.clone(),
+                        LinkTypes::RequestToMatch,
+                        (),
+                    )?;
 
                     // Link offer to match
-                    let offer_anchor_hash = ensure_anchor(&format!("offer_matches:{}", offer_hash))?;
-                    create_link(offer_anchor_hash, match_hash.clone(), LinkTypes::OfferToMatch, ())?;
+                    let offer_anchor_hash =
+                        ensure_anchor(&format!("offer_matches:{}", offer_hash))?;
+                    create_link(
+                        offer_anchor_hash,
+                        match_hash.clone(),
+                        LinkTypes::OfferToMatch,
+                        (),
+                    )?;
 
                     // Link agents
-                    let provider_anchor = ensure_anchor(&format!("provider_matches:{}", offer.provider))?;
-                    create_link(provider_anchor, match_hash.clone(), LinkTypes::AgentProviderMatches, ())?;
+                    let provider_anchor =
+                        ensure_anchor(&format!("provider_matches:{}", offer.provider))?;
+                    create_link(
+                        provider_anchor,
+                        match_hash.clone(),
+                        LinkTypes::AgentProviderMatches,
+                        (),
+                    )?;
 
-                    let requester_anchor = ensure_anchor(&format!("requester_matches:{}", request.requester))?;
-                    create_link(requester_anchor, match_hash.clone(), LinkTypes::AgentRequesterMatches, ())?;
+                    let requester_anchor =
+                        ensure_anchor(&format!("requester_matches:{}", request.requester))?;
+                    create_link(
+                        requester_anchor,
+                        match_hash.clone(),
+                        LinkTypes::AgentRequesterMatches,
+                        (),
+                    )?;
 
                     if let Some(rec) = get(match_hash, GetOptions::default())? {
                         matches.push((score, rec));
@@ -196,22 +223,48 @@ pub fn suggest_match(care_match: CareMatch) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::CareMatch(care_match.clone()))?;
 
     let req_anchor = ensure_anchor(&format!("request_matches:{}", care_match.request_hash))?;
-    create_link(req_anchor, action_hash.clone(), LinkTypes::RequestToMatch, ())?;
+    create_link(
+        req_anchor,
+        action_hash.clone(),
+        LinkTypes::RequestToMatch,
+        (),
+    )?;
 
     let offer_anchor = ensure_anchor(&format!("offer_matches:{}", care_match.offer_hash))?;
-    create_link(offer_anchor, action_hash.clone(), LinkTypes::OfferToMatch, ())?;
+    create_link(
+        offer_anchor,
+        action_hash.clone(),
+        LinkTypes::OfferToMatch,
+        (),
+    )?;
 
     let provider_anchor = ensure_anchor(&format!("provider_matches:{}", care_match.provider))?;
-    create_link(provider_anchor, action_hash.clone(), LinkTypes::AgentProviderMatches, ())?;
+    create_link(
+        provider_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentProviderMatches,
+        (),
+    )?;
 
     let requester_anchor = ensure_anchor(&format!("requester_matches:{}", care_match.requester))?;
-    create_link(requester_anchor, action_hash.clone(), LinkTypes::AgentRequesterMatches, ())?;
+    create_link(
+        requester_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentRequesterMatches,
+        (),
+    )?;
 
     let pending_anchor = ensure_anchor("all_pending_matches")?;
-    create_link(pending_anchor, action_hash.clone(), LinkTypes::AllPendingMatches, ())?;
+    create_link(
+        pending_anchor,
+        action_hash.clone(),
+        LinkTypes::AllPendingMatches,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created match".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created match".into()
+    )))
 }
 
 /// Accept a suggested match
@@ -273,7 +326,9 @@ fn update_match_status(match_hash: ActionHash, new_status: MatchStatus) -> Exter
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid match entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid match entry".into()
+        )))?;
 
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -290,8 +345,9 @@ fn update_match_status(match_hash: ActionHash, new_status: MatchStatus) -> Exter
 
     let updated_hash = update_entry(match_hash, &EntryTypes::CareMatch(care_match))?;
 
-    get(updated_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated match".into())))
+    get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated match".into()
+    )))
 }
 
 /// Calculate match factors between an offer and a request
@@ -307,8 +363,14 @@ fn calculate_match_factors(offer: &ServiceOffer, request: &ServiceRequest) -> Ma
     // In production this would use geospatial distance
     let proximity_score = if offer.location.to_lowercase() == request.location.to_lowercase() {
         1.0
-    } else if offer.location.to_lowercase().contains(&request.location.to_lowercase())
-        || request.location.to_lowercase().contains(&offer.location.to_lowercase())
+    } else if offer
+        .location
+        .to_lowercase()
+        .contains(&request.location.to_lowercase())
+        || request
+            .location
+            .to_lowercase()
+            .contains(&offer.location.to_lowercase())
     {
         0.6
     } else {
@@ -320,8 +382,14 @@ fn calculate_match_factors(offer: &ServiceOffer, request: &ServiceRequest) -> Ma
         || request.preferred_schedule.to_lowercase() == "flexible"
     {
         0.9
-    } else if offer.availability.to_lowercase().contains(&request.preferred_schedule.to_lowercase())
-        || request.preferred_schedule.to_lowercase().contains(&offer.availability.to_lowercase())
+    } else if offer
+        .availability
+        .to_lowercase()
+        .contains(&request.preferred_schedule.to_lowercase())
+        || request
+            .preferred_schedule
+            .to_lowercase()
+            .contains(&offer.availability.to_lowercase())
     {
         0.7
     } else {

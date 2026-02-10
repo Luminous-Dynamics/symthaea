@@ -60,10 +60,9 @@ pub fn define_watershed(watershed: Watershed) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created watershed".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created watershed".into()
+    )))
 }
 
 /// Get all registered watersheds
@@ -84,10 +83,9 @@ pub fn get_all_watersheds(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn register_water_right(right: WaterRight) -> ExternResult<Record> {
     // Verify watershed exists
-    let _ws_record = get(right.watershed_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Watershed not found".into()
-        )))?;
+    let _ws_record = get(right.watershed_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Watershed not found".into())),
+    )?;
 
     let action_hash = create_entry(&EntryTypes::WaterRight(right.clone()))?;
 
@@ -107,10 +105,9 @@ pub fn register_water_right(right: WaterRight) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created water right".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created water right".into()
+    )))
 }
 
 /// Get all water rights for a watershed
@@ -128,10 +125,7 @@ pub fn get_watershed_rights(watershed_hash: ActionHash) -> ExternResult<Vec<Reco
 pub fn get_my_rights(_: ()) -> ExternResult<Vec<Record>> {
     let agent_info = agent_info()?;
     let links = get_links(
-        LinkQuery::try_new(
-            agent_info.agent_initial_pubkey,
-            LinkTypes::HolderToRight,
-        )?,
+        LinkQuery::try_new(agent_info.agent_initial_pubkey, LinkTypes::HolderToRight)?,
         GetStrategy::default(),
     )?;
     records_from_links(links)
@@ -147,10 +141,9 @@ pub fn transfer_right(input: TransferRightInput) -> ExternResult<Record> {
     let agent_info = agent_info()?;
 
     // Fetch the water right
-    let right_record = get(input.right_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Water right not found".into()
-        )))?;
+    let right_record = get(input.right_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Water right not found".into())
+    ))?;
     let right: WaterRight = right_record
         .entry()
         .to_app_option()
@@ -224,10 +217,9 @@ pub fn transfer_right(input: TransferRightInput) -> ExternResult<Record> {
         )?;
     }
 
-    get(transfer_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created transfer".into()
-        )))
+    get(transfer_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created transfer".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -253,10 +245,9 @@ pub fn file_dispute(dispute: WaterDispute) -> ExternResult<Record> {
     }
 
     // Verify watershed exists
-    let _ws = get(dispute.watershed_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Watershed not found".into()
-        )))?;
+    let _ws = get(dispute.watershed_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Watershed not found".into())
+    ))?;
 
     let action_hash = create_entry(&EntryTypes::WaterDispute(dispute.clone()))?;
 
@@ -276,19 +267,17 @@ pub fn file_dispute(dispute: WaterDispute) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created dispute".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created dispute".into()
+    )))
 }
 
 /// Resolve a water dispute
 #[hdk_extern]
 pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
-    let record = get(input.dispute_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Dispute not found".into()
-        )))?;
+    let record = get(input.dispute_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Dispute not found".into())
+    ))?;
     let mut dispute: WaterDispute = record
         .entry()
         .to_app_option()
@@ -311,10 +300,9 @@ pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
         &EntryTypes::WaterDispute(dispute),
     )?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated dispute".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated dispute".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -339,10 +327,7 @@ pub fn get_watershed_disputes(watershed_hash: ActionHash) -> ExternResult<Vec<Re
 pub fn get_my_disputes(_: ()) -> ExternResult<Vec<Record>> {
     let agent_info = agent_info()?;
     let links = get_links(
-        LinkQuery::try_new(
-            agent_info.agent_initial_pubkey,
-            LinkTypes::AgentToDispute,
-        )?,
+        LinkQuery::try_new(agent_info.agent_initial_pubkey, LinkTypes::AgentToDispute)?,
         GetStrategy::default(),
     )?;
     records_from_links(links)

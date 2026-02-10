@@ -230,9 +230,7 @@ fn validate_update_work_order(order: WorkOrder) -> ExternResult<ValidateCallback
             "Work order must be assigned to someone".into(),
         ));
     }
-    if let (Some(actual), Some(estimated)) =
-        (order.actual_cost_cents, order.estimated_cost_cents)
-    {
+    if let (Some(actual), Some(estimated)) = (order.actual_cost_cents, order.estimated_cost_cents) {
         // Allow up to 200% of estimate without special approval
         if actual > estimated * 2 {
             return Ok(ValidateCallbackResult::Invalid(

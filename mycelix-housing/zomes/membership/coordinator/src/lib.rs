@@ -39,10 +39,9 @@ pub fn submit_application(app: MemberApplication) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created application".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created application".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -54,10 +53,9 @@ pub struct ReviewApplicationInput {
 /// Review an application (change its status)
 #[hdk_extern]
 pub fn review_application(input: ReviewApplicationInput) -> ExternResult<Record> {
-    let record = get(input.application_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Application not found".into()
-        )))?;
+    let record = get(input.application_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Application not found".into())
+    ))?;
 
     let mut app: MemberApplication = record
         .entry()
@@ -69,15 +67,11 @@ pub fn review_application(input: ReviewApplicationInput) -> ExternResult<Record>
 
     app.status = input.new_status;
 
-    let new_hash = update_entry(
-        input.application_hash,
-        &EntryTypes::MemberApplication(app),
-    )?;
+    let new_hash = update_entry(input.application_hash, &EntryTypes::MemberApplication(app))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated application".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated application".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -92,10 +86,9 @@ pub struct ApproveMemberInput {
 /// Approve an application and create a member record
 #[hdk_extern]
 pub fn approve_member(input: ApproveMemberInput) -> ExternResult<Record> {
-    let record = get(input.application_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Application not found".into()
-        )))?;
+    let record = get(input.application_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Application not found".into())
+    ))?;
 
     let mut app: MemberApplication = record
         .entry()
@@ -155,10 +148,9 @@ pub fn approve_member(input: ApproveMemberInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created member".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created member".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -196,10 +188,9 @@ pub fn add_to_waitlist(input: AddToWaitlistInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created waitlist entry".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created waitlist entry".into()
+    )))
 }
 
 /// Get the current waitlist, ordered by position
@@ -286,10 +277,9 @@ pub fn create_rent_to_own(input: CreateRentToOwnInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created agreement".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created agreement".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -301,10 +291,9 @@ pub struct RecordRentPaymentInput {
 /// Record a rent payment and update accumulated equity
 #[hdk_extern]
 pub fn record_rent_payment(input: RecordRentPaymentInput) -> ExternResult<Record> {
-    let record = get(input.agreement_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Agreement not found".into()
-        )))?;
+    let record = get(input.agreement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Agreement not found".into())
+    ))?;
 
     let mut agreement: RentToOwnAgreement = record
         .entry()
@@ -321,9 +310,9 @@ pub fn record_rent_payment(input: RecordRentPaymentInput) -> ExternResult<Record
     }
 
     // Calculate equity portion of payment
-    let equity_addition =
-        (input.payment_amount_cents as u128 * agreement.equity_portion_percent as u128 / 100)
-            as u64;
+    let equity_addition = (input.payment_amount_cents as u128
+        * agreement.equity_portion_percent as u128
+        / 100) as u64;
     agreement.accumulated_equity_cents += equity_addition;
 
     // Check if completed
@@ -337,10 +326,9 @@ pub fn record_rent_payment(input: RecordRentPaymentInput) -> ExternResult<Record
         &EntryTypes::RentToOwnAgreement(agreement),
     )?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated agreement".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated agreement".into()
+    )))
 }
 
 /// Get accumulated equity for a member's rent-to-own agreement

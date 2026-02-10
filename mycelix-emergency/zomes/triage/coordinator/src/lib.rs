@@ -14,10 +14,14 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 #[hdk_extern]
 pub fn triage_patient(input: TriagePatientInput) -> ExternResult<Record> {
     if input.patient_id.is_empty() || input.patient_id.len() > 128 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Patient ID must be 1-128 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Patient ID must be 1-128 characters".into()
+        )));
     }
     if input.location.is_empty() || input.location.len() > 512 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Location must be 1-512 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Location must be 1-512 characters".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -49,7 +53,10 @@ pub fn triage_patient(input: TriagePatientInput) -> ExternResult<Record> {
     )?;
 
     // Link by triage category
-    let category_anchor = format!("triage_category:{}:{:?}", input.disaster_hash, input.category);
+    let category_anchor = format!(
+        "triage_category:{}:{:?}",
+        input.disaster_hash, input.category
+    );
     create_entry(&EntryTypes::Anchor(Anchor(category_anchor.clone())))?;
     create_link(
         anchor_hash(&category_anchor)?,
@@ -76,8 +83,9 @@ pub fn triage_patient(input: TriagePatientInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created triage record".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created triage record".into()
+    )))
 }
 
 /// Input for triaging a patient
@@ -96,14 +104,17 @@ pub struct TriagePatientInput {
 /// Update a triage assessment (re-triage)
 #[hdk_extern]
 pub fn update_triage(input: UpdateTriageInput) -> ExternResult<Record> {
-    let current_record = get(input.original_triage_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Triage record not found".into())))?;
+    let current_record = get(input.original_triage_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Triage record not found".into())),
+    )?;
 
     let current_triage: TriageRecord = current_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid triage entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid triage entry".into()
+        )))?;
 
     let agent_info = agent_info()?;
     let now = sys_time()?;
@@ -111,7 +122,9 @@ pub fn update_triage(input: UpdateTriageInput) -> ExternResult<Record> {
     let updated_triage = TriageRecord {
         category: input.new_category.clone(),
         injuries: input.injuries.unwrap_or(current_triage.injuries),
-        transport_priority: input.transport_priority.unwrap_or(current_triage.transport_priority),
+        transport_priority: input
+            .transport_priority
+            .unwrap_or(current_triage.transport_priority),
         notes: input.notes.unwrap_or(current_triage.notes),
         timestamp: now,
         triaged_by: agent_info.agent_initial_pubkey,
@@ -129,7 +142,10 @@ pub fn update_triage(input: UpdateTriageInput) -> ExternResult<Record> {
         input.original_disaster_hash, input.old_category
     );
     let old_links = get_links(
-        LinkQuery::try_new(anchor_hash(&old_category_anchor)?, LinkTypes::CategoryToTriage)?,
+        LinkQuery::try_new(
+            anchor_hash(&old_category_anchor)?,
+            LinkTypes::CategoryToTriage,
+        )?,
         GetStrategy::default(),
     )?;
     for link in old_links {
@@ -153,8 +169,9 @@ pub fn update_triage(input: UpdateTriageInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(new_action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated triage record".into())))
+    get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated triage record".into()
+    )))
 }
 
 /// Input for updating a triage record
@@ -194,7 +211,10 @@ pub fn get_disaster_triage(disaster_hash: ActionHash) -> ExternResult<Vec<Record
 /// Get triage records by category for a disaster
 #[hdk_extern]
 pub fn get_triage_by_category(input: TriageByCategoryInput) -> ExternResult<Vec<Record>> {
-    let category_anchor = format!("triage_category:{}:{:?}", input.disaster_hash, input.category);
+    let category_anchor = format!(
+        "triage_category:{}:{:?}",
+        input.disaster_hash, input.category
+    );
     let links = get_links(
         LinkQuery::try_new(anchor_hash(&category_anchor)?, LinkTypes::CategoryToTriage)?,
         GetStrategy::default(),

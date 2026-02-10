@@ -186,12 +186,10 @@ fn validate_create_charge(
         + charge.utilities_cents
         + charge.reserve_contribution_cents;
     if charge.total_cents != computed_total {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Total ({}) must equal sum of components ({})",
-                charge.total_cents, computed_total
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Total ({}) must equal sum of components ({})",
+            charge.total_cents, computed_total
+        )));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -232,10 +230,7 @@ fn validate_create_fund(
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_create_budget(
-    _action: Create,
-    budget: Budget,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_budget(_action: Create, budget: Budget) -> ExternResult<ValidateCallbackResult> {
     if budget.fiscal_year < 2020 || budget.fiscal_year > 2100 {
         return Ok(ValidateCallbackResult::Invalid(
             "Fiscal year must be between 2020 and 2100".into(),
@@ -256,12 +251,10 @@ fn validate_create_budget(
     // Verify category allocations sum to projected expenses
     let total_allocated: u64 = budget.categories.iter().map(|c| c.allocated_cents).sum();
     if total_allocated != budget.expenses_projected_cents {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Category allocations ({}) must equal projected expenses ({})",
-                total_allocated, budget.expenses_projected_cents
-            ),
-        ));
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Category allocations ({}) must equal projected expenses ({})",
+            total_allocated, budget.expenses_projected_cents
+        )));
     }
     Ok(ValidateCallbackResult::Valid)
 }

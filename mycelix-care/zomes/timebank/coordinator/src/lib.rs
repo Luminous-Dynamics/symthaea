@@ -41,20 +41,36 @@ pub fn create_service_offer(offer: ServiceOffer) -> ExternResult<Record> {
 
     // Link agent to offer
     let agent_anchor = ensure_anchor(&format!("agent_offers:{}", offer.provider))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToOffer, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToOffer,
+        (),
+    )?;
 
     // Link category to offer
     let cat_anchor = ensure_anchor(&format!("cat_offers:{}", offer.category.anchor_key()))?;
-    create_link(cat_anchor, action_hash.clone(), LinkTypes::CategoryToOffer, ())?;
+    create_link(
+        cat_anchor,
+        action_hash.clone(),
+        LinkTypes::CategoryToOffer,
+        (),
+    )?;
 
     // Link to all active offers
     if offer.active {
         let active_anchor = ensure_anchor("all_active_offers")?;
-        create_link(active_anchor, action_hash.clone(), LinkTypes::AllActiveOffers, ())?;
+        create_link(
+            active_anchor,
+            action_hash.clone(),
+            LinkTypes::AllActiveOffers,
+            (),
+        )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created offer".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created offer".into()
+    )))
 }
 
 /// Get all offers in a given category
@@ -106,7 +122,10 @@ pub fn search_offers(query: String) -> ExternResult<Vec<Record>> {
         {
             if offer.title.to_lowercase().contains(&query_lower)
                 || offer.description.to_lowercase().contains(&query_lower)
-                || offer.skills_required.iter().any(|s| s.to_lowercase().contains(&query_lower))
+                || offer
+                    .skills_required
+                    .iter()
+                    .any(|s| s.to_lowercase().contains(&query_lower))
             {
                 results.push(record);
             }
@@ -127,20 +146,36 @@ pub fn create_service_request(request: ServiceRequest) -> ExternResult<Record> {
 
     // Link agent to request
     let agent_anchor = ensure_anchor(&format!("agent_requests:{}", request.requester))?;
-    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToRequest, ())?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToRequest,
+        (),
+    )?;
 
     // Link category to request
     let cat_anchor = ensure_anchor(&format!("cat_requests:{}", request.category.anchor_key()))?;
-    create_link(cat_anchor, action_hash.clone(), LinkTypes::CategoryToRequest, ())?;
+    create_link(
+        cat_anchor,
+        action_hash.clone(),
+        LinkTypes::CategoryToRequest,
+        (),
+    )?;
 
     // Link to all open requests
     if request.open {
         let open_anchor = ensure_anchor("all_open_requests")?;
-        create_link(open_anchor, action_hash.clone(), LinkTypes::AllOpenRequests, ())?;
+        create_link(
+            open_anchor,
+            action_hash.clone(),
+            LinkTypes::AllOpenRequests,
+            (),
+        )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created request".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created request".into()
+    )))
 }
 
 /// Get all open requests
@@ -215,19 +250,39 @@ pub fn complete_exchange(input: CompleteExchangeInput) -> ExternResult<Record> {
 
     // Link provider to exchange
     let provider_anchor = ensure_anchor(&format!("agent_exchanges:{}", input.provider))?;
-    create_link(provider_anchor, action_hash.clone(), LinkTypes::AgentToExchange, ())?;
+    create_link(
+        provider_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToExchange,
+        (),
+    )?;
 
     // Link recipient to exchange
     let recipient_anchor = ensure_anchor(&format!("agent_exchanges:{}", input.recipient))?;
-    create_link(recipient_anchor, action_hash.clone(), LinkTypes::AgentToExchange, ())?;
+    create_link(
+        recipient_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToExchange,
+        (),
+    )?;
 
     // Link offer to exchange
     let offer_anchor = ensure_anchor(&format!("offer_exchanges:{}", input.offer_id))?;
-    create_link(offer_anchor, action_hash.clone(), LinkTypes::OfferToExchange, ())?;
+    create_link(
+        offer_anchor,
+        action_hash.clone(),
+        LinkTypes::OfferToExchange,
+        (),
+    )?;
 
     // Link request to exchange
     let request_anchor = ensure_anchor(&format!("request_exchanges:{}", input.request_id))?;
-    create_link(request_anchor, action_hash.clone(), LinkTypes::RequestToExchange, ())?;
+    create_link(
+        request_anchor,
+        action_hash.clone(),
+        LinkTypes::RequestToExchange,
+        (),
+    )?;
 
     // Update provider credits (earned)
     update_agent_credit(&input.provider, input.hours as f64, true)?;
@@ -235,8 +290,9 @@ pub fn complete_exchange(input: CompleteExchangeInput) -> ExternResult<Record> {
     // Update recipient credits (spent)
     update_agent_credit(&input.recipient, input.hours as f64, false)?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created exchange".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created exchange".into()
+    )))
 }
 
 /// Input for rating an exchange
@@ -251,39 +307,46 @@ pub struct RateExchangeInput {
 #[hdk_extern]
 pub fn rate_exchange(input: RateExchangeInput) -> ExternResult<Record> {
     if input.rating < 1 || input.rating > 5 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Rating must be between 1 and 5".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Rating must be between 1 and 5".into()
+        )));
     }
 
-    let record = get(input.exchange_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Exchange not found".into())))?;
+    let record = get(input.exchange_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Exchange not found".into())
+    ))?;
 
     let mut exchange: TimeExchange = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid exchange entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid exchange entry".into()
+        )))?;
 
     let caller = agent_info()?.agent_initial_pubkey;
 
     if input.is_provider_rating {
         if caller != exchange.provider {
-            return Err(wasm_error!(WasmErrorInner::Guest("Only the provider can set the provider rating".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Only the provider can set the provider rating".into()
+            )));
         }
         exchange.rating_provider = Some(input.rating);
     } else {
         if caller != exchange.recipient {
-            return Err(wasm_error!(WasmErrorInner::Guest("Only the recipient can set the recipient rating".into())));
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Only the recipient can set the recipient rating".into()
+            )));
         }
         exchange.rating_recipient = Some(input.rating);
     }
 
-    let updated_hash = update_entry(
-        input.exchange_hash,
-        &EntryTypes::TimeExchange(exchange),
-    )?;
+    let updated_hash = update_entry(input.exchange_hash, &EntryTypes::TimeExchange(exchange))?;
 
-    get(updated_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated exchange".into())))
+    get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated exchange".into()
+    )))
 }
 
 // ============================================================================
@@ -313,7 +376,9 @@ fn get_or_create_credit(agent: &AgentPubKey) -> ExternResult<TimeCredit> {
                 .entry()
                 .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid credit entry".into())))?;
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid credit entry".into()
+                )))?;
             return Ok(credit);
         }
     }

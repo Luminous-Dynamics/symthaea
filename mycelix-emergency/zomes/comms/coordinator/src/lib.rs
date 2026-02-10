@@ -1,8 +1,8 @@
 //! Communications Coordinator Zome
 //! Offline-first emergency messaging with store-and-forward semantics
 
-use hdk::prelude::*;
 use comms_integrity::*;
+use hdk::prelude::*;
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -14,10 +14,14 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 #[hdk_extern]
 pub fn send_message(input: SendMessageInput) -> ExternResult<Record> {
     if input.content.is_empty() || input.content.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Content must be 1-4096 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Content must be 1-4096 characters".into()
+        )));
     }
     if input.ttl_hours == 0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("TTL must be at least 1 hour".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "TTL must be at least 1 hour".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -64,8 +68,9 @@ pub fn send_message(input: SendMessageInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created message".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created message".into()
+    )))
 }
 
 /// Input for sending a message
@@ -82,10 +87,14 @@ pub struct SendMessageInput {
 #[hdk_extern]
 pub fn create_channel(input: CreateChannelInput) -> ExternResult<Record> {
     if input.name.is_empty() || input.name.len() > 128 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Channel name must be 1-128 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Channel name must be 1-128 characters".into()
+        )));
     }
     if input.participants.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Channel must have at least one participant".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Channel must have at least one participant".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -108,8 +117,9 @@ pub fn create_channel(input: CreateChannelInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created channel".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created channel".into()
+    )))
 }
 
 /// Input for creating a channel
@@ -125,7 +135,9 @@ pub struct CreateChannelInput {
 #[hdk_extern]
 pub fn broadcast(input: BroadcastInput) -> ExternResult<Record> {
     if input.content.is_empty() || input.content.len() > 2048 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Broadcast content must be 1-2048 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Broadcast content must be 1-2048 characters".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -158,8 +170,9 @@ pub fn broadcast(input: BroadcastInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created broadcast".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created broadcast".into()
+    )))
 }
 
 /// Input for issuing a broadcast
@@ -199,7 +212,10 @@ pub fn get_active_broadcasts(_: ()) -> ExternResult<Vec<Record>> {
     let now = sys_time()?;
 
     let links = get_links(
-        LinkQuery::try_new(anchor_hash("active_broadcasts")?, LinkTypes::ActiveBroadcasts)?,
+        LinkQuery::try_new(
+            anchor_hash("active_broadcasts")?,
+            LinkTypes::ActiveBroadcasts,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -230,7 +246,10 @@ pub fn get_active_broadcasts(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn get_unsynced_messages(_: ()) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        LinkQuery::try_new(anchor_hash("unsynced_messages")?, LinkTypes::UnsyncedMessages)?,
+        LinkQuery::try_new(
+            anchor_hash("unsynced_messages")?,
+            LinkTypes::UnsyncedMessages,
+        )?,
         GetStrategy::default(),
     )?;
 
@@ -251,14 +270,17 @@ pub fn get_unsynced_messages(_: ()) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn mark_synced(message_hash: ActionHash) -> ExternResult<Record> {
     // Get and update the message
-    let current_record = get(message_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Message not found".into())))?;
+    let current_record = get(message_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Message not found".into())
+    ))?;
 
     let current_message: EmergencyMessage = current_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid message entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid message entry".into()
+        )))?;
 
     let updated_message = EmergencyMessage {
         synced: true,
@@ -272,7 +294,10 @@ pub fn mark_synced(message_hash: ActionHash) -> ExternResult<Record> {
 
     // Remove from unsynced list
     let links = get_links(
-        LinkQuery::try_new(anchor_hash("unsynced_messages")?, LinkTypes::UnsyncedMessages)?,
+        LinkQuery::try_new(
+            anchor_hash("unsynced_messages")?,
+            LinkTypes::UnsyncedMessages,
+        )?,
         GetStrategy::default(),
     )?;
     for link in links {
@@ -284,6 +309,7 @@ pub fn mark_synced(message_hash: ActionHash) -> ExternResult<Record> {
         }
     }
 
-    get(new_action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated message".into())))
+    get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated message".into()
+    )))
 }

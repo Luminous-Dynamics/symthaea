@@ -14,13 +14,19 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 #[hdk_extern]
 pub fn declare_disaster(input: DeclareDisasterInput) -> ExternResult<Record> {
     if input.title.is_empty() || input.title.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Title must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Title must be 1-256 characters".into()
+        )));
     }
     if input.description.is_empty() || input.description.len() > 8192 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Description must be 1-8192 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Description must be 1-8192 characters".into()
+        )));
     }
     if input.affected_area.radius_km <= 0.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Affected area radius must be positive".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Affected area radius must be positive".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -78,8 +84,9 @@ pub fn declare_disaster(input: DeclareDisasterInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created disaster".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created disaster".into()
+    )))
 }
 
 /// Input for declaring a disaster
@@ -118,14 +125,17 @@ pub fn get_active_disasters(_: ()) -> ExternResult<Vec<Record>> {
 /// Update a disaster's status
 #[hdk_extern]
 pub fn update_disaster_status(input: UpdateDisasterStatusInput) -> ExternResult<Record> {
-    let current_record = get(input.disaster_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Disaster not found".into())))?;
+    let current_record = get(input.disaster_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Disaster not found".into())),
+    )?;
 
     let current_disaster: Disaster = current_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid disaster entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid disaster entry".into()
+        )))?;
 
     let updated_disaster = Disaster {
         status: input.new_status.clone(),
@@ -138,7 +148,10 @@ pub fn update_disaster_status(input: UpdateDisasterStatusInput) -> ExternResult<
     )?;
 
     // If closing or in recovery, remove from active disasters
-    if matches!(input.new_status, DisasterStatus::Closed | DisasterStatus::Recovery) {
+    if matches!(
+        input.new_status,
+        DisasterStatus::Closed | DisasterStatus::Recovery
+    ) {
         let links = get_links(
             LinkQuery::try_new(anchor_hash("active_disasters")?, LinkTypes::ActiveDisasters)?,
             GetStrategy::default(),
@@ -153,8 +166,9 @@ pub fn update_disaster_status(input: UpdateDisasterStatusInput) -> ExternResult<
         }
     }
 
-    get(new_action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated disaster".into())))
+    get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated disaster".into()
+    )))
 }
 
 /// Input for updating disaster status
@@ -168,7 +182,9 @@ pub struct UpdateDisasterStatusInput {
 #[hdk_extern]
 pub fn add_incident_update(input: AddIncidentUpdateInput) -> ExternResult<Record> {
     if input.content.is_empty() || input.content.len() > 8192 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Content must be 1-8192 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Content must be 1-8192 characters".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -192,8 +208,9 @@ pub fn add_incident_update(input: AddIncidentUpdateInput) -> ExternResult<Record
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created update".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created update".into()
+    )))
 }
 
 /// Input for adding an incident update

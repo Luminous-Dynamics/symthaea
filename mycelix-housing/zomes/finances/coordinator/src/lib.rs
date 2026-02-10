@@ -1,8 +1,8 @@
 //! Finances Coordinator Zome
 //! Business logic for charges, payments, reserves, and budgets.
 
-use hdk::prelude::*;
 use finances_integrity::*;
+use hdk::prelude::*;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -101,10 +101,9 @@ pub fn record_payment(payment: Payment) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created payment".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created payment".into()
+    )))
 }
 
 /// Get all payments for a member
@@ -146,10 +145,9 @@ pub fn create_reserve_fund(fund: ReserveFund) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created fund".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created fund".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -167,10 +165,9 @@ pub fn deposit_to_reserve(input: DepositToReserveInput) -> ExternResult<Record> 
         )));
     }
 
-    let record = get(input.fund_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Reserve fund not found".into()
-        )))?;
+    let record = get(input.fund_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Reserve fund not found".into())
+    ))?;
 
     let mut fund: ReserveFund = record
         .entry()
@@ -184,10 +181,9 @@ pub fn deposit_to_reserve(input: DepositToReserveInput) -> ExternResult<Record> 
 
     let new_hash = update_entry(input.fund_hash, &EntryTypes::ReserveFund(fund))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated fund".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated fund".into()
+    )))
 }
 
 /// Create an annual budget
@@ -204,10 +200,9 @@ pub fn create_budget(budget: Budget) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created budget".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created budget".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -218,10 +213,9 @@ pub struct ApproveBudgetInput {
 /// Approve a budget
 #[hdk_extern]
 pub fn approve_budget(input: ApproveBudgetInput) -> ExternResult<Record> {
-    let record = get(input.budget_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Budget not found".into()
-        )))?;
+    let record = get(input.budget_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Budget not found".into())
+    ))?;
 
     let mut budget: Budget = record
         .entry()
@@ -243,10 +237,9 @@ pub fn approve_budget(input: ApproveBudgetInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.budget_hash, &EntryTypes::Budget(budget))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated budget".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated budget".into()
+    )))
 }
 
 /// Financial summary response
@@ -307,10 +300,9 @@ pub fn get_financial_summary(input: FinancialSummaryInput) -> ExternResult<Finan
             )?;
 
             for plink in payment_links {
-                let p_hash = ActionHash::try_from(plink.target)
-                    .map_err(|_| {
-                        wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
-                    })?;
+                let p_hash = ActionHash::try_from(plink.target).map_err(|_| {
+                    wasm_error!(WasmErrorInner::Guest("Invalid link target".into()))
+                })?;
                 if let Some(precord) = get(p_hash, GetOptions::default())? {
                     if let Some(payment) = precord
                         .entry()
@@ -326,7 +318,10 @@ pub fn get_financial_summary(input: FinancialSummaryInput) -> ExternResult<Finan
 
     // Get reserve funds
     let fund_links = get_links(
-        LinkQuery::try_new(anchor_hash("all_reserve_funds")?, LinkTypes::AllReserveFunds)?,
+        LinkQuery::try_new(
+            anchor_hash("all_reserve_funds")?,
+            LinkTypes::AllReserveFunds,
+        )?,
         GetStrategy::default(),
     )?;
 

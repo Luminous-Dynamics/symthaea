@@ -14,16 +14,24 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 #[hdk_extern]
 pub fn register_shelter(input: RegisterShelterInput) -> ExternResult<Record> {
     if input.name.is_empty() || input.name.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Name must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Name must be 1-256 characters".into()
+        )));
     }
     if input.address.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Address cannot be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Address cannot be empty".into()
+        )));
     }
     if input.capacity == 0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Capacity must be greater than 0".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Capacity must be greater than 0".into()
+        )));
     }
     if input.contact.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Contact cannot be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Contact cannot be empty".into()
+        )));
     }
 
     let shelter = Shelter {
@@ -70,8 +78,9 @@ pub fn register_shelter(input: RegisterShelterInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created shelter".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created shelter".into()
+    )))
 }
 
 /// Input for registering a shelter
@@ -91,14 +100,17 @@ pub struct RegisterShelterInput {
 /// Update shelter status
 #[hdk_extern]
 pub fn update_shelter_status(input: UpdateShelterStatusInput) -> ExternResult<Record> {
-    let current_record = get(input.shelter_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Shelter not found".into())))?;
+    let current_record = get(input.shelter_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Shelter not found".into())),
+    )?;
 
     let current_shelter: Shelter = current_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid shelter entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid shelter entry".into()
+        )))?;
 
     let updated_shelter = Shelter {
         status: input.new_status.clone(),
@@ -111,7 +123,10 @@ pub fn update_shelter_status(input: UpdateShelterStatusInput) -> ExternResult<Re
     )?;
 
     // Remove from open shelters if closing or full
-    if matches!(input.new_status, ShelterStatus::Closed | ShelterStatus::Full | ShelterStatus::Evacuating) {
+    if matches!(
+        input.new_status,
+        ShelterStatus::Closed | ShelterStatus::Full | ShelterStatus::Evacuating
+    ) {
         let links = get_links(
             LinkQuery::try_new(anchor_hash("open_shelters")?, LinkTypes::OpenShelters)?,
             GetStrategy::default(),
@@ -126,8 +141,9 @@ pub fn update_shelter_status(input: UpdateShelterStatusInput) -> ExternResult<Re
         }
     }
 
-    get(new_action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated shelter".into())))
+    get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated shelter".into()
+    )))
 }
 
 /// Input for updating shelter status
@@ -141,25 +157,34 @@ pub struct UpdateShelterStatusInput {
 #[hdk_extern]
 pub fn check_in_person(input: CheckInPersonInput) -> ExternResult<Record> {
     if input.person_name.is_empty() || input.person_name.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Person name must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Person name must be 1-256 characters".into()
+        )));
     }
     if input.party_size == 0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Party size must be at least 1".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Party size must be at least 1".into()
+        )));
     }
 
     // Get current shelter to update occupancy
-    let shelter_record = get(input.shelter_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Shelter not found".into())))?;
+    let shelter_record = get(input.shelter_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Shelter not found".into())),
+    )?;
 
     let current_shelter: Shelter = shelter_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid shelter entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid shelter entry".into()
+        )))?;
 
     let new_occupancy = current_shelter.current_occupancy + input.party_size as u32;
     if new_occupancy > current_shelter.capacity {
-        return Err(wasm_error!(WasmErrorInner::Guest("Shelter does not have enough capacity".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Shelter does not have enough capacity".into()
+        )));
     }
 
     let now = sys_time()?;
@@ -230,8 +255,9 @@ pub fn check_in_person(input: CheckInPersonInput) -> ExternResult<Record> {
         }
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created registration".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created registration".into()
+    )))
 }
 
 /// Input for checking in a person
@@ -247,17 +273,22 @@ pub struct CheckInPersonInput {
 /// Check out a person from a shelter
 #[hdk_extern]
 pub fn check_out_person(input: CheckOutPersonInput) -> ExternResult<Record> {
-    let current_record = get(input.registration_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Registration not found".into())))?;
+    let current_record = get(input.registration_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Registration not found".into())),
+    )?;
 
     let current_reg: ShelterRegistration = current_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid registration entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid registration entry".into()
+        )))?;
 
     if current_reg.checked_out_at.is_some() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Person already checked out".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Person already checked out".into()
+        )));
     }
 
     let now = sys_time()?;
@@ -273,14 +304,17 @@ pub fn check_out_person(input: CheckOutPersonInput) -> ExternResult<Record> {
     )?;
 
     // Update shelter occupancy
-    let shelter_record = get(current_reg.shelter_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Shelter not found".into())))?;
+    let shelter_record = get(current_reg.shelter_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Shelter not found".into())),
+    )?;
 
     let current_shelter: Shelter = shelter_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid shelter entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid shelter entry".into()
+        )))?;
 
     let new_occupancy = current_shelter
         .current_occupancy
@@ -313,8 +347,9 @@ pub fn check_out_person(input: CheckOutPersonInput) -> ExternResult<Record> {
         )?;
     }
 
-    get(new_action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated registration".into())))
+    get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated registration".into()
+    )))
 }
 
 /// Input for checking out a person

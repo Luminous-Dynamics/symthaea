@@ -51,10 +51,9 @@ pub fn query_housing(input: QueryHousingInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created query".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created query".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -67,9 +66,7 @@ pub struct RespondToQueryInput {
 #[hdk_extern]
 pub fn respond_to_query(input: RespondToQueryInput) -> ExternResult<Record> {
     let record = get(input.query_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Query not found".into()
-        )))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Query not found".into())))?;
 
     let mut query: HousingQuery = record
         .entry()
@@ -91,10 +88,9 @@ pub fn respond_to_query(input: RespondToQueryInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.query_hash, &EntryTypes::HousingQuery(query))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated query".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated query".into()
+    )))
 }
 
 /// Broadcast a housing event to other hApps
@@ -120,10 +116,9 @@ pub fn broadcast_event(event: HousingEvent) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created event".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created event".into()
+    )))
 }
 
 /// Verify member identity via cross-hApp bridge to mycelix-identity
@@ -156,10 +151,9 @@ pub fn verify_member_identity(member: AgentPubKey) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created query".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created query".into()
+    )))
 }
 
 /// Check property registry via cross-hApp bridge to mycelix-property
@@ -192,10 +186,9 @@ pub fn check_property_registry(property_hash: ActionHash) -> ExternResult<Record
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created query".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created query".into()
+    )))
 }
 
 /// Request dispute resolution via cross-hApp bridge to mycelix-justice
@@ -232,8 +225,7 @@ pub fn request_dispute_resolution(dispute_data: String) -> ExternResult<Record> 
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created event".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created event".into()
+    )))
 }

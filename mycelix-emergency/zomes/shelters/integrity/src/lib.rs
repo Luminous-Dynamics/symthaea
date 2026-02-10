@@ -148,40 +148,58 @@ fn validate_create_shelter(
     shelter: Shelter,
 ) -> ExternResult<ValidateCallbackResult> {
     if shelter.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Shelter ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Shelter ID cannot be empty".into(),
+        ));
     }
     if shelter.name.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Shelter name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Shelter name cannot be empty".into(),
+        ));
     }
     if shelter.address.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Shelter address cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Shelter address cannot be empty".into(),
+        ));
     }
     if shelter.capacity == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Shelter capacity must be greater than 0".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Shelter capacity must be greater than 0".into(),
+        ));
     }
     if shelter.current_occupancy > shelter.capacity {
-        return Ok(ValidateCallbackResult::Invalid("Occupancy cannot exceed capacity".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Occupancy cannot exceed capacity".into(),
+        ));
     }
     if shelter.location_lat < -90.0 || shelter.location_lat > 90.0 {
-        return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Latitude must be between -90 and 90".into(),
+        ));
     }
     if shelter.location_lon < -180.0 || shelter.location_lon > 180.0 {
-        return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Longitude must be between -180 and 180".into(),
+        ));
     }
     if shelter.contact.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Contact information cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contact information cannot be empty".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_update_shelter(
-    shelter: Shelter,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_update_shelter(shelter: Shelter) -> ExternResult<ValidateCallbackResult> {
     if shelter.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Shelter ID cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Shelter ID cannot be empty".into(),
+        ));
     }
     if shelter.current_occupancy > shelter.capacity {
-        return Ok(ValidateCallbackResult::Invalid("Occupancy cannot exceed capacity".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Occupancy cannot exceed capacity".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -191,13 +209,19 @@ fn validate_create_registration(
     reg: ShelterRegistration,
 ) -> ExternResult<ValidateCallbackResult> {
     if reg.person_name.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Person name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Person name cannot be empty".into(),
+        ));
     }
     if reg.party_size == 0 {
-        return Ok(ValidateCallbackResult::Invalid("Party size must be at least 1".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Party size must be at least 1".into(),
+        ));
     }
     if reg.checked_out_at.is_some() {
-        return Ok(ValidateCallbackResult::Invalid("Cannot create registration already checked out".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot create registration already checked out".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }

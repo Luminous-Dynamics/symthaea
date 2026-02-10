@@ -256,10 +256,7 @@ fn validate_create_resolution(
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_create_bylaw(
-    _action: Create,
-    bylaw: ByLaw,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_bylaw(_action: Create, bylaw: ByLaw) -> ExternResult<ValidateCallbackResult> {
     if bylaw.id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "ByLaw ID cannot be empty".into(),
@@ -310,12 +307,10 @@ fn validate_create_election(
     // Verify all candidates are for valid positions
     for candidate in &election.candidates {
         if !election.positions.contains(&candidate.position) {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!(
-                    "Candidate position '{}' is not in the election positions list",
-                    candidate.position
-                ),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Candidate position '{}' is not in the election positions list",
+                candidate.position
+            )));
         }
         if candidate.statement.is_empty() {
             return Ok(ValidateCallbackResult::Invalid(
@@ -326,10 +321,7 @@ fn validate_create_election(
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_create_ballot(
-    _action: Create,
-    ballot: Ballot,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_ballot(_action: Create, ballot: Ballot) -> ExternResult<ValidateCallbackResult> {
     if ballot.votes.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Ballot must contain at least one vote".into(),
@@ -339,9 +331,10 @@ fn validate_create_ballot(
     let mut seen_positions = std::collections::HashSet::new();
     for vote in &ballot.votes {
         if !seen_positions.insert(vote.position.clone()) {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!("Duplicate vote for position '{}'", vote.position),
-            ));
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Duplicate vote for position '{}'",
+                vote.position
+            )));
         }
     }
     Ok(ValidateCallbackResult::Valid)

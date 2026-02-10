@@ -55,10 +55,9 @@ pub fn submit_reading(reading: QualityReading) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created reading".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created reading".into()
+    )))
 }
 
 /// Get all quality readings for a water source
@@ -182,10 +181,9 @@ pub fn raise_alert(alert: ContaminationAlert) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created alert".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created alert".into()
+    )))
 }
 
 /// Get all active (unresolved) alerts
@@ -241,10 +239,9 @@ pub fn resolve_alert(input: ResolveAlertInput) -> ExternResult<Record> {
         &EntryTypes::ContaminationAlert(alert),
     )?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated alert".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated alert".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -276,20 +273,18 @@ pub fn start_remediation(remediation: Remediation) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created remediation".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created remediation".into()
+    )))
 }
 
 /// Complete a remediation with verification
 #[hdk_extern]
 pub fn complete_remediation(input: CompleteRemediationInput) -> ExternResult<Record> {
     let agent_info = agent_info()?;
-    let record = get(input.remediation_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Remediation not found".into()
-        )))?;
+    let record = get(input.remediation_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Remediation not found".into())
+    ))?;
     let mut remediation: Remediation = record
         .entry()
         .to_app_option()
@@ -317,10 +312,9 @@ pub fn complete_remediation(input: CompleteRemediationInput) -> ExternResult<Rec
         &EntryTypes::Remediation(remediation),
     )?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated remediation".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated remediation".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]

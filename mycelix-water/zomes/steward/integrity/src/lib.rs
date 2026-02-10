@@ -249,9 +249,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::RightTransfer(transfer) => {
                     validate_create_right_transfer(action, transfer)
                 }
-                EntryTypes::WaterDispute(dispute) => {
-                    validate_create_water_dispute(action, dispute)
-                }
+                EntryTypes::WaterDispute(dispute) => validate_create_water_dispute(action, dispute),
             },
             OpEntry::UpdateEntry {
                 app_entry,

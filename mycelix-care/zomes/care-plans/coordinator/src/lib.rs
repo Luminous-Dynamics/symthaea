@@ -1,8 +1,8 @@
 //! Care Plans Coordinator Zome
 //! Business logic for care plan management and session logging.
 
-use hdk::prelude::*;
 use care_plans_integrity::*;
+use hdk::prelude::*;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -42,30 +42,44 @@ pub fn create_care_plan(plan: CarePlan) -> ExternResult<Record> {
 
     // Link recipient to plan
     let recipient_anchor = ensure_anchor(&format!("recipient_plans:{}", plan.recipient))?;
-    create_link(recipient_anchor, action_hash.clone(), LinkTypes::RecipientToPlans, ())?;
+    create_link(
+        recipient_anchor,
+        action_hash.clone(),
+        LinkTypes::RecipientToPlans,
+        (),
+    )?;
 
     // Link each caregiver to plan
     for caregiver in &plan.caregivers {
         let cg_anchor = ensure_anchor(&format!("caregiver_plans:{}", caregiver))?;
-        create_link(cg_anchor, action_hash.clone(), LinkTypes::CaregiverToPlans, ())?;
+        create_link(
+            cg_anchor,
+            action_hash.clone(),
+            LinkTypes::CaregiverToPlans,
+            (),
+        )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created care plan".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created care plan".into()
+    )))
 }
 
 /// Log a care session against a plan
 #[hdk_extern]
 pub fn log_session(session: CareSession) -> ExternResult<Record> {
     // Verify the plan exists
-    let _plan_record = get(session.plan_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Care plan not found".into())))?;
+    let _plan_record = get(session.plan_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Care plan not found".into())),
+    )?;
 
     let plan: CarePlan = _plan_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid care plan entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid care plan entry".into()
+        )))?;
 
     // Verify caregiver is assigned to this plan
     if !plan.caregivers.contains(&session.caregiver) {
@@ -85,14 +99,25 @@ pub fn log_session(session: CareSession) -> ExternResult<Record> {
 
     // Link plan to session
     let plan_anchor = ensure_anchor(&format!("plan_sessions:{}", session.plan_hash))?;
-    create_link(plan_anchor, action_hash.clone(), LinkTypes::PlanToSessions, ())?;
+    create_link(
+        plan_anchor,
+        action_hash.clone(),
+        LinkTypes::PlanToSessions,
+        (),
+    )?;
 
     // Link caregiver to session
     let cg_anchor = ensure_anchor(&format!("caregiver_sessions:{}", session.caregiver))?;
-    create_link(cg_anchor, action_hash.clone(), LinkTypes::CaregiverToSessions, ())?;
+    create_link(
+        cg_anchor,
+        action_hash.clone(),
+        LinkTypes::CaregiverToSessions,
+        (),
+    )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created session".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created session".into()
+    )))
 }
 
 /// Get all sessions for a care plan
@@ -116,14 +141,17 @@ pub struct UpdatePlanStatusInput {
 /// Update the status of a care plan
 #[hdk_extern]
 pub fn update_plan_status(input: UpdatePlanStatusInput) -> ExternResult<Record> {
-    let record = get(input.plan_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Care plan not found".into())))?;
+    let record = get(input.plan_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Care plan not found".into())
+    ))?;
 
     let mut plan: CarePlan = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid care plan entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid care plan entry".into()
+        )))?;
 
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -140,8 +168,9 @@ pub fn update_plan_status(input: UpdatePlanStatusInput) -> ExternResult<Record> 
 
     let updated_hash = update_entry(input.plan_hash, &EntryTypes::CarePlan(plan))?;
 
-    get(updated_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated care plan".into())))
+    get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated care plan".into()
+    )))
 }
 
 /// Get care plans where the caller is the recipient

@@ -166,71 +166,112 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<ValidateCallbackResult> {
     if plan.title.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Plan title cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Plan title cannot be empty".into(),
+        ));
     }
     if plan.title.len() > 256 {
-        return Ok(ValidateCallbackResult::Invalid("Plan title must be 256 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Plan title must be 256 characters or fewer".into(),
+        ));
     }
     if plan.description.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Plan description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Plan description cannot be empty".into(),
+        ));
     }
     if plan.description.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Plan description must be 4096 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Plan description must be 4096 characters or fewer".into(),
+        ));
     }
     if plan.schedule.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Schedule cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schedule cannot be empty".into(),
+        ));
     }
     if plan.schedule.len() > 512 {
-        return Ok(ValidateCallbackResult::Invalid("Schedule must be 512 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schedule must be 512 characters or fewer".into(),
+        ));
     }
     if plan.caregivers.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("At least one caregiver must be assigned".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "At least one caregiver must be assigned".into(),
+        ));
     }
     if plan.caregivers.len() > 50 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 caregivers".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot have more than 50 caregivers".into(),
+        ));
     }
     if plan.hours_per_week <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Hours per week must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours per week must be positive".into(),
+        ));
     }
     if plan.hours_per_week > 168.0 {
-        return Ok(ValidateCallbackResult::Invalid("Hours per week cannot exceed 168".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Hours per week cannot exceed 168".into(),
+        ));
     }
     if plan.special_instructions.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Special instructions must be 4096 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Special instructions must be 4096 characters or fewer".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_update_plan(plan: CarePlan) -> ExternResult<ValidateCallbackResult> {
     if plan.title.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Plan title cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Plan title cannot be empty".into(),
+        ));
     }
     if plan.caregivers.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("At least one caregiver must be assigned".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "At least one caregiver must be assigned".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_create_session(_action: Create, session: CareSession) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_session(
+    _action: Create,
+    session: CareSession,
+) -> ExternResult<ValidateCallbackResult> {
     if session.hours <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Session hours must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Session hours must be positive".into(),
+        ));
     }
     if session.hours > 24.0 {
-        return Ok(ValidateCallbackResult::Invalid("Session cannot exceed 24 hours".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Session cannot exceed 24 hours".into(),
+        ));
     }
     if session.notes.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Session notes must be 4096 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Session notes must be 4096 characters or fewer".into(),
+        ));
     }
     if session.tasks_completed.len() > 50 {
-        return Ok(ValidateCallbackResult::Invalid("Cannot list more than 50 tasks".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot list more than 50 tasks".into(),
+        ));
     }
     for task in &session.tasks_completed {
         if task.len() > 256 {
-            return Ok(ValidateCallbackResult::Invalid("Each task must be 256 characters or fewer".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Each task must be 256 characters or fewer".into(),
+            ));
         }
     }
     if session.ended_at <= session.started_at {
-        return Ok(ValidateCallbackResult::Invalid("Session end must be after session start".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Session end must be after session start".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }

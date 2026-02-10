@@ -14,13 +14,19 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 #[hdk_extern]
 pub fn register_resource(input: RegisterResourceInput) -> ExternResult<Record> {
     if input.name.is_empty() || input.name.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Name must be 1-256 characters".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Name must be 1-256 characters".into()
+        )));
     }
     if input.unit.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Unit cannot be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Unit cannot be empty".into()
+        )));
     }
     if input.location.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Location cannot be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Location cannot be empty".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -49,7 +55,9 @@ pub fn register_resource(input: RegisterResourceInput) -> ExternResult<Record> {
     )?;
 
     // Link to available resources
-    create_entry(&EntryTypes::Anchor(Anchor("available_resources".to_string())))?;
+    create_entry(&EntryTypes::Anchor(Anchor(
+        "available_resources".to_string(),
+    )))?;
     create_link(
         anchor_hash("available_resources")?,
         action_hash.clone(),
@@ -75,8 +83,9 @@ pub fn register_resource(input: RegisterResourceInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created resource".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created resource".into()
+    )))
 }
 
 /// Input for registering a resource
@@ -93,17 +102,22 @@ pub struct RegisterResourceInput {
 /// Deploy a resource to a disaster
 #[hdk_extern]
 pub fn deploy_resource(input: DeployResourceInput) -> ExternResult<Record> {
-    let current_record = get(input.resource_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Resource not found".into())))?;
+    let current_record = get(input.resource_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Resource not found".into())),
+    )?;
 
     let current_resource: EmergencyResource = current_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid resource entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid resource entry".into()
+        )))?;
 
     if current_resource.status != ResourceStatus::Available {
-        return Err(wasm_error!(WasmErrorInner::Guest("Resource is not available for deployment".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Resource is not available for deployment".into()
+        )));
     }
 
     let updated_resource = EmergencyResource {
@@ -120,7 +134,10 @@ pub fn deploy_resource(input: DeployResourceInput) -> ExternResult<Record> {
 
     // Remove from available resources
     let links = get_links(
-        LinkQuery::try_new(anchor_hash("available_resources")?, LinkTypes::AvailableResources)?,
+        LinkQuery::try_new(
+            anchor_hash("available_resources")?,
+            LinkTypes::AvailableResources,
+        )?,
         GetStrategy::default(),
     )?;
     for link in links {
@@ -132,8 +149,9 @@ pub fn deploy_resource(input: DeployResourceInput) -> ExternResult<Record> {
         }
     }
 
-    get(new_action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated resource".into())))
+    get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated resource".into()
+    )))
 }
 
 /// Input for deploying a resource
@@ -148,10 +166,14 @@ pub struct DeployResourceInput {
 #[hdk_extern]
 pub fn request_resource(input: RequestResourceInput) -> ExternResult<Record> {
     if input.quantity_needed == 0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Quantity needed must be greater than 0".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Quantity needed must be greater than 0".into()
+        )));
     }
     if input.location.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Location cannot be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Location cannot be empty".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -179,8 +201,9 @@ pub fn request_resource(input: RequestResourceInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created request".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created request".into()
+    )))
 }
 
 /// Input for requesting a resource
@@ -196,17 +219,24 @@ pub struct RequestResourceInput {
 /// Fulfill a resource request
 #[hdk_extern]
 pub fn fulfill_request(input: FulfillRequestInput) -> ExternResult<Record> {
-    let current_record = get(input.request_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Request not found".into())))?;
+    let current_record = get(input.request_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Request not found".into())),
+    )?;
 
     let current_request: ResourceRequest = current_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid request entry".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid request entry".into()
+        )))?;
 
-    if current_request.status != RequestStatus::Pending && current_request.status != RequestStatus::Approved {
-        return Err(wasm_error!(WasmErrorInner::Guest("Request is not in a fulfillable state".into())));
+    if current_request.status != RequestStatus::Pending
+        && current_request.status != RequestStatus::Approved
+    {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Request is not in a fulfillable state".into()
+        )));
     }
 
     let updated_request = ResourceRequest {
@@ -228,8 +258,9 @@ pub fn fulfill_request(input: FulfillRequestInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(new_action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated request".into())))
+    get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated request".into()
+    )))
 }
 
 /// Input for fulfilling a request
@@ -243,7 +274,10 @@ pub struct FulfillRequestInput {
 #[hdk_extern]
 pub fn get_available_resources(_: ()) -> ExternResult<Vec<Record>> {
     let links = get_links(
-        LinkQuery::try_new(anchor_hash("available_resources")?, LinkTypes::AvailableResources)?,
+        LinkQuery::try_new(
+            anchor_hash("available_resources")?,
+            LinkTypes::AvailableResources,
+        )?,
         GetStrategy::default(),
     )?;
 

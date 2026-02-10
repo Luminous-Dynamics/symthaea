@@ -1,8 +1,8 @@
 //! Emergency Bridge Coordinator Zome
 //! Cross-hApp integration for emergency coordination
 
-use hdk::prelude::*;
 use emergency_bridge_integrity::*;
+use hdk::prelude::*;
 
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -14,10 +14,14 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 #[hdk_extern]
 pub fn query_emergency(input: QueryEmergencyInput) -> ExternResult<Record> {
     if input.source_happ.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Source hApp cannot be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Source hApp cannot be empty".into()
+        )));
     }
     if input.parameters.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Parameters cannot be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Parameters cannot be empty".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -55,8 +59,9 @@ pub fn query_emergency(input: QueryEmergencyInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created query".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created query".into()
+    )))
 }
 
 /// Input for querying emergency data
@@ -71,10 +76,14 @@ pub struct QueryEmergencyInput {
 #[hdk_extern]
 pub fn broadcast_event(input: BroadcastEventInput) -> ExternResult<Record> {
     if input.payload.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Event payload cannot be empty".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Event payload cannot be empty".into()
+        )));
     }
     if input.target_happs.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Must target at least one hApp".into())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Must target at least one hApp".into()
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -111,8 +120,9 @@ pub fn broadcast_event(input: BroadcastEventInput) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created event".into())))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created event".into()
+    )))
 }
 
 /// Input for broadcasting an emergency event

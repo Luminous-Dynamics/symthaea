@@ -157,20 +157,30 @@ fn validate_create_message(
     msg: EmergencyMessage,
 ) -> ExternResult<ValidateCallbackResult> {
     if msg.content.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Message content cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Message content cannot be empty".into(),
+        ));
     }
     if msg.content.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Message content cannot exceed 4096 bytes".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Message content cannot exceed 4096 bytes".into(),
+        ));
     }
     if msg.ttl_hours == 0 {
-        return Ok(ValidateCallbackResult::Invalid("TTL must be at least 1 hour".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "TTL must be at least 1 hour".into(),
+        ));
     }
     if let Some((lat, lon)) = msg.location {
         if lat < -90.0 || lat > 90.0 {
-            return Ok(ValidateCallbackResult::Invalid("Latitude must be between -90 and 90".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Latitude must be between -90 and 90".into(),
+            ));
         }
         if lon < -180.0 || lon > 180.0 {
-            return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Longitude must be between -180 and 180".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
@@ -181,10 +191,14 @@ fn validate_create_channel(
     channel: EmergencyChannel,
 ) -> ExternResult<ValidateCallbackResult> {
     if channel.name.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Channel name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Channel name cannot be empty".into(),
+        ));
     }
     if channel.participants.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Channel must have at least one participant".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Channel must have at least one participant".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -194,17 +208,25 @@ fn validate_create_broadcast(
     broadcast: Broadcast,
 ) -> ExternResult<ValidateCallbackResult> {
     if broadcast.content.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Broadcast content cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Broadcast content cannot be empty".into(),
+        ));
     }
     let (lat, lon, radius) = broadcast.target_area;
     if lat < -90.0 || lat > 90.0 {
-        return Ok(ValidateCallbackResult::Invalid("Target area latitude must be between -90 and 90".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Target area latitude must be between -90 and 90".into(),
+        ));
     }
     if lon < -180.0 || lon > 180.0 {
-        return Ok(ValidateCallbackResult::Invalid("Target area longitude must be between -180 and 180".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Target area longitude must be between -180 and 180".into(),
+        ));
     }
     if radius <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Target area radius must be positive".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Target area radius must be positive".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }

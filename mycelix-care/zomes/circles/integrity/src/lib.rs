@@ -112,7 +112,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::CareCircle(circle) => validate_create_circle(action, circle),
-                EntryTypes::CircleMembership(membership) => validate_create_membership(action, membership),
+                EntryTypes::CircleMembership(membership) => {
+                    validate_create_membership(action, membership)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -148,45 +150,71 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_create_circle(_action: Create, circle: CareCircle) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_circle(
+    _action: Create,
+    circle: CareCircle,
+) -> ExternResult<ValidateCallbackResult> {
     if circle.name.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Circle name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle name cannot be empty".into(),
+        ));
     }
     if circle.name.len() > 128 {
-        return Ok(ValidateCallbackResult::Invalid("Circle name must be 128 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle name must be 128 characters or fewer".into(),
+        ));
     }
     if circle.description.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Circle description cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle description cannot be empty".into(),
+        ));
     }
     if circle.description.len() > 2048 {
-        return Ok(ValidateCallbackResult::Invalid("Circle description must be 2048 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle description must be 2048 characters or fewer".into(),
+        ));
     }
     if circle.max_members < 2 {
-        return Ok(ValidateCallbackResult::Invalid("Circle must allow at least 2 members".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle must allow at least 2 members".into(),
+        ));
     }
     if circle.max_members > 500 {
-        return Ok(ValidateCallbackResult::Invalid("Circle cannot have more than 500 members".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle cannot have more than 500 members".into(),
+        ));
     }
     if circle.location.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Location cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Location cannot be empty".into(),
+        ));
     }
     if circle.location.len() > 512 {
-        return Ok(ValidateCallbackResult::Invalid("Location must be 512 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Location must be 512 characters or fewer".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_update_circle(circle: CareCircle) -> ExternResult<ValidateCallbackResult> {
     if circle.name.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Circle name cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle name cannot be empty".into(),
+        ));
     }
     if circle.max_members < 2 {
-        return Ok(ValidateCallbackResult::Invalid("Circle must allow at least 2 members".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Circle must allow at least 2 members".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_create_membership(_action: Create, _membership: CircleMembership) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_membership(
+    _action: Create,
+    _membership: CircleMembership,
+) -> ExternResult<ValidateCallbackResult> {
     // Membership validation is primarily handled at the coordinator level
     // (checking circle exists, member count, etc.)
     Ok(ValidateCallbackResult::Valid)

@@ -1,8 +1,8 @@
 //! Capture Coordinator Zome
 //! Business logic for water harvesting, storage, and aquifer recharge
 
-use hdk::prelude::*;
 use capture_integrity::*;
+use hdk::prelude::*;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -68,10 +68,9 @@ pub fn register_harvest_system(system: HarvestSystem) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created harvest system".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created harvest system".into()
+    )))
 }
 
 /// Get all harvest systems owned by the calling agent
@@ -79,10 +78,7 @@ pub fn register_harvest_system(system: HarvestSystem) -> ExternResult<Record> {
 pub fn get_my_systems(_: ()) -> ExternResult<Vec<Record>> {
     let agent_info = agent_info()?;
     let links = get_links(
-        LinkQuery::try_new(
-            agent_info.agent_initial_pubkey,
-            LinkTypes::OwnerToSystem,
-        )?,
+        LinkQuery::try_new(agent_info.agent_initial_pubkey, LinkTypes::OwnerToSystem)?,
         GetStrategy::default(),
     )?;
     records_from_links(links)
@@ -145,10 +141,9 @@ pub fn register_tank(tank: StorageTank) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created tank".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created tank".into()
+    )))
 }
 
 /// Update the current water level in a tank
@@ -184,10 +179,9 @@ pub fn update_tank_level(input: UpdateTankLevelInput) -> ExternResult<Record> {
         &EntryTypes::StorageTank(tank),
     )?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated tank".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated tank".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -221,10 +215,9 @@ pub fn record_harvest(harvest: HarvestRecord) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created harvest record".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created harvest record".into()
+    )))
 }
 
 /// Get harvest history for a system
@@ -270,10 +263,9 @@ pub fn register_recharge_project(project: RechargeProject) -> ExternResult<Recor
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created recharge project".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created recharge project".into()
+    )))
 }
 
 /// Get all recharge projects

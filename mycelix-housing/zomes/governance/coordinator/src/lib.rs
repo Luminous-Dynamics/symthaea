@@ -23,10 +23,9 @@ pub fn schedule_meeting(meeting: BoardMeeting) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created meeting".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created meeting".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -45,10 +44,9 @@ pub fn record_minutes(input: RecordMinutesInput) -> ExternResult<Record> {
         )));
     }
 
-    let record = get(input.meeting_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Meeting not found".into()
-        )))?;
+    let record = get(input.meeting_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Meeting not found".into())
+    ))?;
 
     let mut meeting: BoardMeeting = record
         .entry()
@@ -63,10 +61,9 @@ pub fn record_minutes(input: RecordMinutesInput) -> ExternResult<Record> {
 
     let new_hash = update_entry(input.meeting_hash, &EntryTypes::BoardMeeting(meeting))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated meeting".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated meeting".into()
+    )))
 }
 
 /// Propose a resolution (optionally tied to a meeting)
@@ -92,10 +89,9 @@ pub fn propose_resolution(resolution: Resolution) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created resolution".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created resolution".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -110,10 +106,9 @@ pub struct VoteOnResolutionInput {
 /// Record votes on a resolution and determine if it passed
 #[hdk_extern]
 pub fn vote_on_resolution(input: VoteOnResolutionInput) -> ExternResult<Record> {
-    let record = get(input.resolution_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Resolution not found".into()
-        )))?;
+    let record = get(input.resolution_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Resolution not found".into())
+    ))?;
 
     let mut resolution: Resolution = record
         .entry()
@@ -136,15 +131,11 @@ pub fn vote_on_resolution(input: VoteOnResolutionInput) -> ExternResult<Record> 
         resolution.effective_date = Some(now);
     }
 
-    let new_hash = update_entry(
-        input.resolution_hash,
-        &EntryTypes::Resolution(resolution),
-    )?;
+    let new_hash = update_entry(input.resolution_hash, &EntryTypes::Resolution(resolution))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated resolution".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated resolution".into()
+    )))
 }
 
 /// Adopt a new bylaw
@@ -170,10 +161,9 @@ pub fn adopt_bylaw(bylaw: ByLaw) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created bylaw".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created bylaw".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -193,9 +183,7 @@ pub fn amend_bylaw(input: AmendByLawInput) -> ExternResult<Record> {
     }
 
     let record = get(input.original_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "ByLaw not found".into()
-        )))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest("ByLaw not found".into())))?;
 
     let original: ByLaw = record
         .entry()
@@ -236,10 +224,9 @@ pub fn amend_bylaw(input: AmendByLawInput) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created bylaw amendment".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created bylaw amendment".into()
+    )))
 }
 
 /// Create an election
@@ -255,20 +242,18 @@ pub fn create_election(election: Election) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created election".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created election".into()
+    )))
 }
 
 /// Cast a ballot in an election
 #[hdk_extern]
 pub fn cast_ballot(ballot: Ballot) -> ExternResult<Record> {
     // Verify the election exists and is open
-    let election_record = get(ballot.election_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Election not found".into()
-        )))?;
+    let election_record = get(ballot.election_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Election not found".into())),
+    )?;
 
     let election: Election = election_record
         .entry()
@@ -316,16 +301,15 @@ pub fn cast_ballot(ballot: Ballot) -> ExternResult<Record> {
 
     // Validate all votes are for valid candidates
     for vote in &ballot.votes {
-        let valid_candidate = election.candidates.iter().any(|c| {
-            c.agent == vote.candidate && c.position == vote.position
-        });
+        let valid_candidate = election
+            .candidates
+            .iter()
+            .any(|c| c.agent == vote.candidate && c.position == vote.position);
         if !valid_candidate {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!(
-                    "Invalid candidate for position '{}'",
-                    vote.position
-                )
-            )));
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Invalid candidate for position '{}'",
+                vote.position
+            ))));
         }
     }
 
@@ -347,19 +331,17 @@ pub fn cast_ballot(ballot: Ballot) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created ballot".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created ballot".into()
+    )))
 }
 
 /// Tally election results
 #[hdk_extern]
 pub fn tally_election(election_hash: ActionHash) -> ExternResult<Record> {
-    let record = get(election_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Election not found".into()
-        )))?;
+    let record = get(election_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Election not found".into())
+    ))?;
 
     let mut election: Election = record
         .entry()
@@ -430,8 +412,7 @@ pub fn tally_election(election_hash: ActionHash) -> ExternResult<Record> {
 
     let new_hash = update_entry(election_hash, &EntryTypes::Election(election))?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated election".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated election".into()
+    )))
 }

@@ -203,10 +203,7 @@ fn validate_create_building(
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_create_unit(
-    _action: Create,
-    unit: Unit,
-) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_unit(_action: Create, unit: Unit) -> ExternResult<ValidateCallbackResult> {
     if unit.unit_number.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Unit number cannot be empty".into(),

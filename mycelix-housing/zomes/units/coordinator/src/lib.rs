@@ -39,10 +39,9 @@ pub fn register_building(building: Building) -> ExternResult<Record> {
         (),
     )?;
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created building".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created building".into()
+    )))
 }
 
 /// Register a new unit within a building
@@ -75,10 +74,9 @@ pub fn register_unit(unit: Unit) -> ExternResult<Record> {
         )?;
     }
 
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find created unit".into()
-        )))
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created unit".into()
+    )))
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -105,7 +103,10 @@ pub fn update_unit_status(input: UpdateUnitStatusInput) -> ExternResult<Record> 
     unit.status = input.new_status.clone();
     let is_available = unit.status == UnitStatus::Available;
 
-    let new_hash = update_entry(input.unit_action_hash.clone(), &EntryTypes::HousingUnit(unit))?;
+    let new_hash = update_entry(
+        input.unit_action_hash.clone(),
+        &EntryTypes::HousingUnit(unit),
+    )?;
 
     // Manage available units index
     if was_available && !is_available {
@@ -132,10 +133,9 @@ pub fn update_unit_status(input: UpdateUnitStatusInput) -> ExternResult<Record> 
         )?;
     }
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated unit".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated unit".into()
+    )))
 }
 
 /// Get all units in a building
@@ -207,7 +207,10 @@ pub fn assign_occupant(input: AssignOccupantInput) -> ExternResult<Record> {
     unit.current_occupant = Some(input.occupant.clone());
     unit.status = UnitStatus::Occupied;
 
-    let new_hash = update_entry(input.unit_action_hash.clone(), &EntryTypes::HousingUnit(unit))?;
+    let new_hash = update_entry(
+        input.unit_action_hash.clone(),
+        &EntryTypes::HousingUnit(unit),
+    )?;
 
     // Link occupant to unit
     create_link(
@@ -231,10 +234,9 @@ pub fn assign_occupant(input: AssignOccupantInput) -> ExternResult<Record> {
         }
     }
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated unit".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated unit".into()
+    )))
 }
 
 /// Vacate a unit, removing the occupant
@@ -288,8 +290,7 @@ pub fn vacate_unit(unit_action_hash: ActionHash) -> ExternResult<Record> {
         (),
     )?;
 
-    get(new_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find updated unit".into()
-        )))
+    get(new_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated unit".into()
+    )))
 }

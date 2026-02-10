@@ -110,7 +110,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::CreateEntry { app_entry, action } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::CareCredential(cred) => validate_create_credential(action, cred),
-                EntryTypes::CareReference(reference) => validate_create_reference(action, reference),
+                EntryTypes::CareReference(reference) => {
+                    validate_create_reference(action, reference)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -146,49 +148,77 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     }
 }
 
-fn validate_create_credential(_action: Create, cred: CareCredential) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_credential(
+    _action: Create,
+    cred: CareCredential,
+) -> ExternResult<ValidateCallbackResult> {
     if cred.issuer.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Issuer cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Issuer cannot be empty".into(),
+        ));
     }
     if cred.issuer.len() > 512 {
-        return Ok(ValidateCallbackResult::Invalid("Issuer must be 512 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Issuer must be 512 characters or fewer".into(),
+        ));
     }
     if cred.metadata.len() > 4096 {
-        return Ok(ValidateCallbackResult::Invalid("Metadata must be 4096 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Metadata must be 4096 characters or fewer".into(),
+        ));
     }
     // If metadata is non-empty, validate it is valid JSON
     if !cred.metadata.is_empty() {
         if serde_json::from_str::<serde_json::Value>(&cred.metadata).is_err() {
-            return Ok(ValidateCallbackResult::Invalid("Metadata must be valid JSON".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Metadata must be valid JSON".into(),
+            ));
         }
     }
     // If expires_at is set, it must be after issued_at
     if let Some(expires) = cred.expires_at {
         if expires <= cred.issued_at {
-            return Ok(ValidateCallbackResult::Invalid("Expiry must be after issuance".into()));
+            return Ok(ValidateCallbackResult::Invalid(
+                "Expiry must be after issuance".into(),
+            ));
         }
     }
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_create_reference(_action: Create, reference: CareReference) -> ExternResult<ValidateCallbackResult> {
+fn validate_create_reference(
+    _action: Create,
+    reference: CareReference,
+) -> ExternResult<ValidateCallbackResult> {
     if reference.rating < 1 || reference.rating > 5 {
-        return Ok(ValidateCallbackResult::Invalid("Rating must be between 1 and 5".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Rating must be between 1 and 5".into(),
+        ));
     }
     if reference.comment.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Comment cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Comment cannot be empty".into(),
+        ));
     }
     if reference.comment.len() > 2048 {
-        return Ok(ValidateCallbackResult::Invalid("Comment must be 2048 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Comment must be 2048 characters or fewer".into(),
+        ));
     }
     if reference.care_type.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid("Care type cannot be empty".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Care type cannot be empty".into(),
+        ));
     }
     if reference.care_type.len() > 128 {
-        return Ok(ValidateCallbackResult::Invalid("Care type must be 128 characters or fewer".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Care type must be 128 characters or fewer".into(),
+        ));
     }
     if reference.provider == reference.from_recipient {
-        return Ok(ValidateCallbackResult::Invalid("Cannot write a reference for yourself".into()));
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot write a reference for yourself".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
