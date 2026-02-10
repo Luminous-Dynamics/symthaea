@@ -5,10 +5,14 @@ on:
     branches: [main]
     paths:
       - "mycelix-workspace/sdk/**"
+      - "mycelix-workspace/shared/**"
+      - "mycelix-workspace/crates/mycelix-fl-core/**"
   pull_request:
     branches: [main]
     paths:
       - "mycelix-workspace/sdk/**"
+      - "mycelix-workspace/shared/**"
+      - "mycelix-workspace/crates/mycelix-fl-core/**"
 
 env:
   CARGO_TERM_COLOR: always
