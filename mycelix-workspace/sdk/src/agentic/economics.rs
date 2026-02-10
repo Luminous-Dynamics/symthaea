@@ -166,13 +166,15 @@ impl SlashingEngine {
             .push_back(event.clone());
 
         // Update cumulative slash
-        let cumulative = self.cumulative_slash
+        let cumulative = self
+            .cumulative_slash
             .entry(agent_id.to_string())
             .or_insert(0.0);
         *cumulative += slash_rate;
 
         // Set cooldown
-        self.cooldowns.insert(agent_id.to_string(), now + self.config.slash_cooldown_ms);
+        self.cooldowns
+            .insert(agent_id.to_string(), now + self.config.slash_cooldown_ms);
 
         // Check for suspension
         if *cumulative >= self.config.max_cumulative_slash {
@@ -190,21 +192,24 @@ impl SlashingEngine {
 
     /// Check if agent is in cooldown
     pub fn in_cooldown(&self, agent_id: &str) -> bool {
-        self.cooldowns.get(agent_id)
+        self.cooldowns
+            .get(agent_id)
             .map(|&expiry| Self::now() < expiry)
             .unwrap_or(false)
     }
 
     /// Get cooldown remaining (ms)
     pub fn cooldown_remaining(&self, agent_id: &str) -> u64 {
-        self.cooldowns.get(agent_id)
+        self.cooldowns
+            .get(agent_id)
             .map(|&expiry| expiry.saturating_sub(Self::now()))
             .unwrap_or(0)
     }
 
     /// Get slash history
     pub fn get_history(&self, agent_id: &str) -> Vec<SlashEvent> {
-        self.history.get(agent_id)
+        self.history
+            .get(agent_id)
             .map(|h| h.iter().cloned().collect())
             .unwrap_or_default()
     }
@@ -350,7 +355,9 @@ impl RewardEngine {
         let trust_bonus = (base as f64 * trust * self.config.trust_weight) as u64;
 
         // Check consistency bonus
-        let consistency_bonus = self.period_rewards.get(agent_id)
+        let consistency_bonus = self
+            .period_rewards
+            .get(agent_id)
             .map(|p| {
                 if p.participation_count > 5 {
                     (base as f64 * (self.config.consistency_multiplier - 1.0)) as u64
@@ -380,7 +387,8 @@ impl RewardEngine {
         let participation_reward = self.calculate_participation_reward(agent_id, trust);
 
         // Get or create period rewards
-        let period = self.period_rewards
+        let period = self
+            .period_rewards
             .entry(agent_id.to_string())
             .or_insert_with(|| PeriodRewards {
                 period_start: now,
@@ -405,15 +413,22 @@ impl RewardEngine {
         // Calculate reward
         let amount = match &reward_type {
             RewardType::Participation => participation_reward,
-            RewardType::HonestBehavior => (self.config.base_participation_reward as f64 * 2.0 * trust) as u64,
+            RewardType::HonestBehavior => {
+                (self.config.base_participation_reward as f64 * 2.0 * trust) as u64
+            }
             RewardType::ConsensusContribution => self.config.base_participation_reward * 3,
-            RewardType::Reliability => (self.config.base_participation_reward as f64 * 5.0 * trust) as u64,
+            RewardType::Reliability => {
+                (self.config.base_participation_reward as f64 * 5.0 * trust) as u64
+            }
             RewardType::Referral => self.config.base_participation_reward * 10,
             RewardType::Custom(_) => self.config.base_participation_reward,
         };
 
         // Apply period limit
-        let remaining = self.config.max_reward_per_period.saturating_sub(period.total_rewards);
+        let remaining = self
+            .config
+            .max_reward_per_period
+            .saturating_sub(period.total_rewards);
         let actual_amount = amount.min(remaining);
 
         if actual_amount == 0 {
@@ -443,7 +458,8 @@ impl RewardEngine {
 
     /// Get reward history
     pub fn get_history(&self, agent_id: &str) -> Vec<RewardEvent> {
-        self.history.get(agent_id)
+        self.history
+            .get(agent_id)
             .map(|h| h.iter().cloned().collect())
             .unwrap_or_default()
     }
@@ -503,18 +519,12 @@ impl BondingCurve {
         let x = successful_actions as f64;
 
         let trust = match self.curve_type {
-            BondingCurveType::Linear => {
-                (x * 0.01).min(self.max_trust)
-            }
-            BondingCurveType::Logarithmic => {
-                ((1.0 + x).ln() * 0.2).min(self.max_trust)
-            }
+            BondingCurveType::Linear => (x * 0.01).min(self.max_trust),
+            BondingCurveType::Logarithmic => ((1.0 + x).ln() * 0.2).min(self.max_trust),
             BondingCurveType::Sigmoid => {
                 self.max_trust / (1.0 + (-self.steepness * (x - self.midpoint)).exp())
             }
-            BondingCurveType::SquareRoot => {
-                (x.sqrt() * 0.1).min(self.max_trust)
-            }
+            BondingCurveType::SquareRoot => (x.sqrt() * 0.1).min(self.max_trust),
         };
 
         trust.clamp(0.0, self.max_trust)
@@ -626,7 +636,7 @@ impl CommitRevealVoting {
 
     /// Create a commitment for a vote
     pub fn create_commitment(vote: CommitRevealVote, salt: &[u8; 32]) -> [u8; 32] {
-        use sha3::{Sha3_256, Digest};
+        use sha3::{Digest, Sha3_256};
 
         let mut hasher = Sha3_256::new();
         hasher.update(b"vote-commitment-v1");
@@ -642,9 +652,7 @@ impl CommitRevealVoting {
         proposal_id: &str,
         commitment: VoteCommitment,
     ) -> bool {
-        let agent_commits = self.commits
-            .entry(agent_id.to_string())
-            .or_default();
+        let agent_commits = self.commits.entry(agent_id.to_string()).or_default();
 
         if agent_commits.contains_key(proposal_id) {
             return false; // Already committed
@@ -663,7 +671,8 @@ impl CommitRevealVoting {
         salt: &[u8; 32],
     ) -> Result<(), CommitRevealError> {
         // Get commitment
-        let commitment = self.commits
+        let commitment = self
+            .commits
             .get(agent_id)
             .and_then(|c| c.get(proposal_id))
             .ok_or(CommitRevealError::NoCommitment)?;
@@ -826,7 +835,9 @@ mod tests {
         assert!(voting.has_committed("agent-1", "prop-1"));
 
         // Reveal
-        voting.reveal("agent-1", "prop-1", CommitRevealVote::Yes, &salt).unwrap();
+        voting
+            .reveal("agent-1", "prop-1", CommitRevealVote::Yes, &salt)
+            .unwrap();
         assert!(voting.has_revealed("agent-1", "prop-1"));
 
         // Get votes

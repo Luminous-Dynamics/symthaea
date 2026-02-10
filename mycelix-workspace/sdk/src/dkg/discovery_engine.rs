@@ -261,15 +261,18 @@ impl DiscoveryEngine {
 
     /// Register a triple for discovery analysis
     pub fn register_triple(&mut self, input: RegisterTripleInput<'_>) {
-        self.triples.insert(input.hash.to_string(), DiscoveryTriple {
-            hash: input.hash.to_string(),
-            subject: input.subject.to_string(),
-            predicate: input.predicate.to_string(),
-            confidence: input.confidence,
-            domain: input.domain.map(|s| s.to_string()),
-            created_at: input.created_at,
-            attestation_count: input.attestation_count,
-        });
+        self.triples.insert(
+            input.hash.to_string(),
+            DiscoveryTriple {
+                hash: input.hash.to_string(),
+                subject: input.subject.to_string(),
+                predicate: input.predicate.to_string(),
+                confidence: input.confidence,
+                domain: input.domain.map(|s| s.to_string()),
+                created_at: input.created_at,
+                attestation_count: input.attestation_count,
+            },
+        );
     }
 
     /// Record a query for demand tracking
@@ -320,10 +323,8 @@ impl DiscoveryEngine {
         for triple in self.triples.values() {
             if triple.confidence < self.config.low_confidence_threshold {
                 self.gap_counter += 1;
-                let importance = self.calculate_gap_importance(
-                    &triple.subject,
-                    &GapType::LowConfidence,
-                );
+                let importance =
+                    self.calculate_gap_importance(&triple.subject, &GapType::LowConfidence);
 
                 if importance >= self.config.min_gap_importance {
                     gaps.push(KnowledgeGap {
@@ -344,10 +345,7 @@ impl DiscoveryEngine {
             let age = current_time.saturating_sub(triple.created_at);
             if age > self.config.stale_threshold_seconds {
                 self.gap_counter += 1;
-                let importance = self.calculate_gap_importance(
-                    &triple.subject,
-                    &GapType::Stale,
-                );
+                let importance = self.calculate_gap_importance(&triple.subject, &GapType::Stale);
 
                 if importance >= self.config.min_gap_importance {
                     gaps.push(KnowledgeGap {
@@ -367,7 +365,9 @@ impl DiscoveryEngine {
 
         // Find high-demand subjects with few claims
         for (subject, query_count) in &self.query_counts {
-            let claim_count = self.triples.values()
+            let claim_count = self
+                .triples
+                .values()
                 .filter(|t| &t.subject == subject)
                 .count();
 
@@ -392,7 +392,9 @@ impl DiscoveryEngine {
         // Find domains with low expert coverage
         for (domain, experts) in &self.domain_experts {
             if experts.len() < 3 {
-                let domain_claims: Vec<_> = self.triples.values()
+                let domain_claims: Vec<_> = self
+                    .triples
+                    .values()
                     .filter(|t| t.domain.as_ref() == Some(domain))
                     .collect();
 
@@ -418,7 +420,11 @@ impl DiscoveryEngine {
             }
         }
 
-        gaps.sort_by(|a, b| b.importance.partial_cmp(&a.importance).unwrap_or(std::cmp::Ordering::Equal));
+        gaps.sort_by(|a, b| {
+            b.importance
+                .partial_cmp(&a.importance)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         gaps
     }
 
@@ -433,7 +439,9 @@ impl DiscoveryEngine {
         };
 
         // Boost importance based on query demand
-        let demand_boost = self.query_counts.get(subject)
+        let demand_boost = self
+            .query_counts
+            .get(subject)
             .map(|c| (*c as f64 / 100.0).min(0.3))
             .unwrap_or(0.0);
 
@@ -449,21 +457,32 @@ impl DiscoveryEngine {
             let (suggestion_type, description) = match gap.gap_type {
                 GapType::LowConfidence => (
                     SuggestionType::VerifyClaim,
-                    format!("Verify claims about '{}' - current confidence is low", gap.subject),
+                    format!(
+                        "Verify claims about '{}' - current confidence is low",
+                        gap.subject
+                    ),
                 ),
                 GapType::HighDemand => (
                     SuggestionType::AddClaim,
-                    format!("Add claims about '{}' - high query demand but few claims", gap.subject),
+                    format!(
+                        "Add claims about '{}' - high query demand but few claims",
+                        gap.subject
+                    ),
                 ),
                 GapType::Stale => (
                     SuggestionType::RefreshClaim,
-                    format!("Update claims about '{}' - information may be outdated", gap.subject),
+                    format!(
+                        "Update claims about '{}' - information may be outdated",
+                        gap.subject
+                    ),
                 ),
                 GapType::MissingPredicate => (
                     SuggestionType::AddClaim,
                     format!(
                         "Add '{}' information for '{}'",
-                        gap.missing_predicate.as_ref().unwrap_or(&"missing".to_string()),
+                        gap.missing_predicate
+                            .as_ref()
+                            .unwrap_or(&"missing".to_string()),
                         gap.subject
                     ),
                 ),
@@ -509,9 +528,8 @@ impl DiscoveryEngine {
         // Find frequent predicates
         for (predicate, triples) in predicate_counts {
             if triples.len() >= 5 {
-                let avg_confidence = triples.iter()
-                    .map(|t| t.confidence)
-                    .sum::<f64>() / triples.len() as f64;
+                let avg_confidence =
+                    triples.iter().map(|t| t.confidence).sum::<f64>() / triples.len() as f64;
 
                 patterns.push(PatternMatch {
                     pattern_id: format!("pat-{}", predicate),
@@ -521,7 +539,9 @@ impl DiscoveryEngine {
                     avg_confidence,
                     description: format!(
                         "Predicate '{}' appears {} times with avg confidence {:.2}",
-                        predicate, triples.len(), avg_confidence
+                        predicate,
+                        triples.len(),
+                        avg_confidence
                     ),
                 });
             }
@@ -546,20 +566,22 @@ impl DiscoveryEngine {
         // Build clusters from subject groups
         for (subject, triples) in subject_groups {
             if triples.len() >= self.config.min_cluster_size {
-                let predicates: HashSet<_> = triples.iter()
-                    .map(|t| t.predicate.clone())
-                    .collect();
+                let predicates: HashSet<_> = triples.iter().map(|t| t.predicate.clone()).collect();
 
-                let avg_confidence = triples.iter()
-                    .map(|t| t.confidence)
-                    .sum::<f64>() / triples.len() as f64;
+                let avg_confidence =
+                    triples.iter().map(|t| t.confidence).sum::<f64>() / triples.len() as f64;
 
                 clusters.push(SemanticCluster {
                     cluster_id: format!("cluster-{}", subject),
                     label: subject.to_string(),
                     members: triples.iter().map(|t| t.hash.clone()).collect(),
-                    centroid: triples.iter()
-                        .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap_or(std::cmp::Ordering::Equal))
+                    centroid: triples
+                        .iter()
+                        .max_by(|a, b| {
+                            a.confidence
+                                .partial_cmp(&b.confidence)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        })
                         .map(|t| t.hash.clone()),
                     cohesion: avg_confidence,
                     key_predicates: predicates.into_iter().collect(),
@@ -575,7 +597,11 @@ impl DiscoveryEngine {
     /// Get top suggestions by priority
     pub fn top_suggestions(&self, _limit: usize) -> Vec<&DiscoverySuggestion> {
         let mut result = self.discover_cached();
-        result.suggestions.sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal));
+        result.suggestions.sort_by(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         // This is a simplification - in production you'd cache the result
         Vec::new()
     }
@@ -594,18 +620,20 @@ impl DiscoveryEngine {
     pub fn stats(&self) -> DiscoveryStats {
         DiscoveryStats {
             total_triples: self.triples.len(),
-            unique_subjects: self.triples.values()
+            unique_subjects: self
+                .triples
+                .values()
                 .map(|t| &t.subject)
                 .collect::<HashSet<_>>()
                 .len(),
-            unique_predicates: self.triples.values()
+            unique_predicates: self
+                .triples
+                .values()
                 .map(|t| &t.predicate)
                 .collect::<HashSet<_>>()
                 .len(),
             domains_tracked: self.domain_experts.len(),
-            total_experts: self.domain_experts.values()
-                .map(|s| s.len())
-                .sum(),
+            total_experts: self.domain_experts.values().map(|s| s.len()).sum(),
             open_gaps: self.gaps.len(),
             total_query_volume: self.query_counts.values().sum(),
         }
@@ -695,7 +723,9 @@ mod tests {
         });
 
         let result = engine.discover(current_time());
-        let low_conf_gaps: Vec<_> = result.gaps.iter()
+        let low_conf_gaps: Vec<_> = result
+            .gaps
+            .iter()
             .filter(|g| g.gap_type == GapType::LowConfidence)
             .collect();
 
@@ -715,7 +745,9 @@ mod tests {
         }
 
         let result = engine.discover(current_time());
-        let demand_gaps: Vec<_> = result.gaps.iter()
+        let demand_gaps: Vec<_> = result
+            .gaps
+            .iter()
             .filter(|g| g.gap_type == GapType::HighDemand)
             .collect();
 
@@ -741,7 +773,9 @@ mod tests {
         });
 
         let result = engine.discover(current_time());
-        let stale_gaps: Vec<_> = result.gaps.iter()
+        let stale_gaps: Vec<_> = result
+            .gaps
+            .iter()
             .filter(|g| g.gap_type == GapType::Stale)
             .collect();
 
@@ -817,7 +851,10 @@ mod tests {
         let result = engine.discover(current_time());
 
         assert!(!result.suggestions.is_empty());
-        assert!(result.suggestions.iter().any(|s| s.suggestion_type == SuggestionType::VerifyClaim));
+        assert!(result
+            .suggestions
+            .iter()
+            .any(|s| s.suggestion_type == SuggestionType::VerifyClaim));
     }
 
     #[test]
@@ -853,12 +890,22 @@ mod tests {
         let mut engine = DiscoveryEngine::new(DiscoveryEngineConfig::default());
 
         engine.register_triple(RegisterTripleInput {
-            hash: "h1", subject: "s1", predicate: "p1", confidence: 0.8,
-            domain: Some("d1"), created_at: current_time(), attestation_count: 5,
+            hash: "h1",
+            subject: "s1",
+            predicate: "p1",
+            confidence: 0.8,
+            domain: Some("d1"),
+            created_at: current_time(),
+            attestation_count: 5,
         });
         engine.register_triple(RegisterTripleInput {
-            hash: "h2", subject: "s2", predicate: "p2", confidence: 0.7,
-            domain: Some("d1"), created_at: current_time(), attestation_count: 3,
+            hash: "h2",
+            subject: "s2",
+            predicate: "p2",
+            confidence: 0.7,
+            domain: Some("d1"),
+            created_at: current_time(),
+            attestation_count: 3,
         });
         engine.register_expert("d1", "expert-1");
         engine.record_query("s1");

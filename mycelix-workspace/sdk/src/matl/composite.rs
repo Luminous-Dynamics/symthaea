@@ -2,8 +2,8 @@
 //!
 //! Combines PoGQ, consistency, and reputation into a single trust score.
 
-use serde::{Deserialize, Serialize};
 use super::{ProofOfGradientQuality, ReputationScore};
+use serde::{Deserialize, Serialize};
 
 /// Composite trust score combining multiple signals
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -98,12 +98,12 @@ impl CompositeScore {
     /// Get confidence level based on component agreement
     pub fn confidence(&self) -> f64 {
         // If all components agree (all high or all low), confidence is high
-        let mean = (self.pogq_component + self.consistency_component + self.reputation_component) / 3.0;
-        let variance = (
-            (self.pogq_component - mean).powi(2) +
-            (self.consistency_component - mean).powi(2) +
-            (self.reputation_component - mean).powi(2)
-        ) / 3.0;
+        let mean =
+            (self.pogq_component + self.consistency_component + self.reputation_component) / 3.0;
+        let variance = ((self.pogq_component - mean).powi(2)
+            + (self.consistency_component - mean).powi(2)
+            + (self.reputation_component - mean).powi(2))
+            / 3.0;
 
         // Higher variance = lower confidence
         1.0 - variance.sqrt().min(1.0)

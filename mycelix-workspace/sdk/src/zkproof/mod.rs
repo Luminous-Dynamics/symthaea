@@ -77,25 +77,23 @@
 //! ```
 
 mod circuit;
-mod types;
 mod gradient_proof;
-mod risc0_prover;
-mod risc0_integration;
-pub mod trust_risc0;
 pub mod proof_system;
+mod risc0_integration;
+mod risc0_prover;
 pub mod trust_proof_system;
+pub mod trust_risc0;
+mod types;
 
 pub use circuit::GradientProofCircuit;
-pub use types::{GradientProof, PublicInputs, ProofMetadata};
 pub use gradient_proof::{
-    GradientProofInput, GradientProofOutput, GradientConstraints,
-    GradientQualityResult, Risc0ProofConfig,
-    verify_gradient_quality, hash_gradient, compute_commitment,
+    compute_commitment, hash_gradient, verify_gradient_quality, GradientConstraints,
+    GradientProofInput, GradientProofOutput, GradientQualityResult, Risc0ProofConfig,
 };
 pub use risc0_prover::{
-    GradientProver, GradientProofReceipt, ProverError,
-    BatchGradientProver, SimulationProofMarker,
+    BatchGradientProver, GradientProofReceipt, GradientProver, ProverError, SimulationProofMarker,
 };
+pub use types::{GradientProof, ProofMetadata, PublicInputs};
 
 // Export prover mode only when features are enabled
 #[cfg(any(feature = "simulation", feature = "risc0"))]
@@ -110,10 +108,8 @@ pub use risc0_prover::SimulationProver;
 
 // RISC-0 integration types (always available)
 pub use risc0_integration::{
-    GradientQualityInput, GradientQualityOutput,
-    Risc0ProofReceipt, Risc0ProverConfig, Risc0ProverError,
-    hash_gradient as risc0_hash_gradient,
-    verify_gradient_constraints,
+    hash_gradient as risc0_hash_gradient, verify_gradient_constraints, GradientQualityInput,
+    GradientQualityOutput, Risc0ProofReceipt, Risc0ProverConfig, Risc0ProverError,
 };
 
 // Real RISC-0 prover (only with feature flag)
@@ -122,17 +118,14 @@ pub use risc0_integration::Risc0GradientProver;
 
 // Generic proof system abstraction
 pub use proof_system::{
-    ProofStatement, ProofWitness, ProofReceipt, ProofOutput,
-    ProofSystem, ProofSystemError, ProofStats,
-    BackendConfig, BackendType, GenericReceipt,
-    SimulationBackend, ProofSystemBackend, ProofSystemBuilder,
-    is_simulation_proof,
+    is_simulation_proof, BackendConfig, BackendType, GenericReceipt, ProofOutput, ProofReceipt,
+    ProofStatement, ProofStats, ProofSystem, ProofSystemBackend, ProofSystemBuilder,
+    ProofSystemError, ProofWitness, SimulationBackend,
 };
 
 // K-Vector trust proof system (uses generic abstraction)
 pub use trust_proof_system::{
-    TrustStatement, TrustWitness, TrustReceipt, TrustPublicData,
-    TrustProofSystem,
+    TrustProofSystem, TrustPublicData, TrustReceipt, TrustStatement, TrustWitness,
 };
 
 /// Prove gradient computation was done correctly

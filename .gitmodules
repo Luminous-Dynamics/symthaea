@@ -13,6 +13,3 @@
 [submodule "mycelix-health"]
 	path = mycelix-health
 	url = https://github.com/Luminous-Dynamics/mycelix-health.git
-[submodule "terra-atlas-mvp"]
-	path = terra-atlas-mvp
-	url = https://github.com/Luminous-Dynamics/terra-atlas-mvp.git

@@ -112,11 +112,7 @@ pub fn hash_gradient(gradients: &[f32]) -> [u8; 32] {
 ///
 /// This is used in simulation mode and can be used to pre-check inputs
 /// before generating real proofs.
-pub fn verify_gradient_constraints(
-    gradients: &[f32],
-    min_norm: f32,
-    max_norm: f32,
-) -> bool {
+pub fn verify_gradient_constraints(gradients: &[f32], min_norm: f32, max_norm: f32) -> bool {
     if gradients.is_empty() {
         return false;
     }
@@ -318,7 +314,9 @@ impl std::fmt::Display for Risc0ProverError {
             Risc0ProverError::ProofFailed(e) => write!(f, "Proof failed: {}", e),
             Risc0ProverError::DecodeFailed(e) => write!(f, "Decode failed: {}", e),
             Risc0ProverError::SerializationFailed(e) => write!(f, "Serialization failed: {}", e),
-            Risc0ProverError::DeserializationFailed(e) => write!(f, "Deserialization failed: {}", e),
+            Risc0ProverError::DeserializationFailed(e) => {
+                write!(f, "Deserialization failed: {}", e)
+            }
             Risc0ProverError::VerificationFailed(e) => write!(f, "Verification failed: {}", e),
         }
     }
@@ -351,9 +349,7 @@ mod tests {
 
     #[test]
     fn test_verify_constraints_valid() {
-        let gradients: Vec<f32> = (0..100)
-            .map(|i| (i as f32 * 0.1).sin() * 0.5)
-            .collect();
+        let gradients: Vec<f32> = (0..100).map(|i| (i as f32 * 0.1).sin() * 0.5).collect();
 
         // Compute expected norm
         let norm: f32 = gradients.iter().map(|g| g * g).sum::<f32>().sqrt();

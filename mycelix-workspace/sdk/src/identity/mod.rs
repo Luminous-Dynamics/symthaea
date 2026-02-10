@@ -56,45 +56,41 @@
 //! // let result = bridge.verify_hardware_key(agent_id, &auth_response)?;
 //! ```
 
-pub mod webauthn;
 pub mod bridge_integration;
+pub mod webauthn;
 
 // Re-export WebAuthn types
 pub use webauthn::{
-    // Core types
-    WebAuthnCredential,
-    WebAuthnService,
-    WebAuthnConfig,
-    WebAuthnError,
-
-    // Challenge types
-    RegistrationChallenge,
+    // Utilities
+    AllowedCredential,
+    AttestationConveyance,
+    // Enums
+    AttestationFormat,
     AuthenticationChallenge,
-    AuthenticatorSelectionCriteria,
-
-    // Response types
-    RegistrationResponse,
     AuthenticationResponse,
     AuthenticationResult,
 
-    // Enums
-    AttestationFormat,
-    AttestationConveyance,
-    AuthenticatorTransport,
     AuthenticatorAttachment,
-    UserVerification,
+    AuthenticatorFlags,
+    AuthenticatorSelectionCriteria,
+
+    AuthenticatorTransport,
+    // Challenge types
+    RegistrationChallenge,
+    // Response types
+    RegistrationResponse,
     ResidentKeyRequirement,
 
-    // Utilities
-    AllowedCredential,
-    AuthenticatorFlags,
+    UserVerification,
+    WebAuthnConfig,
+    // Core types
+    WebAuthnCredential,
+    WebAuthnError,
+
+    WebAuthnService,
 };
 
 // Re-export bridge integration types
 pub use bridge_integration::{
-    HardwareKeyBridge,
-    HardwareKeyBridgeConfig,
-    HardwareKeyBinding,
-    HardwareKeyStatus,
-    BridgeError,
+    BridgeError, HardwareKeyBinding, HardwareKeyBridge, HardwareKeyBridgeConfig, HardwareKeyStatus,
 };

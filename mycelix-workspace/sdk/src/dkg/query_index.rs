@@ -33,9 +33,9 @@
 //! let page = index.by_subject_paginated("sky", 0, 10);
 //! ```
 
+use super::StoredTriple;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::RwLock;
-use super::StoredTriple;
 
 /// Index for fast triple lookups
 #[derive(Clone, Debug, Default)]
@@ -230,10 +230,7 @@ impl TripleIndex {
     pub fn by_subject_predicate(&self, subject: &str, predicate: &str) -> Vec<&StoredTriple> {
         let key = (subject.to_string(), predicate.to_string());
         match self.composite_index.get(&key) {
-            Some(hashes) => hashes
-                .iter()
-                .filter_map(|h| self.triples.get(h))
-                .collect(),
+            Some(hashes) => hashes.iter().filter_map(|h| self.triples.get(h)).collect(),
             None => Vec::new(),
         }
     }
@@ -245,10 +242,7 @@ impl TripleIndex {
         key: &str,
     ) -> Vec<&'a StoredTriple> {
         match index.get(key) {
-            Some(hashes) => hashes
-                .iter()
-                .filter_map(|h| self.triples.get(h))
-                .collect(),
+            Some(hashes) => hashes.iter().filter_map(|h| self.triples.get(h)).collect(),
             None => Vec::new(),
         }
     }
@@ -377,22 +371,42 @@ impl TripleIndex {
     }
 
     /// Query by subject with pagination (memory-efficient for large result sets)
-    pub fn by_subject_paginated(&self, subject: &str, offset: usize, limit: usize) -> PaginatedResult<&StoredTriple> {
+    pub fn by_subject_paginated(
+        &self,
+        subject: &str,
+        offset: usize,
+        limit: usize,
+    ) -> PaginatedResult<&StoredTriple> {
         self.paginate_results(self.by_subject(subject), offset, limit)
     }
 
     /// Query by predicate with pagination
-    pub fn by_predicate_paginated(&self, predicate: &str, offset: usize, limit: usize) -> PaginatedResult<&StoredTriple> {
+    pub fn by_predicate_paginated(
+        &self,
+        predicate: &str,
+        offset: usize,
+        limit: usize,
+    ) -> PaginatedResult<&StoredTriple> {
         self.paginate_results(self.by_predicate(predicate), offset, limit)
     }
 
     /// Query by domain with pagination
-    pub fn by_domain_paginated(&self, domain: &str, offset: usize, limit: usize) -> PaginatedResult<&StoredTriple> {
+    pub fn by_domain_paginated(
+        &self,
+        domain: &str,
+        offset: usize,
+        limit: usize,
+    ) -> PaginatedResult<&StoredTriple> {
         self.paginate_results(self.by_domain(domain), offset, limit)
     }
 
     /// Internal pagination helper
-    fn paginate_results<T>(&self, results: Vec<T>, offset: usize, limit: usize) -> PaginatedResult<T> {
+    fn paginate_results<T>(
+        &self,
+        results: Vec<T>,
+        offset: usize,
+        limit: usize,
+    ) -> PaginatedResult<T> {
         let total = results.len();
         let items: Vec<T> = results.into_iter().skip(offset).take(limit).collect();
         let has_more = offset + items.len() < total;
@@ -576,10 +590,13 @@ impl QueryCache {
             }
 
             // Insert new entry
-            cache.entries.insert(key.clone(), CacheEntry {
-                hashes,
-                created_at: now,
-            });
+            cache.entries.insert(
+                key.clone(),
+                CacheEntry {
+                    hashes,
+                    created_at: now,
+                },
+            );
             cache.order.push_back(key);
         }
     }
@@ -595,7 +612,8 @@ impl QueryCache {
     /// Invalidate entries matching a pattern (e.g., after updating a subject)
     pub fn invalidate_by_prefix(&self, prefix: &str) {
         if let Ok(mut cache) = self.cache.write() {
-            let keys_to_remove: Vec<String> = cache.entries
+            let keys_to_remove: Vec<String> = cache
+                .entries
                 .keys()
                 .filter(|k| k.starts_with(prefix))
                 .cloned()
@@ -679,9 +697,7 @@ impl CachedTripleIndex {
 
         // Try cache first
         if let Some(hashes) = self.cache.get(&cache_key) {
-            return hashes.iter()
-                .filter_map(|h| self.index.get(h))
-                .collect();
+            return hashes.iter().filter_map(|h| self.index.get(h)).collect();
         }
 
         // Cache miss - perform query
@@ -699,9 +715,7 @@ impl CachedTripleIndex {
         let cache_key = QueryCache::cache_key("predicate", &[predicate]);
 
         if let Some(hashes) = self.cache.get(&cache_key) {
-            return hashes.iter()
-                .filter_map(|h| self.index.get(h))
-                .collect();
+            return hashes.iter().filter_map(|h| self.index.get(h)).collect();
         }
 
         let results = self.index.by_predicate(predicate);
@@ -742,14 +756,16 @@ impl Default for CachedTripleIndex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dkg::{VerifiableTriple, TripleValue};
+    use crate::dkg::{TripleValue, VerifiableTriple};
 
-    fn make_triple(subject: &str, predicate: &str, domain: Option<&str>, hash: &str) -> StoredTriple {
-        let mut triple = VerifiableTriple::new(
-            subject,
-            predicate,
-            TripleValue::String("value".into()),
-        );
+    fn make_triple(
+        subject: &str,
+        predicate: &str,
+        domain: Option<&str>,
+        hash: &str,
+    ) -> StoredTriple {
+        let mut triple =
+            VerifiableTriple::new(subject, predicate, TripleValue::String("value".into()));
         if let Some(d) = domain {
             triple = triple.with_domain(d);
         }
@@ -923,7 +939,12 @@ mod tests {
 
         // Insert 10 triples with same subject
         for i in 0..10 {
-            index.insert(&make_triple("entity", &format!("pred{}", i), None, &format!("h{}", i)));
+            index.insert(&make_triple(
+                "entity",
+                &format!("pred{}", i),
+                None,
+                &format!("h{}", i),
+            ));
         }
 
         // First page
@@ -964,7 +985,12 @@ mod tests {
         let mut index = TripleIndex::new();
 
         for i in 0..5 {
-            index.insert(&make_triple(&format!("subj{}", i), "predicate", None, &format!("h{}", i)));
+            index.insert(&make_triple(
+                &format!("subj{}", i),
+                "predicate",
+                None,
+                &format!("h{}", i),
+            ));
         }
 
         let removed = index.batch_remove(&["h0", "h2", "h4"]);
@@ -980,7 +1006,12 @@ mod tests {
         let mut index = TripleIndex::new();
 
         for i in 0..100 {
-            index.insert(&make_triple(&format!("subj{}", i), "predicate", Some("domain"), &format!("h{}", i)));
+            index.insert(&make_triple(
+                &format!("subj{}", i),
+                "predicate",
+                Some("domain"),
+                &format!("h{}", i),
+            ));
         }
 
         let mem = index.estimated_memory_usage();

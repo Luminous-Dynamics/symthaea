@@ -10,10 +10,10 @@
 //! - **Time-series Anomaly**: Detects unusual trust evolution patterns
 //! - **Ensemble Scoring**: Combines multiple detectors for robust anomaly scoring
 
+use super::{ActionOutcome, InstrumentalActor};
+use crate::matl::KVector;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
-use crate::matl::KVector;
-use super::{InstrumentalActor, ActionOutcome};
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -72,7 +72,9 @@ impl AgentFeatures {
         let behavior_len = agent.behavior_log.len();
 
         // Success rate
-        let successes = agent.behavior_log.iter()
+        let successes = agent
+            .behavior_log
+            .iter()
             .filter(|e| e.outcome == ActionOutcome::Success)
             .count();
         let success_rate = if behavior_len > 0 {
@@ -249,7 +251,8 @@ fn compute_timing_regularity(log: &[super::BehaviorLogEntry]) -> f64 {
     let mut timestamps: Vec<u64> = log.iter().map(|e| e.timestamp).collect();
     timestamps.sort();
 
-    let intervals: Vec<f64> = timestamps.windows(2)
+    let intervals: Vec<f64> = timestamps
+        .windows(2)
         .map(|w| w[1].saturating_sub(w[0]) as f64)
         .filter(|&i| i > 0.0)
         .collect();
@@ -263,9 +266,11 @@ fn compute_timing_regularity(log: &[super::BehaviorLogEntry]) -> f64 {
         return 0.5;
     }
 
-    let variance: f64 = intervals.iter()
+    let variance: f64 = intervals
+        .iter()
         .map(|i| ((i - mean) / mean).powi(2))
-        .sum::<f64>() / intervals.len() as f64;
+        .sum::<f64>()
+        / intervals.len() as f64;
 
     // Higher CV = more irregular = lower regularity score
     let cv = variance.sqrt();
@@ -287,9 +292,7 @@ enum IsolationNode {
         right: Box<IsolationNode>,
     },
     /// External (leaf) node
-    External {
-        size: usize,
-    },
+    External { size: usize },
 }
 
 /// Single Isolation Tree
@@ -303,12 +306,22 @@ impl IsolationTree {
     /// Build a tree from samples
     pub fn build(samples: &[Vec<f64>], height_limit: usize, rng: &mut SimpleRng) -> Self {
         let root = Self::build_node(samples, 0, height_limit, rng);
-        Self { root, _height_limit: height_limit }
+        Self {
+            root,
+            _height_limit: height_limit,
+        }
     }
 
-    fn build_node(samples: &[Vec<f64>], depth: usize, limit: usize, rng: &mut SimpleRng) -> IsolationNode {
+    fn build_node(
+        samples: &[Vec<f64>],
+        depth: usize,
+        limit: usize,
+        rng: &mut SimpleRng,
+    ) -> IsolationNode {
         if depth >= limit || samples.len() <= 1 {
-            return IsolationNode::External { size: samples.len() };
+            return IsolationNode::External {
+                size: samples.len(),
+            };
         }
 
         if samples.is_empty() || samples[0].is_empty() {
@@ -325,20 +338,25 @@ impl IsolationTree {
         let max_val = values.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
         if (max_val - min_val).abs() < 1e-10 {
-            return IsolationNode::External { size: samples.len() };
+            return IsolationNode::External {
+                size: samples.len(),
+            };
         }
 
         // Random split point
         let split_value = min_val + rng.next_f64() * (max_val - min_val);
 
         // Partition samples
-        let (left_samples, right_samples): (Vec<_>, Vec<_>) = samples.iter()
+        let (left_samples, right_samples): (Vec<_>, Vec<_>) = samples
+            .iter()
             .cloned()
             .partition(|s| s[feature_idx] < split_value);
 
         // Handle edge case where all samples go to one side
         if left_samples.is_empty() || right_samples.is_empty() {
-            return IsolationNode::External { size: samples.len() };
+            return IsolationNode::External {
+                size: samples.len(),
+            };
         }
 
         IsolationNode::Internal {
@@ -356,10 +374,13 @@ impl IsolationTree {
 
     fn path_length_node(&self, node: &IsolationNode, sample: &[f64], depth: usize) -> f64 {
         match node {
-            IsolationNode::External { size } => {
-                depth as f64 + c_factor(*size)
-            }
-            IsolationNode::Internal { feature_idx, split_value, left, right } => {
+            IsolationNode::External { size } => depth as f64 + c_factor(*size),
+            IsolationNode::Internal {
+                feature_idx,
+                split_value,
+                left,
+                right,
+            } => {
                 if sample[*feature_idx] < *split_value {
                     self.path_length_node(left, sample, depth + 1)
                 } else {
@@ -423,9 +444,12 @@ impl IsolationForest {
             return 0.5;
         }
 
-        let avg_path_length: f64 = self.trees.iter()
+        let avg_path_length: f64 = self
+            .trees
+            .iter()
             .map(|t| t.path_length(sample))
-            .sum::<f64>() / self.trees.len() as f64;
+            .sum::<f64>()
+            / self.trees.len() as f64;
 
         let c = c_factor(self.sample_size);
         if c == 0.0 {
@@ -524,10 +548,7 @@ impl ReconstructionDetector {
         }
 
         // Compute (x - mean)^T * inv_cov * (x - mean)
-        let diff: Vec<f64> = sample.iter()
-            .zip(&self.mean)
-            .map(|(s, m)| s - m)
-            .collect();
+        let diff: Vec<f64> = sample.iter().zip(&self.mean).map(|(s, m)| s - m).collect();
 
         let mut distance = 0.0;
         for i in 0..self.dimension {
@@ -599,7 +620,9 @@ impl TimeSeriesAnomalyDetector {
             } else if diff > 1e-10 {
                 // If std_dev is ~0 but value differs from mean, it's definitely anomalous
                 // Use a large z-score proportional to the difference
-                (value - self.running_mean).signum() * (diff / self.running_mean.abs().max(1.0)) * 100.0
+                (value - self.running_mean).signum()
+                    * (diff / self.running_mean.abs().max(1.0))
+                    * 100.0
             } else {
                 0.0
             };
@@ -612,7 +635,9 @@ impl TimeSeriesAnomalyDetector {
                 if n > 0.0 {
                     let old_mean = self.running_mean;
                     self.running_mean = (old_mean * (n + 1.0) - old) / n;
-                    self.running_var = ((self.running_var * n + (old - old_mean) * (old - self.running_mean)) / n).max(0.0);
+                    self.running_var =
+                        ((self.running_var * n + (old - old_mean) * (old - self.running_mean)) / n)
+                            .max(0.0);
                 }
             }
         } else {
@@ -628,7 +653,9 @@ impl TimeSeriesAnomalyDetector {
         } else {
             let old_mean = self.running_mean;
             self.running_mean = old_mean + (value - old_mean) / (n + 1.0);
-            self.running_var = (self.running_var * n + (value - old_mean) * (value - self.running_mean)) / (n + 1.0);
+            self.running_var = (self.running_var * n
+                + (value - old_mean) * (value - self.running_mean))
+                / (n + 1.0);
         }
 
         self.history.push_back(value);
@@ -824,11 +851,10 @@ impl MLAnomalyDetector {
             + self.config.reconstruction_weight
             + self.config.time_series_weight;
 
-        let anomaly_score = (
-            isolation_score * self.config.isolation_weight +
-            reconstruction_score * self.config.reconstruction_weight +
-            time_series_score * self.config.time_series_weight
-        ) / total_weight;
+        let anomaly_score = (isolation_score * self.config.isolation_weight
+            + reconstruction_score * self.config.reconstruction_weight
+            + time_series_score * self.config.time_series_weight)
+            / total_weight;
 
         let is_anomaly = anomaly_score > self.config.anomaly_threshold;
 
@@ -944,11 +970,10 @@ impl HybridAnomalyDetector {
 
         // Combine scores
         let total_weight = self.gaming_weight + self.sybil_weight + self.ml_weight;
-        let combined_score = (
-            gaming_score * self.gaming_weight +
-            sybil_score * self.sybil_weight +
-            ml_result.anomaly_score * self.ml_weight
-        ) / total_weight;
+        let combined_score = (gaming_score * self.gaming_weight
+            + sybil_score * self.sybil_weight
+            + ml_result.anomaly_score * self.ml_weight)
+            / total_weight;
 
         // Determine anomaly type
         let anomaly_type = if ml_result.anomaly_score > 0.7 {
@@ -1047,7 +1072,7 @@ fn get_recommendation(score: f64, anomaly_type: AnomalyType) -> AnomalyRecommend
 mod tests {
     use super::*;
     use crate::agentic::UncertaintyCalibration;
-    use crate::agentic::{AgentId, AgentStatus, AgentClass, AgentConstraints, EpistemicStats};
+    use crate::agentic::{AgentClass, AgentConstraints, AgentId, AgentStatus, EpistemicStats};
 
     fn create_test_agent() -> InstrumentalActor {
         InstrumentalActor {
@@ -1098,8 +1123,12 @@ mod tests {
         // Outlier should have higher score
         let outlier_score = forest.score(&[10.0, 10.0]);
 
-        assert!(outlier_score > normal_score,
-            "Outlier score {} should be higher than normal {}", outlier_score, normal_score);
+        assert!(
+            outlier_score > normal_score,
+            "Outlier score {} should be higher than normal {}",
+            outlier_score,
+            normal_score
+        );
     }
 
     #[test]
@@ -1118,8 +1147,12 @@ mod tests {
         // Point far from training data should have high error
         let far_error = detector.reconstruction_error(&[100.0, 100.0]);
 
-        assert!(far_error > near_error,
-            "Far error {} should be higher than near {}", far_error, near_error);
+        assert!(
+            far_error > near_error,
+            "Far error {} should be higher than near {}",
+            far_error,
+            near_error
+        );
     }
 
     #[test]
@@ -1165,7 +1198,11 @@ mod tests {
         normal.success_rate = 0.76;
         normal.k_vector = [0.6, 0.5, 0.8, 0.65, 0.2, 0.3, 0.5, 0.2];
         let result = detector.detect(&normal);
-        assert!(result.anomaly_score < 0.7, "Normal agent score: {}", result.anomaly_score);
+        assert!(
+            result.anomaly_score < 0.7,
+            "Normal agent score: {}",
+            result.anomaly_score
+        );
 
         // Anomalous features should have higher score
         let mut anomalous = AgentFeatures::default();
@@ -1173,7 +1210,11 @@ mod tests {
         anomalous.k_vector = [0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99, 0.99];
         let result = detector.detect(&anomalous);
         // Note: With limited training data, detection may not be perfect
-        assert!(result.isolation_score > 0.3, "Anomalous isolation score: {}", result.isolation_score);
+        assert!(
+            result.isolation_score > 0.3,
+            "Anomalous isolation score: {}",
+            result.isolation_score
+        );
     }
 
     #[test]
@@ -1209,10 +1250,25 @@ mod tests {
 
     #[test]
     fn test_recommendation_levels() {
-        assert_eq!(get_recommendation(0.1, AnomalyType::None), AnomalyRecommendation::None);
-        assert_eq!(get_recommendation(0.4, AnomalyType::None), AnomalyRecommendation::Monitor);
-        assert_eq!(get_recommendation(0.55, AnomalyType::MLDetected), AnomalyRecommendation::Review);
-        assert_eq!(get_recommendation(0.75, AnomalyType::GamingDetected), AnomalyRecommendation::Throttle);
-        assert_eq!(get_recommendation(0.9, AnomalyType::Ensemble), AnomalyRecommendation::Quarantine);
+        assert_eq!(
+            get_recommendation(0.1, AnomalyType::None),
+            AnomalyRecommendation::None
+        );
+        assert_eq!(
+            get_recommendation(0.4, AnomalyType::None),
+            AnomalyRecommendation::Monitor
+        );
+        assert_eq!(
+            get_recommendation(0.55, AnomalyType::MLDetected),
+            AnomalyRecommendation::Review
+        );
+        assert_eq!(
+            get_recommendation(0.75, AnomalyType::GamingDetected),
+            AnomalyRecommendation::Throttle
+        );
+        assert_eq!(
+            get_recommendation(0.9, AnomalyType::Ensemble),
+            AnomalyRecommendation::Quarantine
+        );
     }
 }

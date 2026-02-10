@@ -34,17 +34,17 @@ pub enum BeneficiarySpec {
     /// Specific DIDs
     Named(
         /// List of beneficiary DIDs
-        Vec<String>
+        Vec<String>,
     ),
     /// Members of a Local DAO
     LocalDao {
         /// DAO identifier
-        dao_id: String
+        dao_id: String,
     },
     /// Members of a bioregion
     Bioregion {
         /// Bioregion identifier
-        bioregion_id: String
+        bioregion_id: String,
     },
     /// Future generations
     FutureGenerations {
@@ -96,7 +96,7 @@ pub enum GeographicScope {
         /// Longitude coordinate
         lon: f64,
         /// Radius in kilometers
-        radius_km: f64
+        radius_km: f64,
     },
 }
 
@@ -123,17 +123,17 @@ pub enum DissolutionCondition {
     /// Specific date reached
     DateReached {
         /// Dissolution timestamp
-        timestamp: u64
+        timestamp: u64,
     },
     /// Beneficiaries vote to dissolve
     BeneficiaryVote {
         /// Vote threshold fraction
-        threshold: f64
+        threshold: f64,
     },
     /// Guardian DAO decides
     GuardianDecision {
         /// Guardian DAO identifier
-        dao_id: String
+        dao_id: String,
     },
     /// Successor covenant created
     SuccessorCreated,
@@ -143,11 +143,7 @@ pub enum DissolutionCondition {
 
 impl Covenant {
     /// Create a new covenant
-    pub fn new(
-        purpose: String,
-        beneficiaries: BeneficiarySpec,
-        timestamp: u64,
-    ) -> Self {
+    pub fn new(purpose: String, beneficiaries: BeneficiarySpec, timestamp: u64) -> Self {
         let covenant_type = beneficiaries.to_covenant_type();
 
         Self {
@@ -185,7 +181,8 @@ impl Covenant {
 
     /// Check if all metrics are achieved
     pub fn all_metrics_achieved(&self) -> bool {
-        self.success_metrics.iter()
+        self.success_metrics
+            .iter()
             .all(|m| m.current_value >= m.target_value)
     }
 
@@ -195,7 +192,9 @@ impl Covenant {
             return 0.0;
         }
 
-        let total_progress: f64 = self.success_metrics.iter()
+        let total_progress: f64 = self
+            .success_metrics
+            .iter()
             .map(|m| (m.current_value / m.target_value).min(1.0))
             .sum();
 
@@ -212,7 +211,7 @@ mod tests {
         let covenant = Covenant::new(
             "Restore the local watershed".to_string(),
             BeneficiarySpec::Bioregion {
-                bioregion_id: "pacific-northwest".to_string()
+                bioregion_id: "pacific-northwest".to_string(),
             },
             1_000_000,
         );
@@ -231,7 +230,8 @@ mod tests {
             BeneficiarySpec::FutureGenerations {
                 born_after: 0,
                 scope: GeographicScope::Global,
-            }.to_covenant_type(),
+            }
+            .to_covenant_type(),
             CovenantType::FutureGenerations
         );
     }

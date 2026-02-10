@@ -40,19 +40,17 @@
 //! let receipt = storage.store("session:123", &session_data, classification, options).await?;
 //! ```
 
-mod types;
-mod router;
 pub mod backends;
+mod router;
+mod types;
 
-pub use types::*;
-pub use router::{StorageRouter, RouterConfig, TransitionError};
 pub use backends::{
-    MemoryBackend, MemoryBackendConfig, MemoryBackendStats,
-    LocalBackend, LocalBackendConfig, LocalBackendStats,
-    DHTBackend, DHTBackendConfig, DHTBackendStats,
-    IPFSBackend, IPFSBackendConfig, IPFSBackendStats,
-    StorageBackendAdapter, BackendStats,
+    BackendStats, DHTBackend, DHTBackendConfig, DHTBackendStats, IPFSBackend, IPFSBackendConfig,
+    IPFSBackendStats, LocalBackend, LocalBackendConfig, LocalBackendStats, MemoryBackend,
+    MemoryBackendConfig, MemoryBackendStats, StorageBackendAdapter,
 };
+pub use router::{RouterConfig, StorageRouter, TransitionError};
+pub use types::*;
 
 use crate::epistemic::EpistemicClassification;
 use std::collections::HashMap;
@@ -224,46 +222,38 @@ impl EpistemicStorage {
 
         // Store in appropriate backend based on routed tier
         let metadata = match tier.backend {
-            StorageBackend::Memory => {
-                self.memory_backend.set(
-                    key,
-                    data,
-                    classification,
-                    options.schema.clone(),
-                    &options.agent_id,
-                    options.ttl_ms.or(tier.ttl_ms),
-                )
-            }
-            StorageBackend::Local => {
-                self.local_backend.set(
-                    key,
-                    data,
-                    classification,
-                    options.schema.clone(),
-                    &options.agent_id,
-                    options.ttl_ms.or(tier.ttl_ms),
-                )
-            }
-            StorageBackend::DHT => {
-                self.dht_backend.set(
-                    key,
-                    data,
-                    classification,
-                    options.schema.clone(),
-                    &options.agent_id,
-                    options.ttl_ms.or(tier.ttl_ms),
-                )
-            }
-            StorageBackend::IPFS => {
-                self.ipfs_backend.set(
-                    key,
-                    data,
-                    classification,
-                    options.schema.clone(),
-                    &options.agent_id,
-                    options.ttl_ms.or(tier.ttl_ms),
-                )
-            }
+            StorageBackend::Memory => self.memory_backend.set(
+                key,
+                data,
+                classification,
+                options.schema.clone(),
+                &options.agent_id,
+                options.ttl_ms.or(tier.ttl_ms),
+            ),
+            StorageBackend::Local => self.local_backend.set(
+                key,
+                data,
+                classification,
+                options.schema.clone(),
+                &options.agent_id,
+                options.ttl_ms.or(tier.ttl_ms),
+            ),
+            StorageBackend::DHT => self.dht_backend.set(
+                key,
+                data,
+                classification,
+                options.schema.clone(),
+                &options.agent_id,
+                options.ttl_ms.or(tier.ttl_ms),
+            ),
+            StorageBackend::IPFS => self.ipfs_backend.set(
+                key,
+                data,
+                classification,
+                options.schema.clone(),
+                &options.agent_id,
+                options.ttl_ms.or(tier.ttl_ms),
+            ),
             StorageBackend::Filecoin => {
                 // Filecoin uses IPFS as primary storage
                 self.ipfs_backend.set(
@@ -275,7 +265,8 @@ impl EpistemicStorage {
                     options.ttl_ms.or(tier.ttl_ms),
                 )
             }
-        }.ok_or_else(|| StorageError::SerializationError("Failed to serialize data".to_string()))?;
+        }
+        .ok_or_else(|| StorageError::SerializationError("Failed to serialize data".to_string()))?;
 
         // Create storage location for tracking
         let location = StorageLocation::new(tier.backend, key);
@@ -335,8 +326,14 @@ impl EpistemicStorage {
     ) -> Result<StoredData<T>, StorageError> {
         // Get index entry
         let index_entry = {
-            let key_idx = self.key_index.read().map_err(|_| StorageError::BackendError("Lock error".to_string()))?;
-            key_idx.get(key).cloned().ok_or_else(|| StorageError::NotFound(key.to_string()))?
+            let key_idx = self
+                .key_index
+                .read()
+                .map_err(|_| StorageError::BackendError("Lock error".to_string()))?;
+            key_idx
+                .get(key)
+                .cloned()
+                .ok_or_else(|| StorageError::NotFound(key.to_string()))?
         };
 
         // Check access control
@@ -344,11 +341,18 @@ impl EpistemicStorage {
         if tier.access_control != AccessControlMode::Public {
             // Verify capability
             if let Some(cap) = capability {
-                if !cap.matches_resource(key) || !cap.has_right(AccessRight::Read) || cap.is_expired() {
-                    return Err(StorageError::AccessDenied("Invalid or insufficient capability".to_string()));
+                if !cap.matches_resource(key)
+                    || !cap.has_right(AccessRight::Read)
+                    || cap.is_expired()
+                {
+                    return Err(StorageError::AccessDenied(
+                        "Invalid or insufficient capability".to_string(),
+                    ));
                 }
             } else {
-                return Err(StorageError::AccessDenied("Capability required".to_string()));
+                return Err(StorageError::AccessDenied(
+                    "Capability required".to_string(),
+                ));
             }
         }
 
@@ -382,8 +386,14 @@ impl EpistemicStorage {
     ) -> Result<StoredData<T>, StorageError> {
         // Look up key from CID
         let key = {
-            let cid_idx = self.cid_index.read().map_err(|_| StorageError::BackendError("Lock error".to_string()))?;
-            cid_idx.get(cid).cloned().ok_or_else(|| StorageError::NotFound(cid.to_string()))?
+            let cid_idx = self
+                .cid_index
+                .read()
+                .map_err(|_| StorageError::BackendError("Lock error".to_string()))?;
+            cid_idx
+                .get(cid)
+                .cloned()
+                .ok_or_else(|| StorageError::NotFound(cid.to_string()))?
         };
 
         self.retrieve(&key, capability, options)
@@ -399,8 +409,14 @@ impl EpistemicStorage {
     ) -> Result<StorageReceipt, StorageError> {
         // Get index entry
         let index_entry = {
-            let key_idx = self.key_index.read().map_err(|_| StorageError::BackendError("Lock error".to_string()))?;
-            key_idx.get(key).cloned().ok_or_else(|| StorageError::NotFound(key.to_string()))?
+            let key_idx = self
+                .key_index
+                .read()
+                .map_err(|_| StorageError::BackendError("Lock error".to_string()))?;
+            key_idx
+                .get(key)
+                .cloned()
+                .ok_or_else(|| StorageError::NotFound(key.to_string()))?
         };
 
         // Check mutability
@@ -412,44 +428,62 @@ impl EpistemicStorage {
         // Check access control
         if tier.access_control != AccessControlMode::Public {
             if let Some(cap) = capability {
-                if !cap.matches_resource(key) || !cap.has_right(AccessRight::Write) || cap.is_expired() {
-                    return Err(StorageError::AccessDenied("Invalid or insufficient capability".to_string()));
+                if !cap.matches_resource(key)
+                    || !cap.has_right(AccessRight::Write)
+                    || cap.is_expired()
+                {
+                    return Err(StorageError::AccessDenied(
+                        "Invalid or insufficient capability".to_string(),
+                    ));
                 }
             } else {
-                return Err(StorageError::AccessDenied("Capability required".to_string()));
+                return Err(StorageError::AccessDenied(
+                    "Capability required".to_string(),
+                ));
             }
         }
 
         // Update in backend (delete + set for backends without native update)
         let metadata = match index_entry.backend {
-            StorageBackend::Memory => {
-                self.memory_backend.update(key, data, &self.config.agent_id)
-            }
+            StorageBackend::Memory => self.memory_backend.update(key, data, &self.config.agent_id),
             StorageBackend::Local => {
                 // Local doesn't have native update, use delete + set
                 self.local_backend.delete(key);
                 self.local_backend.set(
-                    key, data, index_entry.classification,
-                    index_entry.schema.clone(), &self.config.agent_id, None,
+                    key,
+                    data,
+                    index_entry.classification,
+                    index_entry.schema.clone(),
+                    &self.config.agent_id,
+                    None,
                 )
             }
             StorageBackend::DHT => {
                 // DHT doesn't have native update, use delete + set
                 self.dht_backend.delete(key);
                 self.dht_backend.set(
-                    key, data, index_entry.classification,
-                    index_entry.schema.clone(), &self.config.agent_id, None,
+                    key,
+                    data,
+                    index_entry.classification,
+                    index_entry.schema.clone(),
+                    &self.config.agent_id,
+                    None,
                 )
             }
             StorageBackend::IPFS | StorageBackend::Filecoin => {
                 // IPFS is content-addressed, update creates new CID
                 self.ipfs_backend.delete(key);
                 self.ipfs_backend.set(
-                    key, data, index_entry.classification,
-                    index_entry.schema.clone(), &self.config.agent_id, None,
+                    key,
+                    data,
+                    index_entry.classification,
+                    index_entry.schema.clone(),
+                    &self.config.agent_id,
+                    None,
                 )
             }
-        }.ok_or_else(|| StorageError::BackendError("Update failed".to_string()))?;
+        }
+        .ok_or_else(|| StorageError::BackendError("Update failed".to_string()))?;
 
         // Update indices
         if let Ok(mut key_idx) = self.key_index.write() {
@@ -500,19 +534,32 @@ impl EpistemicStorage {
     ) -> Result<(), StorageError> {
         // Get index entry
         let index_entry = {
-            let key_idx = self.key_index.read().map_err(|_| StorageError::BackendError("Lock error".to_string()))?;
-            key_idx.get(key).cloned().ok_or_else(|| StorageError::NotFound(key.to_string()))?
+            let key_idx = self
+                .key_index
+                .read()
+                .map_err(|_| StorageError::BackendError("Lock error".to_string()))?;
+            key_idx
+                .get(key)
+                .cloned()
+                .ok_or_else(|| StorageError::NotFound(key.to_string()))?
         };
 
         // Check access control
         let tier = self.router.route(&index_entry.classification);
         if tier.access_control != AccessControlMode::Public {
             if let Some(cap) = capability {
-                if !cap.matches_resource(key) || !cap.has_right(AccessRight::Delete) || cap.is_expired() {
-                    return Err(StorageError::AccessDenied("Invalid or insufficient capability".to_string()));
+                if !cap.matches_resource(key)
+                    || !cap.has_right(AccessRight::Delete)
+                    || cap.is_expired()
+                {
+                    return Err(StorageError::AccessDenied(
+                        "Invalid or insufficient capability".to_string(),
+                    ));
                 }
             } else {
-                return Err(StorageError::AccessDenied("Capability required".to_string()));
+                return Err(StorageError::AccessDenied(
+                    "Capability required".to_string(),
+                ));
             }
         }
 
@@ -531,10 +578,18 @@ impl EpistemicStorage {
         } else {
             // Actually delete
             match index_entry.backend {
-                StorageBackend::Memory => { self.memory_backend.delete(key); }
-                StorageBackend::Local => { self.local_backend.delete(key); }
-                StorageBackend::DHT => { self.dht_backend.delete(key); }
-                StorageBackend::IPFS | StorageBackend::Filecoin => { self.ipfs_backend.delete(key); }
+                StorageBackend::Memory => {
+                    self.memory_backend.delete(key);
+                }
+                StorageBackend::Local => {
+                    self.local_backend.delete(key);
+                }
+                StorageBackend::DHT => {
+                    self.dht_backend.delete(key);
+                }
+                StorageBackend::IPFS | StorageBackend::Filecoin => {
+                    self.ipfs_backend.delete(key);
+                }
             }
         }
 
@@ -564,28 +619,44 @@ impl EpistemicStorage {
     ) -> Result<StorageReceipt, StorageError> {
         // Get index entry
         let index_entry = {
-            let key_idx = self.key_index.read().map_err(|_| StorageError::BackendError("Lock error".to_string()))?;
-            key_idx.get(key).cloned().ok_or_else(|| StorageError::NotFound(key.to_string()))?
+            let key_idx = self
+                .key_index
+                .read()
+                .map_err(|_| StorageError::BackendError("Lock error".to_string()))?;
+            key_idx
+                .get(key)
+                .cloned()
+                .ok_or_else(|| StorageError::NotFound(key.to_string()))?
         };
 
         // Validate transition (INV-2: monotonic only)
-        self.router.validate_transition(&index_entry.classification, &new_classification)?;
+        self.router
+            .validate_transition(&index_entry.classification, &new_classification)?;
 
         // Check access control (need Admin right for reclassification)
         let tier = self.router.route(&index_entry.classification);
         if tier.access_control != AccessControlMode::Public {
             if let Some(cap) = capability {
-                if !cap.matches_resource(key) || !cap.has_right(AccessRight::Admin) || cap.is_expired() {
-                    return Err(StorageError::AccessDenied("Admin capability required for reclassification".to_string()));
+                if !cap.matches_resource(key)
+                    || !cap.has_right(AccessRight::Admin)
+                    || cap.is_expired()
+                {
+                    return Err(StorageError::AccessDenied(
+                        "Admin capability required for reclassification".to_string(),
+                    ));
                 }
             } else {
-                return Err(StorageError::AccessDenied("Capability required".to_string()));
+                return Err(StorageError::AccessDenied(
+                    "Capability required".to_string(),
+                ));
             }
         }
 
         // Check if migration is required
         let new_tier = self.router.route(&new_classification);
-        let requires_migration = self.router.requires_migration(&index_entry.classification, &new_classification);
+        let requires_migration = self
+            .router
+            .requires_migration(&index_entry.classification, &new_classification);
 
         // Track final location after potential migration
         let mut final_location = index_entry.location.clone();
@@ -593,12 +664,8 @@ impl EpistemicStorage {
 
         if requires_migration {
             // Perform data migration between backends
-            let migration_result = self.migrate_data(
-                key,
-                &index_entry,
-                new_tier.backend,
-                &_reason.reason,
-            );
+            let migration_result =
+                self.migrate_data(key, &index_entry, new_tier.backend, &_reason.reason);
 
             match migration_result {
                 Ok(result) => {
@@ -727,47 +794,42 @@ impl EpistemicStorage {
 
         // Write to target backend
         let metadata = match target_backend {
-            StorageBackend::Memory => {
-                self.memory_backend.set(
-                    key,
-                    &stored_data.data,
-                    index_entry.classification,
-                    index_entry.schema.clone(),
-                    &index_entry.created_by,
-                    None,
-                )
-            }
-            StorageBackend::Local => {
-                self.local_backend.set(
-                    key,
-                    &stored_data.data,
-                    index_entry.classification,
-                    index_entry.schema.clone(),
-                    &index_entry.created_by,
-                    None,
-                )
-            }
-            StorageBackend::DHT => {
-                self.dht_backend.set(
-                    key,
-                    &stored_data.data,
-                    index_entry.classification,
-                    index_entry.schema.clone(),
-                    &index_entry.created_by,
-                    None,
-                )
-            }
-            StorageBackend::IPFS | StorageBackend::Filecoin => {
-                self.ipfs_backend.set(
-                    key,
-                    &stored_data.data,
-                    index_entry.classification,
-                    index_entry.schema.clone(),
-                    &index_entry.created_by,
-                    None,
-                )
-            }
-        }.ok_or_else(|| StorageError::BackendError("Failed to write to target backend".to_string()))?;
+            StorageBackend::Memory => self.memory_backend.set(
+                key,
+                &stored_data.data,
+                index_entry.classification,
+                index_entry.schema.clone(),
+                &index_entry.created_by,
+                None,
+            ),
+            StorageBackend::Local => self.local_backend.set(
+                key,
+                &stored_data.data,
+                index_entry.classification,
+                index_entry.schema.clone(),
+                &index_entry.created_by,
+                None,
+            ),
+            StorageBackend::DHT => self.dht_backend.set(
+                key,
+                &stored_data.data,
+                index_entry.classification,
+                index_entry.schema.clone(),
+                &index_entry.created_by,
+                None,
+            ),
+            StorageBackend::IPFS | StorageBackend::Filecoin => self.ipfs_backend.set(
+                key,
+                &stored_data.data,
+                index_entry.classification,
+                index_entry.schema.clone(),
+                &index_entry.created_by,
+                None,
+            ),
+        }
+        .ok_or_else(|| {
+            StorageError::BackendError("Failed to write to target backend".to_string())
+        })?;
 
         // Verify data was written successfully by checking CID
         if metadata.cid != index_entry.cid {
@@ -800,12 +862,8 @@ impl EpistemicStorage {
         };
 
         // Create new location with migration history
-        let new_location = StorageLocation::migrated(
-            target_backend,
-            key,
-            index_entry.location.clone(),
-            reason,
-        );
+        let new_location =
+            StorageLocation::migrated(target_backend, key, index_entry.location.clone(), reason);
 
         Ok(MigrationResult {
             key: key.to_string(),
@@ -846,10 +904,18 @@ impl EpistemicStorage {
             cache_hit_rate: None,
         };
 
-        stats.items_by_backend.insert(StorageBackend::Memory, memory_stats.item_count);
-        stats.items_by_backend.insert(StorageBackend::Local, local_stats.item_count);
-        stats.items_by_backend.insert(StorageBackend::DHT, dht_stats.entry_count);
-        stats.items_by_backend.insert(StorageBackend::IPFS, ipfs_stats.item_count);
+        stats
+            .items_by_backend
+            .insert(StorageBackend::Memory, memory_stats.item_count);
+        stats
+            .items_by_backend
+            .insert(StorageBackend::Local, local_stats.item_count);
+        stats
+            .items_by_backend
+            .insert(StorageBackend::DHT, dht_stats.entry_count);
+        stats
+            .items_by_backend
+            .insert(StorageBackend::IPFS, ipfs_stats.item_count);
 
         // Calculate cache hit rate
         if let Some(m) = metrics {
@@ -871,7 +937,7 @@ impl EpistemicStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+    use crate::epistemic::{EmpiricalLevel, MaterialityLevel, NormativeLevel};
 
     fn test_classification() -> EpistemicClassification {
         EpistemicClassification {
@@ -893,21 +959,25 @@ mod tests {
     fn test_store_and_retrieve() {
         let storage = EpistemicStorage::default_storage();
 
-        let receipt = storage.store(
-            "key1",
-            &"hello world".to_string(),
-            test_classification(),
-            test_options(),
-        ).expect("Store should succeed");
+        let receipt = storage
+            .store(
+                "key1",
+                &"hello world".to_string(),
+                test_classification(),
+                test_options(),
+            )
+            .expect("Store should succeed");
 
         assert_eq!(receipt.key, "key1");
         assert!(!receipt.cid.is_empty());
 
-        let result: StoredData<String> = storage.retrieve(
-            "key1",
-            None, // Public access
-            RetrieveOptions::default(),
-        ).expect("Retrieve should succeed");
+        let result: StoredData<String> = storage
+            .retrieve(
+                "key1",
+                None, // Public access
+                RetrieveOptions::default(),
+            )
+            .expect("Retrieve should succeed");
 
         assert_eq!(result.data, "hello world");
     }
@@ -916,18 +986,18 @@ mod tests {
     fn test_retrieve_by_cid() {
         let storage = EpistemicStorage::default_storage();
 
-        let receipt = storage.store(
-            "key1",
-            &"test data".to_string(),
-            test_classification(),
-            test_options(),
-        ).expect("Store should succeed");
+        let receipt = storage
+            .store(
+                "key1",
+                &"test data".to_string(),
+                test_classification(),
+                test_options(),
+            )
+            .expect("Store should succeed");
 
-        let result: StoredData<String> = storage.retrieve_by_cid(
-            &receipt.cid,
-            None,
-            RetrieveOptions::default(),
-        ).expect("Retrieve by CID should succeed");
+        let result: StoredData<String> = storage
+            .retrieve_by_cid(&receipt.cid, None, RetrieveOptions::default())
+            .expect("Retrieve by CID should succeed");
 
         assert_eq!(result.data, "test data");
     }
@@ -936,23 +1006,23 @@ mod tests {
     fn test_update() {
         let storage = EpistemicStorage::default_storage();
 
-        storage.store(
-            "key1",
-            &"v1".to_string(),
-            test_classification(),
-            test_options(),
-        ).expect("Store should succeed");
+        storage
+            .store(
+                "key1",
+                &"v1".to_string(),
+                test_classification(),
+                test_options(),
+            )
+            .expect("Store should succeed");
 
-        let receipt = storage.update(
-            "key1",
-            &"v2".to_string(),
-            None,
-            UpdateOptions::default(),
-        ).expect("Update should succeed");
+        let receipt = storage
+            .update("key1", &"v2".to_string(), None, UpdateOptions::default())
+            .expect("Update should succeed");
 
         assert_eq!(receipt.version, 2);
 
-        let result: StoredData<String> = storage.retrieve("key1", None, RetrieveOptions::default())
+        let result: StoredData<String> = storage
+            .retrieve("key1", None, RetrieveOptions::default())
             .expect("Retrieve should succeed");
         assert_eq!(result.data, "v2");
     }
@@ -961,16 +1031,19 @@ mod tests {
     fn test_delete() {
         let storage = EpistemicStorage::default_storage();
 
-        storage.store(
-            "key1",
-            &"data".to_string(),
-            test_classification(),
-            test_options(),
-        ).expect("Store should succeed");
+        storage
+            .store(
+                "key1",
+                &"data".to_string(),
+                test_classification(),
+                test_options(),
+            )
+            .expect("Store should succeed");
 
         assert!(storage.exists("key1"));
 
-        storage.delete("key1", None, DeleteOptions::default())
+        storage
+            .delete("key1", None, DeleteOptions::default())
             .expect("Delete should succeed");
 
         assert!(!storage.exists("key1"));
@@ -986,7 +1059,8 @@ mod tests {
             materiality: MaterialityLevel::M1Temporal,
         };
 
-        storage.store("key1", &"data".to_string(), from, test_options())
+        storage
+            .store("key1", &"data".to_string(), from, test_options())
             .expect("Store should succeed");
 
         // Valid upgrade: M1 → M2
@@ -1002,10 +1076,14 @@ mod tests {
             timestamp: 0,
         };
 
-        let receipt = storage.reclassify("key1", to, reason, None)
+        let receipt = storage
+            .reclassify("key1", to, reason, None)
             .expect("Reclassify should succeed");
 
-        assert_eq!(receipt.classification.materiality, MaterialityLevel::M2Persistent);
+        assert_eq!(
+            receipt.classification.materiality,
+            MaterialityLevel::M2Persistent
+        );
     }
 
     #[test]
@@ -1018,7 +1096,8 @@ mod tests {
             materiality: MaterialityLevel::M2Persistent,
         };
 
-        storage.store("key1", &"data".to_string(), from, test_options())
+        storage
+            .store("key1", &"data".to_string(), from, test_options())
             .expect("Store should succeed");
 
         // Invalid: E2 → E1 (downgrade)
@@ -1049,10 +1128,16 @@ mod tests {
             materiality: MaterialityLevel::M0Ephemeral,
         };
 
-        storage.store("key1", &"data".to_string(), classification, test_options())
+        storage
+            .store("key1", &"data".to_string(), classification, test_options())
             .expect("Store should succeed");
 
-        let result = storage.update("key1", &"new data".to_string(), None, UpdateOptions::default());
+        let result = storage.update(
+            "key1",
+            &"new data".to_string(),
+            None,
+            UpdateOptions::default(),
+        );
         assert!(matches!(result, Err(StorageError::ImmutableData)));
     }
 
@@ -1060,10 +1145,21 @@ mod tests {
     fn test_duplicate_key_error() {
         let storage = EpistemicStorage::default_storage();
 
-        storage.store("key1", &"data".to_string(), test_classification(), test_options())
+        storage
+            .store(
+                "key1",
+                &"data".to_string(),
+                test_classification(),
+                test_options(),
+            )
             .expect("First store should succeed");
 
-        let result = storage.store("key1", &"data2".to_string(), test_classification(), test_options());
+        let result = storage.store(
+            "key1",
+            &"data2".to_string(),
+            test_classification(),
+            test_options(),
+        );
         assert!(matches!(result, Err(StorageError::DuplicateKey(_))));
     }
 
@@ -1071,12 +1167,32 @@ mod tests {
     fn test_stats() {
         let storage = EpistemicStorage::default_storage();
 
-        storage.store("key1", &"data".to_string(), test_classification(), test_options()).unwrap();
-        storage.store("key2", &"data".to_string(), test_classification(), test_options()).unwrap();
+        storage
+            .store(
+                "key1",
+                &"data".to_string(),
+                test_classification(),
+                test_options(),
+            )
+            .unwrap();
+        storage
+            .store(
+                "key2",
+                &"data".to_string(),
+                test_classification(),
+                test_options(),
+            )
+            .unwrap();
 
         let stats = storage.stats();
         // Memory backend should have 2 items (test_classification uses M0Ephemeral)
-        assert_eq!(*stats.items_by_backend.get(&StorageBackend::Memory).unwrap_or(&0), 2);
+        assert_eq!(
+            *stats
+                .items_by_backend
+                .get(&StorageBackend::Memory)
+                .unwrap_or(&0),
+            2
+        );
         // Total should include at least these 2 items
         assert!(stats.total_items >= 2);
     }
@@ -1127,12 +1243,14 @@ mod tests {
         let storage = EpistemicStorage::default_storage();
 
         // Store some data
-        let receipt = storage.store(
-            "key1",
-            &"test data".to_string(),
-            test_classification(),
-            test_options(),
-        ).unwrap();
+        let receipt = storage
+            .store(
+                "key1",
+                &"test data".to_string(),
+                test_classification(),
+                test_options(),
+            )
+            .unwrap();
 
         // Poison the key_index lock
         let key_index_ref = Arc::clone(&storage.key_index);
@@ -1149,28 +1267,35 @@ mod tests {
         // In production code, we might want to propagate LockPoisoned errors more explicitly
 
         // retrieve should fail with NotFound (because it can't read the index)
-        let result: Result<StoredData<String>, StorageError> = storage.retrieve(
-            "key1",
-            None,
-            RetrieveOptions::default(),
+        let result: Result<StoredData<String>, StorageError> =
+            storage.retrieve("key1", None, RetrieveOptions::default());
+        assert!(
+            matches!(result, Err(StorageError::BackendError(_))),
+            "retrieve should fail when key_index is poisoned"
         );
-        assert!(matches!(result, Err(StorageError::BackendError(_))),
-            "retrieve should fail when key_index is poisoned");
 
         // exists should return false (can't read index)
-        assert!(!storage.exists("key1"), "exists should return false when index is poisoned");
+        assert!(
+            !storage.exists("key1"),
+            "exists should return false when index is poisoned"
+        );
 
         // get_info should return None
-        assert!(storage.get_info("key1").is_none(), "get_info should return None when index is poisoned");
+        assert!(
+            storage.get_info("key1").is_none(),
+            "get_info should return None when index is poisoned"
+        );
 
         // Now test with poisoned cid_index
         let storage2 = EpistemicStorage::default_storage();
-        let receipt2 = storage2.store(
-            "key2",
-            &"test data".to_string(),
-            test_classification(),
-            test_options(),
-        ).unwrap();
+        let receipt2 = storage2
+            .store(
+                "key2",
+                &"test data".to_string(),
+                test_classification(),
+                test_options(),
+            )
+            .unwrap();
 
         let cid_index_ref = Arc::clone(&storage2.cid_index);
         let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
@@ -1179,12 +1304,11 @@ mod tests {
         }));
 
         // retrieve_by_cid should fail
-        let result: Result<StoredData<String>, StorageError> = storage2.retrieve_by_cid(
-            &receipt2.cid,
-            None,
-            RetrieveOptions::default(),
+        let result: Result<StoredData<String>, StorageError> =
+            storage2.retrieve_by_cid(&receipt2.cid, None, RetrieveOptions::default());
+        assert!(
+            matches!(result, Err(StorageError::BackendError(_))),
+            "retrieve_by_cid should fail when cid_index is poisoned"
         );
-        assert!(matches!(result, Err(StorageError::BackendError(_))),
-            "retrieve_by_cid should fail when cid_index is poisoned");
     }
 }

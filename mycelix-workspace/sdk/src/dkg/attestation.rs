@@ -29,9 +29,9 @@
 //! - Endorsement weight uses reputation squared voting
 //! - Challenges trigger RB-BFT consensus verification
 
-use ed25519_dalek::{Signature, VerifyingKey, Verifier};
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
-use sha3::{Sha3_256, Digest};
+use sha3::{Digest, Sha3_256};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use zeroize::{Zeroize, ZeroizeOnDrop};
@@ -76,10 +76,14 @@ impl std::fmt::Display for AttestationError {
             Self::EvidenceTooLong(n) => write!(f, "Evidence too long: {} chars (max 2000)", n),
             Self::EmptySignature => write!(f, "Signature cannot be empty"),
             Self::InvalidSignatureFormat(e) => write!(f, "Invalid signature format: {}", e),
-            Self::SignatureVerificationFailed(e) => write!(f, "Signature verification failed: {}", e),
+            Self::SignatureVerificationFailed(e) => {
+                write!(f, "Signature verification failed: {}", e)
+            }
             Self::PublicKeyNotFound(id) => write!(f, "Public key not found for attester: {}", id),
             Self::InvalidPublicKey(e) => write!(f, "Invalid public key format: {}", e),
-            Self::RateLimited { retry_after } => write!(f, "Rate limited: retry after {:?}", retry_after),
+            Self::RateLimited { retry_after } => {
+                write!(f, "Rate limited: retry after {:?}", retry_after)
+            }
         }
     }
 }
@@ -210,7 +214,11 @@ impl Attestation {
     /// Create a new endorsement attestation
     ///
     /// Note: The signature must be provided via `with_signature()` before validation.
-    pub fn endorse(triple_hash: impl Into<String>, attester: impl Into<String>, signature: Vec<u8>) -> Self {
+    pub fn endorse(
+        triple_hash: impl Into<String>,
+        attester: impl Into<String>,
+        signature: Vec<u8>,
+    ) -> Self {
         Self {
             triple_hash: triple_hash.into(),
             attester: attester.into(),
@@ -224,7 +232,11 @@ impl Attestation {
     }
 
     /// Create a new challenge attestation
-    pub fn challenge(triple_hash: impl Into<String>, attester: impl Into<String>, signature: Vec<u8>) -> Self {
+    pub fn challenge(
+        triple_hash: impl Into<String>,
+        attester: impl Into<String>,
+        signature: Vec<u8>,
+    ) -> Self {
         Self {
             triple_hash: triple_hash.into(),
             attester: attester.into(),
@@ -238,7 +250,11 @@ impl Attestation {
     }
 
     /// Create a new acknowledgment attestation
-    pub fn acknowledge(triple_hash: impl Into<String>, attester: impl Into<String>, signature: Vec<u8>) -> Self {
+    pub fn acknowledge(
+        triple_hash: impl Into<String>,
+        attester: impl Into<String>,
+        signature: Vec<u8>,
+    ) -> Self {
         Self {
             triple_hash: triple_hash.into(),
             attester: attester.into(),
@@ -339,7 +355,10 @@ impl Attestation {
     /// Verify the signature against the attester's public key
     ///
     /// Returns Ok(()) if verification succeeds, or an error describing the failure.
-    pub fn verify_signature(&self, registry: &dyn PublicKeyRegistry) -> Result<(), AttestationError> {
+    pub fn verify_signature(
+        &self,
+        registry: &dyn PublicKeyRegistry,
+    ) -> Result<(), AttestationError> {
         // Look up the attester's public key
         let public_key_bytes = registry
             .get_public_key(&self.attester)
@@ -351,12 +370,14 @@ impl Attestation {
 
         // Parse the signature
         if self.signature.len() != 64 {
-            return Err(AttestationError::InvalidSignatureFormat(
-                format!("Expected 64 bytes, got {}", self.signature.len())
-            ));
+            return Err(AttestationError::InvalidSignatureFormat(format!(
+                "Expected 64 bytes, got {}",
+                self.signature.len()
+            )));
         }
-        let signature_bytes: [u8; 64] = self.signature.clone().try_into()
-            .map_err(|_| AttestationError::InvalidSignatureFormat("Invalid signature length".into()))?;
+        let signature_bytes: [u8; 64] = self.signature.clone().try_into().map_err(|_| {
+            AttestationError::InvalidSignatureFormat("Invalid signature length".into())
+        })?;
         let signature = Signature::from_bytes(&signature_bytes);
 
         // Compute the message that was signed
@@ -379,7 +400,9 @@ impl Attestation {
             return Err(AttestationError::EmptyAttester);
         }
         if self.supporting_sources.len() > 10 {
-            return Err(AttestationError::TooManySources(self.supporting_sources.len()));
+            return Err(AttestationError::TooManySources(
+                self.supporting_sources.len(),
+            ));
         }
         if let Some(ref evidence) = self.evidence {
             if evidence.len() > 2000 {
@@ -395,7 +418,10 @@ impl Attestation {
     /// Full validation including signature verification
     ///
     /// This should be called before accepting any attestation.
-    pub fn validate_with_registry(&self, registry: &dyn PublicKeyRegistry) -> Result<(), AttestationError> {
+    pub fn validate_with_registry(
+        &self,
+        registry: &dyn PublicKeyRegistry,
+    ) -> Result<(), AttestationError> {
         // Basic field validation
         self.validate()?;
 
@@ -512,7 +538,11 @@ impl AttestationSet {
     /// - Validation fails
     /// - Signature verification fails
     /// - Attester is rate limited (must wait before submitting another attestation)
-    pub fn add_verified(&mut self, attestation: Attestation, registry: &dyn PublicKeyRegistry) -> Result<(), AttestationError> {
+    pub fn add_verified(
+        &mut self,
+        attestation: Attestation,
+        registry: &dyn PublicKeyRegistry,
+    ) -> Result<(), AttestationError> {
         // Check rate limiting first (FIND-008)
         if let Some(retry_after) = self.is_rate_limited(&attestation.attester) {
             return Err(AttestationError::RateLimited { retry_after });
@@ -522,10 +552,12 @@ impl AttestationSet {
         attestation.validate_with_registry(registry)?;
 
         // Update rate limit tracking
-        self.last_update.insert(attestation.attester.clone(), Instant::now());
+        self.last_update
+            .insert(attestation.attester.clone(), Instant::now());
 
         // Remove any existing attestation from the same attester
-        self.attestations.retain(|a| a.attester != attestation.attester);
+        self.attestations
+            .retain(|a| a.attester != attestation.attester);
         self.attestations.push(attestation);
         Ok(())
     }
@@ -543,10 +575,12 @@ impl AttestationSet {
         }
 
         // Update rate limit tracking
-        self.last_update.insert(attestation.attester.clone(), Instant::now());
+        self.last_update
+            .insert(attestation.attester.clone(), Instant::now());
 
         // Remove any existing attestation from the same attester
-        self.attestations.retain(|a| a.attester != attestation.attester);
+        self.attestations
+            .retain(|a| a.attester != attestation.attester);
         self.attestations.push(attestation);
         Ok(())
     }
@@ -558,7 +592,8 @@ impl AttestationSet {
     /// Prefer `add_verified()` or `add_rate_limited()` for normal operation.
     pub fn add(&mut self, attestation: Attestation) {
         // Remove any existing attestation from the same attester
-        self.attestations.retain(|a| a.attester != attestation.attester);
+        self.attestations
+            .retain(|a| a.attester != attestation.attester);
         self.attestations.push(attestation);
     }
 
@@ -590,7 +625,8 @@ impl AttestationSet {
 
     /// Get all endorsement reputations
     pub fn endorsement_reputations(&self) -> Vec<f64> {
-        self.attestations.iter()
+        self.attestations
+            .iter()
             .filter(|a| matches!(a.attestation_type, AttestationType::Endorse))
             .map(|a| a.attester_reputation)
             .collect()
@@ -598,7 +634,8 @@ impl AttestationSet {
 
     /// Get total contradiction weight (sum of challenge reputations)
     pub fn contradiction_weight(&self) -> f64 {
-        self.attestations.iter()
+        self.attestations
+            .iter()
             .filter(|a| a.attestation_type.is_contradiction())
             .map(|a| a.attester_reputation)
             .sum()
@@ -608,16 +645,15 @@ impl AttestationSet {
     ///
     /// Positive = more endorsements, negative = more challenges
     pub fn net_weighted_score(&self) -> f64 {
-        self.attestations.iter()
+        self.attestations
+            .iter()
             .map(|a| a.weighted_contribution())
             .sum()
     }
 
     /// Get unique attester count
     pub fn unique_attester_count(&self) -> usize {
-        let mut attesters: Vec<&String> = self.attestations.iter()
-            .map(|a| &a.attester)
-            .collect();
+        let mut attesters: Vec<&String> = self.attestations.iter().map(|a| &a.attester).collect();
         attesters.sort();
         attesters.dedup();
         attesters.len()
@@ -630,7 +666,8 @@ impl AttestationSet {
 
     /// Get the most recent attestation timestamp
     pub fn latest_timestamp(&self) -> u64 {
-        self.attestations.iter()
+        self.attestations
+            .iter()
             .map(|a| a.created_at)
             .max()
             .unwrap_or(0)
@@ -688,7 +725,7 @@ mod hex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ed25519_dalek::{SigningKey, Signer};
+    use ed25519_dalek::{Signer, SigningKey};
 
     /// Create a test keypair and sign an attestation
     fn create_signed_attestation(
@@ -698,10 +735,9 @@ mod tests {
         timestamp: u64,
     ) -> (Attestation, SigningKey) {
         let signing_key = SigningKey::from_bytes(&[
-            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-            0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
-            0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
-            0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+            0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c,
+            0x1d, 0x1e, 0x1f, 0x20,
         ]);
 
         // Create attestation without signature first to compute the message
@@ -737,10 +773,14 @@ mod tests {
         assert!((AttestationType::Challenge.weight() + 1.0).abs() < 0.01);
         assert!((AttestationType::Acknowledge.weight() - 0.1).abs() < 0.01);
 
-        let partial_50 = AttestationType::Partial { agreement_level: 50 };
+        let partial_50 = AttestationType::Partial {
+            agreement_level: 50,
+        };
         assert!(partial_50.weight().abs() < 0.01); // 50% = neutral
 
-        let partial_100 = AttestationType::Partial { agreement_level: 100 };
+        let partial_100 = AttestationType::Partial {
+            agreement_level: 100,
+        };
         assert!((partial_100.weight() - 1.0).abs() < 0.01);
 
         let partial_0 = AttestationType::Partial { agreement_level: 0 };
@@ -749,12 +789,8 @@ mod tests {
 
     #[test]
     fn test_attestation_validation_with_signature() {
-        let (attestation, signing_key) = create_signed_attestation(
-            "hash123",
-            "attester1",
-            AttestationType::Endorse,
-            1000,
-        );
+        let (attestation, signing_key) =
+            create_signed_attestation("hash123", "attester1", AttestationType::Endorse, 1000);
         let registry = create_test_registry("attester1", &signing_key);
 
         // Basic validation should pass
@@ -766,51 +802,44 @@ mod tests {
 
     #[test]
     fn test_attestation_validation_empty_hash() {
-        let (mut attestation, _) = create_signed_attestation(
-            "",
-            "attester1",
-            AttestationType::Endorse,
-            1000,
-        );
+        let (mut attestation, _) =
+            create_signed_attestation("", "attester1", AttestationType::Endorse, 1000);
         attestation.triple_hash = String::new();
 
-        assert!(matches!(attestation.validate(), Err(AttestationError::EmptyTripleHash)));
+        assert!(matches!(
+            attestation.validate(),
+            Err(AttestationError::EmptyTripleHash)
+        ));
     }
 
     #[test]
     fn test_attestation_validation_empty_attester() {
-        let (mut attestation, _) = create_signed_attestation(
-            "hash123",
-            "",
-            AttestationType::Endorse,
-            1000,
-        );
+        let (mut attestation, _) =
+            create_signed_attestation("hash123", "", AttestationType::Endorse, 1000);
         attestation.attester = String::new();
 
-        assert!(matches!(attestation.validate(), Err(AttestationError::EmptyAttester)));
+        assert!(matches!(
+            attestation.validate(),
+            Err(AttestationError::EmptyAttester)
+        ));
     }
 
     #[test]
     fn test_attestation_validation_empty_signature() {
-        let (mut attestation, _) = create_signed_attestation(
-            "hash123",
-            "attester1",
-            AttestationType::Endorse,
-            1000,
-        );
+        let (mut attestation, _) =
+            create_signed_attestation("hash123", "attester1", AttestationType::Endorse, 1000);
         attestation.signature = Vec::new();
 
-        assert!(matches!(attestation.validate(), Err(AttestationError::EmptySignature)));
+        assert!(matches!(
+            attestation.validate(),
+            Err(AttestationError::EmptySignature)
+        ));
     }
 
     #[test]
     fn test_signature_verification_success() {
-        let (attestation, signing_key) = create_signed_attestation(
-            "hash123",
-            "alice",
-            AttestationType::Endorse,
-            1700000000,
-        );
+        let (attestation, signing_key) =
+            create_signed_attestation("hash123", "alice", AttestationType::Endorse, 1700000000);
         let registry = create_test_registry("alice", &signing_key);
 
         assert!(attestation.verify_signature(&registry).is_ok());
@@ -818,12 +847,8 @@ mod tests {
 
     #[test]
     fn test_signature_verification_wrong_key() {
-        let (attestation, _) = create_signed_attestation(
-            "hash123",
-            "alice",
-            AttestationType::Endorse,
-            1700000000,
-        );
+        let (attestation, _) =
+            create_signed_attestation("hash123", "alice", AttestationType::Endorse, 1700000000);
 
         // Create registry with different key
         let wrong_key = SigningKey::from_bytes(&[0x42; 32]);
@@ -837,12 +862,8 @@ mod tests {
 
     #[test]
     fn test_signature_verification_key_not_found() {
-        let (attestation, _) = create_signed_attestation(
-            "hash123",
-            "alice",
-            AttestationType::Endorse,
-            1700000000,
-        );
+        let (attestation, _) =
+            create_signed_attestation("hash123", "alice", AttestationType::Endorse, 1700000000);
         let registry = InMemoryKeyRegistry::new(); // Empty registry
 
         assert!(matches!(
@@ -853,12 +874,8 @@ mod tests {
 
     #[test]
     fn test_signature_verification_tampered_data() {
-        let (mut attestation, signing_key) = create_signed_attestation(
-            "hash123",
-            "alice",
-            AttestationType::Endorse,
-            1700000000,
-        );
+        let (mut attestation, signing_key) =
+            create_signed_attestation("hash123", "alice", AttestationType::Endorse, 1700000000);
         let registry = create_test_registry("alice", &signing_key);
 
         // Tamper with the triple hash
@@ -872,21 +889,13 @@ mod tests {
 
     #[test]
     fn test_weighted_contribution() {
-        let (mut attestation, _) = create_signed_attestation(
-            "hash",
-            "alice",
-            AttestationType::Endorse,
-            1000,
-        );
+        let (mut attestation, _) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
         attestation = attestation.with_reputation(0.9);
         assert!((attestation.weighted_contribution() - 0.9).abs() < 0.01);
 
-        let (mut challenge, _) = create_signed_attestation(
-            "hash",
-            "bob",
-            AttestationType::Challenge,
-            1000,
-        );
+        let (mut challenge, _) =
+            create_signed_attestation("hash", "bob", AttestationType::Challenge, 1000);
         challenge = challenge.with_reputation(0.3);
         assert!((challenge.weighted_contribution() + 0.3).abs() < 0.01);
     }
@@ -895,15 +904,13 @@ mod tests {
     fn test_attestation_set_with_verified_add() {
         let mut set = AttestationSet::new();
 
-        let (attestation1, signing_key1) = create_signed_attestation(
-            "hash",
-            "alice",
-            AttestationType::Endorse,
-            1000,
-        );
+        let (attestation1, signing_key1) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
         let registry1 = create_test_registry("alice", &signing_key1);
 
-        assert!(set.add_verified(attestation1.with_reputation(0.8), &registry1).is_ok());
+        assert!(set
+            .add_verified(attestation1.with_reputation(0.8), &registry1)
+            .is_ok());
         assert_eq!(set.attestations.len(), 1);
     }
 
@@ -911,12 +918,8 @@ mod tests {
     fn test_attestation_set_rejects_invalid_signature() {
         let mut set = AttestationSet::new();
 
-        let (mut attestation, _) = create_signed_attestation(
-            "hash",
-            "alice",
-            AttestationType::Endorse,
-            1000,
-        );
+        let (mut attestation, _) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
         // Corrupt the signature
         attestation.signature[0] ^= 0xFF;
 
@@ -933,12 +936,8 @@ mod tests {
         let mut set = AttestationSet::new();
 
         // Use same attester for both
-        let (attestation1, signing_key) = create_signed_attestation(
-            "hash",
-            "alice",
-            AttestationType::Endorse,
-            1000,
-        );
+        let (attestation1, signing_key) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
 
         // Create second attestation (challenge) with same key
         let mut attestation2 = Attestation {
@@ -957,7 +956,9 @@ mod tests {
 
         let registry = create_test_registry("alice", &signing_key);
 
-        assert!(set.add_verified(attestation1.with_reputation(0.8), &registry).is_ok());
+        assert!(set
+            .add_verified(attestation1.with_reputation(0.8), &registry)
+            .is_ok());
 
         // Clear rate limit for alice to test deduplication behavior (not rate limiting)
         set.clear_rate_limit_for("alice");
@@ -966,16 +967,21 @@ mod tests {
 
         // Should only have one attestation from alice (the challenge replaces the endorse)
         assert_eq!(set.attestations.len(), 1);
-        assert!(matches!(set.attestations[0].attestation_type, AttestationType::Challenge));
+        assert!(matches!(
+            set.attestations[0].attestation_type,
+            AttestationType::Challenge
+        ));
     }
 
     #[test]
     fn test_attestation_set_counts() {
         let mut set = AttestationSet::new();
 
-        let (att1, key1) = create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
+        let (att1, key1) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
         let (att2, key2) = create_signed_attestation("hash", "bob", AttestationType::Endorse, 1000);
-        let (att3, key3) = create_signed_attestation("hash", "eve", AttestationType::Challenge, 1000);
+        let (att3, key3) =
+            create_signed_attestation("hash", "eve", AttestationType::Challenge, 1000);
 
         let mut registry = InMemoryKeyRegistry::new();
         registry.register("alice", key1.verifying_key().to_bytes());
@@ -996,18 +1002,24 @@ mod tests {
     fn test_attestation_set_contradiction_weight() {
         let mut set = AttestationSet::new();
 
-        let (att1, key1) = create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
-        let (att2, key2) = create_signed_attestation("hash", "eve", AttestationType::Challenge, 1000);
-        let (att3, key3) = create_signed_attestation("hash", "mallory", AttestationType::Challenge, 1000);
+        let (att1, key1) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
+        let (att2, key2) =
+            create_signed_attestation("hash", "eve", AttestationType::Challenge, 1000);
+        let (att3, key3) =
+            create_signed_attestation("hash", "mallory", AttestationType::Challenge, 1000);
 
         let mut registry = InMemoryKeyRegistry::new();
         registry.register("alice", key1.verifying_key().to_bytes());
         registry.register("eve", key2.verifying_key().to_bytes());
         registry.register("mallory", key3.verifying_key().to_bytes());
 
-        set.add_verified(att1.with_reputation(0.9), &registry).unwrap();
-        set.add_verified(att2.with_reputation(0.3), &registry).unwrap();
-        set.add_verified(att3.with_reputation(0.4), &registry).unwrap();
+        set.add_verified(att1.with_reputation(0.9), &registry)
+            .unwrap();
+        set.add_verified(att2.with_reputation(0.3), &registry)
+            .unwrap();
+        set.add_verified(att3.with_reputation(0.4), &registry)
+            .unwrap();
 
         assert!((set.contradiction_weight() - 0.7).abs() < 0.01);
     }
@@ -1016,18 +1028,23 @@ mod tests {
     fn test_net_weighted_score() {
         let mut set = AttestationSet::new();
 
-        let (att1, key1) = create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
+        let (att1, key1) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
         let (att2, key2) = create_signed_attestation("hash", "bob", AttestationType::Endorse, 1000);
-        let (att3, key3) = create_signed_attestation("hash", "eve", AttestationType::Challenge, 1000);
+        let (att3, key3) =
+            create_signed_attestation("hash", "eve", AttestationType::Challenge, 1000);
 
         let mut registry = InMemoryKeyRegistry::new();
         registry.register("alice", key1.verifying_key().to_bytes());
         registry.register("bob", key2.verifying_key().to_bytes());
         registry.register("eve", key3.verifying_key().to_bytes());
 
-        set.add_verified(att1.with_reputation(0.9), &registry).unwrap();
-        set.add_verified(att2.with_reputation(0.8), &registry).unwrap();
-        set.add_verified(att3.with_reputation(0.5), &registry).unwrap();
+        set.add_verified(att1.with_reputation(0.9), &registry)
+            .unwrap();
+        set.add_verified(att2.with_reputation(0.8), &registry)
+            .unwrap();
+        set.add_verified(att3.with_reputation(0.5), &registry)
+            .unwrap();
 
         // Net = 0.9 + 0.8 - 0.5 = 1.2
         assert!((set.net_weighted_score() - 1.2).abs() < 0.01);
@@ -1037,9 +1054,11 @@ mod tests {
     fn test_endorsement_ratio() {
         let mut set = AttestationSet::new();
 
-        let (att1, key1) = create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
+        let (att1, key1) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
         let (att2, key2) = create_signed_attestation("hash", "bob", AttestationType::Endorse, 1000);
-        let (att3, key3) = create_signed_attestation("hash", "eve", AttestationType::Challenge, 1000);
+        let (att3, key3) =
+            create_signed_attestation("hash", "eve", AttestationType::Challenge, 1000);
 
         let mut registry = InMemoryKeyRegistry::new();
         registry.register("alice", key1.verifying_key().to_bytes());
@@ -1091,18 +1110,28 @@ mod tests {
 
     #[test]
     fn test_signing_message_deterministic() {
-        let (attestation1, _) = create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
-        let (attestation2, _) = create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
+        let (attestation1, _) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
+        let (attestation2, _) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
 
-        assert_eq!(attestation1.compute_signing_message(), attestation2.compute_signing_message());
+        assert_eq!(
+            attestation1.compute_signing_message(),
+            attestation2.compute_signing_message()
+        );
     }
 
     #[test]
     fn test_signing_message_different_for_different_inputs() {
-        let (attestation1, _) = create_signed_attestation("hash1", "alice", AttestationType::Endorse, 1000);
-        let (attestation2, _) = create_signed_attestation("hash2", "alice", AttestationType::Endorse, 1000);
+        let (attestation1, _) =
+            create_signed_attestation("hash1", "alice", AttestationType::Endorse, 1000);
+        let (attestation2, _) =
+            create_signed_attestation("hash2", "alice", AttestationType::Endorse, 1000);
 
-        assert_ne!(attestation1.compute_signing_message(), attestation2.compute_signing_message());
+        assert_ne!(
+            attestation1.compute_signing_message(),
+            attestation2.compute_signing_message()
+        );
     }
 
     // =========================================================================
@@ -1114,14 +1143,18 @@ mod tests {
         // Use a short rate limit for testing
         let mut set = AttestationSet::with_rate_limit(Duration::from_millis(100));
 
-        let (att1, key1) = create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
+        let (att1, key1) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
         let registry = create_test_registry("alice", &key1);
 
         // First attestation should succeed
-        assert!(set.add_verified(att1.with_reputation(0.8), &registry).is_ok());
+        assert!(set
+            .add_verified(att1.with_reputation(0.8), &registry)
+            .is_ok());
 
         // Second attestation from same attester immediately should fail
-        let (att2, _) = create_signed_attestation("hash2", "alice", AttestationType::Challenge, 2000);
+        let (att2, _) =
+            create_signed_attestation("hash2", "alice", AttestationType::Challenge, 2000);
         let result = set.add_verified(att2, &registry);
         assert!(matches!(result, Err(AttestationError::RateLimited { .. })));
     }
@@ -1130,7 +1163,8 @@ mod tests {
     fn test_rate_limiting_allows_different_attesters() {
         let mut set = AttestationSet::with_rate_limit(Duration::from_secs(60));
 
-        let (att1, key1) = create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
+        let (att1, key1) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
         let (att2, key2) = create_signed_attestation("hash", "bob", AttestationType::Endorse, 1000);
 
         let mut registry = InMemoryKeyRegistry::new();
@@ -1147,11 +1181,14 @@ mod tests {
     fn test_rate_limit_clear_allows_new_attestation() {
         let mut set = AttestationSet::with_rate_limit(Duration::from_secs(60));
 
-        let (att1, key1) = create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
+        let (att1, key1) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
         let registry = create_test_registry("alice", &key1);
 
         // First attestation succeeds
-        assert!(set.add_verified(att1.with_reputation(0.8), &registry).is_ok());
+        assert!(set
+            .add_verified(att1.with_reputation(0.8), &registry)
+            .is_ok());
 
         // Clear rate limit
         set.clear_rate_limit_for("alice");
@@ -1181,7 +1218,8 @@ mod tests {
         // Before any attestations, no one is rate limited
         assert!(set.is_rate_limited("alice").is_none());
 
-        let (att1, key1) = create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
+        let (att1, key1) =
+            create_signed_attestation("hash", "alice", AttestationType::Endorse, 1000);
         let registry = create_test_registry("alice", &key1);
 
         set.add_verified(att1, &registry).unwrap();
@@ -1203,7 +1241,8 @@ mod tests {
         assert_eq!(set.attestations.len(), 1);
 
         // Second add should fail due to rate limiting
-        let (att2, _) = create_signed_attestation("hash2", "alice", AttestationType::Challenge, 2000);
+        let (att2, _) =
+            create_signed_attestation("hash2", "alice", AttestationType::Challenge, 2000);
         let result = set.add_rate_limited(att2);
         assert!(matches!(result, Err(AttestationError::RateLimited { .. })));
     }
@@ -1221,6 +1260,9 @@ mod tests {
         // Attestations should be preserved
         assert_eq!(deserialized.attestations.len(), 1);
         // Rate limit state is transient and not serialized, so it should use default
-        assert_eq!(deserialized.rate_limit, Duration::from_secs(DEFAULT_RATE_LIMIT_SECS));
+        assert_eq!(
+            deserialized.rate_limit,
+            Duration::from_secs(DEFAULT_RATE_LIMIT_SECS)
+        );
     }
 }

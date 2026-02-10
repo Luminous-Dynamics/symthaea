@@ -5,12 +5,11 @@
 //!
 //! Run with: `cargo bench --bench fl_aggregation_benchmarks --features simulation`
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 use mycelix_sdk::fl::{
-    GradientUpdate, FLConfig, FLCoordinator, AggregationMethod,
-    fedavg, fedavg_optimized, trimmed_mean, coordinate_median, krum,
-    GradientAccumulator,
+    coordinate_median, fedavg, fedavg_optimized, krum, trimmed_mean, AggregationMethod, FLConfig,
+    FLCoordinator, GradientAccumulator, GradientUpdate,
 };
 
 // =============================================================================
@@ -28,7 +27,7 @@ fn create_gradient_updates(participant_count: usize, gradient_dim: usize) -> Vec
                 format!("participant-{}", i),
                 1, // round
                 gradients,
-                100 + i, // batch size
+                100 + i,                 // batch size
                 0.5 - (i as f64 * 0.01), // loss
             )
         })
@@ -90,9 +89,7 @@ fn benchmark_fedavg_scaling(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("participants", participant_count),
             &updates,
-            |b, updates| {
-                b.iter(|| fedavg(black_box(updates)))
-            },
+            |b, updates| b.iter(|| fedavg(black_box(updates))),
         );
     }
 
@@ -130,9 +127,7 @@ fn benchmark_gradient_dimension_scaling(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("dimension", gradient_dim),
             &updates,
-            |b, updates| {
-                b.iter(|| fedavg(black_box(updates)))
-            },
+            |b, updates| b.iter(|| fedavg(black_box(updates))),
         );
     }
 
@@ -154,9 +149,7 @@ fn benchmark_trimmed_mean(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("trim_ratio", format!("{:.1}", trim_ratio)),
             &(updates.clone(), *trim_ratio),
-            |b, (updates, ratio)| {
-                b.iter(|| trimmed_mean(black_box(updates), black_box(*ratio)))
-            },
+            |b, (updates, ratio)| b.iter(|| trimmed_mean(black_box(updates), black_box(*ratio))),
         );
     }
 
@@ -179,9 +172,7 @@ fn benchmark_coordinate_median(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("participants", participant_count),
             &updates,
-            |b, updates| {
-                b.iter(|| coordinate_median(black_box(updates)))
-            },
+            |b, updates| b.iter(|| coordinate_median(black_box(updates))),
         );
     }
 
@@ -206,9 +197,7 @@ fn benchmark_krum(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("participants", participant_count),
             &(updates.clone(), byzantine_count),
-            |b, (updates, byz_count)| {
-                b.iter(|| krum(black_box(updates), black_box(*byz_count)))
-            },
+            |b, (updates, byz_count)| b.iter(|| krum(black_box(updates), black_box(*byz_count))),
         );
     }
 
@@ -313,40 +302,36 @@ fn benchmark_aggregation_methods(c: &mut Criterion) {
     ];
 
     for (name, method) in methods.iter() {
-        group.bench_with_input(
-            BenchmarkId::new("method", name),
-            method,
-            |b, method| {
-                b.iter_batched(
-                    || {
-                        let config = FLConfig {
-                            min_participants: participant_count,
-                            max_participants: participant_count + 10,
-                            round_timeout_ms: 60_000,
-                            byzantine_tolerance: 0.33,
-                            aggregation_method: method.clone(),
-                            trust_threshold: 0.5,
-                        };
-                        let mut coordinator = FLCoordinator::new(config);
+        group.bench_with_input(BenchmarkId::new("method", name), method, |b, method| {
+            b.iter_batched(
+                || {
+                    let config = FLConfig {
+                        min_participants: participant_count,
+                        max_participants: participant_count + 10,
+                        round_timeout_ms: 60_000,
+                        byzantine_tolerance: 0.33,
+                        aggregation_method: method.clone(),
+                        trust_threshold: 0.5,
+                    };
+                    let mut coordinator = FLCoordinator::new(config);
 
-                        for i in 0..participant_count {
-                            coordinator.register_participant(format!("p{}", i));
-                        }
-                        coordinator.start_round().unwrap();
+                    for i in 0..participant_count {
+                        coordinator.register_participant(format!("p{}", i));
+                    }
+                    coordinator.start_round().unwrap();
 
-                        let updates = create_gradient_updates(participant_count, gradient_dim);
-                        (coordinator, updates)
-                    },
-                    |(mut coordinator, updates)| {
-                        for update in black_box(updates) {
-                            coordinator.submit_update(black_box(update));
-                        }
-                        coordinator.aggregate_round()
-                    },
-                    criterion::BatchSize::SmallInput,
-                );
-            },
-        );
+                    let updates = create_gradient_updates(participant_count, gradient_dim);
+                    (coordinator, updates)
+                },
+                |(mut coordinator, updates)| {
+                    for update in black_box(updates) {
+                        coordinator.submit_update(black_box(update));
+                    }
+                    coordinator.aggregate_round()
+                },
+                criterion::BatchSize::SmallInput,
+            );
+        });
     }
 
     group.finish();
@@ -370,10 +355,7 @@ criterion_group!(
     benchmark_krum,
 );
 
-criterion_group!(
-    streaming,
-    benchmark_gradient_accumulator,
-);
+criterion_group!(streaming, benchmark_gradient_accumulator,);
 
 criterion_group!(
     coordinator,
@@ -381,4 +363,9 @@ criterion_group!(
     benchmark_aggregation_methods,
 );
 
-criterion_main!(basic_aggregation, byzantine_resistant, streaming, coordinator);
+criterion_main!(
+    basic_aggregation,
+    byzantine_resistant,
+    streaming,
+    coordinator
+);

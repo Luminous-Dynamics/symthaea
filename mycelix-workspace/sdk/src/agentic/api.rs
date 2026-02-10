@@ -15,16 +15,16 @@
 //! - `GET /monitoring/dashboard` - Get dashboard summary
 //! - `GET /monitoring/alerts` - Get active alerts
 
-use serde::{Deserialize, Serialize};
 use super::{
-    InstrumentalActor, AgentId, AgentStatus, AgentClass, AgentConstraints,
-    KVector, EpistemicStats, UncertaintyCalibration,
+    monitoring::{AgentAlert, AlertThresholds, DashboardSummary, MonitoringEngine},
     persistence::{
-        AgentRepository, MemoryStorageBackend, PersistenceError,
-        AgentEvent, EventLogEntry, KVectorSnapshot, AgentStatistics,
+        AgentEvent, AgentRepository, AgentStatistics, EventLogEntry, KVectorSnapshot,
+        MemoryStorageBackend, PersistenceError,
     },
-    monitoring::{MonitoringEngine, DashboardSummary, AgentAlert, AlertThresholds},
+    AgentClass, AgentConstraints, AgentId, AgentStatus, EpistemicStats, InstrumentalActor, KVector,
+    UncertaintyCalibration,
 };
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -148,8 +148,12 @@ pub struct CreateAgentRequest {
     pub kredit_cap: u64,
 }
 
-fn default_kredit_balance() -> i64 { 5000 }
-fn default_kredit_cap() -> u64 { 10000 }
+fn default_kredit_balance() -> i64 {
+    5000
+}
+fn default_kredit_cap() -> u64 {
+    10000
+}
 
 // =============================================================================
 // Input Validation
@@ -182,14 +186,16 @@ impl CreateAgentRequest {
         }
         if !self.sponsor_did.starts_with("did:") {
             return Err(ApiError::validation_error(
-                "sponsor_did must be a valid DID (start with 'did:')"
+                "sponsor_did must be a valid DID (start with 'did:')",
             ));
         }
 
         // Validate agent_id if provided
         if let Some(ref id) = self.agent_id {
             if id.is_empty() {
-                return Err(ApiError::validation_error("agent_id cannot be empty if provided"));
+                return Err(ApiError::validation_error(
+                    "agent_id cannot be empty if provided",
+                ));
             }
             if id.len() > MAX_AGENT_ID_LENGTH {
                 return Err(ApiError::validation_error(&format!(
@@ -198,9 +204,12 @@ impl CreateAgentRequest {
                 )));
             }
             // Check for invalid characters (allow alphanumeric, dash, underscore)
-            if !id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+            if !id
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+            {
                 return Err(ApiError::validation_error(
-                    "agent_id can only contain alphanumeric characters, dashes, and underscores"
+                    "agent_id can only contain alphanumeric characters, dashes, and underscores",
                 ));
             }
         }
@@ -219,11 +228,13 @@ impl CreateAgentRequest {
             )));
         }
         if self.initial_kredit < 0 {
-            return Err(ApiError::validation_error("initial_kredit cannot be negative"));
+            return Err(ApiError::validation_error(
+                "initial_kredit cannot be negative",
+            ));
         }
         if self.initial_kredit as u64 > self.kredit_cap {
             return Err(ApiError::validation_error(
-                "initial_kredit cannot exceed kredit_cap"
+                "initial_kredit cannot exceed kredit_cap",
             ));
         }
 
@@ -421,53 +432,104 @@ pub struct EventSummary {
 impl From<&EventLogEntry> for EventSummary {
     fn from(entry: &EventLogEntry) -> Self {
         let (event_type, agent_id, details) = match &entry.event {
-            AgentEvent::Created { agent_id, sponsor_did, agent_class, .. } => {
-                ("Created".to_string(), agent_id.clone(), serde_json::json!({
+            AgentEvent::Created {
+                agent_id,
+                sponsor_did,
+                agent_class,
+                ..
+            } => (
+                "Created".to_string(),
+                agent_id.clone(),
+                serde_json::json!({
                     "sponsor_did": sponsor_did,
                     "agent_class": format!("{:?}", agent_class),
-                }))
-            }
-            AgentEvent::StatusChanged { agent_id, old_status, new_status, reason, .. } => {
-                ("StatusChanged".to_string(), agent_id.clone(), serde_json::json!({
+                }),
+            ),
+            AgentEvent::StatusChanged {
+                agent_id,
+                old_status,
+                new_status,
+                reason,
+                ..
+            } => (
+                "StatusChanged".to_string(),
+                agent_id.clone(),
+                serde_json::json!({
                     "old_status": format!("{:?}", old_status),
                     "new_status": format!("{:?}", new_status),
                     "reason": reason,
-                }))
-            }
-            AgentEvent::KVectorUpdated { agent_id, trigger, .. } => {
-                ("KVectorUpdated".to_string(), agent_id.clone(), serde_json::json!({
+                }),
+            ),
+            AgentEvent::KVectorUpdated {
+                agent_id, trigger, ..
+            } => (
+                "KVectorUpdated".to_string(),
+                agent_id.clone(),
+                serde_json::json!({
                     "trigger": trigger,
-                }))
-            }
-            AgentEvent::ActionRecorded { agent_id, action_type, kredit_consumed, outcome, .. } => {
-                ("ActionRecorded".to_string(), agent_id.clone(), serde_json::json!({
+                }),
+            ),
+            AgentEvent::ActionRecorded {
+                agent_id,
+                action_type,
+                kredit_consumed,
+                outcome,
+                ..
+            } => (
+                "ActionRecorded".to_string(),
+                agent_id.clone(),
+                serde_json::json!({
                     "action_type": action_type,
                     "kredit_consumed": kredit_consumed,
                     "outcome": outcome,
-                }))
-            }
-            AgentEvent::KreditChanged { agent_id, old_balance, new_balance, reason, .. } => {
-                ("KreditChanged".to_string(), agent_id.clone(), serde_json::json!({
+                }),
+            ),
+            AgentEvent::KreditChanged {
+                agent_id,
+                old_balance,
+                new_balance,
+                reason,
+                ..
+            } => (
+                "KreditChanged".to_string(),
+                agent_id.clone(),
+                serde_json::json!({
                     "old_balance": old_balance,
                     "new_balance": new_balance,
                     "reason": reason,
-                }))
-            }
-            AgentEvent::Quarantined { agent_id, reason, evidence, .. } => {
-                ("Quarantined".to_string(), agent_id.clone(), serde_json::json!({
+                }),
+            ),
+            AgentEvent::Quarantined {
+                agent_id,
+                reason,
+                evidence,
+                ..
+            } => (
+                "Quarantined".to_string(),
+                agent_id.clone(),
+                serde_json::json!({
                     "reason": reason,
                     "evidence": evidence,
-                }))
-            }
-            AgentEvent::Released { agent_id, .. } => {
-                ("Released".to_string(), agent_id.clone(), serde_json::json!({}))
-            }
-            AgentEvent::OutputVerified { agent_id, output_id, outcome, .. } => {
-                ("OutputVerified".to_string(), agent_id.clone(), serde_json::json!({
+                }),
+            ),
+            AgentEvent::Released { agent_id, .. } => (
+                "Released".to_string(),
+                agent_id.clone(),
+                serde_json::json!({}),
+            ),
+            AgentEvent::OutputVerified {
+                agent_id,
+                output_id,
+                outcome,
+                ..
+            } => (
+                "OutputVerified".to_string(),
+                agent_id.clone(),
+                serde_json::json!({
                     "output_id": output_id,
                     "outcome": outcome,
-                }))
-            }
+                }),
+            ),
         };
 
         Self {
@@ -518,7 +580,8 @@ impl AgentApiService {
     pub fn list_agents(&self, offset: usize, limit: usize) -> ApiResult<ListAgentsResponse> {
         let all_agents = self.repo.list_all().map_err(ApiError::from)?;
 
-        let agents: Vec<AgentSummary> = all_agents.iter()
+        let agents: Vec<AgentSummary> = all_agents
+            .iter()
             .skip(offset)
             .take(limit)
             .map(AgentSummary::from)
@@ -548,7 +611,8 @@ impl AgentApiService {
         // Validate input
         request.validate()?;
 
-        let agent_id = request.agent_id
+        let agent_id = request
+            .agent_id
             .map(AgentId::from_string)
             .unwrap_or_else(AgentId::generate);
 
@@ -576,7 +640,9 @@ impl AgentApiService {
             pending_escalations: vec![],
         };
 
-        self.repo.create_agent(agent.clone()).map_err(ApiError::from)?;
+        self.repo
+            .create_agent(agent.clone())
+            .map_err(ApiError::from)?;
 
         Ok(CreateAgentResponse {
             agent: AgentSummary::from(&agent),
@@ -585,7 +651,11 @@ impl AgentApiService {
     }
 
     /// Update an agent
-    pub fn update_agent(&self, agent_id: &str, request: UpdateAgentRequest) -> ApiResult<AgentSummary> {
+    pub fn update_agent(
+        &self,
+        agent_id: &str,
+        request: UpdateAgentRequest,
+    ) -> ApiResult<AgentSummary> {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -595,14 +665,17 @@ impl AgentApiService {
 
         // Handle status change
         if let Some(new_status) = request.status {
-            let agent = self.repo.change_status(agent_id, new_status, reason, now)
+            let agent = self
+                .repo
+                .change_status(agent_id, new_status, reason, now)
                 .map_err(ApiError::from)?;
             return Ok(AgentSummary::from(&agent));
         }
 
         // Handle KREDIT change
         if let Some(new_balance) = request.kredit_balance {
-            self.repo.record_kredit_change(agent_id, new_balance, reason, now)
+            self.repo
+                .record_kredit_change(agent_id, new_balance, reason, now)
                 .map_err(ApiError::from)?;
         }
 
@@ -621,11 +694,18 @@ impl AgentApiService {
     // -------------------------------------------------------------------------
 
     /// Get K-Vector history for an agent
-    pub fn get_kvector_history(&self, agent_id: &str, limit: Option<usize>) -> ApiResult<KVectorHistoryResponse> {
-        let history = self.repo.get_kvector_history(agent_id, limit)
+    pub fn get_kvector_history(
+        &self,
+        agent_id: &str,
+        limit: Option<usize>,
+    ) -> ApiResult<KVectorHistoryResponse> {
+        let history = self
+            .repo
+            .get_kvector_history(agent_id, limit)
             .map_err(ApiError::from)?;
 
-        let entries: Vec<KVectorHistoryEntry> = history.iter()
+        let entries: Vec<KVectorHistoryEntry> = history
+            .iter()
             .map(|(timestamp, snapshot)| KVectorHistoryEntry {
                 timestamp: *timestamp,
                 k_vector: KVectorValues::from(snapshot),
@@ -651,7 +731,9 @@ impl AgentApiService {
         since: Option<u64>,
         limit: Option<usize>,
     ) -> ApiResult<EventsResponse> {
-        let events = self.repo.get_agent_events(agent_id, since, limit)
+        let events = self
+            .repo
+            .get_agent_events(agent_id, since, limit)
             .map_err(ApiError::from)?;
 
         let last_sequence = events.last().map(|e| e.sequence).unwrap_or(0);
@@ -665,8 +747,14 @@ impl AgentApiService {
     }
 
     /// Get all events since sequence
-    pub fn get_events_since(&self, sequence: u64, limit: Option<usize>) -> ApiResult<EventsResponse> {
-        let events = self.repo.get_events_since(sequence, limit)
+    pub fn get_events_since(
+        &self,
+        sequence: u64,
+        limit: Option<usize>,
+    ) -> ApiResult<EventsResponse> {
+        let events = self
+            .repo
+            .get_events_since(sequence, limit)
             .map_err(ApiError::from)?;
 
         let last_sequence = events.last().map(|e| e.sequence).unwrap_or(sequence);
@@ -690,7 +778,12 @@ impl AgentApiService {
 
     /// Get active alerts
     pub fn get_alerts(&self) -> ApiResult<Vec<AgentAlert>> {
-        Ok(self.monitoring.get_active_alerts().into_iter().cloned().collect())
+        Ok(self
+            .monitoring
+            .get_active_alerts()
+            .into_iter()
+            .cloned()
+            .collect())
     }
 
     /// Get statistics
@@ -704,7 +797,10 @@ impl AgentApiService {
 
     /// Find agents by sponsor
     pub fn find_by_sponsor(&self, sponsor_did: &str) -> ApiResult<Vec<AgentSummary>> {
-        let agents = self.repo.find_by_sponsor(sponsor_did).map_err(ApiError::from)?;
+        let agents = self
+            .repo
+            .find_by_sponsor(sponsor_did)
+            .map_err(ApiError::from)?;
         Ok(agents.iter().map(AgentSummary::from).collect())
     }
 
@@ -722,15 +818,19 @@ impl AgentApiService {
     pub fn get_pending_escalations(&self, agent_id: &str) -> ApiResult<Vec<EscalationSummary>> {
         let agent = self.repo.get_agent(agent_id).map_err(ApiError::from)?;
 
-        Ok(agent.pending_escalations.iter().map(|e| EscalationSummary {
-            agent_id: e.agent_id.clone(),
-            blocked_action: e.blocked_action.clone(),
-            uncertainty_total: e.uncertainty.total(),
-            uncertainty_max: e.uncertainty.max_dimension(),
-            guidance: format!("{:?}", e.guidance),
-            recommendations: e.recommendations.clone(),
-            timestamp: e.timestamp,
-        }).collect())
+        Ok(agent
+            .pending_escalations
+            .iter()
+            .map(|e| EscalationSummary {
+                agent_id: e.agent_id.clone(),
+                blocked_action: e.blocked_action.clone(),
+                uncertainty_total: e.uncertainty.total(),
+                uncertainty_max: e.uncertainty.max_dimension(),
+                guidance: format!("{:?}", e.guidance),
+                recommendations: e.recommendations.clone(),
+                timestamp: e.timestamp,
+            })
+            .collect())
     }
 
     /// Resolve an escalation (sponsor decision)
@@ -746,7 +846,7 @@ impl AgentApiService {
         // Verify sponsor authorization
         if agent.sponsor_did != sponsor_did {
             return Err(ApiError::forbidden(
-                "Only the agent's sponsor can resolve escalations"
+                "Only the agent's sponsor can resolve escalations",
             ));
         }
 
@@ -762,8 +862,7 @@ impl AgentApiService {
         }
 
         // Save updated agent
-        self.repo.update_agent(&agent)
-            .map_err(ApiError::from)?;
+        self.repo.update_agent(&agent).map_err(ApiError::from)?;
 
         Ok(EscalationResolutionResponse {
             agent_id: agent_id.to_string(),

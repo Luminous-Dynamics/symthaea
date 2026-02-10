@@ -93,7 +93,7 @@ impl ClientState {
     pub fn new(initial_score: f32) -> Self {
         Self {
             ema_score: initial_score,
-            round_count: 0,  // Start at 0, will be incremented on first evaluate
+            round_count: 0, // Start at 0, will be incremented on first evaluate
             consecutive_violations: 0,
             consecutive_clears: 0,
             quarantined: false,
@@ -226,7 +226,9 @@ impl PoGQv41Enhanced {
                         is_byzantine: true,
                         is_quarantined: false,
                         in_warmup: false,
-                        rejection_reason: Some("Direction prefilter: negative gradient direction".into()),
+                        rejection_reason: Some(
+                            "Direction prefilter: negative gradient direction".into(),
+                        ),
                         confidence: 0.95,
                     };
                 }
@@ -255,7 +257,8 @@ impl PoGQv41Enhanced {
         let config_byzantine_threshold = self.config.byzantine_threshold;
 
         // Get or create client state
-        let state = self.client_states
+        let state = self
+            .client_states
             .entry(client_id.to_string())
             .or_insert_with(|| ClientState::new(raw_score));
 
@@ -264,8 +267,7 @@ impl PoGQv41Enhanced {
         let prev_round_count = state.round_count;
 
         // Update EMA score
-        let ema_score = config_ema_beta * state.ema_score
-            + (1.0 - config_ema_beta) * raw_score;
+        let ema_score = config_ema_beta * state.ema_score + (1.0 - config_ema_beta) * raw_score;
         state.ema_score = ema_score;
         state.last_raw_score = raw_score;
         state.last_round = round;
@@ -281,27 +283,34 @@ impl PoGQv41Enhanced {
                 if raw_score < cap {
                     (
                         true,
-                        Some(format!("Egregious violation: score {:.3} < cap {:.3}", raw_score, cap)),
+                        Some(format!(
+                            "Egregious violation: score {:.3} < cap {:.3}",
+                            raw_score, cap
+                        )),
                         0.98,
                     )
                 } else if in_warmup {
                     if raw_score < config_egregious_threshold {
                         (
                             true,
-                            Some(format!("Warm-up egregious: score {:.3} < threshold {:.3}",
-                                raw_score, config_egregious_threshold)),
+                            Some(format!(
+                                "Warm-up egregious: score {:.3} < threshold {:.3}",
+                                raw_score, config_egregious_threshold
+                            )),
                             0.90,
                         )
                     } else {
                         (false, None, 0.0)
                     }
                 } else if ema_score < config_byzantine_threshold {
-                    let conf = (config_byzantine_threshold - ema_score)
-                        / config_byzantine_threshold;
+                    let conf =
+                        (config_byzantine_threshold - ema_score) / config_byzantine_threshold;
                     (
                         true,
-                        Some(format!("Byzantine: EMA score {:.3} < threshold {:.3}",
-                            ema_score, config_byzantine_threshold)),
+                        Some(format!(
+                            "Byzantine: EMA score {:.3} < threshold {:.3}",
+                            ema_score, config_byzantine_threshold
+                        )),
                         conf.clamp(0.5, 0.99),
                     )
                 } else if prev_round_count > 1 {
@@ -309,8 +318,10 @@ impl PoGQv41Enhanced {
                     if score_drop > 0.4 {
                         (
                             true,
-                            Some(format!("Sudden score drop: {:.3} (from {:.3} to {:.3})",
-                                score_drop, prev_raw_score, raw_score)),
+                            Some(format!(
+                                "Sudden score drop: {:.3} (from {:.3} to {:.3})",
+                                score_drop, prev_raw_score, raw_score
+                            )),
                             0.75,
                         )
                     } else {
@@ -323,20 +334,23 @@ impl PoGQv41Enhanced {
                 if raw_score < config_egregious_threshold {
                     (
                         true,
-                        Some(format!("Warm-up egregious: score {:.3} < threshold {:.3}",
-                            raw_score, config_egregious_threshold)),
+                        Some(format!(
+                            "Warm-up egregious: score {:.3} < threshold {:.3}",
+                            raw_score, config_egregious_threshold
+                        )),
                         0.90,
                     )
                 } else {
                     (false, None, 0.0)
                 }
             } else if ema_score < config_byzantine_threshold {
-                let conf = (config_byzantine_threshold - ema_score)
-                    / config_byzantine_threshold;
+                let conf = (config_byzantine_threshold - ema_score) / config_byzantine_threshold;
                 (
                     true,
-                    Some(format!("Byzantine: EMA score {:.3} < threshold {:.3}",
-                        ema_score, config_byzantine_threshold)),
+                    Some(format!(
+                        "Byzantine: EMA score {:.3} < threshold {:.3}",
+                        ema_score, config_byzantine_threshold
+                    )),
                     conf.clamp(0.5, 0.99),
                 )
             } else if prev_round_count > 1 {
@@ -345,8 +359,10 @@ impl PoGQv41Enhanced {
                 if score_drop > 0.4 {
                     (
                         true,
-                        Some(format!("Sudden score drop: {:.3} (from {:.3} to {:.3})",
-                            score_drop, prev_raw_score, raw_score)),
+                        Some(format!(
+                            "Sudden score drop: {:.3} (from {:.3} to {:.3})",
+                            score_drop, prev_raw_score, raw_score
+                        )),
                         0.75,
                     )
                 } else {
@@ -436,7 +452,8 @@ impl PoGQv41Enhanced {
     pub fn statistics(&self) -> DetectionStatistics {
         let total = self.client_states.len();
         let quarantined = self.quarantined_clients().len();
-        let in_warmup = self.client_states
+        let in_warmup = self
+            .client_states
             .values()
             .filter(|s| s.in_warmup(self.config.warmup_rounds))
             .count();
@@ -496,14 +513,21 @@ mod tests {
         for round in 0..3 {
             detector.set_round(round);
             let eval = detector.evaluate("client_1", 0.35, 0.35, None);
-            assert!(!eval.is_byzantine, "Round {}: Should not reject during warm-up (score above egregious)", round);
+            assert!(
+                !eval.is_byzantine,
+                "Round {}: Should not reject during warm-up (score above egregious)",
+                round
+            );
             assert!(eval.in_warmup, "Round {}: Should be in warm-up", round);
         }
 
         // After warm-up, same score should be flagged (EMA below threshold)
         detector.set_round(4);
         let eval = detector.evaluate("client_1", 0.35, 0.35, None);
-        assert!(eval.is_byzantine, "Should reject after warm-up (EMA below threshold)");
+        assert!(
+            eval.is_byzantine,
+            "Should reject after warm-up (EMA below threshold)"
+        );
         assert!(!eval.in_warmup, "Should not be in warm-up");
     }
 
@@ -511,9 +535,9 @@ mod tests {
     fn test_hysteresis_quarantine() {
         let mut detector = PoGQv41Enhanced::with_defaults();
         detector.config.warmup_rounds = 0; // Disable warm-up for test
-        detector.config.hysteresis_k = 2;  // 2 violations to quarantine
-        detector.config.hysteresis_m = 3;  // 3 clears to release
-        detector.config.ema_beta = 0.5;    // Faster EMA for testing
+        detector.config.hysteresis_k = 2; // 2 violations to quarantine
+        detector.config.hysteresis_m = 3; // 3 clears to release
+        detector.config.ema_beta = 0.5; // Faster EMA for testing
         detector.config.byzantine_threshold = 0.4;
 
         // Start with a good score to initialize
@@ -530,19 +554,29 @@ mod tests {
         // Now EMA should be below threshold, consecutive violations should accumulate
         // First Byzantine (EMA below threshold)
         let eval = detector.evaluate("client_1", 0.1, 0.1, None);
-        assert!(eval.is_byzantine, "Should be Byzantine (EMA below threshold)");
+        assert!(
+            eval.is_byzantine,
+            "Should be Byzantine (EMA below threshold)"
+        );
         // Check consecutive_violations via is_quarantined (k=2)
         // After first Byzantine post-threshold, consecutive_violations=1
 
         // Second Byzantine - should trigger quarantine
         let eval = detector.evaluate("client_1", 0.1, 0.1, None);
         assert!(eval.is_byzantine);
-        assert!(eval.is_quarantined, "Should be quarantined after k=2 violations");
+        assert!(
+            eval.is_quarantined,
+            "Should be quarantined after k=2 violations"
+        );
 
         // Even good scores won't immediately release (m=3 needed)
         for i in 0..2 {
             let eval = detector.evaluate("client_1", 0.9, 0.9, None);
-            assert!(eval.is_quarantined, "Round {}: Still quarantined (need 3 clears)", i);
+            assert!(
+                eval.is_quarantined,
+                "Round {}: Still quarantined (need 3 clears)",
+                i
+            );
         }
 
         // Third clear should release
@@ -572,7 +606,12 @@ mod tests {
 
         // Build up score history
         for i in 0..50 {
-            detector.evaluate(&format!("client_{}", i), 0.7 + (i as f32 % 3.0) * 0.1, 0.8, None);
+            detector.evaluate(
+                &format!("client_{}", i),
+                0.7 + (i as f32 % 3.0) * 0.1,
+                0.8,
+                None,
+            );
         }
 
         // Egregious score should be rejected even during warm-up
@@ -588,6 +627,9 @@ mod tests {
         // Negative direction should be rejected immediately
         let eval = detector.evaluate("client_1", 0.9, 0.9, Some(-0.5));
         assert!(eval.is_byzantine);
-        assert!(eval.rejection_reason.unwrap().contains("Direction prefilter"));
+        assert!(eval
+            .rejection_reason
+            .unwrap()
+            .contains("Direction prefilter"));
     }
 }

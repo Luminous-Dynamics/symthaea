@@ -34,8 +34,8 @@
 //! assert!(prover.verify(&proof));
 //! ```
 
-use crate::matl::KVector as SdkKVector;
 use crate::agentic::zk_trust::ProofStatement;
+use crate::matl::KVector as SdkKVector;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -81,12 +81,12 @@ impl ZkKVector {
             110_000, // k_a: activity
             190_000, // k_i: integrity
             110_000, // k_p: performance
-             50_000, // k_m: membership
-             70_000, // k_s: stake
-             50_000, // k_h: historical
-             40_000, // k_topo: topology
-             90_000, // k_v: verification
-             50_000, // k_phi: coherence
+            50_000,  // k_m: membership
+            70_000,  // k_s: stake
+            50_000,  // k_h: historical
+            40_000,  // k_topo: topology
+            90_000,  // k_v: verification
+            50_000,  // k_phi: coherence
         ];
 
         let mut weighted_sum: u128 = 0;
@@ -279,9 +279,7 @@ pub fn evaluate_statement(
     params: &ZkTrustParams,
 ) -> bool {
     match statement {
-        ZkTrustStatement::TrustExceedsThreshold => {
-            kvector.trust_score() > params.threshold
-        }
+        ZkTrustStatement::TrustExceedsThreshold => kvector.trust_score() > params.threshold,
 
         ZkTrustStatement::TrustInRange => {
             let score = kvector.trust_score();
@@ -342,13 +340,17 @@ pub struct TrustRisc0Prover {
 impl TrustRisc0Prover {
     /// Create a new simulation prover (NO CRYPTOGRAPHIC SECURITY)
     pub fn new_simulation() -> Self {
-        Self { simulation_mode: true }
+        Self {
+            simulation_mode: true,
+        }
     }
 
     /// Create a production prover (requires RISC-0 setup)
     #[cfg(feature = "risc0")]
     pub fn new_production() -> Self {
-        Self { simulation_mode: false }
+        Self {
+            simulation_mode: false,
+        }
     }
 
     /// Check if running in simulation mode
@@ -369,11 +371,7 @@ impl TrustRisc0Prover {
         );
 
         // Evaluate statement
-        let statement_valid = evaluate_statement(
-            &input.kvector,
-            input.statement,
-            &input.params,
-        );
+        let statement_valid = evaluate_statement(&input.kvector, input.statement, &input.params);
 
         // Revealed score only for TrustInRange
         let revealed_score = if input.statement == ZkTrustStatement::TrustInRange {
@@ -586,7 +584,9 @@ impl TrustRisc0Prover {
     pub fn verify(&self, receipt: &ZkTrustReceipt) -> bool {
         if receipt.is_simulation {
             // Simulation proofs just check the marker
-            receipt.proof_bytes.starts_with(b"SIMULATION_TRUST_PROOF_V1")
+            receipt
+                .proof_bytes
+                .starts_with(b"SIMULATION_TRUST_PROOF_V1")
         } else {
             // Production proofs need RISC-0 verification
             #[cfg(feature = "risc0")]
@@ -646,7 +646,9 @@ impl TrustRisc0Prover {
 /// let proof = prover.prove_trust_exceeds_threshold(&kvector, 0.5, "agent-1")?;
 /// ```
 pub fn create_production_prover() -> TrustRisc0Prover {
-    TrustRisc0Prover { simulation_mode: false }
+    TrustRisc0Prover {
+        simulation_mode: false,
+    }
 }
 
 /// Prover errors
@@ -669,8 +671,13 @@ pub enum TrustProverError {
 impl std::fmt::Display for TrustProverError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Risc0NotAvailable => write!(f, "RISC-0 prover not available (enable 'risc0' feature)"),
-            Self::Risc0ElfNotSet => write!(f, "RISC-0 ELF binary not configured - call set_trust_proof_elf() first"),
+            Self::Risc0NotAvailable => {
+                write!(f, "RISC-0 prover not available (enable 'risc0' feature)")
+            }
+            Self::Risc0ElfNotSet => write!(
+                f,
+                "RISC-0 ELF binary not configured - call set_trust_proof_elf() first"
+            ),
             Self::Risc0Execution(msg) => write!(f, "RISC-0 execution error: {}", msg),
             Self::Risc0Verification(msg) => write!(f, "RISC-0 verification error: {}", msg),
             Self::InvalidParams(msg) => write!(f, "Invalid parameters: {}", msg),
@@ -711,14 +718,15 @@ mod risc0_config {
 
     /// Get the configured image ID for verification
     pub fn get_trust_proof_image_id() -> Result<[u32; 8], super::TrustProverError> {
-        TRUST_PROOF_IMAGE_ID.get()
+        TRUST_PROOF_IMAGE_ID
+            .get()
             .copied()
             .ok_or(super::TrustProverError::Risc0ElfNotSet)
     }
 }
 
 #[cfg(feature = "risc0")]
-pub use risc0_config::{set_trust_proof_image_id, get_trust_proof_image_id};
+pub use risc0_config::{get_trust_proof_image_id, set_trust_proof_image_id};
 
 /// Configuration for the external RISC-0 prover service.
 ///
@@ -812,7 +820,7 @@ impl From<&ProofStatement> for ZkTrustStatement {
             ProofStatement::IsVerified => Self::IsVerified,
             ProofStatement::IsStronglyVerified => Self::IsStronglyVerified,
             ProofStatement::WellFormed => Self::TrustInRange, // Map to range [0,1]
-            _ => Self::TrustExceedsThreshold, // Default fallback
+            _ => Self::TrustExceedsThreshold,                 // Default fallback
         }
     }
 }
@@ -884,12 +892,16 @@ mod tests {
         let kv = test_kvector();
 
         // Should succeed (trust > 0.5)
-        let proof = prover.prove_trust_exceeds_threshold(&kv, 0.5, "agent-1").unwrap();
+        let proof = prover
+            .prove_trust_exceeds_threshold(&kv, 0.5, "agent-1")
+            .unwrap();
         assert!(proof.output.statement_valid);
         assert!(prover.verify(&proof));
 
         // Should fail (trust < 0.95)
-        let proof2 = prover.prove_trust_exceeds_threshold(&kv, 0.95, "agent-1").unwrap();
+        let proof2 = prover
+            .prove_trust_exceeds_threshold(&kv, 0.95, "agent-1")
+            .unwrap();
         assert!(!proof2.output.statement_valid);
     }
 
@@ -898,7 +910,9 @@ mod tests {
         let prover = TrustRisc0Prover::new_simulation();
         let kv = test_kvector();
 
-        let proof = prover.prove_trust_in_range(&kv, 0.5, 0.9, "agent-1").unwrap();
+        let proof = prover
+            .prove_trust_in_range(&kv, 0.5, 0.9, "agent-1")
+            .unwrap();
         assert!(proof.output.statement_valid);
         // Score should be revealed
         assert!(proof.output.revealed_score > 0);
@@ -910,11 +924,15 @@ mod tests {
         let kv = test_kvector();
 
         // k_i (integrity, index 2) is 0.9
-        let proof = prover.prove_dimension_exceeds(&kv, 2, 0.8, "agent-1").unwrap();
+        let proof = prover
+            .prove_dimension_exceeds(&kv, 2, 0.8, "agent-1")
+            .unwrap();
         assert!(proof.output.statement_valid);
 
         // k_m (membership, index 4) is 0.5
-        let proof2 = prover.prove_dimension_exceeds(&kv, 4, 0.6, "agent-1").unwrap();
+        let proof2 = prover
+            .prove_dimension_exceeds(&kv, 4, 0.6, "agent-1")
+            .unwrap();
         assert!(!proof2.output.statement_valid);
     }
 

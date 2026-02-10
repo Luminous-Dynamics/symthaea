@@ -6,8 +6,8 @@
 //!
 //! Constitutional: Recognition weighted by recognizer's MYCEL (prevents Sybil attacks).
 
-use serde::{Deserialize, Serialize};
 pub use mycelix_finance_types::ContributionType;
+use serde::{Deserialize, Serialize};
 
 /// A recognition event from one member to another
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,7 +85,12 @@ pub fn recognition_weight(recognizer_mycel: f64, config: &RecognitionConfig) -> 
 mod tests {
     use super::*;
 
-    fn make_recognition(recognizer: &str, recipient: &str, mycel: f64, cycle: &str) -> RecognitionEvent {
+    fn make_recognition(
+        recognizer: &str,
+        recipient: &str,
+        mycel: f64,
+        cycle: &str,
+    ) -> RecognitionEvent {
         let config = RecognitionConfig::default();
         RecognitionEvent {
             recognizer_did: recognizer.to_string(),
@@ -117,12 +122,14 @@ mod tests {
     fn test_recognition_score_diverse_recognizers() {
         let config = RecognitionConfig::default();
         let recognitions: Vec<RecognitionEvent> = (0..5)
-            .map(|i| make_recognition(
-                &format!("did:test:recognizer_{}", i),
-                "did:test:recipient",
-                0.5,
-                "2026-02",
-            ))
+            .map(|i| {
+                make_recognition(
+                    &format!("did:test:recognizer_{}", i),
+                    "did:test:recipient",
+                    0.5,
+                    "2026-02",
+                )
+            })
             .collect();
 
         let score = calculate_recognition_score(&recognitions, &config);
@@ -136,12 +143,14 @@ mod tests {
         let config = RecognitionConfig::default();
         // 20 recognitions from max-MYCEL members — should cap at 1.0
         let recognitions: Vec<RecognitionEvent> = (0..20)
-            .map(|i| make_recognition(
-                &format!("did:test:recognizer_{}", i),
-                "did:test:recipient",
-                1.0,
-                "2026-02",
-            ))
+            .map(|i| {
+                make_recognition(
+                    &format!("did:test:recognizer_{}", i),
+                    "did:test:recipient",
+                    1.0,
+                    "2026-02",
+                )
+            })
             .collect();
 
         let score = calculate_recognition_score(&recognitions, &config);

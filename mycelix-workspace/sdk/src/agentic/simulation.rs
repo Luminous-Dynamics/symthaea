@@ -10,17 +10,15 @@
 //! - **Metrics Collection**: Track system-wide metrics during simulation
 //! - **Emergent Behavior Analysis**: Detect patterns that emerge from interactions
 
+use super::{
+    ActionOutcome, AgentClass, AgentConstraints, AgentId, AgentStatus, AlertThresholds,
+    BehaviorLogEntry, EpistemicStats, GamingDetectionConfig, GamingDetector, InstrumentalActor,
+    MonitoringEngine, QuarantineManager, QuarantineReason, ReputationPropagation, SybilDetector,
+    UncertaintyCalibration,
+};
+use crate::matl::KVector;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::matl::KVector;
-use super::{
-    AgentId, InstrumentalActor, AgentStatus, AgentClass, AgentConstraints,
-    ActionOutcome, BehaviorLogEntry, EpistemicStats, UncertaintyCalibration,
-    GamingDetector, GamingDetectionConfig,
-    SybilDetector, QuarantineManager, QuarantineReason,
-    MonitoringEngine, AlertThresholds,
-    ReputationPropagation,
-};
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -145,20 +143,32 @@ impl AgentArchetype {
     pub fn initial_kvector(&self) -> KVector {
         match self {
             // Honest agents have moderate coherence
-            AgentArchetype::Honest => KVector::new(0.6, 0.5, 0.8, 0.65, 0.2, 0.3, 0.5, 0.2, 0.6, 0.6),
+            AgentArchetype::Honest => {
+                KVector::new(0.6, 0.5, 0.8, 0.65, 0.2, 0.3, 0.5, 0.2, 0.6, 0.6)
+            }
             AgentArchetype::Novice => KVector::new_participant(),
             // Experts have high coherence
-            AgentArchetype::Expert => KVector::new(0.85, 0.7, 0.9, 0.85, 0.5, 0.6, 0.8, 0.4, 0.85, 0.85),
+            AgentArchetype::Expert => {
+                KVector::new(0.85, 0.7, 0.9, 0.85, 0.5, 0.6, 0.8, 0.4, 0.85, 0.85)
+            }
             // Gamers have low coherence (inconsistent outputs)
             AgentArchetype::Gamer => KVector::new(0.5, 0.3, 0.6, 0.5, 0.1, 0.2, 0.4, 0.1, 0.0, 0.3),
             // Byzantine actors have very low coherence
-            AgentArchetype::Byzantine => KVector::new(0.4, 0.4, 0.5, 0.45, 0.2, 0.2, 0.35, 0.2, 0.0, 0.2),
+            AgentArchetype::Byzantine => {
+                KVector::new(0.4, 0.4, 0.5, 0.45, 0.2, 0.2, 0.35, 0.2, 0.0, 0.2)
+            }
             // Sybils have low coherence (coordinated but inconsistent individually)
-            AgentArchetype::Sybil => KVector::new(0.5, 0.4, 0.6, 0.5, 0.15, 0.2, 0.45, 0.15, 0.0, 0.25),
+            AgentArchetype::Sybil => {
+                KVector::new(0.5, 0.4, 0.6, 0.5, 0.15, 0.2, 0.45, 0.15, 0.0, 0.25)
+            }
             // Colluders have moderate coherence (coordinated behavior)
-            AgentArchetype::Colluder => KVector::new(0.55, 0.5, 0.65, 0.55, 0.2, 0.25, 0.5, 0.2, 0.0, 0.4),
+            AgentArchetype::Colluder => {
+                KVector::new(0.55, 0.5, 0.65, 0.55, 0.2, 0.25, 0.5, 0.2, 0.0, 0.4)
+            }
             // Erratic agents have very low coherence
-            AgentArchetype::Erratic => KVector::new(0.4, 0.3, 0.5, 0.4, 0.15, 0.15, 0.35, 0.1, 0.0, 0.15),
+            AgentArchetype::Erratic => {
+                KVector::new(0.4, 0.3, 0.5, 0.4, 0.15, 0.15, 0.35, 0.1, 0.0, 0.15)
+            }
         }
     }
 }
@@ -305,7 +315,10 @@ impl SimulationEngine {
 
     /// Simple PRNG
     fn random(&mut self) -> f64 {
-        self.rng_state = self.rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        self.rng_state = self
+            .rng_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1);
         (self.rng_state >> 33) as f64 / (1u64 << 31) as f64
     }
 
@@ -333,16 +346,25 @@ impl SimulationEngine {
             pending_escalations: vec![],
         };
 
-        self.agents.insert(id.to_string(), SimulatedAgent {
-            agent,
-            archetype,
-            behavior,
-            sponsor: sponsor.to_string(),
-        });
+        self.agents.insert(
+            id.to_string(),
+            SimulatedAgent {
+                agent,
+                archetype,
+                behavior,
+                sponsor: sponsor.to_string(),
+            },
+        );
     }
 
     /// Add a population of agents
-    pub fn add_population(&mut self, prefix: &str, archetype: AgentArchetype, count: usize, sponsor: &str) {
+    pub fn add_population(
+        &mut self,
+        prefix: &str,
+        archetype: AgentArchetype,
+        count: usize,
+        sponsor: &str,
+    ) {
         for i in 0..count {
             self.add_agent(&format!("{}-{}", prefix, i), archetype.clone(), sponsor);
         }
@@ -396,11 +418,12 @@ impl SimulationEngine {
             // Generate actions based on activity rate
             let actions = (sim_agent.behavior.activity_rate + randoms[0].0 * 0.5) as usize;
 
-            for &(_, success_roll, threshold_variance, timing_variance) in randoms.iter().take(actions.min(max_actions_per_agent)) {
-
+            for &(_, success_roll, threshold_variance, timing_variance) in
+                randoms.iter().take(actions.min(max_actions_per_agent))
+            {
                 // Determine outcome
-                let threshold = sim_agent.behavior.success_rate +
-                    (threshold_variance - 0.5) * sim_agent.behavior.success_variance * 2.0;
+                let threshold = sim_agent.behavior.success_rate
+                    + (threshold_variance - 0.5) * sim_agent.behavior.success_variance * 2.0;
 
                 let outcome = if success_roll < threshold {
                     ActionOutcome::Success
@@ -454,7 +477,8 @@ impl SimulationEngine {
             // Group by sponsor
             let mut by_sponsor: HashMap<String, Vec<&InstrumentalActor>> = HashMap::new();
             for sim_agent in self.agents.values() {
-                by_sponsor.entry(sim_agent.sponsor.clone())
+                by_sponsor
+                    .entry(sim_agent.sponsor.clone())
                     .or_default()
                     .push(&sim_agent.agent);
             }
@@ -472,8 +496,11 @@ impl SimulationEngine {
         let mut active_count = 0;
         if self.config.monitoring_enabled {
             for sim_agent in self.agents.values() {
-                if sim_agent.agent.status == AgentStatus::Active &&
-                   !self.quarantine.is_quarantined(sim_agent.agent.agent_id.as_str()) {
+                if sim_agent.agent.status == AgentStatus::Active
+                    && !self
+                        .quarantine
+                        .is_quarantined(sim_agent.agent.agent_id.as_str())
+                {
                     total_trust += sim_agent.agent.k_vector.trust_score() as f64;
                     active_count += 1;
                 }
@@ -488,7 +515,11 @@ impl SimulationEngine {
             total_agents: self.agents.len(),
             active_agents: active_count,
             quarantined_agents: quarantined_count,
-            avg_trust: if active_count > 0 { total_trust / active_count as f64 } else { 0.0 },
+            avg_trust: if active_count > 0 {
+                total_trust / active_count as f64
+            } else {
+                0.0
+            },
             gaming_incidents,
             sybil_evidence,
             consensus_count: 0,
@@ -515,9 +546,13 @@ impl SimulationEngine {
 
         for sim_agent in self.agents.values() {
             let archetype_name = format!("{:?}", sim_agent.archetype);
-            *agents_by_archetype.entry(archetype_name.clone()).or_insert(0) += 1;
+            *agents_by_archetype
+                .entry(archetype_name.clone())
+                .or_insert(0) += 1;
 
-            let entry = trust_sums_by_archetype.entry(archetype_name).or_insert((0.0, 0));
+            let entry = trust_sums_by_archetype
+                .entry(archetype_name)
+                .or_insert((0.0, 0));
             entry.0 += sim_agent.agent.k_vector.trust_score() as f64;
             entry.1 += 1;
         }
@@ -529,9 +564,13 @@ impl SimulationEngine {
 
         // Calculate detection rates
         let total_gamers = agents_by_archetype.get("Gamer").copied().unwrap_or(0);
-        let quarantined_gamers = self.agents.values()
-            .filter(|a| a.archetype == AgentArchetype::Gamer &&
-                       self.quarantine.is_quarantined(a.agent.agent_id.as_str()))
+        let quarantined_gamers = self
+            .agents
+            .values()
+            .filter(|a| {
+                a.archetype == AgentArchetype::Gamer
+                    && self.quarantine.is_quarantined(a.agent.agent_id.as_str())
+            })
             .count();
         let gaming_detection_rate = if total_gamers > 0 {
             quarantined_gamers as f64 / total_gamers as f64
@@ -539,13 +578,19 @@ impl SimulationEngine {
             0.0
         };
 
-        let health_timeline: Vec<(u64, f64)> = self.tick_results.iter()
+        let health_timeline: Vec<(u64, f64)> = self
+            .tick_results
+            .iter()
             .map(|r| (r.tick, r.avg_trust))
             .collect();
 
-        let final_active = self.agents.values()
-            .filter(|a| a.agent.status == AgentStatus::Active &&
-                       !self.quarantine.is_quarantined(a.agent.agent_id.as_str()))
+        let final_active = self
+            .agents
+            .values()
+            .filter(|a| {
+                a.agent.status == AgentStatus::Active
+                    && !self.quarantine.is_quarantined(a.agent.agent_id.as_str())
+            })
             .count();
 
         SimulationReport {
@@ -604,7 +649,12 @@ impl Scenarios {
         engine.add_population("erratic", AgentArchetype::Erratic, 10, "sponsor-d");
         engine.add_population("gamer", AgentArchetype::Gamer, 5, "sponsor-evil");
         engine.add_population("sybil", AgentArchetype::Sybil, 5, "sybil-sponsor");
-        engine.add_population("byzantine", AgentArchetype::Byzantine, 5, "sponsor-malicious");
+        engine.add_population(
+            "byzantine",
+            AgentArchetype::Byzantine,
+            5,
+            "sponsor-malicious",
+        );
     }
 }
 
@@ -627,7 +677,10 @@ mod tests {
         let report = engine.run();
 
         assert_eq!(report.total_agents, 80);
-        assert!(report.final_active >= 70, "Most agents should remain active");
+        assert!(
+            report.final_active >= 70,
+            "Most agents should remain active"
+        );
         assert!(report.total_quarantined < 10, "Few should be quarantined");
     }
 
@@ -642,7 +695,10 @@ mod tests {
         let report = engine.run();
 
         // Gaming detection should catch some gamers
-        println!("Gaming detection rate: {:.2}%", report.gaming_detection_rate * 100.0);
+        println!(
+            "Gaming detection rate: {:.2}%",
+            report.gaming_detection_rate * 100.0
+        );
         // May not catch all due to limited ticks
     }
 
@@ -660,7 +716,10 @@ mod tests {
         println!("  Total agents: {}", report.total_agents);
         println!("  Final active: {}", report.final_active);
         println!("  Quarantined: {}", report.total_quarantined);
-        println!("  Gaming detection: {:.1}%", report.gaming_detection_rate * 100.0);
+        println!(
+            "  Gaming detection: {:.1}%",
+            report.gaming_detection_rate * 100.0
+        );
 
         for (archetype, avg_trust) in &report.avg_trust_by_archetype {
             println!("  {} avg trust: {:.3}", archetype, avg_trust);
@@ -668,6 +727,9 @@ mod tests {
 
         // Basic sanity checks
         assert!(report.total_agents == 100);
-        assert!(report.final_active > 50, "Should have reasonable active count");
+        assert!(
+            report.final_active > 50,
+            "Should have reasonable active count"
+        );
     }
 }

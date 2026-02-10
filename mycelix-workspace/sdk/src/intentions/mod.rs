@@ -156,41 +156,41 @@ pub enum IntentionStatus {
     /// Initial proposal
     Proposed {
         /// Timestamp when intention was proposed
-        proposed_at: u64
+        proposed_at: u64,
     },
     /// Under community review
     Review {
         /// Timestamp when review period started
-        review_start: u64
+        review_start: u64,
     },
     /// Ratified by Global DAO
     Ratified {
         /// Timestamp when intention was ratified
-        ratified_at: u64
+        ratified_at: u64,
     },
     /// Actively being pursued
     Active {
         /// Timestamp when intention became active
-        activated_at: u64
+        activated_at: u64,
     },
     /// Successfully achieved
     Achieved {
         /// Timestamp when intention was achieved
-        achieved_at: u64
+        achieved_at: u64,
     },
     /// Replaced by better intention
     Superseded {
         /// Timestamp when intention was superseded
         superseded_at: u64,
         /// ID of the intention that supersedes this one
-        successor: IntentionId
+        successor: IntentionId,
     },
     /// Abandoned
     Abandoned {
         /// Timestamp when intention was abandoned
         abandoned_at: u64,
         /// Reason for abandonment
-        reason: String
+        reason: String,
     },
 }
 
@@ -243,12 +243,7 @@ impl Trajectory {
 
 impl Intention {
     /// Create a new intention
-    pub fn new(
-        domain: IntentionDomain,
-        name: String,
-        description: String,
-        timestamp: u64,
-    ) -> Self {
+    pub fn new(domain: IntentionDomain, name: String, description: String, timestamp: u64) -> Self {
         Self {
             intention_id: IntentionId::generate(),
             domain,
@@ -258,7 +253,9 @@ impl Intention {
             target_date: None,
             metrics: vec![],
             parent: None,
-            status: IntentionStatus::Proposed { proposed_at: timestamp },
+            status: IntentionStatus::Proposed {
+                proposed_at: timestamp,
+            },
             created_at: timestamp,
         }
     }
@@ -289,7 +286,9 @@ impl Intention {
             return 0.0;
         }
 
-        let total: f64 = self.metrics.iter()
+        let total: f64 = self
+            .metrics
+            .iter()
             .map(|m| (m.current_value / m.target_value).clamp(0.0, 1.0))
             .sum();
 
@@ -323,31 +322,31 @@ pub enum ContributionType {
     /// Direct action taken toward the intention
     DirectAction {
         /// Description of the action taken
-        description: String
+        description: String,
     },
     /// Financial contribution
     Funding {
         /// Amount of SAP contributed
         amount_sap: u64,
         /// Recipient of the funds
-        recipient: String
+        recipient: String,
     },
     /// Infrastructure provided to support the intention
     Infrastructure {
         /// Description of the infrastructure
-        description: String
+        description: String,
     },
     /// Knowledge or research contributed
     Knowledge {
         /// ID of the knowledge artifact
-        artifact_id: String
+        artifact_id: String,
     },
     /// Coordination or governance work
     Coordination {
         /// Role performed
         role: String,
         /// Hours spent
-        hours: f64
+        hours: f64,
     },
 }
 
@@ -361,7 +360,8 @@ pub fn calculate_intention_score(
         return 0.0;
     }
 
-    let score: f64 = contributions.iter()
+    let score: f64 = contributions
+        .iter()
         .map(|c| {
             let progress = progress_map.get(&c.intention_id);
             let urgency = progress
@@ -406,7 +406,8 @@ mod tests {
             "Forest Restoration".to_string(),
             "Restore 1M hectares of forest".to_string(),
             1_000_000,
-        ).with_target(QuantitativeTarget {
+        )
+        .with_target(QuantitativeTarget {
             metric_name: "Hectares restored".to_string(),
             current_value: 500_000.0,
             target_value: 1_000_000.0,
@@ -430,17 +431,15 @@ mod tests {
 
     #[test]
     fn test_intention_score() {
-        let contributions = vec![
-            IntentionContribution {
-                contributor_did: "did:test:alice".to_string(),
-                intention_id: IntentionId::from_string("intent-1".to_string()),
-                contribution_type: ContributionType::DirectAction {
-                    description: "Built water well".to_string(),
-                },
-                estimated_impact: 0.5,
-                timestamp: 1_000_000,
+        let contributions = vec![IntentionContribution {
+            contributor_did: "did:test:alice".to_string(),
+            intention_id: IntentionId::from_string("intent-1".to_string()),
+            contribution_type: ContributionType::DirectAction {
+                description: "Built water well".to_string(),
             },
-        ];
+            estimated_impact: 0.5,
+            timestamp: 1_000_000,
+        }];
 
         let mut progress_map = HashMap::new();
         progress_map.insert(

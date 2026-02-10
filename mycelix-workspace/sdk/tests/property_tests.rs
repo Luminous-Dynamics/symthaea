@@ -221,7 +221,7 @@ proptest! {
 // =============================================================================
 
 /// Byzantine tolerance configuration
-const MAX_BYZANTINE_TOLERANCE: f64 = 0.45;
+const MAX_BYZANTINE_TOLERANCE: f64 = 0.34;
 const MIN_BYZANTINE_TOLERANCE: f64 = 0.10;
 
 /// Validate Byzantine tolerance is within bounds
@@ -247,7 +247,7 @@ proptest! {
 
     /// Valid Byzantine tolerance values should pass validation
     #[test]
-    fn test_byzantine_tolerance_valid_range(value in 0.1f64..0.45f64) {
+    fn test_byzantine_tolerance_valid_range(value in 0.1f64..0.34f64) {
         prop_assert!(validate_byzantine_tolerance(value));
     }
 }

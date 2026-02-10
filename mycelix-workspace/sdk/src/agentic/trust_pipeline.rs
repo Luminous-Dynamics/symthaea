@@ -46,26 +46,21 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::matl::KVector;
 use crate::epistemic::EmpiricalLevel;
+use crate::matl::KVector;
 
-use super::provenance::{
-    ProvenanceNode, ProvenanceBuilder, ProvenanceChain,
-    DerivationType, ProvenanceRegistry,
-};
-use super::phi_consensus::{
-    PhiConsensusConfig, PhiConsensusResult, PhiConsensusStatus,
-    compute_phi_weighted_consensus,
-};
+use super::cross_domain::{translate_trust, TranslationResult, TrustDomain};
 use super::multi_agent::AgentVote;
+use super::phi_consensus::{
+    compute_phi_weighted_consensus, PhiConsensusConfig, PhiConsensusResult, PhiConsensusStatus,
+};
+use super::provenance::{
+    DerivationType, ProvenanceBuilder, ProvenanceChain, ProvenanceNode, ProvenanceRegistry,
+};
 use super::zk_trust::{
-    TrustProof, TrustProver, ProverConfig, ProofStatement,
-    KVectorCommitment, TrustVerifier,
+    KVectorCommitment, ProofStatement, ProverConfig, TrustProof, TrustProver, TrustVerifier,
 };
-use super::cross_domain::{
-    TrustDomain, TranslationResult, translate_trust,
-};
-use super::{InstrumentalActor, AgentOutput};
+use super::{AgentOutput, InstrumentalActor};
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -313,7 +308,8 @@ impl TrustPipeline {
 
     /// Register an agent with the pipeline
     pub fn register_agent(&mut self, agent: InstrumentalActor) {
-        self.agents.insert(agent.agent_id.as_str().to_string(), agent);
+        self.agents
+            .insert(agent.agent_id.as_str().to_string(), agent);
     }
 
     /// Get an agent by ID
@@ -346,8 +342,7 @@ impl TrustPipeline {
         let provenance = if parents.is_empty() {
             ProvenanceBuilder::original(&content, agent_id)
         } else {
-            ProvenanceBuilder::derived(&content, agent_id, derivation)
-                .parents(parents.clone())
+            ProvenanceBuilder::derived(&content, agent_id, derivation).parents(parents.clone())
         }
         .epistemic(output.classification.empirical)
         .confidence(output.classification_confidence as f64)
@@ -359,7 +354,8 @@ impl TrustPipeline {
             for parent in &parents {
                 let _ = self.provenance_registry.register(parent.clone());
             }
-            self.provenance_registry.register(provenance.clone())
+            self.provenance_registry
+                .register(provenance.clone())
                 .map_err(|e| PipelineError::ProvenanceError(format!("{:?}", e)))?;
         }
 
@@ -387,11 +383,8 @@ impl TrustPipeline {
         }
 
         // Run phi-weighted consensus
-        let consensus = compute_phi_weighted_consensus(
-            &votes,
-            &self.agents,
-            &self.config.consensus_config,
-        );
+        let consensus =
+            compute_phi_weighted_consensus(&votes, &self.agents, &self.config.consensus_config);
 
         let consensus_reached = matches!(
             consensus.status,
@@ -421,7 +414,9 @@ impl TrustPipeline {
     ) -> Result<TrustUpdate, PipelineError> {
         let agent_id = outcome.output.agent_id.clone();
 
-        let agent = self.agents.get(&agent_id)
+        let agent = self
+            .agents
+            .get(&agent_id)
             .ok_or_else(|| PipelineError::AgentNotFound(agent_id.clone()))?;
 
         let previous_kvector = agent.k_vector;
@@ -491,10 +486,7 @@ impl TrustPipeline {
                 value * 100.0,
                 outcome.output.output.classification.empirical as u8
             ),
-            TrustDirection::Decrease => format!(
-                "Low consensus ({:.0}%) on output",
-                value * 100.0
-            ),
+            TrustDirection::Decrease => format!("Low consensus ({:.0}%) on output", value * 100.0),
             TrustDirection::Unchanged => "Consensus inconclusive".to_string(),
         };
 
@@ -519,8 +511,8 @@ impl TrustPipeline {
             kvector.k_s, // Stake unchanged
             (kvector.k_h + delta.historical_delta).clamp(0.0, 1.0),
             kvector.k_topo, // Topology unchanged
-            kvector.k_v,   // Verification unchanged
-            kvector.k_phi, // Coherence unchanged by trust delta
+            kvector.k_v,    // Verification unchanged
+            kvector.k_phi,  // Coherence unchanged by trust delta
         )
     }
 
@@ -544,7 +536,8 @@ impl TrustPipeline {
         self.prover = TrustProver::new(prover_config);
 
         // Generate proof
-        let trust_proof = self.prover
+        let trust_proof = self
+            .prover
             .prove(&update.updated_kvector, &statement, blinding)
             .map_err(|e| PipelineError::ProofError(format!("{:?}", e)))?;
 
@@ -552,11 +545,13 @@ impl TrustPipeline {
         let kvector_commitment = self.prover.commit(&update.updated_kvector, blinding);
 
         // Register commitment with verifier
-        self.verifier.register_commitment(kvector_commitment.clone());
+        self.verifier
+            .register_commitment(kvector_commitment.clone());
 
         // Build provenance chain if tracking enabled
         let provenance_chain = if self.config.track_provenance {
-            self.provenance_registry.build_chain(&update.outcome.output.provenance.node_id)
+            self.provenance_registry
+                .build_chain(&update.outcome.output.provenance.node_id)
         } else {
             None
         };
@@ -582,7 +577,10 @@ impl TrustPipeline {
         blinding: &[u8; 32],
     ) -> Result<TranslatedAttestation, PipelineError> {
         // Get source domain (default if not configured)
-        let source_domain = self.config.default_domain.clone()
+        let source_domain = self
+            .config
+            .default_domain
+            .clone()
             .unwrap_or_else(|| TrustDomain {
                 domain_id: "default".to_string(),
                 name: "Default Domain".to_string(),
@@ -613,7 +611,9 @@ impl TrustPipeline {
             };
             let prover = TrustProver::new(prover_config);
 
-            prover.prove(&translation.target_kvector, &statement, blinding).ok()
+            prover
+                .prove(&translation.target_kvector, &statement, blinding)
+                .ok()
         } else {
             None
         };
@@ -635,7 +635,15 @@ impl TrustPipeline {
         &mut self,
         input: PipelineInput<'_>,
     ) -> Result<TrustAttestation, PipelineError> {
-        let PipelineInput { output, agent_id, parents, derivation, votes, proof_statement, blinding } = input;
+        let PipelineInput {
+            output,
+            agent_id,
+            parents,
+            derivation,
+            votes,
+            proof_statement,
+            blinding,
+        } = input;
         // Stage 1: Register
         let registered = self.register_output(output, agent_id, parents, derivation)?;
 
@@ -736,10 +744,12 @@ impl std::fmt::Display for PipelineError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agentic::UncertaintyCalibration;
-    use crate::agentic::{AgentClass, AgentId, AgentConstraints, AgentStatus, EpistemicStats};
     use crate::agentic::epistemic_classifier::OutputContent;
-    use crate::epistemic::{EpistemicClassificationExtended, NormativeLevel, MaterialityLevel, HarmonicLevel};
+    use crate::agentic::UncertaintyCalibration;
+    use crate::agentic::{AgentClass, AgentConstraints, AgentId, AgentStatus, EpistemicStats};
+    use crate::epistemic::{
+        EpistemicClassificationExtended, HarmonicLevel, MaterialityLevel, NormativeLevel,
+    };
 
     fn create_test_agent(id: &str, trust: f32) -> InstrumentalActor {
         InstrumentalActor {
@@ -748,7 +758,9 @@ mod tests {
             agent_class: AgentClass::Autonomous,
             kredit_balance: 1000,
             kredit_cap: 10000,
-            k_vector: KVector::new(trust, trust, trust, trust, trust, trust, trust, trust, trust, trust),
+            k_vector: KVector::new(
+                trust, trust, trust, trust, trust, trust, trust, trust, trust, trust,
+            ),
             behavior_log: Vec::new(),
             constraints: AgentConstraints::default(),
             status: AgentStatus::Active,
@@ -815,12 +827,9 @@ mod tests {
         pipeline.set_timestamp(1000);
 
         let output = create_test_output("agent-1");
-        let registered = pipeline.register_output(
-            output,
-            "agent-1",
-            vec![],
-            DerivationType::Original,
-        ).unwrap();
+        let registered = pipeline
+            .register_output(output, "agent-1", vec![], DerivationType::Original)
+            .unwrap();
 
         assert_eq!(registered.agent_id, "agent-1");
         assert_eq!(registered.registered_at, 1000);
@@ -839,12 +848,9 @@ mod tests {
 
         // Register output
         let output = create_test_output("agent-1");
-        let registered = pipeline.register_output(
-            output,
-            "agent-1",
-            vec![],
-            DerivationType::Original,
-        ).unwrap();
+        let registered = pipeline
+            .register_output(output, "agent-1", vec![], DerivationType::Original)
+            .unwrap();
 
         // Create approving votes
         let votes = vec![
@@ -870,12 +876,9 @@ mod tests {
 
         // Register and get consensus
         let output = create_test_output("agent-1");
-        let registered = pipeline.register_output(
-            output,
-            "agent-1",
-            vec![],
-            DerivationType::Original,
-        ).unwrap();
+        let registered = pipeline
+            .register_output(output, "agent-1", vec![], DerivationType::Original)
+            .unwrap();
 
         let votes = vec![create_test_vote("voter-1", 1.0)];
 
@@ -915,7 +918,8 @@ mod tests {
                     average_individual_phi: 0.65,
                     phi_variance: 0.05,
                     emergent_integration: 0.1,
-                    coherence_level: super::super::phi_integration::CollectiveCoherenceLevel::HighlyIntegrated,
+                    coherence_level:
+                        super::super::phi_integration::CollectiveCoherenceLevel::HighlyIntegrated,
                     agent_count: 3,
                     coherence_distribution: [0, 0, 0, 3, 0],
                 },
@@ -954,15 +958,17 @@ mod tests {
         let blinding = [42u8; 32];
         let statement = ProofStatement::trust_above(0.5);
 
-        let attestation = pipeline.run_full_pipeline(PipelineInput {
-            output,
-            agent_id: "agent-1",
-            parents: vec![],
-            derivation: DerivationType::Original,
-            votes,
-            proof_statement: statement,
-            blinding: &blinding,
-        }).unwrap();
+        let attestation = pipeline
+            .run_full_pipeline(PipelineInput {
+                output,
+                agent_id: "agent-1",
+                parents: vec![],
+                derivation: DerivationType::Original,
+                votes,
+                proof_statement: statement,
+                blinding: &blinding,
+            })
+            .unwrap();
 
         // Verify attestation
         assert!(pipeline.verify_attestation(&attestation));
@@ -985,18 +991,20 @@ mod tests {
         let statement = ProofStatement::trust_above(0.4);
         let target_domain = super::super::cross_domain::DomainTemplates::code_review();
 
-        let translated = pipeline.run_full_pipeline_with_translation(
-            PipelineInput {
-                output,
-                agent_id: "agent-1",
-                parents: vec![],
-                derivation: DerivationType::Original,
-                votes,
-                proof_statement: statement,
-                blinding: &blinding,
-            },
-            target_domain,
-        ).unwrap();
+        let translated = pipeline
+            .run_full_pipeline_with_translation(
+                PipelineInput {
+                    output,
+                    agent_id: "agent-1",
+                    parents: vec![],
+                    derivation: DerivationType::Original,
+                    votes,
+                    proof_statement: statement,
+                    blinding: &blinding,
+                },
+                target_domain,
+            )
+            .unwrap();
 
         assert!(pipeline.verify_translated_attestation(&translated));
         assert!(translated.translation.translation_confidence > 0.0);

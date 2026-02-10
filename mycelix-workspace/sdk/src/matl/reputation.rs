@@ -161,9 +161,12 @@ impl ReputationHistory {
             return 0.0;
         }
         let mean = self.mean();
-        let variance = self.scores.iter()
+        let variance = self
+            .scores
+            .iter()
             .map(|(_, s)| (s - mean).powi(2))
-            .sum::<f64>() / self.scores.len() as f64;
+            .sum::<f64>()
+            / self.scores.len() as f64;
         variance.sqrt()
     }
 

@@ -19,9 +19,9 @@
 //! When contradictions are detected, both claims have reduced confidence
 //! proportional to the opposing claim's attestation strength.
 
+use super::{StoredTriple, TripleValue};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::{TripleValue, StoredTriple};
 
 /// Result of contradiction analysis
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -184,8 +184,8 @@ impl ContradictionDetector {
 
         // Calculate overall contradiction weight
         let contradiction_weight = self.calculate_contradiction_weight(&contradictions);
-        let confidence_penalty = (contradiction_weight * self.config.max_penalty)
-            .min(self.config.max_penalty);
+        let confidence_penalty =
+            (contradiction_weight * self.config.max_penalty).min(self.config.max_penalty);
 
         ContradictionAnalysis {
             triple_hash: triple.hash.clone(),
@@ -424,8 +424,18 @@ mod tests {
     fn test_logical_opposites() {
         let detector = ContradictionDetector::new();
 
-        let t1 = make_stored("room", "temperature", TripleValue::String("hot".into()), "h1");
-        let t2 = make_stored("room", "temperature", TripleValue::String("cold".into()), "h2");
+        let t1 = make_stored(
+            "room",
+            "temperature",
+            TripleValue::String("hot".into()),
+            "h1",
+        );
+        let t2 = make_stored(
+            "room",
+            "temperature",
+            TripleValue::String("cold".into()),
+            "h2",
+        );
 
         let analysis = detector.detect_contradictions(&t1, &[t1.clone(), t2]);
 

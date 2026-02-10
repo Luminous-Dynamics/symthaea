@@ -40,10 +40,10 @@
 //! println!("Swarm health: {:?}", health);
 //! ```
 
+use super::coordination::{AgentGroup, CoordinationConfig};
+use crate::matl::KVector;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::matl::KVector;
-use super::coordination::{AgentGroup, CoordinationConfig};
 
 // ============================================================================
 // Agent Templates
@@ -450,7 +450,6 @@ pub struct LifecycleHooks {
     pub on_health_check: Option<Box<dyn Fn(&OrchestratedAgent) -> f64 + Send + Sync>>,
 }
 
-
 impl Orchestrator {
     /// Create a new orchestrator
     pub fn new(config: OrchestratorConfig) -> Self {
@@ -488,7 +487,9 @@ impl Orchestrator {
 
         // Create KREDIT pool if enabled
         let kredit_pool = if config.shared_kredit_pool {
-            Some(KreditPool::new(config.template.initial_kredit * config.max_agents as u64))
+            Some(KreditPool::new(
+                config.template.initial_kredit * config.max_agents as u64,
+            ))
         } else {
             None
         };
@@ -528,18 +529,24 @@ impl Orchestrator {
             swarm.status = SwarmStatus::Running;
         }
 
-        self.log_event(EventType::SwarmCreated, Some(&swarm_id), None, HashMap::new());
+        self.log_event(
+            EventType::SwarmCreated,
+            Some(&swarm_id),
+            None,
+            HashMap::new(),
+        );
 
         Ok(swarm_id)
     }
 
     /// Stop a swarm
     pub fn stop_swarm(&mut self, swarm_id: &str) -> Result<(), OrchestrationError> {
-        let swarm = self.swarms.get_mut(swarm_id).ok_or_else(|| {
-            OrchestrationError::SwarmNotFound {
-                swarm_id: swarm_id.to_string(),
-            }
-        })?;
+        let swarm =
+            self.swarms
+                .get_mut(swarm_id)
+                .ok_or_else(|| OrchestrationError::SwarmNotFound {
+                    swarm_id: swarm_id.to_string(),
+                })?;
 
         swarm.status = SwarmStatus::Stopped;
 
@@ -549,7 +556,12 @@ impl Orchestrator {
             self.terminate_agent(&agent_id)?;
         }
 
-        self.log_event(EventType::SwarmStopped, Some(swarm_id), None, HashMap::new());
+        self.log_event(
+            EventType::SwarmStopped,
+            Some(swarm_id),
+            None,
+            HashMap::new(),
+        );
 
         Ok(())
     }
@@ -558,13 +570,21 @@ impl Orchestrator {
     pub fn swarm_health(&self, swarm_id: &str) -> Option<SwarmHealth> {
         let swarm = self.swarms.get(swarm_id)?;
 
-        let agents: Vec<_> = swarm.agent_ids.iter()
+        let agents: Vec<_> = swarm
+            .agent_ids
+            .iter()
             .filter_map(|id| self.agents.get(id))
             .collect();
 
         let total = agents.len();
-        let healthy = agents.iter().filter(|a| a.status == AgentStatus::Running && a.health > 0.7).count();
-        let unhealthy = agents.iter().filter(|a| a.status == AgentStatus::Unhealthy).count();
+        let healthy = agents
+            .iter()
+            .filter(|a| a.status == AgentStatus::Running && a.health > 0.7)
+            .count();
+        let unhealthy = agents
+            .iter()
+            .filter(|a| a.status == AgentStatus::Unhealthy)
+            .count();
 
         let avg_health = if total > 0 {
             agents.iter().map(|a| a.health).sum::<f64>() / total as f64
@@ -592,11 +612,12 @@ impl Orchestrator {
 
     /// Scale swarm to target size
     pub fn scale_swarm(&mut self, swarm_id: &str, target: usize) -> Result<(), OrchestrationError> {
-        let swarm = self.swarms.get_mut(swarm_id).ok_or_else(|| {
-            OrchestrationError::SwarmNotFound {
-                swarm_id: swarm_id.to_string(),
-            }
-        })?;
+        let swarm =
+            self.swarms
+                .get_mut(swarm_id)
+                .ok_or_else(|| OrchestrationError::SwarmNotFound {
+                    swarm_id: swarm_id.to_string(),
+                })?;
 
         let current = swarm.agent_ids.len();
         let target = target.clamp(swarm.config.min_agents, swarm.config.max_agents);
@@ -635,11 +656,12 @@ impl Orchestrator {
             });
         }
 
-        let swarm = self.swarms.get(swarm_id).ok_or_else(|| {
-            OrchestrationError::SwarmNotFound {
+        let swarm = self
+            .swarms
+            .get(swarm_id)
+            .ok_or_else(|| OrchestrationError::SwarmNotFound {
                 swarm_id: swarm_id.to_string(),
-            }
-        })?;
+            })?;
 
         // Check swarm limit
         if swarm.agent_ids.len() >= swarm.config.max_agents {
@@ -672,7 +694,9 @@ impl Orchestrator {
                 if swarm.agent_ids.is_empty() {
                     template.initial_trust
                 } else {
-                    let total: f64 = swarm.agent_ids.iter()
+                    let total: f64 = swarm
+                        .agent_ids
+                        .iter()
                         .filter_map(|id| self.agents.get(id))
                         .map(|a| a.trust)
                         .sum();
@@ -721,18 +745,24 @@ impl Orchestrator {
             agent.status = AgentStatus::Running;
         }
 
-        self.log_event(EventType::AgentSpawned, Some(swarm_id), Some(&agent_id), HashMap::new());
+        self.log_event(
+            EventType::AgentSpawned,
+            Some(swarm_id),
+            Some(&agent_id),
+            HashMap::new(),
+        );
 
         Ok(agent_id)
     }
 
     /// Terminate an agent
     pub fn terminate_agent(&mut self, agent_id: &str) -> Result<(), OrchestrationError> {
-        let agent = self.agents.get(agent_id).ok_or_else(|| {
-            OrchestrationError::AgentNotFound {
+        let agent = self
+            .agents
+            .get(agent_id)
+            .ok_or_else(|| OrchestrationError::AgentNotFound {
                 agent_id: agent_id.to_string(),
-            }
-        })?;
+            })?;
 
         // Pre-terminate hook
         if let Some(ref hook) = self.hooks.pre_terminate {
@@ -771,23 +801,31 @@ impl Orchestrator {
             hook(agent_id);
         }
 
-        self.log_event(EventType::AgentTerminated, Some(&swarm_id), Some(agent_id), HashMap::new());
+        self.log_event(
+            EventType::AgentTerminated,
+            Some(&swarm_id),
+            Some(agent_id),
+            HashMap::new(),
+        );
 
         Ok(())
     }
 
     /// Restart an agent
     pub fn restart_agent(&mut self, agent_id: &str) -> Result<(), OrchestrationError> {
-        let agent = self.agents.get_mut(agent_id).ok_or_else(|| {
-            OrchestrationError::AgentNotFound {
-                agent_id: agent_id.to_string(),
-            }
-        })?;
+        let agent =
+            self.agents
+                .get_mut(agent_id)
+                .ok_or_else(|| OrchestrationError::AgentNotFound {
+                    agent_id: agent_id.to_string(),
+                })?;
 
         let swarm_id = agent.swarm_id.clone();
 
         // Check restart limit
-        let max_restarts = self.swarms.get(&swarm_id)
+        let max_restarts = self
+            .swarms
+            .get(&swarm_id)
             .map(|s| s.config.max_restart_attempts)
             .unwrap_or(3);
 
@@ -805,7 +843,12 @@ impl Orchestrator {
         agent.errors.clear();
         agent.status = AgentStatus::Running;
 
-        self.log_event(EventType::AgentRestarted, Some(&swarm_id), Some(agent_id), HashMap::new());
+        self.log_event(
+            EventType::AgentRestarted,
+            Some(&swarm_id),
+            Some(agent_id),
+            HashMap::new(),
+        );
 
         Ok(())
     }
@@ -862,7 +905,9 @@ impl Orchestrator {
             EventType::TrustUpdated,
             Some(&swarm_id),
             Some(agent_id),
-            [("trust".to_string(), trust.to_string())].into_iter().collect(),
+            [("trust".to_string(), trust.to_string())]
+                .into_iter()
+                .collect(),
         );
     }
 
@@ -886,7 +931,9 @@ impl Orchestrator {
         }
 
         // Calculate average trust
-        let trusts: Vec<f64> = swarm.agent_ids.iter()
+        let trusts: Vec<f64> = swarm
+            .agent_ids
+            .iter()
             .filter_map(|id| self.agents.get(id))
             .map(|a| a.trust)
             .collect();
@@ -1038,14 +1085,28 @@ pub enum OrchestrationError {
 impl std::fmt::Display for OrchestrationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            OrchestrationError::TooManySwarms { max } => write!(f, "Maximum swarms ({}) exceeded", max),
-            OrchestrationError::TooManyAgents { max } => write!(f, "Maximum agents ({}) exceeded", max),
-            OrchestrationError::SwarmNotFound { swarm_id } => write!(f, "Swarm not found: {}", swarm_id),
-            OrchestrationError::AgentNotFound { agent_id } => write!(f, "Agent not found: {}", agent_id),
-            OrchestrationError::SwarmFull { swarm_id, max } => write!(f, "Swarm {} is full (max {})", swarm_id, max),
+            OrchestrationError::TooManySwarms { max } => {
+                write!(f, "Maximum swarms ({}) exceeded", max)
+            }
+            OrchestrationError::TooManyAgents { max } => {
+                write!(f, "Maximum agents ({}) exceeded", max)
+            }
+            OrchestrationError::SwarmNotFound { swarm_id } => {
+                write!(f, "Swarm not found: {}", swarm_id)
+            }
+            OrchestrationError::AgentNotFound { agent_id } => {
+                write!(f, "Agent not found: {}", agent_id)
+            }
+            OrchestrationError::SwarmFull { swarm_id, max } => {
+                write!(f, "Swarm {} is full (max {})", swarm_id, max)
+            }
             OrchestrationError::SpawnBlocked { reason } => write!(f, "Spawn blocked: {}", reason),
-            OrchestrationError::TerminateBlocked { reason } => write!(f, "Terminate blocked: {}", reason),
-            OrchestrationError::MaxRestartsExceeded { agent_id, max } => write!(f, "Agent {} exceeded max restarts ({})", agent_id, max),
+            OrchestrationError::TerminateBlocked { reason } => {
+                write!(f, "Terminate blocked: {}", reason)
+            }
+            OrchestrationError::MaxRestartsExceeded { agent_id, max } => {
+                write!(f, "Agent {} exceeded max restarts ({})", agent_id, max)
+            }
         }
     }
 }
@@ -1155,8 +1216,13 @@ mod tests {
         let swarm_id = orch.spawn_swarm(config).unwrap();
 
         // Get first agent and update its trust
-        let agent_ids: Vec<_> = orch.get_swarm(&swarm_id).unwrap()
-            .agent_ids.iter().cloned().collect();
+        let agent_ids: Vec<_> = orch
+            .get_swarm(&swarm_id)
+            .unwrap()
+            .agent_ids
+            .iter()
+            .cloned()
+            .collect();
 
         orch.update_agent_trust(&agent_ids[0], 0.9);
 

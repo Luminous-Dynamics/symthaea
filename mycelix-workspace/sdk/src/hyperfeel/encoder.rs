@@ -158,12 +158,17 @@ impl HyperFeelEncoder {
 
             for _ in 0..size {
                 // Box-Muller transform for Gaussian
-                state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                state = state
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let u1 = (state >> 33) as f32 / (1u64 << 31) as f32;
-                state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                state = state
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let u2 = (state >> 33) as f32 / (1u64 << 31) as f32;
 
-                let z = (-2.0 * u1.max(1e-10).ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
+                let z =
+                    (-2.0 * u1.max(1e-10).ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
                 matrix.push(z * scale);
             }
 
@@ -171,7 +176,9 @@ impl HyperFeelEncoder {
         }
 
         // Safety: we just inserted into the cache above if it didn't exist
-        self.projection_cache.get(&input_dim).expect("projection matrix was just inserted")
+        self.projection_cache
+            .get(&input_dim)
+            .expect("projection matrix was just inserted")
     }
 
     /// Project quantized gradient to hypervector dimension
@@ -196,7 +203,10 @@ impl HyperFeelEncoder {
     /// Binarize and pack to bytes
     fn binarize_and_pack(&self, projected: &[f32]) -> Vec<u8> {
         // Binarize: sign(x) -> 0 or 1
-        let binary: Vec<u8> = projected.iter().map(|&x| if x > 0.0 { 1 } else { 0 }).collect();
+        let binary: Vec<u8> = projected
+            .iter()
+            .map(|&x| if x > 0.0 { 1 } else { 0 })
+            .collect();
 
         // Pack bits to bytes
         let mut packed = Vec::with_capacity(HV16_BYTES);
@@ -224,7 +234,10 @@ impl HyperFeelEncoder {
                 .as_secs(),
         };
 
-        let history = self.temporal_history.entry(node_id.to_string()).or_default();
+        let history = self
+            .temporal_history
+            .entry(node_id.to_string())
+            .or_default();
         history.push(entry);
 
         // Keep only last 50 entries
@@ -326,7 +339,7 @@ impl HyperFeelEncoder {
     pub fn compute_trajectory_smoothness(&self, node_id: &str) -> f32 {
         let history = match self.temporal_history.get(node_id) {
             Some(h) if h.len() >= 2 => h,
-            _ => return 1.0,  // No history = assumed smooth
+            _ => return 1.0, // No history = assumed smooth
         };
 
         // Compute consecutive similarities
@@ -444,7 +457,7 @@ mod tests {
     #[test]
     fn test_normalize() {
         let encoder = HyperFeelEncoder::new(EncodingConfig::default());
-        let gradient = vec![3.0, 4.0];  // norm = 5
+        let gradient = vec![3.0, 4.0]; // norm = 5
         let normalized = encoder.normalize(&gradient);
 
         assert!((normalized[0] - 0.6).abs() < 1e-5);
@@ -469,7 +482,11 @@ mod tests {
 
         // Check smoothness
         let smoothness = encoder.compute_trajectory_smoothness("node-1");
-        assert!(smoothness > 0.5, "Trajectory should be smooth: {}", smoothness);
+        assert!(
+            smoothness > 0.5,
+            "Trajectory should be smooth: {}",
+            smoothness
+        );
     }
 
     #[test]
@@ -490,6 +507,10 @@ mod tests {
 
         // Aggregated should be similar to inputs
         let sim1 = HyperFeelEncoder::cosine_similarity(&aggregated, &hg1.hypervector);
-        assert!(sim1 > 0.7, "Aggregated should be similar to inputs: {}", sim1);
+        assert!(
+            sim1 > 0.7,
+            "Aggregated should be similar to inputs: {}",
+            sim1
+        );
     }
 }

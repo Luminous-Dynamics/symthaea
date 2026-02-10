@@ -19,11 +19,15 @@ struct PogqFixtureCase {
 fn pogq_fixtures_match_rust_implementation() {
     // Resolve fixture path relative to the sdk crate
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let fixture_path = manifest_dir.join("../../Mycelix-Core/tests/shared-fixtures/pogq/simple_cases.json");
+    let fixture_path =
+        manifest_dir.join("../../Mycelix-Core/tests/shared-fixtures/pogq/simple_cases.json");
 
     // Skip test if fixture file doesn't exist (e.g., in CI without submodules)
     if !fixture_path.exists() {
-        eprintln!("Skipping pogq_fixtures test: fixture file not found at {:?}", fixture_path);
+        eprintln!(
+            "Skipping pogq_fixtures test: fixture file not found at {:?}",
+            fixture_path
+        );
         return;
     }
 
@@ -46,4 +50,3 @@ fn pogq_fixtures_match_rust_implementation() {
         );
     }
 }
-

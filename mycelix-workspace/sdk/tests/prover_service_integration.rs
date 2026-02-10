@@ -15,9 +15,7 @@
 
 #[cfg(all(test, feature = "simulation"))]
 mod tests {
-    use mycelix_sdk::fl::prover_integration::{
-        ProverIntegration, ProverBackend, ProverStats,
-    };
+    use mycelix_sdk::fl::prover_integration::{ProverBackend, ProverIntegration, ProverStats};
 
     // ========================================================================
     // Unit Tests (no external service required)
@@ -47,18 +45,16 @@ mod tests {
         let mut integration = ProverIntegration::for_testing();
 
         // Create sample gradient
-        let gradient: Vec<f32> = (0..100)
-            .map(|i| (i as f32 * 0.01).sin() * 0.5)
-            .collect();
+        let gradient: Vec<f32> = (0..100).map(|i| (i as f32 * 0.01).sin() * 0.5).collect();
         let model_hash = [0x42u8; 32];
 
         let result = integration.prove_gradient(
             &gradient,
             &model_hash,
-            5,   // epochs
+            5,    // epochs
             0.01, // learning_rate
             "test-client",
-            1,   // round
+            1, // round
         );
 
         assert!(result.is_ok());
@@ -80,14 +76,7 @@ mod tests {
         let gradient = vec![0.0f32; 100];
         let model_hash = [0x42u8; 32];
 
-        let result = integration.prove_gradient(
-            &gradient,
-            &model_hash,
-            5,
-            0.01,
-            "test-client",
-            1,
-        );
+        let result = integration.prove_gradient(&gradient, &model_hash, 5, 0.01, "test-client", 1);
 
         assert!(result.is_ok());
         let receipt = result.unwrap();
@@ -99,9 +88,7 @@ mod tests {
     fn test_stats_accumulation() {
         let mut integration = ProverIntegration::for_testing();
 
-        let gradient: Vec<f32> = (0..100)
-            .map(|i| (i as f32 * 0.01).sin() * 0.5)
-            .collect();
+        let gradient: Vec<f32> = (0..100).map(|i| (i as f32 * 0.01).sin() * 0.5).collect();
         let model_hash = [0x42u8; 32];
 
         // Generate multiple proofs
@@ -145,9 +132,7 @@ mod tests {
         let mut integration = ProverIntegration::with_external_service(&url);
 
         // Create sample gradient
-        let gradient: Vec<f32> = (0..100)
-            .map(|i| (i as f32 * 0.01).sin() * 0.5)
-            .collect();
+        let gradient: Vec<f32> = (0..100).map(|i| (i as f32 * 0.01).sin() * 0.5).collect();
         let model_hash = [0x42u8; 32];
 
         let result = integration.prove_gradient(
@@ -168,7 +153,10 @@ mod tests {
                 assert!(receipt.is_valid());
             }
             Err(e) => {
-                println!("External service error (may fall back to simulation): {}", e);
+                println!(
+                    "External service error (may fall back to simulation): {}",
+                    e
+                );
             }
         }
     }
@@ -224,20 +212,17 @@ mod tests {
                 .map(|j| ((i * 10 + j) as f32 * 0.01).sin() * 0.5)
                 .collect();
 
-            let result = integration.prove_gradient(
-                &gradient,
-                &model_hash,
-                5,
-                0.01,
-                client,
-                1,
-            );
+            let result = integration.prove_gradient(&gradient, &model_hash, 5, 0.01, client, 1);
             results.push((client, result));
         }
 
         // Count successes
         let successes = results.iter().filter(|(_, r)| r.is_ok()).count();
-        println!("Batch proof results: {}/{} succeeded", successes, clients.len());
+        println!(
+            "Batch proof results: {}/{} succeeded",
+            successes,
+            clients.len()
+        );
 
         // At minimum, simulation fallback should work
         assert!(successes >= 1, "At least some proofs should succeed");
@@ -252,9 +237,7 @@ mod tests {
     fn bench_simulation_proof_generation() {
         let mut integration = ProverIntegration::for_testing();
 
-        let gradient: Vec<f32> = (0..1000)
-            .map(|i| (i as f32 * 0.001).sin() * 0.5)
-            .collect();
+        let gradient: Vec<f32> = (0..1000).map(|i| (i as f32 * 0.001).sin() * 0.5).collect();
         let model_hash = [0x42u8; 32];
 
         let iterations = 100;

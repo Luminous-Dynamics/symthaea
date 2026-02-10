@@ -29,7 +29,7 @@
 //! IPFS API endpoint and build with the `std` feature.
 
 use crate::epistemic::EpistemicClassification;
-use crate::storage::types::{StorageMetadata, SchemaIdentity, StoredData};
+use crate::storage::types::{SchemaIdentity, StorageMetadata, StoredData};
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::collections::HashMap;
@@ -38,7 +38,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(feature = "std")]
 use super::ipfs_client::IpfsClient;
-
 
 /// IPFS backend configuration
 #[derive(Debug, Clone)]
@@ -414,7 +413,13 @@ impl IPFSBackend {
 
     /// Store to real IPFS via HTTP API
     #[cfg(feature = "std")]
-    fn set_to_ipfs(&self, key: &str, expected_cid: &str, content: &[u8], stored_at: u64) -> Option<()> {
+    fn set_to_ipfs(
+        &self,
+        key: &str,
+        expected_cid: &str,
+        content: &[u8],
+        stored_at: u64,
+    ) -> Option<()> {
         let client = IpfsClient::new(&self.config.api_endpoint, self.config.timeout_ms);
 
         // Add to IPFS (with or without pinning based on config)
@@ -741,7 +746,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+    use crate::epistemic::{EmpiricalLevel, MaterialityLevel, NormativeLevel};
 
     fn test_classification() -> EpistemicClassification {
         EpistemicClassification::new(
@@ -861,9 +866,30 @@ mod tests {
         let schema = SchemaIdentity::new("test", "1.0");
         let class = test_classification();
 
-        backend.set("key1", &"value1", class.clone(), schema.clone(), "agent", None);
-        backend.set("key2", &"value2", class.clone(), schema.clone(), "agent", None);
-        backend.set("other", &"value3", class.clone(), schema.clone(), "agent", None);
+        backend.set(
+            "key1",
+            &"value1",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "key2",
+            &"value2",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "other",
+            &"value3",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
 
         // Test keys listing
         let all_keys = backend.keys(None);
@@ -889,8 +915,22 @@ mod tests {
         let schema = SchemaIdentity::new("test", "1.0");
         let class = test_classification();
 
-        backend.set("stat1", &"value1", class.clone(), schema.clone(), "agent", None);
-        backend.set("stat2", &"value2", class.clone(), schema.clone(), "agent", None);
+        backend.set(
+            "stat1",
+            &"value1",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "stat2",
+            &"value2",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
 
         // Retrieve one
         let _: Option<StoredData<String>> = backend.get("stat1");
@@ -912,12 +952,26 @@ mod tests {
 
         // Store initial value
         let meta1 = backend
-            .set("immutable-key", &"value1", class.clone(), schema.clone(), "agent", None)
+            .set(
+                "immutable-key",
+                &"value1",
+                class.clone(),
+                schema.clone(),
+                "agent",
+                None,
+            )
             .unwrap();
 
         // Store different value with same key
         let meta2 = backend
-            .set("immutable-key", &"value2", class.clone(), schema.clone(), "agent", None)
+            .set(
+                "immutable-key",
+                &"value2",
+                class.clone(),
+                schema.clone(),
+                "agent",
+                None,
+            )
             .unwrap();
 
         // CIDs should be different (content-addressed)
@@ -940,8 +994,22 @@ mod tests {
         let schema = SchemaIdentity::new("test", "1.0");
         let class = test_classification();
 
-        backend.set("clear1", &"value1", class.clone(), schema.clone(), "agent", None);
-        backend.set("clear2", &"value2", class.clone(), schema.clone(), "agent", None);
+        backend.set(
+            "clear1",
+            &"value1",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "clear2",
+            &"value2",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
 
         assert_eq!(backend.keys(None).len(), 2);
 
@@ -958,6 +1026,6 @@ mod tests {
         let cid = IPFSBackend::compute_cid(content);
 
         assert!(cid.starts_with("Qm")); // CIDv0 prefix
-        assert_eq!(cid.len(), 2 + 64);  // "Qm" + 64 hex chars (SHA3-256)
+        assert_eq!(cid.len(), 2 + 64); // "Qm" + 64 hex chars (SHA3-256)
     }
 }

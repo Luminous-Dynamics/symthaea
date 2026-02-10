@@ -19,7 +19,7 @@
 //! - **Chain Verification**: Cryptographic proof of unbroken lineage
 
 use serde::{Deserialize, Serialize};
-use sha3::{Sha3_256, Digest};
+use sha3::{Digest, Sha3_256};
 use std::collections::HashMap;
 
 use crate::epistemic::{EmpiricalLevel, EpistemicClassificationExtended};
@@ -304,7 +304,7 @@ pub enum ChainError {
         /// Node ID with missing parent
         node: String,
         /// Expected parent ID
-        parent: String
+        parent: String,
     },
     /// Epistemic level exceeds floor without valid reason
     EpistemicViolation {
@@ -397,10 +397,7 @@ impl ProvenanceBuilder {
         let content_hash = hash_content(&self.content);
 
         // Collect parent hashes
-        let parent_hashes: Vec<[u8; 32]> = self.parents
-            .iter()
-            .map(|p| p.content_hash)
-            .collect();
+        let parent_hashes: Vec<[u8; 32]> = self.parents.iter().map(|p| p.content_hash).collect();
 
         // Compute epistemic floor
         // For derived nodes: minimum of parent epistemic levels (not floors!)
@@ -411,10 +408,13 @@ impl ProvenanceBuilder {
         } else {
             // Take minimum of parent epistemic levels (what they actually claim)
             // This ensures derived knowledge can't exceed what parents actually proved
-            Some(self.parents.iter()
-                .map(|p| p.epistemic_level)
-                .min_by_key(|e| *e as u8)
-                .unwrap_or(EmpiricalLevel::E0Null))
+            Some(
+                self.parents
+                    .iter()
+                    .map(|p| p.epistemic_level)
+                    .min_by_key(|e| *e as u8)
+                    .unwrap_or(EmpiricalLevel::E0Null),
+            )
         };
 
         // Determine epistemic level (cannot exceed parent floor unless special derivation)
@@ -450,23 +450,25 @@ impl ProvenanceBuilder {
         let parent_confidence = if self.parents.is_empty() {
             1.0
         } else {
-            self.parents.iter()
+            self.parents
+                .iter()
                 .map(|p| p.derived_confidence)
                 .fold(f64::MAX, f64::min) // Minimum parent confidence
         };
 
-        let derived_confidence = parent_confidence
-            * self.derivation_type.confidence_decay()
-            * self.base_confidence;
+        let derived_confidence =
+            parent_confidence * self.derivation_type.confidence_decay() * self.base_confidence;
 
         // Compute chain depth
         let chain_depth = if self.parents.is_empty() {
             0
         } else {
-            self.parents.iter()
+            self.parents
+                .iter()
                 .map(|p| p.chain_depth)
                 .max()
-                .unwrap_or(0) + 1
+                .unwrap_or(0)
+                + 1
         };
 
         // Create node
@@ -545,10 +547,7 @@ impl ChainBuilder {
         }
 
         // Compute max depth
-        let max_depth = nodes.values()
-            .map(|n| n.chain_depth)
-            .max()
-            .unwrap_or(0);
+        let max_depth = nodes.values().map(|n| n.chain_depth).max().unwrap_or(0);
 
         // Compute chain confidence
         let mut chain = ProvenanceChain {
@@ -607,8 +606,7 @@ impl ProvenancedOutput {
         let provenance = if parents.is_empty() {
             ProvenanceBuilder::original(&content, agent_id)
         } else {
-            ProvenanceBuilder::derived(&content, agent_id, derivation)
-                .parents(parents)
+            ProvenanceBuilder::derived(&content, agent_id, derivation).parents(parents)
         }
         .confidence(confidence)
         .epistemic(classification.empirical)
@@ -842,11 +840,12 @@ mod tests {
             .build(1000);
 
         // Derive from it
-        let derived = ProvenanceBuilder::derived(b"Derived insight", "agent-2", DerivationType::Synthesis)
-            .parent(original.clone())
-            .confidence(0.9)
-            .epistemic(EmpiricalLevel::E3Cryptographic)
-            .build(2000);
+        let derived =
+            ProvenanceBuilder::derived(b"Derived insight", "agent-2", DerivationType::Synthesis)
+                .parent(original.clone())
+                .confidence(0.9)
+                .epistemic(EmpiricalLevel::E3Cryptographic)
+                .build(2000);
 
         assert_eq!(derived.chain_depth, 1);
         assert_eq!(derived.parent_hashes.len(), 1);
@@ -868,10 +867,11 @@ mod tests {
             .build(1000);
 
         // Try to derive with higher epistemic level
-        let derived = ProvenanceBuilder::derived(b"Still hearsay", "agent-2", DerivationType::Transform)
-            .parent(original.clone())
-            .epistemic(EmpiricalLevel::E4PublicRepro) // Try to claim E4
-            .build(2000);
+        let derived =
+            ProvenanceBuilder::derived(b"Still hearsay", "agent-2", DerivationType::Transform)
+                .parent(original.clone())
+                .epistemic(EmpiricalLevel::E4PublicRepro) // Try to claim E4
+                .build(2000);
 
         // Should be clamped to parent's level (E1)
         assert_eq!(derived.epistemic_level, EmpiricalLevel::E1Testimonial);
@@ -885,10 +885,14 @@ mod tests {
             .build(1000);
 
         // Verification can raise to E3
-        let verified = ProvenanceBuilder::derived(b"Now cryptographically verified", "agent-2", DerivationType::Verification)
-            .parent(original)
-            .epistemic(EmpiricalLevel::E3Cryptographic)
-            .build(2000);
+        let verified = ProvenanceBuilder::derived(
+            b"Now cryptographically verified",
+            "agent-2",
+            DerivationType::Verification,
+        )
+        .parent(original)
+        .epistemic(EmpiricalLevel::E3Cryptographic)
+        .build(2000);
 
         // Verification CAN raise epistemic level
         assert_eq!(verified.epistemic_level, EmpiricalLevel::E3Cryptographic);
@@ -904,9 +908,10 @@ mod tests {
             .epistemic(EmpiricalLevel::E2PrivateVerify)
             .build(1001);
 
-        let synthesis = ProvenanceBuilder::derived(b"Synthesis", "agent-2", DerivationType::Synthesis)
-            .parents(vec![root1.clone(), root2.clone()])
-            .build(2000);
+        let synthesis =
+            ProvenanceBuilder::derived(b"Synthesis", "agent-2", DerivationType::Synthesis)
+                .parents(vec![root1.clone(), root2.clone()])
+                .build(2000);
 
         let chain = ChainBuilder::new()
             .add_node(root1)
@@ -932,9 +937,7 @@ mod tests {
             .parent(root.clone())
             .build(2000);
 
-        let chain = ChainBuilder::new()
-            .add_node(root)
-            .build(derived);
+        let chain = ChainBuilder::new().add_node(root).build(derived);
 
         assert!(matches!(chain.verify(), ChainVerificationResult::Valid));
     }

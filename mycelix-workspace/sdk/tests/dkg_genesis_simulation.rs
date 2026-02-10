@@ -14,9 +14,8 @@
 //! social proof (Bob's endorsement), defeating Mallory's unattested lie.
 
 use mycelix_sdk::dkg::{
-    VerifiableTriple, TripleValue, EpistemicType,
-    ConfidenceInput, calculate_confidence, meets_threshold,
-    Attestation, AttestationType, AttestationSet,
+    calculate_confidence, meets_threshold, Attestation, AttestationSet, AttestationType,
+    ConfidenceInput, EpistemicType, TripleValue, VerifiableTriple,
 };
 
 #[test]
@@ -29,24 +28,16 @@ fn test_genesis_simulation_sky_color() {
     let current_time = 1700000000u64;
 
     // === ACT 1: Alice claims "The sky is blue" ===
-    let alice_claim = VerifiableTriple::new(
-        "sky",
-        "color",
-        TripleValue::String("blue".into()),
-    )
-    .with_epistemic_type(EpistemicType::Empirical)
-    .with_creator("alice")
-    .with_timestamp(current_time);
+    let alice_claim = VerifiableTriple::new("sky", "color", TripleValue::String("blue".into()))
+        .with_epistemic_type(EpistemicType::Empirical)
+        .with_creator("alice")
+        .with_timestamp(current_time);
 
     // === ACT 2: Mallory claims "The sky is green" (lie) ===
-    let mallory_claim = VerifiableTriple::new(
-        "sky",
-        "color",
-        TripleValue::String("green".into()),
-    )
-    .with_epistemic_type(EpistemicType::Empirical)
-    .with_creator("mallory")
-    .with_timestamp(current_time);
+    let mallory_claim = VerifiableTriple::new("sky", "color", TripleValue::String("green".into()))
+        .with_epistemic_type(EpistemicType::Empirical)
+        .with_creator("mallory")
+        .with_timestamp(current_time);
 
     // === ACT 3: Bob endorses Alice's claim ===
     // Create a test signature (in production this would be a real Ed25519 signature)
@@ -57,7 +48,7 @@ fn test_genesis_simulation_sky_color() {
         Attestation::endorse("alice_claim_hash", "bob", test_signature)
             .with_reputation(0.5) // Bob has neutral reputation
             .with_evidence("I looked outside and the sky is indeed blue.")
-            .with_timestamp(current_time + 5)
+            .with_timestamp(current_time + 5),
     );
 
     // Mallory's claim has no endorsements (she's untrustworthy)
@@ -91,7 +82,10 @@ fn test_genesis_simulation_sky_color() {
 
     println!("\n=== GENESIS SIMULATION RESULTS ===");
     println!("Alice's 'blue' claim confidence: {:.4}", alice_score.score);
-    println!("Mallory's 'green' claim confidence: {:.4}", mallory_score.score);
+    println!(
+        "Mallory's 'green' claim confidence: {:.4}",
+        mallory_score.score
+    );
 
     // 1. Alice's endorsed claim should beat Mallory's unattested claim
     assert!(
@@ -132,13 +126,9 @@ fn test_genesis_reputation_squared_voting() {
 
     let current_time = 1700000000u64;
 
-    let claim = VerifiableTriple::new(
-        "test_subject",
-        "test_predicate",
-        TripleValue::Boolean(true),
-    )
-    .with_epistemic_type(EpistemicType::Empirical)
-    .with_timestamp(current_time);
+    let claim = VerifiableTriple::new("test_subject", "test_predicate", TripleValue::Boolean(true))
+        .with_epistemic_type(EpistemicType::Empirical)
+        .with_timestamp(current_time);
 
     // Scenario A: One high-rep attester (0.9)
     let high_rep_input = ConfidenceInput {
@@ -166,7 +156,8 @@ fn test_genesis_reputation_squared_voting() {
     assert!(
         high_rep_score.score > low_rep_score.score,
         "High-rep attester ({:.4}) should produce higher confidence than low-rep ({:.4})",
-        high_rep_score.score, low_rep_score.score
+        high_rep_score.score,
+        low_rep_score.score
     );
 
     println!("Reputation² voting verified:");
@@ -214,7 +205,8 @@ fn test_genesis_challenge_reduces_confidence() {
     assert!(
         unchallenged_score.score > challenged_score.score,
         "Unchallenged claim ({:.4}) should have higher confidence than challenged ({:.4})",
-        unchallenged_score.score, challenged_score.score
+        unchallenged_score.score,
+        challenged_score.score
     );
 
     println!("Challenge mechanism verified:");
@@ -229,21 +221,13 @@ fn test_genesis_time_decay() {
     let current_time = 1700000000u64;
     let one_year_ago = current_time - (365 * 86400);
 
-    let recent_claim = VerifiableTriple::new(
-        "fact",
-        "value",
-        TripleValue::Integer(42),
-    )
-    .with_epistemic_type(EpistemicType::Empirical)
-    .with_timestamp(current_time - 86400); // 1 day ago
+    let recent_claim = VerifiableTriple::new("fact", "value", TripleValue::Integer(42))
+        .with_epistemic_type(EpistemicType::Empirical)
+        .with_timestamp(current_time - 86400); // 1 day ago
 
-    let old_claim = VerifiableTriple::new(
-        "fact",
-        "value",
-        TripleValue::Integer(42),
-    )
-    .with_epistemic_type(EpistemicType::Empirical)
-    .with_timestamp(one_year_ago);
+    let old_claim = VerifiableTriple::new("fact", "value", TripleValue::Integer(42))
+        .with_epistemic_type(EpistemicType::Empirical)
+        .with_timestamp(one_year_ago);
 
     let recent_input = ConfidenceInput {
         triple: &recent_claim,
@@ -269,7 +253,8 @@ fn test_genesis_time_decay() {
     assert!(
         recent_score.score > old_score.score,
         "Recent claim ({:.4}) should have higher confidence than old claim ({:.4})",
-        recent_score.score, old_score.score
+        recent_score.score,
+        old_score.score
     );
 
     println!("Time decay verified:");
@@ -332,12 +317,14 @@ fn test_genesis_epistemic_classification() {
     assert!(
         emp_score.score > norm_score.score,
         "Empirical ({:.4}) should have higher confidence than Normative ({:.4})",
-        emp_score.score, norm_score.score
+        emp_score.score,
+        norm_score.score
     );
     assert!(
         norm_score.score > meta_score.score,
         "Normative ({:.4}) should have higher confidence than Metaphysical ({:.4})",
-        norm_score.score, meta_score.score
+        norm_score.score,
+        meta_score.score
     );
 
     println!("Epistemic classification verified:");

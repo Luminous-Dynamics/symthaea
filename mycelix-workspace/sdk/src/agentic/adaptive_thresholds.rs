@@ -120,7 +120,10 @@ impl FeedbackOutcome {
 
     /// Whether this is a correct decision
     pub fn is_correct(&self) -> bool {
-        matches!(self, FeedbackOutcome::TruePositive | FeedbackOutcome::TrueNegative)
+        matches!(
+            self,
+            FeedbackOutcome::TruePositive | FeedbackOutcome::TrueNegative
+        )
     }
 }
 
@@ -254,13 +257,13 @@ impl ThresholdBandit {
         let total = self.total_pulls.get(&threshold_type).copied().unwrap_or(0);
 
         // Find arm with highest UCB value
-        let best_arm = arms
-            .iter()
-            .max_by(|a, b| {
-                let ucb_a = a.ucb_value(total.max(1), self.config.ucb_c);
-                let ucb_b = b.ucb_value(total.max(1), self.config.ucb_c);
-                ucb_a.partial_cmp(&ucb_b).unwrap_or(std::cmp::Ordering::Equal)
-            });
+        let best_arm = arms.iter().max_by(|a, b| {
+            let ucb_a = a.ucb_value(total.max(1), self.config.ucb_c);
+            let ucb_b = b.ucb_value(total.max(1), self.config.ucb_c);
+            ucb_a
+                .partial_cmp(&ucb_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         best_arm.map(|a| a.threshold).unwrap_or(0.5)
     }
@@ -278,7 +281,9 @@ impl ThresholdBandit {
                 .min_by(|(_, a), (_, b)| {
                     let dist_a = (a.threshold - feedback.threshold_value).abs();
                     let dist_b = (b.threshold - feedback.threshold_value).abs();
-                    dist_a.partial_cmp(&dist_b).unwrap_or(std::cmp::Ordering::Equal)
+                    dist_a
+                        .partial_cmp(&dist_b)
+                        .unwrap_or(std::cmp::Ordering::Equal)
                 })
                 .map(|(i, _)| i);
 
@@ -373,7 +378,10 @@ impl GradientEstimator {
         *v = self.config.momentum * *v + self.config.learning_rate * gradient;
 
         // Update threshold
-        let threshold = self.thresholds.entry(feedback.threshold_type).or_insert(0.5);
+        let threshold = self
+            .thresholds
+            .entry(feedback.threshold_type)
+            .or_insert(0.5);
         *threshold += *v;
 
         // Clamp to valid range
@@ -382,7 +390,8 @@ impl GradientEstimator {
 
     /// Estimate gradient from recent feedback
     fn estimate_gradient(&self, threshold_type: ThresholdType) -> f64 {
-        let relevant: Vec<_> = self.recent_feedback
+        let relevant: Vec<_> = self
+            .recent_feedback
             .iter()
             .filter(|f| f.threshold_type == threshold_type)
             .collect();
@@ -457,7 +466,11 @@ impl AdaptiveThresholdEngine {
 
     /// Get recommended threshold
     pub fn get_threshold(&self, threshold_type: ThresholdType) -> f64 {
-        let mode = self.mode.get(&threshold_type).copied().unwrap_or(AdaptiveMode::Exploration);
+        let mode = self
+            .mode
+            .get(&threshold_type)
+            .copied()
+            .unwrap_or(AdaptiveMode::Exploration);
 
         match mode {
             AdaptiveMode::Exploration => self.bandit.select(threshold_type),
@@ -477,7 +490,9 @@ impl AdaptiveThresholdEngine {
         if count > self.exploration_threshold {
             self.mode.insert(threshold_type, AdaptiveMode::Exploitation);
         } else {
-            self.mode.entry(threshold_type).or_insert(AdaptiveMode::Exploration);
+            self.mode
+                .entry(threshold_type)
+                .or_insert(AdaptiveMode::Exploration);
         }
 
         // Update both algorithms
@@ -487,18 +502,28 @@ impl AdaptiveThresholdEngine {
 
     /// Get recommendation with explanation
     pub fn recommend(&self, threshold_type: ThresholdType) -> ThresholdRecommendation {
-        let mode = self.mode.get(&threshold_type).copied().unwrap_or(AdaptiveMode::Exploration);
+        let mode = self
+            .mode
+            .get(&threshold_type)
+            .copied()
+            .unwrap_or(AdaptiveMode::Exploration);
         let value = self.get_threshold(threshold_type);
 
         let (confidence, direction) = match mode {
             AdaptiveMode::Exploration => {
-                let count = self.feedback_count.get(&threshold_type).copied().unwrap_or(0);
+                let count = self
+                    .feedback_count
+                    .get(&threshold_type)
+                    .copied()
+                    .unwrap_or(0);
                 let conf = (count as f64 / self.exploration_threshold as f64).min(1.0);
                 (conf, RecommendationDirection::Exploring)
             }
             AdaptiveMode::Exploitation => {
                 // High confidence if gradient is small
-                let gradient_velocity = self.gradient.velocity
+                let gradient_velocity = self
+                    .gradient
+                    .velocity
                     .get(&threshold_type)
                     .copied()
                     .unwrap_or(0.0)
@@ -522,7 +547,11 @@ impl AdaptiveThresholdEngine {
             value,
             confidence,
             direction,
-            samples: self.feedback_count.get(&threshold_type).copied().unwrap_or(0),
+            samples: self
+                .feedback_count
+                .get(&threshold_type)
+                .copied()
+                .unwrap_or(0),
         }
     }
 
@@ -672,7 +701,10 @@ mod tests {
 
         // Threshold should have increased
         let threshold = estimator.get_threshold(ThresholdType::TrustAcceptance);
-        assert!(threshold > 0.5, "Threshold should increase after false positives");
+        assert!(
+            threshold > 0.5,
+            "Threshold should increase after false positives"
+        );
     }
 
     #[test]

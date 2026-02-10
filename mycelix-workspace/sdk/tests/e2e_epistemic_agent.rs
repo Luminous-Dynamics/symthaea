@@ -7,19 +7,18 @@
 //!
 //! This complements the existing epistemic_agent_integration.rs test.
 
-use mycelix_sdk::zkproof::{GradientProver, ProverMode};
+use mycelix_sdk::epistemic::{
+    EmpiricalLevel, EpistemicClassification, MaterialityLevel, NormativeLevel,
+};
 use mycelix_sdk::fl::{
-    ZKProofFLBridge, VerifiedAggregationMethod, ZKFLError,
-    GradientUpdate, GradientMetadata, AggregationMethod,
+    AggregationMethod, GradientMetadata, GradientUpdate, VerifiedAggregationMethod, ZKFLError,
+    ZKProofFLBridge,
 };
 use mycelix_sdk::storage::{
-    EpistemicStorage, StorageConfig, StoreOptions, SchemaIdentity,
-    StorageBackend, MutabilityMode, AccessControlMode,
+    AccessControlMode, EpistemicStorage, MutabilityMode, SchemaIdentity, StorageBackend,
+    StorageConfig, StoreOptions,
 };
-use mycelix_sdk::epistemic::{
-    EmpiricalLevel, NormativeLevel, MaterialityLevel,
-    EpistemicClassification,
-};
+use mycelix_sdk::zkproof::{GradientProver, ProverMode};
 
 /// Test the full ZK-FL pipeline
 #[test]
@@ -38,47 +37,60 @@ fn test_zk_fl_pipeline() {
             .map(|j| ((i as f32 + j as f32) / 500.0).sin() * 0.4)
             .collect();
 
-        let result = bridge.submit_with_proof(
-            &format!("honest-client-{}", i),
-            &gradient,
-            5,    // epochs
-            0.01, // learning rate
-            64,   // batch size
-            0.3 - i as f64 * 0.02, // decreasing loss
-        ).expect("Submission should succeed");
+        let result = bridge
+            .submit_with_proof(
+                &format!("honest-client-{}", i),
+                &gradient,
+                5,                     // epochs
+                0.01,                  // learning rate
+                64,                    // batch size
+                0.3 - i as f64 * 0.02, // decreasing loss
+            )
+            .expect("Submission should succeed");
 
-        println!("  Client {} submitted - proof valid: {}", i, result.is_valid());
+        println!(
+            "  Client {} submitted - proof valid: {}",
+            i,
+            result.is_valid()
+        );
         assert!(result.is_valid());
     }
 
     // 2 Byzantine participants submit bad gradients
     for i in 0..2 {
         let bad_gradient = vec![0.0f32; 500]; // Zero gradient - fails quality check
-        let result = bridge.submit_with_proof(
-            &format!("byzantine-{}", i),
-            &bad_gradient,
-            5,
-            0.01,
-            64,
-            0.5,
-        ).expect("Submission should succeed");
+        let result = bridge
+            .submit_with_proof(&format!("byzantine-{}", i), &bad_gradient, 5, 0.01, 64, 0.5)
+            .expect("Submission should succeed");
 
-        println!("  Byzantine {} submitted - proof valid: {}", i, result.is_valid());
+        println!(
+            "  Byzantine {} submitted - proof valid: {}",
+            i,
+            result.is_valid()
+        );
         assert!(!result.is_valid()); // Should be invalid
     }
 
     // Aggregate with Byzantine filtering
-    let result = bridge.aggregate_verified().expect("Aggregation should succeed");
+    let result = bridge
+        .aggregate_verified()
+        .expect("Aggregation should succeed");
 
     println!("\nAggregation results:");
     println!("  Included: {} participants", result.included_count);
     println!("  Excluded: {} participants", result.excluded_count);
-    println!("  Byzantine fraction: {:.1}%", bridge.byzantine_fraction() * 100.0);
-    println!("  Aggregated gradient dimension: {}", result.gradient.gradients.len());
+    println!(
+        "  Byzantine fraction: {:.1}%",
+        bridge.byzantine_fraction() * 100.0
+    );
+    println!(
+        "  Aggregated gradient dimension: {}",
+        result.gradient.gradients.len()
+    );
 
     assert_eq!(result.included_count, 5);
     assert_eq!(result.excluded_count, 2);
-    assert!((bridge.byzantine_fraction() - 2.0/7.0).abs() < 0.01);
+    assert!((bridge.byzantine_fraction() - 2.0 / 7.0).abs() < 0.01);
 
     println!("\n=== ZK-FL Pipeline Test Passed ===\n");
 }
@@ -166,25 +178,32 @@ fn test_store_proof_results() {
         ..Default::default()
     };
 
-    let receipt = storage.store(
-        "proof:round-1:client-001",
-        &proof_result.to_string(),
-        classification,
-        store_options,
-    ).expect("Store should succeed");
+    let receipt = storage
+        .store(
+            "proof:round-1:client-001",
+            &proof_result.to_string(),
+            classification,
+            store_options,
+        )
+        .expect("Store should succeed");
 
     println!("Stored proof result:");
     println!("  Key: proof:round-1:client-001");
     println!("  CID: {}...", &receipt.cid[..20]);
     println!("  Backend: {:?}", receipt.tier.backend);
-    println!("  Immutable: {}", receipt.tier.mutability == MutabilityMode::Immutable);
+    println!(
+        "  Immutable: {}",
+        receipt.tier.mutability == MutabilityMode::Immutable
+    );
 
     // Retrieve and verify
-    let retrieved: mycelix_sdk::storage::StoredData<String> = storage.retrieve(
-        "proof:round-1:client-001",
-        None,
-        mycelix_sdk::storage::RetrieveOptions::default(),
-    ).expect("Retrieve should succeed");
+    let retrieved: mycelix_sdk::storage::StoredData<String> = storage
+        .retrieve(
+            "proof:round-1:client-001",
+            None,
+            mycelix_sdk::storage::RetrieveOptions::default(),
+        )
+        .expect("Retrieve should succeed");
 
     assert!(retrieved.data.contains("norm_valid"));
     println!("  Retrieved successfully: ✓");
@@ -202,10 +221,10 @@ fn test_aggregation_methods() {
     bridge.start_round(1, [0x01u8; 32]);
 
     for i in 0..3 {
-        let gradient: Vec<f32> = (0..100)
-            .map(|j| (i as f32 + j as f32) * 0.01)
-            .collect();
-        bridge.submit_with_proof(&format!("c{}", i), &gradient, 5, 0.01, 32, 0.3).unwrap();
+        let gradient: Vec<f32> = (0..100).map(|j| (i as f32 + j as f32) * 0.01).collect();
+        bridge
+            .submit_with_proof(&format!("c{}", i), &gradient, 5, 0.01, 32, 0.3)
+            .unwrap();
     }
 
     let result = bridge.aggregate_verified().unwrap();
@@ -220,10 +239,10 @@ fn test_aggregation_methods() {
     bridge2.start_round(1, [0x02u8; 32]);
 
     for i in 0..5 {
-        let gradient: Vec<f32> = (0..100)
-            .map(|j| (i as f32 + j as f32) * 0.01)
-            .collect();
-        bridge2.submit_with_proof(&format!("t{}", i), &gradient, 5, 0.01, 32, 0.3).unwrap();
+        let gradient: Vec<f32> = (0..100).map(|j| (i as f32 + j as f32) * 0.01).collect();
+        bridge2
+            .submit_with_proof(&format!("t{}", i), &gradient, 5, 0.01, 32, 0.3)
+            .unwrap();
     }
 
     let result2 = bridge2.aggregate_verified().unwrap();
@@ -232,15 +251,15 @@ fn test_aggregation_methods() {
     assert_eq!(result2.included_count, 5);
 
     // Test 3: Time-Weighted
-    let mut bridge3 = ZKProofFLBridge::new()
-        .with_aggregation(VerifiedAggregationMethod::TimeWeighted);
+    let mut bridge3 =
+        ZKProofFLBridge::new().with_aggregation(VerifiedAggregationMethod::TimeWeighted);
     bridge3.start_round(1, [0x03u8; 32]);
 
     for i in 0..3 {
-        let gradient: Vec<f32> = (0..100)
-            .map(|j| (i as f32 + j as f32) * 0.01)
-            .collect();
-        bridge3.submit_with_proof(&format!("w{}", i), &gradient, 5, 0.01, 32, 0.3).unwrap();
+        let gradient: Vec<f32> = (0..100).map(|j| (i as f32 + j as f32) * 0.01).collect();
+        bridge3
+            .submit_with_proof(&format!("w{}", i), &gradient, 5, 0.01, 32, 0.3)
+            .unwrap();
     }
 
     let result3 = bridge3.aggregate_verified().unwrap();
@@ -268,14 +287,16 @@ fn test_multi_round_fl() {
             let gradient: Vec<f32> = (0..100)
                 .map(|j| ((round + client) as f32 + j as f32) * 0.01)
                 .collect();
-            bridge.submit_with_proof(
-                &format!("client-{}", client),
-                &gradient,
-                round * 5,
-                0.01 / round as f32,
-                64,
-                0.5 / round as f64,
-            ).unwrap();
+            bridge
+                .submit_with_proof(
+                    &format!("client-{}", client),
+                    &gradient,
+                    round * 5,
+                    0.01 / round as f32,
+                    64,
+                    0.5 / round as f64,
+                )
+                .unwrap();
         }
 
         let result = bridge.aggregate_verified().unwrap();
@@ -286,7 +307,10 @@ fn test_multi_round_fl() {
 
     // Verify hash commitments are unique across rounds
     let flat_hashes: Vec<_> = all_hashes.iter().flatten().collect();
-    println!("\nTotal hash commitments across all rounds: {}", flat_hashes.len());
+    println!(
+        "\nTotal hash commitments across all rounds: {}",
+        flat_hashes.len()
+    );
 
     // All hashes should be unique (different gradients)
     let mut unique_hashes = flat_hashes.clone();

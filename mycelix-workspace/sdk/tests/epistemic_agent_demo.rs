@@ -12,23 +12,17 @@
 //! Run with: `cargo test --test epistemic_agent_demo -- --nocapture`
 
 use mycelix_sdk::agentic::{
-    AgentId, InstrumentalActor, AgentStatus, AgentClass, AgentConstraints,
-    ActionOutcome,
-    KVectorBridgeConfig, analyze_behavior, compute_kvector_update,
-    compute_trust_score, calculate_kredit_from_trust,
-    AgentOutput, OutputContent, AgentOutputBuilder,
-    calculate_epistemic_weight,
-    PhiMeasurementConfig, measure_phi_simple, check_coherence_for_action,
-    MoralUncertainty, UncertainOutput,
-    get_recommendations, should_proceed, maybe_escalate,
+    analyze_behavior, calculate_epistemic_weight, calculate_kredit_from_trust,
+    check_coherence_for_action, compute_kvector_update, compute_trust_score, get_recommendations,
+    maybe_escalate, measure_phi_simple, should_proceed, ActionOutcome, AgentClass,
+    AgentConstraints, AgentId, AgentOutput, AgentOutputBuilder, AgentStatus, InstrumentalActor,
+    KVectorBridgeConfig, MoralUncertainty, OutputContent, PhiMeasurementConfig, UncertainOutput,
+};
+use mycelix_sdk::epistemic::{
+    EmpiricalLevel, EpistemicClassification, HarmonicLevel, MaterialityLevel, NormativeLevel,
 };
 use mycelix_sdk::matl::KVector;
-use mycelix_sdk::epistemic::{
-    EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel, EpistemicClassification,
-};
-use mycelix_sdk::storage::{
-    EpistemicStorage, StorageConfig, StoreOptions, SchemaIdentity,
-};
+use mycelix_sdk::storage::{EpistemicStorage, SchemaIdentity, StorageConfig, StoreOptions};
 
 #[test]
 fn demo_complete_epistemic_agent_flow() {
@@ -69,7 +63,10 @@ fn demo_complete_epistemic_agent_flow() {
     println!("Agent ID:      {}", agent.agent_id.as_str());
     println!("Sponsor:       {}", agent.sponsor_did);
     println!("Class:         {:?}", agent.agent_class);
-    println!("KREDIT:        {}/{}", agent.kredit_balance, agent.kredit_cap);
+    println!(
+        "KREDIT:        {}/{}",
+        agent.kredit_balance, agent.kredit_cap
+    );
     println!("Initial K-Vector:");
     print_kvector(&agent.k_vector);
     println!();
@@ -111,9 +108,15 @@ fn demo_complete_epistemic_agent_flow() {
     let analysis = analyze_behavior(&agent.behavior_log);
 
     println!("Behavior Analysis:");
-    println!("  Success Rate:        {:.1}%", analysis.success_rate * 100.0);
+    println!(
+        "  Success Rate:        {:.1}%",
+        analysis.success_rate * 100.0
+    );
     println!("  Violations:          {}", analysis.constraint_violations);
-    println!("  Unique Counterparties: {}", analysis.unique_counterparties);
+    println!(
+        "  Unique Counterparties: {}",
+        analysis.unique_counterparties
+    );
     println!();
 
     let initial_trust = compute_trust_score(&agent.k_vector);
@@ -127,7 +130,10 @@ fn demo_complete_epistemic_agent_flow() {
     let derived_kredit = calculate_kredit_from_trust(trust_score);
 
     println!();
-    println!("Trust Score:       {:.3} (was {:.3})", trust_score, initial_trust);
+    println!(
+        "Trust Score:       {:.3} (was {:.3})",
+        trust_score, initial_trust
+    );
     println!("Derived KREDIT Cap: {}", derived_kredit);
 
     agent.kredit_cap = derived_kredit;
@@ -143,15 +149,36 @@ fn demo_complete_epistemic_agent_flow() {
     println!("{}", "-".repeat(70));
 
     let outputs = vec![
-        create_output("Weather forecast", EmpiricalLevel::E1Testimonial, NormativeLevel::N1Communal, MaterialityLevel::M1Temporal),
-        create_output("SHA256 verification", EmpiricalLevel::E4PublicRepro, NormativeLevel::N3Axiomatic, MaterialityLevel::M3Foundational),
-        create_output("Personal opinion", EmpiricalLevel::E0Null, NormativeLevel::N0Personal, MaterialityLevel::M0Ephemeral),
-        create_output("Signed transaction", EmpiricalLevel::E3Cryptographic, NormativeLevel::N2Network, MaterialityLevel::M2Persistent),
+        create_output(
+            "Weather forecast",
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N1Communal,
+            MaterialityLevel::M1Temporal,
+        ),
+        create_output(
+            "SHA256 verification",
+            EmpiricalLevel::E4PublicRepro,
+            NormativeLevel::N3Axiomatic,
+            MaterialityLevel::M3Foundational,
+        ),
+        create_output(
+            "Personal opinion",
+            EmpiricalLevel::E0Null,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M0Ephemeral,
+        ),
+        create_output(
+            "Signed transaction",
+            EmpiricalLevel::E3Cryptographic,
+            NormativeLevel::N2Network,
+            MaterialityLevel::M2Persistent,
+        ),
     ];
 
     for (i, output) in outputs.iter().enumerate() {
         let weight = calculate_epistemic_weight(&output.classification);
-        println!("Output {}: E{:?} N{:?} M{:?} -> Weight: {:.3}",
+        println!(
+            "Output {}: E{:?} N{:?} M{:?} -> Weight: {:.3}",
             i + 1,
             output.classification.empirical as u8,
             output.classification.normative as u8,
@@ -192,9 +219,15 @@ fn demo_complete_epistemic_agent_flow() {
         // Phi should be a valid measurement
         assert!(phi_result.phi >= 0.0);
     } else {
-        println!("Phi measurement requires at least {} outputs", phi_config.min_outputs);
+        println!(
+            "Phi measurement requires at least {} outputs",
+            phi_config.min_outputs
+        );
         // With 4 outputs, this should succeed
-        assert!(outputs.len() >= phi_config.min_outputs, "Should have enough outputs");
+        assert!(
+            outputs.len() >= phi_config.min_outputs,
+            "Should have enough outputs"
+        );
     }
     println!();
 
@@ -205,16 +238,26 @@ fn demo_complete_epistemic_agent_flow() {
     println!("{}", "-".repeat(70));
 
     let uncertainty = MoralUncertainty::new(0.7, 0.5, 0.8);
-    let uncertain_output: UncertainOutput<String> = UncertainOutput::new(
-        "Medical treatment recommendation".to_string(),
-        uncertainty,
-    );
+    let uncertain_output: UncertainOutput<String> =
+        UncertainOutput::new("Medical treatment recommendation".to_string(), uncertainty);
 
     println!("Uncertain Output: \"{}\"", uncertain_output.output);
-    println!("  Epistemic:   {:.0}%", uncertain_output.uncertainty.epistemic * 100.0);
-    println!("  Axiological: {:.0}%", uncertain_output.uncertainty.axiological * 100.0);
-    println!("  Deontic:     {:.0}%", uncertain_output.uncertainty.deontic * 100.0);
-    println!("  Total:       {:.0}%", uncertain_output.uncertainty.total() * 100.0);
+    println!(
+        "  Epistemic:   {:.0}%",
+        uncertain_output.uncertainty.epistemic * 100.0
+    );
+    println!(
+        "  Axiological: {:.0}%",
+        uncertain_output.uncertainty.axiological * 100.0
+    );
+    println!(
+        "  Deontic:     {:.0}%",
+        uncertain_output.uncertainty.deontic * 100.0
+    );
+    println!(
+        "  Total:       {:.0}%",
+        uncertain_output.uncertainty.total() * 100.0
+    );
     println!("  Guidance:    {:?}", uncertain_output.guidance);
     println!();
 
@@ -247,10 +290,34 @@ fn demo_complete_epistemic_agent_flow() {
     let storage = EpistemicStorage::new(StorageConfig::default());
 
     let test_cases = vec![
-        ("session", EmpiricalLevel::E0Null, NormativeLevel::N0Personal, MaterialityLevel::M0Ephemeral, "Memory"),
-        ("prefs", EmpiricalLevel::E1Testimonial, NormativeLevel::N0Personal, MaterialityLevel::M1Temporal, "Local"),
-        ("doc", EmpiricalLevel::E2PrivateVerify, NormativeLevel::N1Communal, MaterialityLevel::M2Persistent, "DHT"),
-        ("cert", EmpiricalLevel::E3Cryptographic, NormativeLevel::N2Network, MaterialityLevel::M3Foundational, "IPFS"),
+        (
+            "session",
+            EmpiricalLevel::E0Null,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M0Ephemeral,
+            "Memory",
+        ),
+        (
+            "prefs",
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M1Temporal,
+            "Local",
+        ),
+        (
+            "doc",
+            EmpiricalLevel::E2PrivateVerify,
+            NormativeLevel::N1Communal,
+            MaterialityLevel::M2Persistent,
+            "DHT",
+        ),
+        (
+            "cert",
+            EmpiricalLevel::E3Cryptographic,
+            NormativeLevel::N2Network,
+            MaterialityLevel::M3Foundational,
+            "IPFS",
+        ),
     ];
 
     for (key, e, n, m, expected) in test_cases {
@@ -261,11 +328,19 @@ fn demo_complete_epistemic_agent_flow() {
         };
 
         let tier = storage.router().route(&classification);
-        println!("{:8} E{} N{} M{} -> {:?}", key, e as u8, n as u8, m as u8, tier.backend);
+        println!(
+            "{:8} E{} N{} M{} -> {:?}",
+            key, e as u8, n as u8, m as u8, tier.backend
+        );
 
         // Verify routing
         let backend_name = format!("{:?}", tier.backend);
-        assert!(backend_name.contains(expected), "Expected {} for {}", expected, key);
+        assert!(
+            backend_name.contains(expected),
+            "Expected {} for {}",
+            expected,
+            key
+        );
 
         // Store the data
         let options = StoreOptions {
@@ -292,8 +367,10 @@ fn demo_complete_epistemic_agent_flow() {
 }
 
 fn print_kvector(kv: &KVector) {
-    println!("  k_r={:.2} k_a={:.2} k_i={:.2} k_p={:.2} k_m={:.2} k_s={:.2} k_h={:.2} k_topo={:.2}",
-        kv.k_r, kv.k_a, kv.k_i, kv.k_p, kv.k_m, kv.k_s, kv.k_h, kv.k_topo);
+    println!(
+        "  k_r={:.2} k_a={:.2} k_i={:.2} k_p={:.2} k_m={:.2} k_s={:.2} k_h={:.2} k_topo={:.2}",
+        kv.k_r, kv.k_a, kv.k_i, kv.k_p, kv.k_m, kv.k_s, kv.k_h, kv.k_topo
+    );
 }
 
 fn create_output(

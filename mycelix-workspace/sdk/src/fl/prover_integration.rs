@@ -27,16 +27,14 @@
 //! });
 //! ```
 
-use std::time::Instant;
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 use thiserror::Error;
 
 #[cfg(feature = "std")]
 use hex;
 
-use crate::zkproof::{
-    GradientProofReceipt, GradientConstraints,
-};
+use crate::zkproof::{GradientConstraints, GradientProofReceipt};
 
 #[cfg(any(feature = "simulation", feature = "risc0"))]
 use crate::zkproof::GradientProver;
@@ -343,9 +341,14 @@ impl ProverIntegration {
         };
 
         let result = match &self.backend {
-            ProverBackend::Simulation => {
-                self.prove_simulation(gradient, model_hash, epochs, learning_rate, client_id, round)
-            }
+            ProverBackend::Simulation => self.prove_simulation(
+                gradient,
+                model_hash,
+                epochs,
+                learning_rate,
+                client_id,
+                round,
+            ),
             ProverBackend::ExternalService { url, timeout_ms } => {
                 self.prove_external(url, *timeout_ms, &input)
             }
@@ -353,9 +356,14 @@ impl ProverIntegration {
                 self.prove_bonsai(api_key, endpoint.as_deref(), &input)
             }
             #[cfg(feature = "risc0")]
-            ProverBackend::LocalRisc0 => {
-                self.prove_local_risc0(gradient, model_hash, epochs, learning_rate, client_id, round)
-            }
+            ProverBackend::LocalRisc0 => self.prove_local_risc0(
+                gradient,
+                model_hash,
+                epochs,
+                learning_rate,
+                client_id,
+                round,
+            ),
         };
 
         let elapsed_ms = start.elapsed().as_millis() as u64;
@@ -388,7 +396,14 @@ impl ProverIntegration {
 
         let prover = GradientProver::for_federated_learning();
         prover
-            .prove_gradient_quality(gradient, model_hash, epochs, learning_rate, client_id, round)
+            .prove_gradient_quality(
+                gradient,
+                model_hash,
+                epochs,
+                learning_rate,
+                client_id,
+                round,
+            )
             .map_err(|e| ProverIntegrationError::ProofGenerationFailed(e.to_string()))
     }
 
@@ -448,20 +463,24 @@ impl ProverIntegration {
 
             if !proof_response.success {
                 return Err(ProverIntegrationError::ProofGenerationFailed(
-                    proof_response.error.unwrap_or_else(|| "Unknown error".to_string())
+                    proof_response
+                        .error
+                        .unwrap_or_else(|| "Unknown error".to_string()),
                 ));
             }
 
             // Parse gradient hash from hex string to bytes
-            let gradient_hash_bytes = hex::decode(&proof_response.gradient_hash)
-                .map_err(|e| ProverIntegrationError::SerializationError(
-                    format!("Invalid gradient hash hex: {}", e)
-                ))?;
-            let gradient_hash: [u8; 32] = gradient_hash_bytes
-                .try_into()
-                .map_err(|_| ProverIntegrationError::SerializationError(
-                    "Gradient hash must be 32 bytes".to_string()
-                ))?;
+            let gradient_hash_bytes = hex::decode(&proof_response.gradient_hash).map_err(|e| {
+                ProverIntegrationError::SerializationError(format!(
+                    "Invalid gradient hash hex: {}",
+                    e
+                ))
+            })?;
+            let gradient_hash: [u8; 32] = gradient_hash_bytes.try_into().map_err(|_| {
+                ProverIntegrationError::SerializationError(
+                    "Gradient hash must be 32 bytes".to_string(),
+                )
+            })?;
 
             // Construct the output structure
             let output = GradientProofOutput {
@@ -506,7 +525,14 @@ impl ProverIntegration {
             Ok(receipt) => Ok(receipt),
             Err(_) => {
                 // Fall back to simulation if external service fails
-                self.prove_simulation(input.gradient, input.model_hash, input.epochs, input.learning_rate, input.client_id, input.round)
+                self.prove_simulation(
+                    input.gradient,
+                    input.model_hash,
+                    input.epochs,
+                    input.learning_rate,
+                    input.client_id,
+                    input.round,
+                )
             }
         }
     }
@@ -535,9 +561,19 @@ impl ProverIntegration {
                 "[ProverIntegration] Bonsai proving at {} not yet implemented, using simulation",
                 endpoint
             );
-            eprintln!("[ProverIntegration] API key: {}...", &api_key[..8.min(api_key.len())]);
+            eprintln!(
+                "[ProverIntegration] API key: {}...",
+                &api_key[..8.min(api_key.len())]
+            );
 
-            self.prove_simulation(input.gradient, input.model_hash, input.epochs, input.learning_rate, input.client_id, input.round)
+            self.prove_simulation(
+                input.gradient,
+                input.model_hash,
+                input.epochs,
+                input.learning_rate,
+                input.client_id,
+                input.round,
+            )
         }
     }
 
@@ -556,7 +592,14 @@ impl ProverIntegration {
 
         let prover = Risc0GradientProver::new(self.constraints.clone());
         prover
-            .prove(gradient, model_hash, epochs, learning_rate, client_id, round)
+            .prove(
+                gradient,
+                model_hash,
+                epochs,
+                learning_rate,
+                client_id,
+                round,
+            )
             .map_err(|e| ProverIntegrationError::ProofGenerationFailed(e.to_string()))
     }
 
@@ -622,9 +665,7 @@ mod tests {
     use super::*;
 
     fn sample_gradient(size: usize) -> Vec<f32> {
-        (0..size)
-            .map(|i| (i as f32 * 0.01).sin() * 0.5)
-            .collect()
+        (0..size).map(|i| (i as f32 * 0.01).sin() * 0.5).collect()
     }
 
     #[test]
@@ -634,14 +675,7 @@ mod tests {
         let gradient = sample_gradient(100);
         let model_hash = [0x42u8; 32];
 
-        let result = integration.prove_gradient(
-            &gradient,
-            &model_hash,
-            5,
-            0.01,
-            "test-client",
-            1,
-        );
+        let result = integration.prove_gradient(&gradient, &model_hash, 5, 0.01, "test-client", 1);
 
         assert!(result.is_ok());
         let receipt = result.unwrap();
@@ -657,14 +691,7 @@ mod tests {
         let gradient = vec![0.0f32; 100];
         let model_hash = [0x42u8; 32];
 
-        let result = integration.prove_gradient(
-            &gradient,
-            &model_hash,
-            5,
-            0.01,
-            "test-client",
-            1,
-        );
+        let result = integration.prove_gradient(&gradient, &model_hash, 5, 0.01, "test-client", 1);
 
         assert!(result.is_ok());
         let receipt = result.unwrap();

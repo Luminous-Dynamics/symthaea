@@ -90,24 +90,24 @@ pub enum EnergyProof {
         /// Meter reading value
         reading: f64,
         /// Cryptographic signature
-        signature: Vec<u8>
+        signature: Vec<u8>,
     },
     /// Inverter telemetry
     InverterTelemetry {
         /// Telemetry data payload
         data: Vec<u8>,
         /// Cryptographic signature
-        signature: Vec<u8>
+        signature: Vec<u8>,
     },
     /// Utility API confirmation
     UtilityApi {
         /// Confirmation identifier
-        confirmation_id: String
+        confirmation_id: String,
     },
     /// Community witness attestations
     CommunityWitness {
         /// List of witness DIDs
-        witnesses: Vec<String>
+        witnesses: Vec<String>,
     },
 }
 
@@ -141,13 +141,17 @@ impl EnergyOracle {
 
     /// Calculate PoG score for energy attestation
     pub fn calculate_pog(&self, attestation: &EnergyAttestation) -> PogScore {
-        let source = match self.sources.iter().find(|s| s.source_id == attestation.source_id) {
+        let source = match self
+            .sources
+            .iter()
+            .find(|s| s.source_id == attestation.source_id)
+        {
             Some(s) => s,
             None => return PogScore::zero(),
         };
 
-        let period_days = (attestation.period_end - attestation.period_start) as f64
-            / (24.0 * 60.0 * 60.0);
+        let period_days =
+            (attestation.period_end - attestation.period_start) as f64 / (24.0 * 60.0 * 60.0);
         if period_days <= 0.0 {
             return PogScore::zero();
         }

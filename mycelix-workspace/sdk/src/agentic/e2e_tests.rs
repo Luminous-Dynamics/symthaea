@@ -16,17 +16,15 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::matl::KVector;
-    use crate::agentic::{
-        InstrumentalActor, AgentId, AgentClass, AgentStatus, AgentConstraints,
-        EpistemicStats, BehaviorLogEntry, ActionOutcome, UncertaintyCalibration,
-    };
+    use crate::agentic::cross_domain::{translate_trust, DomainRegistry};
     use crate::agentic::kvector_bridge::{
-        update_agent_kvector, KVectorBridgeConfig, calculate_kredit_from_trust,
+        calculate_kredit_from_trust, update_agent_kvector, KVectorBridgeConfig,
     };
-    use crate::agentic::cross_domain::{
-        DomainRegistry, translate_trust,
+    use crate::agentic::{
+        ActionOutcome, AgentClass, AgentConstraints, AgentId, AgentStatus, BehaviorLogEntry,
+        EpistemicStats, InstrumentalActor, UncertaintyCalibration,
     };
+    use crate::matl::KVector;
     use crate::zkproof::trust_risc0::TrustRisc0Prover;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -58,7 +56,11 @@ mod tests {
     }
 
     /// Create a behavior log entry
-    fn create_behavior_entry(action: &str, outcome: ActionOutcome, kredit: u64) -> BehaviorLogEntry {
+    fn create_behavior_entry(
+        action: &str,
+        outcome: ActionOutcome,
+        kredit: u64,
+    ) -> BehaviorLogEntry {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -82,16 +84,16 @@ mod tests {
         // Create agent with initial 10-dimensional K-Vector
         // Including the new k_phi (coherence) dimension
         let initial_kvector = KVector::new(
-            0.7,  // k_r: Reputation
-            0.5,  // k_a: Activity
-            0.8,  // k_i: Integrity
-            0.6,  // k_p: Performance
-            0.3,  // k_m: Membership
-            0.4,  // k_s: Stake
-            0.5,  // k_h: Historical
-            0.3,  // k_topo: Topology
-            0.6,  // k_v: Verification
-            0.5,  // k_phi: Coherence (NEW)
+            0.7, // k_r: Reputation
+            0.5, // k_a: Activity
+            0.8, // k_i: Integrity
+            0.6, // k_p: Performance
+            0.3, // k_m: Membership
+            0.4, // k_s: Stake
+            0.5, // k_h: Historical
+            0.3, // k_topo: Topology
+            0.6, // k_v: Verification
+            0.5, // k_phi: Coherence (NEW)
         );
 
         let agent = create_test_agent("agent-phi-1", initial_kvector);
@@ -101,11 +103,17 @@ mod tests {
         assert_eq!(arr.len(), 10, "K-Vector should have 10 dimensions");
 
         // Verify coherence dimension
-        assert!((agent.k_vector.k_phi - 0.5).abs() < 0.01, "k_phi should be 0.5");
+        assert!(
+            (agent.k_vector.k_phi - 0.5).abs() < 0.01,
+            "k_phi should be 0.5"
+        );
 
         // Verify trust score calculation includes all dimensions
         let trust_score = agent.k_vector.trust_score();
-        assert!(trust_score > 0.0 && trust_score < 1.0, "Trust score should be normalized");
+        assert!(
+            trust_score > 0.0 && trust_score < 1.0,
+            "Trust score should be normalized"
+        );
 
         // KREDIT cap should derive from trust
         let derived_kredit = calculate_kredit_from_trust(trust_score);
@@ -123,9 +131,7 @@ mod tests {
 
     #[test]
     fn test_phase2_kvector_update_from_behavior() {
-        let initial_kvector = KVector::new(
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-        );
+        let initial_kvector = KVector::new(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5);
         let mut agent = create_test_agent("agent-phi-2", initial_kvector);
 
         // Record positive behavior
@@ -148,8 +154,12 @@ mod tests {
         let new_trust = agent.k_vector.trust_score();
 
         // Positive behavior should improve trust
-        assert!(new_trust >= old_trust,
-            "Trust should improve with positive behavior: {} >= {}", new_trust, old_trust);
+        assert!(
+            new_trust >= old_trust,
+            "Trust should improve with positive behavior: {} >= {}",
+            new_trust,
+            old_trust
+        );
 
         // KREDIT cap should increase with trust
         let new_kredit_cap = calculate_kredit_from_trust(new_trust);
@@ -166,40 +176,44 @@ mod tests {
 
     #[test]
     fn test_phase3_zk_trust_attestation() {
-        let kvector = KVector::new(
-            0.8, 0.6, 0.9, 0.7, 0.5, 0.4, 0.6, 0.5, 0.75, 0.7,
-        );
+        let kvector = KVector::new(0.8, 0.6, 0.9, 0.7, 0.5, 0.4, 0.6, 0.5, 0.75, 0.7);
         let agent = create_test_agent("agent-phi-3", kvector);
 
         // Create ZK prover (simulation mode)
         let prover = TrustRisc0Prover::new_simulation();
 
         // Prove trust exceeds threshold WITHOUT revealing actual values
-        let proof = prover.prove_trust_exceeds_threshold(
-            &agent.k_vector,
-            0.5,
-            agent.agent_id.as_str(),
-        ).expect("Proof should succeed");
+        let proof = prover
+            .prove_trust_exceeds_threshold(&agent.k_vector, 0.5, agent.agent_id.as_str())
+            .expect("Proof should succeed");
 
         assert!(proof.output.statement_valid, "Statement should be valid");
         assert!(prover.verify(&proof), "Proof should verify");
 
         // The commitment hides the actual K-Vector values
         let commitment = proof.output.kvector_commitment;
-        assert!(commitment.iter().any(|&b| b != 0), "Commitment should not be zero");
+        assert!(
+            commitment.iter().any(|&b| b != 0),
+            "Commitment should not be zero"
+        );
 
         // Prove coherence without revealing k_phi value
-        let coherence_proof = prover.prove_is_coherent(
-            &agent.k_vector,
-            agent.agent_id.as_str(),
-        ).expect("Coherence proof should succeed");
+        let coherence_proof = prover
+            .prove_is_coherent(&agent.k_vector, agent.agent_id.as_str())
+            .expect("Coherence proof should succeed");
 
-        assert!(coherence_proof.output.statement_valid, "Agent should be coherent");
+        assert!(
+            coherence_proof.output.statement_valid,
+            "Agent should be coherent"
+        );
 
         println!("✓ Phase 3: ZK trust attestation generated");
         println!("  Trust > 0.5: {}", proof.output.statement_valid);
         println!("  Coherent: {}", coherence_proof.output.statement_valid);
-        println!("  Commitment: {:02x}{:02x}...", commitment[0], commitment[1]);
+        println!(
+            "  Commitment: {:02x}{:02x}...",
+            commitment[0], commitment[1]
+        );
         println!("  Proof time: {}ms", proof.proof_time_ms);
     }
 
@@ -209,36 +223,48 @@ mod tests {
 
     #[test]
     fn test_phase4_cross_domain_translation() {
-        let kvector = KVector::new(
-            0.8, 0.6, 0.9, 0.7, 0.5, 0.4, 0.6, 0.5, 0.75, 0.7,
-        );
+        let kvector = KVector::new(0.8, 0.6, 0.9, 0.7, 0.5, 0.4, 0.6, 0.5, 0.75, 0.7);
         let agent = create_test_agent("agent-phi-4", kvector);
 
         // Get domain registry with predefined domains
         let registry = DomainRegistry::with_defaults();
 
-        let code_review = registry.get("code_review").expect("Code review domain should exist");
-        let financial = registry.get("financial").expect("Financial domain should exist");
+        let code_review = registry
+            .get("code_review")
+            .expect("Code review domain should exist");
+        let financial = registry
+            .get("financial")
+            .expect("Financial domain should exist");
 
         // Translate trust from code review to financial domain
         let translation = translate_trust(&agent.k_vector, code_review, financial);
 
         // Financial domain is more demanding
-        assert!(translation.target_trust <= translation.source_trust,
-            "Financial trust should be <= code review trust");
+        assert!(
+            translation.target_trust <= translation.source_trust,
+            "Financial trust should be <= code review trust"
+        );
 
-        assert!(translation.translation_confidence > 0.0,
-            "Translation should have positive confidence");
+        assert!(
+            translation.translation_confidence > 0.0,
+            "Translation should have positive confidence"
+        );
 
         // Check dimension translations (now 10 dimensions)
-        assert_eq!(translation.dimension_translations.len(), 10,
-            "Should translate all 10 dimensions");
+        assert_eq!(
+            translation.dimension_translations.len(),
+            10,
+            "Should translate all 10 dimensions"
+        );
 
         println!("✓ Phase 4: Cross-domain trust translation");
         println!("  Source (code_review): {:.3}", translation.source_trust);
         println!("  Target (financial): {:.3}", translation.target_trust);
         println!("  Confidence: {:.3}", translation.translation_confidence);
-        println!("  Meets requirements: {}", translation.meets_target_requirements);
+        println!(
+            "  Meets requirements: {}",
+            translation.meets_target_requirements
+        );
     }
 
     // ========================================================================
@@ -248,24 +274,35 @@ mod tests {
     #[test]
     fn test_phase5_coherence_dimension() {
         // Test the new k_phi dimension
-        let high_coherence = KVector::new(
-            0.7, 0.6, 0.8, 0.7, 0.5, 0.4, 0.6, 0.5, 0.7, 0.85,
-        );
-        let low_coherence = KVector::new(
-            0.7, 0.6, 0.8, 0.7, 0.5, 0.4, 0.6, 0.5, 0.7, 0.2,
-        );
+        let high_coherence = KVector::new(0.7, 0.6, 0.8, 0.7, 0.5, 0.4, 0.6, 0.5, 0.7, 0.85);
+        let low_coherence = KVector::new(0.7, 0.6, 0.8, 0.7, 0.5, 0.4, 0.6, 0.5, 0.7, 0.2);
 
         // High coherence agent
-        assert!(high_coherence.is_highly_coherent(), "Should be highly coherent");
-        assert!(high_coherence.coherence_level() > 0.8, "Coherence should be high");
+        assert!(
+            high_coherence.is_highly_coherent(),
+            "Should be highly coherent"
+        );
+        assert!(
+            high_coherence.coherence_level() > 0.8,
+            "Coherence should be high"
+        );
 
         // Low coherence agent
-        assert!(!low_coherence.is_highly_coherent(), "Should not be highly coherent");
-        assert!(low_coherence.coherence_level() < 0.3, "Coherence should be low");
+        assert!(
+            !low_coherence.is_highly_coherent(),
+            "Should not be highly coherent"
+        );
+        assert!(
+            low_coherence.coherence_level() < 0.3,
+            "Coherence should be low"
+        );
 
         // Update coherence
         let updated = low_coherence.with_coherence(0.9);
-        assert!(updated.is_highly_coherent(), "Updated should be highly coherent");
+        assert!(
+            updated.is_highly_coherent(),
+            "Updated should be highly coherent"
+        );
 
         println!("✓ Phase 5: Coherence dimension validated");
         println!("  High coherence k_phi: {:.2}", high_coherence.k_phi);
@@ -285,9 +322,7 @@ mod tests {
 
         // === STEP 1: Create Agent with Initial K-Vector ===
         println!("─── Step 1: Agent Creation ───");
-        let initial_kvector = KVector::new(
-            0.6, 0.4, 0.7, 0.5, 0.3, 0.4, 0.5, 0.3, 0.5, 0.5,
-        );
+        let initial_kvector = KVector::new(0.6, 0.4, 0.7, 0.5, 0.3, 0.4, 0.5, 0.3, 0.5, 0.5);
         let mut agent = create_test_agent("epistemic-agent-001", initial_kvector);
         println!("  Created agent: {}", agent.agent_id.as_str());
         println!("  Initial trust: {:.3}", agent.k_vector.trust_score());
@@ -297,7 +332,11 @@ mod tests {
         println!("\n─── Step 2: Behavior → K-Vector ───");
         for i in 0..10 {
             agent.behavior_log.push(create_behavior_entry(
-                if i % 2 == 0 { "contribution" } else { "validation" },
+                if i % 2 == 0 {
+                    "contribution"
+                } else {
+                    "validation"
+                },
                 ActionOutcome::Success,
                 15,
             ));
@@ -308,7 +347,10 @@ mod tests {
         update_agent_kvector(&mut agent, &kv_config);
         let post_update_trust = agent.k_vector.trust_score();
         println!("  Behaviors recorded: {}", agent.behavior_log.len());
-        println!("  Trust: {:.3} → {:.3}", pre_update_trust, post_update_trust);
+        println!(
+            "  Trust: {:.3} → {:.3}",
+            pre_update_trust, post_update_trust
+        );
 
         // === STEP 3: Update Coherence Based on Output Consistency ===
         println!("\n─── Step 3: Coherence Update ───");
@@ -322,23 +364,31 @@ mod tests {
         println!("\n─── Step 4: ZK Trust Attestation ───");
         let prover = TrustRisc0Prover::new_simulation();
 
-        let trust_proof = prover.prove_trust_exceeds_threshold(
-            &agent.k_vector, 0.5, agent.agent_id.as_str()
-        ).expect("Trust proof failed");
+        let trust_proof = prover
+            .prove_trust_exceeds_threshold(&agent.k_vector, 0.5, agent.agent_id.as_str())
+            .expect("Trust proof failed");
 
-        let coherence_proof = prover.prove_is_coherent(
-            &agent.k_vector, agent.agent_id.as_str()
-        ).expect("Coherence proof failed");
+        let coherence_proof = prover
+            .prove_is_coherent(&agent.k_vector, agent.agent_id.as_str())
+            .expect("Coherence proof failed");
 
-        println!("  Trust > 0.5: {} (proof verified: {})",
-            trust_proof.output.statement_valid, prover.verify(&trust_proof));
-        println!("  Highly coherent: {} (proof verified: {})",
-            coherence_proof.output.statement_valid, prover.verify(&coherence_proof));
-        println!("  Commitment: {:02x}{:02x}{:02x}{:02x}...",
+        println!(
+            "  Trust > 0.5: {} (proof verified: {})",
+            trust_proof.output.statement_valid,
+            prover.verify(&trust_proof)
+        );
+        println!(
+            "  Highly coherent: {} (proof verified: {})",
+            coherence_proof.output.statement_valid,
+            prover.verify(&coherence_proof)
+        );
+        println!(
+            "  Commitment: {:02x}{:02x}{:02x}{:02x}...",
             trust_proof.output.kvector_commitment[0],
             trust_proof.output.kvector_commitment[1],
             trust_proof.output.kvector_commitment[2],
-            trust_proof.output.kvector_commitment[3]);
+            trust_proof.output.kvector_commitment[3]
+        );
 
         // === STEP 5: Domain Translation ===
         println!("\n─── Step 5: Domain Translation ───");
@@ -356,10 +406,22 @@ mod tests {
         println!("\n╔══════════════════════════════════════════════════════════════╗");
         println!("║                      SUMMARY                                 ║");
         println!("╠══════════════════════════════════════════════════════════════╣");
-        println!("║  Agent: {}                           ║", agent.agent_id.as_str());
-        println!("║  Final Trust Score: {:.3}                                    ║", agent.k_vector.trust_score());
-        println!("║  Coherence (k_phi): {:.3}                                    ║", agent.k_vector.k_phi);
-        println!("║  Behaviors Logged: {}                                        ║", agent.behavior_log.len());
+        println!(
+            "║  Agent: {}                           ║",
+            agent.agent_id.as_str()
+        );
+        println!(
+            "║  Final Trust Score: {:.3}                                    ║",
+            agent.k_vector.trust_score()
+        );
+        println!(
+            "║  Coherence (k_phi): {:.3}                                    ║",
+            agent.k_vector.k_phi
+        );
+        println!(
+            "║  Behaviors Logged: {}                                        ║",
+            agent.behavior_log.len()
+        );
         println!("║  ZK Proofs Generated: 2 (trust + coherence)                  ║");
         println!("║  Domain Translations: 10 dimensions                          ║");
         println!("╚══════════════════════════════════════════════════════════════╝\n");
@@ -377,12 +439,8 @@ mod tests {
 
     #[test]
     fn test_phase6_fl_agent_integration() {
-        use crate::agentic::fl_bridge::{
-            FLAgentBridge, FLAgentBridgeConfig, FLRoundAgentImpact,
-        };
-        use crate::fl::matl_feedback::{
-            FLMatlFeedback, KVectorDelta, FeedbackStats,
-        };
+        use crate::agentic::fl_bridge::{FLAgentBridge, FLAgentBridgeConfig, FLRoundAgentImpact};
+        use crate::fl::matl_feedback::{FLMatlFeedback, FeedbackStats, KVectorDelta};
         use std::collections::HashMap;
 
         println!("\n─── Phase 6: FL → Agent Integration ───");
@@ -391,15 +449,17 @@ mod tests {
         let mut agents: HashMap<String, InstrumentalActor> = HashMap::new();
 
         // Good agent with moderate trust
-        let good_agent = create_test_agent("fl-agent-good", KVector::new(
-            0.6, 0.5, 0.7, 0.6, 0.4, 0.3, 0.5, 0.3, 0.5, 0.6,
-        ));
+        let good_agent = create_test_agent(
+            "fl-agent-good",
+            KVector::new(0.6, 0.5, 0.7, 0.6, 0.4, 0.3, 0.5, 0.3, 0.5, 0.6),
+        );
         agents.insert("fl-agent-good".to_string(), good_agent);
 
         // Byzantine agent with moderate trust
-        let bad_agent = create_test_agent("fl-agent-bad", KVector::new(
-            0.6, 0.5, 0.7, 0.6, 0.4, 0.3, 0.5, 0.3, 0.5, 0.4,
-        ));
+        let bad_agent = create_test_agent(
+            "fl-agent-bad",
+            KVector::new(0.6, 0.5, 0.7, 0.6, 0.4, 0.3, 0.5, 0.3, 0.5, 0.4),
+        );
         agents.insert("fl-agent-bad".to_string(), bad_agent);
 
         // Capture initial states
@@ -413,30 +473,36 @@ mod tests {
         let mut kvector_deltas = HashMap::new();
 
         // Good agent contributed high quality gradients
-        kvector_deltas.insert("fl-agent-good".to_string(), KVectorDelta {
-            participant_id: "fl-agent-good".to_string(),
-            reputation_delta: 0.03,
-            activity_delta: 0.01,
-            integrity_delta: 0.02,
-            performance_delta: 0.02,
-            historical_delta: 0.01,
-            coherence_delta: 0.0,
-            reason: "High quality gradient contribution".to_string(),
-            is_penalty: false,
-        });
+        kvector_deltas.insert(
+            "fl-agent-good".to_string(),
+            KVectorDelta {
+                participant_id: "fl-agent-good".to_string(),
+                reputation_delta: 0.03,
+                activity_delta: 0.01,
+                integrity_delta: 0.02,
+                performance_delta: 0.02,
+                historical_delta: 0.01,
+                coherence_delta: 0.0,
+                reason: "High quality gradient contribution".to_string(),
+                is_penalty: false,
+            },
+        );
 
         // Bad agent detected as Byzantine
-        kvector_deltas.insert("fl-agent-bad".to_string(), KVectorDelta {
-            participant_id: "fl-agent-bad".to_string(),
-            reputation_delta: -0.08,
-            activity_delta: 0.0,
-            integrity_delta: -0.05,
-            performance_delta: -0.03,
-            historical_delta: -0.02,
-            coherence_delta: -0.02,
-            reason: "Byzantine behavior detected".to_string(),
-            is_penalty: true,
-        });
+        kvector_deltas.insert(
+            "fl-agent-bad".to_string(),
+            KVectorDelta {
+                participant_id: "fl-agent-bad".to_string(),
+                reputation_delta: -0.08,
+                activity_delta: 0.0,
+                integrity_delta: -0.05,
+                performance_delta: -0.03,
+                historical_delta: -0.02,
+                coherence_delta: -0.02,
+                reason: "Byzantine behavior detected".to_string(),
+                is_penalty: true,
+            },
+        );
 
         let feedback = FLMatlFeedback {
             round_id: 42,
@@ -473,18 +539,30 @@ mod tests {
         let good_final_trust = agents["fl-agent-good"].k_vector.trust_score();
         let bad_final_trust = agents["fl-agent-bad"].k_vector.trust_score();
 
-        println!("  Final good agent trust: {:.3} (Δ{:+.3})",
-            good_final_trust, good_final_trust - good_initial_trust);
-        println!("  Final bad agent trust: {:.3} (Δ{:+.3})",
-            bad_final_trust, bad_final_trust - bad_initial_trust);
-        println!("  Impact: {} improved, {} degraded",
-            impact.trust_improved, impact.trust_degraded);
+        println!(
+            "  Final good agent trust: {:.3} (Δ{:+.3})",
+            good_final_trust,
+            good_final_trust - good_initial_trust
+        );
+        println!(
+            "  Final bad agent trust: {:.3} (Δ{:+.3})",
+            bad_final_trust,
+            bad_final_trust - bad_initial_trust
+        );
+        println!(
+            "  Impact: {} improved, {} degraded",
+            impact.trust_improved, impact.trust_degraded
+        );
 
         // Assertions
-        assert!(good_final_trust > good_initial_trust,
-            "Good agent trust should increase");
-        assert!(bad_final_trust < bad_initial_trust,
-            "Bad agent trust should decrease");
+        assert!(
+            good_final_trust > good_initial_trust,
+            "Good agent trust should increase"
+        );
+        assert!(
+            bad_final_trust < bad_initial_trust,
+            "Bad agent trust should decrease"
+        );
         assert_eq!(impact.agents_affected, 2);
         assert_eq!(impact.trust_improved, 1);
         assert_eq!(impact.trust_degraded, 1);
@@ -500,9 +578,7 @@ mod tests {
     fn test_phase7_full_pipeline() {
         use crate::agentic::fl_bridge::{FLAgentBridge, FLAgentBridgeConfig};
         use crate::agentic::kredit::calculate_kredit_cap_from_trust;
-        use crate::fl::matl_feedback::{
-            FLMatlFeedback, KVectorDelta, FeedbackStats,
-        };
+        use crate::fl::matl_feedback::{FLMatlFeedback, FeedbackStats, KVectorDelta};
         use std::collections::HashMap;
 
         println!("\n╔══════════════════════════════════════════════════════════════╗");
@@ -510,14 +586,14 @@ mod tests {
         println!("╚══════════════════════════════════════════════════════════════╝\n");
 
         // Create agent
-        let mut agent = create_test_agent("pipeline-agent", KVector::new(
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5,
-        ));
+        let mut agent = create_test_agent(
+            "pipeline-agent",
+            KVector::new(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5),
+        );
 
         // Set initial KREDIT cap from trust
-        let initial_cap = calculate_kredit_cap_from_trust(
-            &agent.k_vector, agent.agent_class, 0.8
-        ).unwrap();
+        let initial_cap =
+            calculate_kredit_cap_from_trust(&agent.k_vector, agent.agent_class, 0.8).unwrap();
         agent.kredit_cap = initial_cap;
 
         println!("─── Initial State ───");
@@ -536,17 +612,20 @@ mod tests {
         println!("\n─── FL Round Participation ───");
         for round in 1..=5 {
             let mut kvector_deltas = HashMap::new();
-            kvector_deltas.insert("pipeline-agent".to_string(), KVectorDelta {
-                participant_id: "pipeline-agent".to_string(),
-                reputation_delta: 0.02,
-                activity_delta: 0.01,
-                integrity_delta: 0.01,
-                performance_delta: 0.015,
-                historical_delta: 0.005,
-                coherence_delta: 0.01,
-                reason: format!("Round {} contribution", round),
-                is_penalty: false,
-            });
+            kvector_deltas.insert(
+                "pipeline-agent".to_string(),
+                KVectorDelta {
+                    participant_id: "pipeline-agent".to_string(),
+                    reputation_delta: 0.02,
+                    activity_delta: 0.01,
+                    integrity_delta: 0.01,
+                    performance_delta: 0.015,
+                    historical_delta: 0.005,
+                    coherence_delta: 0.01,
+                    reason: format!("Round {} contribution", round),
+                    is_penalty: false,
+                },
+            );
 
             let feedback = FLMatlFeedback {
                 round_id: round,
@@ -556,11 +635,14 @@ mod tests {
             };
 
             let result = bridge.apply_feedback(&mut agent, &feedback, 0.8).unwrap();
-            println!("  Round {}: trust {:.3} → {:.3}, KREDIT {} → {}",
+            println!(
+                "  Round {}: trust {:.3} → {:.3}, KREDIT {} → {}",
                 round,
-                result.trust_before, result.trust_after,
+                result.trust_before,
+                result.trust_after,
                 result.kredit_cap_before.unwrap_or(0),
-                result.kredit_cap_after.unwrap_or(0));
+                result.kredit_cap_after.unwrap_or(0)
+            );
         }
 
         println!("\n─── Final State ───");
@@ -572,17 +654,28 @@ mod tests {
 
         // Verify improvement
         let final_cap = agent.kredit_cap;
-        assert!(final_cap > initial_cap,
-            "KREDIT cap should increase: {} > {}", final_cap, initial_cap);
-        assert!(agent.k_vector.trust_score() > 0.5,
-            "Trust should be above initial 0.5");
+        assert!(
+            final_cap > initial_cap,
+            "KREDIT cap should increase: {} > {}",
+            final_cap,
+            initial_cap
+        );
+        assert!(
+            agent.k_vector.trust_score() > 0.5,
+            "Trust should be above initial 0.5"
+        );
 
         println!("\n╔══════════════════════════════════════════════════════════════╗");
         println!("║  PIPELINE VERIFIED                                            ║");
-        println!("║  Trust improved: {:.3} → {:.3}                              ║",
-            0.5, agent.k_vector.trust_score());
-        println!("║  KREDIT increased: {} → {}                             ║",
-            initial_cap, final_cap);
+        println!(
+            "║  Trust improved: {:.3} → {:.3}                              ║",
+            0.5,
+            agent.k_vector.trust_score()
+        );
+        println!(
+            "║  KREDIT increased: {} → {}                             ║",
+            initial_cap, final_cap
+        );
         println!("╚══════════════════════════════════════════════════════════════╝\n");
     }
 }

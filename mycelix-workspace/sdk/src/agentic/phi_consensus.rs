@@ -19,15 +19,14 @@
 //! - **Coherence-Boosted Confidence**: Higher collective Phi = higher confidence
 //! - **Harmonic Weight**: trust × phi_contribution × epistemic_factors
 
+use super::multi_agent::{AgentVote, ConsensusConfig, ConsensusResult};
+use super::phi_integration::{
+    measure_collective_phi, CollectiveCoherenceLevel, CollectivePhiResult,
+};
+use super::{AgentStatus, InstrumentalActor};
+use crate::matl::KVector;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::{InstrumentalActor, AgentStatus};
-use super::multi_agent::{AgentVote, ConsensusResult, ConsensusConfig};
-use super::phi_integration::{
-    CollectivePhiResult, CollectiveCoherenceLevel,
-    measure_collective_phi,
-};
-use crate::matl::KVector;
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -143,7 +142,8 @@ pub fn compute_phi_contributions(
     agents: &HashMap<String, InstrumentalActor>,
     config: &PhiConsensusConfig,
 ) -> (CollectivePhiResult, HashMap<String, PhiContribution>) {
-    let active_agents: Vec<&InstrumentalActor> = agents.values()
+    let active_agents: Vec<&InstrumentalActor> = agents
+        .values()
         .filter(|a| a.status == AgentStatus::Active)
         .collect();
 
@@ -186,13 +186,16 @@ pub fn compute_phi_contributions(
 
         let is_divergent = contribution < config.divergence_threshold;
 
-        contributions.insert(agent_id.clone(), PhiContribution {
-            agent_id,
-            contribution,
-            alignment,
-            is_divergent,
-            individual_phi,
-        });
+        contributions.insert(
+            agent_id.clone(),
+            PhiContribution {
+                agent_id,
+                contribution,
+                alignment,
+                is_divergent,
+                individual_phi,
+            },
+        );
     }
 
     (collective, contributions)
@@ -236,14 +239,19 @@ fn compute_kvector_centroid(agents: &[&InstrumentalActor]) -> KVector {
 fn compute_individual_phi(agent: &InstrumentalActor) -> f64 {
     let kv = &agent.k_vector;
     let values = [
-        kv.k_r as f64, kv.k_a as f64, kv.k_i as f64, kv.k_p as f64,
-        kv.k_m as f64, kv.k_s as f64, kv.k_h as f64, kv.k_topo as f64,
+        kv.k_r as f64,
+        kv.k_a as f64,
+        kv.k_i as f64,
+        kv.k_p as f64,
+        kv.k_m as f64,
+        kv.k_s as f64,
+        kv.k_h as f64,
+        kv.k_topo as f64,
     ];
 
     let mean: f64 = values.iter().sum::<f64>() / values.len() as f64;
-    let variance: f64 = values.iter()
-        .map(|v| (v - mean).powi(2))
-        .sum::<f64>() / values.len() as f64;
+    let variance: f64 =
+        values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
 
     (1.0 - variance.sqrt().min(1.0)).max(0.0)
 }
@@ -251,15 +259,29 @@ fn compute_individual_phi(agent: &InstrumentalActor) -> f64 {
 /// Compute alignment between two K-Vectors using normalized Euclidean distance
 /// Returns value in [0, 1] where 1 = identical, 0 = maximally different
 fn kvector_alignment(a: &KVector, b: &KVector) -> f64 {
-    let av = [a.k_r as f64, a.k_a as f64, a.k_i as f64, a.k_p as f64,
-              a.k_m as f64, a.k_s as f64, a.k_h as f64, a.k_topo as f64];
-    let bv = [b.k_r as f64, b.k_a as f64, b.k_i as f64, b.k_p as f64,
-              b.k_m as f64, b.k_s as f64, b.k_h as f64, b.k_topo as f64];
+    let av = [
+        a.k_r as f64,
+        a.k_a as f64,
+        a.k_i as f64,
+        a.k_p as f64,
+        a.k_m as f64,
+        a.k_s as f64,
+        a.k_h as f64,
+        a.k_topo as f64,
+    ];
+    let bv = [
+        b.k_r as f64,
+        b.k_a as f64,
+        b.k_i as f64,
+        b.k_p as f64,
+        b.k_m as f64,
+        b.k_s as f64,
+        b.k_h as f64,
+        b.k_topo as f64,
+    ];
 
     // Compute Euclidean distance
-    let squared_dist: f64 = av.iter().zip(&bv)
-        .map(|(x, y)| (x - y).powi(2))
-        .sum();
+    let squared_dist: f64 = av.iter().zip(&bv).map(|(x, y)| (x - y).powi(2)).sum();
     let distance = squared_dist.sqrt();
 
     // Maximum possible distance (corner to corner of 8D unit hypercube)
@@ -351,10 +373,12 @@ pub fn compute_phi_weighted_consensus(
             consensus: empty_consensus_result(votes.len()),
             collective_phi,
             status: PhiConsensusStatus::DeferredLowCoherence,
-            phi_contributions: phi_contributions.iter()
+            phi_contributions: phi_contributions
+                .iter()
                 .map(|(k, v)| (k.clone(), v.contribution))
                 .collect(),
-            divergent_agents: phi_contributions.iter()
+            divergent_agents: phi_contributions
+                .iter()
                 .filter(|(_, v)| v.is_divergent)
                 .map(|(k, _)| k.clone())
                 .collect(),
@@ -370,10 +394,12 @@ pub fn compute_phi_weighted_consensus(
                 consensus: empty_consensus_result(votes.len()),
                 collective_phi,
                 status: PhiConsensusStatus::DeferredCoherenceLevelNotMet,
-                phi_contributions: phi_contributions.iter()
+                phi_contributions: phi_contributions
+                    .iter()
                     .map(|(k, v)| (k.clone(), v.contribution))
                     .collect(),
-                divergent_agents: phi_contributions.iter()
+                divergent_agents: phi_contributions
+                    .iter()
                     .filter(|(_, v)| v.is_divergent)
                     .map(|(k, _)| k.clone())
                     .collect(),
@@ -387,7 +413,8 @@ pub fn compute_phi_weighted_consensus(
     let valid_votes: Vec<_> = votes
         .iter()
         .filter(|v| {
-            agents.get(&v.agent_id)
+            agents
+                .get(&v.agent_id)
                 .map(|a| a.k_vector.trust_score() >= config.base_config.min_trust_threshold)
                 .unwrap_or(false)
         })
@@ -398,7 +425,8 @@ pub fn compute_phi_weighted_consensus(
             consensus: empty_consensus_result(valid_votes.len()),
             collective_phi,
             status: PhiConsensusStatus::InsufficientParticipants,
-            phi_contributions: phi_contributions.iter()
+            phi_contributions: phi_contributions
+                .iter()
                 .map(|(k, v)| (k.clone(), v.contribution))
                 .collect(),
             divergent_agents: vec![],
@@ -423,12 +451,14 @@ pub fn compute_phi_weighted_consensus(
                 .unwrap_or(0.5);
 
             // Epistemic and confidence bonuses
-            let epistemic_bonus = (vote.epistemic_level as f64 / 4.0) * config.base_config.epistemic_weight;
+            let epistemic_bonus =
+                (vote.epistemic_level as f64 / 4.0) * config.base_config.epistemic_weight;
             let confidence_bonus = vote.confidence * config.base_config.confidence_weight;
 
             // HARMONIC WEIGHT: trust × phi_contribution × (1 + bonuses)
             let harmonic_weight = trust
-                * (1.0 - config.phi_contribution_weight + config.phi_contribution_weight * phi_contrib)
+                * (1.0 - config.phi_contribution_weight
+                    + config.phi_contribution_weight * phi_contrib)
                 * (1.0 + epistemic_bonus + confidence_bonus);
 
             harmonic_weights.insert(vote.agent_id.clone(), harmonic_weight);
@@ -442,7 +472,8 @@ pub fn compute_phi_weighted_consensus(
             consensus: empty_consensus_result(valid_votes.len()),
             collective_phi,
             status: PhiConsensusStatus::InsufficientParticipants,
-            phi_contributions: phi_contributions.iter()
+            phi_contributions: phi_contributions
+                .iter()
                 .map(|(k, v)| (k.clone(), v.contribution))
                 .collect(),
             divergent_agents: vec![],
@@ -452,16 +483,15 @@ pub fn compute_phi_weighted_consensus(
     }
 
     // Step 6: Compute weighted consensus value
-    let consensus_value: f64 = weighted_values
-        .iter()
-        .map(|(_, w, v)| w * v)
-        .sum::<f64>() / total_weight;
+    let consensus_value: f64 =
+        weighted_values.iter().map(|(_, w, v)| w * v).sum::<f64>() / total_weight;
 
     // Step 7: Compute dissent
     let variance: f64 = weighted_values
         .iter()
         .map(|(_, w, v)| w * (v - consensus_value).powi(2))
-        .sum::<f64>() / total_weight;
+        .sum::<f64>()
+        / total_weight;
     let dissent = variance.sqrt().min(1.0);
 
     // Step 8: Compute contributions
@@ -484,7 +514,8 @@ pub fn compute_phi_weighted_consensus(
     let status = if !consensus_reached {
         PhiConsensusStatus::FailedHighDissent
     } else if collective_phi.coherence_level == CollectiveCoherenceLevel::Fragmented
-           || collective_phi.coherence_level == CollectiveCoherenceLevel::WeaklyCoordinated {
+        || collective_phi.coherence_level == CollectiveCoherenceLevel::WeaklyCoordinated
+    {
         PhiConsensusStatus::ReachedLowCoherence
     } else {
         PhiConsensusStatus::Reached
@@ -509,7 +540,8 @@ pub fn compute_phi_weighted_consensus(
         },
         collective_phi,
         status,
-        phi_contributions: phi_contributions.iter()
+        phi_contributions: phi_contributions
+            .iter()
             .map(|(k, v)| (k.clone(), v.contribution))
             .collect(),
         divergent_agents,
@@ -547,7 +579,8 @@ pub fn get_recommendation(result: &PhiConsensusResult) -> PhiConsensusRecommenda
     match result.status {
         PhiConsensusStatus::Reached => PhiConsensusRecommendation::Proceed,
         PhiConsensusStatus::ReachedLowCoherence => PhiConsensusRecommendation::ProceedWithCaution {
-            reason: "Low collective coherence - decision may not reflect unified perspective".to_string(),
+            reason: "Low collective coherence - decision may not reflect unified perspective"
+                .to_string(),
         },
         PhiConsensusStatus::DeferredLowCoherence => PhiConsensusRecommendation::Defer {
             reason: format!(
@@ -588,14 +621,14 @@ pub enum PhiConsensusRecommendation {
     /// Proceed but with additional scrutiny
     ProceedWithCaution {
         /// Reason for caution
-        reason: String
+        reason: String,
     },
     /// Defer decision until coherence improves
     Defer {
         /// Reason for deferral
         reason: String,
         /// Suggested wait time in seconds
-        suggested_wait: u64
+        suggested_wait: u64,
     },
     /// Wait for more participants
     Wait {
@@ -604,12 +637,12 @@ pub enum PhiConsensusRecommendation {
         /// Required number of participants
         required: usize,
         /// Current number of participants
-        current: usize
+        current: usize,
     },
     /// Escalate to human oversight
     Escalate {
         /// Reason for escalation
-        reason: String
+        reason: String,
     },
 }
 
@@ -621,7 +654,7 @@ pub enum PhiConsensusRecommendation {
 mod tests {
     use super::*;
     use crate::agentic::UncertaintyCalibration;
-    use crate::agentic::{AgentId, AgentClass, AgentConstraints, EpistemicStats};
+    use crate::agentic::{AgentClass, AgentConstraints, AgentId, EpistemicStats};
     use crate::matl::KVector;
 
     fn create_test_agent(id: &str, k_vector: KVector) -> InstrumentalActor {
@@ -650,18 +683,27 @@ mod tests {
         let mut agents = HashMap::new();
 
         // Create similar agents (should have high alignment)
-        agents.insert("a1".to_string(), create_test_agent(
-            "a1",
-            KVector::new(0.7, 0.6, 0.8, 0.7, 0.3, 0.4, 0.6, 0.3, 0.7, 0.65),
-        ));
-        agents.insert("a2".to_string(), create_test_agent(
-            "a2",
-            KVector::new(0.75, 0.65, 0.82, 0.72, 0.32, 0.42, 0.62, 0.32, 0.72, 0.7),
-        ));
-        agents.insert("a3".to_string(), create_test_agent(
-            "a3",
-            KVector::new(0.68, 0.58, 0.78, 0.68, 0.28, 0.38, 0.58, 0.28, 0.68, 0.6),
-        ));
+        agents.insert(
+            "a1".to_string(),
+            create_test_agent(
+                "a1",
+                KVector::new(0.7, 0.6, 0.8, 0.7, 0.3, 0.4, 0.6, 0.3, 0.7, 0.65),
+            ),
+        );
+        agents.insert(
+            "a2".to_string(),
+            create_test_agent(
+                "a2",
+                KVector::new(0.75, 0.65, 0.82, 0.72, 0.32, 0.42, 0.62, 0.32, 0.72, 0.7),
+            ),
+        );
+        agents.insert(
+            "a3".to_string(),
+            create_test_agent(
+                "a3",
+                KVector::new(0.68, 0.58, 0.78, 0.68, 0.28, 0.38, 0.58, 0.28, 0.68, 0.6),
+            ),
+        );
 
         let config = PhiConsensusConfig::default();
         let (collective, contributions) = compute_phi_contributions(&agents, &config);
@@ -682,24 +724,36 @@ mod tests {
         let mut agents = HashMap::new();
 
         // Three similar high-value agents
-        agents.insert("a1".to_string(), create_test_agent(
-            "a1",
-            KVector::new(0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8),
-        ));
-        agents.insert("a2".to_string(), create_test_agent(
-            "a2",
-            KVector::new(0.82, 0.78, 0.81, 0.79, 0.81, 0.80, 0.79, 0.82, 0.80, 0.8),
-        ));
-        agents.insert("a3".to_string(), create_test_agent(
-            "a3",
-            KVector::new(0.79, 0.81, 0.80, 0.80, 0.79, 0.81, 0.80, 0.79, 0.80, 0.8),
-        ));
+        agents.insert(
+            "a1".to_string(),
+            create_test_agent(
+                "a1",
+                KVector::new(0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8),
+            ),
+        );
+        agents.insert(
+            "a2".to_string(),
+            create_test_agent(
+                "a2",
+                KVector::new(0.82, 0.78, 0.81, 0.79, 0.81, 0.80, 0.79, 0.82, 0.80, 0.8),
+            ),
+        );
+        agents.insert(
+            "a3".to_string(),
+            create_test_agent(
+                "a3",
+                KVector::new(0.79, 0.81, 0.80, 0.80, 0.79, 0.81, 0.80, 0.79, 0.80, 0.8),
+            ),
+        );
 
         // One agent with very low values (different magnitude = lower cosine similarity with centroid)
-        agents.insert("divergent".to_string(), create_test_agent(
-            "divergent",
-            KVector::new(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1),
-        ));
+        agents.insert(
+            "divergent".to_string(),
+            create_test_agent(
+                "divergent",
+                KVector::new(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1),
+            ),
+        );
 
         let config = PhiConsensusConfig::default();
         let (_, contributions) = compute_phi_contributions(&agents, &config);
@@ -709,9 +763,12 @@ mod tests {
         let a1 = contributions.get("a1").unwrap();
 
         // Divergent should have lower contribution than aligned agents
-        assert!(divergent.contribution < a1.contribution,
+        assert!(
+            divergent.contribution < a1.contribution,
             "Divergent contribution ({}) should be less than aligned ({})",
-            divergent.contribution, a1.contribution);
+            divergent.contribution,
+            a1.contribution
+        );
     }
 
     #[test]
@@ -721,21 +778,26 @@ mod tests {
         // Create aligned agents with high trust
         for i in 0..5 {
             let id = format!("agent-{}", i);
-            agents.insert(id.clone(), create_test_agent(
-                &id,
-                KVector::new(0.7, 0.6, 0.8, 0.7, 0.5, 0.5, 0.6, 0.5, 0.7, 0.65),
-            ));
+            agents.insert(
+                id.clone(),
+                create_test_agent(
+                    &id,
+                    KVector::new(0.7, 0.6, 0.8, 0.7, 0.5, 0.5, 0.6, 0.5, 0.7, 0.65),
+                ),
+            );
         }
 
         // Create votes that mostly agree
-        let votes: Vec<AgentVote> = (0..5).map(|i| AgentVote {
-            agent_id: format!("agent-{}", i),
-            value: 0.7 + (i as f64 * 0.02), // Slight variation
-            confidence: 0.8,
-            epistemic_level: 3,
-            reasoning: None,
-            timestamp: 1000,
-        }).collect();
+        let votes: Vec<AgentVote> = (0..5)
+            .map(|i| AgentVote {
+                agent_id: format!("agent-{}", i),
+                value: 0.7 + (i as f64 * 0.02), // Slight variation
+                confidence: 0.8,
+                epistemic_level: 3,
+                reasoning: None,
+                timestamp: 1000,
+            })
+            .collect();
 
         let config = PhiConsensusConfig::default();
         let result = compute_phi_weighted_consensus(&votes, &agents, &config);
@@ -752,35 +814,52 @@ mod tests {
 
         // Create agents with very different K-Vector patterns (low inter-agent alignment)
         // Each agent has different peaks in different dimensions
-        agents.insert("a0".to_string(), create_test_agent(
-            "a0",
-            KVector::new(0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2),
-        ));
-        agents.insert("a1".to_string(), create_test_agent(
-            "a1",
-            KVector::new(0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2),
-        ));
-        agents.insert("a2".to_string(), create_test_agent(
-            "a2",
-            KVector::new(0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2),
-        ));
-        agents.insert("a3".to_string(), create_test_agent(
-            "a3",
-            KVector::new(0.1, 0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2),
-        ));
-        agents.insert("a4".to_string(), create_test_agent(
-            "a4",
-            KVector::new(0.1, 0.1, 0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.2, 0.2),
-        ));
+        agents.insert(
+            "a0".to_string(),
+            create_test_agent(
+                "a0",
+                KVector::new(0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2),
+            ),
+        );
+        agents.insert(
+            "a1".to_string(),
+            create_test_agent(
+                "a1",
+                KVector::new(0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2),
+            ),
+        );
+        agents.insert(
+            "a2".to_string(),
+            create_test_agent(
+                "a2",
+                KVector::new(0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2),
+            ),
+        );
+        agents.insert(
+            "a3".to_string(),
+            create_test_agent(
+                "a3",
+                KVector::new(0.1, 0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2),
+            ),
+        );
+        agents.insert(
+            "a4".to_string(),
+            create_test_agent(
+                "a4",
+                KVector::new(0.1, 0.1, 0.1, 0.1, 0.9, 0.1, 0.1, 0.1, 0.2, 0.2),
+            ),
+        );
 
-        let votes: Vec<AgentVote> = (0..5).map(|i| AgentVote {
-            agent_id: format!("a{}", i),
-            value: 0.5,
-            confidence: 0.8,
-            epistemic_level: 2,
-            reasoning: None,
-            timestamp: 1000,
-        }).collect();
+        let votes: Vec<AgentVote> = (0..5)
+            .map(|i| AgentVote {
+                agent_id: format!("a{}", i),
+                value: 0.5,
+                confidence: 0.8,
+                epistemic_level: 2,
+                reasoning: None,
+                timestamp: 1000,
+            })
+            .collect();
 
         // Use config with threshold we know will fail based on the divergent agents
         let config = PhiConsensusConfig {
@@ -797,7 +876,8 @@ mod tests {
         assert!(
             matches!(result.status, PhiConsensusStatus::DeferredLowCoherence),
             "Expected DeferredLowCoherence, got {:?} with population_phi={:.3}",
-            result.status, result.collective_phi.population_phi
+            result.status,
+            result.collective_phi.population_phi
         );
     }
 
@@ -806,31 +886,43 @@ mod tests {
         let mut agents = HashMap::new();
 
         // High-trust, high-alignment agent
-        agents.insert("aligned".to_string(), create_test_agent(
-            "aligned",
-            KVector::new(0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8),
-        ));
+        agents.insert(
+            "aligned".to_string(),
+            create_test_agent(
+                "aligned",
+                KVector::new(0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8),
+            ),
+        );
 
         // High-trust but divergent agent
-        agents.insert("divergent".to_string(), create_test_agent(
-            "divergent",
-            KVector::new(0.8, 0.2, 0.8, 0.2, 0.8, 0.2, 0.8, 0.2, 0.5, 0.4),
-        ));
+        agents.insert(
+            "divergent".to_string(),
+            create_test_agent(
+                "divergent",
+                KVector::new(0.8, 0.2, 0.8, 0.2, 0.8, 0.2, 0.8, 0.2, 0.5, 0.4),
+            ),
+        );
 
         // Medium agent for baseline
-        agents.insert("medium".to_string(), create_test_agent(
-            "medium",
-            KVector::new(0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75),
-        ));
+        agents.insert(
+            "medium".to_string(),
+            create_test_agent(
+                "medium",
+                KVector::new(0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75),
+            ),
+        );
 
-        let votes: Vec<AgentVote> = vec!["aligned", "divergent", "medium"].iter().map(|id| AgentVote {
-            agent_id: id.to_string(),
-            value: 0.6,
-            confidence: 0.8,
-            epistemic_level: 3,
-            reasoning: None,
-            timestamp: 1000,
-        }).collect();
+        let votes: Vec<AgentVote> = vec!["aligned", "divergent", "medium"]
+            .iter()
+            .map(|id| AgentVote {
+                agent_id: id.to_string(),
+                value: 0.6,
+                confidence: 0.8,
+                epistemic_level: 3,
+                reasoning: None,
+                timestamp: 1000,
+            })
+            .collect();
 
         let config = PhiConsensusConfig::default();
         let result = compute_phi_weighted_consensus(&votes, &agents, &config);
@@ -847,20 +939,25 @@ mod tests {
         let mut agents = HashMap::new();
         for i in 0..3 {
             let id = format!("a{}", i);
-            agents.insert(id.clone(), create_test_agent(
-                &id,
-                KVector::new(0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6),
-            ));
+            agents.insert(
+                id.clone(),
+                create_test_agent(
+                    &id,
+                    KVector::new(0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6),
+                ),
+            );
         }
 
-        let votes: Vec<AgentVote> = (0..3).map(|i| AgentVote {
-            agent_id: format!("a{}", i),
-            value: 0.5,
-            confidence: 0.7,
-            epistemic_level: 2,
-            reasoning: None,
-            timestamp: 1000,
-        }).collect();
+        let votes: Vec<AgentVote> = (0..3)
+            .map(|i| AgentVote {
+                agent_id: format!("a{}", i),
+                value: 0.5,
+                confidence: 0.7,
+                epistemic_level: 2,
+                reasoning: None,
+                timestamp: 1000,
+            })
+            .collect();
 
         let config = PhiConsensusConfig::default();
         let result = compute_phi_weighted_consensus(&votes, &agents, &config);
@@ -868,7 +965,8 @@ mod tests {
         let recommendation = get_recommendation(&result);
         assert!(matches!(
             recommendation,
-            PhiConsensusRecommendation::Proceed | PhiConsensusRecommendation::ProceedWithCaution { .. }
+            PhiConsensusRecommendation::Proceed
+                | PhiConsensusRecommendation::ProceedWithCaution { .. }
         ));
     }
 }

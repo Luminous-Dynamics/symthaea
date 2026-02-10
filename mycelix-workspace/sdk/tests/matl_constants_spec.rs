@@ -8,11 +8,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use mycelix_sdk::matl::{
-    DEFAULT_BYZANTINE_THRESHOLD,
-    DEFAULT_CONSISTENCY_WEIGHT,
-    DEFAULT_QUALITY_WEIGHT,
-    DEFAULT_REPUTATION_WEIGHT,
-    MAX_BYZANTINE_TOLERANCE,
+    DEFAULT_BYZANTINE_THRESHOLD, DEFAULT_CONSISTENCY_WEIGHT, DEFAULT_QUALITY_WEIGHT,
+    DEFAULT_REPUTATION_WEIGHT, MAX_BYZANTINE_TOLERANCE,
 };
 
 fn load_spec() -> HashMap<String, f64> {
@@ -95,4 +92,3 @@ fn matl_constants_match_shared_spec() {
         "DEFAULT_BYZANTINE_THRESHOLD",
     );
 }
-

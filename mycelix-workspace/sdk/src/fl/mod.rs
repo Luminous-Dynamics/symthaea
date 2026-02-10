@@ -38,50 +38,66 @@
 //! coordinator.submit_update(update);
 //! ```
 
-mod types;
+mod advanced_integrations;
 mod aggregation;
 mod coordinator;
-mod serialization;
-mod hyperfeel_bridge;
-mod zkproof_bridge;
-mod rbbft_bridge;
-mod unified_zkrbbft_bridge;
 mod epistemic_fl_bridge;
-mod advanced_integrations;
-pub mod plugin_adapters;
+mod hyperfeel_bridge;
 pub mod matl_feedback;
+pub mod plugin_adapters;
 pub mod prover_integration;
+mod rbbft_bridge;
+mod serialization;
+mod types;
 pub mod unified_pipeline;
+mod unified_zkrbbft_bridge;
+mod zkproof_bridge;
 
 #[cfg(test)]
 mod byzantine_stress_tests;
 
-pub use types::{
-    GradientUpdate, GradientMetadata, AggregatedGradient,
-    Participant, FLRound, RoundStatus, AggregationMethod, FLConfig,
-};
 pub use aggregation::{
-    fedavg, trimmed_mean, coordinate_median, krum, trust_weighted_aggregation,
-    euclidean_distance, validate_gradient_consistency, AggregationError,
-    // Performance optimizations
-    GradientAccumulator, ByzantineDetectionResult, EarlyByzantineDetector,
-    fedavg_optimized, aggregate_with_early_termination, GradientStats,
-    // Multi-signal Byzantine detection (addresses adaptive adversary simulation finding)
-    MultiSignalByzantineDetector, MultiSignalDetectionResult, SignalBreakdown,
-    SignalWeights, DetectionStats, aggregate_with_multi_signal_detection,
+    aggregate_with_early_termination,
+    aggregate_with_multi_signal_detection,
+    coordinate_median,
+    euclidean_distance,
+    fedavg,
+    fedavg_optimized,
+    krum,
+    trimmed_mean,
+    trust_weighted_aggregation,
+    validate_gradient_consistency,
+    AdaptiveAggregationResult,
     // Adaptive aggregation with automatic method selection
-    AdaptiveAggregator, AdaptiveAggregatorConfig, AdaptiveAggregationResult,
-    AdaptiveAggregatorStats, ParticipantBehavior,
+    AdaptiveAggregator,
+    AdaptiveAggregatorConfig,
+    AdaptiveAggregatorStats,
+    AggregationError,
+    ByzantineDetectionResult,
+    DetectionStats,
+    EarlyByzantineDetector,
+    // Performance optimizations
+    GradientAccumulator,
+    GradientStats,
+    // Multi-signal Byzantine detection (addresses adaptive adversary simulation finding)
+    MultiSignalByzantineDetector,
+    MultiSignalDetectionResult,
+    ParticipantBehavior,
+    SignalBreakdown,
+    SignalWeights,
 };
 pub use coordinator::FLCoordinator;
-pub use serialization::{
-    serialize_gradients, deserialize_gradients,
-    SerializedGradientUpdate, SerializedAggregatedGradient,
-};
 pub use hyperfeel_bridge::{
-    HyperFeelFLBridge, HyperFeelFLConfig, HyperFeelFLCoordinator,
-    CompressedSubmission, ByzantineAnalysis, CompressionStats,
-    AggregatedHyperGradient, HVAggregationMethod,
+    AggregatedHyperGradient, ByzantineAnalysis, CompressedSubmission, CompressionStats,
+    HVAggregationMethod, HyperFeelFLBridge, HyperFeelFLConfig, HyperFeelFLCoordinator,
+};
+pub use serialization::{
+    deserialize_gradients, serialize_gradients, SerializedAggregatedGradient,
+    SerializedGradientUpdate,
+};
+pub use types::{
+    AggregatedGradient, AggregationMethod, FLConfig, FLRound, GradientMetadata, GradientUpdate,
+    Participant, RoundStatus,
 };
 // ZKProofFLBridge requires simulation or risc0 feature
 #[cfg(any(feature = "simulation", feature = "risc0"))]
@@ -89,14 +105,14 @@ pub use zkproof_bridge::ZKProofFLBridge;
 
 // Types that don't require prover features
 pub use zkproof_bridge::{
-    ProvenGradientUpdate, ZKFLStats, ZKFLError,
-    VerifiedAggregationMethod, VerifiedAggregationResult,
+    ProvenGradientUpdate, VerifiedAggregationMethod, VerifiedAggregationResult, ZKFLError,
+    ZKFLStats,
 };
 
 // RB-BFT integration for 34% validated Byzantine tolerance
 pub use rbbft_bridge::{
-    RbbftFLBridge, RbbftFLConfig, RbbftFLError, RbbftFLStats,
-    RbbftParticipant, RbbftVote, RoundState as RbbftRoundState, RoundInfo as RbbftRoundInfo,
+    RbbftFLBridge, RbbftFLConfig, RbbftFLError, RbbftFLStats, RbbftParticipant, RbbftVote,
+    RoundInfo as RbbftRoundInfo, RoundState as RbbftRoundState,
 };
 
 // Unified ZK + RB-BFT integration (ZK proofs + 34% validated Byzantine tolerance)
@@ -104,89 +120,132 @@ pub use rbbft_bridge::{
 pub use unified_zkrbbft_bridge::UnifiedZkRbbftBridge;
 
 pub use unified_zkrbbft_bridge::{
-    UnifiedZkRbbftConfig, UnifiedZkRbbftError, UnifiedZkRbbftStats,
-    UnifiedParticipant, ProvenSubmission, UnifiedRoundState, UnifiedRoundInfo,
-    UnifiedAggregationResult,
+    ProvenSubmission, UnifiedAggregationResult, UnifiedParticipant, UnifiedRoundInfo,
+    UnifiedRoundState, UnifiedZkRbbftConfig, UnifiedZkRbbftError, UnifiedZkRbbftStats,
 };
 
 // Epistemic-weighted FL integration (E-N-M-H classification for gradients)
 pub use epistemic_fl_bridge::{
-    GradientEpistemicClassification, EpistemicGradientUpdate,
-    GradientClassificationHints, classify_gradient,
-    EpistemicAggregationResult, epistemic_weighted_aggregation,
-    EpistemicAggregationError, RoundEpistemicStats, EpistemicQualityTier,
-    // Byzantine attack classification with epistemic dimensions
-    ByzantineAttackType, ByzantineScope, EpistemicByzantineResult,
-    KVectorPenalties, classify_byzantine_attack, classify_byzantine_batch,
-    // Agent behavioral feedback loop (FL → K-Vector)
-    FLRoundFeedback, ParticipantFeedback, KVectorUpdates, compute_round_feedback,
+    analyze_byzantine_with_phi,
+    check_phi_participation,
+    classify_byzantine_attack,
+    classify_byzantine_batch,
+    classify_gradient,
+    compute_round_feedback,
+    epistemic_weighted_aggregation,
+    phi_filter_updates,
     // Phi-gated Byzantine detection
-    phi_thresholds, PhiParticipationResult, PhiRecommendation,
-    check_phi_participation, PhiAwareByzantineAnalysis,
-    PhiByzantineClassification, PhiByzantineAction,
-    analyze_byzantine_with_phi, phi_filter_updates,
+    phi_thresholds,
+    // Byzantine attack classification with epistemic dimensions
+    ByzantineAttackType,
+    ByzantineScope,
+    EpistemicAggregationError,
+    EpistemicAggregationResult,
+    EpistemicByzantineResult,
+    EpistemicGradientUpdate,
+    EpistemicQualityTier,
+    // Agent behavioral feedback loop (FL → K-Vector)
+    FLRoundFeedback,
+    GradientClassificationHints,
+    GradientEpistemicClassification,
+    KVectorPenalties,
+    KVectorUpdates,
+    ParticipantFeedback,
+    PhiAwareByzantineAnalysis,
+    PhiByzantineAction,
+    PhiByzantineClassification,
+    PhiParticipationResult,
+    PhiRecommendation,
+    RoundEpistemicStats,
 };
 
 // Advanced integrations (#175-180)
 pub use advanced_integrations::{
-    // #175: HyperFeel for agent communication
-    CompressedAgentState, AgentCompressionConfig, compress_agent_state,
-    compute_state_similarity, CompressedConsensusResult, compute_compressed_consensus,
-    // #176: DKG quality claims
-    FLQualityClaim, QualityEvidence, QualityAttestation,
+    build_gradient_merkle_tree,
+    check_pog_participation,
+    compress_agent_state,
+    compute_compressed_consensus,
+    compute_state_similarity,
+    create_round_archive,
+    generate_merkle_proof,
     // #177: PoG-weighted FL participation
-    pog_thresholds, PogParticipant, PogVerificationLevel, PogParticipationResult,
-    check_pog_participation, PogWeightedResult, pog_weighted_aggregation,
-    // #178: Cross-domain ZK proofs
-    GradientContributionProof, ZkProofData, ZkProofType,
-    CrossDomainVerification, CrossDomainCredits, verify_cross_domain_proof,
-    // #179: Temporal commitment-backed FL
-    FLTemporalCommitment, CommitmentTier, CommitmentStatus,
+    pog_thresholds,
+    pog_weighted_aggregation,
+    verify_cross_domain_proof,
+    verify_merkle_proof,
+    AgentCompressionConfig,
+    CommitmentStatus,
+    CommitmentTier,
+    // #175: HyperFeel for agent communication
+    CompressedAgentState,
+    CompressedConsensusResult,
+    CrossDomainCredits,
+    CrossDomainVerification,
+    FLMerkleLeaf,
     // #180: Storage-backed FL immutability
-    FLMerkleNode, FLMerkleLeaf, FLRoundArchive, StorageReceipt, StorageBackend,
-    build_gradient_merkle_tree, create_round_archive,
-    generate_merkle_proof, verify_merkle_proof,
+    FLMerkleNode,
+    // #176: DKG quality claims
+    FLQualityClaim,
+    FLRoundArchive,
+    // #179: Temporal commitment-backed FL
+    FLTemporalCommitment,
+    // #178: Cross-domain ZK proofs
+    GradientContributionProof,
+    PogParticipant,
+    PogParticipationResult,
+    PogVerificationLevel,
+    PogWeightedResult,
+    QualityAttestation,
+    QualityEvidence,
+    StorageBackend,
+    StorageReceipt,
+    ZkProofData,
+    ZkProofType,
 };
 
 // Unified FL Pipeline (shared with Symthaea via mycelix-fl-core)
-pub use unified_pipeline::{
-    UnifiedPipelineF64, PipelineConfigF64, PipelineResultF64,
-};
+pub use unified_pipeline::{PipelineConfigF64, PipelineResultF64, UnifiedPipelineF64};
 
 // Re-export core pipeline types for direct access
 pub use mycelix_fl_core::{
-    pipeline::{UnifiedPipeline, PipelineConfig, PipelineResult, PipelineStats,
-               ExternalWeightMap, ParticipantWeightAdjustment},
-    privacy::{DifferentialPrivacyConfig, RdpBudgetTracker, PrivacyReport},
-    hybrid_bft::{HybridBftConfig, HybridAggregationResult},
-    byzantine::{MultiSignalByzantineDetector as CoreMultiSignalDetector},
-    types::{MAX_BYZANTINE_TOLERANCE},
+    byzantine::MultiSignalByzantineDetector as CoreMultiSignalDetector,
+    hybrid_bft::{HybridAggregationResult, HybridBftConfig},
+    pipeline::{
+        ExternalWeightMap, ParticipantWeightAdjustment, PipelineConfig, PipelineResult,
+        PipelineStats, UnifiedPipeline,
+    },
+    privacy::{DifferentialPrivacyConfig, PrivacyReport, RdpBudgetTracker},
+    types::MAX_BYZANTINE_TOLERANCE,
 };
 
 // Plugin adapters (wrap SDK bridges as core plugin traits)
-pub use plugin_adapters::{
-    HyperFeelCompressionPlugin, ChecksumVerificationPlugin, EpistemicByzantinePlugin,
-    MatlByzantinePlugin, HyperFeelByzantinePlugin,
-};
 #[cfg(any(feature = "simulation", feature = "risc0"))]
 pub use plugin_adapters::ZkVerificationPlugin;
+pub use plugin_adapters::{
+    ChecksumVerificationPlugin, EpistemicByzantinePlugin, HyperFeelByzantinePlugin,
+    HyperFeelCompressionPlugin, MatlByzantinePlugin,
+};
 
 // Re-export core plugin traits and types for ergonomic use
-pub use mycelix_fl_core::plugins::{
-    CompressionPlugin, ByzantinePlugin, VerificationPlugin,
-    CompressedGradient, VerificationResult as PluginVerificationResult,
-    PipelinePlugins,
-};
 pub use mycelix_fl_core::pipeline::PluginPipelineResult;
+pub use mycelix_fl_core::plugins::{
+    ByzantinePlugin, CompressedGradient, CompressionPlugin, PipelinePlugins, VerificationPlugin,
+    VerificationResult as PluginVerificationResult,
+};
 
 // MATL Feedback Loop (#184-185)
 pub use matl_feedback::{
+    FLMatlFeedback,
+    FeedbackStats,
+    GradientQualityConfig,
     // Gradient quality signals
-    GradientQualitySignals, GradientQualityConfig, QualityTier,
+    GradientQualitySignals,
     // K-Vector delta application
     KVectorDelta,
     // MATL feedback computation
-    MatlFeedbackComputer, MatlFeedbackConfig, FLMatlFeedback, FeedbackStats,
+    MatlFeedbackComputer,
+    MatlFeedbackConfig,
+    QualityTier,
 };
 
 /// Default FL configuration

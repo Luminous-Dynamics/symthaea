@@ -62,55 +62,50 @@
 //! - RB-BFT consensus protects against coordinated misinformation
 //! - PoGQ validation scores contribute to claim confidence
 
-pub mod confidence;
 pub mod attestation;
-pub mod query;
+pub mod confidence;
+pub mod contradictions;
+pub mod discovery_engine;
 pub mod phi_integration;
 pub mod phi_query_router;
-pub mod contradictions;
-pub mod query_index;
 pub mod propagation_engine;
-pub mod discovery_engine;
+pub mod query;
+pub mod query_index;
 
-pub use confidence::{
-    calculate_confidence, ConfidenceScore, ConfidenceFactors,
-    ConfidenceThresholds, ConfidenceInput, meets_threshold,
-};
-pub use phi_integration::{
-    CoherenceState, ConsciousnessMetrics, PhiConfidenceFactors,
-    phi_to_confidence_boost, apply_phi_to_confidence,
-    apply_consciousness_to_confidence, coherence_allows_operation,
-};
 pub use attestation::{
-    Attestation, AttestationType, AttestationSet, AttestationCounts, AttestationError,
-    PublicKeyRegistry, InMemoryKeyRegistry,
+    Attestation, AttestationCounts, AttestationError, AttestationSet, AttestationType,
+    InMemoryKeyRegistry, PublicKeyRegistry,
 };
-pub use query::{
-    QueryFilter, ObjectFilter, query_by_subject, query_by_predicate, query_triples,
-    WeightedQueryResult, AgentKreditBalance, KreditQueryExecutor, KreditQueryResult,
-    QueryCostPreview,
-};
-pub use phi_query_router::{
-    PhiQueryRouter, QueryRouterConfig, PhiQuery, PhiQueryResult,
-    QueryType, QueryRoutingDecision, QueryRestriction,
-    CoherenceWeightedResult, QueryCostDeduction, deduct_query_cost,
+pub use confidence::{
+    calculate_confidence, meets_threshold, ConfidenceFactors, ConfidenceInput, ConfidenceScore,
+    ConfidenceThresholds,
 };
 pub use contradictions::{
-    ContradictionDetector, ContradictionAnalysis, Contradiction,
-    ContradictionType, ContradictionConfig,
-};
-pub use query_index::{
-    TripleIndex, IndexStats, PaginatedResult, QueryCache, QueryCacheStats, CachedTripleIndex,
-};
-pub use propagation_engine::{
-    PropagationEngine, PropagationEngineConfig, PropagationResult,
-    PropagationPath, PropagationNode, PropagationStats,
-    ConfidencePropagation, InferenceRule, InferenceResult,
+    Contradiction, ContradictionAnalysis, ContradictionConfig, ContradictionDetector,
+    ContradictionType,
 };
 pub use discovery_engine::{
-    DiscoveryEngine, DiscoveryEngineConfig, DiscoveryResult,
-    KnowledgeGap, GapType, DiscoverySuggestion, SuggestionType,
-    DiscoveryStats, PatternMatch, SemanticCluster, RegisterTripleInput,
+    DiscoveryEngine, DiscoveryEngineConfig, DiscoveryResult, DiscoveryStats, DiscoverySuggestion,
+    GapType, KnowledgeGap, PatternMatch, RegisterTripleInput, SemanticCluster, SuggestionType,
+};
+pub use phi_integration::{
+    apply_consciousness_to_confidence, apply_phi_to_confidence, coherence_allows_operation,
+    phi_to_confidence_boost, CoherenceState, ConsciousnessMetrics, PhiConfidenceFactors,
+};
+pub use phi_query_router::{
+    deduct_query_cost, CoherenceWeightedResult, PhiQuery, PhiQueryResult, PhiQueryRouter,
+    QueryCostDeduction, QueryRestriction, QueryRouterConfig, QueryRoutingDecision, QueryType,
+};
+pub use propagation_engine::{
+    ConfidencePropagation, InferenceResult, InferenceRule, PropagationEngine,
+    PropagationEngineConfig, PropagationNode, PropagationPath, PropagationResult, PropagationStats,
+};
+pub use query::{
+    query_by_predicate, query_by_subject, query_triples, AgentKreditBalance, KreditQueryExecutor,
+    KreditQueryResult, ObjectFilter, QueryCostPreview, QueryFilter, WeightedQueryResult,
+};
+pub use query_index::{
+    CachedTripleIndex, IndexStats, PaginatedResult, QueryCache, QueryCacheStats, TripleIndex,
 };
 
 use serde::{Deserialize, Serialize};
@@ -232,11 +227,7 @@ pub struct VerifiableTriple {
 
 impl VerifiableTriple {
     /// Create a new verifiable triple
-    pub fn new(
-        subject: impl Into<String>,
-        predicate: impl Into<URI>,
-        object: TripleValue,
-    ) -> Self {
+    pub fn new(subject: impl Into<String>, predicate: impl Into<URI>, object: TripleValue) -> Self {
         Self {
             subject: subject.into(),
             predicate: predicate.into(),
@@ -389,18 +380,12 @@ mod tests {
         );
         assert!(valid.validate().is_ok());
 
-        let empty_subject = VerifiableTriple::new(
-            "",
-            "predicate:type",
-            TripleValue::String("value".into()),
-        );
+        let empty_subject =
+            VerifiableTriple::new("", "predicate:type", TripleValue::String("value".into()));
         assert!(empty_subject.validate().is_err());
 
-        let empty_predicate = VerifiableTriple::new(
-            "subject",
-            "",
-            TripleValue::String("value".into()),
-        );
+        let empty_predicate =
+            VerifiableTriple::new("subject", "", TripleValue::String("value".into()));
         assert!(empty_predicate.validate().is_err());
     }
 

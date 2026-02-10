@@ -119,7 +119,9 @@ impl ResourceBalance {
             ResourceType::Compute => self.compute = value,
             ResourceType::Storage => self.storage = value,
             ResourceType::Bandwidth => self.bandwidth = value,
-            ResourceType::Custom(name) => { self.custom.insert(name.clone(), value); }
+            ResourceType::Custom(name) => {
+                self.custom.insert(name.clone(), value);
+            }
         }
     }
 
@@ -223,12 +225,16 @@ impl MetabolicProcess {
 
     /// Calculate net resource change from this process
     pub fn net_change(&self, resource: &ResourceType) -> f64 {
-        let input: f64 = self.inputs.iter()
+        let input: f64 = self
+            .inputs
+            .iter()
             .filter(|(r, _)| r == resource)
             .map(|(_, a)| a)
             .sum();
 
-        let output: f64 = self.outputs.iter()
+        let output: f64 = self
+            .outputs
+            .iter()
             .filter(|(r, _)| r == resource)
             .map(|(_, a)| a * self.efficiency)
             .sum();
@@ -313,9 +319,7 @@ impl MetabolismState {
 
         // Update rate
         let rate_key = format!("{:?}", flow.resource_type);
-        let rate = self.rates
-            .entry(rate_key)
-            .or_default();
+        let rate = self.rates.entry(rate_key).or_default();
         rate.update(&flow, 1.0); // Assume 1 hour window
 
         // Store in history
@@ -364,9 +368,13 @@ impl MetabolismState {
         // Determine status - check extreme conditions first
         self.health_status = if self.balances.kredit < 0.0 {
             MetabolicHealthStatus::Starving
-        } else if self.balances.kredit > 10000.0 && self.rates.get("Kredit")
-            .map(|r| r.outflow_rate < 10.0)
-            .unwrap_or(false) {
+        } else if self.balances.kredit > 10000.0
+            && self
+                .rates
+                .get("Kredit")
+                .map(|r| r.outflow_rate < 10.0)
+                .unwrap_or(false)
+        {
             MetabolicHealthStatus::Hoarding
         } else if health >= 0.8 {
             MetabolicHealthStatus::Healthy
@@ -484,7 +492,8 @@ impl MetabolismEngine {
     pub fn record_flow(&mut self, flow: ResourceFlow) {
         // Update source agent
         if let Some(ref source) = flow.source {
-            let state = self.agents
+            let state = self
+                .agents
                 .entry(source.clone())
                 .or_insert_with(|| MetabolismState::new(source.clone()));
 
@@ -497,7 +506,8 @@ impl MetabolismEngine {
 
         // Update destination agent
         if let Some(ref dest) = flow.destination {
-            let state = self.agents
+            let state = self
+                .agents
                 .entry(dest.clone())
                 .or_insert_with(|| MetabolismState::new(dest.clone()));
 
@@ -548,13 +558,19 @@ impl MetabolismEngine {
     /// Get global metabolism statistics
     pub fn stats(&self) -> MetabolismStats {
         let total_agents = self.agents.len();
-        let healthy_agents = self.agents.values()
+        let healthy_agents = self
+            .agents
+            .values()
             .filter(|s| s.health_status == MetabolicHealthStatus::Healthy)
             .count();
-        let starving_agents = self.agents.values()
+        let starving_agents = self
+            .agents
+            .values()
             .filter(|s| s.health_status == MetabolicHealthStatus::Starving)
             .count();
-        let hoarding_agents = self.agents.values()
+        let hoarding_agents = self
+            .agents
+            .values()
             .filter(|s| s.health_status == MetabolicHealthStatus::Hoarding)
             .count();
 
@@ -580,12 +596,16 @@ impl MetabolismEngine {
         let mut suggestions = Vec::new();
 
         // Find hoarding agents
-        let hoarders: Vec<_> = self.agents.iter()
+        let hoarders: Vec<_> = self
+            .agents
+            .iter()
             .filter(|(_, s)| s.health_status == MetabolicHealthStatus::Hoarding)
             .collect();
 
         // Find starving agents
-        let starving: Vec<_> = self.agents.iter()
+        let starving: Vec<_> = self
+            .agents
+            .iter()
             .filter(|(_, s)| s.health_status == MetabolicHealthStatus::Starving)
             .collect();
 

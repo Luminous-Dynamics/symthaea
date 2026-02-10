@@ -12,21 +12,17 @@
 
 use std::collections::HashMap;
 
-use mycelix_fl_core::convert;
 use mycelix_fl_core::pipeline::{ExternalWeightMap, ParticipantWeightAdjustment};
 use mycelix_fl_core::plugins::{
-    ByzantinePlugin, CompressedGradient, CompressionPlugin, VerificationPlugin,
-    VerificationResult,
+    ByzantinePlugin, CompressedGradient, CompressionPlugin, VerificationPlugin, VerificationResult,
 };
 use mycelix_fl_core::types::GradientUpdate as CoreGradientUpdate;
 
-use super::hyperfeel_bridge::{
-    CompressedSubmission, HyperFeelFLBridge, HyperFeelFLConfig,
-};
+use super::epistemic_fl_bridge::{EpistemicGradientUpdate, GradientEpistemicClassification};
+use super::hyperfeel_bridge::{CompressedSubmission, HyperFeelFLBridge, HyperFeelFLConfig};
+use super::matl_feedback::{GradientQualityConfig, GradientQualitySignals, QualityTier};
 #[cfg(any(feature = "simulation", feature = "risc0"))]
 use super::zkproof_bridge::ZKProofFLBridge;
-use super::epistemic_fl_bridge::{EpistemicGradientUpdate, GradientEpistemicClassification};
-use super::matl_feedback::{GradientQualityConfig, GradientQualitySignals, QualityTier};
 
 // ============================================================================
 // HyperFeel Compression Plugin
@@ -81,13 +77,17 @@ impl HyperFeelCompressionPlugin {
     }
 }
 
+impl Default for HyperFeelCompressionPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CompressionPlugin for HyperFeelCompressionPlugin {
     fn compress(&mut self, update: &CoreGradientUpdate) -> CompressedGradient {
-        let hg = self.bridge.compress_gradient(
-            &update.gradients,
-            self.round,
-            &update.participant_id,
-        );
+        let hg =
+            self.bridge
+                .compress_gradient(&update.gradients, self.round, &update.participant_id);
         CompressedGradient {
             participant_id: update.participant_id.clone(),
             data: hg.hypervector,
@@ -146,6 +146,12 @@ impl ChecksumVerificationPlugin {
     }
 }
 
+impl Default for ChecksumVerificationPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VerificationPlugin for ChecksumVerificationPlugin {
     fn verify(
         &mut self,
@@ -168,7 +174,7 @@ impl VerificationPlugin for ChecksumVerificationPlugin {
 
         // Hash reputations (sorted by key for determinism)
         let mut sorted_reps: Vec<_> = reputations.iter().collect();
-        sorted_reps.sort_by_key(|(k, _)| k.clone());
+        sorted_reps.sort_by_key(|(k, _)| (*k).clone());
         for (k, &v) in &sorted_reps {
             hasher.update_str(k);
             hasher.update_f32(v);
@@ -333,6 +339,12 @@ impl EpistemicByzantinePlugin {
     }
 }
 
+impl Default for EpistemicByzantinePlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ByzantinePlugin for EpistemicByzantinePlugin {
     fn analyze(&mut self, updates: &[CoreGradientUpdate]) -> ExternalWeightMap {
         let mut weights = ExternalWeightMap::new();
@@ -412,6 +424,12 @@ impl MatlByzantinePlugin {
     }
 }
 
+impl Default for MatlByzantinePlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ByzantinePlugin for MatlByzantinePlugin {
     fn analyze(&mut self, updates: &[CoreGradientUpdate]) -> ExternalWeightMap {
         let mut weights = ExternalWeightMap::new();
@@ -435,11 +453,8 @@ impl ByzantinePlugin for MatlByzantinePlugin {
         // Analyze each participant's gradient quality
         for update in updates {
             let f64_grads: Vec<f64> = update.gradients.iter().map(|&g| g as f64).collect();
-            let signals = GradientQualitySignals::analyze_with_global(
-                &f64_grads,
-                &global_mean,
-                &self.config,
-            );
+            let signals =
+                GradientQualitySignals::analyze_with_global(&f64_grads, &global_mean, &self.config);
             let tier = signals.quality_tier();
 
             let multiplier = match tier {
@@ -513,6 +528,12 @@ impl HyperFeelByzantinePlugin {
     /// Set the current round number.
     pub fn set_round(&mut self, round: u32) {
         self.round = round;
+    }
+}
+
+impl Default for HyperFeelByzantinePlugin {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -633,6 +654,13 @@ impl ZkVerificationPlugin {
 }
 
 #[cfg(any(feature = "simulation", feature = "risc0"))]
+impl Default for ZkVerificationPlugin {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(any(feature = "simulation", feature = "risc0"))]
 impl VerificationPlugin for ZkVerificationPlugin {
     fn verify(
         &mut self,
@@ -645,8 +673,8 @@ impl VerificationPlugin for ZkVerificationPlugin {
             let _ = self.bridge.submit_with_proof(
                 &input.participant_id,
                 &input.gradients,
-                1,     // epochs (metadata — not critical for verification)
-                0.01,  // learning_rate
+                1,    // epochs (metadata — not critical for verification)
+                0.01, // learning_rate
                 input.metadata.batch_size as usize,
                 input.metadata.loss as f64,
             );
@@ -691,8 +719,8 @@ mod tests {
     use super::*;
     use crate::epistemic::{EmpiricalLevel, HarmonicLevel, MaterialityLevel, NormativeLevel};
     use crate::fl::types::GradientUpdate as SdkGradientUpdate;
-    use mycelix_fl_core::plugins::PipelinePlugins;
     use mycelix_fl_core::pipeline::{PipelineConfig, UnifiedPipeline};
+    use mycelix_fl_core::plugins::PipelinePlugins;
 
     fn core_update(id: &str, gradients: Vec<f32>) -> CoreGradientUpdate {
         CoreGradientUpdate::new(id.to_string(), 1, gradients, 100, 0.5)
@@ -780,16 +808,8 @@ mod tests {
 
         let reps = HashMap::new();
 
-        let result1 = plugin.verify(
-            &[core_update("p1", vec![0.1])],
-            &[0.1],
-            &reps,
-        );
-        let result2 = plugin.verify(
-            &[core_update("p1", vec![0.2])],
-            &[0.2],
-            &reps,
-        );
+        let result1 = plugin.verify(&[core_update("p1", vec![0.1])], &[0.1], &reps);
+        let result2 = plugin.verify(&[core_update("p1", vec![0.2])], &[0.2], &reps);
 
         assert_ne!(result1.proof_data, result2.proof_data);
     }
@@ -820,7 +840,11 @@ mod tests {
         let adj = &weights["p1"][0];
         assert!(!adj.veto);
         // E3=0.8, N2=0.9, M2=0.8, H2=0.8 → 0.4608 × phi_mult=0.75 → ~0.346
-        assert!(adj.weight_multiplier > 0.2, "weight={}", adj.weight_multiplier);
+        assert!(
+            adj.weight_multiplier > 0.2,
+            "weight={}",
+            adj.weight_multiplier
+        );
     }
 
     #[test]
@@ -845,7 +869,11 @@ mod tests {
         assert!(weights.contains_key("p1"));
         let adj = &weights["p1"][0];
         // E0=0.2 × N0=0.5 × M0=0.3 × H0=0.5 × conf=0.1 = 0.0015 × phi_mult=0.75 = 0.001
-        assert!(adj.veto, "Very low quality should be vetoed, weight={}", adj.weight_multiplier);
+        assert!(
+            adj.veto,
+            "Very low quality should be vetoed, weight={}",
+            adj.weight_multiplier
+        );
     }
 
     #[test]
@@ -861,7 +889,8 @@ mod tests {
                 MaterialityLevel::M1Temporal,
                 HarmonicLevel::H1Local,
             ),
-        ).with_phi(1.0);
+        )
+        .with_phi(1.0);
 
         let low_phi = EpistemicGradientUpdate::new(
             SdkGradientUpdate::new("low".to_string(), 1, vec![0.0; 5], 100, 0.5),
@@ -871,7 +900,8 @@ mod tests {
                 MaterialityLevel::M1Temporal,
                 HarmonicLevel::H1Local,
             ),
-        ).with_phi(0.0);
+        )
+        .with_phi(0.0);
 
         plugin.register_update(&high_phi);
         plugin.register_update(&low_phi);
@@ -951,7 +981,11 @@ mod tests {
         for update in &updates {
             if let Some(adj) = weights.get(&update.participant_id) {
                 assert!(!adj[0].veto, "Honest gradient should not be vetoed");
-                assert!(adj[0].weight_multiplier > 0.5, "weight={}", adj[0].weight_multiplier);
+                assert!(
+                    adj[0].weight_multiplier > 0.5,
+                    "weight={}",
+                    adj[0].weight_multiplier
+                );
             }
         }
     }
@@ -974,15 +1008,21 @@ mod tests {
         let weights = plugin.analyze(&updates);
 
         // Byzantine gradient should get lower weight than honest ones
-        let byz_weight = weights.get("byzantine")
+        let byz_weight = weights
+            .get("byzantine")
             .map(|a| a[0].weight_multiplier)
             .unwrap_or(1.0);
-        let honest_weight = weights.get("honest1")
+        let honest_weight = weights
+            .get("honest1")
             .map(|a| a[0].weight_multiplier)
             .unwrap_or(0.0);
 
-        assert!(byz_weight <= honest_weight,
-            "Byzantine ({}) should not outweigh honest ({})", byz_weight, honest_weight);
+        assert!(
+            byz_weight <= honest_weight,
+            "Byzantine ({}) should not outweigh honest ({})",
+            byz_weight,
+            honest_weight
+        );
     }
 
     #[test]
@@ -1012,7 +1052,11 @@ mod tests {
         // All similar gradients should have high similarity → no veto
         for update in &updates {
             if let Some(adj) = weights.get(&update.participant_id) {
-                assert!(!adj[0].veto, "{} should not be vetoed", update.participant_id);
+                assert!(
+                    !adj[0].veto,
+                    "{} should not be vetoed",
+                    update.participant_id
+                );
                 assert_eq!(adj[0].source, "hyperfeel_similarity");
             }
         }
@@ -1033,15 +1077,21 @@ mod tests {
         let weights = plugin.analyze(&updates);
 
         // Byzantine should have lower weight or be vetoed
-        let byz_weight = weights.get("byz")
+        let byz_weight = weights
+            .get("byz")
             .map(|a| a[0].weight_multiplier)
             .unwrap_or(1.0);
-        let honest_weight = weights.get("h0")
+        let honest_weight = weights
+            .get("h0")
             .map(|a| a[0].weight_multiplier)
             .unwrap_or(0.0);
 
-        assert!(byz_weight < honest_weight,
-            "Byzantine ({}) should have lower weight than honest ({})", byz_weight, honest_weight);
+        assert!(
+            byz_weight < honest_weight,
+            "Byzantine ({}) should have lower weight than honest ({})",
+            byz_weight,
+            honest_weight
+        );
     }
 
     #[test]
@@ -1090,7 +1140,8 @@ mod tests {
                 MaterialityLevel::M3Foundational,
                 HarmonicLevel::H4Kosmic,
             ),
-        ).with_phi(0.95);
+        )
+        .with_phi(0.95);
         epistemic_plugin.register_update(&high);
 
         // Low-quality participant (should get lower weight but not vetoed)
@@ -1102,7 +1153,8 @@ mod tests {
                 MaterialityLevel::M0Ephemeral,
                 HarmonicLevel::H0None,
             ),
-        ).with_phi(0.2);
+        )
+        .with_phi(0.2);
         epistemic_plugin.register_update(&low);
 
         // Neutral participant (no classification)
@@ -1140,11 +1192,7 @@ mod tests {
 
         // All gradients were identical (0.5), so result should be near 0.5
         for val in &result.result.aggregated.gradients {
-            assert!(
-                (*val - 0.5).abs() < 0.3,
-                "Expected ~0.5, got {}",
-                val,
-            );
+            assert!((*val - 0.5).abs() < 0.3, "Expected ~0.5, got {}", val,);
         }
     }
 }

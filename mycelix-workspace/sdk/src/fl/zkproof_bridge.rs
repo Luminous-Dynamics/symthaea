@@ -45,15 +45,13 @@
 //! ```
 
 #[cfg(any(feature = "simulation", feature = "risc0"))]
-use crate::zkproof::{
-    GradientProver, GradientProofReceipt,
-};
+use crate::zkproof::{GradientProofReceipt, GradientProver};
 
 #[cfg(not(any(feature = "simulation", feature = "risc0")))]
 use crate::zkproof::GradientProofReceipt;
 
-use super::types::{GradientUpdate, AggregatedGradient};
 use super::aggregation::{fedavg, trimmed_mean};
+use super::types::{AggregatedGradient, GradientUpdate};
 
 /// A gradient update bundled with its ZK proof
 #[derive(Debug, Clone)]
@@ -206,21 +204,24 @@ impl ZKProofFLBridge {
         loss: f64,
     ) -> Result<ProvenGradientUpdate, ZKFLError> {
         // Generate proof
-        let proof = self.prover.prove_gradient_quality(
-            gradient,
-            &self.model_hash,
-            epochs,
-            learning_rate,
-            participant_id,
-            self.round,
-        ).map_err(|e| ZKFLError::ProofGenerationFailed(e.to_string()))?;
+        let proof = self
+            .prover
+            .prove_gradient_quality(
+                gradient,
+                &self.model_hash,
+                epochs,
+                learning_rate,
+                participant_id,
+                self.round,
+            )
+            .map_err(|e| ZKFLError::ProofGenerationFailed(e.to_string()))?;
 
         // Update stats
         self.stats.total_submissions += 1;
-        self.stats.avg_proof_time_ms = (
-            self.stats.avg_proof_time_ms * (self.stats.total_submissions - 1) as u64
-            + proof.generation_time_ms
-        ) / self.stats.total_submissions as u64;
+        self.stats.avg_proof_time_ms = (self.stats.avg_proof_time_ms
+            * (self.stats.total_submissions - 1) as u64
+            + proof.generation_time_ms)
+            / self.stats.total_submissions as u64;
 
         if proof.is_valid() {
             self.stats.valid_proofs += 1;
@@ -254,7 +255,8 @@ impl ZKProofFLBridge {
         } else {
             self.stats.invalid_proofs += 1;
         }
-        self.pending_updates.push(ProvenGradientUpdate::new(update, proof));
+        self.pending_updates
+            .push(ProvenGradientUpdate::new(update, proof));
     }
 
     /// Verify all pending proofs
@@ -283,12 +285,14 @@ impl ZKProofFLBridge {
     /// Aggregate only verified valid gradients
     pub fn aggregate_verified(&self) -> Result<VerifiedAggregationResult, ZKFLError> {
         // Filter to valid, verified updates
-        let valid_updates: Vec<&ProvenGradientUpdate> = self.pending_updates
+        let valid_updates: Vec<&ProvenGradientUpdate> = self
+            .pending_updates
             .iter()
             .filter(|u| u.proof.is_valid())
             .collect();
 
-        let excluded: Vec<String> = self.pending_updates
+        let excluded: Vec<String> = self
+            .pending_updates
             .iter()
             .filter(|u| !u.proof.is_valid())
             .map(|u| u.update.participant_id.clone())
@@ -299,14 +303,11 @@ impl ZKProofFLBridge {
         }
 
         // Extract updates for aggregation
-        let updates: Vec<GradientUpdate> = valid_updates
-            .iter()
-            .map(|u| u.update.clone())
-            .collect();
+        let updates: Vec<GradientUpdate> = valid_updates.iter().map(|u| u.update.clone()).collect();
 
         // Helper to create AggregatedGradient from raw gradients
-        let make_aggregated = |gradients: Vec<f64>, method: super::AggregationMethod| {
-            AggregatedGradient {
+        let make_aggregated =
+            |gradients: Vec<f64>, method: super::AggregationMethod| AggregatedGradient {
                 gradients,
                 model_version: self.round as u64,
                 participant_count: updates.len(),
@@ -316,14 +317,13 @@ impl ZKProofFLBridge {
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_millis() as u64)
                     .unwrap_or(0),
-            }
-        };
+            };
 
         // Aggregate based on method
         let aggregated = match self.aggregation_method {
             VerifiedAggregationMethod::FedAvg => {
-                let gradients = fedavg(&updates)
-                    .map_err(|e| ZKFLError::AggregationFailed(e.to_string()))?;
+                let gradients =
+                    fedavg(&updates).map_err(|e| ZKFLError::AggregationFailed(e.to_string()))?;
                 make_aggregated(gradients, super::AggregationMethod::FedAvg)
             }
             VerifiedAggregationMethod::TrimmedMean { trim_ratio } => {
@@ -352,15 +352,16 @@ impl ZKProofFLBridge {
                     }
                 }
 
-                make_aggregated(aggregated_gradients, super::AggregationMethod::TrustWeighted)
+                make_aggregated(
+                    aggregated_gradients,
+                    super::AggregationMethod::TrustWeighted,
+                )
             }
         };
 
         // Collect included hashes
-        let included_hashes: Vec<[u8; 32]> = valid_updates
-            .iter()
-            .map(|u| *u.gradient_hash())
-            .collect();
+        let included_hashes: Vec<[u8; 32]> =
+            valid_updates.iter().map(|u| *u.gradient_hash()).collect();
 
         Ok(VerifiedAggregationResult {
             gradient: aggregated,
@@ -496,18 +497,24 @@ mod tests {
         // Submit 3 valid gradients
         for i in 0..3 {
             let gradient = sample_gradient(100, 0.3 + i as f32 * 0.1);
-            bridge.submit_with_proof(&format!("client-{}", i), &gradient, 5, 0.01, 32, 0.5).unwrap();
+            bridge
+                .submit_with_proof(&format!("client-{}", i), &gradient, 5, 0.01, 32, 0.5)
+                .unwrap();
         }
 
         // Submit 1 invalid gradient
         let bad_gradient = vec![0.0f32; 100];
-        bridge.submit_with_proof("bad-client", &bad_gradient, 5, 0.01, 32, 0.5).unwrap();
+        bridge
+            .submit_with_proof("bad-client", &bad_gradient, 5, 0.01, 32, 0.5)
+            .unwrap();
 
         let result = bridge.aggregate_verified().unwrap();
 
         assert_eq!(result.included_count, 3);
         assert_eq!(result.excluded_count, 1);
-        assert!(result.excluded_participants.contains(&"bad-client".to_string()));
+        assert!(result
+            .excluded_participants
+            .contains(&"bad-client".to_string()));
     }
 
     #[test]
@@ -518,15 +525,19 @@ mod tests {
         // 2 valid
         for i in 0..2 {
             let gradient = sample_gradient(100, 0.5);
-            bridge.submit_with_proof(&format!("good-{}", i), &gradient, 5, 0.01, 32, 0.5).unwrap();
+            bridge
+                .submit_with_proof(&format!("good-{}", i), &gradient, 5, 0.01, 32, 0.5)
+                .unwrap();
         }
 
         // 1 invalid
         let bad_gradient = vec![0.0f32; 100];
-        bridge.submit_with_proof("bad", &bad_gradient, 5, 0.01, 32, 0.5).unwrap();
+        bridge
+            .submit_with_proof("bad", &bad_gradient, 5, 0.01, 32, 0.5)
+            .unwrap();
 
         let byzantine_frac = bridge.byzantine_fraction();
-        assert!((byzantine_frac - 1.0/3.0).abs() < 0.01);
+        assert!((byzantine_frac - 1.0 / 3.0).abs() < 0.01);
     }
 
     #[test]
@@ -536,7 +547,9 @@ mod tests {
         // Round 1
         bridge.start_round(1, [0x01u8; 32]);
         let g1 = sample_gradient(100, 0.5);
-        bridge.submit_with_proof("client-1", &g1, 5, 0.01, 32, 0.5).unwrap();
+        bridge
+            .submit_with_proof("client-1", &g1, 5, 0.01, 32, 0.5)
+            .unwrap();
         let result1 = bridge.aggregate_verified().unwrap();
         assert_eq!(result1.included_count, 1);
 
@@ -544,24 +557,31 @@ mod tests {
         bridge.start_round(2, [0x02u8; 32]);
         assert!(bridge.pending_updates().is_empty()); // Cleared
         let g2 = sample_gradient(100, 0.4);
-        bridge.submit_with_proof("client-2", &g2, 5, 0.01, 32, 0.5).unwrap();
+        bridge
+            .submit_with_proof("client-2", &g2, 5, 0.01, 32, 0.5)
+            .unwrap();
         let result2 = bridge.aggregate_verified().unwrap();
         assert_eq!(result2.included_count, 1);
     }
 
     #[test]
     fn test_time_weighted_aggregation() {
-        let mut bridge = ZKProofFLBridge::new()
-            .with_aggregation(VerifiedAggregationMethod::TimeWeighted);
+        let mut bridge =
+            ZKProofFLBridge::new().with_aggregation(VerifiedAggregationMethod::TimeWeighted);
         bridge.start_round(1, [0x42u8; 32]);
 
         for i in 0..3 {
             let gradient = sample_gradient(100, 0.5);
-            bridge.submit_with_proof(&format!("client-{}", i), &gradient, 5, 0.01, 32, 0.5).unwrap();
+            bridge
+                .submit_with_proof(&format!("client-{}", i), &gradient, 5, 0.01, 32, 0.5)
+                .unwrap();
         }
 
         let result = bridge.aggregate_verified().unwrap();
-        assert_eq!(result.gradient.aggregation_method, crate::fl::AggregationMethod::TrustWeighted);
+        assert_eq!(
+            result.gradient.aggregation_method,
+            crate::fl::AggregationMethod::TrustWeighted
+        );
     }
 
     #[test]
@@ -572,7 +592,9 @@ mod tests {
 
         for i in 0..5 {
             let gradient = sample_gradient(100, 0.3 + i as f32 * 0.1);
-            bridge.submit_with_proof(&format!("client-{}", i), &gradient, 5, 0.01, 32, 0.5).unwrap();
+            bridge
+                .submit_with_proof(&format!("client-{}", i), &gradient, 5, 0.01, 32, 0.5)
+                .unwrap();
         }
 
         let result = bridge.aggregate_verified().unwrap();
@@ -586,8 +608,12 @@ mod tests {
 
         // Only invalid gradients
         let bad_gradient = vec![0.0f32; 100];
-        bridge.submit_with_proof("bad-1", &bad_gradient, 5, 0.01, 32, 0.5).unwrap();
-        bridge.submit_with_proof("bad-2", &bad_gradient, 5, 0.01, 32, 0.5).unwrap();
+        bridge
+            .submit_with_proof("bad-1", &bad_gradient, 5, 0.01, 32, 0.5)
+            .unwrap();
+        bridge
+            .submit_with_proof("bad-2", &bad_gradient, 5, 0.01, 32, 0.5)
+            .unwrap();
 
         let result = bridge.aggregate_verified();
         assert!(matches!(result, Err(ZKFLError::NoValidGradients)));

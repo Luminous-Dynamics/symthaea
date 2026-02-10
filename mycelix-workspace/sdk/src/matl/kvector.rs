@@ -109,22 +109,23 @@ pub struct KVector {
 /// Note: k_phi weight is 0% - coherence is tracked for gating but doesn't affect trust score.
 /// The 5% that was on k_phi has been redistributed to k_r (+1%), k_i (+1%), and k_v (+3%).
 pub const KVECTOR_WEIGHTS: KVectorWeights = KVectorWeights {
-    w_r: 0.25,     // Reputation (was 0.24)
-    w_a: 0.11,     // Activity
-    w_i: 0.20,     // Integrity (was 0.19)
-    w_p: 0.11,     // Performance
-    w_m: 0.05,     // Membership
-    w_s: 0.07,     // Stake
-    w_h: 0.05,     // Historical
-    w_topo: 0.04,  // Topology
-    w_v: 0.12,     // Verification (was 0.09)
-    w_phi: 0.00,   // Coherence - tracked but not weighted (used for gating only)
+    w_r: 0.25,    // Reputation (was 0.24)
+    w_a: 0.11,    // Activity
+    w_i: 0.20,    // Integrity (was 0.19)
+    w_p: 0.11,    // Performance
+    w_m: 0.05,    // Membership
+    w_s: 0.07,    // Stake
+    w_h: 0.05,    // Historical
+    w_topo: 0.04, // Topology
+    w_v: 0.12,    // Verification (was 0.09)
+    w_phi: 0.00,  // Coherence - tracked but not weighted (used for gating only)
 };
 
 /// Pre-computed weight array for SIMD-friendly operations
 /// Order: [k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo, k_v, k_phi]
 /// Note: k_phi (index 9) has 0 weight - tracked for gating, not scoring
-pub const KVECTOR_WEIGHTS_ARRAY: [f32; 10] = [0.25, 0.11, 0.20, 0.11, 0.05, 0.07, 0.05, 0.04, 0.12, 0.00];
+pub const KVECTOR_WEIGHTS_ARRAY: [f32; 10] =
+    [0.25, 0.11, 0.20, 0.11, 0.05, 0.07, 0.05, 0.04, 0.12, 0.00];
 
 /// Configurable weights for K-Vector components
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -156,13 +157,31 @@ pub struct KVectorWeights {
 impl KVectorWeights {
     /// Verify weights sum to 1.0 (within floating point tolerance)
     pub fn is_valid(&self) -> bool {
-        let sum = self.w_r + self.w_a + self.w_i + self.w_p + self.w_m + self.w_s + self.w_h + self.w_topo + self.w_v + self.w_phi;
+        let sum = self.w_r
+            + self.w_a
+            + self.w_i
+            + self.w_p
+            + self.w_m
+            + self.w_s
+            + self.w_h
+            + self.w_topo
+            + self.w_v
+            + self.w_phi;
         (sum - 1.0).abs() < 0.001
     }
 
     /// Normalize weights to sum to 1.0
     pub fn normalize(&mut self) {
-        let sum = self.w_r + self.w_a + self.w_i + self.w_p + self.w_m + self.w_s + self.w_h + self.w_topo + self.w_v + self.w_phi;
+        let sum = self.w_r
+            + self.w_a
+            + self.w_i
+            + self.w_p
+            + self.w_m
+            + self.w_s
+            + self.w_h
+            + self.w_topo
+            + self.w_v
+            + self.w_phi;
         if sum > 0.0 {
             self.w_r /= sum;
             self.w_a /= sum;
@@ -183,7 +202,18 @@ impl KVector {
     ///
     /// For constructing from arrays, use `from_array()` instead.
     #[allow(clippy::too_many_arguments)]
-    pub fn new(k_r: f32, k_a: f32, k_i: f32, k_p: f32, k_m: f32, k_s: f32, k_h: f32, k_topo: f32, k_v: f32, k_phi: f32) -> Self {
+    pub fn new(
+        k_r: f32,
+        k_a: f32,
+        k_i: f32,
+        k_p: f32,
+        k_m: f32,
+        k_s: f32,
+        k_h: f32,
+        k_topo: f32,
+        k_v: f32,
+        k_phi: f32,
+    ) -> Self {
         Self {
             k_r: k_r.clamp(0.0, 1.0),
             k_a: k_a.clamp(0.0, 1.0),
@@ -202,7 +232,17 @@ impl KVector {
     ///
     /// The k_phi dimension defaults to 0.5 (neutral coherence).
     #[allow(clippy::too_many_arguments)]
-    pub fn new_9d(k_r: f32, k_a: f32, k_i: f32, k_p: f32, k_m: f32, k_s: f32, k_h: f32, k_topo: f32, k_v: f32) -> Self {
+    pub fn new_9d(
+        k_r: f32,
+        k_a: f32,
+        k_i: f32,
+        k_p: f32,
+        k_m: f32,
+        k_s: f32,
+        k_h: f32,
+        k_topo: f32,
+        k_v: f32,
+    ) -> Self {
         Self::new(k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo, k_v, 0.5)
     }
 
@@ -210,13 +250,26 @@ impl KVector {
     /// Order: [k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo, k_v, k_phi]
     #[inline]
     pub fn to_array(&self) -> [f32; 10] {
-        [self.k_r, self.k_a, self.k_i, self.k_p, self.k_m, self.k_s, self.k_h, self.k_topo, self.k_v, self.k_phi]
+        [
+            self.k_r,
+            self.k_a,
+            self.k_i,
+            self.k_p,
+            self.k_m,
+            self.k_s,
+            self.k_h,
+            self.k_topo,
+            self.k_v,
+            self.k_phi,
+        ]
     }
 
     /// Create from array (inverse of to_array)
     #[inline]
     pub fn from_array(arr: [f32; 10]) -> Self {
-        Self::new(arr[0], arr[1], arr[2], arr[3], arr[4], arr[5], arr[6], arr[7], arr[8], arr[9])
+        Self::new(
+            arr[0], arr[1], arr[2], arr[3], arr[4], arr[5], arr[6], arr[7], arr[8], arr[9],
+        )
     }
 
     /// Optimized trust score using array dot product
@@ -241,7 +294,16 @@ impl KVector {
     ///
     /// The k_v defaults to 0.0 (unverified), k_phi to 0.5 (neutral).
     #[allow(clippy::too_many_arguments)]
-    pub fn new_legacy(k_r: f32, k_a: f32, k_i: f32, k_p: f32, k_m: f32, k_s: f32, k_h: f32, k_topo: f32) -> Self {
+    pub fn new_legacy(
+        k_r: f32,
+        k_a: f32,
+        k_i: f32,
+        k_p: f32,
+        k_m: f32,
+        k_s: f32,
+        k_h: f32,
+        k_topo: f32,
+    ) -> Self {
         Self::new(k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo, 0.0, 0.5)
     }
 
@@ -264,16 +326,16 @@ impl KVector {
     /// Create a default K-Vector for new participants with baseline trust
     pub fn new_participant() -> Self {
         Self {
-            k_r: 0.5,      // Neutral reputation
-            k_a: 0.0,      // No activity yet
-            k_i: 1.0,      // Assume integrity until proven otherwise
-            k_p: 0.5,      // Unknown performance
-            k_m: 0.0,      // Just joined
-            k_s: 0.0,      // No stake yet
-            k_h: 0.5,      // No history
-            k_topo: 0.0,   // Not connected yet
-            k_v: 0.0,      // Not verified yet
-            k_phi: 0.5,    // Neutral coherence (not yet measured)
+            k_r: 0.5,    // Neutral reputation
+            k_a: 0.0,    // No activity yet
+            k_i: 1.0,    // Assume integrity until proven otherwise
+            k_p: 0.5,    // Unknown performance
+            k_m: 0.0,    // Just joined
+            k_s: 0.0,    // No stake yet
+            k_h: 0.5,    // No history
+            k_topo: 0.0, // Not connected yet
+            k_v: 0.0,    // Not verified yet
+            k_phi: 0.5,  // Neutral coherence (not yet measured)
         }
     }
 
@@ -332,7 +394,10 @@ impl KVector {
 
     /// Batch compute trust scores with custom weights
     pub fn batch_trust_scores_weighted(vectors: &[KVector], weights: &KVectorWeights) -> Vec<f32> {
-        vectors.iter().map(|v| v.trust_score_with_weights(weights)).collect()
+        vectors
+            .iter()
+            .map(|v| v.trust_score_with_weights(weights))
+            .collect()
     }
 
     /// Calculate reputation-squared weighted score (for RB-BFT voting)
@@ -416,11 +481,11 @@ impl KVector {
     /// Activity decays fastest, reputation/historical decay slowly
     pub fn apply_decay(&mut self, decay_factor: f32) {
         let df = decay_factor.clamp(0.0, 1.0);
-        self.k_a *= df;           // Activity decays fully
-        self.k_r *= 0.5 + 0.5 * df;  // Reputation decays slowly
-        self.k_h *= 0.5 + 0.5 * df;  // Historical decays slowly
-        self.k_topo *= df;        // Topology decays fully
-        // Integrity, Performance, Membership, Stake don't decay (they're state-based)
+        self.k_a *= df; // Activity decays fully
+        self.k_r *= 0.5 + 0.5 * df; // Reputation decays slowly
+        self.k_h *= 0.5 + 0.5 * df; // Historical decays slowly
+        self.k_topo *= df; // Topology decays fully
+                           // Integrity, Performance, Membership, Stake don't decay (they're state-based)
     }
 
     /// Merge with another K-Vector (e.g., from different data sources)
@@ -845,11 +910,11 @@ mod tests {
     fn test_decay() {
         let mut kv = KVector::new(0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8);
         kv.apply_decay(0.5);
-        assert!((kv.k_a - 0.4).abs() < 0.001);  // Activity decays fully
-        assert!((kv.k_r - 0.6).abs() < 0.001);  // Reputation decays slowly
-        assert!((kv.k_i - 0.8).abs() < 0.001);  // Integrity doesn't decay
-        assert!((kv.k_v - 0.8).abs() < 0.001);  // Verification doesn't decay (it's credential-based)
-        assert!((kv.k_phi - 0.8).abs() < 0.001);  // Coherence doesn't decay (it's state-based)
+        assert!((kv.k_a - 0.4).abs() < 0.001); // Activity decays fully
+        assert!((kv.k_r - 0.6).abs() < 0.001); // Reputation decays slowly
+        assert!((kv.k_i - 0.8).abs() < 0.001); // Integrity doesn't decay
+        assert!((kv.k_v - 0.8).abs() < 0.001); // Verification doesn't decay (it's credential-based)
+        assert!((kv.k_phi - 0.8).abs() < 0.001); // Coherence doesn't decay (it's state-based)
     }
 
     #[test]
@@ -872,7 +937,7 @@ mod tests {
     #[test]
     fn test_coherence_dimension() {
         let neutral = KVector::new_participant();
-        assert_eq!(neutral.k_phi, 0.5);  // Neutral coherence for new participants
+        assert_eq!(neutral.k_phi, 0.5); // Neutral coherence for new participants
         assert!(!neutral.is_highly_coherent());
 
         let coherent = KVector::new_participant().with_coherence(0.8);

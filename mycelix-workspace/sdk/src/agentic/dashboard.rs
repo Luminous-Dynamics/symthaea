@@ -473,8 +473,7 @@ impl ChartDataBuilder {
 
     /// Build trust over time chart from metrics history
     pub fn trust_over_time(metrics: &VecDeque<LiveMetrics>) -> TimeSeries {
-        let mut series = TimeSeries::new("Average Trust", ChartType::Line)
-            .with_color("#10b981"); // Green
+        let mut series = TimeSeries::new("Average Trust", ChartType::Line).with_color("#10b981"); // Green
 
         for m in metrics {
             series.add_point(m.timestamp, m.average_trust);
@@ -485,8 +484,7 @@ impl ChartDataBuilder {
 
     /// Build health over time chart
     pub fn health_over_time(metrics: &VecDeque<LiveMetrics>) -> TimeSeries {
-        let mut series = TimeSeries::new("Network Health", ChartType::Area)
-            .with_color("#3b82f6"); // Blue
+        let mut series = TimeSeries::new("Network Health", ChartType::Area).with_color("#3b82f6"); // Blue
 
         for m in metrics {
             series.add_point(m.timestamp, m.network_health);
@@ -497,8 +495,7 @@ impl ChartDataBuilder {
 
     /// Build TPS chart
     pub fn tps_over_time(metrics: &VecDeque<LiveMetrics>) -> TimeSeries {
-        let mut series = TimeSeries::new("Transactions/sec", ChartType::Line)
-            .with_color("#f59e0b"); // Amber
+        let mut series = TimeSeries::new("Transactions/sec", ChartType::Line).with_color("#f59e0b"); // Amber
 
         for m in metrics {
             series.add_point(m.timestamp, m.tps);
@@ -509,8 +506,7 @@ impl ChartDataBuilder {
 
     /// Build alert trend chart
     pub fn alert_trend(metrics: &VecDeque<LiveMetrics>) -> TimeSeries {
-        let mut series = TimeSeries::new("Active Alerts", ChartType::Bar)
-            .with_color("#ef4444"); // Red
+        let mut series = TimeSeries::new("Active Alerts", ChartType::Bar).with_color("#ef4444"); // Red
 
         for m in metrics {
             series.add_point(m.timestamp, m.alerts.total() as f64);
@@ -663,14 +659,12 @@ impl AlertPanel {
 
     /// Get default actions for severity
     fn default_actions(severity: AlertSeverity) -> Vec<AlertAction> {
-        let mut actions = vec![
-            AlertAction {
-                action_type: AlertActionType::Acknowledge,
-                label: "Acknowledge".to_string(),
-                description: "Mark alert as seen".to_string(),
-                requires_confirmation: false,
-            },
-        ];
+        let mut actions = vec![AlertAction {
+            action_type: AlertActionType::Acknowledge,
+            label: "Acknowledge".to_string(),
+            description: "Mark alert as seen".to_string(),
+            requires_confirmation: false,
+        }];
 
         match severity {
             AlertSeverity::Critical => {
@@ -772,11 +766,9 @@ impl AlertPanel {
     /// Clean up old resolved alerts
     pub fn cleanup(&mut self, current_time: u64) {
         let retention = self.config.alert_retention_secs;
-        self.alerts.retain(|_, alert| {
-            match alert.resolved_at {
-                Some(resolved) => current_time - resolved < retention,
-                None => true,
-            }
+        self.alerts.retain(|_, alert| match alert.resolved_at {
+            Some(resolved) => current_time - resolved < retention,
+            None => true,
         });
     }
 
@@ -853,7 +845,10 @@ pub fn default_layout() -> Vec<Widget> {
             widget_id: "metrics_summary".to_string(),
             widget_type: WidgetType::MetricsSummary,
             position: WidgetPosition { x: 0, y: 0 },
-            size: WidgetSize { width: 12, height: 2 },
+            size: WidgetSize {
+                width: 12,
+                height: 2,
+            },
             title: "Network Overview".to_string(),
             config: HashMap::new(),
         },
@@ -861,7 +856,10 @@ pub fn default_layout() -> Vec<Widget> {
             widget_id: "trust_chart".to_string(),
             widget_type: WidgetType::TrustChart,
             position: WidgetPosition { x: 0, y: 2 },
-            size: WidgetSize { width: 6, height: 4 },
+            size: WidgetSize {
+                width: 6,
+                height: 4,
+            },
             title: "Trust Trends".to_string(),
             config: HashMap::new(),
         },
@@ -869,7 +867,10 @@ pub fn default_layout() -> Vec<Widget> {
             widget_id: "health_gauge".to_string(),
             widget_type: WidgetType::HealthGauge,
             position: WidgetPosition { x: 6, y: 2 },
-            size: WidgetSize { width: 3, height: 4 },
+            size: WidgetSize {
+                width: 3,
+                height: 4,
+            },
             title: "Network Health".to_string(),
             config: HashMap::new(),
         },
@@ -877,7 +878,10 @@ pub fn default_layout() -> Vec<Widget> {
             widget_id: "phi_meter".to_string(),
             widget_type: WidgetType::PhiMeter,
             position: WidgetPosition { x: 9, y: 2 },
-            size: WidgetSize { width: 3, height: 4 },
+            size: WidgetSize {
+                width: 3,
+                height: 4,
+            },
             title: "Collective Phi".to_string(),
             config: HashMap::new(),
         },
@@ -885,7 +889,10 @@ pub fn default_layout() -> Vec<Widget> {
             widget_id: "alert_list".to_string(),
             widget_type: WidgetType::AlertList,
             position: WidgetPosition { x: 0, y: 6 },
-            size: WidgetSize { width: 6, height: 4 },
+            size: WidgetSize {
+                width: 6,
+                height: 4,
+            },
             title: "Active Alerts".to_string(),
             config: HashMap::new(),
         },
@@ -893,7 +900,10 @@ pub fn default_layout() -> Vec<Widget> {
             widget_id: "event_stream".to_string(),
             widget_type: WidgetType::EventStream,
             position: WidgetPosition { x: 6, y: 6 },
-            size: WidgetSize { width: 6, height: 4 },
+            size: WidgetSize {
+                width: 6,
+                height: 4,
+            },
             title: "Event Stream".to_string(),
             config: HashMap::new(),
         },
@@ -936,7 +946,10 @@ impl Dashboard {
                 DashboardEventType::AttackDetected,
                 EventPriority::High,
                 "system",
-                &format!("Byzantine threat level elevated: {:.2}", metrics.byzantine_threat),
+                &format!(
+                    "Byzantine threat level elevated: {:.2}",
+                    metrics.byzantine_threat
+                ),
             );
         }
 

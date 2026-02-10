@@ -38,9 +38,5 @@ mod constant_time;
 
 // Re-export public API
 pub use constant_time::{
-    secure_compare,
-    secure_compare_hash,
-    secure_compare_64,
-    is_zero,
-    is_zero_hash,
+    is_zero, is_zero_hash, secure_compare, secure_compare_64, secure_compare_hash,
 };

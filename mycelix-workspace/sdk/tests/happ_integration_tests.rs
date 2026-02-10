@@ -8,15 +8,12 @@
 //! - Mail trust filter (Trust scoring)
 
 use mycelix_sdk::{
-    matl::{
-        ProofOfGradientQuality,
-        HierarchicalDetector, CartelDetector, AdaptiveThreshold,
-    },
+    bridge::{CrossHappReputation, HappReputationScore},
     epistemic::{
-        EmpiricalLevel, NormativeLevel, MaterialityLevel, EpistemicClassification,
-        EpistemicClaim, ClaimBuilder,
+        ClaimBuilder, EmpiricalLevel, EpistemicClaim, EpistemicClassification, MaterialityLevel,
+        NormativeLevel,
     },
-    bridge::{HappReputationScore, CrossHappReputation},
+    matl::{AdaptiveThreshold, CartelDetector, HierarchicalDetector, ProofOfGradientQuality},
 };
 
 // ============================================================================
@@ -31,9 +28,9 @@ mod federated_learning_integration {
     fn test_fl_node_trust_scoring() {
         // Create PoGQ for a node's contribution
         let pogq = ProofOfGradientQuality::new(
-            0.92,  // quality: high quality gradient
-            0.88,  // consistency: stable contributor
-            0.05,  // entropy: low divergence from aggregate
+            0.92, // quality: high quality gradient
+            0.88, // consistency: stable contributor
+            0.05, // entropy: low divergence from aggregate
         );
 
         // Compute composite score with reputation
@@ -43,7 +40,11 @@ mod federated_learning_integration {
         // Verify score is in valid range
         assert!(composite >= 0.0 && composite <= 1.0);
         // High quality + good reputation should yield good score
-        assert!(composite > 0.7, "Expected good composite score, got {}", composite);
+        assert!(
+            composite > 0.7,
+            "Expected good composite score, got {}",
+            composite
+        );
     }
 
     /// Tests HierarchicalDetector for Byzantine attack detection
@@ -64,14 +65,21 @@ mod federated_learning_integration {
         let suspected = detector.get_suspected_byzantine();
 
         // Malicious nodes should be flagged due to low scores
-        assert!(suspected.contains(&"malicious1".to_string()),
-            "Expected malicious1 to be detected, got {:?}", suspected);
-        assert!(suspected.contains(&"malicious2".to_string()),
-            "Expected malicious2 to be detected");
+        assert!(
+            suspected.contains(&"malicious1".to_string()),
+            "Expected malicious1 to be detected, got {:?}",
+            suspected
+        );
+        assert!(
+            suspected.contains(&"malicious2".to_string()),
+            "Expected malicious2 to be detected"
+        );
 
         // Honest nodes should not be flagged
-        assert!(!suspected.contains(&"node1".to_string()),
-            "Honest node1 should not be flagged");
+        assert!(
+            !suspected.contains(&"node1".to_string()),
+            "Honest node1 should not be flagged"
+        );
     }
 
     /// Tests CartelDetector for colluding attacker detection
@@ -96,9 +104,18 @@ mod federated_learning_integration {
         assert!(!cartels.is_empty(), "Expected cartel to be detected");
 
         // Verify cartel members are identified
-        assert!(detector.is_cartel_member("cartel1"), "cartel1 should be identified");
-        assert!(detector.is_cartel_member("cartel2"), "cartel2 should be identified");
-        assert!(!detector.is_cartel_member("honest1"), "honest1 should not be in cartel");
+        assert!(
+            detector.is_cartel_member("cartel1"),
+            "cartel1 should be identified"
+        );
+        assert!(
+            detector.is_cartel_member("cartel2"),
+            "cartel2 should be identified"
+        );
+        assert!(
+            !detector.is_cartel_member("honest1"),
+            "honest1 should not be in cartel"
+        );
     }
 
     /// Tests AdaptiveThreshold for dynamic threshold adjustment
@@ -119,8 +136,10 @@ mod federated_learning_integration {
         assert!(t >= 0.0 && t <= 1.0, "Threshold {} should be in [0,1]", t);
 
         // A low score should be anomalous for this high-performing node
-        assert!(threshold.is_anomalous(0.3),
-            "0.3 should be anomalous for a node averaging ~0.88");
+        assert!(
+            threshold.is_anomalous(0.3),
+            "0.3 should be anomalous for a node averaging ~0.88"
+        );
     }
 }
 
@@ -136,33 +155,42 @@ mod epistemic_integration {
     fn test_credential_epistemic_classification() {
         // Educational credential (cryptographically signed, community validated)
         let classification = EpistemicClassification::new(
-            EmpiricalLevel::E3Cryptographic,  // Ed25519 signature
-            NormativeLevel::N1Communal,       // Institution-level authority
-            MaterialityLevel::M2Persistent,   // Archived after completion
+            EmpiricalLevel::E3Cryptographic, // Ed25519 signature
+            NormativeLevel::N1Communal,      // Institution-level authority
+            MaterialityLevel::M2Persistent,  // Archived after completion
         );
 
         // Check minimum requirements for educational context
-        assert!(classification.meets_requirements(
-            EmpiricalLevel::E1Testimonial,
-            NormativeLevel::N1Communal,
-            MaterialityLevel::M1Temporal,
-        ), "Educational credential should meet minimum epistemic requirements");
+        assert!(
+            classification.meets_requirements(
+                EmpiricalLevel::E1Testimonial,
+                NormativeLevel::N1Communal,
+                MaterialityLevel::M1Temporal,
+            ),
+            "Educational credential should meet minimum epistemic requirements"
+        );
     }
 
     /// Tests empirical level auto-determination from proof type
     #[test]
     fn test_proof_type_to_empirical_level() {
         // Ed25519 signature -> E3 Cryptographic
-        assert_eq!(determine_empirical_level("Ed25519Signature2020"),
-            EmpiricalLevel::E3Cryptographic);
+        assert_eq!(
+            determine_empirical_level("Ed25519Signature2020"),
+            EmpiricalLevel::E3Cryptographic
+        );
 
         // ZK proof -> E4 Public Reproducible
-        assert_eq!(determine_empirical_level("ZKProof2023"),
-            EmpiricalLevel::E4PublicRepro);
+        assert_eq!(
+            determine_empirical_level("ZKProof2023"),
+            EmpiricalLevel::E4PublicRepro
+        );
 
         // Unknown -> E2 Private Verify
-        assert_eq!(determine_empirical_level("CustomProof"),
-            EmpiricalLevel::E2PrivateVerify);
+        assert_eq!(
+            determine_empirical_level("CustomProof"),
+            EmpiricalLevel::E2PrivateVerify
+        );
     }
 
     /// Helper to determine empirical level (mirrors credential_zome logic)
@@ -226,16 +254,10 @@ mod epistemic_integration {
         );
 
         // Should meet lower standards
-        assert!(claim.meets_standard(
-            EmpiricalLevel::E2PrivateVerify,
-            NormativeLevel::N1Communal
-        ));
+        assert!(claim.meets_standard(EmpiricalLevel::E2PrivateVerify, NormativeLevel::N1Communal));
 
         // Should not meet higher standards
-        assert!(!claim.meets_standard(
-            EmpiricalLevel::E4PublicRepro,
-            NormativeLevel::N1Communal
-        ));
+        assert!(!claim.meets_standard(EmpiricalLevel::E4PublicRepro, NormativeLevel::N1Communal));
     }
 
     /// Tests classification code generation
@@ -295,22 +317,24 @@ mod bridge_integration {
 
         // Weighted average: (0.9*100 + 0.8*50 + 0.95*25) / 175 = 0.8786
         let expected_aggregate = (0.9 * 100.0 + 0.8 * 50.0 + 0.95 * 25.0) / 175.0;
-        assert!((reputation.aggregate - expected_aggregate).abs() < 0.001,
-            "Expected aggregate {}, got {}", expected_aggregate, reputation.aggregate);
+        assert!(
+            (reputation.aggregate - expected_aggregate).abs() < 0.001,
+            "Expected aggregate {}, got {}",
+            expected_aggregate,
+            reputation.aggregate
+        );
     }
 
     /// Tests trustworthiness check
     #[test]
     fn test_is_trustworthy() {
-        let scores = vec![
-            HappReputationScore {
-                happ_id: "mail".to_string(),
-                happ_name: "Mycelix Mail".to_string(),
-                score: 0.85,
-                interactions: 100,
-                last_updated: 1000,
-            },
-        ];
+        let scores = vec![HappReputationScore {
+            happ_id: "mail".to_string(),
+            happ_name: "Mycelix Mail".to_string(),
+            score: 0.85,
+            interactions: 100,
+            last_updated: 1000,
+        }];
 
         let reputation = CrossHappReputation::from_scores("agent1", scores);
 
@@ -332,8 +356,14 @@ mod bridge_integration {
         assert_eq!(reputation.aggregate, 0.5);
 
         // New agent meets low thresholds but not high ones
-        assert!(reputation.is_trustworthy(0.4), "Default 0.5 should meet 0.4 threshold");
-        assert!(!reputation.is_trustworthy(0.6), "Default 0.5 should not meet 0.6 threshold");
+        assert!(
+            reputation.is_trustworthy(0.4),
+            "Default 0.5 should meet 0.4 threshold"
+        );
+        assert!(
+            !reputation.is_trustworthy(0.6),
+            "Default 0.5 should not meet 0.6 threshold"
+        );
     }
 }
 
@@ -368,17 +398,23 @@ mod mail_trust_integration {
         let reputation = CrossHappReputation::from_scores("sender", sender_scores);
 
         // Step 2: Check against trust level thresholds
-        let priority_threshold = 0.8;  // High bar for priority inbox
-        let spam_threshold = 0.3;       // Low bar to avoid spam filter
+        let priority_threshold = 0.8; // High bar for priority inbox
+        let spam_threshold = 0.3; // Low bar to avoid spam filter
 
         let is_priority = reputation.is_trustworthy(priority_threshold);
         let is_spam = !reputation.is_trustworthy(spam_threshold);
 
         // Verify classification
-        assert!(!is_priority, "Reputation {} shouldn't meet priority threshold {}",
-            reputation.aggregate, priority_threshold);
-        assert!(!is_spam, "Reputation {} should avoid spam threshold {}",
-            reputation.aggregate, spam_threshold);
+        assert!(
+            !is_priority,
+            "Reputation {} shouldn't meet priority threshold {}",
+            reputation.aggregate, priority_threshold
+        );
+        assert!(
+            !is_spam,
+            "Reputation {} should avoid spam threshold {}",
+            reputation.aggregate, spam_threshold
+        );
     }
 
     /// Tests combining PoGQ with reputation for mail scoring
@@ -386,9 +422,9 @@ mod mail_trust_integration {
     fn test_mail_composite_trust() {
         // Use MATL for computing sender trust
         let pogq = ProofOfGradientQuality::new(
-            0.85,  // Message quality (e.g., no spam indicators)
-            0.9,   // Consistency (regular sender, not burst)
-            0.1,   // Low entropy (expected content type)
+            0.85, // Message quality (e.g., no spam indicators)
+            0.9,  // Consistency (regular sender, not burst)
+            0.1,  // Low entropy (expected content type)
         );
 
         let sender_reputation = 0.7;
@@ -413,7 +449,7 @@ mod e2e_workflows {
 
         // Step 1: Collect node contributions with scores
         let contributions = vec![
-            ("node1", 0.92),  // (id, composite_score)
+            ("node1", 0.92), // (id, composite_score)
             ("node2", 0.89),
             ("node3", 0.91),
             ("node4", 0.25), // Byzantine node - low score
@@ -430,8 +466,11 @@ mod e2e_workflows {
         let suspected = detector.get_suspected_byzantine();
 
         // Step 4: Verify Byzantine node is detected
-        assert!(suspected.contains(&"node4".to_string()),
-            "Byzantine node should be detected as anomaly, got {:?}", suspected);
+        assert!(
+            suspected.contains(&"node4".to_string()),
+            "Byzantine node should be detected as anomaly, got {:?}",
+            suspected
+        );
 
         // Step 5: Verify honest nodes are not flagged
         assert!(!suspected.contains(&"node1".to_string()));
@@ -453,11 +492,14 @@ mod e2e_workflows {
         );
 
         // Step 3: Validate meets requirements
-        assert!(credential_classification.meets_requirements(
-            min_empirical,
-            min_normative,
-            MaterialityLevel::M0Ephemeral,  // Any materiality is OK
-        ), "Credential should meet epistemic requirements");
+        assert!(
+            credential_classification.meets_requirements(
+                min_empirical,
+                min_normative,
+                MaterialityLevel::M0Ephemeral, // Any materiality is OK
+            ),
+            "Credential should meet epistemic requirements"
+        );
 
         // Step 4: Create claim for the credential
         let claim = ClaimBuilder::new("course_completion")
@@ -499,9 +541,9 @@ mod e2e_workflows {
 
         // Step 2: Use MATL to compute message trust
         let pogq = ProofOfGradientQuality::new(
-            0.8,   // Message quality
-            0.85,  // Sender consistency
-            0.1,   // Content entropy
+            0.8,  // Message quality
+            0.85, // Sender consistency
+            0.1,  // Content entropy
         );
 
         // Step 3: Combine reputation with message quality
@@ -514,6 +556,10 @@ mod e2e_workflows {
         // Verify the flow produces a valid decision
         assert!(combined_trust >= 0.0 && combined_trust <= 1.0);
         // Good reputation + good message quality should result in prioritization
-        assert!(should_prioritize, "Expected prioritization with trust score {}", combined_trust);
+        assert!(
+            should_prioritize,
+            "Expected prioritization with trust score {}",
+            combined_trust
+        );
     }
 }

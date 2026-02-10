@@ -75,7 +75,9 @@ impl ProofOfGradientQuality {
     /// # Returns
     /// Weighted composite score: 0.4*quality + 0.3*consistency + 0.3*reputation
     pub fn composite_score(&self, reputation: f64) -> f64 {
-        use super::{DEFAULT_QUALITY_WEIGHT, DEFAULT_CONSISTENCY_WEIGHT, DEFAULT_REPUTATION_WEIGHT};
+        use super::{
+            DEFAULT_CONSISTENCY_WEIGHT, DEFAULT_QUALITY_WEIGHT, DEFAULT_REPUTATION_WEIGHT,
+        };
 
         let rep = reputation.clamp(0.0, 1.0);
 

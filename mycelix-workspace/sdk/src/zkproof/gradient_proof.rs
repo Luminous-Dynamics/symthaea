@@ -104,8 +104,8 @@ pub struct GradientConstraints {
 impl Default for GradientConstraints {
     fn default() -> Self {
         Self {
-            min_norm: 0.001,      // Gradient shouldn't be zero
-            max_norm: 100.0,      // Prevent gradient explosion
+            min_norm: 0.001, // Gradient shouldn't be zero
+            max_norm: 100.0, // Prevent gradient explosion
             max_element_magnitude: 10.0,
             min_dimension: 10,
         }
@@ -156,7 +156,8 @@ pub fn verify_gradient_quality(
     let l2_norm: f32 = gradient.iter().map(|g| g * g).sum::<f32>().sqrt();
 
     // Find max element magnitude
-    let max_element: f32 = gradient.iter()
+    let max_element: f32 = gradient
+        .iter()
         .map(|g| g.abs())
         .fold(0.0f32, |a, b| a.max(b));
 
@@ -167,7 +168,10 @@ pub fn verify_gradient_quality(
             l2_norm,
             max_element,
             dimension: gradient.len(),
-            failure_reason: Some(format!("L2 norm too small: {} < {}", l2_norm, constraints.min_norm)),
+            failure_reason: Some(format!(
+                "L2 norm too small: {} < {}",
+                l2_norm, constraints.min_norm
+            )),
         };
     }
 
@@ -177,7 +181,10 @@ pub fn verify_gradient_quality(
             l2_norm,
             max_element,
             dimension: gradient.len(),
-            failure_reason: Some(format!("L2 norm too large: {} > {}", l2_norm, constraints.max_norm)),
+            failure_reason: Some(format!(
+                "L2 norm too large: {} > {}",
+                l2_norm, constraints.max_norm
+            )),
         };
     }
 
@@ -187,7 +194,10 @@ pub fn verify_gradient_quality(
             l2_norm,
             max_element,
             dimension: gradient.len(),
-            failure_reason: Some(format!("Element magnitude too large: {} > {}", max_element, constraints.max_element_magnitude)),
+            failure_reason: Some(format!(
+                "Element magnitude too large: {} > {}",
+                max_element, constraints.max_element_magnitude
+            )),
         };
     }
 
@@ -237,7 +247,7 @@ pub const GRADIENT_HASH_DOMAIN: &[u8] = b"mycelix-gradient-hash-v1";
 /// The domain separator "mycelix-gradient-hash-v1" ensures that hashes of
 /// gradient vectors cannot be confused with hashes from other contexts.
 pub fn hash_gradient(gradient: &[f32]) -> [u8; 32] {
-    use sha3::{Sha3_256, Digest};
+    use sha3::{Digest, Sha3_256};
     let mut hasher = Sha3_256::new();
 
     // FIND-011: Add domain separator
@@ -277,7 +287,7 @@ pub const GRADIENT_COMMITMENT_DOMAIN: &[u8] = b"mycelix-gradient-commitment-v1";
 /// )
 /// ```
 pub fn compute_commitment(output: &GradientProofOutput) -> [u8; 32] {
-    use sha3::{Sha3_256, Digest};
+    use sha3::{Digest, Sha3_256};
     let mut hasher = Sha3_256::new();
 
     // FIND-011: Add domain separator to prevent cross-protocol attacks

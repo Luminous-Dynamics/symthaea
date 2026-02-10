@@ -20,8 +20,9 @@ fn matl_and_hyperfeel_basic_flow() {
 
     // Two similar gradients and one clearly different gradient.
     let grad_honest: Vec<f32> = (0..2_000).map(|i| (i as f32 * 0.001).sin()).collect();
-    let grad_honest_perturbed: Vec<f32> =
-        (0..2_000).map(|i| (i as f32 * 0.001).sin() + 0.01).collect();
+    let grad_honest_perturbed: Vec<f32> = (0..2_000)
+        .map(|i| (i as f32 * 0.001).sin() + 0.01)
+        .collect();
     let grad_bad: Vec<f32> = (0..2_000)
         .map(|i| {
             let x = i as f32;
@@ -33,10 +34,8 @@ fn matl_and_hyperfeel_basic_flow() {
     let hg2 = encoder.encode_gradient(&grad_honest_perturbed, 1, "node-h2");
     let hg_bad = encoder.encode_gradient(&grad_bad, 1, "node-bad");
 
-    let sim_hh =
-        HyperFeelEncoder::cosine_similarity(&hg1.hypervector, &hg2.hypervector);
-    let sim_hb =
-        HyperFeelEncoder::cosine_similarity(&hg1.hypervector, &hg_bad.hypervector);
+    let sim_hh = HyperFeelEncoder::cosine_similarity(&hg1.hypervector, &hg2.hypervector);
+    let sim_hb = HyperFeelEncoder::cosine_similarity(&hg1.hypervector, &hg_bad.hypervector);
 
     assert!(
         sim_hh > sim_hb,
@@ -69,9 +68,7 @@ fn matl_and_hyperfeel_basic_flow() {
     // Network evaluation should always be within configured bounds.
     assert!(
         net_eval.adaptive_byzantine_threshold >= mycelix_sdk::matl::MIN_BYZANTINE_TOLERANCE
-            && net_eval.adaptive_byzantine_threshold
-                <= mycelix_sdk::matl::MAX_BYZANTINE_TOLERANCE,
+            && net_eval.adaptive_byzantine_threshold <= mycelix_sdk::matl::MAX_BYZANTINE_TOLERANCE,
         "adaptive threshold must remain within configured bounds"
     );
 }
-

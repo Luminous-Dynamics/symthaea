@@ -32,12 +32,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::coordination::{
-    CoordinationConfig, ConsensusDecision,
-    ConsensusResult, Proposal, Vote, VoteType,
+    ConsensusDecision, ConsensusResult, CoordinationConfig, Proposal, Vote, VoteType,
 };
-use super::zk_trust::{
-    KVectorCommitment, ProofStatement, TrustProof, TrustProver, ProofError,
-};
+use super::zk_trust::{KVectorCommitment, ProofError, ProofStatement, TrustProof, TrustProver};
 use crate::matl::KVector;
 
 // ============================================================================
@@ -388,7 +385,8 @@ impl ZKAgentGroup {
 
     /// Check if agent has valid membership proof
     pub fn has_valid_proof(&self, agent_id: &str) -> bool {
-        self.members.get(agent_id)
+        self.members
+            .get(agent_id)
             .map(|m| m.membership_proof.is_some())
             .unwrap_or(false)
     }
@@ -476,11 +474,12 @@ impl ZKAgentGroup {
             return Err(ZKCoordinationError::ProofRequired);
         }
 
-        let member = self.members.get(agent_id).ok_or_else(|| {
-            ZKCoordinationError::NotMember {
+        let member = self
+            .members
+            .get(agent_id)
+            .ok_or_else(|| ZKCoordinationError::NotMember {
                 agent_id: agent_id.to_string(),
-            }
-        })?;
+            })?;
 
         let state = self.proposals.get_mut(proposal_id).ok_or_else(|| {
             ZKCoordinationError::ProposalNotFound {
@@ -599,11 +598,12 @@ impl ZKAgentGroup {
         };
 
         // Finalize if decision is final
-        if matches!(decision,
-            ConsensusDecision::Approved |
-            ConsensusDecision::Rejected |
-            ConsensusDecision::NoQuorum |
-            ConsensusDecision::Expired
+        if matches!(
+            decision,
+            ConsensusDecision::Approved
+                | ConsensusDecision::Rejected
+                | ConsensusDecision::NoQuorum
+                | ConsensusDecision::Expired
         ) {
             state.finalized = true;
             state.result = Some(result.clone());
@@ -708,10 +708,20 @@ impl std::fmt::Display for ZKCoordinationError {
             Self::NotMember { agent_id } => write!(f, "Agent {} is not a member", agent_id),
             Self::AlreadyMember { agent_id } => write!(f, "Agent {} is already a member", agent_id),
             Self::GroupFull => write!(f, "Group is full"),
-            Self::InsufficientTrust { agent_id, trust, required } => {
-                write!(f, "Agent {} has trust {} but {} required", agent_id, trust, required)
+            Self::InsufficientTrust {
+                agent_id,
+                trust,
+                required,
+            } => {
+                write!(
+                    f,
+                    "Agent {} has trust {} but {} required",
+                    agent_id, trust, required
+                )
             }
-            Self::ProposalNotFound { proposal_id } => write!(f, "Proposal {} not found", proposal_id),
+            Self::ProposalNotFound { proposal_id } => {
+                write!(f, "Proposal {} not found", proposal_id)
+            }
             Self::ProposalFinalized { proposal_id } => {
                 write!(f, "Proposal {} already finalized", proposal_id)
             }
@@ -737,7 +747,8 @@ fn compute_trust_score(kvector: &KVector) -> f64 {
     let values = kvector.to_array();
     let weights = [0.20, 0.10, 0.20, 0.15, 0.10, 0.05, 0.10, 0.05, 0.025, 0.025];
 
-    values.iter()
+    values
+        .iter()
         .zip(weights.iter())
         .map(|(v, w)| (*v as f64) * w)
         .sum::<f64>()
@@ -752,7 +763,9 @@ mod tests {
     use super::*;
 
     fn create_test_kvector(trust: f32) -> KVector {
-        KVector::new(trust, trust, trust, trust, trust, trust, trust, trust, trust, trust)
+        KVector::new(
+            trust, trust, trust, trust, trust, trust, trust, trust, trust, trust,
+        )
     }
 
     #[test]

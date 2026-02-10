@@ -90,7 +90,11 @@ impl<E: std::error::Error> fmt::Debug for SanitizedError<E> {
 
         #[cfg(not(debug_assertions))]
         {
-            write!(f, "SanitizedError {{ {} }}", sanitize_message(&self.inner.to_string()))
+            write!(
+                f,
+                "SanitizedError {{ {} }}",
+                sanitize_message(&self.inner.to_string())
+            )
         }
     }
 }
@@ -168,13 +172,11 @@ static INCOME_PATTERN: Lazy<Regex> = Lazy::new(|| {
 });
 
 static SSN_PATTERN: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\b\d{3}-\d{2}-\d{4}\b")
-        .expect("hardcoded SSN_PATTERN regex should compile")
+    Regex::new(r"\b\d{3}-\d{2}-\d{4}\b").expect("hardcoded SSN_PATTERN regex should compile")
 });
 
 static KEY_PATTERN: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\b[a-fA-F0-9]{16,}\b")
-        .expect("hardcoded KEY_PATTERN regex should compile")
+    Regex::new(r"\b[a-fA-F0-9]{16,}\b").expect("hardcoded KEY_PATTERN regex should compile")
 });
 
 static EMAIL_PATTERN: Lazy<Regex> = Lazy::new(|| {
@@ -268,10 +270,7 @@ mod tests {
 
     #[test]
     fn test_sanitized_error_wrapper() {
-        let error = std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Failed for income $100,000.00"
-        );
+        let error = std::io::Error::new(std::io::ErrorKind::Other, "Failed for income $100,000.00");
         let sanitized = SanitizedError::new(error);
 
         // The inner error should still be accessible

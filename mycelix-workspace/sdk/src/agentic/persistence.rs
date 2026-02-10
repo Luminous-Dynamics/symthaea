@@ -9,13 +9,11 @@
 //! - **Event Sourcing**: Full audit trail of agent lifecycle events
 //! - **Backend Abstraction**: Support for multiple storage backends
 
+use super::{AgentClass, AgentStatus, InstrumentalActor};
+use crate::matl::KVector;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use crate::matl::KVector;
-use super::{
-    InstrumentalActor, AgentStatus, AgentClass,
-};
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -242,19 +240,37 @@ pub trait AgentStorageBackend: Send + Sync {
     fn find_by_status(&self, status: AgentStatus) -> PersistenceResult<Vec<InstrumentalActor>>;
 
     /// Save K-Vector history entry
-    fn save_kvector_history(&mut self, agent_id: &str, snapshot: KVectorSnapshot, timestamp: u64) -> PersistenceResult<()>;
+    fn save_kvector_history(
+        &mut self,
+        agent_id: &str,
+        snapshot: KVectorSnapshot,
+        timestamp: u64,
+    ) -> PersistenceResult<()>;
 
     /// Get K-Vector history for agent
-    fn get_kvector_history(&self, agent_id: &str, limit: Option<usize>) -> PersistenceResult<Vec<(u64, KVectorSnapshot)>>;
+    fn get_kvector_history(
+        &self,
+        agent_id: &str,
+        limit: Option<usize>,
+    ) -> PersistenceResult<Vec<(u64, KVectorSnapshot)>>;
 
     /// Append event to log
     fn append_event(&mut self, event: AgentEvent) -> PersistenceResult<u64>;
 
     /// Get events for agent
-    fn get_agent_events(&self, agent_id: &str, since: Option<u64>, limit: Option<usize>) -> PersistenceResult<Vec<EventLogEntry>>;
+    fn get_agent_events(
+        &self,
+        agent_id: &str,
+        since: Option<u64>,
+        limit: Option<usize>,
+    ) -> PersistenceResult<Vec<EventLogEntry>>;
 
     /// Get all events since sequence number
-    fn get_events_since(&self, sequence: u64, limit: Option<usize>) -> PersistenceResult<Vec<EventLogEntry>>;
+    fn get_events_since(
+        &self,
+        sequence: u64,
+        limit: Option<usize>,
+    ) -> PersistenceResult<Vec<EventLogEntry>>;
 }
 
 // ============================================================================
@@ -301,18 +317,21 @@ impl Default for MemoryStorageBackend {
 
 impl AgentStorageBackend for MemoryStorageBackend {
     fn save_agent(&mut self, agent: &InstrumentalActor) -> PersistenceResult<()> {
-        self.agents.insert(agent.agent_id.as_str().to_string(), agent.clone());
+        self.agents
+            .insert(agent.agent_id.as_str().to_string(), agent.clone());
         Ok(())
     }
 
     fn load_agent(&self, agent_id: &str) -> PersistenceResult<InstrumentalActor> {
-        self.agents.get(agent_id)
+        self.agents
+            .get(agent_id)
             .cloned()
             .ok_or_else(|| PersistenceError::NotFound(agent_id.to_string()))
     }
 
     fn delete_agent(&mut self, agent_id: &str) -> PersistenceResult<()> {
-        self.agents.remove(agent_id)
+        self.agents
+            .remove(agent_id)
             .map(|_| ())
             .ok_or_else(|| PersistenceError::NotFound(agent_id.to_string()))
     }
@@ -326,20 +345,29 @@ impl AgentStorageBackend for MemoryStorageBackend {
     }
 
     fn find_by_sponsor(&self, sponsor_did: &str) -> PersistenceResult<Vec<InstrumentalActor>> {
-        Ok(self.agents.values()
+        Ok(self
+            .agents
+            .values()
             .filter(|a| a.sponsor_did == sponsor_did)
             .cloned()
             .collect())
     }
 
     fn find_by_status(&self, status: AgentStatus) -> PersistenceResult<Vec<InstrumentalActor>> {
-        Ok(self.agents.values()
+        Ok(self
+            .agents
+            .values()
             .filter(|a| a.status == status)
             .cloned()
             .collect())
     }
 
-    fn save_kvector_history(&mut self, agent_id: &str, snapshot: KVectorSnapshot, timestamp: u64) -> PersistenceResult<()> {
+    fn save_kvector_history(
+        &mut self,
+        agent_id: &str,
+        snapshot: KVectorSnapshot,
+        timestamp: u64,
+    ) -> PersistenceResult<()> {
         self.kvector_history
             .entry(agent_id.to_string())
             .or_default()
@@ -347,8 +375,14 @@ impl AgentStorageBackend for MemoryStorageBackend {
         Ok(())
     }
 
-    fn get_kvector_history(&self, agent_id: &str, limit: Option<usize>) -> PersistenceResult<Vec<(u64, KVectorSnapshot)>> {
-        let history = self.kvector_history.get(agent_id)
+    fn get_kvector_history(
+        &self,
+        agent_id: &str,
+        limit: Option<usize>,
+    ) -> PersistenceResult<Vec<(u64, KVectorSnapshot)>> {
+        let history = self
+            .kvector_history
+            .get(agent_id)
             .cloned()
             .unwrap_or_default();
 
@@ -385,8 +419,15 @@ impl AgentStorageBackend for MemoryStorageBackend {
         Ok(self.next_sequence - 1)
     }
 
-    fn get_agent_events(&self, agent_id: &str, since: Option<u64>, limit: Option<usize>) -> PersistenceResult<Vec<EventLogEntry>> {
-        let filtered: Vec<_> = self.events.iter()
+    fn get_agent_events(
+        &self,
+        agent_id: &str,
+        since: Option<u64>,
+        limit: Option<usize>,
+    ) -> PersistenceResult<Vec<EventLogEntry>> {
+        let filtered: Vec<_> = self
+            .events
+            .iter()
             .filter(|e| {
                 let event_agent_id = match &e.event {
                     AgentEvent::Created { agent_id, .. } => agent_id,
@@ -410,8 +451,14 @@ impl AgentStorageBackend for MemoryStorageBackend {
         })
     }
 
-    fn get_events_since(&self, sequence: u64, limit: Option<usize>) -> PersistenceResult<Vec<EventLogEntry>> {
-        let filtered: Vec<_> = self.events.iter()
+    fn get_events_since(
+        &self,
+        sequence: u64,
+        limit: Option<usize>,
+    ) -> PersistenceResult<Vec<EventLogEntry>> {
+        let filtered: Vec<_> = self
+            .events
+            .iter()
             .filter(|e| e.sequence > sequence)
             .cloned()
             .collect();
@@ -443,11 +490,15 @@ impl<B: AgentStorageBackend> AgentRepository<B> {
 
     /// Create a new agent and persist it
     pub fn create_agent(&self, agent: InstrumentalActor) -> PersistenceResult<()> {
-        let mut backend = self.backend.write()
+        let mut backend = self
+            .backend
+            .write()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
 
         if backend.agent_exists(agent.agent_id.as_str()) {
-            return Err(PersistenceError::AlreadyExists(agent.agent_id.as_str().to_string()));
+            return Err(PersistenceError::AlreadyExists(
+                agent.agent_id.as_str().to_string(),
+            ));
         }
 
         // Record creation event
@@ -471,18 +522,24 @@ impl<B: AgentStorageBackend> AgentRepository<B> {
 
     /// Get an agent by ID
     pub fn get_agent(&self, agent_id: &str) -> PersistenceResult<InstrumentalActor> {
-        let backend = self.backend.read()
+        let backend = self
+            .backend
+            .read()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
         backend.load_agent(agent_id)
     }
 
     /// Update an existing agent
     pub fn update_agent(&self, agent: &InstrumentalActor) -> PersistenceResult<()> {
-        let mut backend = self.backend.write()
+        let mut backend = self
+            .backend
+            .write()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
 
         if !backend.agent_exists(agent.agent_id.as_str()) {
-            return Err(PersistenceError::NotFound(agent.agent_id.as_str().to_string()));
+            return Err(PersistenceError::NotFound(
+                agent.agent_id.as_str().to_string(),
+            ));
         }
 
         backend.save_agent(agent)
@@ -496,7 +553,9 @@ impl<B: AgentStorageBackend> AgentRepository<B> {
         trigger: &str,
         timestamp: u64,
     ) -> PersistenceResult<()> {
-        let mut backend = self.backend.write()
+        let mut backend = self
+            .backend
+            .write()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
 
         // Record K-Vector update event
@@ -527,7 +586,9 @@ impl<B: AgentStorageBackend> AgentRepository<B> {
         reason: &str,
         timestamp: u64,
     ) -> PersistenceResult<InstrumentalActor> {
-        let mut backend = self.backend.write()
+        let mut backend = self
+            .backend
+            .write()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
 
         let mut agent = backend.load_agent(agent_id)?;
@@ -556,7 +617,9 @@ impl<B: AgentStorageBackend> AgentRepository<B> {
         reason: &str,
         timestamp: u64,
     ) -> PersistenceResult<()> {
-        let mut backend = self.backend.write()
+        let mut backend = self
+            .backend
+            .write()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
 
         let mut agent = backend.load_agent(agent_id)?;
@@ -577,52 +640,77 @@ impl<B: AgentStorageBackend> AgentRepository<B> {
 
     /// Delete an agent
     pub fn delete_agent(&self, agent_id: &str) -> PersistenceResult<()> {
-        let mut backend = self.backend.write()
+        let mut backend = self
+            .backend
+            .write()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
         backend.delete_agent(agent_id)
     }
 
     /// List all agents
     pub fn list_all(&self) -> PersistenceResult<Vec<InstrumentalActor>> {
-        let backend = self.backend.read()
+        let backend = self
+            .backend
+            .read()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
         let ids = backend.list_agents()?;
-        ids.iter()
-            .map(|id| backend.load_agent(id))
-            .collect()
+        ids.iter().map(|id| backend.load_agent(id)).collect()
     }
 
     /// Find agents by sponsor
     pub fn find_by_sponsor(&self, sponsor_did: &str) -> PersistenceResult<Vec<InstrumentalActor>> {
-        let backend = self.backend.read()
+        let backend = self
+            .backend
+            .read()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
         backend.find_by_sponsor(sponsor_did)
     }
 
     /// Find agents by status
     pub fn find_by_status(&self, status: AgentStatus) -> PersistenceResult<Vec<InstrumentalActor>> {
-        let backend = self.backend.read()
+        let backend = self
+            .backend
+            .read()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
         backend.find_by_status(status)
     }
 
     /// Get K-Vector history for an agent
-    pub fn get_kvector_history(&self, agent_id: &str, limit: Option<usize>) -> PersistenceResult<Vec<(u64, KVectorSnapshot)>> {
-        let backend = self.backend.read()
+    pub fn get_kvector_history(
+        &self,
+        agent_id: &str,
+        limit: Option<usize>,
+    ) -> PersistenceResult<Vec<(u64, KVectorSnapshot)>> {
+        let backend = self
+            .backend
+            .read()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
         backend.get_kvector_history(agent_id, limit)
     }
 
     /// Get events for an agent
-    pub fn get_agent_events(&self, agent_id: &str, since: Option<u64>, limit: Option<usize>) -> PersistenceResult<Vec<EventLogEntry>> {
-        let backend = self.backend.read()
+    pub fn get_agent_events(
+        &self,
+        agent_id: &str,
+        since: Option<u64>,
+        limit: Option<usize>,
+    ) -> PersistenceResult<Vec<EventLogEntry>> {
+        let backend = self
+            .backend
+            .read()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
         backend.get_agent_events(agent_id, since, limit)
     }
 
     /// Subscribe to events since sequence (for event streaming)
-    pub fn get_events_since(&self, sequence: u64, limit: Option<usize>) -> PersistenceResult<Vec<EventLogEntry>> {
-        let backend = self.backend.read()
+    pub fn get_events_since(
+        &self,
+        sequence: u64,
+        limit: Option<usize>,
+    ) -> PersistenceResult<Vec<EventLogEntry>> {
+        let backend = self
+            .backend
+            .read()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
         backend.get_events_since(sequence, limit)
     }
@@ -708,7 +796,10 @@ impl AgentQueryBuilder {
     }
 
     /// Execute the query
-    pub fn execute<B: AgentStorageBackend>(&self, repo: &AgentRepository<B>) -> PersistenceResult<Vec<InstrumentalActor>> {
+    pub fn execute<B: AgentStorageBackend>(
+        &self,
+        repo: &AgentRepository<B>,
+    ) -> PersistenceResult<Vec<InstrumentalActor>> {
         let all_agents = if let Some(ref sponsor) = self.sponsor_filter {
             repo.find_by_sponsor(sponsor)?
         } else if let Some(status) = self.status_filter {
@@ -717,7 +808,8 @@ impl AgentQueryBuilder {
             repo.list_all()?
         };
 
-        let filtered: Vec<_> = all_agents.into_iter()
+        let filtered: Vec<_> = all_agents
+            .into_iter()
             .filter(|a| {
                 // Apply additional filters
                 if let Some(status) = self.status_filter {
@@ -787,7 +879,9 @@ impl AgentStatistics {
     /// Compute statistics from repository
     pub fn compute<B: AgentStorageBackend>(repo: &AgentRepository<B>) -> PersistenceResult<Self> {
         let agents = repo.list_all()?;
-        let backend = repo.backend.read()
+        let backend = repo
+            .backend
+            .read()
             .map_err(|e| PersistenceError::LockPoisoned(e.to_string()))?;
 
         let mut by_status: HashMap<String, usize> = HashMap::new();
@@ -798,7 +892,9 @@ impl AgentStatistics {
 
         for agent in &agents {
             *by_status.entry(format!("{:?}", agent.status)).or_insert(0) += 1;
-            *by_class.entry(format!("{:?}", agent.agent_class)).or_insert(0) += 1;
+            *by_class
+                .entry(format!("{:?}", agent.agent_class))
+                .or_insert(0) += 1;
 
             let trust = agent.k_vector.trust_score() as f64;
             trust_scores.push(trust);
@@ -848,7 +944,7 @@ impl AgentStatistics {
 mod tests {
     use super::*;
     use crate::agentic::UncertaintyCalibration;
-    use crate::agentic::{AgentId, AgentConstraints, EpistemicStats};
+    use crate::agentic::{AgentConstraints, AgentId, EpistemicStats};
 
     fn create_test_agent(id: &str, sponsor: &str) -> InstrumentalActor {
         InstrumentalActor {
@@ -915,7 +1011,8 @@ mod tests {
         repo.create_agent(agent).unwrap();
 
         // Change status
-        repo.change_status("agent-1", AgentStatus::Suspended, "test", 2000).unwrap();
+        repo.change_status("agent-1", AgentStatus::Suspended, "test", 2000)
+            .unwrap();
 
         // Check events
         let events = repo.get_agent_events("agent-1", None, None).unwrap();
@@ -927,7 +1024,11 @@ mod tests {
         }
 
         match &events[1].event {
-            AgentEvent::StatusChanged { old_status, new_status, .. } => {
+            AgentEvent::StatusChanged {
+                old_status,
+                new_status,
+                ..
+            } => {
                 assert_eq!(*old_status, AgentStatus::Active);
                 assert_eq!(*new_status, AgentStatus::Suspended);
             }
@@ -947,7 +1048,8 @@ mod tests {
         let old_kv = agent.k_vector.clone();
         agent.k_vector = KVector::new(0.7, 0.6, 0.8, 0.7, 0.3, 0.4, 0.5, 0.3, 0.7, 0.65);
 
-        repo.update_agent_with_kvector_history(&agent, &old_kv, "test_update", 2000).unwrap();
+        repo.update_agent_with_kvector_history(&agent, &old_kv, "test_update", 2000)
+            .unwrap();
 
         // Check history
         let history = repo.get_kvector_history("agent-1", None).unwrap();
@@ -987,10 +1089,7 @@ mod tests {
         assert_eq!(results.len(), 1); // Only agent-1 has trust >= 0.6
 
         // Query with limit
-        let results = AgentQueryBuilder::new()
-            .limit(2)
-            .execute(&repo)
-            .unwrap();
+        let results = AgentQueryBuilder::new().limit(2).execute(&repo).unwrap();
         assert_eq!(results.len(), 2);
     }
 
@@ -1043,69 +1142,108 @@ mod tests {
         // create_agent (requires write)
         let new_agent = create_test_agent("agent-2", "sponsor-1");
         let result = repo.create_agent(new_agent);
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "create_agent should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "create_agent should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // get_agent (requires read)
         let result = repo.get_agent("agent-1");
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "get_agent should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "get_agent should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // update_agent (requires write)
         let result = repo.update_agent(&agent);
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "update_agent should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "update_agent should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // update_agent_with_kvector_history (requires write)
         let old_kv = agent.k_vector.clone();
         let result = repo.update_agent_with_kvector_history(&agent, &old_kv, "test", 1000);
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "update_agent_with_kvector_history should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "update_agent_with_kvector_history should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // change_status (requires write)
         let result = repo.change_status("agent-1", AgentStatus::Suspended, "test", 2000);
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "change_status should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "change_status should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // record_kredit_change (requires write)
         let result = repo.record_kredit_change("agent-1", 1000, "test", 2000);
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "record_kredit_change should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "record_kredit_change should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // delete_agent (requires write)
         let result = repo.delete_agent("agent-1");
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "delete_agent should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "delete_agent should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // list_all (requires read)
         let result = repo.list_all();
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "list_all should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "list_all should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // find_by_sponsor (requires read)
         let result = repo.find_by_sponsor("sponsor-1");
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "find_by_sponsor should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "find_by_sponsor should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // find_by_status (requires read)
         let result = repo.find_by_status(AgentStatus::Active);
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "find_by_status should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "find_by_status should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // get_kvector_history (requires read)
         let result = repo.get_kvector_history("agent-1", None);
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "get_kvector_history should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "get_kvector_history should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // get_agent_events (requires read)
         let result = repo.get_agent_events("agent-1", None, None);
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "get_agent_events should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "get_agent_events should return LockPoisoned error, got: {:?}",
+            result
+        );
 
         // get_events_since (requires read)
         let result = repo.get_events_since(0, None);
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "get_events_since should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "get_events_since should return LockPoisoned error, got: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -1131,8 +1269,11 @@ mod tests {
 
         // AgentStatistics::compute should fail gracefully
         let result = AgentStatistics::compute(&repo);
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "AgentStatistics::compute should return LockPoisoned error, got: {:?}", result);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "AgentStatistics::compute should return LockPoisoned error, got: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -1155,11 +1296,12 @@ mod tests {
         }));
 
         // Query execution should fail gracefully
-        let result = AgentQueryBuilder::new()
-            .sponsor("sponsor-1")
-            .execute(&repo);
-        assert!(matches!(result, Err(PersistenceError::LockPoisoned(_))),
-            "Query builder should return LockPoisoned error, got: {:?}", result);
+        let result = AgentQueryBuilder::new().sponsor("sponsor-1").execute(&repo);
+        assert!(
+            matches!(result, Err(PersistenceError::LockPoisoned(_))),
+            "Query builder should return LockPoisoned error, got: {:?}",
+            result
+        );
     }
 
     #[test]

@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 use thiserror::Error;
 
-use super::types::{GradientUpdate, AggregatedGradient, AggregationMethod, Participant};
+use super::types::{AggregatedGradient, AggregationMethod, GradientUpdate, Participant};
 use crate::matl::ProofOfGradientQuality;
 
 // ---- Core crate delegation helpers ----
@@ -42,8 +42,15 @@ fn map_core_error(e: mycelix_fl_core::aggregation::AggregationError) -> Aggregat
     match e {
         CoreErr::NoUpdates => AggregationError::NoUpdates,
         CoreErr::EmptyGradients(id) => AggregationError::EmptyGradients(id),
-        CoreErr::GradientSizeMismatch { participant_id, expected, actual } =>
-            AggregationError::GradientSizeMismatch { participant_id, expected, actual },
+        CoreErr::GradientSizeMismatch {
+            participant_id,
+            expected,
+            actual,
+        } => AggregationError::GradientSizeMismatch {
+            participant_id,
+            expected,
+            actual,
+        },
         CoreErr::InvalidTrimPercentage(p) => AggregationError::InvalidTrimPercentage(p as f64),
         CoreErr::NotEnoughForKrum(n) => AggregationError::NotEnoughForKrum(n),
         CoreErr::InvalidKrumSelect(n) => AggregationError::InvalidKrumSelect(n),
@@ -171,8 +178,8 @@ pub fn trimmed_mean(
 /// * `updates` - Gradient updates from participants
 pub fn coordinate_median(updates: &[GradientUpdate]) -> Result<Vec<f64>, AggregationError> {
     let core_updates = sdk_to_core_updates(updates);
-    let result = mycelix_fl_core::aggregation::coordinate_median(&core_updates)
-        .map_err(map_core_error)?;
+    let result =
+        mycelix_fl_core::aggregation::coordinate_median(&core_updates).map_err(map_core_error)?;
     Ok(mycelix_fl_core::convert::gradients_to_f64(&result))
 }
 
@@ -186,8 +193,8 @@ pub fn coordinate_median(updates: &[GradientUpdate]) -> Result<Vec<f64>, Aggrega
 /// * `num_select` - Number of gradients to select and average (default: 1)
 pub fn krum(updates: &[GradientUpdate], num_select: usize) -> Result<Vec<f64>, AggregationError> {
     let core_updates = sdk_to_core_updates(updates);
-    let result = mycelix_fl_core::aggregation::krum(&core_updates, num_select)
-        .map_err(map_core_error)?;
+    let result =
+        mycelix_fl_core::aggregation::krum(&core_updates, num_select).map_err(map_core_error)?;
     Ok(mycelix_fl_core::convert::gradients_to_f64(&result))
 }
 
@@ -292,7 +299,11 @@ pub fn calculate_update_quality(update: &GradientUpdate) -> f64 {
 
 /// Create PoGQ from gradient update
 #[allow(dead_code)]
-pub fn create_pogq_from_update(update: &GradientUpdate, consistency: f64, entropy: f64) -> ProofOfGradientQuality {
+pub fn create_pogq_from_update(
+    update: &GradientUpdate,
+    consistency: f64,
+    entropy: f64,
+) -> ProofOfGradientQuality {
     let quality = calculate_update_quality(update);
     ProofOfGradientQuality::new(quality, consistency, entropy)
 }
@@ -477,9 +488,8 @@ impl EarlyByzantineDetector {
 
         // Compute statistics
         let mean_norm: f64 = norms.iter().sum::<f64>() / norms.len() as f64;
-        let variance: f64 = norms.iter()
-            .map(|n| (n - mean_norm).powi(2))
-            .sum::<f64>() / norms.len() as f64;
+        let variance: f64 =
+            norms.iter().map(|n| (n - mean_norm).powi(2)).sum::<f64>() / norms.len() as f64;
         let std_dev = variance.sqrt();
 
         for (i, &norm) in norms.iter().enumerate() {
@@ -516,10 +526,14 @@ impl EarlyByzantineDetector {
     }
 
     /// Filter updates, removing detected Byzantine participants
-    pub fn filter_updates<'a>(&self, updates: &'a [GradientUpdate]) -> (Vec<&'a GradientUpdate>, ByzantineDetectionResult) {
+    pub fn filter_updates<'a>(
+        &self,
+        updates: &'a [GradientUpdate],
+    ) -> (Vec<&'a GradientUpdate>, ByzantineDetectionResult) {
         let detection = self.detect(updates);
 
-        let filtered: Vec<&GradientUpdate> = updates.iter()
+        let filtered: Vec<&GradientUpdate> = updates
+            .iter()
             .enumerate()
             .filter(|(i, _)| !detection.byzantine_indices.contains(i))
             .map(|(_, u)| u)
@@ -565,7 +579,8 @@ pub fn aggregate_with_early_termination(
     }
 
     // Get filtered updates (as owned copies for aggregation)
-    let filtered_updates: Vec<GradientUpdate> = updates.iter()
+    let filtered_updates: Vec<GradientUpdate> = updates
+        .iter()
         .enumerate()
         .filter(|(i, _)| !detection.byzantine_indices.contains(i))
         .map(|(_, u)| u.clone())
@@ -625,9 +640,8 @@ impl GradientStats {
         let losses: Vec<f64> = updates.iter().map(|u| u.metadata.loss).collect();
 
         let mean_norm = norms.iter().sum::<f64>() / norms.len() as f64;
-        let variance = norms.iter()
-            .map(|n| (n - mean_norm).powi(2))
-            .sum::<f64>() / norms.len() as f64;
+        let variance =
+            norms.iter().map(|n| (n - mean_norm).powi(2)).sum::<f64>() / norms.len() as f64;
 
         let min_norm = norms.iter().cloned().fold(f64::INFINITY, f64::min);
         let max_norm = norms.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
@@ -696,7 +710,7 @@ impl Default for SignalWeights {
     fn default() -> Self {
         Self {
             magnitude: 0.25,
-            direction: 0.35,  // Direction attacks are most common
+            direction: 0.35, // Direction attacks are most common
             cross_validation: 0.25,
             coordinate: 0.15,
         }
@@ -822,7 +836,10 @@ impl MultiSignalByzantineDetector {
                 signal_breakdown: vec![],
                 early_terminated: false,
                 method: "multi_signal_insufficient".to_string(),
-                stats: DetectionStats { participants_analyzed: n, ..Default::default() },
+                stats: DetectionStats {
+                    participants_analyzed: n,
+                    ..Default::default()
+                },
             };
         }
 
@@ -843,23 +860,24 @@ impl MultiSignalByzantineDetector {
         let mut sorted_norms = norms.clone();
         sorted_norms.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         let median_norm = if n.is_multiple_of(2) {
-            (sorted_norms[n/2 - 1] + sorted_norms[n/2]) / 2.0
+            (sorted_norms[n / 2 - 1] + sorted_norms[n / 2]) / 2.0
         } else {
-            sorted_norms[n/2]
+            sorted_norms[n / 2]
         };
         // Median Absolute Deviation (MAD)
         let mut deviations: Vec<f64> = norms.iter().map(|&n| (n - median_norm).abs()).collect();
         deviations.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         let mad = if n.is_multiple_of(2) {
-            (deviations[n/2 - 1] + deviations[n/2]) / 2.0
+            (deviations[n / 2 - 1] + deviations[n / 2]) / 2.0
         } else {
-            deviations[n/2]
+            deviations[n / 2]
         };
         // Normalized MAD (consistent estimator of std for normal distribution)
         let normalized_mad = mad * 1.4826;
 
         // Compute cosine similarities to mean
-        let cosine_sims: Vec<f64> = updates.iter()
+        let cosine_sims: Vec<f64> = updates
+            .iter()
             .map(|u| self.cosine_similarity(&u.gradients, &mean_gradient))
             .collect();
         let mean_cosine: f64 = cosine_sims.iter().sum::<f64>() / n as f64;
@@ -910,14 +928,11 @@ impl MultiSignalByzantineDetector {
             };
 
             // Signal 3: Cross-validation (Krum-like)
-            let cross_validation_score = self.compute_cross_validation_score(
-                i, &distances, n
-            );
+            let cross_validation_score = self.compute_cross_validation_score(i, &distances, n);
 
             // Signal 4: Coordinate-wise outlier detection
-            let coordinate_score = self.compute_coordinate_anomaly(
-                &updates[i].gradients, updates, gradient_dim
-            );
+            let coordinate_score =
+                self.compute_coordinate_anomaly(&updates[i].gradients, updates, gradient_dim);
 
             // Combine signals using weighted sum
             let combined = self.signal_weights.magnitude * magnitude_score
@@ -946,15 +961,23 @@ impl MultiSignalByzantineDetector {
                 byzantine_indices.push(i);
                 // Use max of combined and individual scores for confidence
                 let confidence = if extreme_outlier {
-                    1.0  // Extreme outliers get maximum confidence
+                    1.0 // Extreme outliers get maximum confidence
                 } else {
                     combined
                 };
                 confidence_scores.push(confidence);
-                if magnitude_score > 0.5 { signals_triggered += 1; }
-                if direction_score > 0.5 { signals_triggered += 1; }
-                if cross_validation_score > 0.5 { signals_triggered += 1; }
-                if coordinate_score > 0.5 { signals_triggered += 1; }
+                if magnitude_score > 0.5 {
+                    signals_triggered += 1;
+                }
+                if direction_score > 0.5 {
+                    signals_triggered += 1;
+                }
+                if cross_validation_score > 0.5 {
+                    signals_triggered += 1;
+                }
+                if coordinate_score > 0.5 {
+                    signals_triggered += 1;
+                }
             }
         }
 
@@ -984,7 +1007,8 @@ impl MultiSignalByzantineDetector {
     ) -> (Vec<&'a GradientUpdate>, MultiSignalDetectionResult) {
         let detection = self.detect(updates);
 
-        let filtered: Vec<&GradientUpdate> = updates.iter()
+        let filtered: Vec<&GradientUpdate> = updates
+            .iter()
             .enumerate()
             .filter(|(i, _)| !detection.byzantine_indices.contains(i))
             .map(|(_, u)| u)
@@ -1046,12 +1070,7 @@ impl MultiSignalByzantineDetector {
     }
 
     /// Compute cross-validation score (Krum-like)
-    fn compute_cross_validation_score(
-        &self,
-        idx: usize,
-        distances: &[Vec<f64>],
-        n: usize,
-    ) -> f64 {
+    fn compute_cross_validation_score(&self, idx: usize, distances: &[Vec<f64>], n: usize) -> f64 {
         if n < 3 {
             return 0.0;
         }
@@ -1061,7 +1080,8 @@ impl MultiSignalByzantineDetector {
         let k = k.max(1).min(n - 1);
 
         // Get sorted distances for this participant
-        let mut dists: Vec<f64> = distances[idx].iter()
+        let mut dists: Vec<f64> = distances[idx]
+            .iter()
             .enumerate()
             .filter(|(i, _)| *i != idx)
             .map(|(_, &d)| d)
@@ -1072,15 +1092,18 @@ impl MultiSignalByzantineDetector {
         let score_i: f64 = dists.iter().take(k).sum();
 
         // Compute scores for all participants
-        let mut all_scores: Vec<f64> = (0..n).map(|i| {
-            let mut d: Vec<f64> = distances[i].iter()
-                .enumerate()
-                .filter(|(j, _)| *j != i)
-                .map(|(_, &d)| d)
-                .collect();
-            d.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-            d.iter().take(k).sum()
-        }).collect();
+        let mut all_scores: Vec<f64> = (0..n)
+            .map(|i| {
+                let mut d: Vec<f64> = distances[i]
+                    .iter()
+                    .enumerate()
+                    .filter(|(j, _)| *j != i)
+                    .map(|(_, &d)| d)
+                    .collect();
+                d.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                d.iter().take(k).sum()
+            })
+            .collect();
 
         // Normalize: highest score = most outlier-like
         all_scores.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
@@ -1156,7 +1179,8 @@ pub fn aggregate_with_multi_signal_detection(
     }
 
     // Get filtered updates
-    let filtered_updates: Vec<GradientUpdate> = updates.iter()
+    let filtered_updates: Vec<GradientUpdate> = updates
+        .iter()
         .enumerate()
         .filter(|(i, _)| !detection.byzantine_indices.contains(i))
         .map(|(_, u)| u.clone())
@@ -1203,9 +1227,9 @@ impl Default for AdaptiveAggregatorConfig {
         Self {
             base_method: AggregationMethod::FedAvg,
             byzantine_tolerance: 0.33,
-            threat_threshold: 0.15,  // Switch to defensive if >15% Byzantine detected
+            threat_threshold: 0.15, // Switch to defensive if >15% Byzantine detected
             history_window: 10,
-            defensive_method: AggregationMethod::Krum,  // Krum is most Byzantine-resistant
+            defensive_method: AggregationMethod::Krum, // Krum is most Byzantine-resistant
         }
     }
 }
@@ -1267,7 +1291,7 @@ impl ParticipantBehavior {
     /// Calculate reputation score (0.0 = bad, 1.0 = good)
     pub fn reputation(&self) -> f64 {
         if self.rounds_participated == 0 {
-            return 1.0;  // New participants get benefit of doubt
+            return 1.0; // New participants get benefit of doubt
         }
         let flag_rate = self.times_flagged as f64 / self.rounds_participated as f64;
         (1.0 - flag_rate - self.trust_penalty).max(0.0)
@@ -1276,7 +1300,8 @@ impl ParticipantBehavior {
     /// Check if participant should be blacklisted
     pub fn is_blacklisted(&self) -> bool {
         // Blacklist if flagged >50% of time with at least 3 rounds
-        self.rounds_participated >= 3 && self.times_flagged as f64 / self.rounds_participated as f64 > 0.5
+        self.rounds_participated >= 3
+            && self.times_flagged as f64 / self.rounds_participated as f64 > 0.5
     }
 }
 
@@ -1325,12 +1350,15 @@ impl AdaptiveAggregator {
     pub fn high_security() -> Self {
         let mut agg = Self::new();
         agg.detector = MultiSignalByzantineDetector::high_security();
-        agg.config.threat_threshold = 0.10;  // More sensitive
+        agg.config.threat_threshold = 0.10; // More sensitive
         agg
     }
 
     /// Perform adaptive aggregation
-    pub fn aggregate(&mut self, updates: &[GradientUpdate]) -> Result<AdaptiveAggregationResult, AggregationError> {
+    pub fn aggregate(
+        &mut self,
+        updates: &[GradientUpdate],
+    ) -> Result<AdaptiveAggregationResult, AggregationError> {
         if updates.is_empty() {
             return Err(AggregationError::NoUpdates);
         }
@@ -1369,7 +1397,8 @@ impl AdaptiveAggregator {
         }
 
         // Step 6: Filter updates
-        let filtered_updates: Vec<GradientUpdate> = updates.iter()
+        let filtered_updates: Vec<GradientUpdate> = updates
+            .iter()
             .enumerate()
             .filter(|(i, _)| !excluded_indices.contains(i))
             .map(|(_, u)| u.clone())
@@ -1414,9 +1443,14 @@ impl AdaptiveAggregator {
     }
 
     /// Update participant behavior history
-    fn update_participant_history(&mut self, updates: &[GradientUpdate], detection: &MultiSignalDetectionResult) {
+    fn update_participant_history(
+        &mut self,
+        updates: &[GradientUpdate],
+        detection: &MultiSignalDetectionResult,
+    ) {
         for (i, update) in updates.iter().enumerate() {
-            let behavior = self.participant_history
+            let behavior = self
+                .participant_history
                 .entry(update.participant_id.clone())
                 .or_default();
 
@@ -1427,7 +1461,9 @@ impl AdaptiveAggregator {
                 behavior.times_flagged += 1;
 
                 // Find the signal breakdown for this participant
-                if let Some(breakdown) = detection.signal_breakdown.iter()
+                if let Some(breakdown) = detection
+                    .signal_breakdown
+                    .iter()
                     .find(|b| b.participant_idx == i)
                 {
                     behavior.cumulative_anomaly += breakdown.combined_score;
@@ -1460,7 +1496,7 @@ impl AdaptiveAggregator {
         let _len = self.detection_history.len();
 
         for (i, &fraction) in self.detection_history.iter().enumerate() {
-            let weight = (i + 1) as f64;  // Linear weight increase
+            let weight = (i + 1) as f64; // Linear weight increase
             weighted_sum += fraction * weight;
             total_weight += weight;
         }
@@ -1516,9 +1552,11 @@ impl AdaptiveAggregator {
         let total_participants = self.participant_history.len();
         let blacklisted = self.blacklisted_participants().len();
         let avg_reputation = if total_participants > 0 {
-            self.participant_history.values()
+            self.participant_history
+                .values()
                 .map(|b| b.reputation())
-                .sum::<f64>() / total_participants as f64
+                .sum::<f64>()
+                / total_participants as f64
         } else {
             1.0
         };
@@ -1679,7 +1717,10 @@ mod tests {
             GradientUpdate::new("p2".to_string(), 1, vec![0.1, 0.2, 0.3], 100, 0.5),
         ];
         let result = fedavg(&updates);
-        assert!(matches!(result, Err(AggregationError::GradientSizeMismatch { .. })));
+        assert!(matches!(
+            result,
+            Err(AggregationError::GradientSizeMismatch { .. })
+        ));
     }
 
     // =========================================================================
@@ -1690,8 +1731,14 @@ mod tests {
     fn test_gradient_accumulator() {
         let mut acc = GradientAccumulator::new(3);
 
-        acc.accumulate(&GradientUpdate::new("p1".to_string(), 1, vec![1.0, 2.0, 3.0], 100, 0.5), 0.5);
-        acc.accumulate(&GradientUpdate::new("p2".to_string(), 1, vec![2.0, 4.0, 6.0], 100, 0.5), 0.5);
+        acc.accumulate(
+            &GradientUpdate::new("p1".to_string(), 1, vec![1.0, 2.0, 3.0], 100, 0.5),
+            0.5,
+        );
+        acc.accumulate(
+            &GradientUpdate::new("p2".to_string(), 1, vec![2.0, 4.0, 6.0], 100, 0.5),
+            0.5,
+        );
 
         assert_eq!(acc.count(), 2);
         assert!((acc.total_weight() - 1.0).abs() < 0.001);
@@ -1753,11 +1800,8 @@ mod tests {
             GradientUpdate::new("p3".to_string(), 1, vec![0.15, 0.25], 100, 0.5),
         ];
 
-        let (result, detection) = aggregate_with_early_termination(
-            &updates,
-            AggregationMethod::FedAvg,
-            0.33,
-        ).unwrap();
+        let (result, detection) =
+            aggregate_with_early_termination(&updates, AggregationMethod::FedAvg, 0.33).unwrap();
 
         assert_eq!(result.len(), 2);
         assert!(!detection.has_byzantine());
@@ -1784,7 +1828,10 @@ mod tests {
     fn test_accumulator_reset() {
         let mut acc = GradientAccumulator::new(2);
 
-        acc.accumulate(&GradientUpdate::new("p1".to_string(), 1, vec![1.0, 2.0], 100, 0.5), 1.0);
+        acc.accumulate(
+            &GradientUpdate::new("p1".to_string(), 1, vec![1.0, 2.0], 100, 0.5),
+            1.0,
+        );
         assert_eq!(acc.count(), 1);
 
         acc.reset();
@@ -1817,8 +1864,14 @@ mod tests {
         ];
 
         let result = detector.detect(&updates);
-        assert!(!result.byzantine_indices.is_empty(), "Should detect obvious Byzantine");
-        assert!(result.byzantine_indices.contains(&4), "Should detect participant 4 as Byzantine");
+        assert!(
+            !result.byzantine_indices.is_empty(),
+            "Should detect obvious Byzantine"
+        );
+        assert!(
+            result.byzantine_indices.contains(&4),
+            "Should detect participant 4 as Byzantine"
+        );
     }
 
     #[test]
@@ -1837,12 +1890,17 @@ mod tests {
         let result = detector.detect(&updates);
 
         // Check direction score is high for Byzantine
-        let byz_breakdown = result.signal_breakdown.iter()
+        let byz_breakdown = result
+            .signal_breakdown
+            .iter()
             .find(|b| b.participant_idx == 4)
             .expect("Should have breakdown for Byzantine");
 
-        assert!(byz_breakdown.direction_score > 0.3,
-            "Direction score should be high for sign-flip attack: {}", byz_breakdown.direction_score);
+        assert!(
+            byz_breakdown.direction_score > 0.3,
+            "Direction score should be high for sign-flip attack: {}",
+            byz_breakdown.direction_score
+        );
     }
 
     #[test]
@@ -1863,13 +1921,18 @@ mod tests {
         let result = detector.detect(&updates);
 
         // Should detect the adaptive attacker via direction or cross-validation
-        let adv_breakdown = result.signal_breakdown.iter()
+        let adv_breakdown = result
+            .signal_breakdown
+            .iter()
             .find(|b| b.participant_idx == 5)
             .expect("Should have breakdown for adaptive attacker");
 
         // Combined score should be elevated
-        assert!(adv_breakdown.combined_score > 0.2,
-            "Adaptive attacker should have elevated combined score: {}", adv_breakdown.combined_score);
+        assert!(
+            adv_breakdown.combined_score > 0.2,
+            "Adaptive attacker should have elevated combined score: {}",
+            adv_breakdown.combined_score
+        );
     }
 
     #[test]
@@ -1886,8 +1949,10 @@ mod tests {
         ];
 
         let result = detector.detect(&updates);
-        assert!(result.byzantine_indices.is_empty(),
-            "Should not detect any Byzantine in honest group");
+        assert!(
+            result.byzantine_indices.is_empty(),
+            "Should not detect any Byzantine in honest group"
+        );
     }
 
     #[test]
@@ -1905,10 +1970,15 @@ mod tests {
         let result = detector.detect(&updates);
 
         // High security should catch subtle attacks
-        let subtle_breakdown = result.signal_breakdown.iter()
+        let subtle_breakdown = result
+            .signal_breakdown
+            .iter()
             .find(|b| b.participant_idx == 3);
 
-        assert!(subtle_breakdown.is_some(), "Should have breakdown for subtle attacker");
+        assert!(
+            subtle_breakdown.is_some(),
+            "Should have breakdown for subtle attacker"
+        );
     }
 
     #[test]
@@ -1920,18 +1990,20 @@ mod tests {
             GradientUpdate::new("byz".to_string(), 1, vec![100.0, -100.0], 100, 0.5),
         ];
 
-        let result = aggregate_with_multi_signal_detection(
-            &updates,
-            AggregationMethod::FedAvg,
-            0.33,
-        );
+        let result =
+            aggregate_with_multi_signal_detection(&updates, AggregationMethod::FedAvg, 0.33);
 
         assert!(result.is_ok(), "Should succeed with Byzantine filtering");
         let (aggregated, detection) = result.unwrap();
 
-        assert!(!detection.byzantine_indices.is_empty(), "Should detect Byzantine");
-        assert!(aggregated[0] < 1.0 && aggregated[1] < 1.0,
-            "Aggregated result should not be influenced by Byzantine");
+        assert!(
+            !detection.byzantine_indices.is_empty(),
+            "Should detect Byzantine"
+        );
+        assert!(
+            aggregated[0] < 1.0 && aggregated[1] < 1.0,
+            "Aggregated result should not be influenced by Byzantine"
+        );
     }
 
     #[test]
@@ -1948,8 +2020,10 @@ mod tests {
 
         assert_eq!(result.stats.participants_analyzed, 3);
         assert!(result.stats.mean_norm > 0.0);
-        assert!(result.stats.mean_cosine_sim > 0.9,
-            "Similar gradients should have high mean cosine similarity");
+        assert!(
+            result.stats.mean_cosine_sim > 0.9,
+            "Similar gradients should have high mean cosine similarity"
+        );
     }
 
     // =========================================================================
@@ -1978,7 +2052,7 @@ mod tests {
     #[test]
     fn test_adaptive_aggregator_switches_to_krum() {
         let mut aggregator = AdaptiveAggregator::new();
-        aggregator.config.threat_threshold = 0.1;  // Lower threshold for testing
+        aggregator.config.threat_threshold = 0.1; // Lower threshold for testing
 
         // Simulate several rounds with Byzantine activity
         for _ in 0..5 {
@@ -1993,7 +2067,10 @@ mod tests {
         }
 
         // After several rounds of Byzantine activity, should be in defensive mode
-        assert!(aggregator.threat_level() > 0.1, "Threat level should be elevated");
+        assert!(
+            aggregator.threat_level() > 0.1,
+            "Threat level should be elevated"
+        );
 
         // Next round should use Krum
         let updates = vec![
@@ -2004,8 +2081,10 @@ mod tests {
         ];
 
         let result = aggregator.aggregate(&updates).expect("Should succeed");
-        assert!(result.defensive_mode || result.method_used == AggregationMethod::Krum,
-            "Should switch to defensive mode");
+        assert!(
+            result.defensive_mode || result.method_used == AggregationMethod::Krum,
+            "Should switch to defensive mode"
+        );
     }
 
     #[test]
@@ -2025,7 +2104,10 @@ mod tests {
         }
 
         // After persistent bad behavior, should be blacklisted
-        assert!(aggregator.is_blacklisted("byz"), "Persistent Byzantine should be blacklisted");
+        assert!(
+            aggregator.is_blacklisted("byz"),
+            "Persistent Byzantine should be blacklisted"
+        );
 
         // Check reputation
         let rep = aggregator.participant_reputation("byz");
@@ -2059,8 +2141,12 @@ mod tests {
         }
 
         let rep_after_good = aggregator.participant_reputation("reformed");
-        assert!(rep_after_good > rep_after_bad,
-            "Reputation should improve with good behavior: {} -> {}", rep_after_bad, rep_after_good);
+        assert!(
+            rep_after_good > rep_after_bad,
+            "Reputation should improve with good behavior: {} -> {}",
+            rep_after_bad,
+            rep_after_good
+        );
     }
 
     #[test]

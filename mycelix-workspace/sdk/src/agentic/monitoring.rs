@@ -11,11 +11,11 @@
 //! - **Health Scoring**: Composite agent health metric
 //! - **Dashboard Support**: Serializable metrics for visualization
 
+use super::calibration_engine::CalibrationQuality;
+use super::{AgentStatus, InstrumentalActor};
+use crate::matl::KVector;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use crate::matl::KVector;
-use super::{InstrumentalActor, AgentStatus};
-use super::calibration_engine::CalibrationQuality;
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -80,19 +80,22 @@ impl MetricsHistory {
     /// Record a new metrics snapshot in history
     pub fn record(&mut self, metrics: &AgentMetrics) {
         // Trust
-        self.trust_history.push_back((metrics.timestamp, metrics.trust_score));
+        self.trust_history
+            .push_back((metrics.timestamp, metrics.trust_score));
         if self.trust_history.len() > self.max_history {
             self.trust_history.pop_front();
         }
 
         // Success
-        self.success_history.push_back((metrics.timestamp, metrics.success_rate));
+        self.success_history
+            .push_back((metrics.timestamp, metrics.success_rate));
         if self.success_history.len() > self.max_history {
             self.success_history.pop_front();
         }
 
         // Health
-        self.health_history.push_back((metrics.timestamp, metrics.health_score));
+        self.health_history
+            .push_back((metrics.timestamp, metrics.health_score));
         if self.health_history.len() > self.max_history {
             self.health_history.pop_front();
         }
@@ -101,7 +104,8 @@ impl MetricsHistory {
     /// Get trust score from N seconds ago
     pub fn trust_at(&self, seconds_ago: u64, current_time: u64) -> Option<f32> {
         let target_time = current_time.saturating_sub(seconds_ago);
-        self.trust_history.iter()
+        self.trust_history
+            .iter()
             .rev()
             .find(|(t, _)| *t <= target_time)
             .map(|(_, v)| *v)
@@ -324,14 +328,17 @@ impl MonitoringEngine {
         let trust_score = agent.k_vector.trust_score();
 
         // Get 24h delta
-        let trust_delta_24h = self.history.get(&agent_id)
+        let trust_delta_24h = self
+            .history
+            .get(&agent_id)
             .and_then(|h| h.trust_at(86400, timestamp))
             .map(|old| trust_score - old)
             .unwrap_or(0.0);
 
         // Success rate (recent 100 actions)
         let recent_actions: Vec<_> = agent.behavior_log.iter().rev().take(100).collect();
-        let successes = recent_actions.iter()
+        let successes = recent_actions
+            .iter()
             .filter(|a| a.outcome == super::ActionOutcome::Success)
             .count();
         let success_rate = if recent_actions.is_empty() {
@@ -353,7 +360,9 @@ impl MonitoringEngine {
 
         // Activity rate (last hour)
         let hour_ago = timestamp.saturating_sub(3600);
-        let recent_count = agent.behavior_log.iter()
+        let recent_count = agent
+            .behavior_log
+            .iter()
             .filter(|a| a.timestamp >= hour_ago)
             .count();
         let activity_rate = recent_count as f64;
@@ -375,7 +384,7 @@ impl MonitoringEngine {
             success_rate,
             output_quality,
             calibration_quality: CalibrationQuality::Insufficient, // Would come from calibration engine
-            coherence_avg: 0.7, // Would come from phi bridge
+            coherence_avg: 0.7,                                    // Would come from phi bridge
             activity_rate,
             health_score,
             timestamp,
@@ -385,7 +394,8 @@ impl MonitoringEngine {
         self.metrics.insert(agent_id.clone(), metrics.clone());
 
         // Update history
-        let history = self.history
+        let history = self
+            .history
             .entry(agent_id)
             .or_insert_with(|| MetricsHistory::new(self.history_size));
         history.record(&metrics);
@@ -417,8 +427,11 @@ impl MonitoringEngine {
             AgentStatus::Revoked => 0.0,
         };
 
-        let raw_score = trust_component + success_component + quality_component
-            + kredit_component + status_component;
+        let raw_score = trust_component
+            + success_component
+            + quality_component
+            + kredit_component
+            + status_component;
 
         (raw_score.clamp(0.0, 100.0)) as u8
     }
@@ -432,7 +445,10 @@ impl MonitoringEngine {
                 agent_id: agent_id.clone(),
                 alert_type: AlertType::TrustDrop,
                 severity: AlertSeverity::Warning,
-                message: format!("Trust dropped by {:.1}% in 24h", metrics.trust_delta_24h.abs() * 100.0),
+                message: format!(
+                    "Trust dropped by {:.1}% in 24h",
+                    metrics.trust_delta_24h.abs() * 100.0
+                ),
                 current_value: metrics.trust_score as f64,
                 threshold: self.thresholds.trust_drop_threshold as f64,
                 timestamp: metrics.timestamp,
@@ -498,12 +514,28 @@ impl MonitoringEngine {
     /// Get dashboard summary
     pub fn dashboard_summary(&self) -> DashboardSummary {
         let total_agents = self.metrics.len();
-        let healthy = self.metrics.values().filter(|m| m.health_score >= 70).count();
-        let warning = self.metrics.values().filter(|m| m.health_score >= 30 && m.health_score < 70).count();
-        let critical = self.metrics.values().filter(|m| m.health_score < 30).count();
+        let healthy = self
+            .metrics
+            .values()
+            .filter(|m| m.health_score >= 70)
+            .count();
+        let warning = self
+            .metrics
+            .values()
+            .filter(|m| m.health_score >= 30 && m.health_score < 70)
+            .count();
+        let critical = self
+            .metrics
+            .values()
+            .filter(|m| m.health_score < 30)
+            .count();
 
         let avg_trust: f64 = if total_agents > 0 {
-            self.metrics.values().map(|m| m.trust_score as f64).sum::<f64>() / total_agents as f64
+            self.metrics
+                .values()
+                .map(|m| m.trust_score as f64)
+                .sum::<f64>()
+                / total_agents as f64
         } else {
             0.0
         };
@@ -517,7 +549,9 @@ impl MonitoringEngine {
             critical_agents: critical,
             average_trust: avg_trust,
             active_alerts,
-            critical_alerts: self.alerts.iter()
+            critical_alerts: self
+                .alerts
+                .iter()
                 .filter(|a| !a.acknowledged && a.severity == AlertSeverity::Critical)
                 .count(),
         }
@@ -553,7 +587,9 @@ pub struct DashboardSummary {
 mod tests {
     use super::*;
     use crate::agentic::UncertaintyCalibration;
-    use crate::agentic::{AgentId, AgentClass, AgentConstraints, EpistemicStats, ActionOutcome, BehaviorLogEntry};
+    use crate::agentic::{
+        ActionOutcome, AgentClass, AgentConstraints, AgentId, BehaviorLogEntry, EpistemicStats,
+    };
 
     fn create_test_agent(id: &str) -> InstrumentalActor {
         InstrumentalActor {
@@ -588,7 +624,11 @@ mod tests {
                 action_type: "process".to_string(),
                 kredit_consumed: 10,
                 counterparties: vec![],
-                outcome: if i % 3 == 0 { ActionOutcome::Error } else { ActionOutcome::Success },
+                outcome: if i % 3 == 0 {
+                    ActionOutcome::Error
+                } else {
+                    ActionOutcome::Success
+                },
             });
         }
 

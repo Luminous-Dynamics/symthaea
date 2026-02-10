@@ -8,15 +8,15 @@
 //! - Compute: Processing capacity with TEE attestation
 //! - Bandwidth: Network connectivity
 
+pub mod bandwidth;
+pub mod compute;
 pub mod energy;
 pub mod storage;
-pub mod compute;
-pub mod bandwidth;
 
-pub use energy::{EnergySource, EnergyOracle, EnergyAttestation};
-pub use storage::{StorageAttestation, ReplicationProof, StorageType};
-pub use compute::{ComputeAttestation, TeeType, BenchmarkResults};
 pub use bandwidth::{BandwidthAttestation, PeerMeasurement};
+pub use compute::{BenchmarkResults, ComputeAttestation, TeeType};
+pub use energy::{EnergyAttestation, EnergyOracle, EnergySource};
+pub use storage::{ReplicationProof, StorageAttestation, StorageType};
 
 use serde::{Deserialize, Serialize};
 
@@ -185,7 +185,10 @@ impl GeoCoordinate {
     /// Create new coordinate with validation
     pub fn new(latitude: f64, longitude: f64) -> Option<Self> {
         if (-90.0..=90.0).contains(&latitude) && (-180.0..=180.0).contains(&longitude) {
-            Some(Self { latitude, longitude })
+            Some(Self {
+                latitude,
+                longitude,
+            })
         } else {
             None
         }
@@ -200,8 +203,7 @@ impl GeoCoordinate {
         let dlat = (other.latitude - self.latitude).to_radians();
         let dlon = (other.longitude - self.longitude).to_radians();
 
-        let a = (dlat / 2.0).sin().powi(2)
-            + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
+        let a = (dlat / 2.0).sin().powi(2) + lat1.cos() * lat2.cos() * (dlon / 2.0).sin().powi(2);
         let c = 2.0 * a.sqrt().atan2((1.0 - a).sqrt());
 
         EARTH_RADIUS_KM * c

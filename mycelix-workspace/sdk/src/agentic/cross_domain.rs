@@ -172,18 +172,19 @@ impl DomainTemplates {
         TrustDomain {
             domain_id: "financial".to_string(),
             name: "Financial Operations".to_string(),
-            description: "High-stakes financial transactions requiring verified identity and stake".to_string(),
+            description: "High-stakes financial transactions requiring verified identity and stake"
+                .to_string(),
             dimension_relevance: DomainRelevance {
                 reputation: 0.8,
-                activity: 0.3,      // Activity less important
-                integrity: 1.0,     // Critical
+                activity: 0.3,  // Activity less important
+                integrity: 1.0, // Critical
                 performance: 0.5,
-                membership: 0.7,    // Longevity matters
-                stake: 1.0,         // Critical
-                historical: 0.9,    // Consistency important
-                topology: 0.2,      // Less relevant
-                verification: 1.0,  // Critical
-                coherence: 0.6,     // Moderate importance for consistency
+                membership: 0.7,   // Longevity matters
+                stake: 1.0,        // Critical
+                historical: 0.9,   // Consistency important
+                topology: 0.2,     // Less relevant
+                verification: 1.0, // Critical
+                coherence: 0.6,    // Moderate importance for consistency
             },
             min_trust_threshold: 0.6,
             requires_verification: true,
@@ -199,15 +200,15 @@ impl DomainTemplates {
             description: "Technical review of code changes".to_string(),
             dimension_relevance: DomainRelevance {
                 reputation: 0.8,
-                activity: 0.6,      // Active reviewers preferred
-                integrity: 0.9,     // Important for honest reviews
-                performance: 1.0,   // Critical - quality of reviews
-                membership: 0.4,    // Less important
-                stake: 0.2,         // Not very relevant
-                historical: 0.7,    // Consistent review quality
-                topology: 0.5,      // Some connectivity helps
-                verification: 0.5,  // Moderate
-                coherence: 0.8,     // High - coherent thinking needed
+                activity: 0.6,     // Active reviewers preferred
+                integrity: 0.9,    // Important for honest reviews
+                performance: 1.0,  // Critical - quality of reviews
+                membership: 0.4,   // Less important
+                stake: 0.2,        // Not very relevant
+                historical: 0.7,   // Consistent review quality
+                topology: 0.5,     // Some connectivity helps
+                verification: 0.5, // Moderate
+                coherence: 0.8,    // High - coherent thinking needed
             },
             min_trust_threshold: 0.4,
             requires_verification: false,
@@ -222,16 +223,16 @@ impl DomainTemplates {
             name: "Social Community".to_string(),
             description: "Community interactions and social activities".to_string(),
             dimension_relevance: DomainRelevance {
-                reputation: 1.0,    // Critical
-                activity: 0.9,      // Very important
-                integrity: 0.6,     // Moderate
-                performance: 0.5,   // Moderate
-                membership: 0.6,    // Some importance
-                stake: 0.1,         // Not very relevant
-                historical: 0.5,    // Moderate
-                topology: 1.0,      // Critical - network position
-                verification: 0.3,  // Less important
-                coherence: 0.4,     // Low - social interactions varied
+                reputation: 1.0,   // Critical
+                activity: 0.9,     // Very important
+                integrity: 0.6,    // Moderate
+                performance: 0.5,  // Moderate
+                membership: 0.6,   // Some importance
+                stake: 0.1,        // Not very relevant
+                historical: 0.5,   // Moderate
+                topology: 1.0,     // Critical - network position
+                verification: 0.3, // Less important
+                coherence: 0.4,    // Low - social interactions varied
             },
             min_trust_threshold: 0.3,
             requires_verification: false,
@@ -246,16 +247,16 @@ impl DomainTemplates {
             name: "Governance".to_string(),
             description: "Participation in governance decisions".to_string(),
             dimension_relevance: DomainRelevance {
-                reputation: 1.0,    // Critical
-                activity: 0.5,      // Some importance
-                integrity: 0.9,     // Very important
-                performance: 0.6,   // Moderate
-                membership: 0.8,    // Longevity matters
-                stake: 0.9,         // Very important
-                historical: 0.8,    // Important
-                topology: 0.6,      // Moderate
-                verification: 0.7,  // Important
-                coherence: 0.7,     // High - rational decision making
+                reputation: 1.0,   // Critical
+                activity: 0.5,     // Some importance
+                integrity: 0.9,    // Very important
+                performance: 0.6,  // Moderate
+                membership: 0.8,   // Longevity matters
+                stake: 0.9,        // Very important
+                historical: 0.8,   // Important
+                topology: 0.6,     // Moderate
+                verification: 0.7, // Important
+                coherence: 0.7,    // High - rational decision making
             },
             min_trust_threshold: 0.5,
             requires_verification: false,
@@ -273,13 +274,13 @@ impl DomainTemplates {
                 reputation: 0.9,
                 activity: 0.4,
                 integrity: 0.8,
-                performance: 1.0,   // Critical
+                performance: 1.0, // Critical
                 membership: 0.3,
                 stake: 0.2,
                 historical: 0.7,
-                topology: 0.6,      // Collaboration networks matter
+                topology: 0.6, // Collaboration networks matter
                 verification: 0.6,
-                coherence: 0.9,     // Very high - research requires coherent thinking
+                coherence: 0.9, // Very high - research requires coherent thinking
             },
             min_trust_threshold: 0.4,
             requires_verification: false,
@@ -296,14 +297,14 @@ impl DomainTemplates {
             dimension_relevance: DomainRelevance {
                 reputation: 0.7,
                 activity: 0.5,
-                integrity: 1.0,     // Critical
-                performance: 0.9,   // Very important
+                integrity: 1.0,   // Critical
+                performance: 0.9, // Very important
                 membership: 0.6,
                 stake: 0.5,
-                historical: 0.9,    // Consistency critical
+                historical: 0.9, // Consistency critical
                 topology: 0.4,
-                verification: 1.0,  // Critical
-                coherence: 0.8,     // High - operational consistency
+                verification: 1.0, // Critical
+                coherence: 0.8,    // High - operational consistency
             },
             min_trust_threshold: 0.6,
             requires_verification: true,
@@ -399,7 +400,9 @@ pub fn translate_trust(
     let target_rel = target_domain.dimension_relevance.to_array();
 
     // Compute domain similarity for base confidence
-    let domain_similarity = source_domain.dimension_relevance.similarity(&target_domain.dimension_relevance);
+    let domain_similarity = source_domain
+        .dimension_relevance
+        .similarity(&target_domain.dimension_relevance);
 
     // Translate each dimension (10 dimensions including k_phi)
     let mut target_arr = [0.0f32; 10];
@@ -668,7 +671,8 @@ impl DomainRegistry {
             if let Some(path) = translate_path(kvector, &path_domains) {
                 // Prefer paths with higher confidence and lower degradation
                 let path_score = path.cumulative_confidence * (1.0 - path.trust_degradation);
-                let best_score = best_path.cumulative_confidence * (1.0 - best_path.trust_degradation);
+                let best_score =
+                    best_path.cumulative_confidence * (1.0 - best_path.trust_degradation);
 
                 if path_score > best_score {
                     best_path = path;
@@ -686,7 +690,8 @@ impl DomainRegistry {
 
         for i in 0..ids.len() {
             for j in 0..ids.len() {
-                if let (Some(d1), Some(d2)) = (self.domains.get(&ids[i]), self.domains.get(&ids[j])) {
+                if let (Some(d1), Some(d2)) = (self.domains.get(&ids[i]), self.domains.get(&ids[j]))
+                {
                     let similarity = d1.dimension_relevance.similarity(&d2.dimension_relevance);
                     matrix.insert((ids[i].clone(), ids[j].clone()), similarity);
                 }
@@ -752,7 +757,8 @@ pub fn analyze_domain_compatibility(
 
     // Generate recommendations
     if target.requires_verification && !source.requires_verification {
-        recommendations.push("Target domain requires verification - ensure agent is verified".to_string());
+        recommendations
+            .push("Target domain requires verification - ensure agent is verified".to_string());
     }
 
     for dim in &weak_transfers {
@@ -770,7 +776,9 @@ pub fn analyze_domain_compatibility(
         ));
     }
 
-    let compatibility = source.dimension_relevance.similarity(&target.dimension_relevance);
+    let compatibility = source
+        .dimension_relevance
+        .similarity(&target.dimension_relevance);
 
     DomainCompatibility {
         source: source.domain_id.clone(),
@@ -806,7 +814,7 @@ mod tests {
         // Financial and social should be less similar
         let fin_soc_sim = financial.similarity(&social);
         assert!(fin_soc_sim < 0.95); // Not identical
-        assert!(fin_soc_sim > 0.3);  // But not completely different
+        assert!(fin_soc_sim > 0.3); // But not completely different
     }
 
     #[test]
@@ -891,7 +899,9 @@ mod tests {
         assert_eq!(path.hop_results.len(), 2);
 
         // Cumulative confidence should be product of hop confidences
-        let expected_conf: f32 = path.hop_results.iter()
+        let expected_conf: f32 = path
+            .hop_results
+            .iter()
             .map(|r| r.translation_confidence)
             .product();
         assert!((path.cumulative_confidence - expected_conf).abs() < 0.001);
@@ -902,7 +912,9 @@ mod tests {
         let kv = test_kvector();
         let registry = DomainRegistry::with_defaults();
 
-        let path = registry.find_best_path(&kv, "social", "financial", 2).unwrap();
+        let path = registry
+            .find_best_path(&kv, "social", "financial", 2)
+            .unwrap();
 
         // Should find a path
         assert!(!path.domains.is_empty());
@@ -929,13 +941,14 @@ mod tests {
     #[test]
     fn test_dimension_translation_details() {
         let kv = test_kvector();
-        let source = DomainTemplates::social();      // High reputation/topology relevance
-        let target = DomainTemplates::financial();   // High stake/verification relevance
+        let source = DomainTemplates::social(); // High reputation/topology relevance
+        let target = DomainTemplates::financial(); // High stake/verification relevance
 
         let result = translate_trust(&kv, &source, &target);
 
         // Find integrity translation (should transfer well - important in both)
-        let integrity_trans = result.dimension_translations
+        let integrity_trans = result
+            .dimension_translations
             .iter()
             .find(|d| d.dimension == KVectorDimension::Integrity)
             .unwrap();
@@ -944,7 +957,8 @@ mod tests {
         assert!(integrity_trans.translation_factor > 0.5);
 
         // Find topology translation (should transfer poorly - high in social, low in financial)
-        let topology_trans = result.dimension_translations
+        let topology_trans = result
+            .dimension_translations
             .iter()
             .find(|d| d.dimension == KVectorDimension::Topology)
             .unwrap();
@@ -963,7 +977,14 @@ mod tests {
         assert_eq!(matrix.len(), domain_count * domain_count);
 
         // Diagonal should be 1.0 (self-similarity)
-        assert!((matrix.get(&("financial".to_string(), "financial".to_string())).unwrap() - 1.0).abs() < 0.001);
+        assert!(
+            (matrix
+                .get(&("financial".to_string(), "financial".to_string()))
+                .unwrap()
+                - 1.0)
+                .abs()
+                < 0.001
+        );
     }
 
     #[test]
@@ -971,16 +992,16 @@ mod tests {
         // Use a K-Vector with varied values to highlight domain differences
         // High stake (financial) but low topology (social contrast)
         let kv = KVector::new(
-            0.5,  // k_r: reputation (moderate)
-            0.3,  // k_a: activity (low)
-            0.9,  // k_i: integrity (high)
-            0.4,  // k_p: performance (moderate)
-            0.6,  // k_m: membership (moderate)
-            0.9,  // k_s: stake (high - financial loves this)
-            0.7,  // k_h: historical (high)
-            0.2,  // k_topo: topology (low - social needs this)
-            0.8,  // k_v: verification (high)
-            0.6,  // k_phi: coherence (moderate)
+            0.5, // k_r: reputation (moderate)
+            0.3, // k_a: activity (low)
+            0.9, // k_i: integrity (high)
+            0.4, // k_p: performance (moderate)
+            0.6, // k_m: membership (moderate)
+            0.9, // k_s: stake (high - financial loves this)
+            0.7, // k_h: historical (high)
+            0.2, // k_topo: topology (low - social needs this)
+            0.8, // k_v: verification (high)
+            0.6, // k_phi: coherence (moderate)
         );
 
         let financial = DomainTemplates::financial();
@@ -995,8 +1016,11 @@ mod tests {
 
         // Financial should be higher (high stake, high verification)
         // Social should be lower (low topology, low activity)
-        assert!(fin_trust > soc_trust,
+        assert!(
+            fin_trust > soc_trust,
             "Expected financial ({:.3}) > social ({:.3}) for high-stake low-topology agent",
-            fin_trust, soc_trust);
+            fin_trust,
+            soc_trust
+        );
     }
 }

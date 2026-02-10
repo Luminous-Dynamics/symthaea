@@ -38,10 +38,10 @@
 //! println!("Detection rate: {:.1}%", results.detection_rate * 100.0);
 //! ```
 
+use super::adversarial::GamingDetector;
+use super::BehaviorLogEntry;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
-use super::BehaviorLogEntry;
-use super::adversarial::GamingDetector;
 
 // ============================================================================
 // Attack Types
@@ -349,7 +349,8 @@ impl AttackScenario {
         Self {
             id: format!("sybil-{}", config.num_identities),
             name: format!("Sybil Attack ({} identities)", config.num_identities),
-            description: "Create multiple fake identities to gain disproportionate influence".into(),
+            description: "Create multiple fake identities to gain disproportionate influence"
+                .into(),
             attack_type: AttackType::Sybil,
             severity,
             config: AttackConfig::Sybil(config),
@@ -375,7 +376,11 @@ impl AttackScenario {
                 AttackSeverity::Medium
             },
             config: AttackConfig::Collusion(config.clone()),
-            preconditions: config.colluder_ids.iter().map(|id| Precondition::AgentExists(id.clone())).collect(),
+            preconditions: config
+                .colluder_ids
+                .iter()
+                .map(|id| Precondition::AgentExists(id.clone()))
+                .collect(),
             expected_signals: vec![
                 "coordinated_timing".into(),
                 "uniform_voting".into(),
@@ -556,9 +561,10 @@ impl AttackCampaign {
 
         for scenario in &self.scenarios {
             // Check preconditions
-            let preconditions_met = scenario.preconditions.iter().all(|p| {
-                system.check_precondition(p)
-            });
+            let preconditions_met = scenario
+                .preconditions
+                .iter()
+                .all(|p| system.check_precondition(p));
 
             if !preconditions_met {
                 results.push(ScenarioResult {
@@ -613,7 +619,8 @@ impl AttackCampaign {
                 results.iter().filter(|r| r.detected).count() as f64 / results.len() as f64
             },
             avg_detection_latency_ms: {
-                let detected: Vec<_> = results.iter()
+                let detected: Vec<_> = results
+                    .iter()
                     .filter_map(|r| r.detection_latency_ms)
                     .collect();
                 if detected.is_empty() {
@@ -644,7 +651,8 @@ fn aggregate_impact(results: &[ScenarioResult]) -> AttackImpact {
         aggregate.kredit_drained += result.impact.kredit_drained;
         aggregate.proposals_affected += result.impact.proposals_affected;
         aggregate.agents_compromised += result.impact.agents_compromised;
-        aggregate.availability_impact = aggregate.availability_impact
+        aggregate.availability_impact = aggregate
+            .availability_impact
             .max(result.impact.availability_impact);
     }
 
@@ -681,29 +689,56 @@ impl CampaignResults {
 
         report.push_str(&format!("# Security Test Report: {}\n\n", self.campaign_id));
         report.push_str("## Summary\n\n");
-        report.push_str(&format!("- Scenarios Executed: {}\n", self.scenarios_executed));
-        report.push_str(&format!("- Detection Rate: {:.1}%\n", self.detection_rate * 100.0));
-        report.push_str(&format!("- False Positive Rate: {:.2}\n", self.false_positive_rate));
+        report.push_str(&format!(
+            "- Scenarios Executed: {}\n",
+            self.scenarios_executed
+        ));
+        report.push_str(&format!(
+            "- Detection Rate: {:.1}%\n",
+            self.detection_rate * 100.0
+        ));
+        report.push_str(&format!(
+            "- False Positive Rate: {:.2}\n",
+            self.false_positive_rate
+        ));
 
         if let Some(latency) = self.avg_detection_latency_ms {
             report.push_str(&format!("- Avg Detection Latency: {}ms\n", latency));
         }
 
         report.push_str("\n## Impact Assessment\n\n");
-        report.push_str(&format!("- Agents with Trust Changes: {}\n", self.total_impact.trust_changes.len()));
-        report.push_str(&format!("- KREDIT Drained: {:.2}\n", self.total_impact.kredit_drained));
-        report.push_str(&format!("- Proposals Affected: {}\n", self.total_impact.proposals_affected));
-        report.push_str(&format!("- Agents Compromised: {}\n", self.total_impact.agents_compromised));
+        report.push_str(&format!(
+            "- Agents with Trust Changes: {}\n",
+            self.total_impact.trust_changes.len()
+        ));
+        report.push_str(&format!(
+            "- KREDIT Drained: {:.2}\n",
+            self.total_impact.kredit_drained
+        ));
+        report.push_str(&format!(
+            "- Proposals Affected: {}\n",
+            self.total_impact.proposals_affected
+        ));
+        report.push_str(&format!(
+            "- Agents Compromised: {}\n",
+            self.total_impact.agents_compromised
+        ));
 
         report.push_str("\n## Scenario Details\n\n");
         for result in &self.scenario_results {
             report.push_str(&format!("### {}\n", result.scenario_id));
-            report.push_str(&format!("- Detected: {}\n", if result.detected { "YES" } else { "NO" }));
+            report.push_str(&format!(
+                "- Detected: {}\n",
+                if result.detected { "YES" } else { "NO" }
+            ));
             if let Some(latency) = result.detection_latency_ms {
                 report.push_str(&format!("- Latency: {}ms\n", latency));
             }
             if !result.triggered_signals.is_empty() {
-                report.push_str(&format!("- Signals: {}\n", result.triggered_signals.join(", ")));
+                report.push_str(&format!(
+                    "- Signals: {}\n",
+                    result.triggered_signals.join(", ")
+                ));
             }
             report.push('\n');
         }
@@ -797,18 +832,22 @@ impl SimulatedSystem {
     /// Add an agent to the system
     pub fn add_agent(&mut self, id: impl Into<String>, trust: f64, kredit: f64) {
         let id = id.into();
-        self.agents.insert(id.clone(), SimulatedAgent {
-            id,
-            trust,
-            kredit,
-            behaviors: vec![],
-            compromised: false,
-        });
+        self.agents.insert(
+            id.clone(),
+            SimulatedAgent {
+                id,
+                trust,
+                kredit,
+                behaviors: vec![],
+                compromised: false,
+            },
+        );
     }
 
     /// Create a group
     pub fn create_group(&mut self, group_id: impl Into<String>, member_ids: Vec<String>) {
-        self.groups.insert(group_id.into(), member_ids.into_iter().collect());
+        self.groups
+            .insert(group_id.into(), member_ids.into_iter().collect());
     }
 
     /// Get agent count
@@ -893,7 +932,9 @@ impl SimulatedSystem {
                         ManipulationType::TargetDeflation => 0.0,
                     };
                     agent.trust = (agent.trust + delta).clamp(0.0, 1.0);
-                    impact.trust_changes.insert(config.attacker_id.clone(), delta);
+                    impact
+                        .trust_changes
+                        .insert(config.attacker_id.clone(), delta);
                 }
 
                 // Apply target deflation
@@ -969,7 +1010,9 @@ impl SimulatedSystem {
             data: [
                 ("scenario_id".to_string(), scenario.id.clone()),
                 ("detected".to_string(), detected.to_string()),
-            ].into_iter().collect(),
+            ]
+            .into_iter()
+            .collect(),
         });
 
         self.current_time += 1000; // Advance time
@@ -1048,12 +1091,14 @@ pub mod suites {
         }));
 
         // Trust manipulation
-        campaign.add_scenario(AttackScenario::trust_manipulation(TrustManipulationConfig {
-            attacker_id: "attacker".into(),
-            manipulation_type: ManipulationType::SelfInflation,
-            intensity: 0.5,
-            ..Default::default()
-        }));
+        campaign.add_scenario(AttackScenario::trust_manipulation(
+            TrustManipulationConfig {
+                attacker_id: "attacker".into(),
+                manipulation_type: ManipulationType::SelfInflation,
+                intensity: 0.5,
+                ..Default::default()
+            },
+        ));
 
         campaign
     }
@@ -1091,12 +1136,14 @@ pub mod suites {
             ManipulationType::StealthInflation,
             ManipulationType::Oscillation,
         ] {
-            campaign.add_scenario(AttackScenario::trust_manipulation(TrustManipulationConfig {
-                attacker_id: "attacker".into(),
-                manipulation_type: manip_type,
-                intensity: 0.7,
-                ..Default::default()
-            }));
+            campaign.add_scenario(AttackScenario::trust_manipulation(
+                TrustManipulationConfig {
+                    attacker_id: "attacker".into(),
+                    manipulation_type: manip_type,
+                    intensity: 0.7,
+                    ..Default::default()
+                },
+            ));
         }
 
         campaign

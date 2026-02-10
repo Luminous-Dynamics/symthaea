@@ -57,12 +57,12 @@
 //! }
 //! ```
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::matl::{KVector, RBBFT_BYZANTINE_THRESHOLD, QUORUM_THRESHOLD};
-use super::types::{GradientUpdate, AggregatedGradient, AggregationMethod};
+use super::types::{AggregatedGradient, AggregationMethod, GradientUpdate};
+use crate::matl::{KVector, QUORUM_THRESHOLD, RBBFT_BYZANTINE_THRESHOLD};
 
 /// Errors from the RB-BFT FL bridge
 #[derive(Debug, Error)]
@@ -451,7 +451,9 @@ impl RbbftFLBridge {
         proof_valid: bool,
     ) -> Result<(), RbbftFLError> {
         // Validate participant
-        let participant = self.participants.get(participant_id)
+        let participant = self
+            .participants
+            .get(participant_id)
             .ok_or_else(|| RbbftFLError::ParticipantNotFound(participant_id.to_string()))?;
 
         if !participant.is_eligible(self.config.min_reputation) {
@@ -462,18 +464,24 @@ impl RbbftFLBridge {
         }
 
         // Check for active round
-        let round = self.current_round.as_mut()
+        let round = self
+            .current_round
+            .as_mut()
             .ok_or(RbbftFLError::NoActiveRound)?;
 
         // Check for duplicate vote
-        if round.votes.iter().any(|v| v.participant_id == participant_id) {
+        if round
+            .votes
+            .iter()
+            .any(|v| v.participant_id == participant_id)
+        {
             return Err(RbbftFLError::DuplicateVote(participant_id.to_string()));
         }
 
         // Validate proof if required
         if self.config.require_proofs && !proof_valid {
             return Err(RbbftFLError::InvalidProof(
-                "Proof validation failed".to_string()
+                "Proof validation failed".to_string(),
             ));
         }
 
@@ -572,11 +580,14 @@ impl RbbftFLBridge {
             ));
         }
 
-        let mut round = self.current_round.take()
+        let mut round = self
+            .current_round
+            .take()
             .ok_or(RbbftFLError::NoActiveRound)?;
 
         // Aggregate valid gradients with reputation weighting
-        let valid_votes: Vec<&RbbftVote> = round.votes
+        let valid_votes: Vec<&RbbftVote> = round
+            .votes
             .iter()
             .filter(|v| v.value && v.proof_valid && v.gradient.is_some())
             .collect();
@@ -586,9 +597,12 @@ impl RbbftFLBridge {
         }
 
         // Get gradient dimension
-        let dimension = valid_votes[0].gradient.as_ref()
+        let dimension = valid_votes[0]
+            .gradient
+            .as_ref()
             .ok_or(RbbftFLError::InsufficientParticipants(0, 1))?
-            .gradients.len();
+            .gradients
+            .len();
 
         // Compute weighted average
         let mut total_weight = 0.0f32;
@@ -661,15 +675,18 @@ impl RbbftFLBridge {
         let total_participants = self.participants.len();
         let eligible_participants = self.eligible_participant_count();
         let total_rounds = self.completed_rounds.len();
-        let successful_rounds = self.completed_rounds
+        let successful_rounds = self
+            .completed_rounds
             .iter()
             .filter(|r| r.state == RoundState::Completed)
             .count();
 
         let avg_participation = if total_rounds > 0 {
-            self.completed_rounds.iter()
+            self.completed_rounds
+                .iter()
                 .map(|r| r.votes.len())
-                .sum::<usize>() as f32 / total_rounds as f32
+                .sum::<usize>() as f32
+                / total_rounds as f32
         } else {
             0.0
         };
@@ -744,8 +761,12 @@ mod tests {
 
         // Submit votes
         let grad = make_gradient(100, 0.1);
-        bridge.submit_vote("client-1", true, Some(grad.clone()), true).unwrap();
-        bridge.submit_vote("client-2", true, Some(grad.clone()), true).unwrap();
+        bridge
+            .submit_vote("client-1", true, Some(grad.clone()), true)
+            .unwrap();
+        bridge
+            .submit_vote("client-2", true, Some(grad.clone()), true)
+            .unwrap();
 
         // Check consensus
         assert!(bridge.check_consensus());
@@ -763,18 +784,25 @@ mod tests {
 
         // High rep votes yes with larger gradient
         let grad1 = make_gradient(100, 1.0);
-        bridge.submit_vote("high-rep", true, Some(grad1), true).unwrap();
+        bridge
+            .submit_vote("high-rep", true, Some(grad1), true)
+            .unwrap();
 
         // Low rep votes yes with smaller gradient
         let grad2 = make_gradient(100, 0.1);
-        bridge.submit_vote("low-rep", true, Some(grad2), true).unwrap();
+        bridge
+            .submit_vote("low-rep", true, Some(grad2), true)
+            .unwrap();
 
         let result = bridge.finalize_round().unwrap();
 
         // Result should be weighted towards high-rep's larger gradient
         // Check index 50 where sin(0.05) ≈ 0.05 gives a non-trivial value
         // High rep contributes scale=1.0, low rep scale=0.1, weighted by reputation²
-        assert!(result.gradients[50].abs() > 0.01, "Weighted gradient at index 50 should be non-trivial");
+        assert!(
+            result.gradients[50].abs() > 0.01,
+            "Weighted gradient at index 50 should be non-trivial"
+        );
     }
 
     #[test]
@@ -788,8 +816,12 @@ mod tests {
         bridge.start_round([0u8; 32]).unwrap();
 
         let grad = make_gradient(100, 0.1);
-        bridge.submit_vote("good-1", true, Some(grad.clone()), true).unwrap();
-        bridge.submit_vote("good-2", true, Some(grad.clone()), true).unwrap();
+        bridge
+            .submit_vote("good-1", true, Some(grad.clone()), true)
+            .unwrap();
+        bridge
+            .submit_vote("good-2", true, Some(grad.clone()), true)
+            .unwrap();
         // Bad participant with invalid proof
         bridge.submit_vote("bad", true, Some(grad), false).ok(); // Will fail but we track it
 
@@ -808,7 +840,9 @@ mod tests {
         bridge.start_round([0u8; 32]).unwrap();
 
         let grad = make_gradient(100, 0.1);
-        bridge.submit_vote("client-1", true, Some(grad.clone()), true).unwrap();
+        bridge
+            .submit_vote("client-1", true, Some(grad.clone()), true)
+            .unwrap();
 
         // Try to vote again
         let result = bridge.submit_vote("client-1", true, Some(grad), true);

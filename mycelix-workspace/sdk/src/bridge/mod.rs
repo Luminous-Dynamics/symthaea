@@ -9,11 +9,20 @@
 pub mod byzantine_identity;
 
 pub use byzantine_identity::{
-    ByzantineIdentityCoordinator, CoordinatorConfig, IdentityTrustAssessment,
-    TrustLevel, MatlNodeResult, NetworkStatusSummary, NetworkHealth,
-    is_reputation_trustworthy, simple_trust_score,
+    is_reputation_trustworthy,
+    simple_trust_score,
     // Aggregated reputation types
-    AggregatedReputation, AggregationConfig, ReputationDataPoint, ReputationSource,
+    AggregatedReputation,
+    AggregationConfig,
+    ByzantineIdentityCoordinator,
+    CoordinatorConfig,
+    IdentityTrustAssessment,
+    MatlNodeResult,
+    NetworkHealth,
+    NetworkStatusSummary,
+    ReputationDataPoint,
+    ReputationSource,
+    TrustLevel,
 };
 
 use serde::{Deserialize, Serialize};
@@ -145,7 +154,8 @@ impl CrossHappReputation {
             return scores.iter().map(|s| s.score).sum::<f64>() / scores.len() as f64;
         }
 
-        scores.iter()
+        scores
+            .iter()
             .map(|s| s.score * (s.interactions as f64 / total_interactions as f64))
             .sum()
     }
@@ -153,14 +163,18 @@ impl CrossHappReputation {
     /// Get the highest scoring hApp
     pub fn best_happ(&self) -> Option<&HappReputationScore> {
         self.scores.iter().max_by(|a, b| {
-            a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal)
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
     }
 
     /// Get the lowest scoring hApp
     pub fn worst_happ(&self) -> Option<&HappReputationScore> {
         self.scores.iter().min_by(|a, b| {
-            a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal)
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
         })
     }
 
@@ -242,20 +256,20 @@ impl LocalBridge {
 
     /// Register a hApp
     pub fn register(&mut self, registration: HappRegistration) {
-        self.registrations.insert(registration.happ_id.clone(), registration);
+        self.registrations
+            .insert(registration.happ_id.clone(), registration);
     }
 
     /// Record reputation for an agent in a hApp
     pub fn record_reputation(&mut self, agent: &str, score: HappReputationScore) {
-        self.reputations.insert(
-            (agent.to_string(), score.happ_id.clone()),
-            score,
-        );
+        self.reputations
+            .insert((agent.to_string(), score.happ_id.clone()), score);
     }
 
     /// Query cross-hApp reputation
     pub fn query_reputation(&self, agent: &str) -> CrossHappReputation {
-        let scores: Vec<HappReputationScore> = self.reputations
+        let scores: Vec<HappReputationScore> = self
+            .reputations
             .iter()
             .filter(|((a, _), _)| a == agent)
             .map(|(_, score)| score.clone())
@@ -326,13 +340,16 @@ mod tests {
         });
 
         // Record reputation
-        bridge.record_reputation("agent1", HappReputationScore {
-            happ_id: "mail".to_string(),
-            happ_name: "Mycelix Mail".to_string(),
-            score: 0.9,
-            interactions: 50,
-            last_updated: 0,
-        });
+        bridge.record_reputation(
+            "agent1",
+            HappReputationScore {
+                happ_id: "mail".to_string(),
+                happ_name: "Mycelix Mail".to_string(),
+                score: 0.9,
+                interactions: 50,
+                last_updated: 0,
+            },
+        );
 
         // Query
         let rep = bridge.query_reputation("agent1");

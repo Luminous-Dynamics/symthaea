@@ -63,11 +63,11 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::matl::KVector;
 use super::epistemic_fl_bridge::{
-    EpistemicGradientUpdate, EpistemicByzantineResult, KVectorUpdates,
-    ByzantineAttackType, ByzantineScope,
+    ByzantineAttackType, ByzantineScope, EpistemicByzantineResult, EpistemicGradientUpdate,
+    KVectorUpdates,
 };
+use crate::matl::KVector;
 
 // ============================================================================
 // Gradient Quality Signals (#185)
@@ -158,14 +158,16 @@ impl GradientQualitySignals {
             && gradient_norm.is_finite();
 
         // Compute max element magnitude
-        let max_element_magnitude = gradient.iter()
+        let max_element_magnitude = gradient
+            .iter()
             .map(|x| x.abs())
             .fold(0.0f64, |a, b| a.max(b));
         let element_magnitude_valid = max_element_magnitude <= config.max_element_magnitude
             && max_element_magnitude.is_finite();
 
         // Check dimension
-        let dimension_valid = dimension == config.expected_dimension || config.expected_dimension == 0;
+        let dimension_valid =
+            dimension == config.expected_dimension || config.expected_dimension == 0;
 
         // Compute variance and sparsity
         let mean = if dimension > 0 {
@@ -179,7 +181,8 @@ impl GradientQualitySignals {
             0.0
         };
 
-        let near_zero_count = gradient.iter()
+        let near_zero_count = gradient
+            .iter()
             .filter(|x| x.abs() < config.sparsity_threshold)
             .count();
         let sparsity = if dimension > 0 {
@@ -236,7 +239,8 @@ impl GradientQualitySignals {
 
         // Compute cosine similarity to global average
         if gradient.len() == global_average.len() && !gradient.is_empty() {
-            let dot_product: f64 = gradient.iter()
+            let dot_product: f64 = gradient
+                .iter()
                 .zip(global_average.iter())
                 .map(|(a, b)| a * b)
                 .sum();
@@ -433,9 +437,17 @@ impl KVectorDelta {
             participant_id: participant_id.to_string(),
             reputation_delta: tier.reputation_delta(),
             activity_delta: if was_included { 0.01 } else { 0.005 }, // Credit for participation
-            integrity_delta: if signals.passes_quality_checks() { 0.001 } else { -0.02 },
+            integrity_delta: if signals.passes_quality_checks() {
+                0.001
+            } else {
+                -0.02
+            },
             performance_delta: tier.performance_delta(),
-            historical_delta: if signals.historical_consistency > 0.8 { 0.002 } else { 0.0 },
+            historical_delta: if signals.historical_consistency > 0.8 {
+                0.002
+            } else {
+                0.0
+            },
             coherence_delta: 0.0,
             reason: format!("Gradient quality: {:?}", tier),
             is_penalty: !signals.passes_quality_checks(),
@@ -512,7 +524,7 @@ impl KVectorDelta {
             kvector.k_s, // Stake doesn't change from FL feedback
             (kvector.k_h + self.historical_delta).clamp(0.0, 1.0),
             kvector.k_topo, // Topology doesn't change from FL feedback
-            kvector.k_v, // Verification doesn't change from FL feedback
+            kvector.k_v,    // Verification doesn't change from FL feedback
             (kvector.k_phi + self.coherence_delta).clamp(0.0, 1.0),
         )
     }
@@ -667,12 +679,14 @@ impl MatlFeedbackComputer {
                         }
                     }
                 }
-                signals.historical_consistency = (total_similarity / history.len() as f64 + 1.0) / 2.0;
+                signals.historical_consistency =
+                    (total_similarity / history.len() as f64 + 1.0) / 2.0;
             }
         }
 
         // Update history
-        let history = self.historical_gradients
+        let history = self
+            .historical_gradients
             .entry(participant_id.to_string())
             .or_default();
         history.push(gradient.to_vec());
@@ -697,7 +711,8 @@ impl MatlFeedbackComputer {
 
         // Build lookup maps
         let weight_map: HashMap<_, _> = participant_weights.iter().cloned().collect();
-        let byzantine_map: HashMap<_, _> = byzantine_results.iter()
+        let byzantine_map: HashMap<_, _> = byzantine_results
+            .iter()
             .map(|r| (r.participant_id.clone(), r))
             .collect();
 
@@ -710,17 +725,17 @@ impl MatlFeedbackComputer {
             stats.total_participants += 1;
 
             // Analyze gradient quality
-            let signals = self.analyze_gradient(
-                pid,
-                &update.gradient.gradients,
-                global_average,
-            );
+            let signals = self.analyze_gradient(pid, &update.gradient.gradients, global_average);
             total_quality += signals.overall_quality;
             quality_signals.insert(pid.clone(), signals.clone());
 
             // Start with quality-based delta
             let was_included = weight_map.contains_key(pid);
-            let mut deltas = vec![KVectorDelta::from_quality_signals(pid, &signals, was_included)];
+            let mut deltas = vec![KVectorDelta::from_quality_signals(
+                pid,
+                &signals,
+                was_included,
+            )];
 
             // Add Byzantine penalty if applicable
             if let Some(byzantine) = byzantine_map.get(pid) {
@@ -784,10 +799,7 @@ impl MatlFeedbackComputer {
     }
 
     /// Apply feedback to a map of K-Vectors
-    pub fn apply_feedback(
-        feedback: &FLMatlFeedback,
-        kvectors: &mut HashMap<String, KVector>,
-    ) {
+    pub fn apply_feedback(feedback: &FLMatlFeedback, kvectors: &mut HashMap<String, KVector>) {
         for (pid, delta) in &feedback.kvector_deltas {
             if let Some(kv) = kvectors.get_mut(pid) {
                 *kv = delta.apply(kv);
@@ -850,7 +862,11 @@ mod tests {
 
         assert!(signals.similarity_to_global.is_some());
         let sim = signals.similarity_to_global.unwrap();
-        assert!(sim > 0.9, "Similar gradients should have high similarity: {}", sim);
+        assert!(
+            sim > 0.9,
+            "Similar gradients should have high similarity: {}",
+            sim
+        );
     }
 
     #[test]
@@ -919,11 +935,18 @@ mod tests {
         );
 
         assert!(delta.is_penalty);
-        assert!(delta.reputation_delta < -0.1, "Should have significant penalty: {}", delta.reputation_delta);
+        assert!(
+            delta.reputation_delta < -0.1,
+            "Should have significant penalty: {}",
+            delta.reputation_delta
+        );
         // Integrity penalty should be more severe (more negative) than reputation
-        assert!(delta.integrity_delta < delta.reputation_delta,
+        assert!(
+            delta.integrity_delta < delta.reputation_delta,
             "Integrity penalty ({}) should be more severe than reputation ({})",
-            delta.integrity_delta, delta.reputation_delta);
+            delta.integrity_delta,
+            delta.reputation_delta
+        );
     }
 
     #[test]
@@ -963,11 +986,9 @@ mod tests {
 
     #[test]
     fn test_matl_feedback_computer() {
-        use crate::epistemic::{
-            EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-        };
         use super::super::epistemic_fl_bridge::GradientEpistemicClassification;
         use super::super::types::GradientUpdate;
+        use crate::epistemic::{EmpiricalLevel, HarmonicLevel, MaterialityLevel, NormativeLevel};
 
         let mut computer = MatlFeedbackComputer::default();
 
@@ -999,10 +1020,7 @@ mod tests {
             },
         ];
 
-        let participant_weights = vec![
-            ("p1".to_string(), 0.6),
-            ("p2".to_string(), 0.4),
-        ];
+        let participant_weights = vec![("p1".to_string(), 0.6), ("p2".to_string(), 0.4)];
 
         let feedback = computer.compute_round_feedback(
             1,
@@ -1030,8 +1048,10 @@ mod tests {
             let signals = computer.analyze_gradient(pid, &gradient, None);
 
             if i > 0 {
-                assert!(signals.historical_consistency > 0.8,
-                    "Consistent gradients should have high historical consistency");
+                assert!(
+                    signals.historical_consistency > 0.8,
+                    "Consistent gradients should have high historical consistency"
+                );
             }
         }
     }

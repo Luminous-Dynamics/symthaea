@@ -25,9 +25,9 @@
 //! - E1-E2 (Observational/Peer-Reviewed): Standard calibration
 //! - E3-E4 (Cryptographic/Formal): Tighter calibration expected
 
+use crate::epistemic::EmpiricalLevel;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::epistemic::EmpiricalLevel;
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -72,7 +72,8 @@ impl CalibrationBin {
     pub fn add_prediction(&mut self, predicted: f64, outcome: bool) {
         let outcome_val = if outcome { 1.0 } else { 0.0 };
         self.outcome_sum += outcome_val;
-        self.avg_predicted = (self.avg_predicted * self.count as f64 + predicted) / (self.count + 1) as f64;
+        self.avg_predicted =
+            (self.avg_predicted * self.count as f64 + predicted) / (self.count + 1) as f64;
         self.count += 1;
         self.actual_frequency = self.outcome_sum / self.count as f64;
     }
@@ -259,7 +260,8 @@ impl AgentCalibrationProfile {
         self.overall_curve.add_prediction(predicted, outcome);
 
         if let Some(domain) = domain {
-            let curve = self.domain_curves
+            let curve = self
+                .domain_curves
                 .entry(domain.to_string())
                 .or_insert_with(|| CalibrationCurve::new(10));
             curve.add_prediction(predicted, outcome);
@@ -285,8 +287,10 @@ impl AgentCalibrationProfile {
         }
 
         let len = self.recent_brier_scores.len();
-        let first_half: f64 = self.recent_brier_scores[..len/2].iter().sum::<f64>() / (len/2) as f64;
-        let second_half: f64 = self.recent_brier_scores[len/2..].iter().sum::<f64>() / (len/2) as f64;
+        let first_half: f64 =
+            self.recent_brier_scores[..len / 2].iter().sum::<f64>() / (len / 2) as f64;
+        let second_half: f64 =
+            self.recent_brier_scores[len / 2..].iter().sum::<f64>() / (len / 2) as f64;
 
         // Negative trend = improving (lower Brier is better)
         self.trend = first_half - second_half;
@@ -295,8 +299,10 @@ impl AgentCalibrationProfile {
     /// Check if recalibration is needed
     pub fn needs_recalibration(&self) -> bool {
         let quality = self.overall_curve.quality_rating();
-        matches!(quality, CalibrationQuality::Poor | CalibrationQuality::VeryPoor)
-            && self.overall_curve.total_predictions >= 100
+        matches!(
+            quality,
+            CalibrationQuality::Poor | CalibrationQuality::VeryPoor
+        ) && self.overall_curve.total_predictions >= 100
     }
 
     /// Get recalibrated probability
@@ -427,7 +433,8 @@ impl CalibrationEngine {
         self.global_curve.add_prediction(predicted, outcome);
 
         // Update agent profile
-        let profile = self.profiles
+        let profile = self
+            .profiles
             .entry(agent_id.to_string())
             .or_insert_with(|| AgentCalibrationProfile::new(agent_id.to_string()));
         profile.record_prediction(predicted, outcome, domain);
@@ -575,7 +582,8 @@ impl EpistemicCalibrationProfile {
             return 0.0;
         }
 
-        self.overconfidence_by_level.iter()
+        self.overconfidence_by_level
+            .iter()
             .zip(self.predictions_by_level.iter())
             .map(|(oc, count)| oc * (*count as f64 / total as f64))
             .sum()
@@ -604,7 +612,9 @@ impl EpistemicCalibrationProfile {
 
         match (ratio, overconfidence) {
             (r, oc) if r >= 0.8 && oc.abs() < 0.05 => EpistemicCalibrationQuality::WellCalibrated,
-            (r, oc) if r >= 0.6 && oc.abs() < 0.10 => EpistemicCalibrationQuality::ModeratelyCalibrated,
+            (r, oc) if r >= 0.6 && oc.abs() < 0.10 => {
+                EpistemicCalibrationQuality::ModeratelyCalibrated
+            }
             (_, oc) if oc > 0.10 => EpistemicCalibrationQuality::SystematicallyOverconfident,
             (_, oc) if oc < -0.10 => EpistemicCalibrationQuality::SystematicallyUnderconfident,
             _ => EpistemicCalibrationQuality::PoorlyCalibrated,
@@ -680,7 +690,14 @@ impl TemporalCalibrationCurve {
     }
 
     /// Add a new prediction
-    pub fn add(&mut self, predicted: f64, outcome: bool, timestamp: u64, e_level: Option<u8>, domain: Option<String>) {
+    pub fn add(
+        &mut self,
+        predicted: f64,
+        outcome: bool,
+        timestamp: u64,
+        e_level: Option<u8>,
+        domain: Option<String>,
+    ) {
         self.predictions.push(TimestampedPrediction {
             predicted,
             outcome,
@@ -761,19 +778,23 @@ impl TemporalCalibrationCurve {
         let older: Vec<_> = self.predictions[..mid].iter().collect();
         let newer: Vec<_> = self.predictions[mid..].iter().collect();
 
-        let older_brier: f64 = older.iter()
+        let older_brier: f64 = older
+            .iter()
             .map(|p| {
                 let o = if p.outcome { 1.0 } else { 0.0 };
                 (p.predicted - o).powi(2)
             })
-            .sum::<f64>() / older.len() as f64;
+            .sum::<f64>()
+            / older.len() as f64;
 
-        let newer_brier: f64 = newer.iter()
+        let newer_brier: f64 = newer
+            .iter()
             .map(|p| {
                 let o = if p.outcome { 1.0 } else { 0.0 };
                 (p.predicted - o).powi(2)
             })
-            .sum::<f64>() / newer.len() as f64;
+            .sum::<f64>()
+            / newer.len() as f64;
 
         // Positive = degrading, negative = improving
         newer_brier - older_brier
@@ -824,7 +845,8 @@ impl EnhancedAgentCalibrationProfile {
         domain: Option<&str>,
     ) {
         // Basic profile
-        self.basic_profile.record_prediction(predicted, outcome, domain);
+        self.basic_profile
+            .record_prediction(predicted, outcome, domain);
 
         // Epistemic profile
         if let Some(level) = e_level {
@@ -849,12 +871,16 @@ impl EnhancedAgentCalibrationProfile {
         if error > 0.0 {
             self.overconfidence_bias = self.overconfidence_bias * (1.0 - alpha) + error * alpha;
         } else {
-            self.underconfidence_bias = self.underconfidence_bias * (1.0 - alpha) + (-error) * alpha;
+            self.underconfidence_bias =
+                self.underconfidence_bias * (1.0 - alpha) + (-error) * alpha;
         }
     }
 
     /// Get comprehensive K-Vector adjustment
-    pub fn comprehensive_kvector_adjustment(&self, current_timestamp: u64) -> ComprehensiveCalibrationAdjustment {
+    pub fn comprehensive_kvector_adjustment(
+        &self,
+        current_timestamp: u64,
+    ) -> ComprehensiveCalibrationAdjustment {
         let basic_adj = self.basic_profile.kvector_adjustment();
         let epistemic_quality = self.epistemic_profile.epistemic_quality();
         let trend = self.temporal_curve.trend(current_timestamp);
@@ -1195,7 +1221,7 @@ mod tests {
 
     #[test]
     fn test_apply_calibration_to_agent() {
-        use super::super::{AgentId, AgentClass, AgentConstraints, AgentStatus, EpistemicStats};
+        use super::super::{AgentClass, AgentConstraints, AgentId, AgentStatus, EpistemicStats};
         use crate::matl::KVector;
 
         let mut agent = InstrumentalActor {

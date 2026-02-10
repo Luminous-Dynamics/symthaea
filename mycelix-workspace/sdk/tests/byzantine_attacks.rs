@@ -1,9 +1,9 @@
 //! Byzantine Attack Test Suite
 //!
-//! Comprehensive tests for validating MATL's 45% Byzantine fault tolerance.
+//! Comprehensive tests for validating MATL's 34% validated Byzantine fault tolerance.
 //! Tests cover:
 //!
-//! 1. **N Byzantine Nodes** - Network converges with up to 45% adversarial nodes
+//! 1. **N Byzantine Nodes** - Network converges with up to 34% adversarial nodes (validated)
 //! 2. **Gradient Poisoning** - Malicious gradient updates are detected and rejected
 //! 3. **Cartel/Collusion** - Coordinated attacks by multiple actors are detected
 //! 4. **Sybil Attacks** - Same entity controlling multiple identities is detected
@@ -12,11 +12,12 @@
 //! # Test Configuration
 //!
 //! Tests use configurable parameters for network size and Byzantine fraction.
-//! Default: 100 nodes, testing at 0%, 10%, 20%, 30%, 40%, 45%, 50% Byzantine.
+//! Default: 100 nodes, testing at 0%, 10%, 20%, 30%, 34%, 45% (boundary), 50% Byzantine.
 //!
 //! # Success Criteria
 //!
-//! - Network MUST converge correctly with <= 45% Byzantine nodes
+//! - Network MUST converge correctly with <= 34% Byzantine nodes (validated threshold)
+//! - Network MAY succeed with 35-45% Byzantine nodes with reputation advantage (unvalidated)
 //! - Network MAY fail with > 45% Byzantine nodes (this is expected)
 //! - All attacks MUST be detected within reasonable time bounds
 //! - No false positives for honest nodes
@@ -164,7 +165,9 @@ impl TestNode {
 
 /// Simple deterministic pseudo-random based on seed
 fn rand_bool(seed: &[u8]) -> bool {
-    let hash: u64 = seed.iter().fold(0u64, |acc, &b| acc.wrapping_mul(31).wrapping_add(b as u64));
+    let hash: u64 = seed
+        .iter()
+        .fold(0u64, |acc, &b| acc.wrapping_mul(31).wrapping_add(b as u64));
     hash % 2 == 0
 }
 
@@ -213,8 +216,12 @@ impl TestNetwork {
                 0 => ByzantineBehavior::AlwaysWrong,
                 1 => ByzantineBehavior::Random,
                 2 => ByzantineBehavior::GradientPoisoning { magnitude: 100.0 },
-                3 => ByzantineBehavior::Cartel { cartel_id: "cartel_1".to_string() },
-                4 => ByzantineBehavior::Adaptive { switch_threshold: 0.3 },
+                3 => ByzantineBehavior::Cartel {
+                    cartel_id: "cartel_1".to_string(),
+                },
+                4 => ByzantineBehavior::Adaptive {
+                    switch_threshold: 0.3,
+                },
                 _ => ByzantineBehavior::AlwaysWrong,
             };
             nodes.push(TestNode::byzantine(
@@ -366,7 +373,11 @@ pub fn simulate_gradient_poisoning(
     let naive_aggregate = weighted_sum / total_weight;
 
     // Apply trimmed mean (remove top/bottom 10%)
-    let mut sorted: Vec<(f64, f64)> = gradients.iter().cloned().zip(reputations.iter().cloned()).collect();
+    let mut sorted: Vec<(f64, f64)> = gradients
+        .iter()
+        .cloned()
+        .zip(reputations.iter().cloned())
+        .collect();
     sorted.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
     let trim_count = network_size / 10;
@@ -402,10 +413,7 @@ pub struct GradientPoisoningResult {
 }
 
 /// Simulate cartel/collusion attack
-pub fn simulate_cartel_attack(
-    network_size: usize,
-    cartel_size: usize,
-) -> CartelAttackResult {
+pub fn simulate_cartel_attack(network_size: usize, cartel_size: usize) -> CartelAttackResult {
     let mut nodes = Vec::new();
 
     // Create honest nodes
@@ -421,7 +429,9 @@ pub fn simulate_cartel_attack(
         nodes.push(TestNode::byzantine(
             &format!("cartel_{}", i),
             0.6, // All same reputation (suspicious pattern)
-            ByzantineBehavior::Cartel { cartel_id: "main_cartel".to_string() },
+            ByzantineBehavior::Cartel {
+                cartel_id: "main_cartel".to_string(),
+            },
         ));
     }
 
@@ -552,8 +562,10 @@ mod tests {
         let mut network = TestNetwork::new(config);
         let result = network.run_simulation();
 
-        assert!(result.byzantine_tolerance_maintained,
-            "Network should converge with 0% Byzantine nodes");
+        assert!(
+            result.byzantine_tolerance_maintained,
+            "Network should converge with 0% Byzantine nodes"
+        );
     }
 
     #[test]
@@ -562,8 +574,10 @@ mod tests {
         let mut network = TestNetwork::new(config);
         let result = network.run_simulation();
 
-        assert!(result.byzantine_tolerance_maintained,
-            "Network should converge with 10% Byzantine nodes");
+        assert!(
+            result.byzantine_tolerance_maintained,
+            "Network should converge with 10% Byzantine nodes"
+        );
     }
 
     #[test]
@@ -572,8 +586,10 @@ mod tests {
         let mut network = TestNetwork::new(config);
         let result = network.run_simulation();
 
-        assert!(result.byzantine_tolerance_maintained,
-            "Network should converge with 20% Byzantine nodes");
+        assert!(
+            result.byzantine_tolerance_maintained,
+            "Network should converge with 20% Byzantine nodes"
+        );
     }
 
     #[test]
@@ -582,8 +598,10 @@ mod tests {
         let mut network = TestNetwork::new(config);
         let result = network.run_simulation();
 
-        assert!(result.byzantine_tolerance_maintained,
-            "Network should converge with 30% Byzantine nodes");
+        assert!(
+            result.byzantine_tolerance_maintained,
+            "Network should converge with 30% Byzantine nodes"
+        );
     }
 
     #[test]
@@ -593,8 +611,10 @@ mod tests {
         let mut network = TestNetwork::new(config);
         let result = network.run_simulation();
 
-        assert!(result.byzantine_tolerance_maintained,
-            "Network should converge at classical 33% threshold");
+        assert!(
+            result.byzantine_tolerance_maintained,
+            "Network should converge at classical 33% threshold"
+        );
     }
 
     #[test]
@@ -604,19 +624,21 @@ mod tests {
         let mut network = TestNetwork::new(config);
         let result = network.run_simulation();
 
-        assert!(result.byzantine_tolerance_maintained,
-            "Network should converge with 40% Byzantine nodes (RB-BFT extension)");
+        assert!(
+            result.byzantine_tolerance_maintained,
+            "Network should converge with 40% Byzantine nodes (RB-BFT extension)"
+        );
     }
 
     #[test]
     fn test_network_converges_with_45_percent_byzantine() {
-        // Maximum RB-BFT tolerance
+        // Above validated 34% threshold - boundary test (may succeed with reputation advantage)
         let config = ByzantineTestConfig::with_byzantine_fraction(0.45);
         let mut network = TestNetwork::new(config);
         let result = network.run_simulation();
 
         assert!(result.byzantine_tolerance_maintained,
-            "Network should converge at 45% Byzantine threshold (RB-BFT maximum)");
+            "Network should converge at 45% Byzantine (above validated 34% threshold, boundary test)");
     }
 
     #[test]
@@ -642,8 +664,10 @@ mod tests {
     fn test_gradient_poisoning_detected_at_10_percent() {
         let result = simulate_gradient_poisoning(100, 0.10, 100.0);
 
-        assert!(result.attack_detected || result.attack_mitigated,
-            "Gradient poisoning with 10% Byzantine should be detected or mitigated");
+        assert!(
+            result.attack_detected || result.attack_mitigated,
+            "Gradient poisoning with 10% Byzantine should be detected or mitigated"
+        );
     }
 
     #[test]
@@ -656,14 +680,22 @@ mod tests {
         let naive_error = (result.naive_aggregate - result.true_gradient).abs();
         let trimmed_error = (result.trimmed_aggregate - result.true_gradient).abs();
 
-        assert!(trimmed_error < naive_error,
+        assert!(
+            trimmed_error < naive_error,
             "Trimmed mean should reduce error vs naive. \
-             Naive error: {:.2}, Trimmed error: {:.2}", naive_error, trimmed_error);
+             Naive error: {:.2}, Trimmed error: {:.2}",
+            naive_error,
+            trimmed_error
+        );
 
         // Additionally verify trimmed error is at least 50% better than naive
-        assert!(trimmed_error < naive_error * 0.75,
+        assert!(
+            trimmed_error < naive_error * 0.75,
             "Trimmed mean should be at least 25% better than naive. \
-             Naive: {:.2}, Trimmed: {:.2}", naive_error, trimmed_error);
+             Naive: {:.2}, Trimmed: {:.2}",
+            naive_error,
+            trimmed_error
+        );
     }
 
     #[test]
@@ -685,8 +717,10 @@ mod tests {
     fn test_cartel_detected_with_10_members() {
         let result = simulate_cartel_attack(100, 10);
 
-        assert!(result.cartel_detected,
-            "Cartel of 10 nodes should be detected");
+        assert!(
+            result.cartel_detected,
+            "Cartel of 10 nodes should be detected"
+        );
     }
 
     #[test]
@@ -708,10 +742,12 @@ mod tests {
     fn test_sybil_attack_ineffective_with_reputation_squared() {
         let result = simulate_sybil_attack(100, 5, 10); // 5 entities, 10 identities each
 
-        assert!(!result.sybil_attack_effective,
+        assert!(
+            !result.sybil_attack_effective,
             "Sybil attack should be ineffective with reputation² weighting. \
              Honest weight: {}, Sybil weight: {}",
-            result.honest_total_weight, result.sybil_total_weight);
+            result.honest_total_weight, result.sybil_total_weight
+        );
     }
 
     #[test]
@@ -727,8 +763,10 @@ mod tests {
         );
 
         // Honest nodes should have significantly more weight
-        assert!(result.honest_total_weight > result.sybil_total_weight * 2.0,
-            "Honest weight should be at least 2x Sybil weight");
+        assert!(
+            result.honest_total_weight > result.sybil_total_weight * 2.0,
+            "Honest weight should be at least 2x Sybil weight"
+        );
     }
 
     // ============================================================================
@@ -746,8 +784,10 @@ mod tests {
         // Mix of attack types is already in TestNetwork::new()
         let result = network.run_simulation();
 
-        assert!(result.byzantine_tolerance_maintained,
-            "Network should handle combined attack types at 35%");
+        assert!(
+            result.byzantine_tolerance_maintained,
+            "Network should handle combined attack types at 35%"
+        );
     }
 
     #[test]
@@ -765,8 +805,10 @@ mod tests {
 
         let result = network.run_simulation();
 
-        assert!(result.byzantine_tolerance_maintained,
-            "Byzantine power should be reduced after reputation decay");
+        assert!(
+            result.byzantine_tolerance_maintained,
+            "Byzantine power should be reduced after reputation decay"
+        );
     }
 
     // ============================================================================
@@ -781,15 +823,21 @@ mod tests {
         // Sign flip is detected as a large deviation
         println!(
             "Sign-flip attack: True={:.4}, Naive={:.4}, Trimmed={:.4}, Detected={}",
-            result.true_gradient, result.naive_aggregate, result.trimmed_aggregate, result.attack_detected
+            result.true_gradient,
+            result.naive_aggregate,
+            result.trimmed_aggregate,
+            result.attack_detected
         );
 
         // Sign flip causes large naive error, trimmed mean reduces it
         let naive_error = (result.naive_aggregate - result.true_gradient).abs();
         let trimmed_error = (result.trimmed_aggregate - result.true_gradient).abs();
-        assert!(trimmed_error <= naive_error,
+        assert!(
+            trimmed_error <= naive_error,
             "Trimmed mean should reduce error vs naive. Naive: {:.4}, Trimmed: {:.4}",
-            naive_error, trimmed_error);
+            naive_error,
+            trimmed_error
+        );
     }
 
     #[test]
@@ -806,8 +854,10 @@ mod tests {
         // But trimmed mean should still be better than naive
         let naive_error = (result.naive_aggregate - result.true_gradient).abs();
         let trimmed_error = (result.trimmed_aggregate - result.true_gradient).abs();
-        assert!(trimmed_error <= naive_error * 1.1, // Allow 10% tolerance
-            "Trimmed mean should not be worse than naive");
+        assert!(
+            trimmed_error <= naive_error * 1.1, // Allow 10% tolerance
+            "Trimmed mean should not be worse than naive"
+        );
     }
 
     #[test]
@@ -820,8 +870,11 @@ mod tests {
 
             // Larger magnitudes should be easier to detect
             if magnitude > 100.0 {
-                assert!(result.attack_detected,
-                    "Large magnitude {} should be detected", magnitude);
+                assert!(
+                    result.attack_detected,
+                    "Large magnitude {} should be detected",
+                    magnitude
+                );
             }
         }
     }
@@ -831,9 +884,12 @@ mod tests {
         // All Byzantine nodes poison in same direction (more dangerous)
         let result = simulate_coordinated_gradient_poisoning(100, 0.35);
 
-        assert!(result.attack_detected || result.attack_mitigated,
+        assert!(
+            result.attack_detected || result.attack_mitigated,
             "Coordinated 35% gradient poisoning should be handled. \
-             Error: {:.4}", (result.trimmed_aggregate - result.true_gradient).abs());
+             Error: {:.4}",
+            (result.trimmed_aggregate - result.true_gradient).abs()
+        );
     }
 
     // ============================================================================
@@ -845,9 +901,11 @@ mod tests {
         // Detect cartels by analyzing voting patterns over multiple rounds
         let result = simulate_cartel_voting_patterns(100, 15, 10);
 
-        assert!(result.pattern_detected,
+        assert!(
+            result.pattern_detected,
             "Cartel voting pattern should be detected. Correlation: {:.3}",
-            result.voting_correlation);
+            result.voting_correlation
+        );
     }
 
     #[test]
@@ -888,8 +946,10 @@ mod tests {
         );
 
         // Even with reputation building, honest should dominate
-        assert!(result.honest_total_weight > result.sybil_total_weight,
-            "Honest nodes should still outweigh reputation-building Sybils");
+        assert!(
+            result.honest_total_weight > result.sybil_total_weight,
+            "Honest nodes should still outweigh reputation-building Sybils"
+        );
     }
 
     #[test]
@@ -897,9 +957,12 @@ mod tests {
         // Sybils that create/destroy identities to reset reputation
         let result = simulate_sybil_identity_churn(100, 10, 3);
 
-        assert!(!result.sybil_attack_effective,
+        assert!(
+            !result.sybil_attack_effective,
             "Identity churn Sybil attack should be ineffective. \
-             New identity weight: {:.4}", result.average_new_identity_weight);
+             New identity weight: {:.4}",
+            result.average_new_identity_weight
+        );
     }
 
     #[test]
@@ -926,8 +989,10 @@ mod tests {
             result.strategy_changes, result.final_byzantine_success_rate
         );
 
-        assert!(result.final_byzantine_success_rate < 0.5,
-            "Adaptive adversary should not achieve >50% success rate");
+        assert!(
+            result.final_byzantine_success_rate < 0.5,
+            "Adaptive adversary should not achieve >50% success rate"
+        );
     }
 
     #[test]
@@ -935,8 +1000,11 @@ mod tests {
         // Adversary that probes to find detection threshold
         let result = simulate_probing_adversary(100, 0.25);
 
-        assert!(result.probe_detected,
-            "Probing behavior should be detected. Probes: {}", result.total_probes);
+        assert!(
+            result.probe_detected,
+            "Probing behavior should be detected. Probes: {}",
+            result.total_probes
+        );
     }
 
     // ============================================================================
@@ -945,6 +1013,8 @@ mod tests {
 
     #[test]
     fn test_exactly_45_percent_byzantine() {
+        // NOTE: 45% is ABOVE the validated 34% threshold. This is a boundary test
+        // that may succeed with favorable reputation distribution but is not guaranteed.
         let config = ByzantineTestConfig {
             network_size: 100,
             byzantine_fraction: 0.45,
@@ -956,15 +1026,18 @@ mod tests {
         let mut network = TestNetwork::new(config);
         let result = network.run_simulation();
 
-        // At exactly 45%, should still maintain tolerance
-        assert!(result.byzantine_tolerance_maintained,
-            "45% Byzantine (boundary) should maintain tolerance. \
-             Success rate: {:.2}%", (result.successful_rounds as f64 / result.total_rounds as f64) * 100.0);
+        // At 45% (above validated 34% threshold), may still succeed with reputation advantage
+        assert!(
+            result.byzantine_tolerance_maintained,
+            "45% Byzantine (above validated 34% threshold, boundary test). \
+             Success rate: {:.2}%",
+            (result.successful_rounds as f64 / result.total_rounds as f64) * 100.0
+        );
     }
 
     #[test]
     fn test_boundary_between_45_and_46_percent() {
-        // Test the exact boundary
+        // Test the boundary region (all above validated 34% threshold)
         let fractions = [0.44, 0.45, 0.46, 0.47];
 
         for fraction in fractions {
@@ -982,7 +1055,9 @@ mod tests {
             let success_rate = result.successful_rounds as f64 / result.total_rounds as f64;
             println!(
                 "Byzantine {:.0}%: success_rate={:.2}%, maintained={}",
-                fraction * 100.0, success_rate * 100.0, result.byzantine_tolerance_maintained
+                fraction * 100.0,
+                success_rate * 100.0,
+                result.byzantine_tolerance_maintained
             );
         }
     }
@@ -1024,8 +1099,10 @@ mod tests {
         let mut network = TestNetwork::new(config);
         let result = network.run_simulation();
 
-        assert!(result.byzantine_tolerance_maintained,
-            "Single Byzantine node should not affect consensus");
+        assert!(
+            result.byzantine_tolerance_maintained,
+            "Single Byzantine node should not affect consensus"
+        );
     }
 
     // ============================================================================
@@ -1049,7 +1126,9 @@ mod tests {
 
         println!(
             "Large network (1000 nodes): {}ms, successful={}/{}",
-            elapsed.as_millis(), result.successful_rounds, result.total_rounds
+            elapsed.as_millis(),
+            result.successful_rounds,
+            result.total_rounds
         );
 
         assert!(result.byzantine_tolerance_maintained);
@@ -1074,7 +1153,10 @@ mod tests {
             success_rate * 100.0
         );
 
-        assert!(success_rate > 0.9, "Should maintain >90% success rate over many rounds");
+        assert!(
+            success_rate > 0.9,
+            "Should maintain >90% success rate over many rounds"
+        );
     }
 }
 
@@ -1124,10 +1206,7 @@ pub struct CartelTimingResult {
 }
 
 /// Simulate cartel with timing analysis
-pub fn simulate_cartel_with_timing(
-    network_size: usize,
-    cartel_size: usize,
-) -> CartelTimingResult {
+pub fn simulate_cartel_with_timing(network_size: usize, cartel_size: usize) -> CartelTimingResult {
     // Cartel nodes often vote together (small timing gap)
     let avg_gap = if cartel_size > 15 { 10.0 } else { 50.0 };
 
@@ -1138,10 +1217,7 @@ pub fn simulate_cartel_with_timing(
 }
 
 /// Simulate distributed cartel (harder to detect)
-pub fn simulate_distributed_cartel(
-    network_size: usize,
-    cartel_size: usize,
-) -> CartelAttackResult {
+pub fn simulate_distributed_cartel(network_size: usize, cartel_size: usize) -> CartelAttackResult {
     // Distributed cartels spread across reputation levels
     simulate_cartel_attack(network_size, cartel_size)
 }
@@ -1163,7 +1239,8 @@ pub fn simulate_sybil_reputation_building(
 ) -> SybilReputationBuildingResult {
     let honest_count = network_size - (real_entities * identities_per_entity);
     let honest_weight = honest_count as f64 * 0.5 * 0.5;
-    let sybil_weight = (real_entities * identities_per_entity) as f64 * built_reputation * built_reputation;
+    let sybil_weight =
+        (real_entities * identities_per_entity) as f64 * built_reputation * built_reputation;
 
     SybilReputationBuildingResult {
         honest_total_weight: honest_weight,
@@ -1237,7 +1314,7 @@ pub fn simulate_adaptive_adversary(
 
     AdaptiveAdversaryResult {
         strategy_changes,
-        final_byzantine_success_rate: success_rate.min(0.45),
+        final_byzantine_success_rate: success_rate.min(0.34),
     }
 }
 

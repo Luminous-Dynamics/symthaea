@@ -7,7 +7,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
-use mycelix_sdk::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel, EpistemicClassification};
+use mycelix_sdk::epistemic::{
+    EmpiricalLevel, EpistemicClassification, MaterialityLevel, NormativeLevel,
+};
 
 fn load_spec() -> HashMap<String, String> {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
@@ -27,10 +29,7 @@ fn load_spec() -> HashMap<String, String> {
         }
 
         let mut parts = line.splitn(2, '=');
-        let key = parts
-            .next()
-            .map(str::trim)
-            .unwrap_or_default();
+        let key = parts.next().map(str::trim).unwrap_or_default();
         let value = parts
             .next()
             .map(str::trim)
@@ -72,4 +71,3 @@ fn epistemic_codes_match_shared_spec() {
     );
     assert_eq!(foundational.to_code(), spec["foundational"]);
 }
-

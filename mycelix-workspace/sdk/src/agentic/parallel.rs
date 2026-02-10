@@ -14,12 +14,14 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use crate::matl::KVector;
 use super::{
-    InstrumentalActor, AgentId, AgentStatus, AgentClass, AgentConstraints,
-    EpistemicStats, BehaviorLogEntry, ActionOutcome, UncertaintyCalibration,
-    adversarial::{GamingDetector, GamingDetectionConfig, SybilDetector, QuarantineManager, QuarantineReason},
+    adversarial::{
+        GamingDetectionConfig, GamingDetector, QuarantineManager, QuarantineReason, SybilDetector,
+    },
+    ActionOutcome, AgentClass, AgentConstraints, AgentId, AgentStatus, BehaviorLogEntry,
+    EpistemicStats, InstrumentalActor, UncertaintyCalibration,
 };
+use crate::matl::KVector;
 
 /// Configuration for parallel simulation
 #[derive(Clone, Debug)]
@@ -131,9 +133,11 @@ impl TickAggregators {
             let current_f = f64::from_bits(current);
             let new_f = current_f + trust;
             let new = new_f.to_bits();
-            if self.total_trust.compare_exchange_weak(
-                current, new, Ordering::SeqCst, Ordering::Relaxed
-            ).is_ok() {
+            if self
+                .total_trust
+                .compare_exchange_weak(current, new, Ordering::SeqCst, Ordering::Relaxed)
+                .is_ok()
+            {
                 break;
             }
         }
@@ -185,7 +189,9 @@ impl RandomBuffer {
 
         for _ in 0..capacity {
             // Linear Congruential Generator (fast, good enough for simulation)
-            state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             values.push((state as f64) / (u64::MAX as f64));
         }
 
@@ -273,15 +279,24 @@ impl ParallelSimEngine {
             pending_escalations: Vec::new(),
         };
 
-        self.agents.insert(id.to_string(), SimAgent {
-            agent,
-            behavior,
-            sponsor: sponsor.to_string(),
-        });
+        self.agents.insert(
+            id.to_string(),
+            SimAgent {
+                agent,
+                behavior,
+                sponsor: sponsor.to_string(),
+            },
+        );
     }
 
     /// Add population of similar agents
-    pub fn add_population(&mut self, prefix: &str, behavior: SimAgentBehavior, count: usize, sponsor: &str) {
+    pub fn add_population(
+        &mut self,
+        prefix: &str,
+        behavior: SimAgentBehavior,
+        count: usize,
+        sponsor: &str,
+    ) {
         for i in 0..count {
             self.add_agent(&format!("{}-{}", prefix, i), behavior.clone(), sponsor);
         }
@@ -310,7 +325,10 @@ impl ParallelSimEngine {
                 continue;
             }
 
-            if self.quarantine.is_quarantined(sim_agent.agent.agent_id.as_str()) {
+            if self
+                .quarantine
+                .is_quarantined(sim_agent.agent.agent_id.as_str())
+            {
                 continue;
             }
 
@@ -321,8 +339,8 @@ impl ParallelSimEngine {
                 let success_roll = self.random_buffer.next();
                 let threshold_variance = self.random_buffer.next();
 
-                let threshold = sim_agent.behavior.success_rate +
-                    (threshold_variance - 0.5) * sim_agent.behavior.success_variance * 2.0;
+                let threshold = sim_agent.behavior.success_rate
+                    + (threshold_variance - 0.5) * sim_agent.behavior.success_variance * 2.0;
 
                 let outcome = if success_roll < threshold {
                     ActionOutcome::Success
@@ -370,7 +388,11 @@ impl ParallelSimEngine {
             total_agents: self.agents.len(),
             active_agents: active_count,
             quarantined_agents: self.quarantine.entries.len(),
-            avg_trust: if active_count > 0 { total_trust / active_count as f64 } else { 0.0 },
+            avg_trust: if active_count > 0 {
+                total_trust / active_count as f64
+            } else {
+                0.0
+            },
             gaming_incidents,
             sybil_evidence: 0,
         };
@@ -385,7 +407,9 @@ impl ParallelSimEngine {
         let aggregators = Arc::new(TickAggregators::new());
 
         // Collect agent data for parallel processing
-        let agent_data: Vec<_> = self.agents.iter()
+        let agent_data: Vec<_> = self
+            .agents
+            .iter()
             .filter(|(_, sim)| sim.agent.status == AgentStatus::Active)
             .filter(|(id, _)| !self.quarantine.is_quarantined(id))
             .map(|(id, sim)| (id.clone(), sim.behavior.clone()))
@@ -396,37 +420,40 @@ impl ParallelSimEngine {
         let new_entries: Vec<(String, Vec<BehaviorLogEntry>)> = agent_data
             .par_chunks(chunk_size)
             .flat_map(|chunk| {
-                chunk.iter().map(|(id, behavior)| {
-                    let mut entries = Vec::new();
-                    use rand::Rng;
-                    let mut rng = rand::thread_rng();
+                chunk
+                    .iter()
+                    .map(|(id, behavior)| {
+                        let mut entries = Vec::new();
+                        use rand::Rng;
+                        let mut rng = rand::thread_rng();
 
-                    let actions = (behavior.activity_rate + rng.gen::<f64>() * 0.5) as usize;
+                        let actions = (behavior.activity_rate + rng.gen::<f64>() * 0.5) as usize;
 
-                    for _ in 0..actions.min(5) {
-                        let success_roll: f64 = rng.gen();
-                        let threshold_variance: f64 = rng.gen();
+                        for _ in 0..actions.min(5) {
+                            let success_roll: f64 = rng.gen();
+                            let threshold_variance: f64 = rng.gen();
 
-                        let threshold = behavior.success_rate +
-                            (threshold_variance - 0.5) * behavior.success_variance * 2.0;
+                            let threshold = behavior.success_rate
+                                + (threshold_variance - 0.5) * behavior.success_variance * 2.0;
 
-                        let outcome = if success_roll < threshold {
-                            ActionOutcome::Success
-                        } else {
-                            ActionOutcome::Error
-                        };
+                            let outcome = if success_roll < threshold {
+                                ActionOutcome::Success
+                            } else {
+                                ActionOutcome::Error
+                            };
 
-                        entries.push(BehaviorLogEntry {
-                            timestamp,
-                            action_type: "action".to_string(),
-                            kredit_consumed: 10,
-                            counterparties: vec![],
-                            outcome,
-                        });
-                    }
+                            entries.push(BehaviorLogEntry {
+                                timestamp,
+                                action_type: "action".to_string(),
+                                kredit_consumed: 10,
+                                counterparties: vec![],
+                                outcome,
+                            });
+                        }
 
-                    (id.clone(), entries)
-                }).collect::<Vec<_>>()
+                        (id.clone(), entries)
+                    })
+                    .collect::<Vec<_>>()
             })
             .collect();
 
@@ -441,7 +468,9 @@ impl ParallelSimEngine {
 
         // Parallel gaming detection
         let gaming_incidents = if self.config.detect_gaming {
-            let detectable: Vec<_> = self.agents.iter()
+            let detectable: Vec<_> = self
+                .agents
+                .iter()
                 .filter(|(_, sim)| sim.agent.behavior_log.len() >= 20)
                 .map(|(id, sim)| (id.clone(), sim.agent.clone()))
                 .collect();
@@ -601,14 +630,14 @@ impl KVectorBatch {
 
         (0..self.k_r.len())
             .map(|i| {
-                W_R * self.k_r[i] +
-                W_A * self.k_a[i] +
-                W_I * self.k_i[i] +
-                W_P * self.k_p[i] +
-                W_M * self.k_m[i] +
-                W_S * self.k_s[i] +
-                W_H * self.k_h[i] +
-                W_TOPO * self.k_topo[i]
+                W_R * self.k_r[i]
+                    + W_A * self.k_a[i]
+                    + W_I * self.k_i[i]
+                    + W_P * self.k_p[i]
+                    + W_M * self.k_m[i]
+                    + W_S * self.k_s[i]
+                    + W_H * self.k_h[i]
+                    + W_TOPO * self.k_topo[i]
             })
             .collect()
     }
@@ -626,7 +655,8 @@ impl KVectorBatch {
                 let dh = self.k_h[i] - reference.k_h;
                 let dt = self.k_topo[i] - reference.k_topo;
 
-                (dr*dr + da*da + di*di + dp*dp + dm*dm + ds*ds + dh*dh + dt*dt).sqrt()
+                (dr * dr + da * da + di * di + dp * dp + dm * dm + ds * ds + dh * dh + dt * dt)
+                    .sqrt()
             })
             .collect()
     }
@@ -686,10 +716,8 @@ pub fn benchmark_simulation(agent_count: usize, tick_count: u64) -> BenchmarkRes
     engine.run();
     let duration = start.elapsed();
 
-    let memory_estimate = agent_count * (
-        std::mem::size_of::<SimAgent>() +
-        100 * std::mem::size_of::<BehaviorLogEntry>()
-    );
+    let memory_estimate = agent_count
+        * (std::mem::size_of::<SimAgent>() + 100 * std::mem::size_of::<BehaviorLogEntry>());
 
     BenchmarkResult {
         name: format!("parallel_sim_{}agents", agent_count),
@@ -783,9 +811,15 @@ mod tests {
     fn test_kvector_batch() {
         let mut batch = KVectorBatch::with_capacity(3);
 
-        batch.push(&KVector::new(0.6, 0.5, 0.7, 0.6, 0.3, 0.4, 0.5, 0.3, 0.6, 0.55));
-        batch.push(&KVector::new(0.8, 0.7, 0.9, 0.8, 0.5, 0.6, 0.7, 0.5, 0.8, 0.75));
-        batch.push(&KVector::new(0.4, 0.3, 0.5, 0.4, 0.1, 0.2, 0.3, 0.1, 0.4, 0.35));
+        batch.push(&KVector::new(
+            0.6, 0.5, 0.7, 0.6, 0.3, 0.4, 0.5, 0.3, 0.6, 0.55,
+        ));
+        batch.push(&KVector::new(
+            0.8, 0.7, 0.9, 0.8, 0.5, 0.6, 0.7, 0.5, 0.8, 0.75,
+        ));
+        batch.push(&KVector::new(
+            0.4, 0.3, 0.5, 0.4, 0.1, 0.2, 0.3, 0.1, 0.4, 0.35,
+        ));
 
         assert_eq!(batch.len(), 3);
 

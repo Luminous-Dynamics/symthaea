@@ -25,15 +25,17 @@ fn main() {
     println!("Encoded hypervector size: {:.1} KB", hyper.size_kb());
     println!(
         "Compression ratio: {:.1}x ({} bytes → {} bytes)",
-        hyper.compression_ratio, hyper.original_size, hyper.hypervector.len()
+        hyper.compression_ratio,
+        hyper.original_size,
+        hyper.hypervector.len()
     );
 
     // Construct a simple PoGQ signal for this contribution. In a real system,
     // quality/consistency/entropy would come from the FL coordinator.
     let pogq = ProofOfGradientQuality::new(
-        0.9, // quality
+        0.9,  // quality
         0.85, // consistency
-        0.1, // entropy
+        0.1,  // entropy
     );
 
     // High-level MATL orchestrator with modest history window and hierarchy.
@@ -63,4 +65,3 @@ fn main() {
     );
     println!("Network status: {:?}", net_eval.status);
 }
-

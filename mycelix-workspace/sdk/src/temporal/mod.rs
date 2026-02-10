@@ -9,9 +9,9 @@ pub mod commitment;
 pub mod covenant;
 pub mod patience;
 
-pub use commitment::{TemporalCommitment, CommitmentTier, EarlyExitResult, CommitmentStatus};
-pub use covenant::{Covenant, BeneficiarySpec};
-pub use patience::{PatienceCoefficient, calculate_patience_coefficient};
+pub use commitment::{CommitmentStatus, CommitmentTier, EarlyExitResult, TemporalCommitment};
+pub use covenant::{BeneficiarySpec, Covenant};
+pub use patience::{calculate_patience_coefficient, PatienceCoefficient};
 
 use serde::{Deserialize, Serialize};
 

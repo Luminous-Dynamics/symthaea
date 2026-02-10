@@ -25,10 +25,9 @@
 //! High uncertainty triggers escalation to human sponsor.
 
 use super::{
-    constraints::AgentConstraints, kredit::calculate_kredit_cap, sponsor_requirements, AgentClass,
-    AgentId, AgentStatus, InstrumentalActor,
-    epistemic_classifier::EpistemicStats,
-    uncertainty::UncertaintyCalibration,
+    constraints::AgentConstraints, epistemic_classifier::EpistemicStats,
+    kredit::calculate_kredit_cap, sponsor_requirements, uncertainty::UncertaintyCalibration,
+    AgentClass, AgentId, AgentStatus, InstrumentalActor,
 };
 use crate::matl::KVector;
 use serde::{Deserialize, Serialize};
@@ -250,7 +249,10 @@ pub fn reactivate_agent(
     }
 
     // Check valid state transition
-    if !matches!(agent.status, AgentStatus::Suspended | AgentStatus::Throttled) {
+    if !matches!(
+        agent.status,
+        AgentStatus::Suspended | AgentStatus::Throttled
+    ) {
         return Err(AgentError::InvalidStateTransition);
     }
 
@@ -292,9 +294,7 @@ pub fn gate_action_on_coherence(
             // Could be Ok if sponsor pre-approved, but for now require explicit approval
             Err(AgentError::CoherenceRequiresApproval(reason))
         }
-        CoherenceCheckResult::Blocked { reason } => {
-            Err(AgentError::CoherenceBlocked(reason))
-        }
+        CoherenceCheckResult::Blocked { reason } => Err(AgentError::CoherenceBlocked(reason)),
     }
 }
 
@@ -350,7 +350,7 @@ pub enum UncertaintyCheckResult {
 fn validate_action_string(action: &str) -> Result<String, UncertaintyGatingError> {
     if action.is_empty() {
         return Err(UncertaintyGatingError::InvalidInput(
-            "Action string cannot be empty".to_string()
+            "Action string cannot be empty".to_string(),
         ));
     }
 
@@ -388,7 +388,11 @@ pub fn add_escalation(
     }
 
     // Check for duplicate escalations (same action already pending)
-    if agent.pending_escalations.iter().any(|e| e.blocked_action == escalation.blocked_action) {
+    if agent
+        .pending_escalations
+        .iter()
+        .any(|e| e.blocked_action == escalation.blocked_action)
+    {
         // Already pending, don't add duplicate
         return Ok(());
     }
@@ -409,14 +413,16 @@ pub fn gate_action_on_uncertainty(
     action: &str,
     context: Option<String>,
 ) -> UncertaintyCheckResult {
-    use super::uncertainty::{MoralActionGuidance, EscalationRequest};
+    use super::uncertainty::{EscalationRequest, MoralActionGuidance};
 
     // Validate action string
     let sanitized_action = match validate_action_string(action) {
         Ok(a) => a,
-        Err(e) => return UncertaintyCheckResult::Blocked {
-            reason: format!("Invalid action: {:?}", e),
-        },
+        Err(e) => {
+            return UncertaintyCheckResult::Blocked {
+                reason: format!("Invalid action: {:?}", e),
+            }
+        }
     };
 
     // Sanitize context
@@ -489,9 +495,7 @@ pub fn check_action_readiness(
     let uncertainty_check = gate_action_on_uncertainty(agent, uncertainty, action, None);
 
     match uncertainty_check {
-        UncertaintyCheckResult::Proceed => {
-            Ok(ActionReadiness::Ready { monitoring: false })
-        }
+        UncertaintyCheckResult::Proceed => Ok(ActionReadiness::Ready { monitoring: false }),
         UncertaintyCheckResult::ProceedWithMonitoring { reason: _ } => {
             Ok(ActionReadiness::Ready { monitoring: true })
         }
@@ -536,7 +540,9 @@ pub fn record_uncertainty_outcome(
     was_uncertain: bool,
     was_good_outcome: bool,
 ) {
-    agent.uncertainty_calibration.record(was_uncertain, was_good_outcome);
+    agent
+        .uncertainty_calibration
+        .record(was_uncertain, was_good_outcome);
 }
 
 /// Process pending escalations that have been resolved by sponsor
@@ -549,7 +555,9 @@ pub fn process_resolved_escalations(
     let mut processed = Vec::new();
 
     for (action, approved) in resolutions {
-        if let Some(idx) = agent.pending_escalations.iter()
+        if let Some(idx) = agent
+            .pending_escalations
+            .iter()
             .position(|e| e.blocked_action == *action)
         {
             let escalation = agent.pending_escalations.remove(idx);
@@ -559,7 +567,9 @@ pub fn process_resolved_escalations(
             // If sponsor rejected, was the agent right to escalate? (high uncertainty, bad outcome avoided)
             let was_uncertain = true; // Escalation means high uncertainty
             let was_good_outcome = *approved; // Sponsor approval = good outcome
-            agent.uncertainty_calibration.record(was_uncertain, was_good_outcome);
+            agent
+                .uncertainty_calibration
+                .record(was_uncertain, was_good_outcome);
 
             processed.push(escalation.blocked_action);
         }
@@ -571,7 +581,7 @@ pub fn process_resolved_escalations(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agentic::uncertainty::{MoralUncertainty, EscalationRequest};
+    use crate::agentic::uncertainty::{EscalationRequest, MoralUncertainty};
 
     fn valid_sponsor() -> SponsorInfo {
         SponsorInfo {
@@ -684,7 +694,10 @@ mod tests {
             None,
         );
         let result = add_escalation(&mut agent, one_more);
-        assert!(matches!(result, Err(UncertaintyGatingError::EscalationQueueFull)));
+        assert!(matches!(
+            result,
+            Err(UncertaintyGatingError::EscalationQueueFull)
+        ));
     }
 
     #[test]
@@ -722,7 +735,10 @@ mod tests {
     fn test_action_string_validation() {
         // Empty string should fail
         let result = validate_action_string("");
-        assert!(matches!(result, Err(UncertaintyGatingError::InvalidInput(_))));
+        assert!(matches!(
+            result,
+            Err(UncertaintyGatingError::InvalidInput(_))
+        ));
 
         // Normal string should pass
         let result = validate_action_string("transfer_funds");

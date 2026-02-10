@@ -8,41 +8,33 @@
 //! Anti-reflexivity: SAP value never depends on MYCEL, MYCEL never computed
 //! from SAP balance, TEND never convertible to SAP at fixed rate.
 
-pub mod poc;
-pub mod metabolic_oracle;
 pub mod commons;
 pub mod decay_garden;
+pub mod metabolic_oracle;
+pub mod poc;
 pub mod recognition;
 
-pub use poc::{
-    MycelCalculation, MycelScore, MycelComponent,
-    calculate_mycel_score, jubilee_normalize,
-    GamingDetection, GamingRecommendation,
+pub use commons::{CommonsContribution, CommonsPool, CommonsResult};
+pub use decay_garden::{
+    calculate_demurrage, CompostAllocation, CompostDistribution, CompostEvent, DemurrageConfig,
 };
 pub use metabolic_oracle::{
-    MetabolicOracle, VitalityIndex, MetabolicState, PolicyBounds,
-    PolicyAdjustment, TendLimitTier,
+    MetabolicOracle, MetabolicState, PolicyAdjustment, PolicyBounds, TendLimitTier, VitalityIndex,
 };
-pub use commons::{
-    CommonsPool, CommonsContribution, CommonsResult,
-};
-pub use decay_garden::{
-    DemurrageConfig, CompostDistribution, CompostEvent, CompostAllocation,
-    calculate_demurrage,
+pub use poc::{
+    calculate_mycel_score, jubilee_normalize, GamingDetection, GamingRecommendation,
+    MycelCalculation, MycelComponent, MycelScore,
 };
 pub use recognition::{
-    RecognitionEvent, RecognitionConfig, calculate_recognition_score,
-    ContributionType,
+    calculate_recognition_score, ContributionType, RecognitionConfig, RecognitionEvent,
 };
 
 use serde::{Deserialize, Serialize};
 
 // Re-export canonical types from shared types crate (used by both SDK and Holochain zomes)
 pub use mycelix_finance_types::{
-    Currency, FeeTier, SuccessionPreference,
-    compute_demurrage_deduction,
-    DEMURRAGE_RATE, DEMURRAGE_EXEMPT_FLOOR,
-    COMPOST_LOCAL_PCT, COMPOST_REGIONAL_PCT, COMPOST_GLOBAL_PCT,
+    compute_demurrage_deduction, Currency, FeeTier, SuccessionPreference, COMPOST_GLOBAL_PCT,
+    COMPOST_LOCAL_PCT, COMPOST_REGIONAL_PCT, DEMURRAGE_EXEMPT_FLOOR, DEMURRAGE_RATE,
     INALIENABLE_RESERVE_RATIO,
 };
 

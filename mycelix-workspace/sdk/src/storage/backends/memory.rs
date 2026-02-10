@@ -3,14 +3,12 @@
 //! Ephemeral, in-memory storage for M0 (Ephemeral) data.
 //! Data is lost on process restart.
 
-
-
 use crate::epistemic::EpistemicClassification;
-use crate::storage::types::{StorageMetadata, SchemaIdentity, StoredData};
+use crate::storage::types::{SchemaIdentity, StorageMetadata, StoredData};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use sha2::{Sha256, Digest};
 
 /// Memory backend configuration
 #[derive(Debug, Clone)]
@@ -263,7 +261,8 @@ impl MemoryBackend {
     /// List all keys matching pattern
     pub fn keys(&self, pattern: Option<&str>) -> Vec<String> {
         if let Ok(store) = self.store.read() {
-            store.keys()
+            store
+                .keys()
                 .filter(|k| {
                     if let Some(p) = pattern {
                         if let Some(prefix) = p.strip_suffix('*') {
@@ -276,7 +275,8 @@ impl MemoryBackend {
                     }
                 })
                 .filter(|k| {
-                    store.get(*k)
+                    store
+                        .get(*k)
                         .map(|e| !e.metadata.tombstone && !Self::is_expired(&e.metadata))
                         .unwrap_or(false)
                 })
@@ -330,12 +330,18 @@ impl MemoryBackend {
             (0, 0)
         };
 
-        let (gets, sets, deletes, gc_runs, gc_items_removed) =
-            if let Ok(stats) = self.stats.read() {
-                (stats.gets, stats.sets, stats.deletes, stats.gc_runs, stats.gc_items_removed)
-            } else {
-                (0, 0, 0, 0, 0)
-            };
+        let (gets, sets, deletes, gc_runs, gc_items_removed) = if let Ok(stats) = self.stats.read()
+        {
+            (
+                stats.gets,
+                stats.sets,
+                stats.deletes,
+                stats.gc_runs,
+                stats.gc_items_removed,
+            )
+        } else {
+            (0, 0, 0, 0, 0)
+        };
 
         MemoryBackendStats {
             item_count,
@@ -377,7 +383,7 @@ mod tests {
     }
 
     fn test_classification() -> EpistemicClassification {
-        use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+        use crate::epistemic::{EmpiricalLevel, MaterialityLevel, NormativeLevel};
         EpistemicClassification::new(
             EmpiricalLevel::E1Testimonial,
             NormativeLevel::N0Personal,
@@ -410,7 +416,14 @@ mod tests {
     fn test_update() {
         let backend = MemoryBackend::default_backend();
 
-        backend.set("key1", &"v1".to_string(), test_classification(), test_schema(), "test", None);
+        backend.set(
+            "key1",
+            &"v1".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
 
         let updated = backend.update("key1", &"v2".to_string(), "test");
         assert!(updated.is_some());
@@ -424,7 +437,14 @@ mod tests {
     fn test_delete() {
         let backend = MemoryBackend::default_backend();
 
-        backend.set("key1", &"data".to_string(), test_classification(), test_schema(), "test", None);
+        backend.set(
+            "key1",
+            &"data".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
         assert!(backend.has("key1"));
 
         assert!(backend.delete("key1"));
@@ -435,7 +455,14 @@ mod tests {
     fn test_tombstone() {
         let backend = MemoryBackend::default_backend();
 
-        backend.set("key1", &"data".to_string(), test_classification(), test_schema(), "test", None);
+        backend.set(
+            "key1",
+            &"data".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
 
         assert!(backend.tombstone("key1", "admin"));
         assert!(!backend.has("key1")); // Tombstoned = not accessible
@@ -449,7 +476,14 @@ mod tests {
         };
         let backend = MemoryBackend::new(config);
 
-        backend.set("key1", &"data".to_string(), test_classification(), test_schema(), "test", None);
+        backend.set(
+            "key1",
+            &"data".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
 
         // Wait for expiration
         std::thread::sleep(std::time::Duration::from_millis(10));
@@ -463,9 +497,30 @@ mod tests {
     fn test_keys_pattern() {
         let backend = MemoryBackend::default_backend();
 
-        backend.set("user:alice:profile", &"data".to_string(), test_classification(), test_schema(), "test", None);
-        backend.set("user:alice:settings", &"data".to_string(), test_classification(), test_schema(), "test", None);
-        backend.set("user:bob:profile", &"data".to_string(), test_classification(), test_schema(), "test", None);
+        backend.set(
+            "user:alice:profile",
+            &"data".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
+        backend.set(
+            "user:alice:settings",
+            &"data".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
+        backend.set(
+            "user:bob:profile",
+            &"data".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
 
         let alice_keys = backend.keys(Some("user:alice:*"));
         assert_eq!(alice_keys.len(), 2);
@@ -484,7 +539,14 @@ mod tests {
 
         // Add items
         for i in 0..10 {
-            backend.set(&format!("key{}", i), &"data".to_string(), test_classification(), test_schema(), "test", None);
+            backend.set(
+                &format!("key{}", i),
+                &"data".to_string(),
+                test_classification(),
+                test_schema(),
+                "test",
+                None,
+            );
         }
 
         // Wait for expiration
@@ -503,8 +565,22 @@ mod tests {
     fn test_stats() {
         let backend = MemoryBackend::default_backend();
 
-        backend.set("key1", &"data".to_string(), test_classification(), test_schema(), "test", None);
-        backend.set("key2", &"data".to_string(), test_classification(), test_schema(), "test", None);
+        backend.set(
+            "key1",
+            &"data".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
+        backend.set(
+            "key2",
+            &"data".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
         let _: Option<StoredData<String>> = backend.get("key1");
         backend.delete("key2");
 
@@ -526,7 +602,14 @@ mod tests {
         let backend = MemoryBackend::default_backend();
 
         // First, add some data normally
-        backend.set("key1", &"data".to_string(), test_classification(), test_schema(), "test", None);
+        backend.set(
+            "key1",
+            &"data".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
 
         // Clone the Arc to the store to poison it independently
         let store_ref = Arc::clone(&backend.store);
@@ -546,31 +629,60 @@ mod tests {
 
         // get() should return None
         let result: Option<StoredData<String>> = backend.get("key1");
-        assert!(result.is_none(), "get() should return None when lock is poisoned");
+        assert!(
+            result.is_none(),
+            "get() should return None when lock is poisoned"
+        );
 
         // has() should return false
-        assert!(!backend.has("key1"), "has() should return false when lock is poisoned");
+        assert!(
+            !backend.has("key1"),
+            "has() should return false when lock is poisoned"
+        );
 
         // keys() should return empty vec
-        assert_eq!(backend.keys(None).len(), 0, "keys() should return empty vec when lock is poisoned");
+        assert_eq!(
+            backend.keys(None).len(),
+            0,
+            "keys() should return empty vec when lock is poisoned"
+        );
 
         // delete() should return false
-        assert!(!backend.delete("key1"), "delete() should return false when lock is poisoned");
+        assert!(
+            !backend.delete("key1"),
+            "delete() should return false when lock is poisoned"
+        );
 
         // set() returns Some(metadata) but doesn't actually store (bug: returns metadata before lock)
         // We'll verify it doesn't actually get stored by trying to retrieve it
-        let result = backend.set("key2", &"new".to_string(), test_classification(), test_schema(), "test", None);
+        let result = backend.set(
+            "key2",
+            &"new".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
         // Note: set() currently returns Some(metadata) even on lock failure (implementation quirk)
         // But the data won't actually be stored
         let verify: Option<StoredData<String>> = backend.get("key2");
-        assert!(verify.is_none(), "Data should not be stored when lock is poisoned");
+        assert!(
+            verify.is_none(),
+            "Data should not be stored when lock is poisoned"
+        );
 
         // update() should return None (requires write lock)
         let result = backend.update("key1", &"updated".to_string(), "test");
-        assert!(result.is_none(), "update() should return None when lock is poisoned");
+        assert!(
+            result.is_none(),
+            "update() should return None when lock is poisoned"
+        );
 
         // tombstone() should return false (requires write lock)
-        assert!(!backend.tombstone("key1", "test"), "tombstone() should return false when lock is poisoned");
+        assert!(
+            !backend.tombstone("key1", "test"),
+            "tombstone() should return false when lock is poisoned"
+        );
     }
 
     #[test]
@@ -581,7 +693,14 @@ mod tests {
         let backend = MemoryBackend::default_backend();
 
         // Add some data first
-        backend.set("key1", &"data".to_string(), test_classification(), test_schema(), "test", None);
+        backend.set(
+            "key1",
+            &"data".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
 
         // Poison the store lock
         let store_ref = Arc::clone(&backend.store);
@@ -592,12 +711,25 @@ mod tests {
 
         // stats() should return zeros for poisoned locks, not panic
         let stats = backend.stats();
-        assert_eq!(stats.item_count, 0, "Should return 0 items when store lock is poisoned");
-        assert_eq!(stats.total_size_bytes, 0, "Should return 0 size when store lock is poisoned");
+        assert_eq!(
+            stats.item_count, 0,
+            "Should return 0 items when store lock is poisoned"
+        );
+        assert_eq!(
+            stats.total_size_bytes, 0,
+            "Should return 0 size when store lock is poisoned"
+        );
 
         // Now poison the stats lock independently
         let backend2 = MemoryBackend::default_backend();
-        backend2.set("key1", &"data".to_string(), test_classification(), test_schema(), "test", None);
+        backend2.set(
+            "key1",
+            &"data".to_string(),
+            test_classification(),
+            test_schema(),
+            "test",
+            None,
+        );
 
         let stats_ref = Arc::clone(&backend2.stats);
         let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {

@@ -299,7 +299,12 @@ impl EpistemicClassificationExtended {
         materiality: MaterialityLevel,
         harmonic: HarmonicLevel,
     ) -> Self {
-        Self { empirical, normative, materiality, harmonic }
+        Self {
+            empirical,
+            normative,
+            materiality,
+            harmonic,
+        }
     }
 
     /// Create from a basic classification with default harmonic level
@@ -360,7 +365,11 @@ impl EpistemicClassification {
         normative: NormativeLevel,
         materiality: MaterialityLevel,
     ) -> Self {
-        Self { empirical, normative, materiality }
+        Self {
+            empirical,
+            normative,
+            materiality,
+        }
     }
 
     /// Get a string representation like "E3-N2-M2"

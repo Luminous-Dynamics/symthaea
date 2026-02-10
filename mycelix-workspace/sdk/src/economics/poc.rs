@@ -44,9 +44,13 @@ impl MycelScore {
 /// Individual MYCEL component types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MycelComponent {
+    /// Participation component (tx activity, governance, commons)
     Participation,
+    /// Recognition component (peer recognition scores)
     Recognition,
+    /// Validation component (quality ratings, validator performance)
     Validation,
+    /// Longevity component (time-based, capped at 24 months)
     Longevity,
 }
 
@@ -74,10 +78,8 @@ pub fn calculate_mycel_score(calc: &MycelCalculation) -> MycelScore {
     // Longevity: linear ramp to 1.0 at 24 months, then capped
     let longevity = (calc.active_months as f64 / 24.0).min(1.0);
 
-    let composite = participation * 0.40
-        + recognition * 0.20
-        + validation * 0.20
-        + longevity * 0.20;
+    let composite =
+        participation * 0.40 + recognition * 0.20 + validation * 0.20 + longevity * 0.20;
 
     MycelScore {
         participation,
@@ -117,6 +119,7 @@ pub struct GamingDetection {
     pub recommendation: GamingRecommendation,
 }
 
+/// Recommendation from anti-gaming detection analysis
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum GamingRecommendation {
     /// No action needed
@@ -223,8 +226,8 @@ mod tests {
     #[test]
     fn test_gaming_detection() {
         let current = MycelCalculation {
-            participation: 0.1,   // Low participation
-            recognition: 0.9,     // But high recognition — suspicious
+            participation: 0.1, // Low participation
+            recognition: 0.9,   // But high recognition — suspicious
             validation: 0.5,
             active_months: 3,
         };

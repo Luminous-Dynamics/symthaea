@@ -4,30 +4,51 @@
 //! calibration, and monitoring working together in realistic scenarios.
 
 use mycelix_sdk::agentic::{
+    compute_consensus,
+    ActionOutcome,
+    AgentClass,
+    AgentConstraints,
     // Core types
-    AgentId, InstrumentalActor, AgentStatus, AgentClass, AgentConstraints,
-    ActionOutcome, BehaviorLogEntry, EpistemicStats,
-
+    AgentId,
+    AgentInteraction,
+    AgentInteractionRecord,
+    AgentStatus,
     // Multi-agent
-    AgentVote, ConsensusConfig, compute_consensus,
-    CollaborationManager, CollaborativeTaskType,
-    CrossAgentCalibration, ReputationPropagation, AgentInteraction, InteractionType,
-
-    // Adversarial
-    GamingDetector, GamingDetectionConfig, GamingResponse,
-    SybilDetector, CollusionDetector, AgentInteractionRecord,
-    QuarantineManager, QuarantineReason,
-
+    AgentVote,
+    AlertThresholds,
+    AlertType,
+    BehaviorLogEntry,
     // Calibration
-    CalibrationEngine, CalibrationEngineConfig,
+    CalibrationEngine,
+    CalibrationEngineConfig,
+    CollaborationManager,
+    CollaborativeTaskType,
+    CollusionDetector,
+    ConsensusConfig,
+    CrossAgentCalibration,
     EnhancedAgentCalibrationProfile,
 
+    EpistemicStats,
+
+    GamingDetectionConfig,
+    // Adversarial
+    GamingDetector,
+    GamingResponse,
+    InstrumentalActor,
+    InteractionType,
+
     // Monitoring
-    MonitoringEngine, AlertThresholds, AlertType, TrustEventType,
+    MonitoringEngine,
+    QuarantineManager,
+    QuarantineReason,
+
+    ReputationPropagation,
+    SybilDetector,
+    TrustEventType,
 };
 
-use mycelix_sdk::matl::KVector;
 use mycelix_sdk::epistemic::EmpiricalLevel;
+use mycelix_sdk::matl::KVector;
 use std::collections::HashMap;
 
 // ============================================================================
@@ -48,9 +69,16 @@ fn create_agent(id: &str, sponsor: &str, trust_level: f32) -> InstrumentalActor 
         last_activity: 0,
         actions_this_hour: 0,
         k_vector: KVector::new(
-            trust_level, trust_level * 0.9, trust_level,
-            trust_level * 0.95, 0.3, 0.4,
-            trust_level * 0.85, 0.3, trust_level * 0.9, 0.5
+            trust_level,
+            trust_level * 0.9,
+            trust_level,
+            trust_level * 0.95,
+            0.3,
+            0.4,
+            trust_level * 0.85,
+            0.3,
+            trust_level * 0.9,
+            0.5,
         ),
         epistemic_stats: EpistemicStats::default(),
         output_history: vec![],
@@ -124,14 +152,20 @@ fn test_scenario_consensus_with_varied_trust() {
     let result = compute_consensus(&votes, &agents, &config);
 
     // Consensus should be computed (may vary based on trust calculation)
-    assert!(result.participant_count == 3, "All agents should participate");
+    assert!(
+        result.participant_count == 3,
+        "All agents should participate"
+    );
 
     // Higher trust agents should have more contribution
     let high_contrib = result.contributions.get("high-trust").unwrap_or(&0.0);
     let low_contrib = result.contributions.get("low-trust").unwrap_or(&0.0);
-    assert!(high_contrib >= low_contrib,
-            "High trust ({}) should have >= contribution than low trust ({})",
-            high_contrib, low_contrib);
+    assert!(
+        high_contrib >= low_contrib,
+        "High trust ({}) should have >= contribution than low trust ({})",
+        high_contrib,
+        low_contrib
+    );
 
     println!("Consensus value: {}", result.consensus_value);
     println!("Contributions: {:?}", result.contributions);
@@ -165,16 +199,25 @@ fn test_scenario_gaming_detection_to_quarantine() {
     let gaming_result = gaming_detector.analyze(&gamer, 5000);
 
     // Should detect gaming
-    assert!(gaming_result.suspicion_score > 0.3,
-            "Should detect gaming: score={}", gaming_result.suspicion_score);
+    assert!(
+        gaming_result.suspicion_score > 0.3,
+        "Should detect gaming: score={}",
+        gaming_result.suspicion_score
+    );
 
     // If response warrants quarantine, quarantine the agent
-    if matches!(gaming_result.recommended_action,
-                GamingResponse::Quarantine | GamingResponse::EscalateToSponsor) {
+    if matches!(
+        gaming_result.recommended_action,
+        GamingResponse::Quarantine | GamingResponse::EscalateToSponsor
+    ) {
         quarantine.quarantine(
             "gamer",
             QuarantineReason::GamingDetected,
-            gaming_result.indicators.iter().map(|i| i.description.clone()).collect(),
+            gaming_result
+                .indicators
+                .iter()
+                .map(|i| i.description.clone())
+                .collect(),
             5000,
         );
 
@@ -214,9 +257,12 @@ fn test_scenario_sybil_detection_same_sponsor() {
     assert!(!evidence.is_empty(), "Should detect Sybil pattern");
 
     // Verify it's the sponsor correlation type
-    let has_sponsor_evidence = evidence.iter().any(|e|
-        matches!(e.evidence_type, mycelix_sdk::agentic::SybilEvidenceType::CorrelatedSponsorAgents)
-    );
+    let has_sponsor_evidence = evidence.iter().any(|e| {
+        matches!(
+            e.evidence_type,
+            mycelix_sdk::agentic::SybilEvidenceType::CorrelatedSponsorAgents
+        )
+    });
     assert!(has_sponsor_evidence, "Should identify sponsor correlation");
 }
 
@@ -255,13 +301,13 @@ fn test_scenario_collaboration_with_calibration_sharing() {
     assert!(collaboration.join_task("predict-1", &expert).is_ok());
     assert!(collaboration.join_task("predict-1", &novice).is_ok());
 
-    assert!(collaboration.contribute(
-        "predict-1", &expert, serde_json::json!(0.75), 3, 0.9, 1000
-    ).is_ok());
+    assert!(collaboration
+        .contribute("predict-1", &expert, serde_json::json!(0.75), 3, 0.9, 1000)
+        .is_ok());
 
-    assert!(collaboration.contribute(
-        "predict-1", &novice, serde_json::json!(0.65), 2, 0.7, 1001
-    ).is_ok());
+    assert!(collaboration
+        .contribute("predict-1", &novice, serde_json::json!(0.65), 2, 0.7, 1001)
+        .is_ok());
 
     // Finalize
     let result = collaboration.finalize_task("predict-1", 2000).unwrap();
@@ -269,9 +315,12 @@ fn test_scenario_collaboration_with_calibration_sharing() {
     // Expert should have higher contribution weight due to higher trust
     let expert_contrib = result.contribution_scores.get("expert").unwrap();
     let novice_contrib = result.contribution_scores.get("novice").unwrap();
-    assert!(expert_contrib > novice_contrib,
-            "Expert ({}) should have more weight than novice ({})",
-            expert_contrib, novice_contrib);
+    assert!(
+        expert_contrib > novice_contrib,
+        "Expert ({}) should have more weight than novice ({})",
+        expert_contrib,
+        novice_contrib
+    );
 }
 
 // ============================================================================
@@ -328,8 +377,14 @@ fn test_scenario_reputation_propagation() {
     let spoke2_rep = reputation.get_propagated_reputation("spoke2").unwrap();
     let spoke3_rep = reputation.get_propagated_reputation("spoke3").unwrap();
 
-    assert!(spoke1_rep > spoke2_rep, "spoke1 should have higher rep than spoke2");
-    assert!(spoke2_rep > spoke3_rep, "spoke2 should have higher rep than spoke3");
+    assert!(
+        spoke1_rep > spoke2_rep,
+        "spoke1 should have higher rep than spoke2"
+    );
+    assert!(
+        spoke2_rep > spoke3_rep,
+        "spoke2 should have higher rep than spoke3"
+    );
 }
 
 // ============================================================================
@@ -438,11 +493,11 @@ fn test_scenario_complete_agent_lifecycle() {
     let mut agent = create_agent("lifecycle-agent", "good-sponsor", 0.6);
 
     // Phase 2: Agent operates with varied behavior (human-like)
-    let varied_intervals = [45, 180, 90, 300, 60, 150, 200, 75, 120, 240,
-                            55, 170, 85, 310, 65, 145, 210, 80, 125, 230,
-                            50, 175, 95, 290, 70, 155, 195, 78, 130, 250,
-                            60, 190, 88, 280, 72, 160, 205, 82, 135, 245,
-                            58, 185, 92, 295, 68, 150, 200, 85, 128, 235];
+    let varied_intervals = [
+        45, 180, 90, 300, 60, 150, 200, 75, 120, 240, 55, 170, 85, 310, 65, 145, 210, 80, 125, 230,
+        50, 175, 95, 290, 70, 155, 195, 78, 130, 250, 60, 190, 88, 280, 72, 160, 205, 82, 135, 245,
+        58, 185, 92, 295, 68, 150, 200, 85, 128, 235,
+    ];
     let mut timestamp = 1000u64;
     for (i, &interval) in varied_intervals.iter().enumerate() {
         timestamp += interval;
@@ -451,7 +506,11 @@ fn test_scenario_complete_agent_lifecycle() {
             action_type: format!("action_{}", i % 5),
             kredit_consumed: 10,
             counterparties: vec![],
-            outcome: if i % 4 == 0 { ActionOutcome::Error } else { ActionOutcome::Success },
+            outcome: if i % 4 == 0 {
+                ActionOutcome::Error
+            } else {
+                ActionOutcome::Success
+            },
         });
     }
 
@@ -546,10 +605,16 @@ fn test_scenario_byzantine_consensus_resistance() {
 
     // Consensus should be close to honest agents' values (~0.7)
     // Byzantine agent's low trust should limit its influence
-    assert!(result.consensus_value > 0.5,
-            "Consensus should resist byzantine: {}", result.consensus_value);
-    assert!(result.consensus_value < 0.75,
-            "But not be exactly honest average due to byzantine: {}", result.consensus_value);
+    assert!(
+        result.consensus_value > 0.5,
+        "Consensus should resist byzantine: {}",
+        result.consensus_value
+    );
+    assert!(
+        result.consensus_value < 0.75,
+        "But not be exactly honest average due to byzantine: {}",
+        result.consensus_value
+    );
 }
 
 // ============================================================================
@@ -565,12 +630,24 @@ fn test_scenario_epistemic_calibration() {
 
     // E1 (testimonial) - looser calibration expected
     for i in 0..30 {
-        profile.record_full(0.7, i < 18, timestamp + i, Some(EmpiricalLevel::E1Testimonial), Some("general"));
+        profile.record_full(
+            0.7,
+            i < 18,
+            timestamp + i,
+            Some(EmpiricalLevel::E1Testimonial),
+            Some("general"),
+        );
     }
 
     // E3 (cryptographic) - tighter calibration expected
     for i in 0..30 {
-        profile.record_full(0.8, i < 24, timestamp + 100 + i, Some(EmpiricalLevel::E3Cryptographic), Some("verified"));
+        profile.record_full(
+            0.8,
+            i < 24,
+            timestamp + 100 + i,
+            Some(EmpiricalLevel::E3Cryptographic),
+            Some("verified"),
+        );
     }
 
     // Get comprehensive adjustment
@@ -578,9 +655,14 @@ fn test_scenario_epistemic_calibration() {
 
     // Should have epistemic quality assessment
     println!("Epistemic quality: {:?}", adjustment.epistemic_quality);
-    println!("Systematic overconfidence: {:.3}", adjustment.systematic_overconfidence);
-    println!("K-Vector adjustments: k_p={:.3}, k_i={:.3}, k_r={:.3}",
-             adjustment.k_p_delta, adjustment.k_i_delta, adjustment.k_r_delta);
+    println!(
+        "Systematic overconfidence: {:.3}",
+        adjustment.systematic_overconfidence
+    );
+    println!(
+        "K-Vector adjustments: k_p={:.3}, k_i={:.3}, k_r={:.3}",
+        adjustment.k_p_delta, adjustment.k_i_delta, adjustment.k_r_delta
+    );
 
     // Well-calibrated agent shouldn't have severe penalties
     assert!(adjustment.k_p_delta > -0.1);

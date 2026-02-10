@@ -70,9 +70,13 @@ impl CartelDetector {
     pub fn get_similarity(&self, node_a: &str, node_b: &str) -> Option<f64> {
         // Check canonical order without allocating
         if node_a < node_b {
-            self.similarities.get(&(node_a.to_string(), node_b.to_string())).copied()
+            self.similarities
+                .get(&(node_a.to_string(), node_b.to_string()))
+                .copied()
         } else {
-            self.similarities.get(&(node_b.to_string(), node_a.to_string())).copied()
+            self.similarities
+                .get(&(node_b.to_string(), node_a.to_string()))
+                .copied()
         }
     }
 
@@ -164,7 +168,11 @@ impl CartelDetector {
             }
         }
 
-        if count == 0 { 0.0 } else { sum / count as f64 }
+        if count == 0 {
+            0.0
+        } else {
+            sum / count as f64
+        }
     }
 
     /// Calculate confidence score for a potential cartel
@@ -195,7 +203,8 @@ impl CartelDetector {
 
     /// Get all cartel members
     pub fn all_cartel_members(&self) -> HashSet<String> {
-        self.cartels.iter()
+        self.cartels
+            .iter()
             .flat_map(|c| c.members.iter().cloned())
             .collect()
     }

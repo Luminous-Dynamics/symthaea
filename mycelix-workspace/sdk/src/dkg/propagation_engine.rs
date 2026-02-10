@@ -330,8 +330,12 @@ impl PropagationEngine {
         domain: Option<&str>,
     ) {
         self.graph.confidences.insert(hash.to_string(), confidence);
-        self.graph.subjects.insert(hash.to_string(), subject.to_string());
-        self.graph.predicates.insert(hash.to_string(), predicate.to_string());
+        self.graph
+            .subjects
+            .insert(hash.to_string(), subject.to_string());
+        self.graph
+            .predicates
+            .insert(hash.to_string(), predicate.to_string());
 
         if let Some(c) = creator {
             self.graph.creators.insert(hash.to_string(), c.to_string());
@@ -342,11 +346,11 @@ impl PropagationEngine {
 
         // Build edges based on shared subjects
         // Collect edges to add first to avoid borrow conflict
-        let edges_to_add: Vec<String> = self.graph.subjects
+        let edges_to_add: Vec<String> = self
+            .graph
+            .subjects
             .iter()
-            .filter(|(other_hash, other_subject)| {
-                *other_hash != hash && *other_subject == subject
-            })
+            .filter(|(other_hash, other_subject)| *other_hash != hash && *other_subject == subject)
             .map(|(other_hash, _)| other_hash.clone())
             .collect();
 
@@ -381,7 +385,9 @@ impl PropagationEngine {
             if depth > 0 {
                 let prev_confidence = self.graph.confidences.get(&current).copied().unwrap_or(0.0);
                 let new_confidence = (prev_confidence + current_delta).clamp(0.0, 1.0);
-                self.graph.confidences.insert(current.clone(), new_confidence);
+                self.graph
+                    .confidences
+                    .insert(current.clone(), new_confidence);
 
                 affected.push(PropagationNode {
                     triple_hash: current.clone(),
@@ -467,10 +473,16 @@ impl PropagationEngine {
         let mut results = Vec::new();
 
         // Find triples with matching predicates
-        let matching: Vec<_> = self.graph.predicates.iter()
+        let matching: Vec<_> = self
+            .graph
+            .predicates
+            .iter()
             .filter(|(hash, pred)| {
                 rule.pattern.predicates.contains(pred)
-                    && self.graph.confidences.get(*hash)
+                    && self
+                        .graph
+                        .confidences
+                        .get(*hash)
                         .map(|c| *c >= rule.pattern.min_premise_confidence)
                         .unwrap_or(false)
             })
@@ -529,10 +541,15 @@ impl PropagationEngine {
         let mut results = Vec::new();
 
         // Find "implies" predicates
-        let implications: Vec<_> = self.graph.predicates.iter()
+        let implications: Vec<_> = self
+            .graph
+            .predicates
+            .iter()
             .filter(|(_, pred)| *pred == "implies")
             .filter(|(hash, _)| {
-                self.graph.confidences.get(*hash)
+                self.graph
+                    .confidences
+                    .get(*hash)
                     .map(|c| *c >= rule.pattern.min_premise_confidence)
                     .unwrap_or(false)
             })
@@ -556,7 +573,8 @@ impl PropagationEngine {
                     let other_confidence = self.graph.confidences.get(other_hash);
                     if let Some(&conf) = other_confidence {
                         if conf >= rule.pattern.min_premise_confidence {
-                            let inferred_confidence = impl_confidence * conf * rule.confidence_factor;
+                            let inferred_confidence =
+                                impl_confidence * conf * rule.confidence_factor;
 
                             results.push(InferenceResult {
                                 rule_id: rule.rule_id.clone(),
@@ -588,17 +606,21 @@ impl PropagationEngine {
     pub fn stats(&self) -> PropagationStats {
         let total_propagations = self.propagation_history.len();
         let avg_affected = if total_propagations > 0 {
-            self.propagation_history.iter()
+            self.propagation_history
+                .iter()
                 .map(|r| r.affected_nodes.len())
-                .sum::<usize>() as f64 / total_propagations as f64
+                .sum::<usize>() as f64
+                / total_propagations as f64
         } else {
             0.0
         };
 
         let avg_depth = if total_propagations > 0 {
-            self.propagation_history.iter()
+            self.propagation_history
+                .iter()
                 .map(|r| r.max_depth as f64)
-                .sum::<f64>() / total_propagations as f64
+                .sum::<f64>()
+                / total_propagations as f64
         } else {
             0.0
         };
@@ -662,9 +684,30 @@ mod tests {
         let mut engine = PropagationEngine::new(PropagationEngineConfig::default());
 
         // Register connected triples
-        engine.register_triple("triple-1", "sky", "color", 0.8, Some("alice"), Some("nature"));
-        engine.register_triple("triple-2", "sky", "clarity", 0.7, Some("bob"), Some("nature"));
-        engine.register_triple("triple-3", "ocean", "color", 0.9, Some("alice"), Some("nature"));
+        engine.register_triple(
+            "triple-1",
+            "sky",
+            "color",
+            0.8,
+            Some("alice"),
+            Some("nature"),
+        );
+        engine.register_triple(
+            "triple-2",
+            "sky",
+            "clarity",
+            0.7,
+            Some("bob"),
+            Some("nature"),
+        );
+        engine.register_triple(
+            "triple-3",
+            "ocean",
+            "color",
+            0.9,
+            Some("alice"),
+            Some("nature"),
+        );
 
         // Propagate confidence boost
         let result = engine.propagate("triple-1", 0.1);
@@ -673,7 +716,9 @@ mod tests {
         assert_eq!(result.source_triple, "triple-1");
 
         // Check that connected node was affected
-        let triple_2_affected = result.affected_nodes.iter()
+        let triple_2_affected = result
+            .affected_nodes
+            .iter()
             .find(|n| n.triple_hash == "triple-2");
         assert!(triple_2_affected.is_some());
     }

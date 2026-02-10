@@ -68,7 +68,8 @@ impl HierarchicalDetector {
     /// Update cluster statistics
     fn update_cluster_score(&mut self, cluster_id: usize) {
         // Get all nodes in this cluster
-        let nodes_in_cluster: Vec<&String> = self.clusters
+        let nodes_in_cluster: Vec<&String> = self
+            .clusters
             .iter()
             .filter(|(_, &c)| c == cluster_id)
             .map(|(n, _)| n)
@@ -83,12 +84,15 @@ impl HierarchicalDetector {
         // In real implementation, would track actual scores
         let mean = cluster_id as f64 / 10.0 + 0.05;
 
-        self.cluster_scores.insert(cluster_id, ClusterScore {
-            mean_score: mean,
-            node_count: count,
-            variance: 0.01, // Placeholder
-            suspected_byzantine: mean < 0.3, // Low-score clusters are suspicious
-        });
+        self.cluster_scores.insert(
+            cluster_id,
+            ClusterScore {
+                mean_score: mean,
+                node_count: count,
+                variance: 0.01,                  // Placeholder
+                suspected_byzantine: mean < 0.3, // Low-score clusters are suspicious
+            },
+        );
     }
 
     /// Check if a node is in a Byzantine cluster
@@ -140,7 +144,9 @@ impl HierarchicalDetector {
     /// Estimate Byzantine fraction
     pub fn byzantine_fraction(&self) -> f64 {
         let total: usize = self.cluster_scores.values().map(|c| c.node_count).sum();
-        let byzantine: usize = self.cluster_scores.values()
+        let byzantine: usize = self
+            .cluster_scores
+            .values()
             .filter(|c| c.suspected_byzantine)
             .map(|c| c.node_count)
             .sum();

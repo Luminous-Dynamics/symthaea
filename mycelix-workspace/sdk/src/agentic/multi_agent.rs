@@ -11,12 +11,10 @@
 //! - **Collective Prediction**: Epistemic-weighted ensemble predictions
 //! - **Reputation Propagation**: Trust flows through agent interaction graphs
 
+use super::calibration_engine::{AgentCalibrationProfile, CalibrationQuality};
+use super::InstrumentalActor;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use super::InstrumentalActor;
-use super::calibration_engine::{
-    AgentCalibrationProfile, CalibrationQuality,
-};
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -104,7 +102,8 @@ pub fn compute_consensus(
     let valid_votes: Vec<_> = votes
         .iter()
         .filter(|v| {
-            agents.get(&v.agent_id)
+            agents
+                .get(&v.agent_id)
                 .map(|a| a.k_vector.trust_score() >= config.min_trust_threshold)
                 .unwrap_or(false)
         })
@@ -151,16 +150,14 @@ pub fn compute_consensus(
     }
 
     // Compute weighted average
-    let consensus_value: f64 = weights
-        .iter()
-        .map(|(_, w, v)| w * v)
-        .sum::<f64>() / total_weight;
+    let consensus_value: f64 = weights.iter().map(|(_, w, v)| w * v).sum::<f64>() / total_weight;
 
     // Compute dissent (weighted variance)
     let variance: f64 = weights
         .iter()
         .map(|(_, w, v)| w * (v - consensus_value).powi(2))
-        .sum::<f64>() / total_weight;
+        .sum::<f64>()
+        / total_weight;
     let dissent = variance.sqrt().min(1.0);
 
     // Compute contributions
@@ -228,12 +225,17 @@ impl CrossAgentCalibration {
     ) -> Option<CalibrationKnowledge> {
         // Only share from well-calibrated agents
         let quality = profile.overall_curve.quality_rating();
-        if !matches!(quality, CalibrationQuality::Excellent | CalibrationQuality::Good) {
+        if !matches!(
+            quality,
+            CalibrationQuality::Excellent | CalibrationQuality::Good
+        ) {
             return None;
         }
 
         // Extract recalibration points from the curve
-        let recalibration_points: Vec<(f64, f64)> = profile.overall_curve.bins
+        let recalibration_points: Vec<(f64, f64)> = profile
+            .overall_curve
+            .bins
             .iter()
             .filter(|bin| bin.count >= 10)
             .map(|bin| (bin.avg_predicted, bin.actual_frequency))
@@ -316,10 +318,7 @@ impl CrossAgentCalibration {
     }
 
     /// Apply learned recalibration to a prediction
-    pub fn apply_learned_recalibration(
-        curve: &[(f64, f64)],
-        predicted: f64,
-    ) -> f64 {
+    pub fn apply_learned_recalibration(curve: &[(f64, f64)], predicted: f64) -> f64 {
         if curve.is_empty() {
             return predicted;
         }
@@ -502,11 +501,14 @@ impl CollaborationManager {
         task_id: &str,
         agent: &InstrumentalActor,
     ) -> Result<(), CollaborationError> {
-        let task = self.tasks.get_mut(task_id)
+        let task = self
+            .tasks
+            .get_mut(task_id)
             .ok_or(CollaborationError::TaskNotFound)?;
 
         if task.status != CollaborativeTaskStatus::Open
-            && task.status != CollaborativeTaskStatus::Active {
+            && task.status != CollaborativeTaskStatus::Active
+        {
             return Err(CollaborationError::TaskNotAcceptingParticipants);
         }
 
@@ -514,7 +516,10 @@ impl CollaborationManager {
             return Err(CollaborationError::InsufficientTrust);
         }
 
-        if task.participants.contains(&agent.agent_id.as_str().to_string()) {
+        if task
+            .participants
+            .contains(&agent.agent_id.as_str().to_string())
+        {
             return Err(CollaborationError::AlreadyParticipating);
         }
 
@@ -522,7 +527,8 @@ impl CollaborationManager {
 
         // Update status if minimum reached
         if task.participants.len() >= task.min_participants
-            && task.status == CollaborativeTaskStatus::Open {
+            && task.status == CollaborativeTaskStatus::Open
+        {
             task.status = CollaborativeTaskStatus::Active;
         }
 
@@ -545,19 +551,28 @@ impl CollaborationManager {
         confidence: f64,
         timestamp: u64,
     ) -> Result<(), CollaborationError> {
-        let task = self.tasks.get_mut(task_id)
+        let task = self
+            .tasks
+            .get_mut(task_id)
             .ok_or(CollaborationError::TaskNotFound)?;
 
         if task.status != CollaborativeTaskStatus::Active {
             return Err(CollaborationError::TaskNotAcceptingContributions);
         }
 
-        if !task.participants.contains(&agent.agent_id.as_str().to_string()) {
+        if !task
+            .participants
+            .contains(&agent.agent_id.as_str().to_string())
+        {
             return Err(CollaborationError::NotParticipating);
         }
 
         // Check if already contributed
-        if task.contributions.iter().any(|c| c.agent_id == agent.agent_id.as_str()) {
+        if task
+            .contributions
+            .iter()
+            .any(|c| c.agent_id == agent.agent_id.as_str())
+        {
             return Err(CollaborationError::AlreadyContributed);
         }
 
@@ -581,7 +596,9 @@ impl CollaborationManager {
     ) -> Result<CollaborativeResult, CollaborationError> {
         // First, extract the data we need
         let (task_type, contributions) = {
-            let task = self.tasks.get_mut(task_id)
+            let task = self
+                .tasks
+                .get_mut(task_id)
                 .ok_or(CollaborationError::TaskNotFound)?;
 
             if task.contributions.is_empty() {
@@ -617,7 +634,10 @@ impl CollaborationManager {
 
         // Update collaboration scores
         for (agent_id, score) in &result.contribution_scores {
-            let entry = self.collaboration_scores.entry(agent_id.clone()).or_insert(0.5);
+            let entry = self
+                .collaboration_scores
+                .entry(agent_id.clone())
+                .or_insert(0.5);
             *entry = (*entry * 0.9) + (score * 0.1); // EMA update
         }
 
@@ -726,13 +746,13 @@ impl CollaborationManager {
         timestamp: u64,
     ) -> CollaborativeResult {
         // For competition, select highest-scoring contribution
-        let winner = contributions
-            .iter()
-            .max_by(|a, b| {
-                let score_a = a.trust_score as f64 * a.confidence;
-                let score_b = b.trust_score as f64 * b.confidence;
-                score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
-            });
+        let winner = contributions.iter().max_by(|a, b| {
+            let score_a = a.trust_score as f64 * a.confidence;
+            let score_b = b.trust_score as f64 * b.confidence;
+            score_a
+                .partial_cmp(&score_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         let mut contribution_scores = HashMap::new();
         if let Some(w) = winner {
@@ -885,7 +905,8 @@ impl ReputationPropagation {
                         for (to_id, weight) in edges {
                             if to_id == agent_id {
                                 let from_score = scores.get(from_id).unwrap_or(&0.5);
-                                link_contribution += self.damping_factor * from_score * weight / total_weight;
+                                link_contribution +=
+                                    self.damping_factor * from_score * weight / total_weight;
                             }
                         }
                     }
@@ -920,7 +941,8 @@ impl ReputationPropagation {
         propagation_weight: f64,
     ) -> f64 {
         let base = agent.k_vector.trust_score() as f64;
-        let propagated = self.propagated_scores
+        let propagated = self
+            .propagated_scores
             .get(agent.agent_id.as_str())
             .copied()
             .unwrap_or(base);
@@ -937,7 +959,7 @@ impl ReputationPropagation {
 mod tests {
     use super::*;
     use crate::agentic::UncertaintyCalibration;
-    use crate::agentic::{AgentId, AgentClass, AgentConstraints, AgentStatus, EpistemicStats};
+    use crate::agentic::{AgentClass, AgentConstraints, AgentId, AgentStatus, EpistemicStats};
     use crate::matl::KVector;
 
     fn create_test_agent(id: &str, trust: f32) -> InstrumentalActor {
@@ -1001,7 +1023,10 @@ mod tests {
         assert!(result.consensus_value > 0.7);
         assert!(result.consensus_reached);
         assert_eq!(result.participant_count, 3);
-        assert!(result.contributions.get("agent-1").unwrap() > result.contributions.get("agent-3").unwrap());
+        assert!(
+            result.contributions.get("agent-1").unwrap()
+                > result.contributions.get("agent-3").unwrap()
+        );
     }
 
     #[test]
@@ -1050,9 +1075,15 @@ mod tests {
         assert!(manager.join_task("task-1", &agent3).is_ok());
 
         // Contribute
-        assert!(manager.contribute("task-1", &agent1, serde_json::json!(0.8), 3, 0.9, 1000).is_ok());
-        assert!(manager.contribute("task-1", &agent2, serde_json::json!(0.75), 2, 0.85, 1001).is_ok());
-        assert!(manager.contribute("task-1", &agent3, serde_json::json!(0.7), 2, 0.8, 1002).is_ok());
+        assert!(manager
+            .contribute("task-1", &agent1, serde_json::json!(0.8), 3, 0.9, 1000)
+            .is_ok());
+        assert!(manager
+            .contribute("task-1", &agent2, serde_json::json!(0.75), 2, 0.85, 1001)
+            .is_ok());
+        assert!(manager
+            .contribute("task-1", &agent3, serde_json::json!(0.7), 2, 0.8, 1002)
+            .is_ok());
 
         // Finalize
         let result = manager.finalize_task("task-1", 2000).unwrap();
@@ -1060,8 +1091,10 @@ mod tests {
         assert_eq!(result.participants.len(), 3);
         assert!(result.confidence > 0.5);
         // Higher trust agents should have more contribution
-        assert!(result.contribution_scores.get("agent-1").unwrap() >
-                result.contribution_scores.get("agent-3").unwrap());
+        assert!(
+            result.contribution_scores.get("agent-1").unwrap()
+                > result.contribution_scores.get("agent-3").unwrap()
+        );
     }
 
     #[test]

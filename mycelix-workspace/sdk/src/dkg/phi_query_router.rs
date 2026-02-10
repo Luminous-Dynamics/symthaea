@@ -20,12 +20,12 @@
 //! 3. **Unstable agents** (Phi 0.3-0.5): Limited access, higher costs
 //! 4. **Degraded/Critical** (Phi < 0.3): Restricted access, maximum costs
 
-use serde::{Deserialize, Serialize};
 use super::{
-    VerifiableTriple, StoredTriple,
+    phi_integration::{coherence_allows_operation, CoherenceState, ConsciousnessMetrics},
     query::QueryFilter,
-    phi_integration::{ConsciousnessMetrics, CoherenceState, coherence_allows_operation},
+    StoredTriple, VerifiableTriple,
 };
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -317,7 +317,9 @@ impl PhiQueryRouter {
                 }
                 QueryRestriction::ExcludedDomains(domains) => {
                     matches.retain(|r| {
-                        r.triple.domain.as_ref()
+                        r.triple
+                            .domain
+                            .as_ref()
                             .map(|d| !domains.contains(d))
                             .unwrap_or(true)
                     });
@@ -328,7 +330,8 @@ impl PhiQueryRouter {
 
         // Sort by relevance (coherent sources first)
         matches.sort_by(|a, b| {
-            b.relevance_score.partial_cmp(&a.relevance_score)
+            b.relevance_score
+                .partial_cmp(&a.relevance_score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
 
@@ -375,11 +378,11 @@ impl PhiQueryRouter {
     /// Get cost multiplier based on coherence state
     fn coherence_cost_multiplier(&self, coherence: CoherenceState) -> f64 {
         match coherence {
-            CoherenceState::Coherent => 0.8,   // 20% discount
-            CoherenceState::Stable => 1.0,     // Normal
-            CoherenceState::Unstable => 1.5,   // 50% premium
-            CoherenceState::Degraded => 2.0,   // 100% premium
-            CoherenceState::Critical => 3.0,   // 200% premium
+            CoherenceState::Coherent => 0.8, // 20% discount
+            CoherenceState::Stable => 1.0,   // Normal
+            CoherenceState::Unstable => 1.5, // 50% premium
+            CoherenceState::Degraded => 2.0, // 100% premium
+            CoherenceState::Critical => 3.0, // 200% premium
         }
     }
 
@@ -393,9 +396,7 @@ impl PhiQueryRouter {
         }
 
         // Complex queries require higher coherence
-        if query.query_type == QueryType::GraphTraversal
-            || query.query_type == QueryType::Complex
-        {
+        if query.query_type == QueryType::GraphTraversal || query.query_type == QueryType::Complex {
             return "query_complex".to_string();
         }
 
@@ -415,7 +416,9 @@ impl PhiQueryRouter {
                 restrictions.push(QueryRestriction::RateLimit(100));
             }
             CoherenceState::Unstable => {
-                restrictions.push(QueryRestriction::MaxResults(self.config.unstable_max_results));
+                restrictions.push(QueryRestriction::MaxResults(
+                    self.config.unstable_max_results,
+                ));
                 restrictions.push(QueryRestriction::MinConfidence(0.5));
                 restrictions.push(QueryRestriction::RateLimit(30));
             }
@@ -452,7 +455,9 @@ impl PhiQueryRouter {
             CoherenceState::Unstable | CoherenceState::Degraded | CoherenceState::Critical
         );
 
-        let is_sensitive = query.filter.domain
+        let is_sensitive = query
+            .filter
+            .domain
             .as_ref()
             .map(|d| self.config.sensitive_domains.contains(d))
             .unwrap_or(false);
@@ -485,11 +490,7 @@ pub struct QueryCostDeduction {
 }
 
 /// Deduct KREDIT for a query (returns updated balance)
-pub fn deduct_query_cost(
-    current_balance: u64,
-    cost: u64,
-    min_balance: u64,
-) -> Result<u64, String> {
+pub fn deduct_query_cost(current_balance: u64, cost: u64, min_balance: u64) -> Result<u64, String> {
     if current_balance < cost {
         return Err(format!(
             "Insufficient KREDIT: have {}, need {}",
@@ -551,9 +552,10 @@ mod tests {
         assert!(!decision.restrictions.is_empty());
 
         // Should have MaxResults restriction
-        let has_max_results = decision.restrictions.iter().any(|r| {
-            matches!(r, QueryRestriction::MaxResults(_))
-        });
+        let has_max_results = decision
+            .restrictions
+            .iter()
+            .any(|r| matches!(r, QueryRestriction::MaxResults(_)));
         assert!(has_max_results);
     }
 

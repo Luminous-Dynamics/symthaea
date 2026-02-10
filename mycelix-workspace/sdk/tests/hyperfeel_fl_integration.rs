@@ -4,8 +4,7 @@
 //! with 2000x gradient compression via HyperFeel.
 
 use mycelix_sdk::fl::{
-    FLConfig, HyperFeelFLConfig, HyperFeelFLCoordinator, CompressedSubmission,
-    AggregationMethod,
+    AggregationMethod, CompressedSubmission, FLConfig, HyperFeelFLConfig, HyperFeelFLCoordinator,
 };
 
 /// Create a gradient simulating honest training
@@ -65,7 +64,9 @@ fn test_full_fl_round_with_hyperfeel_compression() {
 
     for node_id in 1..=5 {
         let gradient = create_honest_gradient(node_id, 1, gradient_size);
-        let hg = coordinator.bridge.compress_gradient(&gradient, 1, &format!("node-{}", node_id));
+        let hg = coordinator
+            .bridge
+            .compress_gradient(&gradient, 1, &format!("node-{}", node_id));
 
         assert!(
             coordinator.submit_compressed(
@@ -99,7 +100,10 @@ fn test_full_fl_round_with_hyperfeel_compression() {
     println!("  Original: {} bytes", stats.total_original_bytes);
     println!("  Compressed: {} bytes", stats.total_compressed_bytes);
     println!("  Ratio: {:.1}x", stats.overall_compression_ratio);
-    println!("  Bandwidth saved: {:.1}%", stats.bandwidth_savings_percent());
+    println!(
+        "  Bandwidth saved: {:.1}%",
+        stats.bandwidth_savings_percent()
+    );
 
     // Verify significant compression (20K floats = 80KB → 2KB = ~40x)
     assert!(
@@ -154,7 +158,9 @@ fn test_byzantine_node_detection_and_exclusion() {
     // Submit honest gradients
     for node_id in 1..=5 {
         let gradient = create_honest_gradient(node_id, 1, gradient_size);
-        let hg = coordinator.bridge.compress_gradient(&gradient, 1, &format!("node-{}", node_id));
+        let hg = coordinator
+            .bridge
+            .compress_gradient(&gradient, 1, &format!("node-{}", node_id));
 
         coordinator.submit_compressed(
             CompressedSubmission {
@@ -169,11 +175,10 @@ fn test_byzantine_node_detection_and_exclusion() {
 
     // Submit Byzantine gradient (completely different pattern)
     let byzantine_gradient = create_byzantine_gradient(gradient_size);
-    let byzantine_hg = coordinator.bridge.compress_gradient(
-        &byzantine_gradient,
-        1,
-        "byzantine-attacker",
-    );
+    let byzantine_hg =
+        coordinator
+            .bridge
+            .compress_gradient(&byzantine_gradient, 1, "byzantine-attacker");
 
     coordinator.submit_compressed(
         CompressedSubmission {
@@ -193,14 +198,29 @@ fn test_byzantine_node_detection_and_exclusion() {
     println!("  Flagged: {}", analysis.flagged_count);
 
     for (node_id, &sim) in &analysis.similarity_scores {
-        let is_flagged = analysis.byzantine_flags.get(node_id).copied().unwrap_or(false);
-        println!("  {} - similarity: {:.3}, flagged: {}", node_id, sim, is_flagged);
+        let is_flagged = analysis
+            .byzantine_flags
+            .get(node_id)
+            .copied()
+            .unwrap_or(false);
+        println!(
+            "  {} - similarity: {:.3}, flagged: {}",
+            node_id, sim, is_flagged
+        );
     }
 
     // Byzantine node should have lower similarity than honest nodes
-    let byzantine_sim = *analysis.similarity_scores.get("byzantine-attacker").unwrap_or(&1.0);
+    let byzantine_sim = *analysis
+        .similarity_scores
+        .get("byzantine-attacker")
+        .unwrap_or(&1.0);
     let honest_sims: Vec<f32> = (1..=5)
-        .map(|i| *analysis.similarity_scores.get(&format!("node-{}", i)).unwrap_or(&0.0))
+        .map(|i| {
+            *analysis
+                .similarity_scores
+                .get(&format!("node-{}", i))
+                .unwrap_or(&0.0)
+        })
         .collect();
     let avg_honest_sim = honest_sims.iter().sum::<f32>() / honest_sims.len() as f32;
 
@@ -242,11 +262,10 @@ fn test_multi_round_fl_with_reputation_updates() {
 
         // Reliable node always contributes
         let reliable_gradient = create_honest_gradient(1, round, gradient_size);
-        let reliable_hg = coordinator.bridge.compress_gradient(
-            &reliable_gradient,
-            round as u32,
-            "reliable-node",
-        );
+        let reliable_hg =
+            coordinator
+                .bridge
+                .compress_gradient(&reliable_gradient, round as u32, "reliable-node");
 
         coordinator.submit_compressed(
             CompressedSubmission {
@@ -260,11 +279,10 @@ fn test_multi_round_fl_with_reputation_updates() {
 
         // Sporadic node contributes
         let sporadic_gradient = create_honest_gradient(2, round, gradient_size);
-        let sporadic_hg = coordinator.bridge.compress_gradient(
-            &sporadic_gradient,
-            round as u32,
-            "sporadic-node",
-        );
+        let sporadic_hg =
+            coordinator
+                .bridge
+                .compress_gradient(&sporadic_gradient, round as u32, "sporadic-node");
 
         coordinator.submit_compressed(
             CompressedSubmission {
@@ -285,12 +303,26 @@ fn test_multi_round_fl_with_reputation_updates() {
     }
 
     // Check final participant reputations
-    let reliable = coordinator.coordinator().get_participant("reliable-node").unwrap();
-    let sporadic = coordinator.coordinator().get_participant("sporadic-node").unwrap();
+    let reliable = coordinator
+        .coordinator()
+        .get_participant("reliable-node")
+        .unwrap();
+    let sporadic = coordinator
+        .coordinator()
+        .get_participant("sporadic-node")
+        .unwrap();
 
     println!("\nFinal Reputations:");
-    println!("  Reliable node: {:.3} (rounds: {})", reliable.trust_score(), reliable.rounds_participated);
-    println!("  Sporadic node: {:.3} (rounds: {})", sporadic.trust_score(), sporadic.rounds_participated);
+    println!(
+        "  Reliable node: {:.3} (rounds: {})",
+        reliable.trust_score(),
+        reliable.rounds_participated
+    );
+    println!(
+        "  Sporadic node: {:.3} (rounds: {})",
+        sporadic.trust_score(),
+        sporadic.rounds_participated
+    );
 
     // Both should have participated in all rounds
     assert_eq!(reliable.rounds_participated, 3);
@@ -324,7 +356,9 @@ fn test_bandwidth_savings_at_scale() {
 
     for node_id in 1..=10 {
         let gradient = create_honest_gradient(node_id, 1, large_gradient_size);
-        let hg = coordinator.bridge.compress_gradient(&gradient, 1, &format!("node-{}", node_id));
+        let hg = coordinator
+            .bridge
+            .compress_gradient(&gradient, 1, &format!("node-{}", node_id));
 
         coordinator.submit_compressed(
             CompressedSubmission {
@@ -342,9 +376,18 @@ fn test_bandwidth_savings_at_scale() {
     println!("Large-Scale Compression Stats:");
     println!("  Participants: {}", stats.submissions);
     println!("  Original total: {} KB", stats.total_original_bytes / 1024);
-    println!("  Compressed total: {} KB", stats.total_compressed_bytes / 1024);
-    println!("  Compression ratio: {:.0}x", stats.overall_compression_ratio);
-    println!("  Bandwidth saved: {} KB", stats.bandwidth_saved_bytes / 1024);
+    println!(
+        "  Compressed total: {} KB",
+        stats.total_compressed_bytes / 1024
+    );
+    println!(
+        "  Compression ratio: {:.0}x",
+        stats.overall_compression_ratio
+    );
+    println!(
+        "  Bandwidth saved: {} KB",
+        stats.bandwidth_saved_bytes / 1024
+    );
 
     // With 10 nodes × 400KB gradients = 4MB original
     // With HyperFeel: 10 × 2KB = 20KB compressed

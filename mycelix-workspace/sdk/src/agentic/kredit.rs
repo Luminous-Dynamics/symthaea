@@ -152,11 +152,7 @@ pub fn recalculate_agent_kredit_cap(
     agent: &mut InstrumentalActor,
     sponsor_civ: f64,
 ) -> Result<u64, KreditError> {
-    let new_cap = calculate_kredit_cap_from_trust(
-        &agent.k_vector,
-        agent.agent_class,
-        sponsor_civ,
-    )?;
+    let new_cap = calculate_kredit_cap_from_trust(&agent.k_vector, agent.agent_class, sponsor_civ)?;
 
     agent.kredit_cap = new_cap;
 
@@ -169,10 +165,7 @@ pub fn recalculate_agent_kredit_cap(
 }
 
 /// Consume KREDIT for an action
-pub fn consume_kredit(
-    agent: &mut InstrumentalActor,
-    cost: u64,
-) -> Result<(), KreditError> {
+pub fn consume_kredit(agent: &mut InstrumentalActor, cost: u64) -> Result<(), KreditError> {
     // Check if action would exceed floor (allow negative up to -10%)
     let floor = -(agent.kredit_cap as i64 / 10);
     if (agent.kredit_balance - cost as i64) < floor {
@@ -330,7 +323,8 @@ mod tests {
         let mut sap_balance = 1000;
         let mut civ = 0.7;
 
-        let result = process_negative_kredit(&mut agent, &mut sap_locked, &mut sap_balance, &mut civ);
+        let result =
+            process_negative_kredit(&mut agent, &mut sap_locked, &mut sap_balance, &mut civ);
 
         assert!(matches!(result, LiabilityResult::LiabilityTriggered { .. }));
         assert_eq!(agent.status, AgentStatus::Revoked);
@@ -341,11 +335,13 @@ mod tests {
     fn test_trust_derived_kredit_cap() {
         // High trust K-Vector (verified agent)
         let high_trust = KVector::new(0.9, 0.8, 1.0, 0.9, 0.5, 0.7, 0.8, 0.6, 0.9, 0.85);
-        let high_cap = calculate_kredit_cap_from_trust(&high_trust, AgentClass::Supervised, 0.8).unwrap();
+        let high_cap =
+            calculate_kredit_cap_from_trust(&high_trust, AgentClass::Supervised, 0.8).unwrap();
 
         // Low trust K-Vector (unverified agent)
         let low_trust = KVector::new(0.3, 0.2, 0.5, 0.3, 0.1, 0.1, 0.2, 0.1, 0.0, 0.2);
-        let low_cap = calculate_kredit_cap_from_trust(&low_trust, AgentClass::Supervised, 0.8).unwrap();
+        let low_cap =
+            calculate_kredit_cap_from_trust(&low_trust, AgentClass::Supervised, 0.8).unwrap();
 
         // High trust should get much more KREDIT
         assert!(high_cap > low_cap * 3);

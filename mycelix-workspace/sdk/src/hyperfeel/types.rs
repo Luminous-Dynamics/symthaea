@@ -47,10 +47,16 @@ impl EncodingConfig {
             return Err(format!("dimension must be >= 1024, got {}", self.dimension));
         }
         if !self.dimension.is_power_of_two() {
-            return Err(format!("dimension must be power of 2, got {}", self.dimension));
+            return Err(format!(
+                "dimension must be power of 2, got {}",
+                self.dimension
+            ));
         }
         if ![1, 2, 4, 8, 16].contains(&self.quantize_bits) {
-            return Err(format!("quantize_bits must be 1,2,4,8,16, got {}", self.quantize_bits));
+            return Err(format!(
+                "quantize_bits must be 1,2,4,8,16, got {}",
+                self.quantize_bits
+            ));
         }
         Ok(())
     }
@@ -205,7 +211,7 @@ mod tests {
         assert!(config.validate().is_ok());
 
         let bad_config = EncodingConfig {
-            dimension: 512,  // Too small
+            dimension: 512, // Too small
             ..Default::default()
         };
         assert!(bad_config.validate().is_err());

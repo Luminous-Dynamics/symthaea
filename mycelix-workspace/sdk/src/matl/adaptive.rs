@@ -101,9 +101,8 @@ impl AdaptiveThreshold {
             return 0.0;
         }
         let mean = self.mean();
-        let variance = self.history.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / self.history.len() as f64;
+        let variance = self.history.iter().map(|x| (x - mean).powi(2)).sum::<f64>()
+            / self.history.len() as f64;
         variance.sqrt()
     }
 
@@ -199,8 +198,10 @@ mod tests {
         let mut threshold = AdaptiveThreshold::new("node1", 100);
 
         // Simulate consistent high-quality node with slight variance (realistic)
-        let values = [0.88, 0.91, 0.89, 0.92, 0.90, 0.87, 0.93, 0.88, 0.91, 0.89,
-                      0.90, 0.88, 0.92, 0.89, 0.91, 0.87, 0.90, 0.93, 0.88, 0.91];
+        let values = [
+            0.88, 0.91, 0.89, 0.92, 0.90, 0.87, 0.93, 0.88, 0.91, 0.89, 0.90, 0.88, 0.92, 0.89,
+            0.91, 0.87, 0.90, 0.93, 0.88, 0.91,
+        ];
         for &v in &values {
             threshold.observe(v);
         }

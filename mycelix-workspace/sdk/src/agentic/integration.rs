@@ -10,41 +10,56 @@
 //! 3. **Privacy Analytics** - DP Aggregation → Dashboard → Alerts
 //! 4. **Agent Lifecycle** - Create → Output → Classify → Update Trust
 
-use crate::matl::KVector;
 use crate::agentic::{
-    AgentId, InstrumentalActor, AgentClass, AgentConstraints, AgentStatus,
-    EpistemicStats, UncertaintyCalibration,
+    // Adaptive thresholds
+    adaptive_thresholds::{
+        AdaptiveConfig, AdaptiveThresholdEngine, FeedbackContext, FeedbackOutcome,
+        ThresholdFeedback, ThresholdType,
+    },
+    // Quarantine
+    adversarial::{
+        GamingDetectionConfig, GamingDetector, GamingResponse, QuarantineManager, QuarantineReason,
+    },
+    // Cascade analysis
+    cascade_analysis::{
+        CascadeConfig, CascadeEngine, CascadeResult, EdgeType, NetworkAgent, NetworkEdge,
+    },
+    // Dashboard
+    dashboard::{AlertSeverity, Dashboard, DashboardConfig, LiveMetrics, MetricsInput},
+    // Differential privacy
+    differential_privacy::{DPConfig, PrivateTrustAnalytics, TrustDistribution},
+    // Economics
+    economics::{
+        RewardConfig, RewardEngine, SlashResult, SlashingConfig, SlashingEngine, ViolationSeverity,
+        ViolationType,
+    },
+    // Epistemic
+    epistemic_classifier::{
+        calculate_epistemic_weight, AgentOutput, AgentOutputBuilder, OutputContent,
+    },
     // Trust pipeline
     kvector_bridge::calculate_kredit_from_trust,
-    // Adaptive thresholds
-    adaptive_thresholds::{AdaptiveThresholdEngine, AdaptiveConfig, ThresholdType, ThresholdFeedback, FeedbackOutcome, FeedbackContext},
-    // Quarantine
-    adversarial::{QuarantineManager, QuarantineReason, GamingDetector, GamingDetectionConfig, GamingResponse},
-    // Economics
-    economics::{SlashingEngine, SlashingConfig, RewardEngine, RewardConfig, ViolationType, ViolationSeverity, SlashResult},
-    // Differential privacy
-    differential_privacy::{PrivateTrustAnalytics, DPConfig, TrustDistribution},
-    // Dashboard
-    dashboard::{Dashboard, DashboardConfig, MetricsInput, LiveMetrics, AlertSeverity},
-    // Cascade analysis
-    cascade_analysis::{CascadeEngine, CascadeConfig, NetworkAgent, NetworkEdge, EdgeType, CascadeResult},
-    // Verification
-    verification::{VerificationEngine, SystemState, InvariantCheckResult},
-    // Epistemic
-    epistemic_classifier::{AgentOutput, AgentOutputBuilder, OutputContent, calculate_epistemic_weight},
+    lifecycle::record_uncertainty_outcome,
     // Phi coherence
     phi_bridge::{
-        CoherenceState, PhiMeasurementConfig, update_agent_coherence,
-        check_zk_operation_phi, ZKOperationType, ZKPhiGatingResult,
-        phi_weighted_attestation, CoherenceHistory, export_phi_metrics, PhiCoherenceExport,
+        check_zk_operation_phi, export_phi_metrics, phi_weighted_attestation,
+        update_agent_coherence, CoherenceHistory, CoherenceState, PhiCoherenceExport,
+        PhiMeasurementConfig, ZKOperationType, ZKPhiGatingResult,
     },
     // Uncertainty (GIS)
-    uncertainty::{
-        MoralUncertainty, MoralActionGuidance, EscalationRequest,
-    },
-    lifecycle::record_uncertainty_outcome,
+    uncertainty::{EscalationRequest, MoralActionGuidance, MoralUncertainty},
+    // Verification
+    verification::{InvariantCheckResult, SystemState, VerificationEngine},
+    AgentClass,
+    AgentConstraints,
+    AgentId,
+    AgentStatus,
+    EpistemicStats,
+    InstrumentalActor,
+    UncertaintyCalibration,
 };
-use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel};
+use crate::epistemic::{EmpiricalLevel, HarmonicLevel, MaterialityLevel, NormativeLevel};
+use crate::matl::KVector;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -105,10 +120,9 @@ impl IntegratedTrustPipeline {
         let trust = agent.k_vector.trust_score();
 
         // Add to cascade network
-        self.cascade_engine.network_mut().add_agent(NetworkAgent::new(
-            agent_id.clone(),
-            trust as f64,
-        ));
+        self.cascade_engine
+            .network_mut()
+            .add_agent(NetworkAgent::new(agent_id.clone(), trust as f64));
 
         self.agents.insert(agent_id, agent);
     }
@@ -121,9 +135,13 @@ impl IntegratedTrustPipeline {
         attestation_weight: f64,
     ) -> Result<AttestationResult, IntegrationError> {
         // Verify both agents exist
-        let from = self.agents.get(from_agent)
+        let from = self
+            .agents
+            .get(from_agent)
             .ok_or_else(|| IntegrationError::AgentNotFound(from_agent.to_string()))?;
-        let _to = self.agents.get(to_agent)
+        let _to = self
+            .agents
+            .get(to_agent)
             .ok_or_else(|| IntegrationError::AgentNotFound(to_agent.to_string()))?;
 
         // Check from_agent has sufficient trust
@@ -183,7 +201,8 @@ impl IntegratedTrustPipeline {
             .unwrap_or_default()
             .as_millis() as u64;
 
-        self.cascade_engine.apply_shock(agent_id, shock_magnitude, timestamp)
+        self.cascade_engine
+            .apply_shock(agent_id, shock_magnitude, timestamp)
     }
 
     /// Verify all invariants hold
@@ -193,7 +212,8 @@ impl IntegratedTrustPipeline {
     }
 
     fn create_system_state(&self) -> SystemState {
-        let trust_scores: HashMap<String, f64> = self.agents
+        let trust_scores: HashMap<String, f64> = self
+            .agents
             .iter()
             .map(|(id, a)| (id.clone(), a.k_vector.trust_score() as f64))
             .collect();
@@ -244,8 +264,7 @@ pub struct AttestationResult {
 // ============================================================================
 
 /// Configuration for integrated attack response
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct AttackResponseConfig {
     /// Adaptive threshold config
     pub thresholds: AdaptiveConfig,
@@ -254,7 +273,6 @@ pub struct AttackResponseConfig {
     /// Gaming detection config
     pub gaming: GamingDetectionConfig,
 }
-
 
 /// Integrated attack response system
 pub struct IntegratedAttackResponse {
@@ -283,10 +301,7 @@ impl IntegratedAttackResponse {
     }
 
     /// Process an agent's behavior and respond to any detected attacks
-    pub fn process_behavior(
-        &mut self,
-        agent: &mut InstrumentalActor,
-    ) -> Option<AttackResponse> {
+    pub fn process_behavior(&mut self, agent: &mut InstrumentalActor) -> Option<AttackResponse> {
         let agent_id = agent.agent_id.as_str();
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -297,15 +312,22 @@ impl IntegratedAttackResponse {
         let gaming_result = self.gaming.analyze(agent, timestamp);
 
         // Check if gaming detected (suspicion score above threshold)
-        let is_gaming = gaming_result.suspicion_score > 0.5 ||
-            matches!(gaming_result.recommended_action, GamingResponse::Quarantine | GamingResponse::EscalateToSponsor);
+        let is_gaming = gaming_result.suspicion_score > 0.5
+            || matches!(
+                gaming_result.recommended_action,
+                GamingResponse::Quarantine | GamingResponse::EscalateToSponsor
+            );
 
         if is_gaming {
             // Quarantine with evidence
             self.quarantine.quarantine(
                 agent_id,
                 QuarantineReason::GamingDetected,
-                gaming_result.indicators.iter().map(|i| i.description.clone()).collect(),
+                gaming_result
+                    .indicators
+                    .iter()
+                    .map(|i| i.description.clone())
+                    .collect(),
                 timestamp,
             );
 
@@ -356,8 +378,12 @@ impl IntegratedAttackResponse {
                 attack_type: "Gaming".to_string(),
                 confidence: gaming_result.suspicion_score,
                 actions_taken: vec![
-                    ResponseAction::Quarantined { duration_secs: 86400 },
-                    ResponseAction::Slashed { amount: slashed_amount },
+                    ResponseAction::Quarantined {
+                        duration_secs: 86400,
+                    },
+                    ResponseAction::Slashed {
+                        amount: slashed_amount,
+                    },
                 ],
                 timestamp,
             };
@@ -482,7 +508,8 @@ impl IntegratedPrivacyAnalytics {
 
         // Compute private trust distribution
         let epsilon_per_query = 0.25;
-        let distribution = self.analytics
+        let distribution = self
+            .analytics
             .analyze_trust_distribution(trust_scores, epsilon_per_query)
             .map_err(|e| IntegrationError::PrivacyError(e.to_string()))?;
 
@@ -644,7 +671,9 @@ impl IntegratedEpistemicLifecycle {
         agent.kredit_cap = kredit_multiplier * self.config.kredit_base;
 
         // Calculate reward
-        let reward = self.rewards.calculate_participation_reward(&agent_id, trust as f64);
+        let reward = self
+            .rewards
+            .calculate_participation_reward(&agent_id, trust as f64);
 
         Ok(OutputProcessingResult {
             output_id: output.output_id,
@@ -657,12 +686,7 @@ impl IntegratedEpistemicLifecycle {
     }
 
     /// Verify an agent's output and update trust accordingly
-    pub fn verify_output(
-        &self,
-        agent: &mut InstrumentalActor,
-        output_id: &str,
-        correct: bool,
-    ) {
+    pub fn verify_output(&self, agent: &mut InstrumentalActor, output_id: &str, correct: bool) {
         use crate::agentic::VerificationOutcome;
 
         let outcome = if correct {
@@ -785,7 +809,9 @@ impl MatlIntegratedPipeline {
         gradient_quality: f64,
         consistency: f64,
     ) -> Result<MatlEvaluationResult, IntegrationError> {
-        let agent = self.trust_pipeline.get_agent(agent_id)
+        let agent = self
+            .trust_pipeline
+            .get_agent(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
         // Create PoGQ from gradient metrics
@@ -803,11 +829,7 @@ impl MatlIntegratedPipeline {
         let reputation = agent.k_vector.trust_score() as f64;
 
         // Evaluate through MATL engine
-        let (node_eval, network_eval) = self.matl_engine.evaluate_node(
-            agent_id,
-            &pogq,
-            reputation,
-        );
+        let (node_eval, network_eval) = self.matl_engine.evaluate_node(agent_id, &pogq, reputation);
 
         // Record network snapshot
         let snapshot = MatlNetworkSnapshot {
@@ -845,20 +867,20 @@ impl MatlIntegratedPipeline {
 
     /// Get network health summary
     pub fn network_health(&self) -> MatlNetworkHealth {
-        let recent_snapshots: Vec<_> = self.status_history.iter()
-            .rev()
-            .take(10)
-            .collect();
+        let recent_snapshots: Vec<_> = self.status_history.iter().rev().take(10).collect();
 
         let avg_byzantine = if !recent_snapshots.is_empty() {
-            recent_snapshots.iter()
+            recent_snapshots
+                .iter()
                 .map(|s| s.byzantine_fraction)
-                .sum::<f64>() / recent_snapshots.len() as f64
+                .sum::<f64>()
+                / recent_snapshots.len() as f64
         } else {
             0.0
         };
 
-        let anomalous_count = recent_snapshots.iter()
+        let anomalous_count = recent_snapshots
+            .iter()
             .flat_map(|s| &s.anomalous_nodes)
             .collect::<std::collections::HashSet<_>>()
             .len();
@@ -918,7 +940,7 @@ pub struct MatlNetworkHealth {
 // Flow 6: ML-Enhanced Attack Response
 // ============================================================================
 
-use crate::agentic::ml_anomaly::{IsolationForest, ReconstructionDetector, AgentFeatures};
+use crate::agentic::ml_anomaly::{AgentFeatures, IsolationForest, ReconstructionDetector};
 
 /// Configuration for ML-enhanced attack response
 #[derive(Debug, Clone)]
@@ -1009,8 +1031,7 @@ impl MLEnhancedAttackResponse {
         let agent_id = agent.agent_id.as_str().to_string();
 
         // Track K-Vector history
-        let history = self.kvector_history.entry(agent_id.clone())
-            .or_default();
+        let history = self.kvector_history.entry(agent_id.clone()).or_default();
         history.push(agent.k_vector);
 
         // Extract features
@@ -1034,10 +1055,7 @@ impl MLEnhancedAttackResponse {
     }
 
     /// Process agent behavior with ML enhancement
-    pub fn process_behavior_ml(
-        &mut self,
-        agent: &mut InstrumentalActor,
-    ) -> MLDetectionResult {
+    pub fn process_behavior_ml(&mut self, agent: &mut InstrumentalActor) -> MLDetectionResult {
         let agent_id = agent.agent_id.as_str().to_string();
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1045,8 +1063,7 @@ impl MLEnhancedAttackResponse {
             .as_secs();
 
         // Track K-Vector history
-        let history = self.kvector_history.entry(agent_id.clone())
-            .or_default();
+        let history = self.kvector_history.entry(agent_id.clone()).or_default();
         history.push(agent.k_vector);
 
         // Extract features
@@ -1192,7 +1209,13 @@ impl ObservabilityExports {
     }
 
     /// Increment a counter
-    pub fn counter_inc(&mut self, name: &str, delta: f64, labels: HashMap<String, String>, help: &str) {
+    pub fn counter_inc(
+        &mut self,
+        name: &str,
+        delta: f64,
+        labels: HashMap<String, String>,
+        help: &str,
+    ) {
         let key = format!("{}_{}", self.prefix, name);
         let current = self.counters.entry(key.clone()).or_insert(0.0);
         *current += delta;
@@ -1217,36 +1240,76 @@ impl ObservabilityExports {
         let mut labels = HashMap::new();
         labels.insert("source".to_string(), "dashboard".to_string());
 
-        self.gauge("active_agents", metrics.active_agents as f64, labels.clone(),
-            "Number of active agents");
-        self.gauge("average_trust", metrics.average_trust, labels.clone(),
-            "Average trust score across all agents");
-        self.gauge("network_health", metrics.network_health, labels.clone(),
-            "Overall network health score");
-        self.gauge("tps", metrics.tps, labels.clone(),
-            "Transactions per second");
-        self.gauge("collective_phi", metrics.collective_phi, labels.clone(),
-            "Collective Phi coherence metric");
-        self.gauge("byzantine_threat", metrics.byzantine_threat, labels.clone(),
-            "Current Byzantine threat level");
+        self.gauge(
+            "active_agents",
+            metrics.active_agents as f64,
+            labels.clone(),
+            "Number of active agents",
+        );
+        self.gauge(
+            "average_trust",
+            metrics.average_trust,
+            labels.clone(),
+            "Average trust score across all agents",
+        );
+        self.gauge(
+            "network_health",
+            metrics.network_health,
+            labels.clone(),
+            "Overall network health score",
+        );
+        self.gauge(
+            "tps",
+            metrics.tps,
+            labels.clone(),
+            "Transactions per second",
+        );
+        self.gauge(
+            "collective_phi",
+            metrics.collective_phi,
+            labels.clone(),
+            "Collective Phi coherence metric",
+        );
+        self.gauge(
+            "byzantine_threat",
+            metrics.byzantine_threat,
+            labels.clone(),
+            "Current Byzantine threat level",
+        );
 
         // Alert counts
         let mut alert_labels = labels.clone();
         alert_labels.insert("severity".to_string(), "critical".to_string());
-        self.gauge("alerts", metrics.alerts.critical as f64, alert_labels.clone(),
-            "Active alert count by severity");
+        self.gauge(
+            "alerts",
+            metrics.alerts.critical as f64,
+            alert_labels.clone(),
+            "Active alert count by severity",
+        );
 
         alert_labels.insert("severity".to_string(), "high".to_string());
-        self.gauge("alerts", metrics.alerts.high as f64, alert_labels.clone(),
-            "Active alert count by severity");
+        self.gauge(
+            "alerts",
+            metrics.alerts.high as f64,
+            alert_labels.clone(),
+            "Active alert count by severity",
+        );
 
         alert_labels.insert("severity".to_string(), "medium".to_string());
-        self.gauge("alerts", metrics.alerts.medium as f64, alert_labels.clone(),
-            "Active alert count by severity");
+        self.gauge(
+            "alerts",
+            metrics.alerts.medium as f64,
+            alert_labels.clone(),
+            "Active alert count by severity",
+        );
 
         alert_labels.insert("severity".to_string(), "low".to_string());
-        self.gauge("alerts", metrics.alerts.low as f64, alert_labels,
-            "Active alert count by severity");
+        self.gauge(
+            "alerts",
+            metrics.alerts.low as f64,
+            alert_labels,
+            "Active alert count by severity",
+        );
     }
 
     /// Export from MATL network health
@@ -1254,14 +1317,30 @@ impl ObservabilityExports {
         let mut labels = HashMap::new();
         labels.insert("source".to_string(), "matl".to_string());
 
-        self.gauge("byzantine_fraction", health.avg_byzantine_fraction, labels.clone(),
-            "Estimated Byzantine fraction in network");
-        self.gauge("anomalous_agents", health.unique_anomalous_agents as f64, labels.clone(),
-            "Number of unique anomalous agents detected");
-        self.gauge("under_attack", if health.is_under_attack { 1.0 } else { 0.0 }, labels.clone(),
-            "Whether network is under attack");
-        self.counter_inc("matl_evaluations_total", health.total_evaluations as f64, labels,
-            "Total MATL evaluations performed");
+        self.gauge(
+            "byzantine_fraction",
+            health.avg_byzantine_fraction,
+            labels.clone(),
+            "Estimated Byzantine fraction in network",
+        );
+        self.gauge(
+            "anomalous_agents",
+            health.unique_anomalous_agents as f64,
+            labels.clone(),
+            "Number of unique anomalous agents detected",
+        );
+        self.gauge(
+            "under_attack",
+            if health.is_under_attack { 1.0 } else { 0.0 },
+            labels.clone(),
+            "Whether network is under attack",
+        );
+        self.counter_inc(
+            "matl_evaluations_total",
+            health.total_evaluations as f64,
+            labels,
+            "Total MATL evaluations performed",
+        );
     }
 
     /// Export from ML detection
@@ -1269,18 +1348,38 @@ impl ObservabilityExports {
         let mut labels = HashMap::new();
         labels.insert("agent_id".to_string(), result.agent_id.clone());
 
-        self.gauge("ml_isolation_score", result.isolation_score, labels.clone(),
-            "Isolation forest anomaly score");
-        self.gauge("ml_reconstruction_score", result.reconstruction_score, labels.clone(),
-            "Reconstruction error anomaly score");
-        self.gauge("ml_rule_based_score", result.rule_based_score, labels.clone(),
-            "Rule-based gaming detection score");
-        self.gauge("ml_ensemble_confidence", result.confidence, labels.clone(),
-            "Ensemble detection confidence");
+        self.gauge(
+            "ml_isolation_score",
+            result.isolation_score,
+            labels.clone(),
+            "Isolation forest anomaly score",
+        );
+        self.gauge(
+            "ml_reconstruction_score",
+            result.reconstruction_score,
+            labels.clone(),
+            "Reconstruction error anomaly score",
+        );
+        self.gauge(
+            "ml_rule_based_score",
+            result.rule_based_score,
+            labels.clone(),
+            "Rule-based gaming detection score",
+        );
+        self.gauge(
+            "ml_ensemble_confidence",
+            result.confidence,
+            labels.clone(),
+            "Ensemble detection confidence",
+        );
 
         if result.is_anomaly {
-            self.counter_inc("ml_anomalies_detected_total", 1.0, labels,
-                "Total anomalies detected by ML ensemble");
+            self.counter_inc(
+                "ml_anomalies_detected_total",
+                1.0,
+                labels,
+                "Total anomalies detected by ML ensemble",
+            );
         }
     }
 
@@ -1303,15 +1402,21 @@ impl ObservabilityExports {
 
             // Value line with labels
             if metric.labels.is_empty() {
-                output.push_str(&format!("{} {} {}\n",
-                    metric.name, metric.value, metric.timestamp_ms));
+                output.push_str(&format!(
+                    "{} {} {}\n",
+                    metric.name, metric.value, metric.timestamp_ms
+                ));
             } else {
-                let labels_str: String = metric.labels.iter()
+                let labels_str: String = metric
+                    .labels
+                    .iter()
                     .map(|(k, v)| format!("{}=\"{}\"", k, v))
                     .collect::<Vec<_>>()
                     .join(",");
-                output.push_str(&format!("{}{{{}}} {} {}\n",
-                    metric.name, labels_str, metric.value, metric.timestamp_ms));
+                output.push_str(&format!(
+                    "{}{{{}}} {} {}\n",
+                    metric.name, labels_str, metric.value, metric.timestamp_ms
+                ));
             }
         }
 
@@ -1320,22 +1425,26 @@ impl ObservabilityExports {
 
     /// Format as OpenTelemetry JSON
     pub fn to_otel_json(&self) -> String {
-        let otel_metrics: Vec<_> = self.metrics.iter().map(|m| {
-            serde_json::json!({
-                "name": m.name,
-                "description": m.help,
-                "unit": "",
-                "data": {
-                    "dataPoints": [{
-                        "attributes": m.labels.iter().map(|(k, v)| {
-                            serde_json::json!({"key": k, "value": {"stringValue": v}})
-                        }).collect::<Vec<_>>(),
-                        "timeUnixNano": m.timestamp_ms * 1_000_000,
-                        "asDouble": m.value,
-                    }]
-                }
+        let otel_metrics: Vec<_> = self
+            .metrics
+            .iter()
+            .map(|m| {
+                serde_json::json!({
+                    "name": m.name,
+                    "description": m.help,
+                    "unit": "",
+                    "data": {
+                        "dataPoints": [{
+                            "attributes": m.labels.iter().map(|(k, v)| {
+                                serde_json::json!({"key": k, "value": {"stringValue": v}})
+                            }).collect::<Vec<_>>(),
+                            "timeUnixNano": m.timestamp_ms * 1_000_000,
+                            "asDouble": m.value,
+                        }]
+                    }
+                })
             })
-        }).collect();
+            .collect();
 
         serde_json::json!({
             "resourceMetrics": [{
@@ -1349,7 +1458,8 @@ impl ObservabilityExports {
                     "metrics": otel_metrics
                 }]
             }]
-        }).to_string()
+        })
+        .to_string()
     }
 
     /// Get all metrics
@@ -1367,14 +1477,12 @@ impl ObservabilityExports {
 // Flow 8: ZK Trust Integration
 // ============================================================================
 
-use crate::agentic::zk_trust::{
-    TrustProver, TrustVerifier, TrustProof, ProofStatement,
-    KVectorCommitment, ProverConfig, VerificationResult,
-    AggregatedTrustProof, AggregateStatement, aggregate_proofs,
-};
 use crate::agentic::epistemic_classifier::{
-    ZKEpistemicClassifier,
-    compute_kvector_delta_from_epistemic, KVectorDelta,
+    compute_kvector_delta_from_epistemic, KVectorDelta, ZKEpistemicClassifier,
+};
+use crate::agentic::zk_trust::{
+    aggregate_proofs, AggregateStatement, AggregatedTrustProof, KVectorCommitment, ProofStatement,
+    ProverConfig, TrustProof, TrustProver, TrustVerifier, VerificationResult,
 };
 
 /// Configuration for ZK-integrated trust pipeline
@@ -1507,7 +1615,10 @@ impl ZKIntegratedPipeline {
     }
 
     /// Register an agent and create initial commitment
-    pub fn register_agent_with_commitment(&mut self, agent: InstrumentalActor) -> KVectorCommitment {
+    pub fn register_agent_with_commitment(
+        &mut self,
+        agent: InstrumentalActor,
+    ) -> KVectorCommitment {
         let agent_id = agent.agent_id.as_str().to_string();
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1519,13 +1630,10 @@ impl ZKIntegratedPipeline {
         self.blindings.insert(agent_id.clone(), blinding);
 
         // Create commitment
-        let commitment = KVectorCommitment::create(
-            &agent.k_vector,
-            &agent_id,
-            timestamp,
-            &blinding,
-        );
-        self.commitments.insert(agent_id.clone(), commitment.clone());
+        let commitment =
+            KVectorCommitment::create(&agent.k_vector, &agent_id, timestamp, &blinding);
+        self.commitments
+            .insert(agent_id.clone(), commitment.clone());
 
         // Register with verifier
         self.verifier.register_commitment(commitment.clone());
@@ -1553,10 +1661,15 @@ impl ZKIntegratedPipeline {
         agent_id: &str,
         statement: ProofStatement,
     ) -> Result<AgentTrustProofResult, IntegrationError> {
-        let agent = self.matl_pipeline.trust_pipeline().get_agent(agent_id)
+        let agent = self
+            .matl_pipeline
+            .trust_pipeline()
+            .get_agent(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
-        let blinding = self.blindings.get(agent_id)
+        let blinding = self
+            .blindings
+            .get(agent_id)
             .ok_or_else(|| IntegrationError::ZKError("No blinding factor for agent".to_string()))?;
 
         let timestamp = std::time::SystemTime::now()
@@ -1573,25 +1686,24 @@ impl ZKIntegratedPipeline {
         let prover = TrustProver::new(prover_config);
 
         // Generate proof
-        let proof = prover.prove(&agent.k_vector, &statement, blinding)
+        let proof = prover
+            .prove(&agent.k_vector, &statement, blinding)
             .map_err(|e| IntegrationError::ZKError(format!("{:?}", e)))?;
 
         // Verify proof
         let verification = self.verifier.verify(&proof);
 
         // Update commitment
-        let commitment = KVectorCommitment::create(
-            &agent.k_vector,
-            agent_id,
-            timestamp,
-            blinding,
-        );
-        self.commitments.insert(agent_id.to_string(), commitment.clone());
+        let commitment = KVectorCommitment::create(&agent.k_vector, agent_id, timestamp, blinding);
+        self.commitments
+            .insert(agent_id.to_string(), commitment.clone());
         self.verifier.register_commitment(commitment);
 
         // Create summary
         let (result, verified) = match &verification {
-            VerificationResult::Valid { statement_result, .. } => (*statement_result, true),
+            VerificationResult::Valid {
+                statement_result, ..
+            } => (*statement_result, true),
             VerificationResult::Invalid(_) => (false, false),
         };
 
@@ -1638,7 +1750,7 @@ impl ZKIntegratedPipeline {
 
         if !trust_verified {
             return Err(IntegrationError::ZKError(
-                "Attester failed to prove minimum trust threshold".to_string()
+                "Attester failed to prove minimum trust threshold".to_string(),
             ));
         }
 
@@ -1663,10 +1775,15 @@ impl ZKIntegratedPipeline {
         previous_kvector: &KVector,
         previous_timestamp: u64,
     ) -> Result<AgentTrustProofResult, IntegrationError> {
-        let agent = self.matl_pipeline.trust_pipeline().get_agent(agent_id)
+        let agent = self
+            .matl_pipeline
+            .trust_pipeline()
+            .get_agent(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
-        let blinding = self.blindings.get(agent_id)
+        let blinding = self
+            .blindings
+            .get(agent_id)
             .ok_or_else(|| IntegrationError::ZKError("No blinding factor for agent".to_string()))?;
 
         let timestamp = std::time::SystemTime::now()
@@ -1687,19 +1804,23 @@ impl ZKIntegratedPipeline {
         let prover = TrustProver::new(prover_config);
 
         // Generate improvement proof
-        let proof = prover.prove_improvement(
-            previous_kvector,
-            &agent.k_vector,
-            None, // Overall trust improvement
-            &prev_blinding,
-            blinding,
-        ).map_err(|e| IntegrationError::ZKError(format!("{:?}", e)))?;
+        let proof = prover
+            .prove_improvement(
+                previous_kvector,
+                &agent.k_vector,
+                None, // Overall trust improvement
+                &prev_blinding,
+                blinding,
+            )
+            .map_err(|e| IntegrationError::ZKError(format!("{:?}", e)))?;
 
         // Verify
         let verification = self.verifier.verify(&proof);
 
         let (result, verified) = match &verification {
-            VerificationResult::Valid { statement_result, .. } => (*statement_result, true),
+            VerificationResult::Valid {
+                statement_result, ..
+            } => (*statement_result, true),
             VerificationResult::Invalid(_) => (false, false),
         };
 
@@ -1733,9 +1854,11 @@ impl ZKIntegratedPipeline {
         statement: ProofStatement,
     ) -> AggregatedTrustProof {
         // Get trust scores as weights
-        let weights: Vec<f64> = proofs.iter()
+        let weights: Vec<f64> = proofs
+            .iter()
             .filter_map(|p| {
-                self.matl_pipeline.trust_pipeline()
+                self.matl_pipeline
+                    .trust_pipeline()
                     .get_agent(&p.commitment.agent_id)
                     .map(|a| a.k_vector.trust_score() as f64)
             })
@@ -1760,10 +1883,7 @@ impl ZKIntegratedPipeline {
     pub fn zk_network_health(&self) -> ZKNetworkHealth {
         let matl_health = self.matl_pipeline.network_health();
 
-        let recent_proofs: Vec<_> = self.proof_history.iter()
-            .rev()
-            .take(100)
-            .collect();
+        let recent_proofs: Vec<_> = self.proof_history.iter().rev().take(100).collect();
 
         let valid_proofs = recent_proofs.iter().filter(|p| p.valid).count();
         let true_proofs = recent_proofs.iter().filter(|p| p.result).count();
@@ -1892,7 +2012,10 @@ impl ZKIntegratedPipeline {
         agent_id: &str,
         operation: ZKOperationType,
     ) -> Result<ZKPhiGatingResult, IntegrationError> {
-        let agent = self.matl_pipeline.trust_pipeline().get_agent(agent_id)
+        let agent = self
+            .matl_pipeline
+            .trust_pipeline()
+            .get_agent(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
         Ok(check_zk_operation_phi(agent, operation))
@@ -1942,10 +2065,8 @@ impl ZKIntegratedPipeline {
         }
 
         // Apply Phi weighting to attestation
-        let weighted_attestation = phi_weighted_attestation(
-            base_attestation_weight as f32,
-            gating.current_phi,
-        );
+        let weighted_attestation =
+            phi_weighted_attestation(base_attestation_weight as f32, gating.current_phi);
 
         // Process with weighted attestation
         self.process_zk_attestation(from_agent, to_agent, weighted_attestation as f64)
@@ -1961,9 +2082,11 @@ impl ZKIntegratedPipeline {
         statement: ProofStatement,
     ) -> AggregatedTrustProof {
         // Filter proofs from agents with sufficient coherence
-        let filtered_proofs: Vec<TrustProof> = proofs.into_iter()
+        let filtered_proofs: Vec<TrustProof> = proofs
+            .into_iter()
             .filter(|p| {
-                self.matl_pipeline.trust_pipeline()
+                self.matl_pipeline
+                    .trust_pipeline()
                     .get_agent(&p.commitment.agent_id)
                     .map(|a| {
                         let state = CoherenceState::from_phi(a.k_vector.k_phi as f64);
@@ -1974,9 +2097,11 @@ impl ZKIntegratedPipeline {
             .collect();
 
         // Get Phi-weighted trust scores
-        let weights: Vec<f64> = filtered_proofs.iter()
+        let weights: Vec<f64> = filtered_proofs
+            .iter()
             .filter_map(|p| {
-                self.matl_pipeline.trust_pipeline()
+                self.matl_pipeline
+                    .trust_pipeline()
                     .get_agent(&p.commitment.agent_id)
                     .map(|a| {
                         let trust = a.k_vector.trust_score() as f64;
@@ -1998,8 +2123,12 @@ impl ZKIntegratedPipeline {
     }
 
     /// Check if an agent can participate in Byzantine consensus based on Phi
-    pub fn can_participate_in_byzantine_consensus(&self, agent_id: &str) -> Result<bool, IntegrationError> {
-        let gating = self.check_phi_for_zk_operation(agent_id, ZKOperationType::ByzantineConsensus)?;
+    pub fn can_participate_in_byzantine_consensus(
+        &self,
+        agent_id: &str,
+    ) -> Result<bool, IntegrationError> {
+        let gating =
+            self.check_phi_for_zk_operation(agent_id, ZKOperationType::ByzantineConsensus)?;
         Ok(gating.permitted)
     }
 
@@ -2007,13 +2136,18 @@ impl ZKIntegratedPipeline {
     ///
     /// Call this periodically or after significant agent activity to update coherence.
     pub fn update_agent_phi(&mut self, agent_id: &str) -> Result<PhiUpdateInfo, IntegrationError> {
-        let agent = self.matl_pipeline.trust_pipeline.agents.get_mut(agent_id)
+        let agent = self
+            .matl_pipeline
+            .trust_pipeline
+            .agents
+            .get_mut(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
         let update_result = update_agent_coherence(agent, &self.phi_config);
 
         // Update coherence history
-        let history = self.coherence_histories
+        let history = self
+            .coherence_histories
             .entry(agent_id.to_string())
             .or_default();
         history.add_measurement(update_result.measurement.clone());
@@ -2032,8 +2166,14 @@ impl ZKIntegratedPipeline {
     }
 
     /// Get agent's coherence state
-    pub fn get_agent_coherence_state(&self, agent_id: &str) -> Result<CoherenceState, IntegrationError> {
-        let agent = self.matl_pipeline.trust_pipeline().get_agent(agent_id)
+    pub fn get_agent_coherence_state(
+        &self,
+        agent_id: &str,
+    ) -> Result<CoherenceState, IntegrationError> {
+        let agent = self
+            .matl_pipeline
+            .trust_pipeline()
+            .get_agent(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
         Ok(CoherenceState::from_phi(agent.k_vector.k_phi as f64))
@@ -2045,11 +2185,19 @@ impl ZKIntegratedPipeline {
     }
 
     /// Export Phi coherence metrics for an agent
-    pub fn export_agent_phi_metrics(&self, agent_id: &str) -> Result<PhiCoherenceExport, IntegrationError> {
-        let agent = self.matl_pipeline.trust_pipeline().get_agent(agent_id)
+    pub fn export_agent_phi_metrics(
+        &self,
+        agent_id: &str,
+    ) -> Result<PhiCoherenceExport, IntegrationError> {
+        let agent = self
+            .matl_pipeline
+            .trust_pipeline()
+            .get_agent(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
-        let history = self.coherence_histories.get(agent_id)
+        let history = self
+            .coherence_histories
+            .get(agent_id)
             .cloned()
             .unwrap_or_default();
 
@@ -2153,10 +2301,7 @@ impl ZKIntegratedPipeline {
     /// - Epistemic level (lower E → higher epistemic uncertainty)
     /// - Harmonic level (higher H → higher axiological uncertainty)
     /// - Materiality level (higher M → higher deontic uncertainty)
-    pub fn infer_uncertainty_from_content(
-        &self,
-        content: &OutputContent,
-    ) -> MoralUncertainty {
+    pub fn infer_uncertainty_from_content(&self, content: &OutputContent) -> MoralUncertainty {
         use crate::agentic::epistemic_classifier::auto_classify;
 
         // Auto-classify the content
@@ -2216,7 +2361,11 @@ impl ZKIntegratedPipeline {
         was_uncertain: bool,
         was_good_outcome: bool,
     ) -> Result<CalibrationUpdateResult, IntegrationError> {
-        let agent = self.matl_pipeline.trust_pipeline.agents.get_mut(agent_id)
+        let agent = self
+            .matl_pipeline
+            .trust_pipeline
+            .agents
+            .get_mut(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
         let old_score = agent.uncertainty_calibration.calibration_score();
@@ -2252,15 +2401,24 @@ impl ZKIntegratedPipeline {
         blocked_action: &str,
         sponsor_approved: bool,
     ) -> Result<EscalationResolutionResult, IntegrationError> {
-        let agent = self.matl_pipeline.trust_pipeline.agents.get_mut(agent_id)
+        let agent = self
+            .matl_pipeline
+            .trust_pipeline
+            .agents
+            .get_mut(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
         // Find and remove the escalation
-        let escalation_idx = agent.pending_escalations.iter()
+        let escalation_idx = agent
+            .pending_escalations
+            .iter()
             .position(|e| e.blocked_action == blocked_action)
-            .ok_or_else(|| IntegrationError::ZKError(
-                format!("No pending escalation for action: {}", blocked_action)
-            ))?;
+            .ok_or_else(|| {
+                IntegrationError::ZKError(format!(
+                    "No pending escalation for action: {}",
+                    blocked_action
+                ))
+            })?;
 
         let escalation = agent.pending_escalations.remove(escalation_idx);
 
@@ -2316,8 +2474,14 @@ impl ZKIntegratedPipeline {
     }
 
     /// Get agent's uncertainty calibration summary
-    pub fn get_calibration_summary(&self, agent_id: &str) -> Result<CalibrationSummary, IntegrationError> {
-        let agent = self.matl_pipeline.trust_pipeline().get_agent(agent_id)
+    pub fn get_calibration_summary(
+        &self,
+        agent_id: &str,
+    ) -> Result<CalibrationSummary, IntegrationError> {
+        let agent = self
+            .matl_pipeline
+            .trust_pipeline()
+            .get_agent(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
         let cal = &agent.uncertainty_calibration;
@@ -2584,16 +2748,36 @@ impl ObservabilityExports {
         let mut labels = HashMap::new();
         labels.insert("source".to_string(), "zk_trust".to_string());
 
-        self.gauge("zk_total_proofs", health.total_proofs_generated as f64, labels.clone(),
-            "Total ZK proofs generated");
-        self.gauge("zk_valid_rate", health.recent_valid_rate, labels.clone(),
-            "Recent ZK proof validity rate");
-        self.gauge("zk_true_rate", health.recent_true_rate, labels.clone(),
-            "Recent ZK proof true rate");
-        self.gauge("zk_agents_with_commitments", health.agents_with_commitments as f64, labels.clone(),
-            "Number of agents with active ZK commitments");
-        self.gauge("zk_simulation_mode", if health.simulation_mode { 1.0 } else { 0.0 }, labels,
-            "Whether ZK is running in simulation mode");
+        self.gauge(
+            "zk_total_proofs",
+            health.total_proofs_generated as f64,
+            labels.clone(),
+            "Total ZK proofs generated",
+        );
+        self.gauge(
+            "zk_valid_rate",
+            health.recent_valid_rate,
+            labels.clone(),
+            "Recent ZK proof validity rate",
+        );
+        self.gauge(
+            "zk_true_rate",
+            health.recent_true_rate,
+            labels.clone(),
+            "Recent ZK proof true rate",
+        );
+        self.gauge(
+            "zk_agents_with_commitments",
+            health.agents_with_commitments as f64,
+            labels.clone(),
+            "Number of agents with active ZK commitments",
+        );
+        self.gauge(
+            "zk_simulation_mode",
+            if health.simulation_mode { 1.0 } else { 0.0 },
+            labels,
+            "Whether ZK is running in simulation mode",
+        );
 
         // Also export MATL health
         self.export_matl(&health.matl_health);
@@ -2606,16 +2790,28 @@ impl ObservabilityExports {
         labels.insert("statement_type".to_string(), record.statement_type.clone());
 
         if record.valid {
-            self.counter_inc("zk_proofs_valid_total", 1.0, labels.clone(),
-                "Total valid ZK proofs");
+            self.counter_inc(
+                "zk_proofs_valid_total",
+                1.0,
+                labels.clone(),
+                "Total valid ZK proofs",
+            );
         } else {
-            self.counter_inc("zk_proofs_invalid_total", 1.0, labels.clone(),
-                "Total invalid ZK proofs");
+            self.counter_inc(
+                "zk_proofs_invalid_total",
+                1.0,
+                labels.clone(),
+                "Total invalid ZK proofs",
+            );
         }
 
         if record.result {
-            self.counter_inc("zk_proofs_true_total", 1.0, labels,
-                "Total ZK proofs with true result");
+            self.counter_inc(
+                "zk_proofs_true_total",
+                1.0,
+                labels,
+                "Total ZK proofs with true result",
+            );
         }
     }
 
@@ -2623,55 +2819,120 @@ impl ObservabilityExports {
     pub fn export_phi_coherence(&mut self, metrics: &PhiCoherenceExport) {
         let mut labels = HashMap::new();
         labels.insert("agent_id".to_string(), metrics.agent_id.clone());
-        labels.insert("coherence_state".to_string(), metrics.coherence_state.clone());
+        labels.insert(
+            "coherence_state".to_string(),
+            metrics.coherence_state.clone(),
+        );
 
-        self.gauge("phi_current", metrics.phi, labels.clone(),
-            "Current Phi coherence value");
-        self.gauge("k_phi", metrics.k_phi as f64, labels.clone(),
-            "K-Vector k_phi dimension value");
-        self.gauge("phi_rolling", metrics.rolling_phi, labels.clone(),
-            "Rolling average Phi");
-        self.gauge("phi_trend", metrics.trend as f64, labels.clone(),
-            "Phi trend direction (-1=declining, 0=stable, 1=improving)");
-        self.gauge("phi_sample_size", metrics.sample_size as f64, labels.clone(),
-            "Number of outputs in Phi sample");
-        self.gauge("phi_can_high_stakes", if metrics.can_high_stakes { 1.0 } else { 0.0 }, labels.clone(),
-            "Whether agent can perform high-stakes actions");
-        self.gauge("phi_is_critical", if metrics.is_critical { 1.0 } else { 0.0 }, labels,
-            "Whether agent is in critical coherence state");
+        self.gauge(
+            "phi_current",
+            metrics.phi,
+            labels.clone(),
+            "Current Phi coherence value",
+        );
+        self.gauge(
+            "k_phi",
+            metrics.k_phi as f64,
+            labels.clone(),
+            "K-Vector k_phi dimension value",
+        );
+        self.gauge(
+            "phi_rolling",
+            metrics.rolling_phi,
+            labels.clone(),
+            "Rolling average Phi",
+        );
+        self.gauge(
+            "phi_trend",
+            metrics.trend as f64,
+            labels.clone(),
+            "Phi trend direction (-1=declining, 0=stable, 1=improving)",
+        );
+        self.gauge(
+            "phi_sample_size",
+            metrics.sample_size as f64,
+            labels.clone(),
+            "Number of outputs in Phi sample",
+        );
+        self.gauge(
+            "phi_can_high_stakes",
+            if metrics.can_high_stakes { 1.0 } else { 0.0 },
+            labels.clone(),
+            "Whether agent can perform high-stakes actions",
+        );
+        self.gauge(
+            "phi_is_critical",
+            if metrics.is_critical { 1.0 } else { 0.0 },
+            labels,
+            "Whether agent is in critical coherence state",
+        );
     }
 
     /// Export network-wide Phi health metrics
     pub fn export_phi_network_health(&mut self, health: &PhiNetworkHealth) {
         let mut labels = HashMap::new();
         labels.insert("source".to_string(), "phi_network".to_string());
-        labels.insert("coherence_level".to_string(), format!("{:?}", health.network_coherence_level));
+        labels.insert(
+            "coherence_level".to_string(),
+            format!("{:?}", health.network_coherence_level),
+        );
 
-        self.gauge("phi_network_agent_count", health.agent_count as f64, labels.clone(),
-            "Total number of agents in network");
-        self.gauge("phi_network_average", health.average_phi, labels.clone(),
-            "Network-wide average Phi");
-        self.gauge("phi_network_coherent_agents", health.coherent_agents as f64, labels.clone(),
-            "Number of coherent/stable agents");
-        self.gauge("phi_network_degraded_agents", health.degraded_agents as f64, labels.clone(),
-            "Number of degraded/unstable agents");
-        self.gauge("phi_network_critical_agents", health.critical_agents as f64, labels,
-            "Number of agents in critical coherence state");
+        self.gauge(
+            "phi_network_agent_count",
+            health.agent_count as f64,
+            labels.clone(),
+            "Total number of agents in network",
+        );
+        self.gauge(
+            "phi_network_average",
+            health.average_phi,
+            labels.clone(),
+            "Network-wide average Phi",
+        );
+        self.gauge(
+            "phi_network_coherent_agents",
+            health.coherent_agents as f64,
+            labels.clone(),
+            "Number of coherent/stable agents",
+        );
+        self.gauge(
+            "phi_network_degraded_agents",
+            health.degraded_agents as f64,
+            labels.clone(),
+            "Number of degraded/unstable agents",
+        );
+        self.gauge(
+            "phi_network_critical_agents",
+            health.critical_agents as f64,
+            labels,
+            "Number of agents in critical coherence state",
+        );
     }
 
     /// Export Phi update event
     pub fn export_phi_update(&mut self, update: &PhiUpdateInfo) {
         let mut labels = HashMap::new();
         labels.insert("agent_id".to_string(), update.agent_id.clone());
-        labels.insert("previous_state".to_string(), format!("{:?}", update.previous_state));
+        labels.insert(
+            "previous_state".to_string(),
+            format!("{:?}", update.previous_state),
+        );
         labels.insert("new_state".to_string(), format!("{:?}", update.new_state));
 
-        self.gauge("phi_update_delta", update.delta as f64, labels.clone(),
-            "Change in k_phi from update");
+        self.gauge(
+            "phi_update_delta",
+            update.delta as f64,
+            labels.clone(),
+            "Change in k_phi from update",
+        );
 
         if update.state_changed {
-            self.counter_inc("phi_state_transitions_total", 1.0, labels,
-                "Total Phi state transitions");
+            self.counter_inc(
+                "phi_state_transitions_total",
+                1.0,
+                labels,
+                "Total Phi state transitions",
+            );
         }
     }
 
@@ -2681,18 +2942,42 @@ impl ObservabilityExports {
         labels.insert("agent_id".to_string(), summary.agent_id.clone());
         labels.insert("tendency".to_string(), format!("{:?}", summary.tendency));
 
-        self.gauge("gis_calibration_score", summary.calibration_score as f64, labels.clone(),
-            "Agent uncertainty calibration score");
-        self.gauge("gis_total_events", summary.total_events as f64, labels.clone(),
-            "Total calibration events");
-        self.gauge("gis_appropriate_uncertainty", summary.appropriate_uncertainty as f64, labels.clone(),
-            "Times appropriately uncertain");
-        self.gauge("gis_appropriate_confidence", summary.appropriate_confidence as f64, labels.clone(),
-            "Times appropriately confident");
-        self.gauge("gis_overconfident", summary.overconfident as f64, labels.clone(),
-            "Times overconfident");
-        self.gauge("gis_overcautious", summary.overcautious as f64, labels,
-            "Times overcautious");
+        self.gauge(
+            "gis_calibration_score",
+            summary.calibration_score as f64,
+            labels.clone(),
+            "Agent uncertainty calibration score",
+        );
+        self.gauge(
+            "gis_total_events",
+            summary.total_events as f64,
+            labels.clone(),
+            "Total calibration events",
+        );
+        self.gauge(
+            "gis_appropriate_uncertainty",
+            summary.appropriate_uncertainty as f64,
+            labels.clone(),
+            "Times appropriately uncertain",
+        );
+        self.gauge(
+            "gis_appropriate_confidence",
+            summary.appropriate_confidence as f64,
+            labels.clone(),
+            "Times appropriately confident",
+        );
+        self.gauge(
+            "gis_overconfident",
+            summary.overconfident as f64,
+            labels.clone(),
+            "Times overconfident",
+        );
+        self.gauge(
+            "gis_overcautious",
+            summary.overcautious as f64,
+            labels,
+            "Times overcautious",
+        );
     }
 
     /// Export GIS network health metrics
@@ -2700,18 +2985,42 @@ impl ObservabilityExports {
         let mut labels = HashMap::new();
         labels.insert("source".to_string(), "gis_network".to_string());
 
-        self.gauge("gis_network_agent_count", health.agent_count as f64, labels.clone(),
-            "Total agents in network");
-        self.gauge("gis_network_avg_calibration", health.average_calibration_score, labels.clone(),
-            "Network-wide average calibration score");
-        self.gauge("gis_network_pending_escalations", health.pending_escalations_total as f64, labels.clone(),
-            "Total pending escalations");
-        self.gauge("gis_network_overconfident", health.overconfident_agents as f64, labels.clone(),
-            "Number of overconfident agents");
-        self.gauge("gis_network_overcautious", health.overcautious_agents as f64, labels.clone(),
-            "Number of overcautious agents");
-        self.gauge("gis_network_well_calibrated", health.well_calibrated_agents as f64, labels,
-            "Number of well-calibrated agents");
+        self.gauge(
+            "gis_network_agent_count",
+            health.agent_count as f64,
+            labels.clone(),
+            "Total agents in network",
+        );
+        self.gauge(
+            "gis_network_avg_calibration",
+            health.average_calibration_score,
+            labels.clone(),
+            "Network-wide average calibration score",
+        );
+        self.gauge(
+            "gis_network_pending_escalations",
+            health.pending_escalations_total as f64,
+            labels.clone(),
+            "Total pending escalations",
+        );
+        self.gauge(
+            "gis_network_overconfident",
+            health.overconfident_agents as f64,
+            labels.clone(),
+            "Number of overconfident agents",
+        );
+        self.gauge(
+            "gis_network_overcautious",
+            health.overcautious_agents as f64,
+            labels.clone(),
+            "Number of overcautious agents",
+        );
+        self.gauge(
+            "gis_network_well_calibrated",
+            health.well_calibrated_agents as f64,
+            labels,
+            "Number of well-calibrated agents",
+        );
     }
 
     /// Export escalation event
@@ -2721,15 +3030,31 @@ impl ObservabilityExports {
         labels.insert("guidance".to_string(), format!("{:?}", escalation.guidance));
         labels.insert("action".to_string(), escalation.blocked_action.clone());
 
-        self.counter_inc("gis_escalations_total", 1.0, labels.clone(),
-            "Total escalations to sponsors");
+        self.counter_inc(
+            "gis_escalations_total",
+            1.0,
+            labels.clone(),
+            "Total escalations to sponsors",
+        );
 
-        self.gauge("gis_escalation_epistemic", escalation.uncertainty.epistemic as f64, labels.clone(),
-            "Epistemic uncertainty at escalation");
-        self.gauge("gis_escalation_axiological", escalation.uncertainty.axiological as f64, labels.clone(),
-            "Axiological uncertainty at escalation");
-        self.gauge("gis_escalation_deontic", escalation.uncertainty.deontic as f64, labels,
-            "Deontic uncertainty at escalation");
+        self.gauge(
+            "gis_escalation_epistemic",
+            escalation.uncertainty.epistemic as f64,
+            labels.clone(),
+            "Epistemic uncertainty at escalation",
+        );
+        self.gauge(
+            "gis_escalation_axiological",
+            escalation.uncertainty.axiological as f64,
+            labels.clone(),
+            "Axiological uncertainty at escalation",
+        );
+        self.gauge(
+            "gis_escalation_deontic",
+            escalation.uncertainty.deontic as f64,
+            labels,
+            "Deontic uncertainty at escalation",
+        );
     }
 }
 
@@ -2742,8 +3067,10 @@ impl ObservabilityExports {
 pub enum IntegrationError {
     /// Agent not found in the pipeline.
     #[error("Agent not found: {0}")]
-    AgentNotFound(/// Agent ID.
-        String),
+    AgentNotFound(
+        /// Agent ID.
+        String,
+    ),
 
     /// Agent's trust is below the required threshold.
     #[error("Insufficient trust: {agent} has {actual}, needs {required}")]
@@ -2758,23 +3085,31 @@ pub enum IntegrationError {
 
     /// Error from privacy-preserving analytics.
     #[error("Privacy error: {0}")]
-    PrivacyError(/// Error description.
-        String),
+    PrivacyError(
+        /// Error description.
+        String,
+    ),
 
     /// Error during epistemic classification.
     #[error("Classification error: {0}")]
-    ClassificationError(/// Error description.
-        String),
+    ClassificationError(
+        /// Error description.
+        String,
+    ),
 
     /// Error during ZK proof generation or verification.
     #[error("ZK error: {0}")]
-    ZKError(/// Error description.
-        String),
+    ZKError(
+        /// Error description.
+        String,
+    ),
 
     /// Error due to insufficient Phi coherence.
     #[error("Phi coherence error: {0}")]
-    PhiCoherenceError(/// Error description.
-        String),
+    PhiCoherenceError(
+        /// Error description.
+        String,
+    ),
 }
 
 // ============================================================================
@@ -2817,7 +3152,9 @@ mod tests {
         pipeline.register_agent(agent1);
         pipeline.register_agent(agent2);
 
-        let result = pipeline.process_attestation("agent-1", "agent-2", 0.8).unwrap();
+        let result = pipeline
+            .process_attestation("agent-1", "agent-2", 0.8)
+            .unwrap();
 
         assert!(result.new_trust >= result.old_trust);
         assert!(result.new_kredit_cap > 0);
@@ -2855,7 +3192,11 @@ mod tests {
 
         let results = pipeline.verify_invariants();
         for result in &results {
-            assert!(result.holds, "Invariant {} should hold", result.invariant_id);
+            assert!(
+                result.holds,
+                "Invariant {} should hold",
+                result.invariant_id
+            );
         }
     }
 
@@ -2881,8 +3222,11 @@ mod tests {
         let result = result.unwrap();
         // DP noise (Laplace with epsilon_per_query=0.25) can significantly perturb
         // the private mean, so we only check that the result is finite.
-        assert!(result.distribution.mean.is_finite(),
-            "Private mean should be finite, got {}", result.distribution.mean);
+        assert!(
+            result.distribution.mean.is_finite(),
+            "Private mean should be finite, got {}",
+            result.distribution.mean
+        );
         assert!(result.remaining_budget.0 > 0.0);
     }
 
@@ -2907,10 +3251,8 @@ mod tests {
         let initial_trust = agent.k_vector.trust_score();
 
         for i in 0..5 {
-            let result = lifecycle.process_output(
-                &mut agent,
-                OutputContent::Text(format!("Output {}", i)),
-            );
+            let result =
+                lifecycle.process_output(&mut agent, OutputContent::Text(format!("Output {}", i)));
             assert!(result.is_ok());
         }
 
@@ -2926,10 +3268,9 @@ mod tests {
 
         let mut agent = lifecycle.create_agent("did:test:sponsor", AgentClass::Supervised);
 
-        let result = lifecycle.process_output(
-            &mut agent,
-            OutputContent::Text("Test output".to_string()),
-        ).unwrap();
+        let result = lifecycle
+            .process_output(&mut agent, OutputContent::Text("Test output".to_string()))
+            .unwrap();
 
         let initial_trust = agent.k_vector.trust_score();
 
@@ -2937,10 +3278,12 @@ mod tests {
         let trust_after_correct = agent.k_vector.trust_score();
         assert!(trust_after_correct > initial_trust);
 
-        let result2 = lifecycle.process_output(
-            &mut agent,
-            OutputContent::Text("Another output".to_string()),
-        ).unwrap();
+        let result2 = lifecycle
+            .process_output(
+                &mut agent,
+                OutputContent::Text("Another output".to_string()),
+            )
+            .unwrap();
 
         lifecycle.verify_output(&mut agent, &result2.output_id, false);
         let trust_after_incorrect = agent.k_vector.trust_score();
@@ -2960,7 +3303,8 @@ mod tests {
             dashboard: crate::agentic::dashboard::DashboardConfig::default(),
         };
         let mut privacy_analytics = IntegratedPrivacyAnalytics::new(privacy_config);
-        let epistemic_lifecycle = IntegratedEpistemicLifecycle::new(EpistemicLifecycleConfig::default());
+        let epistemic_lifecycle =
+            IntegratedEpistemicLifecycle::new(EpistemicLifecycleConfig::default());
 
         let agent1 = epistemic_lifecycle.create_agent("did:sponsor:1", AgentClass::Supervised);
         let agent2 = epistemic_lifecycle.create_agent("did:sponsor:2", AgentClass::Supervised);
@@ -2968,22 +3312,19 @@ mod tests {
         trust_pipeline.register_agent(agent1.clone());
         trust_pipeline.register_agent(agent2.clone());
 
-        let attest_result = trust_pipeline.process_attestation(
-            agent1.agent_id.as_str(),
-            agent2.agent_id.as_str(),
-            0.9,
-        ).unwrap();
+        let attest_result = trust_pipeline
+            .process_attestation(agent1.agent_id.as_str(), agent2.agent_id.as_str(), 0.9)
+            .unwrap();
 
-        let trust_scores: Vec<f64> = trust_pipeline.agents()
+        let trust_scores: Vec<f64> = trust_pipeline
+            .agents()
             .values()
             .map(|a| a.k_vector.trust_score() as f64)
             .collect();
 
-        let analytics_result = privacy_analytics.analyze_and_display(
-            &trust_scores,
-            &[0.7],
-            0.1,
-        ).unwrap();
+        let analytics_result = privacy_analytics
+            .analyze_and_display(&trust_scores, &[0.7], 0.1)
+            .unwrap();
 
         let invariant_results = trust_pipeline.verify_invariants();
 
@@ -3008,7 +3349,7 @@ mod tests {
         for i in 0..5 {
             let result = pipeline.evaluate_contribution(
                 &format!("matl-agent-{}", i),
-                0.8 - (i as f64 * 0.1),  // Varying quality
+                0.8 - (i as f64 * 0.1), // Varying quality
                 1.0,
             );
             assert!(result.is_ok());
@@ -3153,7 +3494,7 @@ mod tests {
         assert!(result.is_ok());
         let proof_result = result.unwrap();
         assert!(proof_result.summary.verified); // Proof is valid
-        assert!(!proof_result.summary.result);  // But statement is false
+        assert!(!proof_result.summary.result); // But statement is false
     }
 
     #[test]
@@ -3237,10 +3578,9 @@ mod tests {
         let mut proofs = Vec::new();
 
         for i in 0..5 {
-            let result = pipeline.generate_trust_proof(
-                &format!("agg-agent-{}", i),
-                statement.clone(),
-            ).unwrap();
+            let result = pipeline
+                .generate_trust_proof(&format!("agg-agent-{}", i), statement.clone())
+                .unwrap();
             proofs.push(result.proof);
         }
 
@@ -3274,10 +3614,9 @@ mod tests {
         let mut proofs = Vec::new();
 
         for i in 0..10 {
-            let result = pipeline.generate_trust_proof(
-                &format!("byz-agent-{}", i),
-                statement.clone(),
-            ).unwrap();
+            let result = pipeline
+                .generate_trust_proof(&format!("byz-agent-{}", i), statement.clone())
+                .unwrap();
             proofs.push(result.proof);
         }
 
@@ -3299,10 +3638,8 @@ mod tests {
             let agent = create_test_agent(&format!("health-agent-{}", i));
             pipeline.register_agent_with_commitment(agent);
 
-            let _ = pipeline.generate_trust_proof(
-                &format!("health-agent-{}", i),
-                ProofStatement::WellFormed,
-            );
+            let _ = pipeline
+                .generate_trust_proof(&format!("health-agent-{}", i), ProofStatement::WellFormed);
         }
 
         let health = pipeline.zk_network_health();
@@ -3321,10 +3658,7 @@ mod tests {
         let agent = create_test_agent("obs-agent");
         pipeline.register_agent_with_commitment(agent);
 
-        let _ = pipeline.generate_trust_proof(
-            "obs-agent",
-            ProofStatement::IsVerified,
-        );
+        let _ = pipeline.generate_trust_proof("obs-agent", ProofStatement::IsVerified);
 
         let health = pipeline.zk_network_health();
 
@@ -3348,8 +3682,10 @@ mod tests {
         // Generate multiple proofs
         let _ = pipeline.generate_trust_proof("history-agent", ProofStatement::WellFormed);
         let _ = pipeline.generate_trust_proof("history-agent", ProofStatement::IsVerified);
-        let _ = pipeline.generate_trust_proof("history-agent",
-            ProofStatement::TrustExceedsThreshold { threshold: 0.3 });
+        let _ = pipeline.generate_trust_proof(
+            "history-agent",
+            ProofStatement::TrustExceedsThreshold { threshold: 0.3 },
+        );
 
         let history = pipeline.proof_history();
         assert_eq!(history.len(), 3);
@@ -3427,15 +3763,25 @@ mod tests {
         // Output should have ZK proof attached
         assert!(output_result.output.has_proof);
         // Classification should be E3+ due to ZK proof
-        assert!(output_result.output.classification.empirical >= crate::epistemic::EmpiricalLevel::E3Cryptographic);
+        assert!(
+            output_result.output.classification.empirical
+                >= crate::epistemic::EmpiricalLevel::E3Cryptographic
+        );
         // Proof should be verified
         assert!(output_result.proof_summary.verified);
 
         // Agent's K-Vector should have been updated
-        let updated_agent = pipeline.matl_pipeline().trust_pipeline().get_agent("output-agent").unwrap();
+        let updated_agent = pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("output-agent")
+            .unwrap();
         // Delta was applied (trust should have changed slightly)
         let final_trust = updated_agent.k_vector.trust_score();
-        assert!(final_trust >= initial_trust, "Trust should increase with positive epistemic output");
+        assert!(
+            final_trust >= initial_trust,
+            "Trust should increase with positive epistemic output"
+        );
     }
 
     #[test]
@@ -3448,12 +3794,18 @@ mod tests {
 
         // Process multiple outputs
         let outputs = vec![
-            (OutputContent::Text("First verified claim".to_string()),
-             ProofStatement::WellFormed),
-            (OutputContent::Text("Second cryptographic proof".to_string()),
-             ProofStatement::IsVerified),
-            (OutputContent::Json(r#"{"proof": true, "data": "verified"}"#.to_string()),
-             ProofStatement::TrustExceedsThreshold { threshold: 0.4 }),
+            (
+                OutputContent::Text("First verified claim".to_string()),
+                ProofStatement::WellFormed,
+            ),
+            (
+                OutputContent::Text("Second cryptographic proof".to_string()),
+                ProofStatement::IsVerified,
+            ),
+            (
+                OutputContent::Json(r#"{"proof": true, "data": "verified"}"#.to_string()),
+                ProofStatement::TrustExceedsThreshold { threshold: 0.4 },
+            ),
         ];
 
         let results = pipeline.process_zk_output_batch("batch-agent", outputs);
@@ -3465,9 +3817,10 @@ mod tests {
         // All outputs should have proofs
         assert!(batch_results.iter().all(|r| r.output.has_proof));
         // All should be E3+
-        assert!(batch_results.iter().all(|r|
-            r.output.classification.empirical >= crate::epistemic::EmpiricalLevel::E3Cryptographic
-        ));
+        assert!(batch_results
+            .iter()
+            .all(|r| r.output.classification.empirical
+                >= crate::epistemic::EmpiricalLevel::E3Cryptographic));
     }
 
     #[test]
@@ -3479,11 +3832,14 @@ mod tests {
         pipeline.register_agent_with_commitment(agent);
 
         let content = OutputContent::Text(
-            "This is a foundational network-wide cryptographic proof with global consensus".to_string()
+            "This is a foundational network-wide cryptographic proof with global consensus"
+                .to_string(),
         );
         let statement = ProofStatement::TrustExceedsThreshold { threshold: 0.3 };
 
-        let result = pipeline.process_zk_output("delta-agent", content, statement).unwrap();
+        let result = pipeline
+            .process_zk_output("delta-agent", content, statement)
+            .unwrap();
 
         // High epistemic content should produce meaningful deltas
         assert!(result.kvector_delta.k_r_delta > 0.0);
@@ -3508,8 +3864,15 @@ mod tests {
         }
 
         // Check agent's output history
-        let agent = pipeline.matl_pipeline().trust_pipeline().get_agent("history-agent-2").unwrap();
-        assert!(agent.output_history.len() >= 3, "Agent should have recorded outputs");
+        let agent = pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("history-agent-2")
+            .unwrap();
+        assert!(
+            agent.output_history.len() >= 3,
+            "Agent should have recorded outputs"
+        );
     }
 
     // =========================================================================
@@ -3547,12 +3910,14 @@ mod tests {
         pipeline.register_agent_with_commitment(agent);
 
         // Should be able to generate proofs
-        let result = pipeline.check_phi_for_zk_operation("coherent-agent", ZKOperationType::GenerateProof);
+        let result =
+            pipeline.check_phi_for_zk_operation("coherent-agent", ZKOperationType::GenerateProof);
         assert!(result.is_ok());
         assert!(result.unwrap().permitted);
 
         // Should be able to participate in Byzantine consensus
-        let result = pipeline.check_phi_for_zk_operation("coherent-agent", ZKOperationType::ByzantineConsensus);
+        let result = pipeline
+            .check_phi_for_zk_operation("coherent-agent", ZKOperationType::ByzantineConsensus);
         assert!(result.is_ok());
         assert!(result.unwrap().permitted);
     }
@@ -3567,19 +3932,22 @@ mod tests {
         pipeline.register_agent_with_commitment(agent);
 
         // Should NOT be able to generate proofs
-        let result = pipeline.check_phi_for_zk_operation("degraded-agent", ZKOperationType::GenerateProof);
+        let result =
+            pipeline.check_phi_for_zk_operation("degraded-agent", ZKOperationType::GenerateProof);
         assert!(result.is_ok());
         let gating = result.unwrap();
         assert!(!gating.permitted);
         assert_eq!(gating.current_state, CoherenceState::Degraded);
 
         // Should NOT participate in Byzantine consensus
-        let result = pipeline.check_phi_for_zk_operation("degraded-agent", ZKOperationType::ByzantineConsensus);
+        let result = pipeline
+            .check_phi_for_zk_operation("degraded-agent", ZKOperationType::ByzantineConsensus);
         assert!(result.is_ok());
         assert!(!result.unwrap().permitted);
 
         // CAN verify proofs (low stakes)
-        let result = pipeline.check_phi_for_zk_operation("degraded-agent", ZKOperationType::VerifyProof);
+        let result =
+            pipeline.check_phi_for_zk_operation("degraded-agent", ZKOperationType::VerifyProof);
         assert!(result.is_ok());
         assert!(result.unwrap().permitted);
     }
@@ -3593,20 +3961,16 @@ mod tests {
         let coherent = create_agent_with_phi("coherent", 0.75);
         pipeline.register_agent_with_commitment(coherent);
 
-        let result = pipeline.generate_trust_proof_phi_gated(
-            "coherent",
-            ProofStatement::WellFormed,
-        );
+        let result =
+            pipeline.generate_trust_proof_phi_gated("coherent", ProofStatement::WellFormed);
         assert!(result.is_ok());
 
         // Critical agent cannot
         let critical = create_agent_with_phi("critical", 0.05);
         pipeline.register_agent_with_commitment(critical);
 
-        let result = pipeline.generate_trust_proof_phi_gated(
-            "critical",
-            ProofStatement::WellFormed,
-        );
+        let result =
+            pipeline.generate_trust_proof_phi_gated("critical", ProofStatement::WellFormed);
         assert!(result.is_err());
         match result.unwrap_err() {
             IntegrationError::PhiCoherenceError(_) => (),
@@ -3647,16 +4011,15 @@ mod tests {
         // Generate proofs from coherent agents
         let mut proofs = Vec::new();
         for agent_id in &["coherent-agg", "moderate-agg"] {
-            if let Ok(result) = pipeline.generate_trust_proof(*agent_id, ProofStatement::WellFormed) {
+            if let Ok(result) = pipeline.generate_trust_proof(*agent_id, ProofStatement::WellFormed)
+            {
                 proofs.push(result.proof);
             }
         }
 
         // Aggregation should filter out critical agent's proofs
-        let aggregate = pipeline.aggregate_trust_proofs_phi_filtered(
-            proofs,
-            ProofStatement::WellFormed,
-        );
+        let aggregate =
+            pipeline.aggregate_trust_proofs_phi_filtered(proofs, ProofStatement::WellFormed);
 
         // Should have some proofs included
         assert!(aggregate.total_count > 0);
@@ -3674,10 +4037,14 @@ mod tests {
         pipeline.register_agent_with_commitment(unstable);
 
         // Coherent can participate
-        assert!(pipeline.can_participate_in_byzantine_consensus("byz-coherent").unwrap());
+        assert!(pipeline
+            .can_participate_in_byzantine_consensus("byz-coherent")
+            .unwrap());
 
         // Unstable cannot
-        assert!(!pipeline.can_participate_in_byzantine_consensus("byz-unstable").unwrap());
+        assert!(!pipeline
+            .can_participate_in_byzantine_consensus("byz-unstable")
+            .unwrap());
     }
 
     #[test]
@@ -3734,20 +4101,22 @@ mod tests {
         let mut agent = create_agent_with_phi("update-test", 0.5);
         // Add some mock output history entries for Phi measurement
         for i in 0..5 {
-            agent.output_history.push(crate::agentic::OutputHistoryEntry {
-                output_id: format!("out-{}", i),
-                classification: crate::epistemic::EpistemicClassificationExtended::new(
-                    EmpiricalLevel::E2PrivateVerify,
-                    NormativeLevel::N1Communal,
-                    MaterialityLevel::M1Temporal,
-                    HarmonicLevel::H1Local,
-                ),
-                confidence: 0.8,
-                epistemic_weight: 0.5,
-                timestamp: 1000 + i * 100,
-                verified: false,
-                verification_outcome: None,
-            });
+            agent
+                .output_history
+                .push(crate::agentic::OutputHistoryEntry {
+                    output_id: format!("out-{}", i),
+                    classification: crate::epistemic::EpistemicClassificationExtended::new(
+                        EmpiricalLevel::E2PrivateVerify,
+                        NormativeLevel::N1Communal,
+                        MaterialityLevel::M1Temporal,
+                        HarmonicLevel::H1Local,
+                    ),
+                    confidence: 0.8,
+                    epistemic_weight: 0.5,
+                    timestamp: 1000 + i * 100,
+                    verified: false,
+                    verification_outcome: None,
+                });
         }
         pipeline.register_agent_with_commitment(agent);
 
@@ -3830,7 +4199,11 @@ mod tests {
         assert!(gis_result.guidance.requires_human());
 
         // Escalation should be pending on agent
-        let agent = pipeline.matl_pipeline().trust_pipeline().get_agent("high-uncertainty-agent").unwrap();
+        let agent = pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("high-uncertainty-agent")
+            .unwrap();
         assert!(!agent.pending_escalations.is_empty());
     }
 
@@ -3845,13 +4218,13 @@ mod tests {
 
         // High epistemic content (contains "proof", "cryptographic")
         let crypto_content = OutputContent::Text(
-            "This is a cryptographic proof with verifiable commitments".to_string()
+            "This is a cryptographic proof with verifiable commitments".to_string(),
         );
         let crypto_uncertainty = pipeline.infer_uncertainty_from_content(&crypto_content);
 
         // Foundational content with global impact
         let global_content = OutputContent::Text(
-            "This foundational change affects the entire network globally forever".to_string()
+            "This foundational change affects the entire network globally forever".to_string(),
         );
         let global_uncertainty = pipeline.infer_uncertainty_from_content(&global_content);
 
@@ -3872,22 +4245,22 @@ mod tests {
         pipeline.register_agent_with_commitment(agent);
 
         // Process with auto-inferred uncertainty
-        let content = OutputContent::Text("A moderate statement with some verifiable claims".to_string());
+        let content =
+            OutputContent::Text("A moderate statement with some verifiable claims".to_string());
         let statement = ProofStatement::WellFormed;
 
-        let result = pipeline.process_zk_output_auto_uncertainty(
-            "auto-unc-agent",
-            content,
-            statement,
-        );
+        let result =
+            pipeline.process_zk_output_auto_uncertainty("auto-unc-agent", content, statement);
 
         assert!(result.is_ok());
         let gis_result = result.unwrap();
 
         // Uncertainty should be inferred (not all zeros)
-        assert!(gis_result.uncertainty.epistemic > 0.0 ||
-                gis_result.uncertainty.axiological > 0.0 ||
-                gis_result.uncertainty.deontic > 0.0);
+        assert!(
+            gis_result.uncertainty.epistemic > 0.0
+                || gis_result.uncertainty.axiological > 0.0
+                || gis_result.uncertainty.deontic > 0.0
+        );
     }
 
     #[test]
@@ -3911,7 +4284,11 @@ mod tests {
         assert!(update2.total_calibration_events == 2);
 
         // Calibration score should be improving with good behavior
-        let agent = pipeline.matl_pipeline().trust_pipeline().get_agent("calibration-agent").unwrap();
+        let agent = pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("calibration-agent")
+            .unwrap();
         assert!(agent.uncertainty_calibration.calibration_score() > 0.0);
     }
 
@@ -3936,7 +4313,11 @@ mod tests {
         );
 
         // Verify escalation exists
-        let agent = pipeline.matl_pipeline().trust_pipeline().get_agent("resolve-agent").unwrap();
+        let agent = pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("resolve-agent")
+            .unwrap();
         assert!(!agent.pending_escalations.is_empty());
 
         // Resolve the escalation (sponsor approves)
@@ -3948,7 +4329,11 @@ mod tests {
         assert!(resolution.calibration_updated);
 
         // Escalation should be removed
-        let agent = pipeline.matl_pipeline().trust_pipeline().get_agent("resolve-agent").unwrap();
+        let agent = pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("resolve-agent")
+            .unwrap();
         assert!(agent.pending_escalations.is_empty());
     }
 
@@ -3971,7 +4356,10 @@ mod tests {
         assert!(result.is_ok());
         let combined = result.unwrap();
         assert!(combined.permitted);
-        assert_eq!(combined.recommendation, CombinedGatingRecommendation::Proceed);
+        assert_eq!(
+            combined.recommendation,
+            CombinedGatingRecommendation::Proceed
+        );
         assert!(!combined.requires_escalation);
 
         // Low coherence -> wait for coherence
@@ -3987,7 +4375,10 @@ mod tests {
         assert!(result.is_ok());
         let combined = result.unwrap();
         assert!(!combined.permitted);
-        assert_eq!(combined.recommendation, CombinedGatingRecommendation::WaitForCoherence);
+        assert_eq!(
+            combined.recommendation,
+            CombinedGatingRecommendation::WaitForCoherence
+        );
 
         // High coherence, high uncertainty -> escalate
         let high_uncertainty = MoralUncertainty::new(0.9, 0.9, 0.9);
@@ -4001,7 +4392,10 @@ mod tests {
         let combined = result.unwrap();
         assert!(!combined.permitted);
         assert!(combined.requires_escalation);
-        assert_eq!(combined.recommendation, CombinedGatingRecommendation::EscalateForUncertainty);
+        assert_eq!(
+            combined.recommendation,
+            CombinedGatingRecommendation::EscalateForUncertainty
+        );
     }
 
     #[test]
@@ -4013,10 +4407,10 @@ mod tests {
         pipeline.register_agent_with_commitment(agent);
 
         // Record some outcomes
-        let _ = pipeline.record_gis_outcome("summary-agent", true, true);   // Appropriate uncertainty
-        let _ = pipeline.record_gis_outcome("summary-agent", false, true);  // Appropriate confidence
+        let _ = pipeline.record_gis_outcome("summary-agent", true, true); // Appropriate uncertainty
+        let _ = pipeline.record_gis_outcome("summary-agent", false, true); // Appropriate confidence
         let _ = pipeline.record_gis_outcome("summary-agent", false, false); // Overconfident
-        let _ = pipeline.record_gis_outcome("summary-agent", true, false);  // Overcautious
+        let _ = pipeline.record_gis_outcome("summary-agent", true, false); // Overcautious
 
         let summary = pipeline.get_calibration_summary("summary-agent");
         assert!(summary.is_ok());
@@ -4044,10 +4438,12 @@ mod tests {
             if i < 2 {
                 // Overconfident: confident but wrong (need > 10 events with more wrong than right)
                 for _ in 0..8 {
-                    let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), false, false);
+                    let _ =
+                        pipeline.record_gis_outcome(&format!("health-agent-{}", i), false, false);
                 }
                 for _ in 0..3 {
-                    let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), false, true);
+                    let _ =
+                        pipeline.record_gis_outcome(&format!("health-agent-{}", i), false, true);
                 }
             } else if i < 4 {
                 // Well-calibrated: mix of appropriate outcomes
@@ -4055,12 +4451,14 @@ mod tests {
                     let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), true, true);
                 }
                 for _ in 0..6 {
-                    let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), false, true);
+                    let _ =
+                        pipeline.record_gis_outcome(&format!("health-agent-{}", i), false, true);
                 }
             } else {
                 // Overcautious: uncertain when shouldn't be (but threshold requires 10 events)
                 for _ in 0..8 {
-                    let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), true, false);
+                    let _ =
+                        pipeline.record_gis_outcome(&format!("health-agent-{}", i), true, false);
                 }
                 for _ in 0..3 {
                     let _ = pipeline.record_gis_outcome(&format!("health-agent-{}", i), true, true);
@@ -4115,12 +4513,9 @@ mod tests {
         let statement = ProofStatement::WellFormed;
         let uncertainty = MoralUncertainty::new(0.9, 0.85, 0.9);
 
-        let result = pipeline.process_zk_output_with_uncertainty(
-            "esc-obs-agent",
-            content,
-            statement,
-            uncertainty,
-        ).unwrap();
+        let result = pipeline
+            .process_zk_output_with_uncertainty("esc-obs-agent", content, statement, uncertainty)
+            .unwrap();
 
         // Export the escalation
         if let Some(ref escalation) = result.escalation {

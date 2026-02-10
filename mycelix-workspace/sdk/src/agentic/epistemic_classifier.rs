@@ -13,8 +13,8 @@
 //! - High M-level outputs have longer-lasting trust implications
 
 use crate::epistemic::{
-    EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-    EpistemicClassificationExtended,
+    EmpiricalLevel, EpistemicClassificationExtended, HarmonicLevel, MaterialityLevel,
+    NormativeLevel,
 };
 use serde::{Deserialize, Serialize};
 
@@ -242,7 +242,10 @@ pub fn create_classified_output(
         hints.relevance_duration.is_some(),
         hints.affected_harmonies_count > 0,
         hints.civilizational_scope,
-    ].iter().filter(|&&x| x).count();
+    ]
+    .iter()
+    .filter(|&&x| x)
+    .count();
 
     let classification_confidence = (hints_provided as f32 / 8.0).max(0.3);
 
@@ -296,7 +299,13 @@ impl AgentOutputBuilder {
     }
 
     /// Set explicit classification
-    pub fn classification(mut self, e: EmpiricalLevel, n: NormativeLevel, m: MaterialityLevel, h: HarmonicLevel) -> Self {
+    pub fn classification(
+        mut self,
+        e: EmpiricalLevel,
+        n: NormativeLevel,
+        m: MaterialityLevel,
+        h: HarmonicLevel,
+    ) -> Self {
         self.classification = Some(EpistemicClassificationExtended::new(e, n, m, h));
         self
     }
@@ -377,7 +386,8 @@ impl EpistemicStats {
 
     /// Get dominant empirical level
     pub fn dominant_empirical(&self) -> EmpiricalLevel {
-        let max_idx = self.empirical_distribution
+        let max_idx = self
+            .empirical_distribution
             .iter()
             .enumerate()
             .max_by_key(|(_, &count)| count)
@@ -401,17 +411,21 @@ impl EpistemicStats {
         }
 
         // Weight toward higher E and N levels
-        let e_score: f32 = self.empirical_distribution
+        let e_score: f32 = self
+            .empirical_distribution
             .iter()
             .enumerate()
             .map(|(i, &count)| (i as f32 / 4.0) * count as f32)
-            .sum::<f32>() / self.total_outputs as f32;
+            .sum::<f32>()
+            / self.total_outputs as f32;
 
-        let n_score: f32 = self.normative_distribution
+        let n_score: f32 = self
+            .normative_distribution
             .iter()
             .enumerate()
             .map(|(i, &count)| (i as f32 / 3.0) * count as f32)
-            .sum::<f32>() / self.total_outputs as f32;
+            .sum::<f32>()
+            / self.total_outputs as f32;
 
         (e_score + n_score) / 2.0
     }
@@ -437,20 +451,47 @@ impl Default for ContentAnalyzer {
     fn default() -> Self {
         Self {
             crypto_keywords: vec![
-                "proof", "zkp", "zero-knowledge", "signature", "hash", "merkle",
-                "commitment", "attestation", "cryptographic", "verified",
+                "proof",
+                "zkp",
+                "zero-knowledge",
+                "signature",
+                "hash",
+                "merkle",
+                "commitment",
+                "attestation",
+                "cryptographic",
+                "verified",
             ],
             public_data_keywords: vec![
-                "public", "blockchain", "on-chain", "ledger", "published",
-                "reproducible", "open-source", "transparent",
+                "public",
+                "blockchain",
+                "on-chain",
+                "ledger",
+                "published",
+                "reproducible",
+                "open-source",
+                "transparent",
             ],
             network_scope_keywords: vec![
-                "network", "global", "consensus", "protocol", "constitutional",
-                "governance", "axiomatic", "universal",
+                "network",
+                "global",
+                "consensus",
+                "protocol",
+                "constitutional",
+                "governance",
+                "axiomatic",
+                "universal",
             ],
             foundational_keywords: vec![
-                "foundational", "permanent", "immutable", "forever", "constitutional",
-                "core", "fundamental", "persistent", "archival",
+                "foundational",
+                "permanent",
+                "immutable",
+                "forever",
+                "constitutional",
+                "core",
+                "fundamental",
+                "persistent",
+                "archival",
             ],
         }
     }
@@ -461,16 +502,21 @@ impl ContentAnalyzer {
     pub fn analyze_text(&self, text: &str) -> ClassificationHints {
         let lower = text.to_lowercase();
 
-        let has_crypto_proof = self.crypto_keywords.iter()
+        let has_crypto_proof = self.crypto_keywords.iter().any(|kw| lower.contains(kw));
+
+        let uses_public_data = self
+            .public_data_keywords
+            .iter()
             .any(|kw| lower.contains(kw));
 
-        let uses_public_data = self.public_data_keywords.iter()
+        let is_network_scope = self
+            .network_scope_keywords
+            .iter()
             .any(|kw| lower.contains(kw));
 
-        let is_network_scope = self.network_scope_keywords.iter()
-            .any(|kw| lower.contains(kw));
-
-        let is_foundational = self.foundational_keywords.iter()
+        let is_foundational = self
+            .foundational_keywords
+            .iter()
             .any(|kw| lower.contains(kw));
 
         // Determine agreement scope
@@ -501,13 +547,18 @@ impl ContentAnalyzer {
             lower.contains("local") || lower.contains("community"),
             lower.contains("network") || lower.contains("global"),
             lower.contains("civilization") || lower.contains("humanity"),
-        ].iter().filter(|&&x| x).count();
+        ]
+        .iter()
+        .filter(|&&x| x)
+        .count();
 
         ClassificationHints {
             has_crypto_proof,
             uses_public_data,
             third_party_verified: lower.contains("verified") || lower.contains("audited"),
-            is_personal_opinion: lower.contains("opinion") || lower.contains("believe") || lower.contains("think"),
+            is_personal_opinion: lower.contains("opinion")
+                || lower.contains("believe")
+                || lower.contains("think"),
             agreement_scope,
             relevance_duration,
             affected_harmonies_count,
@@ -523,10 +574,14 @@ impl ContentAnalyzer {
                 || value.get("signature").is_some()
                 || value.get("attestation").is_some();
 
-            let is_public = value.get("public").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false)
+            let is_public = value
+                .get("public")
+                .map(|v| v.as_bool().unwrap_or(false))
+                .unwrap_or(false)
                 || value.get("published").is_some();
 
-            let scope_str = value.get("scope")
+            let scope_str = value
+                .get("scope")
                 .and_then(|v| v.as_str())
                 .unwrap_or("personal");
 
@@ -537,7 +592,8 @@ impl ContentAnalyzer {
                 _ => Some(AgreementScope::Self_),
             };
 
-            let retention_str = value.get("retention")
+            let retention_str = value
+                .get("retention")
                 .and_then(|v| v.as_str())
                 .unwrap_or("ephemeral");
 
@@ -551,14 +607,24 @@ impl ContentAnalyzer {
             ClassificationHints {
                 has_crypto_proof: has_proof,
                 uses_public_data: is_public,
-                third_party_verified: value.get("verified").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false),
-                is_personal_opinion: value.get("type").map(|v| v.as_str() == Some("opinion")).unwrap_or(false),
+                third_party_verified: value
+                    .get("verified")
+                    .map(|v| v.as_bool().unwrap_or(false))
+                    .unwrap_or(false),
+                is_personal_opinion: value
+                    .get("type")
+                    .map(|v| v.as_str() == Some("opinion"))
+                    .unwrap_or(false),
                 agreement_scope,
                 relevance_duration,
-                affected_harmonies_count: value.get("harmonics_affected")
+                affected_harmonies_count: value
+                    .get("harmonics_affected")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as usize,
-                civilizational_scope: value.get("civilizational").map(|v| v.as_bool().unwrap_or(false)).unwrap_or(false),
+                civilizational_scope: value
+                    .get("civilizational")
+                    .map(|v| v.as_bool().unwrap_or(false))
+                    .unwrap_or(false),
             }
         } else {
             // Fall back to text analysis if JSON parsing fails
@@ -580,7 +646,9 @@ impl ContentAnalyzer {
                     ..Default::default()
                 }
             }
-            OutputContent::ActionResult { success, details, .. } => {
+            OutputContent::ActionResult {
+                success, details, ..
+            } => {
                 let mut hints = self.analyze_text(details);
                 // Successful actions are more trustworthy
                 if *success {
@@ -588,13 +656,13 @@ impl ContentAnalyzer {
                 }
                 hints
             }
-            OutputContent::Analysis { findings, recommendations, .. } => {
+            OutputContent::Analysis {
+                findings,
+                recommendations,
+                ..
+            } => {
                 // Combine analysis of findings and recommendations
-                let all_text = format!(
-                    "{} {}",
-                    findings.join(" "),
-                    recommendations.join(" ")
-                );
+                let all_text = format!("{} {}", findings.join(" "), recommendations.join(" "));
                 self.analyze_text(&all_text)
             }
         }
@@ -612,7 +680,7 @@ pub fn auto_classify(content: &OutputContent) -> EpistemicClassificationExtended
 // ZK-Aware Classification
 // =============================================================================
 
-use crate::agentic::zk_trust::{TrustProof, ProofStatement};
+use crate::agentic::zk_trust::{ProofStatement, TrustProof};
 
 /// ZK-enhanced epistemic classifier
 ///
@@ -621,7 +689,6 @@ use crate::agentic::zk_trust::{TrustProof, ProofStatement};
 pub struct ZKEpistemicClassifier {
     content_analyzer: ContentAnalyzer,
 }
-
 
 impl ZKEpistemicClassifier {
     /// Create a new ZK-aware classifier
@@ -665,8 +732,9 @@ impl ZKEpistemicClassifier {
         }
 
         // ZK proofs are typically persistent evidence
-        if hints.relevance_duration.is_none() ||
-           matches!(hints.relevance_duration, Some(RelevanceDuration::Ephemeral)) {
+        if hints.relevance_duration.is_none()
+            || matches!(hints.relevance_duration, Some(RelevanceDuration::Ephemeral))
+        {
             hints.relevance_duration = Some(RelevanceDuration::MediumTerm);
         }
 
@@ -746,9 +814,9 @@ pub fn compute_kvector_delta_from_epistemic(
     let weight = calculate_epistemic_weight(classification);
 
     KVectorDelta {
-        k_r_delta: base_delta * weight * 0.5,  // Reputation
-        k_p_delta: base_delta * weight * 0.3,  // Performance
-        k_h_delta: base_delta * weight * 0.2,  // Historical
+        k_r_delta: base_delta * weight * 0.5, // Reputation
+        k_p_delta: base_delta * weight * 0.3, // Performance
+        k_h_delta: base_delta * weight * 0.2, // Historical
         // Higher E-level increases verification status slightly
         k_v_delta: if classification.empirical >= EmpiricalLevel::E3Cryptographic {
             base_delta * 0.1
@@ -924,7 +992,8 @@ mod tests {
     fn test_content_analyzer_crypto_keywords() {
         let analyzer = ContentAnalyzer::default();
 
-        let crypto_text = "This claim is backed by a zero-knowledge proof and cryptographic signature";
+        let crypto_text =
+            "This claim is backed by a zero-knowledge proof and cryptographic signature";
         let hints = analyzer.analyze_text(crypto_text);
 
         assert!(hints.has_crypto_proof);
@@ -972,7 +1041,10 @@ mod tests {
         // Medium-term (archive keyword without foundational keywords)
         let archive_text = "Archive this data for later retrieval";
         let hints = analyzer.analyze_text(archive_text);
-        assert_eq!(hints.relevance_duration, Some(RelevanceDuration::MediumTerm));
+        assert_eq!(
+            hints.relevance_duration,
+            Some(RelevanceDuration::MediumTerm)
+        );
 
         // Temporal
         let temporal_text = "This is valid for the current session only";
@@ -997,7 +1069,8 @@ mod tests {
     fn test_auto_classify() {
         // High epistemic content
         let content = OutputContent::Text(
-            "This cryptographic proof is published on blockchain for global network verification".to_string()
+            "This cryptographic proof is published on blockchain for global network verification"
+                .to_string(),
         );
         let class = auto_classify(&content);
 

@@ -34,8 +34,8 @@ mod tests {
 
         // Export MATL types
         use crate::matl::{
-            KVector, KVectorWeights, KVectorDimension, GovernanceTier,
-            ProofOfGradientQuality, RoundState, VoteType, Vote,
+            GovernanceTier, KVector, KVectorDimension, KVectorWeights, ProofOfGradientQuality,
+            RoundState, Vote, VoteType,
         };
 
         KVector::export_all().expect("Failed to export KVector");
@@ -49,8 +49,8 @@ mod tests {
 
         // Export Epistemic types
         use crate::epistemic::{
-            EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-            EpistemicClassification, EpistemicClassificationExtended,
+            EmpiricalLevel, EpistemicClassification, EpistemicClassificationExtended,
+            HarmonicLevel, MaterialityLevel, NormativeLevel,
         };
 
         EmpiricalLevel::export_all().expect("Failed to export EmpiricalLevel");
@@ -58,12 +58,13 @@ mod tests {
         MaterialityLevel::export_all().expect("Failed to export MaterialityLevel");
         HarmonicLevel::export_all().expect("Failed to export HarmonicLevel");
         EpistemicClassification::export_all().expect("Failed to export EpistemicClassification");
-        EpistemicClassificationExtended::export_all().expect("Failed to export EpistemicClassificationExtended");
+        EpistemicClassificationExtended::export_all()
+            .expect("Failed to export EpistemicClassificationExtended");
 
         // Export DKG types
         use crate::dkg::{
-            EpistemicType, URI, TripleValue, VerifiableTriple, StoredTriple, DKGConfig,
-            ConfidenceScore, ConfidenceFactors, ConfidenceThresholds,
+            ConfidenceFactors, ConfidenceScore, ConfidenceThresholds, DKGConfig, EpistemicType,
+            StoredTriple, TripleValue, VerifiableTriple, URI,
         };
 
         EpistemicType::export_all().expect("Failed to export EpistemicType");
@@ -79,13 +80,18 @@ mod tests {
         // Export Agentic types (MIP-E-004: Epistemic-Aware AI Agency)
         // Note: Only exporting self-contained API types to avoid dependency cascades
         use crate::agentic::{
-            // GIS integration (Graceful Ignorance System)
-            MoralUncertaintyType, MoralActionGuidance,
-            // Gaming detection
-            GamingAttackType, GamingResponse,
             // API types (self-contained)
-            ApiError, KVectorValues,
-            EscalationSummary, EscalationResolutionResponse, CalibrationSummary,
+            ApiError,
+            CalibrationSummary,
+            EscalationResolutionResponse,
+            EscalationSummary,
+            // Gaming detection
+            GamingAttackType,
+            GamingResponse,
+            KVectorValues,
+            MoralActionGuidance,
+            // GIS integration (Graceful Ignorance System)
+            MoralUncertaintyType,
         };
 
         MoralUncertaintyType::export_all().expect("Failed to export MoralUncertaintyType");
@@ -95,7 +101,8 @@ mod tests {
         ApiError::export_all().expect("Failed to export ApiError");
         KVectorValues::export_all().expect("Failed to export KVectorValues");
         EscalationSummary::export_all().expect("Failed to export EscalationSummary");
-        EscalationResolutionResponse::export_all().expect("Failed to export EscalationResolutionResponse");
+        EscalationResolutionResponse::export_all()
+            .expect("Failed to export EscalationResolutionResponse");
         CalibrationSummary::export_all().expect("Failed to export CalibrationSummary");
 
         // Print summary
@@ -110,7 +117,9 @@ mod tests {
         println!("  MATL: KVector, KVectorWeights, KVectorDimension, GovernanceTier,");
         println!("        ProofOfGradientQuality, RoundState, VoteType, Vote");
         println!("  Epistemic: EmpiricalLevel, NormativeLevel, MaterialityLevel,");
-        println!("             HarmonicLevel, EpistemicClassification, EpistemicClassificationExtended");
+        println!(
+            "             HarmonicLevel, EpistemicClassification, EpistemicClassificationExtended"
+        );
         println!("  DKG: EpistemicType, URI, TripleValue, VerifiableTriple, StoredTriple,");
         println!("       DKGConfig, ConfidenceScore, ConfidenceFactors, ConfidenceThresholds");
         println!("  Agentic: MoralUncertaintyType, MoralActionGuidance, GamingAttackType,");

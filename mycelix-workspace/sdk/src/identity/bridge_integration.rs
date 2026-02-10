@@ -58,9 +58,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::webauthn::{
-    WebAuthnCredential, WebAuthnService, WebAuthnError, WebAuthnConfig,
-    AuthenticationChallenge, AuthenticationResponse, AuthenticationResult,
-    RegistrationChallenge, RegistrationResponse, UserVerification,
+    AuthenticationChallenge, AuthenticationResponse, AuthenticationResult, RegistrationChallenge,
+    RegistrationResponse, UserVerification, WebAuthnConfig, WebAuthnCredential, WebAuthnError,
+    WebAuthnService,
 };
 
 // ============================================================================
@@ -107,9 +107,18 @@ impl std::fmt::Display for BridgeError {
         match self {
             Self::WebAuthn(e) => write!(f, "WebAuthn error: {}", e),
             Self::AgentNotFound(id) => write!(f, "Agent not found: {:?}", id),
-            Self::NoHardwareKeys(id) => write!(f, "No hardware keys registered for agent: {:?}", id),
-            Self::HardwareKeyNotFound { agent_id, credential_id } => {
-                write!(f, "Hardware key {:?} not found for agent {:?}", credential_id, agent_id)
+            Self::NoHardwareKeys(id) => {
+                write!(f, "No hardware keys registered for agent: {:?}", id)
+            }
+            Self::HardwareKeyNotFound {
+                agent_id,
+                credential_id,
+            } => {
+                write!(
+                    f,
+                    "Hardware key {:?} not found for agent {:?}",
+                    credential_id, agent_id
+                )
             }
             Self::MaxKeysExceeded { agent_id, max } => {
                 write!(f, "Maximum {} keys exceeded for agent {:?}", max, agent_id)
@@ -309,10 +318,12 @@ impl HardwareKeyBridge {
         }
 
         // Get existing credential IDs to exclude
-        let exclude_ids: Vec<Vec<u8>> = self.bindings
+        let exclude_ids: Vec<Vec<u8>> = self
+            .bindings
             .get(agent_id)
             .map(|bindings| {
-                bindings.iter()
+                bindings
+                    .iter()
                     .map(|b| b.credential.credential_id.clone())
                     .collect()
             })
@@ -329,7 +340,8 @@ impl HardwareKeyBridge {
         )?;
 
         // Store pending registration
-        self.pending_registrations.insert(agent_id.to_vec(), challenge.clone());
+        self.pending_registrations
+            .insert(agent_id.to_vec(), challenge.clone());
 
         Ok(challenge)
     }
@@ -348,7 +360,8 @@ impl HardwareKeyBridge {
         response: &RegistrationResponse,
     ) -> Result<WebAuthnCredential, BridgeError> {
         // Get pending challenge
-        let challenge = self.pending_registrations
+        let challenge = self
+            .pending_registrations
             .remove(agent_id)
             .ok_or_else(|| BridgeError::InternalError("No pending registration".to_string()))?;
 
@@ -356,7 +369,11 @@ impl HardwareKeyBridge {
         let credential = self.webauthn.verify_registration(&challenge, response)?;
 
         // Determine if this is the primary key
-        let is_primary = self.bindings.get(agent_id).map(|b| b.is_empty()).unwrap_or(true);
+        let is_primary = self
+            .bindings
+            .get(agent_id)
+            .map(|b| b.is_empty())
+            .unwrap_or(true);
 
         // Create binding
         let binding = HardwareKeyBinding::new(credential.clone(), is_primary);
@@ -386,12 +403,21 @@ impl HardwareKeyBridge {
             }
 
             // Check for duplicate credential ID
-            if existing.iter().any(|b| b.credential.credential_id == credential.credential_id) {
-                return Err(BridgeError::WebAuthn(WebAuthnError::CredentialAlreadyRegistered));
+            if existing
+                .iter()
+                .any(|b| b.credential.credential_id == credential.credential_id)
+            {
+                return Err(BridgeError::WebAuthn(
+                    WebAuthnError::CredentialAlreadyRegistered,
+                ));
             }
         }
 
-        let is_primary = self.bindings.get(agent_id).map(|b| b.is_empty()).unwrap_or(true);
+        let is_primary = self
+            .bindings
+            .get(agent_id)
+            .map(|b| b.is_empty())
+            .unwrap_or(true);
         let binding = HardwareKeyBinding::new(credential, is_primary);
 
         self.bindings
@@ -418,7 +444,8 @@ impl HardwareKeyBridge {
         agent_id: &[u8],
     ) -> Result<AuthenticationChallenge, BridgeError> {
         // Get agent's credential IDs
-        let credential_ids: Vec<Vec<u8>> = self.bindings
+        let credential_ids: Vec<Vec<u8>> = self
+            .bindings
             .get(agent_id)
             .ok_or_else(|| BridgeError::NoHardwareKeys(agent_id.to_vec()))?
             .iter()
@@ -436,13 +463,13 @@ impl HardwareKeyBridge {
             UserVerification::Preferred
         };
 
-        let challenge = self.webauthn.create_authentication_challenge_with_options(
-            &credential_ids,
-            user_verification,
-        )?;
+        let challenge = self
+            .webauthn
+            .create_authentication_challenge_with_options(&credential_ids, user_verification)?;
 
         // Store pending authentication
-        self.pending_authentications.insert(agent_id.to_vec(), challenge.clone());
+        self.pending_authentications
+            .insert(agent_id.to_vec(), challenge.clone());
 
         Ok(challenge)
     }
@@ -461,12 +488,14 @@ impl HardwareKeyBridge {
         response: &AuthenticationResponse,
     ) -> Result<AuthenticationResult, BridgeError> {
         // Get pending challenge
-        let challenge = self.pending_authentications
+        let challenge = self
+            .pending_authentications
             .remove(agent_id)
             .ok_or_else(|| BridgeError::InternalError("No pending authentication".to_string()))?;
 
         // Find the credential
-        let bindings = self.bindings
+        let bindings = self
+            .bindings
             .get_mut(agent_id)
             .ok_or_else(|| BridgeError::NoHardwareKeys(agent_id.to_vec()))?;
 
@@ -479,11 +508,9 @@ impl HardwareKeyBridge {
             })?;
 
         // Verify authentication
-        let result = self.webauthn.verify_authentication(
-            &challenge,
-            response,
-            &binding.credential,
-        )?;
+        let result =
+            self.webauthn
+                .verify_authentication(&challenge, response, &binding.credential)?;
 
         // Update binding
         binding.record_use(result.new_sign_count);
@@ -499,9 +526,7 @@ impl HardwareKeyBridge {
     pub fn get_status(&self, agent_id: &[u8]) -> Option<HardwareKeyStatus> {
         self.bindings.get(agent_id).map(|bindings| {
             let total_authentications: u64 = bindings.iter().map(|b| b.use_count).sum();
-            let last_authenticated = bindings.iter()
-                .filter_map(|b| b.last_used)
-                .max();
+            let last_authenticated = bindings.iter().filter_map(|b| b.last_used).max();
             let has_primary = bindings.iter().any(|b| b.is_primary);
 
             HardwareKeyStatus {
@@ -550,7 +575,8 @@ impl HardwareKeyBridge {
         agent_id: &[u8],
         credential_id: &[u8],
     ) -> Result<WebAuthnCredential, BridgeError> {
-        let bindings = self.bindings
+        let bindings = self
+            .bindings
             .get_mut(agent_id)
             .ok_or_else(|| BridgeError::NoHardwareKeys(agent_id.to_vec()))?;
 
@@ -583,7 +609,8 @@ impl HardwareKeyBridge {
         agent_id: &[u8],
         credential_id: &[u8],
     ) -> Result<(), BridgeError> {
-        let bindings = self.bindings
+        let bindings = self
+            .bindings
             .get_mut(agent_id)
             .ok_or_else(|| BridgeError::NoHardwareKeys(agent_id.to_vec()))?;
 
@@ -695,8 +722,12 @@ mod tests {
         let agent_id = b"agent123".to_vec();
 
         // Bind up to limit
-        bridge.bind_hardware_key(&agent_id, create_test_credential(1)).unwrap();
-        bridge.bind_hardware_key(&agent_id, create_test_credential(2)).unwrap();
+        bridge
+            .bind_hardware_key(&agent_id, create_test_credential(1))
+            .unwrap();
+        bridge
+            .bind_hardware_key(&agent_id, create_test_credential(2))
+            .unwrap();
 
         // Should fail on third key
         let result = bridge.bind_hardware_key(&agent_id, create_test_credential(3));
@@ -708,8 +739,12 @@ mod tests {
         let mut bridge = create_test_bridge();
         let agent_id = b"agent123".to_vec();
 
-        bridge.bind_hardware_key(&agent_id, create_test_credential(1)).unwrap();
-        bridge.bind_hardware_key(&agent_id, create_test_credential(2)).unwrap();
+        bridge
+            .bind_hardware_key(&agent_id, create_test_credential(1))
+            .unwrap();
+        bridge
+            .bind_hardware_key(&agent_id, create_test_credential(2))
+            .unwrap();
 
         // Remove first key
         let removed = bridge.unbind_hardware_key(&agent_id, &vec![1, 1, 2, 3]);
@@ -727,8 +762,12 @@ mod tests {
         let mut bridge = create_test_bridge();
         let agent_id = b"agent123".to_vec();
 
-        bridge.bind_hardware_key(&agent_id, create_test_credential(1)).unwrap();
-        bridge.bind_hardware_key(&agent_id, create_test_credential(2)).unwrap();
+        bridge
+            .bind_hardware_key(&agent_id, create_test_credential(1))
+            .unwrap();
+        bridge
+            .bind_hardware_key(&agent_id, create_test_credential(2))
+            .unwrap();
 
         // Set second key as primary
         assert!(bridge.set_primary_key(&agent_id, &vec![2, 1, 2, 3]).is_ok());
@@ -766,7 +805,9 @@ mod tests {
         let mut bridge = create_test_bridge();
         let agent_id = b"agent123".to_vec();
 
-        bridge.bind_hardware_key(&agent_id, create_test_credential(1)).unwrap();
+        bridge
+            .bind_hardware_key(&agent_id, create_test_credential(1))
+            .unwrap();
 
         let challenge = bridge.start_authentication(&agent_id);
         assert!(challenge.is_ok());
@@ -783,7 +824,12 @@ mod tests {
 
         assert!(bridge.bind_hardware_key(&agent_id, cred.clone()).is_ok());
         let result = bridge.bind_hardware_key(&agent_id, cred);
-        assert!(matches!(result, Err(BridgeError::WebAuthn(WebAuthnError::CredentialAlreadyRegistered))));
+        assert!(matches!(
+            result,
+            Err(BridgeError::WebAuthn(
+                WebAuthnError::CredentialAlreadyRegistered
+            ))
+        ));
     }
 
     #[test]
@@ -794,7 +840,9 @@ mod tests {
         // No status before binding
         assert!(bridge.get_status(&agent_id).is_none());
 
-        bridge.bind_hardware_key(&agent_id, create_test_credential(1)).unwrap();
+        bridge
+            .bind_hardware_key(&agent_id, create_test_credential(1))
+            .unwrap();
 
         let status = bridge.get_status(&agent_id).unwrap();
         assert_eq!(status.key_count, 1);

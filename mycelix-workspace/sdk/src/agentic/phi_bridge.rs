@@ -27,7 +27,7 @@
 //! - `Degraded` (0.1-0.3): Monitoring required
 //! - `Critical` (< 0.1): Agent suspended
 
-use super::epistemic_classifier::{AgentOutput, calculate_epistemic_weight};
+use super::epistemic_classifier::{calculate_epistemic_weight, AgentOutput};
 use serde::{Deserialize, Serialize};
 
 /// Coherence thresholds for agent behavior gating
@@ -167,21 +167,19 @@ impl Default for PhiMeasurementConfig {
 ///
 /// For production use with the full HypervectorPhiMeasurer, see the
 /// integration module in mycelix-math.
-pub fn measure_phi_simple(outputs: &[AgentOutput], config: &PhiMeasurementConfig) -> Option<AgentPhiResult> {
+pub fn measure_phi_simple(
+    outputs: &[AgentOutput],
+    config: &PhiMeasurementConfig,
+) -> Option<AgentPhiResult> {
     if outputs.len() < config.min_outputs {
         return None;
     }
 
     // Take most recent outputs up to max
-    let recent: Vec<_> = outputs.iter()
-        .rev()
-        .take(config.max_outputs)
-        .collect();
+    let recent: Vec<_> = outputs.iter().rev().take(config.max_outputs).collect();
 
     // Convert to vectors
-    let vectors: Vec<Vec<f64>> = recent.iter()
-        .map(|o| output_to_vector(o))
-        .collect();
+    let vectors: Vec<Vec<f64>> = recent.iter().map(|o| output_to_vector(o)).collect();
 
     // Calculate pairwise cosine similarities
     let n = vectors.len();
@@ -204,18 +202,26 @@ pub fn measure_phi_simple(outputs: &[AgentOutput], config: &PhiMeasurementConfig
     };
 
     // Calculate per-output contributions
-    let output_contributions: Vec<f64> = vectors.iter().enumerate().map(|(i, v)| {
-        // Contribution = average similarity to other vectors
-        let mut contrib = 0.0;
-        let mut count = 0;
-        for (j, other) in vectors.iter().enumerate() {
-            if i != j {
-                contrib += cosine_similarity(v, other).max(0.0);
-                count += 1;
+    let output_contributions: Vec<f64> = vectors
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            // Contribution = average similarity to other vectors
+            let mut contrib = 0.0;
+            let mut count = 0;
+            for (j, other) in vectors.iter().enumerate() {
+                if i != j {
+                    contrib += cosine_similarity(v, other).max(0.0);
+                    count += 1;
+                }
             }
-        }
-        if count > 0 { contrib / count as f64 } else { 0.0 }
-    }).collect();
+            if count > 0 {
+                contrib / count as f64
+            } else {
+                0.0
+            }
+        })
+        .collect();
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -269,7 +275,8 @@ pub fn check_coherence_for_action(
             reason: "High-stakes actions blocked - agent coherence is degraded".to_string(),
         },
         (CoherenceState::Unstable, true) => CoherenceCheckResult::RequiresApproval {
-            reason: "High-stakes action requires sponsor approval - agent coherence is unstable".to_string(),
+            reason: "High-stakes action requires sponsor approval - agent coherence is unstable"
+                .to_string(),
         },
         (_, _) => CoherenceCheckResult::Allowed,
     }
@@ -319,7 +326,9 @@ impl CoherenceHistory {
 
         // Calculate trend from recent measurements
         if self.measurements.len() >= 3 {
-            let recent: Vec<f64> = self.measurements.iter()
+            let recent: Vec<f64> = self
+                .measurements
+                .iter()
                 .rev()
                 .take(5)
                 .map(|m| m.phi)
@@ -411,15 +420,15 @@ pub fn measure_agent_phi(
     }
 
     // Take most recent outputs up to max
-    let recent: Vec<_> = agent.output_history.iter()
+    let recent: Vec<_> = agent
+        .output_history
+        .iter()
         .rev()
         .take(config.max_outputs)
         .collect();
 
     // Convert to vectors
-    let vectors: Vec<Vec<f64>> = recent.iter()
-        .map(|o| output_history_to_vector(o))
-        .collect();
+    let vectors: Vec<Vec<f64>> = recent.iter().map(|o| output_history_to_vector(o)).collect();
 
     // Calculate pairwise cosine similarities
     let n = vectors.len();
@@ -442,17 +451,25 @@ pub fn measure_agent_phi(
     };
 
     // Calculate per-output contributions
-    let output_contributions: Vec<f64> = vectors.iter().enumerate().map(|(i, v)| {
-        let mut contrib = 0.0;
-        let mut count = 0;
-        for (j, other) in vectors.iter().enumerate() {
-            if i != j {
-                contrib += cosine_similarity(v, other).max(0.0);
-                count += 1;
+    let output_contributions: Vec<f64> = vectors
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let mut contrib = 0.0;
+            let mut count = 0;
+            for (j, other) in vectors.iter().enumerate() {
+                if i != j {
+                    contrib += cosine_similarity(v, other).max(0.0);
+                    count += 1;
+                }
             }
-        }
-        if count > 0 { contrib / count as f64 } else { 0.0 }
-    }).collect();
+            if count > 0 {
+                contrib / count as f64
+            } else {
+                0.0
+            }
+        })
+        .collect();
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -684,10 +701,7 @@ pub fn phi_weight_multiplier(phi: f64) -> f64 {
 }
 
 /// Apply Phi-weighting to a K-Vector trust delta
-pub fn apply_phi_weighting_to_delta(
-    base_delta: f32,
-    phi: f64,
-) -> f32 {
+pub fn apply_phi_weighting_to_delta(base_delta: f32, phi: f64) -> f32 {
     let multiplier = phi_weight_multiplier(phi);
     (base_delta * multiplier as f32).clamp(-0.5, 0.5)
 }
@@ -696,10 +710,7 @@ pub fn apply_phi_weighting_to_delta(
 ///
 /// Attestations from high-coherence agents are weighted more heavily
 /// in Byzantine aggregation and consensus.
-pub fn phi_weighted_attestation(
-    attestation_value: f32,
-    attester_phi: f64,
-) -> f32 {
+pub fn phi_weighted_attestation(attestation_value: f32, attester_phi: f64) -> f32 {
     let weight = phi_weight_multiplier(attester_phi);
     attestation_value * weight as f32
 }
@@ -756,10 +767,18 @@ pub fn export_phi_metrics(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel, EpistemicClassificationExtended};
     use crate::agentic::epistemic_classifier::OutputContent;
+    use crate::epistemic::{
+        EmpiricalLevel, EpistemicClassificationExtended, HarmonicLevel, MaterialityLevel,
+        NormativeLevel,
+    };
 
-    fn create_test_output(e: EmpiricalLevel, n: NormativeLevel, m: MaterialityLevel, h: HarmonicLevel) -> AgentOutput {
+    fn create_test_output(
+        e: EmpiricalLevel,
+        n: NormativeLevel,
+        m: MaterialityLevel,
+        h: HarmonicLevel,
+    ) -> AgentOutput {
         AgentOutput {
             output_id: "test-out".to_string(),
             agent_id: "test-agent".to_string(),
@@ -785,14 +804,16 @@ mod tests {
     #[test]
     fn test_similar_outputs_high_phi() {
         // Create similar outputs (same classification)
-        let outputs: Vec<AgentOutput> = (0..5).map(|_| {
-            create_test_output(
-                EmpiricalLevel::E3Cryptographic,
-                NormativeLevel::N2Network,
-                MaterialityLevel::M2Persistent,
-                HarmonicLevel::H1Local,
-            )
-        }).collect();
+        let outputs: Vec<AgentOutput> = (0..5)
+            .map(|_| {
+                create_test_output(
+                    EmpiricalLevel::E3Cryptographic,
+                    NormativeLevel::N2Network,
+                    MaterialityLevel::M2Persistent,
+                    HarmonicLevel::H1Local,
+                )
+            })
+            .collect();
 
         let config = PhiMeasurementConfig::default();
         let result = measure_phi_simple(&outputs, &config).unwrap();
@@ -806,9 +827,24 @@ mod tests {
     fn test_diverse_outputs_lower_phi() {
         // Create diverse outputs
         let outputs = vec![
-            create_test_output(EmpiricalLevel::E0Null, NormativeLevel::N0Personal, MaterialityLevel::M0Ephemeral, HarmonicLevel::H0None),
-            create_test_output(EmpiricalLevel::E4PublicRepro, NormativeLevel::N3Axiomatic, MaterialityLevel::M3Foundational, HarmonicLevel::H4Kosmic),
-            create_test_output(EmpiricalLevel::E2PrivateVerify, NormativeLevel::N1Communal, MaterialityLevel::M1Temporal, HarmonicLevel::H2Network),
+            create_test_output(
+                EmpiricalLevel::E0Null,
+                NormativeLevel::N0Personal,
+                MaterialityLevel::M0Ephemeral,
+                HarmonicLevel::H0None,
+            ),
+            create_test_output(
+                EmpiricalLevel::E4PublicRepro,
+                NormativeLevel::N3Axiomatic,
+                MaterialityLevel::M3Foundational,
+                HarmonicLevel::H4Kosmic,
+            ),
+            create_test_output(
+                EmpiricalLevel::E2PrivateVerify,
+                NormativeLevel::N1Communal,
+                MaterialityLevel::M1Temporal,
+                HarmonicLevel::H2Network,
+            ),
         ];
 
         let config = PhiMeasurementConfig::default();
@@ -830,7 +866,10 @@ mod tests {
 
         // Unstable agent needs approval for high-stakes
         let result = check_coherence_for_action(CoherenceState::Unstable, true);
-        assert!(matches!(result, CoherenceCheckResult::RequiresApproval { .. }));
+        assert!(matches!(
+            result,
+            CoherenceCheckResult::RequiresApproval { .. }
+        ));
     }
 
     #[test]
@@ -871,9 +910,12 @@ mod tests {
 
     #[test]
     fn test_insufficient_outputs() {
-        let outputs = vec![
-            create_test_output(EmpiricalLevel::E0Null, NormativeLevel::N0Personal, MaterialityLevel::M0Ephemeral, HarmonicLevel::H0None),
-        ];
+        let outputs = vec![create_test_output(
+            EmpiricalLevel::E0Null,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M0Ephemeral,
+            HarmonicLevel::H0None,
+        )];
 
         let config = PhiMeasurementConfig::default();
         let result = measure_phi_simple(&outputs, &config);
@@ -886,9 +928,11 @@ mod tests {
     // ZK Phi Gating Tests
     // =========================================================================
 
-    use crate::matl::KVector;
-    use crate::agentic::{AgentId, AgentClass, AgentConstraints, AgentStatus, UncertaintyCalibration};
     use crate::agentic::epistemic_classifier::EpistemicStats;
+    use crate::agentic::{
+        AgentClass, AgentConstraints, AgentId, AgentStatus, UncertaintyCalibration,
+    };
+    use crate::matl::KVector;
 
     fn create_test_agent_with_phi(phi: f32) -> InstrumentalActor {
         InstrumentalActor {
@@ -914,10 +958,16 @@ mod tests {
     #[test]
     fn test_zk_operation_type_required_coherence() {
         // Low-stakes operations have lower requirements
-        assert_eq!(ZKOperationType::VerifyProof.required_coherence(), CoherenceState::Degraded);
+        assert_eq!(
+            ZKOperationType::VerifyProof.required_coherence(),
+            CoherenceState::Degraded
+        );
 
         // High-stakes operations require high coherence
-        assert_eq!(ZKOperationType::ByzantineConsensus.required_coherence(), CoherenceState::Coherent);
+        assert_eq!(
+            ZKOperationType::ByzantineConsensus.required_coherence(),
+            CoherenceState::Coherent
+        );
     }
 
     #[test]
@@ -944,7 +994,10 @@ mod tests {
         // Cannot participate in Byzantine consensus
         let result = check_zk_operation_phi(&agent, ZKOperationType::ByzantineConsensus);
         assert!(!result.permitted);
-        assert_eq!(result.recommendation, ZKGatingRecommendation::EscalateToSponsor);
+        assert_eq!(
+            result.recommendation,
+            ZKGatingRecommendation::EscalateToSponsor
+        );
     }
 
     #[test]

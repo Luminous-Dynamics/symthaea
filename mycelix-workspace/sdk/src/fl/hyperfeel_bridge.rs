@@ -22,9 +22,9 @@
 //! - Flag outliers (similarity < threshold to cluster centroid)
 //! - Weight contributions by trust score × similarity
 
-use crate::hyperfeel::{HyperFeelEncoder, EncodingConfig, HyperGradient};
-use super::types::{GradientUpdate, AggregatedGradient};
-use super::coordinator::{FLCoordinator, CoordinatorError};
+use super::coordinator::{CoordinatorError, FLCoordinator};
+use super::types::{AggregatedGradient, GradientUpdate};
+use crate::hyperfeel::{EncodingConfig, HyperFeelEncoder, HyperGradient};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -159,7 +159,8 @@ impl HyperFeelFLBridge {
     ) -> GradientUpdate {
         // Convert hypervector to gradient representation
         // We use the hypervector bytes directly as a compressed feature
-        let gradients: Vec<f64> = hg.hypervector
+        let gradients: Vec<f64> = hg
+            .hypervector
             .iter()
             .map(|&b| (b as f64 - 128.0) / 128.0) // Normalize bytes to [-1, 1]
             .collect();
@@ -312,20 +313,24 @@ impl HyperFeelFLBridge {
             return CompressionStats::default();
         }
 
-        let total_original: usize = self.round_hypergradients
+        let total_original: usize = self
+            .round_hypergradients
             .iter()
             .map(|hg| hg.original_size)
             .sum();
 
-        let total_compressed: usize = self.round_hypergradients
+        let total_compressed: usize = self
+            .round_hypergradients
             .iter()
             .map(|hg| hg.hypervector.len())
             .sum();
 
-        let avg_encode_time: f32 = self.round_hypergradients
+        let avg_encode_time: f32 = self
+            .round_hypergradients
             .iter()
             .map(|hg| hg.encode_time_ms)
-            .sum::<f32>() / self.round_hypergradients.len() as f32;
+            .sum::<f32>()
+            / self.round_hypergradients.len() as f32;
 
         CompressionStats {
             submissions: self.round_hypergradients.len(),
@@ -370,7 +375,8 @@ impl HyperFeelFLBridge {
             }
         }
 
-        let aggregated: Vec<u8> = sum.iter()
+        let aggregated: Vec<u8> = sum
+            .iter()
             .map(|&s| (s / n as i32).clamp(0, 255) as u8)
             .collect();
 
@@ -401,7 +407,8 @@ impl HyperFeelFLBridge {
         let mut excluded_count = 0;
 
         for hg in &self.round_hypergradients {
-            let is_byzantine = analysis.byzantine_flags
+            let is_byzantine = analysis
+                .byzantine_flags
                 .get(&hg.node_id)
                 .copied()
                 .unwrap_or(false);
@@ -424,7 +431,8 @@ impl HyperFeelFLBridge {
             return None;
         }
 
-        let aggregated: Vec<u8> = weighted_sum.iter()
+        let aggregated: Vec<u8> = weighted_sum
+            .iter()
             .map(|&s| ((s / total_weight) + 128.0).clamp(0.0, 255.0) as u8)
             .collect();
 
@@ -473,7 +481,8 @@ impl HyperFeelFLBridge {
         }
 
         // Select the gradient with highest Krum score (most similar to neighbors)
-        let (best_idx, _) = scores.iter()
+        let (best_idx, _) = scores
+            .iter()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))?;
 
         Some(AggregatedHyperGradient {
@@ -488,7 +497,11 @@ impl HyperFeelFLBridge {
     /// Multi-Krum aggregation in hypervector space
     ///
     /// Selects top-m gradients by Krum score and averages them.
-    pub fn aggregate_multi_krum_hv(&self, num_byzantine: usize, m: usize) -> Option<AggregatedHyperGradient> {
+    pub fn aggregate_multi_krum_hv(
+        &self,
+        num_byzantine: usize,
+        m: usize,
+    ) -> Option<AggregatedHyperGradient> {
         let n = self.round_hypergradients.len();
         if n < 3 || m == 0 {
             return self.aggregate_fedavg_hv();
@@ -525,12 +538,17 @@ impl HyperFeelFLBridge {
         let mut sum: Vec<i32> = vec![0; hv_len];
 
         for &idx in &selected_indices {
-            for (i, &byte) in self.round_hypergradients[idx].hypervector.iter().enumerate() {
+            for (i, &byte) in self.round_hypergradients[idx]
+                .hypervector
+                .iter()
+                .enumerate()
+            {
                 sum[i] += byte as i32;
             }
         }
 
-        let aggregated: Vec<u8> = sum.iter()
+        let aggregated: Vec<u8> = sum
+            .iter()
             .map(|&s| (s / selected_indices.len() as i32).clamp(0, 255) as u8)
             .collect();
 
@@ -556,7 +574,8 @@ impl HyperFeelFLBridge {
         let mut aggregated: Vec<u8> = Vec::with_capacity(hv_len);
 
         for pos in 0..hv_len {
-            let mut values: Vec<u8> = self.round_hypergradients
+            let mut values: Vec<u8> = self
+                .round_hypergradients
                 .iter()
                 .map(|hg| hg.hypervector[pos])
                 .collect();
@@ -598,7 +617,8 @@ impl HyperFeelFLBridge {
         let mut aggregated: Vec<u8> = Vec::with_capacity(hv_len);
 
         for pos in 0..hv_len {
-            let mut values: Vec<u8> = self.round_hypergradients
+            let mut values: Vec<u8> = self
+                .round_hypergradients
                 .iter()
                 .map(|hg| hg.hypervector[pos])
                 .collect();
@@ -705,10 +725,7 @@ pub struct HyperFeelFLCoordinator {
 
 impl HyperFeelFLCoordinator {
     /// Create a new HyperFeel-enabled coordinator
-    pub fn new(
-        fl_config: super::types::FLConfig,
-        hyperfeel_config: HyperFeelFLConfig,
-    ) -> Self {
+    pub fn new(fl_config: super::types::FLConfig, hyperfeel_config: HyperFeelFLConfig) -> Self {
         Self {
             coordinator: FLCoordinator::new(fl_config),
             bridge: HyperFeelFLBridge::new(hyperfeel_config),
@@ -765,7 +782,9 @@ impl HyperFeelFLCoordinator {
 
         self.byzantine_analysis = Some(analysis);
         // Safe: we just set byzantine_analysis to Some above
-        self.byzantine_analysis.as_ref().expect("byzantine_analysis should be Some after setting it")
+        self.byzantine_analysis
+            .as_ref()
+            .expect("byzantine_analysis should be Some after setting it")
     }
 
     /// Aggregate the round with Byzantine filtering
@@ -818,11 +837,17 @@ mod tests {
     fn create_byzantine_gradient(size: usize) -> Vec<f32> {
         // Completely different pattern (Byzantine attacker)
         // Use random-looking values that are very different from sine waves
-        (0..size).map(|i| {
-            let x = i as f32;
-            // Mix of very different patterns: random-ish alternating high/low
-            if i % 2 == 0 { 1000.0 } else { -1000.0 }
-        }).collect()
+        (0..size)
+            .map(|i| {
+                let x = i as f32;
+                // Mix of very different patterns: random-ish alternating high/low
+                if i % 2 == 0 {
+                    1000.0
+                } else {
+                    -1000.0
+                }
+            })
+            .collect()
     }
 
     #[test]
@@ -834,7 +859,11 @@ mod tests {
         let hg = bridge.compress_gradient(&gradient, 1, "node-1");
 
         // 50K floats = 200KB, hypervector = 2KB, ratio > 90
-        assert!(hg.compression_ratio > 50.0, "Compression ratio: {}", hg.compression_ratio);
+        assert!(
+            hg.compression_ratio > 50.0,
+            "Compression ratio: {}",
+            hg.compression_ratio
+        );
 
         // Convert to update
         let update = bridge.hypergradient_to_update(&hg, 1, 100, 0.5);
@@ -903,9 +932,17 @@ mod tests {
         let analysis = bridge.analyze_byzantine();
 
         // Check similarity scores - Byzantine should have lowest similarity
-        let byzantine_sim = *analysis.similarity_scores.get("byzantine-node").unwrap_or(&1.0);
+        let byzantine_sim = *analysis
+            .similarity_scores
+            .get("byzantine-node")
+            .unwrap_or(&1.0);
         let honest_sims: Vec<f32> = (0..4)
-            .map(|i| *analysis.similarity_scores.get(&format!("node-{}", i)).unwrap_or(&0.0))
+            .map(|i| {
+                *analysis
+                    .similarity_scores
+                    .get(&format!("node-{}", i))
+                    .unwrap_or(&0.0)
+            })
             .collect();
         let avg_honest_sim = honest_sims.iter().sum::<f32>() / 4.0;
 
@@ -913,7 +950,8 @@ mod tests {
         assert!(
             byzantine_sim < avg_honest_sim,
             "Byzantine ({}) should be less similar than honest avg ({})",
-            byzantine_sim, avg_honest_sim
+            byzantine_sim,
+            avg_honest_sim
         );
     }
 
@@ -1020,11 +1058,10 @@ mod tests {
         let base: Vec<f32> = (0..50_000).map(|i| (i as f32 * 0.001).sin()).collect();
 
         let hg1 = coordinator.bridge.compress_gradient(&base, 1, "p1");
-        let hg2 = coordinator.bridge.compress_gradient(
-            &create_similar_gradient(&base, 0.01),
-            1,
-            "p2",
-        );
+        let hg2 =
+            coordinator
+                .bridge
+                .compress_gradient(&create_similar_gradient(&base, 0.01), 1, "p2");
 
         assert!(coordinator.submit_compressed(
             CompressedSubmission {

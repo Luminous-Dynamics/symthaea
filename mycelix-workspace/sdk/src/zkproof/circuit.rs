@@ -33,7 +33,7 @@ impl GradientProofCircuit {
         Self {
             client_id: client_id.to_string(),
             current_round: 0,
-            use_real_stark: false,  // Simulation mode by default
+            use_real_stark: false, // Simulation mode by default
         }
     }
 
@@ -154,7 +154,8 @@ impl GradientProofCircuit {
 
         let mut padding_seed = [0u8; 32];
         padding_seed[..8].copy_from_slice(&(gradient.len() as u64).to_le_bytes());
-        padding_seed[8..16].copy_from_slice(&public_inputs.epochs.to_le_bytes().repeat(2).as_slice()[..8]);
+        padding_seed[8..16]
+            .copy_from_slice(&public_inputs.epochs.to_le_bytes().repeat(2).as_slice()[..8]);
 
         // Generate deterministic padding
         let mut hasher = Sha3_256::new();
@@ -222,7 +223,11 @@ impl GradientProofCircuit {
     }
 
     /// Generate real zkSTARK proof (future implementation)
-    fn generate_real_stark_proof(&self, _public_inputs: &PublicInputs, _gradient: &[f32]) -> Vec<u8> {
+    fn generate_real_stark_proof(
+        &self,
+        _public_inputs: &PublicInputs,
+        _gradient: &[f32],
+    ) -> Vec<u8> {
         // Future: integrate RISC Zero zkVM
         // This would:
         // 1. Compile the gradient computation to RISC-V

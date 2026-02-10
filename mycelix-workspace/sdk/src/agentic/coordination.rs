@@ -42,8 +42,8 @@
 //! }
 //! ```
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Coordination configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -326,7 +326,11 @@ impl AgentGroup {
     }
 
     /// Add a member to the group
-    pub fn add_member(&mut self, agent_id: impl Into<String>, trust_score: f64) -> Result<(), CoordinationError> {
+    pub fn add_member(
+        &mut self,
+        agent_id: impl Into<String>,
+        trust_score: f64,
+    ) -> Result<(), CoordinationError> {
         let agent_id = agent_id.into();
 
         // Check trust threshold
@@ -374,7 +378,11 @@ impl AgentGroup {
     }
 
     /// Update a member's trust score
-    pub fn update_trust(&mut self, agent_id: &str, new_trust: f64) -> Result<(), CoordinationError> {
+    pub fn update_trust(
+        &mut self,
+        agent_id: &str,
+        new_trust: f64,
+    ) -> Result<(), CoordinationError> {
         if let Some(member) = self.members.get_mut(agent_id) {
             self.total_trust -= member.trust_score;
             member.trust_score = new_trust;
@@ -433,9 +441,12 @@ impl AgentGroup {
         vote_type: VoteType,
     ) -> Result<(), CoordinationError> {
         // Check membership
-        let member = self.members.get(agent_id).ok_or_else(|| CoordinationError::NotMember {
-            agent_id: agent_id.to_string(),
-        })?;
+        let member = self
+            .members
+            .get(agent_id)
+            .ok_or_else(|| CoordinationError::NotMember {
+                agent_id: agent_id.to_string(),
+            })?;
 
         // Get proposal
         let state = self.proposals.get_mut(proposal_id).ok_or_else(|| {
@@ -527,7 +538,8 @@ impl AgentGroup {
         } else if !quorum_reached {
             // Check if it's still possible to reach quorum
             let remaining_weight = total_possible - total_vote_weight;
-            if total_vote_weight + remaining_weight < self.config.min_participation * total_possible {
+            if total_vote_weight + remaining_weight < self.config.min_participation * total_possible
+            {
                 ConsensusDecision::NoQuorum
             } else {
                 ConsensusDecision::Pending
@@ -561,7 +573,10 @@ impl AgentGroup {
         // Finalize if decision is final
         if matches!(
             decision,
-            ConsensusDecision::Approved | ConsensusDecision::Rejected | ConsensusDecision::NoQuorum | ConsensusDecision::Expired
+            ConsensusDecision::Approved
+                | ConsensusDecision::Rejected
+                | ConsensusDecision::NoQuorum
+                | ConsensusDecision::Expired
         ) {
             state.finalized = true;
             state.result = Some(result.clone());
@@ -680,28 +695,42 @@ impl AgentGroup {
 
     /// Get comprehensive metrics for monitoring
     pub fn metrics(&self) -> CoordinationMetrics {
-        let active_proposals = self.proposals.values()
+        let active_proposals = self
+            .proposals
+            .values()
             .filter(|p| !p.finalized && !p.proposal.is_expired())
             .count();
 
-        let finalized_proposals = self.proposals.values()
-            .filter(|p| p.finalized)
-            .count();
+        let finalized_proposals = self.proposals.values().filter(|p| p.finalized).count();
 
-        let expired_proposals = self.proposals.values()
+        let expired_proposals = self
+            .proposals
+            .values()
             .filter(|p| !p.finalized && p.proposal.is_expired())
             .count();
 
-        let total_votes: usize = self.proposals.values()
-            .map(|p| p.votes.len())
-            .sum();
+        let total_votes: usize = self.proposals.values().map(|p| p.votes.len()).sum();
 
-        let approved_count = self.proposals.values()
-            .filter(|p| matches!(p.result.as_ref().map(|r| &r.decision), Some(ConsensusDecision::Approved)))
+        let approved_count = self
+            .proposals
+            .values()
+            .filter(|p| {
+                matches!(
+                    p.result.as_ref().map(|r| &r.decision),
+                    Some(ConsensusDecision::Approved)
+                )
+            })
             .count();
 
-        let rejected_count = self.proposals.values()
-            .filter(|p| matches!(p.result.as_ref().map(|r| &r.decision), Some(ConsensusDecision::Rejected)))
+        let rejected_count = self
+            .proposals
+            .values()
+            .filter(|p| {
+                matches!(
+                    p.result.as_ref().map(|r| &r.decision),
+                    Some(ConsensusDecision::Rejected)
+                )
+            })
             .count();
 
         let avg_trust = if self.members.is_empty() {
@@ -713,13 +742,17 @@ impl AgentGroup {
         let avg_participation = if finalized_proposals == 0 || self.members.is_empty() {
             0.0
         } else {
-            self.proposals.values()
+            self.proposals
+                .values()
                 .filter(|p| p.finalized)
                 .map(|p| p.votes.len() as f64 / self.members.len() as f64)
-                .sum::<f64>() / finalized_proposals as f64
+                .sum::<f64>()
+                / finalized_proposals as f64
         };
 
-        let member_participation: Vec<_> = self.members.values()
+        let member_participation: Vec<_> = self
+            .members
+            .values()
             .map(|m| (m.agent_id.clone(), m.participation_count))
             .collect();
 
@@ -895,8 +928,16 @@ pub enum CoordinationError {
 impl std::fmt::Display for CoordinationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CoordinationError::InsufficientTrust { agent_id, trust, required } => {
-                write!(f, "Agent {} has trust {} but {} required", agent_id, trust, required)
+            CoordinationError::InsufficientTrust {
+                agent_id,
+                trust,
+                required,
+            } => {
+                write!(
+                    f,
+                    "Agent {} has trust {} but {} required",
+                    agent_id, trust, required
+                )
             }
             CoordinationError::NotMember { agent_id } => {
                 write!(f, "Agent {} is not a group member", agent_id)
@@ -973,9 +1014,15 @@ mod tests {
         let proposal_id = group.submit_proposal(proposal).unwrap();
 
         // Vote
-        group.vote("agent-1", &proposal_id, VoteType::Approve).unwrap();
-        group.vote("agent-2", &proposal_id, VoteType::Approve).unwrap();
-        group.vote("agent-3", &proposal_id, VoteType::Reject).unwrap();
+        group
+            .vote("agent-1", &proposal_id, VoteType::Approve)
+            .unwrap();
+        group
+            .vote("agent-2", &proposal_id, VoteType::Approve)
+            .unwrap();
+        group
+            .vote("agent-3", &proposal_id, VoteType::Reject)
+            .unwrap();
 
         // Check consensus
         let result = group.check_consensus(&proposal_id).unwrap();
@@ -1007,11 +1054,19 @@ mod tests {
         let proposal_id = group.submit_proposal(proposal).unwrap();
 
         // Whale votes approve
-        group.vote("whale", &proposal_id, VoteType::Approve).unwrap();
+        group
+            .vote("whale", &proposal_id, VoteType::Approve)
+            .unwrap();
         // All small agents vote reject
-        group.vote("small-1", &proposal_id, VoteType::Reject).unwrap();
-        group.vote("small-2", &proposal_id, VoteType::Reject).unwrap();
-        group.vote("small-3", &proposal_id, VoteType::Reject).unwrap();
+        group
+            .vote("small-1", &proposal_id, VoteType::Reject)
+            .unwrap();
+        group
+            .vote("small-2", &proposal_id, VoteType::Reject)
+            .unwrap();
+        group
+            .vote("small-3", &proposal_id, VoteType::Reject)
+            .unwrap();
 
         let result = group.check_consensus(&proposal_id).unwrap();
 

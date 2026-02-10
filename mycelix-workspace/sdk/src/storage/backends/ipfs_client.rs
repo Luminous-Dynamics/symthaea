@@ -78,7 +78,9 @@ impl std::fmt::Display for IpfsClientError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IpfsClientError::Network(msg) => write!(f, "IPFS network error: {}", msg),
-            IpfsClientError::Api(err) => write!(f, "IPFS API error: {} (code {})", err.message, err.code),
+            IpfsClientError::Api(err) => {
+                write!(f, "IPFS API error: {} (code {})", err.message, err.code)
+            }
             IpfsClientError::Parse(msg) => write!(f, "IPFS parse error: {}", msg),
             IpfsClientError::CidMismatch { expected, actual } => {
                 write!(f, "CID mismatch: expected {}, got {}", expected, actual)
@@ -120,14 +122,19 @@ impl IpfsClient {
         let boundary = "----MycelixIpfsBoundary";
         let mut body = Vec::new();
         body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
-        body.extend_from_slice(b"Content-Disposition: form-data; name=\"file\"; filename=\"data\"\r\n");
+        body.extend_from_slice(
+            b"Content-Disposition: form-data; name=\"file\"; filename=\"data\"\r\n",
+        );
         body.extend_from_slice(b"Content-Type: application/octet-stream\r\n\r\n");
         body.extend_from_slice(content);
         body.extend_from_slice(format!("\r\n--{}--\r\n", boundary).as_bytes());
 
         let response = ureq::post(&url)
             .timeout(std::time::Duration::from_secs(self.timeout_secs))
-            .set("Content-Type", &format!("multipart/form-data; boundary={}", boundary))
+            .set(
+                "Content-Type",
+                &format!("multipart/form-data; boundary={}", boundary),
+            )
             .send_bytes(&body)
             .map_err(|e| match e {
                 ureq::Error::Status(_, resp) => {
@@ -147,7 +154,8 @@ impl IpfsClient {
                 }
             })?;
 
-        let body = response.into_string()
+        let body = response
+            .into_string()
             .map_err(|e| IpfsClientError::Parse(e.to_string()))?;
 
         serde_json::from_str(&body)
@@ -162,14 +170,19 @@ impl IpfsClient {
         let boundary = "----MycelixIpfsBoundary";
         let mut body = Vec::new();
         body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
-        body.extend_from_slice(b"Content-Disposition: form-data; name=\"file\"; filename=\"data\"\r\n");
+        body.extend_from_slice(
+            b"Content-Disposition: form-data; name=\"file\"; filename=\"data\"\r\n",
+        );
         body.extend_from_slice(b"Content-Type: application/octet-stream\r\n\r\n");
         body.extend_from_slice(content);
         body.extend_from_slice(format!("\r\n--{}--\r\n", boundary).as_bytes());
 
         let response = ureq::post(&url)
             .timeout(std::time::Duration::from_secs(self.timeout_secs))
-            .set("Content-Type", &format!("multipart/form-data; boundary={}", boundary))
+            .set(
+                "Content-Type",
+                &format!("multipart/form-data; boundary={}", boundary),
+            )
             .send_bytes(&body)
             .map_err(|e| match e {
                 ureq::Error::Status(_, resp) => {
@@ -183,7 +196,8 @@ impl IpfsClient {
                 ureq::Error::Transport(t) => IpfsClientError::Network(t.to_string()),
             })?;
 
-        let body = response.into_string()
+        let body = response
+            .into_string()
             .map_err(|e| IpfsClientError::Parse(e.to_string()))?;
 
         serde_json::from_str(&body)
@@ -212,7 +226,8 @@ impl IpfsClient {
             })?;
 
         let mut bytes = Vec::new();
-        response.into_reader()
+        response
+            .into_reader()
             .read_to_end(&mut bytes)
             .map_err(|e| IpfsClientError::Parse(e.to_string()))?;
 
@@ -240,7 +255,8 @@ impl IpfsClient {
                 ureq::Error::Transport(t) => IpfsClientError::Network(t.to_string()),
             })?;
 
-        let body = response.into_string()
+        let body = response
+            .into_string()
             .map_err(|e| IpfsClientError::Parse(e.to_string()))?;
 
         serde_json::from_str(&body)
@@ -268,7 +284,8 @@ impl IpfsClient {
                 ureq::Error::Transport(t) => IpfsClientError::Network(t.to_string()),
             })?;
 
-        let body = response.into_string()
+        let body = response
+            .into_string()
             .map_err(|e| IpfsClientError::Parse(e.to_string()))?;
 
         serde_json::from_str(&body)

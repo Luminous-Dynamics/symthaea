@@ -49,11 +49,13 @@ mod tests {
 
         // Completely different gradient (different frequency and shape)
         // This creates a truly different distribution, not just inverted
-        let gradient3: Vec<f32> = (0..5000).map(|i| {
-            let x = i as f32;
-            // Mix of different patterns: spiky, exponential decay
-            ((x * 0.1).sin() * (x * 0.05).cos()).powi(3) + (x / 5000.0).exp() - 1.0
-        }).collect();
+        let gradient3: Vec<f32> = (0..5000)
+            .map(|i| {
+                let x = i as f32;
+                // Mix of different patterns: spiky, exponential decay
+                ((x * 0.1).sin() * (x * 0.05).cos()).powi(3) + (x / 5000.0).exp() - 1.0
+            })
+            .collect();
 
         let hg1 = encoder.encode_gradient(&gradient1, 1, "node-1");
         let hg2 = encoder.encode_gradient(&gradient2, 1, "node-2");
@@ -63,12 +65,19 @@ mod tests {
         let sim_different = HyperFeelEncoder::cosine_similarity(&hg1.hypervector, &hg3.hypervector);
 
         // Similar gradients should have high similarity
-        assert!(sim_similar > 0.7, "Similar gradients should be similar: {}", sim_similar);
+        assert!(
+            sim_similar > 0.7,
+            "Similar gradients should be similar: {}",
+            sim_similar
+        );
         // Different distribution should be detectable
         // Note: HyperFeel with JL projection preserves L2 distance, so different shapes should differ
-        assert!(sim_similar > sim_different,
+        assert!(
+            sim_similar > sim_different,
             "Similar grads ({}) should be more similar than different ones ({})",
-            sim_similar, sim_different);
+            sim_similar,
+            sim_different
+        );
     }
 
     #[test]
@@ -83,6 +92,10 @@ mod tests {
         assert_eq!(hg.original_size, 400_000);
         assert_eq!(hg.hypervector.len(), HV16_BYTES);
         // 400KB / 2KB = 195x compression (not the full 2000x but proves the mechanism)
-        assert!(hg.compression_ratio > 150.0, "Compression ratio: {}", hg.compression_ratio);
+        assert!(
+            hg.compression_ratio > 150.0,
+            "Compression ratio: {}",
+            hg.compression_ratio
+        );
     }
 }

@@ -1,7 +1,7 @@
 //! RB-BFT: Reputation-Based Byzantine Fault Tolerance
 //!
-//! A novel consensus mechanism that achieves 45% Byzantine fault tolerance
-//! (vs. classical 33%) through reputation-weighted voting.
+//! A novel consensus mechanism that achieves 34% validated Byzantine fault tolerance
+//! through reputation-weighted voting. Theoretical target: 45% with improved detection.
 //!
 //! ## Key Innovation: Reputation² Weighting
 //!
@@ -41,8 +41,8 @@ use crate::crypto::secure_compare_hash;
 /// Minimum reputation to participate as validator
 pub const MIN_VALIDATOR_REPUTATION: f32 = 0.3;
 
-/// Default Byzantine tolerance threshold for RB-BFT (revolutionary 45%)
-pub const RBBFT_BYZANTINE_THRESHOLD: f32 = 0.45;
+/// Default Byzantine tolerance threshold for RB-BFT (validated to 34%)
+pub const RBBFT_BYZANTINE_THRESHOLD: f32 = 0.34;
 
 /// Quorum threshold for consensus (2/3 of weighted votes)
 pub const QUORUM_THRESHOLD: f32 = 0.667;
@@ -253,7 +253,7 @@ pub enum ConsensusResult {
 /// Configuration for RB-BFT consensus
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RbBftConfig {
-    /// Byzantine tolerance threshold (default 0.45)
+    /// Byzantine tolerance threshold (default 0.34)
     pub byzantine_threshold: f32,
     /// Quorum threshold for decisions (default 0.667)
     pub quorum_threshold: f32,
@@ -430,10 +430,7 @@ impl RbBftConsensus {
 
     /// Get total weighted voting power
     pub fn total_voting_weight(&self) -> f32 {
-        self.validators
-            .values()
-            .map(|v| v.voting_weight())
-            .sum()
+        self.validators.values().map(|v| v.voting_weight()).sum()
     }
 
     /// Get number of active validators
@@ -936,7 +933,14 @@ mod tests {
         for (i, vid) in [v1, v2, v3].iter().enumerate() {
             // Only submit pre-vote if still in pre-vote phase
             if consensus.state() == RoundState::PreVote {
-                let vote = Vote::new(*vid, VoteType::PreVote, hash, 1, true, 0.9 - (i as f32 * 0.1));
+                let vote = Vote::new(
+                    *vid,
+                    VoteType::PreVote,
+                    hash,
+                    1,
+                    true,
+                    0.9 - (i as f32 * 0.1),
+                );
                 let result = consensus.vote(vote).unwrap();
                 assert!(result.accepted);
             }
@@ -971,8 +975,22 @@ mod tests {
     fn test_weighted_consensus_function() {
         // Test the standalone weighted consensus function
         let votes = vec![
-            Vote::new(make_validator_id(1), VoteType::PreVote, [0u8; 32], 0, true, 0.9),
-            Vote::new(make_validator_id(2), VoteType::PreVote, [0u8; 32], 0, true, 0.8),
+            Vote::new(
+                make_validator_id(1),
+                VoteType::PreVote,
+                [0u8; 32],
+                0,
+                true,
+                0.9,
+            ),
+            Vote::new(
+                make_validator_id(2),
+                VoteType::PreVote,
+                [0u8; 32],
+                0,
+                true,
+                0.8,
+            ),
             Vote::new(
                 make_validator_id(3),
                 VoteType::PreVote,
@@ -985,8 +1003,8 @@ mod tests {
 
         // Weighted for: 0.81 + 0.64 = 1.45
         // Weighted total: 0.81 + 0.64 + 0.09 = 1.54
-        // Ratio: 1.45 / 1.54 ≈ 0.94 > 0.45 threshold
-        let result = RbBftConsensus::weighted_consensus(&votes, 0.45);
+        // Ratio: 1.45 / 1.54 ≈ 0.94 > 0.34 threshold
+        let result = RbBftConsensus::weighted_consensus(&votes, RBBFT_BYZANTINE_THRESHOLD);
         assert_eq!(result, ConsensusResult::Accepted);
 
         // With higher threshold
@@ -1039,7 +1057,7 @@ mod tests {
         consensus.register_validator(b2, make_kvector(0.7));
 
         // Total weight: 3×0.81 + 2×0.49 = 2.43 + 0.98 = 3.41
-        // Byzantine weight: 0.98 / 3.41 = 0.287 < 0.45 threshold
+        // Byzantine weight: 0.98 / 3.41 = 0.287 < 0.34 threshold
         // They cannot disrupt consensus!
 
         let byzantine_weight = 2.0 * 0.49;

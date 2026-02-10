@@ -545,7 +545,8 @@ impl StreamingAnalyzer {
 
     /// Update agent activity profile
     fn update_activity_profile(&mut self, event: &TrustEvent) {
-        let profile = self.agent_activity
+        let profile = self
+            .agent_activity
             .entry(event.agent_id.clone())
             .or_default();
 
@@ -556,7 +557,9 @@ impl StreamingAnalyzer {
 
         match &event.event_type {
             TrustEventType::TrustChanged { new_value, .. } => {
-                profile.trust_history.push_back((event.timestamp, *new_value));
+                profile
+                    .trust_history
+                    .push_back((event.timestamp, *new_value));
                 while profile.trust_history.len() > 100 {
                     profile.trust_history.pop_front();
                 }
@@ -565,7 +568,9 @@ impl StreamingAnalyzer {
                 profile.interaction_partners.insert(counterparty.clone());
             }
             TrustEventType::VoteCast { proposal_id, vote } => {
-                profile.voting_patterns.push_back((proposal_id.clone(), vote.clone()));
+                profile
+                    .voting_patterns
+                    .push_back((proposal_id.clone(), vote.clone()));
                 while profile.voting_patterns.len() > 100 {
                     profile.voting_patterns.pop_front();
                 }
@@ -575,7 +580,9 @@ impl StreamingAnalyzer {
 
         // Track burst windows
         profile.burst_windows.push_back((event.timestamp, 1));
-        profile.burst_windows.retain(|(t, _)| self.current_time - *t < self.config.flash_attack_window_ms);
+        profile
+            .burst_windows
+            .retain(|(t, _)| self.current_time - *t < self.config.flash_attack_window_ms);
     }
 
     /// Run detection algorithms
@@ -595,21 +602,26 @@ impl StreamingAnalyzer {
     /// Check a specific signature
     fn check_signature(&self, signature: &AttackSignature) -> Option<DetectionResult> {
         match &signature.pattern {
-            AttackPattern::RapidCreation { max_count, window_ms } => {
-                self.check_rapid_creation(*max_count, *window_ms, signature)
-            }
-            AttackPattern::CoordinatedVoting { min_correlation, min_participants } => {
-                self.check_coordinated_voting(*min_correlation, *min_participants, signature)
-            }
-            AttackPattern::TrustInflation { max_increase, window_ms } => {
-                self.check_trust_inflation(*max_increase, *window_ms, signature)
-            }
-            AttackPattern::BurstActivity { events_per_second, duration_ms } => {
-                self.check_burst_activity(*events_per_second, *duration_ms, signature)
-            }
-            AttackPattern::SimilarKVectors { similarity_threshold, min_cluster_size } => {
-                self.check_similar_kvectors(*similarity_threshold, *min_cluster_size, signature)
-            }
+            AttackPattern::RapidCreation {
+                max_count,
+                window_ms,
+            } => self.check_rapid_creation(*max_count, *window_ms, signature),
+            AttackPattern::CoordinatedVoting {
+                min_correlation,
+                min_participants,
+            } => self.check_coordinated_voting(*min_correlation, *min_participants, signature),
+            AttackPattern::TrustInflation {
+                max_increase,
+                window_ms,
+            } => self.check_trust_inflation(*max_increase, *window_ms, signature),
+            AttackPattern::BurstActivity {
+                events_per_second,
+                duration_ms,
+            } => self.check_burst_activity(*events_per_second, *duration_ms, signature),
+            AttackPattern::SimilarKVectors {
+                similarity_threshold,
+                min_cluster_size,
+            } => self.check_similar_kvectors(*similarity_threshold, *min_cluster_size, signature),
             _ => None,
         }
     }
@@ -621,15 +633,15 @@ impl StreamingAnalyzer {
         window_ms: u64,
         signature: &AttackSignature,
     ) -> Option<DetectionResult> {
-        let creation_events: Vec<_> = self.event_buffer.iter()
+        let creation_events: Vec<_> = self
+            .event_buffer
+            .iter()
             .filter(|e| matches!(e.event_type, TrustEventType::AgentRegistered))
             .filter(|e| self.current_time - e.timestamp <= window_ms)
             .collect();
 
         if creation_events.len() as u32 > max_count {
-            let agents: Vec<String> = creation_events.iter()
-                .map(|e| e.agent_id.clone())
-                .collect();
+            let agents: Vec<String> = creation_events.iter().map(|e| e.agent_id.clone()).collect();
 
             return Some(DetectionResult {
                 id: format!("det-{}-{}", signature.id, self.current_time),
@@ -641,7 +653,9 @@ impl StreamingAnalyzer {
                     evidence_type: EvidenceType::StatisticalAnomaly,
                     description: format!(
                         "{} agents created in {}ms window (threshold: {})",
-                        creation_events.len(), window_ms, max_count
+                        creation_events.len(),
+                        window_ms,
+                        max_count
                     ),
                     event_ids: creation_events.iter().map(|e| e.id.clone()).collect(),
                     strength: 0.9,
@@ -683,7 +697,10 @@ impl StreamingAnalyzer {
             // Group by vote value
             let mut vote_groups: HashMap<String, Vec<String>> = HashMap::new();
             for (agent, vote) in votes {
-                vote_groups.entry(vote.clone()).or_default().push(agent.clone());
+                vote_groups
+                    .entry(vote.clone())
+                    .or_default()
+                    .push(agent.clone());
             }
 
             // Check if any group is suspiciously large
@@ -701,7 +718,10 @@ impl StreamingAnalyzer {
                             evidence_type: EvidenceType::PatternMatch,
                             description: format!(
                                 "{} agents voted '{}' on proposal {} ({:.1}% correlation)",
-                                agents.len(), vote_value, proposal_id, correlation * 100.0
+                                agents.len(),
+                                vote_value,
+                                proposal_id,
+                                correlation * 100.0
                             ),
                             event_ids: vec![],
                             strength: correlation,
@@ -725,7 +745,9 @@ impl StreamingAnalyzer {
         signature: &AttackSignature,
     ) -> Option<DetectionResult> {
         for (agent_id, profile) in &self.agent_activity {
-            let recent_changes: Vec<_> = profile.trust_history.iter()
+            let recent_changes: Vec<_> = profile
+                .trust_history
+                .iter()
                 .filter(|(t, _)| self.current_time - *t <= window_ms)
                 .collect();
 
@@ -771,7 +793,9 @@ impl StreamingAnalyzer {
         signature: &AttackSignature,
     ) -> Option<DetectionResult> {
         for (agent_id, profile) in &self.agent_activity {
-            let burst_count: u32 = profile.burst_windows.iter()
+            let burst_count: u32 = profile
+                .burst_windows
+                .iter()
                 .filter(|(t, _)| self.current_time - *t <= duration_ms)
                 .map(|(_, c)| c)
                 .sum();
@@ -812,10 +836,10 @@ impl StreamingAnalyzer {
         signature: &AttackSignature,
     ) -> Option<DetectionResult> {
         // Collect agents with K-Vectors
-        let agents_with_kvectors: Vec<_> = self.agent_activity.iter()
-            .filter_map(|(id, profile)| {
-                profile.last_kvector.as_ref().map(|kv| (id.clone(), *kv))
-            })
+        let agents_with_kvectors: Vec<_> = self
+            .agent_activity
+            .iter()
+            .filter_map(|(id, profile)| profile.last_kvector.as_ref().map(|kv| (id.clone(), *kv)))
             .collect();
 
         if agents_with_kvectors.len() < min_cluster_size as usize {
@@ -832,7 +856,8 @@ impl StreamingAnalyzer {
             for cluster in &mut clusters {
                 // Check if agent fits in cluster
                 if let Some(first_agent) = cluster.first() {
-                    if let Some((_, first_kv)) = agents_with_kvectors.iter()
+                    if let Some((_, first_kv)) = agents_with_kvectors
+                        .iter()
                         .find(|(id, _)| id == first_agent)
                     {
                         let first_trust = first_kv.trust_score();
@@ -886,10 +911,7 @@ impl StreamingAnalyzer {
         if matches!(event.event_type, TrustEventType::RateLimitHit) {
             let profile = self.agent_activity.get(&event.agent_id);
             if let Some(p) = profile {
-                let rate_limit_hits = p.events_by_type
-                    .get("RateLimitHit")
-                    .copied()
-                    .unwrap_or(0);
+                let rate_limit_hits = p.events_by_type.get("RateLimitHit").copied().unwrap_or(0);
 
                 if rate_limit_hits > 5 {
                     detections.push(DetectionResult {
@@ -900,10 +922,7 @@ impl StreamingAnalyzer {
                         involved_agents: vec![event.agent_id.clone()],
                         evidence: vec![Evidence {
                             evidence_type: EvidenceType::BehavioralDeviation,
-                            description: format!(
-                                "Agent hit rate limit {} times",
-                                rate_limit_hits
-                            ),
+                            description: format!("Agent hit rate limit {} times", rate_limit_hits),
                             event_ids: vec![event.id.clone()],
                             strength: 0.7,
                         }],
@@ -921,14 +940,18 @@ impl StreamingAnalyzer {
     /// Correlate related detections
     fn correlate_detections(&self, detections: &mut [DetectionResult]) {
         // Find detections within correlation window
-        let recent: Vec<_> = self.recent_detections.iter()
+        let recent: Vec<_> = self
+            .recent_detections
+            .iter()
             .filter(|d| self.current_time - d.timestamp <= self.config.correlation_window_ms)
             .collect();
 
         for detection in detections.iter_mut() {
             for recent_detection in &recent {
                 // Check for overlapping agents
-                let overlap: HashSet<_> = detection.involved_agents.iter()
+                let overlap: HashSet<_> = detection
+                    .involved_agents
+                    .iter()
                     .filter(|a| recent_detection.involved_agents.contains(*a))
                     .collect();
 
@@ -949,7 +972,9 @@ impl StreamingAnalyzer {
 
     /// Get agent risk score
     pub fn agent_risk_score(&self, agent_id: &str) -> f64 {
-        let detections: Vec<_> = self.recent_detections.iter()
+        let detections: Vec<_> = self
+            .recent_detections
+            .iter()
             .filter(|d| d.involved_agents.contains(&agent_id.to_string()))
             .collect();
 
@@ -974,7 +999,9 @@ impl StreamingAnalyzer {
 
     /// Get statistics
     pub fn stats(&self) -> DetectionStats {
-        let detections_by_type: HashMap<String, usize> = self.recent_detections.iter()
+        let detections_by_type: HashMap<String, usize> = self
+            .recent_detections
+            .iter()
             .map(|d| format!("{:?}", d.attack_type))
             .fold(HashMap::new(), |mut acc, t| {
                 *acc.entry(t).or_insert(0) += 1;
@@ -1077,13 +1104,12 @@ impl AlertPipeline {
             severity: detection.severity,
             summary: format!(
                 "{:?} detected with {:.0}% confidence",
-                detection.attack_type, detection.confidence * 100.0
+                detection.attack_type,
+                detection.confidence * 100.0
             ),
             details: format!(
                 "Agents involved: {:?}\nEvidence: {:?}\nRecommended action: {:?}",
-                detection.involved_agents,
-                detection.evidence,
-                detection.recommended_action
+                detection.involved_agents, detection.evidence, detection.recommended_action
             ),
             timestamp: detection.timestamp,
             status: AlertStatus::New,
@@ -1179,7 +1205,10 @@ mod tests {
 
             if i >= 10 {
                 assert!(!detections.is_empty(), "Should detect rapid creation");
-                assert!(matches!(detections[0].attack_type, DetectedAttackType::Sybil));
+                assert!(matches!(
+                    detections[0].attack_type,
+                    DetectedAttackType::Sybil
+                ));
             }
         }
     }
@@ -1205,7 +1234,8 @@ mod tests {
 
             // Should detect after enough votes
             if i >= 5 {
-                let collusion_detected = detections.iter()
+                let collusion_detected = detections
+                    .iter()
                     .any(|d| matches!(d.attack_type, DetectedAttackType::Collusion));
                 if collusion_detected {
                     // Good, detected
@@ -1225,19 +1255,26 @@ mod tests {
         // Rapid trust increase
         let event1 = create_test_event(
             "agent-1",
-            TrustEventType::TrustChanged { old_value: 0.3, new_value: 0.4 },
+            TrustEventType::TrustChanged {
+                old_value: 0.3,
+                new_value: 0.4,
+            },
             1000,
         );
         analyzer.process_event(event1);
 
         let event2 = create_test_event(
             "agent-1",
-            TrustEventType::TrustChanged { old_value: 0.4, new_value: 0.8 },
+            TrustEventType::TrustChanged {
+                old_value: 0.4,
+                new_value: 0.8,
+            },
             2000,
         );
         let detections = analyzer.process_event(event2);
 
-        let manipulation_detected = detections.iter()
+        let manipulation_detected = detections
+            .iter()
             .any(|d| matches!(d.attack_type, DetectedAttackType::TrustManipulation));
         assert!(manipulation_detected, "Should detect trust inflation");
     }

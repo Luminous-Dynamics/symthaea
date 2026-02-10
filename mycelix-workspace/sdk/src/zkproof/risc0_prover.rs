@@ -29,8 +29,8 @@
 //! ```
 
 use super::gradient_proof::{
-    GradientConstraints, GradientProofOutput,
-    verify_gradient_quality, hash_gradient, compute_commitment,
+    compute_commitment, hash_gradient, verify_gradient_quality, GradientConstraints,
+    GradientProofOutput,
 };
 use crate::crypto::secure_compare_hash;
 use serde::{Deserialize, Serialize};
@@ -132,8 +132,7 @@ impl SimulationProofMarker {
 ///
 /// **SECURITY WARNING**: `ProverMode::Simulation` provides NO cryptographic
 /// guarantees. Use `ProductionProver` for real security.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ProverMode {
     /// Simulation mode - no real proofs, instant "verification"
     ///
@@ -254,7 +253,14 @@ impl ProductionProver {
         // Real RISC-0 proof generation would go here
         // For now, delegate to internal implementation
         let prover = GradientProver::new_internal(ProverMode::Risc0);
-        prover.prove_gradient_quality(gradient, global_model_hash, epochs, learning_rate, client_id, round)
+        prover.prove_gradient_quality(
+            gradient,
+            global_model_hash,
+            epochs,
+            learning_rate,
+            client_id,
+            round,
+        )
     }
 
     /// Verify a proof receipt
@@ -316,7 +322,14 @@ impl SimulationProver {
         round: u32,
     ) -> Result<GradientProofReceipt, ProverError> {
         let prover = GradientProver::new_internal(ProverMode::Simulation);
-        prover.prove_gradient_quality(gradient, global_model_hash, epochs, learning_rate, client_id, round)
+        prover.prove_gradient_quality(
+            gradient,
+            global_model_hash,
+            epochs,
+            learning_rate,
+            client_id,
+            round,
+        )
     }
 
     /// Verify a simulation receipt (only checks commitment, not cryptography)
@@ -430,28 +443,24 @@ impl GradientProver {
     ) -> Result<GradientProofReceipt, ProverError> {
         match self.mode {
             #[cfg(feature = "simulation")]
-            ProverMode::Simulation => {
-                self.prove_simulation(
-                    gradient,
-                    global_model_hash,
-                    epochs,
-                    learning_rate,
-                    client_id,
-                    round,
-                )
-            }
+            ProverMode::Simulation => self.prove_simulation(
+                gradient,
+                global_model_hash,
+                epochs,
+                learning_rate,
+                client_id,
+                round,
+            ),
             #[cfg(feature = "risc0")]
-            ProverMode::Risc0 => {
-                self.prove_risc0(
-                    gradient,
-                    global_model_hash,
-                    epochs,
-                    learning_rate,
-                    client_id,
-                    round,
-                    Instant::now(),
-                )
-            }
+            ProverMode::Risc0 => self.prove_risc0(
+                gradient,
+                global_model_hash,
+                epochs,
+                learning_rate,
+                client_id,
+                round,
+                Instant::now(),
+            ),
         }
     }
 
@@ -520,12 +529,13 @@ impl GradientProver {
                     commitment: [0u8; 32],
                 });
                 // SECURITY: Use constant-time comparison for commitment verification (FIND-004)
-                Ok(secure_compare_hash(&receipt.output.commitment, &expected_commitment) && receipt.output.norm_valid)
+                Ok(
+                    secure_compare_hash(&receipt.output.commitment, &expected_commitment)
+                        && receipt.output.norm_valid,
+                )
             }
             #[cfg(feature = "risc0")]
-            ProverMode::Risc0 => {
-                self.verify_risc0(receipt)
-            }
+            ProverMode::Risc0 => self.verify_risc0(receipt),
         }
     }
 
@@ -661,13 +671,17 @@ mod tests {
         assert!(SimulationProofMarker::is_simulation_bytes_v2(&bytes));
 
         // Legacy DEADBEEF should also be detected
-        assert!(SimulationProofMarker::is_simulation_bytes_v2(&[0xDE, 0xAD, 0xBE, 0xEF]));
+        assert!(SimulationProofMarker::is_simulation_bytes_v2(&[
+            0xDE, 0xAD, 0xBE, 0xEF
+        ]));
 
         // Empty bytes should be detected as simulation
         assert!(SimulationProofMarker::is_simulation_bytes_v2(&[]));
 
         // Random bytes should NOT be simulation
-        assert!(!SimulationProofMarker::is_simulation_bytes_v2(&[0x01, 0x02, 0x03, 0x04, 0x05]));
+        assert!(!SimulationProofMarker::is_simulation_bytes_v2(&[
+            0x01, 0x02, 0x03, 0x04, 0x05
+        ]));
     }
 
     #[test]
@@ -726,7 +740,10 @@ mod tests {
         // Simulation proofs should fail production-ready check
         let result = receipt.verify_production_ready();
         assert!(result.is_err());
-        assert!(matches!(result, Err(ProverError::SimulationProofRejected(_))));
+        assert!(matches!(
+            result,
+            Err(ProverError::SimulationProofRejected(_))
+        ));
     }
 
     #[test]
@@ -756,11 +773,8 @@ mod tests {
         let g2 = sample_gradient(1000, 0.3);
         let g3 = vec![0.0f32; 1000]; // Invalid
 
-        let gradients: Vec<(&[f32], &str)> = vec![
-            (&g1, "client-1"),
-            (&g2, "client-2"),
-            (&g3, "client-3"),
-        ];
+        let gradients: Vec<(&[f32], &str)> =
+            vec![(&g1, "client-1"), (&g2, "client-2"), (&g3, "client-3")];
 
         let model_hash = [0x42u8; 32];
         let results = batch_prover.prove_batch(&gradients, &model_hash, 5, 0.01, 1);

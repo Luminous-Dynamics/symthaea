@@ -33,9 +33,5 @@
 mod sanitize;
 
 pub use sanitize::{
-    SanitizedError,
-    SanitizedResult,
-    SanitizeExt,
-    sanitize_message,
-    contains_sensitive_data,
+    contains_sensitive_data, sanitize_message, SanitizeExt, SanitizedError, SanitizedResult,
 };

@@ -2,7 +2,7 @@
 //!
 //! SAP locked for specified durations with graduated governance weight.
 
-use super::{CommitmentId, CovenantId, DurationTier, CovenantType};
+use super::{CommitmentId, CovenantId, CovenantType, DurationTier};
 use serde::{Deserialize, Serialize};
 
 /// Time-locked SAP commitment
@@ -182,7 +182,8 @@ pub fn calculate_vote_weight(
         return base_civ;
     }
 
-    let weighted_sum: f64 = commitments.iter()
+    let weighted_sum: f64 = commitments
+        .iter()
         .filter(|c| c.status == CommitmentStatus::Active)
         .map(|c| c.sap_locked as f64 * c.governance_multiplier())
         .sum();

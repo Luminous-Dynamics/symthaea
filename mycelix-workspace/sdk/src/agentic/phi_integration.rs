@@ -23,10 +23,10 @@
 //! - ~~**Agent Clustering**~~: DEPRECATED - use k-means on K-Vector
 //! - ~~**Temporal Phi Analysis**~~: DEPRECATED - use variance tracking
 
+use super::InstrumentalActor;
+use crate::matl::KVector;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::matl::KVector;
-use super::InstrumentalActor;
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -116,17 +116,17 @@ pub fn measure_collective_phi(agents: &[&InstrumentalActor]) -> CollectivePhiRes
     }
 
     // Compute individual Phi values
-    let individual_phis: Vec<f64> = agents.iter()
-        .map(|a| compute_agent_phi(a))
-        .collect();
+    let individual_phis: Vec<f64> = agents.iter().map(|a| compute_agent_phi(a)).collect();
 
     let sum_individual: f64 = individual_phis.iter().sum();
     let average_individual_phi = sum_individual / agents.len() as f64;
 
     // Compute variance
-    let phi_variance = individual_phis.iter()
+    let phi_variance = individual_phis
+        .iter()
         .map(|p| (p - average_individual_phi).powi(2))
-        .sum::<f64>() / agents.len() as f64;
+        .sum::<f64>()
+        / agents.len() as f64;
 
     // Compute population-level Phi by creating a combined state
     let population_phi = compute_population_phi(agents);
@@ -153,26 +153,37 @@ pub fn measure_collective_phi(agents: &[&InstrumentalActor]) -> CollectivePhiRes
 }
 
 fn individual_coherence_level(phi: f64) -> usize {
-    if phi >= 0.8 { 4 }
-    else if phi >= 0.6 { 3 }
-    else if phi >= 0.4 { 2 }
-    else if phi >= 0.2 { 1 }
-    else { 0 }
+    if phi >= 0.8 {
+        4
+    } else if phi >= 0.6 {
+        3
+    } else if phi >= 0.4 {
+        2
+    } else if phi >= 0.2 {
+        1
+    } else {
+        0
+    }
 }
 
 fn compute_agent_phi(agent: &InstrumentalActor) -> f64 {
     // Use K-Vector as proxy for internal state coherence
     let kv = &agent.k_vector;
     let values = [
-        kv.k_r as f64, kv.k_a as f64, kv.k_i as f64, kv.k_p as f64,
-        kv.k_m as f64, kv.k_s as f64, kv.k_h as f64, kv.k_topo as f64,
+        kv.k_r as f64,
+        kv.k_a as f64,
+        kv.k_i as f64,
+        kv.k_p as f64,
+        kv.k_m as f64,
+        kv.k_s as f64,
+        kv.k_h as f64,
+        kv.k_topo as f64,
     ];
 
     // Compute coherence as inverse variance (more uniform = more coherent)
     let mean: f64 = values.iter().sum::<f64>() / values.len() as f64;
-    let variance: f64 = values.iter()
-        .map(|v| (v - mean).powi(2))
-        .sum::<f64>() / values.len() as f64;
+    let variance: f64 =
+        values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
 
     // Transform to 0-1 range (low variance = high Phi)
     let std_dev = variance.sqrt();
@@ -205,9 +216,7 @@ fn compute_population_phi(agents: &[&InstrumentalActor]) -> f64 {
 
     // Compute Phi of aggregated state
     let mean: f64 = aggregated.iter().sum::<f64>() / 8.0;
-    let variance: f64 = aggregated.iter()
-        .map(|v| (v - mean).powi(2))
-        .sum::<f64>() / 8.0;
+    let variance: f64 = aggregated.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / 8.0;
 
     // Also measure inter-agent alignment
     let alignment = compute_inter_agent_alignment(agents);
@@ -242,10 +251,26 @@ fn compute_inter_agent_alignment(agents: &[&InstrumentalActor]) -> f64 {
 }
 
 fn kvector_cosine_similarity(a: &KVector, b: &KVector) -> f64 {
-    let av = [a.k_r as f64, a.k_a as f64, a.k_i as f64, a.k_p as f64,
-              a.k_m as f64, a.k_s as f64, a.k_h as f64, a.k_topo as f64];
-    let bv = [b.k_r as f64, b.k_a as f64, b.k_i as f64, b.k_p as f64,
-              b.k_m as f64, b.k_s as f64, b.k_h as f64, b.k_topo as f64];
+    let av = [
+        a.k_r as f64,
+        a.k_a as f64,
+        a.k_i as f64,
+        a.k_p as f64,
+        a.k_m as f64,
+        a.k_s as f64,
+        a.k_h as f64,
+        a.k_topo as f64,
+    ];
+    let bv = [
+        b.k_r as f64,
+        b.k_a as f64,
+        b.k_i as f64,
+        b.k_p as f64,
+        b.k_m as f64,
+        b.k_s as f64,
+        b.k_h as f64,
+        b.k_topo as f64,
+    ];
 
     let dot: f64 = av.iter().zip(&bv).map(|(x, y)| x * y).sum();
     let norm_a: f64 = av.iter().map(|x| x * x).sum::<f64>().sqrt();
@@ -307,7 +332,10 @@ pub struct EmergentBehavior {
 /// DEPRECATED: This is over-engineered. For Byzantine detection, use the MATL
 /// Byzantine detector. For clustering, use simple k-means on K-Vectors.
 /// For oscillation detection, use variance tracking on trust scores.
-#[deprecated(since = "0.2.0", note = "Use simpler approaches: MATL Byzantine detection, k-means clustering, or variance tracking")]
+#[deprecated(
+    since = "0.2.0",
+    note = "Use simpler approaches: MATL Byzantine detection, k-means clustering, or variance tracking"
+)]
 pub struct EmergentBehaviorDetector {
     /// History of collective Phi measurements
     phi_history: Vec<(u64, f64)>,
@@ -319,6 +347,7 @@ pub struct EmergentBehaviorDetector {
     cluster_threshold: f64,
 }
 
+#[allow(deprecated)]
 impl EmergentBehaviorDetector {
     /// Create a new detector
     pub fn new() -> Self {
@@ -342,7 +371,8 @@ impl EmergentBehaviorDetector {
 
         // Measure collective Phi
         let collective = measure_collective_phi(&agent_refs);
-        self.phi_history.push((timestamp, collective.population_phi));
+        self.phi_history
+            .push((timestamp, collective.population_phi));
 
         // Detect synchronization (sudden increase in population Phi)
         if let Some(sync) = self.detect_synchronization(&collective, timestamp) {
@@ -351,7 +381,9 @@ impl EmergentBehaviorDetector {
 
         // Detect clustering
         let clusters = self.compute_clusters(agents);
-        if let Some(cluster_behavior) = self.detect_clustering_emergence(&clusters, agents, timestamp) {
+        if let Some(cluster_behavior) =
+            self.detect_clustering_emergence(&clusters, agents, timestamp)
+        {
             behaviors.push(cluster_behavior);
         }
         self.prev_clusters = clusters;
@@ -369,13 +401,19 @@ impl EmergentBehaviorDetector {
         behaviors
     }
 
-    fn detect_synchronization(&self, collective: &CollectivePhiResult, timestamp: u64) -> Option<EmergentBehavior> {
+    fn detect_synchronization(
+        &self,
+        collective: &CollectivePhiResult,
+        timestamp: u64,
+    ) -> Option<EmergentBehavior> {
         if self.phi_history.len() < 5 {
             return None;
         }
 
         // Check if recent Phi values show sudden increase
-        let recent: Vec<f64> = self.phi_history.iter()
+        let recent: Vec<f64> = self
+            .phi_history
+            .iter()
             .rev()
             .take(5)
             .map(|(_, phi)| *phi)
@@ -390,7 +428,10 @@ impl EmergentBehaviorDetector {
                 confidence: (new_avg - old_avg).min(1.0),
                 involved_agents: vec![], // All agents
                 evidence: vec![
-                    format!("Population Phi increased from {:.2} to {:.2}", old_avg, new_avg),
+                    format!(
+                        "Population Phi increased from {:.2} to {:.2}",
+                        old_avg, new_avg
+                    ),
                     format!("Coherence level: {:?}", collective.coherence_level),
                 ],
                 detected_at: timestamp,
@@ -472,7 +513,9 @@ impl EmergentBehaviorDetector {
         }
 
         // Check for alternating high-low pattern
-        let recent: Vec<f64> = self.phi_history.iter()
+        let recent: Vec<f64> = self
+            .phi_history
+            .iter()
             .rev()
             .take(10)
             .map(|(_, phi)| *phi)
@@ -513,7 +556,8 @@ impl EmergentBehaviorDetector {
         timestamp: u64,
     ) -> Option<EmergentBehavior> {
         // Look for agents with very similar behavior patterns indicating coordination
-        let suspicious: Vec<_> = agents.iter()
+        let suspicious: Vec<_> = agents
+            .iter()
             .filter(|(_, a)| {
                 // Agents with suspiciously similar success patterns and timing
                 let log_len = a.behavior_log.len();
@@ -522,7 +566,9 @@ impl EmergentBehaviorDetector {
                 }
 
                 // High success rate is suspicious
-                let successes = a.behavior_log.iter()
+                let successes = a
+                    .behavior_log
+                    .iter()
                     .filter(|e| e.outcome == super::ActionOutcome::Success)
                     .count();
                 successes as f64 / log_len as f64 > 0.95
@@ -532,9 +578,8 @@ impl EmergentBehaviorDetector {
 
         if suspicious.len() >= 3 {
             // Check if they're also clustered
-            let suspicious_agents: Vec<_> = suspicious.iter()
-                .filter_map(|id| agents.get(id))
-                .collect();
+            let suspicious_agents: Vec<_> =
+                suspicious.iter().filter_map(|id| agents.get(id)).collect();
 
             if !suspicious_agents.is_empty() {
                 let collective = measure_collective_phi(&suspicious_agents);
@@ -546,7 +591,10 @@ impl EmergentBehaviorDetector {
                         involved_agents: suspicious,
                         evidence: vec![
                             "Multiple agents with >95% success rate".to_string(),
-                            format!("Collective Phi of suspicious agents: {:.2}", collective.population_phi),
+                            format!(
+                                "Collective Phi of suspicious agents: {:.2}",
+                                collective.population_phi
+                            ),
                         ],
                         detected_at: timestamp,
                         concerning: true,
@@ -565,6 +613,7 @@ impl EmergentBehaviorDetector {
     }
 }
 
+#[allow(deprecated)]
 impl Default for EmergentBehaviorDetector {
     fn default() -> Self {
         Self::new()
@@ -788,7 +837,8 @@ pub fn cluster_agents_by_phi(
             continue;
         }
 
-        let members: Vec<String> = member_indices.iter()
+        let members: Vec<String> = member_indices
+            .iter()
             .map(|&i| agent_ids[i].clone())
             .collect();
 
@@ -917,7 +967,9 @@ impl PhiEvolutionTracker {
         let n_f = recent.len() as f64;
         let sum_x: f64 = (0..recent.len()).map(|i| i as f64).sum();
         let sum_y: f64 = recent.iter().map(|(_, phi)| *phi).sum();
-        let sum_xy: f64 = recent.iter().enumerate()
+        let sum_xy: f64 = recent
+            .iter()
+            .enumerate()
             .map(|(i, (_, phi))| i as f64 * phi)
             .sum();
         let sum_x2: f64 = (0..recent.len()).map(|i| (i as f64).powi(2)).sum();
@@ -940,9 +992,11 @@ impl PhiEvolutionTracker {
         }
 
         let mean: f64 = recent.iter().map(|(_, phi)| *phi).sum::<f64>() / recent.len() as f64;
-        let variance: f64 = recent.iter()
+        let variance: f64 = recent
+            .iter()
             .map(|(_, phi)| (phi - mean).powi(2))
-            .sum::<f64>() / recent.len() as f64;
+            .sum::<f64>()
+            / recent.len() as f64;
 
         variance.sqrt()
     }
@@ -1001,7 +1055,7 @@ pub struct PhiEvolutionSummary {
 mod tests {
     use super::*;
     use crate::agentic::UncertaintyCalibration;
-    use crate::agentic::{AgentId, AgentClass, AgentConstraints, AgentStatus, EpistemicStats};
+    use crate::agentic::{AgentClass, AgentConstraints, AgentId, AgentStatus, EpistemicStats};
 
     fn create_test_agent(id: &str, k_vector: KVector) -> InstrumentalActor {
         InstrumentalActor {
@@ -1027,34 +1081,61 @@ mod tests {
     #[test]
     fn test_collective_phi_measurement() {
         // Create agents with similar K-Vectors (should have high collective Phi)
-        let agent1 = create_test_agent("a1", KVector::new(0.7, 0.6, 0.8, 0.7, 0.3, 0.4, 0.6, 0.3, 0.7, 0.65));
-        let agent2 = create_test_agent("a2", KVector::new(0.75, 0.65, 0.82, 0.72, 0.32, 0.42, 0.62, 0.32, 0.72, 0.7));
-        let agent3 = create_test_agent("a3", KVector::new(0.68, 0.58, 0.78, 0.68, 0.28, 0.38, 0.58, 0.28, 0.68, 0.6));
+        let agent1 = create_test_agent(
+            "a1",
+            KVector::new(0.7, 0.6, 0.8, 0.7, 0.3, 0.4, 0.6, 0.3, 0.7, 0.65),
+        );
+        let agent2 = create_test_agent(
+            "a2",
+            KVector::new(0.75, 0.65, 0.82, 0.72, 0.32, 0.42, 0.62, 0.32, 0.72, 0.7),
+        );
+        let agent3 = create_test_agent(
+            "a3",
+            KVector::new(0.68, 0.58, 0.78, 0.68, 0.28, 0.38, 0.58, 0.28, 0.68, 0.6),
+        );
 
         let result = measure_collective_phi(&[&agent1, &agent2, &agent3]);
 
         assert_eq!(result.agent_count, 3);
-        assert!(result.population_phi > 0.5, "Similar agents should have high collective Phi");
-        assert!(result.phi_variance < 0.1, "Similar agents should have low variance");
+        assert!(
+            result.population_phi > 0.5,
+            "Similar agents should have high collective Phi"
+        );
+        assert!(
+            result.phi_variance < 0.1,
+            "Similar agents should have low variance"
+        );
     }
 
     #[test]
     fn test_collective_phi_diverse_agents() {
         // Create agents with diverse K-Vectors (should have lower collective Phi)
-        let agent1 = create_test_agent("a1", KVector::new(0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.5, 0.3));
-        let agent2 = create_test_agent("a2", KVector::new(0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.5, 0.3));
+        let agent1 = create_test_agent(
+            "a1",
+            KVector::new(0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.5, 0.3),
+        );
+        let agent2 = create_test_agent(
+            "a2",
+            KVector::new(0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.1, 0.9, 0.5, 0.3),
+        );
 
         let result = measure_collective_phi(&[&agent1, &agent2]);
 
         assert_eq!(result.agent_count, 2);
         // Diverse agents should have lower alignment
-        assert!(result.population_phi < 0.7, "Diverse agents should have lower collective Phi");
+        assert!(
+            result.population_phi < 0.7,
+            "Diverse agents should have lower collective Phi"
+        );
     }
 
     #[test]
     fn test_phi_gating() {
         // Create agent with moderate coherence
-        let agent = create_test_agent("a1", KVector::new(0.6, 0.5, 0.6, 0.5, 0.4, 0.5, 0.6, 0.4, 0.55, 0.5));
+        let agent = create_test_agent(
+            "a1",
+            KVector::new(0.6, 0.5, 0.6, 0.5, 0.4, 0.5, 0.6, 0.4, 0.55, 0.5),
+        );
         let config = PhiGatingConfig::default();
 
         // Low stakes should be permitted
@@ -1072,16 +1153,43 @@ mod tests {
 
         // Create two clusters
         // Cluster 1: High trust agents
-        agents.insert("a1".to_string(), create_test_agent("a1", KVector::new(0.8, 0.7, 0.9, 0.8, 0.5, 0.6, 0.7, 0.5, 0.8, 0.75)));
-        agents.insert("a2".to_string(), create_test_agent("a2", KVector::new(0.82, 0.72, 0.88, 0.78, 0.52, 0.58, 0.72, 0.52, 0.78, 0.75)));
+        agents.insert(
+            "a1".to_string(),
+            create_test_agent(
+                "a1",
+                KVector::new(0.8, 0.7, 0.9, 0.8, 0.5, 0.6, 0.7, 0.5, 0.8, 0.75),
+            ),
+        );
+        agents.insert(
+            "a2".to_string(),
+            create_test_agent(
+                "a2",
+                KVector::new(0.82, 0.72, 0.88, 0.78, 0.52, 0.58, 0.72, 0.52, 0.78, 0.75),
+            ),
+        );
 
         // Cluster 2: Low trust agents
-        agents.insert("a3".to_string(), create_test_agent("a3", KVector::new(0.2, 0.3, 0.25, 0.3, 0.1, 0.15, 0.2, 0.1, 0.2, 0.2)));
-        agents.insert("a4".to_string(), create_test_agent("a4", KVector::new(0.22, 0.28, 0.27, 0.32, 0.12, 0.17, 0.22, 0.12, 0.22, 0.2)));
+        agents.insert(
+            "a3".to_string(),
+            create_test_agent(
+                "a3",
+                KVector::new(0.2, 0.3, 0.25, 0.3, 0.1, 0.15, 0.2, 0.1, 0.2, 0.2),
+            ),
+        );
+        agents.insert(
+            "a4".to_string(),
+            create_test_agent(
+                "a4",
+                KVector::new(0.22, 0.28, 0.27, 0.32, 0.12, 0.17, 0.22, 0.12, 0.22, 0.2),
+            ),
+        );
 
         let result = cluster_agents_by_phi(&agents, 0.9);
 
-        assert!(result.cluster_count >= 1, "Should find at least one cluster");
+        assert!(
+            result.cluster_count >= 1,
+            "Should find at least one cluster"
+        );
     }
 
     #[test]
@@ -1094,8 +1202,14 @@ mod tests {
         }
 
         let summary = tracker.summary();
-        assert!(summary.trend > 0.0, "Trend should be positive for improving Phi");
-        assert!(summary.current > summary.smoothed - 0.1, "Current should be near smoothed");
+        assert!(
+            summary.trend > 0.0,
+            "Trend should be positive for improving Phi"
+        );
+        assert!(
+            summary.current > summary.smoothed - 0.1,
+            "Current should be near smoothed"
+        );
     }
 
     #[test]
@@ -1119,10 +1233,25 @@ mod tests {
 
     #[test]
     fn test_coherence_level_classification() {
-        assert_eq!(CollectiveCoherenceLevel::from_phi(0.1), CollectiveCoherenceLevel::Fragmented);
-        assert_eq!(CollectiveCoherenceLevel::from_phi(0.4), CollectiveCoherenceLevel::WeaklyCoordinated);
-        assert_eq!(CollectiveCoherenceLevel::from_phi(0.6), CollectiveCoherenceLevel::ModeratelySynchronized);
-        assert_eq!(CollectiveCoherenceLevel::from_phi(0.75), CollectiveCoherenceLevel::HighlyIntegrated);
-        assert_eq!(CollectiveCoherenceLevel::from_phi(0.9), CollectiveCoherenceLevel::EmergentCollective);
+        assert_eq!(
+            CollectiveCoherenceLevel::from_phi(0.1),
+            CollectiveCoherenceLevel::Fragmented
+        );
+        assert_eq!(
+            CollectiveCoherenceLevel::from_phi(0.4),
+            CollectiveCoherenceLevel::WeaklyCoordinated
+        );
+        assert_eq!(
+            CollectiveCoherenceLevel::from_phi(0.6),
+            CollectiveCoherenceLevel::ModeratelySynchronized
+        );
+        assert_eq!(
+            CollectiveCoherenceLevel::from_phi(0.75),
+            CollectiveCoherenceLevel::HighlyIntegrated
+        );
+        assert_eq!(
+            CollectiveCoherenceLevel::from_phi(0.9),
+            CollectiveCoherenceLevel::EmergentCollective
+        );
     }
 }

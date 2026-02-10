@@ -8,24 +8,19 @@
 //!
 //! Run with: `cargo bench --bench agentic_benchmarks --features simulation`
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
-use mycelix_sdk::agentic::{
-    InstrumentalActor, AgentId, AgentClass, AgentStatus, AgentConstraints,
-    BehaviorLogEntry, ActionOutcome, KVectorBridgeConfig,
-    compute_trust_score, calculate_kredit_from_trust, update_kvector_from_behavior,
-    MoralUncertainty, MoralUncertaintyType, MoralActionGuidance,
-    EscalationRequest, UncertaintyCalibration,
-    AgentOutput, EpistemicStats, PhiMeasurementConfig,
-    GamingDetector, GamingDetectionConfig,
-    CoherenceState, check_coherence_for_action,
-};
-use mycelix_sdk::agentic::adversarial::{
-    SybilDetector, SybilDetectionConfig, SybilEvidence,
-};
+use mycelix_sdk::agentic::adversarial::{SybilDetectionConfig, SybilDetector, SybilEvidence};
 use mycelix_sdk::agentic::lifecycle::{
-    gate_action_on_uncertainty, UncertaintyCheckResult,
-    process_resolved_escalations,
+    gate_action_on_uncertainty, process_resolved_escalations, UncertaintyCheckResult,
+};
+use mycelix_sdk::agentic::{
+    calculate_kredit_from_trust, check_coherence_for_action, compute_trust_score,
+    update_kvector_from_behavior, ActionOutcome, AgentClass, AgentConstraints, AgentId,
+    AgentOutput, AgentStatus, BehaviorLogEntry, CoherenceState, EpistemicStats, EscalationRequest,
+    GamingDetectionConfig, GamingDetector, InstrumentalActor, KVectorBridgeConfig,
+    MoralActionGuidance, MoralUncertainty, MoralUncertaintyType, PhiMeasurementConfig,
+    UncertaintyCalibration,
 };
 use mycelix_sdk::matl::KVector;
 
@@ -61,9 +56,8 @@ fn benchmark_kvector_trust_computation(c: &mut Criterion) {
             BenchmarkId::new("batch_trust_scores", count),
             &count,
             |b, &count| {
-                let kvectors: Vec<KVector> = (0..count)
-                    .map(|i| create_kvector_with_seed(i))
-                    .collect();
+                let kvectors: Vec<KVector> =
+                    (0..count).map(|i| create_kvector_with_seed(i)).collect();
                 let config = KVectorBridgeConfig::default();
 
                 b.iter(|| {
@@ -91,7 +85,11 @@ fn benchmark_kvector_behavior_update(c: &mut Criterion) {
 
         b.iter(|| {
             let mut a = agent.clone();
-            update_kvector_from_behavior(black_box(&mut a), black_box(&behavior), black_box(&config))
+            update_kvector_from_behavior(
+                black_box(&mut a),
+                black_box(&behavior),
+                black_box(&config),
+            )
         })
     });
 
@@ -116,7 +114,11 @@ fn benchmark_kvector_behavior_update(c: &mut Criterion) {
                 b.iter(|| {
                     let mut a = agent.clone();
                     for behavior in &behaviors {
-                        update_kvector_from_behavior(black_box(&mut a), black_box(behavior), black_box(&config));
+                        update_kvector_from_behavior(
+                            black_box(&mut a),
+                            black_box(behavior),
+                            black_box(&config),
+                        );
                     }
                     a.k_vector.trust_score()
                 })
@@ -191,9 +193,8 @@ fn benchmark_sybil_detection(c: &mut Criterion) {
 
     // Small network
     group.bench_function("small_network_10_agents", |b| {
-        let agents: Vec<InstrumentalActor> = (0..10)
-            .map(|i| create_kvector_agent_with_seed(i))
-            .collect();
+        let agents: Vec<InstrumentalActor> =
+            (0..10).map(|i| create_kvector_agent_with_seed(i)).collect();
         let detector = SybilDetector::new(SybilDetectionConfig::default());
 
         b.iter(|| detector.detect(black_box(&agents)))
@@ -201,9 +202,8 @@ fn benchmark_sybil_detection(c: &mut Criterion) {
 
     // Medium network
     group.bench_function("medium_network_50_agents", |b| {
-        let agents: Vec<InstrumentalActor> = (0..50)
-            .map(|i| create_kvector_agent_with_seed(i))
-            .collect();
+        let agents: Vec<InstrumentalActor> =
+            (0..50).map(|i| create_kvector_agent_with_seed(i)).collect();
         let detector = SybilDetector::new(SybilDetectionConfig::default());
 
         b.iter(|| detector.detect(black_box(&agents)))
@@ -212,9 +212,8 @@ fn benchmark_sybil_detection(c: &mut Criterion) {
     // Network with Sybil cluster
     group.bench_function("sybil_cluster_detection", |b| {
         // Create 40 honest agents + 10 Sybil agents with similar K-Vectors
-        let mut agents: Vec<InstrumentalActor> = (0..40)
-            .map(|i| create_kvector_agent_with_seed(i))
-            .collect();
+        let mut agents: Vec<InstrumentalActor> =
+            (0..40).map(|i| create_kvector_agent_with_seed(i)).collect();
 
         // Add Sybil cluster (nearly identical K-Vectors)
         let sybil_base = create_kvector_agent_with_seed(1000);
@@ -604,9 +603,9 @@ criterion_group!(
 // =============================================================================
 
 use mycelix_sdk::agentic::dashboard::{
-    Dashboard, DashboardConfig, MetricsInput, MetricsAggregator, AlertPanel,
-    AlertSeverity, EventStream, EventPriority, DashboardEventType,
-    TimeSeries, ChartType, ChartDataBuilder, DashboardAlert,
+    AlertPanel, AlertSeverity, ChartDataBuilder, ChartType, Dashboard, DashboardAlert,
+    DashboardConfig, DashboardEventType, EventPriority, EventStream, MetricsAggregator,
+    MetricsInput, TimeSeries,
 };
 
 /// Benchmark dashboard metrics aggregation
@@ -634,9 +633,8 @@ fn benchmark_dashboard_metrics(c: &mut Criterion) {
             |b, &count| {
                 let config = DashboardConfig::default();
                 let mut agg = MetricsAggregator::new(config);
-                let inputs: Vec<MetricsInput> = (0..count)
-                    .map(|i| create_metrics_input(10 + i))
-                    .collect();
+                let inputs: Vec<MetricsInput> =
+                    (0..count).map(|i| create_metrics_input(10 + i)).collect();
 
                 b.iter(|| {
                     let mut a = agg.clone();
@@ -693,7 +691,11 @@ fn benchmark_alert_panel(c: &mut Criterion) {
         let config = DashboardConfig::default();
         let mut panel = AlertPanel::new(config);
         for i in 0..100 {
-            let severity = if i % 10 == 0 { AlertSeverity::Critical } else { AlertSeverity::Low };
+            let severity = if i % 10 == 0 {
+                AlertSeverity::Critical
+            } else {
+                AlertSeverity::Low
+            };
             panel.create_alert(severity, &format!("Alert {}", i), "Description", "test");
         }
 
@@ -734,7 +736,12 @@ fn benchmark_event_stream(c: &mut Criterion) {
                 2 => EventPriority::Medium,
                 _ => EventPriority::Low,
             };
-            stream.emit(DashboardEventType::Custom, priority, &format!("src-{}", i), "Event");
+            stream.emit(
+                DashboardEventType::Custom,
+                priority,
+                &format!("src-{}", i),
+                "Event",
+            );
         }
 
         b.iter(|| black_box(&stream).by_priority(black_box(EventPriority::High)))
@@ -787,8 +794,8 @@ fn benchmark_chart_building(c: &mut Criterion) {
 // =============================================================================
 
 use mycelix_sdk::agentic::verification::{
-    VerificationEngine, SystemState, Invariant, InvariantType, ViolationSeverity as VerifSeverity,
-    CompareOp,
+    CompareOp, Invariant, InvariantType, SystemState, VerificationEngine,
+    ViolationSeverity as VerifSeverity,
 };
 
 /// Benchmark verification engine operations
@@ -836,9 +843,8 @@ fn benchmark_verification_engine(c: &mut Criterion) {
             &count,
             |b, &count| {
                 let mut engine = VerificationEngine::with_defaults();
-                let states: Vec<SystemState> = (0..count)
-                    .map(|i| create_system_state(20, i % 3))
-                    .collect();
+                let states: Vec<SystemState> =
+                    (0..count).map(|i| create_system_state(20, i % 3)).collect();
 
                 b.iter(|| {
                     let mut e = engine.clone();
@@ -865,7 +871,8 @@ fn benchmark_compare_ops(c: &mut Criterion) {
             .collect();
 
         b.iter(|| {
-            pairs.iter()
+            pairs
+                .iter()
                 .map(|(a, b)| CompareOp::Lt.eval(black_box(*a), black_box(*b)))
                 .filter(|&x| x)
                 .count()
@@ -874,12 +881,11 @@ fn benchmark_compare_ops(c: &mut Criterion) {
 
     // Integer comparisons
     group.bench_function("usize_comparison_batch", |b| {
-        let pairs: Vec<(usize, usize)> = (0..1000)
-            .map(|i| (i * 17 % 100, i * 31 % 100))
-            .collect();
+        let pairs: Vec<(usize, usize)> = (0..1000).map(|i| (i * 17 % 100, i * 31 % 100)).collect();
 
         b.iter(|| {
-            pairs.iter()
+            pairs
+                .iter()
                 .map(|(a, b)| CompareOp::Lt.eval_usize(black_box(*a), black_box(*b)))
                 .filter(|&x| x)
                 .count()
@@ -893,12 +899,11 @@ fn benchmark_compare_ops(c: &mut Criterion) {
 // INTEGRATION BENCHMARKS
 // =============================================================================
 
-use mycelix_sdk::agentic::integration::{
-    IntegratedTrustPipeline, TrustPipelineConfig,
-    IntegratedEpistemicLifecycle, EpistemicLifecycleConfig,
-    IntegratedAttackResponse, AttackResponseConfig,
-};
 use mycelix_sdk::agentic::epistemic_classifier::OutputContent;
+use mycelix_sdk::agentic::integration::{
+    AttackResponseConfig, EpistemicLifecycleConfig, IntegratedAttackResponse,
+    IntegratedEpistemicLifecycle, IntegratedTrustPipeline, TrustPipelineConfig,
+};
 
 /// Benchmark trust pipeline operations
 fn benchmark_trust_pipeline(c: &mut Criterion) {
@@ -928,11 +933,7 @@ fn benchmark_trust_pipeline(c: &mut Criterion) {
 
         b.iter(|| {
             let mut p = pipeline.clone();
-            p.process_attestation(
-                black_box("agent-0"),
-                black_box("agent-1"),
-                black_box(0.8),
-            )
+            p.process_attestation(black_box("agent-0"), black_box("agent-1"), black_box(0.8))
         })
     });
 
@@ -1078,12 +1079,8 @@ fn benchmark_attack_response(c: &mut Criterion) {
 
 /// Create metrics input for dashboard testing
 fn create_metrics_input(seed: usize) -> MetricsInput {
-    let trust_scores: Vec<f64> = (0..10)
-        .map(|i| rand_float(seed + i) as f64)
-        .collect();
-    let phi_values: Vec<f64> = (0..3)
-        .map(|i| rand_float(seed + i + 100) as f64)
-        .collect();
+    let trust_scores: Vec<f64> = (0..10).map(|i| rand_float(seed + i) as f64).collect();
+    let phi_values: Vec<f64> = (0..3).map(|i| rand_float(seed + i + 100) as f64).collect();
 
     MetricsInput {
         trust_scores,
@@ -1232,7 +1229,10 @@ fn benchmark_zk_proof_generation(c: &mut Criterion) {
 
         b.iter(|| {
             let mut p = pipeline.clone();
-            p.generate_trust_proof(black_box("test-agent"), black_box(ProofStatement::WellFormed))
+            p.generate_trust_proof(
+                black_box("test-agent"),
+                black_box(ProofStatement::WellFormed),
+            )
         })
     });
 
@@ -1255,11 +1255,7 @@ fn benchmark_zk_attestation(c: &mut Criterion) {
 
         b.iter(|| {
             let mut p = pipeline.clone();
-            p.process_zk_attestation(
-                black_box("agent-0"),
-                black_box("agent-1"),
-                black_box(0.8),
-            )
+            p.process_zk_attestation(black_box("agent-0"), black_box("agent-1"), black_box(0.8))
         })
     });
 
@@ -1312,10 +1308,8 @@ fn benchmark_zk_aggregate(c: &mut Criterion) {
                 for i in 0..count {
                     let agent = create_kvector_agent_with_seed(i);
                     pipeline.register_agent_with_commitment(agent);
-                    let result = pipeline.generate_trust_proof(
-                        &format!("agent-{}", i),
-                        statement.clone(),
-                    );
+                    let result =
+                        pipeline.generate_trust_proof(&format!("agent-{}", i), statement.clone());
                     if let Ok(r) = result {
                         proofs.push(r.proof);
                     }
@@ -1350,10 +1344,8 @@ fn benchmark_zk_network_health(c: &mut Criterion) {
                 for i in 0..*count {
                     let agent = create_kvector_agent_with_seed(i);
                     pipeline.register_agent_with_commitment(agent);
-                    let _ = pipeline.generate_trust_proof(
-                        &format!("agent-{}", i),
-                        ProofStatement::WellFormed,
-                    );
+                    let _ = pipeline
+                        .generate_trust_proof(&format!("agent-{}", i), ProofStatement::WellFormed);
                 }
 
                 b.iter(|| pipeline.zk_network_health())

@@ -10,10 +10,10 @@
 //! - **Anomaly Scoring**: Statistical detection of abnormal patterns
 //! - **Quarantine System**: Isolates suspicious agents pending review
 
+use super::{ActionOutcome, InstrumentalActor};
+use crate::matl::KVector;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
-use crate::matl::KVector;
-use super::{InstrumentalActor, ActionOutcome};
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -198,17 +198,15 @@ impl GamingDetector {
         let suspicion_score = if indicators.is_empty() {
             0.0
         } else {
-            let max_severity = indicators.iter()
-                .map(|i| i.severity)
-                .fold(0.0f64, f64::max);
-            let avg_severity: f64 = indicators.iter()
-                .map(|i| i.severity)
-                .sum::<f64>() / indicators.len() as f64;
+            let max_severity = indicators.iter().map(|i| i.severity).fold(0.0f64, f64::max);
+            let avg_severity: f64 =
+                indicators.iter().map(|i| i.severity).sum::<f64>() / indicators.len() as f64;
             (max_severity * 0.6 + avg_severity * 0.4).min(1.0)
         };
 
         // Update history
-        let history_entry = self.history
+        let history_entry = self
+            .history
             .entry(agent.agent_id.as_str().to_string())
             .or_default();
         history_entry.push_back(suspicion_score);
@@ -261,12 +259,17 @@ impl GamingDetector {
 }
 
 // Pattern detection functions
-fn detect_success_inflation(agent: &InstrumentalActor, config: &GamingDetectionConfig) -> Option<GamingIndicator> {
+fn detect_success_inflation(
+    agent: &InstrumentalActor,
+    config: &GamingDetectionConfig,
+) -> Option<GamingIndicator> {
     if agent.behavior_log.len() < config.min_actions_for_analysis {
         return None;
     }
 
-    let successes = agent.behavior_log.iter()
+    let successes = agent
+        .behavior_log
+        .iter()
         .filter(|e| e.outcome == ActionOutcome::Success)
         .count();
     let success_rate = successes as f64 / agent.behavior_log.len() as f64;
@@ -274,16 +277,27 @@ fn detect_success_inflation(agent: &InstrumentalActor, config: &GamingDetectionC
     if success_rate > config.suspicious_success_rate {
         Some(GamingIndicator {
             indicator_type: "success_inflation".to_string(),
-            severity: (success_rate - config.suspicious_success_rate) / (1.0 - config.suspicious_success_rate),
-            description: format!("Suspiciously high success rate: {:.1}%", success_rate * 100.0),
-            evidence: format!("{} successes out of {} actions", successes, agent.behavior_log.len()),
+            severity: (success_rate - config.suspicious_success_rate)
+                / (1.0 - config.suspicious_success_rate),
+            description: format!(
+                "Suspiciously high success rate: {:.1}%",
+                success_rate * 100.0
+            ),
+            evidence: format!(
+                "{} successes out of {} actions",
+                successes,
+                agent.behavior_log.len()
+            ),
         })
     } else {
         None
     }
 }
 
-fn detect_timing_manipulation(agent: &InstrumentalActor, config: &GamingDetectionConfig) -> Option<GamingIndicator> {
+fn detect_timing_manipulation(
+    agent: &InstrumentalActor,
+    config: &GamingDetectionConfig,
+) -> Option<GamingIndicator> {
     if agent.behavior_log.len() < config.min_actions_for_analysis {
         return None;
     }
@@ -298,7 +312,8 @@ fn detect_timing_manipulation(agent: &InstrumentalActor, config: &GamingDetectio
     timestamps.sort();
 
     // Compute intervals safely (use saturating_sub in case of any edge case)
-    let intervals: Vec<f64> = timestamps.windows(2)
+    let intervals: Vec<f64> = timestamps
+        .windows(2)
         .map(|w| w[1].saturating_sub(w[0]) as f64)
         .filter(|&i| i > 0.0) // Skip zero intervals
         .collect();
@@ -312,9 +327,11 @@ fn detect_timing_manipulation(agent: &InstrumentalActor, config: &GamingDetectio
         return None;
     }
 
-    let variance: f64 = intervals.iter()
+    let variance: f64 = intervals
+        .iter()
         .map(|i| ((i - mean_interval) / mean_interval).powi(2))
-        .sum::<f64>() / intervals.len() as f64;
+        .sum::<f64>()
+        / intervals.len() as f64;
     let coefficient_of_variation = variance.sqrt();
 
     // Very low variance suggests automated/scripted behavior
@@ -323,15 +340,20 @@ fn detect_timing_manipulation(agent: &InstrumentalActor, config: &GamingDetectio
             indicator_type: "timing_manipulation".to_string(),
             severity: 1.0 - (coefficient_of_variation / config.timing_variance_threshold),
             description: "Suspiciously regular action timing (possible automation)".to_string(),
-            evidence: format!("Coefficient of variation: {:.3} (threshold: {:.3})",
-                             coefficient_of_variation, config.timing_variance_threshold),
+            evidence: format!(
+                "Coefficient of variation: {:.3} (threshold: {:.3})",
+                coefficient_of_variation, config.timing_variance_threshold
+            ),
         })
     } else {
         None
     }
 }
 
-fn detect_activity_bursting(agent: &InstrumentalActor, config: &GamingDetectionConfig) -> Option<GamingIndicator> {
+fn detect_activity_bursting(
+    agent: &InstrumentalActor,
+    config: &GamingDetectionConfig,
+) -> Option<GamingIndicator> {
     if agent.behavior_log.len() < config.min_actions_for_analysis * 2 {
         return None;
     }
@@ -340,7 +362,9 @@ fn detect_activity_bursting(agent: &InstrumentalActor, config: &GamingDetectionC
     let window_start = now.saturating_sub(config.analysis_window_secs);
 
     // Split into recent half and older half
-    let in_window: Vec<_> = agent.behavior_log.iter()
+    let in_window: Vec<_> = agent
+        .behavior_log
+        .iter()
         .filter(|e| e.timestamp >= window_start)
         .collect();
 
@@ -361,23 +385,31 @@ fn detect_activity_bursting(agent: &InstrumentalActor, config: &GamingDetectionC
     if burst_ratio > config.burst_ratio_threshold {
         Some(GamingIndicator {
             indicator_type: "activity_bursting".to_string(),
-            severity: ((burst_ratio - config.burst_ratio_threshold) / config.burst_ratio_threshold).min(1.0),
+            severity: ((burst_ratio - config.burst_ratio_threshold) / config.burst_ratio_threshold)
+                .min(1.0),
             description: "Suspicious activity burst pattern".to_string(),
-            evidence: format!("Recent: {} actions, Older: {} actions (ratio: {:.1}x)",
-                             recent_count, older_count, burst_ratio),
+            evidence: format!(
+                "Recent: {} actions, Older: {} actions (ratio: {:.1}x)",
+                recent_count, older_count, burst_ratio
+            ),
         })
     } else {
         None
     }
 }
 
-fn detect_epistemic_gaming(agent: &InstrumentalActor, config: &GamingDetectionConfig) -> Option<GamingIndicator> {
+fn detect_epistemic_gaming(
+    agent: &InstrumentalActor,
+    config: &GamingDetectionConfig,
+) -> Option<GamingIndicator> {
     // Check if agent consistently claims high epistemic levels but has poor verification
     if agent.output_history.len() < config.min_actions_for_analysis {
         return None;
     }
 
-    let high_e_claims: Vec<_> = agent.output_history.iter()
+    let high_e_claims: Vec<_> = agent
+        .output_history
+        .iter()
         .filter(|o| o.classification.empirical as u8 >= 3) // E3 or E4
         .collect();
 
@@ -391,8 +423,14 @@ fn detect_epistemic_gaming(agent: &InstrumentalActor, config: &GamingDetectionCo
         return None; // Not enough verified to judge
     }
 
-    let correct = verified.iter()
-        .filter(|o| matches!(o.verification_outcome, Some(super::VerificationOutcome::Correct)))
+    let correct = verified
+        .iter()
+        .filter(|o| {
+            matches!(
+                o.verification_outcome,
+                Some(super::VerificationOutcome::Correct)
+            )
+        })
         .count();
     let accuracy = correct as f64 / verified.len() as f64;
 
@@ -404,8 +442,13 @@ fn detect_epistemic_gaming(agent: &InstrumentalActor, config: &GamingDetectionCo
             indicator_type: "epistemic_gaming".to_string(),
             severity: (expected_accuracy - accuracy) / expected_accuracy,
             description: "High epistemic claims with poor verification accuracy".to_string(),
-            evidence: format!("{} correct out of {} verified high-E outputs ({:.1}% vs expected {:.1}%)",
-                             correct, verified.len(), accuracy * 100.0, expected_accuracy * 100.0),
+            evidence: format!(
+                "{} correct out of {} verified high-E outputs ({:.1}% vs expected {:.1}%)",
+                correct,
+                verified.len(),
+                accuracy * 100.0,
+                expected_accuracy * 100.0
+            ),
         })
     } else {
         None
@@ -486,7 +529,10 @@ impl SybilDetector {
         // Group agents by sponsor
         let mut by_sponsor: HashMap<&str, Vec<&InstrumentalActor>> = HashMap::new();
         for agent in agents {
-            by_sponsor.entry(&agent.sponsor_did).or_default().push(*agent);
+            by_sponsor
+                .entry(&agent.sponsor_did)
+                .or_default()
+                .push(*agent);
         }
 
         // Find sponsors with multiple agents that have correlated behavior
@@ -499,16 +545,23 @@ impl SybilDetector {
             let kvectors: Vec<_> = sponsor_agents.iter().map(|a| &a.k_vector).collect();
             let similarities = self.compute_kvector_similarities(&kvectors);
 
-            let avg_similarity: f64 = similarities.iter().sum::<f64>() / similarities.len().max(1) as f64;
+            let avg_similarity: f64 =
+                similarities.iter().sum::<f64>() / similarities.len().max(1) as f64;
 
             if avg_similarity > self.similarity_threshold {
                 return Some(SybilEvidence {
-                    suspected_agents: sponsor_agents.iter().map(|a| a.agent_id.as_str().to_string()).collect(),
-                    confidence: (avg_similarity - self.similarity_threshold) / (1.0 - self.similarity_threshold),
+                    suspected_agents: sponsor_agents
+                        .iter()
+                        .map(|a| a.agent_id.as_str().to_string())
+                        .collect(),
+                    confidence: (avg_similarity - self.similarity_threshold)
+                        / (1.0 - self.similarity_threshold),
                     evidence_type: SybilEvidenceType::CorrelatedSponsorAgents,
                     details: format!(
                         "Sponsor {} has {} agents with {:.1}% K-Vector similarity",
-                        sponsor, sponsor_agents.len(), avg_similarity * 100.0
+                        sponsor,
+                        sponsor_agents.len(),
+                        avg_similarity * 100.0
                     ),
                 });
             }
@@ -542,16 +595,21 @@ impl SybilDetector {
 
         for (agent_id, timestamp) in &all_times {
             let window = timestamp / window_size;
-            window_agents.entry(window).or_default().insert(agent_id.clone());
+            window_agents
+                .entry(window)
+                .or_default()
+                .insert(agent_id.clone());
         }
 
         // Find windows with many different agents
-        let suspicious_windows: Vec<_> = window_agents.iter()
+        let suspicious_windows: Vec<_> = window_agents
+            .iter()
             .filter(|(_, agents)| agents.len() >= self.min_ring_size)
             .collect();
 
         if suspicious_windows.len() > 5 {
-            let all_suspects: HashSet<_> = suspicious_windows.iter()
+            let all_suspects: HashSet<_> = suspicious_windows
+                .iter()
                 .flat_map(|(_, agents)| agents.iter().cloned())
                 .collect();
 
@@ -561,7 +619,8 @@ impl SybilDetector {
                 evidence_type: SybilEvidenceType::SynchronizedTiming,
                 details: format!(
                     "{} time windows with {} or more agents active simultaneously",
-                    suspicious_windows.len(), self.min_ring_size
+                    suspicious_windows.len(),
+                    self.min_ring_size
                 ),
             });
         }
@@ -587,7 +646,8 @@ fn kvector_similarity(a: &KVector, b: &KVector) -> f64 {
     let dims_a = [a.k_r, a.k_a, a.k_i, a.k_p, a.k_m, a.k_s, a.k_h, a.k_topo];
     let dims_b = [b.k_r, b.k_a, b.k_i, b.k_p, b.k_m, b.k_s, b.k_h, b.k_topo];
 
-    let diff_sum: f64 = dims_a.iter()
+    let diff_sum: f64 = dims_a
+        .iter()
         .zip(dims_b.iter())
         .map(|(x, y)| ((*x as f64) - (*y as f64)).abs())
         .sum();
@@ -734,7 +794,9 @@ impl CollusionDetector {
 
     fn detect_vote_coordination(&self) -> Option<CollusionEvidence> {
         // Look for agents that vote identically on multiple topics
-        let vote_interactions: Vec<_> = self.interactions.iter()
+        let vote_interactions: Vec<_> = self
+            .interactions
+            .iter()
             .filter(|i| i.interaction_type == "vote")
             .collect();
 
@@ -745,7 +807,10 @@ impl CollusionDetector {
         // Group by topic (using value as topic proxy)
         let mut votes_by_agent: HashMap<String, Vec<f64>> = HashMap::new();
         for v in vote_interactions {
-            votes_by_agent.entry(v.from_agent.clone()).or_default().push(v.value);
+            votes_by_agent
+                .entry(v.from_agent.clone())
+                .or_default()
+                .push(v.value);
         }
 
         // Find agents with highly correlated vote patterns
@@ -760,7 +825,9 @@ impl CollusionDetector {
                 if votes_i.len() >= 5 && votes_j.len() >= 5 {
                     // Simple correlation: count identical votes
                     let min_len = votes_i.len().min(votes_j.len());
-                    let identical = votes_i.iter().take(min_len)
+                    let identical = votes_i
+                        .iter()
+                        .take(min_len)
                         .zip(votes_j.iter().take(min_len))
                         .filter(|(a, b)| (**a - **b).abs() < 0.01)
                         .count();
@@ -879,7 +946,8 @@ impl QuarantineManager {
 
     /// Check if agent is quarantined
     pub fn is_quarantined(&self, agent_id: &str) -> bool {
-        self.entries.get(agent_id)
+        self.entries
+            .get(agent_id)
             .map(|e| !matches!(e.review_status, ReviewStatus::Cleared))
             .unwrap_or(false)
     }
@@ -917,8 +985,14 @@ impl QuarantineManager {
 
     /// Get pending reviews
     pub fn pending_reviews(&self) -> Vec<&QuarantineEntry> {
-        self.entries.values()
-            .filter(|e| matches!(e.review_status, ReviewStatus::Pending | ReviewStatus::UnderReview))
+        self.entries
+            .values()
+            .filter(|e| {
+                matches!(
+                    e.review_status,
+                    ReviewStatus::Pending | ReviewStatus::UnderReview
+                )
+            })
             .collect()
     }
 }
@@ -931,7 +1005,9 @@ impl QuarantineManager {
 mod tests {
     use super::*;
     use crate::agentic::UncertaintyCalibration;
-    use crate::agentic::{AgentId, AgentClass, AgentConstraints, AgentStatus, EpistemicStats, BehaviorLogEntry};
+    use crate::agentic::{
+        AgentClass, AgentConstraints, AgentId, AgentStatus, BehaviorLogEntry, EpistemicStats,
+    };
     use crate::matl::KVector;
 
     fn create_test_agent(id: &str, sponsor: &str) -> InstrumentalActor {
@@ -961,9 +1037,10 @@ mod tests {
         let mut agent = create_test_agent("clean-agent", "sponsor-1");
 
         // Add normal behavior with varied timing (human-like)
-        let varied_intervals = [45, 180, 90, 300, 60, 150, 200, 75, 120, 240,
-                                55, 170, 85, 310, 65, 145, 210, 80, 125, 230,
-                                50, 175, 95, 290, 70, 155, 195, 78, 130, 250];
+        let varied_intervals = [
+            45, 180, 90, 300, 60, 150, 200, 75, 120, 240, 55, 170, 85, 310, 65, 145, 210, 80, 125,
+            230, 50, 175, 95, 290, 70, 155, 195, 78, 130, 250,
+        ];
         let mut timestamp = 1000u64;
         for (i, &interval) in varied_intervals.iter().enumerate() {
             timestamp += interval;
@@ -972,14 +1049,25 @@ mod tests {
                 action_type: "process".to_string(),
                 kredit_consumed: 10,
                 counterparties: vec![],
-                outcome: if i % 4 == 0 { ActionOutcome::Error } else { ActionOutcome::Success },
+                outcome: if i % 4 == 0 {
+                    ActionOutcome::Error
+                } else {
+                    ActionOutcome::Success
+                },
             });
         }
 
         let result = detector.analyze(&agent, timestamp + 1000);
         // Clean agent should have low suspicion (allowing for some margin)
-        assert!(result.suspicion_score < 0.5, "Suspicion score too high: {}", result.suspicion_score);
-        assert!(matches!(result.recommended_action, GamingResponse::None | GamingResponse::IncreasedMonitoring));
+        assert!(
+            result.suspicion_score < 0.5,
+            "Suspicion score too high: {}",
+            result.suspicion_score
+        );
+        assert!(matches!(
+            result.recommended_action,
+            GamingResponse::None | GamingResponse::IncreasedMonitoring
+        ));
     }
 
     #[test]
@@ -1000,7 +1088,9 @@ mod tests {
 
         let result = detector.analyze(&agent, 5000);
         assert!(result.suspicion_score > 0.3);
-        assert!(result.detected_attacks.contains(&GamingAttackType::SuccessInflation));
+        assert!(result
+            .detected_attacks
+            .contains(&GamingAttackType::SuccessInflation));
     }
 
     #[test]
@@ -1022,7 +1112,9 @@ mod tests {
         let evidence = detector.analyze_group(&agents);
 
         assert!(!evidence.is_empty());
-        assert!(evidence.iter().any(|e| matches!(e.evidence_type, SybilEvidenceType::CorrelatedSponsorAgents)));
+        assert!(evidence
+            .iter()
+            .any(|e| matches!(e.evidence_type, SybilEvidenceType::CorrelatedSponsorAgents)));
     }
 
     #[test]
@@ -1093,21 +1185,28 @@ mod tests {
     fn behavior_log_strategy(count: usize) -> impl Strategy<Value = Vec<BehaviorLogEntry>> {
         prop::collection::vec(
             (
-                1000u64..100000u64,           // timestamp
-                0.0f64..1.0f64,               // success probability
+                1000u64..100000u64, // timestamp
+                0.0f64..1.0f64,     // success probability
                 prop::collection::vec(any::<u8>().prop_map(|b| format!("peer_{}", b)), 0..5),
             ),
-            count
-        ).prop_map(|entries| {
-            let mut log: Vec<BehaviorLogEntry> = entries.into_iter().enumerate().map(|(i, (ts, p, peers))| {
-                BehaviorLogEntry {
+            count,
+        )
+        .prop_map(|entries| {
+            let mut log: Vec<BehaviorLogEntry> = entries
+                .into_iter()
+                .enumerate()
+                .map(|(i, (ts, p, peers))| BehaviorLogEntry {
                     timestamp: ts + i as u64 * 60,
                     action_type: "test_action".to_string(),
                     kredit_consumed: 10,
                     counterparties: peers,
-                    outcome: if p > 0.5 { ActionOutcome::Success } else { ActionOutcome::Error },
-                }
-            }).collect();
+                    outcome: if p > 0.5 {
+                        ActionOutcome::Success
+                    } else {
+                        ActionOutcome::Error
+                    },
+                })
+                .collect();
             log.sort_by_key(|e| e.timestamp);
             log
         })

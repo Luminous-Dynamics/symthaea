@@ -11,11 +11,11 @@
 //! ## 4D Extended Classification (E/N/M/H) - GIS v4.0
 //! - **H-Axis (Harmonic)**: Resonance with Kosmic Song consciousness metrics (H0-H4)
 
-mod cube;
 mod claims;
+mod cube;
 
+pub use claims::{ClaimBuilder, EpistemicClaim};
 pub use cube::{
-    EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-    EpistemicClassification, EpistemicClassificationExtended,
+    EmpiricalLevel, EpistemicClassification, EpistemicClassificationExtended, HarmonicLevel,
+    MaterialityLevel, NormativeLevel,
 };
-pub use claims::{EpistemicClaim, ClaimBuilder};

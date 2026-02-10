@@ -13,15 +13,15 @@ use mycelix_sdk::*;
 fn test_kvector_creation_and_trust_score() {
     // Create KVector with all 10 dimensions
     let kv = KVector::new(
-        0.8, // k_r (reputation)
-        0.6, // k_a (activity)
-        0.9, // k_i (integrity)
-        0.7, // k_p (performance)
-        0.3, // k_m (membership)
-        0.5, // k_s (stake)
-        0.6, // k_h (historical)
-        0.4, // k_topo (topology)
-        0.7, // k_v (verification)
+        0.8,  // k_r (reputation)
+        0.6,  // k_a (activity)
+        0.9,  // k_i (integrity)
+        0.7,  // k_p (performance)
+        0.3,  // k_m (membership)
+        0.5,  // k_s (stake)
+        0.6,  // k_h (historical)
+        0.4,  // k_topo (topology)
+        0.7,  // k_v (verification)
         0.65, // k_phi (coherence)
     );
 
@@ -94,10 +94,7 @@ fn test_epistemic_classification() {
     assert_eq!(claim.materiality, MaterialityLevel::M2Persistent);
 
     // Test that it meets lower standards
-    assert!(claim.meets_standard(
-        EmpiricalLevel::E2PrivateVerify,
-        NormativeLevel::N1Communal,
-    ));
+    assert!(claim.meets_standard(EmpiricalLevel::E2PrivateVerify, NormativeLevel::N1Communal,));
 }
 
 /// Test gaming detection configuration
@@ -141,7 +138,9 @@ fn test_fedavg_aggregation() {
     coordinator.submit_update(update3);
 
     // Aggregate round
-    let result = coordinator.aggregate_round().expect("Aggregation should succeed");
+    let result = coordinator
+        .aggregate_round()
+        .expect("Aggregation should succeed");
 
     // Should produce a weighted average
     assert_eq!(result.gradients.len(), 2);

@@ -177,8 +177,16 @@ impl WasmKVector {
     pub fn to_json(&self) -> String {
         format!(
             r#"{{"k_r":{},"k_a":{},"k_i":{},"k_p":{},"k_m":{},"k_s":{},"k_h":{},"k_topo":{},"k_v":{},"k_phi":{}}}"#,
-            self.k_r, self.k_a, self.k_i, self.k_p, self.k_m,
-            self.k_s, self.k_h, self.k_topo, self.k_v, self.k_phi
+            self.k_r,
+            self.k_a,
+            self.k_i,
+            self.k_p,
+            self.k_m,
+            self.k_s,
+            self.k_h,
+            self.k_topo,
+            self.k_v,
+            self.k_phi
         )
     }
 }
@@ -193,15 +201,15 @@ impl WasmKVector {
 pub fn wasm_compute_trust_score(kvector: &WasmKVector) -> f64 {
     // Default weights
     let weights = [
-        (kvector.k_r, 0.20),   // Reputation
-        (kvector.k_a, 0.10),   // Activity
-        (kvector.k_i, 0.20),   // Integrity
-        (kvector.k_p, 0.15),   // Performance
-        (kvector.k_m, 0.10),   // Membership
-        (kvector.k_s, 0.05),   // Stake
-        (kvector.k_h, 0.10),   // Historical
+        (kvector.k_r, 0.20),    // Reputation
+        (kvector.k_a, 0.10),    // Activity
+        (kvector.k_i, 0.20),    // Integrity
+        (kvector.k_p, 0.15),    // Performance
+        (kvector.k_m, 0.10),    // Membership
+        (kvector.k_s, 0.05),    // Stake
+        (kvector.k_h, 0.10),    // Historical
         (kvector.k_topo, 0.05), // Topology
-        (kvector.k_v, 0.025),  // Verification
+        (kvector.k_v, 0.025),   // Verification
         (kvector.k_phi, 0.025), // Coherence
     ];
 
@@ -383,7 +391,8 @@ impl WasmAgentGroup {
         if self.members.iter().any(|(id, _)| id == agent_id) {
             return false;
         }
-        self.members.push((agent_id.to_string(), trust.clamp(0.0, 1.0)));
+        self.members
+            .push((agent_id.to_string(), trust.clamp(0.0, 1.0)));
         true
     }
 
@@ -448,7 +457,8 @@ impl WasmAgentGroup {
         };
 
         // Remove existing vote if any
-        self.votes.retain(|v| !(v.proposal_id == proposal_id && v.agent_id == agent_id));
+        self.votes
+            .retain(|v| !(v.proposal_id == proposal_id && v.agent_id == agent_id));
 
         // Add vote
         self.votes.push(WasmVote {
@@ -525,8 +535,13 @@ impl WasmAgentGroup {
 
         format!(
             r#"{{"proposalId":"{}","decision":"{}","approvalWeight":{},"rejectionWeight":{},"abstentionWeight":{},"participationRate":{},"quorumReached":{}}}"#,
-            proposal_id, decision, approval_weight, rejection_weight, abstention_weight,
-            participation_rate, quorum_reached
+            proposal_id,
+            decision,
+            approval_weight,
+            rejection_weight,
+            abstention_weight,
+            participation_rate,
+            quorum_reached
         )
     }
 }

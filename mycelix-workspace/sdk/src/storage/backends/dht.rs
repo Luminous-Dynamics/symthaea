@@ -11,8 +11,6 @@
 //! - Capability-based access control (CapBAC) support
 //! - Simulation mode for testing without Holochain runtime
 
-
-
 //! # Architecture
 //!
 //! In production, this backend communicates with Holochain zomes:
@@ -22,13 +20,12 @@
 //! For testing, simulation mode provides in-memory DHT simulation.
 
 use crate::epistemic::EpistemicClassification;
-use crate::storage::types::{StorageMetadata, SchemaIdentity, StoredData};
+use crate::storage::types::{SchemaIdentity, StorageMetadata, StoredData};
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
-
 
 /// DHT backend configuration
 #[derive(Debug, Clone)]
@@ -212,7 +209,10 @@ impl DHTBackend {
     }
 
     /// Get data by entry hash directly
-    pub fn get_by_hash<T: for<'de> Deserialize<'de>>(&self, entry_hash: &str) -> Option<StoredData<T>> {
+    pub fn get_by_hash<T: for<'de> Deserialize<'de>>(
+        &self,
+        entry_hash: &str,
+    ) -> Option<StoredData<T>> {
         if self.config.simulation_mode {
             self.get_simulated(entry_hash)
         } else {
@@ -221,7 +221,10 @@ impl DHTBackend {
     }
 
     /// Get from simulated DHT
-    fn get_simulated<T: for<'de> Deserialize<'de>>(&self, entry_hash: &str) -> Option<StoredData<T>> {
+    fn get_simulated<T: for<'de> Deserialize<'de>>(
+        &self,
+        entry_hash: &str,
+    ) -> Option<StoredData<T>> {
         let entries = self.simulated_entries.read().ok()?;
         let serialized = entries.get(entry_hash)?;
 
@@ -256,7 +259,10 @@ impl DHTBackend {
     }
 
     /// Get from real Holochain (placeholder)
-    fn get_from_holochain<T: for<'de> Deserialize<'de>>(&self, entry_hash: &str) -> Option<StoredData<T>> {
+    fn get_from_holochain<T: for<'de> Deserialize<'de>>(
+        &self,
+        entry_hash: &str,
+    ) -> Option<StoredData<T>> {
         // In a real implementation, this would:
         // 1. Connect to Holochain conductor via WebSocket
         // 2. Call zome function: get_storage_entry(entry_hash)
@@ -290,7 +296,9 @@ impl DHTBackend {
                 // Get existing entry version
                 let entries = self.simulated_entries.read().ok()?;
                 if let Some(serialized) = entries.get(existing_hash) {
-                    if let Ok(existing) = serde_json::from_str::<DHTEntry<serde_json::Value>>(serialized) {
+                    if let Ok(existing) =
+                        serde_json::from_str::<DHTEntry<serde_json::Value>>(serialized)
+                    {
                         (existing.version + 1, Some(existing_hash.clone()))
                     } else {
                         (1, None)
@@ -664,7 +672,7 @@ fn hex_encode(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+    use crate::epistemic::{EmpiricalLevel, MaterialityLevel, NormativeLevel};
 
     fn test_classification() -> EpistemicClassification {
         EpistemicClassification::new(
@@ -717,11 +725,29 @@ mod tests {
         let class = test_classification();
 
         // First version
-        let meta1 = backend.set("versioned", &"v1", class.clone(), schema.clone(), "agent", None).unwrap();
+        let meta1 = backend
+            .set(
+                "versioned",
+                &"v1",
+                class.clone(),
+                schema.clone(),
+                "agent",
+                None,
+            )
+            .unwrap();
         assert_eq!(meta1.version, 1);
 
         // Update (new version)
-        let meta2 = backend.set("versioned", &"v2", class.clone(), schema.clone(), "agent", None).unwrap();
+        let meta2 = backend
+            .set(
+                "versioned",
+                &"v2",
+                class.clone(),
+                schema.clone(),
+                "agent",
+                None,
+            )
+            .unwrap();
         assert_eq!(meta2.version, 2);
 
         // Hashes should be different
@@ -750,9 +776,30 @@ mod tests {
             MaterialityLevel::M2Persistent,
         );
 
-        backend.set("key1", &"value1", class_e2_n1_m2.clone(), schema.clone(), "agent", None);
-        backend.set("key2", &"value2", class_e2_n1_m2.clone(), schema.clone(), "agent", None);
-        backend.set("key3", &"value3", class_e3_n2_m2.clone(), schema.clone(), "agent", None);
+        backend.set(
+            "key1",
+            &"value1",
+            class_e2_n1_m2.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "key2",
+            &"value2",
+            class_e2_n1_m2.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "key3",
+            &"value3",
+            class_e3_n2_m2.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
 
         // Query by E level
         let e2_results = backend.query_by_classification(Some(2), None, None);
@@ -777,9 +824,30 @@ mod tests {
         let schema = SchemaIdentity::new("test", "1.0");
         let class = test_classification();
 
-        backend.set("key1", &"value1", class.clone(), schema.clone(), "agent", None);
-        backend.set("key2", &"value2", class.clone(), schema.clone(), "agent", None);
-        backend.set("other", &"value3", class.clone(), schema.clone(), "agent", None);
+        backend.set(
+            "key1",
+            &"value1",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "key2",
+            &"value2",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "other",
+            &"value3",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
 
         // All keys
         let all_keys = backend.keys(None);
@@ -797,8 +865,22 @@ mod tests {
         let schema = SchemaIdentity::new("test", "1.0");
         let class = test_classification();
 
-        backend.set("stat1", &"value1", class.clone(), schema.clone(), "agent", None);
-        backend.set("stat2", &"value2", class.clone(), schema.clone(), "agent", None);
+        backend.set(
+            "stat1",
+            &"value1",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "stat2",
+            &"value2",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
 
         // Retrieve one
         let _: Option<StoredData<String>> = backend.get("stat1");
@@ -822,8 +904,22 @@ mod tests {
         let schema = SchemaIdentity::new("test", "1.0");
         let class = test_classification();
 
-        backend.set("clear1", &"value1", class.clone(), schema.clone(), "agent", None);
-        backend.set("clear2", &"value2", class.clone(), schema.clone(), "agent", None);
+        backend.set(
+            "clear1",
+            &"value1",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "clear2",
+            &"value2",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
 
         assert_eq!(backend.keys(None).len(), 2);
 
@@ -838,6 +934,6 @@ mod tests {
         let hash = DHTBackend::compute_hash(content);
 
         assert!(hash.starts_with("hC")); // Holochain-style prefix
-        assert_eq!(hash.len(), 2 + 64);  // "hC" + 64 hex chars (SHA3-256)
+        assert_eq!(hash.len(), 2 + 64); // "hC" + 64 hex chars (SHA3-256)
     }
 }

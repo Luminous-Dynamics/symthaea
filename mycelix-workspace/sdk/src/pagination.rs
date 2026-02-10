@@ -163,7 +163,6 @@ pub fn paginate_vec<T: Clone>(items: Vec<T>, request: &PaginationRequest) -> Pag
 
 /// Cursor encoding/decoding utilities
 pub mod cursor {
-    
 
     /// Encode a cursor from timestamp and optional ID
     pub fn encode(timestamp_micros: i64, id: Option<&str>) -> String {

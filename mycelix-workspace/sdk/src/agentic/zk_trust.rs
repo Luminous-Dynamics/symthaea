@@ -24,11 +24,11 @@
 //! WARNING: Never use simulation mode in production!
 
 use serde::{Deserialize, Serialize};
-use sha3::{Sha3_256, Digest};
+use sha3::{Digest, Sha3_256};
 use std::collections::HashMap;
 
-use crate::matl::{KVector, KVectorDimension, GovernanceTier};
-use super::provenance::{ProvenanceChain, DerivationType};
+use super::provenance::{DerivationType, ProvenanceChain};
+use crate::matl::{GovernanceTier, KVector, KVectorDimension};
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -102,19 +102,18 @@ pub enum ProofStatement {
     /// Compound: All of the given statements are true
     And(
         /// List of statements that must all be true
-        Vec<ProofStatement>
+        Vec<ProofStatement>,
     ),
 
     /// Compound: At least one of the given statements is true
     Or(
         /// List of statements, at least one must be true
-        Vec<ProofStatement>
+        Vec<ProofStatement>,
     ),
 
     // ========================================================================
     // Provenance-Related Proofs (Option C)
     // ========================================================================
-
     /// Prove output was derived from sources at minimum epistemic level
     /// "I derived this from E3+ sources" without revealing which ones
     ProvenanceEpistemicFloor {
@@ -169,7 +168,10 @@ impl ProofStatement {
 
     /// Create a dimension threshold proof
     pub fn dimension_above(dimension: KVectorDimension, threshold: f32) -> Self {
-        Self::DimensionExceedsThreshold { dimension, threshold }
+        Self::DimensionExceedsThreshold {
+            dimension,
+            threshold,
+        }
     }
 
     /// Create a governance tier proof
@@ -205,7 +207,11 @@ impl ProofStatement {
     }
 
     /// Prove combined provenance quality
-    pub fn provenance_quality(min_epistemic_level: u8, max_chain_depth: u32, min_confidence: f64) -> Self {
+    pub fn provenance_quality(
+        min_epistemic_level: u8,
+        max_chain_depth: u32,
+        min_confidence: f64,
+    ) -> Self {
         Self::ProvenanceQuality {
             min_epistemic_level,
             max_chain_depth,
@@ -272,7 +278,12 @@ impl KVectorCommitment {
 }
 
 /// Compute Pedersen-style commitment (simplified for simulation)
-fn compute_commitment(kvector: &KVector, agent_id: &str, timestamp: u64, blinding: &[u8; 32]) -> [u8; 32] {
+fn compute_commitment(
+    kvector: &KVector,
+    agent_id: &str,
+    timestamp: u64,
+    blinding: &[u8; 32],
+) -> [u8; 32] {
     let mut hasher = Sha3_256::new();
 
     // Domain separation
@@ -484,9 +495,7 @@ impl TrustProver {
                 let curr_val = get_dimension(current, dim);
                 curr_val > prev_val
             }
-            None => {
-                current.trust_score() > previous.trust_score()
-            }
+            None => current.trust_score() > previous.trust_score(),
         };
 
         // Create statement
@@ -587,10 +596,8 @@ impl TrustProver {
         let result = trust_result && prov_result;
 
         // Create combined statement
-        let combined_statement = ProofStatement::And(vec![
-            trust_statement.clone(),
-            provenance_statement.clone(),
-        ]);
+        let combined_statement =
+            ProofStatement::And(vec![trust_statement.clone(), provenance_statement.clone()]);
 
         // Create commitment
         let commitment = self.commit(kvector, blinding);
@@ -679,13 +686,17 @@ impl TrustVerifier {
 
     /// Register a known commitment for future verification
     pub fn register_commitment(&mut self, commitment: KVectorCommitment) {
-        self.known_commitments.insert(commitment.commitment, commitment);
+        self.known_commitments
+            .insert(commitment.commitment, commitment);
     }
 
     /// Verify a proof
     pub fn verify(&self, proof: &TrustProof) -> VerificationResult {
         match &proof.proof_data {
-            ProofData::Simulation { verification_hash, result } => {
+            ProofData::Simulation {
+                verification_hash,
+                result,
+            } => {
                 // Recompute verification hash
                 let mut hasher = Sha3_256::new();
                 hasher.update(b"mycelix-simulation-proof-v1");
@@ -730,7 +741,9 @@ impl TrustVerifier {
     /// Verify and extract result
     pub fn verify_and_get_result(&self, proof: &TrustProof) -> Option<bool> {
         match self.verify(proof) {
-            VerificationResult::Valid { statement_result, .. } => Some(statement_result),
+            VerificationResult::Valid {
+                statement_result, ..
+            } => Some(statement_result),
             _ => None,
         }
     }
@@ -759,7 +772,13 @@ pub enum VerificationResult {
 impl VerificationResult {
     /// Check if verification succeeded and statement was true
     pub fn is_valid_and_true(&self) -> bool {
-        matches!(self, Self::Valid { statement_result: true, .. })
+        matches!(
+            self,
+            Self::Valid {
+                statement_result: true,
+                ..
+            }
+        )
     }
 
     /// Check if verification succeeded (regardless of statement result)
@@ -959,7 +978,11 @@ pub fn evaluate_provenance_statement(
             Ok(chain.verified)
         }
 
-        ProofStatement::ProvenanceQuality { min_epistemic_level, max_chain_depth, min_confidence } => {
+        ProofStatement::ProvenanceQuality {
+            min_epistemic_level,
+            max_chain_depth,
+            min_confidence,
+        } => {
             // Combined quality check
             let floor_ok = chain.head.epistemic_floor as u8 >= *min_epistemic_level;
             let depth_ok = chain.max_depth <= *max_chain_depth;
@@ -1019,7 +1042,7 @@ pub enum AggregateStatement {
     /// All agents prove the same statement
     AllProve(
         /// Statement that all agents must prove
-        ProofStatement
+        ProofStatement,
     ),
 
     /// Threshold of agents must prove true
@@ -1043,16 +1066,15 @@ impl AggregatedTrustProof {
     /// Check if the aggregate statement is satisfied
     pub fn is_satisfied(&self) -> bool {
         match &self.aggregate_statement {
-            AggregateStatement::AllProve(_) => {
-                self.true_count == self.total_count
-            }
+            AggregateStatement::AllProve(_) => self.true_count == self.total_count,
             AggregateStatement::ThresholdProve { threshold, .. } => {
                 let fraction = self.true_count as f64 / self.total_count as f64;
                 fraction >= *threshold
             }
-            AggregateStatement::WeightedThreshold { threshold, .. } => {
-                self.weighted_result.map(|w| w >= *threshold).unwrap_or(false)
-            }
+            AggregateStatement::WeightedThreshold { threshold, .. } => self
+                .weighted_result
+                .map(|w| w >= *threshold)
+                .unwrap_or(false),
         }
     }
 }
@@ -1227,19 +1249,23 @@ mod tests {
         let prover = TrustProver::new(config);
 
         // Should meet Major tier (0.4)
-        let proof = prover.prove(
-            &kv,
-            &ProofStatement::meets_tier(GovernanceTier::Major),
-            &blinding,
-        ).unwrap();
+        let proof = prover
+            .prove(
+                &kv,
+                &ProofStatement::meets_tier(GovernanceTier::Major),
+                &blinding,
+            )
+            .unwrap();
         assert!(TrustVerifier::new().verify(&proof).is_valid_and_true());
 
         // Should NOT meet Constitutional tier (0.6)
-        let proof = prover.prove(
-            &kv,
-            &ProofStatement::meets_tier(GovernanceTier::Constitutional),
-            &blinding,
-        ).unwrap();
+        let proof = prover
+            .prove(
+                &kv,
+                &ProofStatement::meets_tier(GovernanceTier::Constitutional),
+                &blinding,
+            )
+            .unwrap();
         // Actually ~0.68 should meet 0.6 threshold
         assert!(TrustVerifier::new().verify(&proof).is_valid_and_true());
     }
@@ -1314,13 +1340,15 @@ mod tests {
 
         let prover = TrustProver::new(config);
 
-        let proof = prover.prove_improvement(
-            &prev_kv,
-            &curr_kv,
-            None, // Overall trust
-            &prev_blinding,
-            &curr_blinding,
-        ).unwrap();
+        let proof = prover
+            .prove_improvement(
+                &prev_kv,
+                &curr_kv,
+                None, // Overall trust
+                &prev_blinding,
+                &curr_blinding,
+            )
+            .unwrap();
 
         let verifier = TrustVerifier::new();
         assert!(verifier.verify(&proof).is_valid_and_true());
@@ -1341,11 +1369,15 @@ mod tests {
         let prover = TrustProver::new(config);
 
         // Verified agent
-        let proof = prover.prove(&verified_kv, &ProofStatement::IsVerified, &blinding).unwrap();
+        let proof = prover
+            .prove(&verified_kv, &ProofStatement::IsVerified, &blinding)
+            .unwrap();
         assert!(TrustVerifier::new().verify(&proof).is_valid_and_true());
 
         // Unverified agent
-        let proof = prover.prove(&unverified_kv, &ProofStatement::IsVerified, &blinding).unwrap();
+        let proof = prover
+            .prove(&unverified_kv, &ProofStatement::IsVerified, &blinding)
+            .unwrap();
         assert!(!TrustVerifier::new().verify(&proof).is_valid_and_true());
     }
 
@@ -1398,7 +1430,9 @@ mod tests {
         };
 
         let prover = TrustProver::new(config);
-        let proof = prover.prove(&kv, &ProofStatement::WellFormed, &blinding).unwrap();
+        let proof = prover
+            .prove(&kv, &ProofStatement::WellFormed, &blinding)
+            .unwrap();
 
         assert!(TrustVerifier::new().verify(&proof).is_valid_and_true());
     }
@@ -1407,7 +1441,7 @@ mod tests {
     // Provenance Proof Tests (Option C)
     // =========================================================================
 
-    use super::super::provenance::{ProvenanceBuilder, ChainBuilder};
+    use super::super::provenance::{ChainBuilder, ProvenanceBuilder};
 
     fn create_test_chain() -> ProvenanceChain {
         // Create a simple chain: root -> derived
@@ -1416,15 +1450,14 @@ mod tests {
             .epistemic(EmpiricalLevel::E3Cryptographic)
             .build(1000);
 
-        let derived = ProvenanceBuilder::derived(b"Derived insight", "agent-2", DerivationType::Citation)
-            .parent(root.clone())
-            .confidence(0.9)
-            .epistemic(EmpiricalLevel::E3Cryptographic)
-            .build(2000);
+        let derived =
+            ProvenanceBuilder::derived(b"Derived insight", "agent-2", DerivationType::Citation)
+                .parent(root.clone())
+                .confidence(0.9)
+                .epistemic(EmpiricalLevel::E3Cryptographic)
+                .build(2000);
 
-        ChainBuilder::new()
-            .add_node(root)
-            .build(derived)
+        ChainBuilder::new().add_node(root).build(derived)
     }
 
     #[test]
@@ -1532,7 +1565,9 @@ mod tests {
         let prover = TrustProver::new(config);
 
         let statement = ProofStatement::provenance_epistemic_floor(2);
-        let proof = prover.prove_provenance(&chain, &kv, &statement, &blinding).unwrap();
+        let proof = prover
+            .prove_provenance(&chain, &kv, &statement, &blinding)
+            .unwrap();
 
         let verifier = TrustVerifier::new();
         assert!(verifier.verify(&proof).is_valid_and_true());
@@ -1554,13 +1589,9 @@ mod tests {
         let trust_statement = ProofStatement::trust_above(0.5);
         let prov_statement = ProofStatement::provenance_quality(2, 5, 0.7);
 
-        let proof = prover.prove_with_provenance(
-            &kv,
-            &chain,
-            &trust_statement,
-            &prov_statement,
-            &blinding,
-        ).unwrap();
+        let proof = prover
+            .prove_with_provenance(&kv, &chain, &trust_statement, &prov_statement, &blinding)
+            .unwrap();
 
         let verifier = TrustVerifier::new();
         assert!(verifier.verify(&proof).is_valid_and_true());

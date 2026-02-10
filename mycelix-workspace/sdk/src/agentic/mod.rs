@@ -14,45 +14,45 @@
 //! - Constitutional constraints are enforced at the protocol level
 //! - KREDIT allocation derives from trust scores
 
-pub mod kredit;
-pub mod constraints;
-pub mod lifecycle;
-pub mod kvector_bridge;
-pub mod fl_bridge;
-pub mod epistemic_classifier;
-pub mod phi_bridge;
-pub mod uncertainty;
-pub mod calibration_engine;
-pub mod metabolism_engine;
-pub mod multi_agent;
+pub mod adaptive_thresholds;
 pub mod adversarial;
 pub mod adversarial_sim;
-pub mod monitoring;
-pub mod simulation;
-pub mod ml_anomaly;
-pub mod persistence;
-pub mod phi_integration;
-pub mod phi_consensus;
-pub mod provenance;
-pub mod zk_trust;
-pub mod cross_domain;
-pub mod trust_pipeline;
 pub mod api;
-pub mod coordination;
-pub mod orchestration;
-pub mod zk_coordination;
-pub mod temporal_trust;
-pub mod economics;
-pub mod federation;
 pub mod attack_detection;
-pub mod differential_privacy;
+pub mod calibration_engine;
 pub mod cascade_analysis;
+pub mod constraints;
+pub mod coordination;
+pub mod cross_domain;
 pub mod dashboard;
-pub mod adaptive_thresholds;
+pub mod differential_privacy;
+pub mod economics;
+pub mod epistemic_classifier;
+pub mod federation;
+pub mod fl_bridge;
 pub mod game_theory;
-pub mod verification;
-pub mod trust_portability;
 pub mod integration;
+pub mod kredit;
+pub mod kvector_bridge;
+pub mod lifecycle;
+pub mod metabolism_engine;
+pub mod ml_anomaly;
+pub mod monitoring;
+pub mod multi_agent;
+pub mod orchestration;
+pub mod persistence;
+pub mod phi_bridge;
+pub mod phi_consensus;
+pub mod phi_integration;
+pub mod provenance;
+pub mod simulation;
+pub mod temporal_trust;
+pub mod trust_pipeline;
+pub mod trust_portability;
+pub mod uncertainty;
+pub mod verification;
+pub mod zk_coordination;
+pub mod zk_trust;
 
 #[cfg(feature = "parallel")]
 pub mod parallel;
@@ -63,404 +63,636 @@ mod e2e_tests;
 #[cfg(test)]
 mod property_tests;
 
-pub use kredit::{KreditAllocation, SponsorCollateral, consume_kredit};
-pub use constraints::{AgentConstraints, AgentClass, enforce_constraints};
-pub use lifecycle::{create_agent, suspend_agent, revoke_agent};
-pub use kvector_bridge::{
-    KVectorBridgeConfig, BehaviorAnalysis, analyze_behavior,
-    compute_kvector_update, update_agent_kvector, compute_trust_score,
-    calculate_kredit_from_trust, record_and_maybe_update,
-    // Epistemic-weighted K-Vector updates
-    EpistemicOutputAnalysis, analyze_outputs,
-    compute_epistemic_weighted_kvector_update, update_agent_kvector_epistemic,
-};
-pub use fl_bridge::{
-    FLAgentBridge, FLAgentBridgeConfig, FLAgentUpdateResult,
-    apply_fl_feedback_to_agent, apply_fl_feedback_to_agents,
-    delta_from_gradient_quality, FLRoundAgentImpact,
-};
-pub use epistemic_classifier::{
-    AgentOutput, OutputContent, ClassificationHints, AgentOutputBuilder,
-    classify_output, calculate_epistemic_weight, create_classified_output,
-    EpistemicStats, AgreementScope, RelevanceDuration,
-};
-pub use phi_bridge::{
-    CoherenceState, CoherenceCheckResult, CoherenceHistory, AgentPhiResult,
-    PhiMeasurementConfig, measure_phi_simple, check_coherence_for_action,
-    output_to_vector, phi_to_kvector_dimension,
-};
-pub use uncertainty::{
-    MoralUncertainty, MoralUncertaintyType, MoralActionGuidance,
-    EscalationRequest, UncertaintyCalibration, UncertainOutput,
-    get_recommendations, should_proceed, maybe_escalate,
-};
-pub use calibration_engine::{
-    CalibrationBin, CalibrationCurve, CalibrationQuality,
-    AgentCalibrationProfile, KVectorCalibrationAdjustment,
-    CalibrationEngine, CalibrationEngineConfig, CalibrationStats,
-    // Enhanced calibration with epistemic integration
-    EpistemicCalibrationProfile, EpistemicCalibrationQuality,
-    TemporalCalibrationCurve, TimestampedPrediction,
-    EnhancedAgentCalibrationProfile, ComprehensiveCalibrationAdjustment,
-    apply_calibration_to_agent, CalibratedAgent,
-};
-pub use metabolism_engine::{
-    MetabolismEngine, MetabolismEngineConfig, MetabolismState,
-    ResourceFlow, ResourceType, MetabolicProcess, MetabolicRate,
-    MetabolismStats, FlowDirection, ResourceBalance,
-};
-pub use multi_agent::{
-    // Trust-weighted consensus
-    AgentVote, ConsensusResult, ConsensusConfig, compute_consensus,
-    // Cross-agent calibration
-    CalibrationKnowledge, CrossAgentCalibration,
-    // Collaboration protocols
-    CollaborativeTask, CollaborativeTaskType, CollaborativeTaskStatus,
-    TaskContribution, CollaborativeResult, CollaborationManager, CollaborationError,
-    // Reputation propagation
-    AgentInteraction, InteractionType, ReputationPropagation,
+pub use adaptive_thresholds::{
+    // Configuration
+    AdaptiveConfig,
+    // Engine
+    AdaptiveThresholdEngine,
+    // Bandit
+    BanditArm,
+    FeedbackContext,
+    FeedbackOutcome,
+    // Gradient
+    GradientEstimator,
+    RecommendationDirection,
+    ThresholdBandit,
+    // Feedback
+    ThresholdFeedback,
+    ThresholdRecommendation,
+    ThresholdState,
+    // Threshold types
+    ThresholdType,
 };
 pub use adversarial::{
-    // Gaming detection
-    GamingAttackType, GamingDetectionResult, GamingIndicator, GamingResponse,
-    GamingDetectionConfig, GamingDetector,
-    // Sybil resistance
-    SybilEvidence, SybilEvidenceType, SybilDetector,
+    AgentInteractionRecord,
+    CollusionDetector,
     // Collusion detection
-    CollusionEvidence, CollusionType, CollusionDetector, AgentInteractionRecord,
+    CollusionEvidence,
+    CollusionType,
+    // Gaming detection
+    GamingAttackType,
+    GamingDetectionConfig,
+    GamingDetectionResult,
+    GamingDetector,
+    GamingIndicator,
+    GamingResponse,
     // Quarantine system
-    QuarantineEntry, QuarantineReason, ReviewStatus, QuarantineManager,
+    QuarantineEntry,
+    QuarantineManager,
+    QuarantineReason,
+    ReviewStatus,
+    SybilDetector,
+    // Sybil resistance
+    SybilEvidence,
+    SybilEvidenceType,
 };
-pub use monitoring::{
-    // Metrics
-    AgentMetrics, MetricsHistory,
-    // Trust evolution
-    TrustEvent, TrustEventType, KVectorSnapshot,
+pub use api::{
+    // Service
+    AgentApiService,
+    AgentSummary as ApiAgentSummary,
+    // API types
+    ApiError,
+    ApiResult,
+    CalibrationSummary,
+    CreateAgentRequest,
+    CreateAgentResponse,
+    EscalationResolutionResponse,
+    // Escalation API types (GIS integration)
+    EscalationSummary,
+    EventSummary,
+    EventsResponse,
+    KVectorHistoryEntry,
+    KVectorHistoryResponse,
+    KVectorValues,
+    ListAgentsResponse,
+    UpdateAgentRequest,
+};
+pub use attack_detection::{
+    AgentActivityProfile,
     // Alerts
-    AlertType, AlertSeverity, AgentAlert, AlertThresholds,
-    // Engine
-    MonitoringEngine, DashboardSummary,
+    Alert,
+    AlertPipeline,
+    AlertStatus,
+    // Configuration
+    AttackDetectionConfig,
+    AttackPattern,
+    AttackSeverity,
+    // Signatures
+    AttackSignature,
+    DetectedAttackType,
+    // Detection
+    DetectionResult,
+    DetectionStats,
+    EventSource,
+    Evidence,
+    EvidenceType,
+    RecommendedResponse,
+    // Analyzer
+    StreamingAnalyzer,
+    // Events
+    TrustEvent as AttackTrustEvent,
+    TrustEventType as AttackEventType,
 };
-pub use simulation::{
-    // Agent archetypes
-    AgentArchetype, AgentBehaviorConfig,
-    // Simulation engine
-    SimulationConfig, SimulatedAgent, SimulationEngine,
+pub use calibration_engine::{
+    apply_calibration_to_agent,
+    AgentCalibrationProfile,
+    CalibratedAgent,
+    CalibrationBin,
+    CalibrationCurve,
+    CalibrationEngine,
+    CalibrationEngineConfig,
+    CalibrationQuality,
+    CalibrationStats,
+    ComprehensiveCalibrationAdjustment,
+    EnhancedAgentCalibrationProfile,
+    // Enhanced calibration with epistemic integration
+    EpistemicCalibrationProfile,
+    EpistemicCalibrationQuality,
+    KVectorCalibrationAdjustment,
+    TemporalCalibrationCurve,
+    TimestampedPrediction,
+};
+pub use cascade_analysis::{
+    AgentState,
+    // Configuration
+    CascadeConfig,
+    // Engine
+    CascadeEngine,
+    CascadeEvent,
+    CascadeEventType,
     // Results
-    TickResult, SimulationReport,
-    // Predefined scenarios
-    Scenarios,
+    CascadeResult,
+    ContagionPath,
+    CriticalAgent,
+    EdgeType,
+    // Network model
+    NetworkAgent,
+    NetworkEdge,
+    NetworkSnapshot,
+    RecoveryResult,
+    ResilienceScore,
+    TickSnapshot,
+    TopologyAnalysis,
+    TopologyRisk,
+    TrustNetwork,
+};
+pub use constraints::{enforce_constraints, AgentClass, AgentConstraints};
+pub use cross_domain::{
+    analyze_domain_compatibility,
+    compute_domain_trust,
+    translate_path,
+    translate_trust,
+    DimensionTranslation,
+    // Compatibility analysis
+    DomainCompatibility,
+    // Registry
+    DomainRegistry,
+    DomainRelevance,
+    // Domain templates
+    DomainTemplates,
+    // Path translation
+    TranslationPath,
+    // Translation
+    TranslationResult,
+    // Domain types
+    TrustDomain,
+};
+pub use dashboard::{
+    default_layout,
+    AlertAction,
+    AlertActionType,
+    AlertCounts,
+    AlertPanel,
+    AlertSeverity as DashboardAlertSeverity,
+    AlertStatus as DashboardAlertStatus,
+    ChartDataBuilder,
+    ChartType,
+    // Dashboard state
+    Dashboard,
+    // Alerts panel
+    DashboardAlert,
+    // Configuration
+    DashboardConfig,
+    // Events
+    DashboardEvent,
+    DashboardEventType,
+    // Charts
+    DataPoint,
+    EventPriority,
+    EventStream,
+    // Live metrics
+    LiveMetrics,
+    MetricsAggregator,
+    MetricsInput,
+    TimeSeries,
+    // Widgets
+    Widget,
+    WidgetPosition,
+    WidgetSize,
+    WidgetType,
+};
+pub use differential_privacy::{
+    BudgetQuery,
+    ClippingBounds,
+    // Configuration
+    DPConfig,
+    DPRng,
+    // Local DP
+    LocalDP,
+    NoiseGenerator,
+    // Noise mechanisms
+    NoiseMechanism,
+    // Budget
+    PrivacyBudget,
+    // Errors
+    PrivacyError,
+    // Aggregations
+    PrivateAggregator,
+    // Trust analytics
+    PrivateTrustAnalytics,
+    TrustDistribution,
+};
+pub use economics::{
+    // Bonding curves
+    BondingCurve,
+    BondingCurveType,
+    CommitRevealError,
+    CommitRevealVote,
+    // Commit-reveal voting
+    CommitRevealVoting,
+    // Rewards
+    RewardConfig,
+    RewardEngine,
+    RewardEvent,
+    RewardType,
+    SlashEvent,
+    SlashResult,
+    // Slashing
+    SlashingConfig,
+    SlashingEngine,
+    ViolationSeverity,
+    ViolationType,
+    VoteCommitment,
+    VoteReveal,
+};
+pub use epistemic_classifier::{
+    calculate_epistemic_weight, classify_output, create_classified_output, AgentOutput,
+    AgentOutputBuilder, AgreementScope, ClassificationHints, EpistemicStats, OutputContent,
+    RelevanceDuration,
+};
+pub use federation::{
+    AttestationEvidence,
+    BridgeType,
+    CrossSwarmTrust,
+    // Federated consensus
+    FederatedProposal,
+    FederatedProposalState,
+    FederatedProposalType,
+    FederatedVote,
+    FederatedVoteDecision,
+    // Configuration
+    FederationConfig,
+    // Engine
+    FederationEngine,
+    FederationError,
+    FederationStats,
+    SwarmId,
+    SwarmProfile,
+    TransferStatus,
+    // Attestations
+    TrustAttestation,
+    // Bridges
+    TrustBridge,
+    TrustTransfer,
+};
+pub use fl_bridge::{
+    apply_fl_feedback_to_agent, apply_fl_feedback_to_agents, delta_from_gradient_quality,
+    FLAgentBridge, FLAgentBridgeConfig, FLAgentUpdateResult, FLRoundAgentImpact,
+};
+pub use game_theory::{
+    // Pre-built games
+    trust_attestation_game,
+    validate_mechanism,
+    voting_game,
+    ActionCondition,
+    ActionType,
+    EquilibriumFinder,
+    GameDefinition,
+    // Incentive analysis
+    IncentiveAnalysis,
+    IncentiveAnalyzer,
+    MechanismParams,
+    // Mechanism validation
+    MechanismValidation,
+    // Equilibrium
+    NashEquilibrium,
+    // Payoffs
+    PayoffEntry,
+    // Players and strategies
+    Player,
+    PlayerType,
+    ProfitableDeviation,
+    Strategy,
+    StrategyAction,
+};
+pub use kredit::{consume_kredit, KreditAllocation, SponsorCollateral};
+pub use kvector_bridge::{
+    analyze_behavior,
+    analyze_outputs,
+    calculate_kredit_from_trust,
+    compute_epistemic_weighted_kvector_update,
+    compute_kvector_update,
+    compute_trust_score,
+    record_and_maybe_update,
+    update_agent_kvector,
+    update_agent_kvector_epistemic,
+    BehaviorAnalysis,
+    // Epistemic-weighted K-Vector updates
+    EpistemicOutputAnalysis,
+    KVectorBridgeConfig,
+};
+pub use lifecycle::{create_agent, revoke_agent, suspend_agent};
+pub use metabolism_engine::{
+    FlowDirection, MetabolicProcess, MetabolicRate, MetabolismEngine, MetabolismEngineConfig,
+    MetabolismState, MetabolismStats, ResourceBalance, ResourceFlow, ResourceType,
 };
 pub use ml_anomaly::{
     // Feature extraction
     AgentFeatures,
+    AnomalyRecommendation,
+    AnomalyType,
+    // Hybrid detector
+    HybridAnomalyDetector,
+    HybridAnomalyResult,
     // Isolation Forest
-    IsolationForest, IsolationTree,
+    IsolationForest,
+    IsolationTree,
+    MLAnomalyConfig,
+    // ML Ensemble
+    MLAnomalyDetector,
+    MLAnomalyResult,
     // Reconstruction
     ReconstructionDetector,
     // Time-series
-    TimeSeriesAnomalyDetector, TimeSeriesAnomalyResult,
-    // ML Ensemble
-    MLAnomalyDetector, MLAnomalyConfig, MLAnomalyResult,
-    // Hybrid detector
-    HybridAnomalyDetector, HybridAnomalyResult,
-    AnomalyType, AnomalyRecommendation,
+    TimeSeriesAnomalyDetector,
+    TimeSeriesAnomalyResult,
+};
+pub use monitoring::{
+    AgentAlert,
+    // Metrics
+    AgentMetrics,
+    AlertSeverity,
+    AlertThresholds,
+    // Alerts
+    AlertType,
+    DashboardSummary,
+    KVectorSnapshot,
+    MetricsHistory,
+    // Engine
+    MonitoringEngine,
+    // Trust evolution
+    TrustEvent,
+    TrustEventType,
+};
+pub use multi_agent::{
+    compute_consensus,
+    // Reputation propagation
+    AgentInteraction,
+    // Trust-weighted consensus
+    AgentVote,
+    // Cross-agent calibration
+    CalibrationKnowledge,
+    CollaborationError,
+    CollaborationManager,
+    CollaborativeResult,
+    // Collaboration protocols
+    CollaborativeTask,
+    CollaborativeTaskStatus,
+    CollaborativeTaskType,
+    ConsensusConfig,
+    ConsensusResult,
+    CrossAgentCalibration,
+    InteractionType,
+    ReputationPropagation,
+    TaskContribution,
 };
 pub use persistence::{
     // Events
-    AgentEvent, EventLogEntry,
-    KVectorSnapshot as PersistedKVectorSnapshot,
-    // Backend trait and errors
-    AgentStorageBackend, PersistenceError, PersistenceResult,
-    // Memory backend
-    MemoryStorageBackend,
+    AgentEvent,
+    AgentQueryBuilder,
     // Repository
-    AgentRepository, AgentQueryBuilder,
+    AgentRepository,
     // Statistics
     AgentStatistics,
+    // Backend trait and errors
+    AgentStorageBackend,
+    EventLogEntry,
+    KVectorSnapshot as PersistedKVectorSnapshot,
+    // Memory backend
+    MemoryStorageBackend,
+    PersistenceError,
+    PersistenceResult,
 };
-pub use phi_integration::{
-    // Collective Phi
-    CollectivePhiResult, CollectiveCoherenceLevel, measure_collective_phi,
-    // Emergent behavior detection
-    EmergentBehaviorType, EmergentBehavior, EmergentBehaviorDetector,
-    // Phi-gated actions
-    PhiGatingConfig, StakesLevel, PhiGatingResult, PhiGatingRecommendation,
-    check_phi_gating,
-    // Clustering
-    PhiClusterResult, PhiCluster, cluster_agents_by_phi,
-    // Temporal analysis
-    PhiEvolutionTracker, PhiEvolutionSummary,
+pub use phi_bridge::{
+    check_coherence_for_action, measure_phi_simple, output_to_vector, phi_to_kvector_dimension,
+    AgentPhiResult, CoherenceCheckResult, CoherenceHistory, CoherenceState, PhiMeasurementConfig,
 };
 pub use phi_consensus::{
-    // Configuration
-    PhiConsensusConfig,
-    // Phi contribution analysis
-    PhiContribution, compute_phi_contributions,
-    // Phi-weighted consensus
-    PhiConsensusResult, PhiConsensusStatus, PhiConsensusRecommendation,
+    compute_phi_contributions,
     compute_phi_weighted_consensus,
+    get_recommendation as get_phi_recommendation,
     // Helpers
     should_proceed as phi_should_proceed,
-    get_recommendation as get_phi_recommendation,
+    // Configuration
+    PhiConsensusConfig,
+    PhiConsensusRecommendation,
+    // Phi-weighted consensus
+    PhiConsensusResult,
+    PhiConsensusStatus,
+    // Phi contribution analysis
+    PhiContribution,
+};
+#[allow(deprecated)]
+pub use phi_integration::{
+    check_phi_gating,
+    cluster_agents_by_phi,
+    measure_collective_phi,
+    CollectiveCoherenceLevel,
+    // Collective Phi
+    CollectivePhiResult,
+    EmergentBehavior,
+    EmergentBehaviorDetector,
+    // Emergent behavior detection
+    EmergentBehaviorType,
+    PhiCluster,
+    // Clustering
+    PhiClusterResult,
+    PhiEvolutionSummary,
+    // Temporal analysis
+    PhiEvolutionTracker,
+    // Phi-gated actions
+    PhiGatingConfig,
+    PhiGatingRecommendation,
+    PhiGatingResult,
+    StakesLevel,
 };
 pub use provenance::{
+    ChainBuilder,
+    ChainError,
+    ChainVerificationResult,
     // Core types
-    DerivationType, ProvenanceNode, ProvenanceChain,
-    ChainVerificationResult, ChainError,
+    DerivationType,
     // Builders
-    ProvenanceBuilder, ChainBuilder,
+    ProvenanceBuilder,
+    ProvenanceChain,
+    ProvenanceNode,
+    // Registry
+    ProvenanceRegistry,
     // Integration
     ProvenancedOutput,
-    // Registry
-    ProvenanceRegistry, RegistryError, RegistryStats,
+    RegistryError,
+    RegistryStats,
 };
-pub use zk_trust::{
-    // Proof statements
-    ProofStatement,
-    // Commitments
-    KVectorCommitment,
-    // Proofs
-    TrustProof, ProofData,
-    // Prover
-    TrustProver, ProverConfig, ProofError,
-    // Verifier
-    TrustVerifier, VerificationResult, VerificationError,
-    // Aggregation
-    AggregatedTrustProof, AggregateStatement, aggregate_proofs,
+pub use simulation::{
+    // Agent archetypes
+    AgentArchetype,
+    AgentBehaviorConfig,
+    // Predefined scenarios
+    Scenarios,
+    SimulatedAgent,
+    // Simulation engine
+    SimulationConfig,
+    SimulationEngine,
+    SimulationReport,
+    // Results
+    TickResult,
 };
-pub use cross_domain::{
-    // Domain types
-    TrustDomain, DomainRelevance,
-    // Domain templates
-    DomainTemplates,
-    // Translation
-    TranslationResult, DimensionTranslation,
-    translate_trust, compute_domain_trust,
-    // Path translation
-    TranslationPath, translate_path,
-    // Registry
-    DomainRegistry,
-    // Compatibility analysis
-    DomainCompatibility, analyze_domain_compatibility,
+pub use temporal_trust::{
+    // Decay curves
+    DecayCurve,
+    ReputationMemoryConfig,
+    SnapshotReason,
+    // Configuration
+    TemporalTrustConfig,
+    TemporalTrustError,
+    // Manager
+    TemporalTrustManager,
+    TrustDecayConfig,
+    // Snapshots and events
+    TrustSnapshot,
+    // Results
+    TrustUpdateResult,
+    VelocityLimitConfig,
+    VelocityViolationAction,
 };
 pub use trust_pipeline::{
+    ConsensusOutcome,
     // Configuration
     PipelineConfig,
-    // Pipeline stages
-    RegisteredOutput, ConsensusOutcome, TrustUpdate,
-    TrustDelta, TrustDirection,
-    TrustAttestation as PipelineTrustAttestation, TranslatedAttestation,
-    // Pipeline engine
-    TrustPipeline,
     // Errors
     PipelineError,
+    // Pipeline stages
+    RegisteredOutput,
+    TranslatedAttestation,
+    TrustAttestation as PipelineTrustAttestation,
+    TrustDelta,
+    TrustDirection,
+    // Pipeline engine
+    TrustPipeline,
+    TrustUpdate,
 };
-pub use api::{
-    // API types
-    ApiError, ApiResult,
-    CreateAgentRequest, CreateAgentResponse,
-    UpdateAgentRequest,
-    AgentSummary as ApiAgentSummary,
-    ListAgentsResponse, KVectorHistoryResponse, KVectorHistoryEntry, KVectorValues,
-    EventsResponse, EventSummary,
-    // Escalation API types (GIS integration)
-    EscalationSummary, EscalationResolutionResponse, CalibrationSummary,
-    // Service
-    AgentApiService,
+pub use trust_portability::{
+    // Bridge
+    BridgeAdapter,
+    BridgeError,
+    // Chain identity
+    ChainId,
+    ChainProfile,
+    ChainType,
+    // Import/Export
+    ExportResult,
+    ExportStatus,
+    ImportResult,
+    ImportStatus,
+    KVectorDimension,
+    MockBridgeAdapter,
+    // Configuration
+    PortabilityConfig,
+    // Engine
+    PortabilityEngine,
+    PortabilityStats,
+    // Portable trust
+    PortableTrust,
+    ProofSignature,
+    ProofType,
+    TrustProof as PortabilityTrustProof,
+    VerificationResult as PortabilityVerificationResult,
+};
+pub use uncertainty::{
+    get_recommendations, maybe_escalate, should_proceed, EscalationRequest, MoralActionGuidance,
+    MoralUncertainty, MoralUncertaintyType, UncertainOutput, UncertaintyCalibration,
+};
+pub use verification::{
+    Action,
+    AtomicPredicate,
+    Counterexample,
+    // Invariants
+    Invariant,
+    InvariantCheckResult,
+    InvariantType,
+    InvariantViolation,
+    // Proof obligations
+    ProofObligation,
+    ProofStatus,
+    ProofTechnique,
+    ProofWitness,
+    PropertyFormula,
+    // Properties
+    PropertySpec,
+    SystemState,
+    // Engine
+    VerificationEngine,
+    VerificationEvent,
+    VerificationEventType,
+    VerificationSummary,
+    ViolationSeverity as VerificationSeverity,
 };
 pub use zk_coordination::{
-    // Configuration
-    ZKCoordinationConfig,
     // Proofs
-    MembershipProof, VoteProof,
+    MembershipProof,
+    VoteProof,
     // ZK-enabled group
     ZKAgentGroup,
+    // Configuration
+    ZKCoordinationConfig,
     // Errors
     ZKCoordinationError,
 };
-pub use temporal_trust::{
-    // Configuration
-    TemporalTrustConfig, TrustDecayConfig, VelocityLimitConfig, ReputationMemoryConfig,
-    // Decay curves
-    DecayCurve, VelocityViolationAction,
-    // Snapshots and events
-    TrustSnapshot, SnapshotReason,
-    // Manager
-    TemporalTrustManager,
-    // Results
-    TrustUpdateResult, TemporalTrustError,
-};
-pub use economics::{
-    // Slashing
-    SlashingConfig, ViolationSeverity, SlashEvent, ViolationType,
-    SlashingEngine, SlashResult,
-    // Rewards
-    RewardConfig, RewardEvent, RewardType, RewardEngine,
-    // Bonding curves
-    BondingCurve, BondingCurveType,
-    // Commit-reveal voting
-    CommitRevealVoting, VoteCommitment, VoteReveal, CommitRevealVote,
-    CommitRevealError,
-};
-pub use federation::{
-    // Configuration
-    FederationConfig, SwarmId, SwarmProfile,
-    // Attestations
-    TrustAttestation, AttestationEvidence,
-    // Federated consensus
-    FederatedProposal, FederatedProposalType, FederatedProposalState,
-    FederatedVote, FederatedVoteDecision,
-    // Bridges
-    TrustBridge, BridgeType, TrustTransfer, TransferStatus,
-    // Engine
-    FederationEngine, CrossSwarmTrust, FederationStats,
-    FederationError,
-};
-pub use attack_detection::{
-    // Configuration
-    AttackDetectionConfig,
-    // Events
-    TrustEvent as AttackTrustEvent, TrustEventType as AttackEventType, EventSource,
-    // Signatures
-    AttackSignature, AttackPattern, AttackSeverity, RecommendedResponse,
-    // Detection
-    DetectionResult, DetectedAttackType, Evidence, EvidenceType,
-    // Analyzer
-    StreamingAnalyzer, AgentActivityProfile, DetectionStats,
-    // Alerts
-    Alert, AlertStatus, AlertPipeline,
-};
-pub use differential_privacy::{
-    // Configuration
-    DPConfig, ClippingBounds,
-    // Noise mechanisms
-    NoiseMechanism, NoiseGenerator, DPRng,
-    // Budget
-    PrivacyBudget, BudgetQuery,
-    // Aggregations
-    PrivateAggregator,
-    // Local DP
-    LocalDP,
-    // Trust analytics
-    PrivateTrustAnalytics, TrustDistribution,
-    // Errors
-    PrivacyError,
-};
-pub use cascade_analysis::{
-    // Configuration
-    CascadeConfig,
-    // Network model
-    NetworkAgent, NetworkEdge, EdgeType, TrustNetwork,
-    NetworkSnapshot, AgentState,
-    // Engine
-    CascadeEngine, CascadeEvent, CascadeEventType,
-    // Results
-    CascadeResult, RecoveryResult, TickSnapshot,
-    CriticalAgent, ResilienceScore, ContagionPath,
-    TopologyAnalysis, TopologyRisk,
-};
-pub use dashboard::{
-    // Configuration
-    DashboardConfig,
-    // Live metrics
-    LiveMetrics, AlertCounts, MetricsAggregator, MetricsInput,
-    // Events
-    DashboardEvent, DashboardEventType, EventPriority, EventStream,
-    // Charts
-    DataPoint, TimeSeries, ChartType, ChartDataBuilder,
-    // Alerts panel
-    DashboardAlert, AlertSeverity as DashboardAlertSeverity,
-    AlertStatus as DashboardAlertStatus, AlertAction, AlertActionType, AlertPanel,
-    // Widgets
-    Widget, WidgetType, WidgetPosition, WidgetSize, default_layout,
-    // Dashboard state
-    Dashboard,
-};
-pub use adaptive_thresholds::{
-    // Configuration
-    AdaptiveConfig,
-    // Threshold types
-    ThresholdType, ThresholdState,
-    // Feedback
-    ThresholdFeedback, FeedbackOutcome, FeedbackContext,
-    // Bandit
-    BanditArm, ThresholdBandit,
-    // Gradient
-    GradientEstimator,
-    // Engine
-    AdaptiveThresholdEngine, ThresholdRecommendation, RecommendationDirection,
-};
-pub use game_theory::{
-    // Players and strategies
-    Player, PlayerType, Strategy, StrategyAction, ActionType, ActionCondition,
-    // Payoffs
-    PayoffEntry, GameDefinition,
-    // Equilibrium
-    NashEquilibrium, EquilibriumFinder,
-    // Incentive analysis
-    IncentiveAnalysis, ProfitableDeviation, IncentiveAnalyzer,
-    // Mechanism validation
-    MechanismValidation, MechanismParams, validate_mechanism,
-    // Pre-built games
-    trust_attestation_game, voting_game,
-};
-pub use verification::{
-    // Invariants
-    Invariant, InvariantType, ViolationSeverity as VerificationSeverity,
-    InvariantCheckResult, InvariantViolation,
-    // Properties
-    PropertySpec, PropertyFormula, AtomicPredicate, ProofStatus,
-    // Proof obligations
-    ProofObligation, ProofWitness, ProofTechnique, Counterexample,
-    SystemState, Action,
-    // Engine
-    VerificationEngine, VerificationEvent, VerificationEventType, VerificationSummary,
-};
-pub use trust_portability::{
-    // Configuration
-    PortabilityConfig,
-    // Chain identity
-    ChainId, ChainProfile, ChainType, ProofType,
-    // Portable trust
-    PortableTrust, KVectorDimension, TrustProof as PortabilityTrustProof, ProofSignature,
-    // Import/Export
-    ExportResult, ExportStatus, ImportResult, ImportStatus,
-    VerificationResult as PortabilityVerificationResult,
-    // Bridge
-    BridgeAdapter, BridgeError, MockBridgeAdapter,
-    // Engine
-    PortabilityEngine, PortabilityStats,
+pub use zk_trust::{
+    aggregate_proofs,
+    AggregateStatement,
+    // Aggregation
+    AggregatedTrustProof,
+    // Commitments
+    KVectorCommitment,
+    ProofData,
+    ProofError,
+    // Proof statements
+    ProofStatement,
+    ProverConfig,
+    // Proofs
+    TrustProof,
+    // Prover
+    TrustProver,
+    // Verifier
+    TrustVerifier,
+    VerificationError,
+    VerificationResult,
 };
 
 #[cfg(feature = "parallel")]
 pub use parallel::{
-    // Configuration
-    ParallelSimConfig, SimAgentBehavior,
-    // Engine
-    ParallelSimEngine, SimAgent, ParallelTickResult,
-    // Batch operations
-    KVectorBatch, TickAggregators, RandomBuffer,
+    benchmark_simulation,
     // Benchmarking
-    BenchmarkResult, benchmark_simulation,
+    BenchmarkResult,
+    // Batch operations
+    KVectorBatch,
+    // Configuration
+    ParallelSimConfig,
+    // Engine
+    ParallelSimEngine,
+    ParallelTickResult,
+    RandomBuffer,
+    SimAgent,
+    SimAgentBehavior,
+    TickAggregators,
 };
 
 pub use integration::{
-    // Trust Pipeline
-    TrustPipelineConfig, IntegratedTrustPipeline, AttestationResult,
+    AttackResponse,
     // Attack Response
-    AttackResponseConfig, IntegratedAttackResponse, AttackResponse, ResponseAction,
-    // Privacy Analytics
-    PrivacyAnalyticsConfig, IntegratedPrivacyAnalytics, PrivateAnalyticsResult,
+    AttackResponseConfig,
+    AttestationResult,
     // Epistemic Lifecycle
-    EpistemicLifecycleConfig, IntegratedEpistemicLifecycle, OutputProcessingResult,
+    EpistemicLifecycleConfig,
+    IntegratedAttackResponse,
+    IntegratedEpistemicLifecycle,
+    IntegratedPrivacyAnalytics,
+    IntegratedTrustPipeline,
     // Errors
     IntegrationError,
+    OutputProcessingResult,
+    // Privacy Analytics
+    PrivacyAnalyticsConfig,
+    PrivateAnalyticsResult,
+    ResponseAction,
+    // Trust Pipeline
+    TrustPipelineConfig,
 };
 
-use serde::{Deserialize, Serialize};
-use crate::matl::KVector;
 use crate::epistemic::EpistemicClassificationExtended;
+use crate::matl::KVector;
+use serde::{Deserialize, Serialize};
 
 /// Unique identifier for an Instrumental Actor
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -652,7 +884,8 @@ impl InstrumentalActor {
     /// Get summary statistics
     pub fn summary_stats(&self) -> AgentSummary {
         let total_actions = self.behavior_log.len();
-        let successful = self.behavior_log
+        let successful = self
+            .behavior_log
             .iter()
             .filter(|e| e.outcome == ActionOutcome::Success)
             .count();
@@ -697,7 +930,9 @@ impl InstrumentalActor {
 
     /// Mark an output as verified with outcome
     pub fn verify_output(&mut self, output_id: &str, outcome: VerificationOutcome) {
-        if let Some(entry) = self.output_history.iter_mut()
+        if let Some(entry) = self
+            .output_history
+            .iter_mut()
             .find(|e| e.output_id == output_id)
         {
             entry.verified = true;
@@ -717,19 +952,19 @@ impl InstrumentalActor {
 
     /// Get verified output accuracy (among verified outputs)
     pub fn verified_accuracy(&self) -> f32 {
-        let verified: Vec<_> = self.output_history.iter()
-            .filter(|e| e.verified)
-            .collect();
+        let verified: Vec<_> = self.output_history.iter().filter(|e| e.verified).collect();
 
         if verified.is_empty() {
             return 0.5; // Neutral default
         }
 
-        let correct = verified.iter()
+        let correct = verified
+            .iter()
             .filter(|e| matches!(e.verification_outcome, Some(VerificationOutcome::Correct)))
             .count();
 
-        let partial = verified.iter()
+        let partial = verified
+            .iter()
             .filter(|e| matches!(e.verification_outcome, Some(VerificationOutcome::Partial)))
             .count();
 
@@ -852,7 +1087,7 @@ mod tests {
 
     #[test]
     fn test_agent_epistemic_tracking() {
-        use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel};
+        use crate::epistemic::{EmpiricalLevel, HarmonicLevel, MaterialityLevel, NormativeLevel};
 
         let mut agent = InstrumentalActor {
             agent_id: AgentId::generate(),

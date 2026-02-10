@@ -18,29 +18,24 @@
 //! Run with: `cargo bench --bench core_operations`
 //! Compare against baseline: `cargo bench --bench core_operations -- --baseline main`
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 // Import Mycelix SDK types
-use mycelix_sdk::matl::{
-    KVector, ProofOfGradientQuality, GovernanceTier,
-    CartelDetector, RbBftConsensus, RbBftConfig,
-};
+use mycelix_sdk::bridge::{CrossHappReputation, HappReputationScore};
 use mycelix_sdk::credentials::VerifiableCredential;
+use mycelix_sdk::dkg::{query_triples, QueryFilter, TripleValue, VerifiableTriple, URI};
 use mycelix_sdk::epistemic::{
-    EpistemicClaim, EmpiricalLevel, NormativeLevel, MaterialityLevel,
-    EpistemicClassification,
+    EmpiricalLevel, EpistemicClaim, EpistemicClassification, MaterialityLevel, NormativeLevel,
 };
 use mycelix_sdk::fl::{
-    GradientUpdate, fedavg, krum, trimmed_mean, coordinate_median,
-    fedavg_optimized, GradientAccumulator, EarlyByzantineDetector, GradientStats,
+    coordinate_median, fedavg, fedavg_optimized, krum, trimmed_mean, EarlyByzantineDetector,
+    GradientAccumulator, GradientStats, GradientUpdate,
 };
-use mycelix_sdk::matl::{CachedKVector, KVectorBatch, KVECTOR_WEIGHTS};
 use mycelix_sdk::identity::WebAuthnService;
-use mycelix_sdk::dkg::{
-    VerifiableTriple, TripleValue, URI,
-    query_triples, QueryFilter,
+use mycelix_sdk::matl::{CachedKVector, KVectorBatch, KVECTOR_WEIGHTS};
+use mycelix_sdk::matl::{
+    CartelDetector, GovernanceTier, KVector, ProofOfGradientQuality, RbBftConfig, RbBftConsensus,
 };
-use mycelix_sdk::bridge::{CrossHappReputation, HappReputationScore};
 use mycelix_sdk::storage::StorageRouter;
 
 // =============================================================================
@@ -72,22 +67,19 @@ fn benchmark_did_resolution(c: &mut Criterion) {
     // Batch DID resolution (common in permission checks)
     for count in [10, 50, 100, 500] {
         group.throughput(Throughput::Elements(count as u64));
-        group.bench_with_input(
-            BenchmarkId::new("batch", count),
-            &count,
-            |b, &count| {
-                let kvectors: Vec<KVector> = (0..count)
-                    .map(|i| create_kvector_with_seed(i))
-                    .collect();
+        group.bench_with_input(BenchmarkId::new("batch", count), &count, |b, &count| {
+            let kvectors: Vec<KVector> = (0..count).map(|i| create_kvector_with_seed(i)).collect();
 
-                b.iter(|| {
-                    kvectors.iter().map(|kv| {
+            b.iter(|| {
+                kvectors
+                    .iter()
+                    .map(|kv| {
                         let score = kv.trust_score();
                         (score, GovernanceTier::from_trust_score(score))
-                    }).collect::<Vec<_>>()
-                })
-            },
-        );
+                    })
+                    .collect::<Vec<_>>()
+            })
+        });
     }
 
     group.finish();
@@ -104,12 +96,7 @@ fn benchmark_identity_verification(c: &mut Criterion) {
         );
         let user_id = b"did:mycelix:agent123".to_vec();
 
-        b.iter(|| {
-            service.create_registration_challenge(
-                black_box(&user_id),
-                black_box("testuser"),
-            )
-        })
+        b.iter(|| service.create_registration_challenge(black_box(&user_id), black_box("testuser")))
     });
 
     group.bench_function("create_auth_challenge", |b| {
@@ -119,9 +106,7 @@ fn benchmark_identity_verification(c: &mut Criterion) {
         );
         let credential_ids = vec![b"credential123".to_vec()];
 
-        b.iter(|| {
-            service.create_authentication_challenge(black_box(&credential_ids))
-        })
+        b.iter(|| service.create_authentication_challenge(black_box(&credential_ids)))
     });
 
     group.finish();
@@ -154,9 +139,7 @@ fn benchmark_market_trade(c: &mut Criterion) {
             |b, &count| {
                 let updates = create_gradient_updates(count, gradient_size);
 
-                b.iter(|| {
-                    fedavg(black_box(&updates))
-                })
+                b.iter(|| fedavg(black_box(&updates)))
             },
         );
 
@@ -166,9 +149,7 @@ fn benchmark_market_trade(c: &mut Criterion) {
             |b, &count| {
                 let updates = create_gradient_updates(count.max(3), gradient_size);
 
-                b.iter(|| {
-                    krum(black_box(&updates), 1)
-                })
+                b.iter(|| krum(black_box(&updates), 1))
             },
         );
 
@@ -178,9 +159,7 @@ fn benchmark_market_trade(c: &mut Criterion) {
             |b, &count| {
                 let updates = create_gradient_updates(count, gradient_size);
 
-                b.iter(|| {
-                    trimmed_mean(black_box(&updates), 0.1)
-                })
+                b.iter(|| trimmed_mean(black_box(&updates), 0.1))
             },
         );
 
@@ -190,9 +169,7 @@ fn benchmark_market_trade(c: &mut Criterion) {
             |b, &count| {
                 let updates = create_gradient_updates(count, gradient_size);
 
-                b.iter(|| {
-                    coordinate_median(black_box(&updates))
-                })
+                b.iter(|| coordinate_median(black_box(&updates)))
             },
         );
     }
@@ -207,9 +184,9 @@ fn benchmark_pogq_computation(c: &mut Criterion) {
     group.bench_function("create", |b| {
         b.iter(|| {
             ProofOfGradientQuality::new(
-                black_box(0.95),  // quality
-                black_box(0.88),  // consistency
-                black_box(0.12),  // entropy
+                black_box(0.95), // quality
+                black_box(0.88), // consistency
+                black_box(0.12), // entropy
             )
         })
     });
@@ -217,9 +194,7 @@ fn benchmark_pogq_computation(c: &mut Criterion) {
     group.bench_function("composite_score", |b| {
         let pogq = ProofOfGradientQuality::new(0.95, 0.88, 0.12);
 
-        b.iter(|| {
-            pogq.composite_score(black_box(0.75))
-        })
+        b.iter(|| pogq.composite_score(black_box(0.75)))
     });
 
     group.finish();
@@ -244,9 +219,7 @@ fn benchmark_reputation_query(c: &mut Criterion) {
     group.bench_function("kvector_trust_score", |b| {
         let kvector = create_test_kvector();
 
-        b.iter(|| {
-            black_box(&kvector).trust_score()
-        })
+        b.iter(|| black_box(&kvector).trust_score())
     });
 
     // K-Vector governance tier determination
@@ -323,7 +296,11 @@ fn benchmark_dkg_query(c: &mut Criterion) {
                 let current_time = 1234567890u64;
 
                 b.iter(|| {
-                    query_triples(black_box(&triples), black_box(&filter), black_box(current_time))
+                    query_triples(
+                        black_box(&triples),
+                        black_box(&filter),
+                        black_box(current_time),
+                    )
                 })
             },
         );
@@ -338,7 +315,11 @@ fn benchmark_dkg_query(c: &mut Criterion) {
         let current_time = 1234567890u64;
 
         b.iter(|| {
-            query_triples(black_box(&triples), black_box(&filter), black_box(current_time))
+            query_triples(
+                black_box(&triples),
+                black_box(&filter),
+                black_box(current_time),
+            )
         })
     });
 
@@ -404,9 +385,7 @@ fn benchmark_credential_verify(c: &mut Criterion) {
             .expires("2025-12-31T23:59:59Z")
             .build();
 
-        b.iter(|| {
-            black_box(&vc).is_expired()
-        })
+        b.iter(|| black_box(&vc).is_expired())
     });
 
     // Proof presence check
@@ -416,9 +395,7 @@ fn benchmark_credential_verify(c: &mut Criterion) {
             .subject("did:mycelix:subject")
             .build();
 
-        b.iter(|| {
-            black_box(&vc).has_proof()
-        })
+        b.iter(|| black_box(&vc).has_proof())
     });
 
     // Epistemic code extraction
@@ -435,9 +412,7 @@ fn benchmark_credential_verify(c: &mut Criterion) {
             .epistemic(epistemic)
             .build();
 
-        b.iter(|| {
-            black_box(&vc).epistemic_code()
-        })
+        b.iter(|| black_box(&vc).epistemic_code())
     });
 
     // Batch credential verification
@@ -457,7 +432,8 @@ fn benchmark_credential_verify(c: &mut Criterion) {
                     .collect();
 
                 b.iter(|| {
-                    credentials.iter()
+                    credentials
+                        .iter()
                         .map(|vc| (!vc.is_expired(), vc.has_proof()))
                         .collect::<Vec<_>>()
                 })
@@ -484,9 +460,7 @@ fn benchmark_storage_routing(c: &mut Criterion) {
             materiality: MaterialityLevel::M2Persistent,
         };
 
-        b.iter(|| {
-            router.route(black_box(&classification))
-        })
+        b.iter(|| router.route(black_box(&classification)))
     });
 
     // Batch routing
@@ -522,7 +496,8 @@ fn benchmark_storage_routing(c: &mut Criterion) {
                     .collect();
 
                 b.iter(|| {
-                    classifications.iter()
+                    classifications
+                        .iter()
                         .map(|c| router.route(c))
                         .collect::<Vec<_>>()
                 })
@@ -544,9 +519,7 @@ fn benchmark_rbbft_consensus(c: &mut Criterion) {
     group.bench_function("create_consensus", |b| {
         let config = RbBftConfig::default();
 
-        b.iter(|| {
-            RbBftConsensus::new(black_box(config.clone()))
-        })
+        b.iter(|| RbBftConsensus::new(black_box(config.clone())))
     });
 
     group.finish();
@@ -597,9 +570,7 @@ fn benchmark_kvector_batch_ops(c: &mut Criterion) {
     let mut group = c.benchmark_group("kvector_batch_ops");
 
     for size in [10, 100, 1000] {
-        let vectors: Vec<KVector> = (0..size)
-            .map(|i| create_kvector_with_seed(i))
-            .collect();
+        let vectors: Vec<KVector> = (0..size).map(|i| create_kvector_with_seed(i)).collect();
 
         group.throughput(Throughput::Elements(size as u64));
 
@@ -607,29 +578,19 @@ fn benchmark_kvector_batch_ops(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("individual_loop", size),
             &vectors,
-            |b, v| {
-                b.iter(|| {
-                    v.iter().map(|kv| kv.trust_score()).collect::<Vec<_>>()
-                })
-            },
+            |b, v| b.iter(|| v.iter().map(|kv| kv.trust_score()).collect::<Vec<_>>()),
         );
 
         // Batch computation
-        group.bench_with_input(
-            BenchmarkId::new("batch_compute", size),
-            &vectors,
-            |b, v| {
-                b.iter(|| KVectorBatch::compute_trust_scores(black_box(v)))
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("batch_compute", size), &vectors, |b, v| {
+            b.iter(|| KVectorBatch::compute_trust_scores(black_box(v)))
+        });
 
         // Filter by threshold
         group.bench_with_input(
             BenchmarkId::new("filter_threshold", size),
             &vectors,
-            |b, v| {
-                b.iter(|| KVectorBatch::filter_by_threshold(black_box(v), 0.5))
-            },
+            |b, v| b.iter(|| KVectorBatch::filter_by_threshold(black_box(v), 0.5)),
         );
     }
 
@@ -644,7 +605,9 @@ fn benchmark_fl_optimizations(c: &mut Criterion) {
         let updates = create_gradient_updates(participant_count, gradient_size);
         let label = format!("{}x{}", participant_count, gradient_size);
 
-        group.throughput(Throughput::Elements((participant_count * gradient_size) as u64));
+        group.throughput(Throughput::Elements(
+            (participant_count * gradient_size) as u64,
+        ));
 
         // Original FedAvg
         group.bench_with_input(
@@ -661,21 +624,17 @@ fn benchmark_fl_optimizations(c: &mut Criterion) {
         );
 
         // Gradient accumulator
-        group.bench_with_input(
-            BenchmarkId::new("accumulator", &label),
-            &updates,
-            |b, u| {
-                b.iter(|| {
-                    let total_samples: usize = u.iter().map(|upd| upd.metadata.batch_size).sum();
-                    let mut acc = GradientAccumulator::new(u[0].gradients.len());
-                    for upd in u {
-                        let weight = upd.metadata.batch_size as f64 / total_samples as f64;
-                        acc.accumulate(upd, weight);
-                    }
-                    acc.finalize()
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("accumulator", &label), &updates, |b, u| {
+            b.iter(|| {
+                let total_samples: usize = u.iter().map(|upd| upd.metadata.batch_size).sum();
+                let mut acc = GradientAccumulator::new(u[0].gradients.len());
+                for upd in u {
+                    let weight = upd.metadata.batch_size as f64 / total_samples as f64;
+                    acc.accumulate(upd, weight);
+                }
+                acc.finalize()
+            })
+        });
     }
 
     group.finish();
@@ -728,9 +687,7 @@ fn benchmark_byzantine_optimizations(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("gradient_stats", participant_count),
             &updates,
-            |b, u| {
-                b.iter(|| GradientStats::compute(black_box(u)))
-            },
+            |b, u| b.iter(|| GradientStats::compute(black_box(u))),
         );
     }
 
@@ -744,15 +701,15 @@ fn benchmark_byzantine_optimizations(c: &mut Criterion) {
 /// Create a test K-Vector with realistic values
 fn create_test_kvector() -> KVector {
     KVector::new(
-        0.8,   // k_r: Reliability
-        0.6,   // k_a: Activity
-        0.9,   // k_i: Integrity
-        0.7,   // k_p: Performance
-        0.5,   // k_m: Membership
-        0.4,   // k_s: Stake
-        0.6,   // k_h: Historical
-        0.3,   // k_topo: Topology
-        0.7,   // k_v: Verification
+        0.8, // k_r: Reliability
+        0.6, // k_a: Activity
+        0.9, // k_i: Integrity
+        0.7, // k_p: Performance
+        0.5, // k_m: Membership
+        0.4, // k_s: Stake
+        0.6, // k_h: Historical
+        0.3, // k_topo: Topology
+        0.7, // k_v: Verification
     )
 }
 
@@ -782,9 +739,9 @@ fn create_gradient_updates(count: usize, gradient_size: usize) -> Vec<GradientUp
 
             GradientUpdate::new(
                 format!("participant_{}", i),
-                1,  // model version
+                1, // model version
                 gradients,
-                100 + (i % 50), // batch size variation
+                100 + (i % 50),                     // batch size variation
                 0.5 - (rand_float(i) as f64) * 0.1, // loss
             )
         })
@@ -815,14 +772,12 @@ fn create_test_triples(count: usize) -> Vec<VerifiableTriple> {
 /// Create HappReputationScore instances for cross-hApp reputation benchmarks
 fn create_happ_reputation_scores(count: usize) -> Vec<HappReputationScore> {
     (0..count)
-        .map(|i| {
-            HappReputationScore {
-                happ_id: format!("happ_{}", i),
-                happ_name: format!("Mycelix App {}", i),
-                score: 0.5 + (rand_float(i) as f64) * 0.5,
-                interactions: 10 + (i as u64 * 5),
-                last_updated: 1234567890,
-            }
+        .map(|i| HappReputationScore {
+            happ_id: format!("happ_{}", i),
+            happ_name: format!("Mycelix App {}", i),
+            score: 0.5 + (rand_float(i) as f64) * 0.5,
+            interactions: 10 + (i as u64 * 5),
+            last_updated: 1234567890,
         })
         .collect()
 }

@@ -385,10 +385,8 @@ impl MetabolicOracle {
         }
 
         let new_fee = self.current_params.fee_rate * adjustment.fee_rate_factor;
-        self.current_params.fee_rate = new_fee.clamp(
-            self.bounds.fee_rate_min,
-            self.bounds.fee_rate_max,
-        );
+        self.current_params.fee_rate =
+            new_fee.clamp(self.bounds.fee_rate_min, self.bounds.fee_rate_max);
 
         let new_demurrage = self.current_params.demurrage_rate * adjustment.demurrage_rate_factor;
         self.current_params.demurrage_rate = new_demurrage.clamp(
@@ -452,7 +450,11 @@ mod tests {
         let healthy = healthy_components();
         let vitality = healthy.calculate_vitality();
         // 0.75*0.40 + 0.70*0.30 + 0.65*0.20 + 0.55*0.10 = 69.5
-        assert!(vitality > 65.0 && vitality < 75.0, "Expected ~69.5, got {}", vitality);
+        assert!(
+            vitality > 65.0 && vitality < 75.0,
+            "Expected ~69.5, got {}",
+            vitality
+        );
     }
 
     #[test]
@@ -472,10 +474,22 @@ mod tests {
 
     #[test]
     fn test_tend_limit_tiers() {
-        assert_eq!(TendLimitTier::from_state(MetabolicState::Healthy).limit(), 40);
-        assert_eq!(TendLimitTier::from_state(MetabolicState::Stressed).limit(), 60);
-        assert_eq!(TendLimitTier::from_state(MetabolicState::Critical).limit(), 80);
-        assert_eq!(TendLimitTier::from_state(MetabolicState::Failing).limit(), 120);
+        assert_eq!(
+            TendLimitTier::from_state(MetabolicState::Healthy).limit(),
+            40
+        );
+        assert_eq!(
+            TendLimitTier::from_state(MetabolicState::Stressed).limit(),
+            60
+        );
+        assert_eq!(
+            TendLimitTier::from_state(MetabolicState::Critical).limit(),
+            80
+        );
+        assert_eq!(
+            TendLimitTier::from_state(MetabolicState::Failing).limit(),
+            120
+        );
     }
 
     #[test]

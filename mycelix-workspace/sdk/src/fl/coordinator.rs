@@ -6,12 +6,12 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use super::aggregation::{
-    fedavg, trimmed_mean, coordinate_median, krum, trust_weighted_aggregation,
-    calculate_update_quality, AggregationError,
+    calculate_update_quality, coordinate_median, fedavg, krum, trimmed_mean,
+    trust_weighted_aggregation, AggregationError,
 };
 use super::types::{
-    FLConfig, FLRound, GradientUpdate, AggregatedGradient, Participant,
-    RoundStatus, AggregationMethod,
+    AggregatedGradient, AggregationMethod, FLConfig, FLRound, GradientUpdate, Participant,
+    RoundStatus,
 };
 use crate::matl::ProofOfGradientQuality;
 
@@ -68,13 +68,16 @@ impl FLCoordinator {
 
     /// Create with validated config
     pub fn with_validated_config(config: FLConfig) -> Result<Self, CoordinatorError> {
-        config.validate().map_err(|e| CoordinatorError::ConfigError(e.to_string()))?;
+        config
+            .validate()
+            .map_err(|e| CoordinatorError::ConfigError(e.to_string()))?;
         Ok(Self::new(config))
     }
 
     /// Register a participant
     pub fn register_participant(&mut self, id: String) -> &Participant {
-        self.participants.entry(id.clone())
+        self.participants
+            .entry(id.clone())
             .or_insert_with(|| Participant::new(id))
     }
 
@@ -115,7 +118,10 @@ impl FLCoordinator {
 
         self.current_round = Some(round);
         // Safe: we just set current_round to Some above
-        Ok(self.current_round.as_ref().expect("current_round should be Some after setting it"))
+        Ok(self
+            .current_round
+            .as_ref()
+            .expect("current_round should be Some after setting it"))
     }
 
     /// Submit a gradient update
@@ -181,7 +187,9 @@ impl FLCoordinator {
             let round = match &self.current_round {
                 Some(r) if r.status == RoundStatus::Collecting => r,
                 Some(r) if r.status == RoundStatus::Completed => {
-                    return r.aggregated_result.clone()
+                    return r
+                        .aggregated_result
+                        .clone()
                         .ok_or(CoordinatorError::NoActiveRound);
                 }
                 _ => return Err(CoordinatorError::NoActiveRound),
@@ -199,7 +207,11 @@ impl FLCoordinator {
                 round.updates.clone(),
                 round.model_version,
                 round.updates.len(),
-                round.updates.iter().map(|u| u.participant_id.clone()).collect::<Vec<_>>(),
+                round
+                    .updates
+                    .iter()
+                    .map(|u| u.participant_id.clone())
+                    .collect::<Vec<_>>(),
             )
         };
 
@@ -250,13 +262,11 @@ impl FLCoordinator {
                     AggregationMethod::Krum,
                 )
             }
-            AggregationMethod::TrustWeighted => {
-                trust_weighted_aggregation(
-                    &round_updates,
-                    &self.participants,
-                    self.config.trust_threshold,
-                )?
-            }
+            AggregationMethod::TrustWeighted => trust_weighted_aggregation(
+                &round_updates,
+                &self.participants,
+                self.config.trust_threshold,
+            )?,
         };
 
         // Update participant reputations
@@ -270,10 +280,12 @@ impl FLCoordinator {
         if let Some(ref mut round) = self.current_round {
             round.aggregated_result = Some(aggregated_result.clone());
             round.status = RoundStatus::Completed;
-            round.end_time = Some(std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0));
+            round.end_time = Some(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
+            );
         }
 
         // Move to history
@@ -288,18 +300,18 @@ impl FLCoordinator {
     pub fn cancel_round(&mut self) {
         if let Some(ref mut round) = self.current_round {
             round.status = RoundStatus::Failed;
-            round.end_time = Some(std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(0));
+            round.end_time = Some(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0),
+            );
         }
     }
 
     /// Get round statistics
     pub fn get_round_stats(&self) -> RoundStats {
-        let total_participation: usize = self.round_history.iter()
-            .map(|r| r.updates.len())
-            .sum();
+        let total_participation: usize = self.round_history.iter().map(|r| r.updates.len()).sum();
 
         RoundStats {
             total_rounds: self.round_history.len(),
@@ -445,8 +457,20 @@ mod tests {
 
         // Complete one round
         coordinator.start_round().unwrap();
-        coordinator.submit_update(GradientUpdate::new("p1".to_string(), 1, vec![0.1], 100, 0.5));
-        coordinator.submit_update(GradientUpdate::new("p2".to_string(), 1, vec![0.2], 100, 0.4));
+        coordinator.submit_update(GradientUpdate::new(
+            "p1".to_string(),
+            1,
+            vec![0.1],
+            100,
+            0.5,
+        ));
+        coordinator.submit_update(GradientUpdate::new(
+            "p2".to_string(),
+            1,
+            vec![0.2],
+            100,
+            0.4,
+        ));
         coordinator.aggregate_round().unwrap();
 
         let stats = coordinator.get_round_stats();
@@ -476,8 +500,20 @@ mod tests {
             coordinator.register_participant("p2".to_string());
             coordinator.start_round().unwrap();
 
-            coordinator.submit_update(GradientUpdate::new("p1".to_string(), 1, vec![0.1, 0.2], 100, 0.5));
-            coordinator.submit_update(GradientUpdate::new("p2".to_string(), 1, vec![0.2, 0.3], 100, 0.4));
+            coordinator.submit_update(GradientUpdate::new(
+                "p1".to_string(),
+                1,
+                vec![0.1, 0.2],
+                100,
+                0.5,
+            ));
+            coordinator.submit_update(GradientUpdate::new(
+                "p2".to_string(),
+                1,
+                vec![0.2, 0.3],
+                100,
+                0.4,
+            ));
 
             let result = coordinator.aggregate_round();
             assert!(result.is_ok(), "Aggregation failed for method {:?}", method);

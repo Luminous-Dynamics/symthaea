@@ -635,7 +635,11 @@ impl FederationEngine {
     }
 
     /// Remove a swarm
-    pub fn remove_swarm(&mut self, swarm_id: &SwarmId, reason: String) -> Result<(), FederationError> {
+    pub fn remove_swarm(
+        &mut self,
+        swarm_id: &SwarmId,
+        reason: String,
+    ) -> Result<(), FederationError> {
         if !self.swarms.contains_key(swarm_id) {
             return Err(FederationError::SwarmNotFound(swarm_id.clone()));
         }
@@ -671,7 +675,9 @@ impl FederationEngine {
         signature: Vec<u8>,
     ) -> Result<String, FederationError> {
         // Verify source swarm exists and is authorized
-        let source = self.swarms.get(&source_swarm)
+        let source = self
+            .swarms
+            .get(&source_swarm)
             .ok_or_else(|| FederationError::SwarmNotFound(source_swarm.clone()))?;
 
         if source.reputation < self.config.min_swarm_reputation {
@@ -698,7 +704,8 @@ impl FederationEngine {
             confirming_swarms: HashSet::from([source_swarm.clone()]),
         };
 
-        self.attestations.insert(attestation_id.clone(), attestation);
+        self.attestations
+            .insert(attestation_id.clone(), attestation);
         self.events.push_back(FederationEvent::AttestationCreated {
             attestation_id: attestation_id.clone(),
             source: source_swarm,
@@ -716,11 +723,15 @@ impl FederationEngine {
         confirming_swarm: SwarmId,
         signature: Vec<u8>,
     ) -> Result<bool, FederationError> {
-        let attestation = self.attestations.get_mut(attestation_id)
+        let attestation = self
+            .attestations
+            .get_mut(attestation_id)
             .ok_or_else(|| FederationError::AttestationNotFound(attestation_id.to_string()))?;
 
         if attestation.is_expired(self.current_time) {
-            return Err(FederationError::AttestationExpired(attestation_id.to_string()));
+            return Err(FederationError::AttestationExpired(
+                attestation_id.to_string(),
+            ));
         }
 
         if !self.swarms.contains_key(&confirming_swarm) {
@@ -738,16 +749,21 @@ impl FederationEngine {
         let is_fully_confirmed = attestation.is_confirmed(self.config.required_confirmations);
 
         // Clone attestation data before releasing the mutable borrow on self.attestations
-        let attestation_clone = if is_fully_confirmed { Some(attestation.clone()) } else { None };
+        let attestation_clone = if is_fully_confirmed {
+            Some(attestation.clone())
+        } else {
+            None
+        };
 
         if let Some(ref att) = attestation_clone {
             // Update cross-swarm trust
             self.update_cross_swarm_trust(att);
 
-            self.events.push_back(FederationEvent::AttestationConfirmed {
-                attestation_id: attestation_id.to_string(),
-                timestamp: self.current_time,
-            });
+            self.events
+                .push_back(FederationEvent::AttestationConfirmed {
+                    attestation_id: attestation_id.to_string(),
+                    timestamp: self.current_time,
+                });
         }
 
         Ok(is_fully_confirmed)
@@ -755,13 +771,16 @@ impl FederationEngine {
 
     /// Update cross-swarm trust based on confirmed attestation
     fn update_cross_swarm_trust(&mut self, attestation: &TrustAttestation) {
-        let source_reputation = self.swarms.get(&attestation.source_swarm)
+        let source_reputation = self
+            .swarms
+            .get(&attestation.source_swarm)
             .map(|s| s.reputation)
             .unwrap_or(0.0);
 
         let effective_trust = attestation.effective_trust(source_reputation);
 
-        let entry = self.cross_swarm_trust
+        let entry = self
+            .cross_swarm_trust
             .entry(attestation.agent_id.clone())
             .or_insert_with(|| CrossSwarmTrust {
                 agent_id: attestation.agent_id.clone(),
@@ -771,11 +790,15 @@ impl FederationEngine {
                 last_updated: self.current_time,
             });
 
-        entry.swarm_trust.insert(attestation.source_swarm.clone(), effective_trust);
+        entry
+            .swarm_trust
+            .insert(attestation.source_swarm.clone(), effective_trust);
         entry.last_updated = self.current_time;
 
         // Recalculate aggregate
-        let swarm_weights: HashMap<SwarmId, f64> = self.swarms.iter()
+        let swarm_weights: HashMap<SwarmId, f64> = self
+            .swarms
+            .iter()
             .map(|(id, profile)| (id.clone(), profile.federation_weight()))
             .collect();
         entry.recalculate(&swarm_weights);
@@ -797,7 +820,12 @@ impl FederationEngine {
             return Err(FederationError::SwarmNotFound(target));
         }
 
-        let bridge_id = format!("bridge-{}-{}-{}", source.as_str(), target.as_str(), self.current_time);
+        let bridge_id = format!(
+            "bridge-{}-{}-{}",
+            source.as_str(),
+            target.as_str(),
+            self.current_time
+        );
         let bridge = TrustBridge {
             id: bridge_id.clone(),
             source: source.clone(),
@@ -831,11 +859,15 @@ impl FederationEngine {
         proof: Vec<u8>,
     ) -> Result<String, FederationError> {
         // Find active bridge
-        let bridge = self.bridges.values()
+        let bridge = self
+            .bridges
+            .values()
             .find(|b| {
-                b.active &&
-                ((b.source == source_swarm && b.target == target_swarm) ||
-                 (b.bridge_type == BridgeType::Bidirectional && b.target == source_swarm && b.source == target_swarm))
+                b.active
+                    && ((b.source == source_swarm && b.target == target_swarm)
+                        || (b.bridge_type == BridgeType::Bidirectional
+                            && b.target == source_swarm
+                            && b.source == target_swarm))
             })
             .ok_or(FederationError::NoBridge {
                 source: source_swarm.clone(),
@@ -886,7 +918,8 @@ impl FederationEngine {
                 transfer.status = TransferStatus::Completed;
 
                 // Update cross-swarm trust
-                let entry = self.cross_swarm_trust
+                let entry = self
+                    .cross_swarm_trust
                     .entry(transfer.agent_id.clone())
                     .or_insert_with(|| CrossSwarmTrust {
                         agent_id: transfer.agent_id.clone(),
@@ -896,7 +929,9 @@ impl FederationEngine {
                         last_updated: self.current_time,
                     });
 
-                entry.swarm_trust.insert(transfer.target_swarm.clone(), transfer.trust_amount);
+                entry
+                    .swarm_trust
+                    .insert(transfer.target_swarm.clone(), transfer.trust_amount);
                 entry.last_updated = self.current_time;
 
                 results.push(TransferResult {
@@ -977,11 +1012,15 @@ impl FederationEngine {
         decision: FederatedVoteDecision,
         signature: Vec<u8>,
     ) -> Result<(), FederationError> {
-        let swarm = self.swarms.get(&swarm_id)
+        let swarm = self
+            .swarms
+            .get(&swarm_id)
             .ok_or_else(|| FederationError::SwarmNotFound(swarm_id.clone()))?;
         let weight = swarm.federation_weight();
 
-        let proposal = self.proposals.get_mut(proposal_id)
+        let proposal = self
+            .proposals
+            .get_mut(proposal_id)
             .ok_or_else(|| FederationError::ProposalNotFound(proposal_id.to_string()))?;
 
         if proposal.state != FederatedProposalState::Active {
@@ -1006,8 +1045,13 @@ impl FederationEngine {
     }
 
     /// Tally proposal votes and update state
-    pub fn tally_proposal(&mut self, proposal_id: &str) -> Result<FederatedProposalState, FederationError> {
-        let proposal = self.proposals.get_mut(proposal_id)
+    pub fn tally_proposal(
+        &mut self,
+        proposal_id: &str,
+    ) -> Result<FederatedProposalState, FederationError> {
+        let proposal = self
+            .proposals
+            .get_mut(proposal_id)
             .ok_or_else(|| FederationError::ProposalNotFound(proposal_id.to_string()))?;
 
         if proposal.state != FederatedProposalState::Active {
@@ -1015,15 +1059,13 @@ impl FederationEngine {
         }
 
         // Calculate total weight and votes
-        let total_weight: f64 = self.swarms.values()
-            .map(|s| s.federation_weight())
-            .sum();
+        let total_weight: f64 = self.swarms.values().map(|s| s.federation_weight()).sum();
 
-        let voting_weight: f64 = proposal.votes.values()
-            .map(|v| v.weight)
-            .sum();
+        let voting_weight: f64 = proposal.votes.values().map(|v| v.weight).sum();
 
-        let approval_weight: f64 = proposal.votes.values()
+        let approval_weight: f64 = proposal
+            .votes
+            .values()
             .filter(|v| v.decision == FederatedVoteDecision::Approve)
             .map(|v| v.weight)
             .sum();
@@ -1078,7 +1120,9 @@ impl FederationEngine {
         self.current_time += elapsed_ms;
 
         // Expire old attestations
-        let expired: Vec<String> = self.attestations.iter()
+        let expired: Vec<String> = self
+            .attestations
+            .iter()
             .filter(|(_, a)| a.is_expired(self.current_time))
             .map(|(id, _)| id.clone())
             .collect();
@@ -1115,7 +1159,9 @@ impl FederationEngine {
             active_bridges: self.bridges.values().filter(|b| b.active).count(),
             pending_transfers: self.pending_transfers.len(),
             completed_transfers: self.completed_transfers.len(),
-            active_proposals: self.proposals.values()
+            active_proposals: self
+                .proposals
+                .values()
                 .filter(|p| p.state == FederatedProposalState::Active)
                 .count(),
             tracked_agents: self.cross_swarm_trust.len(),
@@ -1157,8 +1203,10 @@ pub struct FederationStats {
 #[derive(Debug, Clone)]
 pub enum FederationError {
     /// Swarm not found in the federation.
-    SwarmNotFound(/// Swarm ID that was not found.
-        SwarmId),
+    SwarmNotFound(
+        /// Swarm ID that was not found.
+        SwarmId,
+    ),
     /// Swarm does not meet federation requirements.
     InsufficientRequirements {
         /// Swarm ID.
@@ -1176,11 +1224,15 @@ pub enum FederationError {
         actual: f64,
     },
     /// Attestation not found.
-    AttestationNotFound(/// Attestation ID.
-        String),
+    AttestationNotFound(
+        /// Attestation ID.
+        String,
+    ),
     /// Attestation has expired.
-    AttestationExpired(/// Attestation ID.
-        String),
+    AttestationExpired(
+        /// Attestation ID.
+        String,
+    ),
     /// No bridge exists between the specified swarms.
     NoBridge {
         /// Source swarm.
@@ -1198,14 +1250,20 @@ pub enum FederationError {
         requested: f64,
     },
     /// Proposal not found.
-    ProposalNotFound(/// Proposal ID.
-        String),
+    ProposalNotFound(
+        /// Proposal ID.
+        String,
+    ),
     /// Proposal is not in active state.
-    ProposalNotActive(/// Proposal ID.
-        String),
+    ProposalNotActive(
+        /// Proposal ID.
+        String,
+    ),
     /// Proposal voting deadline has passed.
-    ProposalExpired(/// Proposal ID.
-        String),
+    ProposalExpired(
+        /// Proposal ID.
+        String,
+    ),
     /// Cryptographic signature verification failed.
     InvalidSignature,
     /// Proof verification failed.
@@ -1217,18 +1275,46 @@ impl std::fmt::Display for FederationError {
         match self {
             Self::SwarmNotFound(id) => write!(f, "Swarm not found: {}", id.as_str()),
             Self::InsufficientRequirements { swarm_id, reason } => {
-                write!(f, "Swarm {} insufficient requirements: {}", swarm_id.as_str(), reason)
+                write!(
+                    f,
+                    "Swarm {} insufficient requirements: {}",
+                    swarm_id.as_str(),
+                    reason
+                )
             }
-            Self::InsufficientReputation { swarm_id, required, actual } => {
-                write!(f, "Swarm {} reputation {} below required {}", swarm_id.as_str(), actual, required)
+            Self::InsufficientReputation {
+                swarm_id,
+                required,
+                actual,
+            } => {
+                write!(
+                    f,
+                    "Swarm {} reputation {} below required {}",
+                    swarm_id.as_str(),
+                    actual,
+                    required
+                )
             }
             Self::AttestationNotFound(id) => write!(f, "Attestation not found: {}", id),
             Self::AttestationExpired(id) => write!(f, "Attestation expired: {}", id),
             Self::NoBridge { source, target } => {
-                write!(f, "No bridge from {} to {}", source.as_str(), target.as_str())
+                write!(
+                    f,
+                    "No bridge from {} to {}",
+                    source.as_str(),
+                    target.as_str()
+                )
             }
-            Self::BridgeCapacityExceeded { bridge_id, capacity, requested } => {
-                write!(f, "Bridge {} capacity {} exceeded by request {}", bridge_id, capacity, requested)
+            Self::BridgeCapacityExceeded {
+                bridge_id,
+                capacity,
+                requested,
+            } => {
+                write!(
+                    f,
+                    "Bridge {} capacity {} exceeded by request {}",
+                    bridge_id, capacity, requested
+                )
             }
             Self::ProposalNotFound(id) => write!(f, "Proposal not found: {}", id),
             Self::ProposalNotActive(id) => write!(f, "Proposal not active: {}", id),
@@ -1323,27 +1409,27 @@ mod tests {
         engine.register_swarm(swarm2).unwrap();
         engine.register_swarm(swarm3).unwrap();
 
-        let attestation_id = engine.create_attestation(
-            SwarmId::new("swarm-1"),
-            SwarmId::new("swarm-2"),
-            "agent-1".to_string(),
-            0.8,
-            0.9,
-            AttestationEvidence::InteractionHistory {
-                interaction_count: 100,
-                success_rate: 0.95,
-                time_span_days: 30,
-            },
-            86400_000,
-            vec![1, 2, 3],
-        ).unwrap();
+        let attestation_id = engine
+            .create_attestation(
+                SwarmId::new("swarm-1"),
+                SwarmId::new("swarm-2"),
+                "agent-1".to_string(),
+                0.8,
+                0.9,
+                AttestationEvidence::InteractionHistory {
+                    interaction_count: 100,
+                    success_rate: 0.95,
+                    time_span_days: 30,
+                },
+                86400_000,
+                vec![1, 2, 3],
+            )
+            .unwrap();
 
         // Confirm from third swarm
-        let confirmed = engine.confirm_attestation(
-            &attestation_id,
-            SwarmId::new("swarm-3"),
-            vec![4, 5, 6],
-        ).unwrap();
+        let confirmed = engine
+            .confirm_attestation(&attestation_id, SwarmId::new("swarm-3"), vec![4, 5, 6])
+            .unwrap();
 
         assert!(confirmed);
 
@@ -1382,22 +1468,26 @@ mod tests {
         engine.register_swarm(swarm1).unwrap();
         engine.register_swarm(swarm2).unwrap();
 
-        engine.create_bridge(
-            SwarmId::new("swarm-1"),
-            SwarmId::new("swarm-2"),
-            BridgeType::Bidirectional,
-            100.0,
-            0.01,
-        ).unwrap();
+        engine
+            .create_bridge(
+                SwarmId::new("swarm-1"),
+                SwarmId::new("swarm-2"),
+                BridgeType::Bidirectional,
+                100.0,
+                0.01,
+            )
+            .unwrap();
 
-        let transfer_id = engine.initiate_transfer(
-            SwarmId::new("swarm-1"),
-            SwarmId::new("swarm-2"),
-            "agent-1".to_string(),
-            0.7,
-            KVector::new_participant(),
-            vec![1, 2, 3], // Non-empty proof
-        ).unwrap();
+        let transfer_id = engine
+            .initiate_transfer(
+                SwarmId::new("swarm-1"),
+                SwarmId::new("swarm-2"),
+                "agent-1".to_string(),
+                0.7,
+                KVector::new_participant(),
+                vec![1, 2, 3], // Non-empty proof
+            )
+            .unwrap();
 
         assert!(!transfer_id.is_empty());
 
@@ -1418,25 +1508,48 @@ mod tests {
         engine.register_swarm(swarm2).unwrap();
         engine.register_swarm(swarm3).unwrap();
 
-        let proposal_id = engine.create_proposal(
-            SwarmId::new("swarm-1"),
-            FederatedProposalType::UpdateConfig {
-                changes: FederationConfigChanges {
-                    min_swarm_reputation: Some(0.4),
-                    byzantine_threshold: None,
-                    stake_requirement: None,
+        let proposal_id = engine
+            .create_proposal(
+                SwarmId::new("swarm-1"),
+                FederatedProposalType::UpdateConfig {
+                    changes: FederationConfigChanges {
+                        min_swarm_reputation: Some(0.4),
+                        byzantine_threshold: None,
+                        stake_requirement: None,
+                    },
                 },
-            },
-            "Lower minimum reputation".to_string(),
-            0.5,
-            0.5,
-            1000000,
-        ).unwrap();
+                "Lower minimum reputation".to_string(),
+                0.5,
+                0.5,
+                1000000,
+            )
+            .unwrap();
 
         // Vote
-        engine.vote_proposal(&proposal_id, SwarmId::new("swarm-1"), FederatedVoteDecision::Approve, vec![]).unwrap();
-        engine.vote_proposal(&proposal_id, SwarmId::new("swarm-2"), FederatedVoteDecision::Approve, vec![]).unwrap();
-        engine.vote_proposal(&proposal_id, SwarmId::new("swarm-3"), FederatedVoteDecision::Reject, vec![]).unwrap();
+        engine
+            .vote_proposal(
+                &proposal_id,
+                SwarmId::new("swarm-1"),
+                FederatedVoteDecision::Approve,
+                vec![],
+            )
+            .unwrap();
+        engine
+            .vote_proposal(
+                &proposal_id,
+                SwarmId::new("swarm-2"),
+                FederatedVoteDecision::Approve,
+                vec![],
+            )
+            .unwrap();
+        engine
+            .vote_proposal(
+                &proposal_id,
+                SwarmId::new("swarm-3"),
+                FederatedVoteDecision::Reject,
+                vec![],
+            )
+            .unwrap();
 
         // Tally
         engine.current_time = 2000000; // Past deadline

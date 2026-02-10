@@ -17,7 +17,7 @@
 //! # Mycelix SDK
 //!
 //! Shared library for the Mycelix ecosystem providing:
-//! - **MATL**: Mycelix Adaptive Trust Layer (45% Byzantine tolerance)
+//! - **MATL**: Mycelix Adaptive Trust Layer (34% validated Byzantine tolerance)
 //!   - K-Vector: 8-dimensional trust scoring (k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo)
 //!   - Governance Tiers: Observer, Basic (Φ≥0.3), Major (Φ≥0.4), Constitutional (Φ≥0.6)
 //!   - RB-BFT: Reputation-Based Byzantine Fault Tolerance with reputation² voting
@@ -68,79 +68,104 @@
 #![warn(missing_docs)]
 #![deny(clippy::unwrap_used)]
 
-pub mod matl;
+pub mod crypto;
 pub mod dkg;
 pub mod fl;
-pub mod crypto;
+pub mod matl;
 
 // TypeScript binding generation (ts-export feature only)
+pub mod agentic;
+pub mod bridge;
+pub mod credentials;
+pub mod economics;
+pub mod epistemic;
+pub mod error;
 #[cfg(feature = "ts-export")]
 mod export_bindings;
 pub mod hyperfeel;
-pub mod zkproof;
-pub mod epistemic;
-pub mod credentials;
-pub mod bridge;
-pub mod economics;
-pub mod pog;
-pub mod agentic;
-pub mod temporal;
+pub mod identity;
 pub mod intentions;
 pub mod pagination;
+pub mod pog;
 pub mod storage;
-pub mod identity;
-pub mod error;
+pub mod temporal;
+pub mod zkproof;
 
 // WASM bindings (wasm feature only)
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
 // Re-exports for convenience
-pub use matl::{ProofOfGradientQuality, ReputationScore, CompositeScore, AdaptiveThreshold};
-pub use matl::{KVector, KVectorWeights, KVectorDimension, GovernanceTier, KVECTOR_WEIGHTS};
-pub use matl::{RbBftConsensus, RbBftConfig, RoundState, ConsensusResult, Vote, VoteType};
-pub use dkg::{
-    VerifiableTriple, TripleValue, EpistemicType as DkgEpistemicType, URI, StoredTriple, DKGConfig,
-    calculate_confidence, ConfidenceScore, ConfidenceFactors, ConfidenceThresholds, ConfidenceInput, meets_threshold,
-    Attestation, AttestationType, AttestationSet, AttestationCounts,
-    QueryFilter, ObjectFilter, query_by_subject, query_by_predicate, query_triples,
-};
-pub use fl::{FLCoordinator, FLConfig, AggregationMethod, GradientUpdate, AggregatedGradient};
-pub use hyperfeel::{HyperFeelEncoder, EncodingConfig, HyperGradient};
-pub use zkproof::{GradientProofCircuit, GradientProof, PublicInputs};
-pub use epistemic::{EpistemicClaim, EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel};
-pub use epistemic::EpistemicClassificationExtended;
-pub use credentials::{VerifiableCredential, CredentialBuilder};
 pub use bridge::{BridgeMessage, CrossHappReputation};
-pub use pagination::{PaginationRequest, PaginatedResponse, paginate_vec};
-pub use storage::{EpistemicStorage, StorageConfig, StorageRouter, StorageReceipt, StorageError};
-pub use identity::{
-    WebAuthnCredential, WebAuthnService, WebAuthnError,
-    HardwareKeyBridge, HardwareKeyBridgeConfig, BridgeError as HardwareKeyBridgeError,
+pub use credentials::{CredentialBuilder, VerifiableCredential};
+pub use dkg::{
+    calculate_confidence, meets_threshold, query_by_predicate, query_by_subject, query_triples,
+    Attestation, AttestationCounts, AttestationSet, AttestationType, ConfidenceFactors,
+    ConfidenceInput, ConfidenceScore, ConfidenceThresholds, DKGConfig,
+    EpistemicType as DkgEpistemicType, ObjectFilter, QueryFilter, StoredTriple, TripleValue,
+    VerifiableTriple, URI,
 };
-pub use error::{SanitizedError, SanitizedResult, SanitizeExt, sanitize_message, contains_sensitive_data};
+pub use epistemic::EpistemicClassificationExtended;
+pub use epistemic::{
+    EmpiricalLevel, EpistemicClaim, HarmonicLevel, MaterialityLevel, NormativeLevel,
+};
+pub use error::{
+    contains_sensitive_data, sanitize_message, SanitizeExt, SanitizedError, SanitizedResult,
+};
+pub use fl::{AggregatedGradient, AggregationMethod, FLConfig, FLCoordinator, GradientUpdate};
+pub use hyperfeel::{EncodingConfig, HyperFeelEncoder, HyperGradient};
+pub use identity::{
+    BridgeError as HardwareKeyBridgeError, HardwareKeyBridge, HardwareKeyBridgeConfig,
+    WebAuthnCredential, WebAuthnError, WebAuthnService,
+};
+pub use matl::{AdaptiveThreshold, CompositeScore, ProofOfGradientQuality, ReputationScore};
+pub use matl::{ConsensusResult, RbBftConfig, RbBftConsensus, RoundState, Vote, VoteType};
+pub use matl::{GovernanceTier, KVector, KVectorDimension, KVectorWeights, KVECTOR_WEIGHTS};
+pub use pagination::{paginate_vec, PaginatedResponse, PaginationRequest};
+pub use storage::{EpistemicStorage, StorageConfig, StorageError, StorageReceipt, StorageRouter};
+pub use zkproof::{GradientProof, GradientProofCircuit, PublicInputs};
 
 // Agentic Economy exports (MIP-E-004: Epistemic-Aware AI Agency)
 pub use agentic::{
-    // Core types
-    AgentId, InstrumentalActor, AgentClass, AgentStatus, AgentConstraints,
-    BehaviorLogEntry, ActionOutcome,
-    // K-Vector integration
-    KVectorBridgeConfig, compute_trust_score, calculate_kredit_from_trust,
-    // GIS integration (Graceful Ignorance System)
-    MoralUncertainty, MoralUncertaintyType, MoralActionGuidance,
-    EscalationRequest, UncertaintyCalibration,
-    // Epistemic classification
-    AgentOutput, EpistemicStats,
-    // Coherence (Phi) measurement
-    CoherenceState, CoherenceCheckResult, PhiMeasurementConfig,
+    calculate_kredit_from_trust,
+    compute_trust_score,
+    ActionOutcome,
     // API service
-    AgentApiService, ApiError, ApiResult,
-    CreateAgentRequest, UpdateAgentRequest,
+    AgentApiService,
+    AgentClass,
+    AgentConstraints,
+    // Core types
+    AgentId,
+    // Epistemic classification
+    AgentOutput,
+    AgentStatus,
+    ApiError,
+    ApiResult,
+    BehaviorLogEntry,
+    CoherenceCheckResult,
+    // Coherence (Phi) measurement
+    CoherenceState,
+    CreateAgentRequest,
+    EpistemicStats,
+    EscalationRequest,
+    GamingDetectionConfig,
+    GamingDetectionResult,
     // Gaming detection
-    GamingDetector, GamingDetectionConfig, GamingDetectionResult, GamingResponse,
+    GamingDetector,
+    GamingResponse,
+    InstrumentalActor,
+    // K-Vector integration
+    KVectorBridgeConfig,
+    MoralActionGuidance,
+    // GIS integration (Graceful Ignorance System)
+    MoralUncertainty,
+    MoralUncertaintyType,
+    PhiMeasurementConfig,
     // Quarantine
-    QuarantineManager, QuarantineReason,
+    QuarantineManager,
+    QuarantineReason,
+    UncertaintyCalibration,
+    UpdateAgentRequest,
 };
 
 /// SDK version

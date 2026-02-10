@@ -12,34 +12,32 @@
 //! verifiable "epistemic fingerprints" - trust profiles that prove
 //! reliability without revealing internal state.
 
-use mycelix_sdk::agentic::{
-    InstrumentalActor, AgentClass, AgentId, AgentConstraints, AgentStatus,
-    ActionOutcome, BehaviorLogEntry,
+use mycelix_sdk::agentic::epistemic_classifier::{
+    calculate_epistemic_weight, classify_output, create_classified_output, AgentOutput,
+    AgreementScope, ClassificationHints, EpistemicStats, OutputContent, RelevanceDuration,
 };
 use mycelix_sdk::agentic::kvector_bridge::{
-    analyze_behavior, compute_kvector_update, calculate_kredit_from_trust,
-    KVectorBridgeConfig, record_and_maybe_update,
-};
-use mycelix_sdk::agentic::epistemic_classifier::{
-    AgentOutput, OutputContent, ClassificationHints, AgreementScope,
-    RelevanceDuration, classify_output, calculate_epistemic_weight,
-    create_classified_output, EpistemicStats,
+    analyze_behavior, calculate_kredit_from_trust, compute_kvector_update, record_and_maybe_update,
+    KVectorBridgeConfig,
 };
 use mycelix_sdk::agentic::phi_bridge::{
-    measure_phi_simple, PhiMeasurementConfig, CoherenceState,
-    check_coherence_for_action, CoherenceCheckResult, CoherenceHistory,
+    check_coherence_for_action, measure_phi_simple, CoherenceCheckResult, CoherenceHistory,
+    CoherenceState, PhiMeasurementConfig,
 };
 use mycelix_sdk::agentic::uncertainty::{
-    MoralUncertainty, MoralActionGuidance, maybe_escalate,
-    UncertaintyCalibration, UncertainOutput,
+    maybe_escalate, MoralActionGuidance, MoralUncertainty, UncertainOutput, UncertaintyCalibration,
 };
-use mycelix_sdk::matl::{KVector, GovernanceTier};
+use mycelix_sdk::agentic::{
+    ActionOutcome, AgentClass, AgentConstraints, AgentId, AgentStatus, BehaviorLogEntry,
+    InstrumentalActor,
+};
 use mycelix_sdk::epistemic::{
-    EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-    EpistemicClassification, EpistemicClassificationExtended,
+    EmpiricalLevel, EpistemicClassification, EpistemicClassificationExtended, HarmonicLevel,
+    MaterialityLevel, NormativeLevel,
 };
+use mycelix_sdk::matl::{GovernanceTier, KVector};
 use mycelix_sdk::storage::{
-    EpistemicStorage, StorageBackend, MutabilityMode, StoreOptions, SchemaIdentity,
+    EpistemicStorage, MutabilityMode, SchemaIdentity, StorageBackend, StoreOptions,
 };
 
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -103,11 +101,7 @@ fn simulate_agent_actions(
 }
 
 /// Create agent output with epistemic classification
-fn create_agent_output(
-    agent_id: &str,
-    content: &str,
-    hints: ClassificationHints,
-) -> AgentOutput {
+fn create_agent_output(agent_id: &str, content: &str, hints: ClassificationHints) -> AgentOutput {
     create_classified_output(
         agent_id,
         OutputContent::Text(content.to_string()),
@@ -133,7 +127,10 @@ fn test_full_agent_lifecycle_kvector_evolution() {
     println!("  Initial K-Vector: {:?}", agent.k_vector);
     println!("  Initial Trust Score: {:.3}", initial_trust);
     println!("  Initial KREDIT Cap: {}", initial_kredit);
-    println!("  Governance Tier: {:?}", GovernanceTier::from_trust_score(initial_trust));
+    println!(
+        "  Governance Tier: {:?}",
+        GovernanceTier::from_trust_score(initial_trust)
+    );
 
     // Phase 2: Agent performs well (90% success rate)
     println!("\nPhase 2: High Performance Period (90% success)");
@@ -154,11 +151,25 @@ fn test_full_agent_lifecycle_kvector_evolution() {
     println!("    k_a (Activity): {:.3}", agent.k_vector.k_a);
     println!("    k_i (Integrity): {:.3}", agent.k_vector.k_i);
     println!("    k_p (Performance): {:.3}", agent.k_vector.k_p);
-    println!("  New Trust Score: {:.3} (change: {:+.3})", new_trust, new_trust - initial_trust);
-    println!("  New KREDIT Cap: {} (change: {:+})", new_kredit, new_kredit as i64 - initial_kredit as i64);
+    println!(
+        "  New Trust Score: {:.3} (change: {:+.3})",
+        new_trust,
+        new_trust - initial_trust
+    );
+    println!(
+        "  New KREDIT Cap: {} (change: {:+})",
+        new_kredit,
+        new_kredit as i64 - initial_kredit as i64
+    );
 
-    assert!(new_trust > initial_trust, "Trust should improve with good performance");
-    assert!(new_kredit > initial_kredit, "KREDIT should increase with trust");
+    assert!(
+        new_trust > initial_trust,
+        "Trust should improve with good performance"
+    );
+    assert!(
+        new_kredit > initial_kredit,
+        "KREDIT should increase with trust"
+    );
 
     // Phase 3: Agent has problems (40% success, violations)
     println!("\nPhase 3: Poor Performance Period (40% success, violations)");
@@ -166,7 +177,8 @@ fn test_full_agent_lifecycle_kvector_evolution() {
     simulate_agent_actions(&mut agent, 0.4, 30);
 
     let analysis2 = analyze_behavior(&agent.behavior_log);
-    let updated_kv2 = compute_kvector_update(&agent.k_vector, &analysis2, &config, days_active + 1.0);
+    let updated_kv2 =
+        compute_kvector_update(&agent.k_vector, &analysis2, &config, days_active + 1.0);
     let trust_before_drop = agent.k_vector.trust_score();
     agent.k_vector = updated_kv2;
 
@@ -175,12 +187,25 @@ fn test_full_agent_lifecycle_kvector_evolution() {
 
     println!("  Success Rate: {:.1}%", analysis2.success_rate * 100.0);
     println!("  Violations: {}", analysis2.constraint_violations);
-    println!("  Trust Score: {:.3} (change: {:+.3})", dropped_trust, dropped_trust - trust_before_drop);
+    println!(
+        "  Trust Score: {:.3} (change: {:+.3})",
+        dropped_trust,
+        dropped_trust - trust_before_drop
+    );
     println!("  KREDIT Cap: {}", dropped_kredit);
-    println!("  Integrity (k_i): {:.3} (violations penalized)", agent.k_vector.k_i);
+    println!(
+        "  Integrity (k_i): {:.3} (violations penalized)",
+        agent.k_vector.k_i
+    );
 
-    assert!(dropped_trust < new_trust, "Trust should drop with poor performance");
-    assert!(agent.k_vector.k_i < 1.0, "Integrity should be penalized for violations");
+    assert!(
+        dropped_trust < new_trust,
+        "Trust should drop with poor performance"
+    );
+    assert!(
+        agent.k_vector.k_i < 1.0,
+        "Integrity should be penalized for violations"
+    );
 
     // Phase 4: Recovery (80% success, no violations)
     println!("\nPhase 4: Recovery Period (80% success, clean)");
@@ -194,12 +219,17 @@ fn test_full_agent_lifecycle_kvector_evolution() {
             action_type: "clean_action".to_string(),
             kredit_consumed: 15,
             counterparties: vec![format!("partner_{}", i % 10)],
-            outcome: if i < 32 { ActionOutcome::Success } else { ActionOutcome::Error },
+            outcome: if i < 32 {
+                ActionOutcome::Success
+            } else {
+                ActionOutcome::Error
+            },
         });
     }
 
     let analysis3 = analyze_behavior(&agent.behavior_log);
-    let recovered_kv = compute_kvector_update(&agent.k_vector, &analysis3, &config, days_active + 2.0);
+    let recovered_kv =
+        compute_kvector_update(&agent.k_vector, &analysis3, &config, days_active + 2.0);
     agent.k_vector = recovered_kv;
 
     let recovered_trust = agent.k_vector.trust_score();
@@ -207,9 +237,16 @@ fn test_full_agent_lifecycle_kvector_evolution() {
 
     println!("  Success Rate: {:.1}%", analysis3.success_rate * 100.0);
     println!("  Violations: {} (clean!)", analysis3.constraint_violations);
-    println!("  Trust Score: {:.3} (recovery: {:+.3})", recovered_trust, recovered_trust - dropped_trust);
+    println!(
+        "  Trust Score: {:.3} (recovery: {:+.3})",
+        recovered_trust,
+        recovered_trust - dropped_trust
+    );
     println!("  KREDIT Cap: {}", recovered_kredit);
-    println!("  Governance Tier: {:?}", GovernanceTier::from_trust_score(recovered_trust));
+    println!(
+        "  Governance Tier: {:?}",
+        GovernanceTier::from_trust_score(recovered_trust)
+    );
 
     println!("\n=== K-Vector Evolution Test PASSED ===\n");
 }
@@ -235,11 +272,13 @@ fn test_epistemic_classification_workflow() {
     stats.add_output(&output1.classification);
 
     println!("Output 1: Personal Opinion");
-    println!("  Classification: E{}/N{}/M{}/H{}",
+    println!(
+        "  Classification: E{}/N{}/M{}/H{}",
         output1.classification.empirical as u8,
         output1.classification.normative as u8,
         output1.classification.materiality as u8,
-        output1.classification.harmonic as u8);
+        output1.classification.harmonic as u8
+    );
     println!("  Epistemic Weight: {:.4}", weight1);
 
     assert_eq!(output1.classification.empirical, EmpiricalLevel::E0Null);
@@ -259,15 +298,23 @@ fn test_epistemic_classification_workflow() {
     stats.add_output(&output2.classification);
 
     println!("\nOutput 2: Verified Analysis");
-    println!("  Classification: E{}/N{}/M{}/H{}",
+    println!(
+        "  Classification: E{}/N{}/M{}/H{}",
         output2.classification.empirical as u8,
         output2.classification.normative as u8,
         output2.classification.materiality as u8,
-        output2.classification.harmonic as u8);
+        output2.classification.harmonic as u8
+    );
     println!("  Epistemic Weight: {:.4}", weight2);
 
-    assert_eq!(output2.classification.empirical, EmpiricalLevel::E2PrivateVerify);
-    assert!(weight2 > weight1, "Verified analysis should have higher weight");
+    assert_eq!(
+        output2.classification.empirical,
+        EmpiricalLevel::E2PrivateVerify
+    );
+    assert!(
+        weight2 > weight1,
+        "Verified analysis should have higher weight"
+    );
 
     // Output 3: Cryptographically proven result (high epistemic level)
     let hints3 = ClassificationHints {
@@ -283,14 +330,19 @@ fn test_epistemic_classification_workflow() {
     stats.add_output(&output3.classification);
 
     println!("\nOutput 3: Cryptographic Proof");
-    println!("  Classification: E{}/N{}/M{}/H{}",
+    println!(
+        "  Classification: E{}/N{}/M{}/H{}",
         output3.classification.empirical as u8,
         output3.classification.normative as u8,
         output3.classification.materiality as u8,
-        output3.classification.harmonic as u8);
+        output3.classification.harmonic as u8
+    );
     println!("  Epistemic Weight: {:.4}", weight3);
 
-    assert_eq!(output3.classification.empirical, EmpiricalLevel::E4PublicRepro);
+    assert_eq!(
+        output3.classification.empirical,
+        EmpiricalLevel::E4PublicRepro
+    );
     assert!(weight3 > 0.5, "Cryptographic proof should have high weight");
 
     // Summary statistics
@@ -353,11 +405,36 @@ fn test_phi_coherence_measurement() {
     // Scenario 2: Incoherent agent (wildly varying outputs)
     println!("\nScenario 2: Incoherent Agent (inconsistent outputs)");
     let levels = [
-        (EmpiricalLevel::E0Null, NormativeLevel::N0Personal, MaterialityLevel::M0Ephemeral, HarmonicLevel::H0None),
-        (EmpiricalLevel::E4PublicRepro, NormativeLevel::N3Axiomatic, MaterialityLevel::M3Foundational, HarmonicLevel::H4Kosmic),
-        (EmpiricalLevel::E1Testimonial, NormativeLevel::N2Network, MaterialityLevel::M1Temporal, HarmonicLevel::H2Network),
-        (EmpiricalLevel::E3Cryptographic, NormativeLevel::N0Personal, MaterialityLevel::M2Persistent, HarmonicLevel::H1Local),
-        (EmpiricalLevel::E2PrivateVerify, NormativeLevel::N1Communal, MaterialityLevel::M0Ephemeral, HarmonicLevel::H3Civilizational),
+        (
+            EmpiricalLevel::E0Null,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M0Ephemeral,
+            HarmonicLevel::H0None,
+        ),
+        (
+            EmpiricalLevel::E4PublicRepro,
+            NormativeLevel::N3Axiomatic,
+            MaterialityLevel::M3Foundational,
+            HarmonicLevel::H4Kosmic,
+        ),
+        (
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N2Network,
+            MaterialityLevel::M1Temporal,
+            HarmonicLevel::H2Network,
+        ),
+        (
+            EmpiricalLevel::E3Cryptographic,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M2Persistent,
+            HarmonicLevel::H1Local,
+        ),
+        (
+            EmpiricalLevel::E2PrivateVerify,
+            NormativeLevel::N1Communal,
+            MaterialityLevel::M0Ephemeral,
+            HarmonicLevel::H3Civilizational,
+        ),
     ];
 
     let incoherent_outputs: Vec<AgentOutput> = levels
@@ -387,7 +464,10 @@ fn test_phi_coherence_measurement() {
 
     // Incoherent agents should be restricted
     if incoherent_result.coherence_state == CoherenceState::Critical {
-        assert!(matches!(incoherent_check, CoherenceCheckResult::Blocked { .. }));
+        assert!(matches!(
+            incoherent_check,
+            CoherenceCheckResult::Blocked { .. }
+        ));
     }
 
     println!("\n=== Phi Coherence Test PASSED ===\n");
@@ -409,9 +489,18 @@ fn test_gis_uncertainty_escalation() {
     let confident_uncertainty = MoralUncertainty::new(0.1, 0.15, 0.1);
     let confident_guidance = MoralActionGuidance::from_uncertainty(&confident_uncertainty);
 
-    println!("  Epistemic Uncertainty: {:.2}", confident_uncertainty.epistemic);
-    println!("  Axiological Uncertainty: {:.2}", confident_uncertainty.axiological);
-    println!("  Deontic Uncertainty: {:.2}", confident_uncertainty.deontic);
+    println!(
+        "  Epistemic Uncertainty: {:.2}",
+        confident_uncertainty.epistemic
+    );
+    println!(
+        "  Axiological Uncertainty: {:.2}",
+        confident_uncertainty.axiological
+    );
+    println!(
+        "  Deontic Uncertainty: {:.2}",
+        confident_uncertainty.deontic
+    );
     println!("  Total Uncertainty: {:.3}", confident_uncertainty.total());
     println!("  Guidance: {:?}", confident_guidance);
     println!("  Can Proceed: {}", confident_guidance.can_proceed());
@@ -427,8 +516,14 @@ fn test_gis_uncertainty_escalation() {
     let epistemic_uncertainty = MoralUncertainty::new(0.85, 0.3, 0.4);
     let epistemic_guidance = MoralActionGuidance::from_uncertainty(&epistemic_uncertainty);
 
-    println!("  Epistemic Uncertainty: {:.2} (HIGH)", epistemic_uncertainty.epistemic);
-    println!("  Most Uncertain: {:?}", epistemic_uncertainty.most_uncertain_type());
+    println!(
+        "  Epistemic Uncertainty: {:.2} (HIGH)",
+        epistemic_uncertainty.epistemic
+    );
+    println!(
+        "  Most Uncertain: {:?}",
+        epistemic_uncertainty.most_uncertain_type()
+    );
     println!("  Guidance: {:?}", epistemic_guidance);
     println!("  Requires Human: {}", epistemic_guidance.requires_human());
 
@@ -450,27 +545,39 @@ fn test_gis_uncertainty_escalation() {
     println!("\nScenario 3: Morally Uncertain Agent");
     let moral_uncertainty = MoralUncertainty::new(0.3, 0.8, 0.75);
 
-    println!("  Axiological Uncertainty: {:.2} (HIGH)", moral_uncertainty.axiological);
-    println!("  Deontic Uncertainty: {:.2} (HIGH)", moral_uncertainty.deontic);
+    println!(
+        "  Axiological Uncertainty: {:.2} (HIGH)",
+        moral_uncertainty.axiological
+    );
+    println!(
+        "  Deontic Uncertainty: {:.2} (HIGH)",
+        moral_uncertainty.deontic
+    );
     println!("  Total Uncertainty: {:.3}", moral_uncertainty.total());
 
     let moral_guidance = MoralActionGuidance::from_uncertainty(&moral_uncertainty);
     println!("  Guidance: {:?}", moral_guidance);
 
-    assert!(moral_guidance.requires_human(), "High moral uncertainty should require human");
+    assert!(
+        moral_guidance.requires_human(),
+        "High moral uncertainty should require human"
+    );
 
     // Scenario 4: Calibration tracking
     println!("\nScenario 4: Calibration Tracking");
 
     // Record some calibration events
-    calibration.record(true, false);  // Appropriately uncertain
-    calibration.record(false, true);  // Appropriately confident
-    calibration.record(true, false);  // Appropriately uncertain
-    calibration.record(false, true);  // Appropriately confident
+    calibration.record(true, false); // Appropriately uncertain
+    calibration.record(false, true); // Appropriately confident
+    calibration.record(true, false); // Appropriately uncertain
+    calibration.record(false, true); // Appropriately confident
     calibration.record(false, false); // Overconfident (bad!)
 
     println!("  Total Events: {}", calibration.total_events);
-    println!("  Calibration Score: {:.2}", calibration.calibration_score());
+    println!(
+        "  Calibration Score: {:.2}",
+        calibration.calibration_score()
+    );
     println!("  Is Overconfident: {}", calibration.is_overconfident());
 
     // Scenario 5: UncertainOutput wrapper
@@ -552,12 +659,20 @@ fn test_epistemic_storage_routing() {
         let tier = router.route(&classification);
 
         println!("{}:", name);
-        println!("  Classification: E{}/N{}/M{}",
+        println!(
+            "  Classification: E{}/N{}/M{}",
             classification.empirical as u8,
             classification.normative as u8,
-            classification.materiality as u8);
-        println!("  Backend: {:?} (expected: {:?})", tier.backend, expected_backend);
-        println!("  Mutability: {:?} (expected: {:?})", tier.mutability, expected_mutability);
+            classification.materiality as u8
+        );
+        println!(
+            "  Backend: {:?} (expected: {:?})",
+            tier.backend, expected_backend
+        );
+        println!(
+            "  Mutability: {:?} (expected: {:?})",
+            tier.mutability, expected_mutability
+        );
         println!("  Encrypted: {}", tier.encrypted);
         println!("  Content-Addressed: {}", tier.content_addressed);
 
@@ -590,8 +705,14 @@ fn test_complete_integration_flow() {
 
     println!("  Agent ID: {}", agent.agent_id.as_str());
     println!("  Initial Trust Score: {:.3}", initial_trust);
-    println!("  Initial KREDIT Cap: {}", calculate_kredit_from_trust(initial_trust));
-    println!("  Governance Tier: {:?}", GovernanceTier::from_trust_score(initial_trust));
+    println!(
+        "  Initial KREDIT Cap: {}",
+        calculate_kredit_from_trust(initial_trust)
+    );
+    println!(
+        "  Governance Tier: {:?}",
+        GovernanceTier::from_trust_score(initial_trust)
+    );
 
     // Step 2: Agent produces outputs with epistemic classification
     println!("\n┌─────────────────────────────────────────────────────────────────┐");
@@ -599,42 +720,59 @@ fn test_complete_integration_flow() {
     println!("└─────────────────────────────────────────────────────────────────┘");
 
     let outputs: Vec<AgentOutput> = vec![
-        create_agent_output(agent.agent_id.as_str(), "Initial analysis complete", ClassificationHints {
-            third_party_verified: true,
-            agreement_scope: Some(AgreementScope::Community),
-            relevance_duration: Some(RelevanceDuration::MediumTerm),
-            ..Default::default()
-        }),
-        create_agent_output(agent.agent_id.as_str(), "Data validated with proof", ClassificationHints {
-            has_crypto_proof: true,
-            uses_public_data: true,
-            agreement_scope: Some(AgreementScope::Network),
-            relevance_duration: Some(RelevanceDuration::LongTerm),
-            affected_harmonies_count: 3,
-            ..Default::default()
-        }),
-        create_agent_output(agent.agent_id.as_str(), "Recommendation generated", ClassificationHints {
-            third_party_verified: true,
-            agreement_scope: Some(AgreementScope::Community),
-            relevance_duration: Some(RelevanceDuration::ShortTerm),
-            affected_harmonies_count: 1,
-            ..Default::default()
-        }),
+        create_agent_output(
+            agent.agent_id.as_str(),
+            "Initial analysis complete",
+            ClassificationHints {
+                third_party_verified: true,
+                agreement_scope: Some(AgreementScope::Community),
+                relevance_duration: Some(RelevanceDuration::MediumTerm),
+                ..Default::default()
+            },
+        ),
+        create_agent_output(
+            agent.agent_id.as_str(),
+            "Data validated with proof",
+            ClassificationHints {
+                has_crypto_proof: true,
+                uses_public_data: true,
+                agreement_scope: Some(AgreementScope::Network),
+                relevance_duration: Some(RelevanceDuration::LongTerm),
+                affected_harmonies_count: 3,
+                ..Default::default()
+            },
+        ),
+        create_agent_output(
+            agent.agent_id.as_str(),
+            "Recommendation generated",
+            ClassificationHints {
+                third_party_verified: true,
+                agreement_scope: Some(AgreementScope::Community),
+                relevance_duration: Some(RelevanceDuration::ShortTerm),
+                affected_harmonies_count: 1,
+                ..Default::default()
+            },
+        ),
     ];
 
     let mut epistemic_stats = EpistemicStats::default();
     for (i, output) in outputs.iter().enumerate() {
         let weight = calculate_epistemic_weight(&output.classification);
         epistemic_stats.add_output(&output.classification);
-        println!("  Output {}: E{}/N{}/M{}/H{} (weight: {:.4})",
+        println!(
+            "  Output {}: E{}/N{}/M{}/H{} (weight: {:.4})",
             i + 1,
             output.classification.empirical as u8,
             output.classification.normative as u8,
             output.classification.materiality as u8,
             output.classification.harmonic as u8,
-            weight);
+            weight
+        );
     }
-    println!("  Average Epistemic Weight: {:.4}", epistemic_stats.average_weight);
+    println!(
+        "  Average Epistemic Weight: {:.4}",
+        epistemic_stats.average_weight
+    );
 
     // Step 3: Measure Phi coherence
     println!("\n┌─────────────────────────────────────────────────────────────────┐");
@@ -681,7 +819,11 @@ fn test_complete_integration_flow() {
     let new_trust = agent.k_vector.trust_score();
     println!("  Actions Recorded: {}", analysis.total_actions);
     println!("  Success Rate: {:.1}%", analysis.success_rate * 100.0);
-    println!("  Updated Trust Score: {:.3} (change: {:+.3})", new_trust, new_trust - initial_trust);
+    println!(
+        "  Updated Trust Score: {:.3} (change: {:+.3})",
+        new_trust,
+        new_trust - initial_trust
+    );
 
     // Step 6: Adjust KREDIT based on new trust
     println!("\n┌─────────────────────────────────────────────────────────────────┐");
@@ -694,7 +836,10 @@ fn test_complete_integration_flow() {
     println!("  Previous KREDIT Cap: {}", old_kredit);
     println!("  New KREDIT Cap: {}", new_kredit);
     println!("  Change: {:+}", new_kredit as i64 - old_kredit as i64);
-    println!("  Governance Tier: {:?}", GovernanceTier::from_trust_score(new_trust));
+    println!(
+        "  Governance Tier: {:?}",
+        GovernanceTier::from_trust_score(new_trust)
+    );
 
     // Step 7: Route to appropriate storage
     println!("\n┌─────────────────────────────────────────────────────────────────┐");
@@ -721,23 +866,42 @@ fn test_complete_integration_flow() {
     println!("\n╔══════════════════════════════════════════════════════════════════╗");
     println!("║                    INTEGRATION SUMMARY                           ║");
     println!("╠══════════════════════════════════════════════════════════════════╣");
-    println!("║  Agent Trust Evolution: {:.3} → {:.3} ({:+.3})              ║",
-        initial_trust, new_trust, new_trust - initial_trust);
-    println!("║  KREDIT Allocation: {} → {}                          ║",
-        old_kredit, new_kredit);
-    println!("║  Epistemic Quality Score: {:.4}                             ║",
-        epistemic_stats.quality_score());
-    println!("║  Phi Coherence: {:.4} ({:?})                     ║",
-        phi_result.phi, phi_result.coherence_state);
-    println!("║  Uncertainty Level: {:.3} ({:?})           ║",
-        uncertainty.total(), guidance);
+    println!(
+        "║  Agent Trust Evolution: {:.3} → {:.3} ({:+.3})              ║",
+        initial_trust,
+        new_trust,
+        new_trust - initial_trust
+    );
+    println!(
+        "║  KREDIT Allocation: {} → {}                          ║",
+        old_kredit, new_kredit
+    );
+    println!(
+        "║  Epistemic Quality Score: {:.4}                             ║",
+        epistemic_stats.quality_score()
+    );
+    println!(
+        "║  Phi Coherence: {:.4} ({:?})                     ║",
+        phi_result.phi, phi_result.coherence_state
+    );
+    println!(
+        "║  Uncertainty Level: {:.3} ({:?})           ║",
+        uncertainty.total(),
+        guidance
+    );
     println!("╚══════════════════════════════════════════════════════════════════╝");
     println!();
 
     // Assertions
-    assert!(new_trust >= initial_trust, "Trust should improve or maintain");
+    assert!(
+        new_trust >= initial_trust,
+        "Trust should improve or maintain"
+    );
     assert!(phi_result.phi > 0.0, "Phi should be measurable");
-    assert!(guidance.can_proceed(), "Low uncertainty should allow proceeding");
+    assert!(
+        guidance.can_proceed(),
+        "Low uncertainty should allow proceeding"
+    );
     assert_eq!(high_tier.backend, StorageBackend::IPFS);
     assert_eq!(high_tier.mutability, MutabilityMode::Immutable);
 
@@ -755,11 +919,10 @@ fn test_complete_integration_flow() {
 // - Phase 4: GIS Uncertainty Handling
 
 use mycelix_sdk::agentic::integration::{
-    ZKIntegratedPipeline, ZKTrustConfig, ObservabilityExports,
-    CombinedGatingRecommendation,
+    CombinedGatingRecommendation, ObservabilityExports, ZKIntegratedPipeline, ZKTrustConfig,
 };
-use mycelix_sdk::agentic::zk_trust::ProofStatement;
 use mycelix_sdk::agentic::phi_bridge::ZKOperationType;
+use mycelix_sdk::agentic::zk_trust::ProofStatement;
 
 /// Create a test agent with specific Phi coherence level
 fn create_agent_with_phi(name: &str, phi: f32) -> InstrumentalActor {
@@ -824,8 +987,8 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("└──────────────────────────────────────────────────────────────────────┘");
 
     // Register agents with different trust/coherence levels
-    let alice = create_agent_with_phi("alice", 0.85);  // High coherence
-    let bob = create_agent_with_phi("bob", 0.65);      // Moderate coherence
+    let alice = create_agent_with_phi("alice", 0.85); // High coherence
+    let bob = create_agent_with_phi("bob", 0.65); // Moderate coherence
     let charlie = create_agent_with_phi("charlie", 0.25); // Low coherence
 
     // Register with ZK commitments
@@ -835,21 +998,54 @@ fn test_zk_integrated_full_pipeline_demo() {
 
     println!("\n  Agent: Alice (High-Trust, High-Coherence)");
     println!("    K-Vector Commitment: {}", alice_commit.agent_id);
-    println!("    k_phi (Coherence): 0.85 ({:?})", CoherenceState::from_phi(0.85));
-    println!("    Trust Score: {:.3}", pipeline.matl_pipeline().trust_pipeline()
-        .get_agent("agent-alice").unwrap().k_vector.trust_score());
+    println!(
+        "    k_phi (Coherence): 0.85 ({:?})",
+        CoherenceState::from_phi(0.85)
+    );
+    println!(
+        "    Trust Score: {:.3}",
+        pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("agent-alice")
+            .unwrap()
+            .k_vector
+            .trust_score()
+    );
 
     println!("\n  Agent: Bob (Moderate-Trust, Stable-Coherence)");
     println!("    K-Vector Commitment: {}", bob_commit.agent_id);
-    println!("    k_phi (Coherence): 0.65 ({:?})", CoherenceState::from_phi(0.65));
-    println!("    Trust Score: {:.3}", pipeline.matl_pipeline().trust_pipeline()
-        .get_agent("agent-bob").unwrap().k_vector.trust_score());
+    println!(
+        "    k_phi (Coherence): 0.65 ({:?})",
+        CoherenceState::from_phi(0.65)
+    );
+    println!(
+        "    Trust Score: {:.3}",
+        pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("agent-bob")
+            .unwrap()
+            .k_vector
+            .trust_score()
+    );
 
     println!("\n  Agent: Charlie (Lower-Trust, Degraded-Coherence)");
     println!("    K-Vector Commitment: {}", charlie_commit.agent_id);
-    println!("    k_phi (Coherence): 0.25 ({:?})", CoherenceState::from_phi(0.25));
-    println!("    Trust Score: {:.3}", pipeline.matl_pipeline().trust_pipeline()
-        .get_agent("agent-charlie").unwrap().k_vector.trust_score());
+    println!(
+        "    k_phi (Coherence): 0.25 ({:?})",
+        CoherenceState::from_phi(0.25)
+    );
+    println!(
+        "    Trust Score: {:.3}",
+        pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("agent-charlie")
+            .unwrap()
+            .k_vector
+            .trust_score()
+    );
 
     // ==========================================================================
     // PHASE 2: Epistemic Classification with ZK Proofs
@@ -859,20 +1055,29 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("└──────────────────────────────────────────────────────────────────────┘");
 
     // Alice produces high-quality outputs with ZK proofs
-    let alice_output = pipeline.process_zk_output(
-        "agent-alice",
-        OutputContent::Text("Cryptographically verified analysis: gradient quality = 0.94".to_string()),
-        ProofStatement::TrustExceedsThreshold { threshold: 0.5 },
-    ).expect("Alice should be able to produce ZK output");
+    let alice_output = pipeline
+        .process_zk_output(
+            "agent-alice",
+            OutputContent::Text(
+                "Cryptographically verified analysis: gradient quality = 0.94".to_string(),
+            ),
+            ProofStatement::TrustExceedsThreshold { threshold: 0.5 },
+        )
+        .expect("Alice should be able to produce ZK output");
 
     println!("\n  Alice's ZK-Proven Output:");
-    println!("    Classification: E{}/N{}/M{}/H{}",
+    println!(
+        "    Classification: E{}/N{}/M{}/H{}",
         alice_output.output.classification.empirical as u8,
         alice_output.output.classification.normative as u8,
         alice_output.output.classification.materiality as u8,
-        alice_output.output.classification.harmonic as u8);
+        alice_output.output.classification.harmonic as u8
+    );
     println!("    Has ZK Proof: {}", alice_output.output.has_proof);
-    println!("    Proof Verified: {}", alice_output.proof_summary.verified);
+    println!(
+        "    Proof Verified: {}",
+        alice_output.proof_summary.verified
+    );
     println!("    Proof Result: {}", alice_output.proof_summary.result);
     println!("    K-Vector Delta Applied:");
     println!("      k_r: {:+.4}", alice_output.kvector_delta.k_r_delta);
@@ -880,8 +1085,10 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("      k_v: {:+.4}", alice_output.kvector_delta.k_v_delta);
 
     assert!(alice_output.output.has_proof, "Output should have ZK proof");
-    assert!(alice_output.output.classification.empirical >= EmpiricalLevel::E3Cryptographic,
-        "ZK-proven output should be E3+");
+    assert!(
+        alice_output.output.classification.empirical >= EmpiricalLevel::E3Cryptographic,
+        "ZK-proven output should be E3+"
+    );
 
     // ==========================================================================
     // PHASE 3: Phi Coherence Gating
@@ -903,15 +1110,22 @@ fn test_zk_integrated_full_pipeline_demo() {
         println!("\n  Operation: {}", op_name);
 
         for agent_id in &["agent-alice", "agent-bob", "agent-charlie"] {
-            let gating = pipeline.check_phi_for_zk_operation(agent_id, *op)
+            let gating = pipeline
+                .check_phi_for_zk_operation(agent_id, *op)
                 .expect("Gating check should succeed");
 
-            let status = if gating.permitted { "✓ Allowed" } else { "✗ Blocked" };
-            println!("    {}: {} (Phi: {:.2}, State: {:?})",
+            let status = if gating.permitted {
+                "✓ Allowed"
+            } else {
+                "✗ Blocked"
+            };
+            println!(
+                "    {}: {} (Phi: {:.2}, State: {:?})",
                 agent_id.replace("agent-", ""),
                 status,
                 gating.current_phi,
-                gating.current_state);
+                gating.current_state
+            );
         }
     }
 
@@ -919,20 +1133,36 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("\n  Phi-Gated Proof Generation:");
 
     // Alice can generate proofs (high coherence)
-    let alice_proof = pipeline.generate_trust_proof_phi_gated(
-        "agent-alice",
-        ProofStatement::IsVerified,
+    let alice_proof =
+        pipeline.generate_trust_proof_phi_gated("agent-alice", ProofStatement::IsVerified);
+    println!(
+        "    Alice: {}",
+        if alice_proof.is_ok() {
+            "✓ Proof generated"
+        } else {
+            "✗ Blocked"
+        }
     );
-    println!("    Alice: {}", if alice_proof.is_ok() { "✓ Proof generated" } else { "✗ Blocked" });
-    assert!(alice_proof.is_ok(), "High-coherence agent should generate proofs");
+    assert!(
+        alice_proof.is_ok(),
+        "High-coherence agent should generate proofs"
+    );
 
     // Charlie is blocked (low coherence)
-    let charlie_proof = pipeline.generate_trust_proof_phi_gated(
-        "agent-charlie",
-        ProofStatement::IsVerified,
+    let charlie_proof =
+        pipeline.generate_trust_proof_phi_gated("agent-charlie", ProofStatement::IsVerified);
+    println!(
+        "    Charlie: {}",
+        if charlie_proof.is_ok() {
+            "✓ Proof generated"
+        } else {
+            "✗ Blocked (insufficient coherence)"
+        }
     );
-    println!("    Charlie: {}", if charlie_proof.is_ok() { "✓ Proof generated" } else { "✗ Blocked (insufficient coherence)" });
-    assert!(charlie_proof.is_err(), "Low-coherence agent should be blocked");
+    assert!(
+        charlie_proof.is_err(),
+        "Low-coherence agent should be blocked"
+    );
 
     // Check network-wide Phi health
     let phi_health = pipeline.phi_network_health();
@@ -941,7 +1171,10 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("    Average Phi: {:.3}", phi_health.average_phi);
     println!("    Coherent Agents: {}", phi_health.coherent_agents);
     println!("    Degraded Agents: {}", phi_health.degraded_agents);
-    println!("    Network Level: {:?}", phi_health.network_coherence_level);
+    println!(
+        "    Network Level: {:?}",
+        phi_health.network_coherence_level
+    );
 
     // ==========================================================================
     // PHASE 4: GIS Uncertainty & Escalation
@@ -954,43 +1187,79 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("\n  Scenario A: Low Uncertainty (Should Proceed)");
 
     let low_uncertainty = MoralUncertainty::new(0.15, 0.2, 0.1);
-    let low_unc_result = pipeline.process_zk_output_with_uncertainty(
-        "agent-alice",
-        OutputContent::Text("Standard data analysis complete".to_string()),
-        ProofStatement::WellFormed,
-        low_uncertainty.clone(),
-    ).expect("Low uncertainty output should succeed");
+    let low_unc_result = pipeline
+        .process_zk_output_with_uncertainty(
+            "agent-alice",
+            OutputContent::Text("Standard data analysis complete".to_string()),
+            ProofStatement::WellFormed,
+            low_uncertainty.clone(),
+        )
+        .expect("Low uncertainty output should succeed");
 
-    println!("    Uncertainty: E={:.2}, A={:.2}, D={:.2} (Total: {:.3})",
-        low_uncertainty.epistemic, low_uncertainty.axiological, low_uncertainty.deontic,
-        low_uncertainty.total());
+    println!(
+        "    Uncertainty: E={:.2}, A={:.2}, D={:.2} (Total: {:.3})",
+        low_uncertainty.epistemic,
+        low_uncertainty.axiological,
+        low_uncertainty.deontic,
+        low_uncertainty.total()
+    );
     println!("    Guidance: {:?}", low_unc_result.guidance);
-    println!("    Output Produced: {}", low_unc_result.output_result.is_some());
-    println!("    Escalation Required: {}", low_unc_result.escalation.is_some());
+    println!(
+        "    Output Produced: {}",
+        low_unc_result.output_result.is_some()
+    );
+    println!(
+        "    Escalation Required: {}",
+        low_unc_result.escalation.is_some()
+    );
 
-    assert!(low_unc_result.output_result.is_some(), "Low uncertainty should produce output");
-    assert!(low_unc_result.escalation.is_none(), "Low uncertainty should not escalate");
+    assert!(
+        low_unc_result.output_result.is_some(),
+        "Low uncertainty should produce output"
+    );
+    assert!(
+        low_unc_result.escalation.is_none(),
+        "Low uncertainty should not escalate"
+    );
 
     // High uncertainty output - triggers escalation
     println!("\n  Scenario B: High Uncertainty (Should Escalate)");
 
     let high_uncertainty = MoralUncertainty::new(0.85, 0.9, 0.8);
-    let high_unc_result = pipeline.process_zk_output_with_uncertainty(
-        "agent-bob",
-        OutputContent::Text("Critical decision with global implications".to_string()),
-        ProofStatement::TrustExceedsThreshold { threshold: 0.6 },
-        high_uncertainty.clone(),
-    ).expect("High uncertainty output should create escalation");
+    let high_unc_result = pipeline
+        .process_zk_output_with_uncertainty(
+            "agent-bob",
+            OutputContent::Text("Critical decision with global implications".to_string()),
+            ProofStatement::TrustExceedsThreshold { threshold: 0.6 },
+            high_uncertainty.clone(),
+        )
+        .expect("High uncertainty output should create escalation");
 
-    println!("    Uncertainty: E={:.2}, A={:.2}, D={:.2} (Total: {:.3})",
-        high_uncertainty.epistemic, high_uncertainty.axiological, high_uncertainty.deontic,
-        high_uncertainty.total());
+    println!(
+        "    Uncertainty: E={:.2}, A={:.2}, D={:.2} (Total: {:.3})",
+        high_uncertainty.epistemic,
+        high_uncertainty.axiological,
+        high_uncertainty.deontic,
+        high_uncertainty.total()
+    );
     println!("    Guidance: {:?}", high_unc_result.guidance);
-    println!("    Output Produced: {}", high_unc_result.output_result.is_some());
-    println!("    Escalation Created: {}", high_unc_result.escalation.is_some());
+    println!(
+        "    Output Produced: {}",
+        high_unc_result.output_result.is_some()
+    );
+    println!(
+        "    Escalation Created: {}",
+        high_unc_result.escalation.is_some()
+    );
 
-    assert!(high_unc_result.output_result.is_none(), "High uncertainty should not produce output");
-    assert!(high_unc_result.escalation.is_some(), "High uncertainty should create escalation");
+    assert!(
+        high_unc_result.output_result.is_none(),
+        "High uncertainty should not produce output"
+    );
+    assert!(
+        high_unc_result.escalation.is_some(),
+        "High uncertainty should create escalation"
+    );
 
     if let Some(ref esc) = high_unc_result.escalation {
         println!("    Escalation Details:");
@@ -1001,54 +1270,80 @@ fn test_zk_integrated_full_pipeline_demo() {
     // Combined gating (Phi + GIS)
     println!("\n  Scenario C: Combined Gating (Phi + Uncertainty)");
 
-    let combined = pipeline.check_combined_gating(
-        "agent-alice",
-        &MoralUncertainty::new(0.2, 0.2, 0.2),
-        ZKOperationType::GenerateProof,
-    ).expect("Combined gating should work");
+    let combined = pipeline
+        .check_combined_gating(
+            "agent-alice",
+            &MoralUncertainty::new(0.2, 0.2, 0.2),
+            ZKOperationType::GenerateProof,
+        )
+        .expect("Combined gating should work");
 
     println!("    Agent: Alice (high coherence, low uncertainty)");
     println!("    Permitted: {}", combined.permitted);
     println!("    Recommendation: {:?}", combined.recommendation);
 
-    assert!(combined.permitted, "High coherence + low uncertainty should permit");
-    assert_eq!(combined.recommendation, CombinedGatingRecommendation::Proceed);
+    assert!(
+        combined.permitted,
+        "High coherence + low uncertainty should permit"
+    );
+    assert_eq!(
+        combined.recommendation,
+        CombinedGatingRecommendation::Proceed
+    );
 
-    let combined_blocked = pipeline.check_combined_gating(
-        "agent-charlie",
-        &MoralUncertainty::new(0.2, 0.2, 0.2),
-        ZKOperationType::GenerateProof,
-    ).expect("Combined gating should work");
+    let combined_blocked = pipeline
+        .check_combined_gating(
+            "agent-charlie",
+            &MoralUncertainty::new(0.2, 0.2, 0.2),
+            ZKOperationType::GenerateProof,
+        )
+        .expect("Combined gating should work");
 
     println!("\n    Agent: Charlie (low coherence, low uncertainty)");
     println!("    Permitted: {}", combined_blocked.permitted);
     println!("    Recommendation: {:?}", combined_blocked.recommendation);
 
-    assert!(!combined_blocked.permitted, "Low coherence should block even with low uncertainty");
-    assert_eq!(combined_blocked.recommendation, CombinedGatingRecommendation::WaitForCoherence);
+    assert!(
+        !combined_blocked.permitted,
+        "Low coherence should block even with low uncertainty"
+    );
+    assert_eq!(
+        combined_blocked.recommendation,
+        CombinedGatingRecommendation::WaitForCoherence
+    );
 
     // Calibration tracking
     println!("\n  Calibration Tracking:");
 
     // Record some outcomes for Bob
-    let _ = pipeline.record_gis_outcome("agent-bob", true, true);   // Appropriately uncertain
-    let _ = pipeline.record_gis_outcome("agent-bob", false, true);  // Appropriately confident
-    let _ = pipeline.record_gis_outcome("agent-bob", true, true);   // Appropriately uncertain
+    let _ = pipeline.record_gis_outcome("agent-bob", true, true); // Appropriately uncertain
+    let _ = pipeline.record_gis_outcome("agent-bob", false, true); // Appropriately confident
+    let _ = pipeline.record_gis_outcome("agent-bob", true, true); // Appropriately uncertain
 
-    let bob_calibration = pipeline.get_calibration_summary("agent-bob")
+    let bob_calibration = pipeline
+        .get_calibration_summary("agent-bob")
         .expect("Should get calibration");
 
     println!("    Bob's Calibration:");
     println!("      Total Events: {}", bob_calibration.total_events);
-    println!("      Calibration Score: {:.3}", bob_calibration.calibration_score);
+    println!(
+        "      Calibration Score: {:.3}",
+        bob_calibration.calibration_score
+    );
     println!("      Tendency: {:?}", bob_calibration.tendency);
 
     // GIS network health
     let gis_health = pipeline.gis_network_health();
     println!("\n  Network GIS Health:");
     println!("    Total Agents: {}", gis_health.agent_count);
-    println!("    Avg Calibration: {:.3}", gis_health.average_calibration_score);
-    println!("    Pending Escalations: {}", gis_health.pending_escalations_total);
+    println!(
+        "    Avg Calibration: {:.3}",
+        gis_health.average_calibration_score
+    );
+    println!(
+        "    Pending Escalations: {}",
+        gis_health.pending_escalations_total
+    );
 
     // ==========================================================================
     // OBSERVABILITY: Export Metrics
@@ -1090,9 +1385,18 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("\n  Total Metrics Exported: {}", exports.metrics().len());
 
     // Verify key metrics exist
-    assert!(prom_text.contains("zk_total_proofs"), "Should export ZK metrics");
-    assert!(prom_text.contains("phi_network_average"), "Should export Phi metrics");
-    assert!(prom_text.contains("gis_network_avg_calibration"), "Should export GIS metrics");
+    assert!(
+        prom_text.contains("zk_total_proofs"),
+        "Should export ZK metrics"
+    );
+    assert!(
+        prom_text.contains("phi_network_average"),
+        "Should export Phi metrics"
+    );
+    assert!(
+        prom_text.contains("gis_network_avg_calibration"),
+        "Should export GIS metrics"
+    );
 
     // ==========================================================================
     // FINAL SUMMARY
@@ -1104,10 +1408,30 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("║  PHASE 1 - K-Vector Integration                                      ║");
     println!("║    ✓ 3 agents registered with ZK commitments                         ║");
     println!("║    ✓ K-Vector trust profiles tracked                                 ║");
-    println!("║    ✓ Trust scores: Alice={:.2}, Bob={:.2}, Charlie={:.2}              ║",
-        pipeline.matl_pipeline().trust_pipeline().get_agent("agent-alice").unwrap().k_vector.trust_score(),
-        pipeline.matl_pipeline().trust_pipeline().get_agent("agent-bob").unwrap().k_vector.trust_score(),
-        pipeline.matl_pipeline().trust_pipeline().get_agent("agent-charlie").unwrap().k_vector.trust_score());
+    println!(
+        "║    ✓ Trust scores: Alice={:.2}, Bob={:.2}, Charlie={:.2}              ║",
+        pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("agent-alice")
+            .unwrap()
+            .k_vector
+            .trust_score(),
+        pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("agent-bob")
+            .unwrap()
+            .k_vector
+            .trust_score(),
+        pipeline
+            .matl_pipeline()
+            .trust_pipeline()
+            .get_agent("agent-charlie")
+            .unwrap()
+            .k_vector
+            .trust_score()
+    );
     println!("║                                                                      ║");
     println!("║  PHASE 2 - Epistemic Classification                                  ║");
     println!("║    ✓ ZK-proven outputs classified E3+                                ║");
@@ -1116,8 +1440,10 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("║  PHASE 3 - Phi Coherence Gating                                      ║");
     println!("║    ✓ High-coherence agents (Alice) can generate proofs               ║");
     println!("║    ✓ Low-coherence agents (Charlie) blocked from ZK operations       ║");
-    println!("║    ✓ Network Phi health: avg={:.3}, coherent={}                       ║",
-        phi_health.average_phi, phi_health.coherent_agents);
+    println!(
+        "║    ✓ Network Phi health: avg={:.3}, coherent={}                       ║",
+        phi_health.average_phi, phi_health.coherent_agents
+    );
     println!("║                                                                      ║");
     println!("║  PHASE 4 - GIS Uncertainty Handling                                  ║");
     println!("║    ✓ Low uncertainty → outputs proceed                               ║");
@@ -1127,8 +1453,10 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("║                                                                      ║");
     println!("║  OBSERVABILITY                                                       ║");
     println!("║    ✓ Prometheus metrics exported                                     ║");
-    println!("║    ✓ {} total metrics tracked                                        ║",
-        exports.metrics().len());
+    println!(
+        "║    ✓ {} total metrics tracked                                        ║",
+        exports.metrics().len()
+    );
     println!("║                                                                      ║");
     println!("╠══════════════════════════════════════════════════════════════════════╣");
     println!("║  This demonstrates AI agents with verifiable \"epistemic fingerprints\"║");

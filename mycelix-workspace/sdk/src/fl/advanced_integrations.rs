@@ -8,17 +8,17 @@
 //! - Temporal commitments (#179)
 //! - Storage-backed immutability (#180)
 
-use serde::{Deserialize, Serialize};
+use super::epistemic_fl_bridge::{
+    EpistemicGradientUpdate, EpistemicQualityTier, GradientEpistemicClassification,
+    RoundEpistemicStats,
+};
+use super::types::{FLRound, GradientUpdate, Participant};
 use crate::epistemic::{
-    EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-    EpistemicClassificationExtended,
+    EmpiricalLevel, EpistemicClassificationExtended, HarmonicLevel, MaterialityLevel,
+    NormativeLevel,
 };
 use crate::pog::PogScore;
-use super::types::{GradientUpdate, Participant, FLRound};
-use super::epistemic_fl_bridge::{
-    GradientEpistemicClassification, EpistemicGradientUpdate,
-    RoundEpistemicStats, EpistemicQualityTier,
-};
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // #175: HyperFeel for Agent Communication
@@ -108,7 +108,10 @@ pub fn compress_agent_state(
 
 /// Compute similarity between two compressed agent states
 /// Returns cosine similarity (0.0 = orthogonal, 1.0 = identical)
-pub fn compute_state_similarity(state1: &CompressedAgentState, state2: &CompressedAgentState) -> f64 {
+pub fn compute_state_similarity(
+    state1: &CompressedAgentState,
+    state2: &CompressedAgentState,
+) -> f64 {
     if state1.compressed_kvector.len() != state2.compressed_kvector.len() {
         return 0.0;
     }
@@ -123,8 +126,16 @@ pub fn compute_state_similarity(state1: &CompressedAgentState, state2: &Compress
         let start = i * 8;
         let end = start + 8;
         if end <= state1.compressed_kvector.len() {
-            let v1 = f64::from_le_bytes(state1.compressed_kvector[start..end].try_into().unwrap_or([0; 8]));
-            let v2 = f64::from_le_bytes(state2.compressed_kvector[start..end].try_into().unwrap_or([0; 8]));
+            let v1 = f64::from_le_bytes(
+                state1.compressed_kvector[start..end]
+                    .try_into()
+                    .unwrap_or([0; 8]),
+            );
+            let v2 = f64::from_le_bytes(
+                state2.compressed_kvector[start..end]
+                    .try_into()
+                    .unwrap_or([0; 8]),
+            );
             dot += v1 * v2;
             norm1 += v1 * v1;
             norm2 += v2 * v2;
@@ -186,11 +197,16 @@ pub fn compute_compressed_consensus(
         }
     }
 
-    let average_similarity = if count > 0 { total_sim / count as f64 } else { 1.0 };
+    let average_similarity = if count > 0 {
+        total_sim / count as f64
+    } else {
+        1.0
+    };
     let consensus_reached = outliers.is_empty() && average_similarity >= similarity_threshold;
 
     // Simple clustering: consensus group vs outliers
-    let consensus_group: Vec<_> = states.iter()
+    let consensus_group: Vec<_> = states
+        .iter()
         .filter(|s| !outliers.contains(&s.agent_id))
         .map(|s| s.agent_id.clone())
         .collect();
@@ -305,7 +321,12 @@ impl FLQualityClaim {
             round_id: round.round_id,
             model_id: format!("model-v{}", round.model_version),
             quality_score,
-            classification: EpistemicClassificationExtended::new(empirical, normative, materiality, harmonic),
+            classification: EpistemicClassificationExtended::new(
+                empirical,
+                normative,
+                materiality,
+                harmonic,
+            ),
             evidence: QualityEvidence {
                 participant_count: round.participants.len(),
                 byzantine_count: round.participants.len() - round.updates.len(),
@@ -328,11 +349,11 @@ impl FLQualityClaim {
             return 0.5; // Base confidence without attestations
         }
 
-        let total_weight: f64 = self.attestations.iter()
-            .map(|a| a.reputation_weight)
-            .sum();
+        let total_weight: f64 = self.attestations.iter().map(|a| a.reputation_weight).sum();
 
-        let confirming_weight: f64 = self.attestations.iter()
+        let confirming_weight: f64 = self
+            .attestations
+            .iter()
             .filter(|a| a.confirms)
             .map(|a| a.reputation_weight)
             .sum();
@@ -438,7 +459,8 @@ pub fn check_pog_participation(
             high_security_eligible: false,
             rejection_reason: Some(format!(
                 "PoG score {:.2} below high-security threshold {:.2}",
-                verified_score, pog_thresholds::HIGH_SECURITY
+                verified_score,
+                pog_thresholds::HIGH_SECURITY
             )),
         };
     }
@@ -452,7 +474,8 @@ pub fn check_pog_participation(
             high_security_eligible: false,
             rejection_reason: Some(format!(
                 "PoG score {:.2} below minimum threshold {:.2}",
-                verified_score, pog_thresholds::MIN_PARTICIPATION
+                verified_score,
+                pog_thresholds::MIN_PARTICIPATION
             )),
         };
     }
@@ -461,8 +484,9 @@ pub fn check_pog_participation(
     let pog_multiplier = if verified_score >= pog_thresholds::FULL_WEIGHT {
         1.0
     } else {
-        0.5 + (verified_score - pog_thresholds::MIN_PARTICIPATION) /
-            (pog_thresholds::FULL_WEIGHT - pog_thresholds::MIN_PARTICIPATION) * 0.5
+        0.5 + (verified_score - pog_thresholds::MIN_PARTICIPATION)
+            / (pog_thresholds::FULL_WEIGHT - pog_thresholds::MIN_PARTICIPATION)
+            * 0.5
     };
 
     PogParticipationResult {
@@ -534,7 +558,11 @@ pub fn pog_weighted_aggregation(
     Ok(PogWeightedResult {
         aggregated,
         participant_weights,
-        average_pog: if included > 0 { pog_sum / included as f64 } else { 0.0 },
+        average_pog: if included > 0 {
+            pog_sum / included as f64
+        } else {
+            0.0
+        },
         excluded_count: excluded,
     })
 }
@@ -699,7 +727,10 @@ pub fn verify_cross_domain_proof(
             historical_credit: scaled_credit * 0.2,
         },
         warnings: if !trust_source_domain {
-            vec![format!("Source domain '{}' not fully trusted", proof.source_domain)]
+            vec![format!(
+                "Source domain '{}' not fully trusted",
+                proof.source_domain
+            )]
         } else {
             vec![]
         },
@@ -986,32 +1017,38 @@ pub fn build_gradient_merkle_tree(
     }
 
     // Create leaf nodes
-    let mut leaves: Vec<FLMerkleNode> = updates.iter().map(|u| {
-        let gradient_bytes: Vec<u8> = u.gradient.gradients.iter()
-            .flat_map(|f| f.to_le_bytes())
-            .collect();
-        let gradient_hash = hash_bytes(&gradient_bytes);
+    let mut leaves: Vec<FLMerkleNode> = updates
+        .iter()
+        .map(|u| {
+            let gradient_bytes: Vec<u8> = u
+                .gradient
+                .gradients
+                .iter()
+                .flat_map(|f| f.to_le_bytes())
+                .collect();
+            let gradient_hash = hash_bytes(&gradient_bytes);
 
-        let leaf_data = FLMerkleLeaf {
-            participant_id: u.gradient.participant_id.clone(),
-            gradient_hash,
-            timestamp: u.gradient.metadata.timestamp,
-            classification: u.classification.clone(),
-        };
+            let leaf_data = FLMerkleLeaf {
+                participant_id: u.gradient.participant_id.clone(),
+                gradient_hash,
+                timestamp: u.gradient.metadata.timestamp,
+                classification: u.classification.clone(),
+            };
 
-        // Leaf hash includes all data
-        let mut leaf_bytes = Vec::new();
-        leaf_bytes.extend_from_slice(&gradient_hash);
-        leaf_bytes.extend_from_slice(leaf_data.participant_id.as_bytes());
-        leaf_bytes.extend_from_slice(&leaf_data.timestamp.to_le_bytes());
+            // Leaf hash includes all data
+            let mut leaf_bytes = Vec::new();
+            leaf_bytes.extend_from_slice(&gradient_hash);
+            leaf_bytes.extend_from_slice(leaf_data.participant_id.as_bytes());
+            leaf_bytes.extend_from_slice(&leaf_data.timestamp.to_le_bytes());
 
-        FLMerkleNode {
-            hash: hash_bytes(&leaf_bytes),
-            left: None,
-            right: None,
-            data: Some(leaf_data),
-        }
-    }).collect();
+            FLMerkleNode {
+                hash: hash_bytes(&leaf_bytes),
+                left: None,
+                right: None,
+                data: Some(leaf_data),
+            }
+        })
+        .collect();
 
     // Pad to power of 2
     while leaves.len().count_ones() != 1 {
@@ -1065,11 +1102,11 @@ pub fn create_round_archive(
     let (_, merkle_root) = build_gradient_merkle_tree(updates);
 
     // Hash aggregated result
-    let result_hash = round.aggregated_result.as_ref()
+    let result_hash = round
+        .aggregated_result
+        .as_ref()
         .map(|r| {
-            let bytes: Vec<u8> = r.gradients.iter()
-                .flat_map(|f| f.to_le_bytes())
-                .collect();
+            let bytes: Vec<u8> = r.gradients.iter().flat_map(|f| f.to_le_bytes()).collect();
             hash_bytes(&bytes)
         })
         .unwrap_or([0u8; 32]);
@@ -1096,7 +1133,10 @@ pub fn generate_merkle_proof(
 ) -> Option<Vec<[u8; 32]>> {
     // Find leaf with matching participant
     let leaf_idx = nodes.iter().position(|n| {
-        n.data.as_ref().map(|d| d.participant_id == participant_id).unwrap_or(false)
+        n.data
+            .as_ref()
+            .map(|d| d.participant_id == participant_id)
+            .unwrap_or(false)
     })?;
 
     // Build proof path (simplified - would need proper tree structure)
@@ -1143,13 +1183,18 @@ pub fn verify_merkle_proof(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::types::GradientMetadata;
+    use super::*;
 
     #[test]
     fn test_compressed_agent_state() {
         let kvector = [0.5; 10];
-        let state = compress_agent_state("agent-1", &kvector, None, &AgentCompressionConfig::default());
+        let state = compress_agent_state(
+            "agent-1",
+            &kvector,
+            None,
+            &AgentCompressionConfig::default(),
+        );
 
         assert_eq!(state.agent_id, "agent-1");
         assert!(!state.compressed_kvector.is_empty());
@@ -1177,11 +1222,13 @@ mod tests {
         let high_pog = PogScore::new(0.8);
         let low_pog = PogScore::new(0.05);
 
-        let high_result = check_pog_participation(&high_pog, PogVerificationLevel::OracleVerified, false);
+        let high_result =
+            check_pog_participation(&high_pog, PogVerificationLevel::OracleVerified, false);
         assert!(high_result.allowed);
         assert!(high_result.leadership_eligible);
 
-        let low_result = check_pog_participation(&low_pog, PogVerificationLevel::SelfReported, false);
+        let low_result =
+            check_pog_participation(&low_pog, PogVerificationLevel::SelfReported, false);
         assert!(!low_result.allowed);
     }
 

@@ -2,11 +2,11 @@
 //!
 //! Serialization utilities for gradient transmission.
 
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use super::types::{GradientUpdate, GradientMetadata, AggregatedGradient, AggregationMethod};
+use super::types::{AggregatedGradient, AggregationMethod, GradientMetadata, GradientUpdate};
 
 /// Serialization errors
 #[derive(Debug, Error)]
@@ -44,7 +44,8 @@ pub fn deserialize_gradients(data: &[u8]) -> Result<Vec<f64>, SerializationError
     let mut gradients = Vec::with_capacity(data.len() / 8);
     for chunk in data.chunks_exact(8) {
         // Safe: chunks_exact guarantees exactly 8 bytes
-        let bytes: [u8; 8] = chunk.try_into()
+        let bytes: [u8; 8] = chunk
+            .try_into()
             .expect("chunks_exact(8) guarantees 8-byte chunks");
         gradients.push(f64::from_le_bytes(bytes));
     }
@@ -81,7 +82,8 @@ impl SerializedGradientUpdate {
 
     /// Convert to GradientUpdate
     pub fn to_update(&self) -> Result<GradientUpdate, SerializationError> {
-        let bytes = BASE64.decode(&self.gradients)
+        let bytes = BASE64
+            .decode(&self.gradients)
             .map_err(|e| SerializationError::Base64Error(e.to_string()))?;
         let gradients = deserialize_gradients(&bytes)?;
 
@@ -129,7 +131,8 @@ impl SerializedAggregatedGradient {
 
     /// Convert to AggregatedGradient
     pub fn to_aggregated(&self) -> Result<AggregatedGradient, SerializationError> {
-        let bytes = BASE64.decode(&self.gradients)
+        let bytes = BASE64
+            .decode(&self.gradients)
             .map_err(|e| SerializationError::Base64Error(e.to_string()))?;
         let gradients = deserialize_gradients(&bytes)?;
 
@@ -148,15 +151,14 @@ impl SerializedAggregatedGradient {
 #[allow(dead_code)]
 pub fn to_json(update: &GradientUpdate) -> Result<String, SerializationError> {
     let serialized = SerializedGradientUpdate::from_update(update)?;
-    serde_json::to_string(&serialized)
-        .map_err(|e| SerializationError::Base64Error(e.to_string()))
+    serde_json::to_string(&serialized).map_err(|e| SerializationError::Base64Error(e.to_string()))
 }
 
 /// Deserialize gradient update from JSON string
 #[allow(dead_code)]
 pub fn from_json(json: &str) -> Result<GradientUpdate, SerializationError> {
-    let serialized: SerializedGradientUpdate = serde_json::from_str(json)
-        .map_err(|e| SerializationError::Base64Error(e.to_string()))?;
+    let serialized: SerializedGradientUpdate =
+        serde_json::from_str(json).map_err(|e| SerializationError::Base64Error(e.to_string()))?;
     serialized.to_update()
 }
 
@@ -201,8 +203,8 @@ mod tests {
             0.5,
         );
 
-        let serialized = SerializedGradientUpdate::from_update(&update)
-            .expect("Serialization failed");
+        let serialized =
+            SerializedGradientUpdate::from_update(&update).expect("Serialization failed");
 
         assert_eq!(serialized.participant_id, "participant-1");
         assert!(!serialized.gradients.is_empty());
@@ -215,13 +217,7 @@ mod tests {
 
     #[test]
     fn test_json_roundtrip() {
-        let update = GradientUpdate::new(
-            "p1".to_string(),
-            1,
-            vec![1.0, 2.0, 3.0],
-            50,
-            0.25,
-        );
+        let update = GradientUpdate::new("p1".to_string(), 1, vec![1.0, 2.0, 3.0], 50, 0.25);
 
         let json = to_json(&update).expect("JSON serialization failed");
         let parsed = from_json(&json).expect("JSON deserialization failed");
@@ -233,22 +229,19 @@ mod tests {
 
     #[test]
     fn test_serialized_aggregated_gradient() {
-        let aggregated = AggregatedGradient::new(
-            vec![0.15, 0.25, 0.35],
-            1,
-            3,
-            1,
-            AggregationMethod::FedAvg,
-        );
+        let aggregated =
+            AggregatedGradient::new(vec![0.15, 0.25, 0.35], 1, 3, 1, AggregationMethod::FedAvg);
 
         let serialized = SerializedAggregatedGradient::from_aggregated(&aggregated)
             .expect("Serialization failed");
 
-        let deserialized = serialized.to_aggregated()
-            .expect("Deserialization failed");
+        let deserialized = serialized.to_aggregated().expect("Deserialization failed");
 
         assert_eq!(aggregated.participant_count, deserialized.participant_count);
         assert_eq!(aggregated.excluded_count, deserialized.excluded_count);
-        assert_eq!(aggregated.aggregation_method, deserialized.aggregation_method);
+        assert_eq!(
+            aggregated.aggregation_method,
+            deserialized.aggregation_method
+        );
     }
 }

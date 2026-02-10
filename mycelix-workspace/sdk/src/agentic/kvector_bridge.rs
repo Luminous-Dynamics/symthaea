@@ -16,8 +16,10 @@
 //! | Consistency | k_h (Historical) | Consistent behavior = higher historical |
 //! | Interactions | k_topo (Topology) | More connections = higher topology |
 
+use super::{
+    ActionOutcome, BehaviorLogEntry, InstrumentalActor, OutputHistoryEntry, VerificationOutcome,
+};
 use crate::matl::{KVector, KVectorWeights};
-use super::{ActionOutcome, BehaviorLogEntry, InstrumentalActor, OutputHistoryEntry, VerificationOutcome};
 use serde::{Deserialize, Serialize};
 
 /// Configuration for behavior-to-K-Vector mapping
@@ -87,10 +89,12 @@ pub fn analyze_behavior(log: &[BehaviorLogEntry]) -> BehaviorAnalysis {
     }
 
     let total = log.len();
-    let successful = log.iter()
+    let successful = log
+        .iter()
         .filter(|e| e.outcome == ActionOutcome::Success)
         .count();
-    let violations = log.iter()
+    let violations = log
+        .iter()
         .filter(|e| e.outcome == ActionOutcome::ConstraintViolation)
         .count();
 
@@ -107,8 +111,7 @@ pub fn analyze_behavior(log: &[BehaviorLogEntry]) -> BehaviorAnalysis {
 
     // Calculate time span
     let timestamps: Vec<u64> = log.iter().map(|e| e.timestamp).collect();
-    let time_span = timestamps.iter().max().unwrap_or(&0)
-        - timestamps.iter().min().unwrap_or(&0);
+    let time_span = timestamps.iter().max().unwrap_or(&0) - timestamps.iter().min().unwrap_or(&0);
 
     let hours = (time_span as f32 / 3600.0).max(1.0);
     let actions_per_hour = total as f32 / hours;
@@ -139,10 +142,8 @@ pub fn compute_kvector_update(
         let blended = current.k_r * (1.0 - config.recency_weight)
             + behavior_reputation * config.recency_weight;
         // Clamp delta to prevent rapid swings
-        let delta = (blended - current.k_r).clamp(
-            -config.max_reputation_delta,
-            config.max_reputation_delta
-        );
+        let delta = (blended - current.k_r)
+            .clamp(-config.max_reputation_delta, config.max_reputation_delta);
         (current.k_r + delta).clamp(0.0, 1.0)
     };
 
@@ -152,8 +153,8 @@ pub fn compute_kvector_update(
 
     // Integrity decreases with violations
     let new_k_i = {
-        let penalty = analysis.constraint_violations as f32
-            * config.integrity_penalty_per_violation;
+        let penalty =
+            analysis.constraint_violations as f32 * config.integrity_penalty_per_violation;
         (current.k_i - penalty).clamp(0.0, 1.0)
     };
 
@@ -180,8 +181,8 @@ pub fn compute_kvector_update(
     let new_k_s = {
         if analysis.total_actions > 0 {
             // Success-weighted KREDIT efficiency
-            let success_kredit_ratio = analysis.successful_actions as f32
-                / analysis.total_actions as f32;
+            let success_kredit_ratio =
+                analysis.successful_actions as f32 / analysis.total_actions as f32;
             (current.k_s * 0.7 + success_kredit_ratio * 0.3).clamp(0.0, 1.0)
         } else {
             current.k_s
@@ -192,8 +193,7 @@ pub fn compute_kvector_update(
     // For now, blend toward success rate slowly
     let new_k_h = {
         let blend_factor = 0.1; // Very slow historical update
-        (current.k_h * (1.0 - blend_factor) + analysis.success_rate * blend_factor)
-            .clamp(0.0, 1.0)
+        (current.k_h * (1.0 - blend_factor) + analysis.success_rate * blend_factor).clamp(0.0, 1.0)
     };
 
     // Topology based on unique interactions
@@ -239,12 +239,7 @@ pub fn update_agent_kvector(
         .as_secs();
     let days_active = (now - agent.created_at) as f32 / 86400.0;
 
-    let new_kvector = compute_kvector_update(
-        &agent.k_vector,
-        &analysis,
-        config,
-        days_active,
-    );
+    let new_kvector = compute_kvector_update(&agent.k_vector, &analysis, config, days_active);
 
     agent.k_vector = new_kvector;
     Some(new_kvector)
@@ -285,13 +280,11 @@ pub fn calculate_kredit_from_trust(trust_score: f32) -> u64 {
         clamped_score / EXPONENTIAL_THRESHOLD * 0.3
     } else {
         // Exponential scaling for high trust
-        let normalized = (clamped_score - EXPONENTIAL_THRESHOLD)
-            / (1.0 - EXPONENTIAL_THRESHOLD);
+        let normalized = (clamped_score - EXPONENTIAL_THRESHOLD) / (1.0 - EXPONENTIAL_THRESHOLD);
         0.3 + 0.7 * normalized.powi(2)
     };
 
-    let kredit = BASE_KREDIT_MIN as f32
-        + (BASE_KREDIT_MAX - BASE_KREDIT_MIN) as f32 * trust_factor;
+    let kredit = BASE_KREDIT_MIN as f32 + (BASE_KREDIT_MAX - BASE_KREDIT_MIN) as f32 * trust_factor;
 
     kredit as u64
 }
@@ -319,7 +312,11 @@ pub fn record_and_maybe_update(
     agent.actions_this_hour += 1;
 
     // Check if we should update K-Vector
-    if agent.behavior_log.len().is_multiple_of(config.min_actions_for_update) {
+    if agent
+        .behavior_log
+        .len()
+        .is_multiple_of(config.min_actions_for_update)
+    {
         update_agent_kvector(agent, config)
     } else {
         None
@@ -363,10 +360,12 @@ pub fn analyze_outputs(history: &[OutputHistoryEntry]) -> EpistemicOutputAnalysi
     let verification_accuracy = if verified.is_empty() {
         0.5
     } else {
-        let correct = verified.iter()
+        let correct = verified
+            .iter()
             .filter(|o| matches!(o.verification_outcome, Some(VerificationOutcome::Correct)))
             .count();
-        let partial = verified.iter()
+        let partial = verified
+            .iter()
             .filter(|o| matches!(o.verification_outcome, Some(VerificationOutcome::Partial)))
             .count();
         (correct as f32 + partial as f32 * 0.5) / verified.len() as f32
@@ -492,9 +491,9 @@ pub fn update_agent_kvector_epistemic(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agentic::UncertaintyCalibration;
-    use crate::agentic::{AgentClass, AgentId, AgentConstraints, AgentStatus, EpistemicStats};
     use crate::agentic::epistemic_classifier::calculate_epistemic_weight;
+    use crate::agentic::UncertaintyCalibration;
+    use crate::agentic::{AgentClass, AgentConstraints, AgentId, AgentStatus, EpistemicStats};
 
     fn create_test_agent() -> InstrumentalActor {
         InstrumentalActor {
@@ -509,7 +508,8 @@ mod tests {
             created_at: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_secs() - 86400, // 1 day ago
+                .as_secs()
+                - 86400, // 1 day ago
             last_activity: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -531,19 +531,21 @@ mod tests {
 
         let successes = (count as f32 * success_rate) as usize;
 
-        (0..count).map(|i| {
-            BehaviorLogEntry {
-                timestamp: now - (count - i) as u64 * 60, // 1 minute apart
-                action_type: "test_action".to_string(),
-                kredit_consumed: 10,
-                counterparties: vec![format!("peer_{}", i % 5)],
-                outcome: if i < successes {
-                    ActionOutcome::Success
-                } else {
-                    ActionOutcome::Error
-                },
-            }
-        }).collect()
+        (0..count)
+            .map(|i| {
+                BehaviorLogEntry {
+                    timestamp: now - (count - i) as u64 * 60, // 1 minute apart
+                    action_type: "test_action".to_string(),
+                    kredit_consumed: 10,
+                    counterparties: vec![format!("peer_{}", i % 5)],
+                    outcome: if i < successes {
+                        ActionOutcome::Success
+                    } else {
+                        ActionOutcome::Error
+                    },
+                }
+            })
+            .collect()
     }
 
     #[test]
@@ -584,15 +586,15 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        let log: Vec<BehaviorLogEntry> = (0..20).map(|i| {
-            BehaviorLogEntry {
+        let log: Vec<BehaviorLogEntry> = (0..20)
+            .map(|i| BehaviorLogEntry {
                 timestamp: now - i * 60,
                 action_type: "violating_action".to_string(),
                 kredit_consumed: 10,
                 counterparties: vec![],
                 outcome: ActionOutcome::ConstraintViolation,
-            }
-        }).collect();
+            })
+            .collect();
 
         let analysis = analyze_behavior(&log);
         let config = KVectorBridgeConfig::default();
@@ -643,8 +645,8 @@ mod tests {
     #[test]
     fn test_epistemic_output_analysis() {
         use crate::epistemic::{
-            EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-            EpistemicClassificationExtended,
+            EmpiricalLevel, EpistemicClassificationExtended, HarmonicLevel, MaterialityLevel,
+            NormativeLevel,
         };
 
         // Create output history with various epistemic levels
@@ -664,12 +666,14 @@ mod tests {
                     HarmonicLevel::H1Local,
                 ),
                 confidence: 0.9,
-                epistemic_weight: calculate_epistemic_weight(&EpistemicClassificationExtended::new(
-                    EmpiricalLevel::E3Cryptographic,
-                    NormativeLevel::N2Network,
-                    MaterialityLevel::M2Persistent,
-                    HarmonicLevel::H1Local,
-                )),
+                epistemic_weight: calculate_epistemic_weight(
+                    &EpistemicClassificationExtended::new(
+                        EmpiricalLevel::E3Cryptographic,
+                        NormativeLevel::N2Network,
+                        MaterialityLevel::M2Persistent,
+                        HarmonicLevel::H1Local,
+                    ),
+                ),
                 verified: true,
                 verification_outcome: Some(VerificationOutcome::Correct),
             },
@@ -683,12 +687,14 @@ mod tests {
                     HarmonicLevel::H0None,
                 ),
                 confidence: 0.5,
-                epistemic_weight: calculate_epistemic_weight(&EpistemicClassificationExtended::new(
-                    EmpiricalLevel::E1Testimonial,
-                    NormativeLevel::N0Personal,
-                    MaterialityLevel::M0Ephemeral,
-                    HarmonicLevel::H0None,
-                )),
+                epistemic_weight: calculate_epistemic_weight(
+                    &EpistemicClassificationExtended::new(
+                        EmpiricalLevel::E1Testimonial,
+                        NormativeLevel::N0Personal,
+                        MaterialityLevel::M0Ephemeral,
+                        HarmonicLevel::H0None,
+                    ),
+                ),
                 verified: true,
                 verification_outcome: Some(VerificationOutcome::Partial),
             },
@@ -706,8 +712,8 @@ mod tests {
     #[test]
     fn test_epistemic_weighted_kvector_update() {
         use crate::epistemic::{
-            EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-            EpistemicClassificationExtended,
+            EmpiricalLevel, EpistemicClassificationExtended, HarmonicLevel, MaterialityLevel,
+            NormativeLevel,
         };
 
         let initial = KVector::new_participant();
@@ -721,8 +727,8 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        let high_quality_history: Vec<OutputHistoryEntry> = (0..10).map(|i| {
-            OutputHistoryEntry {
+        let high_quality_history: Vec<OutputHistoryEntry> = (0..10)
+            .map(|i| OutputHistoryEntry {
                 output_id: format!("out-{}", i),
                 timestamp: now + i * 60,
                 classification: EpistemicClassificationExtended::new(
@@ -732,16 +738,18 @@ mod tests {
                     HarmonicLevel::H2Network,
                 ),
                 confidence: 0.95,
-                epistemic_weight: calculate_epistemic_weight(&EpistemicClassificationExtended::new(
-                    EmpiricalLevel::E4PublicRepro,
-                    NormativeLevel::N2Network,
-                    MaterialityLevel::M2Persistent,
-                    HarmonicLevel::H2Network,
-                )),
+                epistemic_weight: calculate_epistemic_weight(
+                    &EpistemicClassificationExtended::new(
+                        EmpiricalLevel::E4PublicRepro,
+                        NormativeLevel::N2Network,
+                        MaterialityLevel::M2Persistent,
+                        HarmonicLevel::H2Network,
+                    ),
+                ),
                 verified: true,
                 verification_outcome: Some(VerificationOutcome::Correct),
-            }
-        }).collect();
+            })
+            .collect();
 
         let output_analysis = analyze_outputs(&high_quality_history);
 
@@ -767,8 +775,8 @@ mod tests {
     #[test]
     fn test_low_quality_outputs_limit_boost() {
         use crate::epistemic::{
-            EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-            EpistemicClassificationExtended,
+            EmpiricalLevel, EpistemicClassificationExtended, HarmonicLevel, MaterialityLevel,
+            NormativeLevel,
         };
 
         let initial = KVector::new_participant();
@@ -782,8 +790,8 @@ mod tests {
             .unwrap()
             .as_secs();
 
-        let low_quality_history: Vec<OutputHistoryEntry> = (0..10).map(|i| {
-            OutputHistoryEntry {
+        let low_quality_history: Vec<OutputHistoryEntry> = (0..10)
+            .map(|i| OutputHistoryEntry {
                 output_id: format!("out-{}", i),
                 timestamp: now + i * 60,
                 classification: EpistemicClassificationExtended::new(
@@ -793,16 +801,18 @@ mod tests {
                     HarmonicLevel::H0None,
                 ),
                 confidence: 0.3,
-                epistemic_weight: calculate_epistemic_weight(&EpistemicClassificationExtended::new(
-                    EmpiricalLevel::E0Null,
-                    NormativeLevel::N0Personal,
-                    MaterialityLevel::M0Ephemeral,
-                    HarmonicLevel::H0None,
-                )),
+                epistemic_weight: calculate_epistemic_weight(
+                    &EpistemicClassificationExtended::new(
+                        EmpiricalLevel::E0Null,
+                        NormativeLevel::N0Personal,
+                        MaterialityLevel::M0Ephemeral,
+                        HarmonicLevel::H0None,
+                    ),
+                ),
                 verified: true,
                 verification_outcome: Some(VerificationOutcome::Incorrect),
-            }
-        }).collect();
+            })
+            .collect();
 
         let output_analysis = analyze_outputs(&low_quality_history);
 
@@ -838,9 +848,10 @@ mod tests {
             0.0f32..=1.0f32,
             0.0f32..=1.0f32,
             0.0f32..=1.0f32,
-        ).prop_map(|(r, a, i, p, m, s, h, t, v, phi)| {
-            KVector::new(r, a, i, p, m, s, h, t, v, phi)
-        })
+        )
+            .prop_map(|(r, a, i, p, m, s, h, t, v, phi)| {
+                KVector::new(r, a, i, p, m, s, h, t, v, phi)
+            })
     }
 
     /// Generate a behavior analysis with valid ranges
@@ -850,19 +861,20 @@ mod tests {
             0.0f32..=1.0f32, // success_rate
             0usize..50,      // violations
             0usize..100,     // counterparties
-        ).prop_map(|(total, success_rate, violations, counterparties)| {
-            let successful = (total as f32 * success_rate) as usize;
-            BehaviorAnalysis {
-                total_actions: total,
-                successful_actions: successful,
-                success_rate,
-                constraint_violations: violations.min(total),
-                avg_kredit_per_action: 10.0,
-                unique_counterparties: counterparties,
-                time_span_secs: total as u64 * 60,
-                actions_per_hour: (total as f32) / ((total as f32 * 60.0) / 3600.0),
-            }
-        })
+        )
+            .prop_map(|(total, success_rate, violations, counterparties)| {
+                let successful = (total as f32 * success_rate) as usize;
+                BehaviorAnalysis {
+                    total_actions: total,
+                    successful_actions: successful,
+                    success_rate,
+                    constraint_violations: violations.min(total),
+                    avg_kredit_per_action: 10.0,
+                    unique_counterparties: counterparties,
+                    time_span_secs: total as u64 * 60,
+                    actions_per_hour: (total as f32) / ((total as f32 * 60.0) / 3600.0),
+                }
+            })
     }
 
     proptest! {

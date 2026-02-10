@@ -213,11 +213,15 @@ impl EquilibriumFinder {
                 let is_pareto = self.is_pareto_optimal(profile, &profiles);
 
                 equilibria.push(NashEquilibrium {
-                    strategy_profile: profile.iter()
+                    strategy_profile: profile
+                        .iter()
                         .enumerate()
                         .map(|(i, s)| (self.game.players[i].id.clone(), s.clone()))
                         .collect(),
-                    payoffs: self.game.players.iter()
+                    payoffs: self
+                        .game
+                        .players
+                        .iter()
                         .enumerate()
                         .map(|(i, p)| (p.id.clone(), payoffs[i]))
                         .collect(),
@@ -232,9 +236,7 @@ impl EquilibriumFinder {
     }
 
     fn enumerate_profiles(&self) -> Vec<Vec<String>> {
-        let strategy_ids: Vec<String> = self.game.strategies.iter()
-            .map(|s| s.id.clone())
-            .collect();
+        let strategy_ids: Vec<String> = self.game.strategies.iter().map(|s| s.id.clone()).collect();
 
         let n = self.game.players.len();
         let mut profiles = Vec::new();
@@ -306,11 +308,13 @@ impl EquilibriumFinder {
             let other_payoffs = self.get_payoffs(other_profile);
 
             // Check if other_profile Pareto dominates current profile
-            let at_least_as_good = current_payoffs.iter()
+            let at_least_as_good = current_payoffs
+                .iter()
                 .zip(other_payoffs.iter())
                 .all(|(c, o)| *o >= *c);
 
-            let strictly_better = current_payoffs.iter()
+            let strictly_better = current_payoffs
+                .iter()
                 .zip(other_payoffs.iter())
                 .any(|(c, o)| *o > *c);
 
@@ -392,7 +396,10 @@ pub struct IncentiveAnalyzer {
 impl IncentiveAnalyzer {
     /// Create a new incentive analyzer for the given game and honest strategy.
     pub fn new(game: GameDefinition, honest_strategy_id: String) -> Self {
-        Self { game, honest_strategy_id }
+        Self {
+            game,
+            honest_strategy_id,
+        }
     }
 
     /// Analyze incentive compatibility
@@ -401,7 +408,10 @@ impl IncentiveAnalyzer {
         let mut ir_violations = Vec::new();
 
         // Check for profitable deviations from honest strategy
-        let honest_profile: Vec<String> = self.game.players.iter()
+        let honest_profile: Vec<String> = self
+            .game
+            .players
+            .iter()
             .map(|_| self.honest_strategy_id.clone())
             .collect();
 
@@ -446,20 +456,28 @@ impl IncentiveAnalyzer {
         let mut recommendations = Vec::new();
 
         if !profitable_deviations.is_empty() {
-            recommendations.push("Consider increasing slashing penalties for detected deviations".to_string());
+            recommendations
+                .push("Consider increasing slashing penalties for detected deviations".to_string());
         }
 
         if !ir_violations.is_empty() {
-            recommendations.push("Increase rewards for honest behavior to ensure individual rationality".to_string());
+            recommendations.push(
+                "Increase rewards for honest behavior to ensure individual rationality".to_string(),
+            );
         }
 
         if !dominant {
-            recommendations.push("Honest strategy is not dominant - consider mechanism redesign".to_string());
+            recommendations
+                .push("Honest strategy is not dominant - consider mechanism redesign".to_string());
         }
 
         IncentiveAnalysis {
             is_incentive_compatible: profitable_deviations.is_empty() && ir_violations.is_empty(),
-            dominant_strategy: if dominant { Some(self.honest_strategy_id.clone()) } else { None },
+            dominant_strategy: if dominant {
+                Some(self.honest_strategy_id.clone())
+            } else {
+                None
+            },
             ir_violations,
             profitable_deviations,
             recommendations,
@@ -504,9 +522,7 @@ impl IncentiveAnalyzer {
     }
 
     fn enumerate_opponent_profiles(&self) -> Vec<Vec<String>> {
-        let strategy_ids: Vec<String> = self.game.strategies.iter()
-            .map(|s| s.id.clone())
-            .collect();
+        let strategy_ids: Vec<String> = self.game.strategies.iter().map(|s| s.id.clone()).collect();
 
         let n = self.game.players.len() - 1;
         if n == 0 {
@@ -693,7 +709,9 @@ pub fn trust_attestation_game(
                 name: "False Attestation".to_string(),
                 description: "Inflate target's trust falsely".to_string(),
                 actions: vec![StrategyAction {
-                    action_type: ActionType::AttestFalse { inflated_trust: trust_gain_from_false },
+                    action_type: ActionType::AttestFalse {
+                        inflated_trust: trust_gain_from_false,
+                    },
                     probability: 1.0,
                     conditions: vec![ActionCondition::Always],
                 }],
@@ -785,7 +803,9 @@ pub fn voting_game(
                 name: "Vote Strategically".to_string(),
                 description: "Vote to manipulate outcome".to_string(),
                 actions: vec![StrategyAction {
-                    action_type: ActionType::VoteStrategic { target_outcome: "manipulated".to_string() },
+                    action_type: ActionType::VoteStrategic {
+                        target_outcome: "manipulated".to_string(),
+                    },
                     probability: 1.0,
                     conditions: vec![ActionCondition::Always],
                 }],

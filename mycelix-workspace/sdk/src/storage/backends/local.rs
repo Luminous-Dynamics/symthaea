@@ -12,7 +12,7 @@
 //! - Thread-safe via file locking patterns
 
 use crate::epistemic::EpistemicClassification;
-use crate::storage::types::{StorageMetadata, SchemaIdentity, StoredData};
+use crate::storage::types::{SchemaIdentity, StorageMetadata, StoredData};
 use serde::{Deserialize, Serialize};
 use sha3::{Digest, Sha3_256};
 use std::fs::{self, File};
@@ -20,7 +20,6 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
-
 
 /// Local file-based storage backend configuration
 #[derive(Debug, Clone)]
@@ -118,9 +117,10 @@ impl LocalBackend {
 
     /// Ensure the storage directory exists
     fn ensure_initialized(&self) -> std::io::Result<()> {
-        let mut init = self.initialized.write().map_err(|_| {
-            std::io::Error::other("Lock poisoned")
-        })?;
+        let mut init = self
+            .initialized
+            .write()
+            .map_err(|_| std::io::Error::other("Lock poisoned"))?;
         if !*init {
             if self.config.auto_create_dirs {
                 fs::create_dir_all(&self.config.base_dir)?;
@@ -134,22 +134,29 @@ impl LocalBackend {
 
     /// Rebuild the key cache from filesystem
     fn rebuild_key_cache(&self) -> std::io::Result<()> {
-        let mut cache = self.key_cache.write().map_err(|_| {
-            std::io::Error::other("Lock poisoned")
-        })?;
+        let mut cache = self
+            .key_cache
+            .write()
+            .map_err(|_| std::io::Error::other("Lock poisoned"))?;
         cache.clear();
 
         if self.config.base_dir.exists() {
             for entry in fs::read_dir(&self.config.base_dir)? {
                 let entry = entry?;
                 let path = entry.path();
-                if path.is_file() && path.extension().is_some_and(|e| e == self.config.file_extension.as_str()) {
+                if path.is_file()
+                    && path
+                        .extension()
+                        .is_some_and(|e| e == self.config.file_extension.as_str())
+                {
                     // Read the file to extract the original key
                     if let Ok(mut file) = File::open(&path) {
                         let mut contents = String::new();
                         if file.read_to_string(&mut contents).is_ok() {
                             // Parse just to get the key field
-                            if let Ok(entry) = serde_json::from_str::<LocalEntry<serde_json::Value>>(&contents) {
+                            if let Ok(entry) =
+                                serde_json::from_str::<LocalEntry<serde_json::Value>>(&contents)
+                            {
                                 // Check if expired
                                 if !Self::is_expired(&entry) {
                                     cache.push(entry.key);
@@ -166,7 +173,11 @@ impl LocalBackend {
     /// Convert a key to a safe filename
     fn key_to_filename(key: &str) -> String {
         // Use hex encoding of SHA3 hash for long/complex keys
-        if key.len() > 50 || key.chars().any(|c| !c.is_alphanumeric() && c != '-' && c != '_') {
+        if key.len() > 50
+            || key
+                .chars()
+                .any(|c| !c.is_alphanumeric() && c != '-' && c != '_')
+        {
             let mut hasher = Sha3_256::new();
             hasher.update(key.as_bytes());
             let hash = hasher.finalize();
@@ -296,7 +307,9 @@ impl LocalBackend {
             if let Ok(mut file) = File::open(&path) {
                 let mut contents = String::new();
                 if file.read_to_string(&mut contents).is_ok() {
-                    if let Ok(existing) = serde_json::from_str::<LocalEntry<serde_json::Value>>(&contents) {
+                    if let Ok(existing) =
+                        serde_json::from_str::<LocalEntry<serde_json::Value>>(&contents)
+                    {
                         existing.version + 1
                     } else {
                         1
@@ -349,28 +362,26 @@ impl LocalBackend {
         // Write atomically via temp file
         let temp_path = path.with_extension("tmp");
         if let Ok(mut file) = File::create(&temp_path) {
-            if file.write_all(json.as_bytes()).is_ok()
-                && fs::rename(&temp_path, &path).is_ok()
-            {
-                    // Update key cache
-                    let mut cache = self.key_cache.write().ok()?;
-                    if !cache.contains(&key.to_string()) {
-                        cache.push(key.to_string());
-                    }
+            if file.write_all(json.as_bytes()).is_ok() && fs::rename(&temp_path, &path).is_ok() {
+                // Update key cache
+                let mut cache = self.key_cache.write().ok()?;
+                if !cache.contains(&key.to_string()) {
+                    cache.push(key.to_string());
+                }
 
-                    return Some(StorageMetadata {
-                        cid,
-                        classification,
-                        schema,
-                        stored_at: now,
-                        modified_at: None,
-                        version,
-                        expires_at,
-                        size_bytes,
-                        created_by: created_by.to_string(),
-                        tombstone: false,
-                        retracted_by: None,
-                    });
+                return Some(StorageMetadata {
+                    cid,
+                    classification,
+                    schema,
+                    stored_at: now,
+                    modified_at: None,
+                    version,
+                    expires_at,
+                    size_bytes,
+                    created_by: created_by.to_string(),
+                    tombstone: false,
+                    retracted_by: None,
+                });
             }
             let _ = fs::remove_file(&temp_path);
         }
@@ -411,7 +422,8 @@ impl LocalBackend {
         if let Ok(mut file) = File::open(&path) {
             let mut contents = String::new();
             if file.read_to_string(&mut contents).is_ok() {
-                if let Ok(entry) = serde_json::from_str::<LocalEntry<serde_json::Value>>(&contents) {
+                if let Ok(entry) = serde_json::from_str::<LocalEntry<serde_json::Value>>(&contents)
+                {
                     if Self::is_expired(&entry) {
                         let _ = fs::remove_file(&path);
                         return false;
@@ -437,11 +449,7 @@ impl LocalBackend {
             Err(_) => return Vec::new(),
         };
         match pattern {
-            Some(pat) => cache
-                .iter()
-                .filter(|k| k.contains(pat))
-                .cloned()
-                .collect(),
+            Some(pat) => cache.iter().filter(|k| k.contains(pat)).cloned().collect(),
             None => cache.clone(),
         }
     }
@@ -518,7 +526,7 @@ mod hex {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+    use crate::epistemic::{EmpiricalLevel, MaterialityLevel, NormativeLevel};
     use std::env;
 
     fn temp_dir() -> PathBuf {
@@ -583,11 +591,32 @@ mod tests {
         let class = test_classification();
 
         // Add multiple keys - verify each succeeds
-        let r1 = backend.set("key1", &"value1", class.clone(), schema.clone(), "agent", None);
+        let r1 = backend.set(
+            "key1",
+            &"value1",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
         assert!(r1.is_some(), "Failed to set key1");
-        let r2 = backend.set("key2", &"value2", class.clone(), schema.clone(), "agent", None);
+        let r2 = backend.set(
+            "key2",
+            &"value2",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
         assert!(r2.is_some(), "Failed to set key2");
-        let r3 = backend.set("other", &"value3", class.clone(), schema.clone(), "agent", None);
+        let r3 = backend.set(
+            "other",
+            &"value3",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
         assert!(r3.is_some(), "Failed to set other");
 
         // Verify files exist
@@ -637,8 +666,22 @@ mod tests {
         let schema = SchemaIdentity::new("test", "1.0");
         let class = test_classification();
 
-        backend.set("stat1", &"value1", class.clone(), schema.clone(), "agent", None);
-        backend.set("stat2", &"value2", class.clone(), schema.clone(), "agent", None);
+        backend.set(
+            "stat1",
+            &"value1",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "stat2",
+            &"value2",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
 
         let stats = backend.stats();
         assert_eq!(stats.item_count, 2);
@@ -656,8 +699,22 @@ mod tests {
         let schema = SchemaIdentity::new("test", "1.0");
         let class = test_classification();
 
-        backend.set("clear1", &"value1", class.clone(), schema.clone(), "agent", None);
-        backend.set("clear2", &"value2", class.clone(), schema.clone(), "agent", None);
+        backend.set(
+            "clear1",
+            &"value1",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
+        backend.set(
+            "clear2",
+            &"value2",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
 
         assert_eq!(backend.keys(None).len(), 2);
 
@@ -678,11 +735,25 @@ mod tests {
         let class = test_classification();
 
         // First write
-        let meta1 = backend.set("versioned", &"v1", class.clone(), schema.clone(), "agent", None);
+        let meta1 = backend.set(
+            "versioned",
+            &"v1",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
         assert_eq!(meta1.unwrap().version, 1);
 
         // Update
-        let meta2 = backend.set("versioned", &"v2", class.clone(), schema.clone(), "agent", None);
+        let meta2 = backend.set(
+            "versioned",
+            &"v2",
+            class.clone(),
+            schema.clone(),
+            "agent",
+            None,
+        );
         assert_eq!(meta2.unwrap().version, 2);
 
         // Verify latest value

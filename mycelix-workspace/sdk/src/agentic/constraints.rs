@@ -213,7 +213,9 @@ pub fn enforce_constraints(
     // Whitelist check
     if let Some(ref whitelist) = constraints.action_whitelist {
         if !whitelist.contains(&action.action_type) {
-            return Err(ConstraintViolation::NotWhitelisted(action.action_type.clone()));
+            return Err(ConstraintViolation::NotWhitelisted(
+                action.action_type.clone(),
+            ));
         }
     }
 
@@ -249,9 +251,9 @@ pub fn enforce_constraints(
 
 #[cfg(test)]
 mod tests {
+    use super::super::{AgentStatus, InstrumentalActor};
     use super::*;
     use crate::agentic::UncertaintyCalibration;
-    use super::super::{AgentStatus, InstrumentalActor};
     use crate::matl::KVector;
 
     fn test_agent(class: AgentClass) -> InstrumentalActor {
@@ -286,7 +288,10 @@ mod tests {
         };
 
         let result = enforce_constraints(&agent, &action);
-        assert!(matches!(result, Err(ConstraintViolation::Constitutional(_))));
+        assert!(matches!(
+            result,
+            Err(ConstraintViolation::Constitutional(_))
+        ));
     }
 
     #[test]

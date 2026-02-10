@@ -57,15 +57,15 @@
 //! }
 //! ```
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::matl::{KVector, RBBFT_BYZANTINE_THRESHOLD, QUORUM_THRESHOLD};
-use super::types::{GradientUpdate, AggregatedGradient, AggregationMethod};
+use super::types::{AggregatedGradient, AggregationMethod, GradientUpdate};
+use crate::matl::{KVector, QUORUM_THRESHOLD, RBBFT_BYZANTINE_THRESHOLD};
 
 #[cfg(any(feature = "simulation", feature = "risc0"))]
-use crate::zkproof::{GradientProver, GradientProofReceipt};
+use crate::zkproof::{GradientProofReceipt, GradientProver};
 
 /// Errors from the Unified ZK-RBBFT FL bridge
 #[derive(Debug, Error)]
@@ -562,7 +562,9 @@ impl UnifiedZkRbbftBridge {
         loss: f64,
     ) -> Result<(), UnifiedZkRbbftError> {
         // Validate participant
-        let participant = self.participants.get(participant_id)
+        let participant = self
+            .participants
+            .get(participant_id)
             .ok_or_else(|| UnifiedZkRbbftError::ParticipantNotFound(participant_id.to_string()))?
             .clone();
 
@@ -574,23 +576,34 @@ impl UnifiedZkRbbftBridge {
         }
 
         // Check for active round
-        let round = self.current_round.as_mut()
+        let round = self
+            .current_round
+            .as_mut()
             .ok_or(UnifiedZkRbbftError::NoActiveRound)?;
 
         // Check for duplicate submission
-        if round.submissions.iter().any(|s| s.participant_id == participant_id) {
-            return Err(UnifiedZkRbbftError::DuplicateSubmission(participant_id.to_string()));
+        if round
+            .submissions
+            .iter()
+            .any(|s| s.participant_id == participant_id)
+        {
+            return Err(UnifiedZkRbbftError::DuplicateSubmission(
+                participant_id.to_string(),
+            ));
         }
 
         // Generate ZK proof
-        let proof = self.prover.prove_gradient_quality(
-            gradient,
-            &round.model_hash,
-            epochs,
-            learning_rate,
-            participant_id,
-            round.round as u32,
-        ).map_err(|e| UnifiedZkRbbftError::ProofGenerationFailed(e.to_string()))?;
+        let proof = self
+            .prover
+            .prove_gradient_quality(
+                gradient,
+                &round.model_hash,
+                epochs,
+                learning_rate,
+                participant_id,
+                round.round as u32,
+            )
+            .map_err(|e| UnifiedZkRbbftError::ProofGenerationFailed(e.to_string()))?;
 
         // Update stats
         self.cumulative_stats.total_proofs += 1;
@@ -655,7 +668,9 @@ impl UnifiedZkRbbftBridge {
         proof: GradientProofReceipt,
     ) -> Result<(), UnifiedZkRbbftError> {
         // Validate participant
-        let participant = self.participants.get(participant_id)
+        let participant = self
+            .participants
+            .get(participant_id)
             .ok_or_else(|| UnifiedZkRbbftError::ParticipantNotFound(participant_id.to_string()))?
             .clone();
 
@@ -667,12 +682,20 @@ impl UnifiedZkRbbftBridge {
         }
 
         // Check for active round
-        let round = self.current_round.as_mut()
+        let round = self
+            .current_round
+            .as_mut()
             .ok_or(UnifiedZkRbbftError::NoActiveRound)?;
 
         // Check for duplicate submission
-        if round.submissions.iter().any(|s| s.participant_id == participant_id) {
-            return Err(UnifiedZkRbbftError::DuplicateSubmission(participant_id.to_string()));
+        if round
+            .submissions
+            .iter()
+            .any(|s| s.participant_id == participant_id)
+        {
+            return Err(UnifiedZkRbbftError::DuplicateSubmission(
+                participant_id.to_string(),
+            ));
         }
 
         // Update stats
@@ -728,9 +751,14 @@ impl UnifiedZkRbbftBridge {
             let mut invalid_count = 0usize;
 
             for submission in &round.submissions {
-                let weight = submission.kvector.k_r.powi(
-                    if self.config.use_quadratic_weighting { 2 } else { 1 }
-                );
+                let weight = submission
+                    .kvector
+                    .k_r
+                    .powi(if self.config.use_quadratic_weighting {
+                        2
+                    } else {
+                        1
+                    });
                 total_weight += weight;
 
                 if submission.is_valid() {
@@ -798,25 +826,20 @@ impl UnifiedZkRbbftBridge {
             });
         }
 
-        let mut round = self.current_round.take()
+        let mut round = self
+            .current_round
+            .take()
             .ok_or(UnifiedZkRbbftError::NoActiveRound)?;
 
         // Filter valid submissions
-        let valid_submissions: Vec<&ProvenSubmission> = round.submissions
-            .iter()
-            .filter(|s| s.is_valid())
-            .collect();
+        let valid_submissions: Vec<&ProvenSubmission> =
+            round.submissions.iter().filter(|s| s.is_valid()).collect();
 
-        let invalid_submissions: Vec<&ProvenSubmission> = round.submissions
-            .iter()
-            .filter(|s| !s.is_valid())
-            .collect();
+        let invalid_submissions: Vec<&ProvenSubmission> =
+            round.submissions.iter().filter(|s| !s.is_valid()).collect();
 
         if valid_submissions.is_empty() {
-            return Err(UnifiedZkRbbftError::InsufficientParticipants {
-                have: 0,
-                need: 1,
-            });
+            return Err(UnifiedZkRbbftError::InsufficientParticipants { have: 0, need: 1 });
         }
 
         // Get gradient dimension
@@ -846,10 +869,8 @@ impl UnifiedZkRbbftBridge {
         let aggregation_hash = compute_aggregation_hash(&aggregated_gradients);
 
         // Collect included hashes
-        let included_hashes: Vec<[u8; 32]> = valid_submissions
-            .iter()
-            .map(|s| s.gradient_hash)
-            .collect();
+        let included_hashes: Vec<[u8; 32]> =
+            valid_submissions.iter().map(|s| s.gradient_hash).collect();
 
         // Collect excluded participants
         let excluded_participants: Vec<String> = invalid_submissions
@@ -911,7 +932,8 @@ impl UnifiedZkRbbftBridge {
         let total_participants = self.participants.len();
         let eligible_participants = self.eligible_participant_count();
         let total_rounds = self.completed_rounds.len();
-        let successful_rounds = self.completed_rounds
+        let successful_rounds = self
+            .completed_rounds
             .iter()
             .filter(|r| r.state == UnifiedRoundState::Completed)
             .count();
@@ -923,13 +945,15 @@ impl UnifiedZkRbbftBridge {
         };
 
         let avg_consensus_ratio = if self.cumulative_stats.rounds_counted > 0 {
-            self.cumulative_stats.total_consensus_ratio / self.cumulative_stats.rounds_counted as f32
+            self.cumulative_stats.total_consensus_ratio
+                / self.cumulative_stats.rounds_counted as f32
         } else {
             0.0
         };
 
         let avg_byzantine_fraction = if self.cumulative_stats.rounds_counted > 0 {
-            self.cumulative_stats.total_byzantine_fraction / self.cumulative_stats.rounds_counted as f32
+            self.cumulative_stats.total_byzantine_fraction
+                / self.cumulative_stats.rounds_counted as f32
         } else {
             0.0
         };
@@ -967,7 +991,7 @@ impl Default for UnifiedZkRbbftBridge {
 
 /// Compute hash of aggregated gradient
 fn compute_aggregation_hash(gradients: &[f64]) -> [u8; 32] {
-    use sha2::{Sha256, Digest};
+    use sha2::{Digest, Sha256};
 
     let mut hasher = Sha256::new();
     for g in gradients {
@@ -1000,9 +1024,7 @@ mod tests {
     }
 
     fn make_valid_gradient(size: usize, scale: f32) -> Vec<f32> {
-        (0..size)
-            .map(|i| (i as f32 * 0.01).sin() * scale)
-            .collect()
+        (0..size).map(|i| (i as f32 * 0.01).sin() * scale).collect()
     }
 
     #[test]
@@ -1021,8 +1043,12 @@ mod tests {
         let grad1 = make_valid_gradient(100, 0.5);
         let grad2 = make_valid_gradient(100, 0.4);
 
-        bridge.submit_proven_gradient("client-1", &grad1, 5, 0.01, 32, 0.5).unwrap();
-        bridge.submit_proven_gradient("client-2", &grad2, 5, 0.01, 32, 0.4).unwrap();
+        bridge
+            .submit_proven_gradient("client-1", &grad1, 5, 0.01, 32, 0.5)
+            .unwrap();
+        bridge
+            .submit_proven_gradient("client-2", &grad2, 5, 0.01, 32, 0.4)
+            .unwrap();
 
         // Check consensus
         assert!(bridge.check_consensus());
@@ -1045,12 +1071,18 @@ mod tests {
 
         // Good participants submit valid gradients
         let good_grad = make_valid_gradient(100, 0.5);
-        bridge.submit_proven_gradient("good-1", &good_grad, 5, 0.01, 32, 0.5).unwrap();
-        bridge.submit_proven_gradient("good-2", &good_grad, 5, 0.01, 32, 0.5).unwrap();
+        bridge
+            .submit_proven_gradient("good-1", &good_grad, 5, 0.01, 32, 0.5)
+            .unwrap();
+        bridge
+            .submit_proven_gradient("good-2", &good_grad, 5, 0.01, 32, 0.5)
+            .unwrap();
 
         // Bad participant submits zero gradient (will fail quality check)
         let bad_grad = vec![0.0f32; 100];
-        bridge.submit_proven_gradient("bad", &bad_grad, 5, 0.01, 32, 0.5).unwrap();
+        bridge
+            .submit_proven_gradient("bad", &bad_grad, 5, 0.01, 32, 0.5)
+            .unwrap();
 
         // Byzantine fraction should be detected
         let byzantine = bridge.byzantine_fraction();
@@ -1069,11 +1101,15 @@ mod tests {
 
         // High rep submits gradient with larger values
         let grad1 = make_valid_gradient(100, 1.0);
-        bridge.submit_proven_gradient("high-rep", &grad1, 5, 0.01, 32, 0.5).unwrap();
+        bridge
+            .submit_proven_gradient("high-rep", &grad1, 5, 0.01, 32, 0.5)
+            .unwrap();
 
         // Low rep submits gradient with smaller values
         let grad2 = make_valid_gradient(100, 0.1);
-        bridge.submit_proven_gradient("low-rep", &grad2, 5, 0.01, 32, 0.5).unwrap();
+        bridge
+            .submit_proven_gradient("low-rep", &grad2, 5, 0.01, 32, 0.5)
+            .unwrap();
 
         let result = bridge.finalize_round().unwrap();
 
@@ -1091,9 +1127,13 @@ mod tests {
         // Verify aggregated is closer to high-rep than low-rep
         let dist_to_high = (aggregated_val - high_rep_val).abs();
         let dist_to_low = (aggregated_val - low_rep_val).abs();
-        assert!(dist_to_high < dist_to_low,
+        assert!(
+            dist_to_high < dist_to_low,
             "Aggregated gradient should be closer to high-rep: agg={:.4}, high={:.4}, low={:.4}",
-            aggregated_val, high_rep_val, low_rep_val);
+            aggregated_val,
+            high_rep_val,
+            low_rep_val
+        );
     }
 
     #[test]
@@ -1106,11 +1146,16 @@ mod tests {
         bridge.start_round([0u8; 32]).unwrap();
 
         let grad = make_valid_gradient(100, 0.5);
-        bridge.submit_proven_gradient("client-1", &grad, 5, 0.01, 32, 0.5).unwrap();
+        bridge
+            .submit_proven_gradient("client-1", &grad, 5, 0.01, 32, 0.5)
+            .unwrap();
 
         // Try to submit again
         let result = bridge.submit_proven_gradient("client-1", &grad, 5, 0.01, 32, 0.5);
-        assert!(matches!(result, Err(UnifiedZkRbbftError::DuplicateSubmission(_))));
+        assert!(matches!(
+            result,
+            Err(UnifiedZkRbbftError::DuplicateSubmission(_))
+        ));
     }
 
     #[test]
@@ -1133,8 +1178,12 @@ mod tests {
             bridge.start_round([0u8; 32]).unwrap();
 
             let grad = make_valid_gradient(100, 0.5);
-            bridge.submit_proven_gradient("client-1", &grad, 5, 0.01, 32, 0.5).unwrap();
-            bridge.submit_proven_gradient("client-2", &grad, 5, 0.01, 32, 0.5).unwrap();
+            bridge
+                .submit_proven_gradient("client-1", &grad, 5, 0.01, 32, 0.5)
+                .unwrap();
+            bridge
+                .submit_proven_gradient("client-2", &grad, 5, 0.01, 32, 0.5)
+                .unwrap();
 
             bridge.finalize_round().unwrap();
         }
@@ -1157,7 +1206,9 @@ mod tests {
 
         // Submit one gradient
         let grad = make_valid_gradient(100, 0.5);
-        bridge.submit_proven_gradient("client-1", &grad, 5, 0.01, 32, 0.5).unwrap();
+        bridge
+            .submit_proven_gradient("client-1", &grad, 5, 0.01, 32, 0.5)
+            .unwrap();
 
         // Abort round
         bridge.abort_round();
@@ -1167,6 +1218,9 @@ mod tests {
         assert_eq!(round, 2);
 
         // Previous round should be marked failed
-        assert_eq!(bridge.completed_rounds()[0].state, UnifiedRoundState::Failed);
+        assert_eq!(
+            bridge.completed_rounds()[0].state,
+            UnifiedRoundState::Failed
+        );
     }
 }

@@ -11,35 +11,56 @@
 //! 7. Full epistemic fingerprint evolution tracked
 
 use mycelix_sdk::agentic::{
+    analyze_behavior,
+    calculate_epistemic_weight,
+    calculate_kredit_from_trust,
+
+    check_coherence_for_action,
+    classify_output,
+    compute_kvector_update,
+    compute_trust_score,
+    maybe_escalate,
+    measure_phi_simple,
+    phi_to_kvector_dimension,
+
+    should_proceed,
+    update_agent_kvector,
+    ActionOutcome,
+    AgentClass,
+    AgentConstraints,
     // Phase 1: K-Vector Integration
-    AgentId, AgentClass, AgentConstraints, AgentStatus, InstrumentalActor,
-    ActionOutcome, BehaviorLogEntry,
-    KVectorBridgeConfig, analyze_behavior, compute_kvector_update,
-    update_agent_kvector, compute_trust_score, calculate_kredit_from_trust,
-
+    AgentId,
     // Phase 2: Epistemic Classification
-    AgentOutput, OutputContent, ClassificationHints, AgentOutputBuilder,
-    classify_output, calculate_epistemic_weight, EpistemicStats,
-    AgreementScope, RelevanceDuration,
-
+    AgentOutput,
+    AgentOutputBuilder,
+    AgentStatus,
+    AgreementScope,
+    BehaviorLogEntry,
+    ClassificationHints,
+    CoherenceHistory,
     // Phase 3: Phi Measurement
-    CoherenceState, CoherenceHistory, PhiMeasurementConfig,
-    measure_phi_simple, check_coherence_for_action, phi_to_kvector_dimension,
-
+    CoherenceState,
+    EpistemicStats,
+    InstrumentalActor,
+    KVectorBridgeConfig,
+    MoralActionGuidance,
     // Phase 4: GIS Integration
-    MoralUncertainty, MoralActionGuidance, UncertaintyCalibration,
-    should_proceed, maybe_escalate, UncertainOutput,
+    MoralUncertainty,
+    OutputContent,
+    PhiMeasurementConfig,
+    RelevanceDuration,
+
+    UncertainOutput,
+    UncertaintyCalibration,
 };
 
-use mycelix_sdk::agentic::kredit::{
-    calculate_kredit_cap_from_trust, recalculate_agent_kredit_cap,
-};
+use mycelix_sdk::agentic::kredit::{calculate_kredit_cap_from_trust, recalculate_agent_kredit_cap};
 
-use mycelix_sdk::matl::KVector;
 use mycelix_sdk::epistemic::{
-    EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-    EpistemicClassificationExtended,
+    EmpiricalLevel, EpistemicClassificationExtended, HarmonicLevel, MaterialityLevel,
+    NormativeLevel,
 };
+use mycelix_sdk::matl::KVector;
 
 /// Helper to create an agent for testing
 fn create_test_agent(agent_id: &str) -> InstrumentalActor {
@@ -55,7 +76,8 @@ fn create_test_agent(agent_id: &str) -> InstrumentalActor {
         created_at: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
-            .as_secs() - 86400, // Created 1 day ago
+            .as_secs()
+            - 86400, // Created 1 day ago
         last_activity: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -85,7 +107,10 @@ fn create_agent_output(
         classification: EpistemicClassificationExtended::new(e, n, m, h),
         classification_confidence: 0.85,
         timestamp,
-        has_proof: matches!(e, EmpiricalLevel::E3Cryptographic | EmpiricalLevel::E4PublicRepro),
+        has_proof: matches!(
+            e,
+            EmpiricalLevel::E3Cryptographic | EmpiricalLevel::E4PublicRepro
+        ),
         proof_data: None,
         context_references: vec![],
     }
@@ -115,16 +140,18 @@ fn test_full_agent_lifecycle() {
         .as_secs();
 
     // Create a sequence of high-quality outputs
-    let outputs: Vec<AgentOutput> = (0..10).map(|i| {
-        create_agent_output(
-            agent.agent_id.as_str(),
-            EmpiricalLevel::E3Cryptographic, // High verifiability
-            NormativeLevel::N2Network,       // Network-wide agreement
-            MaterialityLevel::M2Persistent,  // Long-lasting relevance
-            HarmonicLevel::H1Local,          // Local resonance
-            base_time + i * 60,
-        )
-    }).collect();
+    let outputs: Vec<AgentOutput> = (0..10)
+        .map(|i| {
+            create_agent_output(
+                agent.agent_id.as_str(),
+                EmpiricalLevel::E3Cryptographic, // High verifiability
+                NormativeLevel::N2Network,       // Network-wide agreement
+                MaterialityLevel::M2Persistent,  // Long-lasting relevance
+                HarmonicLevel::H1Local,          // Local resonance
+                base_time + i * 60,
+            )
+        })
+        .collect();
 
     // Calculate epistemic stats
     let mut epistemic_stats = EpistemicStats::default();
@@ -132,7 +159,10 @@ fn test_full_agent_lifecycle() {
         epistemic_stats.add_output(&output.classification);
     }
 
-    println!("Epistemic quality score: {:.4}", epistemic_stats.quality_score());
+    println!(
+        "Epistemic quality score: {:.4}",
+        epistemic_stats.quality_score()
+    );
     assert!(epistemic_stats.quality_score() > 0.5); // Good quality outputs
 
     // =========================================================================
@@ -146,7 +176,10 @@ fn test_full_agent_lifecycle() {
 
     // Consistent outputs should have high coherence
     assert!(phi_result.phi > 0.8);
-    assert!(matches!(phi_result.coherence_state, CoherenceState::Coherent));
+    assert!(matches!(
+        phi_result.coherence_state,
+        CoherenceState::Coherent
+    ));
 
     // Check if high-stakes actions are allowed
     let coherence_check = check_coherence_for_action(phi_result.coherence_state, true);
@@ -158,8 +191,10 @@ fn test_full_agent_lifecycle() {
     let uncertainty = MoralUncertainty::new(0.2, 0.3, 0.25);
     let guidance = MoralActionGuidance::from_uncertainty(&uncertainty);
 
-    println!("Uncertainty: epistemic={:.2}, axiological={:.2}, deontic={:.2}",
-        uncertainty.epistemic, uncertainty.axiological, uncertainty.deontic);
+    println!(
+        "Uncertainty: epistemic={:.2}, axiological={:.2}, deontic={:.2}",
+        uncertainty.epistemic, uncertainty.axiological, uncertainty.deontic
+    );
     println!("Guidance: {:?}", guidance);
 
     // Low uncertainty should allow proceeding
@@ -207,8 +242,9 @@ fn test_full_agent_lifecycle() {
     let sponsor_civ = 0.75;
 
     // Calculate new KREDIT cap
-    let new_cap = calculate_kredit_cap_from_trust(&new_kvector, AgentClass::Supervised, sponsor_civ)
-        .expect("Should calculate KREDIT");
+    let new_cap =
+        calculate_kredit_cap_from_trust(&new_kvector, AgentClass::Supervised, sponsor_civ)
+            .expect("Should calculate KREDIT");
 
     println!("New KREDIT cap: {}", new_cap);
     assert!(new_cap > 5000); // Good trust = good KREDIT
@@ -241,10 +277,16 @@ fn test_full_agent_lifecycle() {
     println!("\nCoherence history:");
     println!("  Rolling Phi: {:.4}", coherence_history.rolling_phi);
     println!("  Current state: {:?}", coherence_history.current_state());
-    println!("  Trend: {} (1=improving, 0=stable, -1=declining)", coherence_history.trend);
+    println!(
+        "  Trend: {} (1=improving, 0=stable, -1=declining)",
+        coherence_history.trend
+    );
 
     // Should still be coherent after stable measurements
-    assert!(matches!(coherence_history.current_state(), CoherenceState::Coherent | CoherenceState::Stable));
+    assert!(matches!(
+        coherence_history.current_state(),
+        CoherenceState::Coherent | CoherenceState::Stable
+    ));
 
     // =========================================================================
     // VERIFICATION: Complete epistemic fingerprint
@@ -270,16 +312,18 @@ fn test_agent_degradation_scenario() {
         .as_secs();
 
     // Agent produces low-quality outputs (all E0/N0/M0/H0)
-    let bad_outputs: Vec<AgentOutput> = (0..10).map(|i| {
-        create_agent_output(
-            agent.agent_id.as_str(),
-            EmpiricalLevel::E0Null,
-            NormativeLevel::N0Personal,
-            MaterialityLevel::M0Ephemeral,
-            HarmonicLevel::H0None,
-            base_time + i * 60,
-        )
-    }).collect();
+    let bad_outputs: Vec<AgentOutput> = (0..10)
+        .map(|i| {
+            create_agent_output(
+                agent.agent_id.as_str(),
+                EmpiricalLevel::E0Null,
+                NormativeLevel::N0Personal,
+                MaterialityLevel::M0Ephemeral,
+                HarmonicLevel::H0None,
+                base_time + i * 60,
+            )
+        })
+        .collect();
 
     // Low epistemic quality
     let mut stats = EpistemicStats::default();
@@ -353,7 +397,10 @@ fn test_high_uncertainty_escalation() {
 
     // Should have recommendations from all three types
     assert!(!esc.recommendations.is_empty());
-    assert!(esc.recommendations.iter().any(|r| r.contains("factual") || r.contains("values") || r.contains("action")));
+    assert!(esc
+        .recommendations
+        .iter()
+        .any(|r| r.contains("factual") || r.contains("values") || r.contains("action")));
 }
 
 #[test]
@@ -367,12 +414,34 @@ fn test_diverse_outputs_lower_coherence() {
 
     // Create wildly different outputs (should have lower Phi)
     let diverse_outputs = vec![
-        create_agent_output(agent_id, EmpiricalLevel::E0Null, NormativeLevel::N0Personal, MaterialityLevel::M0Ephemeral, HarmonicLevel::H0None, base_time),
-        create_agent_output(agent_id, EmpiricalLevel::E4PublicRepro, NormativeLevel::N3Axiomatic, MaterialityLevel::M3Foundational, HarmonicLevel::H4Kosmic, base_time + 60),
-        create_agent_output(agent_id, EmpiricalLevel::E2PrivateVerify, NormativeLevel::N1Communal, MaterialityLevel::M1Temporal, HarmonicLevel::H2Network, base_time + 120),
+        create_agent_output(
+            agent_id,
+            EmpiricalLevel::E0Null,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M0Ephemeral,
+            HarmonicLevel::H0None,
+            base_time,
+        ),
+        create_agent_output(
+            agent_id,
+            EmpiricalLevel::E4PublicRepro,
+            NormativeLevel::N3Axiomatic,
+            MaterialityLevel::M3Foundational,
+            HarmonicLevel::H4Kosmic,
+            base_time + 60,
+        ),
+        create_agent_output(
+            agent_id,
+            EmpiricalLevel::E2PrivateVerify,
+            NormativeLevel::N1Communal,
+            MaterialityLevel::M1Temporal,
+            HarmonicLevel::H2Network,
+            base_time + 120,
+        ),
     ];
 
-    let phi_result = measure_phi_simple(&diverse_outputs, &PhiMeasurementConfig::default()).unwrap();
+    let phi_result =
+        measure_phi_simple(&diverse_outputs, &PhiMeasurementConfig::default()).unwrap();
 
     println!("Diverse outputs Phi: {:.4}", phi_result.phi);
     println!("Coherence state: {:?}", phi_result.coherence_state);
@@ -386,12 +455,15 @@ fn test_uncertainty_calibration_tracking() {
     let mut calibration = UncertaintyCalibration::default();
 
     // Agent is appropriately calibrated
-    calibration.record(true, false);  // Uncertain when should be (bad outcome avoided)
-    calibration.record(false, true);  // Confident when should be (good outcome)
-    calibration.record(false, true);  // Confident when should be (good outcome)
-    calibration.record(true, false);  // Uncertain when should be (bad outcome avoided)
+    calibration.record(true, false); // Uncertain when should be (bad outcome avoided)
+    calibration.record(false, true); // Confident when should be (good outcome)
+    calibration.record(false, true); // Confident when should be (good outcome)
+    calibration.record(true, false); // Uncertain when should be (bad outcome avoided)
 
-    println!("Calibration score (good agent): {:.4}", calibration.calibration_score());
+    println!(
+        "Calibration score (good agent): {:.4}",
+        calibration.calibration_score()
+    );
     assert!(calibration.calibration_score() > 0.8); // Well calibrated
 
     // Now simulate an overconfident agent
@@ -400,7 +472,10 @@ fn test_uncertainty_calibration_tracking() {
         bad_calibration.record(false, false); // Confident but wrong!
     }
 
-    println!("Calibration score (overconfident agent): {:.4}", bad_calibration.calibration_score());
+    println!(
+        "Calibration score (overconfident agent): {:.4}",
+        bad_calibration.calibration_score()
+    );
     assert!(bad_calibration.calibration_score() < 0.2);
     assert!(bad_calibration.is_overconfident());
 }
@@ -427,7 +502,7 @@ fn test_byzantine_gaming_prevention() {
         agent.behavior_log.push(BehaviorLogEntry {
             timestamp: base_time + i * 60,
             action_type: "suspicious_action".to_string(),
-            kredit_consumed: 100, // High KREDIT usage
+            kredit_consumed: 100,                          // High KREDIT usage
             counterparties: vec!["same_peer".to_string()], // Always same counterparty
             outcome,
         });

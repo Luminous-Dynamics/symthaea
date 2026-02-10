@@ -132,17 +132,17 @@ impl MoralActionGuidance {
 
     /// Check if guidance allows proceeding (even with monitoring)
     pub fn can_proceed(&self) -> bool {
-        matches!(self,
-            MoralActionGuidance::ProceedConfidently |
-            MoralActionGuidance::ProceedWithMonitoring
+        matches!(
+            self,
+            MoralActionGuidance::ProceedConfidently | MoralActionGuidance::ProceedWithMonitoring
         )
     }
 
     /// Check if escalation to human is required
     pub fn requires_human(&self) -> bool {
-        matches!(self,
-            MoralActionGuidance::SeekConsultation |
-            MoralActionGuidance::DeferAction
+        matches!(
+            self,
+            MoralActionGuidance::SeekConsultation | MoralActionGuidance::DeferAction
         )
     }
 }
@@ -264,10 +264,10 @@ impl UncertaintyCalibration {
         self.total_events += 1;
 
         match (was_uncertain, was_good_outcome) {
-            (true, true) => self.overcautious += 1,      // High uncertainty but would've been fine
+            (true, true) => self.overcautious += 1, // High uncertainty but would've been fine
             (true, false) => self.appropriate_uncertainty += 1, // High uncertainty, bad outcome avoided
-            (false, true) => self.appropriate_confidence += 1, // Low uncertainty, good outcome
-            (false, false) => self.overconfident += 1,   // Low uncertainty, bad outcome
+            (false, true) => self.appropriate_confidence += 1,  // Low uncertainty, good outcome
+            (false, false) => self.overconfident += 1,          // Low uncertainty, bad outcome
         }
     }
 
@@ -310,7 +310,11 @@ impl<T> UncertainOutput<T> {
     /// Create a new uncertain output
     pub fn new(output: T, uncertainty: MoralUncertainty) -> Self {
         let guidance = MoralActionGuidance::from_uncertainty(&uncertainty);
-        Self { output, uncertainty, guidance }
+        Self {
+            output,
+            uncertainty,
+            guidance,
+        }
     }
 
     /// Check if this output can be acted upon
@@ -349,11 +353,17 @@ mod tests {
     fn test_guidance_levels() {
         // Low uncertainty = proceed confidently
         let low = MoralUncertainty::new(0.1, 0.1, 0.1);
-        assert_eq!(MoralActionGuidance::from_uncertainty(&low), MoralActionGuidance::ProceedConfidently);
+        assert_eq!(
+            MoralActionGuidance::from_uncertainty(&low),
+            MoralActionGuidance::ProceedConfidently
+        );
 
         // Medium uncertainty = proceed with monitoring
         let med = MoralUncertainty::new(0.3, 0.3, 0.3);
-        assert_eq!(MoralActionGuidance::from_uncertainty(&med), MoralActionGuidance::ProceedWithMonitoring);
+        assert_eq!(
+            MoralActionGuidance::from_uncertainty(&med),
+            MoralActionGuidance::ProceedWithMonitoring
+        );
 
         // High uncertainty = seek consultation
         let high = MoralUncertainty::new(0.7, 0.7, 0.7);
@@ -377,7 +387,12 @@ mod tests {
         assert!(maybe_escalate("agent-1", &low_mu, "transfer", None).is_none());
 
         let high_mu = MoralUncertainty::unsure();
-        let esc = maybe_escalate("agent-1", &high_mu, "transfer", Some("large amount".to_string()));
+        let esc = maybe_escalate(
+            "agent-1",
+            &high_mu,
+            "transfer",
+            Some("large amount".to_string()),
+        );
         assert!(esc.is_some());
 
         let esc = esc.unwrap();
@@ -391,12 +406,12 @@ mod tests {
         let mut cal = UncertaintyCalibration::default();
 
         // Record good calibration events
-        cal.record(true, false);  // Was uncertain, bad outcome (good!)
-        cal.record(false, true);  // Was confident, good outcome (good!)
+        cal.record(true, false); // Was uncertain, bad outcome (good!)
+        cal.record(false, true); // Was confident, good outcome (good!)
 
         // Record bad calibration events
         cal.record(false, false); // Was confident, bad outcome (bad!)
-        cal.record(true, true);   // Was uncertain, good outcome (too cautious)
+        cal.record(true, true); // Was uncertain, good outcome (too cautious)
 
         assert_eq!(cal.total_events, 4);
         assert!((cal.calibration_score() - 0.5).abs() < 0.01);
@@ -404,18 +419,13 @@ mod tests {
 
     #[test]
     fn test_uncertain_output() {
-        let output = UncertainOutput::new(
-            "result".to_string(),
-            MoralUncertainty::confident(),
-        );
+        let output = UncertainOutput::new("result".to_string(), MoralUncertainty::confident());
 
         assert!(output.can_act());
         assert_eq!(output.get_if_allowed(), Some("result".to_string()));
 
-        let blocked = UncertainOutput::new(
-            "blocked_result".to_string(),
-            MoralUncertainty::unsure(),
-        );
+        let blocked =
+            UncertainOutput::new("blocked_result".to_string(), MoralUncertainty::unsure());
 
         assert!(!blocked.can_act());
         assert_eq!(blocked.get_if_allowed(), None);

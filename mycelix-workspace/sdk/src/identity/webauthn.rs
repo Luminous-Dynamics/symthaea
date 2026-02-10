@@ -59,7 +59,7 @@
 //! - Recovery mechanism via multiple registered authenticators
 
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -70,9 +70,11 @@ use ts_rs::TS;
 #[cfg(feature = "webauthn-full")]
 use ciborium::Value as CborValue;
 #[cfg(feature = "webauthn-full")]
-use p256::ecdsa::{signature::Verifier, Signature as P256Signature, VerifyingKey as P256VerifyingKey};
-#[cfg(feature = "webauthn-full")]
 use ed25519_dalek::{Signature as Ed25519Signature, VerifyingKey as Ed25519VerifyingKey};
+#[cfg(feature = "webauthn-full")]
+use p256::ecdsa::{
+    signature::Verifier, Signature as P256Signature, VerifyingKey as P256VerifyingKey,
+};
 
 // ============================================================================
 // Core Types
@@ -614,7 +616,8 @@ impl CoseKey {
         let cbor_value: CborValue = ciborium::from_reader(data)
             .map_err(|e| WebAuthnError::CoseKeyError(format!("CBOR parse error: {}", e)))?;
 
-        let map = cbor_value.as_map()
+        let map = cbor_value
+            .as_map()
             .ok_or_else(|| WebAuthnError::CoseKeyError("Expected CBOR map".to_string()))?;
 
         // COSE key parameter labels:
@@ -631,38 +634,49 @@ impl CoseKey {
         let key_type = match kty {
             1 => CoseKeyType::Okp,
             2 => CoseKeyType::Ec2,
-            other => return Err(WebAuthnError::CoseKeyError(
-                format!("Unsupported key type: {}", other)
-            )),
+            other => {
+                return Err(WebAuthnError::CoseKeyError(format!(
+                    "Unsupported key type: {}",
+                    other
+                )))
+            }
         };
 
         let algorithm = match alg {
             -7 => CoseAlgorithm::Es256,
             -8 => CoseAlgorithm::EdDsa,
-            other => return Err(WebAuthnError::CoseKeyError(
-                format!("Unsupported algorithm: {}", other)
-            )),
+            other => {
+                return Err(WebAuthnError::CoseKeyError(format!(
+                    "Unsupported algorithm: {}",
+                    other
+                )))
+            }
         };
 
         // Validate key type and algorithm match
         match (key_type, algorithm) {
             (CoseKeyType::Ec2, CoseAlgorithm::Es256) => {
                 if crv != 1 {
-                    return Err(WebAuthnError::CoseKeyError(
-                        format!("ES256 requires P-256 curve (1), got: {}", crv)
-                    ));
+                    return Err(WebAuthnError::CoseKeyError(format!(
+                        "ES256 requires P-256 curve (1), got: {}",
+                        crv
+                    )));
                 }
             }
             (CoseKeyType::Okp, CoseAlgorithm::EdDsa) => {
                 if crv != 6 {
-                    return Err(WebAuthnError::CoseKeyError(
-                        format!("EdDSA requires Ed25519 curve (6), got: {}", crv)
-                    ));
+                    return Err(WebAuthnError::CoseKeyError(format!(
+                        "EdDSA requires Ed25519 curve (6), got: {}",
+                        crv
+                    )));
                 }
             }
-            _ => return Err(WebAuthnError::CoseKeyError(
-                format!("Mismatched key type {:?} and algorithm {:?}", key_type, algorithm)
-            )),
+            _ => {
+                return Err(WebAuthnError::CoseKeyError(format!(
+                    "Mismatched key type {:?} and algorithm {:?}",
+                    key_type, algorithm
+                )))
+            }
         }
 
         let x_coordinate = Self::get_bytes_param(map, -2).ok();
@@ -671,13 +685,13 @@ impl CoseKey {
         // Validate required parameters
         if x_coordinate.is_none() {
             return Err(WebAuthnError::CoseKeyError(
-                "Missing x coordinate (-2)".to_string()
+                "Missing x coordinate (-2)".to_string(),
             ));
         }
 
         if key_type == CoseKeyType::Ec2 && y_coordinate.is_none() {
             return Err(WebAuthnError::CoseKeyError(
-                "Missing y coordinate (-3) for EC2 key".to_string()
+                "Missing y coordinate (-3) for EC2 key".to_string(),
             ));
         }
 
@@ -694,7 +708,7 @@ impl CoseKey {
     #[cfg(not(feature = "webauthn-full"))]
     pub fn from_cbor(_data: &[u8]) -> Result<Self, WebAuthnError> {
         Err(WebAuthnError::CoseKeyError(
-            "COSE key parsing requires 'webauthn-full' feature".to_string()
+            "COSE key parsing requires 'webauthn-full' feature".to_string(),
         ))
     }
 
@@ -703,27 +717,37 @@ impl CoseKey {
     fn get_integer_param(map: &[(CborValue, CborValue)], label: i64) -> Result<i64, WebAuthnError> {
         for (k, v) in map {
             if let Some(key_int) = k.as_integer() {
-                let key_val: i64 = key_int.try_into()
+                let key_val: i64 = key_int
+                    .try_into()
                     .map_err(|_| WebAuthnError::CoseKeyError("Invalid key label".to_string()))?;
                 if key_val == label {
                     if let Some(val_int) = v.as_integer() {
-                        return val_int.try_into()
-                            .map_err(|_| WebAuthnError::CoseKeyError(
-                                format!("Integer overflow for label {}", label)
-                            ));
+                        return val_int.try_into().map_err(|_| {
+                            WebAuthnError::CoseKeyError(format!(
+                                "Integer overflow for label {}",
+                                label
+                            ))
+                        });
                     }
                 }
             }
         }
-        Err(WebAuthnError::CoseKeyError(format!("Missing parameter {}", label)))
+        Err(WebAuthnError::CoseKeyError(format!(
+            "Missing parameter {}",
+            label
+        )))
     }
 
     /// Helper to get bytes parameter from COSE key map
     #[cfg(feature = "webauthn-full")]
-    fn get_bytes_param(map: &[(CborValue, CborValue)], label: i64) -> Result<Vec<u8>, WebAuthnError> {
+    fn get_bytes_param(
+        map: &[(CborValue, CborValue)],
+        label: i64,
+    ) -> Result<Vec<u8>, WebAuthnError> {
         for (k, v) in map {
             if let Some(key_int) = k.as_integer() {
-                let key_val: i64 = key_int.try_into()
+                let key_val: i64 = key_int
+                    .try_into()
                     .map_err(|_| WebAuthnError::CoseKeyError("Invalid key label".to_string()))?;
                 if key_val == label {
                     if let Some(bytes) = v.as_bytes() {
@@ -732,7 +756,10 @@ impl CoseKey {
                 }
             }
         }
-        Err(WebAuthnError::CoseKeyError(format!("Missing parameter {}", label)))
+        Err(WebAuthnError::CoseKeyError(format!(
+            "Missing parameter {}",
+            label
+        )))
     }
 
     /// Get the algorithm for this key
@@ -833,22 +860,40 @@ impl std::fmt::Display for WebAuthnError {
             Self::ChallengeExpired => write!(f, "Challenge has expired"),
             Self::ChallengeNotFound => write!(f, "Challenge not found"),
             Self::OriginMismatch { expected, received } => {
-                write!(f, "Origin mismatch: expected {}, received {}", expected, received)
+                write!(
+                    f,
+                    "Origin mismatch: expected {}, received {}",
+                    expected, received
+                )
             }
             Self::RpIdMismatch { expected, received } => {
-                write!(f, "RP ID mismatch: expected {}, received {}", expected, received)
+                write!(
+                    f,
+                    "RP ID mismatch: expected {}, received {}",
+                    expected, received
+                )
             }
             Self::SignCounterNotIncremented { stored, received } => {
-                write!(f, "Sign counter not incremented: stored {}, received {}", stored, received)
+                write!(
+                    f,
+                    "Sign counter not incremented: stored {}, received {}",
+                    stored, received
+                )
             }
             Self::CredentialNotFound { credential_id } => {
                 write!(f, "Credential not found: {:?}", credential_id)
             }
-            Self::UserVerificationRequired => write!(f, "User verification required but not performed"),
+            Self::UserVerificationRequired => {
+                write!(f, "User verification required but not performed")
+            }
             Self::UserPresenceRequired => write!(f, "User presence required but not confirmed"),
             Self::InvalidAttestationFormat(s) => write!(f, "Invalid attestation format: {}", s),
-            Self::AttestationVerificationFailed(s) => write!(f, "Attestation verification failed: {}", s),
-            Self::SignatureVerificationFailed(s) => write!(f, "Signature verification failed: {}", s),
+            Self::AttestationVerificationFailed(s) => {
+                write!(f, "Attestation verification failed: {}", s)
+            }
+            Self::SignatureVerificationFailed(s) => {
+                write!(f, "Signature verification failed: {}", s)
+            }
             Self::InvalidClientData(s) => write!(f, "Invalid client data: {}", s),
             Self::InvalidAuthenticatorData(s) => write!(f, "Invalid authenticator data: {}", s),
             Self::CoseKeyError(s) => write!(f, "COSE key error: {}", s),
@@ -953,7 +998,12 @@ impl WebAuthnService {
         // Use timestamp + hash for basic randomness
         // In production, use getrandom or os-level CSPRNG
         let now = current_timestamp();
-        let seed_data = format!("{}{}{:?}", now, self.config.rp_id, std::time::Instant::now());
+        let seed_data = format!(
+            "{}{}{:?}",
+            now,
+            self.config.rp_id,
+            std::time::Instant::now()
+        );
         let mut hasher = Sha256::new();
         hasher.update(seed_data.as_bytes());
         challenge.copy_from_slice(&hasher.finalize());
@@ -1017,7 +1067,8 @@ impl WebAuthnService {
         };
 
         // Store the challenge
-        self.pending_registrations.insert(challenge, reg_challenge.clone());
+        self.pending_registrations
+            .insert(challenge, reg_challenge.clone());
 
         // Clean up expired challenges
         self.cleanup_expired_challenges();
@@ -1039,7 +1090,8 @@ impl WebAuthnService {
         response: &RegistrationResponse,
     ) -> Result<WebAuthnCredential, WebAuthnError> {
         // 1. Verify challenge is valid and not expired
-        let stored = self.pending_registrations
+        let stored = self
+            .pending_registrations
             .get(&challenge.challenge)
             .ok_or(WebAuthnError::ChallengeNotFound)?;
 
@@ -1054,17 +1106,19 @@ impl WebAuthnService {
         // Verify type is "webauthn.create"
         if client_data.get("type").and_then(|v| v.as_str()) != Some("webauthn.create") {
             return Err(WebAuthnError::InvalidClientData(
-                "Invalid type, expected webauthn.create".to_string()
+                "Invalid type, expected webauthn.create".to_string(),
             ));
         }
 
         // Verify challenge matches (base64url encoded)
         let challenge_b64 = base64::Engine::encode(
             &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-            &challenge.challenge
+            &challenge.challenge,
         );
         if client_data.get("challenge").and_then(|v| v.as_str()) != Some(&challenge_b64) {
-            return Err(WebAuthnError::InvalidClientData("Challenge mismatch".to_string()));
+            return Err(WebAuthnError::InvalidClientData(
+                "Challenge mismatch".to_string(),
+            ));
         }
 
         // Verify origin
@@ -1098,7 +1152,7 @@ impl WebAuthnService {
         // 5. Verify flags
         if auth_data.len() < 33 {
             return Err(WebAuthnError::InvalidAuthenticatorData(
-                "Auth data too short".to_string()
+                "Auth data too short".to_string(),
             ));
         }
         let flags = AuthenticatorFlags::from_byte(auth_data[32]);
@@ -1181,7 +1235,8 @@ impl WebAuthnService {
         };
 
         // Store the challenge
-        self.pending_authentications.insert(challenge, auth_challenge.clone());
+        self.pending_authentications
+            .insert(challenge, auth_challenge.clone());
 
         // Clean up expired challenges
         self.cleanup_expired_challenges();
@@ -1205,7 +1260,8 @@ impl WebAuthnService {
         credential: &WebAuthnCredential,
     ) -> Result<AuthenticationResult, WebAuthnError> {
         // 1. Verify challenge is valid
-        let stored = self.pending_authentications
+        let stored = self
+            .pending_authentications
             .get(&challenge.challenge)
             .ok_or(WebAuthnError::ChallengeNotFound)?;
 
@@ -1227,17 +1283,19 @@ impl WebAuthnService {
         // Verify type is "webauthn.get"
         if client_data.get("type").and_then(|v| v.as_str()) != Some("webauthn.get") {
             return Err(WebAuthnError::InvalidClientData(
-                "Invalid type, expected webauthn.get".to_string()
+                "Invalid type, expected webauthn.get".to_string(),
             ));
         }
 
         // Verify challenge matches
         let challenge_b64 = base64::Engine::encode(
             &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-            &challenge.challenge
+            &challenge.challenge,
         );
         if client_data.get("challenge").and_then(|v| v.as_str()) != Some(&challenge_b64) {
-            return Err(WebAuthnError::InvalidClientData("Challenge mismatch".to_string()));
+            return Err(WebAuthnError::InvalidClientData(
+                "Challenge mismatch".to_string(),
+            ));
         }
 
         // Verify origin
@@ -1253,7 +1311,7 @@ impl WebAuthnService {
         // 4. Verify RP ID hash in authenticator data
         if response.authenticator_data.len() < 37 {
             return Err(WebAuthnError::InvalidAuthenticatorData(
-                "Auth data too short".to_string()
+                "Auth data too short".to_string(),
             ));
         }
 
@@ -1271,8 +1329,9 @@ impl WebAuthnService {
         }
 
         // 5. Verify flags
-        let flags = response.parse_flags()
-            .ok_or_else(|| WebAuthnError::InvalidAuthenticatorData("Cannot parse flags".to_string()))?;
+        let flags = response.parse_flags().ok_or_else(|| {
+            WebAuthnError::InvalidAuthenticatorData("Cannot parse flags".to_string())
+        })?;
 
         if !flags.user_present {
             return Err(WebAuthnError::UserPresenceRequired);
@@ -1312,7 +1371,10 @@ impl WebAuthnService {
     // =========================================================================
 
     /// Parse client data JSON
-    fn parse_client_data(&self, client_data_json: &[u8]) -> Result<serde_json::Value, WebAuthnError> {
+    fn parse_client_data(
+        &self,
+        client_data_json: &[u8],
+    ) -> Result<serde_json::Value, WebAuthnError> {
         serde_json::from_slice(client_data_json)
             .map_err(|e| WebAuthnError::InvalidClientData(format!("JSON parse error: {}", e)))
     }
@@ -1335,11 +1397,13 @@ impl WebAuthnService {
         attestation_object: &[u8],
     ) -> Result<(Vec<u8>, AttestationFormat, Vec<u8>), WebAuthnError> {
         // Parse CBOR
-        let cbor_value: CborValue = ciborium::from_reader(attestation_object)
-            .map_err(|e| WebAuthnError::InvalidAttestationFormat(format!("CBOR parse error: {}", e)))?;
+        let cbor_value: CborValue = ciborium::from_reader(attestation_object).map_err(|e| {
+            WebAuthnError::InvalidAttestationFormat(format!("CBOR parse error: {}", e))
+        })?;
 
-        let map = cbor_value.as_map()
-            .ok_or_else(|| WebAuthnError::InvalidAttestationFormat("Expected CBOR map".to_string()))?;
+        let map = cbor_value.as_map().ok_or_else(|| {
+            WebAuthnError::InvalidAttestationFormat("Expected CBOR map".to_string())
+        })?;
 
         // Extract fmt (attestation format)
         let fmt_str = self.cbor_map_get_text(map, "fmt")?;
@@ -1351,9 +1415,12 @@ impl WebAuthnService {
             "android-key" => AttestationFormat::AndroidKey,
             "android-safetynet" => AttestationFormat::AndroidSafetyNet,
             "apple" => AttestationFormat::Apple,
-            other => return Err(WebAuthnError::InvalidAttestationFormat(
-                format!("Unknown attestation format: {}", other)
-            )),
+            other => {
+                return Err(WebAuthnError::InvalidAttestationFormat(format!(
+                    "Unknown attestation format: {}",
+                    other
+                )))
+            }
         };
 
         // Extract authData
@@ -1372,7 +1439,7 @@ impl WebAuthnService {
 
         if auth_data.len() < 37 {
             return Err(WebAuthnError::InvalidAuthenticatorData(
-                "Auth data too short (minimum 37 bytes)".to_string()
+                "Auth data too short (minimum 37 bytes)".to_string(),
             ));
         }
 
@@ -1381,14 +1448,14 @@ impl WebAuthnService {
         // Check if attested credential data is present
         if !flags.attested_credential_data {
             return Err(WebAuthnError::InvalidAuthenticatorData(
-                "No attested credential data in registration response".to_string()
+                "No attested credential data in registration response".to_string(),
             ));
         }
 
         // Parse attested credential data (starts at byte 37)
         if auth_data.len() < 55 {
             return Err(WebAuthnError::InvalidAuthenticatorData(
-                "Auth data too short for attested credential data".to_string()
+                "Auth data too short for attested credential data".to_string(),
             ));
         }
 
@@ -1399,7 +1466,7 @@ impl WebAuthnService {
         let cose_key_start = 55 + cred_id_len;
         if auth_data.len() <= cose_key_start {
             return Err(WebAuthnError::InvalidAuthenticatorData(
-                "Auth data too short for COSE key".to_string()
+                "Auth data too short for COSE key".to_string(),
             ));
         }
 
@@ -1416,42 +1483,58 @@ impl WebAuthnService {
         _attestation_object: &[u8],
     ) -> Result<(Vec<u8>, AttestationFormat, Vec<u8>), WebAuthnError> {
         Err(WebAuthnError::InternalError(
-            "Attestation parsing requires 'webauthn-full' feature".to_string()
+            "Attestation parsing requires 'webauthn-full' feature".to_string(),
         ))
     }
 
     /// Helper to get a text value from a CBOR map
     #[cfg(feature = "webauthn-full")]
-    fn cbor_map_get_text(&self, map: &[(CborValue, CborValue)], key: &str) -> Result<String, WebAuthnError> {
+    fn cbor_map_get_text(
+        &self,
+        map: &[(CborValue, CborValue)],
+        key: &str,
+    ) -> Result<String, WebAuthnError> {
         for (k, v) in map {
             if let Some(k_str) = k.as_text() {
                 if k_str == key {
-                    return v.as_text()
-                        .map(|s| s.to_string())
-                        .ok_or_else(|| WebAuthnError::InvalidAttestationFormat(
-                            format!("Expected text for key '{}'", key)
-                        ));
+                    return v.as_text().map(|s| s.to_string()).ok_or_else(|| {
+                        WebAuthnError::InvalidAttestationFormat(format!(
+                            "Expected text for key '{}'",
+                            key
+                        ))
+                    });
                 }
             }
         }
-        Err(WebAuthnError::InvalidAttestationFormat(format!("Missing key '{}'", key)))
+        Err(WebAuthnError::InvalidAttestationFormat(format!(
+            "Missing key '{}'",
+            key
+        )))
     }
 
     /// Helper to get bytes from a CBOR map
     #[cfg(feature = "webauthn-full")]
-    fn cbor_map_get_bytes(&self, map: &[(CborValue, CborValue)], key: &str) -> Result<Vec<u8>, WebAuthnError> {
+    fn cbor_map_get_bytes(
+        &self,
+        map: &[(CborValue, CborValue)],
+        key: &str,
+    ) -> Result<Vec<u8>, WebAuthnError> {
         for (k, v) in map {
             if let Some(k_str) = k.as_text() {
                 if k_str == key {
-                    return v.as_bytes()
-                        .map(|b| b.to_vec())
-                        .ok_or_else(|| WebAuthnError::InvalidAttestationFormat(
-                            format!("Expected bytes for key '{}'", key)
-                        ));
+                    return v.as_bytes().map(|b| b.to_vec()).ok_or_else(|| {
+                        WebAuthnError::InvalidAttestationFormat(format!(
+                            "Expected bytes for key '{}'",
+                            key
+                        ))
+                    });
                 }
             }
         }
-        Err(WebAuthnError::InvalidAttestationFormat(format!("Missing key '{}'", key)))
+        Err(WebAuthnError::InvalidAttestationFormat(format!(
+            "Missing key '{}'",
+            key
+        )))
     }
 
     /// Verify a signature using COSE public key
@@ -1475,12 +1558,8 @@ impl WebAuthnService {
         let cose_key = CoseKey::from_cbor(public_key)?;
 
         match cose_key.algorithm {
-            CoseAlgorithm::Es256 => {
-                self.verify_es256_signature(&cose_key, signed_data, signature)
-            }
-            CoseAlgorithm::EdDsa => {
-                self.verify_eddsa_signature(&cose_key, signed_data, signature)
-            }
+            CoseAlgorithm::Es256 => self.verify_es256_signature(&cose_key, signed_data, signature),
+            CoseAlgorithm::EdDsa => self.verify_eddsa_signature(&cose_key, signed_data, signature),
         }
     }
 
@@ -1522,9 +1601,11 @@ impl WebAuthnService {
         // Extract P-256 coordinates from COSE key
         let (x, y) = match (&cose_key.x_coordinate, &cose_key.y_coordinate) {
             (Some(x), Some(y)) => (x, y),
-            _ => return Err(WebAuthnError::CoseKeyError(
-                "Missing x or y coordinate for EC2 key".to_string()
-            )),
+            _ => {
+                return Err(WebAuthnError::CoseKeyError(
+                    "Missing x or y coordinate for EC2 key".to_string(),
+                ))
+            }
         };
 
         // Build uncompressed SEC1 point: 0x04 || x || y
@@ -1547,23 +1628,28 @@ impl WebAuthnService {
 
         // Parse signature (WebAuthn uses raw r||s format, 64 bytes for P-256)
         let sig = if signature.len() == 64 {
-            P256Signature::from_slice(signature)
-                .map_err(|e| WebAuthnError::SignatureVerificationFailed(
-                    format!("Invalid ES256 signature format: {}", e)
-                ))?
+            P256Signature::from_slice(signature).map_err(|e| {
+                WebAuthnError::SignatureVerificationFailed(format!(
+                    "Invalid ES256 signature format: {}",
+                    e
+                ))
+            })?
         } else {
             // Try DER format
-            P256Signature::from_der(signature)
-                .map_err(|e| WebAuthnError::SignatureVerificationFailed(
-                    format!("Invalid ES256 signature: {}", e)
-                ))?
+            P256Signature::from_der(signature).map_err(|e| {
+                WebAuthnError::SignatureVerificationFailed(format!(
+                    "Invalid ES256 signature: {}",
+                    e
+                ))
+            })?
         };
 
         // Verify signature over SHA-256 hash of signed_data
-        verifying_key.verify(signed_data, &sig)
-            .map_err(|_| WebAuthnError::SignatureVerificationFailed(
-                "ES256 signature verification failed".to_string()
-            ))
+        verifying_key.verify(signed_data, &sig).map_err(|_| {
+            WebAuthnError::SignatureVerificationFailed(
+                "ES256 signature verification failed".to_string(),
+            )
+        })
     }
 
     /// Verify EdDSA (Ed25519) signature
@@ -1575,41 +1661,44 @@ impl WebAuthnService {
         signature: &[u8],
     ) -> Result<(), WebAuthnError> {
         // Extract Ed25519 public key from COSE key (x coordinate for OKP)
-        let x = cose_key.x_coordinate.as_ref()
-            .ok_or_else(|| WebAuthnError::CoseKeyError(
-                "Missing x coordinate for OKP key".to_string()
-            ))?;
+        let x = cose_key.x_coordinate.as_ref().ok_or_else(|| {
+            WebAuthnError::CoseKeyError("Missing x coordinate for OKP key".to_string())
+        })?;
 
         if x.len() != 32 {
-            return Err(WebAuthnError::CoseKeyError(
-                format!("Invalid Ed25519 public key length: {} (expected 32)", x.len())
-            ));
+            return Err(WebAuthnError::CoseKeyError(format!(
+                "Invalid Ed25519 public key length: {} (expected 32)",
+                x.len()
+            )));
         }
 
-        let key_bytes: [u8; 32] = x.as_slice().try_into()
+        let key_bytes: [u8; 32] = x
+            .as_slice()
+            .try_into()
             .map_err(|_| WebAuthnError::CoseKeyError("Invalid key length".to_string()))?;
 
         let verifying_key = Ed25519VerifyingKey::from_bytes(&key_bytes)
             .map_err(|e| WebAuthnError::CoseKeyError(format!("Invalid Ed25519 key: {}", e)))?;
 
         if signature.len() != 64 {
-            return Err(WebAuthnError::SignatureVerificationFailed(
-                format!("Invalid Ed25519 signature length: {} (expected 64)", signature.len())
-            ));
+            return Err(WebAuthnError::SignatureVerificationFailed(format!(
+                "Invalid Ed25519 signature length: {} (expected 64)",
+                signature.len()
+            )));
         }
 
-        let sig_bytes: [u8; 64] = signature.try_into()
-            .map_err(|_| WebAuthnError::SignatureVerificationFailed(
-                "Invalid signature length".to_string()
-            ))?;
+        let sig_bytes: [u8; 64] = signature.try_into().map_err(|_| {
+            WebAuthnError::SignatureVerificationFailed("Invalid signature length".to_string())
+        })?;
 
         let sig = Ed25519Signature::from_bytes(&sig_bytes);
 
         use ed25519_dalek::Verifier;
-        verifying_key.verify(signed_data, &sig)
-            .map_err(|_| WebAuthnError::SignatureVerificationFailed(
-                "EdDSA signature verification failed".to_string()
-            ))
+        verifying_key.verify(signed_data, &sig).map_err(|_| {
+            WebAuthnError::SignatureVerificationFailed(
+                "EdDSA signature verification failed".to_string(),
+            )
+        })
     }
 
     /// Clean up expired challenges
@@ -1617,7 +1706,8 @@ impl WebAuthnService {
         let now = current_timestamp();
 
         self.pending_registrations.retain(|_, c| c.expires_at > now);
-        self.pending_authentications.retain(|_, c| c.expires_at > now);
+        self.pending_authentications
+            .retain(|_, c| c.expires_at > now);
     }
 
     /// Get number of pending registrations
@@ -1711,10 +1801,9 @@ mod tests {
         let mut service = create_test_service();
 
         let user_id = b"did:mycelix:test123".to_vec();
-        let challenge = service.create_registration_challenge(
-            &user_id,
-            "test_user",
-        ).unwrap();
+        let challenge = service
+            .create_registration_challenge(&user_id, "test_user")
+            .unwrap();
 
         assert_eq!(challenge.rp_id, "mycelix.example.com");
         assert_eq!(challenge.user_id, user_id);
@@ -1727,10 +1816,7 @@ mod tests {
     fn test_authentication_challenge_creation() {
         let mut service = create_test_service();
 
-        let cred_ids = vec![
-            vec![1, 2, 3, 4],
-            vec![5, 6, 7, 8],
-        ];
+        let cred_ids = vec![vec![1, 2, 3, 4], vec![5, 6, 7, 8]];
 
         let challenge = service.create_authentication_challenge(&cred_ids).unwrap();
 
@@ -1805,7 +1891,9 @@ mod tests {
         assert_eq!(config.rp_id, "example.com");
         assert_eq!(config.rp_origin, "https://example.com");
         assert_eq!(config.rp_name, "Example App");
-        assert!(config.allowed_origins.contains(&"https://example.com".to_string()));
+        assert!(config
+            .allowed_origins
+            .contains(&"https://example.com".to_string()));
     }
 
     #[test]
@@ -1929,46 +2017,35 @@ mod webauthn_full_tests {
         let mut map: Vec<(CborValue, CborValue)> = Vec::new();
 
         // kty = 2 (EC2)
-        map.push((
-            CborValue::Integer(1.into()),
-            CborValue::Integer(2.into())
-        ));
+        map.push((CborValue::Integer(1.into()), CborValue::Integer(2.into())));
 
         // alg = -7 (ES256)
         map.push((
             CborValue::Integer(3.into()),
-            CborValue::Integer((-7i64).into())
+            CborValue::Integer((-7i64).into()),
         ));
 
         // crv = 1 (P-256)
         map.push((
             CborValue::Integer((-1i64).into()),
-            CborValue::Integer(1.into())
+            CborValue::Integer(1.into()),
         ));
 
         // x coordinate (32 bytes of test data)
         let x = vec![
-            0x04, 0xb1, 0x71, 0x91, 0x4a, 0xf1, 0xf5, 0x49,
-            0xdb, 0x73, 0x9c, 0x2e, 0x85, 0xe4, 0xf0, 0x3b,
-            0x4e, 0xf5, 0x4a, 0x82, 0xda, 0x75, 0xbb, 0x5e,
-            0x85, 0x4a, 0x0c, 0x4b, 0xf8, 0xc8, 0x1a, 0x75,
+            0x04, 0xb1, 0x71, 0x91, 0x4a, 0xf1, 0xf5, 0x49, 0xdb, 0x73, 0x9c, 0x2e, 0x85, 0xe4,
+            0xf0, 0x3b, 0x4e, 0xf5, 0x4a, 0x82, 0xda, 0x75, 0xbb, 0x5e, 0x85, 0x4a, 0x0c, 0x4b,
+            0xf8, 0xc8, 0x1a, 0x75,
         ];
-        map.push((
-            CborValue::Integer((-2i64).into()),
-            CborValue::Bytes(x)
-        ));
+        map.push((CborValue::Integer((-2i64).into()), CborValue::Bytes(x)));
 
         // y coordinate (32 bytes of test data)
         let y = vec![
-            0x9f, 0x14, 0x86, 0xc0, 0x47, 0x83, 0x0a, 0xa5,
-            0xde, 0x90, 0x3f, 0x50, 0x3b, 0x3c, 0x29, 0xa7,
-            0xf5, 0xfa, 0x6d, 0xd8, 0x61, 0xd7, 0x7e, 0x04,
-            0x5e, 0x1b, 0x13, 0x80, 0x28, 0xd8, 0x9c, 0x73,
+            0x9f, 0x14, 0x86, 0xc0, 0x47, 0x83, 0x0a, 0xa5, 0xde, 0x90, 0x3f, 0x50, 0x3b, 0x3c,
+            0x29, 0xa7, 0xf5, 0xfa, 0x6d, 0xd8, 0x61, 0xd7, 0x7e, 0x04, 0x5e, 0x1b, 0x13, 0x80,
+            0x28, 0xd8, 0x9c, 0x73,
         ];
-        map.push((
-            CborValue::Integer((-3i64).into()),
-            CborValue::Bytes(y)
-        ));
+        map.push((CborValue::Integer((-3i64).into()), CborValue::Bytes(y)));
 
         let cbor = CborValue::Map(map);
         let mut buf = Vec::new();
@@ -1988,34 +2065,27 @@ mod webauthn_full_tests {
         let mut map: Vec<(CborValue, CborValue)> = Vec::new();
 
         // kty = 1 (OKP)
-        map.push((
-            CborValue::Integer(1.into()),
-            CborValue::Integer(1.into())
-        ));
+        map.push((CborValue::Integer(1.into()), CborValue::Integer(1.into())));
 
         // alg = -8 (EdDSA)
         map.push((
             CborValue::Integer(3.into()),
-            CborValue::Integer((-8i64).into())
+            CborValue::Integer((-8i64).into()),
         ));
 
         // crv = 6 (Ed25519)
         map.push((
             CborValue::Integer((-1i64).into()),
-            CborValue::Integer(6.into())
+            CborValue::Integer(6.into()),
         ));
 
         // x coordinate (Ed25519 public key, 32 bytes)
         let x = vec![
-            0xd7, 0x5a, 0x98, 0x01, 0x82, 0xb1, 0x0a, 0xb7,
-            0xd5, 0x4b, 0xfe, 0xd3, 0xc9, 0x64, 0x07, 0x3a,
-            0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25,
-            0xaf, 0x02, 0x1a, 0x68, 0xf7, 0x07, 0x51, 0x1a,
+            0xd7, 0x5a, 0x98, 0x01, 0x82, 0xb1, 0x0a, 0xb7, 0xd5, 0x4b, 0xfe, 0xd3, 0xc9, 0x64,
+            0x07, 0x3a, 0x0e, 0xe1, 0x72, 0xf3, 0xda, 0xa6, 0x23, 0x25, 0xaf, 0x02, 0x1a, 0x68,
+            0xf7, 0x07, 0x51, 0x1a,
         ];
-        map.push((
-            CborValue::Integer((-2i64).into()),
-            CborValue::Bytes(x)
-        ));
+        map.push((CborValue::Integer((-2i64).into()), CborValue::Bytes(x)));
 
         let cbor = CborValue::Map(map);
         let mut buf = Vec::new();
@@ -2059,15 +2129,15 @@ mod webauthn_full_tests {
         let mut map: Vec<(CborValue, CborValue)> = Vec::new();
         map.push((
             CborValue::Text("fmt".to_string()),
-            CborValue::Text("none".to_string())
+            CborValue::Text("none".to_string()),
         ));
         map.push((
             CborValue::Text("authData".to_string()),
-            CborValue::Bytes(auth_data)
+            CborValue::Bytes(auth_data),
         ));
         map.push((
             CborValue::Text("attStmt".to_string()),
-            CborValue::Map(vec![])
+            CborValue::Map(vec![]),
         ));
 
         let cbor = CborValue::Map(map);
@@ -2114,10 +2184,7 @@ mod webauthn_full_tests {
     fn test_cose_key_missing_params() {
         // CBOR map with only kty, missing other required params
         let mut map: Vec<(CborValue, CborValue)> = Vec::new();
-        map.push((
-            CborValue::Integer(1.into()),
-            CborValue::Integer(2.into())
-        ));
+        map.push((CborValue::Integer(1.into()), CborValue::Integer(2.into())));
 
         let cbor = CborValue::Map(map);
         let mut buf = Vec::new();
@@ -2125,20 +2192,25 @@ mod webauthn_full_tests {
 
         let result = CoseKey::from_cbor(&buf);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Missing parameter"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Missing parameter"));
     }
 
     #[test]
     fn test_attestation_object_parsing() {
         let attestation = create_test_attestation_object();
 
-        let service = WebAuthnService::new(
-            "example.com".to_string(),
-            "https://example.com".to_string(),
-        );
+        let service =
+            WebAuthnService::new("example.com".to_string(), "https://example.com".to_string());
 
         let result = service.parse_attestation_object(&attestation);
-        assert!(result.is_ok(), "Failed to parse attestation: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Failed to parse attestation: {:?}",
+            result.err()
+        );
 
         let (auth_data, format, public_key) = result.unwrap();
 
@@ -2148,7 +2220,11 @@ mod webauthn_full_tests {
 
         // Verify public key is valid COSE key
         let cose_key = CoseKey::from_cbor(&public_key);
-        assert!(cose_key.is_ok(), "Public key is not valid COSE: {:?}", cose_key.err());
+        assert!(
+            cose_key.is_ok(),
+            "Public key is not valid COSE: {:?}",
+            cose_key.err()
+        );
     }
 
     #[test]
@@ -2157,34 +2233,35 @@ mod webauthn_full_tests {
         let mut map: Vec<(CborValue, CborValue)> = Vec::new();
         map.push((
             CborValue::Text("fmt".to_string()),
-            CborValue::Text("unknown-format".to_string())
+            CborValue::Text("unknown-format".to_string()),
         ));
         map.push((
             CborValue::Text("authData".to_string()),
-            CborValue::Bytes(vec![0u8; 37])
+            CborValue::Bytes(vec![0u8; 37]),
         ));
         map.push((
             CborValue::Text("attStmt".to_string()),
-            CborValue::Map(vec![])
+            CborValue::Map(vec![]),
         ));
 
         let cbor = CborValue::Map(map);
         let mut buf = Vec::new();
         ciborium::into_writer(&cbor, &mut buf).unwrap();
 
-        let service = WebAuthnService::new(
-            "example.com".to_string(),
-            "https://example.com".to_string(),
-        );
+        let service =
+            WebAuthnService::new("example.com".to_string(), "https://example.com".to_string());
 
         let result = service.parse_attestation_object(&buf);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Unknown attestation format"));
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown attestation format"));
     }
 
     #[test]
     fn test_es256_signature_verification() {
-        use p256::ecdsa::{SigningKey, signature::Signer};
+        use p256::ecdsa::{signature::Signer, SigningKey};
         use rand::rngs::OsRng;
 
         // Generate a test key pair
@@ -2199,8 +2276,14 @@ mod webauthn_full_tests {
         // Create COSE key
         let mut map: Vec<(CborValue, CborValue)> = Vec::new();
         map.push((CborValue::Integer(1.into()), CborValue::Integer(2.into()))); // kty: EC2
-        map.push((CborValue::Integer(3.into()), CborValue::Integer((-7i64).into()))); // alg: ES256
-        map.push((CborValue::Integer((-1i64).into()), CborValue::Integer(1.into()))); // crv: P-256
+        map.push((
+            CborValue::Integer(3.into()),
+            CborValue::Integer((-7i64).into()),
+        )); // alg: ES256
+        map.push((
+            CborValue::Integer((-1i64).into()),
+            CborValue::Integer(1.into()),
+        )); // crv: P-256
         map.push((CborValue::Integer((-2i64).into()), CborValue::Bytes(x)));
         map.push((CborValue::Integer((-3i64).into()), CborValue::Bytes(y)));
 
@@ -2213,18 +2296,17 @@ mod webauthn_full_tests {
         let signature: P256Signature = signing_key.sign(test_data);
 
         // Verify signature
-        let service = WebAuthnService::new(
-            "example.com".to_string(),
-            "https://example.com".to_string(),
-        );
+        let service =
+            WebAuthnService::new("example.com".to_string(), "https://example.com".to_string());
 
-        let result = service.verify_signature(
-            &cose_key_bytes,
-            test_data,
-            signature.to_bytes().as_slice(),
-        );
+        let result =
+            service.verify_signature(&cose_key_bytes, test_data, signature.to_bytes().as_slice());
 
-        assert!(result.is_ok(), "ES256 signature verification failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "ES256 signature verification failed: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -2235,16 +2317,10 @@ mod webauthn_full_tests {
         // Invalid signature (random bytes)
         let invalid_signature = vec![0u8; 64];
 
-        let service = WebAuthnService::new(
-            "example.com".to_string(),
-            "https://example.com".to_string(),
-        );
+        let service =
+            WebAuthnService::new("example.com".to_string(), "https://example.com".to_string());
 
-        let result = service.verify_signature(
-            &cose_key_bytes,
-            b"test data",
-            &invalid_signature,
-        );
+        let result = service.verify_signature(&cose_key_bytes, b"test data", &invalid_signature);
 
         // Should fail - invalid key or signature
         assert!(result.is_err());
@@ -2252,7 +2328,7 @@ mod webauthn_full_tests {
 
     #[test]
     fn test_eddsa_signature_verification() {
-        use ed25519_dalek::{SigningKey, Signer};
+        use ed25519_dalek::{Signer, SigningKey};
         use rand::rngs::OsRng;
 
         // Generate a test key pair
@@ -2265,9 +2341,18 @@ mod webauthn_full_tests {
         // Create COSE key
         let mut map: Vec<(CborValue, CborValue)> = Vec::new();
         map.push((CborValue::Integer(1.into()), CborValue::Integer(1.into()))); // kty: OKP
-        map.push((CborValue::Integer(3.into()), CborValue::Integer((-8i64).into()))); // alg: EdDSA
-        map.push((CborValue::Integer((-1i64).into()), CborValue::Integer(6.into()))); // crv: Ed25519
-        map.push((CborValue::Integer((-2i64).into()), CborValue::Bytes(public_key_bytes)));
+        map.push((
+            CborValue::Integer(3.into()),
+            CborValue::Integer((-8i64).into()),
+        )); // alg: EdDSA
+        map.push((
+            CborValue::Integer((-1i64).into()),
+            CborValue::Integer(6.into()),
+        )); // crv: Ed25519
+        map.push((
+            CborValue::Integer((-2i64).into()),
+            CborValue::Bytes(public_key_bytes),
+        ));
 
         let cbor = CborValue::Map(map);
         let mut cose_key_bytes = Vec::new();
@@ -2278,18 +2363,17 @@ mod webauthn_full_tests {
         let signature = signing_key.sign(test_data);
 
         // Verify signature
-        let service = WebAuthnService::new(
-            "example.com".to_string(),
-            "https://example.com".to_string(),
-        );
+        let service =
+            WebAuthnService::new("example.com".to_string(), "https://example.com".to_string());
 
-        let result = service.verify_signature(
-            &cose_key_bytes,
-            test_data,
-            signature.to_bytes().as_slice(),
-        );
+        let result =
+            service.verify_signature(&cose_key_bytes, test_data, signature.to_bytes().as_slice());
 
-        assert!(result.is_ok(), "EdDSA signature verification failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "EdDSA signature verification failed: {:?}",
+            result.err()
+        );
     }
 
     #[test]
@@ -2304,9 +2388,18 @@ mod webauthn_full_tests {
 
         let mut map: Vec<(CborValue, CborValue)> = Vec::new();
         map.push((CborValue::Integer(1.into()), CborValue::Integer(1.into()))); // kty: OKP
-        map.push((CborValue::Integer(3.into()), CborValue::Integer((-8i64).into()))); // alg: EdDSA
-        map.push((CborValue::Integer((-1i64).into()), CborValue::Integer(6.into()))); // crv: Ed25519
-        map.push((CborValue::Integer((-2i64).into()), CborValue::Bytes(public_key_bytes)));
+        map.push((
+            CborValue::Integer(3.into()),
+            CborValue::Integer((-8i64).into()),
+        )); // alg: EdDSA
+        map.push((
+            CborValue::Integer((-1i64).into()),
+            CborValue::Integer(6.into()),
+        )); // crv: Ed25519
+        map.push((
+            CborValue::Integer((-2i64).into()),
+            CborValue::Bytes(public_key_bytes),
+        ));
 
         let cbor = CborValue::Map(map);
         let mut cose_key_bytes = Vec::new();
@@ -2315,16 +2408,10 @@ mod webauthn_full_tests {
         // Invalid signature (random bytes)
         let invalid_signature = vec![0u8; 64];
 
-        let service = WebAuthnService::new(
-            "example.com".to_string(),
-            "https://example.com".to_string(),
-        );
+        let service =
+            WebAuthnService::new("example.com".to_string(), "https://example.com".to_string());
 
-        let result = service.verify_signature(
-            &cose_key_bytes,
-            b"test data",
-            &invalid_signature,
-        );
+        let result = service.verify_signature(&cose_key_bytes, b"test data", &invalid_signature);
 
         // Should fail
         assert!(result.is_err());
@@ -2353,25 +2440,23 @@ mod webauthn_full_tests {
         let mut map: Vec<(CborValue, CborValue)> = Vec::new();
         map.push((
             CborValue::Text("fmt".to_string()),
-            CborValue::Text("packed".to_string())
+            CborValue::Text("packed".to_string()),
         ));
         map.push((
             CborValue::Text("authData".to_string()),
-            CborValue::Bytes(auth_data)
+            CborValue::Bytes(auth_data),
         ));
         map.push((
             CborValue::Text("attStmt".to_string()),
-            CborValue::Map(vec![])
+            CborValue::Map(vec![]),
         ));
 
         let cbor = CborValue::Map(map);
         let mut buf = Vec::new();
         ciborium::into_writer(&cbor, &mut buf).unwrap();
 
-        let service = WebAuthnService::new(
-            "example.com".to_string(),
-            "https://example.com".to_string(),
-        );
+        let service =
+            WebAuthnService::new("example.com".to_string(), "https://example.com".to_string());
 
         let result = service.parse_attestation_object(&buf);
         assert!(result.is_ok());
@@ -2403,25 +2488,23 @@ mod webauthn_full_tests {
         let mut map: Vec<(CborValue, CborValue)> = Vec::new();
         map.push((
             CborValue::Text("fmt".to_string()),
-            CborValue::Text("fido-u2f".to_string())
+            CborValue::Text("fido-u2f".to_string()),
         ));
         map.push((
             CborValue::Text("authData".to_string()),
-            CborValue::Bytes(auth_data)
+            CborValue::Bytes(auth_data),
         ));
         map.push((
             CborValue::Text("attStmt".to_string()),
-            CborValue::Map(vec![])
+            CborValue::Map(vec![]),
         ));
 
         let cbor = CborValue::Map(map);
         let mut buf = Vec::new();
         ciborium::into_writer(&cbor, &mut buf).unwrap();
 
-        let service = WebAuthnService::new(
-            "example.com".to_string(),
-            "https://example.com".to_string(),
-        );
+        let service =
+            WebAuthnService::new("example.com".to_string(), "https://example.com".to_string());
 
         let result = service.parse_attestation_object(&buf);
         assert!(result.is_ok());

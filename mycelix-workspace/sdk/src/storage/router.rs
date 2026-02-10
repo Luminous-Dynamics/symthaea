@@ -3,12 +3,8 @@
 //! Routes data to appropriate storage backends based on E/N/M classification.
 //! Implements INV-2 (monotonic classification transitions).
 
-
-
-use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel, EpistemicClassification};
-use super::types::{
-    StorageTier, StorageBackend, MutabilityMode, AccessControlMode,
-};
+use super::types::{AccessControlMode, MutabilityMode, StorageBackend, StorageTier};
+use crate::epistemic::{EmpiricalLevel, EpistemicClassification, MaterialityLevel, NormativeLevel};
 use serde::{Deserialize, Serialize};
 
 /// Router configuration
@@ -69,7 +65,8 @@ impl StorageRouter {
     /// This is the core routing logic that maps E/N/M levels to storage behavior.
     pub fn route(&self, classification: &EpistemicClassification) -> StorageTier {
         // 1. Backend from Materiality
-        let (backend, additional_backends) = self.backend_from_materiality(classification.materiality);
+        let (backend, additional_backends) =
+            self.backend_from_materiality(classification.materiality);
 
         // 2. Mutability from Empirical
         let mutability = self.mutability_from_empirical(classification.empirical);
@@ -108,7 +105,10 @@ impl StorageRouter {
     }
 
     /// Determine backend from Materiality level
-    fn backend_from_materiality(&self, materiality: MaterialityLevel) -> (StorageBackend, Vec<StorageBackend>) {
+    fn backend_from_materiality(
+        &self,
+        materiality: MaterialityLevel,
+    ) -> (StorageBackend, Vec<StorageBackend>) {
         match materiality {
             MaterialityLevel::M0Ephemeral => (StorageBackend::Memory, vec![]),
             MaterialityLevel::M1Temporal => (StorageBackend::Local, vec![]),
@@ -116,7 +116,10 @@ impl StorageRouter {
             MaterialityLevel::M3Foundational => {
                 if self.config.enable_ipfs {
                     if self.config.enable_filecoin {
-                        (StorageBackend::IPFS, vec![StorageBackend::Filecoin, StorageBackend::DHT])
+                        (
+                            StorageBackend::IPFS,
+                            vec![StorageBackend::Filecoin, StorageBackend::DHT],
+                        )
                     } else {
                         (StorageBackend::IPFS, vec![StorageBackend::DHT])
                     }
@@ -132,7 +135,9 @@ impl StorageRouter {
         match empirical {
             EmpiricalLevel::E0Null | EmpiricalLevel::E1Testimonial => MutabilityMode::MutableCRDT,
             EmpiricalLevel::E2PrivateVerify => MutabilityMode::AppendOnly,
-            EmpiricalLevel::E3Cryptographic | EmpiricalLevel::E4PublicRepro => MutabilityMode::Immutable,
+            EmpiricalLevel::E3Cryptographic | EmpiricalLevel::E4PublicRepro => {
+                MutabilityMode::Immutable
+            }
         }
     }
 
@@ -161,8 +166,8 @@ impl StorageRouter {
             MaterialityLevel::M1Temporal => 1,  // Local only
             MaterialityLevel::M2Persistent => {
                 match classification.normative {
-                    NormativeLevel::N0Personal => 3,  // Moderate for personal
-                    NormativeLevel::N1Communal => 5,  // Higher for communal
+                    NormativeLevel::N0Personal => 3, // Moderate for personal
+                    NormativeLevel::N1Communal => 5, // Higher for communal
                     _ => self.config.dht_default_replication,
                 }
             }
@@ -170,7 +175,10 @@ impl StorageRouter {
                 // Logarithmic replication based on network size
                 // Formula: ceil(log2(network_size)), bounded by [min, max]
                 let log_replication = (self.config.network_size as f64).log2().ceil() as usize;
-                log_replication.clamp(self.config.m3_min_replication, self.config.m3_max_replication)
+                log_replication.clamp(
+                    self.config.m3_min_replication,
+                    self.config.m3_max_replication,
+                )
             }
         }
     }
@@ -274,8 +282,16 @@ pub enum TransitionError {
 mod tests {
     use super::*;
 
-    fn classification(e: EmpiricalLevel, n: NormativeLevel, m: MaterialityLevel) -> EpistemicClassification {
-        EpistemicClassification { empirical: e, normative: n, materiality: m }
+    fn classification(
+        e: EmpiricalLevel,
+        n: NormativeLevel,
+        m: MaterialityLevel,
+    ) -> EpistemicClassification {
+        EpistemicClassification {
+            empirical: e,
+            normative: n,
+            materiality: m,
+        }
     }
 
     #[test]
@@ -478,22 +494,50 @@ mod tests {
         let router = StorageRouter::default_router();
 
         // Valid upgrade
-        let from = classification(EmpiricalLevel::E1Testimonial, NormativeLevel::N0Personal, MaterialityLevel::M1Temporal);
-        let to = classification(EmpiricalLevel::E2PrivateVerify, NormativeLevel::N1Communal, MaterialityLevel::M2Persistent);
+        let from = classification(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M1Temporal,
+        );
+        let to = classification(
+            EmpiricalLevel::E2PrivateVerify,
+            NormativeLevel::N1Communal,
+            MaterialityLevel::M2Persistent,
+        );
         assert!(router.validate_transition(&from, &to).is_ok());
 
         // Invalid: E downgrade
-        let to_bad_e = classification(EmpiricalLevel::E0Null, NormativeLevel::N0Personal, MaterialityLevel::M1Temporal);
+        let to_bad_e = classification(
+            EmpiricalLevel::E0Null,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M1Temporal,
+        );
         assert!(router.validate_transition(&from, &to_bad_e).is_err());
 
         // Invalid: N downgrade
-        let from_n1 = classification(EmpiricalLevel::E1Testimonial, NormativeLevel::N1Communal, MaterialityLevel::M1Temporal);
-        let to_n0 = classification(EmpiricalLevel::E1Testimonial, NormativeLevel::N0Personal, MaterialityLevel::M1Temporal);
+        let from_n1 = classification(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N1Communal,
+            MaterialityLevel::M1Temporal,
+        );
+        let to_n0 = classification(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M1Temporal,
+        );
         assert!(router.validate_transition(&from_n1, &to_n0).is_err());
 
         // Invalid: M downgrade
-        let from_m2 = classification(EmpiricalLevel::E1Testimonial, NormativeLevel::N0Personal, MaterialityLevel::M2Persistent);
-        let to_m1 = classification(EmpiricalLevel::E1Testimonial, NormativeLevel::N0Personal, MaterialityLevel::M1Temporal);
+        let from_m2 = classification(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M2Persistent,
+        );
+        let to_m1 = classification(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M1Temporal,
+        );
         assert!(router.validate_transition(&from_m2, &to_m1).is_err());
     }
 
@@ -502,22 +546,50 @@ mod tests {
         let router = StorageRouter::default_router();
 
         // Same classification → no migration
-        let c = classification(EmpiricalLevel::E1Testimonial, NormativeLevel::N0Personal, MaterialityLevel::M1Temporal);
+        let c = classification(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M1Temporal,
+        );
         assert!(!router.requires_migration(&c, &c));
 
         // M1 → M2: backend change → migration
-        let from = classification(EmpiricalLevel::E1Testimonial, NormativeLevel::N0Personal, MaterialityLevel::M1Temporal);
-        let to = classification(EmpiricalLevel::E1Testimonial, NormativeLevel::N0Personal, MaterialityLevel::M2Persistent);
+        let from = classification(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M1Temporal,
+        );
+        let to = classification(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M2Persistent,
+        );
         assert!(router.requires_migration(&from, &to));
 
         // N0 → N2: encryption change → migration
-        let from = classification(EmpiricalLevel::E1Testimonial, NormativeLevel::N0Personal, MaterialityLevel::M1Temporal);
-        let to = classification(EmpiricalLevel::E1Testimonial, NormativeLevel::N2Network, MaterialityLevel::M1Temporal);
+        let from = classification(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M1Temporal,
+        );
+        let to = classification(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N2Network,
+            MaterialityLevel::M1Temporal,
+        );
         assert!(router.requires_migration(&from, &to));
 
         // E1 → E3: mutability change → migration
-        let from = classification(EmpiricalLevel::E1Testimonial, NormativeLevel::N0Personal, MaterialityLevel::M1Temporal);
-        let to = classification(EmpiricalLevel::E3Cryptographic, NormativeLevel::N0Personal, MaterialityLevel::M1Temporal);
+        let from = classification(
+            EmpiricalLevel::E1Testimonial,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M1Temporal,
+        );
+        let to = classification(
+            EmpiricalLevel::E3Cryptographic,
+            NormativeLevel::N0Personal,
+            MaterialityLevel::M1Temporal,
+        );
         assert!(router.requires_migration(&from, &to));
     }
 }

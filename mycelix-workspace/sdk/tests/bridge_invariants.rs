@@ -40,4 +40,3 @@ fn aggregate_respects_weighted_average() {
     let worst = rep.worst_happ().unwrap();
     assert_eq!(worst.happ_id, "marketplace");
 }
-

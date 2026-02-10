@@ -47,11 +47,7 @@ pub struct GradientProof {
 
 impl GradientProof {
     /// Create a new gradient proof
-    pub fn new(
-        proof_bytes: Vec<u8>,
-        public_inputs: PublicInputs,
-        metadata: ProofMetadata,
-    ) -> Self {
+    pub fn new(proof_bytes: Vec<u8>, public_inputs: PublicInputs, metadata: ProofMetadata) -> Self {
         Self {
             proof_bytes,
             public_inputs,
@@ -98,16 +94,15 @@ mod tests {
             is_real_stark: false,
         };
 
-        let proof = GradientProof::new(
-            vec![0u8; 50000],
-            public_inputs,
-            metadata,
-        );
+        let proof = GradientProof::new(vec![0u8; 50000], public_inputs, metadata);
 
         let bytes = proof.to_bytes().unwrap();
         let restored = GradientProof::from_bytes(&bytes).unwrap();
 
-        assert_eq!(proof.public_inputs.client_id, restored.public_inputs.client_id);
+        assert_eq!(
+            proof.public_inputs.client_id,
+            restored.public_inputs.client_id
+        );
         assert_eq!(proof.proof_bytes.len(), restored.proof_bytes.len());
     }
 }

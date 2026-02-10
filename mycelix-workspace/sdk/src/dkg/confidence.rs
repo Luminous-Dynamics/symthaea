@@ -15,9 +15,9 @@
 //! - This elevated it above the 0.5 baseline, defeating Mallory's "green" lie
 //! - Social consensus (endorsement) elevated truth above unattested claims
 
-use serde::{Deserialize, Serialize};
-use super::{VerifiableTriple, URI, EpistemicType};
 use super::phi_integration::{ConsciousnessMetrics, PhiConfidenceFactors};
+use super::{EpistemicType, VerifiableTriple, URI};
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "ts-export")]
 use ts_rs::TS;
@@ -56,7 +56,8 @@ impl ConfidenceFactors {
             self.consistency,
         ];
 
-        let weighted_sum: f64 = scores.iter()
+        let weighted_sum: f64 = scores
+            .iter()
             .zip(Self::WEIGHTS.iter())
             .map(|(s, w)| s * w)
             .sum();
@@ -84,10 +85,7 @@ impl ConfidenceFactors {
             self.consistency,
         ];
 
-        let weighted_sum: f64 = scores.iter()
-            .zip(weights.iter())
-            .map(|(s, w)| s * w)
-            .sum();
+        let weighted_sum: f64 = scores.iter().zip(weights.iter()).map(|(s, w)| s * w).sum();
 
         let weight_sum: f64 = weights.iter().sum();
         if weight_sum > 0.0 {
@@ -191,17 +189,12 @@ pub fn calculate_confidence(input: &ConfidenceInput) -> ConfidenceScore {
     let base_score = factors.weighted_score();
 
     // Apply domain-specific adjustments
-    let adjusted_score = domain_adjusted_confidence(
-        base_score,
-        input.triple.domain.as_deref(),
-        input.triple,
-    );
+    let adjusted_score =
+        domain_adjusted_confidence(base_score, input.triple.domain.as_deref(), input.triple);
 
     // Apply epistemic type adjustments
-    let epistemic_score = epistemic_adjusted_confidence(
-        adjusted_score,
-        &input.triple.epistemic_type,
-    );
+    let epistemic_score =
+        epistemic_adjusted_confidence(adjusted_score, &input.triple.epistemic_type);
 
     // Apply Phi boost if available
     let final_score = match phi_factor {
@@ -243,16 +236,10 @@ pub fn calculate_confidence_with_phi(
     let base_score = factors.weighted_score();
 
     // Apply all adjustments
-    let domain_score = domain_adjusted_confidence(
-        base_score,
-        input.triple.domain.as_deref(),
-        input.triple,
-    );
+    let domain_score =
+        domain_adjusted_confidence(base_score, input.triple.domain.as_deref(), input.triple);
 
-    let epistemic_score = epistemic_adjusted_confidence(
-        domain_score,
-        &input.triple.epistemic_type,
-    );
+    let epistemic_score = epistemic_adjusted_confidence(domain_score, &input.triple.epistemic_type);
 
     // Apply consciousness boost
     let consciousness_score = epistemic_score * phi_factors.combined_multiplier;
@@ -310,7 +297,8 @@ pub fn source_quality_confidence(sources: &[URI]) -> f64 {
         return 0.50; // Neutral if no sources
     }
 
-    let qualities: Vec<f64> = sources.iter()
+    let qualities: Vec<f64> = sources
+        .iter()
         .map(|uri| domain_quality_score(uri.domain()))
         .collect();
 
@@ -380,12 +368,12 @@ pub fn time_decay_confidence(created_at: u64, current_time: u64, half_life_days:
 /// Get half-life in days for a domain
 fn get_half_life_days(domain: &Option<String>) -> u64 {
     match domain.as_deref() {
-        Some("finance") | Some("trading") | Some("market") => 7,    // 1 week
-        Some("news") | Some("current_events") => 30,                 // 1 month
-        Some("technology") | Some("software") => 180,               // 6 months
-        Some("science") | Some("research") => 365,                  // 1 year
-        Some("history") | Some("mathematics") => 3650,              // 10 years
-        _ => 365, // Default: 1 year
+        Some("finance") | Some("trading") | Some("market") => 7, // 1 week
+        Some("news") | Some("current_events") => 30,             // 1 month
+        Some("technology") | Some("software") => 180,            // 6 months
+        Some("science") | Some("research") => 365,               // 1 year
+        Some("history") | Some("mathematics") => 3650,           // 10 years
+        _ => 365,                                                // Default: 1 year
     }
 }
 
@@ -404,18 +392,16 @@ pub fn consistency_confidence(contradiction_weight: f64) -> f64 {
 }
 
 /// Domain-specific confidence adjustments
-fn domain_adjusted_confidence(
-    base: f64,
-    domain: Option<&str>,
-    triple: &VerifiableTriple,
-) -> f64 {
+fn domain_adjusted_confidence(base: f64, domain: Option<&str>, triple: &VerifiableTriple) -> f64 {
     match domain {
         Some("medical") | Some("health") | Some("pharma") => {
             // Require high standards for medical claims
-            let has_peer_reviewed = triple.sources.iter()
-                .any(|uri| matches!(uri.domain(),
+            let has_peer_reviewed = triple.sources.iter().any(|uri| {
+                matches!(
+                    uri.domain(),
                     "nature.com" | "science.org" | "pubmed.gov" | "ncbi.nlm.nih.gov"
-                ));
+                )
+            });
 
             if !has_peer_reviewed && base > 0.7 {
                 base * 0.85 // Cap non-peer-reviewed medical claims
@@ -641,9 +627,12 @@ mod tests {
         let without_phi = calculate_confidence(&input_no_phi);
 
         // Coherent Phi should boost confidence
-        assert!(with_phi.score > without_phi.score,
+        assert!(
+            with_phi.score > without_phi.score,
             "Coherent Phi ({:.3}) should boost above no-Phi ({:.3})",
-            with_phi.score, without_phi.score);
+            with_phi.score,
+            without_phi.score
+        );
     }
 
     #[test]
@@ -682,9 +671,9 @@ mod tests {
 
         let alice_input = ConfidenceInput {
             triple: &alice_triple,
-            attestation_count: 1, // Bob's endorsement
+            attestation_count: 1,         // Bob's endorsement
             attester_reputations: &[0.5], // Bob's neutral reputation
-            current_time: 1700000005, // 5 seconds later
+            current_time: 1700000005,     // 5 seconds later
             contradiction_weights: 0.0,
             consciousness: None,
         };
@@ -712,14 +701,19 @@ mod tests {
         let mallory_score = calculate_confidence(&mallory_input);
 
         // Truth Engine verdict: Blue should win
-        assert!(alice_score.score > mallory_score.score,
+        assert!(
+            alice_score.score > mallory_score.score,
             "Alice's endorsed claim ({}) should beat Mallory's unattested claim ({})",
-            alice_score.score, mallory_score.score);
+            alice_score.score,
+            mallory_score.score
+        );
 
         // Alice's score should be above baseline (0.5)
-        assert!(alice_score.score > 0.5,
+        assert!(
+            alice_score.score > 0.5,
             "Endorsed claim confidence ({}) should be above baseline (0.5)",
-            alice_score.score);
+            alice_score.score
+        );
     }
 
     #[test]
@@ -767,8 +761,11 @@ mod tests {
         let mallory_score = calculate_confidence(&mallory_input);
 
         // Coherent Alice should beat incoherent Mallory
-        assert!(alice_score.score > mallory_score.score,
+        assert!(
+            alice_score.score > mallory_score.score,
             "Coherent agent ({:.3}) should have higher confidence than incoherent ({:.3})",
-            alice_score.score, mallory_score.score);
+            alice_score.score,
+            mallory_score.score
+        );
     }
 }

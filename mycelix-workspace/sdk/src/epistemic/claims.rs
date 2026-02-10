@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::cube::{EmpiricalLevel, NormativeLevel, MaterialityLevel, EpistemicClassification};
+use super::cube::{EmpiricalLevel, EpistemicClassification, MaterialityLevel, NormativeLevel};
 
 /// A claim with epistemic classification
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -221,15 +221,9 @@ mod tests {
             MaterialityLevel::M2Persistent,
         );
 
-        assert!(claim.meets_standard(
-            EmpiricalLevel::E2PrivateVerify,
-            NormativeLevel::N1Communal
-        ));
+        assert!(claim.meets_standard(EmpiricalLevel::E2PrivateVerify, NormativeLevel::N1Communal));
 
-        assert!(!claim.meets_standard(
-            EmpiricalLevel::E4PublicRepro,
-            NormativeLevel::N1Communal
-        ));
+        assert!(!claim.meets_standard(EmpiricalLevel::E4PublicRepro, NormativeLevel::N1Communal));
     }
 
     #[test]

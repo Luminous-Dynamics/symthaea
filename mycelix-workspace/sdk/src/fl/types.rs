@@ -270,7 +270,11 @@ pub struct FLRound {
 
 impl FLRound {
     /// Create a new round
-    pub fn new(round_id: u64, model_version: u64, participants: HashMap<String, Participant>) -> Self {
+    pub fn new(
+        round_id: u64,
+        model_version: u64,
+        participants: HashMap<String, Participant>,
+    ) -> Self {
         Self {
             round_id,
             model_version,
@@ -300,9 +304,8 @@ impl FLRound {
 
     /// Get duration in milliseconds
     pub fn duration_ms(&self) -> Option<u64> {
-        self.end_time.map(|end| {
-            end.saturating_sub(self.start_time) * 1000
-        })
+        self.end_time
+            .map(|end| end.saturating_sub(self.start_time) * 1000)
     }
 }
 

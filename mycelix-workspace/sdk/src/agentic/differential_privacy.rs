@@ -10,9 +10,9 @@
 //! - Local differential privacy for decentralized settings
 //! - Trust-specific DP queries
 
-use serde::{Deserialize, Serialize};
 use rand::Rng;
 use rand_distr::{Distribution, Normal};
+use serde::{Deserialize, Serialize};
 
 /// Configuration for differential privacy
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -156,7 +156,8 @@ impl NoiseGenerator {
             }
             NoiseMechanism::Gaussian => {
                 // For (ε, δ)-DP with Gaussian mechanism
-                let sigma = sensitivity * (2.0_f64 * (1.25 / self.config.delta).ln()).sqrt() / epsilon;
+                let sigma =
+                    sensitivity * (2.0_f64 * (1.25 / self.config.delta).ln()).sqrt() / epsilon;
                 value + self.rng.sample_gaussian(sigma)
             }
         }
@@ -222,7 +223,13 @@ impl PrivacyBudget {
     }
 
     /// Consume budget for a query
-    pub fn consume(&mut self, query_id: &str, epsilon: f64, delta: f64, description: &str) -> Result<(), PrivacyError> {
+    pub fn consume(
+        &mut self,
+        query_id: &str,
+        epsilon: f64,
+        delta: f64,
+        description: &str,
+    ) -> Result<(), PrivacyError> {
         if !self.can_query(epsilon, delta) {
             return Err(PrivacyError::BudgetExceeded {
                 requested_epsilon: epsilon,
@@ -312,10 +319,12 @@ impl PrivateAggregator {
         self.query_counter += 1;
 
         // Consume budget
-        self.budget.consume(&query_id, epsilon, 0.0, "Private mean")?;
+        self.budget
+            .consume(&query_id, epsilon, 0.0, "Private mean")?;
 
         // Clip values
-        let clipped: Vec<f64> = values.iter()
+        let clipped: Vec<f64> = values
+            .iter()
             .map(|v| self.config.clipping_bounds.clip(*v))
             .collect();
 
@@ -337,10 +346,12 @@ impl PrivateAggregator {
         self.query_counter += 1;
 
         // Consume budget
-        self.budget.consume(&query_id, epsilon, 0.0, "Private sum")?;
+        self.budget
+            .consume(&query_id, epsilon, 0.0, "Private sum")?;
 
         // Clip values
-        let clipped: Vec<f64> = values.iter()
+        let clipped: Vec<f64> = values
+            .iter()
             .map(|v| self.config.clipping_bounds.clip(*v))
             .collect();
 
@@ -360,7 +371,8 @@ impl PrivateAggregator {
         self.query_counter += 1;
 
         // Consume budget
-        self.budget.consume(&query_id, epsilon, 0.0, "Private count")?;
+        self.budget
+            .consume(&query_id, epsilon, 0.0, "Private count")?;
 
         // Sensitivity of count = 1
         let sensitivity = 1.0;
@@ -370,7 +382,12 @@ impl PrivateAggregator {
     }
 
     /// Private histogram
-    pub fn private_histogram(&mut self, values: &[f64], bins: usize, epsilon: f64) -> Result<Vec<f64>, PrivacyError> {
+    pub fn private_histogram(
+        &mut self,
+        values: &[f64],
+        bins: usize,
+        epsilon: f64,
+    ) -> Result<Vec<f64>, PrivacyError> {
         let query_id = format!("hist_{}", self.query_counter);
         self.query_counter += 1;
 
@@ -378,10 +395,12 @@ impl PrivateAggregator {
         let per_bin_epsilon = epsilon;
 
         // Consume budget
-        self.budget.consume(&query_id, per_bin_epsilon, 0.0, "Private histogram")?;
+        self.budget
+            .consume(&query_id, per_bin_epsilon, 0.0, "Private histogram")?;
 
         // Clip values
-        let clipped: Vec<f64> = values.iter()
+        let clipped: Vec<f64> = values
+            .iter()
             .map(|v| self.config.clipping_bounds.clip(*v))
             .collect();
 
@@ -407,7 +426,12 @@ impl PrivateAggregator {
     }
 
     /// Private percentile (approximate)
-    pub fn private_percentile(&mut self, values: &[f64], percentile: f64, epsilon: f64) -> Result<f64, PrivacyError> {
+    pub fn private_percentile(
+        &mut self,
+        values: &[f64],
+        percentile: f64,
+        epsilon: f64,
+    ) -> Result<f64, PrivacyError> {
         // Use histogram approach for percentile
         let bins = 100;
         let hist = self.private_histogram(values, bins, epsilon)?;
@@ -517,11 +541,21 @@ impl PrivateTrustAnalytics {
     }
 
     /// Analyze trust score distribution privately
-    pub fn analyze_trust_distribution(&mut self, scores: &[f64], epsilon_per_query: f64) -> Result<TrustDistribution, PrivacyError> {
+    pub fn analyze_trust_distribution(
+        &mut self,
+        scores: &[f64],
+        epsilon_per_query: f64,
+    ) -> Result<TrustDistribution, PrivacyError> {
         let mean = self.aggregator.private_mean(scores, epsilon_per_query)?;
-        let median = self.aggregator.private_percentile(scores, 50.0, epsilon_per_query)?;
-        let count = self.aggregator.private_count(scores.len(), epsilon_per_query)?;
-        let histogram = self.aggregator.private_histogram(scores, 10, epsilon_per_query)?;
+        let median = self
+            .aggregator
+            .private_percentile(scores, 50.0, epsilon_per_query)?;
+        let count = self
+            .aggregator
+            .private_count(scores.len(), epsilon_per_query)?;
+        let histogram = self
+            .aggregator
+            .private_histogram(scores, 10, epsilon_per_query)?;
 
         Ok(TrustDistribution {
             mean,
@@ -532,7 +566,12 @@ impl PrivateTrustAnalytics {
     }
 
     /// Private trust tier counts
-    pub fn private_tier_counts(&mut self, scores: &[f64], thresholds: &[f64], epsilon: f64) -> Result<Vec<f64>, PrivacyError> {
+    pub fn private_tier_counts(
+        &mut self,
+        scores: &[f64],
+        thresholds: &[f64],
+        epsilon: f64,
+    ) -> Result<Vec<f64>, PrivacyError> {
         let num_tiers = thresholds.len() + 1;
         let mut counts = vec![0.0_f64; num_tiers];
 
@@ -549,10 +588,15 @@ impl PrivateTrustAnalytics {
         // Add noise to each tier count
         let per_tier_epsilon = epsilon; // Using parallel composition
         let query_id = format!("tiers_{}", self.aggregator.query_counter);
-        self.aggregator.budget.consume(&query_id, per_tier_epsilon, 0.0, "Private tier counts")?;
+        self.aggregator
+            .budget
+            .consume(&query_id, per_tier_epsilon, 0.0, "Private tier counts")?;
 
         for count in counts.iter_mut() {
-            *count = self.aggregator.noise_gen.add_noise(*count, per_tier_epsilon, 1.0);
+            *count = self
+                .aggregator
+                .noise_gen
+                .add_noise(*count, per_tier_epsilon, 1.0);
             *count = (*count).max(0.0);
         }
 
@@ -608,13 +652,15 @@ mod tests {
         let mut gen = NoiseGenerator::new(config);
 
         // Generate many samples, should be centered around 0
-        let samples: Vec<f64> = (0..5000)
-            .map(|_| gen.add_noise(0.0, 1.0, 1.0))
-            .collect();
+        let samples: Vec<f64> = (0..5000).map(|_| gen.add_noise(0.0, 1.0, 1.0)).collect();
 
         let mean: f64 = samples.iter().sum::<f64>() / samples.len() as f64;
         // Allow 0.3 tolerance for random noise
-        assert!(mean.abs() < 0.3, "Laplace noise should be centered around 0, got {}", mean);
+        assert!(
+            mean.abs() < 0.3,
+            "Laplace noise should be centered around 0, got {}",
+            mean
+        );
     }
 
     #[test]
@@ -623,13 +669,15 @@ mod tests {
         let mut gen = NoiseGenerator::with_mechanism(config, NoiseMechanism::Gaussian);
 
         // Generate many samples
-        let samples: Vec<f64> = (0..5000)
-            .map(|_| gen.add_noise(0.0, 1.0, 1.0))
-            .collect();
+        let samples: Vec<f64> = (0..5000).map(|_| gen.add_noise(0.0, 1.0, 1.0)).collect();
 
         let mean: f64 = samples.iter().sum::<f64>() / samples.len() as f64;
         // Gaussian noise with larger sigma has higher variance, allow 0.5 tolerance
-        assert!(mean.abs() < 0.5, "Gaussian noise should be centered around 0, got {}", mean);
+        assert!(
+            mean.abs() < 0.5,
+            "Gaussian noise should be centered around 0, got {}",
+            mean
+        );
     }
 
     #[test]

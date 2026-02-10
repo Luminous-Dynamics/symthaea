@@ -134,9 +134,9 @@ impl Default for VelocityLimitConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            max_increase_per_period: 0.1,  // 10% max increase per period
-            max_decrease_per_period: 0.2,   // 20% max decrease per period
-            period_ms: 24 * 3600_000,       // 24 hours
+            max_increase_per_period: 0.1, // 10% max increase per period
+            max_decrease_per_period: 0.2, // 20% max decrease per period
+            period_ms: 24 * 3600_000,     // 24 hours
             violation_action: VelocityViolationAction::Clamp,
         }
     }
@@ -172,10 +172,10 @@ impl Default for ReputationMemoryConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            negative_memory_ms: 90 * 24 * 3600_000,  // 90 days for negative
+            negative_memory_ms: 90 * 24 * 3600_000, // 90 days for negative
             positive_memory_ms: 180 * 24 * 3600_000, // 180 days for positive
             forgiveness_half_life_ms: 30 * 24 * 3600_000, // 30 days
-            history_weight: 0.3, // 30% from history, 70% from current
+            history_weight: 0.3,                    // 30% from history, 70% from current
         }
     }
 }
@@ -353,11 +353,12 @@ impl TemporalTrustManager {
         new_trust: f64,
         reason: &str,
     ) -> Result<TrustUpdateResult, TemporalTrustError> {
-        let state = self.agents.get_mut(agent_id).ok_or_else(|| {
-            TemporalTrustError::AgentNotFound {
-                agent_id: agent_id.to_string(),
-            }
-        })?;
+        let state =
+            self.agents
+                .get_mut(agent_id)
+                .ok_or_else(|| TemporalTrustError::AgentNotFound {
+                    agent_id: agent_id.to_string(),
+                })?;
 
         let now = self.current_time;
         let old_trust = state.current_trust;
@@ -396,7 +397,12 @@ impl TemporalTrustManager {
 
         // Take snapshot if significant change
         if actual_delta.abs() > 0.05 {
-            self.take_snapshot(agent_id, SnapshotReason::SignificantChange { delta: actual_delta });
+            self.take_snapshot(
+                agent_id,
+                SnapshotReason::SignificantChange {
+                    delta: actual_delta,
+                },
+            );
         }
 
         Ok(TrustUpdateResult {
@@ -415,7 +421,6 @@ impl TemporalTrustManager {
         new_trust: f64,
         now: u64,
     ) -> (f64, bool) {
-
         // Check if we're in a new period
         if now.saturating_sub(state.period_start_time) >= config.period_ms {
             state.period_start_trust = state.current_trust;
@@ -425,7 +430,6 @@ impl TemporalTrustManager {
         let period_delta = new_trust - state.period_start_trust;
 
         // Check limits
-        
 
         if period_delta > 0.0 && period_delta > config.max_increase_per_period {
             match config.violation_action {
@@ -497,7 +501,10 @@ impl TemporalTrustManager {
                 let progress = (elapsed_ms as f64 / full_decay_time as f64).min(1.0);
                 trust - (trust - config.floor) * progress
             }
-            DecayCurve::Stepped { step_interval_ms, step_size } => {
+            DecayCurve::Stepped {
+                step_interval_ms,
+                step_size,
+            } => {
                 let steps = elapsed_ms / step_interval_ms;
                 (trust - (steps as f64 * step_size)).max(config.floor)
             }
@@ -528,21 +535,24 @@ impl TemporalTrustManager {
 
     /// Get trust history for an agent
     pub fn trust_history(&self, agent_id: &str) -> Vec<TrustSnapshot> {
-        self.agents.get(agent_id)
+        self.agents
+            .get(agent_id)
             .map(|s| s.snapshots.iter().cloned().collect())
             .unwrap_or_default()
     }
 
     /// Get recent trust events
     pub fn recent_events(&self, agent_id: &str, limit: usize) -> Vec<TrustEvent> {
-        self.agents.get(agent_id)
+        self.agents
+            .get(agent_id)
             .map(|s| s.events.iter().rev().take(limit).cloned().collect())
             .unwrap_or_default()
     }
 
     /// Check if agent is flagged for review
     pub fn is_flagged(&self, agent_id: &str) -> bool {
-        self.agents.get(agent_id)
+        self.agents
+            .get(agent_id)
             .map(|s| s.flags.flagged_for_review)
             .unwrap_or(false)
     }
@@ -562,9 +572,7 @@ impl TemporalTrustManager {
         for agent_id in agent_ids {
             if let Some(state) = self.agents.get(&agent_id) {
                 // Check if snapshot needed
-                let last_snapshot_time = state.snapshots.back()
-                    .map(|s| s.timestamp)
-                    .unwrap_or(0);
+                let last_snapshot_time = state.snapshots.back().map(|s| s.timestamp).unwrap_or(0);
 
                 if now.saturating_sub(last_snapshot_time) >= self.config.snapshot_interval_ms {
                     let _current = self.current_trust(&agent_id).unwrap_or(0.0);
@@ -709,7 +717,11 @@ impl std::fmt::Display for TemporalTrustError {
         match self {
             Self::AgentNotFound { agent_id } => write!(f, "Agent not found: {}", agent_id),
             Self::VelocityLimitExceeded { requested, allowed } => {
-                write!(f, "Velocity limit exceeded: requested {}, allowed {}", requested, allowed)
+                write!(
+                    f,
+                    "Velocity limit exceeded: requested {}, allowed {}",
+                    requested, allowed
+                )
             }
         }
     }
@@ -763,7 +775,10 @@ mod tests {
                 period_ms: 1000,
                 violation_action: VelocityViolationAction::Clamp,
             },
-            decay: TrustDecayConfig { enabled: false, ..Default::default() },
+            decay: TrustDecayConfig {
+                enabled: false,
+                ..Default::default()
+            },
             ..Default::default()
         };
 

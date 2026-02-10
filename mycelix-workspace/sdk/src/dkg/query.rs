@@ -9,8 +9,8 @@
 //! - `query_by_predicate("color")` - All color claims
 //! - Combined filters for complex queries
 
+use super::{EpistemicType, TripleValue, VerifiableTriple};
 use serde::{Deserialize, Serialize};
-use super::{VerifiableTriple, TripleValue, EpistemicType};
 
 /// Filter criteria for querying triples
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -209,7 +209,8 @@ pub fn query_by_subject<'a>(
     current_time: u64,
 ) -> Vec<&'a VerifiableTriple> {
     let filter = QueryFilter::new().with_subject(subject);
-    triples.iter()
+    triples
+        .iter()
         .filter(|t| filter.matches(t, current_time))
         .collect()
 }
@@ -221,7 +222,8 @@ pub fn query_by_predicate<'a>(
     current_time: u64,
 ) -> Vec<&'a VerifiableTriple> {
     let filter = QueryFilter::new().with_predicate(predicate);
-    triples.iter()
+    triples
+        .iter()
         .filter(|t| filter.matches(t, current_time))
         .collect()
 }
@@ -232,7 +234,8 @@ pub fn query_triples<'a>(
     filter: &QueryFilter,
     current_time: u64,
 ) -> Vec<&'a VerifiableTriple> {
-    let mut results: Vec<&VerifiableTriple> = triples.iter()
+    let mut results: Vec<&VerifiableTriple> = triples
+        .iter()
         .filter(|t| filter.matches(t, current_time))
         .collect();
 
@@ -271,11 +274,11 @@ pub struct WeightedQueryResult {
 // KREDIT-INTEGRATED QUERY SYSTEM
 // =============================================================================
 
-use super::phi_query_router::{
-    PhiQueryRouter, PhiQuery, PhiQueryResult, QueryType, QueryCostDeduction,
-    deduct_query_cost, QueryRouterConfig,
-};
 use super::phi_integration::ConsciousnessMetrics;
+use super::phi_query_router::{
+    deduct_query_cost, PhiQuery, PhiQueryResult, PhiQueryRouter, QueryCostDeduction,
+    QueryRouterConfig, QueryType,
+};
 use super::StoredTriple;
 use std::collections::HashMap;
 
@@ -406,7 +409,9 @@ impl KreditQueryExecutor {
         current_time: u64,
     ) -> Result<KreditQueryResult, String> {
         // Check agent is registered
-        let balance = self.balances.get(agent_id)
+        let balance = self
+            .balances
+            .get(agent_id)
             .ok_or_else(|| format!("Agent {} not registered", agent_id))?;
 
         // Build the query
@@ -434,15 +439,14 @@ impl KreditQueryExecutor {
         }
 
         // Execute the query
-        let result = self.router.execute_query(
-            &query,
-            triples,
-            &self.source_coherence,
-            current_time,
-        )?;
+        let result =
+            self.router
+                .execute_query(&query, triples, &self.source_coherence, current_time)?;
 
         // Deduct the cost
-        let balance = self.balances.get_mut(agent_id)
+        let balance = self
+            .balances
+            .get_mut(agent_id)
             .ok_or_else(|| format!("Agent {} balance disappeared", agent_id))?;
         balance.deduct(result.cost_deducted)?;
 
@@ -623,8 +627,7 @@ mod tests {
     #[test]
     fn test_query_filter_object_exact() {
         let triples = sample_triples();
-        let filter = QueryFilter::new()
-            .with_object(ObjectFilter::ExactString("blue".into()));
+        let filter = QueryFilter::new().with_object(ObjectFilter::ExactString("blue".into()));
 
         let results = query_triples(&triples, &filter, 1700000000);
         assert_eq!(results.len(), 1);
@@ -634,11 +637,10 @@ mod tests {
     #[test]
     fn test_query_filter_object_numeric() {
         let triples = sample_triples();
-        let filter = QueryFilter::new()
-            .with_object(ObjectFilter::NumericRange {
-                min: Some(3.0),
-                max: Some(4.0),
-            });
+        let filter = QueryFilter::new().with_object(ObjectFilter::NumericRange {
+            min: Some(3.0),
+            max: Some(4.0),
+        });
 
         let results = query_triples(&triples, &filter, 1700000000);
         assert_eq!(results.len(), 1);
@@ -648,8 +650,7 @@ mod tests {
     #[test]
     fn test_query_filter_domain() {
         let triples = sample_triples();
-        let filter = QueryFilter::new()
-            .with_domain("mathematics");
+        let filter = QueryFilter::new().with_domain("mathematics");
 
         let results = query_triples(&triples, &filter, 1700000000);
         assert_eq!(results.len(), 1);
@@ -661,9 +662,7 @@ mod tests {
         let triples = sample_triples();
 
         // First page
-        let filter1 = QueryFilter::new()
-            .with_predicate("color")
-            .with_limit(2);
+        let filter1 = QueryFilter::new().with_predicate("color").with_limit(2);
         let page1 = query_triples(&triples, &filter1, 1700000000);
         assert_eq!(page1.len(), 2);
 
@@ -681,8 +680,7 @@ mod tests {
         let triples = sample_triples();
         let current_time = 1700000000 + 3600; // 1 hour later
 
-        let filter = QueryFilter::new()
-            .with_max_age(1800); // 30 minutes max age
+        let filter = QueryFilter::new().with_max_age(1800); // 30 minutes max age
 
         let results = query_triples(&triples, &filter, current_time);
         assert_eq!(results.len(), 0); // All triples are too old

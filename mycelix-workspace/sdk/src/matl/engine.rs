@@ -12,12 +12,8 @@
 use std::collections::HashMap;
 
 use super::{
-    AdaptiveByzantineThreshold,
-    AdaptiveThresholdManager,
-    CartelDetector,
-    HierarchicalDetector,
-    NetworkStatus,
-    ProofOfGradientQuality,
+    AdaptiveByzantineThreshold, AdaptiveThresholdManager, CartelDetector, HierarchicalDetector,
+    NetworkStatus, ProofOfGradientQuality,
 };
 
 /// Per-node evaluation result produced by [`MatlEngine`].
@@ -129,9 +125,8 @@ impl MatlEngine {
         // 3. Node is in a suspicious cluster (hierarchical detection)
         const GLOBAL_MIN_SCORE: f64 = 0.3;
         let is_in_suspicious_cluster = self.hierarchical.is_in_byzantine_cluster(node_id);
-        let is_node_anomalous = composite < node_threshold
-            || composite < GLOBAL_MIN_SCORE
-            || is_in_suspicious_cluster;
+        let is_node_anomalous =
+            composite < node_threshold || composite < GLOBAL_MIN_SCORE || is_in_suspicious_cluster;
 
         let node_eval = NodeEvaluation {
             node_id: node_id.to_string(),
@@ -201,10 +196,8 @@ mod tests {
         // hierarchical level once bad nodes are present.
         let net_summary = engine.adaptive_byzantine().recommendation();
         assert!(
-            net_summary.current_threshold
-                >= super::super::MIN_BYZANTINE_TOLERANCE
-                && net_summary.current_threshold
-                    <= super::super::MAX_BYZANTINE_TOLERANCE,
+            net_summary.current_threshold >= super::super::MIN_BYZANTINE_TOLERANCE
+                && net_summary.current_threshold <= super::super::MAX_BYZANTINE_TOLERANCE,
             "Adaptive threshold should remain within allowed bounds",
         );
     }

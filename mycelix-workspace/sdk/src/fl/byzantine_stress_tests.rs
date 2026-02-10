@@ -12,11 +12,8 @@
 
 #[cfg(test)]
 mod tests {
+    use crate::fl::{GradientUpdate, RbbftFLBridge, RbbftFLConfig};
     use crate::matl::KVector;
-    use crate::fl::{
-        RbbftFLBridge, RbbftFLConfig,
-        GradientUpdate,
-    };
 
     /// Create a GradientUpdate from a Vec<f64>
     fn make_gradient(participant_id: &str, gradients: Vec<f64>) -> GradientUpdate {
@@ -56,7 +53,15 @@ mod tests {
             let id = format!("honest-{}", i);
             let kv = KVector::new(
                 honest_reputation, // k_r
-                0.5, 0.9, 0.5, 0.3, 0.4, 0.5, 0.3, 0.5, 0.5,
+                0.5,
+                0.9,
+                0.5,
+                0.3,
+                0.4,
+                0.5,
+                0.3,
+                0.5,
+                0.5,
             );
             bridge.register_participant(&id, kv);
             honest_ids.push(id);
@@ -67,7 +72,15 @@ mod tests {
             let id = format!("byzantine-{}", i);
             let kv = KVector::new(
                 byzantine_reputation, // k_r
-                0.5, 0.9, 0.5, 0.3, 0.4, 0.5, 0.3, 0.5, 0.5,
+                0.5,
+                0.9,
+                0.5,
+                0.3,
+                0.4,
+                0.5,
+                0.3,
+                0.5,
+                0.5,
             );
             bridge.register_participant(&id, kv);
             byzantine_ids.push(id);
@@ -91,13 +104,17 @@ mod tests {
         // Honest votes: YES with valid gradients
         for id in &honest_ids {
             let gradient = make_gradient(id, vec![0.1; 100]);
-            bridge.submit_vote(id, true, Some(gradient), true).expect("Vote failed");
+            bridge
+                .submit_vote(id, true, Some(gradient), true)
+                .expect("Vote failed");
         }
 
         // Byzantine votes: NO (trying to block)
         for id in &byzantine_ids {
             let gradient = make_gradient(id, vec![100.0; 100]);
-            bridge.submit_vote(id, false, Some(gradient), true).expect("Vote failed");
+            bridge
+                .submit_vote(id, false, Some(gradient), true)
+                .expect("Vote failed");
         }
 
         // With reputation² weighting and 44% Byzantine, consensus should succeed
@@ -107,13 +124,20 @@ mod tests {
         );
 
         let result = bridge.finalize_round();
-        assert!(result.is_ok(), "Finalization should succeed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Finalization should succeed: {:?}",
+            result.err()
+        );
 
         let stats = bridge.stats();
         let byzantine_est = bridge.estimate_byzantine_fraction();
         println!("44% Byzantine test:");
         println!("  Byzantine fraction (est): {:.2}%", byzantine_est * 100.0);
-        println!("  Consensus ratio: {:.2}%", bridge.consensus_ratio().unwrap_or(0.0) * 100.0);
+        println!(
+            "  Consensus ratio: {:.2}%",
+            bridge.consensus_ratio().unwrap_or(0.0) * 100.0
+        );
         println!("  Stats: {:?}", stats);
     }
 
@@ -122,8 +146,7 @@ mod tests {
         // 45% Byzantine (ABOVE validated 34% threshold) - boundary test that may succeed
         // with reputation advantage but is beyond the validated maximum
         let (mut bridge, honest_ids, byzantine_ids) = setup_byzantine_scenario(
-            100,
-            0.45, // Above validated 34% threshold - boundary test
+            100, 0.45, // Above validated 34% threshold - boundary test
             0.8,  // Higher honest reputation to edge out
             0.3,  // Lower Byzantine reputation
         );
@@ -132,12 +155,16 @@ mod tests {
 
         for id in &honest_ids {
             let gradient = make_gradient(id, vec![0.1; 100]);
-            bridge.submit_vote(id, true, Some(gradient), true).expect("Vote failed");
+            bridge
+                .submit_vote(id, true, Some(gradient), true)
+                .expect("Vote failed");
         }
 
         for id in &byzantine_ids {
             let gradient = make_gradient(id, vec![100.0; 100]);
-            bridge.submit_vote(id, false, Some(gradient), true).expect("Vote failed");
+            bridge
+                .submit_vote(id, false, Some(gradient), true)
+                .expect("Vote failed");
         }
 
         // At 45% (above validated 34% threshold), result depends on reputation distribution
@@ -161,8 +188,7 @@ mod tests {
     fn test_46_percent_byzantine_should_fail_or_flag() {
         // 46% Byzantine (above threshold) - consensus might fail
         let (mut bridge, honest_ids, byzantine_ids) = setup_byzantine_scenario(
-            100,
-            0.46, // 46% Byzantine
+            100, 0.46, // 46% Byzantine
             0.6,  // Equal reputation
             0.6,  // Equal reputation
         );
@@ -171,14 +197,18 @@ mod tests {
 
         for id in &honest_ids {
             let gradient = make_gradient(id, vec![0.1; 100]);
-            bridge.submit_vote(id, true, Some(gradient), true).expect("Vote failed");
+            bridge
+                .submit_vote(id, true, Some(gradient), true)
+                .expect("Vote failed");
         }
 
         // Byzantine participants vote NO with invalid proof flag
         for id in &byzantine_ids {
             let gradient = make_gradient(id, vec![100.0; 100]);
             // Mark proof as invalid to simulate Byzantine behavior
-            bridge.submit_vote(id, false, Some(gradient), false).expect("Vote failed");
+            bridge
+                .submit_vote(id, false, Some(gradient), false)
+                .expect("Vote failed");
         }
 
         let byzantine_est = bridge.estimate_byzantine_fraction();
@@ -203,25 +233,30 @@ mod tests {
     #[test]
     fn test_large_scale_100_participants() {
         let (mut bridge, honest_ids, byzantine_ids) = setup_byzantine_scenario(
-            100,
-            0.30, // 30% Byzantine
-            0.7,
-            0.4,
+            100, 0.30, // 30% Byzantine
+            0.7, 0.4,
         );
 
         bridge.start_round([0u8; 32]).expect("Start round failed");
 
         for id in &honest_ids {
             let gradient = make_gradient(id, vec![0.1; 1000]);
-            bridge.submit_vote(id, true, Some(gradient), true).expect("Vote failed");
+            bridge
+                .submit_vote(id, true, Some(gradient), true)
+                .expect("Vote failed");
         }
 
         for id in &byzantine_ids {
             let gradient = make_gradient(id, vec![10.0; 1000]);
-            bridge.submit_vote(id, false, Some(gradient), true).expect("Vote failed");
+            bridge
+                .submit_vote(id, false, Some(gradient), true)
+                .expect("Vote failed");
         }
 
-        assert!(bridge.check_consensus(), "Should reach consensus with 30% Byzantine");
+        assert!(
+            bridge.check_consensus(),
+            "Should reach consensus with 30% Byzantine"
+        );
 
         let result = bridge.finalize_round().expect("Finalization failed");
         println!("100 participant test:");
@@ -232,30 +267,38 @@ mod tests {
     #[test]
     fn test_large_scale_500_participants() {
         let (mut bridge, honest_ids, byzantine_ids) = setup_byzantine_scenario(
-            500,
-            0.35, // 35% Byzantine
-            0.7,
-            0.3,
+            500, 0.35, // 35% Byzantine
+            0.7, 0.3,
         );
 
         bridge.start_round([0u8; 32]).expect("Start round failed");
 
         for id in &honest_ids {
             let gradient = make_gradient(id, vec![0.05; 500]);
-            bridge.submit_vote(id, true, Some(gradient), true).expect("Vote failed");
+            bridge
+                .submit_vote(id, true, Some(gradient), true)
+                .expect("Vote failed");
         }
 
         for id in &byzantine_ids {
             let gradient = make_gradient(id, vec![5.0; 500]);
-            bridge.submit_vote(id, false, Some(gradient), true).expect("Vote failed");
+            bridge
+                .submit_vote(id, false, Some(gradient), true)
+                .expect("Vote failed");
         }
 
-        assert!(bridge.check_consensus(), "Should reach consensus with 35% Byzantine");
+        assert!(
+            bridge.check_consensus(),
+            "Should reach consensus with 35% Byzantine"
+        );
 
         let result = bridge.finalize_round().expect("Finalization failed");
         println!("500 participant test:");
         println!("  Valid submissions: {}", result.participant_count);
-        assert!(result.participant_count >= 300, "Should have most honest participants");
+        assert!(
+            result.participant_count >= 300,
+            "Should have most honest participants"
+        );
     }
 
     // ========================================================================
@@ -274,30 +317,67 @@ mod tests {
         let gamer_id = "gamer-1";
 
         // Honest participant with established reputation
-        bridge.register_participant(honest_id, KVector::new(0.8, 0.6, 0.9, 0.7, 0.5, 0.4, 0.5, 0.3, 0.6, 0.5));
+        bridge.register_participant(
+            honest_id,
+            KVector::new(0.8, 0.6, 0.9, 0.7, 0.5, 0.4, 0.5, 0.3, 0.6, 0.5),
+        );
 
         // Gamer starts with medium reputation (built over time)
-        bridge.register_participant(gamer_id, KVector::new(0.6, 0.5, 0.8, 0.5, 0.4, 0.3, 0.4, 0.2, 0.5, 0.4));
+        bridge.register_participant(
+            gamer_id,
+            KVector::new(0.6, 0.5, 0.8, 0.5, 0.4, 0.3, 0.4, 0.2, 0.5, 0.4),
+        );
 
         // Round 1: Gamer behaves honestly
         bridge.start_round([1u8; 32]).expect("Start round 1");
-        bridge.submit_vote(honest_id, true, Some(make_gradient(honest_id, vec![0.1; 100])), true).unwrap();
-        bridge.submit_vote(gamer_id, true, Some(make_gradient(gamer_id, vec![0.1; 100])), true).unwrap();
+        bridge
+            .submit_vote(
+                honest_id,
+                true,
+                Some(make_gradient(honest_id, vec![0.1; 100])),
+                true,
+            )
+            .unwrap();
+        bridge
+            .submit_vote(
+                gamer_id,
+                true,
+                Some(make_gradient(gamer_id, vec![0.1; 100])),
+                true,
+            )
+            .unwrap();
         assert!(bridge.check_consensus(), "Round 1 should succeed");
         let _ = bridge.finalize_round();
 
         // Round 2: Gamer attacks
         bridge.start_round([2u8; 32]).expect("Start round 2");
-        bridge.submit_vote(honest_id, true, Some(make_gradient(honest_id, vec![0.1; 100])), true).unwrap();
+        bridge
+            .submit_vote(
+                honest_id,
+                true,
+                Some(make_gradient(honest_id, vec![0.1; 100])),
+                true,
+            )
+            .unwrap();
         // Gamer votes yes but submits malicious gradient
-        bridge.submit_vote(gamer_id, true, Some(make_gradient(gamer_id, vec![1000.0; 100])), true).unwrap();
+        bridge
+            .submit_vote(
+                gamer_id,
+                true,
+                Some(make_gradient(gamer_id, vec![1000.0; 100])),
+                true,
+            )
+            .unwrap();
 
         // Consensus should still work, but malicious gradient is included
         assert!(bridge.check_consensus(), "Round 2 should reach consensus");
 
         let result = bridge.finalize_round().expect("Round 2 finalization");
         println!("Reputation gaming test:");
-        println!("  Result contains {} participants", result.participant_count);
+        println!(
+            "  Result contains {} participants",
+            result.participant_count
+        );
     }
 
     #[test]
@@ -311,7 +391,10 @@ mod tests {
         // 5 honest participants with high reputation
         for i in 0..5 {
             let id = format!("honest-{}", i);
-            bridge.register_participant(&id, KVector::new(0.8, 0.6, 0.9, 0.7, 0.5, 0.4, 0.5, 0.3, 0.6, 0.5));
+            bridge.register_participant(
+                &id,
+                KVector::new(0.8, 0.6, 0.9, 0.7, 0.5, 0.4, 0.5, 0.3, 0.6, 0.5),
+            );
         }
 
         // 20 Sybil identities with varying reputation (many filtered)
@@ -320,7 +403,10 @@ mod tests {
             let id = format!("sybil-{}", i);
             // Low reputation - some will be filtered
             let rep = 0.2 + (i as f32 * 0.02); // 0.2 to 0.58
-            if bridge.register_participant(&id, KVector::new(rep, 0.3, 0.5, 0.3, 0.2, 0.1, 0.2, 0.1, 0.3, 0.2)) {
+            if bridge.register_participant(
+                &id,
+                KVector::new(rep, 0.3, 0.5, 0.3, 0.2, 0.1, 0.2, 0.1, 0.3, 0.2),
+            ) {
                 sybil_registered += 1;
             }
         }
@@ -330,7 +416,9 @@ mod tests {
         // Honest votes
         for i in 0..5 {
             let id = format!("honest-{}", i);
-            bridge.submit_vote(&id, true, Some(make_gradient(&id, vec![0.1; 100])), true).unwrap();
+            bridge
+                .submit_vote(&id, true, Some(make_gradient(&id, vec![0.1; 100])), true)
+                .unwrap();
         }
 
         // Sybil votes (those that were registered)
@@ -338,7 +426,8 @@ mod tests {
             let id = format!("sybil-{}", i);
             let rep = 0.2 + (i as f32 * 0.02);
             if rep >= 0.3 {
-                let _ = bridge.submit_vote(&id, false, Some(make_gradient(&id, vec![50.0; 100])), true);
+                let _ =
+                    bridge.submit_vote(&id, false, Some(make_gradient(&id, vec![50.0; 100])), true);
             }
         }
 
@@ -350,7 +439,10 @@ mod tests {
         println!("  Consensus reached: {}", consensus);
 
         // High-reputation honest participants should win
-        assert!(consensus, "Honest participants should win against low-rep Sybils");
+        assert!(
+            consensus,
+            "Honest participants should win against low-rep Sybils"
+        );
     }
 
     #[test]
@@ -363,13 +455,19 @@ mod tests {
         // 6 honest participants
         for i in 0..6 {
             let id = format!("honest-{}", i);
-            bridge.register_participant(&id, KVector::new(0.7, 0.5, 0.8, 0.6, 0.4, 0.3, 0.4, 0.2, 0.5, 0.4));
+            bridge.register_participant(
+                &id,
+                KVector::new(0.7, 0.5, 0.8, 0.6, 0.4, 0.3, 0.4, 0.2, 0.5, 0.4),
+            );
         }
 
         // 4 colluding participants (40% - below threshold but significant)
         for i in 0..4 {
             let id = format!("colluder-{}", i);
-            bridge.register_participant(&id, KVector::new(0.75, 0.6, 0.85, 0.65, 0.45, 0.35, 0.45, 0.25, 0.55, 0.45));
+            bridge.register_participant(
+                &id,
+                KVector::new(0.75, 0.6, 0.85, 0.65, 0.45, 0.35, 0.45, 0.25, 0.55, 0.45),
+            );
         }
 
         bridge.start_round([0u8; 32]).expect("Start round");
@@ -378,14 +476,23 @@ mod tests {
         for i in 0..6 {
             let id = format!("honest-{}", i);
             let gradient = vec![0.1 + i as f64 * 0.01; 100]; // Slightly varied
-            bridge.submit_vote(&id, true, Some(make_gradient(&id, gradient)), true).unwrap();
+            bridge
+                .submit_vote(&id, true, Some(make_gradient(&id, gradient)), true)
+                .unwrap();
         }
 
         // Colluders coordinate: same malicious gradient
         let malicious_gradient = vec![-10.0; 100];
         for i in 0..4 {
             let id = format!("colluder-{}", i);
-            bridge.submit_vote(&id, true, Some(make_gradient(&id, malicious_gradient.clone())), true).unwrap();
+            bridge
+                .submit_vote(
+                    &id,
+                    true,
+                    Some(make_gradient(&id, malicious_gradient.clone())),
+                    true,
+                )
+                .unwrap();
         }
 
         assert!(bridge.check_consensus(), "Should reach consensus");
@@ -409,12 +516,18 @@ mod tests {
         // Setup: 3 honest, 2 Byzantine
         for i in 0..3 {
             let id = format!("honest-{}", i);
-            bridge.register_participant(&id, KVector::new(0.8, 0.6, 0.9, 0.7, 0.5, 0.4, 0.5, 0.3, 0.6, 0.5));
+            bridge.register_participant(
+                &id,
+                KVector::new(0.8, 0.6, 0.9, 0.7, 0.5, 0.4, 0.5, 0.3, 0.6, 0.5),
+            );
         }
 
         for i in 0..2 {
             let id = format!("byzantine-{}", i);
-            bridge.register_participant(&id, KVector::new(0.5, 0.4, 0.6, 0.4, 0.3, 0.2, 0.3, 0.1, 0.4, 0.3));
+            bridge.register_participant(
+                &id,
+                KVector::new(0.5, 0.4, 0.6, 0.4, 0.3, 0.2, 0.3, 0.1, 0.4, 0.3),
+            );
         }
 
         // Round 1: Byzantine participants attack
@@ -422,12 +535,16 @@ mod tests {
 
         for i in 0..3 {
             let id = format!("honest-{}", i);
-            bridge.submit_vote(&id, true, Some(make_gradient(&id, vec![0.1; 100])), true).unwrap();
+            bridge
+                .submit_vote(&id, true, Some(make_gradient(&id, vec![0.1; 100])), true)
+                .unwrap();
         }
 
         for i in 0..2 {
             let id = format!("byzantine-{}", i);
-            bridge.submit_vote(&id, false, Some(make_gradient(&id, vec![100.0; 100])), true).unwrap();
+            bridge
+                .submit_vote(&id, false, Some(make_gradient(&id, vec![100.0; 100])), true)
+                .unwrap();
         }
 
         // Should succeed (40% Byzantine, below threshold)
@@ -439,12 +556,16 @@ mod tests {
 
         for i in 0..3 {
             let id = format!("honest-{}", i);
-            bridge.submit_vote(&id, true, Some(make_gradient(&id, vec![0.1; 100])), true).unwrap();
+            bridge
+                .submit_vote(&id, true, Some(make_gradient(&id, vec![0.1; 100])), true)
+                .unwrap();
         }
 
         for i in 0..2 {
             let id = format!("byzantine-{}", i);
-            bridge.submit_vote(&id, false, Some(make_gradient(&id, vec![100.0; 100])), true).unwrap();
+            bridge
+                .submit_vote(&id, false, Some(make_gradient(&id, vec![100.0; 100])), true)
+                .unwrap();
         }
 
         assert!(bridge.check_consensus(), "Round 2 should succeed");
@@ -469,23 +590,38 @@ mod tests {
         let mut bridge = RbbftFLBridge::new(config);
 
         // 1 high-reputation honest participant
-        bridge.register_participant("high-rep", KVector::new(0.95, 0.8, 0.95, 0.85, 0.7, 0.6, 0.7, 0.5, 0.8, 0.75));
+        bridge.register_participant(
+            "high-rep",
+            KVector::new(0.95, 0.8, 0.95, 0.85, 0.7, 0.6, 0.7, 0.5, 0.8, 0.75),
+        );
 
         // 10 low-reputation Byzantine participants
         for i in 0..10 {
             let id = format!("low-rep-{}", i);
-            bridge.register_participant(&id, KVector::new(0.3, 0.2, 0.4, 0.25, 0.15, 0.1, 0.15, 0.05, 0.2, 0.15));
+            bridge.register_participant(
+                &id,
+                KVector::new(0.3, 0.2, 0.4, 0.25, 0.15, 0.1, 0.15, 0.05, 0.2, 0.15),
+            );
         }
 
         bridge.start_round([0u8; 32]).expect("Start round");
 
         // High-rep votes YES
-        bridge.submit_vote("high-rep", true, Some(make_gradient("high-rep", vec![0.1; 100])), true).unwrap();
+        bridge
+            .submit_vote(
+                "high-rep",
+                true,
+                Some(make_gradient("high-rep", vec![0.1; 100])),
+                true,
+            )
+            .unwrap();
 
         // All low-rep vote NO
         for i in 0..10 {
             let id = format!("low-rep-{}", i);
-            bridge.submit_vote(&id, false, Some(make_gradient(&id, vec![50.0; 100])), true).unwrap();
+            bridge
+                .submit_vote(&id, false, Some(make_gradient(&id, vec![50.0; 100])), true)
+                .unwrap();
         }
 
         // With reputation²:
@@ -496,7 +632,10 @@ mod tests {
         let ratio = bridge.consensus_ratio().unwrap_or(0.0);
         println!("Quadratic weighting test:");
         println!("  High-rep (0.95): weight = {:.3}", 0.95f32.powi(2));
-        println!("  Low-rep (0.3 × 10): weight = {:.3}", 10.0 * 0.3f32.powi(2));
+        println!(
+            "  Low-rep (0.3 × 10): weight = {:.3}",
+            10.0 * 0.3f32.powi(2)
+        );
         println!("  Consensus ratio: {:.2}%", ratio * 100.0);
 
         // The single high-reputation participant should nearly match 10 low-reputation ones
@@ -515,22 +654,72 @@ mod tests {
             let mut bridge = RbbftFLBridge::new(config);
 
             // 2 high-rep, 3 medium-rep
-            bridge.register_participant("high-1", KVector::new(0.9, 0.7, 0.9, 0.8, 0.6, 0.5, 0.6, 0.4, 0.7, 0.6));
-            bridge.register_participant("high-2", KVector::new(0.85, 0.65, 0.85, 0.75, 0.55, 0.45, 0.55, 0.35, 0.65, 0.55));
-            bridge.register_participant("med-1", KVector::new(0.5, 0.4, 0.6, 0.45, 0.35, 0.25, 0.35, 0.15, 0.4, 0.3));
-            bridge.register_participant("med-2", KVector::new(0.5, 0.4, 0.6, 0.45, 0.35, 0.25, 0.35, 0.15, 0.4, 0.3));
-            bridge.register_participant("med-3", KVector::new(0.5, 0.4, 0.6, 0.45, 0.35, 0.25, 0.35, 0.15, 0.4, 0.3));
+            bridge.register_participant(
+                "high-1",
+                KVector::new(0.9, 0.7, 0.9, 0.8, 0.6, 0.5, 0.6, 0.4, 0.7, 0.6),
+            );
+            bridge.register_participant(
+                "high-2",
+                KVector::new(0.85, 0.65, 0.85, 0.75, 0.55, 0.45, 0.55, 0.35, 0.65, 0.55),
+            );
+            bridge.register_participant(
+                "med-1",
+                KVector::new(0.5, 0.4, 0.6, 0.45, 0.35, 0.25, 0.35, 0.15, 0.4, 0.3),
+            );
+            bridge.register_participant(
+                "med-2",
+                KVector::new(0.5, 0.4, 0.6, 0.45, 0.35, 0.25, 0.35, 0.15, 0.4, 0.3),
+            );
+            bridge.register_participant(
+                "med-3",
+                KVector::new(0.5, 0.4, 0.6, 0.45, 0.35, 0.25, 0.35, 0.15, 0.4, 0.3),
+            );
 
             bridge.start_round([0u8; 32]).expect("Start round");
 
             // High-rep vote YES
-            bridge.submit_vote("high-1", true, Some(make_gradient("high-1", vec![0.1; 50])), true).unwrap();
-            bridge.submit_vote("high-2", true, Some(make_gradient("high-2", vec![0.1; 50])), true).unwrap();
+            bridge
+                .submit_vote(
+                    "high-1",
+                    true,
+                    Some(make_gradient("high-1", vec![0.1; 50])),
+                    true,
+                )
+                .unwrap();
+            bridge
+                .submit_vote(
+                    "high-2",
+                    true,
+                    Some(make_gradient("high-2", vec![0.1; 50])),
+                    true,
+                )
+                .unwrap();
 
             // Medium-rep vote NO
-            bridge.submit_vote("med-1", false, Some(make_gradient("med-1", vec![5.0; 50])), true).unwrap();
-            bridge.submit_vote("med-2", false, Some(make_gradient("med-2", vec![5.0; 50])), true).unwrap();
-            bridge.submit_vote("med-3", false, Some(make_gradient("med-3", vec![5.0; 50])), true).unwrap();
+            bridge
+                .submit_vote(
+                    "med-1",
+                    false,
+                    Some(make_gradient("med-1", vec![5.0; 50])),
+                    true,
+                )
+                .unwrap();
+            bridge
+                .submit_vote(
+                    "med-2",
+                    false,
+                    Some(make_gradient("med-2", vec![5.0; 50])),
+                    true,
+                )
+                .unwrap();
+            bridge
+                .submit_vote(
+                    "med-3",
+                    false,
+                    Some(make_gradient("med-3", vec![5.0; 50])),
+                    true,
+                )
+                .unwrap();
 
             bridge.consensus_ratio().unwrap_or(0.0)
         };

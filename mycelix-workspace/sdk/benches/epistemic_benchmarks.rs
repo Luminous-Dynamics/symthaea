@@ -8,20 +8,18 @@
 //! - Storage routing decisions
 //! - Byzantine/cartel detection
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use mycelix_sdk::matl::KVector;
-use mycelix_sdk::matl::CartelDetector;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use mycelix_sdk::agentic::{
-    InstrumentalActor, AgentId, AgentStatus, AgentClass, AgentConstraints,
-    ActionOutcome, KVectorBridgeConfig, analyze_behavior, compute_kvector_update,
-    compute_trust_score, calculate_kredit_from_trust,
-    AgentOutput, OutputContent, AgentOutputBuilder,
-    PhiMeasurementConfig, measure_phi_simple,
+    analyze_behavior, calculate_kredit_from_trust, compute_kvector_update, compute_trust_score,
+    measure_phi_simple, ActionOutcome, AgentClass, AgentConstraints, AgentId, AgentOutput,
+    AgentOutputBuilder, AgentStatus, InstrumentalActor, KVectorBridgeConfig, OutputContent,
+    PhiMeasurementConfig,
 };
 use mycelix_sdk::epistemic::{
-    EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-    EpistemicClassification,
+    EmpiricalLevel, EpistemicClassification, HarmonicLevel, MaterialityLevel, NormativeLevel,
 };
+use mycelix_sdk::matl::CartelDetector;
+use mycelix_sdk::matl::KVector;
 use mycelix_sdk::storage::StorageRouter;
 
 /// Benchmark K-Vector trust score computation
@@ -100,9 +98,7 @@ fn bench_phi_measurement(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("outputs", output_count),
             output_count,
-            |b, _| {
-                b.iter(|| measure_phi_simple(black_box(&outputs), black_box(&config)))
-            },
+            |b, _| b.iter(|| measure_phi_simple(black_box(&outputs), black_box(&config))),
         );
     }
 
@@ -164,16 +160,12 @@ fn bench_cartel_detection(c: &mut Criterion) {
             }
         }
 
-        group.bench_with_input(
-            BenchmarkId::new("nodes", node_count),
-            node_count,
-            |b, _| {
-                b.iter(|| {
-                    let mut d = detector.clone();
-                    d.detect()
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("nodes", node_count), node_count, |b, _| {
+            b.iter(|| {
+                let mut d = detector.clone();
+                d.detect()
+            })
+        });
     }
 
     group.finish();
@@ -201,9 +193,7 @@ fn bench_behavior_analysis(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("actions", action_count),
             action_count,
-            |b, _| {
-                b.iter(|| analyze_behavior(black_box(&agent.behavior_log)))
-            },
+            |b, _| b.iter(|| analyze_behavior(black_box(&agent.behavior_log))),
         );
     }
 

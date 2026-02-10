@@ -45,14 +45,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use super::{kredit::calculate_kredit_cap_from_trust, ActionOutcome, InstrumentalActor};
+use crate::fl::matl_feedback::{FLMatlFeedback, GradientQualitySignals, KVectorDelta};
 use crate::matl::KVector;
-use crate::fl::matl_feedback::{
-    FLMatlFeedback, KVectorDelta, GradientQualitySignals,
-};
-use super::{
-    InstrumentalActor, ActionOutcome,
-    kredit::calculate_kredit_cap_from_trust,
-};
 
 /// Configuration for FL-Agent bridge
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -138,7 +133,8 @@ impl FLAgentBridge {
         let delta = feedback.kvector_deltas.get(&agent_id)?;
 
         // Track participation
-        let count = self.participation_counts
+        let count = self
+            .participation_counts
             .entry(agent_id.clone())
             .or_insert(0);
         *count += 1;
@@ -169,11 +165,7 @@ impl FLAgentBridge {
 
         // Update KREDIT cap if configured
         let kredit_cap_after = if self.config.auto_update_kredit {
-            match calculate_kredit_cap_from_trust(
-                &agent.k_vector,
-                agent.agent_class,
-                sponsor_civ,
-            ) {
+            match calculate_kredit_cap_from_trust(&agent.k_vector, agent.agent_class, sponsor_civ) {
                 Ok(new_cap) => {
                     agent.kredit_cap = new_cap;
                     Some(new_cap)
@@ -216,8 +208,10 @@ impl FLAgentBridge {
         let mut scaled = delta.clone();
 
         // Scale all deltas
-        scaled.reputation_delta = (scaled.reputation_delta * scale)
-            .clamp(-self.config.max_reputation_delta, self.config.max_reputation_delta);
+        scaled.reputation_delta = (scaled.reputation_delta * scale).clamp(
+            -self.config.max_reputation_delta,
+            self.config.max_reputation_delta,
+        );
         scaled.activity_delta *= scale;
         scaled.integrity_delta *= scale;
         scaled.performance_delta *= scale;
@@ -229,7 +223,10 @@ impl FLAgentBridge {
 
     /// Get participation count for an agent
     pub fn participation_count(&self, agent_id: &str) -> u32 {
-        self.participation_counts.get(agent_id).copied().unwrap_or(0)
+        self.participation_counts
+            .get(agent_id)
+            .copied()
+            .unwrap_or(0)
     }
 
     /// Reset participation tracking
@@ -331,7 +328,8 @@ impl FLRoundAgentImpact {
                 impact.trust_unchanged += 1;
             }
 
-            if let (Some(before), Some(after)) = (result.kredit_cap_before, result.kredit_cap_after) {
+            if let (Some(before), Some(after)) = (result.kredit_cap_before, result.kredit_cap_after)
+            {
                 impact.total_kredit_change += after as i64 - before as i64;
             }
         }
@@ -345,8 +343,7 @@ impl FLRoundAgentImpact {
 mod tests {
     use super::*;
     use crate::agentic::{
-        AgentId, AgentClass, AgentConstraints, AgentStatus, EpistemicStats,
-        UncertaintyCalibration,
+        AgentClass, AgentConstraints, AgentId, AgentStatus, EpistemicStats, UncertaintyCalibration,
     };
     use crate::fl::matl_feedback::FeedbackStats;
 
@@ -475,8 +472,12 @@ mod tests {
         let change2 = result2.trust_after - result2.trust_before;
 
         // Full warmup should have larger effect
-        assert!(change2 > change1, "Full warmup ({}) should have larger effect than initial ({})",
-            change2, change1);
+        assert!(
+            change2 > change1,
+            "Full warmup ({}) should have larger effect than initial ({})",
+            change2,
+            change1
+        );
     }
 
     #[test]
@@ -486,11 +487,8 @@ mod tests {
 
         // Get trust-derived initial cap
         let initial_trust = agent.k_vector.trust_score();
-        let initial_cap = calculate_kredit_cap_from_trust(
-            &agent.k_vector,
-            agent.agent_class,
-            0.8,
-        ).unwrap();
+        let initial_cap =
+            calculate_kredit_cap_from_trust(&agent.k_vector, agent.agent_class, 0.8).unwrap();
         agent.kredit_cap = initial_cap;
 
         // Use a single bridge to properly accumulate participation count
@@ -508,12 +506,20 @@ mod tests {
         let final_trust = agent.k_vector.trust_score();
 
         // Trust should have increased
-        assert!(final_trust > initial_trust,
-            "Trust should increase: {} > {}", final_trust, initial_trust);
+        assert!(
+            final_trust > initial_trust,
+            "Trust should increase: {} > {}",
+            final_trust,
+            initial_trust
+        );
 
         // KREDIT cap should have increased with trust
-        assert!(agent.kredit_cap > initial_cap,
-            "KREDIT cap should increase with trust: {} > {}", agent.kredit_cap, initial_cap);
+        assert!(
+            agent.kredit_cap > initial_cap,
+            "KREDIT cap should increase with trust: {} > {}",
+            agent.kredit_cap,
+            initial_cap
+        );
     }
 
     #[test]
@@ -554,7 +560,7 @@ mod tests {
     #[test]
     fn test_max_reputation_delta_clamping() {
         let config = FLAgentBridgeConfig {
-            max_reputation_delta: 0.02, // Very restrictive
+            max_reputation_delta: 0.02,  // Very restrictive
             reputation_warmup_rounds: 1, // Skip warmup
             ..Default::default()
         };
@@ -587,7 +593,10 @@ mod tests {
         let result = bridge.apply_feedback(&mut agent, &feedback, 0.8).unwrap();
 
         // Should be clamped to max
-        assert!(result.applied_delta.reputation_delta <= 0.02,
-            "Delta should be clamped: {}", result.applied_delta.reputation_delta);
+        assert!(
+            result.applied_delta.reputation_delta <= 0.02,
+            "Delta should be clamped: {}",
+            result.applied_delta.reputation_delta
+        );
     }
 }

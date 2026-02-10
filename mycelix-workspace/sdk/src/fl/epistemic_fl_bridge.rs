@@ -18,11 +18,11 @@
 //! Instead of pure trust scores, aggregation uses:
 //! `weight = reputation² × PoGQ × epistemic_weight(E,N,M,H)`
 
+use super::types::{AggregatedGradient, AggregationMethod, GradientUpdate, Participant};
 use crate::epistemic::{
-    EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-    EpistemicClassificationExtended,
+    EmpiricalLevel, EpistemicClassificationExtended, HarmonicLevel, MaterialityLevel,
+    NormativeLevel,
 };
-use super::types::{GradientUpdate, AggregatedGradient, Participant, AggregationMethod};
 use serde::{Deserialize, Serialize};
 
 /// Epistemic classification for a gradient update
@@ -42,7 +42,12 @@ pub struct GradientEpistemicClassification {
 
 impl GradientEpistemicClassification {
     /// Create from full E-N-M-H specification
-    pub fn new(e: EmpiricalLevel, n: NormativeLevel, m: MaterialityLevel, h: HarmonicLevel) -> Self {
+    pub fn new(
+        e: EmpiricalLevel,
+        n: NormativeLevel,
+        m: MaterialityLevel,
+        h: HarmonicLevel,
+    ) -> Self {
         Self {
             empirical: e,
             normative: n,
@@ -53,7 +58,13 @@ impl GradientEpistemicClassification {
     }
 
     /// Create with confidence
-    pub fn with_confidence(e: EmpiricalLevel, n: NormativeLevel, m: MaterialityLevel, h: HarmonicLevel, confidence: f32) -> Self {
+    pub fn with_confidence(
+        e: EmpiricalLevel,
+        n: NormativeLevel,
+        m: MaterialityLevel,
+        h: HarmonicLevel,
+        confidence: f32,
+    ) -> Self {
         Self {
             empirical: e,
             normative: n,
@@ -203,7 +214,8 @@ pub struct GradientClassificationHints {
 /// Classify gradient based on hints
 pub fn classify_gradient(hints: &GradientClassificationHints) -> GradientEpistemicClassification {
     // E-axis: Verifiability
-    let empirical = if hints.has_zk_proof && hints.has_pogq && hints.pogq_score.unwrap_or(0.0) > 0.8 {
+    let empirical = if hints.has_zk_proof && hints.has_pogq && hints.pogq_score.unwrap_or(0.0) > 0.8
+    {
         EmpiricalLevel::E4PublicRepro
     } else if hints.has_zk_proof || (hints.has_pogq && hints.pogq_score.unwrap_or(0.0) > 0.7) {
         EmpiricalLevel::E3Cryptographic
@@ -253,10 +265,19 @@ pub fn classify_gradient(hints: &GradientClassificationHints) -> GradientEpistem
         hints.peer_validated,
         hints.persistent_model,
         hints.agent_phi.is_some(),
-    ].iter().filter(|&&x| x).count();
+    ]
+    .iter()
+    .filter(|&&x| x)
+    .count();
     let confidence = (0.3 + evidence_count as f32 * 0.14).min(1.0);
 
-    GradientEpistemicClassification::with_confidence(empirical, normative, materiality, harmonic, confidence)
+    GradientEpistemicClassification::with_confidence(
+        empirical,
+        normative,
+        materiality,
+        harmonic,
+        confidence,
+    )
 }
 
 /// Epistemic-weighted aggregation result
@@ -295,10 +316,8 @@ pub fn epistemic_weighted_aggregation(
     }
 
     // Build participant lookup
-    let participant_map: std::collections::HashMap<_, _> = participants
-        .iter()
-        .map(|p| (p.id.clone(), p))
-        .collect();
+    let participant_map: std::collections::HashMap<_, _> =
+        participants.iter().map(|p| (p.id.clone(), p)).collect();
 
     // Calculate weights and filter by minimum epistemic threshold
     let mut weights: Vec<(usize, f64)> = Vec::new();
@@ -376,8 +395,14 @@ pub fn epistemic_weighted_aggregation(
         AggregationMethod::TrustWeighted,
     );
 
-    let avg_weight = participant_weights.iter().map(|(_, w)| w).sum::<f64>() / participant_weights.len() as f64 * total_weight;
-    let avg_phi = if phi_count > 0 { Some(phi_sum / phi_count as f64) } else { None };
+    let avg_weight = participant_weights.iter().map(|(_, w)| w).sum::<f64>()
+        / participant_weights.len() as f64
+        * total_weight;
+    let avg_phi = if phi_count > 0 {
+        Some(phi_sum / phi_count as f64)
+    } else {
+        None
+    };
 
     Ok(EpistemicAggregationResult {
         aggregated,
@@ -460,11 +485,23 @@ impl RoundEpistemicStats {
         }
 
         let n = updates.len() as f32;
-        let e_sum: f32 = updates.iter().map(|u| u.classification.empirical as u8 as f32).sum();
-        let n_sum: f32 = updates.iter().map(|u| u.classification.normative as u8 as f32).sum();
-        let high_e = updates.iter().filter(|u| u.classification.empirical >= EmpiricalLevel::E3Cryptographic).count();
+        let e_sum: f32 = updates
+            .iter()
+            .map(|u| u.classification.empirical as u8 as f32)
+            .sum();
+        let n_sum: f32 = updates
+            .iter()
+            .map(|u| u.classification.normative as u8 as f32)
+            .sum();
+        let high_e = updates
+            .iter()
+            .filter(|u| u.classification.empirical >= EmpiricalLevel::E3Cryptographic)
+            .count();
         let zk = updates.iter().filter(|u| u.proof_data.is_some()).count();
-        let weight_sum: f64 = updates.iter().map(|u| u.classification.epistemic_weight()).sum();
+        let weight_sum: f64 = updates
+            .iter()
+            .map(|u| u.classification.epistemic_weight())
+            .sum();
 
         let avg_e = e_sum / n;
         let avg_n = n_sum / n;
@@ -534,11 +571,11 @@ impl ByzantineAttackType {
     /// Higher E-level = more certain = stricter penalty
     pub fn penalty_multiplier(&self) -> f64 {
         match self {
-            Self::UnverifiedAnomaly => 0.1,    // Very light - might be false positive
-            Self::PeerReportedMalice => 0.3,   // Light - needs investigation
-            Self::VerifiedMalfunction => 0.5,  // Moderate - confirmed issue
-            Self::CryptoProofFailure => 0.8,   // Severe - cryptographic evidence
-            Self::ManifestByzantine => 1.0,    // Maximum - undeniable attack
+            Self::UnverifiedAnomaly => 0.1, // Very light - might be false positive
+            Self::PeerReportedMalice => 0.3, // Light - needs investigation
+            Self::VerifiedMalfunction => 0.5, // Moderate - confirmed issue
+            Self::CryptoProofFailure => 0.8, // Severe - cryptographic evidence
+            Self::ManifestByzantine => 1.0, // Maximum - undeniable attack
         }
     }
 }
@@ -684,21 +721,21 @@ pub fn classify_byzantine_attack(
     // Low Phi + Byzantine = likely incoherent/broken
     // High Phi + Byzantine = likely malicious
     let appears_malicious = match agent_phi {
-        Some(phi) if phi >= 0.5 => true,  // High coherence = intentional
-        Some(phi) if phi < 0.3 => false,  // Low coherence = broken
-        _ => detection_confidence > 0.8,  // No Phi? Use confidence as proxy
+        Some(phi) if phi >= 0.5 => true, // High coherence = intentional
+        Some(phi) if phi < 0.3 => false, // Low coherence = broken
+        _ => detection_confidence > 0.8, // No Phi? Use confidence as proxy
     };
 
-    let penalties = KVectorPenalties::from_attack(
-        attack_type,
-        scope,
-        detection_confidence,
-        appears_malicious,
-    );
+    let penalties =
+        KVectorPenalties::from_attack(attack_type, scope, detection_confidence, appears_malicious);
 
     let explanation = format!(
         "{} detected: {} (scope: {:?}, confidence: {:.1}%, {}). Total penalty: {:.2}",
-        if appears_malicious { "Malicious attack" } else { "Incoherent behavior" },
+        if appears_malicious {
+            "Malicious attack"
+        } else {
+            "Incoherent behavior"
+        },
         match attack_type {
             ByzantineAttackType::UnverifiedAnomaly => "unverified anomaly",
             ByzantineAttackType::PeerReportedMalice => "peer-reported malice",
@@ -708,7 +745,9 @@ pub fn classify_byzantine_attack(
         },
         scope,
         detection_confidence * 100.0,
-        agent_phi.map(|p| format!("Phi: {:.2}", p)).unwrap_or_else(|| "no Phi".into()),
+        agent_phi
+            .map(|p| format!("Phi: {:.2}", p))
+            .unwrap_or_else(|| "no Phi".into()),
         penalties.total_penalty,
     );
 
@@ -734,22 +773,25 @@ pub fn classify_byzantine_batch(
     // Detect coordination by looking for similar deviation patterns
     let coordinated_groups = detect_coordination(detections, gradient_deviations);
 
-    detections.iter().map(|(pid, confidence)| {
-        let phi = participant_phis.get(pid).copied();
-        let zk_failed = zk_failures.contains(pid);
-        let deviation = gradient_deviations.get(pid).copied().unwrap_or(0.0);
-        let coordinated = coordinated_groups.get(pid).copied().unwrap_or(0);
+    detections
+        .iter()
+        .map(|(pid, confidence)| {
+            let phi = participant_phis.get(pid).copied();
+            let zk_failed = zk_failures.contains(pid);
+            let deviation = gradient_deviations.get(pid).copied().unwrap_or(0.0);
+            let coordinated = coordinated_groups.get(pid).copied().unwrap_or(0);
 
-        classify_byzantine_attack(
-            pid,
-            *confidence,
-            phi,
-            0, // peer reports not available in batch
-            zk_failed,
-            deviation,
-            coordinated,
-        )
-    }).collect()
+            classify_byzantine_attack(
+                pid,
+                *confidence,
+                phi,
+                0, // peer reports not available in batch
+                zk_failed,
+                deviation,
+                coordinated,
+            )
+        })
+        .collect()
 }
 
 /// Detect coordinated attacks by finding similar deviation patterns
@@ -836,11 +878,11 @@ impl KVectorUpdates {
         // Scale updates by contribution and epistemic quality
         let scale = marginal_contribution.max(0.0) * epistemic_weight;
         Self {
-            reputation_delta: scale * 0.05,       // Small reputation boost
-            performance_delta: scale * 0.1,       // Larger performance boost
-            activity_delta: 0.01,                 // Constant activity credit
-            integrity_delta: 0.02,                // Small integrity boost
-            historical_delta: scale * 0.03,       // Historical consistency
+            reputation_delta: scale * 0.05, // Small reputation boost
+            performance_delta: scale * 0.1, // Larger performance boost
+            activity_delta: 0.01,           // Constant activity credit
+            integrity_delta: 0.02,          // Small integrity boost
+            historical_delta: scale * 0.03, // Historical consistency
         }
     }
 
@@ -849,7 +891,7 @@ impl KVectorUpdates {
         Self {
             reputation_delta: -penalties.reputation_penalty,
             performance_delta: -penalties.performance_penalty,
-            activity_delta: 0.0,  // Still participated
+            activity_delta: 0.0, // Still participated
             integrity_delta: -penalties.integrity_penalty,
             historical_delta: -0.05,
         }
@@ -860,7 +902,7 @@ impl KVectorUpdates {
         Self {
             reputation_delta: 0.0,
             performance_delta: 0.0,
-            activity_delta: 0.01,  // Credit for participation
+            activity_delta: 0.01, // Credit for participation
             integrity_delta: 0.0,
             historical_delta: 0.0,
         }
@@ -892,51 +934,54 @@ pub fn compute_round_feedback(
         .cloned()
         .collect();
 
-    let participant_feedback: Vec<_> = updates.iter().map(|update| {
-        let pid = &update.gradient.participant_id;
+    let participant_feedback: Vec<_> = updates
+        .iter()
+        .map(|update| {
+            let pid = &update.gradient.participant_id;
 
-        // Check if marked Byzantine
-        if let Some(byzantine) = byzantine_map.get(pid) {
-            return ParticipantFeedback {
-                participant_id: pid.clone(),
-                marginal_contribution: 0.0,
-                epistemic_weight: update.classification.epistemic_weight(),
-                was_included: false,
-                exclusion_reason: Some(byzantine.explanation.clone()),
-                kvector_updates: KVectorUpdates::negative(
-                    &byzantine.explanation,
-                    &byzantine.recommended_penalties,
-                ),
-            };
-        }
-
-        // Check if included in aggregation
-        let weight = weight_map.get(pid).copied();
-        let was_included = weight.is_some();
-        let epistemic_weight = update.classification.epistemic_weight();
-
-        if was_included {
-            // Estimate marginal contribution (simplified: proportional to weight)
-            let marginal = quality_delta * weight.unwrap_or(0.0);
-            ParticipantFeedback {
-                participant_id: pid.clone(),
-                marginal_contribution: marginal,
-                epistemic_weight,
-                was_included: true,
-                exclusion_reason: None,
-                kvector_updates: KVectorUpdates::positive(marginal, epistemic_weight),
+            // Check if marked Byzantine
+            if let Some(byzantine) = byzantine_map.get(pid) {
+                return ParticipantFeedback {
+                    participant_id: pid.clone(),
+                    marginal_contribution: 0.0,
+                    epistemic_weight: update.classification.epistemic_weight(),
+                    was_included: false,
+                    exclusion_reason: Some(byzantine.explanation.clone()),
+                    kvector_updates: KVectorUpdates::negative(
+                        &byzantine.explanation,
+                        &byzantine.recommended_penalties,
+                    ),
+                };
             }
-        } else {
-            ParticipantFeedback {
-                participant_id: pid.clone(),
-                marginal_contribution: 0.0,
-                epistemic_weight,
-                was_included: false,
-                exclusion_reason: Some("Below epistemic threshold".into()),
-                kvector_updates: KVectorUpdates::neutral(),
+
+            // Check if included in aggregation
+            let weight = weight_map.get(pid).copied();
+            let was_included = weight.is_some();
+            let epistemic_weight = update.classification.epistemic_weight();
+
+            if was_included {
+                // Estimate marginal contribution (simplified: proportional to weight)
+                let marginal = quality_delta * weight.unwrap_or(0.0);
+                ParticipantFeedback {
+                    participant_id: pid.clone(),
+                    marginal_contribution: marginal,
+                    epistemic_weight,
+                    was_included: true,
+                    exclusion_reason: None,
+                    kvector_updates: KVectorUpdates::positive(marginal, epistemic_weight),
+                }
+            } else {
+                ParticipantFeedback {
+                    participant_id: pid.clone(),
+                    marginal_contribution: 0.0,
+                    epistemic_weight,
+                    was_included: false,
+                    exclusion_reason: Some("Below epistemic threshold".into()),
+                    kvector_updates: KVectorUpdates::neutral(),
+                }
             }
-        }
-    }).collect();
+        })
+        .collect();
 
     FLRoundFeedback {
         round_id,
@@ -1016,8 +1061,10 @@ pub fn check_phi_participation(phi: f64) -> PhiParticipationResult {
     }
 
     if phi < phi_thresholds::FULL_WEIGHT {
-        let multiplier = 0.5 + (phi - phi_thresholds::MIN_PARTICIPATION) /
-            (phi_thresholds::FULL_WEIGHT - phi_thresholds::MIN_PARTICIPATION) * 0.5;
+        let multiplier = 0.5
+            + (phi - phi_thresholds::MIN_PARTICIPATION)
+                / (phi_thresholds::FULL_WEIGHT - phi_thresholds::MIN_PARTICIPATION)
+                * 0.5;
         return PhiParticipationResult {
             allowed: true,
             phi_multiplier: multiplier,
@@ -1132,18 +1179,20 @@ pub fn analyze_byzantine_with_phi(
 }
 
 /// Filter FL updates by Phi, returning allowed updates with multipliers
-pub fn phi_filter_updates(
-    updates: &[EpistemicGradientUpdate],
-) -> Vec<(usize, f64)> {
-    updates.iter().enumerate().filter_map(|(idx, update)| {
-        let phi = update.agent_phi.unwrap_or(0.5); // Default to medium
-        let check = check_phi_participation(phi);
-        if check.allowed {
-            Some((idx, check.phi_multiplier))
-        } else {
-            None
-        }
-    }).collect()
+pub fn phi_filter_updates(updates: &[EpistemicGradientUpdate]) -> Vec<(usize, f64)> {
+    updates
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, update)| {
+            let phi = update.agent_phi.unwrap_or(0.5); // Default to medium
+            let check = check_phi_participation(phi);
+            if check.allowed {
+                Some((idx, check.phi_multiplier))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -1167,7 +1216,11 @@ mod tests {
         assert_eq!(class.empirical, EmpiricalLevel::E4PublicRepro);
         assert_eq!(class.normative, NormativeLevel::N2Network);
         // E4=1.0 * N2=0.9 * M2=0.8 * H2=0.8 * confidence=1.0 = 0.576
-        assert!(class.epistemic_weight() > 0.5, "weight was {}", class.epistemic_weight());
+        assert!(
+            class.epistemic_weight() > 0.5,
+            "weight was {}",
+            class.epistemic_weight()
+        );
     }
 
     #[test]
@@ -1209,16 +1262,23 @@ mod tests {
             ),
         ];
 
-        let participants = vec![
-            Participant::new("p1".into()),
-            Participant::new("p2".into()),
-        ];
+        let participants = vec![Participant::new("p1".into()), Participant::new("p2".into())];
 
         let result = epistemic_weighted_aggregation(&updates, &participants, 0.0).unwrap();
 
         // p1 should have higher weight (higher epistemic score)
-        let p1_weight = result.participant_weights.iter().find(|(id, _)| id == "p1").map(|(_, w)| *w).unwrap();
-        let p2_weight = result.participant_weights.iter().find(|(id, _)| id == "p2").map(|(_, w)| *w).unwrap();
+        let p1_weight = result
+            .participant_weights
+            .iter()
+            .find(|(id, _)| id == "p1")
+            .map(|(_, w)| *w)
+            .unwrap();
+        let p2_weight = result
+            .participant_weights
+            .iter()
+            .find(|(id, _)| id == "p2")
+            .map(|(_, w)| *w)
+            .unwrap();
         assert!(p1_weight > p2_weight);
     }
 
@@ -1233,7 +1293,8 @@ mod tests {
                     MaterialityLevel::M3Foundational,
                     HarmonicLevel::H3Civilizational,
                 ),
-            ).with_proof(vec![1, 2, 3]),
+            )
+            .with_proof(vec![1, 2, 3]),
             EpistemicGradientUpdate::new(
                 GradientUpdate::new("p2".into(), 1, vec![0.2], 100, 0.4),
                 GradientEpistemicClassification::new(
@@ -1242,7 +1303,8 @@ mod tests {
                     MaterialityLevel::M2Persistent,
                     HarmonicLevel::H2Network,
                 ),
-            ).with_proof(vec![4, 5, 6]),
+            )
+            .with_proof(vec![4, 5, 6]),
         ];
 
         let stats = RoundEpistemicStats::from_updates(&updates);
@@ -1259,8 +1321,8 @@ mod tests {
             0.95,
             Some(0.8), // High coherence
             0,
-            true,  // ZK proof failed
-            3.0,   // High deviation
+            true, // ZK proof failed
+            3.0,  // High deviation
             0,
         );
         assert_eq!(result.attack_type, ByzantineAttackType::ManifestByzantine);
@@ -1281,8 +1343,10 @@ mod tests {
             0,
         );
         assert!(!incoherent.appears_malicious);
-        assert!(incoherent.recommended_penalties.verification_penalty >
-                incoherent.recommended_penalties.integrity_penalty);
+        assert!(
+            incoherent.recommended_penalties.verification_penalty
+                > incoherent.recommended_penalties.integrity_penalty
+        );
 
         // High Phi + Byzantine = malicious (intentional)
         let malicious = classify_byzantine_attack(
@@ -1295,22 +1359,22 @@ mod tests {
             0,
         );
         assert!(malicious.appears_malicious);
-        assert!(malicious.recommended_penalties.integrity_penalty >
-                malicious.recommended_penalties.verification_penalty);
+        assert!(
+            malicious.recommended_penalties.integrity_penalty
+                > malicious.recommended_penalties.verification_penalty
+        );
     }
 
     #[test]
     fn test_coordinated_attack_detection() {
-        let detections = vec![
-            ("p1".into(), 0.8),
-            ("p2".into(), 0.85),
-            ("p3".into(), 0.75),
-        ];
+        let detections = vec![("p1".into(), 0.8), ("p2".into(), 0.85), ("p3".into(), 0.75)];
         let deviations: std::collections::HashMap<_, _> = [
             ("p1".into(), 2.5),
             ("p2".into(), 2.6), // Similar to p1
             ("p3".into(), 1.0), // Different
-        ].into_iter().collect();
+        ]
+        .into_iter()
+        .collect();
 
         let results = classify_byzantine_batch(
             &detections,
@@ -1322,8 +1386,10 @@ mod tests {
         // p1 and p2 should show coordination
         let p1_result = results.iter().find(|r| r.participant_id == "p1").unwrap();
         let p3_result = results.iter().find(|r| r.participant_id == "p3").unwrap();
-        assert!(p1_result.scope != ByzantineScope::Individual ||
-                p3_result.scope == ByzantineScope::Individual);
+        assert!(
+            p1_result.scope != ByzantineScope::Individual
+                || p3_result.scope == ByzantineScope::Individual
+        );
     }
 
     #[test]

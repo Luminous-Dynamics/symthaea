@@ -11,8 +11,7 @@ use std::collections::HashMap;
 
 use mycelix_fl_core::convert;
 use mycelix_fl_core::pipeline::{
-    ExternalWeightMap, ParticipantWeightAdjustment,
-    PipelineConfig, PipelineResult, PipelineStats, UnifiedPipeline,
+    ExternalWeightMap, ParticipantWeightAdjustment, PipelineConfig, PipelineStats, UnifiedPipeline,
 };
 use mycelix_fl_core::privacy::DifferentialPrivacyConfig;
 use mycelix_fl_core::types::{AggregationMethod, GradientUpdate as CoreGradientUpdate};
@@ -158,9 +157,7 @@ impl UnifiedPipelineF64 {
             excluded_count: result.aggregated.excluded_count,
             method: result.aggregated.method,
             stats: result.stats,
-            epsilon_estimate: result
-                .privacy
-                .and_then(|p| p.epsilon_estimate),
+            epsilon_estimate: result.privacy.and_then(|p| p.epsilon_estimate),
         })
     }
 
@@ -184,10 +181,7 @@ impl UnifiedPipelineF64 {
         reputations: &HashMap<String, f64>,
     ) -> Result<PipelineResultF64, mycelix_fl_core::aggregation::AggregationError> {
         // Extract base gradient updates and build external weight map
-        let base_updates: Vec<&GradientUpdate> = updates
-            .iter()
-            .map(|u| &u.gradient)
-            .collect();
+        let base_updates: Vec<&GradientUpdate> = updates.iter().map(|u| &u.gradient).collect();
 
         let mut external_weights = ExternalWeightMap::new();
 
@@ -241,9 +235,7 @@ impl UnifiedPipelineF64 {
             excluded_count: result.aggregated.excluded_count,
             method: result.aggregated.method,
             stats: result.stats,
-            epsilon_estimate: result
-                .privacy
-                .and_then(|p| p.epsilon_estimate),
+            epsilon_estimate: result.privacy.and_then(|p| p.epsilon_estimate),
         })
     }
 
@@ -255,11 +247,9 @@ impl UnifiedPipelineF64 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::epistemic::{
-        EmpiricalLevel, NormativeLevel, MaterialityLevel, HarmonicLevel,
-    };
     use super::super::epistemic_fl_bridge::GradientEpistemicClassification;
+    use super::*;
+    use crate::epistemic::{EmpiricalLevel, HarmonicLevel, MaterialityLevel, NormativeLevel};
 
     #[test]
     fn test_unified_pipeline_f64_basic() {
@@ -324,11 +314,7 @@ mod tests {
 
         // Byzantine should be gated out (rep 0.15 < threshold 0.3)
         for val in &result.gradients {
-            assert!(
-                (*val - 0.5).abs() < 0.2,
-                "Should be near 0.5, got {}",
-                val
-            );
+            assert!((*val - 0.5).abs() < 0.2, "Should be near 0.5, got {}", val);
         }
     }
 
@@ -369,7 +355,8 @@ mod tests {
                 MaterialityLevel::M2Persistent,
                 HarmonicLevel::H2Network,
             ),
-        ).with_phi(0.9);
+        )
+        .with_phi(0.9);
 
         let medium_quality = EpistemicGradientUpdate::new(
             GradientUpdate::new("p2".to_string(), 1, vec![0.15, 0.25, 0.35], 100, 0.4),
@@ -379,7 +366,8 @@ mod tests {
                 MaterialityLevel::M1Temporal,
                 HarmonicLevel::H1Local,
             ),
-        ).with_phi(0.5);
+        )
+        .with_phi(0.5);
 
         let low_quality = EpistemicGradientUpdate::new(
             GradientUpdate::new("p3".to_string(), 1, vec![0.12, 0.22, 0.32], 100, 0.45),
@@ -418,7 +406,8 @@ mod tests {
                 MaterialityLevel::M1Temporal,
                 HarmonicLevel::H1Local,
             ),
-        ).with_phi(1.0);  // Maximum Phi → multiplier = 1.0
+        )
+        .with_phi(1.0); // Maximum Phi → multiplier = 1.0
 
         let low_phi = EpistemicGradientUpdate::new(
             GradientUpdate::new("low".to_string(), 1, vec![0.0; 5], 100, 0.5),
@@ -428,7 +417,8 @@ mod tests {
                 MaterialityLevel::M1Temporal,
                 HarmonicLevel::H1Local,
             ),
-        ).with_phi(0.0);  // Minimum Phi → multiplier = 0.5
+        )
+        .with_phi(0.0); // Minimum Phi → multiplier = 0.5
 
         // Need a third participant
         let neutral = EpistemicGradientUpdate::new(
@@ -439,7 +429,8 @@ mod tests {
                 MaterialityLevel::M1Temporal,
                 HarmonicLevel::H1Local,
             ),
-        ).with_phi(0.5);
+        )
+        .with_phi(0.5);
 
         let updates = vec![high_phi, low_phi, neutral];
         let mut reps = HashMap::new();

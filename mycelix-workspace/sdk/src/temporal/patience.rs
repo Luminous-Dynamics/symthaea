@@ -3,7 +3,7 @@
 //! Calculates the patience coefficient from temporal commitments,
 //! used as a multiplier throughout the protocol.
 
-use super::{TemporalCommitment, CommitmentStatus, CovenantType};
+use super::{CommitmentStatus, CovenantType, TemporalCommitment};
 use serde::{Deserialize, Serialize};
 
 /// Patience coefficient for a member
@@ -29,11 +29,10 @@ impl PatienceCoefficient {
 }
 
 /// Calculate patience coefficient from commitments
-pub fn calculate_patience_coefficient(
-    commitments: &[TemporalCommitment],
-) -> PatienceCoefficient {
+pub fn calculate_patience_coefficient(commitments: &[TemporalCommitment]) -> PatienceCoefficient {
     // Filter to active commitments
-    let active: Vec<_> = commitments.iter()
+    let active: Vec<_> = commitments
+        .iter()
         .filter(|c| c.status == CommitmentStatus::Active)
         .collect();
 
@@ -48,23 +47,24 @@ pub fn calculate_patience_coefficient(
 
     // Calculate weighted average duration
     let total_sap: u64 = active.iter().map(|c| c.sap_locked).sum();
-    let weighted_duration: f64 = active.iter()
+    let weighted_duration: f64 = active
+        .iter()
         .map(|c| c.duration_epochs as f64 * c.sap_locked as f64)
-        .sum::<f64>() / total_sap as f64;
+        .sum::<f64>()
+        / total_sap as f64;
 
     // Find max duration
-    let max_duration = active.iter()
-        .map(|c| c.duration_epochs)
-        .max()
-        .unwrap_or(0);
+    let max_duration = active.iter().map(|c| c.duration_epochs).max().unwrap_or(0);
 
     // Calculate covenant depth (weighted by SAP)
-    let covenant_depth: f64 = active.iter()
+    let covenant_depth: f64 = active
+        .iter()
         .map(|c| {
             let depth = covenant_type_to_depth(&c.covenant_type);
             depth * c.sap_locked as f64
         })
-        .sum::<f64>() / total_sap as f64;
+        .sum::<f64>()
+        / total_sap as f64;
 
     // Calculate coefficient
     // Duration component: log scale, 1 epoch = 0.5, 168 epochs (14 years) = 2.0
@@ -116,8 +116,8 @@ pub fn calculate_poc_with_patience(
 
 #[cfg(test)]
 mod tests {
+    use super::super::{CommitmentId, DurationTier};
     use super::*;
-    use super::super::{DurationTier, CommitmentId};
 
     fn make_commitment(duration: u32, sap: u64, covenant_type: CovenantType) -> TemporalCommitment {
         TemporalCommitment {
@@ -142,9 +142,7 @@ mod tests {
 
     #[test]
     fn test_short_commitment() {
-        let commits = vec![
-            make_commitment(3, 1000, CovenantType::None),
-        ];
+        let commits = vec![make_commitment(3, 1000, CovenantType::None)];
         let patience = calculate_patience_coefficient(&commits);
 
         // Short duration, no covenant = low coefficient
@@ -153,9 +151,7 @@ mod tests {
 
     #[test]
     fn test_long_commitment_with_covenant() {
-        let commits = vec![
-            make_commitment(168, 1000, CovenantType::Universal),
-        ];
+        let commits = vec![make_commitment(168, 1000, CovenantType::Universal)];
         let patience = calculate_patience_coefficient(&commits);
 
         // Long duration + universal covenant = high coefficient

@@ -37,11 +37,10 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::matl::{
-    MatlEngine, NodeEvaluation, NetworkEvaluation, NetworkStatus,
-    ProofOfGradientQuality, KVector,
-};
 use super::{CrossHappReputation, HappReputationScore};
+use crate::matl::{
+    KVector, MatlEngine, NetworkEvaluation, NetworkStatus, NodeEvaluation, ProofOfGradientQuality,
+};
 
 /// Trust level classification for identities
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -270,19 +269,13 @@ impl ByzantineIdentityCoordinator {
         let pogq = self.create_pogq_from_reputation(reputation);
 
         // Evaluate with MATL
-        let (node_eval, net_eval) = self.matl_engine.evaluate_node(
-            &node_id,
-            &pogq,
-            reputation.aggregate,
-        );
+        let (node_eval, net_eval) =
+            self.matl_engine
+                .evaluate_node(&node_id, &pogq, reputation.aggregate);
 
         // Determine trust level
-        let trust_level = self.determine_trust_level(
-            reputation,
-            &node_eval,
-            &net_eval,
-            &mut reasons,
-        );
+        let trust_level =
+            self.determine_trust_level(reputation, &node_eval, &net_eval, &mut reasons);
 
         // Compute combined trust score
         let trust_score = self.compute_trust_score(reputation, &node_eval);
@@ -298,7 +291,8 @@ impl ByzantineIdentityCoordinator {
         };
 
         // Cache the assessment
-        self.assessment_cache.insert(did.to_string(), assessment.clone());
+        self.assessment_cache
+            .insert(did.to_string(), assessment.clone());
 
         assessment
     }
@@ -315,7 +309,10 @@ impl ByzantineIdentityCoordinator {
     }
 
     /// Create a PoGQ from reputation data
-    fn create_pogq_from_reputation(&self, reputation: &CrossHappReputation) -> ProofOfGradientQuality {
+    fn create_pogq_from_reputation(
+        &self,
+        reputation: &CrossHappReputation,
+    ) -> ProofOfGradientQuality {
         // Map reputation metrics to PoGQ fields
         // - quality_score: aggregate reputation
         // - consistency_score: variance across hApps (lower variance = higher consistency)
@@ -326,9 +323,12 @@ impl ByzantineIdentityCoordinator {
         // Compute consistency from score variance
         let consistency_score = if reputation.scores.len() > 1 {
             let mean = reputation.aggregate;
-            let variance: f64 = reputation.scores.iter()
+            let variance: f64 = reputation
+                .scores
+                .iter()
                 .map(|s| (s.score - mean).powi(2))
-                .sum::<f64>() / reputation.scores.len() as f64;
+                .sum::<f64>()
+                / reputation.scores.len() as f64;
             let std_dev = variance.sqrt();
             // Lower std dev = higher consistency
             (1.0 - std_dev.min(0.5) * 2.0).max(0.0)
@@ -414,13 +414,17 @@ impl ByzantineIdentityCoordinator {
     }
 
     /// Compute combined trust score
-    fn compute_trust_score(&self, reputation: &CrossHappReputation, node_eval: &NodeEvaluation) -> f64 {
+    fn compute_trust_score(
+        &self,
+        reputation: &CrossHappReputation,
+        node_eval: &NodeEvaluation,
+    ) -> f64 {
         let matl_score = node_eval.composite_score;
         let rep_score = reputation.aggregate;
 
         // Weighted combination
-        let combined = self.config.matl_weight * matl_score
-            + (1.0 - self.config.matl_weight) * rep_score;
+        let combined =
+            self.config.matl_weight * matl_score + (1.0 - self.config.matl_weight) * rep_score;
 
         // Apply penalties
         let mut score = combined;
@@ -543,7 +547,12 @@ pub struct ReputationChangeEvent {
 
 impl ReputationChangeEvent {
     /// Create a new reputation change event
-    pub fn new(agent_id: impl Into<String>, old_score: f64, new_score: f64, source: impl Into<String>) -> Self {
+    pub fn new(
+        agent_id: impl Into<String>,
+        old_score: f64,
+        new_score: f64,
+        source: impl Into<String>,
+    ) -> Self {
         Self {
             agent_id: agent_id.into(),
             old_score,
@@ -649,13 +658,21 @@ impl TrustScoreCache {
     }
 
     /// Insert an assessment into the cache
-    pub fn insert(&mut self, agent_id: impl Into<String>, assessment: IdentityTrustAssessment, reputation: f64) {
+    pub fn insert(
+        &mut self,
+        agent_id: impl Into<String>,
+        assessment: IdentityTrustAssessment,
+        reputation: f64,
+    ) {
         let agent_id = agent_id.into();
-        self.cache.insert(agent_id, CachedScore {
-            assessment,
-            last_reputation: reputation,
-            cached_at: current_timestamp(),
-        });
+        self.cache.insert(
+            agent_id,
+            CachedScore {
+                assessment,
+                last_reputation: reputation,
+                cached_at: current_timestamp(),
+            },
+        );
     }
 
     /// Process a reputation change event and invalidate cache if needed
@@ -733,7 +750,13 @@ impl ByzantineIdentityCoordinator {
     ///
     /// This method should be called when a reputation score changes.
     /// It will invalidate the cache if the change is significant.
-    pub fn on_reputation_change(&mut self, agent_id: &str, old_score: f64, new_score: f64, threshold: f64) {
+    pub fn on_reputation_change(
+        &mut self,
+        agent_id: &str,
+        old_score: f64,
+        new_score: f64,
+        threshold: f64,
+    ) {
         if (new_score - old_score).abs() > threshold {
             self.assessment_cache.remove(agent_id);
             // Cache invalidated due to significant reputation change (FIND-009)
@@ -879,7 +902,8 @@ impl AggregatedReputation {
 
     /// Convert to CrossHappReputation (for compatibility)
     pub fn to_cross_happ_reputation(&self) -> CrossHappReputation {
-        let scores: Vec<HappReputationScore> = self.data_points
+        let scores: Vec<HappReputationScore> = self
+            .data_points
             .iter()
             .filter_map(|dp| {
                 if let ReputationSource::HappInteraction(ref happ_id) = dp.source {
@@ -1007,7 +1031,13 @@ impl ByzantineIdentityCoordinator {
             let vdp = ReputationDataPoint::new(
                 ReputationSource::CredentialVerification,
                 verification,
-                if kv.is_strongly_verified() { 0.95 } else if kv.is_verified() { 0.7 } else { 0.3 },
+                if kv.is_strongly_verified() {
+                    0.95
+                } else if kv.is_verified() {
+                    0.7
+                } else {
+                    0.3
+                },
             )
             .with_weight(config.credential_weight);
 
@@ -1023,8 +1053,15 @@ impl ByzantineIdentityCoordinator {
         // 3. MATL evaluation (use cached if available)
         let byzantine_risk: f64 = if let Some(assessment) = self.assessment_cache.get(did) {
             let _matl_score = 1.0 - (assessment.matl_evaluation.composite_score.max(0.0));
-            let risk: f64 = if assessment.matl_evaluation.is_anomalous { 0.5 } else { 0.1 }
-                + if assessment.matl_evaluation.in_suspicious_cluster { 0.4 } else { 0.0 };
+            let risk: f64 = if assessment.matl_evaluation.is_anomalous {
+                0.5
+            } else {
+                0.1
+            } + if assessment.matl_evaluation.in_suspicious_cluster {
+                0.4
+            } else {
+                0.0
+            };
 
             // Add MATL as a data point (inverted - higher score = lower risk)
             let dp = ReputationDataPoint::new(
@@ -1055,9 +1092,8 @@ impl ByzantineIdentityCoordinator {
         let aggregated_confidence = if data_points.is_empty() {
             0.0
         } else {
-            let avg_confidence: f64 = data_points.iter()
-                .map(|dp| dp.confidence)
-                .sum::<f64>() / data_points.len() as f64;
+            let avg_confidence: f64 =
+                data_points.iter().map(|dp| dp.confidence).sum::<f64>() / data_points.len() as f64;
             // Boost confidence with more data points
             let data_point_boost = (data_points.len() as f64 / 5.0).min(1.0);
             (avg_confidence * 0.7 + data_point_boost * 0.3).min(1.0)
@@ -1125,15 +1161,16 @@ mod tests {
     use super::*;
 
     fn mock_reputation(score: f64, interactions: u64) -> CrossHappReputation {
-        CrossHappReputation::from_scores("test_agent", vec![
-            HappReputationScore {
+        CrossHappReputation::from_scores(
+            "test_agent",
+            vec![HappReputationScore {
                 happ_id: "test_happ".to_string(),
                 happ_name: "Test hApp".to_string(),
                 score,
                 interactions,
                 last_updated: 0,
-            },
-        ])
+            }],
+        )
     }
 
     #[test]
@@ -1277,15 +1314,13 @@ mod tests {
     #[test]
     fn test_aggregated_reputation_with_kvector() {
         let mut coordinator = ByzantineIdentityCoordinator::new();
-        let happ_scores = vec![
-            HappReputationScore {
-                happ_id: "test".to_string(),
-                happ_name: "Test".to_string(),
-                score: 0.7,
-                interactions: 50,
-                last_updated: current_timestamp(),
-            },
-        ];
+        let happ_scores = vec![HappReputationScore {
+            happ_id: "test".to_string(),
+            happ_name: "Test".to_string(),
+            score: 0.7,
+            interactions: 50,
+            last_updated: current_timestamp(),
+        }];
 
         // Create K-Vector with high verification
         let kv = KVector::new(0.8, 0.6, 0.9, 0.7, 0.3, 0.5, 0.6, 0.4, 0.85, 0.7);
@@ -1343,15 +1378,13 @@ mod tests {
     #[test]
     fn test_aggregated_reputation_to_cross_happ() {
         let mut coordinator = ByzantineIdentityCoordinator::new();
-        let happ_scores = vec![
-            HappReputationScore {
-                happ_id: "mail".to_string(),
-                happ_name: "Mail".to_string(),
-                score: 0.9,
-                interactions: 100,
-                last_updated: 0,
-            },
-        ];
+        let happ_scores = vec![HappReputationScore {
+            happ_id: "mail".to_string(),
+            happ_name: "Mail".to_string(),
+            score: 0.9,
+            interactions: 100,
+            last_updated: 0,
+        }];
 
         let agg = coordinator.get_aggregated_reputation(
             "did:mycelix:test",
@@ -1386,11 +1419,7 @@ mod tests {
         let reputation = mock_reputation(0.85, 75);
         let kv = KVector::new_verified_participant(0.7);
 
-        let agg = coordinator.get_aggregated_reputation_quick(
-            "did:quick",
-            &reputation,
-            Some(kv),
-        );
+        let agg = coordinator.get_aggregated_reputation_quick("did:quick", &reputation, Some(kv));
 
         assert!(agg.aggregated_score > 0.5);
         assert!(agg.is_verified());

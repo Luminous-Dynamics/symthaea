@@ -57,11 +57,11 @@ impl CoherenceState {
     /// Get multiplier for confidence calculations
     pub fn confidence_multiplier(&self) -> f64 {
         match self {
-            Self::Coherent => 1.15,  // +15% boost
-            Self::Stable => 1.0,     // Normal
-            Self::Unstable => 0.85,  // -15% penalty
-            Self::Degraded => 0.6,   // -40% penalty
-            Self::Critical => 0.3,   // -70% penalty
+            Self::Coherent => 1.15, // +15% boost
+            Self::Stable => 1.0,    // Normal
+            Self::Unstable => 0.85, // -15% penalty
+            Self::Degraded => 0.6,  // -40% penalty
+            Self::Critical => 0.3,  // -70% penalty
         }
     }
 
@@ -199,11 +199,7 @@ pub fn phi_to_confidence_boost(phi: f64) -> f64 {
 ///
 /// # Returns
 /// Adjusted confidence score (0.0-0.99)
-pub fn apply_phi_to_confidence(
-    base_confidence: f64,
-    phi: f64,
-    harmonic_level: u8,
-) -> f64 {
+pub fn apply_phi_to_confidence(base_confidence: f64, phi: f64, harmonic_level: u8) -> f64 {
     let phi_boost = phi_to_confidence_boost(phi);
 
     // Harmonic bonus: H0=0%, H1=1%, H2=2%, H3=3%, H4=4%
@@ -337,7 +333,7 @@ mod tests {
 
         // Check staleness
         assert!(!metrics.is_stale(1700001000)); // Within 1 hour
-        assert!(metrics.is_stale(1700010000));  // Over 1 hour
+        assert!(metrics.is_stale(1700010000)); // Over 1 hour
     }
 
     #[test]

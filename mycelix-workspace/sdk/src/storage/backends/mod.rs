@@ -6,10 +6,10 @@
 //! - DHT: Holochain distributed (M2)
 //! - IPFS: Content-addressed (M3)
 
-mod memory;
-mod local;
-mod ipfs;
 mod dht;
+mod ipfs;
+mod local;
+mod memory;
 
 // Real IPFS HTTP client (requires std feature)
 #[cfg(feature = "std")]
@@ -18,13 +18,13 @@ pub mod ipfs_client;
 // Holochain DHT client infrastructure
 pub mod dht_client;
 
-pub use memory::{MemoryBackend, MemoryBackendConfig, MemoryBackendStats};
-pub use local::{LocalBackend, LocalBackendConfig, LocalBackendStats};
-pub use ipfs::{IPFSBackend, IPFSBackendConfig, IPFSBackendStats};
 pub use dht::{DHTBackend, DHTBackendConfig, DHTBackendStats};
+pub use ipfs::{IPFSBackend, IPFSBackendConfig, IPFSBackendStats};
+pub use local::{LocalBackend, LocalBackendConfig, LocalBackendStats};
+pub use memory::{MemoryBackend, MemoryBackendConfig, MemoryBackendStats};
 
 use crate::epistemic::EpistemicClassification;
-use crate::storage::types::{StorageMetadata, SchemaIdentity, StoredData};
+use crate::storage::types::{SchemaIdentity, StorageMetadata, StoredData};
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::pin::Pin;
@@ -51,22 +51,14 @@ pub trait StorageBackendAdapter: Send + Sync {
     ) -> Pin<Box<dyn Future<Output = Option<StorageMetadata>> + Send + '_>>;
 
     /// Delete data
-    fn delete(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = bool> + Send + '_>>;
+    fn delete(&self, key: &str) -> Pin<Box<dyn Future<Output = bool> + Send + '_>>;
 
     /// Check if key exists
-    fn has(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = bool> + Send + '_>>;
+    fn has(&self, key: &str) -> Pin<Box<dyn Future<Output = bool> + Send + '_>>;
 
     /// List keys matching pattern
-    fn keys(
-        &self,
-        pattern: Option<&str>,
-    ) -> Pin<Box<dyn Future<Output = Vec<String>> + Send + '_>>;
+    fn keys(&self, pattern: Option<&str>)
+        -> Pin<Box<dyn Future<Output = Vec<String>> + Send + '_>>;
 
     /// Clear all data
     fn clear(&self) -> Pin<Box<dyn Future<Output = ()> + Send + '_>>;
@@ -107,22 +99,17 @@ impl StorageBackendAdapter for MemoryBackend {
         created_by: &str,
         ttl_ms: Option<u64>,
     ) -> Pin<Box<dyn Future<Output = Option<StorageMetadata>> + Send + '_>> {
-        let result = MemoryBackend::set(self, key, data, classification, schema, created_by, ttl_ms);
+        let result =
+            MemoryBackend::set(self, key, data, classification, schema, created_by, ttl_ms);
         Box::pin(async move { result })
     }
 
-    fn delete(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
+    fn delete(&self, key: &str) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
         let result = MemoryBackend::delete(self, key);
         Box::pin(async move { result })
     }
 
-    fn has(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
+    fn has(&self, key: &str) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
         let result = MemoryBackend::has(self, key);
         Box::pin(async move { result })
     }
@@ -176,18 +163,12 @@ impl StorageBackendAdapter for LocalBackend {
         Box::pin(async move { result })
     }
 
-    fn delete(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
+    fn delete(&self, key: &str) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
         let result = LocalBackend::delete(self, key);
         Box::pin(async move { result })
     }
 
-    fn has(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
+    fn has(&self, key: &str) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
         let result = LocalBackend::has(self, key);
         Box::pin(async move { result })
     }
@@ -241,18 +222,12 @@ impl StorageBackendAdapter for IPFSBackend {
         Box::pin(async move { result })
     }
 
-    fn delete(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
+    fn delete(&self, key: &str) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
         let result = IPFSBackend::delete(self, key);
         Box::pin(async move { result })
     }
 
-    fn has(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
+    fn has(&self, key: &str) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
         let result = IPFSBackend::has(self, key);
         Box::pin(async move { result })
     }
@@ -306,18 +281,12 @@ impl StorageBackendAdapter for DHTBackend {
         Box::pin(async move { result })
     }
 
-    fn delete(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
+    fn delete(&self, key: &str) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
         let result = DHTBackend::delete(self, key);
         Box::pin(async move { result })
     }
 
-    fn has(
-        &self,
-        key: &str,
-    ) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
+    fn has(&self, key: &str) -> Pin<Box<dyn Future<Output = bool> + Send + '_>> {
         let result = DHTBackend::has(self, key);
         Box::pin(async move { result })
     }

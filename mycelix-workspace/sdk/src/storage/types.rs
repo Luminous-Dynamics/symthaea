@@ -3,9 +3,7 @@
 //! Type definitions for the Unified Epistemic Storage System.
 //! Based on the TypeScript SDK implementation.
 
-
-
-use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel, EpistemicClassification};
+use crate::epistemic::{EmpiricalLevel, EpistemicClassification, MaterialityLevel, NormativeLevel};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -555,8 +553,7 @@ mod tests {
 
     #[test]
     fn test_schema_identity() {
-        let schema = SchemaIdentity::new("user-profile", "1.0.0")
-            .with_family("user-data");
+        let schema = SchemaIdentity::new("user-profile", "1.0.0").with_family("user-data");
 
         assert_eq!(schema.id, "user-profile");
         assert_eq!(schema.version, "1.0.0");
@@ -587,7 +584,7 @@ mod tests {
 
     #[test]
     fn test_storage_metadata_expiry() {
-        use crate::epistemic::{EmpiricalLevel, NormativeLevel, MaterialityLevel};
+        use crate::epistemic::{EmpiricalLevel, MaterialityLevel, NormativeLevel};
 
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

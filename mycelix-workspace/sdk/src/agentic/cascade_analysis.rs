@@ -189,7 +189,10 @@ impl TrustNetwork {
 
     /// Add edge to network
     pub fn add_edge(&mut self, edge: NetworkEdge) {
-        self.outgoing.entry(edge.from.clone()).or_default().push(edge.clone());
+        self.outgoing
+            .entry(edge.from.clone())
+            .or_default()
+            .push(edge.clone());
         self.incoming.entry(edge.to.clone()).or_default().push(edge);
     }
 
@@ -266,12 +269,19 @@ impl TrustNetwork {
     /// Clone network state
     pub fn snapshot(&self) -> NetworkSnapshot {
         NetworkSnapshot {
-            agent_states: self.agents.iter()
-                .map(|(id, a)| (id.clone(), AgentState {
-                    trust: a.trust,
-                    stressed: a.stressed,
-                    failed: a.failed,
-                }))
+            agent_states: self
+                .agents
+                .iter()
+                .map(|(id, a)| {
+                    (
+                        id.clone(),
+                        AgentState {
+                            trust: a.trust,
+                            stressed: a.stressed,
+                            failed: a.failed,
+                        },
+                    )
+                })
                 .collect(),
         }
     }
@@ -377,7 +387,12 @@ impl CascadeEngine {
     }
 
     /// Apply shock to an agent and simulate cascade
-    pub fn apply_shock(&mut self, agent_id: &str, shock_magnitude: f64, timestamp: u64) -> CascadeResult {
+    pub fn apply_shock(
+        &mut self,
+        agent_id: &str,
+        shock_magnitude: f64,
+        timestamp: u64,
+    ) -> CascadeResult {
         // Record initial shock
         self.history.push(CascadeEvent {
             id: format!("shock-{}-{}", agent_id, timestamp),
@@ -407,7 +422,9 @@ impl CascadeEngine {
             }
 
             // Propagate to dependents
-            let outgoing: Vec<_> = self.network.outgoing_edges(&current_id)
+            let outgoing: Vec<_> = self
+                .network
+                .outgoing_edges(&current_id)
                 .filter(|e| e.weight >= self.config.min_edge_weight)
                 .cloned()
                 .collect();
@@ -417,7 +434,8 @@ impl CascadeEngine {
                     continue;
                 }
 
-                let propagated_magnitude = magnitude * self.config.propagation_factor
+                let propagated_magnitude = magnitude
+                    * self.config.propagation_factor
                     * edge.weight
                     * self.config.hop_decay.powi(depth as i32);
 
@@ -437,7 +455,11 @@ impl CascadeEngine {
 
                 self.history.push(CascadeEvent {
                     id: format!("prop-{}-{}", edge.to, timestamp),
-                    event_type: if failed { CascadeEventType::Failure } else { CascadeEventType::Propagation },
+                    event_type: if failed {
+                        CascadeEventType::Failure
+                    } else {
+                        CascadeEventType::Propagation
+                    },
                     agent_id: edge.to.clone(),
                     trust_delta: -propagated_magnitude,
                     depth: depth + 1,
@@ -450,15 +472,13 @@ impl CascadeEngine {
         }
 
         // Calculate result
-        let failed_count = self.network.agents()
-            .filter(|a| a.failed)
-            .count();
+        let failed_count = self.network.agents().filter(|a| a.failed).count();
 
-        let stressed_count = self.network.agents()
-            .filter(|a| a.stressed)
-            .count();
+        let stressed_count = self.network.agents().filter(|a| a.stressed).count();
 
-        let total_trust_loss: f64 = self.network.agents()
+        let total_trust_loss: f64 = self
+            .network
+            .agents()
             .map(|a| a.baseline_trust - a.trust)
             .sum();
 
@@ -469,12 +489,16 @@ impl CascadeEngine {
             agents_failed: failed_count,
             agents_stressed: stressed_count,
             total_trust_loss,
-            max_depth_reached: self.history.iter()
+            max_depth_reached: self
+                .history
+                .iter()
                 .filter(|e| e.timestamp == timestamp)
                 .map(|e| e.depth)
                 .max()
                 .unwrap_or(0),
-            events: self.history.iter()
+            events: self
+                .history
+                .iter()
                 .filter(|e| e.timestamp == timestamp)
                 .cloned()
                 .collect(),
@@ -564,24 +588,27 @@ impl CascadeEngine {
         }
 
         // Calculate metrics
-        let avg_cascade_size = shock_results.iter()
+        let avg_cascade_size = shock_results
+            .iter()
             .map(|r| r.agents_affected as f64)
-            .sum::<f64>() / shock_results.len() as f64;
+            .sum::<f64>()
+            / shock_results.len() as f64;
 
-        let avg_failures = shock_results.iter()
+        let avg_failures = shock_results
+            .iter()
             .map(|r| r.agents_failed as f64)
-            .sum::<f64>() / shock_results.len() as f64;
+            .sum::<f64>()
+            / shock_results.len() as f64;
 
-        let max_cascade = shock_results.iter()
+        let max_cascade = shock_results
+            .iter()
             .map(|r| r.agents_affected)
             .max()
             .unwrap_or(0);
 
         // Calculate centrality distribution
         let total_agents = self.network.agent_count() as f64;
-        let high_importance = self.network.agents()
-            .filter(|a| a.importance > 0.5)
-            .count() as f64;
+        let high_importance = self.network.agents().filter(|a| a.importance > 0.5).count() as f64;
 
         let concentration = high_importance / total_agents;
 
@@ -608,7 +635,14 @@ impl CascadeEngine {
         let mut visited = HashSet::new();
         let mut current_path = Vec::new();
 
-        self.dfs_paths(from, to, max_depth, &mut visited, &mut current_path, &mut paths);
+        self.dfs_paths(
+            from,
+            to,
+            max_depth,
+            &mut visited,
+            &mut current_path,
+            &mut paths,
+        );
 
         paths
     }
@@ -637,7 +671,14 @@ impl CascadeEngine {
         } else {
             for edge in self.network.outgoing_edges(current) {
                 if !visited.contains(&edge.to) && edge.weight >= self.config.min_edge_weight {
-                    self.dfs_paths(&edge.to, target, remaining_depth - 1, visited, current_path, paths);
+                    self.dfs_paths(
+                        &edge.to,
+                        target,
+                        remaining_depth - 1,
+                        visited,
+                        current_path,
+                        paths,
+                    );
                 }
             }
         }
@@ -650,7 +691,9 @@ impl CascadeEngine {
         let mut weight = 1.0;
 
         for window in path.windows(2) {
-            if let Some(edge) = self.network.outgoing_edges(&window[0])
+            if let Some(edge) = self
+                .network
+                .outgoing_edges(&window[0])
                 .find(|e| e.to == window[1])
             {
                 weight *= edge.weight * self.config.hop_decay;
@@ -673,14 +716,24 @@ impl CascadeEngine {
         };
 
         // Find strongly connected components (simplified)
-        let avg_degree = if n > 0 { (2 * m) as f64 / n as f64 } else { 0.0 };
+        let avg_degree = if n > 0 {
+            (2 * m) as f64 / n as f64
+        } else {
+            0.0
+        };
 
         // Calculate clustering coefficient (simplified)
         let mut total_clustering = 0.0;
         for agent_id in self.network.agent_ids() {
-            let neighbors: HashSet<_> = self.network.outgoing_edges(agent_id)
+            let neighbors: HashSet<_> = self
+                .network
+                .outgoing_edges(agent_id)
                 .map(|e| e.to.clone())
-                .chain(self.network.incoming_edges(agent_id).map(|e| e.from.clone()))
+                .chain(
+                    self.network
+                        .incoming_edges(agent_id)
+                        .map(|e| e.from.clone()),
+                )
                 .collect();
 
             if neighbors.len() < 2 {
@@ -693,7 +746,9 @@ impl CascadeEngine {
             for i in 0..neighbor_vec.len() {
                 for j in (i + 1)..neighbor_vec.len() {
                     // Check if neighbors are connected
-                    if self.network.outgoing_edges(neighbor_vec[i])
+                    if self
+                        .network
+                        .outgoing_edges(neighbor_vec[i])
                         .any(|e| &e.to == neighbor_vec[j])
                     {
                         triangles += 1;
@@ -707,7 +762,11 @@ impl CascadeEngine {
             }
         }
 
-        let clustering_coefficient = if n > 0 { total_clustering / n as f64 } else { 0.0 };
+        let clustering_coefficient = if n > 0 {
+            total_clustering / n as f64
+        } else {
+            0.0
+        };
 
         TopologyAnalysis {
             node_count: n,
@@ -983,7 +1042,10 @@ mod tests {
 
         // There should be both direct and indirect paths
         let path_lengths: Vec<_> = paths.iter().map(|p| p.nodes.len()).collect();
-        assert!(path_lengths.iter().any(|&l| l > 2), "Should have paths longer than 2");
+        assert!(
+            path_lengths.iter().any(|&l| l > 2),
+            "Should have paths longer than 2"
+        );
     }
 
     #[test]

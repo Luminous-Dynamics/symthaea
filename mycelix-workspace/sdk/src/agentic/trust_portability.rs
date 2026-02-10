@@ -281,8 +281,12 @@ pub struct VerificationResult {
 /// Bridge adapter trait
 pub trait BridgeAdapter {
     /// Export trust to this chain
-    fn export(&self, agent_id: &str, kvector: &KVector, dimensions: &[KVectorDimension])
-        -> Result<ExportResult, BridgeError>;
+    fn export(
+        &self,
+        agent_id: &str,
+        kvector: &KVector,
+        dimensions: &[KVectorDimension],
+    ) -> Result<ExportResult, BridgeError>;
 
     /// Import trust from another chain
     fn import(&self, package: &PortableTrust) -> Result<ImportResult, BridgeError>;
@@ -301,14 +305,20 @@ pub trait BridgeAdapter {
 #[derive(Debug, Clone)]
 pub enum BridgeError {
     /// Target chain is not supported.
-    ChainNotSupported(/// Chain ID.
-        ChainId),
+    ChainNotSupported(
+        /// Chain ID.
+        ChainId,
+    ),
     /// Proof type not supported by target chain.
-    ProofTypeNotSupported(/// Proof type.
-        ProofType),
+    ProofTypeNotSupported(
+        /// Proof type.
+        ProofType,
+    ),
     /// Proof verification failed.
-    VerificationFailed(/// Error message.
-        String),
+    VerificationFailed(
+        /// Error message.
+        String,
+    ),
     /// Trust package has expired.
     PackageExpired,
     /// Source chain reputation is too low.
@@ -319,11 +329,15 @@ pub enum BridgeError {
         actual: f64,
     },
     /// Network communication error.
-    NetworkError(/// Error message.
-        String),
+    NetworkError(
+        /// Error message.
+        String,
+    ),
     /// Proof data is invalid.
-    InvalidProof(/// Error message.
-        String),
+    InvalidProof(
+        /// Error message.
+        String,
+    ),
 }
 
 impl std::fmt::Display for BridgeError {
@@ -334,7 +348,11 @@ impl std::fmt::Display for BridgeError {
             Self::VerificationFailed(msg) => write!(f, "Verification failed: {}", msg),
             Self::PackageExpired => write!(f, "Trust package expired"),
             Self::InsufficientReputation { required, actual } => {
-                write!(f, "Insufficient reputation: {} required, {} actual", required, actual)
+                write!(
+                    f,
+                    "Insufficient reputation: {} required, {} actual",
+                    required, actual
+                )
             }
             Self::NetworkError(msg) => write!(f, "Network error: {}", msg),
             Self::InvalidProof(msg) => write!(f, "Invalid proof: {}", msg),
@@ -379,9 +397,12 @@ impl MockBridgeAdapter {
 }
 
 impl BridgeAdapter for MockBridgeAdapter {
-    fn export(&self, agent_id: &str, kvector: &KVector, dimensions: &[KVectorDimension])
-        -> Result<ExportResult, BridgeError>
-    {
+    fn export(
+        &self,
+        agent_id: &str,
+        kvector: &KVector,
+        dimensions: &[KVectorDimension],
+    ) -> Result<ExportResult, BridgeError> {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -453,7 +474,11 @@ impl BridgeAdapter for MockBridgeAdapter {
             valid,
             method: proof.proof_type,
             confidence: if valid { 0.95 } else { 0.0 },
-            errors: if valid { vec![] } else { vec!["Empty proof data".to_string()] },
+            errors: if valid {
+                vec![]
+            } else {
+                vec!["Empty proof data".to_string()]
+            },
         })
     }
 
@@ -514,7 +539,9 @@ impl PortabilityEngine {
         target_chain: &ChainId,
         dimensions: Option<Vec<KVectorDimension>>,
     ) -> Result<PortableTrust, BridgeError> {
-        let target = self.chains.get(target_chain)
+        let target = self
+            .chains
+            .get(target_chain)
             .ok_or_else(|| BridgeError::ChainNotSupported(target_chain.clone()))?;
 
         // Check target chain reputation
@@ -530,12 +557,14 @@ impl PortabilityEngine {
             .unwrap_or_default()
             .as_millis() as u64;
 
-        let dims = dimensions.unwrap_or_else(|| vec![
-            KVectorDimension::Reputation,
-            KVectorDimension::Activity,
-            KVectorDimension::Integrity,
-            KVectorDimension::Performance,
-        ]);
+        let dims = dimensions.unwrap_or_else(|| {
+            vec![
+                KVectorDimension::Reputation,
+                KVectorDimension::Activity,
+                KVectorDimension::Integrity,
+                KVectorDimension::Performance,
+            ]
+        });
 
         // Generate proof (simplified)
         let proof = self.generate_proof(kvector, &dims)?;
@@ -554,19 +583,23 @@ impl PortabilityEngine {
         })
     }
 
-    fn generate_proof(&self, kvector: &KVector, dimensions: &[KVectorDimension])
-        -> Result<TrustProof, BridgeError>
-    {
+    fn generate_proof(
+        &self,
+        kvector: &KVector,
+        dimensions: &[KVectorDimension],
+    ) -> Result<TrustProof, BridgeError> {
         // Simplified proof generation
         // Real implementation would generate actual ZK proof
 
         let proof_data = serde_json::to_vec(kvector).unwrap_or_default(); // Serialize K-Vector
-        let public_inputs = dimensions.iter()
-            .map(|d| *d as u8)
-            .collect();
+        let public_inputs = dimensions.iter().map(|d| *d as u8).collect();
 
         Ok(TrustProof {
-            proof_type: if self.config.require_zk { ProofType::ZK } else { ProofType::MultiSig },
+            proof_type: if self.config.require_zk {
+                ProofType::ZK
+            } else {
+                ProofType::MultiSig
+            },
             proof_data,
             public_inputs,
             vk_id: "mycelix-trust-v1".to_string(),
@@ -587,7 +620,9 @@ impl PortabilityEngine {
         }
 
         // Get source chain reputation
-        let source_reputation = self.chains.get(&package.source_chain)
+        let source_reputation = self
+            .chains
+            .get(&package.source_chain)
             .map(|c| c.reputation)
             .unwrap_or(0.5);
 
@@ -595,9 +630,7 @@ impl PortabilityEngine {
         let verification = self.verify_proof(&package.proof)?;
 
         if !verification.valid {
-            return Err(BridgeError::InvalidProof(
-                verification.errors.join(", "),
-            ));
+            return Err(BridgeError::InvalidProof(verification.errors.join(", ")));
         }
 
         // Calculate discounted trust
@@ -612,7 +645,8 @@ impl PortabilityEngine {
             verification,
         };
 
-        self.imported_trust.insert(package.agent_id.clone(), result.clone());
+        self.imported_trust
+            .insert(package.agent_id.clone(), result.clone());
 
         Ok(result)
     }
@@ -627,7 +661,11 @@ impl PortabilityEngine {
             valid,
             method: proof.proof_type,
             confidence: if valid { 0.9 } else { 0.0 },
-            errors: if valid { vec![] } else { vec!["Invalid proof data".to_string()] },
+            errors: if valid {
+                vec![]
+            } else {
+                vec!["Invalid proof data".to_string()]
+            },
         })
     }
 
@@ -638,7 +676,8 @@ impl PortabilityEngine {
 
     /// Get total cross-chain trust for an agent
     pub fn total_cross_chain_trust(&self, agent_id: &str) -> f64 {
-        self.imported_trust.get(agent_id)
+        self.imported_trust
+            .get(agent_id)
             .map(|r| r.applied_trust)
             .unwrap_or(0.0)
     }
@@ -711,12 +750,7 @@ mod tests {
 
         let kvector = KVector::new(0.8, 0.7, 0.9, 0.6, 0.5, 0.4, 0.7, 0.5, 0.8, 0.6);
 
-        let package = engine.prepare_export(
-            "agent-1",
-            &kvector,
-            &ChainId::new("polygon"),
-            None,
-        );
+        let package = engine.prepare_export("agent-1", &kvector, &ChainId::new("polygon"), None);
 
         assert!(package.is_ok());
         let pkg = package.unwrap();
@@ -806,11 +840,7 @@ mod tests {
         let adapter = MockBridgeAdapter::new("test-chain", ChainType::EVM);
 
         let kvector = KVector::new_participant();
-        let result = adapter.export(
-            "agent-1",
-            &kvector,
-            &[KVectorDimension::Reputation],
-        );
+        let result = adapter.export("agent-1", &kvector, &[KVectorDimension::Reputation]);
 
         assert!(result.is_ok());
         let export = result.unwrap();

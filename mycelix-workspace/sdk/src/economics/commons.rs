@@ -10,9 +10,9 @@
 //! Constitutional: Inalienable reserve minimum 25% (can increase, never decrease).
 //! Constitutional: All commons SAP exempt from demurrage.
 
+use mycelix_finance_types::INALIENABLE_RESERVE_RATIO;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use mycelix_finance_types::INALIENABLE_RESERVE_RATIO;
 
 /// Commons pool state
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,14 +70,23 @@ impl Default for CommonsGovernance {
 pub enum CommonsResult {
     /// Contribution accepted
     Contributed {
+        /// Total contribution amount
         total: u64,
+        /// Amount directed to inalienable reserve
         to_reserve: u64,
+        /// Amount directed to available balance
         to_available: u64,
     },
     /// Allocation approved (auto or voted)
-    Allocated { amount: u64 },
+    Allocated {
+        /// Amount allocated from the pool
+        amount: u64,
+    },
     /// Error
-    Error { message: String },
+    Error {
+        /// Error description
+        message: String,
+    },
 }
 
 impl CommonsPool {
@@ -120,7 +129,8 @@ impl CommonsPool {
         self.last_activity = timestamp;
 
         // Track contribution
-        let contribution = self.contributions
+        let contribution = self
+            .contributions
             .entry(member_did.to_string())
             .or_insert_with(|| CommonsContribution {
                 sap_contributed: 0,
@@ -192,7 +202,11 @@ mod tests {
         let mut pool = CommonsPool::new("local-dao-1".to_string(), 1000);
 
         match pool.contribute("did:test:alice", 1_000, 1001) {
-            CommonsResult::Contributed { total, to_reserve, to_available } => {
+            CommonsResult::Contributed {
+                total,
+                to_reserve,
+                to_available,
+            } => {
                 assert_eq!(total, 1_000);
                 assert_eq!(to_reserve, 250);
                 assert_eq!(to_available, 750);

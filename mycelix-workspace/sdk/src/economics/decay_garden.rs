@@ -23,7 +23,7 @@ pub struct DemurrageConfig {
 impl Default for DemurrageConfig {
     fn default() -> Self {
         Self {
-            annual_rate: 0.02,  // 2%
+            annual_rate: 0.02,   // 2%
             exempt_floor: 1_000, // 1,000 SAP protected
             distribution: CompostDistribution::default(),
         }
@@ -54,9 +54,8 @@ impl Default for CompostDistribution {
 impl CompostDistribution {
     /// Validate distribution ratios sum to 1.0
     pub fn is_valid(&self) -> bool {
-        let sum = self.local_commons_ratio
-            + self.regional_commons_ratio
-            + self.global_commons_ratio;
+        let sum =
+            self.local_commons_ratio + self.regional_commons_ratio + self.global_commons_ratio;
         (sum - 1.0).abs() < 0.001
     }
 
@@ -146,8 +145,11 @@ mod tests {
         let decayed = calculate_demurrage(10_000, 1_000, 0.02, one_year);
 
         // 9,000 eligible × (1 - e^(-0.02)) ≈ 9,000 × 0.0198 ≈ 178
-        assert!(decayed > 150 && decayed < 200,
-            "Expected ~178 decay, got {}", decayed);
+        assert!(
+            decayed > 150 && decayed < 200,
+            "Expected ~178 decay, got {}",
+            decayed
+        );
     }
 
     #[test]
@@ -157,8 +159,11 @@ mod tests {
         let decayed = calculate_demurrage(10_000, 1_000, 0.02, five_years);
 
         // 9,000 × (1 - e^(-0.10)) ≈ 9,000 × 0.0952 ≈ 857
-        assert!(decayed > 800 && decayed < 950,
-            "Expected ~857 decay, got {}", decayed);
+        assert!(
+            decayed > 800 && decayed < 950,
+            "Expected ~857 decay, got {}",
+            decayed
+        );
     }
 
     #[test]
