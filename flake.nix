@@ -91,6 +91,17 @@
           # C++ standard library (libstdc++.so.6 for neural bridge tests)
           stdenv.cc.cc.lib
 
+          # LaTeX for paper compilation
+          (texliveSmall.withPackages (tp: with tp; [
+            collection-latexrecommended
+            collection-fontsrecommended
+            booktabs
+            natbib
+            multirow
+            enumitem
+            float
+          ]))
+
           # Development tools
           cmake
           gnuplot
@@ -158,6 +169,9 @@
             echo "    --features embeddings          # Qwen3/BGE embeddings"
             echo "    --features perception          # Full multimodal perception"
             echo "    --features pyphi               # PyPhi IIT integration"
+            echo ""
+            echo "  Paper:"
+            echo "    cd papers/latex && pdflatex hai_paper && bibtex hai_paper && pdflatex hai_paper && pdflatex hai_paper"
             echo ""
             echo "  Data available:"
             [ -d "$PWD/data/sleep-edf" ] && echo "    - Sleep EDF: $PWD/data/sleep-edf"
