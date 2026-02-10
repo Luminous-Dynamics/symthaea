@@ -28,8 +28,8 @@
 //! ```
 
 use super::proof_system::{
-    BackendConfig, BackendType, GenericReceipt, ProofOutput, ProofStatement, ProofStats,
-    ProofSystemError, ProofWitness, SimulationBackend,
+    BackendConfig, BackendType, GenericReceipt, ProofOutput, ProofReceipt, ProofStatement,
+    ProofStats, ProofSystemError, ProofWitness, SimulationBackend,
 };
 use super::trust_risc0::{
     compute_commitment as zk_compute_commitment, evaluate_statement, ZkKVector, ZkTrustParams,
