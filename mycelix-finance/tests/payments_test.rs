@@ -96,7 +96,7 @@ mod payment_creation {
         let payment_input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 100.0,
+            amount: 100_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Test payment from Alice to Bob".to_string()),
@@ -124,7 +124,7 @@ mod payment_creation {
         assert!(payment.id.starts_with("payment:"), "Payment ID should have correct prefix");
         assert_eq!(payment.from_did, alice_did, "From DID mismatch");
         assert_eq!(payment.to_did, bob_did, "To DID mismatch");
-        assert_eq!(payment.amount, 100.0, "Amount mismatch");
+        assert_eq!(payment.amount, 100_000_000, "Amount mismatch");
         assert_eq!(payment.currency, TEST_CURRENCY, "Currency mismatch");
         assert!(matches!(payment.status, TransferStatus::Completed), "Status should be Completed");
         assert!(payment.memo.is_some(), "Memo should be present");
@@ -168,7 +168,7 @@ mod payment_creation {
             let input = SendPaymentInput {
                 from_did: alice_did.clone(),
                 to_did: bob_did.clone(),
-                amount: 10.0,
+                amount: 10_000_000,
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: payment_type.clone(),
                 memo: Some(format!("Test {} payment", type_name)),
@@ -223,7 +223,7 @@ mod payment_creation {
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 50.0,
+            amount: 50_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Recurring(recurring_config.clone()),
             memo: Some("Monthly subscription".to_string()),
@@ -283,7 +283,7 @@ mod payment_validation {
         let invalid_sender_input = SendPaymentInput {
             from_did: "invalid:alice".to_string(), // Invalid - no "did:" prefix
             to_did: test_did("bob"),
-            amount: 100.0,
+            amount: 100_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
@@ -310,7 +310,7 @@ mod payment_validation {
         let invalid_receiver_input = SendPaymentInput {
             from_did: test_did("alice"),
             to_did: "bob@example.com".to_string(), // Invalid - email format
-            amount: 100.0,
+            amount: 100_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
@@ -360,7 +360,7 @@ mod payment_validation {
         let zero_amount_input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 0.0,
+            amount: 0,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
@@ -382,31 +382,8 @@ mod payment_validation {
             Ok(_) => panic!("Should have rejected zero amount"),
         }
 
-        // Test negative amount
-        let negative_amount_input = SendPaymentInput {
-            from_did: alice_did.clone(),
-            to_did: bob_did.clone(),
-            amount: -50.0,
-            currency: TEST_CURRENCY.to_string(),
-            payment_type: PaymentType::Direct,
-            memo: None,
-        };
-
-        let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "send_payment", negative_amount_input)
-            .await;
-
-        match result {
-            Err(e) => {
-                let error_msg = format!("{:?}", e);
-                assert!(
-                    error_msg.contains("Amount must be positive"),
-                    "Should reject negative amount, got: {}", error_msg
-                );
-                println!("  - Negative amount rejected: OK");
-            }
-            Ok(_) => panic!("Should have rejected negative amount"),
-        }
+        // Note: negative amounts are now impossible at the type level (u64 is always >= 0).
+        // Only zero-amount validation remains relevant.
 
         println!("Test 2.2 PASSED: Invalid amounts are properly rejected");
     }
@@ -434,7 +411,7 @@ mod payment_validation {
         let self_payment_input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: alice_did.clone(), // Same as from_did
-            amount: 100.0,
+            amount: 100_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Self payment attempt".to_string()),
@@ -486,7 +463,7 @@ mod payment_validation {
             let input = SendPaymentInput {
                 from_did: alice_did.clone(),
                 to_did: bob_did.clone(),
-                amount: 10.0,
+                amount: 10_000_000,
                 currency: currency.to_string(),
                 payment_type: PaymentType::Direct,
                 memo: None,
@@ -549,7 +526,7 @@ mod double_spend_prevention {
             let input = SendPaymentInput {
                 from_did: alice_did.clone(),
                 to_did: bob_did.clone(),
-                amount: 10.0,
+                amount: 10_000_000,
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: PaymentType::Direct,
                 memo: Some(format!("Payment {}", i)),
@@ -612,7 +589,7 @@ mod double_spend_prevention {
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 100.0,
+            amount: 100_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Payment with receipt".to_string()),
@@ -631,7 +608,10 @@ mod double_spend_prevention {
 
         // Get payment history and verify receipt link exists
         let history: Vec<Record> = conductor
-            .call(&alice_cell.zome("payments"), "get_payment_history", alice_did.clone())
+            .call(&alice_cell.zome("payments"), "get_payment_history", GetPaymentHistoryInput {
+                did: alice_did.clone(),
+                limit: None,
+            })
             .await
             .expect("Failed to get payment history");
 
@@ -674,8 +654,8 @@ mod double_spend_prevention {
             party_a: alice_did.clone(),
             party_b: bob_did.clone(),
             currency: TEST_CURRENCY.to_string(),
-            initial_deposit_a: 500.0,
-            initial_deposit_b: 300.0,
+            initial_deposit_a: 500_000_000,
+            initial_deposit_b: 300_000_000,
         };
 
         let channel_record: Record = conductor
@@ -694,13 +674,13 @@ mod double_spend_prevention {
         println!("  - Initial balances: A={}, B={}", channel.balance_a, channel.balance_b);
 
         // Verify initial state
-        assert_eq!(channel.balance_a, 500.0, "Initial balance A mismatch");
-        assert_eq!(channel.balance_b, 300.0, "Initial balance B mismatch");
+        assert_eq!(channel.balance_a, 500_000_000, "Initial balance A mismatch");
+        assert_eq!(channel.balance_b, 300_000_000, "Initial balance B mismatch");
 
         // Make transfers within channel
         let transfer_input = ChannelTransferInput {
             channel_id: channel_id.clone(),
-            amount: 100.0,
+            amount: 100_000_000,
             from_a: true, // Alice sends to Bob
         };
 
@@ -716,11 +696,11 @@ mod double_spend_prevention {
             .expect("No entry");
 
         // Verify conservation of total balance
-        let total_before = 500.0 + 300.0;
+        let total_before: u64 = 500_000_000 + 300_000_000;
         let total_after = channel_after.balance_a + channel_after.balance_b;
         assert_eq!(total_before, total_after, "Total balance should be conserved");
-        assert_eq!(channel_after.balance_a, 400.0, "Balance A after transfer");
-        assert_eq!(channel_after.balance_b, 400.0, "Balance B after transfer");
+        assert_eq!(channel_after.balance_a, 400_000_000, "Balance A after transfer");
+        assert_eq!(channel_after.balance_b, 400_000_000, "Balance B after transfer");
 
         println!("  - After transfer: A={}, B={}", channel_after.balance_a, channel_after.balance_b);
         println!("  - Total conserved: {}", total_after);
@@ -754,8 +734,8 @@ mod double_spend_prevention {
             party_a: alice_did.clone(),
             party_b: bob_did.clone(),
             currency: TEST_CURRENCY.to_string(),
-            initial_deposit_a: 100.0,
-            initial_deposit_b: 100.0,
+            initial_deposit_a: 100_000_000,
+            initial_deposit_b: 100_000_000,
         };
 
         let channel_record: Record = conductor
@@ -774,7 +754,7 @@ mod double_spend_prevention {
         // Attempt transfer exceeding balance
         let transfer_input = ChannelTransferInput {
             channel_id: channel_id.clone(),
-            amount: 150.0, // Exceeds Alice's 100.0 balance
+            amount: 150_000_000, // Exceeds Alice's 100_000_000 balance
             from_a: true,
         };
 
@@ -829,7 +809,7 @@ mod transaction_confirmation {
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 100.0,
+            amount: 100_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
@@ -890,7 +870,7 @@ mod transaction_confirmation {
         let input1 = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 50.0,
+            amount: 50_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Alice to Bob".to_string()),
@@ -906,7 +886,7 @@ mod transaction_confirmation {
         let input2 = SendPaymentInput {
             from_did: charlie_did.clone(),
             to_did: alice_did.clone(),
-            amount: 30.0,
+            amount: 30_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Charlie to Alice".to_string()),
@@ -922,7 +902,7 @@ mod transaction_confirmation {
         let input3 = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: charlie_did.clone(),
-            amount: 20.0,
+            amount: 20_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Alice to Charlie".to_string()),
@@ -939,7 +919,10 @@ mod transaction_confirmation {
 
         // Get Alice's payment history (should include sent and received)
         let alice_history: Vec<Record> = conductor
-            .call(&alice_cell.zome("payments"), "get_payment_history", alice_did.clone())
+            .call(&alice_cell.zome("payments"), "get_payment_history", GetPaymentHistoryInput {
+                did: alice_did.clone(),
+                limit: None,
+            })
             .await
             .expect("Failed to get Alice's history");
 
@@ -948,7 +931,10 @@ mod transaction_confirmation {
 
         // Get Bob's payment history
         let bob_history: Vec<Record> = conductor
-            .call(&bob_cell.zome("payments"), "get_payment_history", bob_did.clone())
+            .call(&bob_cell.zome("payments"), "get_payment_history", GetPaymentHistoryInput {
+                did: bob_did.clone(),
+                limit: None,
+            })
             .await
             .expect("Failed to get Bob's history");
 
@@ -990,7 +976,7 @@ mod currency_tests {
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 100.0,
+            amount: 100_000_000,
             currency: "SAP".to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("SAP payment".to_string()),
@@ -1008,7 +994,7 @@ mod currency_tests {
             .expect("No entry");
 
         assert_eq!(payment.currency, "SAP", "Currency should be SAP");
-        assert_eq!(payment.amount, 100.0, "Full amount should be recorded");
+        assert_eq!(payment.amount, 100_000_000, "Full amount should be recorded");
         println!("  - SAP payment amount: {}", payment.amount);
         println!("  - Currency: {}", payment.currency);
         println!("Test 5.1 PASSED: SAP payment works");
@@ -1037,7 +1023,7 @@ mod currency_tests {
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 5.0,
+            amount: 5_000_000,
             currency: "TEND".to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("TEND payment".to_string()),
@@ -1084,7 +1070,7 @@ mod currency_tests {
         let sap_input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 10.0,
+            amount: 10_000_000,
             currency: "SAP".to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
@@ -1100,7 +1086,7 @@ mod currency_tests {
         let tend_input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 10.0,
+            amount: 10_000_000,
             currency: "TEND".to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
@@ -1116,7 +1102,7 @@ mod currency_tests {
         let myc_input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 10.0,
+            amount: 10_000_000,
             currency: "MYC".to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
@@ -1162,7 +1148,7 @@ mod failed_transaction_handling {
         // Try to transfer on non-existent channel
         let transfer_input = ChannelTransferInput {
             channel_id: "channel:nonexistent:12345".to_string(),
-            amount: 50.0,
+            amount: 50_000_000,
             from_a: true,
         };
 
@@ -1207,7 +1193,10 @@ mod failed_transaction_handling {
         let new_user_did = test_did("new_user_with_no_payments");
 
         let history: Vec<Record> = conductor
-            .call(&alice_cell.zome("payments"), "get_payment_history", new_user_did)
+            .call(&alice_cell.zome("payments"), "get_payment_history", GetPaymentHistoryInput {
+                did: new_user_did,
+                limit: None,
+            })
             .await
             .expect("Failed to get history");
 
@@ -1244,8 +1233,8 @@ mod failed_transaction_handling {
             party_a: alice_did.clone(),
             party_b: bob_did.clone(),
             currency: TEST_CURRENCY.to_string(),
-            initial_deposit_a: 1000.0,
-            initial_deposit_b: 1000.0,
+            initial_deposit_a: 1_000_000_000,
+            initial_deposit_b: 1_000_000_000,
         };
 
         let channel_record: Record = conductor
@@ -1263,9 +1252,9 @@ mod failed_transaction_handling {
         println!("  - Channel opened with 1000/1000 balances");
 
         // Perform rapid sequential transfers
-        let transfer_amounts = vec![100.0, 150.0, 75.0, 200.0, 50.0];
-        let mut expected_balance_a = 1000.0;
-        let mut expected_balance_b = 1000.0;
+        let transfer_amounts: Vec<u64> = vec![100_000_000, 150_000_000, 75_000_000, 200_000_000, 50_000_000];
+        let mut expected_balance_a: u64 = 1_000_000_000;
+        let mut expected_balance_b: u64 = 1_000_000_000;
 
         for (i, amount) in transfer_amounts.iter().enumerate() {
             let from_a = i % 2 == 0; // Alternate between A and B sending
@@ -1307,7 +1296,7 @@ mod failed_transaction_handling {
 
         // Verify final total
         let final_total = expected_balance_a + expected_balance_b;
-        assert_eq!(final_total, 2000.0, "Total balance should be conserved");
+        assert_eq!(final_total, 2_000_000_000, "Total balance should be conserved");
         println!("  - Final total conserved: {}", final_total);
 
         println!("Test 6.3 PASSED: Concurrent transfers handled correctly");
@@ -1346,8 +1335,8 @@ mod payment_channels {
             party_a: alice_did.clone(),
             party_b: bob_did.clone(),
             currency: TEST_CURRENCY.to_string(),
-            initial_deposit_a: 500.0,
-            initial_deposit_b: 300.0,
+            initial_deposit_a: 500_000_000,
+            initial_deposit_b: 300_000_000,
         };
 
         let result: Record = conductor
@@ -1364,8 +1353,8 @@ mod payment_channels {
         assert!(channel.id.starts_with("channel:"), "Channel ID format");
         assert_eq!(channel.party_a, alice_did, "Party A mismatch");
         assert_eq!(channel.party_b, bob_did, "Party B mismatch");
-        assert_eq!(channel.balance_a, 500.0, "Balance A mismatch");
-        assert_eq!(channel.balance_b, 300.0, "Balance B mismatch");
+        assert_eq!(channel.balance_a, 500_000_000, "Balance A mismatch");
+        assert_eq!(channel.balance_b, 300_000_000, "Balance B mismatch");
         assert_eq!(channel.currency, TEST_CURRENCY, "Currency mismatch");
         assert!(channel.closed.is_none(), "Channel should not be closed");
 
@@ -1403,8 +1392,8 @@ mod payment_channels {
             party_a: alice_did.clone(),
             party_b: bob_did.clone(),
             currency: TEST_CURRENCY.to_string(),
-            initial_deposit_a: 100.0,
-            initial_deposit_b: 100.0,
+            initial_deposit_a: 100_000_000,
+            initial_deposit_b: 100_000_000,
         };
 
         let channel_record: Record = conductor
@@ -1419,12 +1408,12 @@ mod payment_channels {
             .expect("No entry");
 
         let channel_id = channel.id.clone();
-        println!("  - Initial: A=100, B=100");
+        println!("  - Initial: A=100M, B=100M");
 
         // Alice -> Bob (from_a = true)
         let transfer1 = ChannelTransferInput {
             channel_id: channel_id.clone(),
-            amount: 30.0,
+            amount: 30_000_000,
             from_a: true,
         };
 
@@ -1439,14 +1428,14 @@ mod payment_channels {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert_eq!(channel1.balance_a, 70.0, "After A->B: A balance");
-        assert_eq!(channel1.balance_b, 130.0, "After A->B: B balance");
-        println!("  - After A->B (30): A=70, B=130");
+        assert_eq!(channel1.balance_a, 70_000_000, "After A->B: A balance");
+        assert_eq!(channel1.balance_b, 130_000_000, "After A->B: B balance");
+        println!("  - After A->B (30M): A=70M, B=130M");
 
         // Bob -> Alice (from_a = false)
         let transfer2 = ChannelTransferInput {
             channel_id: channel_id.clone(),
-            amount: 50.0,
+            amount: 50_000_000,
             from_a: false,
         };
 
@@ -1461,13 +1450,13 @@ mod payment_channels {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert_eq!(channel2.balance_a, 120.0, "After B->A: A balance");
-        assert_eq!(channel2.balance_b, 80.0, "After B->A: B balance");
-        println!("  - After B->A (50): A=120, B=80");
+        assert_eq!(channel2.balance_a, 120_000_000, "After B->A: A balance");
+        assert_eq!(channel2.balance_b, 80_000_000, "After B->A: B balance");
+        println!("  - After B->A (50M): A=120M, B=80M");
 
         // Verify total conserved
         let total = channel2.balance_a + channel2.balance_b;
-        assert_eq!(total, 200.0, "Total should be conserved");
+        assert_eq!(total, 200_000_000, "Total should be conserved");
 
         println!("Test 7.2 PASSED: Bidirectional transfers work correctly");
     }
@@ -1495,8 +1484,8 @@ mod payment_channels {
             party_a: "invalid_did".to_string(), // No "did:" prefix
             party_b: test_did("bob"),
             currency: TEST_CURRENCY.to_string(),
-            initial_deposit_a: 100.0,
-            initial_deposit_b: 100.0,
+            initial_deposit_a: 100_000_000,
+            initial_deposit_b: 100_000_000,
         };
 
         let result: Result<Record, _> = conductor
@@ -1516,31 +1505,8 @@ mod payment_channels {
             Ok(_) => panic!("Should have rejected invalid party_a"),
         }
 
-        // Test negative balance
-        let negative_balance_input = OpenChannelInput {
-            party_a: test_did("alice"),
-            party_b: test_did("bob"),
-            currency: TEST_CURRENCY.to_string(),
-            initial_deposit_a: -50.0, // Negative
-            initial_deposit_b: 100.0,
-        };
-
-        let result: Result<Record, _> = conductor
-            .call_fallible(&alice_cell.zome("payments"), "open_payment_channel", negative_balance_input)
-            .await;
-
-        match result {
-            Err(e) => {
-                let error_msg = format!("{:?}", e);
-                assert!(
-                    error_msg.contains("Balances cannot be negative") ||
-                    error_msg.contains("negative"),
-                    "Should reject negative balance, got: {}", error_msg
-                );
-                println!("  - Negative balance rejected: OK");
-            }
-            Ok(_) => panic!("Should have rejected negative balance"),
-        }
+        // Note: negative deposit amounts are now impossible at the type level (u64 is always >= 0).
+        // Only DID validation remains relevant for channel creation.
 
         println!("Test 7.3 PASSED: Channel validation works correctly");
     }
@@ -1681,7 +1647,7 @@ mod performance_benchmarks {
             let input = SendPaymentInput {
                 from_did: alice_did.clone(),
                 to_did: bob_did.clone(),
-                amount: 10.0,
+                amount: 10_000_000,
                 currency: TEST_CURRENCY.to_string(),
                 payment_type: PaymentType::Direct,
                 memo: Some(format!("Benchmark payment {}", i)),
@@ -2010,13 +1976,13 @@ mod exit_protocol {
         struct InitiateExitInput {
             pub member_did: String,
             pub succession_preference: SuccessionPreference,
-            pub sap_balance: f64,
+            pub sap_balance: u64,
         }
 
         let input = InitiateExitInput {
             member_did: alice_did.clone(),
             succession_preference: SuccessionPreference::Commons,
-            sap_balance: 500.0,
+            sap_balance: 500_000_000,
         };
 
         let result: Record = conductor
@@ -2032,7 +1998,7 @@ mod exit_protocol {
 
         assert_eq!(exit.member_did, alice_did, "Member DID mismatch");
         assert!(matches!(exit.succession_preference, SuccessionPreference::Commons));
-        assert_eq!(exit.sap_balance, 500.0, "SAP balance mismatch");
+        assert_eq!(exit.sap_balance, 500_000_000, "SAP balance mismatch");
 
         println!("  - Exit initiated for: {}", exit.member_did);
         println!("  - Succession: Commons");
@@ -2064,14 +2030,14 @@ mod exit_protocol {
         struct InitiateExitInput {
             pub member_did: String,
             pub succession_preference: SuccessionPreference,
-            pub sap_balance: f64,
+            pub sap_balance: u64,
         }
 
         let designee_did = test_did("bob");
         let input = InitiateExitInput {
             member_did: alice_did.clone(),
             succession_preference: SuccessionPreference::Designee(designee_did.clone()),
-            sap_balance: 250.0,
+            sap_balance: 250_000_000,
         };
 
         let result: Record = conductor
@@ -2131,7 +2097,7 @@ mod escrow_tests {
         struct CreateEscrowInput {
             pub from_did: String,
             pub to_did: String,
-            pub amount: f64,
+            pub amount: u64,
             pub currency: String,
             pub escrow_id: String,
             pub memo: Option<String>,
@@ -2140,7 +2106,7 @@ mod escrow_tests {
         let escrow_input = CreateEscrowInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 200.0,
+            amount: 200_000_000,
             currency: TEST_CURRENCY.to_string(),
             escrow_id: "escrow:test:001".to_string(),
             memo: Some("Test escrow".to_string()),
@@ -2201,7 +2167,7 @@ mod escrow_tests {
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 100.0,
+            amount: 100_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Payment to refund".to_string()),
@@ -2261,7 +2227,7 @@ mod escrow_tests {
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 50.0,
+            amount: 50_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
             memo: None,
@@ -2340,8 +2306,8 @@ mod channel_close_tests {
             party_a: alice_did.clone(),
             party_b: bob_did.clone(),
             currency: TEST_CURRENCY.to_string(),
-            initial_deposit_a: 200.0,
-            initial_deposit_b: 200.0,
+            initial_deposit_a: 200_000_000,
+            initial_deposit_b: 200_000_000,
         };
 
         let channel_record: Record = conductor
@@ -2401,8 +2367,8 @@ mod channel_close_tests {
             party_a: alice_did.clone(),
             party_b: bob_did.clone(),
             currency: TEST_CURRENCY.to_string(),
-            initial_deposit_a: 100.0,
-            initial_deposit_b: 100.0,
+            initial_deposit_a: 100_000_000,
+            initial_deposit_b: 100_000_000,
         };
 
         let channel_record: Record = conductor
@@ -2599,7 +2565,7 @@ mod fee_tier_tests {
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 1.0, // 1 SAP = 1_000_000 micro-SAP
+            amount: 1_000_000, // 1 SAP = 1_000_000 micro-SAP
             currency: "SAP".to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Fee tier test payment".to_string()),
@@ -2677,7 +2643,7 @@ mod fee_tier_tests {
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
             to_did: bob_did.clone(),
-            amount: 5.0,
+            amount: 5_000_000,
             currency: "TEND".to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("TEND fee test".to_string()),
@@ -2695,11 +2661,11 @@ mod fee_tier_tests {
             .expect("No entry");
 
         assert_eq!(payment.currency, "TEND", "Currency should be TEND");
-        assert_eq!(payment.amount, 5.0, "Amount should be recorded as-is");
+        assert_eq!(payment.amount, 5_000_000, "Amount should be recorded as-is");
         assert!(matches!(payment.status, TransferStatus::Completed));
 
         // TEND payments do not go through debit_sap/credit_sap, so no fee is applied.
-        // The coordinator code path for non-SAP currencies sets fee_amount = 0.0.
+        // The coordinator code path for non-SAP currencies sets fee_amount = 0.
         println!("  - TEND payment completed: {} TEND (fee-free)", payment.amount);
         println!("  - No SAP balance deduction for TEND payments");
 

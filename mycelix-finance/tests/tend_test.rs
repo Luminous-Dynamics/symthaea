@@ -36,6 +36,13 @@ mod test_helpers {
 
 use test_helpers::*;
 
+/// Paginated input for get_dao_listings
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PaginatedDaoInput {
+    pub dao_did: String,
+    pub limit: Option<usize>,
+}
+
 // ============================================================================
 // Section 1: Balance Limits Tests
 // ============================================================================
@@ -490,7 +497,10 @@ mod service_listings {
 
         // Query all DAO listings
         let listings: Vec<ServiceListing> = conductor
-            .call(&alice_cell.zome("tend"), "get_dao_listings", TEST_DAO.to_string())
+            .call(&alice_cell.zome("tend"), "get_dao_listings", PaginatedDaoInput {
+                dao_did: TEST_DAO.to_string(),
+                limit: None,
+            })
             .await
             .expect("Failed to query listings");
 

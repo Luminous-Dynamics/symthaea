@@ -157,14 +157,22 @@ pub struct BroadcastFinanceEventInput {
     pub payload: String,
 }
 
-/// Get payment history for a DID
+/// Input for paginated payment history queries
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetPaymentHistoryInput {
+    pub did: String,
+    pub limit: Option<usize>,
+}
+
+/// Get payment history for a DID (paginated, default limit 100)
 #[hdk_extern]
-pub fn get_payment_history(did: String) -> ExternResult<Vec<Record>> {
-    let query = LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::DidToPayments)?;
+pub fn get_payment_history(input: GetPaymentHistoryInput) -> ExternResult<Vec<Record>> {
+    let limit = input.limit.unwrap_or(100);
+    let query = LinkQuery::try_new(anchor_hash(&input.did)?, LinkTypes::DidToPayments)?;
     let links = get_links(query, GetStrategy::default())?;
 
     let mut payments = Vec::new();
-    for link in links {
+    for link in links.into_iter().take(limit) {
         let hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link".into())))?;
         if let Some(record) = get(hash, GetOptions::default())? {
@@ -209,8 +217,9 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
     // Enforce rate limit: max 5% of vault per day per member
     enforce_rate_limit(&input.depositor_did, sap_minted, now)?;
 
+    let deposit_id = format!("deposit:{}:{}:{}", input.depositor_did, input.collateral_type, now.as_micros());
     let deposit = CollateralBridgeDeposit {
-        id: format!("deposit:{}:{}:{}", input.depositor_did, input.collateral_type, now.as_micros()),
+        id: deposit_id.clone(),
         depositor_did: input.depositor_did.clone(),
         collateral_type: input.collateral_type.clone(),
         collateral_amount: input.collateral_amount,
@@ -227,6 +236,14 @@ pub fn deposit_collateral(input: DepositCollateralInput) -> ExternResult<Record>
         anchor_hash(&input.depositor_did)?,
         hash.clone(),
         LinkTypes::DidToDeposits,
+        (),
+    )?;
+
+    // Index by deposit ID for O(1) lookup
+    create_link(
+        anchor_hash(&deposit_id)?,
+        hash.clone(),
+        LinkTypes::DepositIdToDeposit,
         (),
     )?;
 
@@ -288,120 +305,128 @@ pub struct DepositCollateralInput {
 
 /// Confirm a pending deposit after collateral has been verified.
 ///
-/// Only the original depositor can confirm. Transitions Pending → Confirmed.
+/// Only the original depositor can confirm. Transitions Pending -> Confirmed.
+/// Uses link-based indexing for O(1) lookup instead of chain scan.
 #[hdk_extern]
 pub fn confirm_deposit(deposit_id: String) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CollateralBridgeDeposit)?))
-        .include_entries(true);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&deposit_id)?, LinkTypes::DepositIdToDeposit)?,
+        GetStrategy::default(),
+    )?;
+    let link = links.first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))?;
+    let hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+    let record = get(hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))?;
+    let deposit = record.entry().to_app_option::<CollateralBridgeDeposit>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialization error: {:?}", e))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit entry missing".into())))?;
 
-    for record in query(filter)? {
-        if let Some(deposit) = record.entry().to_app_option::<CollateralBridgeDeposit>().ok().flatten() {
-            if deposit.id == deposit_id {
-                verify_caller_is_did(&deposit.depositor_did)?;
+    verify_caller_is_did(&deposit.depositor_did)?;
 
-                if deposit.status != BridgeDepositStatus::Pending {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        format!("Deposit is {:?}, only Pending deposits can be confirmed", deposit.status)
-                    )));
-                }
-
-                let now = sys_time()?;
-                let confirmed = CollateralBridgeDeposit {
-                    status: BridgeDepositStatus::Confirmed,
-                    completed_at: Some(now),
-                    ..deposit
-                };
-
-                let action_hash = update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::CollateralBridgeDeposit(confirmed),
-                )?;
-
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
-            }
-        }
+    if deposit.status != BridgeDepositStatus::Pending {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Deposit is {:?}, only Pending deposits can be confirmed", deposit.status)
+        )));
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))
+
+    let now = sys_time()?;
+    let confirmed = CollateralBridgeDeposit {
+        status: BridgeDepositStatus::Confirmed,
+        completed_at: Some(now),
+        ..deposit
+    };
+
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::CollateralBridgeDeposit(confirmed),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 /// Redeem collateral by marking a deposit as redeemed (SAP returned, collateral released).
 ///
 /// Rate-limited: max 5% of total vault value per day per member.
+/// Uses link-based indexing for O(1) lookup instead of chain scan.
 #[hdk_extern]
 pub fn redeem_collateral(deposit_id: String) -> ExternResult<Record> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CollateralBridgeDeposit)?))
-        .include_entries(true);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&deposit_id)?, LinkTypes::DepositIdToDeposit)?,
+        GetStrategy::default(),
+    )?;
+    let link = links.first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))?;
+    let hash = ActionHash::try_from(link.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+    let record = get(hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))?;
+    let deposit = record.entry().to_app_option::<CollateralBridgeDeposit>()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialization error: {:?}", e))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Deposit entry missing".into())))?;
 
-    for record in query(filter)? {
-        if let Some(deposit) = record.entry().to_app_option::<CollateralBridgeDeposit>().ok().flatten() {
-            if deposit.id == deposit_id {
-                verify_caller_is_did(&deposit.depositor_did)?;
+    verify_caller_is_did(&deposit.depositor_did)?;
 
-                if deposit.status != BridgeDepositStatus::Confirmed {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Only confirmed deposits can be redeemed".into()
-                    )));
-                }
-
-                // Enforce rate limit on redemption
-                let now = sys_time()?;
-                enforce_rate_limit(&deposit.depositor_did, deposit.sap_minted, now)?;
-
-                let redeemed = CollateralBridgeDeposit {
-                    status: BridgeDepositStatus::Redeemed,
-                    completed_at: Some(now),
-                    ..deposit.clone()
-                };
-
-                let action_hash = update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::CollateralBridgeDeposit(redeemed),
-                )?;
-
-                // Debit SAP from depositor's balance via payments zome
-                #[derive(Serialize, Debug)]
-                struct DebitSapPayload {
-                    member_did: String,
-                    amount: u64,
-                    reason: String,
-                }
-                if let Err(e) = call(
-                    CallTargetCell::Local,
-                    ZomeName::from("payments"),
-                    FunctionName::from("debit_sap"),
-                    None,
-                    DebitSapPayload {
-                        member_did: deposit.depositor_did.clone(),
-                        amount: deposit.sap_minted,
-                        reason: format!("Collateral bridge redemption: {}", deposit.collateral_type),
-                    },
-                ) {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        format!("Cannot redeem: failed to debit SAP — {:?}", e)
-                    )));
-                }
-
-                // Broadcast the redemption event
-                broadcast_finance_event(BroadcastFinanceEventInput {
-                    event_type: FinanceEventType::CollateralRedeemed,
-                    subject_did: deposit.depositor_did,
-                    amount: Some(deposit.sap_minted),
-                    payload: serde_json::json!({
-                        "collateral_type": deposit.collateral_type,
-                        "collateral_amount": deposit.collateral_amount,
-                        "sap_returned": deposit.sap_minted,
-                    }).to_string(),
-                })?;
-
-                return get(action_hash, GetOptions::default())?
-                    .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
-            }
-        }
+    if deposit.status != BridgeDepositStatus::Confirmed {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only confirmed deposits can be redeemed".into()
+        )));
     }
-    Err(wasm_error!(WasmErrorInner::Guest("Deposit not found".into())))
+
+    // Enforce rate limit on redemption
+    let now = sys_time()?;
+    enforce_rate_limit(&deposit.depositor_did, deposit.sap_minted, now)?;
+
+    let redeemed = CollateralBridgeDeposit {
+        status: BridgeDepositStatus::Redeemed,
+        completed_at: Some(now),
+        ..deposit.clone()
+    };
+
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::CollateralBridgeDeposit(redeemed),
+    )?;
+
+    // Debit SAP from depositor's balance via payments zome
+    #[derive(Serialize, Debug)]
+    struct DebitSapPayload {
+        member_did: String,
+        amount: u64,
+        reason: String,
+    }
+    if let Err(e) = call(
+        CallTargetCell::Local,
+        ZomeName::from("payments"),
+        FunctionName::from("debit_sap"),
+        None,
+        DebitSapPayload {
+            member_did: deposit.depositor_did.clone(),
+            amount: deposit.sap_minted,
+            reason: format!("Collateral bridge redemption: {}", deposit.collateral_type),
+        },
+    ) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Cannot redeem: failed to debit SAP — {:?}", e)
+        )));
+    }
+
+    // Broadcast the redemption event
+    broadcast_finance_event(BroadcastFinanceEventInput {
+        event_type: FinanceEventType::CollateralRedeemed,
+        subject_did: deposit.depositor_did,
+        amount: Some(deposit.sap_minted),
+        payload: serde_json::json!({
+            "collateral_type": deposit.collateral_type,
+            "collateral_amount": deposit.collateral_amount,
+            "sap_returned": deposit.sap_minted,
+        }).to_string(),
+    })?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
 // ---------------------------------------------------------------------------

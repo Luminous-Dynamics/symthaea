@@ -19,7 +19,7 @@ pub struct Treasury {
     pub name: String,
     pub description: String,
     pub currency: String,
-    pub balance: f64,
+    pub balance: u64,
     pub reserve_ratio: f64,
     pub managers: Vec<String>,
     pub created: Timestamp,
@@ -32,7 +32,7 @@ pub struct Contribution {
     pub id: String,
     pub treasury_id: String,
     pub contributor_did: String,
-    pub amount: f64,
+    pub amount: u64,
     pub currency: String,
     pub contribution_type: ContributionType,
     pub timestamp: Timestamp,
@@ -54,7 +54,7 @@ pub struct Allocation {
     pub treasury_id: String,
     pub proposal_id: Option<String>,
     pub recipient_did: String,
-    pub amount: f64,
+    pub amount: u64,
     pub currency: String,
     pub purpose: String,
     pub status: AllocationStatus,
@@ -78,8 +78,8 @@ pub struct SavingsPool {
     pub id: String,
     pub treasury_id: String,
     pub name: String,
-    pub target_amount: f64,
-    pub current_amount: f64,
+    pub target_amount: u64,
+    pub current_amount: u64,
     pub currency: String,
     pub members: Vec<String>,
     pub yield_rate: f64,
@@ -131,6 +131,8 @@ pub enum LinkTypes {
     MemberToPool,
     DaoToCommonsPool,
     CommonsPoolToCompost,
+    TreasuryIdToTreasury,
+    AllocationIdToAllocation,
 }
 
 /// Genesis self-check
@@ -238,6 +240,16 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::TreasuryIdToTreasury |
+                LinkTypes::AllocationIdToAllocation => {
+                    // Anchor-to-entry links for ID-based lookups
+                    if !base_valid || !target_valid {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "ID index link must connect valid hashes".into()
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { link_type, .. } => {
@@ -329,7 +341,7 @@ fn validate_create_contribution(
     if !contribution.contributor_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Contributor must be a valid DID".into()));
     }
-    if contribution.amount <= 0.0 {
+    if contribution.amount == 0 {
         return Ok(ValidateCallbackResult::Invalid("Contribution amount must be positive".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -358,7 +370,7 @@ fn validate_create_allocation(
     if !allocation.recipient_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Recipient must be a valid DID".into()));
     }
-    if allocation.amount <= 0.0 {
+    if allocation.amount == 0 {
         return Ok(ValidateCallbackResult::Invalid("Allocation amount must be positive".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -368,7 +380,7 @@ fn validate_update_allocation(
     _action: Update,
     allocation: Allocation,
 ) -> ExternResult<ValidateCallbackResult> {
-    if allocation.amount <= 0.0 {
+    if allocation.amount == 0 {
         return Ok(ValidateCallbackResult::Invalid("Allocation amount must be positive".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -391,7 +403,7 @@ fn validate_create_savings_pool(
         }
     }
 
-    if pool.target_amount <= 0.0 {
+    if pool.target_amount == 0 {
         return Ok(ValidateCallbackResult::Invalid("Target amount must be positive".into()));
     }
     if pool.yield_rate < 0.0 {
@@ -404,7 +416,7 @@ fn validate_update_savings_pool(
     _action: Update,
     pool: SavingsPool,
 ) -> ExternResult<ValidateCallbackResult> {
-    if pool.target_amount <= 0.0 {
+    if pool.target_amount == 0 {
         return Ok(ValidateCallbackResult::Invalid("Target amount must be positive".into()));
     }
     Ok(ValidateCallbackResult::Valid)

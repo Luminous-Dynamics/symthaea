@@ -94,7 +94,7 @@ pub fn treasury_zome(cell: &SweetCell) -> holochain::sweettest::SweetZome {
 pub fn create_test_payment_input(
     from_did: &str,
     to_did: &str,
-    amount: f64,
+    amount: u64,
     payment_type: PaymentType,
 ) -> SendPaymentInput {
     SendPaymentInput {
@@ -111,8 +111,8 @@ pub fn create_test_payment_input(
 pub fn create_test_channel_input(
     party_a: &str,
     party_b: &str,
-    deposit_a: f64,
-    deposit_b: f64,
+    deposit_a: u64,
+    deposit_b: u64,
 ) -> OpenChannelInput {
     OpenChannelInput {
         party_a: party_a.to_string(),
@@ -129,13 +129,13 @@ pub fn timestamp() -> i64 {
 }
 
 /// Test assertion helper - checks if a payment was created successfully
-pub fn assert_payment_valid(payment: &Payment, from_did: &str, to_did: &str, amount: f64) {
+pub fn assert_payment_valid(payment: &Payment, from_did: &str, to_did: &str, amount: u64) {
     assert!(payment.from_did.starts_with("did:"), "From DID must be valid");
     assert!(payment.to_did.starts_with("did:"), "To DID must be valid");
     assert_eq!(payment.from_did, from_did, "From DID mismatch");
     assert_eq!(payment.to_did, to_did, "To DID mismatch");
     assert_eq!(payment.amount, amount, "Amount mismatch");
-    assert!(payment.amount > 0.0, "Amount must be positive");
+    assert!(payment.amount > 0, "Amount must be positive");
     assert!(
         payment.currency == "SAP" || payment.currency == "TEND",
         "Currency must be SAP or TEND, got: {}", payment.currency
@@ -147,15 +147,14 @@ pub fn assert_channel_valid(
     channel: &PaymentChannel,
     party_a: &str,
     party_b: &str,
-    balance_a: f64,
-    balance_b: f64,
+    balance_a: u64,
+    balance_b: u64,
 ) {
     assert_eq!(channel.party_a, party_a, "Party A mismatch");
     assert_eq!(channel.party_b, party_b, "Party B mismatch");
     assert_eq!(channel.balance_a, balance_a, "Balance A mismatch");
     assert_eq!(channel.balance_b, balance_b, "Balance B mismatch");
-    assert!(channel.balance_a >= 0.0, "Balance A cannot be negative");
-    assert!(channel.balance_b >= 0.0, "Balance B cannot be negative");
+    // u64 is always >= 0, no negative check needed
 }
 
 #[cfg(test)]
@@ -181,12 +180,12 @@ mod fixture_tests {
         let input = create_test_payment_input(
             "did:mycelix:alice",
             "did:mycelix:bob",
-            100.0,
+            100_000_000,
             PaymentType::Direct,
         );
         assert_eq!(input.from_did, "did:mycelix:alice");
         assert_eq!(input.to_did, "did:mycelix:bob");
-        assert_eq!(input.amount, 100.0);
+        assert_eq!(input.amount, 100_000_000);
         assert_eq!(input.currency, "SAP", "Default currency should be SAP");
     }
 

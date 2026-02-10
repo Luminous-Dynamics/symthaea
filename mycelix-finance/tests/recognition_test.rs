@@ -31,6 +31,13 @@ mod test_helpers {
 
 use test_helpers::*;
 
+/// Paginated input for get_validation_score
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetValidationScoreInput {
+    pub member_did: String,
+    pub limit: Option<usize>,
+}
+
 // ============================================================================
 // Section 1: Apprentice Graduation Flow Tests
 // ============================================================================
@@ -458,7 +465,10 @@ mod quality_rating_integration {
 
         // Step 2: Get Alice's validation score from TEND
         let validation_score: f64 = conductor
-            .call(&alice_cell.zome("tend"), "get_validation_score", alice_did.clone())
+            .call(&alice_cell.zome("tend"), "get_validation_score", GetValidationScoreInput {
+                member_did: alice_did.clone(),
+                limit: None,
+            })
             .await
             .expect("Failed to get validation score");
 
@@ -580,7 +590,10 @@ mod quality_rating_integration {
 
         // Get validation score — 1/5 avg maps to (1-1)/4 = 0.0
         let validation_score: f64 = conductor
-            .call(&alice_cell.zome("tend"), "get_validation_score", alice_did.clone())
+            .call(&alice_cell.zome("tend"), "get_validation_score", GetValidationScoreInput {
+                member_did: alice_did.clone(),
+                limit: None,
+            })
             .await
             .expect("Failed to get validation score");
 

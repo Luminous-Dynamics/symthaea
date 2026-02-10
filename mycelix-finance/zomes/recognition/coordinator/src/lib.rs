@@ -22,6 +22,52 @@ const DID_METHOD_PREFIX: &str = "did:mycelix:";
 /// Maximum length for a DID string
 const MAX_DID_LENGTH: usize = 256;
 
+const GOVERNANCE_AGENTS_ANCHOR: &str = "governance_agents";
+
+/// Check if the calling agent is a registered governance agent.
+/// If no governance agents are registered yet (bootstrap), allow any agent.
+fn verify_governance_or_bootstrap() -> ExternResult<()> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let gov_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(GOVERNANCE_AGENTS_ANCHOR)?,
+            LinkTypes::GovernanceAgents,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    // Bootstrap: if no governance agents registered yet, allow anyone
+    if gov_links.is_empty() {
+        return Ok(());
+    }
+
+    // Check if caller is in the governance list
+    for link in gov_links {
+        if let Ok(agent) = AgentPubKey::try_from(link.target) {
+            if agent == caller {
+                return Ok(());
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Caller is not an authorized governance agent".into()
+    )))
+}
+
+/// Register a governance agent. Only existing governance agents can register
+/// new ones (or anyone during bootstrap when no agents exist yet).
+#[hdk_extern]
+pub fn register_governance_agent(agent: AgentPubKey) -> ExternResult<ActionHash> {
+    verify_governance_or_bootstrap()?;
+    create_link(
+        anchor_hash(GOVERNANCE_AGENTS_ANCHOR)?,
+        agent,
+        LinkTypes::GovernanceAgents,
+        (),
+    )
+}
+
 // =============================================================================
 // INPUT/OUTPUT TYPES
 // =============================================================================
@@ -55,6 +101,8 @@ pub struct UpdateMycelInput {
 pub struct GetRecognitionsInput {
     pub member_did: String,
     pub cycle_id: Option<String>,
+    /// Maximum number of recognition events to return (default 100)
+    pub limit: Option<usize>,
 }
 
 // =============================================================================
@@ -160,7 +208,7 @@ pub fn recognize_member(input: RecognizeMemberInput) -> ExternResult<Record> {
     Ok(record)
 }
 
-/// Get all recognitions received by a member, optionally filtered by cycle
+/// Get all recognitions received by a member, optionally filtered by cycle (paginated, default limit 100)
 #[hdk_extern]
 pub fn get_recognition_received(input: GetRecognitionsInput) -> ExternResult<Vec<RecognitionEvent>> {
     if input.member_did.is_empty() || input.member_did.len() > MAX_DID_LENGTH {
@@ -169,6 +217,7 @@ pub fn get_recognition_received(input: GetRecognitionsInput) -> ExternResult<Vec
         )));
     }
 
+    let limit = input.limit.unwrap_or(100);
     let links = get_links(
         LinkQuery::try_new(
             anchor_hash(&format!("recipient:{}", input.member_did))?,
@@ -189,6 +238,9 @@ pub fn get_recognition_received(input: GetRecognitionsInput) -> ExternResult<Vec
                         }
                     } else {
                         events.push(event);
+                    }
+                    if events.len() >= limit {
+                        break;
                     }
                 }
             }
@@ -343,10 +395,10 @@ pub fn update_mycel_score(input: UpdateMycelInput) -> ExternResult<MemberMycelSt
 /// `new_mycel = 0.3 + (current - 0.3) * 0.8`
 /// Compresses toward mean without resetting. Active members recover quickly.
 ///
-/// NOTE: This is a governance operation — callable on any member.
-/// In production, restrict to governance/oracle agents via capability tokens.
+/// Restricted to authorized governance agents (or any agent during bootstrap).
 #[hdk_extern]
 pub fn jubilee_normalize(member_did: String) -> ExternResult<MemberMycelState> {
+    verify_governance_or_bootstrap()?;
     if member_did.is_empty() || member_did.len() > MAX_DID_LENGTH {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Member DID must be 1-256 characters".into()
@@ -378,10 +430,10 @@ pub fn jubilee_normalize(member_did: String) -> ExternResult<MemberMycelState> {
 /// MYCEL dissolves immediately. Contribution history is preserved via
 /// immutable RecognitionEvent entries in the DHT.
 ///
-/// NOTE: This is called cross-zome by the exit protocol (payments coordinator).
-/// In production, restrict to authorized callers via capability tokens.
+/// Restricted to authorized governance agents (or any agent during bootstrap).
 #[hdk_extern]
 pub fn dissolve_mycel(member_did: String) -> ExternResult<()> {
+    verify_governance_or_bootstrap()?;
     if member_did.is_empty() || member_did.len() > MAX_DID_LENGTH {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Member DID must be 1-256 characters".into()
@@ -427,10 +479,10 @@ pub fn dissolve_mycel(member_did: String) -> ExternResult<()> {
 ///
 /// `new_score = score - score * PASSIVE_DECAY_RATE * (elapsed_seconds / seconds_per_year)`
 ///
-/// NOTE: This is a governance/oracle operation — should be called periodically
-/// (e.g., monthly) by an authorized agent. In production, restrict via capability tokens.
+/// Restricted to authorized governance agents (or any agent during bootstrap).
 #[hdk_extern]
 pub fn apply_passive_decay(member_did: String) -> ExternResult<MemberMycelState> {
+    verify_governance_or_bootstrap()?;
     if member_did.is_empty() || member_did.len() > MAX_DID_LENGTH {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Member DID must be 1-256 characters".into()
@@ -731,12 +783,17 @@ fn increment_allocation(recognizer_did: &str, cycle_id: &str) -> ExternResult<()
 /// ratings for the member. Falls back to 0.0 if the TEND zome is
 /// unreachable (e.g., in unit tests without full DNA).
 fn fetch_validation_from_tend(member_did: &str) -> ExternResult<f64> {
+    #[derive(Serialize, Debug)]
+    struct ValidationScoreInput {
+        member_did: String,
+        limit: Option<usize>,
+    }
     match call(
         CallTargetCell::Local,
         ZomeName::from("tend"),
         FunctionName::from("get_validation_score"),
         None,
-        member_did.to_string(),
+        ValidationScoreInput { member_did: member_did.to_string(), limit: None },
     ) {
         Ok(ZomeCallResponse::Ok(result)) => {
             result.decode::<f64>().map_err(|e| {

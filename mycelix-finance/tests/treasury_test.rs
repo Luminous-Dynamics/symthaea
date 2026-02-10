@@ -92,7 +92,7 @@ mod treasury_lifecycle {
         assert!(treasury.id.starts_with("treasury:Community_Fund:"));
         assert_eq!(treasury.name, "Community Fund");
         assert_eq!(treasury.currency, "SAP");
-        assert_eq!(treasury.balance, 0.0, "Initial balance should be 0");
+        assert_eq!(treasury.balance, 0, "Initial balance should be 0");
         assert_eq!(treasury.reserve_ratio, 0.25);
         assert_eq!(treasury.managers.len(), 2);
         assert!(treasury.managers.contains(&manager_a));
@@ -153,14 +153,14 @@ mod treasury_lifecycle {
             .expect("No entry");
 
         let treasury_id = treasury.id.clone();
-        assert_eq!(treasury.balance, 0.0);
+        assert_eq!(treasury.balance, 0);
 
         // Step 2: Contribute 500 SAP
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct ContributeInput {
             pub treasury_id: String,
             pub contributor_did: String,
-            pub amount: f64,
+            pub amount: u64,
             pub currency: String,
             pub contribution_type: ContributionType,
         }
@@ -168,7 +168,7 @@ mod treasury_lifecycle {
         let contribute_input = ContributeInput {
             treasury_id: treasury_id.clone(),
             contributor_did: test_did("alice"),
-            amount: 500.0,
+            amount: 500_000_000,
             currency: "SAP".to_string(),
             contribution_type: ContributionType::Deposit,
         };
@@ -184,7 +184,7 @@ mod treasury_lifecycle {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert_eq!(contribution.amount, 500.0);
+        assert_eq!(contribution.amount, 500_000_000);
         assert_eq!(contribution.currency, "SAP");
         assert!(matches!(contribution.contribution_type, ContributionType::Deposit));
 
@@ -201,7 +201,7 @@ mod treasury_lifecycle {
             .expect("Deserialize failed")
             .expect("No entry");
 
-        assert_eq!(updated.balance, 500.0, "Balance should be 500 after contribution");
+        assert_eq!(updated.balance, 500_000_000, "Balance should be 500M after contribution");
 
         println!("  - Contribution: {} SAP", contribution.amount);
         println!("  - Updated balance: {}", updated.balance);
@@ -260,7 +260,7 @@ mod allocation_governance {
         cell: &holochain::sweettest::SweetCell,
         treasury_id: &str,
         recipient: &str,
-        amount: f64,
+        amount: u64,
         purpose: &str,
     ) -> String {
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -268,7 +268,7 @@ mod allocation_governance {
             pub treasury_id: String,
             pub proposal_id: Option<String>,
             pub recipient_did: String,
-            pub amount: f64,
+            pub amount: u64,
             pub currency: String,
             pub purpose: String,
         }
@@ -333,7 +333,7 @@ mod allocation_governance {
         struct ContributeInput {
             pub treasury_id: String,
             pub contributor_did: String,
-            pub amount: f64,
+            pub amount: u64,
             pub currency: String,
             pub contribution_type: ContributionType,
         }
@@ -341,7 +341,7 @@ mod allocation_governance {
         let fund_input = ContributeInput {
             treasury_id: treasury_id.clone(),
             contributor_did: test_did("funder"),
-            amount: 1000.0,
+            amount: 1_000_000_000,
             currency: "SAP".to_string(),
             contribution_type: ContributionType::Grant,
         };
@@ -357,7 +357,7 @@ mod allocation_governance {
             cell,
             &treasury_id,
             &recipient,
-            200.0,
+            200_000_000,
             "Infrastructure upgrade",
         )
         .await;
@@ -439,7 +439,7 @@ mod allocation_governance {
             .expect("Deserialize")
             .expect("Entry");
 
-        assert_eq!(treasury_data.balance, 800.0, "Balance should be 1000 - 200 = 800");
+        assert_eq!(treasury_data.balance, 800_000_000, "Balance should be 1000M - 200M = 800M");
         println!("  - Executed: balance now {}", treasury_data.balance);
         println!("Test 2.1 PASSED: Full propose -> approve -> execute lifecycle works");
     }
@@ -472,7 +472,7 @@ mod allocation_governance {
             cell,
             &treasury_id,
             &recipient,
-            100.0,
+            100_000_000,
             "Rejected proposal",
         )
         .await;
@@ -532,7 +532,7 @@ mod allocation_governance {
             cell,
             &treasury_id,
             &recipient,
-            50.0,
+            50_000_000,
             "To be cancelled",
         )
         .await;
@@ -593,7 +593,7 @@ mod allocation_governance {
             cell,
             &treasury_id,
             &recipient,
-            75.0,
+            75_000_000,
             "Non-manager test",
         )
         .await;
@@ -1140,7 +1140,7 @@ mod savings_pool_tests {
         struct CreatePoolInput {
             pub treasury_id: String,
             pub name: String,
-            pub target_amount: f64,
+            pub target_amount: u64,
             pub currency: String,
             pub initial_members: Vec<String>,
             pub yield_rate: f64,
@@ -1150,7 +1150,7 @@ mod savings_pool_tests {
         let pool_input = CreatePoolInput {
             treasury_id: treasury_id.clone(),
             name: "Community Savings".to_string(),
-            target_amount: 5000.0,
+            target_amount: 5_000_000_000,
             currency: "SAP".to_string(),
             initial_members: vec![alice.clone()],
             yield_rate: 0.03,
@@ -1169,8 +1169,8 @@ mod savings_pool_tests {
 
         assert!(pool.id.starts_with("pool:"));
         assert_eq!(pool.name, "Community Savings");
-        assert_eq!(pool.target_amount, 5000.0);
-        assert_eq!(pool.current_amount, 0.0);
+        assert_eq!(pool.target_amount, 5_000_000_000);
+        assert_eq!(pool.current_amount, 0);
         assert_eq!(pool.yield_rate, 0.03);
         assert_eq!(pool.members.len(), 1);
         assert!(pool.members.contains(&alice));
@@ -1262,7 +1262,7 @@ mod savings_pool_tests {
         struct CreatePoolInput {
             pub treasury_id: String,
             pub name: String,
-            pub target_amount: f64,
+            pub target_amount: u64,
             pub currency: String,
             pub initial_members: Vec<String>,
             pub yield_rate: f64,
@@ -1272,7 +1272,7 @@ mod savings_pool_tests {
         let pool_input = CreatePoolInput {
             treasury_id: treasury.id.clone(),
             name: "Rainy Day Fund".to_string(),
-            target_amount: 2000.0,
+            target_amount: 2_000_000_000,
             currency: "SAP".to_string(),
             initial_members: vec![alice.clone()],
             yield_rate: 0.02,
@@ -1290,20 +1290,20 @@ mod savings_pool_tests {
             .expect("Entry");
 
         let pool_id = pool.id.clone();
-        assert_eq!(pool.current_amount, 0.0);
+        assert_eq!(pool.current_amount, 0);
 
         // Contribute 300 SAP
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct PoolContributionInput {
             pub pool_id: String,
             pub contributor_did: String,
-            pub amount: f64,
+            pub amount: u64,
         }
 
         let contrib_input = PoolContributionInput {
             pool_id: pool_id.clone(),
             contributor_did: alice.clone(),
-            amount: 300.0,
+            amount: 300_000_000,
         };
 
         let contrib_result: Record = conductor
@@ -1317,13 +1317,13 @@ mod savings_pool_tests {
             .expect("Deserialize")
             .expect("Entry");
 
-        assert_eq!(updated.current_amount, 300.0, "Pool amount should be 300 after contribution");
+        assert_eq!(updated.current_amount, 300_000_000, "Pool amount should be 300M after contribution");
 
         // Contribute another 200 SAP
         let contrib_2 = PoolContributionInput {
             pool_id: pool_id.clone(),
             contributor_did: alice.clone(),
-            amount: 200.0,
+            amount: 200_000_000,
         };
 
         let contrib_result_2: Record = conductor
@@ -1337,9 +1337,9 @@ mod savings_pool_tests {
             .expect("Deserialize")
             .expect("Entry");
 
-        assert_eq!(final_pool.current_amount, 500.0, "Pool amount should be 500 after second contribution");
+        assert_eq!(final_pool.current_amount, 500_000_000, "Pool amount should be 500M after second contribution");
 
-        println!("  - After 1st contribution (300): {}", 300.0);
+        println!("  - After 1st contribution (300M): {}", 300_000_000);
         println!("  - After 2nd contribution (200): {}", final_pool.current_amount);
         println!("Test 4.2 PASSED: Pool contributions accumulate correctly");
     }

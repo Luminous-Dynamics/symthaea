@@ -20,6 +20,56 @@ use mycelix_finance_shared::anchor_hash;
 pub use tend_integrity::*;
 
 // =============================================================================
+// GOVERNANCE AGENT AUTHORIZATION
+// =============================================================================
+
+const GOVERNANCE_AGENTS_ANCHOR: &str = "governance_agents";
+
+/// Check if the calling agent is a registered governance agent.
+/// If no governance agents are registered yet (bootstrap), allow any agent.
+fn verify_governance_or_bootstrap() -> ExternResult<()> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let gov_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(GOVERNANCE_AGENTS_ANCHOR)?,
+            LinkTypes::GovernanceAgents,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    // Bootstrap: if no governance agents registered yet, allow anyone
+    if gov_links.is_empty() {
+        return Ok(());
+    }
+
+    // Check if caller is in the governance list
+    for link in gov_links {
+        if let Ok(agent) = AgentPubKey::try_from(link.target) {
+            if agent == caller {
+                return Ok(());
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Caller is not an authorized governance agent".into()
+    )))
+}
+
+/// Register a governance agent. Only existing governance agents can register
+/// new ones (or anyone during bootstrap when no agents exist yet).
+#[hdk_extern]
+pub fn register_governance_agent(agent: AgentPubKey) -> ExternResult<ActionHash> {
+    verify_governance_or_bootstrap()?;
+    create_link(
+        anchor_hash(GOVERNANCE_AGENTS_ANCHOR)?,
+        agent,
+        LinkTypes::GovernanceAgents,
+        (),
+    )
+}
+
+// =============================================================================
 // CONSTANTS
 // =============================================================================
 
@@ -132,12 +182,11 @@ const ORACLE_STATE_ANCHOR: &str = "tend:oracle_state";
 
 /// Update the oracle state (sets current vitality and limit tier).
 ///
-/// In production, restrict to authorized oracle agents via capability tokens.
+/// Restricted to authorized governance agents (or any agent during bootstrap).
 /// The oracle agent monitors network health metrics and calls this periodically.
 #[hdk_extern]
 pub fn update_oracle_state(vitality: u32) -> ExternResult<OracleState> {
-    // WARNING: This function lacks caller verification. In production,
-    // restrict to authorized oracle agents via capability tokens.
+    verify_governance_or_bootstrap()?;
     if vitality > 100 {
         return Err(wasm_error!(WasmErrorInner::Guest("Vitality must be 0-100".into())));
     }
@@ -1117,15 +1166,23 @@ pub fn create_listing(input: CreateListingInput) -> ExternResult<ServiceListing>
     Ok(listing)
 }
 
-/// Get all active listings in a DAO
+/// Input for paginated DAO queries
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PaginatedDaoInput {
+    pub dao_did: String,
+    pub limit: Option<usize>,
+}
+
+/// Get all active listings in a DAO (paginated, default limit 100)
 #[hdk_extern]
-pub fn get_dao_listings(dao_did: String) -> ExternResult<Vec<ServiceListing>> {
-    if dao_did.is_empty() || dao_did.len() > 256 {
+pub fn get_dao_listings(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceListing>> {
+    if input.dao_did.is_empty() || input.dao_did.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("DAO DID must be 1-256 characters".into())));
     }
+    let limit = input.limit.unwrap_or(100);
     let links = get_links(
         LinkQuery::try_new(
-            anchor_hash(&format!("listings:{}", dao_did))?,
+            anchor_hash(&format!("listings:{}", input.dao_did))?,
             LinkTypes::DaoToListings,
         )?,
         GetStrategy::default(),
@@ -1137,6 +1194,9 @@ pub fn get_dao_listings(dao_did: String) -> ExternResult<Vec<ServiceListing>> {
             if let Some(listing) = record.entry().to_app_option::<ServiceListing>().ok().flatten() {
                 if listing.active {
                     listings.push(listing);
+                    if listings.len() >= limit {
+                        break;
+                    }
                 }
             }
         }
@@ -1193,15 +1253,16 @@ pub fn create_request(input: CreateRequestInput) -> ExternResult<ServiceRequest>
     Ok(request)
 }
 
-/// Get all open requests in a DAO
+/// Get all open requests in a DAO (paginated, default limit 100)
 #[hdk_extern]
-pub fn get_dao_requests(dao_did: String) -> ExternResult<Vec<ServiceRequest>> {
-    if dao_did.is_empty() || dao_did.len() > 256 {
+pub fn get_dao_requests(input: PaginatedDaoInput) -> ExternResult<Vec<ServiceRequest>> {
+    if input.dao_did.is_empty() || input.dao_did.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("DAO DID must be 1-256 characters".into())));
     }
+    let limit = input.limit.unwrap_or(100);
     let links = get_links(
         LinkQuery::try_new(
-            anchor_hash(&format!("requests:{}", dao_did))?,
+            anchor_hash(&format!("requests:{}", input.dao_did))?,
             LinkTypes::DaoToRequests,
         )?,
         GetStrategy::default(),
@@ -1213,6 +1274,9 @@ pub fn get_dao_requests(dao_did: String) -> ExternResult<Vec<ServiceRequest>> {
             if let Some(request) = record.entry().to_app_option::<ServiceRequest>().ok().flatten() {
                 if request.open {
                     requests.push(request);
+                    if requests.len() >= limit {
+                        break;
+                    }
                 }
             }
         }
@@ -1225,26 +1289,36 @@ pub fn get_dao_requests(dao_did: String) -> ExternResult<Vec<ServiceRequest>> {
 // VALIDATION SCORE (for MYCEL component)
 // =============================================================================
 
+/// Input for paginated validation score queries
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetValidationScoreInput {
+    pub member_did: String,
+    /// Maximum number of ratings to consider (default 100)
+    pub limit: Option<usize>,
+}
+
 /// Get aggregate validation score for a member based on their quality ratings.
 ///
 /// Returns a score between 0.0 and 1.0 derived from the average of all
 /// QualityRating entries linked to this member. This is called cross-zome
 /// by the recognition coordinator to compute the MYCEL Validation component.
 ///
-/// Scoring: average rating (1-5) mapped to 0.0-1.0 → (avg - 1) / 4
+/// Scoring: average rating (1-5) mapped to 0.0-1.0 -> (avg - 1) / 4
 /// Minimum 3 ratings required for a non-zero score (prevents gaming with
 /// a single 5-star rating).
+/// Paginated: default limit 100 ratings considered.
 #[hdk_extern]
-pub fn get_validation_score(member_did: String) -> ExternResult<f64> {
-    if member_did.is_empty() || member_did.len() > 256 {
+pub fn get_validation_score(input: GetValidationScoreInput) -> ExternResult<f64> {
+    if input.member_did.is_empty() || input.member_did.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Member DID must be 1-256 characters".into()
         )));
     }
 
+    let limit = input.limit.unwrap_or(100);
     let links = get_links(
         LinkQuery::try_new(
-            anchor_hash(&format!("ratings_for:{}", member_did))?,
+            anchor_hash(&format!("ratings_for:{}", input.member_did))?,
             LinkTypes::ExchangeToRating,
         )?,
         GetStrategy::default(),
@@ -1253,7 +1327,7 @@ pub fn get_validation_score(member_did: String) -> ExternResult<f64> {
     let mut total: f64 = 0.0;
     let mut count: u32 = 0;
 
-    for link in links {
+    for link in links.into_iter().take(limit) {
         if let Some(action_hash) = link.target.into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
                 if let Some(rating) = record.entry().to_app_option::<QualityRating>().ok().flatten() {
@@ -1495,10 +1569,11 @@ pub struct RecordCrossDAOExchangeInput {
 ///
 /// Provider's DAO gains credit, receiver's DAO gains debt.
 /// DAOs are stored in canonical alphabetical order.
+///
+/// Restricted to authorized governance agents (or any agent during bootstrap).
 #[hdk_extern]
 pub fn record_cross_dao_exchange(input: RecordCrossDAOExchangeInput) -> ExternResult<BilateralBalance> {
-    // WARNING: In production, restrict to authorized governance/exit-protocol callers
-    // via capability tokens. Currently callable by any agent.
+    verify_governance_or_bootstrap()?;
     if input.provider_dao_did == input.receiver_dao_did {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Cross-DAO exchange requires two different DAOs".into()
@@ -1622,10 +1697,10 @@ pub struct SettleBilateralInput {
 /// Returns the settlement Record on success.
 ///
 /// NOTE: Governance operation -- should be called quarterly by an authorized agent.
+/// Restricted to authorized governance agents (or any agent during bootstrap).
 #[hdk_extern]
 pub fn settle_bilateral_balance(input: SettleBilateralInput) -> ExternResult<Record> {
-    // WARNING: In production, restrict to authorized governance/exit-protocol callers
-    // via capability tokens. Currently callable by any agent.
+    verify_governance_or_bootstrap()?;
     let (dao_a, dao_b) = if input.dao_a_did < input.dao_b_did {
         (input.dao_a_did.clone(), input.dao_b_did.clone())
     } else {
@@ -1796,10 +1871,11 @@ pub fn get_tend_reputation_input(input: GetBalanceInput) -> ExternResult<f32> {
 /// Sets their balance to zero. The community absorbs the micro-imbalance,
 /// proven safe by 40+ years of LETS experience.
 /// Returns the list of (dao_did, forgiven_amount) pairs.
+///
+/// Restricted to authorized governance agents (or any agent during bootstrap).
 #[hdk_extern]
 pub fn forgive_balance(member_did: String) -> ExternResult<Vec<(String, i32)>> {
-    // WARNING: In production, restrict to authorized governance/exit-protocol callers
-    // via capability tokens. Currently callable by any agent.
+    verify_governance_or_bootstrap()?;
     if member_did.is_empty() || member_did.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("Member DID must be 1-256 characters".into())));
     }

@@ -163,6 +163,8 @@ pub enum LinkTypes {
     RecognizerCycleToAllocation,
     /// General anchor links
     AnchorLinks,
+    /// Link from governance_agents anchor to authorized agent pubkeys
+    GovernanceAgents,
 }
 
 // =============================================================================
@@ -223,6 +225,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::MemberToMycelState => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::RecognizerCycleToAllocation => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::AnchorLinks => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::GovernanceAgents => Ok(ValidateCallbackResult::Valid),
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),

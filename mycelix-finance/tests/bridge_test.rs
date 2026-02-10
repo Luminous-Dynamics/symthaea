@@ -30,6 +30,13 @@ mod test_helpers {
 
 use test_helpers::*;
 
+/// Paginated input for get_payment_history
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetPaymentHistoryInput {
+    pub did: String,
+    pub limit: Option<usize>,
+}
+
 // ============================================================================
 // Section 1: Collateral Bridge Deposit Tests
 // ============================================================================
@@ -1106,7 +1113,10 @@ mod redemption_tests {
 
         // Query payment history for Alice
         let history: Vec<Record> = conductor
-            .call(&alice_cell.zome("finance_bridge"), "get_payment_history", alice_did.clone())
+            .call(&alice_cell.zome("finance_bridge"), "get_payment_history", GetPaymentHistoryInput {
+                did: alice_did.clone(),
+                limit: None,
+            })
             .await
             .expect("Failed to get payment history");
 

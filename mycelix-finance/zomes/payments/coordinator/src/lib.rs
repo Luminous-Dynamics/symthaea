@@ -276,13 +276,18 @@ pub struct DebitSapInput {
 // --- Internal helpers ---
 
 fn find_sap_balance_record(member_did: &str) -> ExternResult<Option<(Record, SapBalance)>> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::SapBalance)?))
-        .include_entries(true);
-
-    for record in query(filter)? {
-        if let Some(bal) = record.entry().to_app_option::<SapBalance>().ok().flatten() {
-            if bal.member_did == member_did {
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("sap:{}", member_did))?,
+            LinkTypes::DidToSapBalance,
+        )?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.last() {
+        let hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(hash, GetOptions::default())? {
+            if let Some(bal) = record.entry().to_app_option::<SapBalance>().ok().flatten() {
                 return Ok(Some((record, bal)));
             }
         }
@@ -353,29 +358,27 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
 
     // If sending SAP, enforce on-chain balance with demurrage + progressive fee
     let (memo, fee_amount) = if input.currency == "SAP" {
-        // Convert f64 amount to micro-SAP (u64)
-        let micro_amount = (input.amount * 1_000_000.0) as u64;
-
+        // input.amount is already in micro-SAP (u64)
         // Compute progressive fee based on sender's MYCEL score
-        let fee_micro = compute_sap_fee(&input.from_did, micro_amount)?;
-        let total_debit = micro_amount + fee_micro;
+        let fee = compute_sap_fee(&input.from_did, input.amount)?;
+        let total_debit = input.amount + fee;
 
         // Debit sender's SAP balance (amount + fee, applies demurrage)
         debit_sap(DebitSapInput {
             member_did: input.from_did.clone(),
             amount: total_debit,
-            reason: format!("Payment to {} (includes fee {})", input.to_did, fee_micro),
+            reason: format!("Payment to {} (includes fee {})", input.to_did, fee),
         })?;
 
         // Credit receiver's SAP balance (amount only, fee goes to commons)
         credit_sap(CreditSapInput {
             member_did: input.to_did.clone(),
-            amount: micro_amount,
+            amount: input.amount,
             reason: format!("Payment from {}", input.from_did),
         })?;
 
         // Route fee to commons via treasury (if fee > 0)
-        if fee_micro > 0 {
+        if fee > 0 {
             if let Err(e) = call(
                 CallTargetCell::Local,
                 ZomeName::from("treasury"),
@@ -383,7 +386,7 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
                 None,
                 ReceiveCompostPayload {
                     commons_pool_id: "global-fee-pool".to_string(),
-                    amount: fee_micro,
+                    amount: fee,
                     source_member_did: input.from_did.clone(),
                 },
             ) {
@@ -391,10 +394,9 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
             }
         }
 
-        let fee_f64 = fee_micro as f64 / 1_000_000.0;
-        (input.memo.clone(), fee_f64)
+        (input.memo.clone(), fee)
     } else {
-        (input.memo.clone(), 0.0)
+        (input.memo.clone(), 0)
     };
 
     let payment = Payment {
@@ -414,8 +416,20 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::Payment(payment.clone()))?;
     create_link(anchor_hash(&input.from_did)?, action_hash.clone(), LinkTypes::SenderToPayments, ())?;
     create_link(anchor_hash(&input.to_did)?, action_hash.clone(), LinkTypes::ReceiverToPayments, ())?;
+    // Link-based index for O(1) payment ID lookups
+    create_link(
+        anchor_hash(&payment.id)?,
+        action_hash.clone(),
+        LinkTypes::PaymentIdToPayment,
+        (),
+    )?;
 
-    // Create receipt
+    // Create receipt with Ed25519 signature
+    let sig_data = format!(
+        "{}|{}|{}|{}|{}|{}",
+        payment.id, payment.from_did, payment.to_did,
+        payment.amount, payment.currency, now.as_micros()
+    );
     let receipt = Receipt {
         payment_id: payment.id.clone(),
         from_did: input.from_did,
@@ -424,11 +438,9 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
         currency: payment.currency,
         timestamp: now,
         signature: {
-            // Placeholder: 88 hex chars derived from timestamp
-            // Production: real Ed25519 signature over payment fields
-            let ts = now.as_micros();
-            let hex = format!("{:016x}{:016x}{:016x}{:016x}{:016x}{:08x}", ts, ts, ts, ts, ts, ts as u32);
-            hex[..88].to_string()
+            let agent = agent_info()?.agent_initial_pubkey;
+            let sig = sign(agent, sig_data.into_bytes())?;
+            sig.0.iter().map(|b| format!("{:02x}", b)).collect::<String>()
         },
     };
     let receipt_hash = create_entry(&EntryTypes::Receipt(receipt))?;
@@ -441,7 +453,7 @@ pub fn send_payment(input: SendPaymentInput) -> ExternResult<Record> {
 pub struct SendPaymentInput {
     pub from_did: String,
     pub to_did: String,
-    pub amount: f64,
+    pub amount: u64,
     pub currency: String,
     pub payment_type: PaymentType,
     pub memo: Option<String>,
@@ -475,8 +487,8 @@ pub struct OpenChannelInput {
     pub party_a: String,
     pub party_b: String,
     pub currency: String,
-    pub initial_deposit_a: f64,
-    pub initial_deposit_b: f64,
+    pub initial_deposit_a: u64,
+    pub initial_deposit_b: u64,
 }
 
 #[hdk_extern]
@@ -487,13 +499,18 @@ pub fn channel_transfer(input: ChannelTransferInput) -> ExternResult<Record> {
             if channel.id == input.channel_id {
                 let now = sys_time()?;
                 let (new_a, new_b) = if input.from_a {
-                    (channel.balance_a - input.amount, channel.balance_b + input.amount)
+                    (
+                        channel.balance_a.checked_sub(input.amount)
+                            .ok_or(wasm_error!(WasmErrorInner::Guest("Insufficient balance for party A".into())))?,
+                        channel.balance_b + input.amount,
+                    )
                 } else {
-                    (channel.balance_a + input.amount, channel.balance_b - input.amount)
+                    (
+                        channel.balance_a + input.amount,
+                        channel.balance_b.checked_sub(input.amount)
+                            .ok_or(wasm_error!(WasmErrorInner::Guest("Insufficient balance for party B".into())))?,
+                    )
                 };
-                if new_a < 0.0 || new_b < 0.0 {
-                    return Err(wasm_error!(WasmErrorInner::Guest("Insufficient balance".into())));
-                }
                 let updated = PaymentChannel { balance_a: new_a, balance_b: new_b, last_updated: now, ..channel };
                 let action_hash = update_entry(record.action_address().clone(), &EntryTypes::PaymentChannel(updated))?;
                 return get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())));
@@ -506,45 +523,54 @@ pub fn channel_transfer(input: ChannelTransferInput) -> ExternResult<Record> {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChannelTransferInput {
     pub channel_id: String,
-    pub amount: f64,
+    pub amount: u64,
     pub from_a: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetPaymentHistoryInput {
+    pub did: String,
+    pub limit: Option<usize>,
+}
+
 #[hdk_extern]
-pub fn get_payment_history(did: String) -> ExternResult<Vec<Record>> {
+pub fn get_payment_history(input: GetPaymentHistoryInput) -> ExternResult<Vec<Record>> {
+    let max = input.limit.unwrap_or(100);
     let mut payments = Vec::new();
     // Get sent payments
-    let query = LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::SenderToPayments)?;
-    for link in get_links(query, GetStrategy::default())? {
+    let query = LinkQuery::try_new(anchor_hash(&input.did)?, LinkTypes::SenderToPayments)?;
+    for link in get_links(query, GetStrategy::default())?.into_iter().take(max) {
         if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
             payments.push(record);
         }
     }
-    // Get received payments
-    let query = LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::ReceiverToPayments)?;
-    for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
-            payments.push(record);
+    // Get received payments (respect remaining budget)
+    let remaining = max.saturating_sub(payments.len());
+    if remaining > 0 {
+        let query = LinkQuery::try_new(anchor_hash(&input.did)?, LinkTypes::ReceiverToPayments)?;
+        for link in get_links(query, GetStrategy::default())?.into_iter().take(remaining) {
+            if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+                payments.push(record);
+            }
         }
     }
     Ok(payments)
 }
 
-/// Get a specific payment by ID
+/// Get a specific payment by ID (O(1) link-based lookup)
 #[hdk_extern]
 pub fn get_payment(payment_id: String) -> ExternResult<Option<Record>> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Payment)?))
-        .include_entries(true);
-
-    for record in query(filter)? {
-        if let Some(payment) = record.entry().to_app_option::<Payment>().ok().flatten() {
-            if payment.id == payment_id {
-                return Ok(Some(record));
-            }
-        }
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&payment_id)?, LinkTypes::PaymentIdToPayment)?,
+        GetStrategy::default(),
+    )?;
+    if let Some(link) = links.first() {
+        let hash = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        Ok(get(hash, GetOptions::default())?)
+    } else {
+        Ok(None)
     }
-    Ok(None)
 }
 
 /// Get receipt for a payment
@@ -637,22 +663,32 @@ pub fn refund_payment(payment_id: String) -> ExternResult<Record> {
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest("Not found".into())))
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetChannelsInput {
+    pub did: String,
+    pub limit: Option<usize>,
+}
+
 /// Get all channels for a party
 #[hdk_extern]
-pub fn get_channels(did: String) -> ExternResult<Vec<Record>> {
+pub fn get_channels(input: GetChannelsInput) -> ExternResult<Vec<Record>> {
+    let max = input.limit.unwrap_or(100);
     let mut channels = Vec::new();
     // Party A channels
-    let query = LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::ChannelPartyA)?;
-    for link in get_links(query, GetStrategy::default())? {
+    let query = LinkQuery::try_new(anchor_hash(&input.did)?, LinkTypes::ChannelPartyA)?;
+    for link in get_links(query, GetStrategy::default())?.into_iter().take(max) {
         if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
             channels.push(record);
         }
     }
-    // Party B channels
-    let query = LinkQuery::try_new(anchor_hash(&did)?, LinkTypes::ChannelPartyB)?;
-    for link in get_links(query, GetStrategy::default())? {
-        if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
-            channels.push(record);
+    // Party B channels (respect remaining budget)
+    let remaining = max.saturating_sub(channels.len());
+    if remaining > 0 {
+        let query = LinkQuery::try_new(anchor_hash(&input.did)?, LinkTypes::ChannelPartyB)?;
+        for link in get_links(query, GetStrategy::default())?.into_iter().take(remaining) {
+            if let Some(record) = get(ActionHash::try_from(link.target).map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid".into())))?, GetOptions::default())? {
+                channels.push(record);
+            }
         }
     }
     Ok(channels)
@@ -666,11 +702,9 @@ pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
     let now = sys_time()?;
     // Compute fee for escrow (SAP: progressive fee; TEND: zero)
     let escrow_fee = if input.currency == "SAP" {
-        let micro_amount = (input.amount * 1_000_000.0) as u64;
-        let fee_micro = compute_sap_fee(&input.from_did, micro_amount)?;
-        fee_micro as f64 / 1_000_000.0
+        compute_sap_fee(&input.from_did, input.amount)?
     } else {
-        0.0
+        0
     };
     let payment = Payment {
         id: format!("escrow:{}:{}", input.from_did, now.as_micros()),
@@ -696,7 +730,7 @@ pub fn create_escrow(input: CreateEscrowInput) -> ExternResult<Record> {
 pub struct CreateEscrowInput {
     pub from_did: String,
     pub to_did: String,
-    pub amount: f64,
+    pub amount: u64,
     pub currency: String,
     pub escrow_id: String,
     pub memo: Option<String>,
@@ -712,8 +746,8 @@ pub struct InitiateExitInput {
     pub member_did: String,
     /// How to handle remaining SAP balance
     pub succession_preference: SuccessionPreference,
-    /// Current SAP balance (caller must provide; on-chain accounting is external)
-    pub sap_balance: f64,
+    /// Current SAP balance in micro-units (caller must provide; on-chain accounting is external)
+    pub sap_balance: u64,
 }
 
 /// Initiate member exit — coordinates MYCEL dissolution, SAP succession, and TEND forgiveness.
@@ -745,7 +779,7 @@ pub fn initiate_exit(input: InitiateExitInput) -> ExternResult<Record> {
     };
 
     // Step 2: Handle SAP succession
-    if input.sap_balance > 0.0 {
+    if input.sap_balance > 0 {
         match &input.succession_preference {
             SuccessionPreference::Commons => {
                 // For commons succession, we record a payment to the commons pool.

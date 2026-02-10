@@ -490,6 +490,8 @@ pub enum LinkTypes {
     DaoToBilateralBalance,
     /// Link from settlement registry anchor to settlement entries
     SettlementRegistry,
+    /// Link from governance_agents anchor to authorized agent pubkeys
+    GovernanceAgents,
 }
 
 // =============================================================================
@@ -620,6 +622,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::ExchangeToDispute => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::DaoToBilateralBalance => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::SettlementRegistry => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::GovernanceAgents => Ok(ValidateCallbackResult::Valid),
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),

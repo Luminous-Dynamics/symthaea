@@ -9,8 +9,7 @@ pub use mycelix_finance_types::SuccessionPreference;
 
 /// Steward minimum fee rate: 0.01% (1 basis point).
 /// For micro-SAP amounts: fee_micro >= amount_micro / 10_000.
-/// Using f64: fee >= amount / 10_000.0.
-pub const SAP_STEWARD_MIN_FEE_DIVISOR: f64 = 10_000.0;
+pub const SAP_STEWARD_MIN_FEE_DIVISOR: u64 = 10_000;
 
 // String length limits — prevent DHT bloat attacks
 const MAX_DID_LEN: usize = 256;
@@ -25,8 +24,8 @@ pub struct Payment {
     pub id: String,
     pub from_did: String,
     pub to_did: String,
-    pub amount: f64,
-    pub fee: f64,
+    pub amount: u64,
+    pub fee: u64,
     pub currency: String,
     pub payment_type: PaymentType,
     pub status: TransferStatus,
@@ -68,8 +67,8 @@ pub struct PaymentChannel {
     pub party_a: String,
     pub party_b: String,
     pub currency: String,
-    pub balance_a: f64,
-    pub balance_b: f64,
+    pub balance_a: u64,
+    pub balance_b: u64,
     pub opened: Timestamp,
     pub last_updated: Timestamp,
     pub closed: Option<Timestamp>,
@@ -81,7 +80,7 @@ pub struct Receipt {
     pub payment_id: String,
     pub from_did: String,
     pub to_did: String,
-    pub amount: f64,
+    pub amount: u64,
     pub currency: String,
     pub timestamp: Timestamp,
     pub signature: String,
@@ -108,7 +107,7 @@ pub struct ExitRecord {
     /// SAP succession preference
     pub succession_preference: SuccessionPreference,
     /// SAP balance at time of exit
-    pub sap_balance: f64,
+    pub sap_balance: u64,
     /// TEND balances forgiven (list of dao_did:amount pairs)
     pub tend_balances_forgiven: Vec<(String, i32)>,
     /// Whether MYCEL was dissolved
@@ -136,6 +135,7 @@ pub enum LinkTypes {
     ChannelPartyB,
     DidToSapBalance,
     MemberToExitRecord,
+    PaymentIdToPayment,
 }
 
 /// Genesis self-check
@@ -244,6 +244,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::PaymentIdToPayment => {
+                    if target_address.as_ref().len() != 39 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PaymentIdToPayment target must be a valid action hash".into()
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { link_type, .. } => {
@@ -289,7 +297,7 @@ fn validate_create_payment(
     if !payment.to_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Receiver must be a valid DID".into()));
     }
-    if payment.amount <= 0.0 {
+    if payment.amount == 0 {
         return Ok(ValidateCallbackResult::Invalid("Amount must be positive".into()));
     }
     if payment.from_did == payment.to_did {
@@ -302,28 +310,20 @@ fn validate_create_payment(
         ));
     }
 
-    // Fee must not be negative
-    if payment.fee < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Fee cannot be negative".into()
-        ));
-    }
-
     // Fee proportionality: SAP payments must pay at least the Steward minimum (0.01%)
-    if payment.currency == "SAP" && payment.amount > 0.0 {
-        let min_fee = payment.amount / SAP_STEWARD_MIN_FEE_DIVISOR;
-        if payment.fee < min_fee {
+    if payment.currency == "SAP" {
+        if payment.fee < payment.amount / SAP_STEWARD_MIN_FEE_DIVISOR {
             return Ok(ValidateCallbackResult::Invalid(
                 format!(
                     "SAP payment fee ({}) is below Steward minimum (0.01% = {})",
-                    payment.fee, min_fee
+                    payment.fee, payment.amount / SAP_STEWARD_MIN_FEE_DIVISOR
                 ),
             ));
         }
     }
 
     // TEND payments are fee-free (mutual credit)
-    if payment.currency == "TEND" && payment.fee != 0.0 {
+    if payment.currency == "TEND" && payment.fee != 0 {
         return Ok(ValidateCallbackResult::Invalid(
             "TEND payments must have zero fee (mutual credit is fee-free)".into()
         ));
@@ -337,7 +337,7 @@ fn validate_update_payment(
     payment: Payment,
 ) -> ExternResult<ValidateCallbackResult> {
     // Status can change but amount/parties cannot
-    if payment.amount <= 0.0 {
+    if payment.amount == 0 {
         return Ok(ValidateCallbackResult::Invalid("Amount must be positive".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -358,9 +358,6 @@ fn validate_create_payment_channel(
     if !channel.party_a.starts_with("did:") || !channel.party_b.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Parties must be valid DIDs".into()));
     }
-    if channel.balance_a < 0.0 || channel.balance_b < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Balances cannot be negative".into()));
-    }
     if channel.currency != "SAP" && channel.currency != "TEND" {
         return Ok(ValidateCallbackResult::Invalid(
             "Currency must be \"SAP\" or \"TEND\"".into()
@@ -371,11 +368,8 @@ fn validate_create_payment_channel(
 
 fn validate_update_payment_channel(
     _action: Update,
-    channel: PaymentChannel,
+    _channel: PaymentChannel,
 ) -> ExternResult<ValidateCallbackResult> {
-    if channel.balance_a < 0.0 || channel.balance_b < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("Balances cannot be negative".into()));
-    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -403,7 +397,7 @@ fn validate_create_receipt(
     }
 
     // Validate amount
-    if receipt.amount <= 0.0 {
+    if receipt.amount == 0 {
         return Ok(ValidateCallbackResult::Invalid("Amount must be positive".into()));
     }
 
@@ -469,9 +463,6 @@ fn validate_create_exit_record(
 
     if !exit.member_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Member must be a valid DID".into()));
-    }
-    if exit.sap_balance < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid("SAP balance cannot be negative".into()));
     }
     if let SuccessionPreference::Designee(ref designee) = exit.succession_preference {
         if !designee.starts_with("did:") {

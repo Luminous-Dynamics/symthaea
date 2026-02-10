@@ -140,6 +140,7 @@ pub enum LinkTypes {
     CollateralRegistry,
     RecentEvents,
     DidToDeposits,
+    DepositIdToDeposit,
 }
 
 /// Genesis self-check
@@ -216,6 +217,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     if target_address.as_ref().len() != 39 {
                         return Ok(ValidateCallbackResult::Invalid(
                             "Link target must be a valid entry hash".into()
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::DepositIdToDeposit => {
+                    if target_address.as_ref().len() != 39 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "Link target must be a valid action hash".into()
                         ));
                     }
                     Ok(ValidateCallbackResult::Valid)

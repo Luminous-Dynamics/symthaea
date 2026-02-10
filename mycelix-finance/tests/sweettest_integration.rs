@@ -188,8 +188,8 @@ pub struct Payment {
     pub id: String,
     pub from_did: String,
     pub to_did: String,
-    pub amount: f64,
-    pub fee: f64,
+    pub amount: u64,
+    pub fee: u64,
     pub currency: String,
     pub payment_type: PaymentType,
     pub status: TransferStatus,
@@ -202,10 +202,30 @@ pub struct Payment {
 pub struct SendPaymentInput {
     pub from_did: String,
     pub to_did: String,
-    pub amount: f64,
+    pub amount: u64,
     pub currency: String,
     pub payment_type: PaymentType,
     pub memo: Option<String>,
+}
+
+// --- Paginated API Input Types ---
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct PaginatedDaoInput {
+    pub dao_did: String,
+    pub limit: Option<usize>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetPaymentHistoryInput {
+    pub did: String,
+    pub limit: Option<usize>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetValidationScoreInput {
+    pub member_did: String,
+    pub limit: Option<usize>,
 }
 
 // --- TEND Mirror Types ---
@@ -424,7 +444,10 @@ mod tend_tests {
 
         // Get DAO listings
         let listings: Vec<ServiceListing> = conductor
-            .call(&cell.zome("tend"), "get_dao_listings", "did:mycelix:dao-listing".to_string())
+            .call(&cell.zome("tend"), "get_dao_listings", PaginatedDaoInput {
+                dao_did: "did:mycelix:dao-listing".to_string(),
+                limit: None,
+            })
             .await;
 
         assert!(!listings.is_empty(), "Should have at least one listing");
@@ -974,7 +997,7 @@ mod three_currency_lifecycle {
         let payment_input = SendPaymentInput {
             from_did: did1.clone(),
             to_did: did2.clone(),
-            amount: 100.0,
+            amount: 100_000_000,
             currency: "SAP".to_string(),
             payment_type: PaymentType::Direct,
             memo: Some("Lifecycle test SAP payment".to_string()),
@@ -989,6 +1012,6 @@ mod three_currency_lifecycle {
 
         assert_eq!(payment.currency, "SAP", "Currency must be SAP");
         assert_eq!(payment.status, TransferStatus::Completed, "Payment should complete");
-        assert_eq!(payment.amount, 100.0, "Amount must match");
+        assert_eq!(payment.amount, 100_000_000, "Amount must match");
     }
 }

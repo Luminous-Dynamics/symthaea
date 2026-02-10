@@ -304,6 +304,12 @@ pub enum LinkTypes {
     EpochToRewards,
     /// Active stakes anchor
     ActiveStakes,
+    /// Stake ID to stake entry (O(1) lookup by ID)
+    StakeIdToStake,
+    /// Escrow ID to escrow entry (O(1) lookup by ID)
+    EscrowIdToEscrow,
+    /// Link from governance_agents anchor to authorized agent pubkeys
+    GovernanceAgents,
 }
 
 /// Validation callback
@@ -336,6 +342,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::BeneficiaryToEscrow => Ok(ValidateCallbackResult::Valid),
             LinkTypes::EpochToRewards => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ActiveStakes => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::StakeIdToStake => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::EscrowIdToEscrow => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::GovernanceAgents => Ok(ValidateCallbackResult::Valid),
         },
         _ => Ok(ValidateCallbackResult::Valid),
     }
