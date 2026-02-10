@@ -3,6 +3,7 @@
 	import { SpaceScene } from '$lib/three/SpaceScene.js';
 	import { TimeController } from '$lib/three/TimeController.js';
 	import { CelestrakClient, CATEGORIES } from '$lib/three/CelestrakClient.js';
+	import { screenConjunctions } from '$lib/three/ConjunctionScreener.js';
 
 	// ── Reactive state (Svelte 5) ────────────────────────────────────
 
@@ -159,6 +160,47 @@
 			objectList = spaceScene.orbits.listSatellites();
 			dataSource = 'live';
 			satCount = added;
+
+			// Screen for conjunctions among the loaded satellites
+			try {
+				const screened = screenConjunctions(satellites, {
+					windowHours: 24,
+					thresholdKm: 50,
+					maxSatellites: 80,
+					maxResults: 15,
+				});
+
+				// Clear existing conjunction visuals
+				for (const c of conjunctionWarnings) {
+					spaceScene.conjunctionRenderer.removeConjunction(c.id);
+				}
+
+				// Add screened conjunctions to 3D scene
+				for (const c of screened) {
+					spaceScene.addConjunction({
+						id: c.id,
+						pos1Km: c.pos1Km,
+						pos2Km: c.pos2Km,
+						pc: c.pc,
+						tca: c.tca,
+					});
+				}
+
+				// Update sidebar
+				conjunctionWarnings = screened.map((c) => ({
+					id: c.id,
+					primary: c.primaryName,
+					secondary: c.secondaryName,
+					pc: c.pc,
+					tca: c.tca.toISOString(),
+					risk: c.risk,
+				})).sort((a, b) => {
+					const riskOrder = { Emergency: 0, High: 1, Medium: 2, Low: 3, Negligible: 4 };
+					return (riskOrder[a.risk] ?? 5) - (riskOrder[b.risk] ?? 5);
+				});
+			} catch (screenErr) {
+				console.warn('Conjunction screening failed:', screenErr);
+			}
 		} catch (err) {
 			errorMessage = `CelesTrak fetch failed: ${err.message}. Using mock data.`;
 			loadMockData(spaceScene);
