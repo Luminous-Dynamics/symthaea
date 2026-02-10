@@ -16,16 +16,81 @@ pub const NIX_HDC_DIM: usize = 16_384;
 /// Seed namespace to avoid collisions with other subsystems.
 const CODEBOOK_SEED_BASE: u64 = 0x4E69_784F_5300_0000; // "NixOS\0\0\0"
 
+/// Number of random hyperplanes per LSH hash table.
+const LSH_NUM_PLANES: usize = 8;
+/// Number of independent LSH hash tables for multi-probe.
+const LSH_NUM_TABLES: usize = 4;
+/// Minimum cache size before LSH kicks in (below this, brute-force is faster).
+const LSH_MIN_ENTRIES: usize = 32;
+
+/// A single LSH hash table using random hyperplane projections.
+struct LshTable {
+    /// Random hyperplane normals (one per bit of the hash).
+    planes: Vec<Vec<f32>>,
+    /// Buckets: hash → list of token indices.
+    buckets: HashMap<u32, Vec<usize>>,
+}
+
+impl LshTable {
+    fn new(dim: usize, seed: u64) -> Self {
+        let planes: Vec<Vec<f32>> = (0..LSH_NUM_PLANES)
+            .map(|i| {
+                let hv = ContinuousHV::random(dim, seed.wrapping_add(i as u64));
+                hv.as_slice().to_vec()
+            })
+            .collect();
+        Self {
+            planes,
+            buckets: HashMap::new(),
+        }
+    }
+
+    fn hash(&self, vector: &ContinuousHV) -> u32 {
+        let slice = vector.as_slice();
+        let mut h: u32 = 0;
+        for (i, plane) in self.planes.iter().enumerate() {
+            let dot: f32 = slice.iter().zip(plane.iter()).map(|(a, b)| a * b).sum();
+            if dot >= 0.0 {
+                h |= 1 << i;
+            }
+        }
+        h
+    }
+
+    fn insert(&mut self, vector: &ContinuousHV, index: usize) {
+        let h = self.hash(vector);
+        self.buckets.entry(h).or_default().push(index);
+    }
+
+    fn query(&self, vector: &ContinuousHV) -> Vec<usize> {
+        let h = self.hash(vector);
+        self.buckets.get(&h).cloned().unwrap_or_default()
+    }
+
+    fn clear(&mut self) {
+        self.buckets.clear();
+    }
+}
+
 /// Pre-computed basis vectors for NixOS HDC encoding.
 ///
 /// Provides deterministic, cached mapping from string tokens to hypervectors.
 /// All NixOS encoding modules share a single codebook to ensure vectors
 /// live in the same semantic space.
+///
+/// Includes an LSH (Locality-Sensitive Hashing) index for sub-linear
+/// approximate nearest-neighbor search when the cache grows large.
 pub struct NixCodebook {
     /// Dimension of all vectors in this codebook.
     dim: usize,
     /// Cached basis vectors: token string → ContinuousHV.
     cache: HashMap<String, ContinuousHV>,
+    /// Ordered token list (index matches LSH table indices).
+    token_order: Vec<String>,
+    /// LSH hash tables for fast approximate search.
+    lsh_tables: Vec<LshTable>,
+    /// Whether the LSH index needs rebuilding.
+    lsh_dirty: bool,
 
     // ── Structural role markers ──────────────────────────────────────
     /// Role vector for "path segment at level N" (hierarchical position).
@@ -58,16 +123,26 @@ impl NixCodebook {
             })
             .collect();
 
-        Self {
+        let lsh_tables: Vec<LshTable> = (0..LSH_NUM_TABLES)
+            .map(|t| LshTable::new(dim, CODEBOOK_SEED_BASE.wrapping_add(0x1000 + t as u64 * 100)))
+            .collect();
+
+        let mut cb = Self {
             dim,
-            cache: HashMap::new(),
+            cache: HashMap::with_capacity(64),
+            token_order: Vec::with_capacity(64),
+            lsh_tables,
+            lsh_dirty: false,
             level_markers,
             value_role: ContinuousHV::random(dim, CODEBOOK_SEED_BASE.wrapping_add(0x200)),
             type_role: ContinuousHV::random(dim, CODEBOOK_SEED_BASE.wrapping_add(0x201)),
             package_role: ContinuousHV::random(dim, CODEBOOK_SEED_BASE.wrapping_add(0x202)),
             service_role: ContinuousHV::random(dim, CODEBOOK_SEED_BASE.wrapping_add(0x203)),
             input_role: ContinuousHV::random(dim, CODEBOOK_SEED_BASE.wrapping_add(0x204)),
-        }
+        };
+        // Pre-populate common segments to avoid cold-cache penalties
+        cb.preload_common_segments();
+        cb
     }
 
     /// Get the dimension of vectors in this codebook.
@@ -82,7 +157,9 @@ impl NixCodebook {
         if !self.cache.contains_key(token) {
             let seed = Self::token_seed(token);
             let hv = ContinuousHV::random(self.dim, seed);
-            self.cache.insert(token.to_string(), hv);
+            self.cache.insert(token.to_string(), hv.clone());
+            self.token_order.push(token.to_string());
+            self.lsh_dirty = true;
         }
         &self.cache[token]
     }
@@ -144,6 +221,72 @@ impl NixCodebook {
     /// Whether the cache is empty.
     pub fn is_empty(&self) -> bool {
         self.cache.is_empty()
+    }
+
+    /// Find the top-k most similar cached tokens to a query vector.
+    ///
+    /// Uses LSH for approximate nearest-neighbor when the cache is large
+    /// enough to benefit (>= LSH_MIN_ENTRIES). Falls back to brute-force
+    /// for small caches where the overhead isn't worthwhile.
+    pub fn search_similar(&mut self, query: &ContinuousHV, top_k: usize) -> Vec<(String, f32)> {
+        if self.cache.len() < LSH_MIN_ENTRIES {
+            return self.search_brute_force(query, top_k);
+        }
+
+        if self.lsh_dirty {
+            self.rebuild_lsh();
+        }
+
+        // Collect candidate indices from all LSH tables
+        let mut candidate_set = std::collections::HashSet::new();
+        for table in &self.lsh_tables {
+            for idx in table.query(query) {
+                candidate_set.insert(idx);
+            }
+        }
+
+        // If LSH returned too few candidates, fall back to brute force
+        if candidate_set.len() < top_k * 2 {
+            return self.search_brute_force(query, top_k);
+        }
+
+        // Score only the candidates
+        let mut results: Vec<(String, f32)> = candidate_set
+            .into_iter()
+            .filter_map(|idx| {
+                self.token_order.get(idx).and_then(|token| {
+                    self.cache.get(token).map(|hv| (token.clone(), query.similarity(hv)))
+                })
+            })
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results.truncate(top_k);
+        results
+    }
+
+    /// Brute-force search over all cached vectors.
+    fn search_brute_force(&self, query: &ContinuousHV, top_k: usize) -> Vec<(String, f32)> {
+        let mut results: Vec<(String, f32)> = self.cache.iter()
+            .map(|(token, hv)| (token.clone(), query.similarity(hv)))
+            .collect();
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results.truncate(top_k);
+        results
+    }
+
+    /// Rebuild the LSH index from all cached vectors.
+    fn rebuild_lsh(&mut self) {
+        for table in &mut self.lsh_tables {
+            table.clear();
+        }
+        for (idx, token) in self.token_order.iter().enumerate() {
+            if let Some(hv) = self.cache.get(token) {
+                for table in &mut self.lsh_tables {
+                    table.insert(hv, idx);
+                }
+            }
+        }
+        self.lsh_dirty = false;
     }
 
     /// Deterministic seed from a token string.
@@ -218,9 +361,9 @@ mod tests {
 
     #[test]
     fn test_preload() {
-        let mut cb = NixCodebook::new();
-        assert!(cb.is_empty());
-        cb.preload_common_segments();
+        let cb = NixCodebook::new();
+        // Constructor now auto-preloads common segments for performance
+        assert!(!cb.is_empty());
         assert!(cb.len() > 30);
     }
 
@@ -240,5 +383,40 @@ mod tests {
                 assert!(sim < 0.1, "Role markers {} and {} should be quasi-orthogonal, got {}", i, j, sim);
             }
         }
+    }
+
+    #[test]
+    fn test_search_similar_finds_self() {
+        let mut cb = NixCodebook::new();
+        let hv = cb.get_or_create("services").clone();
+        let results = cb.search_similar(&hv, 3);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].0, "services");
+        assert!((results[0].1 - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn test_lsh_index_rebuilt_on_search() {
+        let mut cb = NixCodebook::new();
+        // Preload fills ~40 entries, above LSH_MIN_ENTRIES
+        assert!(cb.len() >= 32);
+        let hv = cb.get_or_create("services").clone();
+        let results = cb.search_similar(&hv, 5);
+        assert!(!results.is_empty());
+        // After search, LSH should be clean
+        assert!(!cb.lsh_dirty);
+    }
+
+    #[test]
+    fn test_token_order_tracks_insertions() {
+        let mut cb = NixCodebook::with_dim(256);
+        let preloaded = cb.token_order.len();
+        cb.get_or_create("alpha");
+        cb.get_or_create("beta");
+        cb.get_or_create("gamma");
+        assert_eq!(cb.token_order.len(), preloaded + 3);
+        assert_eq!(cb.token_order[preloaded], "alpha");
+        assert_eq!(cb.token_order[preloaded + 1], "beta");
+        assert_eq!(cb.token_order[preloaded + 2], "gamma");
     }
 }

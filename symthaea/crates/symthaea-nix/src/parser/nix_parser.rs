@@ -13,18 +13,18 @@
 //!
 //! ## Example
 //!
-//! ```rust,ignore
-//! use symthaea::language::nix_parser::NixParser;
+//! ```no_run
+//! use symthaea_nix::parser::nix_parser::NixParser;
 //!
-//! let parser = NixParser::new();
-//! let result = parser.parse(r#"
+//! let mut parser = NixParser::new();
+//! let config = parser.parse(r#"
 //!     { config, pkgs, ... }: {
 //!       services.nginx.enable = true;
 //!       environment.systemPackages = with pkgs; [ vim git ];
 //!     }
-//! "#)?;
+//! "#).unwrap();
 //!
-//! for option in result.options() {
+//! for option in &config.options {
 //!     println!("{} = {:?}", option.path, option.value);
 //! }
 //! ```
@@ -492,8 +492,11 @@ impl NixConfig {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// let config = parser.parse(source)?;
+    /// ```no_run
+    /// use symthaea_nix::parser::nix_parser::NixParser;
+    ///
+    /// let mut parser = NixParser::new();
+    /// let config = parser.parse("{ x = 1; }").unwrap();
     /// for node in config.traverse_ast() {
     ///     println!("{}: {}", node.kind(), config.get_source_range(&node));
     /// }
@@ -510,8 +513,11 @@ impl NixConfig {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
-    /// // Find all string literals
+    /// ```no_run
+    /// use symthaea_nix::parser::nix_parser::NixParser;
+    ///
+    /// let mut parser = NixParser::new();
+    /// let config = parser.parse("{ x = \"hello\"; }").unwrap();
     /// let strings = config.find_nodes("string_expression");
     /// for node in strings {
     ///     println!("String: {}", config.get_source_range(&node));
@@ -530,13 +536,16 @@ impl NixConfig {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```no_run
+    /// use symthaea_nix::parser::nix_parser::NixParser;
+    ///
+    /// let mut parser = NixParser::new();
     /// let config = parser.parse(r#"
     ///     let
     ///       x = 1;
     ///       y = "hello";
     ///     in x + y
-    /// "#)?;
+    /// "#).unwrap();
     ///
     /// for (name, value) in config.extract_bindings() {
     ///     println!("{} = {}", name, value);
@@ -599,7 +608,11 @@ impl NixConfig {
     ///
     /// # Example
     ///
-    /// ```rust,ignore
+    /// ```no_run
+    /// use symthaea_nix::parser::nix_parser::NixParser;
+    ///
+    /// let mut parser = NixParser::new();
+    /// let config = parser.parse("{ x = 1; y = 2; }").unwrap();
     /// for node in config.find_nodes("identifier") {
     ///     let text = config.get_source_range(&node);
     ///     println!("Identifier: {}", text);

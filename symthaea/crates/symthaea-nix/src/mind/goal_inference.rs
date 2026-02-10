@@ -249,6 +249,7 @@ mod tests {
 
         // Second goal should incorporate context from first
         let sim = goal1.goal_state.similarity(&goal2.goal_state);
+        assert!(sim.is_finite());
         // They should share some similarity due to accumulated context
         assert!(gi.working_memory().len() == 2);
     }

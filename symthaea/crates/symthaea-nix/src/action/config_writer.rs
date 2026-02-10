@@ -403,7 +403,7 @@ mod tests {
 
     #[test]
     fn test_add_package_patch() {
-        let (dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
         let patch = writer.add_system_package("htop").unwrap();
         assert!(!patch.is_noop());
         assert!(patch.modified.contains("pkgs.htop"));
@@ -412,7 +412,7 @@ mod tests {
 
     #[test]
     fn test_add_existing_package_noop() {
-        let (dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
         let patch = writer.add_system_package("firefox").unwrap();
         // "pkgs.firefox" doesn't appear in the "with pkgs; [" style,
         // but the content does contain "firefox" — the add_system_package
@@ -431,7 +431,7 @@ mod tests {
   ];
 }
 "#;
-        let (dir, writer) = setup_temp_config(config);
+        let (_dir, writer) = setup_temp_config(config);
         let patch = writer.remove_system_package("git").unwrap();
         assert!(!patch.modified.contains("pkgs.git"));
         assert!(patch.modified.contains("pkgs.vim"));
@@ -440,7 +440,7 @@ mod tests {
 
     #[test]
     fn test_set_option_existing() {
-        let (dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
         let patch = writer.set_option("services.openssh.enable", "false").unwrap();
         assert!(patch.modified.contains("services.openssh.enable = false;"));
         assert!(!patch.modified.contains("services.openssh.enable = true;"));
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn test_set_option_new() {
-        let (dir, writer) = setup_temp_config(SAMPLE_CONFIG);
+        let (_dir, writer) = setup_temp_config(SAMPLE_CONFIG);
         let patch = writer.set_option("services.nginx.enable", "true").unwrap();
         assert!(patch.modified.contains("services.nginx.enable = true;"));
     }

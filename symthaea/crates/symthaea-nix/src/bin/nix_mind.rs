@@ -164,14 +164,74 @@ fn main() {
 
 // ---- Command implementations ----
 
-fn cmd_search(query: &str, _options: bool, _limit: usize, format: OutputFormat) {
-    // Use nix search for now; HDC similarity search comes later
-    let cmd = NixOSCommand::Search {
-        query: query.to_string(),
-        json: matches!(format, OutputFormat::Json),
-    };
-    let (bin, args) = cmd.to_command();
-    println!("  {} {}", bin, args.join(" "));
+fn cmd_search(query: &str, options: bool, limit: usize, format: OutputFormat) {
+    if options {
+        // HDC semantic search over NixOS options
+        use symthaea_nix::encoding::{NixCodebook, search_options};
+
+        let mut codebook = NixCodebook::new();
+
+        // Common NixOS option paths for semantic search
+        let known_paths = [
+            "services.nginx.enable", "services.nginx.package", "services.nginx.virtualHosts",
+            "services.postgresql.enable", "services.postgresql.package",
+            "services.openssh.enable", "services.openssh.settings.PermitRootLogin",
+            "services.pipewire.enable", "services.pipewire.alsa.enable",
+            "services.docker.enable", "services.podman.enable",
+            "services.xserver.enable", "services.xserver.displayManager.gdm.enable",
+            "services.xserver.desktopManager.gnome.enable",
+            "networking.firewall.enable", "networking.firewall.allowedTCPPorts",
+            "networking.networkmanager.enable", "networking.wireguard.enable",
+            "boot.loader.grub.enable", "boot.loader.systemd-boot.enable",
+            "hardware.opengl.enable", "hardware.nvidia.modesetting.enable",
+            "hardware.pulseaudio.enable", "hardware.bluetooth.enable",
+            "security.sudo.enable", "security.polkit.enable",
+            "users.users", "users.defaultUserShell",
+            "environment.systemPackages", "nixpkgs.config.allowUnfree",
+            "programs.zsh.enable", "programs.fish.enable", "programs.steam.enable",
+            "nix.gc.automatic", "nix.settings.experimental-features",
+        ];
+        let path_refs: Vec<&str> = known_paths.iter().copied().collect();
+
+        let results = search_options(query, &mut codebook, &path_refs, limit);
+
+        match format {
+            OutputFormat::Json => {
+                let json_results: Vec<serde_json::Value> = results.iter().map(|r| {
+                    serde_json::json!({
+                        "path": r.path,
+                        "similarity": r.similarity,
+                        "reason": r.match_reason,
+                    })
+                }).collect();
+                println!("{}", serde_json::to_string_pretty(&json_results).unwrap_or_default());
+            }
+            OutputFormat::Minimal => {
+                for r in &results {
+                    println!("{}", r.path);
+                }
+            }
+            OutputFormat::Human => {
+                println!("  HDC Semantic Search: \"{}\"", query);
+                println!();
+                for (i, r) in results.iter().enumerate() {
+                    println!("  {}. {} (similarity: {:.3})", i + 1, r.path, r.similarity);
+                    println!("     {}", r.match_reason);
+                }
+                if results.is_empty() {
+                    println!("  No matching options found.");
+                }
+            }
+        }
+    } else {
+        // Package search via nix search
+        let cmd = NixOSCommand::Search {
+            query: query.to_string(),
+            json: matches!(format, OutputFormat::Json),
+        };
+        let (bin, args) = cmd.to_command();
+        println!("  {} {}", bin, args.join(" "));
+    }
 }
 
 fn cmd_execute(cmd: NixOSCommand, dry_run: bool, phi_override: Option<f64>) {
