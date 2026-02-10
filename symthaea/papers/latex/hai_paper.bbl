@@ -1,0 +1,192 @@
+\begin{thebibliography}{28}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Albantakis et~al.(2023)Albantakis, Barbosa, Findlay,
+  et~al.]{albantakis2023integrated}
+Larissa Albantakis, Leonardo Barbosa, Graham Findlay, et~al.
+\newblock Integrated information theory ({IIT}) 4.0: Formulating the properties
+  of phenomenal existence in physical terms.
+\newblock \emph{PLoS Computational Biology}, 19\penalty0 (10):\penalty0
+  e1011465, 2023.
+
+\bibitem[Casali et~al.(2013)Casali, Gosseries, Rosanova,
+  et~al.]{casali2013consciousness}
+Adenauer~G Casali, Olivia Gosseries, Mario Rosanova, et~al.
+\newblock A theoretically based index of consciousness independent of sensory
+  processing and behavior.
+\newblock \emph{Science Translational Medicine}, 5\penalty0 (198):\penalty0
+  198ra105, 2013.
+
+\bibitem[{\c{C}}atal et~al.(2020){\c{C}}atal, Wauthier, De~Boom, Verbelen, and
+  Dhoedt]{catal2020learning}
+Ozan {\c{C}}atal, Samuel Wauthier, Cedric De~Boom, Tim Verbelen, and Bart
+  Dhoedt.
+\newblock Learning perception and planning with deep active inference.
+\newblock \emph{arXiv preprint arXiv:2001.11841}, 2020.
+
+\bibitem[Cohen(1988)]{cohen1988statistical}
+Jacob Cohen.
+\newblock \emph{Statistical Power Analysis for the Behavioral Sciences}.
+\newblock Lawrence Erlbaum Associates, 2nd edition, 1988.
+
+\bibitem[Feldman and Friston(2010)]{feldman2010attention}
+Harriet Feldman and Karl~J Friston.
+\newblock Attention, uncertainty, and free-energy.
+\newblock \emph{Frontiers in Human Neuroscience}, 4:\penalty0 215, 2010.
+
+\bibitem[Forbes et~al.(2020)Forbes, Hwang, Shwartz, Sap, and
+  Choi]{forbes2020social}
+Maxwell Forbes, Jena~D Hwang, Vered Shwartz, Maarten Sap, and Yejin Choi.
+\newblock Social chemistry 101: Learning to reason about social and moral
+  norms.
+\newblock In \emph{Proceedings of the 2020 Conference on Empirical Methods in
+  Natural Language Processing}, 2020.
+
+\bibitem[Fountas et~al.(2020)Fountas, Sajid, Mediano, and
+  Friston]{fountas2020deep}
+Zafeirios Fountas, Noor Sajid, Pedro A~M Mediano, and Karl Friston.
+\newblock Deep active inference agents using {Monte-Carlo} methods.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~33, pages 11662--11675, 2020.
+
+\bibitem[Friston(2010)]{friston2010free}
+Karl Friston.
+\newblock The free-energy principle: a unified brain theory?
+\newblock \emph{Nature Reviews Neuroscience}, 11\penalty0 (2):\penalty0
+  127--138, 2010.
+
+\bibitem[Friston et~al.(2017)Friston, FitzGerald, Rigoli, Schwartenbeck, and
+  Pezzulo]{friston2017active}
+Karl Friston, Thomas FitzGerald, Francesco Rigoli, Philipp Schwartenbeck, and
+  Giovanni Pezzulo.
+\newblock Active inference: a process theory.
+\newblock \emph{Neural Computation}, 29\penalty0 (1):\penalty0 1--49, 2017.
+
+\bibitem[Garcez and Lamb(2020)]{garcez2020neurosymbolic}
+Artur Garcez and Luis~C Lamb.
+\newblock Neurosymbolic {AI}: The 3rd wave.
+\newblock \emph{arXiv preprint arXiv:2012.05876}, 2020.
+
+\bibitem[Hasani et~al.(2021)Hasani, Lechner, Amini, Liebenwein, Ray,
+  Tschaikowski, Teschl, and Rus]{hasani2021liquid}
+Ramin Hasani, Mathias Lechner, Alexander Amini, Lucas Liebenwein, Aaron Ray,
+  Max Tschaikowski, Gerald Teschl, and Daniela Rus.
+\newblock Liquid time-constant networks.
+\newblock In \emph{AAAI}, volume~35, pages 7657--7666, 2021.
+
+\bibitem[Hasani et~al.(2022)Hasani, Lechner, Amini, Liebenwein, Tschaikowski,
+  Teschl, and Rus]{hasani2022closed}
+Ramin Hasani, Mathias Lechner, Alexander Amini, Lucas Liebenwein, Max
+  Tschaikowski, Gerald Teschl, and Daniela Rus.
+\newblock Closed-form continuous-time neural networks.
+\newblock \emph{Nature Machine Intelligence}, 4\penalty0 (11):\penalty0
+  992--1003, 2022.
+
+\bibitem[Heins et~al.(2022)Heins, Millidge, Da~Costa, et~al.]{heins2022pymdp}
+Conor Heins, Beren Millidge, Lancelot Da~Costa, et~al.
+\newblock pymdp: A {Python} library for active inference in discrete state
+  spaces.
+\newblock \emph{Journal of Open Source Software}, 7\penalty0 (73):\penalty0
+  4098, 2022.
+
+\bibitem[Hendrycks et~al.(2021)Hendrycks, Burns, Basart, Critch, Li, Song, and
+  Steinhardt]{hendrycks2021aligning}
+Dan Hendrycks, Collin Burns, Steven Basart, Andrew Critch, Jerry Li, Dawn Song,
+  and Jacob Steinhardt.
+\newblock Aligning {AI} with shared human values.
+\newblock In \emph{International Conference on Learning Representations}, 2021.
+
+\bibitem[Hersche et~al.(2023)Hersche, Terzic, Kleyko,
+  et~al.]{hersche2023neurovsa}
+Michael Hersche, Bojan Terzic, Denis Kleyko, et~al.
+\newblock A neuro-vector-symbolic architecture for solving {Raven}'s
+  progressive matrices.
+\newblock \emph{Nature Machine Intelligence}, 5\penalty0 (4):\penalty0
+  363--375, 2023.
+
+\bibitem[Imani et~al.(2019)Imani, Duan, and Rosing]{imani2019hierarchical}
+Mohsen Imani, Yeseong Duan, and Tajana Rosing.
+\newblock Hierarchical hyperdimensional computing for energy-efficient
+  classification.
+\newblock In \emph{DAC}, pages 1--6, 2019.
+
+\bibitem[Joshi et~al.(2016)Joshi, Halseth, and Kanerva]{joshi2016language}
+Aditya Joshi, Johan~T Halseth, and Pentti Kanerva.
+\newblock Language geometry using random indexing.
+\newblock In \emph{International Conference on Quantum Interaction}, 2016.
+
+\bibitem[Kanerva(2009)]{kanerva2009hyperdimensional}
+Pentti Kanerva.
+\newblock Hyperdimensional computing: An introduction to computing in
+  distributed representation with high-dimensional random vectors.
+\newblock \emph{Cognitive Computation}, 1\penalty0 (2):\penalty0 139--159,
+  2009.
+
+\bibitem[Kim et~al.(2020)Kim, Duan, Imani, et~al.]{kim2020hdc}
+Yeseong Kim, Yeseong Duan, Mohsen Imani, et~al.
+\newblock {HDC} for {DNA} sequence classification with error-resilient
+  encoding.
+\newblock In \emph{DAC}, pages 1--6, 2020.
+
+\bibitem[Li et~al.(2023)Li, Huang, and Naik]{li2023scallop}
+Ziyang Li, Jiani Huang, and Mayur Naik.
+\newblock Scallop: A language for neurosymbolic programming.
+\newblock \emph{Proceedings of the ACM on Programming Languages}, 7\penalty0
+  (PLDI):\penalty0 1463--1487, 2023.
+
+\bibitem[Manhaeve et~al.(2018)Manhaeve, Dumancic, Kimmig, Demeester, and
+  De~Raedt]{manhaeve2018deepproblog}
+Robin Manhaeve, Sebastijan Dumancic, Angelika Kimmig, Thomas Demeester, and Luc
+  De~Raedt.
+\newblock {DeepProbLog}: Neural probabilistic logic programming.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~31, pages 3749--3759, 2018.
+
+\bibitem[Mao et~al.(2019)Mao, Gan, Kohli, Tenenbaum, and Wu]{mao2019neuro}
+Jiayuan Mao, Chuang Gan, Pushmeet Kohli, Joshua~B Tenenbaum, and Jiajun Wu.
+\newblock The neuro-symbolic concept learner: Interpreting scenes, words, and
+  sentences from natural supervision.
+\newblock In \emph{International Conference on Learning Representations}, 2019.
+
+\bibitem[Neubert et~al.(2019)Neubert, Schubert, and
+  Protzel]{neubert2019introduction}
+Peer Neubert, Stefan Schubert, and Peter Protzel.
+\newblock An introduction to hyperdimensional computing for robotics.
+\newblock \emph{KI-K{\"u}nstliche Intelligenz}, 33\penalty0 (4):\penalty0
+  319--330, 2019.
+
+\bibitem[Rahimi et~al.(2016)Rahimi, Kanerva, and Recht]{rahimi2016robust}
+Abbas Rahimi, Pentti Kanerva, and Benjamin Recht.
+\newblock A robust and energy-efficient classifier using brain-inspired
+  hyperdimensional computing.
+\newblock In \emph{ISLPED}, pages 64--69, 2016.
+
+\bibitem[Riegel et~al.(2020)Riegel, Gray, Luus, et~al.]{riegel2020logical}
+Ryan Riegel, Alexander Gray, Francois Luus, et~al.
+\newblock Logical neural networks.
+\newblock \emph{arXiv preprint arXiv:2006.13155}, 2020.
+
+\bibitem[Toker and Sommer(2019)]{toker2019information}
+Daniel Toker and Friedrich~T Sommer.
+\newblock Information integration in large brain networks.
+\newblock \emph{PLoS Computational Biology}, 15\penalty0 (2):\penalty0
+  e1006807, 2019.
+
+\bibitem[Tononi(2004)]{tononi2004information}
+Giulio Tononi.
+\newblock An information integration theory of consciousness.
+\newblock \emph{BMC Neuroscience}, 5\penalty0 (1):\penalty0 42, 2004.
+
+\bibitem[Tononi et~al.(2016)Tononi, Boly, Massimini, and
+  Koch]{tononi2016integrated}
+Giulio Tononi, Melanie Boly, Marcello Massimini, and Christof Koch.
+\newblock Integrated information theory: from consciousness to its physical
+  substrate.
+\newblock \emph{Nature Reviews Neuroscience}, 17\penalty0 (7):\penalty0
+  450--461, 2016.
+
+\end{thebibliography}

@@ -28,8 +28,8 @@
 //! ```
 
 use super::proof_system::{
-    BackendConfig, BackendType, GenericReceipt, ProofOutput, ProofReceipt, ProofStatement,
-    ProofStats, ProofSystemError, ProofWitness, SimulationBackend,
+    BackendConfig, BackendType, GenericReceipt, ProofOutput, ProofStatement, ProofStats,
+    ProofSystemError, ProofWitness, SimulationBackend,
 };
 use super::trust_risc0::{
     compute_commitment as zk_compute_commitment, evaluate_statement, ZkKVector, ZkTrustParams,
@@ -469,6 +469,7 @@ fn create_simulation_proof_bytes(output: &ProofOutput) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::proof_system::ProofReceipt;
 
     fn test_kvector() -> SdkKVector {
         SdkKVector::new(0.8, 0.6, 0.9, 0.7, 0.5, 0.4, 0.6, 0.5, 0.75, 0.7)

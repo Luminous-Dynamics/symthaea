@@ -2,7 +2,6 @@
 % Hyperdimensional Active Inference: Free Energy Principle in
 % Vector Symbolic Architectures
 %
-% Full paper — converted from HYPERDIMENSIONAL_ACTIVE_INFERENCE_DRAFT.md
 % Target venue: PLoS Computational Biology / Neural Computation
 % ============================================================================
 
@@ -24,7 +23,7 @@
 \usepackage{graphicx}
 \usepackage{natbib}
 \usepackage{caption}
-% subcaption omitted — not needed for current figures
+% subcaption not required for current figure layout
 \usepackage{multirow}
 \usepackage{array}
 \usepackage{float}
@@ -93,7 +92,7 @@ We address both challenges by integrating FEP with Hyperdimensional Computing (H
 \textbf{Key contributions:}
 \begin{enumerate}[nosep]
   \item \textbf{Reformulation of variational free energy} using HDC similarity metrics, replacing Mahalanobis distance with precision-weighted cosine similarity in hypervector space.
-  \item \textbf{Precision-weighted binding}, a novel HDC operation: $\mathrm{bind}(\hvec{1}, \hvec{2}, \pi) = (\hvec{1} \otimes \hvec{2}) \odot \sigma(\pi)$, enabling confidence-modulated feature combination.
+  \item \textbf{Precision-weighted binding}, a novel HDC operation for confidence-modulated feature combination.
   \item \textbf{Direct motor command derivation} from expected free energy, producing eight interpretable action types without intermediate policy layers.
   \item \textbf{Empirical validation} showing convergence, correct precision dynamics, and computational efficiency gains.
 \end{enumerate}
@@ -231,7 +230,7 @@ The gradient decomposes into:
 \label{eq:gradient}
 \end{multline}
 
-This pulls the belief toward observations (weighted by sensory precision) and priors (weighted by prior precision).
+This gradient pulls the belief toward observations, weighted by sensory precision~$\pi_s$, and toward priors, weighted by prior precision~$\pi_p$.
 
 \subsection{Expected Free Energy and Motor Commands}
 
@@ -243,7 +242,7 @@ where $G_p$ is pragmatic value, $G_e$ is epistemic value, $N(a)$ is novelty bonu
 
 The eight motor command types derived from EFE minimization are shown in Table~\ref{tab:motor}.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{Motor command types from EFE minimization.}
 \label{tab:motor}
@@ -309,9 +308,14 @@ where intrinsic reward is negative prediction error. The value function is $V_\t
 \textbf{Tasks:} T-Maze (context inference), Grid World 3$\times$3 and 5$\times$5 (navigation).
 \textbf{Trials:} 100 per task (10 seeds $\times$ 10 repetitions), 50 steps (T-Maze), 100 steps (Grid World).
 
+\textbf{Statistical methodology.}
+For the core active inference comparisons (Tables~\ref{tab:benchmark}--\ref{tab:speedups}), we report means with 95\% confidence intervals computed as $\bar{x} \pm 1.96 \times \mathrm{SE}$, with significance assessed via Welch's $t$-test (unequal variances) and effect sizes via Cohen's $d$~\citep{cohen1988statistical}.
+For the extended benchmarks (Tables~\ref{tab:core-benchmarks}--\ref{tab:socialchem}), results are reported as point estimates from deterministic evaluations on fixed test splits.
+Where randomness enters through seed selection, we use 10 seeds; per-seed variance is reported in Appendix~\ref{app:methodology}.
+
 \subsection{Free Energy Convergence}
 
-\begin{figure}[h]
+\begin{figure}[ht]
 \centering
 \includegraphics[width=\columnwidth]{fig2_convergence.pdf}
 \caption{\textbf{Free energy convergence} over 20 belief updating iterations. $F$ decreases monotonically from ${\sim}2.3$ to ${\sim}0.4$, converging by iteration~15. KL divergence remains non-negative (mathematical validity check).}
@@ -322,7 +326,7 @@ On a 4-dimensional observation, 8-dimensional hidden state system, free energy c
 
 \subsection{Precision Dynamics Validation}
 
-\begin{figure}[h]
+\begin{figure}[ht]
 \centering
 \includegraphics[width=\columnwidth]{fig3_precision.pdf}
 \caption{\textbf{Precision dynamics} under three error regimes. Sensory precision $\pi_s$ increases with prediction error; prior precision $\pi_p$ decreases. Error bars show $\pm 1$ SE across 100 trials.}
@@ -331,7 +335,7 @@ On a 4-dimensional observation, 8-dimensional hidden state system, free energy c
 
 Precision dynamics correctly implement the trust-observations-vs-predictions tradeoff (Table~\ref{tab:precision}).
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{Precision response to prediction error magnitude.}
 \label{tab:precision}
@@ -354,7 +358,7 @@ $\varepsilon = 0.8$ (high) & $+12\%$ & $-15\%$ \\
 
 We compare against pymdp v0.0.8~\citep{heins2022pymdp}, the reference Python implementation for discrete-state active inference. Results are shown in Table~\ref{tab:benchmark}.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{HAI vs.\ pymdp benchmark results.}
 \label{tab:benchmark}
@@ -374,7 +378,7 @@ Grid 5$\times$5 & pymdp & 0.356 & 2.338 & $-9.24$ & 10\% \\
 }
 \end{table}
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{Aggregate speedups with 95\% confidence intervals.}
 \label{tab:speedups}
@@ -394,7 +398,7 @@ Total & 7.9$\times$ & [6.4, 9.5] & --- & --- \\
 
 All differences are statistically significant at $p < 0.001$ with large effect sizes (Cohen's $d > 1.8$). HAI achieves substantially higher success rates (88--100\% vs.\ 10--16\%) with lower free energy, suggesting HDC-based precision weighting provides more effective exploration-exploitation balance.
 
-\begin{figure}[h]
+\begin{figure}[ht]
 \centering
 \includegraphics[width=\columnwidth]{fig4_scaling.pdf}
 \caption{\textbf{Scaling analysis.} HAI (Rust, 16,384-D HVs) vs.\ pymdp (Python, discrete categorical). All differences statistically significant ($p < 10^{-26}$, Cohen's $d > 1.8$).}
@@ -403,7 +407,7 @@ All differences are statistically significant at $p < 0.001$ with large effect s
 
 \subsection{Extended Benchmark Validation}
 
-\begin{figure}[h]
+\begin{figure}[ht]
 \centering
 \includegraphics[width=\columnwidth]{fig5_benchmark_radar.pdf}
 \caption{\textbf{Benchmark validation radar} showing test pass rates across 18 domains. 11 benchmarks achieve 100\% pass rate; 7 show partial passes with documented limitations.}
@@ -470,9 +474,13 @@ IIT 4.0~\citep{albantakis2023integrated} extends the formalism with intrinsic ex
 
 \subsection{Neuro-Symbolic AI}
 
-Recent neuro-symbolic approaches include \textbf{DeepProbLog}~\citep{manhaeve2018deepproblog} (neural predicates in probabilistic logic), \textbf{LNN}~\citep{riegel2020logical} (differentiable logic gates), and \textbf{Scallop}~\citep{li2023scallop} (probabilistic Datalog circuits). See also~\citet{garcez2020neurosymbolic,mao2019neuro}.
+Neuro-symbolic integration remains a central challenge in AI~\citep{garcez2020neurosymbolic}.
+\textbf{DeepProbLog}~\citep{manhaeve2018deepproblog} embeds neural networks as probabilistic predicates within ProbLog programs, enabling end-to-end gradient-based training of hybrid systems that combine perception with logical reasoning.
+\textbf{Logical Neural Networks (LNN)}~\citep{riegel2020logical} implement real-valued, differentiable logic gates that maintain the semantics of classical Boolean logic while supporting gradient descent, achieving tight bounds on truth values for every proposition.
+\textbf{Scallop}~\citep{li2023scallop} introduces a probabilistic Datalog language with provenance semirings that enables differentiable reasoning over relational data, scaling neuro-symbolic integration to complex multi-hop queries.
+The Neuro-Symbolic Concept Learner~\citep{mao2019neuro} jointly learns visual concepts and semantic parsing from natural supervision without explicit symbolic labels.
 
-Our approach differs fundamentally: HDC's native algebraic structure provides compositional semantics \emph{within} the substrate, rather than bridging separate neural and symbolic components. The moral algebra system (\S\ref{sec:ethics}) demonstrates this: ethical propositions compose using HDC operators directly.
+Our approach differs fundamentally from these bridging architectures: rather than coupling separate neural and symbolic modules through an interface layer, HDC's algebraic structure provides compositional semantics \emph{within} the representational substrate itself. Binding ($\otimes$) and bundling ($\oplus$) serve as native symbolic operators over distributed representations, eliminating the neural--symbolic translation bottleneck. The moral algebra system (\S\ref{sec:ethics}) demonstrates this concretely: ethical propositions compose via HDC operators, achieving 92.9\% on ETHICS without requiring a logic engine or pretrained language model.
 
 \subsection{Novelty Assessment}
 
@@ -495,7 +503,7 @@ The eight motor command types provide an interpretable action vocabulary for cog
 
 We validated $\lambda_2$ (algebraic connectivity) as a proxy for exact IIT $\Phi$ across network topologies at scales $n=4..7$ (Figure~\ref{fig:lambda2}).
 
-\begin{figure}[h]
+\begin{figure}[ht]
 \centering
 \includegraphics[width=\columnwidth]{fig6_lambda2_phi.pdf}
 \caption{\textbf{$\lambda_2$-$\Phi$ proxy validation.} $\lambda_2$ shows correct topological ordering (chain $<$ ring $<$ star $<$ complete) but exact $\Phi$ degenerates to 0 for all weighted systems.}
@@ -522,20 +530,14 @@ CfC cells exhibit gradient vanishing from compounding attenuation: SiLU derivati
   \item Social Chemistry 3-class accuracy (69.6\%) limited by inherent norm ambiguity.
 \end{enumerate}
 
-\subsection{Unified Federated Learning Pipeline}
+\subsection{Unified Federated Learning}
 \label{sec:fl}
 
-We developed a unified FL pipeline (\texttt{mycelix-fl-core}) with six stages:
-(1)~Differential Privacy (L2 clipping + Gaussian noise, R\'{e}nyi DP composition),
-(2)~Reputation Gate,
-(3)~Multi-signal Byzantine Detection (4-signal ensemble),
-(4)~Hybrid BFT Trimming,
-(5)~Reputation$^2$-weighted Aggregation,
-(6)~Plugin System.
+We developed a unified FL pipeline (\texttt{mycelix\-fl\-core}) with six stages: (1)~Differential Privacy (L2 clipping + Gaussian noise, R\'{e}nyi DP composition), (2)~Reputation Gate, (3)~Multi-signal Byzantine Detection (4-signal ensemble), (4)~Hybrid BFT Trimming, (5)~Reputation$^2$-weighted Aggregation, and (6)~Plugin System.
 
 Table~\ref{tab:fl-pipeline} shows unified pipeline results.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{Unified pipeline benchmark (100-node network).}
 \label{tab:fl-pipeline}
@@ -558,17 +560,18 @@ Phase diagram (7$\times$) & 10--34\% $\times$ rep & 0.001--0.45 \\
 \end{table}
 
 The pipeline supports \textbf{consciousness-aware aggregation} via external weight maps:
-\begin{equation}
-w_i = E_\mathrm{factor} \cdot N_\mathrm{factor} \cdot M_\mathrm{factor} \cdot H_\mathrm{factor} \cdot (0.5 + \Phi_i \cdot 0.5) \cdot c_i
-\end{equation}
+\begin{multline}
+w_i = E_\mathrm{factor} \cdot N_\mathrm{factor} \cdot M_\mathrm{factor} \cdot H_\mathrm{factor} \\
+  \cdot\; (0.5 + \Phi_i \cdot 0.5) \cdot c_i
+\end{multline}
 
 On real MNIST (784$\to$10 softmax, 20 nodes, 40 rounds), the pipeline neutralizes 20\% Byzantine nodes completely (67.4\% accuracy, identical to clean). Non-IID degrades proportionally; DP trades ${\sim}20\%$ accuracy for formal privacy guarantees.
 
-Three defense tiers emerge: (1)~equal-reputation fails at 5\% Byzantine, (2)~reputation$^2$ weighting extends to 25\%, (3)~Krum selection withstands 40\%+.
+Three defense tiers emerge from the phase diagram: equal-reputation aggregation fails at just 5\% Byzantine participation, reputation-squared weighting extends the safety boundary to~25\%, and Krum-based selection withstands 40\%+.
 
-\textbf{Novel contributions relative to existing FL systems} are summarized in Table~\ref{tab:fl-comparison}.
+\textbf{Novel contributions} relative to existing FL systems are summarized in Table~\ref{tab:fl-comparison}.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{Feature comparison with existing FL frameworks.}
 \label{tab:fl-comparison}
@@ -594,7 +597,7 @@ Validated 34\% BFT & \checkmark & --- & --- & --- & --- \\
 
 Table~\ref{tab:fed-mnist} shows federated MNIST convergence across attack and privacy scenarios.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{Federated MNIST convergence (softmax $784 \to 10$, 15 nodes, 20 rounds).}
 \label{tab:fed-mnist}
@@ -621,7 +624,7 @@ The unified pipeline resists up to 30\% Byzantine nodes on a real classification
 
 Table~\ref{tab:meta-learn} demonstrates meta-learning signal weight adaptation.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{Meta-learning signal weight adaptation (35 rounds, 8 honest + 3 Byzantine).}
 \label{tab:meta-learn}
@@ -643,7 +646,7 @@ After attackers reform (20 honest rounds), EMA exclusion rates decay below the s
 
 Table~\ref{tab:hyperfeel} shows HyperFeel compression ratios.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{HyperFeel compression ratios (honest measurement).}
 \label{tab:hyperfeel}
@@ -666,7 +669,7 @@ Compression ratio scales linearly with model size because the output (2~KB HV16 
 
 Table~\ref{tab:rdp} tracks R\'{e}nyi DP privacy budgets.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{RDP privacy budget tracking ($\delta = 10^{-5}$).}
 \label{tab:rdp}
@@ -686,7 +689,7 @@ Low privacy & 1.0 & 3.20 & 16.97 & 5 \\
 
 Table~\ref{tab:byz-phase} presents the Byzantine tolerance phase diagram.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{Byzantine tolerance phase diagram (20 nodes, MSE threshold $< 1.0$).}
 \label{tab:byz-phase}
@@ -712,11 +715,11 @@ Byz.\ \% & Equal-Rep & Low-Rep ($\text{rep}^2$) & Krum ($k{=}1$) \\
 \raggedright\scriptsize{$^\dagger$MSE $\geq 1.0$ (aggregation failure). --- indicates non-convergence.}
 \end{table}
 
-Three defense tiers emerge: (1)~Equal-reputation aggregation fails at 5\% Byzantine. (2)~Reputation-squared weighting extends the safety boundary to 25\%, reducing effective Byzantine voting power from 34\% to ${\sim}2.7\%$. (3)~Krum selection withstands 40\%+ by choosing the single gradient closest to its neighbors.
+Three defense tiers emerge from the phase diagram. Equal-reputation aggregation fails at just 5\% Byzantine participation. Reputation-squared weighting extends the safety boundary to~25\%, reducing effective Byzantine voting power from 34\% to ${\sim}2.7\%$. Krum selection withstands 40\%+ by choosing the single gradient closest to its neighbors.
 
 Table~\ref{tab:real-mnist} shows real MNIST federated training results.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{Real MNIST federated training (linear softmax $784 \to 10$, 20 nodes, 40 rounds).}
 \label{tab:real-mnist}
@@ -745,11 +748,11 @@ Real MNIST confirms: (1)~the pipeline completely neutralizes 20\% Byzantine node
 
 We evaluate HDC compositional ethical reasoning on the ETHICS benchmark~\citep{hendrycks2021aligning} (4 categories, 500 test examples each) and Social Chemistry 101~\citep{forbes2020social} (292K norms).
 
-\textbf{Architecture.} Three layers: (1)~Moral algebra---seven 16,384-D primitives (AGENT, PATIENT, ACTION, INTENT, CONSENT, OBLIGATION, MAGNITUDE) with five compositional operators; (2)~Learned HDC prototypes via dual-channel text encoder (trigrams + words + sentiment); (3)~Per-category dimension tuning (16,384-D for virtue/commonsense, 8,192-D for justice/deontology).
+\textbf{Architecture.} The system comprises three layers: (1)~a moral algebra of seven 16,384-D primitives (\textsc{agent}, \textsc{patient}, \textsc{action}, \textsc{intent}, \textsc{consent}, \textsc{obligation}, \textsc{magnitude}) with five compositional operators; (2)~learned HDC prototypes via a dual-channel text encoder (character trigrams, words, and sentiment); and (3)~per-category dimension tuning (16,384-D for virtue/commonsense, 8,192-D for justice/deontology).
 
 Results are shown in Table~\ref{tab:ethics}.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{ETHICS benchmark results (500 test examples/category).}
 \label{tab:ethics}
@@ -774,7 +777,7 @@ Virtue & 63.8\% & 63.8\% & 92.8\% \\
 
 Social Chemistry 101 results are shown in Table~\ref{tab:socialchem}.
 
-\begin{table}[h]
+\begin{table}[ht]
 \centering
 \caption{Social Chemistry 101 results (500 test examples, 3-class).}
 \label{tab:socialchem}
@@ -805,7 +808,7 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
   \item \textbf{Correct precision dynamics:} Adaptive confidence weighting validated empirically.
   \item \textbf{Mathematical soundness:} Free energy convergence and KL non-negativity confirmed.
   \item \textbf{Compositional ethical reasoning:} 92.9\% on ETHICS without pretrained LMs.
-  \item \textbf{Unified federated learning:} Consciousness-aware FL with 34\% Byzantine tolerance validated on real MNIST.
+  \item \textbf{Federated learning:} Consciousness-aware FL pipeline with 34\% Byzantine tolerance validated on real MNIST.
 \end{enumerate}
 
 HAI opens new directions for efficient, interpretable cognitive architectures combining the rigor of active inference with the elegance of hyperdimensional computing.
@@ -820,16 +823,18 @@ HAI opens new directions for efficient, interpretable cognitive architectures co
 \section{Implementation Details}
 \label{app:implementation}
 
-\textbf{Repository:} \url{https://github.com/Luminous-Dynamics/symthaea}\\
-\textbf{Language:} Rust (Edition 2021)\\
-\textbf{Dependencies:} ndarray, nalgebra, rand, burn (optional GPU), duckdb\\
-\textbf{Lines of code:} ${\sim}338$K total, ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\\
-\textbf{Test suite:} 2,797 tests, 13 ignored, 0 failures\\
-\textbf{Feature flags:} 75 (48 active in cfg attrs)\\
-\textbf{Test command:} \texttt{cargo test test\_fep\_active\_inference}\\
-\textbf{Demo command:} \texttt{cargo run --example fep\_active\_inference\_demo}
+{\raggedright
+\textbf{Repository:} \url{https://github.com/Luminous-Dynamics/symthaea}\par
+\textbf{Language:} Rust (Edition 2021)\par
+\textbf{Dependencies:} ndarray, nalgebra, rand, burn (optional GPU), duckdb\par
+\textbf{Lines of code:} ${\sim}338$K total, ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
+\textbf{Test suite:} 2,797 tests, 13 ignored, 0 failures\par
+\textbf{Feature flags:} 75 (48 active in cfg attrs)\par
+\textbf{Test command:} \texttt{cargo test test\_fep\_active\_inference}\par
+\textbf{Demo command:} \texttt{cargo run --example fep\_active\_inference\_demo}\par
+}
 
-\section{Full Mathematical Derivations}
+\section{Mathematical Derivations}
 \label{app:derivations}
 
 \subsection{Free Energy Gradient}
@@ -867,9 +872,6 @@ G_e(a) = H[p(\mathbf{o}|\hvec{s'}^{(a)})] - H[p(\mathbf{o}|\hvec{s})]
 
 \subsection{Timing Methodology}
 
-All measurements: 10 warm-up runs (discarded), 100 measured runs.
-Reported: mean $\pm$ SE. 95\% CI = mean $\pm 1.96 \times$ SE.
-Platform: single-threaded AMD Ryzen~9.
-Reproducibility: deterministic seeds; raw data in \texttt{data/benchmarks/*/results.json}.
+All timing measurements consist of 10 warm-up runs (discarded) followed by 100 timed runs. We report mean~$\pm$~SE, with 95\% confidence intervals computed as mean~$\pm\,1.96 \times$~SE. All experiments run single-threaded on an AMD Ryzen~9 processor. For reproducibility, all runs use deterministic seeds; raw data are archived in the repository under \texttt{data/\allowbreak benchmarks/}.
 
 \end{document}
