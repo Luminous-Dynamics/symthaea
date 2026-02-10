@@ -273,8 +273,7 @@ impl HolochainClient {
         let norad_suffix = call.norad_id.unwrap_or(0);
         let filename = format!(
             "submit_observation_{}_{}.json",
-            norad_suffix,
-            call.observation_time.micros
+            norad_suffix, call.observation_time.micros
         );
         let path = self.config.batch_dir.join(&filename);
         let json = serde_json::to_string_pretty(&call)?;
@@ -455,7 +454,10 @@ impl IngestionReport {
     }
 
     pub fn total_created(&self) -> usize {
-        self.objects_created + self.tles_created + self.state_vectors_created + self.observations_created
+        self.objects_created
+            + self.tles_created
+            + self.state_vectors_created
+            + self.observations_created
     }
 
     pub fn has_errors(&self) -> bool {
