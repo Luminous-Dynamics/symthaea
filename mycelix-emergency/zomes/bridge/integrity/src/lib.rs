@@ -112,15 +112,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::HappToQuery => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
-            link_type,
+            link_type: _,
             original_action: _,
             base_address: _,
             target_address: _,
             tag: _,
             action: _,
-        } => match link_type {
-            _ => Ok(ValidateCallbackResult::Valid),
-        },
+        } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),

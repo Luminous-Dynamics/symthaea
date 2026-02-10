@@ -197,7 +197,7 @@ pub fn get_recent_events(_: ()) -> ExternResult<Vec<Record>> {
         GetStrategy::default(),
     )?;
     let mut records = records_from_links(links)?;
-    records.sort_by(|a, b| b.action().timestamp().cmp(&a.action().timestamp()));
+    records.sort_by_key(|b| std::cmp::Reverse(b.action().timestamp()));
     // Return most recent 50 events
     records.truncate(50);
     Ok(records)
@@ -212,7 +212,7 @@ pub fn get_events_by_type(event_type: WaterEventType) -> ExternResult<Vec<Record
         GetStrategy::default(),
     )?;
     let mut records = records_from_links(links)?;
-    records.sort_by(|a, b| b.action().timestamp().cmp(&a.action().timestamp()));
+    records.sort_by_key(|b| std::cmp::Reverse(b.action().timestamp()));
     Ok(records)
 }
 

@@ -232,7 +232,7 @@ jobs:
             # Test SDK (exclude risc0 feature — requires external risc0-zkvm installation)
             echo ""
             echo "=== Running SDK Tests ==="
-            cargo test --features "simulation,full,parallel,webauthn-full,stub-webauthn" --manifest-path mycelix-workspace/sdk/Cargo.toml
+            cargo test --features "simulation,parallel,webauthn-full,stub-webauthn" --manifest-path mycelix-workspace/sdk/Cargo.toml
           '
 
       - name: Run integration tests
@@ -356,7 +356,7 @@ jobs:
             # SDK clippy: exclude benches (criterion not in Nix env) and risc0 feature
             echo "Linting sdk..."
             cargo clippy --lib --tests --manifest-path mycelix-workspace/sdk/Cargo.toml \
-              --features "simulation,full,parallel,webauthn-full,stub-webauthn" -- -D warnings
+              --features "simulation,parallel,webauthn-full,stub-webauthn" -- -D warnings
           '
 
   # ============================================================================

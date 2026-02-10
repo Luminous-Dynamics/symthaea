@@ -111,7 +111,7 @@ pub fn calculate_max_resale_price(input: CalculateResaleInput) -> ExternResult<R
         }
         FormulaType::AreaMedianIncome => {
             let ami_cap_pct = formula.ami_cap_percent.unwrap_or(80) as f64 / 100.0;
-            let current_ami = input.current_ami.unwrap_or(60000_00) as f64;
+            let current_ami = input.current_ami.unwrap_or(6_000_000) as f64;
             // Maximum price = AMI cap % * annual AMI * affordability factor (assume 3x annual income)
             let ami_based_max = (ami_cap_pct * current_ami * 3.0) as u64;
 
@@ -138,7 +138,7 @@ pub fn calculate_max_resale_price(input: CalculateResaleInput) -> ExternResult<R
 
             // AMI-based calculation
             let ami_cap_pct = formula.ami_cap_percent.unwrap_or(80) as f64 / 100.0;
-            let current_ami = input.current_ami.unwrap_or(60000_00) as f64;
+            let current_ami = input.current_ami.unwrap_or(6_000_000) as f64;
             let ami_result = (ami_cap_pct * current_ami * 3.0) as u64;
 
             // Hybrid takes the minimum of both to ensure maximum affordability
