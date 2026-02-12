@@ -14,6 +14,7 @@ pub struct DidDocument {
     /// Controller of this DID (usually self)
     pub controller: AgentPubKey,
     /// Verification methods (public keys)
+    #[serde(rename = "verificationMethod", alias = "verification_method")]
     pub verification_method: Vec<VerificationMethod>,
     /// Authentication methods
     pub authentication: Vec<String>,
@@ -22,7 +23,7 @@ pub struct DidDocument {
     /// Each entry is a DID URL fragment (e.g. "#kem-1") referencing a
     /// `VerificationMethod` with an ML-KEM public key. Recipients use this
     /// to look up the KEM key for encrypting data to this DID's owner.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(rename = "keyAgreement", alias = "key_agreement", default, skip_serializing_if = "Vec::is_empty")]
     pub key_agreement: Vec<String>,
     /// Service endpoints
     pub service: Vec<ServiceEndpoint>,
@@ -38,8 +39,10 @@ pub struct DidDocument {
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct VerificationMethod {
     pub id: String,
+    #[serde(rename = "type", alias = "type_")]
     pub type_: String,
     pub controller: String,
+    #[serde(rename = "publicKeyMultibase", alias = "public_key_multibase")]
     pub public_key_multibase: String,
     /// Algorithm identifier (multicodec u16). None defaults to Ed25519 (0xed01).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -50,7 +53,9 @@ pub struct VerificationMethod {
 #[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub struct ServiceEndpoint {
     pub id: String,
+    #[serde(rename = "type", alias = "type_")]
     pub type_: String,
+    #[serde(rename = "serviceEndpoint", alias = "service_endpoint")]
     pub service_endpoint: String,
 }
 

@@ -322,9 +322,11 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
 /// Input for updating a DID document
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateDidInput {
+    #[serde(rename = "verificationMethod", alias = "verification_method")]
     pub verification_method: Option<Vec<VerificationMethod>>,
     pub authentication: Option<Vec<String>>,
     /// Key agreement methods (DID URL fragments referencing KEM verification methods).
+    #[serde(rename = "keyAgreement", alias = "key_agreement")]
     pub key_agreement: Option<Vec<String>>,
     pub service: Option<Vec<ServiceEndpoint>>,
 }

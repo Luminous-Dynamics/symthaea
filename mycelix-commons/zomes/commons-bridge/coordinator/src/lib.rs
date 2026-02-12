@@ -137,30 +137,43 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
         });
     }
 
+    // Use HDK host call directly to bypass the ExternIO::encode() in the
+    // convenience `call()` wrapper — our payload is already msgpack-encoded.
     let payload = ExternIO(input.payload);
 
-    match call(
-        CallTargetCell::Local,
-        ZomeName::from(input.zome.as_str()),
-        FunctionName::from(input.fn_name.as_str()),
-        None,
-        payload,
-    ) {
-        Ok(ZomeCallResponse::Ok(extern_io)) => Ok(DispatchResult {
-            success: true,
-            response: Some(extern_io.0),
-            error: None,
-        }),
-        Ok(ZomeCallResponse::NetworkError(err)) => Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!("Network error: {}", err)),
-        }),
-        Ok(other) => Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!("Zome call rejected: {:?}", other)),
-        }),
+    let result = HDK.with(|h| {
+        h.borrow().call(vec![Call::new(
+            CallTarget::ConductorCell(CallTargetCell::Local),
+            ZomeName::from(input.zome.as_str()),
+            FunctionName::from(input.fn_name.as_str()),
+            None,
+            payload,
+        )])
+    });
+
+    match result {
+        Ok(responses) => match responses.into_iter().next() {
+            Some(ZomeCallResponse::Ok(extern_io)) => Ok(DispatchResult {
+                success: true,
+                response: Some(extern_io.0),
+                error: None,
+            }),
+            Some(ZomeCallResponse::NetworkError(err)) => Ok(DispatchResult {
+                success: false,
+                response: None,
+                error: Some(format!("Network error: {}", err)),
+            }),
+            Some(other) => Ok(DispatchResult {
+                success: false,
+                response: None,
+                error: Some(format!("Zome call rejected: {:?}", other)),
+            }),
+            None => Ok(DispatchResult {
+                success: false,
+                response: None,
+                error: Some("No response from zome call".into()),
+            }),
+        },
         Err(e) => Ok(DispatchResult {
             success: false,
             response: None,
@@ -197,7 +210,9 @@ pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
 
     // Attempt auto-dispatch if query_type looks like a zome function call
     if let Some(zome_name) = resolve_domain_zome(&query.domain, &query.query_type) {
-        let payload_bytes = query.params.as_bytes().to_vec();
+        let payload_bytes = ExternIO::encode(query.params.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0;
         let dispatch = DispatchInput {
             zome: zome_name,
             fn_name: query.query_type.clone(),

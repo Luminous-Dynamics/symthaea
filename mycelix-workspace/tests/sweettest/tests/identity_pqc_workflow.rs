@@ -30,27 +30,39 @@ use harness::*;
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, Clone)]
 struct VerificationMethod {
     id: String,
+    #[serde(rename = "type", alias = "type_")]
     type_: String,
     controller: String,
+    #[serde(rename = "publicKeyMultibase", alias = "public_key_multibase")]
     public_key_multibase: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     algorithm: Option<u16>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, Clone)]
+struct ServiceEndpoint {
+    id: String,
+    #[serde(rename = "type", alias = "type_")]
+    type_: String,
+    #[serde(rename = "serviceEndpoint", alias = "service_endpoint")]
+    service_endpoint: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct DidDocument {
     id: String,
     controller: AgentPubKey,
+    #[serde(rename = "verificationMethod", alias = "verification_method")]
     verification_method: Vec<VerificationMethod>,
     authentication: Vec<String>,
-    #[serde(default)]
+    #[serde(rename = "keyAgreement", alias = "key_agreement", default)]
     key_agreement: Vec<String>,
-    service: Vec<serde_json::Value>,
+    service: Vec<ServiceEndpoint>,
     created: Timestamp,
     updated: Timestamp,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct CredentialProof {
     #[serde(rename = "type")]
     proof_type: String,
@@ -67,14 +79,14 @@ struct CredentialProof {
     algorithm: Option<u16>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct CredentialSubject {
     id: String,
     #[serde(flatten)]
     claims: serde_json::Value,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 #[serde(untagged)]
 enum CredentialIssuer {
     Did(String),
@@ -85,7 +97,7 @@ enum CredentialIssuer {
     },
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct VerifiableCredential {
     #[serde(rename = "@context")]
     context: Vec<String>,
@@ -108,7 +120,7 @@ struct VerifiableCredential {
     mycelix_created: Timestamp,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct IssueCredentialWithProofInput {
     credential: VerifiableCredential,
 }
@@ -302,6 +314,32 @@ async fn test_issue_credential_with_hybrid_proof() {
         !record.action_hashed().hash.as_ref().is_empty(),
         "Hybrid-signed credential should be stored successfully"
     );
+
+    // Retrieve the credential by ID and verify the proof algorithm
+    let retrieved: Option<Record> = alice
+        .call_zome_fn(
+            "verifiable_credential",
+            "get_credential",
+            "urn:uuid:test-hybrid-001".to_string(),
+        )
+        .await;
+    assert!(retrieved.is_some(), "Should retrieve the issued credential");
+    let cred_record = retrieved.unwrap();
+    let stored_vc: VerifiableCredential = cred_record
+        .entry()
+        .to_app_option()
+        .expect("Failed to deserialize credential")
+        .expect("Credential entry is None");
+    assert_eq!(
+        stored_vc.proof.algorithm,
+        Some(AlgorithmId::HybridEd25519MlDsa65.as_u16()),
+        "Stored credential proof should have HybridEd25519MlDsa65 algorithm tag"
+    );
+    assert_eq!(stored_vc.proof.proof_type, "DataIntegrityProof");
+    assert!(
+        stored_vc.proof.cryptosuite.is_some(),
+        "Hybrid proof should specify a cryptosuite"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -377,6 +415,23 @@ async fn test_hybrid_credential_cross_agent() {
     assert!(
         !retrieved.is_empty(),
         "Bob should retrieve Alice's hybrid-signed credential via DHT subject link"
+    );
+
+    // Verify the first retrieved credential has a valid hash and hybrid proof
+    let first = &retrieved[0];
+    assert!(
+        !first.action_hashed().hash.as_ref().is_empty(),
+        "Retrieved credential should have a valid action hash"
+    );
+    let cross_vc: VerifiableCredential = first
+        .entry()
+        .to_app_option()
+        .expect("Failed to deserialize credential")
+        .expect("Credential entry is None");
+    assert_eq!(
+        cross_vc.proof.algorithm,
+        Some(AlgorithmId::HybridEd25519MlDsa65.as_u16()),
+        "Cross-agent credential should preserve HybridEd25519MlDsa65 algorithm"
     );
 }
 
