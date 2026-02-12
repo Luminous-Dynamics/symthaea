@@ -293,6 +293,7 @@ pub fn compute_phi_cached(node_representations: &[ContinuousHV]) -> PhiResult {
 mod tests {
     use super::*;
     use crate::hdc::HDC_DIMENSION;
+    use proptest::prelude::*;
 
     #[test]
     fn test_cache_hit() {
@@ -402,5 +403,73 @@ mod tests {
         // Actual compute should be a cache hit
         cache.compute(&hvs);
         assert_eq!(cache.stats().hits, 1);
+    }
+
+    // =====================================================================
+    // Property-based tests
+    // =====================================================================
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        #[test]
+        fn prop_hit_rate_bounded(hits in 0u64..1000, misses in 0u64..1000) {
+            let stats = CacheStats {
+                hits,
+                misses,
+                time_saved: Duration::ZERO,
+                cache_size: 0,
+                max_capacity: 1000,
+            };
+            let rate = stats.hit_rate();
+            prop_assert!(rate >= 0.0, "Hit rate should be >= 0, got {}", rate);
+            prop_assert!(rate <= 100.0, "Hit rate should be <= 100, got {}", rate);
+        }
+
+        #[test]
+        fn prop_hit_rate_monotonic(misses in 1u64..100) {
+            // More hits with same misses → higher rate
+            let rate_low = CacheStats {
+                hits: 1, misses, time_saved: Duration::ZERO,
+                cache_size: 0, max_capacity: 1000,
+            }.hit_rate();
+            let rate_high = CacheStats {
+                hits: misses * 10, misses, time_saved: Duration::ZERO,
+                cache_size: 0, max_capacity: 1000,
+            }.hit_rate();
+            prop_assert!(rate_high >= rate_low,
+                "More hits should mean higher rate: {} >= {}", rate_high, rate_low);
+        }
+
+        #[test]
+        fn prop_hit_rate_perfect_when_no_misses(hits in 1u64..1000) {
+            let rate = CacheStats {
+                hits, misses: 0, time_saved: Duration::ZERO,
+                cache_size: 0, max_capacity: 1000,
+            }.hit_rate();
+            prop_assert!((rate - 100.0).abs() < 1e-10,
+                "All hits, no misses should give 100% rate, got {}", rate);
+        }
+
+        #[test]
+        fn prop_hit_rate_zero_when_no_hits(misses in 1u64..1000) {
+            let rate = CacheStats {
+                hits: 0, misses, time_saved: Duration::ZERO,
+                cache_size: 0, max_capacity: 1000,
+            }.hit_rate();
+            prop_assert!((rate - 0.0).abs() < 1e-10,
+                "No hits should give 0% rate, got {}", rate);
+        }
+
+        #[test]
+        fn prop_hash_deterministic(seed in 0u64..100) {
+            let cache = CachedPhiEngine::default_cached();
+            let hvs: Vec<ContinuousHV> = (0..3)
+                .map(|i| ContinuousHV::random(128, seed * 10 + i))
+                .collect();
+            let h1 = cache.hash_topology(&hvs);
+            let h2 = cache.hash_topology(&hvs);
+            prop_assert_eq!(h1, h2, "Same input should produce same hash");
+        }
     }
 }

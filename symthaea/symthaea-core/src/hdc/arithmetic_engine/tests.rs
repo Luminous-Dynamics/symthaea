@@ -1,6 +1,7 @@
 use super::*;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use std::collections::HashMap;
+use proptest::prelude::*;
 
 #[test]
 
@@ -955,7 +956,7 @@ fn test_quadratic_equation_solver() {
 
     assert_eq!(solutions.len(), 2);
     let mut sorted = solutions.clone();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
     assert!((sorted[0] - 2.0).abs() < 0.001);
     assert!((sorted[1] - 3.0).abs() < 0.001);
 }
@@ -1213,6 +1214,232 @@ fn test_multipath_phi_measurement() {
         // Each step should have phi measurement
         for step in &path.steps {
             assert!(step.phi >= 0.0, "Step Φ should be non-negative");
+        }
+    }
+}
+
+// ========================================================================
+// PROPERTY-BASED TESTS (proptest)
+// ========================================================================
+
+/// Strategy for small numbers suitable for deep (Peano) path
+fn small_nat() -> impl Strategy<Value = u64> {
+    0u64..15
+}
+
+/// Strategy for numbers that exercise the fast path (>= 50 threshold)
+fn fast_path_nat() -> impl Strategy<Value = u64> {
+    50u64..200
+}
+
+/// Strategy for nonzero small naturals
+fn nonzero_small() -> impl Strategy<Value = u64> {
+    1u64..15
+}
+
+/// Strategy for nonzero fast-path naturals
+fn nonzero_fast() -> impl Strategy<Value = u64> {
+    50u64..200
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(32))]
+
+    // =====================================================================
+    // ArithmeticEngine (Peano) properties
+    // =====================================================================
+
+    #[test]
+    fn prop_add_commutative(a in small_nat(), b in small_nat()) {
+        let mut engine = ArithmeticEngine::new();
+        let ab = engine.add(a, b);
+        let ba = engine.add(b, a);
+        prop_assert_eq!(ab.result.value, ba.result.value,
+            "Addition should be commutative: {} + {} vs {} + {}", a, b, b, a);
+    }
+
+    #[test]
+    fn prop_mul_commutative(a in 0u64..8, b in 0u64..8) {
+        let mut engine = ArithmeticEngine::new();
+        let ab = engine.multiply(a, b);
+        let ba = engine.multiply(b, a);
+        prop_assert_eq!(ab.result.value, ba.result.value,
+            "Multiplication should be commutative: {} × {} vs {} × {}", a, b, b, a);
+    }
+
+    #[test]
+    fn prop_add_identity(a in small_nat()) {
+        let mut engine = ArithmeticEngine::new();
+        let result = engine.add(a, 0);
+        prop_assert_eq!(result.result.value, a,
+            "Adding zero should be identity");
+    }
+
+    #[test]
+    fn prop_mul_identity(a in 0u64..10) {
+        let mut engine = ArithmeticEngine::new();
+        let result = engine.multiply(a, 1);
+        prop_assert_eq!(result.result.value, a,
+            "Multiplying by one should be identity");
+    }
+
+    #[test]
+    fn prop_mul_zero(a in 0u64..10) {
+        let mut engine = ArithmeticEngine::new();
+        let result = engine.multiply(a, 0);
+        prop_assert_eq!(result.result.value, 0,
+            "Multiplying by zero should give zero");
+    }
+
+    #[test]
+    fn prop_subtract_inverse_of_add(a in small_nat(), b in small_nat()) {
+        let mut engine = ArithmeticEngine::new();
+        let sum = engine.add(a, b);
+        let diff = engine.subtract(sum.result.value, b);
+        prop_assert!(diff.is_some(), "subtract(a+b, b) should succeed");
+        prop_assert_eq!(diff.unwrap().result.value, a,
+            "subtract(add({}, {}), {}) should equal {}", a, b, b, a);
+    }
+
+    #[test]
+    fn prop_phi_positive_add(a in small_nat(), b in small_nat()) {
+        let mut engine = ArithmeticEngine::new();
+        let result = engine.add(a, b);
+        prop_assert!(result.total_phi > 0.0,
+            "Φ should be positive for add({}, {})", a, b);
+    }
+
+    #[test]
+    fn prop_phi_positive_mul(a in 0u64..8, b in 0u64..8) {
+        let mut engine = ArithmeticEngine::new();
+        let result = engine.multiply(a, b);
+        prop_assert!(result.total_phi > 0.0,
+            "Φ should be positive for multiply({}, {})", a, b);
+    }
+
+    // =====================================================================
+    // HybridArithmeticEngine properties
+    // =====================================================================
+
+    #[test]
+    fn prop_hybrid_add_commutative(a in fast_path_nat(), b in fast_path_nat()) {
+        let mut engine = HybridArithmeticEngine::new();
+        let ab = engine.add(a, b);
+        let ba = engine.add(b, a);
+        prop_assert_eq!(ab.value, ba.value,
+            "Hybrid add should be commutative: {} + {} vs {} + {}", a, b, b, a);
+    }
+
+    #[test]
+    fn prop_hybrid_mul_commutative(a in fast_path_nat(), b in fast_path_nat()) {
+        let mut engine = HybridArithmeticEngine::new();
+        let ab = engine.multiply(a, b);
+        let ba = engine.multiply(b, a);
+        prop_assert_eq!(ab.value, ba.value,
+            "Hybrid mul should be commutative: {} × {} vs {} × {}", a, b, b, a);
+    }
+
+    #[test]
+    fn prop_hybrid_add_correct(a in 0u64..500, b in 0u64..500) {
+        let mut engine = HybridArithmeticEngine::new();
+        let result = engine.add(a, b);
+        prop_assert_eq!(result.value, a + b,
+            "Hybrid add({}, {}) should equal native", a, b);
+    }
+
+    #[test]
+    fn prop_hybrid_mul_correct(a in 0u64..100, b in 0u64..100) {
+        let mut engine = HybridArithmeticEngine::new();
+        let result = engine.multiply(a, b);
+        prop_assert_eq!(result.value, a * b,
+            "Hybrid multiply({}, {}) should equal native", a, b);
+    }
+
+    #[test]
+    fn prop_hybrid_deep_fast_agree(a in 1u64..20, b in 1u64..20) {
+        let mut engine = HybridArithmeticEngine::new();
+        let deep_result = engine.add_deep(a, b);
+        let fast_result = engine.add(a + 50, b + 50);
+        // Deep computes a+b, fast computes (a+50)+(b+50) = a+b+100
+        prop_assert_eq!(deep_result.value + 100, fast_result.value,
+            "Deep and fast paths should produce consistent results");
+    }
+
+    #[test]
+    fn prop_hybrid_division_modulo(a in 1u64..200, b in nonzero_fast()) {
+        let mut engine = HybridArithmeticEngine::new();
+        if let (Some(quot), Some(rem)) = (engine.divide(a, b), engine.modulo(a, b)) {
+            prop_assert_eq!(quot.value * b + rem.value, a,
+                "q*b + r should equal a for {}/{}", a, b);
+        }
+    }
+
+    #[test]
+    fn prop_hybrid_gcd_divides_both(a in nonzero_fast(), b in nonzero_fast()) {
+        let mut engine = HybridArithmeticEngine::new();
+        let g = engine.gcd(a, b);
+        prop_assert_eq!(a % g.value, 0,
+            "gcd({},{})={} should divide {}", a, b, g.value, a);
+        prop_assert_eq!(b % g.value, 0,
+            "gcd({},{})={} should divide {}", a, b, g.value, b);
+    }
+
+    #[test]
+    fn prop_hybrid_gcd_commutative(a in nonzero_fast(), b in nonzero_fast()) {
+        let mut engine = HybridArithmeticEngine::new();
+        let gcd_ab = engine.gcd(a, b);
+        let gcd_ba = engine.gcd(b, a);
+        prop_assert_eq!(gcd_ab.value, gcd_ba.value,
+            "gcd should be commutative: gcd({},{}) vs gcd({},{})", a, b, b, a);
+    }
+
+    #[test]
+    fn prop_hybrid_power_correct(base in 0u64..10, exp in 0u64..6) {
+        let mut engine = HybridArithmeticEngine::new();
+        let result = engine.power(base, exp);
+        prop_assert_eq!(result.value, base.pow(exp as u32),
+            "power({}, {}) should match native pow", base, exp);
+    }
+
+    #[test]
+    fn prop_hybrid_phi_nonnegative(a in 0u64..200, b in 0u64..200) {
+        let mut engine = HybridArithmeticEngine::new();
+        let result = engine.add(a, b);
+        prop_assert!(result.phi >= 0.0,
+            "Φ should be non-negative for add({}, {})", a, b);
+    }
+
+    // =====================================================================
+    // MultiPathVerifier properties
+    // =====================================================================
+
+    #[test]
+    fn prop_multipath_add_commutative_valid(a in 1u64..15, b in 1u64..15) {
+        let mut verifier = MultiPathVerifier::new();
+        let result = verifier.verify_addition_commutative(a, b);
+        prop_assert!(result.valid_paths >= 2,
+            "Should have at least 2 valid proof paths for {} + {}", a, b);
+        prop_assert!(result.paths_agree,
+            "All paths should agree for {} + {}", a, b);
+    }
+
+    #[test]
+    fn prop_multipath_mul_commutative_valid(a in 1u64..8, b in 1u64..8) {
+        let mut verifier = MultiPathVerifier::new();
+        let result = verifier.verify_multiplication_commutative(a, b);
+        prop_assert!(result.valid_paths >= 2,
+            "Should have at least 2 valid proof paths for {} × {}", a, b);
+        prop_assert!(result.paths_agree,
+            "All paths should agree for {} × {}", a, b);
+    }
+
+    #[test]
+    fn prop_multipath_best_path_is_valid(a in 1u64..10, b in 1u64..10) {
+        let mut verifier = MultiPathVerifier::new();
+        let result = verifier.verify_addition_commutative(a, b);
+        if let Some(idx) = result.best_path_index {
+            prop_assert!(result.paths[idx].is_valid,
+                "Best path should be valid for {} + {}", a, b);
         }
     }
 }
