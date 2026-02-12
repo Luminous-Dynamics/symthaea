@@ -877,31 +877,25 @@ impl TieredPhi {
                 min_partition_info = min_partition_info.min(partition_info);
             }
         } else {
-            // Sample random bipartitions for large systems
-            use std::collections::HashSet;
-            let mut tested_partitions = HashSet::new();
-
+            // Sample random bipartitions for large systems (supports n > 64)
             for _ in 0..num_samples {
-                // Generate random bipartition
-                let partition_mask = self.random_bipartition_mask(n, &mut tested_partitions);
+                // Generate random bipartition using Vec<bool> (no 64-bit limit)
+                let partition_mask = self.random_bipartition_vec(n);
 
                 let mut part_a = Vec::new();
                 let mut part_b = Vec::new();
 
                 for i in 0..n {
-                    // Safe bit check: use wrapping operations for i >= 64
-                    let in_part_a = if i < 64 {
-                        (partition_mask & (1u64 << i)) != 0
-                    } else {
-                        // For i >= 64, use modular index
-                        (partition_mask & (1u64 << (i % 64))) != 0
-                    };
-
-                    if in_part_a {
+                    if partition_mask[i] {
                         part_a.push(i);
                     } else {
                         part_b.push(i);
                     }
+                }
+
+                // Skip trivial partitions
+                if part_a.is_empty() || part_b.is_empty() {
+                    continue;
                 }
 
                 // Compute information for this partition
@@ -948,43 +942,28 @@ impl TieredPhi {
         }
     }
 
-    /// Generate random bipartition mask, avoiding duplicates
-    fn random_bipartition_mask(&self, n: usize, tested: &mut std::collections::HashSet<u64>) -> u64 {
+    /// Generate a random bipartition as Vec<bool>, supporting arbitrary n.
+    ///
+    /// Each element is independently assigned to partition A (true) or B (false)
+    /// with equal probability. Guarantees a non-trivial partition (both sides non-empty).
+    fn random_bipartition_vec(&self, n: usize) -> Vec<bool> {
         use std::collections::hash_map::RandomState;
-        use std::hash::{BuildHasher, Hash, Hasher};
+        use std::hash::BuildHasher;
 
-        // Limit n to 63 to prevent shift overflow (u64 can't shift by 64+)
-        let safe_n = n.min(63);
+        for attempt in 0..100u64 {
+            let mask: Vec<bool> = (0..n).map(|i| {
+                RandomState::new().hash_one((self.stats.total_calculations, attempt, i)) & 1 == 1
+            }).collect();
 
-        let mut attempts = 0;
-        loop {
-            // Simple PRNG using hash of attempt counter
-
-
-            let random_value = RandomState::new().hash_one(self.stats.total_calculations + attempts);
-
-            // Create bipartition mask (ensure non-trivial)
-            // For n >= 63, we use the full u64 range modulo the max value
-            let max_mask = if safe_n < 63 {
-                (1u64 << safe_n) - 2
-            } else {
-                u64::MAX - 2
-            };
-            let mask = (random_value % max_mask.max(1)) + 1;
-
-            // Check for duplicates
-            if !tested.contains(&mask) {
-                tested.insert(mask);
+            // Ensure non-trivial partition (both sides non-empty)
+            let count_true = mask.iter().filter(|&&b| b).count();
+            if count_true > 0 && count_true < n {
                 return mask;
             }
-
-            attempts += 1;
-            if attempts > 1000 {
-                // Fallback: balanced partition (half bits set)
-                let half_n = safe_n / 2;
-                return if half_n < 63 { (1u64 << half_n) - 1 } else { u64::MAX / 2 };
-            }
         }
+
+        // Fallback: balanced partition (first half in A, second half in B)
+        (0..n).map(|i| i < n / 2).collect()
     }
 
     /// Generate intelligent partitions based on component similarity

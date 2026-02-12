@@ -51,7 +51,7 @@ use symthaea::hdc::{HDC_DIMENSION, LTC_NEURONS};
 use symthaea::Symthaea;
 
 // Voice support (feature-gated)
-#[cfg(feature = "voice")]
+#[cfg(feature = "voice-tts")]
 use symthaea::voice::{VoiceConfig, VoiceConversation};
 
 /// Symthaea Service - Consciousness daemon
@@ -85,17 +85,17 @@ struct Args {
     verbose: bool,
 
     /// Enable voice interface
-    #[cfg(feature = "voice")]
+    #[cfg(feature = "voice-tts")]
     #[arg(long)]
     voice: bool,
 
     /// Voice input device (default: system default)
-    #[cfg(feature = "voice")]
+    #[cfg(feature = "voice-tts")]
     #[arg(long)]
     voice_input: Option<String>,
 
     /// Voice ID for TTS (0-9)
-    #[cfg(feature = "voice")]
+    #[cfg(feature = "voice-tts")]
     #[arg(long, default_value = "0")]
     voice_id: u8,
 }
@@ -614,17 +614,17 @@ struct ServiceState {
     requests_processed: u64,
     sleep_cycles: u32,
     state_file: Option<PathBuf>,
-    #[cfg(feature = "voice")]
+    #[cfg(feature = "voice-tts")]
     voice: Option<VoiceConversation>,
-    #[cfg(feature = "voice")]
+    #[cfg(feature = "voice-tts")]
     voice_enabled: bool,
 }
 
 impl ServiceState {
     async fn new(
         state_file: Option<PathBuf>,
-        #[cfg(feature = "voice")] voice_enabled: bool,
-        #[cfg(feature = "voice")] voice_id: u8,
+        #[cfg(feature = "voice-tts")] voice_enabled: bool,
+        #[cfg(feature = "voice-tts")] voice_id: u8,
     ) -> Result<Self> {
         // Try to resume from state file if it exists
         let symthaea = if let Some(ref path) = state_file {
@@ -646,7 +646,7 @@ impl ServiceState {
         };
 
         // Initialize voice if enabled
-        #[cfg(feature = "voice")]
+        #[cfg(feature = "voice-tts")]
         let voice = if voice_enabled {
             info!("Initializing voice interface (voice_id={})...", voice_id);
             let config = VoiceConfig {
@@ -674,9 +674,9 @@ impl ServiceState {
             requests_processed: 0,
             sleep_cycles: 0,
             state_file,
-            #[cfg(feature = "voice")]
+            #[cfg(feature = "voice-tts")]
             voice,
-            #[cfg(feature = "voice")]
+            #[cfg(feature = "voice-tts")]
             voice_enabled,
         })
     }
@@ -793,7 +793,7 @@ impl ServiceState {
 
             // Voice requests
             Request::Speak { text } => {
-                #[cfg(feature = "voice")]
+                #[cfg(feature = "voice-tts")]
                 {
                     if let Some(ref mut voice) = self.voice {
                         let start = Instant::now();
@@ -822,7 +822,7 @@ impl ServiceState {
             }
 
             Request::Listen => {
-                #[cfg(feature = "voice")]
+                #[cfg(feature = "voice-tts")]
                 {
                     if let Some(ref mut voice) = self.voice {
                         match voice.listen() {
@@ -849,7 +849,7 @@ impl ServiceState {
             }
 
             Request::VoiceTurn => {
-                #[cfg(feature = "voice")]
+                #[cfg(feature = "voice-tts")]
                 {
                     if let Some(ref mut voice) = self.voice {
                         let start = Instant::now();
@@ -903,7 +903,7 @@ impl ServiceState {
             }
 
             Request::VoiceStatus => {
-                #[cfg(feature = "voice")]
+                #[cfg(feature = "voice-tts")]
                 {
                     Response::VoiceStatusResponse {
                         enabled: self.voice_enabled,
@@ -1494,9 +1494,9 @@ async fn main() -> Result<()> {
     let state = Arc::new(RwLock::new(
         ServiceState::new(
             args.state_file.clone(),
-            #[cfg(feature = "voice")]
+            #[cfg(feature = "voice-tts")]
             args.voice,
-            #[cfg(feature = "voice")]
+            #[cfg(feature = "voice-tts")]
             args.voice_id,
         )
         .await
@@ -1519,7 +1519,7 @@ async fn main() -> Result<()> {
         println!("   • λ₂ (Spectral Connectivity): {:.3}", phi);
         println!("   • Is Conscious: {}", if is_conscious { "✅ Yes" } else { "🔄 Awakening..." });
 
-        #[cfg(feature = "voice")]
+        #[cfg(feature = "voice-tts")]
         {
             if s.voice_enabled {
                 if s.voice.is_some() {
