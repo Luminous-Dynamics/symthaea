@@ -129,14 +129,6 @@ fn get_pools_anchor() -> ExternResult<EntryHash> {
     Ok(entry_hash)
 }
 
-/// Get or create a pool-specific anchor
-fn get_pool_anchor(pool_id: &str) -> ExternResult<EntryHash> {
-    let anchor = PoolsAnchor::new(format!("pool_{}", pool_id));
-    let entry_hash = hash_entry(&anchor)?;
-    create_entry(EntryTypes::Anchor(anchor))?;
-    Ok(entry_hash)
-}
-
 /// Get or create a member-specific anchor
 fn get_member_anchor(did: &str) -> ExternResult<EntryHash> {
     let anchor = PoolsAnchor::new(format!("member_{}", did));
@@ -464,8 +456,6 @@ pub fn request_disbursement(input: RequestDisbursementInput) -> ExternResult<Dis
 /// Vote on a disbursement request
 #[hdk_extern]
 pub fn vote_disbursement(input: VoteDisbursementInput) -> ExternResult<DisbursementWithHash> {
-    let now = sys_time()?;
-
     // Get the current disbursement
     let record = get(input.disbursement_hash.clone(), GetOptions::default())?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Disbursement not found".to_string())))?;
