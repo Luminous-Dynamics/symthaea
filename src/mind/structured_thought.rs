@@ -443,6 +443,14 @@ pub struct StructuredThought {
 
     /// Original user input (for reference in translation)
     pub original_input: Option<String>,
+
+    /// Active ontological primitive tiers for this thought.
+    ///
+    /// Populated from the 9-tier primitive system grounding step,
+    /// these indicate which fundamental cognitive primitives are
+    /// active (e.g. "Mathematical", "Strategic", "MetaCognitive").
+    #[serde(default)]
+    pub primitive_tiers: Vec<String>,
 }
 
 /// Context for code understanding and generation within StructuredThought.
@@ -650,6 +658,7 @@ impl Default for StructuredThought {
             trust: 0.0,
             constraints: Vec::new(),
             original_input: None,
+            primitive_tiers: Vec::new(),
         }
     }
 }

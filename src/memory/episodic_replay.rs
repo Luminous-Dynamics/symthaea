@@ -589,8 +589,11 @@ impl EpisodicMemory {
         // Reset replay counter
         self.cycles_since_replay = 0;
 
-        // Increment replay counts for sampled episodes
+        // Increment replay counts and reconsolidate sampled episodes
         // (This requires mutable access to episodes, which we'll handle by rebuilding)
+        // Reconsolidation: retrieval makes memories labile, then re-stores them
+        // with updated consolidation strength (biological reconsolidation model).
+        let current_phi = total_phi / batch.len().max(1) as f64;
         let mut new_episodes = BinaryHeap::new();
         for mut pe in self.episodes.drain() {
             // Check if this episode was in the batch
@@ -600,6 +603,7 @@ impl EpisodicMemory {
                     && pe.episode.timestamp == be.timestamp
                 {
                     pe.episode.replay_count += 1;
+                    pe.episode.reconsolidate(current_phi);
                     break;
                 }
             }

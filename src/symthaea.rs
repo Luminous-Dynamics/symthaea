@@ -109,8 +109,7 @@ pub struct SleepReport {
 pub struct Symthaea {
     /// Core cognitive system.
     mind: ContinuousMind,
-    /// Language processing core (used in Phase 3 for conscious NL understanding).
-    #[allow(dead_code)]
+    /// Language processing core (used in Phase 3.5 for primitive tier grounding).
     language: ConsciousnessLanguageCore,
     /// LLM organ for text generation.
     llm: LLMOrgan,
@@ -146,6 +145,9 @@ pub struct Symthaea {
 impl Symthaea {
     /// Create a new Symthaea instance with the given HDC dimension and LTC neuron count.
     pub async fn new(hdc_dim: usize, ltc_neurons: usize) -> Result<Self> {
+        if hdc_dim == 0 {
+            anyhow::bail!("hdc_dim must be greater than 0");
+        }
         let mind_config = MindConfig {
             dimension: hdc_dim,
             ..MindConfig::default()
@@ -265,6 +267,9 @@ impl Symthaea {
 
         let hdc_dim = state.hdc_dim;
         let ltc_neurons = state.ltc_neurons;
+        if hdc_dim == 0 {
+            anyhow::bail!("hdc_dim must be greater than 0");
+        }
 
         let mind_config = MindConfig {
             dimension: hdc_dim,
@@ -281,7 +286,11 @@ impl Symthaea {
             "Resumed with working memory seeded"
         );
 
-        let language = ConsciousnessLanguageCore::default();
+        let language_config = ConsciousnessLanguageConfig {
+            dimension: hdc_dim,
+            ..ConsciousnessLanguageConfig::default()
+        };
+        let language = ConsciousnessLanguageCore::new(language_config);
         let backend = llm_backend::default_backend();
         let llm = LLMOrgan::with_backend(LLMOrganConfig {
             dimension: hdc_dim,
@@ -453,6 +462,13 @@ impl Symthaea {
                 cube,
                 phi: domain_phi,
             });
+        }
+
+        // Primitive tier grounding: run language understanding to map
+        // the input to ontological primitive tiers for the structured thought.
+        {
+            let understanding = self.language.understand(content);
+            thought.primitive_tiers = understanding.primitive_tiers;
         }
 
         // Derive epistemic status from cube (principled 3D mapping)
@@ -984,7 +1000,17 @@ impl Symthaea {
     fn text_to_hv(&mut self, text: &str) -> ContinuousHV {
         // Try Neural Bridge v2 first (if available)
         #[cfg(feature = "neural-bridge")]
-        if let Some(ref mut bridge) = self.neural_bridge {
+        if self.hdc_dim != symthaea_core::hdc::unified_hv::HDC_DIMENSION {
+            static NEURAL_BRIDGE_DIM_WARN: std::sync::Once = std::sync::Once::new();
+            NEURAL_BRIDGE_DIM_WARN.call_once(|| {
+                tracing::warn!(
+                    target: "symthaea::perception",
+                    hdc_dim = self.hdc_dim,
+                    expected_dim = symthaea_core::hdc::unified_hv::HDC_DIMENSION,
+                    "Neural bridge expects HDC_DIMENSION; falling back to hash-based encoding"
+                );
+            });
+        } else if let Some(ref mut bridge) = self.neural_bridge {
             match bridge.encode_to_hdc(text) {
                 Ok(packed) => {
                     // Convert PackedBipolar to ContinuousHV
