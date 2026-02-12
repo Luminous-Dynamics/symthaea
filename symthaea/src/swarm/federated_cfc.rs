@@ -455,6 +455,9 @@ impl FederatedAggregator {
     ///
     /// This is the recommended aggregation path for production use, as it provides
     /// multi-signal Byzantine detection, hybrid BFT, and plugin extensibility.
+    ///
+    /// Requires the `mycelix` feature flag.
+    #[cfg(feature = "mycelix")]
     pub fn aggregate_with_pipeline(
         &mut self,
         pipeline: &mut mycelix_fl_core::UnifiedPipeline,
@@ -720,22 +723,52 @@ impl FederatedAggregator {
 // DIFFERENTIAL PRIVACY HELPERS
 // ============================================================================
 
-// Delegate DP helpers to mycelix-fl-core (canonical implementation)
+// DP helpers: delegate to mycelix-fl-core when available, standalone otherwise
 
-/// Clip gradient to have at most the specified L2 norm (in-place)
+#[cfg(feature = "mycelix")]
 fn clip_gradient(gradient: &mut [f32], clip_norm: f32) {
     mycelix_fl_core::privacy::clip_gradient(gradient, clip_norm);
 }
 
-/// Add Gaussian noise to gradient for differential privacy (in-place)
+#[cfg(feature = "mycelix")]
 fn add_gaussian_noise(gradient: &mut [f32], sigma: f32) {
     mycelix_fl_core::privacy::add_gaussian_noise(gradient, sigma);
 }
 
-/// Compute the L2 norm of a vector
+#[cfg(feature = "mycelix")]
 #[allow(dead_code)]
 fn l2_norm(v: &[f32]) -> f32 {
     mycelix_fl_core::privacy::l2_norm(v)
+}
+
+#[cfg(not(feature = "mycelix"))]
+fn clip_gradient(gradient: &mut [f32], clip_norm: f32) {
+    let norm: f32 = gradient.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm > clip_norm && norm > 0.0 {
+        let scale = clip_norm / norm;
+        for v in gradient.iter_mut() {
+            *v *= scale;
+        }
+    }
+}
+
+#[cfg(not(feature = "mycelix"))]
+fn add_gaussian_noise(gradient: &mut [f32], sigma: f32) {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    for v in gradient.iter_mut() {
+        // Box-Muller transform for Gaussian noise
+        let u1: f32 = rng.gen::<f32>().max(f32::EPSILON);
+        let u2: f32 = rng.gen();
+        let normal = (-2.0 * u1.ln()).sqrt() * (2.0 * std::f32::consts::PI * u2).cos();
+        *v += sigma * normal;
+    }
+}
+
+#[cfg(not(feature = "mycelix"))]
+#[allow(dead_code)]
+fn l2_norm(v: &[f32]) -> f32 {
+    v.iter().map(|x| x * x).sum::<f32>().sqrt()
 }
 
 // ============================================================================

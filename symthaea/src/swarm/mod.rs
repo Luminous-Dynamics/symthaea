@@ -73,6 +73,7 @@ mod service;
 mod federated_cfc;
 mod federated_network;
 mod checkpoint;
+#[cfg(feature = "mycelix")]
 pub mod hybrid_bft;
 
 // Iroh and handshake modules compile always (with stub implementations when feature disabled)

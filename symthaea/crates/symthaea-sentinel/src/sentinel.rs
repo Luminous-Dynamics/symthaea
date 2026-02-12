@@ -638,6 +638,7 @@ mod tests {
                 attack_sharpness: 0.5,
                 decay_roughness: 0.5,
                 silence_ratio: 0.5,
+                burst_density: 0.5,
             };
             sentinel.process(&features);
         }

@@ -4,12 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-symthaea-math = { path = "../symthaea-math" }
+symthaea-core = { path = "../../symthaea-core" }
 anyhow = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 serde = { workspace = true }
-rand = "0.8"  # For JL projection random matrices
+rand = { workspace = true }  # For JL projection random matrices
 syn = { version = "2.0", features = ["full", "visit"] }  # For Rust code parsing
 ignore = "0.4"  # For gitignore-aware file walking
 # Optional heavy dependencies
