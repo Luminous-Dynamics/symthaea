@@ -18,8 +18,8 @@ on:
       - 'mycelix-edunet/**'
       - 'mycelix-marketplace/**'
       - 'mycelix-supplychain/**'
-      - 'Mycelix-Core/**'
-      - 'Mycelix-Mail/**'
+      - 'mycelix-core/**'
+      - 'mycelix-mail/**'
       - '.github/workflows/mycelix-ci.yml'
   pull_request:
     branches: [main]
@@ -38,8 +38,8 @@ on:
       - 'mycelix-edunet/**'
       - 'mycelix-marketplace/**'
       - 'mycelix-supplychain/**'
-      - 'Mycelix-Core/**'
-      - 'Mycelix-Mail/**'
+      - 'mycelix-core/**'
+      - 'mycelix-mail/**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -216,7 +216,7 @@ jobs:
           - { name: edunet, path: mycelix-edunet }
           - { name: marketplace, path: mycelix-marketplace/backend }
           - { name: supplychain, path: mycelix-supplychain/holochain }
-          - { name: mail, path: Mycelix-Mail/holochain }
+          - { name: mail, path: mycelix-mail/holochain }
 
     steps:
       - uses: actions/checkout@v4
@@ -249,7 +249,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: Mycelix-Core
+        working-directory: mycelix-core
 
     steps:
       - uses: actions/checkout@v4
@@ -325,7 +325,7 @@ jobs:
         run: |
           cargo test --lib --all-features -p bridge_integrity -p bridge_coordinator
           cargo test --lib --all-features -p fl_integrity -p fl_coordinator
-        working-directory: Mycelix-Core
+        working-directory: mycelix-core
 
       - name: Run SDK unit tests
         run: cargo test --lib --features simulation
@@ -437,7 +437,7 @@ jobs:
           }
 
           echo "✅ DNA bundles packed successfully"
-        working-directory: Mycelix-Core
+        working-directory: mycelix-core
 
       - name: Start Holochain conductor
         id: conductor
@@ -515,7 +515,7 @@ jobs:
           else
             echo "::warning::FL integration tests failed or not found"
           fi
-        working-directory: Mycelix-Core
+        working-directory: mycelix-core
         env:
           HOLOCHAIN_ADMIN_URL: ws://localhost:4444
         continue-on-error: true  # Don't fail CI for missing tests, but do warn
@@ -528,7 +528,7 @@ jobs:
           else
             echo "::warning::Cross-zome tests not found or failed"
           fi
-        working-directory: Mycelix-Core
+        working-directory: mycelix-core
         env:
           HOLOCHAIN_ADMIN_URL: ws://localhost:4444
         continue-on-error: true
@@ -598,7 +598,7 @@ jobs:
             -p bridge_coordinator \
             -p fl_integrity \
             -p fl_coordinator
-        working-directory: Mycelix-Core
+        working-directory: mycelix-core
 
       - name: Setup multi-conductor environment
         run: |
@@ -666,7 +666,7 @@ jobs:
           # Credential verification flow test
           echo "Testing credential verification flow..."
           cargo test e2e_credentials -- --test-threads=1 --ignored 2>&1 || echo "E2E credential tests not found"
-        working-directory: Mycelix-Core
+        working-directory: mycelix-core
         env:
           CONDUCTOR_1_ADMIN_URL: ws://localhost:4441
           CONDUCTOR_1_APP_URL: ws://localhost:8881
@@ -689,13 +689,13 @@ jobs:
               cargo test network_partition -- --test-threads=1 --ignored 2>&1 || echo "Partition test not found"
             fi
           fi
-        working-directory: Mycelix-Core
+        working-directory: mycelix-core
 
       - name: Run Byzantine fault tolerance tests
         run: |
           echo "Testing Byzantine fault tolerance..."
           cargo test byzantine -- --test-threads=1 --ignored 2>&1 || echo "Byzantine tests not found"
-        working-directory: Mycelix-Core
+        working-directory: mycelix-core
 
       - name: Cleanup E2E environment
         if: always()
@@ -728,12 +728,12 @@ jobs:
         run: |
           cargo check -p bridge_integrity -p bridge_coordinator
           cargo check -p fl_integrity -p fl_coordinator
-        working-directory: Mycelix-Core
+        working-directory: mycelix-core
 
       - name: Run critical path tests
         run: |
           cargo test --lib critical_ -- --test-threads=4
-        working-directory: Mycelix-Core
+        working-directory: mycelix-core
 
   # ============================================================================
   # Security Scanning

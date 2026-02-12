@@ -8,9 +8,9 @@ on:
   push:
     branches: [main]
     paths:
-      - 'Mycelix-Core/dna/**'
-      - 'Mycelix-Core/zomes/**'
-      - 'Mycelix-Core/libs/**'
+      - 'mycelix-core/dna/**'
+      - 'mycelix-core/zomes/**'
+      - 'mycelix-core/libs/**'
       - 'mycelix-governance/zomes/**'
       - 'mycelix-workspace/happs/**'
       - 'mycelix-workspace/sdk/**'
@@ -25,9 +25,9 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'Mycelix-Core/dna/**'
-      - 'Mycelix-Core/zomes/**'
-      - 'Mycelix-Core/libs/**'
+      - 'mycelix-core/dna/**'
+      - 'mycelix-core/zomes/**'
+      - 'mycelix-core/libs/**'
       - 'mycelix-governance/zomes/**'
       - 'mycelix-workspace/happs/**'
       - 'mycelix-workspace/sdk/**'
@@ -83,7 +83,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            Mycelix-Core/target/
+            mycelix-core/target/
             mycelix-workspace/sdk/target/
             mycelix-care/target/
             mycelix-emergency/target/
@@ -102,24 +102,24 @@ jobs:
 
             echo ""
             echo "=== Building Bridge Zome ==="
-            if [ -d "Mycelix-Core/dna/agents" ]; then
-              cd Mycelix-Core/dna/agents
+            if [ -d "mycelix-core/dna/agents" ]; then
+              cd mycelix-core/dna/agents
               cargo build --release --target wasm32-unknown-unknown
               cd -
             fi
 
             echo ""
             echo "=== Building Byzantine FL Zome ==="
-            if [ -d "Mycelix-Core/dna/byzantine_fl" ]; then
-              cd Mycelix-Core/dna/byzantine_fl
+            if [ -d "mycelix-core/dna/byzantine_fl" ]; then
+              cd mycelix-core/dna/byzantine_fl
               cargo build --release --target wasm32-unknown-unknown
               cd -
             fi
 
             echo ""
             echo "=== Building H_FL Zome ==="
-            if [ -d "Mycelix-Core/dna/h_fl" ]; then
-              cd Mycelix-Core/dna/h_fl
+            if [ -d "mycelix-core/dna/h_fl" ]; then
+              cd mycelix-core/dna/h_fl
               cargo build --release --target wasm32-unknown-unknown
               cd -
             fi
@@ -150,8 +150,8 @@ jobs:
 
             echo ""
             echo "=== Building Federated Learning Zome ==="
-            if [ -d "Mycelix-Core/zomes/federated_learning" ]; then
-              cd Mycelix-Core/zomes/federated_learning
+            if [ -d "mycelix-core/zomes/federated_learning" ]; then
+              cd mycelix-core/zomes/federated_learning
               cargo build --release --target wasm32-unknown-unknown
               cd -
             fi
@@ -167,9 +167,9 @@ jobs:
         with:
           name: zome-wasm
           path: |
-            Mycelix-Core/dna/*/target/wasm32-unknown-unknown/release/*.wasm
-            Mycelix-Core/zomes/federated_learning/target/wasm32-unknown-unknown/release/*.wasm
-            Mycelix-Core/target/wasm32-unknown-unknown/release/*.wasm
+            mycelix-core/dna/*/target/wasm32-unknown-unknown/release/*.wasm
+            mycelix-core/zomes/federated_learning/target/wasm32-unknown-unknown/release/*.wasm
+            mycelix-core/target/wasm32-unknown-unknown/release/*.wasm
             mycelix-care/target/wasm32-unknown-unknown/release/*.wasm
             mycelix-emergency/target/wasm32-unknown-unknown/release/*.wasm
             mycelix-water/target/wasm32-unknown-unknown/release/*.wasm
@@ -211,7 +211,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            Mycelix-Core/target/
+            mycelix-core/target/
           key: ${{ runner.os }}-cargo-holochain-test-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-holochain-
@@ -222,7 +222,7 @@ jobs:
             echo "=== Running Zome Unit Tests ==="
 
             # Test each zome
-            for zome_dir in Mycelix-Core/dna/*/; do
+            for zome_dir in mycelix-core/dna/*/; do
               if [ -f "${zome_dir}Cargo.toml" ]; then
                 echo "Testing $(basename $zome_dir)..."
                 cargo test --all-features --manifest-path "${zome_dir}Cargo.toml"
@@ -333,7 +333,7 @@ jobs:
           nix develop ./mycelix-workspace#holochain --command bash -c '
             echo "=== Checking Rust Formatting ==="
 
-            for dir in Mycelix-Core/dna/*/ mycelix-workspace/sdk/ mycelix-care/ mycelix-emergency/ mycelix-water/ mycelix-housing/; do
+            for dir in mycelix-core/dna/*/ mycelix-workspace/sdk/ mycelix-care/ mycelix-emergency/ mycelix-water/ mycelix-housing/; do
               if [ -f "${dir}Cargo.toml" ]; then
                 echo "Checking $(basename $dir)..."
                 cargo fmt --all --check --manifest-path "${dir}Cargo.toml"
@@ -346,7 +346,7 @@ jobs:
           nix develop ./mycelix-workspace#holochain --command bash -c '
             echo "=== Running Clippy ==="
 
-            for dir in Mycelix-Core/dna/*/ mycelix-care/ mycelix-emergency/ mycelix-water/ mycelix-housing/; do
+            for dir in mycelix-core/dna/*/ mycelix-care/ mycelix-emergency/ mycelix-water/ mycelix-housing/; do
               if [ -f "${dir}Cargo.toml" ]; then
                 echo "Linting $(basename $dir)..."
                 cargo clippy --all-targets --manifest-path "${dir}Cargo.toml" -- -D warnings
@@ -399,7 +399,7 @@ jobs:
             mkdir -p dist/dna
 
             # Package each DNA
-            for dna_dir in Mycelix-Core/dna/*/; do
+            for dna_dir in mycelix-core/dna/*/; do
               dna_name=$(basename "$dna_dir")
               if [ -f "${dna_dir}dna.yaml" ]; then
                 echo "Packaging $dna_name..."
@@ -429,8 +429,8 @@ jobs:
   sweettest:
     name: Sweettest Integration
     runs-on: ubuntu-latest
-    needs: package-dna
-    timeout-minutes: 45
+    needs: build-zomes
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v4
@@ -450,11 +450,130 @@ jobs:
           name: holochain-ci
           skipPush: true
 
-      - name: Download DNA artifacts
+      - name: Download WASM artifacts
         uses: actions/download-artifact@v4
         with:
-          name: dna-bundles
-          path: dist/dna
+          name: zome-wasm
+          path: wasm-artifacts
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            mycelix-identity/target/
+            mycelix-governance/target/
+            mycelix-finance/target/
+            mycelix-edunet/target/
+            mycelix-supplychain/target/
+            mycelix-health/target/
+            mycelix-marketplace/target/
+            mycelix-climate/target/
+            mycelix-core/target/
+            mycelix-workspace/tests/sweettest/target/
+          key: ${{ runner.os }}-cargo-sweettest-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-sweettest-
+
+      - name: Build and pack DNAs in-place
+        run: |
+          nix develop ./mycelix-workspace#holochain --command bash -c '
+            echo "=== Rebuilding WASM zomes (uses cached artifacts) ==="
+            # Identity
+            if [ -f "mycelix-identity/Cargo.toml" ]; then
+              echo "Building Identity zomes..."
+              cargo build --release --target wasm32-unknown-unknown --manifest-path mycelix-identity/Cargo.toml
+              hc dna pack mycelix-identity/dna/ -o mycelix-identity/dna/mycelix_identity_dna.dna
+              echo "  Identity DNA packed"
+            fi
+
+            # Governance
+            if [ -f "mycelix-governance/Cargo.toml" ]; then
+              echo "Building Governance zomes..."
+              cargo build --release --target wasm32-unknown-unknown --manifest-path mycelix-governance/Cargo.toml
+              hc dna pack mycelix-governance/dna/ -o mycelix-governance/dna/mycelix_governance.dna
+              echo "  Governance DNA packed"
+            fi
+
+            # Finance
+            if [ -f "mycelix-finance/Cargo.toml" ]; then
+              echo "Building Finance zomes..."
+              cargo build --release --target wasm32-unknown-unknown --manifest-path mycelix-finance/Cargo.toml
+              hc dna pack mycelix-finance/dna/ -o mycelix-finance/dna/mycelix_finance.dna
+              echo "  Finance DNA packed"
+            fi
+
+            # EduNet
+            if [ -f "mycelix-edunet/Cargo.toml" ]; then
+              echo "Building EduNet zomes..."
+              cargo build --release --target wasm32-unknown-unknown --manifest-path mycelix-edunet/Cargo.toml
+              hc dna pack mycelix-edunet/dna/ -o mycelix-edunet/dna/edunet.dna
+              echo "  EduNet DNA packed"
+            fi
+
+            # SupplyChain
+            if [ -f "mycelix-supplychain/Cargo.toml" ]; then
+              echo "Building SupplyChain zomes..."
+              cargo build --release --target wasm32-unknown-unknown --manifest-path mycelix-supplychain/Cargo.toml
+              hc dna pack mycelix-supplychain/holochain/dna/ -o mycelix-supplychain/holochain/dna/supplychain.dna
+              echo "  SupplyChain DNA packed"
+            fi
+
+            # Health
+            if [ -f "mycelix-health/Cargo.toml" ]; then
+              echo "Building Health zomes..."
+              cargo build --release --target wasm32-unknown-unknown --manifest-path mycelix-health/Cargo.toml
+              hc dna pack mycelix-health/dna/ -o mycelix-health/dna/health.dna
+              echo "  Health DNA packed"
+            fi
+
+            # Marketplace
+            if [ -f "mycelix-marketplace/Cargo.toml" ]; then
+              echo "Building Marketplace zomes..."
+              cargo build --release --target wasm32-unknown-unknown --manifest-path mycelix-marketplace/Cargo.toml
+              hc dna pack mycelix-marketplace/backend/ -o mycelix-marketplace/backend/mycelix_marketplace.dna
+              echo "  Marketplace DNA packed"
+            fi
+
+            # Climate
+            if [ -f "mycelix-climate/Cargo.toml" ]; then
+              echo "Building Climate zomes..."
+              cargo build --release --target wasm32-unknown-unknown --manifest-path mycelix-climate/Cargo.toml
+              hc dna pack mycelix-climate/dnas/climate/workdir/ -o mycelix-climate/dnas/climate/workdir/climate.dna
+              echo "  Climate DNA packed"
+            fi
+
+            # Federated Learning
+            if [ -d "mycelix-core/zomes/federated_learning" ]; then
+              echo "Building FL zome..."
+              cd mycelix-core/zomes/federated_learning
+              cargo build --release --target wasm32-unknown-unknown
+              cd ../../..
+              hc dna pack mycelix-core/zomes/federated_learning/workdir/dna/ -o mycelix-core/zomes/federated_learning/workdir/dna/federated_learning.dna
+              echo "  FL DNA packed"
+            fi
+
+            echo ""
+            echo "=== Verifying DNA bundles ==="
+            for dna in mycelix-identity/dna/mycelix_identity_dna.dna \
+                       mycelix-governance/dna/mycelix_governance.dna \
+                       mycelix-finance/dna/mycelix_finance.dna \
+                       mycelix-edunet/dna/edunet.dna \
+                       mycelix-supplychain/holochain/dna/supplychain.dna \
+                       mycelix-health/dna/health.dna \
+                       mycelix-marketplace/backend/mycelix_marketplace.dna \
+                       mycelix-climate/dnas/climate/workdir/climate.dna \
+                       mycelix-core/zomes/federated_learning/workdir/dna/federated_learning.dna; do
+              if [ -f "$dna" ]; then
+                echo "  OK: $dna ($(du -h "$dna" | cut -f1))"
+              else
+                echo "  MISSING: $dna"
+              fi
+            done
+          '
 
       - name: Run sweettest - Identity (4 tests)
         run: |
@@ -612,7 +731,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            Mycelix-Core/target/
+            mycelix-core/target/
             mycelix-governance/target/
             mycelix-care/target/
             mycelix-emergency/target/
@@ -625,9 +744,9 @@ jobs:
       - name: Run Rust integration tests
         run: |
           nix develop ./mycelix-workspace#holochain --command bash -c '
-            echo "=== Mycelix-Core Integration Tests ==="
-            if [ -d "Mycelix-Core/tests/integration" ]; then
-              cargo test -p mycelix-integration-tests --all-features --manifest-path Mycelix-Core/Cargo.toml -- --test-threads=1
+            echo "=== mycelix-core Integration Tests ==="
+            if [ -d "mycelix-core/tests/integration" ]; then
+              cargo test -p mycelix-integration-tests --all-features --manifest-path mycelix-core/Cargo.toml -- --test-threads=1
             fi
 
             echo ""
