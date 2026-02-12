@@ -94,3 +94,35 @@ jobs:
         run: cargo test --workspace --lib
         env:
           RUST_BACKTRACE: 1
+
+  features:
+    name: Feature Matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - identity
+          - code_generation
+          - nix-mind
+          - audio-sentinel
+          - voice-stt
+          - embeddings
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-feat-${{ matrix.features }}-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-feat-${{ matrix.features }}-
+      - name: Check feature (${{ matrix.features }})
+        run: cargo check --lib --features ${{ matrix.features }}

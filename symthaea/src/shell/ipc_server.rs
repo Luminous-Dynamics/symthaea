@@ -31,6 +31,8 @@
 //! ```
 
 use std::path::{Path, PathBuf};
+#[cfg(unix)]
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::net::{UnixListener, UnixStream};
@@ -209,6 +211,13 @@ impl IpcServer {
         let listener = UnixListener::bind(&self.config.socket_path)
             .context("Failed to bind to socket")?;
 
+        #[cfg(unix)]
+        {
+            let perms = std::fs::Permissions::from_mode(0o600);
+            tokio::fs::set_permissions(&self.config.socket_path, perms).await
+                .context("Failed to set socket permissions")?;
+        }
+
         tracing::info!(
             socket = %self.config.socket_path.display(),
             "IPC server listening"
@@ -227,6 +236,11 @@ impl IpcServer {
                             let clients = *self.active_clients.read().await;
                             if clients >= self.config.max_clients {
                                 tracing::warn!("Max clients reached, rejecting connection");
+                                continue;
+                            }
+
+                            if let Err(err) = authorize_peer(&stream, &self.config.socket_path) {
+                                tracing::warn!(error = %err, "Unauthorized IPC client");
                                 continue;
                             }
 
@@ -328,9 +342,6 @@ async fn handle_client(
         }
     });
 
-    // Read buffer
-    let mut buf = vec![0u8; config.buffer_size];
-
     loop {
         tokio::select! {
             // Check for shutdown
@@ -349,30 +360,26 @@ async fn handle_client(
             }
 
             // Read incoming requests
-            result = reader.read(&mut buf) => {
+            result = read_frame(&mut reader, config.buffer_size) => {
                 match result {
-                    Ok(0) => {
-                        // Client disconnected
+                    Ok(Some(request)) => {
+                        let response = handle_request(
+                            request,
+                            &metrics_provider,
+                            &executor,
+                            &subscribed,
+                        ).await;
+
+                        // Send response
+                        let data = rmp_serde::to_vec(&response)?;
+                        let len = (data.len() as u32).to_le_bytes();
+                        writer.write_all(&len).await?;
+                        writer.write_all(&data).await?;
+                        writer.flush().await?;
+                    }
+                    Ok(None) => {
                         tracing::debug!("Client disconnected");
                         break;
-                    }
-                    Ok(n) => {
-                        // Parse request
-                        if let Ok(request) = rmp_serde::from_slice::<IpcRequest>(&buf[..n]) {
-                            let response = handle_request(
-                                request,
-                                &metrics_provider,
-                                &executor,
-                                &subscribed,
-                            ).await;
-
-                            // Send response
-                            let data = rmp_serde::to_vec(&response)?;
-                            let len = (data.len() as u32).to_le_bytes();
-                            writer.write_all(&len).await?;
-                            writer.write_all(&data).await?;
-                            writer.flush().await?;
-                        }
                     }
                     Err(e) => {
                         tracing::debug!(error = %e, "Read error");
@@ -449,6 +456,49 @@ async fn handle_request(
             IpcResponse::Completions(items)
         }
     }
+}
+
+#[cfg(unix)]
+fn authorize_peer(stream: &UnixStream, socket_path: &Path) -> Result<()> {
+    let creds = stream.peer_cred().context("Failed to read peer credentials")?;
+    let socket_uid = std::fs::metadata(socket_path)
+        .context("Failed to read socket metadata")?
+        .uid();
+
+    if creds.uid() == socket_uid || creds.uid() == 0 {
+        Ok(())
+    } else {
+        anyhow::bail!("UID {} not authorized for socket owner {}", creds.uid(), socket_uid);
+    }
+}
+
+#[cfg(not(unix))]
+fn authorize_peer(_stream: &UnixStream, _socket_path: &Path) -> Result<()> {
+    Ok(())
+}
+
+async fn read_frame(
+    reader: &mut BufReader<tokio::net::unix::OwnedReadHalf>,
+    max_size: usize,
+) -> Result<Option<IpcRequest>> {
+    let mut len_buf = [0u8; 4];
+    match reader.read_exact(&mut len_buf).await {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+            return Ok(None);
+        }
+        Err(e) => return Err(e.into()),
+    }
+
+    let len = u32::from_le_bytes(len_buf) as usize;
+    if len == 0 || len > max_size {
+        anyhow::bail!("Invalid IPC frame size: {}", len);
+    }
+
+    let mut buf = vec![0u8; len];
+    reader.read_exact(&mut buf).await?;
+    let request = rmp_serde::from_slice::<IpcRequest>(&buf)?;
+    Ok(Some(request))
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

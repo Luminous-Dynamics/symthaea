@@ -2,6 +2,7 @@
 //!
 //! End-to-end tests for the nix-mind CLI command parsing,
 //! cognitive context initialization, and dispatch logic.
+#![cfg(feature = "cli")]
 
 use clap::Parser;
 use symthaea_nix::cli::commands::{Cli, Command, OutputFormat, RebuildMode, ObserveDomain, ServiceCommand, FlakeCommand};

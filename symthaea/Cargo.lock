@@ -11979,6 +11979,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-perception"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hf-hub",
+ "ignore",
+ "image 0.24.9",
+ "ort",
+ "proptest",
+ "rand 0.8.5",
+ "serde",
+ "symthaea-core",
+ "syn 2.0.114",
+ "tempfile",
+ "tokenizers",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "symthaea-sentinel"
 version = "0.1.0"
 dependencies = [
