@@ -112,7 +112,7 @@ impl HdcNumber {
     }
 
     /// Measure Φ contribution of a construction step
-    fn measure_step_phi(before: &BinaryHV, after: &BinaryHV) -> f64 {
+    pub(crate) fn measure_step_phi(before: &BinaryHV, after: &BinaryHV) -> f64 {
         let mut phi_calc = IntegratedInformation::new();
         let components = vec![*before, *after];
         phi_calc.compute_phi(&components)

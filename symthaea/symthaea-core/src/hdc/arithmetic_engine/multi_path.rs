@@ -1,5 +1,6 @@
 use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
 
 use super::hybrid::{HybridArithmeticEngine, HybridResult};
 

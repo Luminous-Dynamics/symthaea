@@ -2,6 +2,7 @@ use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use crate::hdc::integrated_information::IntegratedInformation;
 use serde::{Serialize, Deserialize};
+use std::collections::HashMap;
 
 use super::hybrid::{AbstractProof, HybridArithmeticEngine, HybridResult};
 
@@ -57,7 +58,7 @@ pub struct MathDiscovery {
     explorations: Vec<ProofExploration>,
 
     /// Pattern database (for conjecture generation)
-    patterns: HashMap<String, Vec<(u64, u64, f64)>>, // operation -> [(a, b, phi), ...]
+    pub(crate) patterns: HashMap<String, Vec<(u64, u64, f64)>>, // operation -> [(a, b, phi), ...]
 }
 
 impl MathDiscovery {
