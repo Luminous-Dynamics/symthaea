@@ -2,7 +2,7 @@
 rustflags = ["-C", "link-arg=-fuse-ld=lld"]
 
 [env]
-RUST_TEST_THREADS = "4"
+RUST_TEST_THREADS = "8"
 
 [profile.dev]
 split-debuginfo = "unpacked"
