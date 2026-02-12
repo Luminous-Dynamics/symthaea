@@ -314,3 +314,84 @@ fn empty_message_sign_verify() {
     let ok = Ed25519Verifier.verify(&pk, b"", &sig).unwrap();
     assert!(ok, "Empty message should sign and verify");
 }
+
+// ============================================================================
+// Fuzz-style: from_multibase with arbitrary bytes (parser robustness)
+// ============================================================================
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(256))]
+
+    #[test]
+    fn pubkey_from_multibase_never_panics(raw in prop::collection::vec(any::<u8>(), 0..512)) {
+        // Encode random bytes as base58btc with 'z' prefix
+        let encoded = format!("z{}", bs58::encode(&raw).into_string());
+        // Must not panic — errors are fine
+        let _ = TaggedPublicKey::from_multibase(&encoded);
+    }
+
+    #[test]
+    fn sig_from_multibase_never_panics(raw in prop::collection::vec(any::<u8>(), 0..512)) {
+        let encoded = format!("z{}", bs58::encode(&raw).into_string());
+        let _ = TaggedSignature::from_multibase(&encoded);
+    }
+
+    #[test]
+    fn pubkey_from_multibase_rejects_bad_prefix(s in "[^z].{0,100}") {
+        let result = TaggedPublicKey::from_multibase(&s);
+        prop_assert!(result.is_err(), "Non-'z' prefix should be rejected");
+    }
+
+    #[test]
+    fn pubkey_from_multibase_rejects_empty(_seed in 0u64..1) {
+        assert!(TaggedPublicKey::from_multibase("").is_err());
+        assert!(TaggedPublicKey::from_multibase("z").is_err());
+    }
+
+    #[test]
+    fn sig_from_multibase_rejects_empty(_seed in 0u64..1) {
+        assert!(TaggedSignature::from_multibase("").is_err());
+        assert!(TaggedSignature::from_multibase("z").is_err());
+    }
+
+    #[test]
+    fn pubkey_from_multibase_rejects_invalid_base58(
+        bad_char in prop::sample::select(vec!['0', 'O', 'I', 'l']),
+    ) {
+        // These characters are not in base58btc alphabet
+        let s = format!("z{}", bad_char);
+        let result = TaggedPublicKey::from_multibase(&s);
+        prop_assert!(result.is_err(), "Invalid base58 char should be rejected");
+    }
+}
+
+// Truncation: valid multibase keys with bytes chopped off should fail or return wrong result
+#[test]
+fn pubkey_truncated_multibase_rejected() {
+    let signer = Ed25519Signer::generate();
+    let pk = signer.public_key();
+    let multibase = pk.to_multibase();
+    // Chop off last 5 chars
+    let truncated = &multibase[..multibase.len().saturating_sub(5)];
+    let result = TaggedPublicKey::from_multibase(truncated);
+    // Should either error or produce a different key
+    match result {
+        Err(_) => {} // Expected
+        Ok(restored) => assert_ne!(restored.key_bytes, pk.key_bytes,
+            "Truncated multibase should not produce original key"),
+    }
+}
+
+#[test]
+fn sig_truncated_multibase_rejected() {
+    let signer = Ed25519Signer::generate();
+    let sig = signer.sign(b"test").unwrap();
+    let multibase = sig.to_multibase();
+    let truncated = &multibase[..multibase.len().saturating_sub(5)];
+    let result = TaggedSignature::from_multibase(truncated);
+    match result {
+        Err(_) => {}
+        Ok(restored) => assert_ne!(restored.signature_bytes, sig.signature_bytes,
+            "Truncated multibase should not produce original sig"),
+    }
+}

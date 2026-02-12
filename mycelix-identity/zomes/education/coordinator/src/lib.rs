@@ -271,7 +271,7 @@ pub fn import_credential_from_csv(
         validate_field(&input.degree_name, "degree_name", 512),
     ];
 
-    for validation in validations.into_iter().flatten() {
+    if let Some(validation) = validations.into_iter().flatten().next() {
         return Ok(ImportCredentialResult {
             row_number: input.row_number,
             success: false,
@@ -553,7 +553,7 @@ fn generate_credential_id(issuer_did: &str, subject_did: &str) -> ExternResult<S
     use sha2::Digest;
     hasher.update(issuer_did.as_bytes());
     hasher.update(subject_did.as_bytes());
-    hasher.update(&timestamp.to_le_bytes());
+    hasher.update(timestamp.to_le_bytes());
     hasher.update(agent.get_raw_39());
     let hash = hasher.finalize();
 
@@ -577,7 +577,7 @@ fn generate_nonce() -> ExternResult<Vec<u8>> {
     let mut hasher = sha2::Sha256::new();
     use sha2::Digest;
     hasher.update(b"nonce:");
-    hasher.update(&timestamp.to_le_bytes());
+    hasher.update(timestamp.to_le_bytes());
     hasher.update(agent.get_raw_39());
 
     Ok(hasher.finalize().to_vec())
@@ -591,7 +591,7 @@ fn generate_batch_id() -> ExternResult<String> {
     let mut hasher = sha2::Sha256::new();
     use sha2::Digest;
     hasher.update(b"batch:");
-    hasher.update(&timestamp.to_le_bytes());
+    hasher.update(timestamp.to_le_bytes());
     hasher.update(agent.get_raw_39());
     let hash = hasher.finalize();
 

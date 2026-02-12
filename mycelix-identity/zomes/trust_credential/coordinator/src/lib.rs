@@ -247,7 +247,7 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
         credential_id: input.credential_id.clone(),
         subject_did: input.subject_did.clone(),
         disclosed_tier: input.disclosed_tier,
-        disclosed_range: input.disclose_range.then(|| input.trust_range),
+        disclosed_range: input.disclose_range.then_some(input.trust_range),
         presentation_proof: input.presentation_proof,
         verifier_did: input.verifier_did,
         purpose: input.purpose,
@@ -301,7 +301,7 @@ pub fn request_attestation(input: RequestAttestationInput) -> ExternResult<Recor
         return Err(wasm_error!(WasmErrorInner::Guest("At least one component is required".into())));
     }
     if let Some(score) = input.min_trust_score {
-        if score < 0.0 || score > 1.0 {
+        if !(0.0..=1.0).contains(&score) {
             return Err(wasm_error!(WasmErrorInner::Guest("Min trust score must be between 0.0 and 1.0".into())));
         }
     }

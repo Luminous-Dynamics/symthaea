@@ -1,7 +1,7 @@
 //! Verifiable Credential Integrity Zome
 //!
 //! W3C Verifiable Credentials Data Model 2.0 compliant implementation
-//! https://www.w3.org/TR/vc-data-model-2.0/
+//! <https://www.w3.org/TR/vc-data-model-2.0/>
 
 use hdi::prelude::*;
 
@@ -10,7 +10,7 @@ use hdi::prelude::*;
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct VerifiableCredential {
-    /// JSON-LD context (required: "https://www.w3.org/ns/credentials/v2")
+    /// JSON-LD context (required: `https://www.w3.org/ns/credentials/v2`)
     #[serde(rename = "@context")]
     pub context: Vec<String>,
     /// Unique credential identifier
@@ -271,6 +271,7 @@ pub struct EncryptedEntry {
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
+#[allow(clippy::large_enum_variant)] // HDK entry types require inline variants
 pub enum EntryTypes {
     VerifiableCredential(VerifiableCredential),
     VerifiablePresentation(VerifiablePresentation),

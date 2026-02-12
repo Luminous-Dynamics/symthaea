@@ -571,6 +571,14 @@ jobs:
             done
           '
 
+      - name: Clippy lint (identity workspace)
+        run: |
+          nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo clippy --all-features --lib -- -D warnings"
+
+      - name: Cargo doc (identity public API)
+        run: |
+          nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && RUSTDOCFLAGS='-D warnings' cargo doc --no-deps --all-features"
+
       - name: WASM compilation gate (all identity zomes)
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo build --release --target wasm32-unknown-unknown"
@@ -595,7 +603,7 @@ jobs:
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo test --all-features --lib -- --test-threads=1"
 
-      - name: Test mycelix-crypto (native PQC - 50 tests)
+      - name: Test mycelix-crypto (native PQC - 58 tests)
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity/crates/mycelix-crypto && cargo test --features native"
 
@@ -1024,7 +1032,7 @@ jobs:
           echo "| Sweettest Identity | 4 | DID registration, profile updates, trust attestations |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest Identity PQC** | 6 | Hybrid signatures, ML-KEM key agreement, PQC verification methods |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest MFA Identity** | 7 | MFA state, factor enrollment, assurance levels, FL eligibility |" >> $GITHUB_STEP_SUMMARY
-          echo "| mycelix-crypto native | 28 | Ed25519, ML-DSA-65/87, SPHINCS+, hybrid, ML-KEM, XChaCha20 |" >> $GITHUB_STEP_SUMMARY
+          echo "| mycelix-crypto native | 58 | Ed25519, ML-DSA-65/87, SPHINCS+, hybrid, ML-KEM, XChaCha20, fuzz |" >> $GITHUB_STEP_SUMMARY
           echo "| MFA Unit Tests | 16 | Decay calculations, factor strength, assurance scores |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Governance | 3 | Proposal lifecycle, voting, execution |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Bridge | 2 | Cross-hApp communication |" >> $GITHUB_STEP_SUMMARY

@@ -67,7 +67,7 @@ pub enum AcademicCredentialStatus {
 pub struct AcademicCredential {
     // =========== W3C VC 2.0 Standard Fields ===========
 
-    /// JSON-LD context (required: "https://www.w3.org/ns/credentials/v2")
+    /// JSON-LD context (required: `https://www.w3.org/ns/credentials/v2`)
     #[serde(rename = "@context")]
     pub context: Vec<String>,
 
@@ -553,6 +553,7 @@ pub struct EpistemicClaimReference {
 
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
+#[allow(clippy::large_enum_variant)] // HDK entry types require inline variants
 pub enum EntryTypes {
     AcademicCredential(AcademicCredential),
     LegacyBridgeImport(LegacyBridgeImport),

@@ -238,9 +238,7 @@ fn string_to_entry_hash(s: &str) -> EntryHash {
         holo_hash::blake2b_256(s.as_bytes())
             .into_iter()
             .chain([0u8; 4])
-            .collect::<Vec<u8>>()
-            .try_into()
-            .expect("Failed to convert to hash"),
+            .collect::<Vec<u8>>(),
     )
 }
 
@@ -719,7 +717,7 @@ pub fn verify_factor(input: VerifyFactorInput) -> ExternResult<MfaStateOutput> {
 
 /// Decode a hex-encoded string to bytes.
 fn hex_decode(s: &str) -> Option<Vec<u8>> {
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         return None;
     }
     let mut result = Vec::with_capacity(s.len() / 2);

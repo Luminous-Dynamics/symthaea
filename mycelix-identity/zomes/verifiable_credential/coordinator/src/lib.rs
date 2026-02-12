@@ -41,9 +41,7 @@ fn string_to_entry_hash(s: &str) -> EntryHash {
         holo_hash::blake2b_256(s.as_bytes())
             .into_iter()
             .chain([0u8; 4])
-            .collect::<Vec<u8>>()
-            .try_into()
-            .expect("36 bytes"),
+            .collect::<Vec<u8>>(),
     )
 }
 
@@ -480,7 +478,7 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
     // Sign with agent's ed25519 key
     let signature = sign_raw(
         agent_info.agent_initial_pubkey.clone(),
-        presentation_data.into(),
+        presentation_data,
     )?;
     let tagged_sig = TaggedSignature::new(AlgorithmId::Ed25519, signature.as_ref().to_vec())
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Signature tagging error: {}", e))))?;
@@ -585,7 +583,7 @@ pub fn create_derived_credential(input: CreateDerivedInput) -> ExternResult<Reco
     // Sign with holder's ed25519 key
     let holder_signature = sign_raw(
         agent_info.agent_initial_pubkey.clone(),
-        sign_data.into(),
+        sign_data,
     )?;
 
     let derivation_proof = DerivationProof {
@@ -1185,8 +1183,8 @@ fn days_since_epoch(year: i32, month: u32, day: u32) -> Option<i64> {
         [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     };
 
-    for m in 0..(month - 1) as usize {
-        days += days_in_months[m] as i64;
+    for d in &days_in_months[..((month - 1) as usize)] {
+        days += *d as i64;
     }
 
     // Add days in current month
@@ -1213,8 +1211,8 @@ fn days_since_epoch_negative(year: i32, month: u32, day: u32) -> Option<i64> {
 
     // Days remaining in the year from the given date
     let mut remaining = 0i64;
-    for m in (month as usize)..12 {
-        remaining += days_in_months[m] as i64;
+    for d in &days_in_months[(month as usize)..12] {
+        remaining += *d as i64;
     }
     remaining -= (day - 1) as i64;
     remaining += days_in_months[(month - 1) as usize] as i64;
@@ -1231,8 +1229,8 @@ fn is_leap_year(year: i32) -> bool {
 
 /// Decode multibase string (base58btc with 'z' prefix)
 fn multibase_decode(s: &str) -> Option<Vec<u8>> {
-    if s.starts_with('z') {
-        base58_decode(&s[1..])
+    if let Some(stripped) = s.strip_prefix('z') {
+        base58_decode(stripped)
     } else {
         None
     }
@@ -1522,7 +1520,7 @@ fn sign_credential(vc: &VerifiableCredential) -> ExternResult<String> {
     // Sign with agent's ed25519 key via HDK
     let signature = sign_raw(
         agent_info()?.agent_initial_pubkey,
-        content_hash.clone().into(),
+        content_hash.clone(),
     )?;
 
     // Wrap in TaggedSignature for algorithm-tagged multibase encoding

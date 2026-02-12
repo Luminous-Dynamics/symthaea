@@ -79,10 +79,10 @@ fn enroll_social_recovery_factor(did: &str, trustees: &[String]) -> ExternResult
         reason: String,
     }
 
-    let factor_id = format!("social_recovery:{}", holo_hash::blake2b_256(did.as_bytes())
+    let factor_id = format!("social_recovery:{}", &holo_hash::blake2b_256(did.as_bytes())
         .iter()
         .map(|b| format!("{:02x}", b))
-        .collect::<String>()[..16].to_string());
+        .collect::<String>()[..16]);
 
     let metadata = serde_json::json!({
         "trustees": trustees,

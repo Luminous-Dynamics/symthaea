@@ -8,7 +8,7 @@
 //!
 //! Integration with kvector-zkp library:
 //! - KVectorWitness.commitment() produces the 32-byte commitment
-//! - KVectorRangeProof proves values are in valid [0,1] range
+//! - KVectorRangeProof proves values are in valid \[0,1\] range
 //! - Proofs are generated off-chain and verified on-chain
 
 use hdi::prelude::*;
@@ -29,7 +29,7 @@ pub struct TrustCredential {
     /// K-Vector commitment hash (32 bytes, SHA3-256)
     /// This binds to the actual K-Vector without revealing values
     pub kvector_commitment: Vec<u8>,
-    /// STARK proof that K-Vector components are in valid [0,1] range
+    /// STARK proof that K-Vector components are in valid \[0,1\] range
     /// Serialized proof from kvector-zkp library
     pub range_proof: Vec<u8>,
     /// Proven trust score range (e.g., [0.5, 0.7])
@@ -372,7 +372,7 @@ fn validate_create_request(
 
     // Min trust score must be valid if specified
     if let Some(score) = req.min_trust_score {
-        if score < 0.0 || score > 1.0 {
+        if !(0.0..=1.0).contains(&score) {
             return Ok(ValidateCallbackResult::Invalid(
                 "Minimum trust score must be in [0, 1]".into(),
             ));

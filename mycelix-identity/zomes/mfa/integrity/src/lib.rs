@@ -175,7 +175,7 @@ impl EnrolledFactor {
         let decay_days = decay_time as f32 / 86400.0;
         let decay_factor = (-decay_rate * decay_days).exp();
 
-        decay_factor.max(0.0).min(1.0)
+        decay_factor.clamp(0.0, 1.0)
     }
 
     /// Check if factor needs re-verification

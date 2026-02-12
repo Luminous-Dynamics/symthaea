@@ -108,9 +108,7 @@ fn string_to_entry_hash(s: &str) -> EntryHash {
         holo_hash::blake2b_256(s.as_bytes())
             .into_iter()
             .chain([0u8; 4])
-            .collect::<Vec<u8>>()
-            .try_into()
-            .expect("36 bytes"),
+            .collect::<Vec<u8>>(),
     )
 }
 
@@ -193,6 +191,7 @@ fn get_mfa_assurance_for_did(did: &str) -> ExternResult<f64> {
 }
 
 /// Check if DID has MFA state enrolled
+#[allow(dead_code)] // Reserved for cross-zome MFA checks
 fn has_mfa_enrolled(did: &str) -> ExternResult<bool> {
     let response = call(
         CallTargetCell::Local,

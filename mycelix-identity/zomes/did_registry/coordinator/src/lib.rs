@@ -353,7 +353,7 @@ pub fn deactivate_did(reason: String) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
 
     // Check if already deactivated
-    if is_did_active(current_did.id.clone())? == false {
+    if !is_did_active(current_did.id.clone())? {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "DID is already deactivated".into()
         )));
