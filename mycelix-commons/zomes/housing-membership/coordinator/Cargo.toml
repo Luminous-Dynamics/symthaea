@@ -1,0 +1,16 @@
+[package]
+name = "housing_membership"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "housing_membership"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+housing_membership_integrity = { path = "../integrity" }
+

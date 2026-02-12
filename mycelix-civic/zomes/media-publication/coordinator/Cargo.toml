@@ -1,0 +1,16 @@
+[package]
+name = "media_publication"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "media_publication"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+media_publication_integrity = { path = "../integrity" }
+

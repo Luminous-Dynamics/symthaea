@@ -1,4 +1,0 @@
-# WASM build configuration for Holochain zomes
-
-[target.wasm32-unknown-unknown]
-rustflags = ['--cfg', 'getrandom_backend="custom"']

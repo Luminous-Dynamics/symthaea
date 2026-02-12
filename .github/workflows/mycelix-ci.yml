@@ -8,9 +8,8 @@ on:
       - 'mycelix-finance/**'
       - 'mycelix-identity/**'
       - 'mycelix-governance/**'
-      - 'mycelix-justice/**'
-      - 'mycelix-media/**'
-      - 'mycelix-property/**'
+      - 'mycelix-commons/**'
+      - 'mycelix-civic/**'
       - 'mycelix-space/**'
       - 'mycelix-health/**'
       - 'mycelix-energy/**'
@@ -28,9 +27,8 @@ on:
       - 'mycelix-finance/**'
       - 'mycelix-identity/**'
       - 'mycelix-governance/**'
-      - 'mycelix-justice/**'
-      - 'mycelix-media/**'
-      - 'mycelix-property/**'
+      - 'mycelix-commons/**'
+      - 'mycelix-civic/**'
       - 'mycelix-space/**'
       - 'mycelix-health/**'
       - 'mycelix-energy/**'
@@ -206,9 +204,8 @@ jobs:
           - { name: finance, path: mycelix-finance }
           - { name: identity, path: mycelix-identity }
           - { name: governance, path: mycelix-governance }
-          - { name: justice, path: mycelix-justice }
-          - { name: media, path: mycelix-media }
-          - { name: property, path: mycelix-property }
+          - { name: commons, path: mycelix-commons }
+          - { name: civic, path: mycelix-civic }
           - { name: space, path: mycelix-space }
           - { name: health, path: mycelix-health }
           - { name: energy, path: mycelix-energy }

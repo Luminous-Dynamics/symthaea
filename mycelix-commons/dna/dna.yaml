@@ -1,0 +1,214 @@
+---
+# Mycelix Commons DNA
+# Universal Resource Coordination: property + housing + care + mutualaid + water
+# 27 domain zomes + 1 unified bridge = 28 zomes
+
+manifest_version: "0"
+name: mycelix_commons
+
+integrity:
+  network_seed: "mycelix-commons-v1"
+  properties:
+    # Cross-domain integration enabled
+    cross_domain_calls: true
+
+  zomes:
+    # Property domain
+    - name: property_registry_integrity
+      path: ../target/wasm32-unknown-unknown/release/property_registry_integrity.wasm
+    - name: property_transfer_integrity
+      path: ../target/wasm32-unknown-unknown/release/property_transfer_integrity.wasm
+    - name: property_disputes_integrity
+      path: ../target/wasm32-unknown-unknown/release/property_disputes_integrity.wasm
+    - name: property_commons_integrity
+      path: ../target/wasm32-unknown-unknown/release/property_commons_integrity.wasm
+
+    # Housing domain
+    - name: housing_units_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_units_integrity.wasm
+    - name: housing_membership_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_membership_integrity.wasm
+    - name: housing_finances_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_finances_integrity.wasm
+    - name: housing_maintenance_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_maintenance_integrity.wasm
+    - name: housing_clt_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_clt_integrity.wasm
+    - name: housing_governance_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_governance_integrity.wasm
+
+    # Care domain
+    - name: care_timebank_integrity
+      path: ../target/wasm32-unknown-unknown/release/care_timebank_integrity.wasm
+    - name: care_circles_integrity
+      path: ../target/wasm32-unknown-unknown/release/care_circles_integrity.wasm
+    - name: care_matching_integrity
+      path: ../target/wasm32-unknown-unknown/release/care_matching_integrity.wasm
+    - name: care_plans_integrity
+      path: ../target/wasm32-unknown-unknown/release/care_plans_integrity.wasm
+    - name: care_credentials_integrity
+      path: ../target/wasm32-unknown-unknown/release/care_credentials_integrity.wasm
+
+    # Mutual Aid domain
+    - name: mutualaid_needs_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_needs_integrity.wasm
+    - name: mutualaid_circles_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_circles_integrity.wasm
+    - name: mutualaid_governance_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_governance_integrity.wasm
+    - name: mutualaid_pools_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_pools_integrity.wasm
+    - name: mutualaid_requests_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_requests_integrity.wasm
+    - name: mutualaid_resources_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_resources_integrity.wasm
+    - name: mutualaid_timebank_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_timebank_integrity.wasm
+
+    # Water domain
+    - name: water_flow_integrity
+      path: ../target/wasm32-unknown-unknown/release/water_flow_integrity.wasm
+    - name: water_purity_integrity
+      path: ../target/wasm32-unknown-unknown/release/water_purity_integrity.wasm
+    - name: water_capture_integrity
+      path: ../target/wasm32-unknown-unknown/release/water_capture_integrity.wasm
+    - name: water_steward_integrity
+      path: ../target/wasm32-unknown-unknown/release/water_steward_integrity.wasm
+    - name: water_wisdom_integrity
+      path: ../target/wasm32-unknown-unknown/release/water_wisdom_integrity.wasm
+
+    # Unified bridge
+    - name: commons_bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/commons_bridge_integrity.wasm
+
+coordinator:
+  zomes:
+    # Property domain
+    - name: property_registry
+      path: ../target/wasm32-unknown-unknown/release/property_registry.wasm
+      dependencies:
+        - name: property_registry_integrity
+    - name: property_transfer
+      path: ../target/wasm32-unknown-unknown/release/property_transfer.wasm
+      dependencies:
+        - name: property_transfer_integrity
+        - name: property_registry_integrity
+    - name: property_disputes
+      path: ../target/wasm32-unknown-unknown/release/property_disputes.wasm
+      dependencies:
+        - name: property_disputes_integrity
+        - name: property_registry_integrity
+    - name: property_commons
+      path: ../target/wasm32-unknown-unknown/release/property_commons.wasm
+      dependencies:
+        - name: property_commons_integrity
+        - name: property_registry_integrity
+
+    # Housing domain
+    - name: housing_units
+      path: ../target/wasm32-unknown-unknown/release/housing_units.wasm
+      dependencies:
+        - name: housing_units_integrity
+    - name: housing_membership
+      path: ../target/wasm32-unknown-unknown/release/housing_membership.wasm
+      dependencies:
+        - name: housing_membership_integrity
+    - name: housing_finances
+      path: ../target/wasm32-unknown-unknown/release/housing_finances.wasm
+      dependencies:
+        - name: housing_finances_integrity
+    - name: housing_maintenance
+      path: ../target/wasm32-unknown-unknown/release/housing_maintenance.wasm
+      dependencies:
+        - name: housing_maintenance_integrity
+    - name: housing_clt
+      path: ../target/wasm32-unknown-unknown/release/housing_clt.wasm
+      dependencies:
+        - name: housing_clt_integrity
+        - name: property_registry_integrity
+    - name: housing_governance
+      path: ../target/wasm32-unknown-unknown/release/housing_governance.wasm
+      dependencies:
+        - name: housing_governance_integrity
+
+    # Care domain
+    - name: care_timebank
+      path: ../target/wasm32-unknown-unknown/release/care_timebank.wasm
+      dependencies:
+        - name: care_timebank_integrity
+    - name: care_circles
+      path: ../target/wasm32-unknown-unknown/release/care_circles.wasm
+      dependencies:
+        - name: care_circles_integrity
+    - name: care_matching
+      path: ../target/wasm32-unknown-unknown/release/care_matching.wasm
+      dependencies:
+        - name: care_matching_integrity
+        - name: care_timebank_integrity
+    - name: care_plans
+      path: ../target/wasm32-unknown-unknown/release/care_plans.wasm
+      dependencies:
+        - name: care_plans_integrity
+        - name: care_timebank_integrity
+    - name: care_credentials
+      path: ../target/wasm32-unknown-unknown/release/care_credentials.wasm
+      dependencies:
+        - name: care_credentials_integrity
+
+    # Mutual Aid domain
+    - name: mutualaid_needs
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_needs.wasm
+      dependencies:
+        - name: mutualaid_needs_integrity
+    - name: mutualaid_circles
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_circles.wasm
+      dependencies:
+        - name: mutualaid_circles_integrity
+    - name: mutualaid_governance
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_governance.wasm
+      dependencies:
+        - name: mutualaid_governance_integrity
+    - name: mutualaid_pools
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_pools.wasm
+      dependencies:
+        - name: mutualaid_pools_integrity
+    - name: mutualaid_requests
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_requests.wasm
+      dependencies:
+        - name: mutualaid_requests_integrity
+    - name: mutualaid_resources
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_resources.wasm
+      dependencies:
+        - name: mutualaid_resources_integrity
+    - name: mutualaid_timebank
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_timebank.wasm
+      dependencies:
+        - name: mutualaid_timebank_integrity
+
+    # Water domain
+    - name: water_flow
+      path: ../target/wasm32-unknown-unknown/release/water_flow.wasm
+      dependencies:
+        - name: water_flow_integrity
+    - name: water_purity
+      path: ../target/wasm32-unknown-unknown/release/water_purity.wasm
+      dependencies:
+        - name: water_purity_integrity
+    - name: water_capture
+      path: ../target/wasm32-unknown-unknown/release/water_capture.wasm
+      dependencies:
+        - name: water_capture_integrity
+    - name: water_steward
+      path: ../target/wasm32-unknown-unknown/release/water_steward.wasm
+      dependencies:
+        - name: water_steward_integrity
+    - name: water_wisdom
+      path: ../target/wasm32-unknown-unknown/release/water_wisdom.wasm
+      dependencies:
+        - name: water_wisdom_integrity
+
+    # Unified bridge
+    - name: commons_bridge
+      path: ../target/wasm32-unknown-unknown/release/commons_bridge.wasm
+      dependencies:
+        - name: commons_bridge_integrity

@@ -1,0 +1,127 @@
+---
+# Mycelix Civic DNA
+# Civic Operations Platform: justice + emergency + media
+# 15 domain zomes + 1 unified bridge = 16 zomes
+
+manifest_version: "0"
+name: mycelix_civic
+
+integrity:
+  network_seed: "mycelix-civic-v1"
+  properties:
+    cross_domain_calls: true
+
+  zomes:
+    # Justice domain
+    - name: justice_cases_integrity
+      path: ../target/wasm32-unknown-unknown/release/justice_cases_integrity.wasm
+    - name: justice_evidence_integrity
+      path: ../target/wasm32-unknown-unknown/release/justice_evidence_integrity.wasm
+    - name: justice_arbitration_integrity
+      path: ../target/wasm32-unknown-unknown/release/justice_arbitration_integrity.wasm
+    - name: justice_restorative_integrity
+      path: ../target/wasm32-unknown-unknown/release/justice_restorative_integrity.wasm
+    - name: justice_enforcement_integrity
+      path: ../target/wasm32-unknown-unknown/release/justice_enforcement_integrity.wasm
+
+    # Emergency domain
+    - name: emergency_incidents_integrity
+      path: ../target/wasm32-unknown-unknown/release/emergency_incidents_integrity.wasm
+    - name: emergency_triage_integrity
+      path: ../target/wasm32-unknown-unknown/release/emergency_triage_integrity.wasm
+    - name: emergency_resources_integrity
+      path: ../target/wasm32-unknown-unknown/release/emergency_resources_integrity.wasm
+    - name: emergency_coordination_integrity
+      path: ../target/wasm32-unknown-unknown/release/emergency_coordination_integrity.wasm
+    - name: emergency_shelters_integrity
+      path: ../target/wasm32-unknown-unknown/release/emergency_shelters_integrity.wasm
+    - name: emergency_comms_integrity
+      path: ../target/wasm32-unknown-unknown/release/emergency_comms_integrity.wasm
+
+    # Media domain
+    - name: media_publication_integrity
+      path: ../target/wasm32-unknown-unknown/release/media_publication_integrity.wasm
+    - name: media_attribution_integrity
+      path: ../target/wasm32-unknown-unknown/release/media_attribution_integrity.wasm
+    - name: media_factcheck_integrity
+      path: ../target/wasm32-unknown-unknown/release/media_factcheck_integrity.wasm
+    - name: media_curation_integrity
+      path: ../target/wasm32-unknown-unknown/release/media_curation_integrity.wasm
+
+    # Unified bridge
+    - name: civic_bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/civic_bridge_integrity.wasm
+
+coordinator:
+  zomes:
+    # Justice domain
+    - name: justice_cases
+      path: ../target/wasm32-unknown-unknown/release/justice_cases.wasm
+      dependencies:
+        - name: justice_cases_integrity
+    - name: justice_evidence
+      path: ../target/wasm32-unknown-unknown/release/justice_evidence.wasm
+      dependencies:
+        - name: justice_evidence_integrity
+    - name: justice_arbitration
+      path: ../target/wasm32-unknown-unknown/release/justice_arbitration.wasm
+      dependencies:
+        - name: justice_arbitration_integrity
+    - name: justice_restorative
+      path: ../target/wasm32-unknown-unknown/release/justice_restorative.wasm
+      dependencies:
+        - name: justice_restorative_integrity
+    - name: justice_enforcement
+      path: ../target/wasm32-unknown-unknown/release/justice_enforcement.wasm
+      dependencies:
+        - name: justice_enforcement_integrity
+
+    # Emergency domain
+    - name: emergency_incidents
+      path: ../target/wasm32-unknown-unknown/release/emergency_incidents.wasm
+      dependencies:
+        - name: emergency_incidents_integrity
+    - name: emergency_triage
+      path: ../target/wasm32-unknown-unknown/release/emergency_triage.wasm
+      dependencies:
+        - name: emergency_triage_integrity
+    - name: emergency_resources
+      path: ../target/wasm32-unknown-unknown/release/emergency_resources.wasm
+      dependencies:
+        - name: emergency_resources_integrity
+    - name: emergency_coordination
+      path: ../target/wasm32-unknown-unknown/release/emergency_coordination.wasm
+      dependencies:
+        - name: emergency_coordination_integrity
+    - name: emergency_shelters
+      path: ../target/wasm32-unknown-unknown/release/emergency_shelters.wasm
+      dependencies:
+        - name: emergency_shelters_integrity
+    - name: emergency_comms
+      path: ../target/wasm32-unknown-unknown/release/emergency_comms.wasm
+      dependencies:
+        - name: emergency_comms_integrity
+
+    # Media domain
+    - name: media_publication
+      path: ../target/wasm32-unknown-unknown/release/media_publication.wasm
+      dependencies:
+        - name: media_publication_integrity
+    - name: media_attribution
+      path: ../target/wasm32-unknown-unknown/release/media_attribution.wasm
+      dependencies:
+        - name: media_attribution_integrity
+    - name: media_factcheck
+      path: ../target/wasm32-unknown-unknown/release/media_factcheck.wasm
+      dependencies:
+        - name: media_factcheck_integrity
+    - name: media_curation
+      path: ../target/wasm32-unknown-unknown/release/media_curation.wasm
+      dependencies:
+        - name: media_curation_integrity
+
+    # Unified bridge
+    - name: civic_bridge
+      path: ../target/wasm32-unknown-unknown/release/civic_bridge.wasm
+      dependencies:
+        - name: civic_bridge_integrity

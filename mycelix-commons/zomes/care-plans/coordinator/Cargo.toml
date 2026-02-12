@@ -1,0 +1,16 @@
+[package]
+name = "care_plans"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "care_plans"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+care_plans_integrity = { path = "../integrity" }
+

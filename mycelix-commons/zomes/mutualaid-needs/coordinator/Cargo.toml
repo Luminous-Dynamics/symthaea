@@ -1,0 +1,16 @@
+[package]
+name = "mutualaid_needs"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "mutualaid_needs"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+mutualaid_needs_integrity = { path = "../integrity" }
+mutualaid-common = { workspace = true }
