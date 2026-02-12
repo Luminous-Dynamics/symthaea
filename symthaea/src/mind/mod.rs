@@ -397,6 +397,7 @@ impl ContinuousMind {
             code_context: None,
             constraints: Vec::new(),
             original_input: None,
+            primitive_tiers: Vec::new(), // Populated by Symthaea facade from language grounding
         }
     }
 

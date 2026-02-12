@@ -12,7 +12,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use symthaea_nix::encoding::{NixCodebook, SystemStateEncoder, SystemStateSnapshot, ServiceState};
-use symthaea_nix::ipc::{default_snapshot_path, AnomalyEntry, ConcernEntry, DaemonSnapshot};
+use symthaea_nix::ipc::{default_snapshot_path, AnomalyEntry, ConcernEntry, DaemonConfig, DaemonSnapshot};
 use symthaea_nix::mind::causal_graph::{NixCausalGraph, NixOSCausalPatterns};
 use symthaea_nix::mind::episodic_memory::{EpisodeOutcome, NixEpisodicMemory, SystemEpisode};
 use symthaea_nix::mind::working_memory::{MemorySource, WorkingMemory};
@@ -22,28 +22,7 @@ use symthaea_nix::observe::SystemObserver;
 use symthaea_core::hdc::ContinuousHV;
 
 
-/// Daemon configuration.
-struct DaemonConfig {
-    /// How often to take a full system snapshot (seconds).
-    snapshot_interval: u64,
-    /// How often to check for high-frequency events like journal entries (seconds).
-    poll_interval: u64,
-    /// Prediction error threshold for episodic storage.
-    surprise_threshold: f64,
-    /// Maximum journal entries to process per poll cycle.
-    journal_batch_size: usize,
-}
-
-impl Default for DaemonConfig {
-    fn default() -> Self {
-        Self {
-            snapshot_interval: 60,
-            poll_interval: 5,
-            surprise_threshold: 0.3,
-            journal_batch_size: 50,
-        }
-    }
-}
+// DaemonConfig is now imported from symthaea_nix::ipc
 
 /// Mutable daemon state collected across cycles.
 struct DaemonState {
@@ -95,6 +74,7 @@ impl DaemonState {
         let free_energy = self.world_model.free_energy();
 
         // Detect state transitions vs previous snapshot
+        let mut wm_pushes = 0usize;
         if let (Some(prev_snap), Some(prev_hv)) = (&self.prev_snapshot, &self.prev_state_hv) {
             let transitions = detect_transitions(prev_snap, &snapshot);
             if !transitions.is_empty() {
@@ -117,6 +97,7 @@ impl DaemonState {
                         MemorySource::SystemObservation,
                         label,
                     );
+                    wm_pushes += 1;
                 }
             }
 
@@ -136,8 +117,37 @@ impl DaemonState {
             }
         }
 
+        // Graduate evicted items after the immutable borrow on prev_state_hv ends
+        if wm_pushes > 0 {
+            self.graduate_evicted(free_energy);
+        }
+
         self.prev_snapshot = Some(snapshot);
         self.prev_state_hv = Some(state_hv);
+    }
+
+    /// Graduate evicted working memory items to episodic memory.
+    ///
+    /// When working memory is full and a new item is pushed, the lowest-activation
+    /// item is evicted. If it survived enough decay cycles (>=3), it's worth
+    /// remembering as a system episode.
+    fn graduate_evicted(&mut self, current_phi: f64) {
+        const MIN_STEPS_FOR_GRADUATION: u64 = 3;
+        if let Some(evicted) = self.working_memory.take_evicted() {
+            if evicted.steps_survived >= MIN_STEPS_FOR_GRADUATION {
+                let episode = SystemEpisode {
+                    state_before: evicted.content.clone(),
+                    action: format!("graduated_wm:{}", evicted.label),
+                    state_after: evicted.content,
+                    outcome: EpisodeOutcome::Success,
+                    phi_at_encoding: current_phi,
+                    prediction_error: 1.0 - evicted.activation, // Low activation = high surprise
+                    emotional_valence: 0.0,
+                    timestamp: now_secs() as i64,
+                };
+                self.episodic_memory.record(episode);
+            }
+        }
     }
 
     /// Process journal entries for anomaly detection.
@@ -158,6 +168,8 @@ impl DaemonState {
                 MemorySource::SystemObservation,
                 format!("anomaly: {}", anomaly.reason),
             );
+            // Graduate evicted items to episodic memory
+            self.graduate_evicted(anomaly.anomaly_score as f64);
 
             // Track for IPC snapshot
             self.recent_anomalies.push(AnomalyEntry {
@@ -271,7 +283,7 @@ fn now_secs() -> u64 {
 }
 
 fn main() -> ! {
-    let config = DaemonConfig::default();
+    let config = DaemonConfig::load_default();
     let mut state = DaemonState::new();
     let snapshot_path = default_snapshot_path();
 
@@ -327,8 +339,8 @@ fn main() -> ! {
         // Journal anomaly detection on every poll
         state.process_journal(config.journal_batch_size);
 
-        // Write IPC snapshot + persist working memory every 10 cycles
-        if cycle % 10 == 0 {
+        // Write IPC snapshot + persist working memory at configured interval
+        if cycle % config.ipc_write_interval == 0 {
             let ipc_snap = state.to_ipc_snapshot();
             if let Err(e) = ipc_snap.write_to(&snapshot_path) {
                 eprintln!("nix-mind-daemon: IPC write failed: {}", e);

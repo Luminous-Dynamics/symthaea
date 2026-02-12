@@ -135,6 +135,7 @@ use crate::consciousness::fep_active_inference::{
 };
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
 use crate::memory::semantic_memory::SemanticMemory;
+use crate::memory::memory_coordinator::{MemoryCoordinator, CoordinatorConfig};
 use crate::hdc_ltc_bridge::HdcLtcBridge;
 use crate::consciousness::stability_regime::{StabilityRegimeProcessor, RegimeTransition};
 use crate::consciousness::primitive_discovery::{PrimitiveDiscoveryService, DiscoveryServiceConfig};
@@ -560,6 +561,11 @@ pub struct CognitiveLoopService {
     /// to modulate learning rate - high error on similar inputs → boost learning
     semantic_memory: SemanticMemory,
 
+    /// Memory Coordinator: cross-tier signal broadcaster
+    /// Bridges episodic and semantic memory with shared consciousness signals,
+    /// handles graduation from working memory to episodic storage.
+    memory_coordinator: MemoryCoordinator,
+
     /// Neural bridge for projecting pre-computed embeddings (e.g. BGE-M3)
     /// directly into HDC space via a trained linear probe.
     /// Only available when the `neural-bridge` feature is enabled and
@@ -769,6 +775,8 @@ impl CognitiveLoopService {
             // Semantic memory: HDC-based similarity lookup for CfC context
             // 1000 entries, 0.3 similarity threshold
             semantic_memory: SemanticMemory::with_threshold(1000, 0.3),
+            // Memory coordinator: cross-tier signal broadcaster
+            memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             #[cfg(feature = "neural-bridge")]
             neural_bridge: {
                 let probe_path = std::path::Path::new("models/neural_bridge/probe_weights.npy");
@@ -1182,7 +1190,15 @@ impl CognitiveLoopService {
 
         let semantic_hdc = self.temporal_network.project_to_hdc_vec(&compressed_state)
             .unwrap_or_else(|| compressed_state.clone());
-        let semantic_lr_factor = self.semantic_memory.compute_lr_factor(&semantic_hdc, 3);
+        // Phi-weighted learning rate: consciousness level modulates how aggressively
+        // we adjust to prediction errors on similar past inputs.
+        let current_phi_for_lr = self.coherence_bridge.smoothed_coherence() as f64;
+        let semantic_lr_factor = self.semantic_memory.compute_lr_factor_phi_weighted(
+            &semantic_hdc,
+            3,
+            current_phi_for_lr,
+            self.stats.total_cycles as u64,
+        );
 
         // 3. Convert to ndarray for CfC
         let input_array = Array1::from_vec(compressed_state.clone());
@@ -1773,6 +1789,26 @@ impl CognitiveLoopService {
                             "Episodic replay session completed"
                         );
                     }
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // MEMORY COORDINATOR: Broadcast consciousness signals across memory tiers
+        // ═══════════════════════════════════════════════════════════════════════
+        {
+            let coord_phi = self.coherence_bridge.smoothed_coherence() as f64;
+            let coord_coherence = coherence as f64;
+            self.memory_coordinator.update_signals(coord_phi, coord_coherence);
+
+            // Process any queued graduations into episodic memory
+            if let Some(ref mut replay) = self.phi_episodic_replay {
+                let graduated = self.memory_coordinator.process_graduations(replay);
+                if graduated > 0 {
+                    tracing::debug!(
+                        graduated,
+                        "Memory coordinator graduated items to episodic storage"
+                    );
                 }
             }
         }

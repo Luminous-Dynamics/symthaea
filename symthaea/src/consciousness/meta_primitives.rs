@@ -378,6 +378,16 @@ impl MetaPrimitiveEvolution {
             let generalization = 1.0 / (1.0 + variance); // High generalization = low variance
 
             composite.fitness.update(avg_phi, generalization);
+
+            // Task-grounded fitness: measure improvement consistency and accuracy
+            // improvement = fraction of problems where Phi > threshold (0.1)
+            // accuracy = fraction of problems with non-trivial Phi output
+            let threshold = 0.1;
+            let improved_count = phi_scores.iter().filter(|&&p| p > threshold).count();
+            let task_improvement = improved_count as f64 / phi_scores.len().max(1) as f64;
+            let accuracy = phi_scores.iter().filter(|&&p| p > 0.0).count() as f64
+                / phi_scores.len().max(1) as f64;
+            composite.fitness.update_task_fitness(task_improvement, accuracy);
         }
 
         // Sort by fitness
