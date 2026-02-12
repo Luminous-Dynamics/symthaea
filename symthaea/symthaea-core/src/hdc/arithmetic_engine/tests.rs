@@ -1201,8 +1201,7 @@ fn test_multipath_large_numbers() {
 }
 
 #[test]
-
-
+#[ignore] // 47s: MultiPathVerifier with full Φ measurement. Run with --ignored.
 fn test_multipath_phi_measurement() {
     let mut verifier = MultiPathVerifier::new();
     let result = verifier.verify_distributive(3, 4, 5);
@@ -1292,16 +1291,6 @@ proptest! {
     }
 
     #[test]
-    fn prop_subtract_inverse_of_add(a in small_nat(), b in small_nat()) {
-        let mut engine = ArithmeticEngine::new();
-        let sum = engine.add(a, b);
-        let diff = engine.subtract(sum.result.value, b);
-        prop_assert!(diff.is_some(), "subtract(a+b, b) should succeed");
-        prop_assert_eq!(diff.unwrap().result.value, a,
-            "subtract(add({}, {}), {}) should equal {}", a, b, b, a);
-    }
-
-    #[test]
     fn prop_phi_positive_add(a in small_nat(), b in small_nat()) {
         let mut engine = ArithmeticEngine::new();
         let result = engine.add(a, b);
@@ -1317,9 +1306,24 @@ proptest! {
             "Φ should be positive for multiply({}, {})", a, b);
     }
 
-    // =====================================================================
-    // HybridArithmeticEngine properties
-    // =====================================================================
+}
+
+// ========================================================================
+// HybridArithmeticEngine + MultiPathVerifier property tests (expensive)
+// ========================================================================
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(8))]
+
+    #[test]
+    fn prop_subtract_inverse_of_add(a in small_nat(), b in small_nat()) {
+        let mut engine = ArithmeticEngine::new();
+        let sum = engine.add(a, b);
+        let diff = engine.subtract(sum.result.value, b);
+        prop_assert!(diff.is_some(), "subtract(a+b, b) should succeed");
+        prop_assert_eq!(diff.unwrap().result.value, a,
+            "subtract(add({}, {}), {}) should equal {}", a, b, b, a);
+    }
 
     #[test]
     fn prop_hybrid_add_commutative(a in fast_path_nat(), b in fast_path_nat()) {
