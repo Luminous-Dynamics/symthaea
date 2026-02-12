@@ -3083,7 +3083,7 @@ impl ConsciousnessPipeline {
         }
 
         // === PERIODIC VERIFICATION ===
-        if self.verification_interval > 0 && self.current_cycle % self.verification_interval as u64 == 0 {
+        if self.verification_interval > 0 && self.current_cycle.is_multiple_of(self.verification_interval as u64) {
             if let Some(ref verifier) = self.verifier {
                 self.latest_verification = Some(verifier.verify_from_state(&self.state));
             }
@@ -5558,7 +5558,6 @@ mod tests {
         // "slow" should have ran
         let slow_report = reports.iter().find(|r| r.name == "slow").unwrap();
         assert!(slow_report.ran);
-        assert!(slow_report.duration_us >= 0);
         assert!(slow_report.phi_delta > 0.0, "slow sub increases phi");
         assert!(slow_report.error.is_none());
 

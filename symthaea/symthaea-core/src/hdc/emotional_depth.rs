@@ -507,7 +507,7 @@ impl CompoundEmotion {
 /// HDC-native emotional encoder
 pub struct EmotionalEncoder {
     /// Primitive system for base emotion vectors
-    primitives: PrimitiveSystem,
+    primitives: &'static PrimitiveSystem,
 
     /// Cached component encodings
     component_cache: HashMap<EmotionalComponent, BinaryHV>,
@@ -518,7 +518,7 @@ pub struct EmotionalEncoder {
 
 impl EmotionalEncoder {
     pub fn new() -> Self {
-        let primitives = PrimitiveSystem::new();
+        let primitives = PrimitiveSystem::global();
         let mut encoder = Self {
             primitives,
             component_cache: HashMap::new(),

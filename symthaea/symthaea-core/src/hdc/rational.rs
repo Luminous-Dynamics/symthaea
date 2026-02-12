@@ -112,39 +112,41 @@ impl RationalArithmeticEngine {
         }
     }
 
-    /// Encode an integer into HDC space using the natural number encoding scheme
+    /// Encode an integer into HDC space using binary decomposition.
+    ///
+    /// Represents integer n by binding together deterministic basis vectors
+    /// for each set bit position in |n|, plus a sign vector. O(log n) — at
+    /// most 64 iterations for any i64.
     fn encode_int(&self, n: i64) -> BinaryHV {
         if n == 0 {
             return self.primitives.get("ZERO").unwrap().encoding;
         }
 
-        let (is_negative, abs_n) = if n < 0 {
-            (true, (-n) as u64)
+        let is_negative = n < 0;
+        let abs_n = (n as i128).unsigned_abs() as u64;
+
+        // Sign vector
+        let sign_hv = if is_negative {
+            if let Some(negation) = self.primitives.get("NEGATION") {
+                negation.encoding
+            } else {
+                BinaryHV::random(seed_from_name("NEGATION"))
+            }
         } else {
-            (false, n as u64)
+            BinaryHV::random(seed_from_name("POS_SIGN"))
         };
 
-        // Build up from ZERO using SUCCESSOR
-        let zero = self.primitives.get("ZERO").unwrap().encoding;
-        let successor = self.primitives.get("SUCCESSOR").unwrap().encoding;
+        let mut components = vec![sign_hv];
 
-        let mut encoding = zero;
-        for _ in 0..abs_n {
-            encoding = encoding.bind(&successor);
-        }
-
-        // Apply negation if needed
-        if is_negative {
-            if let Some(negation) = self.primitives.get("NEGATION") {
-                encoding = encoding.bind(&negation.encoding);
-            } else {
-                // Fallback: use a deterministic seed for negation
-                let neg_hv = BinaryHV::random(seed_from_name("NEGATION"));
-                encoding = encoding.bind(&neg_hv);
+        // Binary decomposition: bind a deterministic basis vector for each set bit
+        for bit_pos in 0..64 {
+            if abs_n & (1u64 << bit_pos) != 0 {
+                let bit_basis = BinaryHV::random(seed_from_name(&format!("INT_BIT_{}", bit_pos)));
+                components.push(bit_basis);
             }
         }
 
-        encoding
+        BinaryHV::bundle(&components)
     }
 
     /// Encode a rational number as numerator/denominator

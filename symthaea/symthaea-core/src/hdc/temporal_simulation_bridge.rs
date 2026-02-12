@@ -367,9 +367,9 @@ impl TemporalSimulationBridge {
     }
 
     /// Subsample the trajectory to at most `sample_rate` evenly-spaced states.
-    fn subsample<'a>(
+    fn subsample(
         &self,
-        result: &'a SimulationResult,
+        result: &SimulationResult,
     ) -> (Vec<Vec<f64>>, Vec<f64>) {
         let n = result.states.len();
         if n <= self.sample_rate {
