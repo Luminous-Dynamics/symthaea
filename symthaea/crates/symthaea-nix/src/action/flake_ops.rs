@@ -86,8 +86,7 @@ impl FlakeOps {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "nix flake metadata failed: {}",
                     String::from_utf8_lossy(&output.stderr)

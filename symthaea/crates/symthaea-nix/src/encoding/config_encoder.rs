@@ -84,7 +84,7 @@ impl<'a> ConfigEncoder<'a> {
             NixValue::Null => "null".to_string(),
             NixValue::List(items) => {
                 items.iter()
-                    .map(|v| Self::value_to_string(v))
+                    .map(Self::value_to_string)
                     .collect::<Vec<_>>()
                     .join(" ")
             }

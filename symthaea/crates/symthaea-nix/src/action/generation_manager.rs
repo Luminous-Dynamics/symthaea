@@ -47,8 +47,7 @@ impl GenerationManager {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "nixos-rebuild list-generations failed: {}",
                     String::from_utf8_lossy(&output.stderr)

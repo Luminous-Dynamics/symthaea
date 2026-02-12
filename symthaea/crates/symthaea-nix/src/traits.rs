@@ -217,25 +217,13 @@ pub struct IntentPrototypes {
 }
 
 /// Domain-specific prompt templates.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DomainPrompts {
     pub system: String,
     pub clarification: String,
     pub action_confirm: String,
     pub error_explain: String,
     pub out_of_domain: String,
-}
-
-impl Default for DomainPrompts {
-    fn default() -> Self {
-        Self {
-            system: String::new(),
-            clarification: String::new(),
-            action_confirm: String::new(),
-            error_explain: String::new(),
-            out_of_domain: String::new(),
-        }
-    }
 }
 
 /// A structured diagnosis of an error.

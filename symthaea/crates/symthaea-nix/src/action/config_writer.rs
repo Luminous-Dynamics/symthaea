@@ -357,8 +357,7 @@ impl ConfigWriter {
             .status()?;
 
         if !status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 "git restore failed",
             ));
         }
