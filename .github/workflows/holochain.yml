@@ -575,6 +575,10 @@ jobs:
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo build --release --target wasm32-unknown-unknown"
 
+      - name: WASM gate - mycelix-crypto (wasm feature isolation)
+        run: |
+          nix develop ./mycelix-identity --command bash -c "cd mycelix-identity/crates/mycelix-crypto && cargo check --target wasm32-unknown-unknown --features wasm"
+
       - name: Identity unit tests (250+ tests)
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo test --lib -- --test-threads=1"
@@ -591,7 +595,7 @@ jobs:
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo test --all-features --lib -- --test-threads=1"
 
-      - name: Test mycelix-crypto (native PQC - 28 tests)
+      - name: Test mycelix-crypto (native PQC - 50 tests)
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity/crates/mycelix-crypto && cargo test --features native"
 
