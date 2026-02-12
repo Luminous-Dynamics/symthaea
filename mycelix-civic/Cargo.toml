@@ -70,6 +70,7 @@ getrandom_03 = { package = "getrandom", version = "0.3" }
 
 # Internal shared crates
 civic-types = { path = "crates/civic-types" }
+mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 
 [profile.dev]
 opt-level = "z"

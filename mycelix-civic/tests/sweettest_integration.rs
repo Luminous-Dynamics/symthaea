@@ -52,7 +52,7 @@ pub struct ResolveQueryInput {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct CivicBridgeHealth {
+pub struct BridgeHealth {
     pub healthy: bool,
     pub agent: String,
     pub total_events: u32,
@@ -236,7 +236,7 @@ async fn test_civic_bridge_health() {
         .unwrap()
         .into_tuple();
 
-    let health: CivicBridgeHealth = conductor
+    let health: BridgeHealth = conductor
         .call(&alice.zome("civic_bridge"), "health_check", ())
         .await;
 

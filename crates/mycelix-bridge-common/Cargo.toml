@@ -1,0 +1,9 @@
+[package]
+name = "mycelix-bridge-common"
+version = "0.1.0"
+edition = "2021"
+description = "Shared bridge dispatch types and utilities for Mycelix cluster DNAs"
+
+[dependencies]
+hdk = "0.6.0"
+serde = { version = "1.0", features = ["derive"] }

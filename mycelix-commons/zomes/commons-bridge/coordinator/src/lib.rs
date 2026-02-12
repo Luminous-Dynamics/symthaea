@@ -9,8 +9,12 @@
 //! 3. **broadcast_event** — pub-sub event distribution across domains
 
 use commons_bridge_integrity::*;
-use commons_types::{CommonsQuery, CommonsEvent, BridgeHealthStatus};
+use commons_types::{CommonsQuery, CommonsEvent};
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    self as bridge,
+    DispatchInput, DispatchResult, ResolveQueryInput, EventTypeQuery, BridgeHealth,
+};
 
 // ============================================================================
 // Allowed zome names — security boundary for dispatch
@@ -51,12 +55,8 @@ const ALLOWED_ZOMES: &[&str] = &[
     "water_wisdom",
 ];
 
-fn is_allowed_zome(zome: &str) -> bool {
-    ALLOWED_ZOMES.contains(&zome)
-}
-
 // ============================================================================
-// Helpers
+// Helpers (use zome-specific EntryTypes for anchors)
 // ============================================================================
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -70,44 +70,9 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
     anchor_hash(anchor_str)
 }
 
-fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
-    let mut records = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            records.push(record);
-        }
-    }
-    Ok(records)
-}
-
 // ============================================================================
 // Cross-Domain Dispatch (synchronous RPC)
 // ============================================================================
-
-/// Input for dispatching a call to any domain zome within the Commons DNA.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DispatchInput {
-    /// Target zome name (e.g., "property_registry", "housing_clt").
-    /// Must be in the ALLOWED_ZOMES list.
-    pub zome: String,
-    /// Target function name (e.g., "verify_ownership", "get_property").
-    pub fn_name: String,
-    /// MessagePack-serialized input payload. Use `()` serialized for no-arg functions.
-    pub payload: Vec<u8>,
-}
-
-/// Result of a dispatched cross-domain call.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DispatchResult {
-    /// Whether the call succeeded.
-    pub success: bool,
-    /// MessagePack-serialized response payload (on success).
-    pub response: Option<Vec<u8>>,
-    /// Error message (on failure).
-    pub error: Option<String>,
-}
 
 /// Dispatch a synchronous call to any domain zome within the Commons DNA.
 ///
@@ -126,60 +91,7 @@ pub struct DispatchResult {
 /// ```
 #[hdk_extern]
 pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
-    if !is_allowed_zome(&input.zome) {
-        return Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!(
-                "Zome '{}' is not in the allowed dispatch list. Valid zomes: {:?}",
-                input.zome, ALLOWED_ZOMES
-            )),
-        });
-    }
-
-    // Use HDK host call directly to bypass the ExternIO::encode() in the
-    // convenience `call()` wrapper — our payload is already msgpack-encoded.
-    let payload = ExternIO(input.payload);
-
-    let result = HDK.with(|h| {
-        h.borrow().call(vec![Call::new(
-            CallTarget::ConductorCell(CallTargetCell::Local),
-            ZomeName::from(input.zome.as_str()),
-            FunctionName::from(input.fn_name.as_str()),
-            None,
-            payload,
-        )])
-    });
-
-    match result {
-        Ok(responses) => match responses.into_iter().next() {
-            Some(ZomeCallResponse::Ok(extern_io)) => Ok(DispatchResult {
-                success: true,
-                response: Some(extern_io.0),
-                error: None,
-            }),
-            Some(ZomeCallResponse::NetworkError(err)) => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some(format!("Network error: {}", err)),
-            }),
-            Some(other) => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some(format!("Zome call rejected: {:?}", other)),
-            }),
-            None => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some("No response from zome call".into()),
-            }),
-        },
-        Err(e) => Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!("Call failed: {:?}", e)),
-        }),
-    }
+    bridge::dispatch_call_checked(&input, ALLOWED_ZOMES)
 }
 
 // ============================================================================
@@ -240,7 +152,6 @@ pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
 
 /// Map a domain name to its primary coordinator zome for auto-dispatch.
 fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
-    // Map known query patterns to specific zomes
     let zome = match domain {
         "property" => match query_type {
             s if s.contains("transfer") || s.contains("ownership") => "property_transfer",
@@ -282,14 +193,6 @@ fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
         _ => return None,
     };
     Some(zome.to_string())
-}
-
-/// Input for resolving a query with a result
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ResolveQueryInput {
-    pub query_hash: ActionHash,
-    pub result: String,
-    pub success: bool,
 }
 
 /// Resolve a pending query with a result
@@ -343,6 +246,10 @@ pub fn broadcast_event(event: CommonsEvent) -> ExternResult<Record> {
     )))
 }
 
+// ============================================================================
+// Query helpers
+// ============================================================================
+
 /// Get all events for a specific domain
 #[hdk_extern]
 pub fn get_domain_events(domain: String) -> ExternResult<Vec<Record>> {
@@ -351,7 +258,7 @@ pub fn get_domain_events(domain: String) -> ExternResult<Vec<Record>> {
         LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
         GetStrategy::default(),
     )?;
-    records_from_links(links)
+    bridge::records_from_links(links)
 }
 
 /// Get all queries for a specific domain
@@ -362,16 +269,10 @@ pub fn get_domain_queries(domain: String) -> ExternResult<Vec<Record>> {
         LinkQuery::try_new(domain_anchor, LinkTypes::DomainToQuery)?,
         GetStrategy::default(),
     )?;
-    records_from_links(links)
+    bridge::records_from_links(links)
 }
 
 /// Get events by type within a domain
-#[derive(Serialize, Deserialize, Debug)]
-pub struct EventTypeQuery {
-    pub domain: String,
-    pub event_type: String,
-}
-
 #[hdk_extern]
 pub fn get_events_by_type(query: EventTypeQuery) -> ExternResult<Vec<Record>> {
     let type_anchor = anchor_hash(&format!("event_type:{}:{}", query.domain, query.event_type))?;
@@ -379,7 +280,7 @@ pub fn get_events_by_type(query: EventTypeQuery) -> ExternResult<Vec<Record>> {
         LinkQuery::try_new(type_anchor, LinkTypes::EventTypeToEvent)?,
         GetStrategy::default(),
     )?;
-    records_from_links(links)
+    bridge::records_from_links(links)
 }
 
 /// Get all recent events across all domains
@@ -390,7 +291,7 @@ pub fn get_all_events(_: ()) -> ExternResult<Vec<Record>> {
         LinkQuery::try_new(all_anchor, LinkTypes::AllEvents)?,
         GetStrategy::default(),
     )?;
-    records_from_links(links)
+    bridge::records_from_links(links)
 }
 
 /// Get my queries
@@ -402,7 +303,7 @@ pub fn get_my_queries(_: ()) -> ExternResult<Vec<Record>> {
         LinkQuery::try_new(agent_anchor, LinkTypes::AgentToQuery)?,
         GetStrategy::default(),
     )?;
-    records_from_links(links)
+    bridge::records_from_links(links)
 }
 
 /// Get my events
@@ -414,17 +315,17 @@ pub fn get_my_events(_: ()) -> ExternResult<Vec<Record>> {
         LinkQuery::try_new(agent_anchor, LinkTypes::AgentToEvent)?,
         GetStrategy::default(),
     )?;
-    records_from_links(links)
+    bridge::records_from_links(links)
 }
 
 /// Network health check — returns status for all 5 domains
 #[hdk_extern]
-pub fn health_check(_: ()) -> ExternResult<BridgeHealthStatus> {
+pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
     let caller = agent_info()?.agent_initial_pubkey;
     let events = get_all_events(())?;
     let queries = get_my_queries(())?;
 
-    Ok(BridgeHealthStatus {
+    Ok(BridgeHealth {
         healthy: true,
         agent: caller.to_string(),
         total_events: events.len() as u32,

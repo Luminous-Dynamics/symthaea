@@ -10,6 +10,10 @@
 
 use civic_bridge_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    self as bridge,
+    DispatchInput, DispatchResult, ResolveQueryInput, EventTypeQuery, BridgeHealth,
+};
 
 // ============================================================================
 // Allowed zome names — security boundary for dispatch
@@ -36,12 +40,8 @@ const ALLOWED_ZOMES: &[&str] = &[
     "media_curation",
 ];
 
-fn is_allowed_zome(zome: &str) -> bool {
-    ALLOWED_ZOMES.contains(&zome)
-}
-
 // ============================================================================
-// Helpers
+// Helpers (use zome-specific EntryTypes for anchors)
 // ============================================================================
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
@@ -55,44 +55,9 @@ fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
     anchor_hash(anchor_str)
 }
 
-fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
-    let mut records = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            records.push(record);
-        }
-    }
-    Ok(records)
-}
-
 // ============================================================================
 // Cross-Domain Dispatch (synchronous RPC)
 // ============================================================================
-
-/// Input for dispatching a call to any domain zome within the Civic DNA.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DispatchInput {
-    /// Target zome name (e.g., "justice_cases", "emergency_incidents").
-    /// Must be in the ALLOWED_ZOMES list.
-    pub zome: String,
-    /// Target function name (e.g., "report_incident", "publish").
-    pub fn_name: String,
-    /// MessagePack-serialized input payload.
-    pub payload: Vec<u8>,
-}
-
-/// Result of a dispatched cross-domain call.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DispatchResult {
-    /// Whether the call succeeded.
-    pub success: bool,
-    /// MessagePack-serialized response payload (on success).
-    pub response: Option<Vec<u8>>,
-    /// Error message (on failure).
-    pub error: Option<String>,
-}
 
 /// Dispatch a synchronous call to any domain zome within the Civic DNA.
 ///
@@ -100,60 +65,7 @@ pub struct DispatchResult {
 /// `call(CallTargetCell::Local, ...)` to invoke the function directly.
 #[hdk_extern]
 pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
-    if !is_allowed_zome(&input.zome) {
-        return Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!(
-                "Zome '{}' is not in the allowed dispatch list. Valid zomes: {:?}",
-                input.zome, ALLOWED_ZOMES
-            )),
-        });
-    }
-
-    // Use HDK host call directly to bypass the ExternIO::encode() in the
-    // convenience `call()` wrapper — our payload is already msgpack-encoded.
-    let payload = ExternIO(input.payload);
-
-    let result = HDK.with(|h| {
-        h.borrow().call(vec![Call::new(
-            CallTarget::ConductorCell(CallTargetCell::Local),
-            ZomeName::from(input.zome.as_str()),
-            FunctionName::from(input.fn_name.as_str()),
-            None,
-            payload,
-        )])
-    });
-
-    match result {
-        Ok(responses) => match responses.into_iter().next() {
-            Some(ZomeCallResponse::Ok(extern_io)) => Ok(DispatchResult {
-                success: true,
-                response: Some(extern_io.0),
-                error: None,
-            }),
-            Some(ZomeCallResponse::NetworkError(err)) => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some(format!("Network error: {}", err)),
-            }),
-            Some(other) => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some(format!("Zome call rejected: {:?}", other)),
-            }),
-            None => Ok(DispatchResult {
-                success: false,
-                response: None,
-                error: Some("No response from zome call".into()),
-            }),
-        },
-        Err(e) => Ok(DispatchResult {
-            success: false,
-            response: None,
-            error: Some(format!("Call failed: {:?}", e)),
-        }),
-    }
+    bridge::dispatch_call_checked(&input, ALLOWED_ZOMES)
 }
 
 // ============================================================================
@@ -240,13 +152,6 @@ fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
 // ============================================================================
 
 /// Resolve a pending query with a result
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ResolveQueryInput {
-    pub query_hash: ActionHash,
-    pub result: String,
-    pub success: bool,
-}
-
 #[hdk_extern]
 pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
     let record = get(input.query_hash.clone(), GetOptions::default())?
@@ -296,7 +201,7 @@ pub fn broadcast_event(event: CivicEventEntry) -> ExternResult<Record> {
 }
 
 // ============================================================================
-// Query Helpers
+// Query helpers
 // ============================================================================
 
 /// Get events for a specific domain
@@ -307,7 +212,7 @@ pub fn get_domain_events(domain: String) -> ExternResult<Vec<Record>> {
         LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
         GetStrategy::default(),
     )?;
-    records_from_links(links)
+    bridge::records_from_links(links)
 }
 
 /// Get all events
@@ -318,7 +223,18 @@ pub fn get_all_events(_: ()) -> ExternResult<Vec<Record>> {
         LinkQuery::try_new(all_anchor, LinkTypes::AllEvents)?,
         GetStrategy::default(),
     )?;
-    records_from_links(links)
+    bridge::records_from_links(links)
+}
+
+/// Get events by type within a domain
+#[hdk_extern]
+pub fn get_events_by_type(query: EventTypeQuery) -> ExternResult<Vec<Record>> {
+    let type_anchor = anchor_hash(&format!("event_type:{}:{}", query.domain, query.event_type))?;
+    let links = get_links(
+        LinkQuery::try_new(type_anchor, LinkTypes::EventTypeToEvent)?,
+        GetStrategy::default(),
+    )?;
+    bridge::records_from_links(links)
 }
 
 /// Get my queries
@@ -330,29 +246,32 @@ pub fn get_my_queries(_: ()) -> ExternResult<Vec<Record>> {
         LinkQuery::try_new(agent_anchor, LinkTypes::AgentToQuery)?,
         GetStrategy::default(),
     )?;
-    records_from_links(links)
+    bridge::records_from_links(links)
+}
+
+/// Get my events
+#[hdk_extern]
+pub fn get_my_events(_: ()) -> ExternResult<Vec<Record>> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let agent_anchor = anchor_hash(&format!("agent_events:{}", caller))?;
+    let links = get_links(
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToEvent)?,
+        GetStrategy::default(),
+    )?;
+    bridge::records_from_links(links)
 }
 
 // ============================================================================
 // Health Check
 // ============================================================================
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CivicBridgeHealth {
-    pub healthy: bool,
-    pub agent: String,
-    pub total_events: u32,
-    pub total_queries: u32,
-    pub domains: Vec<String>,
-}
-
 #[hdk_extern]
-pub fn health_check(_: ()) -> ExternResult<CivicBridgeHealth> {
+pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
     let caller = agent_info()?.agent_initial_pubkey;
     let events = get_all_events(())?;
     let queries = get_my_queries(())?;
 
-    Ok(CivicBridgeHealth {
+    Ok(BridgeHealth {
         healthy: true,
         agent: caller.to_string(),
         total_events: events.len() as u32,
