@@ -1,13 +1,15 @@
 //! K3: Dry-Run Sandbox
 //!
-//! Provides isolated command testing without affecting the actual system.
-//! Uses Nix sandbox features and temporary stores.
+//! Provides scoped command testing without affecting the actual system by default.
+//! This is not a security boundary; real command execution is opt-in.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::fs;
 use std::time::{Duration, Instant};
+use std::io::Read;
+use wait_timeout::ChildExt;
 
 /// Sandbox for isolated command execution
 pub struct Sandbox {
@@ -25,6 +27,8 @@ pub struct Sandbox {
     outputs: Vec<SandboxOutput>,
     /// Simulation mode (no real execution)
     simulation_only: bool,
+    /// Require explicit opt-in before running real commands
+    real_execution_enabled: bool,
 }
 
 impl Sandbox {
@@ -40,6 +44,7 @@ impl Sandbox {
             initialized: false,
             outputs: Vec::new(),
             simulation_only: false,
+            real_execution_enabled: false,
         }
     }
 
@@ -53,6 +58,7 @@ impl Sandbox {
             initialized: false,
             outputs: Vec::new(),
             simulation_only: false,
+            real_execution_enabled: false,
         }
     }
 
@@ -65,6 +71,12 @@ impl Sandbox {
     /// Enable simulation-only mode (no real execution)
     pub fn simulation_only(mut self) -> Self {
         self.simulation_only = true;
+        self
+    }
+
+    /// Explicitly allow real command execution (not a security boundary).
+    pub fn enable_real_execution(mut self) -> Self {
+        self.real_execution_enabled = true;
         self
     }
 
@@ -124,28 +136,11 @@ impl Sandbox {
             return Ok(self.simulate_command(command, args));
         }
 
-        // Build the command
-        let output = Command::new(command)
-            .args(args)
-            .current_dir(&self.root)
-            .envs(&self.env)
-            .env("HOME", self.root.join("home"))
-            .env("TMPDIR", self.root.join("tmp"))
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
+        if !self.real_execution_enabled {
+            return Err(SandboxError::RealExecutionDisabled);
+        }
 
-        let elapsed = start.elapsed();
-
-        let result = SandboxResult {
-            command: format!("{} {}", command, args.join(" ")),
-            exit_code: output.status.code().unwrap_or(-1),
-            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            elapsed,
-            simulated: false,
-        };
+        let result = self.run_command_with_timeout(command, args, start)?;
 
         self.outputs.push(SandboxOutput {
             result: result.clone(),
@@ -177,30 +172,18 @@ impl Sandbox {
             });
         }
 
+        if !self.real_execution_enabled {
+            return Err(SandboxError::RealExecutionDisabled);
+        }
+
         // Run nixos-rebuild dry-build
         let start = Instant::now();
 
-        let output = Command::new("nixos-rebuild")
-            .args([
-                "dry-build",
-                "-I", &format!("nixos-config={}", sandbox_config.display()),
-            ])
-            .current_dir(&self.root)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .output()
-            .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
-
-        let elapsed = start.elapsed();
-
-        Ok(SandboxResult {
-            command: format!("nixos-rebuild dry-build -I nixos-config={}", sandbox_config.display()),
-            exit_code: output.status.code().unwrap_or(-1),
-            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-            elapsed,
-            simulated: false,
-        })
+        self.run_command_with_timeout(
+            "nixos-rebuild",
+            &["dry-build", "-I", &format!("nixos-config={}", sandbox_config.display())],
+            start,
+        )
     }
 
     /// Evaluate a Nix expression in sandbox
@@ -233,6 +216,56 @@ impl Sandbox {
         }
 
         self.run("nix-instantiate", &["--parse", &file.to_string_lossy()])
+    }
+
+    fn run_command_with_timeout(
+        &self,
+        command: &str,
+        args: &[&str],
+        start: Instant,
+    ) -> Result<SandboxResult, SandboxError> {
+        let mut child = Command::new(command)
+            .args(args)
+            .current_dir(&self.root)
+            .envs(&self.env)
+            .env("HOME", self.root.join("home"))
+            .env("TMPDIR", self.root.join("tmp"))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
+
+        let mut stdout = child.stdout.take()
+            .ok_or_else(|| SandboxError::ExecutionFailed("Missing stdout pipe".to_string()))?;
+        let mut stderr = child.stderr.take()
+            .ok_or_else(|| SandboxError::ExecutionFailed("Missing stderr pipe".to_string()))?;
+
+        let status = match child.wait_timeout(self.timeout)
+            .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?
+        {
+            Some(status) => status,
+            None => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(SandboxError::Timeout);
+            }
+        };
+
+        let mut stdout_buf = Vec::new();
+        let mut stderr_buf = Vec::new();
+        stdout.read_to_end(&mut stdout_buf)
+            .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
+        stderr.read_to_end(&mut stderr_buf)
+            .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
+
+        Ok(SandboxResult {
+            command: format!("{} {}", command, args.join(" ")),
+            exit_code: status.code().unwrap_or(-1),
+            stdout: String::from_utf8_lossy(&stdout_buf).to_string(),
+            stderr: String::from_utf8_lossy(&stderr_buf).to_string(),
+            elapsed: start.elapsed(),
+            simulated: false,
+        })
     }
 
     /// Get all sandbox outputs
@@ -378,6 +411,8 @@ pub enum SandboxError {
     CommandNotAllowed(String),
     /// Command execution failed
     ExecutionFailed(String),
+    /// Real execution is disabled (simulation only)
+    RealExecutionDisabled,
     /// Timeout exceeded
     Timeout,
     /// Cleanup failed
@@ -390,6 +425,7 @@ impl std::fmt::Display for SandboxError {
             Self::InitFailed(e) => write!(f, "Sandbox init failed: {}", e),
             Self::CommandNotAllowed(cmd) => write!(f, "Command not allowed: {}", cmd),
             Self::ExecutionFailed(e) => write!(f, "Execution failed: {}", e),
+            Self::RealExecutionDisabled => write!(f, "Real execution disabled"),
             Self::Timeout => write!(f, "Sandbox operation timed out"),
             Self::CleanupFailed(e) => write!(f, "Cleanup failed: {}", e),
         }
@@ -429,6 +465,7 @@ pub struct SandboxConfig {
     timeout: Duration,
     allowed_commands: Vec<String>,
     simulation_only: bool,
+    real_execution_enabled: bool,
 }
 
 impl SandboxConfig {
@@ -438,6 +475,7 @@ impl SandboxConfig {
             timeout: Duration::from_secs(60),
             allowed_commands: default_allowed_commands(),
             simulation_only: false,
+            real_execution_enabled: false,
         }
     }
 
@@ -461,6 +499,11 @@ impl SandboxConfig {
         self
     }
 
+    pub fn enable_real_execution(mut self) -> Self {
+        self.real_execution_enabled = true;
+        self
+    }
+
     pub fn build(self) -> Sandbox {
         let mut sandbox = if let Some(root) = self.root {
             Sandbox::with_root(root)
@@ -471,6 +514,7 @@ impl SandboxConfig {
         sandbox.timeout = self.timeout;
         sandbox.allowed_commands = self.allowed_commands;
         sandbox.simulation_only = self.simulation_only;
+        sandbox.real_execution_enabled = self.real_execution_enabled;
 
         sandbox
     }
@@ -524,6 +568,13 @@ mod tests {
 
         assert!(sandbox.simulation_only);
         assert!(sandbox.allowed_commands.contains(&"custom-cmd".to_string()));
+    }
+
+    #[test]
+    fn test_real_execution_disabled_by_default() {
+        let mut sandbox = Sandbox::new();
+        let err = sandbox.run("nix-build", &["--version"]).unwrap_err();
+        assert!(matches!(err, SandboxError::RealExecutionDisabled));
     }
 
     #[test]
