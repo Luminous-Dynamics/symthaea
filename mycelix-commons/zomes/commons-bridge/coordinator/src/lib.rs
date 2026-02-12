@@ -1,12 +1,63 @@
 //! Commons Bridge Coordinator Zome
 //!
 //! Unified cross-domain dispatch for the Commons cluster.
-//! Routes queries and events by domain field to appropriate zomes
-//! via call(CallTargetCell::Local, ...).
+//! Provides three integration patterns:
+//!
+//! 1. **dispatch_call** — synchronous RPC to any domain zome via
+//!    `call(CallTargetCell::Local, ...)`. The core value of clustering.
+//! 2. **query_commons** — audited async query/response with auto-dispatch
+//! 3. **broadcast_event** — pub-sub event distribution across domains
 
 use commons_bridge_integrity::*;
 use commons_types::{CommonsQuery, CommonsEvent, BridgeHealthStatus};
 use hdk::prelude::*;
+
+// ============================================================================
+// Allowed zome names — security boundary for dispatch
+// ============================================================================
+
+const ALLOWED_ZOMES: &[&str] = &[
+    // Property domain
+    "property_registry",
+    "property_transfer",
+    "property_disputes",
+    "property_commons",
+    // Housing domain
+    "housing_units",
+    "housing_membership",
+    "housing_finances",
+    "housing_maintenance",
+    "housing_clt",
+    "housing_governance",
+    // Care domain
+    "care_timebank",
+    "care_circles",
+    "care_matching",
+    "care_plans",
+    "care_credentials",
+    // Mutual aid domain
+    "mutualaid_needs",
+    "mutualaid_circles",
+    "mutualaid_governance",
+    "mutualaid_pools",
+    "mutualaid_requests",
+    "mutualaid_resources",
+    "mutualaid_timebank",
+    // Water domain
+    "water_flow",
+    "water_purity",
+    "water_capture",
+    "water_steward",
+    "water_wisdom",
+];
+
+fn is_allowed_zome(zome: &str) -> bool {
+    ALLOWED_ZOMES.contains(&zome)
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -31,7 +82,102 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     Ok(records)
 }
 
-/// Submit a cross-domain query within the Commons cluster
+// ============================================================================
+// Cross-Domain Dispatch (synchronous RPC)
+// ============================================================================
+
+/// Input for dispatching a call to any domain zome within the Commons DNA.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DispatchInput {
+    /// Target zome name (e.g., "property_registry", "housing_clt").
+    /// Must be in the ALLOWED_ZOMES list.
+    pub zome: String,
+    /// Target function name (e.g., "verify_ownership", "get_property").
+    pub fn_name: String,
+    /// MessagePack-serialized input payload. Use `()` serialized for no-arg functions.
+    pub payload: Vec<u8>,
+}
+
+/// Result of a dispatched cross-domain call.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DispatchResult {
+    /// Whether the call succeeded.
+    pub success: bool,
+    /// MessagePack-serialized response payload (on success).
+    pub response: Option<Vec<u8>>,
+    /// Error message (on failure).
+    pub error: Option<String>,
+}
+
+/// Dispatch a synchronous call to any domain zome within the Commons DNA.
+///
+/// This is the core cross-domain integration primitive. It validates the target
+/// zome against an allowlist, then uses `call(CallTargetCell::Local, ...)` to
+/// invoke the function directly within the same DNA.
+///
+/// ## Example (from another coordinator zome or external client)
+/// ```ignore
+/// let input = DispatchInput {
+///     zome: "property_registry".into(),
+///     fn_name: "verify_ownership".into(),
+///     payload: encode(&VerifyOwnershipInput { ... })?,
+/// };
+/// let result: DispatchResult = call("commons_bridge", "dispatch_call", input)?;
+/// ```
+#[hdk_extern]
+pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
+    if !is_allowed_zome(&input.zome) {
+        return Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(format!(
+                "Zome '{}' is not in the allowed dispatch list. Valid zomes: {:?}",
+                input.zome, ALLOWED_ZOMES
+            )),
+        });
+    }
+
+    let payload = ExternIO(input.payload);
+
+    match call(
+        CallTargetCell::Local,
+        ZomeName::from(input.zome.as_str()),
+        FunctionName::from(input.fn_name.as_str()),
+        None,
+        payload,
+    ) {
+        Ok(ZomeCallResponse::Ok(extern_io)) => Ok(DispatchResult {
+            success: true,
+            response: Some(extern_io.0),
+            error: None,
+        }),
+        Ok(ZomeCallResponse::NetworkError(err)) => Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(format!("Network error: {}", err)),
+        }),
+        Ok(other) => Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(format!("Zome call rejected: {:?}", other)),
+        }),
+        Err(e) => Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(format!("Call failed: {:?}", e)),
+        }),
+    }
+}
+
+// ============================================================================
+// Audited Query/Response (with auto-dispatch)
+// ============================================================================
+
+/// Submit a cross-domain query within the Commons cluster.
+///
+/// Stores the query on the DHT for auditability, then attempts to auto-dispatch
+/// to the target domain zome if the query_type matches a known function name.
+/// If auto-dispatch succeeds, the query is automatically resolved with the result.
 #[hdk_extern]
 pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
     let stored: StoredQuery = query.clone().into();
@@ -49,9 +195,78 @@ pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
     let domain_anchor = ensure_anchor(&format!("domain_queries:{}", query.domain))?;
     create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToQuery, ())?;
 
+    // Attempt auto-dispatch if query_type looks like a zome function call
+    if let Some(zome_name) = resolve_domain_zome(&query.domain, &query.query_type) {
+        let payload_bytes = query.params.as_bytes().to_vec();
+        let dispatch = DispatchInput {
+            zome: zome_name,
+            fn_name: query.query_type.clone(),
+            payload: payload_bytes,
+        };
+        if let Ok(result) = dispatch_call(dispatch) {
+            if result.success {
+                let result_str = result.response
+                    .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+                    .unwrap_or_else(|| "null".to_string());
+                // Auto-resolve the query
+                let _ = resolve_query(ResolveQueryInput {
+                    query_hash: action_hash.clone(),
+                    result: result_str,
+                    success: true,
+                });
+            }
+        }
+    }
+
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created query".into()
     )))
+}
+
+/// Map a domain name to its primary coordinator zome for auto-dispatch.
+fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
+    // Map known query patterns to specific zomes
+    let zome = match domain {
+        "property" => match query_type {
+            s if s.contains("transfer") || s.contains("ownership") => "property_transfer",
+            s if s.contains("dispute") => "property_disputes",
+            s if s.contains("encumbrance") || s.contains("title") => "property_registry",
+            _ => "property_registry",
+        },
+        "housing" => match query_type {
+            s if s.contains("clt") || s.contains("lease") || s.contains("resale") => "housing_clt",
+            s if s.contains("member") => "housing_membership",
+            s if s.contains("finance") || s.contains("fee") => "housing_finances",
+            s if s.contains("maintenance") || s.contains("repair") => "housing_maintenance",
+            s if s.contains("governance") || s.contains("proposal") => "housing_governance",
+            _ => "housing_units",
+        },
+        "care" => match query_type {
+            s if s.contains("match") => "care_matching",
+            s if s.contains("circle") => "care_circles",
+            s if s.contains("credential") => "care_credentials",
+            s if s.contains("plan") => "care_plans",
+            _ => "care_timebank",
+        },
+        "mutualaid" => match query_type {
+            s if s.contains("resource") || s.contains("booking") => "mutualaid_resources",
+            s if s.contains("need") || s.contains("handoff") => "mutualaid_needs",
+            s if s.contains("pool") => "mutualaid_pools",
+            s if s.contains("request") => "mutualaid_requests",
+            s if s.contains("circle") => "mutualaid_circles",
+            s if s.contains("governance") || s.contains("proposal") => "mutualaid_governance",
+            _ => "mutualaid_timebank",
+        },
+        "water" => match query_type {
+            s if s.contains("purity") || s.contains("quality") => "water_purity",
+            s if s.contains("capture") || s.contains("harvest") => "water_capture",
+            s if s.contains("steward") || s.contains("guardian") => "water_steward",
+            s if s.contains("wisdom") || s.contains("knowledge") => "water_wisdom",
+            _ => "water_flow",
+        },
+        _ => return None,
+    };
+    Some(zome.to_string())
 }
 
 /// Input for resolving a query with a result

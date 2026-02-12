@@ -34,6 +34,123 @@ pub fn create_land_trust(trust: LandTrust) -> ExternResult<Record> {
     )))
 }
 
+// ============================================================================
+// Cross-domain: Property ownership verification via bridge dispatch
+// ============================================================================
+
+/// Input for verifying property ownership before lease issuance.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyPropertyForLeaseInput {
+    /// Property ID to verify in the property registry.
+    pub property_id: String,
+    /// Expected owner DID (must match the trust).
+    pub expected_owner_did: Option<String>,
+}
+
+/// Result of property ownership verification.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PropertyVerificationResult {
+    pub verified: bool,
+    pub owner_did: Option<String>,
+    pub has_clear_title: bool,
+    pub error: Option<String>,
+}
+
+/// Verify property ownership by calling property_registry within the same DNA.
+///
+/// This is a concrete cross-domain call example: housing-clt queries
+/// property-registry directly using `call(CallTargetCell::Local, ...)`.
+#[hdk_extern]
+pub fn verify_property_for_lease(input: VerifyPropertyForLeaseInput) -> ExternResult<PropertyVerificationResult> {
+    // 1. Check if property exists in the registry
+    let get_response = call(
+        CallTargetCell::Local,
+        ZomeName::from("property_registry"),
+        FunctionName::from("get_property"),
+        None,
+        input.property_id.clone(),
+    );
+
+    let property_exists = match &get_response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            // Decode as Option<Record> — None means not found
+            let record: Option<Record> = extern_io.decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            record.is_some()
+        }
+        _ => false,
+    };
+
+    if !property_exists {
+        return Ok(PropertyVerificationResult {
+            verified: false,
+            owner_did: None,
+            has_clear_title: false,
+            error: Some(format!("Property '{}' not found in registry", input.property_id)),
+        });
+    }
+
+    // 2. Check if property has clear title (no encumbrances)
+    let title_response = call(
+        CallTargetCell::Local,
+        ZomeName::from("property_registry"),
+        FunctionName::from("has_clear_title"),
+        None,
+        input.property_id.clone(),
+    );
+
+    let has_clear_title = match &title_response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            extern_io.decode::<bool>().unwrap_or(false)
+        }
+        _ => false,
+    };
+
+    // 3. Optionally verify ownership matches expected DID
+    let mut owner_did = None;
+    let mut ownership_match = true;
+
+    if let Some(ref expected) = input.expected_owner_did {
+        let verify_response = call(
+            CallTargetCell::Local,
+            ZomeName::from("property_registry"),
+            FunctionName::from("verify_ownership"),
+            None,
+            serde_json::json!({
+                "property_id": input.property_id,
+                "expected_owner": expected,
+            }).to_string(),
+        );
+
+        match &verify_response {
+            Ok(ZomeCallResponse::Ok(extern_io)) => {
+                ownership_match = extern_io.decode::<bool>().unwrap_or(false);
+                owner_did = Some(expected.clone());
+            }
+            _ => {
+                ownership_match = false;
+            }
+        }
+    }
+
+    Ok(PropertyVerificationResult {
+        verified: property_exists && has_clear_title && ownership_match,
+        owner_did,
+        has_clear_title,
+        error: if !has_clear_title {
+            Some("Property has encumbrances — clear title required for CLT lease".to_string())
+        } else if !ownership_match {
+            Some("Property ownership does not match expected trust DID".to_string())
+        } else {
+            None
+        },
+    })
+}
+
+// ============================================================================
+// Lease Management
+// ============================================================================
+
 /// Issue a ground lease for a unit under the trust
 #[hdk_extern]
 pub fn issue_ground_lease(lease: GroundLease) -> ExternResult<Record> {
