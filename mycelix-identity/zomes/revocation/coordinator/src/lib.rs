@@ -532,6 +532,25 @@ pub struct BatchSuspendInput {
     pub suspension_end: Timestamp,
 }
 
+/// Pure suspension-expiry decision logic — no HDK calls, fully testable.
+/// Returns the effective status given the current time.
+pub fn resolve_suspension_status(
+    status: &RevocationStatus,
+    suspension_end: Option<i64>,
+    now_micros: i64,
+) -> RevocationStatus {
+    if *status == RevocationStatus::Suspended {
+        if let Some(end) = suspension_end {
+            if now_micros >= end {
+                return RevocationStatus::Active;
+            }
+        }
+        RevocationStatus::Suspended
+    } else {
+        status.clone()
+    }
+}
+
 /// Internal: add credential IDs to an existing revocation list
 fn add_to_revocation_list(
     list_id: &str,
@@ -581,4 +600,154 @@ fn add_to_revocation_list(
 
     update_entry(action_hash, &EntryTypes::RevocationList(list))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- string_to_entry_hash ---
+
+    #[test]
+    fn string_to_entry_hash_deterministic() {
+        let h1 = string_to_entry_hash("cred:abc:123");
+        let h2 = string_to_entry_hash("cred:abc:123");
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn string_to_entry_hash_different_inputs_differ() {
+        let h1 = string_to_entry_hash("cred:abc:123");
+        let h2 = string_to_entry_hash("cred:xyz:456");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn string_to_entry_hash_empty_string() {
+        let _ = string_to_entry_hash("");
+    }
+
+    // --- RevocationStatus serde ---
+
+    #[test]
+    fn revocation_status_all_variants() {
+        let statuses = vec![
+            RevocationStatus::Active,
+            RevocationStatus::Suspended,
+            RevocationStatus::Revoked,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).unwrap();
+            let restored: RevocationStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(restored, status);
+        }
+    }
+
+    // --- resolve_suspension_status ---
+
+    #[test]
+    fn suspended_not_expired() {
+        let result = resolve_suspension_status(
+            &RevocationStatus::Suspended,
+            Some(1_000_000_000_000), // 1 second from epoch in micros
+            500_000_000_000,         // 0.5 seconds (before end)
+        );
+        assert_eq!(result, RevocationStatus::Suspended);
+    }
+
+    #[test]
+    fn suspended_expired_becomes_active() {
+        let result = resolve_suspension_status(
+            &RevocationStatus::Suspended,
+            Some(1_000_000_000_000),
+            2_000_000_000_000, // after suspension end
+        );
+        assert_eq!(result, RevocationStatus::Active);
+    }
+
+    #[test]
+    fn suspended_exactly_at_end_becomes_active() {
+        let end = 1_000_000_000_000i64;
+        let result = resolve_suspension_status(
+            &RevocationStatus::Suspended,
+            Some(end),
+            end,
+        );
+        assert_eq!(result, RevocationStatus::Active);
+    }
+
+    #[test]
+    fn suspended_no_end_stays_suspended() {
+        let result = resolve_suspension_status(
+            &RevocationStatus::Suspended,
+            None,
+            999_999_999_999,
+        );
+        assert_eq!(result, RevocationStatus::Suspended);
+    }
+
+    #[test]
+    fn revoked_stays_revoked_regardless() {
+        let result = resolve_suspension_status(
+            &RevocationStatus::Revoked,
+            Some(1_000_000_000_000),
+            2_000_000_000_000,
+        );
+        assert_eq!(result, RevocationStatus::Revoked);
+    }
+
+    #[test]
+    fn active_stays_active() {
+        let result = resolve_suspension_status(
+            &RevocationStatus::Active,
+            None,
+            0,
+        );
+        assert_eq!(result, RevocationStatus::Active);
+    }
+
+    // --- Input/Output type serde ---
+
+    #[test]
+    fn revoke_input_serde() {
+        let input = RevokeInput {
+            credential_id: "cred:123".into(),
+            issuer_did: "did:mycelix:issuer".into(),
+            reason: "Fraudulent".into(),
+            effective_from: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let restored: RevokeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.credential_id, "cred:123");
+        assert!(restored.effective_from.is_none());
+    }
+
+    #[test]
+    fn batch_revoke_result_serde() {
+        let result = BatchRevokeResult {
+            revoked_count: 3,
+            failed_count: 1,
+            revoked: vec!["a".into(), "b".into(), "c".into()],
+            failed: vec![BatchItemError {
+                credential_id: "d".into(),
+                error: "not found".into(),
+            }],
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let restored: BatchRevokeResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.revoked_count, 3);
+        assert_eq!(restored.failed.len(), 1);
+        assert_eq!(restored.failed[0].credential_id, "d");
+    }
+
+    #[test]
+    fn create_revocation_list_input_serde() {
+        let input = CreateRevocationListInput {
+            id: "list:issuer:2026".into(),
+            issuer_did: "did:mycelix:issuer".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let restored: CreateRevocationListInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.id, "list:issuer:2026");
+    }
 }

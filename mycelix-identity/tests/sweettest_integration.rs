@@ -1278,3 +1278,168 @@ async fn test_accept_valid_non_ed25519_key_type() {
 
     assert!(result.is_ok(), "Non-Ed25519 key types should bypass multibase Ed25519 validation");
 }
+
+// ============================================================================
+// Cross-Zome Bridge Notification Tests
+// ============================================================================
+
+/// Mirror of bridge coordinator::DidDeactivatedInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DidDeactivatedInput {
+    pub did: String,
+    pub reason: String,
+    pub deactivated_at: String,
+}
+
+/// Mirror of bridge coordinator::MfaAssuranceChangedInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct MfaAssuranceChangedInput {
+    pub did: String,
+    pub old_level: String,
+    pub new_level: String,
+    pub new_score: f64,
+}
+
+/// Mirror of bridge coordinator::GetEventsInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetEventsInput {
+    pub event_type: Option<String>,
+    pub since: Option<u64>,
+    pub limit: Option<u32>,
+}
+
+/// Mirror of bridge coordinator::BridgeEvent
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BridgeEvent {
+    pub id: String,
+    pub event_type: String,
+    pub subject: String,
+    pub payload: String,
+    pub source_happ: String,
+    pub timestamp: Timestamp,
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+async fn test_notify_did_deactivated_creates_event() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("test", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // First create a DID so the bridge zome has context
+    let did_record: Record = conductor
+        .call(&cell.zome("did_registry"), "create_did", ())
+        .await;
+    let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
+
+    // Call notify_did_deactivated on the bridge
+    let input = DidDeactivatedInput {
+        did: did_doc.id.clone(),
+        reason: "Key compromised".to_string(),
+        deactivated_at: "2026-02-12T00:00:00Z".to_string(),
+    };
+
+    let event_record: Record = conductor
+        .call(&cell.zome("identity_bridge"), "notify_did_deactivated", input)
+        .await;
+
+    let event: BridgeEvent = decode_entry(&event_record).expect("Failed to decode event");
+    assert!(event.id.starts_with("event:"), "Event ID should start with 'event:'");
+    assert_eq!(event.subject, did_doc.id, "Event subject should be the DID");
+    assert!(event.payload.contains("Key compromised"), "Payload should contain reason");
+
+    // Verify event is retrievable via get_recent_events
+    let query = GetEventsInput {
+        event_type: None,
+        since: None,
+        limit: Some(10),
+    };
+
+    let events: Vec<Record> = conductor
+        .call(&cell.zome("identity_bridge"), "get_recent_events", query)
+        .await;
+
+    assert!(!events.is_empty(), "Should have at least one recent event");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+async fn test_notify_mfa_assurance_changed_creates_event() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("test", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Create a DID first
+    let did_record: Record = conductor
+        .call(&cell.zome("did_registry"), "create_did", ())
+        .await;
+    let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
+
+    // Notify MFA assurance change
+    let input = MfaAssuranceChangedInput {
+        did: did_doc.id.clone(),
+        old_level: "Basic".to_string(),
+        new_level: "Verified".to_string(),
+        new_score: 0.65,
+    };
+
+    let event_record: Record = conductor
+        .call(&cell.zome("identity_bridge"), "notify_mfa_assurance_changed", input)
+        .await;
+
+    let event: BridgeEvent = decode_entry(&event_record).expect("Failed to decode event");
+    assert_eq!(event.subject, did_doc.id, "Event subject should be the DID");
+    assert!(event.payload.contains("Verified"), "Payload should contain new level");
+    assert!(event.payload.contains("0.65"), "Payload should contain new score");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+async fn test_multiple_notifications_retrievable() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor.setup_app("test", &[dna]).await.unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Create a DID
+    let did_record: Record = conductor
+        .call(&cell.zome("did_registry"), "create_did", ())
+        .await;
+    let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
+
+    // Send DID deactivation notification
+    let deactivation = DidDeactivatedInput {
+        did: did_doc.id.clone(),
+        reason: "Rotation".to_string(),
+        deactivated_at: "2026-02-12T12:00:00Z".to_string(),
+    };
+    let _: Record = conductor
+        .call(&cell.zome("identity_bridge"), "notify_did_deactivated", deactivation)
+        .await;
+
+    // Send MFA assurance change
+    let mfa_change = MfaAssuranceChangedInput {
+        did: did_doc.id.clone(),
+        old_level: "Anonymous".to_string(),
+        new_level: "Basic".to_string(),
+        new_score: 0.25,
+    };
+    let _: Record = conductor
+        .call(&cell.zome("identity_bridge"), "notify_mfa_assurance_changed", mfa_change)
+        .await;
+
+    // Query all recent events
+    let query = GetEventsInput {
+        event_type: None,
+        since: None,
+        limit: Some(50),
+    };
+
+    let events: Vec<Record> = conductor
+        .call(&cell.zome("identity_bridge"), "get_recent_events", query)
+        .await;
+
+    assert!(events.len() >= 2, "Should have at least 2 events, got {}", events.len());
+}

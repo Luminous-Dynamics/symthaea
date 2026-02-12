@@ -318,3 +318,106 @@ pub fn list_active_schemas(_: ()) -> ExternResult<Vec<Record>> {
 
     Ok(active_schemas)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- string_to_entry_hash ---
+
+    #[test]
+    fn string_to_entry_hash_deterministic() {
+        let h1 = string_to_entry_hash("did:mycelix:alice");
+        let h2 = string_to_entry_hash("did:mycelix:alice");
+        assert_eq!(h1, h2);
+    }
+
+    #[test]
+    fn string_to_entry_hash_different_inputs_differ() {
+        let h1 = string_to_entry_hash("schema:edu:v1");
+        let h2 = string_to_entry_hash("schema:edu:v2");
+        assert_ne!(h1, h2);
+    }
+
+    #[test]
+    fn string_to_entry_hash_empty_string() {
+        // Should not panic
+        let _ = string_to_entry_hash("");
+    }
+
+    // --- UpdateSchemaInput serde ---
+
+    #[test]
+    fn update_schema_input_minimal_json() {
+        let json = r#"{"schema_id":"schema:test:v1"}"#;
+        let input: UpdateSchemaInput = serde_json::from_str(json).unwrap();
+        assert_eq!(input.schema_id, "schema:test:v1");
+        assert!(input.name.is_none());
+        assert!(input.version.is_none());
+        assert!(input.active.is_none());
+    }
+
+    #[test]
+    fn update_schema_input_full_round_trip() {
+        let input = UpdateSchemaInput {
+            schema_id: "schema:test:v1".into(),
+            name: Some("Test Schema".into()),
+            description: Some("A test".into()),
+            version: Some("2.0.0".into()),
+            schema: Some("{}".into()),
+            required_fields: Some(vec!["name".into()]),
+            optional_fields: Some(vec!["email".into()]),
+            default_expiration: Some(86400),
+            active: Some(true),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let restored: UpdateSchemaInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.schema_id, "schema:test:v1");
+        assert_eq!(restored.name.as_deref(), Some("Test Schema"));
+        assert_eq!(restored.default_expiration, Some(86400));
+    }
+
+    // --- EndorseSchemaInput serde ---
+
+    #[test]
+    fn endorse_schema_input_serde() {
+        let input = EndorseSchemaInput {
+            schema_id: "schema:edu:v1".into(),
+            endorser_did: "did:mycelix:bob".into(),
+            trust_level: 0.85,
+            comment: Some("Looks good".into()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let restored: EndorseSchemaInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.endorser_did, "did:mycelix:bob");
+        assert!((restored.trust_level - 0.85).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn endorse_schema_input_no_comment() {
+        let json = r#"{"schema_id":"s","endorser_did":"d","trust_level":0.5}"#;
+        let input: EndorseSchemaInput = serde_json::from_str(json).unwrap();
+        assert!(input.comment.is_none());
+    }
+
+    // --- SchemaCategory serde ---
+
+    #[test]
+    fn schema_category_all_variants_round_trip() {
+        let categories = vec![
+            SchemaCategory::Education,
+            SchemaCategory::Employment,
+            SchemaCategory::Identity,
+            SchemaCategory::Skills,
+            SchemaCategory::Governance,
+            SchemaCategory::Financial,
+            SchemaCategory::Energy,
+            SchemaCategory::Custom("MyApp".into()),
+        ];
+        for cat in categories {
+            let json = serde_json::to_string(&cat).unwrap();
+            let restored: SchemaCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(restored, cat);
+        }
+    }
+}

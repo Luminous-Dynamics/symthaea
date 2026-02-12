@@ -575,7 +575,7 @@ jobs:
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo build --release --target wasm32-unknown-unknown"
 
-      - name: Identity unit tests (190+ tests)
+      - name: Identity unit tests (250+ tests)
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo test --lib -- --test-threads=1"
 
