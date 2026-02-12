@@ -100,6 +100,10 @@
             multirow
             enumitem
             float
+            units        # provides nicefrac.sty
+            algorithms   # provides algorithm.sty and algorithmic.sty
+            xcolor
+            microtype
           ]))
 
           # Development tools

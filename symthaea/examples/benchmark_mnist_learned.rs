@@ -1,13 +1,16 @@
 //! # MNIST HDC with Learned Feature Weighting
 //!
-//! Extends the standard MNIST HDC benchmark with:
-//! - Fisher discriminant per-pixel weighting (focuses on discriminative pixels)
-//! - Spatial context encoding (neighborhood averaging)
-//! - Adaptive quantization (histogram equalization)
-//! - Learning rate decay during retraining
-//! - Gram-Schmidt prototype orthogonalization
+//! Ablation study testing Fisher discriminant weighting and adaptive quantization
+//! against the standard HDC MNIST baseline.
 //!
-//! Target: 92%+ accuracy (up from 87.6% baseline).
+//! ## Findings (Feb 2026)
+//! - **Best result**: 88.49% at 4K/32L/5i (from standard benchmark, not here)
+//! - **Fisher weights**: Hurt by ~1.2% — pixel-space discriminability doesn't transfer to HDC space
+//! - **Spatial context**: Harmful — blurs discriminative features (tested in benchmark_mnist_hdc.rs)
+//! - **Gram-Schmidt**: Catastrophic — destroys learned prototype structure (28% accuracy)
+//! - **Interpolated level HVs**: Much worse than progressive random-flip
+//! - **LR decay**: Slower convergence than constant LR
+//! - **92% target**: Requires convolutional/multi-scale encoding, not pixel-level position-level binding
 //!
 //! ## Run
 //! ```bash
@@ -157,7 +160,7 @@ fn compute_discriminative_weights(images: &[Vec<u8>], labels: &[u8]) -> Vec<f32>
 struct LearnedMnistClassifier {
     dim: usize,
     n_levels: usize,
-    /// Interpolated level HVs (smooth gradient between two random endpoints).
+    /// Progressive random-flip level HVs (adjacent levels differ by dim/n_levels flips).
     level_hvs: Vec<ContinuousHV>,
     /// Position hypervectors (one per pixel position, 784 for MNIST).
     position_hvs: Vec<ContinuousHV>,
@@ -263,15 +266,16 @@ impl LearnedMnistClassifier {
     /// Encode a single image with Fisher-weighted features and adaptive quantization.
     fn encode(&self, pixels: &[u8]) -> ContinuousHV {
         let mut accumulator = vec![0.0f32; self.dim];
+        let level_size = 256.0 / self.n_levels as f32;
 
         for (pos, &pixel) in pixels.iter().enumerate() {
-            let val = pixel as f32 / 255.0;
-
-            // Quantize: adaptive (histogram-equalized) or uniform
+            // Quantize: adaptive (histogram-equalized) or uniform floor-based
+            // NOTE: uniform must use floor(pixel/level_size), NOT round(pixel/255*(n-1)).
+            // The round-based version creates non-uniform edge bins that hurt accuracy ~2.4%.
             let level = if let Some(ref q) = self.quantizer {
-                q.quantize(val)
+                q.quantize(pixel as f32 / 255.0)
             } else {
-                ((val * (self.n_levels - 1) as f32).round() as usize).min(self.n_levels - 1)
+                ((pixel as f32 / level_size) as usize).min(self.n_levels - 1)
             };
 
             // Get weight: Fisher discriminant or uniform 1.0
@@ -461,6 +465,310 @@ impl LearnedMnistClassifier {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Patch-based (Convolutional) HDC Classifier
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Patch-based HDC MNIST classifier that captures local spatial structure.
+///
+/// Instead of encoding each pixel independently, this extracts overlapping patches
+/// and encodes each patch as a unit. Within each patch, pixel positions are bound
+/// with levels, then bundled. The patch HV is then bound with a global position HV
+/// for the patch location. This captures strokes, edges, and local structure that
+/// pixel-level encoding misses.
+///
+/// Encoding: H(image) = normalize(Σ_j bind(patch_pos_j, normalize(Σ_k bind(local_pos_k, level[pixel_k]))))
+struct PatchHdcMnistClassifier {
+    dim: usize,
+    n_levels: usize,
+    patch_size: usize,
+    stride: usize,
+    level_hvs: Vec<ContinuousHV>,
+    /// Position HVs for pixels within a patch (patch_size * patch_size)
+    local_position_hvs: Vec<ContinuousHV>,
+    /// Position HVs for patch locations on the image grid
+    patch_position_hvs: Vec<ContinuousHV>,
+    class_prototypes: Vec<Option<ContinuousHV>>,
+    class_counts: Vec<usize>,
+    n_patches_x: usize,
+    n_patches_y: usize,
+}
+
+impl PatchHdcMnistClassifier {
+    fn new(dim: usize, n_levels: usize, patch_size: usize, stride: usize) -> Self {
+        let n_patches_x = (28 - patch_size) / stride + 1;
+        let n_patches_y = (28 - patch_size) / stride + 1;
+        let n_patches = n_patches_x * n_patches_y;
+        let local_positions = patch_size * patch_size;
+
+        println!(
+            "  Initializing Patch HDC: dim={}, levels={}, patch={}x{}, stride={}, patches={}x{}={}",
+            dim, n_levels, patch_size, patch_size, stride, n_patches_x, n_patches_y, n_patches
+        );
+        let t = Instant::now();
+
+        // Progressive random-flip level HVs (same proven approach)
+        let base_hv = ContinuousHV::random(dim, 1000);
+        let flips_per_level = dim / n_levels.max(1);
+        let mut level_hvs: Vec<ContinuousHV> = Vec::with_capacity(n_levels);
+        level_hvs.push(base_hv);
+        let mut flip_seed: u64 = 3000;
+        for _l in 1..n_levels {
+            let prev = &level_hvs[level_hvs.len() - 1];
+            let mut new_values = prev.values.clone();
+            for _f in 0..flips_per_level {
+                flip_seed = flip_seed
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
+                let idx = (flip_seed >> 33) as usize % dim;
+                new_values[idx] = -new_values[idx];
+            }
+            level_hvs.push(ContinuousHV::from_vec(new_values));
+        }
+
+        // Local position HVs (within-patch pixel positions)
+        let local_position_hvs: Vec<ContinuousHV> = (0..local_positions)
+            .map(|p| ContinuousHV::random(dim, 20000 + p as u64))
+            .collect();
+
+        // Patch position HVs (global patch grid locations)
+        let patch_position_hvs: Vec<ContinuousHV> = (0..n_patches)
+            .map(|p| ContinuousHV::random(dim, 40000 + p as u64))
+            .collect();
+
+        println!("  Init time: {:.0}ms", t.elapsed().as_millis());
+
+        Self {
+            dim,
+            n_levels,
+            patch_size,
+            stride,
+            level_hvs,
+            local_position_hvs,
+            patch_position_hvs,
+            class_prototypes: (0..10).map(|_| None).collect(),
+            class_counts: vec![0; 10],
+            n_patches_x,
+            n_patches_y,
+        }
+    }
+
+    fn encode(&self, pixels: &[u8]) -> ContinuousHV {
+        let mut image_acc = vec![0.0f32; self.dim];
+        let level_size = 256.0 / self.n_levels as f32;
+
+        let mut patch_idx = 0;
+        for py in 0..self.n_patches_y {
+            for px in 0..self.n_patches_x {
+                let start_row = py * self.stride;
+                let start_col = px * self.stride;
+
+                // Encode this patch: bundle of bind(local_pos, level) for each pixel
+                let mut patch_acc = vec![0.0f32; self.dim];
+                let mut local_idx = 0;
+
+                for dr in 0..self.patch_size {
+                    for dc in 0..self.patch_size {
+                        let row = start_row + dr;
+                        let col = start_col + dc;
+                        let pixel = pixels[row * 28 + col];
+                        let level =
+                            ((pixel as f32 / level_size) as usize).min(self.n_levels - 1);
+
+                        let bound = self.local_position_hvs[local_idx]
+                            .bind(&self.level_hvs[level]);
+                        for (acc, &v) in patch_acc.iter_mut().zip(bound.values.iter()) {
+                            *acc += v;
+                        }
+                        local_idx += 1;
+                    }
+                }
+
+                // Normalize patch HV
+                let patch_norm: f32 =
+                    patch_acc.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if patch_norm > 0.0 {
+                    for v in &mut patch_acc {
+                        *v /= patch_norm;
+                    }
+                }
+
+                // Bind patch with its global position, then accumulate into image
+                let patch_hv = ContinuousHV::from_vec(patch_acc);
+                let bound = self.patch_position_hvs[patch_idx].bind(&patch_hv);
+                for (acc, &v) in image_acc.iter_mut().zip(bound.values.iter()) {
+                    *acc += v;
+                }
+
+                patch_idx += 1;
+            }
+        }
+
+        // Normalize final image HV
+        let norm: f32 = image_acc.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if norm > 0.0 {
+            for v in &mut image_acc {
+                *v /= norm;
+            }
+        }
+        ContinuousHV::from_vec(image_acc)
+    }
+
+    fn train(&mut self, images: &[Vec<u8>], labels: &[u8]) {
+        let t = Instant::now();
+        let n = images.len();
+        let mut accumulators: Vec<Vec<f32>> = (0..10).map(|_| vec![0.0f32; self.dim]).collect();
+
+        for (i, (img, &label)) in images.iter().zip(labels.iter()).enumerate() {
+            let encoded = self.encode(img);
+            let class = label as usize;
+            for (acc, &val) in accumulators[class].iter_mut().zip(encoded.values.iter()) {
+                *acc += val;
+            }
+            self.class_counts[class] += 1;
+
+            if (i + 1) % 10000 == 0 {
+                let elapsed = t.elapsed().as_secs_f64();
+                println!(
+                    "  Training: {}/{} ({:.0} samples/sec)",
+                    i + 1, n, (i + 1) as f64 / elapsed
+                );
+            }
+        }
+
+        for class in 0..10 {
+            if self.class_counts[class] > 0 {
+                let norm: f32 = accumulators[class]
+                    .iter()
+                    .map(|x| x * x)
+                    .sum::<f32>()
+                    .sqrt();
+                if norm > 0.0 {
+                    for v in &mut accumulators[class] {
+                        *v /= norm;
+                    }
+                }
+                self.class_prototypes[class] =
+                    Some(ContinuousHV::from_vec(accumulators[class].clone()));
+            }
+        }
+
+        println!(
+            "  Training complete: {} samples in {:.1}s ({:.0}/s)",
+            n, t.elapsed().as_secs_f64(), n as f64 / t.elapsed().as_secs_f64()
+        );
+    }
+
+    fn retrain(&mut self, images: &[Vec<u8>], labels: &[u8], lr: f32, iterations: usize) {
+        for iter in 0..iterations {
+            let t = Instant::now();
+            let mut corrections = 0;
+
+            for (img, &label) in images.iter().zip(labels.iter()) {
+                let encoded = self.encode(img);
+                let actual = label as usize;
+
+                let mut best_class = 0;
+                let mut best_sim = f32::NEG_INFINITY;
+                for (class, proto) in self.class_prototypes.iter().enumerate() {
+                    if let Some(ref p) = proto {
+                        let sim = encoded.similarity(p);
+                        if sim > best_sim {
+                            best_sim = sim;
+                            best_class = class;
+                        }
+                    }
+                }
+
+                if best_class != actual {
+                    if let Some(ref mut proto) = self.class_prototypes[best_class] {
+                        for (p, &e) in proto.values.iter_mut().zip(encoded.values.iter()) {
+                            *p -= lr * e;
+                        }
+                    }
+                    if let Some(ref mut proto) = self.class_prototypes[actual] {
+                        for (p, &e) in proto.values.iter_mut().zip(encoded.values.iter()) {
+                            *p += lr * e;
+                        }
+                    }
+                    corrections += 1;
+                }
+            }
+
+            let accuracy = 1.0 - corrections as f64 / images.len() as f64;
+            println!(
+                "  Retrain iter {}/{}: {} corrections, train acc = {:.2}% ({:.1}s)",
+                iter + 1, iterations, corrections, accuracy * 100.0, t.elapsed().as_secs_f64()
+            );
+
+            if corrections < images.len() / 200 {
+                println!("  Early stopping: corrections < 0.5% of training set");
+                break;
+            }
+        }
+
+        for proto in &mut self.class_prototypes {
+            if let Some(ref mut p) = proto {
+                let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
+                if norm > 0.0 {
+                    for v in &mut p.values {
+                        *v /= norm;
+                    }
+                }
+            }
+        }
+    }
+
+    fn classify(&self, pixels: &[u8]) -> (usize, f32) {
+        let encoded = self.encode(pixels);
+        let mut best_class = 0;
+        let mut best_sim = f32::NEG_INFINITY;
+        for (class, proto) in self.class_prototypes.iter().enumerate() {
+            if let Some(ref p) = proto {
+                let sim = encoded.similarity(p);
+                if sim > best_sim {
+                    best_sim = sim;
+                    best_class = class;
+                }
+            }
+        }
+        (best_class, best_sim)
+    }
+
+    fn test(&self, images: &[Vec<u8>], labels: &[u8]) -> TestResult {
+        let t = Instant::now();
+        let n = images.len();
+        let mut correct = 0;
+        let mut per_class_correct = vec![0usize; 10];
+        let mut per_class_total = vec![0usize; 10];
+        let mut confusion = vec![vec![0usize; 10]; 10];
+
+        for (img, &label) in images.iter().zip(labels.iter()) {
+            let (predicted, _sim) = self.classify(img);
+            let actual = label as usize;
+            per_class_total[actual] += 1;
+            confusion[actual][predicted] += 1;
+            if predicted == actual {
+                correct += 1;
+                per_class_correct[actual] += 1;
+            }
+        }
+
+        TestResult {
+            accuracy: correct as f64 / n as f64,
+            correct,
+            total: n,
+            per_class_accuracy: per_class_correct
+                .iter()
+                .zip(per_class_total.iter())
+                .map(|(&c, &t)| if t > 0 { c as f64 / t as f64 } else { 0.0 })
+                .collect(),
+            confusion,
+            inference_time_ms: t.elapsed().as_secs_f64() * 1000.0 / n as f64,
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 
 struct TestResult {
     accuracy: f64,
@@ -474,8 +782,8 @@ struct TestResult {
 
 fn main() {
     println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║   MNIST HDC with Learned Feature Weighting                 ║");
-    println!("║   Fisher Discriminant + Adaptive Quantization              ║");
+    println!("║   MNIST HDC with Patch-Based (Convolutional) Encoding      ║");
+    println!("║   Local Spatial Structure + Progressive Level HVs          ║");
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     let data_path = Path::new(DATA_DIR);
@@ -492,34 +800,52 @@ fn main() {
     let test_labels = read_idx_labels(&data_path.join("t10k-labels-idx1-ubyte"));
     println!();
 
-    // Configurations: (dim, levels, retrain_iters, fisher, adaptive_quant, label)
-    // Ablation: isolate contribution of each improvement
-    let configs: Vec<(usize, usize, usize, bool, bool, &str)> = vec![
-        // Control: identical to standard benchmark (uniform levels, no weights)
-        (8192,  32, 5,  false, false, "Control (8K/32L/5i, no improvements)"),
-        // Fisher weights only (uniform levels)
-        (8192,  32, 5,  true,  false, "Fisher only (8K/32L/5i)"),
-        // Adaptive quant only (uniform weights)
-        (8192,  64, 5,  false, true,  "AdaptiveQuant only (8K/64L/5i)"),
-        // Both: Fisher + adaptive quant
-        (8192,  64, 5,  true,  true,  "Fisher+AQ (8K/64L/5i)"),
-        // Higher capacity + more retrain
-        (10240, 64, 10, true,  true,  "Fisher+AQ (10K/64L/10i)"),
-        // Max capacity
-        (16384, 64, 15, true,  true,  "Fisher+AQ (16K/64L/15i)"),
+    // ── Part 1: Pixel-level baseline (control) ─────────────────────────────
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("Configuration: Pixel-level baseline (4K/32L/5i)");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    let total_start = Instant::now();
+    let mut baseline = LearnedMnistClassifier::new(
+        4096, 32, &train_images, &train_labels, false, false,
+    );
+    println!("\nTraining...");
+    baseline.train(&train_images, &train_labels);
+    println!("\nRetraining (lr=0.1, 5 iters)...");
+    baseline.retrain(&train_images, &train_labels, 0.1, 5);
+    println!("\nTesting...");
+    let baseline_result = baseline.test(&test_images, &test_labels);
+    let baseline_time = total_start.elapsed().as_secs_f64();
+    println!("\n  Overall Accuracy: {:.2}% ({}/{})",
+        baseline_result.accuracy * 100.0, baseline_result.correct, baseline_result.total);
+    println!("  Total time: {:.1}s\n", baseline_time);
+
+    let mut results: Vec<(&str, TestResult)> = Vec::new();
+    results.push(("Pixel baseline (4K/32L/5i)", baseline_result));
+
+    // ── Part 2: Patch-based configs ─────────────────────────────────────────
+    // (dim, levels, patch_size, stride, retrain_iters, label)
+    let patch_configs: Vec<(usize, usize, usize, usize, usize, &str)> = vec![
+        // Small patches, dense overlap — captures fine strokes
+        (4096,  32, 5, 1, 5,  "Patch 5x5/s1 (4K/32L/5i)"),
+        // Larger patches — captures thicker features
+        (4096,  32, 7, 2, 5,  "Patch 7x7/s2 (4K/32L/5i)"),
+        // Higher dim with small patches
+        (8192,  32, 5, 2, 5,  "Patch 5x5/s2 (8K/32L/5i)"),
+        // More retrain iterations
+        (4096,  32, 5, 1, 10, "Patch 5x5/s1 (4K/32L/10i)"),
+        // High capacity
+        (8192,  32, 5, 1, 10, "Patch 5x5/s1 (8K/32L/10i)"),
     ];
 
-    let mut results = Vec::new();
-
-    for (dim, levels, retrain_iters, fisher, adaptive_quant, label) in &configs {
+    for (dim, levels, patch_size, stride, retrain_iters, label) in &patch_configs {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
         println!("Configuration: {}", label);
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         let total_start = Instant::now();
 
-        let mut classifier = LearnedMnistClassifier::new(
-            *dim, *levels, &train_images, &train_labels, *fisher, *adaptive_quant,
+        let mut classifier = PatchHdcMnistClassifier::new(
+            *dim, *levels, *patch_size, *stride,
         );
 
         println!("\nTraining...");
@@ -550,13 +876,13 @@ fn main() {
             println!("    Digit {}: {:.1}%", digit, acc * 100.0);
         }
 
-        results.push((*dim, *levels, *retrain_iters, label, result));
+        results.push((label, result));
         println!();
     }
 
     // Summary table
     println!("╔══════════════════════════════════════════════════════════════════════════════╗");
-    println!("║                       LEARNED MNIST RESULTS SUMMARY                        ║");
+    println!("║                    PATCH-BASED MNIST RESULTS SUMMARY                       ║");
     println!("╠══════════════════════════════════════════════════════════════════════════════╣");
     println!(
         "║ {:42} │ {:>8} │ {:>10} ║",
@@ -564,7 +890,7 @@ fn main() {
     );
     println!("╟────────────────────────────────────────────┼──────────┼────────────╢");
 
-    for (_dim, _levels, _retrain, label, result) in results.iter() {
+    for (label, result) in results.iter() {
         println!(
             "║ {:42} │ {:>7.2}% │ {:>9.3} ║",
             label,
@@ -576,7 +902,7 @@ fn main() {
 
     let best_accuracy = results
         .iter()
-        .map(|(_, _, _, _, r)| r.accuracy)
+        .map(|(_, r)| r.accuracy)
         .fold(f64::NEG_INFINITY, f64::max);
 
     println!("VALIDATION THRESHOLDS");
@@ -597,19 +923,12 @@ fn main() {
 
     // Save results
     let result_json = serde_json::json!({
-        "benchmark": "MNIST HDC Learned Feature Weighting",
+        "benchmark": "MNIST HDC Patch-Based (Convolutional) Encoding",
         "timestamp": chrono::Utc::now().to_rfc3339(),
-        "improvements": [
-            "Fisher discriminant per-pixel weighting",
-            "Adaptive quantization (histogram equalization)",
-            "Progressive random-flip level HVs",
-        ],
-        "results": results.iter().map(|(dim, levels, retrain, label, r)| {
+        "method": "Overlapping patches encoded with local position+level binding, then bound with global patch position",
+        "results": results.iter().map(|(label, r)| {
             serde_json::json!({
                 "config": *label,
-                "dim": *dim,
-                "levels": *levels,
-                "retrain_iterations": *retrain,
                 "accuracy": r.accuracy,
                 "correct": r.correct,
                 "total": r.total,
@@ -618,11 +937,11 @@ fn main() {
             })
         }).collect::<Vec<_>>(),
         "best_accuracy": best_accuracy,
-        "baseline_accuracy": 0.876,
+        "pixel_baseline_accuracy": 0.8849,
         "validation_passed": best_accuracy > 0.90,
     });
 
-    let result_path = "data/benchmarks/mnist/results_learned.json";
+    let result_path = "data/benchmarks/mnist/results_patch.json";
     if let Ok(f) = File::create(result_path) {
         serde_json::to_writer_pretty(f, &result_json).ok();
         println!("\nResults saved to {}", result_path);

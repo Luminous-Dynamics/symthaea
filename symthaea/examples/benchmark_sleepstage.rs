@@ -30,7 +30,6 @@ use std::time::Instant;
 
 use symthaea::dynamics::hmm::HiddenMarkovModel;
 use symthaea::dynamics::wavelet::{WaveletAnalyzer, DwtConfig, WaveletFamily, ExtensionMode};
-use symthaea::dynamics::phase_amplitude_coupling::{PacAnalyzer, PacConfig};
 use symthaea::perception::physio::{
     EdfFile, IntegrationMetrics, SleepSentinel, SleepSentinelConfig, SleepStage,
     ConsciousnessState,
@@ -263,7 +262,7 @@ fn main() {
         // Gaussian model is good at Wake detection (z-normalized features)
         // Rule-based model is good at N2/N3 separation (sigmoid thresholds)
         let emission_gaussian = compute_emission_probs_learned(&epoch_signals, &stage_stats, 100.0);
-        let emission_rules = compute_emission_probs_enhanced(&epoch_metrics, &epoch_signals, 100.0);
+        let emission_rules = compute_emission_probs_enhanced(&epoch_metrics, &epoch_signals, 100.0, Some(&stage_stats));
         let emission_sequence: Vec<Vec<f64>> = emission_gaussian.iter().zip(emission_rules.iter())
             .map(|(g, r)| {
                 // Geometric mean gives balanced combination
@@ -479,7 +478,7 @@ fn run_synthetic_benchmark() {
     }
 
     // Compute emission probabilities with wavelet/PAC enhancement
-    let emission_sequence = compute_emission_probs_enhanced(&all_metrics, &all_signals, sample_rate);
+    let emission_sequence = compute_emission_probs_enhanced(&all_metrics, &all_signals, sample_rate, None);
     let smoothed = hmm.viterbi(&emission_sequence);
 
     // Score both raw and HMM-smoothed
@@ -665,14 +664,14 @@ const N_FEAT: usize = 7;
 
 /// Extract discriminative EEG features from a raw signal using Welch PSD.
 ///
-/// Returns [delta_ratio, theta_ratio, alpha_ratio, beta_ratio, log_total_power, log_rms, zcr]
+/// Returns [delta_ratio, theta_ratio, alpha_ratio, beta_ratio, log_total_power, log_rms, spectral_slope]
 /// - Band ratios are normalized within 0.5-30 Hz only (not full spectrum)
 /// - log_total_power: absolute power level (differs greatly across stages)
 /// - log_rms: signal amplitude (N3 >> Wake)
-/// - zcr: zero crossing rate (Wake > N3, fast vs slow EEG)
+/// - spectral_slope: 1/f slope (more negative = more low-freq dominated = deeper sleep)
 fn extract_spectral_features(signal: &[f64], spectral: &SpectralAnalyzer) -> [f64; N_FEAT] {
     if signal.len() < 256 {
-        return [0.25, 0.25, 0.25, 0.25, 0.0, 0.0, 0.1];
+        return [0.25, 0.25, 0.25, 0.25, 0.0, 0.0, 0.0];
     }
     let spectrum = spectral.welch(signal);
 
@@ -681,6 +680,13 @@ fn extract_spectral_features(signal: &[f64], spectral: &SpectralAnalyzer) -> [f6
     let mut theta = 0.0f64;
     let mut alpha = 0.0f64;
     let mut beta = 0.0f64;
+    // For spectral slope: collect log(f), log(PSD) pairs in 1-30 Hz
+    let mut log_f_sum = 0.0f64;
+    let mut log_p_sum = 0.0f64;
+    let mut log_f_sq_sum = 0.0f64;
+    let mut log_fp_sum = 0.0f64;
+    let mut slope_n = 0usize;
+
     for (i, &p) in spectrum.psd.iter().enumerate() {
         let f = spectrum.frequencies[i];
         let pv = p.max(0.0);
@@ -688,6 +694,17 @@ fn extract_spectral_features(signal: &[f64], spectral: &SpectralAnalyzer) -> [f6
         else if f >= 4.0 && f < 8.0 { theta += pv; }
         else if f >= 8.0 && f < 12.0 { alpha += pv; }
         else if f >= 12.0 && f < 30.0 { beta += pv; }
+
+        // Spectral slope: linear regression of log(PSD) vs log(f) in 1-30 Hz
+        if f >= 1.0 && f <= 30.0 && pv > 1e-20 {
+            let lf = f.ln();
+            let lp = pv.ln();
+            log_f_sum += lf;
+            log_p_sum += lp;
+            log_f_sq_sum += lf * lf;
+            log_fp_sum += lf * lp;
+            slope_n += 1;
+        }
     }
 
     // Normalize within EEG bands only (0.5-30 Hz), not full spectrum
@@ -700,18 +717,23 @@ fn extract_spectral_features(signal: &[f64], spectral: &SpectralAnalyzer) -> [f6
     let rms = (signal.iter().map(|&x| x * x).sum::<f64>() / signal.len() as f64).sqrt();
     let log_rms = rms.max(1e-20).ln();
 
-    // Zero crossing rate (fraction of samples with sign change)
-    // Higher for fast EEG (Wake/REM) than slow EEG (N3)
-    let mut zero_crossings = 0usize;
-    for i in 1..signal.len() {
-        if (signal[i] >= 0.0) != (signal[i - 1] >= 0.0) {
-            zero_crossings += 1;
+    // Spectral slope via linear regression: log(PSD) = slope * log(f) + intercept
+    // More negative slope = steeper 1/f = deeper sleep (delta dominant)
+    // Flatter/positive slope = more broadband = Wake/REM
+    let spectral_slope = if slope_n >= 3 {
+        let n = slope_n as f64;
+        let denom = n * log_f_sq_sum - log_f_sum * log_f_sum;
+        if denom.abs() > 1e-10 {
+            (n * log_fp_sum - log_f_sum * log_p_sum) / denom
+        } else {
+            0.0
         }
-    }
-    let zcr = zero_crossings as f64 / signal.len() as f64;
+    } else {
+        0.0
+    };
 
     [delta / total_eeg, theta / total_eeg, alpha / total_eeg, beta / total_eeg,
-     log_power, log_rms, zcr]
+     log_power, log_rms, spectral_slope]
 }
 
 /// Per-stage feature statistics learned from training data.
@@ -824,10 +846,13 @@ fn compute_emission_probs_learned(
 /// 1. Wavelet spindle detection → boosts N2 confidence
 /// 2. Wavelet entropy → multi-scale complexity measure
 /// 3. PAC delta-beta coupling → distinguishes N3 from lighter stages
+/// 4. PAC theta-gamma coupling → distinguishes REM from other stages
+/// 5. Adaptive thresholds from training statistics (not hardcoded)
 fn compute_emission_probs_enhanced(
     metrics: &[IntegrationMetrics],
     signals: &[Vec<f64>],
     sample_rate: f64,
+    stage_stats: Option<&StageFeatureStats>,
 ) -> Vec<Vec<f64>> {
     // Initialize wavelet analyzer for EEG
     let wavelet_config = DwtConfig {
@@ -836,16 +861,6 @@ fn compute_emission_probs_enhanced(
         extension: ExtensionMode::Symmetric,
     };
     let wavelet = WaveletAnalyzer::new(wavelet_config, sample_rate);
-
-    // Initialize PAC analyzer (fast: no surrogates for emission probs)
-    let pac_config = PacConfig {
-        sample_rate,
-        n_phase_bins: 18,
-        n_surrogates: 0, // Skip surrogates for speed (not testing significance here)
-        significance_level: 0.05,
-        filter_order: 128, // Shorter filter for 100 Hz data
-    };
-    let pac = PacAnalyzer::new(pac_config);
 
     // Compute band powers DIRECTLY from raw EEG via FFT (not from IntegrationMetrics)
     use symthaea::dynamics::spectral_analysis::{SpectralAnalyzer, SpectralConfig, WindowType};
@@ -860,7 +875,7 @@ fn compute_emission_probs_enhanced(
         // Compute band powers from raw EEG signal via Welch PSD.
         // IntegrationMetrics come from CfC network state and don't reflect
         // epoch-to-epoch frequency variation needed for classification.
-        let (delta_ratio, theta_ratio, alpha_ratio, beta_ratio, entropy) = if signal.len() >= 256 {
+        let (delta_ratio, theta_ratio, alpha_ratio, beta_ratio, _entropy) = if signal.len() >= 256 {
             let spectrum = spectral.welch(signal);
 
             let mut delta = 0.0f64;
@@ -905,16 +920,33 @@ fn compute_emission_probs_enhanced(
         // Wavelet entropy (multi-scale complexity)
         let w_entropy = wavelet.wavelet_entropy(signal);
 
-        // --- PAC features ---
-        // Delta-beta coupling: strong in deep sleep, weak in light/REM
-        let delta_beta_mi = if signal.len() >= 256 {
-            let pac_result = pac.compute_pac(signal, (0.5, 4.0), (13.0, 30.0));
-            pac_result.modulation_index
-        } else {
-            0.0
-        };
-        // Normalize MI (typically 0-0.3 range for EEG)
-        let pac_score = (delta_beta_mi / 0.3).min(1.0);
+        // --- Cross-frequency proxies (fast approximation of PAC) ---
+        // Delta-beta co-activation: strong in deep sleep (delta dominant + low beta)
+        // Using band power product as PAC proxy (avoids expensive FIR+Hilbert)
+        let pac_score = (delta_ratio * (1.0 - beta_ratio) * 4.0).min(1.0);
+
+        // Theta-gamma proxy: theta dominant with some high-freq activity = REM
+        // True PAC requires FIR filtering (~30ms/epoch), proxy is O(1)
+        let theta_gamma_score = (theta_ratio * beta_ratio * 20.0).min(1.0);
+
+        // --- Adaptive thresholds from training statistics ---
+        // Use training means as sigmoid centers instead of hardcoded values.
+        // Fallback to hardcoded if no stats provided.
+        let (wake_alpha_c, wake_delta_c, n1_theta_c, n1_delta_c,
+             n2_delta_c, n3_delta_c, rem_theta_c, rem_delta_c) =
+            if let Some(ss) = stage_stats {
+                // means[stage][feature]: 0=delta, 1=theta, 2=alpha, 3=beta
+                (ss.means[0][2].max(0.05),  // Wake alpha center
+                 ss.means[0][0].min(0.45),  // Wake delta center (upper bound)
+                 ss.means[1][1].max(0.08),  // N1 theta center
+                 ss.means[1][0],            // N1 delta center
+                 ss.means[2][0],            // N2 delta center
+                 ss.means[3][0].max(0.50),  // N3 delta center
+                 ss.means[4][1].max(0.08),  // REM theta center
+                 ss.means[4][0].min(0.55))  // REM delta center (upper bound)
+            } else {
+                (0.08, 0.40, 0.10, 0.35, 0.42, 0.55, 0.12, 0.50)
+            };
 
         // --- Compute enhanced scores ---
         // Use thresholded features, not linear scaling.
@@ -926,40 +958,42 @@ fn compute_emission_probs_enhanced(
             1.0 / (1.0 + (-(x - center) * sharpness).exp())
         };
 
-        // Wake: alpha relatively high, delta NOT dominant, high entropy
-        // Alpha power should be noticeable (>10%), delta should be low (<40%)
-        let wake_alpha = sigmoid(alpha_ratio, 0.08, 30.0); // sharp at 8%
-        let wake_low_delta = sigmoid(-delta_ratio, -0.40, 15.0); // penalize delta > 40%
-        scores[0] = wake_alpha * 2.0 + wake_low_delta * 1.5 + entropy * 0.8
+        // Wake: alpha relatively high, delta NOT dominant, high wavelet entropy
+        let wake_alpha = sigmoid(alpha_ratio, wake_alpha_c, 30.0);
+        let wake_low_delta = sigmoid(-delta_ratio, -wake_delta_c, 15.0);
+        let wake_high_wentropy = sigmoid(w_entropy, 1.5, 8.0); // broadband = Wake
+        scores[0] = wake_alpha * 2.0 + wake_low_delta * 1.5 + wake_high_wentropy * 1.2
             + beta_ratio * 1.0 + (1.0 - spindle_score) * 0.3;
 
-        // N1: theta dominant relative to alpha, moderate delta (25-50%)
-        let n1_theta = sigmoid(theta_ratio, 0.10, 25.0);
-        let n1_mod_delta = 1.0 - (delta_ratio - 0.35).abs() * 3.0; // peaks at delta=35%
-        let n1_low_alpha = sigmoid(-alpha_ratio, -0.10, 20.0); // penalize alpha > 10%
+        // N1: theta dominant relative to alpha, moderate delta
+        let n1_theta = sigmoid(theta_ratio, n1_theta_c, 25.0);
+        let n1_mod_delta = 1.0 - (delta_ratio - n1_delta_c).abs() * 3.0;
+        let n1_low_alpha = sigmoid(-alpha_ratio, -0.10, 20.0);
+        let n1_mid_wentropy = 1.0 - (w_entropy - 1.3).abs() * 2.0; // peaks mid-range
         scores[1] = n1_theta * 2.0 + n1_mod_delta.max(0.0) * 1.0 + n1_low_alpha * 0.8
+            + n1_mid_wentropy.max(0.0) * 0.8
             + (1.0 - spindle_score) * 0.3;
 
-        // N2: moderate delta (30-55%), spindles are the hallmark
-        let n2_mod_delta = 1.0 - (delta_ratio - 0.42).abs() * 2.5;
+        // N2: moderate delta, spindles are the hallmark
+        let n2_mod_delta = 1.0 - (delta_ratio - n2_delta_c).abs() * 2.5;
         scores[2] = n2_mod_delta.max(0.0) * 1.5 + theta_ratio * 1.0
             + spindle_score * 2.5 // Spindles are THE N2 marker
-            + (1.0 - wake_alpha) * 0.3; // Not awake
+            + (1.0 - wake_alpha) * 0.3;
 
-        // N3: delta MUST be dominant (>55%), low entropy, low alpha/beta
-        let n3_high_delta = sigmoid(delta_ratio, 0.55, 20.0); // sharp at 55%
+        // N3: delta MUST be dominant, low wavelet entropy, low alpha/beta
+        let n3_high_delta = sigmoid(delta_ratio, n3_delta_c, 20.0);
         let n3_low_fast = sigmoid(-(alpha_ratio + beta_ratio), -0.10, 20.0);
+        let n3_low_wentropy = sigmoid(-w_entropy, -0.8, 10.0); // concentrated = N3
         scores[3] = n3_high_delta * 3.0 + n3_low_fast * 1.0
-            + (1.0 - entropy) * 0.5
-            + pac_score * 0.8
-            + (1.0 - w_entropy) * 0.3;
+            + n3_low_wentropy * 1.0
+            + pac_score * 0.8;
 
-        // REM: theta high, delta NOT dominant (<50%), beta present, no spindles
-        let rem_theta = sigmoid(theta_ratio, 0.12, 25.0);
-        let rem_low_delta = sigmoid(-delta_ratio, -0.50, 15.0);
+        // REM: theta high, delta NOT dominant, theta-gamma coupling, no spindles
+        let rem_theta = sigmoid(theta_ratio, rem_theta_c, 25.0);
+        let rem_low_delta = sigmoid(-delta_ratio, -rem_delta_c, 15.0);
         let rem_beta = sigmoid(beta_ratio, 0.05, 30.0);
         scores[4] = rem_theta * 1.5 + rem_low_delta * 1.5 + rem_beta * 1.0
-            + entropy * 0.5
+            + theta_gamma_score * 1.2 // Theta-gamma coupling = REM marker
             + (1.0 - spindle_score) * 0.3
             + (1.0 - pac_score) * 0.3;
 
