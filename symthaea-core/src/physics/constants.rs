@@ -55,3 +55,9 @@ pub const AMU: f64 = 1.660_539_066_60e-27;
 
 /// MeV to Joules conversion factor (E_CHARGE × 1e6)
 pub const MEV_TO_J: f64 = 1.602_176_634e-13;
+
+/// Faraday constant (C/mol) — N_A × e
+pub const F_FARADAY: f64 = 96_485.332_12;
+
+/// Rydberg energy (eV) — ground-state hydrogen ionization
+pub const RYDBERG_EV: f64 = 13.605_693_122_994;

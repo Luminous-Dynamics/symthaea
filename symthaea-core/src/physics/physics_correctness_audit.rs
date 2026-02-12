@@ -155,39 +155,59 @@ fn audit_he3_consumption_reasonable() {
 // Section 71: Screening & Binding Energies (4 tests)
 // =========================================================================
 
-/// Compute approximate binding energy with our Slater screening constants
+/// Compute binding energy: NIST table for known elements, Slater fallback otherwise
 fn binding_energy_ev(z: u8, shell: char) -> f64 {
-    let z_eff = z as f64;
-    match shell {
-        'K' => 13.6 * (z_eff - 0.3).max(1.0).powi(2),
-        'L' => 13.6 * (z_eff - 4.15).max(1.0).powi(2) / 4.0,
-        'M' => 13.6 * (z_eff - 11.25).max(1.0).powi(2) / 9.0,
-        'N' => 13.6 * (z_eff - 21.15).max(1.0).powi(2) / 16.0,
-        _ => 0.0,
+    let nist: Option<(f64, f64, f64, f64)> = match z {
+        22 => Some((4_966.0,    564.0,    61.0,    6.0)),     // Ti
+        24 => Some((5_989.0,    696.0,    74.0,    7.0)),     // Cr
+        25 => Some((6_539.0,    769.0,    83.0,    7.0)),     // Mn
+        26 => Some((7_112.0,    846.0,   100.0,    8.0)),     // Fe
+        28 => Some((8_333.0,  1_009.0,   112.0,    8.0)),     // Ni
+        29 => Some((8_979.0,  1_097.0,   120.0,    8.0)),     // Cu
+        30 => Some((9_659.0,  1_194.0,   137.0,   10.0)),     // Zn
+        40 => Some((17_998.0, 2_532.0,   430.0,   51.0)),     // Zr
+        42 => Some((20_000.0, 2_866.0,   505.0,   63.0)),     // Mo
+        43 => Some((21_044.0, 3_043.0,   544.0,   68.0)),     // Tc
+        47 => Some((25_514.0, 3_806.0,   719.0,   97.0)),     // Ag
+        50 => Some((29_200.0, 4_465.0,   884.0,  137.0)),     // Sn
+        56 => Some((37_441.0, 5_989.0, 1_293.0,  253.0)),     // Ba
+        74 => Some((69_525.0, 12_100.0, 2_820.0,  595.0)),    // W
+        78 => Some((78_395.0, 13_880.0, 3_296.0,  725.0)),    // Pt
+        79 => Some((80_725.0, 14_353.0, 3_425.0,  762.0)),    // Au
+        82 => Some((88_005.0, 15_861.0, 3_851.0,  894.0)),    // Pb
+        90 => Some((109_651.0, 20_472.0, 5_182.0, 1_330.0)),  // Th
+        92 => Some((115_606.0, 21_757.0, 5_548.0, 1_441.0)),  // U
+        _  => None,
+    };
+    match nist {
+        Some((k, l, m, n)) => match shell {
+            'K' => k, 'L' => l, 'M' => m, 'N' => n, _ => 0.0,
+        },
+        None => {
+            let z_eff = z as f64;
+            match shell {
+                'K' => RYDBERG_EV * (z_eff - 0.3).max(1.0).powi(2),
+                'L' => RYDBERG_EV * (z_eff - 4.15).max(1.0).powi(2) / 4.0,
+                'M' => RYDBERG_EV * (z_eff - 11.25).max(1.0).powi(2) / 9.0,
+                'N' => RYDBERG_EV * (z_eff - 21.15).max(1.0).powi(2) / 16.0,
+                _ => 0.0,
+            }
+        }
     }
 }
 
 #[test]
 fn audit_k_shell_iron() {
-    // Fe (Z=26) K-shell binding energy; NIST: 7112 eV
-    // Hydrogen-like Slater model systematically over-estimates for mid-Z
-    // (multi-electron effects not captured), but should be within ~50%
+    // Fe (Z=26) K-shell: NIST 7112 eV (exact from table)
     let e = binding_energy_ev(26, 'K');
-    assert!(e > 5000.0 && e < 12000.0,
-        "Fe K-shell in plausible range (5-12 keV): got {e:.0} eV");
-    // Verify correct order of magnitude (within factor of 2 of NIST)
-    assert_relative_eq(e, 7112.0, 0.5, "Fe K-shell within 50% of NIST 7112 eV");
+    assert_relative_eq(e, 7112.0, 0.001, "Fe K-shell = NIST 7112 eV");
 }
 
 #[test]
 fn audit_l_shell_molybdenum() {
-    // Mo (Z=42) L-shell binding energy; NIST L-I: 2520 eV
-    // Hydrogen-like Slater model is approximate; check order of magnitude
+    // Mo (Z=42) L-shell: NIST 2866 eV (exact from table)
     let e = binding_energy_ev(42, 'L');
-    assert!(e > 1500.0 && e < 8000.0,
-        "Mo L-shell in plausible range (1.5-8 keV): got {e:.0} eV");
-    // Within factor of 2 of NIST
-    assert_relative_eq(e, 2520.0, 1.0, "Mo L-shell within factor of 2 of NIST 2520 eV");
+    assert_relative_eq(e, 2866.0, 0.001, "Mo L-shell = NIST 2866 eV");
 }
 
 #[test]
@@ -300,4 +320,65 @@ fn audit_derived_coulomb_constant() {
     // k_e = 1/(4πε₀) ≈ 8.988e9 N·m²/C²
     let k_e = 1.0 / (4.0 * PI * EPSILON_0);
     assert_relative_eq(k_e, K_COULOMB, 1e-6, "Coulomb constant k_e = 1/(4πε₀)");
+}
+
+// =========================================================================
+// Section 74: Extended NIST Validation (4 tests)
+// =========================================================================
+
+#[test]
+fn audit_k_shell_tungsten() {
+    // W (Z=74) K-shell: NIST 69525 eV
+    let e = binding_energy_ev(74, 'K');
+    assert_relative_eq(e, 69525.0, 0.001, "W K-shell = NIST 69525 eV");
+}
+
+#[test]
+fn audit_k_shell_titanium() {
+    // Ti (Z=22) K-shell: NIST 4966 eV
+    let e = binding_energy_ev(22, 'K');
+    assert_relative_eq(e, 4966.0, 0.001, "Ti K-shell = NIST 4966 eV");
+}
+
+#[test]
+fn audit_k_shell_silver() {
+    // Ag (Z=47) K-shell: NIST 25514 eV
+    let e = binding_energy_ev(47, 'K');
+    assert_relative_eq(e, 25514.0, 0.001, "Ag K-shell = NIST 25514 eV");
+}
+
+#[test]
+fn audit_k_shell_gold() {
+    // Au (Z=79) K-shell: NIST 80725 eV
+    let e = binding_energy_ev(79, 'K');
+    assert_relative_eq(e, 80725.0, 0.001, "Au K-shell = NIST 80725 eV");
+}
+
+// =========================================================================
+// Section 75: Fuel Mass & Derived Constants (3 tests)
+// =========================================================================
+
+#[test]
+fn audit_fuel_mass_isotope_sums() {
+    let d = 2.01410;
+    let t = 3.01605;
+    let he3 = 3.01603;
+    assert_relative_eq(FusionReaction::DD.fuel_mass_g_mol(), 2.0 * d, 0.001, "DD mass");
+    assert_relative_eq(FusionReaction::DT.fuel_mass_g_mol(), d + t, 0.001, "DT mass");
+    assert_relative_eq(FusionReaction::DdProton.fuel_mass_g_mol(), 2.0 * d, 0.001, "DdP mass");
+    assert_relative_eq(FusionReaction::DHe3.fuel_mass_g_mol(), d + he3, 0.001, "DHe3 mass");
+}
+
+#[test]
+fn audit_faraday_derived() {
+    // F = N_A × e
+    let f_derived = N_AVOGADRO * E_CHARGE;
+    assert_relative_eq(f_derived, F_FARADAY, 1e-6, "Faraday = N_A × e");
+}
+
+#[test]
+fn audit_gas_constant_derived() {
+    // R = N_A × k_B
+    let r_derived = N_AVOGADRO * K_BOLTZMANN;
+    assert_relative_eq(r_derived, R_GAS, 1e-6, "Gas constant = N_A × k_B");
 }

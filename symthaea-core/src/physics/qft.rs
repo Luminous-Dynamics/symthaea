@@ -21,6 +21,7 @@ use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::{StandardModel, PHYSICS_DIM};
 use super::hadrons::Hadrons;
+use super::constants::ALPHA;
 use serde::{Deserialize, Serialize};
 
 /// Propagator type (line style in Feynman diagram)
@@ -140,7 +141,7 @@ impl QEDEncoder {
             electron_propagator,
             photon_propagator,
             qed_vertex,
-            fine_structure: 1.0 / 137.036,
+            fine_structure: ALPHA,
             fermion_type,
             boson_type,
             momentum,
@@ -620,7 +621,7 @@ mod tests {
         assert_eq!(vertex.incoming.len() + vertex.outgoing.len(), 3);
 
         // Coupling should be √α
-        assert!((vertex.coupling - (1.0 / 137.036_f64).sqrt()).abs() < 0.001);
+        assert!((vertex.coupling - ALPHA.sqrt()).abs() < 0.001);
     }
 
     #[test]
@@ -631,7 +632,7 @@ mod tests {
 
         assert_eq!(diagram.loop_order, 0);  // Tree level
         assert_eq!(diagram.vertices.len(), 2);
-        assert!((diagram.amplitude_estimate - 1.0 / 137.036).abs() < 0.0001);
+        assert!((diagram.amplitude_estimate - ALPHA).abs() < 0.0001);
     }
 
     #[test]

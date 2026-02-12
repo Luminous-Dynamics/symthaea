@@ -24,7 +24,7 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
-use super::constants::K_BOLTZMANN;
+use super::constants::{K_BOLTZMANN, R_GAS, P_STANDARD};
 use serde::{Deserialize, Serialize};
 
 /// Thermodynamic state
@@ -149,12 +149,12 @@ impl ThermoEncoder {
         internal_energy_j: f64,
     ) -> ThermodynamicState {
         // Estimate entropy from ideal gas (simplified)
-        let n_moles = pressure_pa * volume_m3 / (8.314 * temperature_k);
-        let entropy_j_k = n_moles * 8.314 * (volume_m3 / n_moles).ln().max(1.0);
+        let n_moles = pressure_pa * volume_m3 / (R_GAS * temperature_k);
+        let entropy_j_k = n_moles * R_GAS * (volume_m3 / n_moles).ln().max(1.0);
 
         // Encode state vector
         let t_scaled = (temperature_k as f32 / 300.0).clamp(0.01, 100.0);
-        let p_scaled = (pressure_pa as f32 / 101325.0).clamp(0.01, 100.0);
+        let p_scaled = (pressure_pa as f32 / P_STANDARD as f32).clamp(0.01, 100.0);
         let v_scaled = (volume_m3 as f32 * 1000.0).clamp(0.01, 100.0);
         let u_scaled = (internal_energy_j as f32 / 1000.0).clamp(0.01, 100.0);
 
