@@ -334,11 +334,10 @@ impl DiscoveryEngine {
         let mut best: Option<(String, f32)> = None;
         for (id, unit) in &self.units {
             let sim = unit.similarity(&hv);
-            if sim > self.config.similarity_threshold {
-                if best.as_ref().map(|(_, s)| sim > *s).unwrap_or(true) {
+            if sim > self.config.similarity_threshold
+                && best.as_ref().map(|(_, s)| sim > *s).unwrap_or(true) {
                     best = Some((id.clone(), sim));
                 }
-            }
         }
 
         let unit_id = if let Some((id, _)) = best {

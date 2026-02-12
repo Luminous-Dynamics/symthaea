@@ -55,7 +55,7 @@ impl PhonemeTargets {
 
     /// Generate a deterministic random HV for a phoneme index
     fn generate_target(index: usize) -> HV16 {
-        use crate::hdc::HDC_WORDS;
+        
 
         // Use blake3 hash for deterministic randomness
         let mut hasher = blake3::Hasher::new();
@@ -424,16 +424,13 @@ impl Default for DirectClassifierConfig {
 
 /// Activation function for random features
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Default)]
 pub enum RFActivation {
+    #[default]
     Tanh,
     ReLU,
 }
 
-impl Default for RFActivation {
-    fn default() -> Self {
-        RFActivation::Tanh
-    }
-}
 
 /// Random nonlinear feature expansion (Extreme Learning Machine / Random Kitchen Sinks)
 /// Maps input x → activation(W*x + b) where W and b are fixed random matrices

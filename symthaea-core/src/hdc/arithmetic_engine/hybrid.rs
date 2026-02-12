@@ -1,11 +1,8 @@
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
-use super::core_number::HdcNumber;
 use super::engine::{ArithmeticEngine, ArithmeticOp, ArithmeticResult, ProofStep};
-use super::verification::VerificationThreshold;
 
 /// Configuration for the hybrid engine
 #[derive(Debug, Clone, Serialize, Deserialize)]

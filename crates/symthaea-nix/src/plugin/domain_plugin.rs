@@ -99,7 +99,7 @@ impl DomainPlugin for NixOsPlugin {
         for cmd in &commands {
             for (i, _) in lower.match_indices(cmd) {
                 entities.push(
-                    Entity::new("nix_command", *cmd, i, i + cmd.len())
+                    Entity::new("nix_command", cmd, i, i + cmd.len())
                         .with_confidence(0.95),
                 );
             }

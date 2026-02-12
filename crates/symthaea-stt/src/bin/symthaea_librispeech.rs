@@ -166,11 +166,9 @@ fn main() {
                     eprintln!("{}Training failed: {}", WARN, e);
                     std::process::exit(1);
                 }
-            } else {
-                if let Err(e) = train_on_data(&data, &output, max_files, workers, min_instances, dict.as_deref()) {
-                    eprintln!("{}Training failed: {}", WARN, e);
-                    std::process::exit(1);
-                }
+            } else if let Err(e) = train_on_data(&data, &output, max_files, workers, min_instances, dict.as_deref()) {
+                eprintln!("{}Training failed: {}", WARN, e);
+                std::process::exit(1);
             }
         }
         Commands::Auto { subset, base_dir, workers, dict } => {
@@ -426,7 +424,7 @@ fn train_on_data(
     let progress_clone = progress.clone();
     let callback = Box::new(move |current: usize, _total: usize, path: &str| {
         progress_clone.set_position(current as u64);
-        progress_clone.set_message(format!("Processing {}", path.split('/').last().unwrap_or(path)));
+        progress_clone.set_message(format!("Processing {}", path.split('/').next_back().unwrap_or(path)));
     });
 
     // Train
@@ -549,7 +547,7 @@ fn train_adaptive(
     let progress_clone = progress.clone();
     let callback = Box::new(move |current: usize, _total: usize, path: &str| {
         progress_clone.set_position(current as u64);
-        progress_clone.set_message(format!("Processing {}", path.split('/').last().unwrap_or(path)));
+        progress_clone.set_message(format!("Processing {}", path.split('/').next_back().unwrap_or(path)));
     });
 
     // Train with adaptive clustering
@@ -830,7 +828,7 @@ fn evaluate_model(
     let phoneme_hvs: std::collections::HashMap<String, symthaea_stt::HV16> = prototypes
         .as_pairs()
         .iter()
-        .map(|(l, h)| (l.clone(), h.clone()))
+        .map(|(l, h)| (l.clone(), *h))
         .collect();
     let phoneme_classes = symthaea_stt::PhonemeClasses::new(&phoneme_hvs);
     let phonotactics = symthaea_stt::PhonotacticConstraints::new(&phoneme_hvs);

@@ -84,10 +84,28 @@ const DANGEROUS_PROGRAMS: &[&str] = &[
 
 /// Check if a path is within a forbidden system path
 fn is_forbidden_path(path: &Path) -> bool {
-    let path_str = path.to_string_lossy();
+    let normalized = normalize_path(path);
+    let path_str = normalized.to_string_lossy();
     FORBIDDEN_PATHS.iter().any(|forbidden| {
         path_str.starts_with(forbidden)
     })
+}
+
+fn normalize_path(path: &Path) -> std::path::PathBuf {
+    use std::path::Component;
+    let mut normalized = std::path::PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir => normalized.push(Path::new("/")),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                let _ = normalized.pop();
+            }
+            Component::Normal(part) => normalized.push(part),
+        }
+    }
+    normalized
 }
 
 /// Check if a program name is dangerous

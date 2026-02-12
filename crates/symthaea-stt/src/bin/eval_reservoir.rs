@@ -147,11 +147,10 @@ fn decode_with_voting(
         let run_len = run_end - run_start;
 
         // Only emit if run is long enough and different from last emission
-        if run_len >= min_duration && !current.is_empty() {
-            if result.last().map_or(true, |last| last != current) {
+        if run_len >= min_duration && !current.is_empty()
+            && result.last() != Some(current) {
                 result.push(current.clone());
             }
-        }
 
         run_start = run_end;
     }

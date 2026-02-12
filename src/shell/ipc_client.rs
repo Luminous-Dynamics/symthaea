@@ -931,7 +931,7 @@ impl ShellIpcClient {
                     warnings,
                 }
             }
-            (Request::Execute { dry_run: true, .. }, IpcResponse::ValidationResult { valid, safety_level, preview, warnings }) => {
+            (Request::Execute { dry_run: true, .. }, IpcResponse::ValidationResult { valid, safety_level: _, preview, warnings }) => {
                 let output = preview.unwrap_or_else(|| warnings.join("\n"));
                 let gate_reason = if valid { Some("dry-run".to_string()) } else { Some("dry-run failed".to_string()) };
                 Response::ExecutionResult {

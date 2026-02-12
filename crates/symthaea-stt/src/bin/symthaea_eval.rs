@@ -165,7 +165,7 @@ fn main() {
     if let Some(ref dict) = dictionary {
         // Build reverse dictionary manually
         for word in dict.words() {
-            if let Some(_phonemes) = dict.get(&word) {
+            if let Some(_phonemes) = dict.get(word) {
                 // This is a workaround - we'd need to add the phonemes
             }
         }

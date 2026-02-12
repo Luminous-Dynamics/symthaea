@@ -351,7 +351,7 @@ impl DtwTrainer {
             for frame_idx in segment.start_frame..end {
                 self.accumulators
                     .entry(segment.phoneme.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(frames[frame_idx]);
 
                 *self.counts.entry(segment.phoneme.clone()).or_insert(0) += 1;

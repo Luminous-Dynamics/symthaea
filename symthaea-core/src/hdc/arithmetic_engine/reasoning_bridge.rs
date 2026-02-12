@@ -1,11 +1,6 @@
-use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::PrimitiveSystem;
-use crate::hdc::deterministic_seeds::seed_from_name;
-use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
 use super::hybrid::{AbstractProof, HybridArithmeticEngine};
-use super::engine::ArithmeticResult;
 use super::discovery::MathDiscovery;
 use super::theorems::TheoremProver;
 

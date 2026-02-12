@@ -1,6 +1,5 @@
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
-use crate::hdc::integrated_information::IntegratedInformation;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 

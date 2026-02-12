@@ -57,7 +57,7 @@ impl PhonemeClasses {
         let mut phonemes = HashMap::new();
         for (label, hv) in phoneme_hvs {
             let base = strip_stress(label);
-            phonemes.entry(base).or_insert_with(|| hv.clone());
+            phonemes.entry(base).or_insert_with(|| *hv);
         }
 
         // Helper to bundle phonemes by name
@@ -298,7 +298,7 @@ impl PhonotacticConstraints {
         let mut phonemes = HashMap::new();
         for (label, hv) in phoneme_hvs {
             let base = strip_stress(label);
-            phonemes.entry(base).or_insert_with(|| hv.clone());
+            phonemes.entry(base).or_insert_with(|| *hv);
         }
 
         // Build legal follower bundles
@@ -329,7 +329,7 @@ impl PhonotacticConstraints {
             "L", "R", "W", "Y", "M", "N"
         ]);
         for stop in &["P", "B", "T", "D", "K", "G"] {
-            constraints.insert(stop.to_string(), after_stop.clone());
+            constraints.insert(stop.to_string(), after_stop);
         }
 
         // After nasals: usually vowels
@@ -338,7 +338,7 @@ impl PhonotacticConstraints {
             "T", "D", "K", "G", "Z", "S"  // Can have nasal + stop clusters
         ]);
         for nasal in &["M", "N"] {
-            constraints.insert(nasal.to_string(), after_nasal.clone());
+            constraints.insert(nasal.to_string(), after_nasal);
         }
 
         // After NG: very restricted (usually vowel or nothing)
@@ -354,7 +354,7 @@ impl PhonotacticConstraints {
             "L", "R", "W", "Y", "T", "P", "K"
         ]);
         for fric in &["F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH"] {
-            constraints.insert(fric.to_string(), after_fricative.clone());
+            constraints.insert(fric.to_string(), after_fricative);
         }
 
         // After vowels: almost anything
@@ -365,7 +365,7 @@ impl PhonotacticConstraints {
             "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW"
         ]);
         for vowel in &["AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW"] {
-            constraints.insert(vowel.to_string(), after_vowel.clone());
+            constraints.insert(vowel.to_string(), after_vowel);
         }
 
         // After liquids
@@ -374,7 +374,7 @@ impl PhonotacticConstraints {
             "P", "B", "T", "D", "K", "G", "M", "N", "S", "Z", "F", "V"
         ]);
         for liquid in &["L", "R"] {
-            constraints.insert(liquid.to_string(), after_liquid.clone());
+            constraints.insert(liquid.to_string(), after_liquid);
         }
 
         // After glides
@@ -382,7 +382,7 @@ impl PhonotacticConstraints {
             "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
         ]);
         for glide in &["W", "Y"] {
-            constraints.insert(glide.to_string(), after_glide.clone());
+            constraints.insert(glide.to_string(), after_glide);
         }
 
         constraints
