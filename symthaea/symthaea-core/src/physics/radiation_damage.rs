@@ -487,6 +487,7 @@ impl FusionReaction {
     }
 
     /// Total fuel mass in g/mol (sum of reactant atomic masses)
+    #[allow(dead_code)]
     pub fn fuel_mass_g_mol(&self) -> f64 {
         let d = 2.01410;  // Deuterium
         let t = 3.01605;  // Tritium

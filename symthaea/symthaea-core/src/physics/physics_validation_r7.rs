@@ -20,7 +20,7 @@ use super::molecular_biology::{DNABase, RNABase};
 use super::derived_laws::LawsDerivationEngine;
 use super::uncertainty::{UncertainParameter, ParameterUncertainties, UncertaintyDistribution};
 use super::coupled_physics::OperatingConditions;
-use super::constants::{K_BOLTZMANN, E_CHARGE};
+use super::constants::{K_BOLTZMANN, E_CHARGE, ALPHA};
 use crate::genesis::GenesisSeed;
 
 // =========================================================================
@@ -717,7 +717,7 @@ fn qft_fine_structure() {
     let genesis = GenesisSeed::from_phrase("r7_qft_alpha");
     let model = super::standard_model::StandardModel::from_genesis(&genesis);
     let qed = QEDEncoder::from_genesis(&genesis, &model);
-    assert_relative_eq(qed.fine_structure, 1.0 / 137.036, 1e-4, "Fine structure constant");
+    assert_relative_eq(qed.fine_structure, ALPHA, 1e-4, "Fine structure constant");
 }
 
 #[test]

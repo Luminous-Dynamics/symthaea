@@ -22,7 +22,7 @@
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
-use super::constants::{K_BOLTZMANN, T_ROOM};
+use super::constants::{K_BOLTZMANN, T_ROOM, R_GAS, F_FARADAY};
 use serde::{Deserialize, Serialize};
 
 /// Thermal energy at 300K (computed from constants)
@@ -350,7 +350,7 @@ impl BiophysicsEncoder {
 
     /// Nernst potential: E = (RT/zF) ln([out]/[in])
     pub fn nernst_potential_mv(&self, z: i32, conc_out: f64, conc_in: f64, temp_k: f64) -> f64 {
-        let rt_f = 8.314 * temp_k / 96485.0;  // R*T/F in volts
+        let rt_f = R_GAS * temp_k / F_FARADAY;  // R*T/F in volts
         1000.0 * rt_f / (z as f64) * (conc_out / conc_in).ln()
     }
 
