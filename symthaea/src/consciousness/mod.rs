@@ -65,6 +65,9 @@ pub mod multi_modal_integration;
 // Primitive-Consciousness Bridge - connects HDC primitives to consciousness processing
 pub mod primitive_consciousness;
 
+// Primitive-Belief Bridge - maps primitives to active inference belief states
+pub mod primitive_belief_bridge;
+
 // Stability Regime - CfC neurons for primitives with Crystallized/Plastic/Fluid dynamics
 pub mod stability_regime;
 
@@ -383,6 +386,7 @@ pub use primitive_consciousness::{
     PrimitiveBinding, ConsciousnessPrimitiveProcessor, ProcessorStats,
     ConsciousnessDecomposer, PrimitiveBindingEngine,
 };
+pub use primitive_belief_bridge::{PrimitiveBeliefBridge, PrimitivePredictionError};
 pub use stability_regime::{
     StabilityRegimeType, StabilityRegimeConfig, RegimeParams,
     CfCPrimitive, StabilityRegimeProcessor,

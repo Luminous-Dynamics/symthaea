@@ -42,6 +42,10 @@ pub struct MemoryItem {
     pub label: String,
     /// Step at which this item was added.
     pub added_at: u64,
+    /// Number of decay cycles this item has survived since being added.
+    /// Used for graduation: items that persist long enough in WM
+    /// are candidates for promotion to episodic memory.
+    pub steps_survived: u64,
 }
 
 /// Working memory with capacity-limited, activation-gated storage.
@@ -52,6 +56,10 @@ pub struct WorkingMemory {
     capacity: usize,
     /// Current time step (increments with each operation).
     step: u64,
+    /// Last item evicted by push(), available until next push().
+    /// Callers can use [`take_evicted`] to retrieve it for graduation
+    /// to episodic memory.
+    last_evicted: Option<MemoryItem>,
 }
 
 impl WorkingMemory {
@@ -61,6 +69,7 @@ impl WorkingMemory {
             items: Vec::new(),
             capacity: DEFAULT_CAPACITY,
             step: 0,
+            last_evicted: None,
         }
     }
 
@@ -70,6 +79,7 @@ impl WorkingMemory {
             items: Vec::new(),
             capacity: capacity.max(1),
             step: 0,
+            last_evicted: None,
         }
     }
 
@@ -79,10 +89,12 @@ impl WorkingMemory {
     /// New items start with activation = 1.0.
     pub fn push(&mut self, content: ContinuousHV, source: MemorySource, label: String) {
         self.step += 1;
+        self.last_evicted = None;
 
-        // Decay existing items
+        // Decay existing items and track survival
         for item in &mut self.items {
             item.activation *= DECAY_RATE;
+            item.steps_survived += 1;
         }
 
         let item = MemoryItem {
@@ -91,6 +103,7 @@ impl WorkingMemory {
             source,
             label,
             added_at: self.step,
+            steps_survived: 0,
         };
 
         self.items.push(item);
@@ -104,11 +117,24 @@ impl WorkingMemory {
                 .min_by(|(_, a), (_, b)| a.activation.partial_cmp(&b.activation).unwrap())
                 .map(|(i, _)| i)
                 .unwrap();
-            self.items.remove(min_idx);
+            let evicted = self.items.remove(min_idx);
+            self.last_evicted = Some(evicted);
         }
 
         // Sort by activation (highest first)
         self.items.sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
+    }
+
+    /// Take the last evicted item, if any.
+    ///
+    /// Returns the item that was evicted by the most recent [`push`] call.
+    /// This item is a candidate for graduation to episodic memory if its
+    /// `steps_survived` exceeds the minimum threshold.
+    ///
+    /// Returns `None` if no item was evicted or if the evicted item was
+    /// already taken.
+    pub fn take_evicted(&mut self) -> Option<MemoryItem> {
+        self.last_evicted.take()
     }
 
     /// Boost activation of items similar to the query.
@@ -199,6 +225,7 @@ impl WorkingMemory {
                     activation: item.activation,
                     source: item.source.clone(),
                     added_at: item.added_at,
+                    steps_survived: item.steps_survived,
                 })
                 .collect(),
         }
@@ -221,6 +248,7 @@ impl WorkingMemory {
                 source: saved_item.source.clone(),
                 label: saved_item.label.clone(),
                 added_at: saved_item.added_at,
+                steps_survived: saved_item.steps_survived,
             });
         }
 
@@ -241,6 +269,9 @@ pub struct SavedItem {
     pub activation: f64,
     pub source: MemorySource,
     pub added_at: u64,
+    /// Number of decay cycles survived (for graduation tracking)
+    #[serde(default)]
+    pub steps_survived: u64,
 }
 
 /// Serializable snapshot of working memory state.

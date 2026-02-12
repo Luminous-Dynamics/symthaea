@@ -234,6 +234,15 @@ pub struct CompositeFitness {
 
     /// Number of evaluations
     pub num_evaluations: usize,
+
+    /// Task-specific improvement: how much this composite improves downstream task metrics
+    pub task_improvement: f64,
+
+    /// Classification accuracy when this composite is used as a feature transform
+    pub classification_accuracy: f64,
+
+    /// Number of task-grounded evaluations (separate from Φ evaluations)
+    pub task_evaluations: usize,
 }
 
 impl Default for CompositeFitness {
@@ -243,6 +252,9 @@ impl Default for CompositeFitness {
             generalization_score: 0.0,
             novelty_score: 1.0, // Start with high novelty
             num_evaluations: 0,
+            task_improvement: 0.0,
+            classification_accuracy: 0.0,
+            task_evaluations: 0,
         }
     }
 }
@@ -262,12 +274,42 @@ impl CompositeFitness {
         self.novelty_score *= 0.99;
     }
 
-    /// Compute overall fitness
+    /// Compute overall fitness including task-grounded metrics.
+    ///
+    /// Blends Φ-based fitness (discovery) with task-grounded fitness (utility):
+    /// - Φ contribution: does the composite increase consciousness integration?
+    /// - Generalization: does it work across many problems?
+    /// - Novelty: is it different from existing transformations?
+    /// - Task improvement: does it actually improve downstream task performance?
+    /// - Classification accuracy: does it help with discriminative tasks?
     pub fn composite_score(&self) -> f64 {
-        // Weighted combination
-        0.5 * self.avg_phi_contribution
-            + 0.3 * self.generalization_score
-            + 0.2 * self.novelty_score
+        // Base discovery-driven fitness (always available)
+        let discovery_score = 0.4 * self.avg_phi_contribution
+            + 0.2 * self.generalization_score
+            + 0.1 * self.novelty_score;
+
+        // Task-grounded fitness (available once task_evaluations > 0)
+        if self.task_evaluations > 0 {
+            let task_score = 0.2 * self.task_improvement + 0.1 * self.classification_accuracy;
+            discovery_score + task_score
+        } else {
+            // Fall back to pure discovery scoring when no task data available
+            // (rescale to use the full weight budget)
+            let scale = 1.0 / 0.7; // 0.4 + 0.2 + 0.1 = 0.7, scale up
+            discovery_score * scale
+        }
+    }
+
+    /// Update fitness from task-grounded evaluation.
+    ///
+    /// Call this after using the composite in a concrete task (classification,
+    /// reasoning, etc.) to track how much it improves real metrics.
+    pub fn update_task_fitness(&mut self, improvement: f64, accuracy: f64) {
+        let n = self.task_evaluations as f64;
+        self.task_improvement = (self.task_improvement * n + improvement) / (n + 1.0);
+        self.classification_accuracy =
+            (self.classification_accuracy * n + accuracy) / (n + 1.0);
+        self.task_evaluations += 1;
     }
 }
 

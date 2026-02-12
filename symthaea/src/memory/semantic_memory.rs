@@ -376,6 +376,71 @@ impl SemanticMemory {
         }
     }
 
+    /// Compute Phi-weighted learning rate factor with recency decay.
+    ///
+    /// Enhanced version of [`compute_lr_factor`] that incorporates:
+    /// - **Phi modulation**: Higher Phi → wider learning range (more capacity to update)
+    /// - **Recency decay**: Older similar entries contribute less to the error estimate
+    /// - **Base error weighting**: Same error-driven logic as the standard version
+    ///
+    /// Formula: `0.5 + (recency_weighted_error × phi_factor)`, clamped to [0.5, 1.5]
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - HDC vector to search for
+    /// * `top_k` - Number of similar entries to consider
+    /// * `current_phi` - Current Phi from consciousness processing (0.0–1.0)
+    /// * `current_step` - Current step/cycle number for recency calculation
+    pub fn compute_lr_factor_phi_weighted(
+        &mut self,
+        query: &[f32],
+        top_k: usize,
+        current_phi: f64,
+        current_step: u64,
+    ) -> f32 {
+        let similar = self.find_similar(query, top_k);
+
+        if similar.is_empty() {
+            return 1.0; // Neutral: no similar entries
+        }
+
+        let entries: Vec<&SemanticEntry> = similar
+            .iter()
+            .filter_map(|(idx, _)| self.entries.get(*idx))
+            .collect();
+
+        if entries.is_empty() {
+            return 1.0;
+        }
+
+        // Compute recency-weighted prediction error
+        let mut weighted_sum = 0.0f64;
+        let mut weight_total = 0.0f64;
+
+        for entry in &entries {
+            let age = current_step.saturating_sub(entry.timestamp) as f64;
+            // Exponential decay with half-life ~346 steps (e^(-1) at 500 steps)
+            let recency_weight = (-age / 500.0).exp();
+            let w = recency_weight.max(0.01); // Floor to avoid zero weights
+            weighted_sum += entry.prediction_error as f64 * w;
+            weight_total += w;
+        }
+
+        let weighted_error = if weight_total > 0.0 {
+            weighted_sum / weight_total
+        } else {
+            0.5
+        };
+
+        // Phi modulation: higher Phi → wider learning range
+        // Range of phi_factor: 0.5 (at Phi=0) to 1.0 (at Phi=1)
+        let phi_factor = 0.5 + current_phi.clamp(0.0, 1.0) * 0.5;
+
+        // Final formula
+        let lr = 0.5 + (weighted_error * phi_factor) as f32;
+        lr.clamp(0.5, 1.5)
+    }
+
     /// Compute cosine similarity between two vectors
     ///
     /// Optimized version that takes pre-computed query magnitude.
