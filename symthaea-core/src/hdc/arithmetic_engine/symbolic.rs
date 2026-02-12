@@ -1,8 +1,12 @@
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use crate::hdc::deterministic_seeds::seed_from_name;
+use crate::hdc::integrated_information::IntegratedInformation;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
+
+use super::core_number::HdcNumber;
+use super::hybrid::{HybridArithmeticEngine, HybridResult};
 
 /// Symbolic operation types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -123,7 +123,7 @@ pub struct HybridArithmeticEngine {
     deep_engine: ArithmeticEngine,
 
     /// Configuration
-    config: HybridConfig,
+    pub(crate) config: HybridConfig,
 
     /// Statistics
     stats: HybridStats,
