@@ -105,8 +105,7 @@ pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
 /// If auto-dispatch succeeds, the query is automatically resolved with the result.
 #[hdk_extern]
 pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
-    let stored: StoredQuery = query.clone().into();
-    let action_hash = create_entry(&EntryTypes::Query(stored))?;
+    let action_hash = create_entry(&EntryTypes::Query(query.clone()))?;
 
     // Link to all queries
     let all_anchor = ensure_anchor("all_commons_queries")?;
@@ -222,8 +221,7 @@ pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
 /// Broadcast a cross-domain event within the Commons cluster
 #[hdk_extern]
 pub fn broadcast_event(event: CommonsEvent) -> ExternResult<Record> {
-    let stored: StoredEvent = event.clone().into();
-    let action_hash = create_entry(&EntryTypes::Event(stored))?;
+    let action_hash = create_entry(&EntryTypes::Event(event.clone()))?;
 
     // Link to all events
     let all_anchor = ensure_anchor("all_commons_events")?;

@@ -104,6 +104,7 @@ getrandom_03 = { package = "getrandom", version = "0.3" }
 commons-types = { path = "crates/commons-types" }
 mutualaid-common = { path = "crates/mutualaid-common" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
+mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
 
 [profile.dev]
 opt-level = "z"

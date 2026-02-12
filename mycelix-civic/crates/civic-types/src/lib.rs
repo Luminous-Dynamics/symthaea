@@ -9,7 +9,9 @@
 pub mod evidence;
 pub mod status;
 pub mod roles;
+pub mod bridge_types;
 
 pub use evidence::*;
 pub use status::*;
 pub use roles::*;
+pub use bridge_types::*;

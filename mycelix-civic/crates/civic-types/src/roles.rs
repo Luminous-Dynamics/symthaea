@@ -30,21 +30,3 @@ pub enum PartyRole {
     Curator,
 }
 
-/// Bridge query for the civic cluster
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct CivicQuery {
-    pub domain: String,
-    pub query_type: String,
-    pub requester: String,
-    pub params: String,
-    pub result: Option<String>,
-}
-
-/// Bridge event for the civic cluster
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-pub struct CivicEvent {
-    pub domain: String,
-    pub event_type: String,
-    pub payload: String,
-    pub related_hashes: Vec<String>,
-}
