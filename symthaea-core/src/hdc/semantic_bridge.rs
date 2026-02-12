@@ -176,7 +176,7 @@ impl SemanticBridge {
         // Deduplicate consecutive identical words
         let mut result: Vec<String> = Vec::new();
         for (_, word, _) in &recovered_words {
-            if result.last().map_or(true, |last| last != word) {
+            if result.last() != Some(word) {
                 result.push(word.clone());
             }
         }
