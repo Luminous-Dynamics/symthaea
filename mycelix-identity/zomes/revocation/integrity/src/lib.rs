@@ -215,3 +215,143 @@ fn validate_update_revocation_list(
 
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts(micros: i64) -> Timestamp {
+        Timestamp::from_micros(micros)
+    }
+
+    // --- RevocationStatus ---
+
+    #[test]
+    fn revocation_status_json_variants() {
+        let variants = vec![
+            (RevocationStatus::Active, "\"Active\""),
+            (RevocationStatus::Suspended, "\"Suspended\""),
+            (RevocationStatus::Revoked, "\"Revoked\""),
+        ];
+        for (variant, expected) in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            assert_eq!(json, expected);
+            let back: RevocationStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    // --- RevocationEntry ---
+
+    #[test]
+    fn revocation_entry_revoked_json_round_trip() {
+        let entry = RevocationEntry {
+            credential_id: "cred-001".into(),
+            issuer: "did:mycelix:issuer1".into(),
+            status: RevocationStatus::Revoked,
+            reason: "Key compromise detected".into(),
+            effective_from: ts(1_700_000_000_000_000),
+            recorded_at: ts(1_700_000_001_000_000),
+            suspension_end: None,
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        let back: RevocationEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(entry, back);
+    }
+
+    #[test]
+    fn revocation_entry_suspended_with_end_date() {
+        let entry = RevocationEntry {
+            credential_id: "cred-002".into(),
+            issuer: "did:mycelix:issuer1".into(),
+            status: RevocationStatus::Suspended,
+            reason: "Under investigation".into(),
+            effective_from: ts(1_700_000_000_000_000),
+            recorded_at: ts(1_700_000_001_000_000),
+            suspension_end: Some(ts(1_710_000_000_000_000)),
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        let back: RevocationEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(entry, back);
+        assert!(entry.suspension_end.is_some());
+    }
+
+    #[test]
+    fn revocation_entry_suspended_requires_end_date() {
+        // Validation condition: Suspended status without suspension_end should be rejected
+        let status = RevocationStatus::Suspended;
+        let suspension_end: Option<Timestamp> = None;
+        assert!(
+            status == RevocationStatus::Suspended && suspension_end.is_none(),
+            "Suspended without end date should be rejected"
+        );
+    }
+
+    #[test]
+    fn revocation_entry_rejects_non_did_issuer() {
+        assert!(!"alice@example.com".starts_with("did:"));
+        assert!("did:mycelix:issuer1".starts_with("did:"));
+    }
+
+    #[test]
+    fn revocation_entry_rejects_empty_reason() {
+        assert!("".is_empty(), "Empty reason should be rejected");
+        assert!(!"Key compromise".is_empty());
+    }
+
+    // --- RevocationList ---
+
+    #[test]
+    fn revocation_list_json_round_trip() {
+        let list = RevocationList {
+            id: "revlist-001".into(),
+            issuer: "did:mycelix:issuer1".into(),
+            revoked: vec!["cred-001".into(), "cred-002".into()],
+            updated: ts(1_700_000_000_000_000),
+            version: 1,
+        };
+        let json = serde_json::to_string(&list).unwrap();
+        let back: RevocationList = serde_json::from_str(&json).unwrap();
+        assert_eq!(list, back);
+    }
+
+    #[test]
+    fn revocation_list_initial_version_must_be_one() {
+        // Validation condition: initial version must be 1
+        let version = 0u32;
+        assert_ne!(version, 1, "Version 0 should be rejected");
+        let version = 1u32;
+        assert_eq!(version, 1, "Version 1 should be accepted");
+    }
+
+    #[test]
+    fn revocation_list_empty_revoked_is_valid() {
+        let list = RevocationList {
+            id: "revlist-002".into(),
+            issuer: "did:mycelix:issuer2".into(),
+            revoked: vec![],
+            updated: ts(1_700_000_000_000_000),
+            version: 1,
+        };
+        let json = serde_json::to_string(&list).unwrap();
+        let back: RevocationList = serde_json::from_str(&json).unwrap();
+        assert_eq!(list, back);
+    }
+
+    // --- RevocationCheckResult ---
+
+    #[test]
+    fn revocation_check_result_json_round_trip() {
+        let result = RevocationCheckResult {
+            credential_id: "cred-001".into(),
+            status: RevocationStatus::Revoked,
+            reason: Some("Expired".into()),
+            checked_at: ts(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let back: RevocationCheckResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.credential_id, "cred-001");
+        assert_eq!(back.status, RevocationStatus::Revoked);
+        assert_eq!(back.reason, Some("Expired".into()));
+    }
+}

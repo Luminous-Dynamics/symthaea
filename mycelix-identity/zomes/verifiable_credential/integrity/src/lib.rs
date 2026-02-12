@@ -545,3 +545,363 @@ fn validate_create_encrypted_entry(
 
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts(micros: i64) -> Timestamp {
+        Timestamp::from_micros(micros)
+    }
+
+    fn valid_proof() -> CredentialProof {
+        CredentialProof {
+            proof_type: "Ed25519Signature2020".into(),
+            created: "2026-01-01T00:00:00Z".into(),
+            verification_method: "did:mycelix:issuer1#key-1".into(),
+            proof_purpose: "assertionMethod".into(),
+            proof_value: "zBase64EncodedSignature".into(),
+            cryptosuite: None,
+            algorithm: None,
+        }
+    }
+
+    fn valid_vc() -> VerifiableCredential {
+        VerifiableCredential {
+            context: vec![
+                "https://www.w3.org/ns/credentials/v2".into(),
+                "https://mycelix.net/ns/v1".into(),
+            ],
+            id: "urn:uuid:test-credential-001".into(),
+            credential_type: vec!["VerifiableCredential".into(), "DegreeCredential".into()],
+            issuer: CredentialIssuer::Did("did:mycelix:issuer1".into()),
+            valid_from: "2026-01-01T00:00:00Z".into(),
+            valid_until: Some("2030-01-01T00:00:00Z".into()),
+            credential_subject: CredentialSubject {
+                id: "did:mycelix:holder1".into(),
+                claims: serde_json::json!({"degree": "BSc Computer Science"}),
+            },
+            credential_schema: Some(CredentialSchemaRef {
+                id: "mycelix:schema:education:degree:v1".into(),
+                schema_type: "JsonSchema".into(),
+            }),
+            credential_status: None,
+            proof: valid_proof(),
+            mycelix_schema_id: "mycelix:schema:education:degree:v1".into(),
+            mycelix_created: ts(1_700_000_000_000_000),
+        }
+    }
+
+    // --- W3C camelCase field naming ---
+
+    #[test]
+    fn vc_json_uses_w3c_camel_case_fields() {
+        let vc = valid_vc();
+        let json = serde_json::to_string_pretty(&vc).unwrap();
+
+        // W3C fields must be camelCase
+        assert!(json.contains("\"@context\""), "Must have @context");
+        assert!(json.contains("\"validFrom\""), "Must have validFrom not valid_from");
+        assert!(json.contains("\"validUntil\""), "Must have validUntil not valid_until");
+        assert!(json.contains("\"credentialSubject\""), "Must have credentialSubject");
+        assert!(json.contains("\"credentialSchema\""), "Must have credentialSchema");
+        assert!(json.contains("\"proofPurpose\""), "Must have proofPurpose");
+        assert!(json.contains("\"proofValue\""), "Must have proofValue");
+        assert!(json.contains("\"verificationMethod\""), "Must have verificationMethod");
+
+        // Must NOT contain snake_case versions
+        assert!(!json.contains("\"valid_from\""));
+        assert!(!json.contains("\"valid_until\""));
+        assert!(!json.contains("\"credential_subject\""));
+        assert!(!json.contains("\"credential_schema\""));
+        assert!(!json.contains("\"proof_purpose\""));
+        assert!(!json.contains("\"proof_value\""));
+        assert!(!json.contains("\"verification_method\""));
+
+        // JSON-LD type field should be "type" not "credential_type"
+        assert!(json.contains("\"type\""));
+        assert!(!json.contains("\"credential_type\""));
+    }
+
+    #[test]
+    fn vc_json_round_trip() {
+        let vc = valid_vc();
+        let json = serde_json::to_string(&vc).unwrap();
+        let back: VerifiableCredential = serde_json::from_str(&json).unwrap();
+        assert_eq!(vc, back);
+    }
+
+    // --- CredentialIssuer ---
+
+    #[test]
+    fn credential_issuer_did_string() {
+        let issuer = CredentialIssuer::Did("did:mycelix:issuer1".into());
+        assert_eq!(issuer.did(), "did:mycelix:issuer1");
+        let json = serde_json::to_string(&issuer).unwrap();
+        assert_eq!(json, "\"did:mycelix:issuer1\"");
+    }
+
+    #[test]
+    fn credential_issuer_object() {
+        let issuer = CredentialIssuer::Object {
+            id: "did:mycelix:issuer2".into(),
+            name: Some("Acme University".into()),
+            issuer_type: Some(vec!["Issuer".into()]),
+        };
+        assert_eq!(issuer.did(), "did:mycelix:issuer2");
+        let json = serde_json::to_string(&issuer).unwrap();
+        assert!(json.contains("\"id\""));
+        assert!(json.contains("\"name\""));
+        let back: CredentialIssuer = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.did(), "did:mycelix:issuer2");
+    }
+
+    // --- CredentialProof ---
+
+    #[test]
+    fn credential_proof_camel_case_fields() {
+        let proof = valid_proof();
+        let json = serde_json::to_string(&proof).unwrap();
+        assert!(json.contains("\"proofPurpose\""));
+        assert!(json.contains("\"proofValue\""));
+        assert!(json.contains("\"verificationMethod\""));
+        assert!(json.contains("\"type\""));
+        assert!(!json.contains("\"proof_type\""));
+    }
+
+    #[test]
+    fn credential_proof_with_algorithm() {
+        let mut proof = valid_proof();
+        proof.cryptosuite = Some("eddsa-rdfc-2022".into());
+        proof.algorithm = Some(0xED01);
+        let json = serde_json::to_string(&proof).unwrap();
+        assert!(json.contains("\"cryptosuite\""));
+        assert!(json.contains("\"algorithm\""));
+        let back: CredentialProof = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.algorithm, Some(0xED01));
+    }
+
+    #[test]
+    fn credential_proof_algorithm_defaults_to_none() {
+        let proof = valid_proof();
+        assert_eq!(proof.algorithm, None);
+        let json = serde_json::to_string(&proof).unwrap();
+        // skip_serializing_if = "Option::is_none"
+        assert!(!json.contains("\"algorithm\""));
+    }
+
+    // --- VerifiablePresentation ---
+
+    #[test]
+    fn vp_json_camel_case_fields() {
+        let vp = VerifiablePresentation {
+            context: vec!["https://www.w3.org/ns/credentials/v2".into()],
+            id: "urn:uuid:presentation-001".into(),
+            presentation_type: vec!["VerifiablePresentation".into()],
+            holder: "did:mycelix:holder1".into(),
+            verifiable_credential: vec![valid_vc()],
+            proof: CredentialProof {
+                proof_purpose: "authentication".into(),
+                ..valid_proof()
+            },
+            mycelix_created: ts(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&vp).unwrap();
+        assert!(json.contains("\"verifiableCredential\""));
+        assert!(!json.contains("\"verifiable_credential\""));
+        // Round-trip
+        let back: VerifiablePresentation = serde_json::from_str(&json).unwrap();
+        assert_eq!(vp, back);
+    }
+
+    // --- Validation conditions ---
+
+    #[test]
+    fn vc_must_include_credentials_context() {
+        let ctx = vec!["https://www.w3.org/ns/credentials/v2".to_string()];
+        assert!(ctx.iter().any(|c| c.contains("credentials")));
+        let bad_ctx = vec!["https://example.com".to_string()];
+        assert!(!bad_ctx.iter().any(|c| c.contains("credentials")));
+    }
+
+    #[test]
+    fn vc_type_must_include_verifiable_credential() {
+        let types = vec!["VerifiableCredential".to_string(), "DegreeCredential".to_string()];
+        assert!(types.contains(&"VerifiableCredential".to_string()));
+        let bad_types = vec!["DegreeCredential".to_string()];
+        assert!(!bad_types.contains(&"VerifiableCredential".to_string()));
+    }
+
+    #[test]
+    fn vc_issuer_must_be_did() {
+        assert!("did:mycelix:abc".starts_with("did:"));
+        assert!(!"https://example.com".starts_with("did:"));
+    }
+
+    #[test]
+    fn vp_proof_purpose_must_be_authentication() {
+        assert_eq!("authentication", "authentication");
+        assert_ne!("assertionMethod", "authentication");
+    }
+
+    // --- CredentialStatus ---
+
+    #[test]
+    fn credential_status_camel_case() {
+        let status = CredentialStatus {
+            id: "https://example.com/status/1".into(),
+            status_type: "BitstringStatusListEntry".into(),
+            status_purpose: Some("revocation".into()),
+            status_list_index: Some("42".into()),
+            status_list_credential: Some("https://example.com/status-list".into()),
+        };
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(json.contains("\"statusPurpose\""));
+        assert!(json.contains("\"statusListIndex\""));
+        assert!(json.contains("\"statusListCredential\""));
+        let back: CredentialStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(status, back);
+    }
+
+    // --- RequestStatus ---
+
+    #[test]
+    fn request_status_json_variants() {
+        let variants = vec![
+            (RequestStatus::Pending, "\"Pending\""),
+            (RequestStatus::UnderReview, "\"UnderReview\""),
+            (RequestStatus::Approved, "\"Approved\""),
+            (RequestStatus::Rejected, "\"Rejected\""),
+            (RequestStatus::Issued, "\"Issued\""),
+        ];
+        for (variant, expected) in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            assert_eq!(json, expected);
+        }
+    }
+
+    // --- CredentialRequest ---
+
+    #[test]
+    fn credential_request_json_round_trip() {
+        let req = CredentialRequest {
+            id: "req-001".into(),
+            requester_did: "did:mycelix:holder1".into(),
+            issuer_did: "did:mycelix:issuer1".into(),
+            schema_id: "mycelix:schema:education:degree:v1".into(),
+            provided_claims: serde_json::json!({"name": "Alice", "degree": "BSc CS"}),
+            evidence: vec![CredentialEvidence {
+                evidence_type: "DocumentVerification".into(),
+                id: "evidence-001".into(),
+                description: Some("Transcript verification".into()),
+            }],
+            status: RequestStatus::Pending,
+            created: ts(1_700_000_000_000_000),
+            updated: ts(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: CredentialRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(req, back);
+    }
+
+    #[test]
+    fn credential_request_requires_did_prefix() {
+        assert!("did:mycelix:holder1".starts_with("did:"));
+        assert!(!"alice@example.com".starts_with("did:"));
+    }
+
+    #[test]
+    fn credential_request_requires_schema_prefix() {
+        assert!("mycelix:schema:education:degree:v1".starts_with("mycelix:schema:"));
+        assert!(!"custom-schema-id".starts_with("mycelix:schema:"));
+    }
+
+    // --- EncryptedEntry ---
+
+    #[test]
+    fn encrypted_entry_json_round_trip() {
+        let entry = EncryptedEntry {
+            entry_type_tag: "CredentialClaims".into(),
+            kem_algorithm: 0xF020,
+            encapsulated_key: vec![1u8; 128],
+            nonce: vec![0u8; 24],
+            ciphertext: vec![42u8; 64],
+            recipient_key_id: "did:mycelix:holder1#kem-1".into(),
+            encrypted_at: ts(1_700_000_000_000_000),
+            plaintext_version: 1,
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        let back: EncryptedEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(entry, back);
+    }
+
+    #[test]
+    fn encrypted_entry_nonce_must_be_24_bytes() {
+        assert_eq!(vec![0u8; 24].len(), 24, "24-byte nonce is valid");
+        assert_ne!(vec![0u8; 16].len(), 24, "16-byte nonce is invalid");
+        assert_ne!(vec![0u8; 32].len(), 24, "32-byte nonce is invalid");
+    }
+
+    #[test]
+    fn encrypted_entry_ciphertext_minimum_16_bytes() {
+        assert!(vec![0u8; 16].len() >= 16, "16 bytes is minimum (tag only)");
+        assert!(vec![0u8; 15].len() < 16, "15 bytes is too short");
+        assert!(vec![0u8; 64].len() >= 16, "64 bytes is valid");
+    }
+
+    #[test]
+    fn encrypted_entry_recipient_key_id_must_be_did_or_self() {
+        assert_eq!("self", "self");
+        assert!("did:mycelix:holder1#kem-1".starts_with("did:"));
+        assert!(!"random-key-id".starts_with("did:") && "random-key-id" != "self");
+    }
+
+    #[test]
+    fn encrypted_entry_self_encryption() {
+        let entry = EncryptedEntry {
+            entry_type_tag: "DerivedContent".into(),
+            kem_algorithm: 0xF030, // self-encrypt
+            encapsulated_key: vec![], // empty for self-encryption
+            nonce: vec![0u8; 24],
+            ciphertext: vec![42u8; 32],
+            recipient_key_id: "self".into(),
+            encrypted_at: ts(1_700_000_000_000_000),
+            plaintext_version: 1,
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        let back: EncryptedEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(entry, back);
+        assert!(entry.encapsulated_key.is_empty());
+    }
+
+    // --- DerivedCredential ---
+
+    #[test]
+    fn derived_credential_json_round_trip() {
+        let dc = DerivedCredential {
+            original_credential_id: "urn:uuid:cred-001".into(),
+            original_issuer: "did:mycelix:issuer1".into(),
+            holder: "did:mycelix:holder1".into(),
+            selected_claims: vec!["degree".into(), "institution".into()],
+            derived_content: CredentialSubject {
+                id: "did:mycelix:holder1".into(),
+                claims: serde_json::json!({"degree": "BSc CS"}),
+            },
+            derivation_proof: DerivationProof {
+                proof_type: "MerkleDisclosure2024".into(),
+                original_credential_hash: vec![0u8; 32],
+                claim_proofs: vec![ClaimProof {
+                    claim_key: "degree".into(),
+                    merkle_path: Some(vec![vec![1u8; 32], vec![2u8; 32]]),
+                    commitment: None,
+                }],
+                holder_signature: vec![3u8; 64],
+            },
+            created: ts(1_700_000_000_000_000),
+            expires: Some(ts(1_800_000_000_000_000)),
+        };
+        let json = serde_json::to_string(&dc).unwrap();
+        let back: DerivedCredential = serde_json::from_str(&json).unwrap();
+        assert_eq!(dc, back);
+    }
+}

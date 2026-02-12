@@ -587,6 +587,32 @@ jobs:
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity/crates/mycelix-crypto && cargo test --features native"
 
+      - name: CLI PQC smoke test (keygen → sign → verify)
+        run: |
+          nix develop ./mycelix-identity --command bash -c '
+            cd mycelix-identity/cli && cargo build --release
+            BIN=target/release/mycelix-credential
+            echo "{\"test\":\"credential\"}" > /tmp/test-cred.json
+
+            # Generate keys for each algorithm
+            $BIN keygen --algorithm ed25519 --output /tmp/pqc-ed.json
+            $BIN keygen --algorithm ml-dsa-65 --output /tmp/pqc-mldsa65.json
+            $BIN keygen --algorithm hybrid-ed25519-ml-dsa-65 --output /tmp/pqc-hybrid.json
+
+            # Sign with each algorithm
+            $BIN sign --key /tmp/pqc-ed.json --credential /tmp/test-cred.json --output /tmp/signed-ed.json
+            $BIN sign --key /tmp/pqc-mldsa65.json --credential /tmp/test-cred.json --output /tmp/signed-mldsa.json
+            $BIN sign --key /tmp/pqc-hybrid.json --credential /tmp/test-cred.json --output /tmp/signed-hybrid.json
+
+            # Verify with --key (real cryptographic verification)
+            $BIN pqc-verify --credential /tmp/signed-ed.json --key /tmp/pqc-ed.json --verbose
+            $BIN pqc-verify --credential /tmp/signed-mldsa.json --key /tmp/pqc-mldsa65.json --verbose
+            $BIN pqc-verify --credential /tmp/signed-hybrid.json --key /tmp/pqc-hybrid.json --verbose
+
+            # Verify structure-only (no --key) still works
+            $BIN pqc-verify --credential /tmp/signed-ed.json --verbose
+          '
+
       - name: Run sweettest - Identity PQC (6 tests)
         run: |
           nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release identity_pqc -- --ignored --test-threads=1 --nocapture"

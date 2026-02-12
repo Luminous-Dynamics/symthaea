@@ -187,6 +187,18 @@ enum Commands {
         #[arg(short, long)]
         credential: PathBuf,
 
+        /// Key file for full cryptographic verification (from keygen)
+        #[arg(short, long)]
+        key: Option<PathBuf>,
+
+        /// Ed25519 key file (for dual-key hybrid verification with hybrid-sign output)
+        #[arg(long)]
+        ed25519_key: Option<PathBuf>,
+
+        /// ML-DSA-65 key file (for dual-key hybrid verification with hybrid-sign output)
+        #[arg(long)]
+        pqc_key: Option<PathBuf>,
+
         /// Show full verification details
         #[arg(long)]
         verbose: bool,
@@ -278,9 +290,18 @@ async fn main() -> Result<()> {
 
         Commands::PqcVerify {
             credential,
+            key,
+            ed25519_key,
+            pqc_key,
             verbose,
         } => {
-            pqc_commands::pqc_verify(&credential, verbose)?;
+            pqc_commands::pqc_verify(
+                &credential,
+                key.as_deref(),
+                ed25519_key.as_deref(),
+                pqc_key.as_deref(),
+                verbose,
+            )?;
         }
     }
 

@@ -270,8 +270,28 @@ pub fn hybrid_sign(
     Ok(())
 }
 
+/// Load a public key from a key file for verification.
+fn load_public_key(key_path: &Path) -> Result<TaggedPublicKey> {
+    let data = std::fs::read_to_string(key_path).context("Failed to read key file")?;
+    let key_file: KeyFile = serde_json::from_str(&data).context("Failed to parse key file JSON")?;
+    TaggedPublicKey::from_multibase(&key_file.public_key)
+        .map_err(|e| anyhow::anyhow!("Failed to decode public key from key file: {:?}", e))
+}
+
 /// Verify a PQC/hybrid signature on a signed credential.
-pub fn pqc_verify(credential_path: &Path, verbose: bool) -> Result<()> {
+///
+/// Key modes:
+/// - `key_path`: single key file (works for all algorithms including hybrid)
+/// - `ed25519_key_path` + `pqc_key_path`: separate keys for dual-key hybrid
+///   signatures produced by `hybrid-sign`
+/// - No keys: structural validation only (with opportunistic issuer-key check)
+pub fn pqc_verify(
+    credential_path: &Path,
+    key_path: Option<&Path>,
+    ed25519_key_path: Option<&Path>,
+    pqc_key_path: Option<&Path>,
+    verbose: bool,
+) -> Result<()> {
     let data = std::fs::read_to_string(credential_path).context("Failed to read signed credential")?;
     let signed: SignedCredential =
         serde_json::from_str(&data).context("Failed to parse signed credential JSON")?;
@@ -301,8 +321,7 @@ pub fn pqc_verify(credential_path: &Path, verbose: bool) -> Result<()> {
         }
     }
 
-    // Structural validation only — we don't have the public key in the signed
-    // credential itself, so we validate the signature structure and report.
+    // Structural validation
     let valid_structure = match alg {
         AlgorithmId::Ed25519 => signature.signature_bytes.len() == 64,
         AlgorithmId::MlDsa65 => signature.signature_bytes.len() == 3309,
@@ -322,9 +341,63 @@ pub fn pqc_verify(credential_path: &Path, verbose: bool) -> Result<()> {
         println!("  Structure:   INVALID (unexpected length {} for {:?})", signature.signature_bytes.len(), alg);
     }
 
-    // If a public key is embedded in the credential (e.g. issuer DID with key),
-    // attempt full cryptographic verification.
-    if let Some(issuer) = signed.credential.get("issuer") {
+    // Full cryptographic verification when key file(s) are provided.
+    let has_dual_keys = ed25519_key_path.is_some() && pqc_key_path.is_some();
+    if let Some(kp) = key_path {
+        let pub_key = load_public_key(kp)?;
+        let canonical = serde_json::to_vec(&signed.credential)?;
+        let result = verify_with_algorithm(&pub_key, &canonical, &signature, alg);
+        match result {
+            Ok(true) => println!("  Cryptographic verification: PASSED"),
+            Ok(false) => {
+                println!("  Cryptographic verification: FAILED");
+                bail!("Cryptographic signature verification failed");
+            }
+            Err(e) => {
+                println!("  Cryptographic verification: ERROR ({:?})", e);
+                bail!("Cryptographic verification error: {:?}", e);
+            }
+        }
+    } else if has_dual_keys && alg == AlgorithmId::HybridEd25519MlDsa65 {
+        // Dual-key verification for hybrid-sign output: verify each component separately.
+        let ed_pub = load_public_key(ed25519_key_path.unwrap())?;
+        let pqc_pub = load_public_key(pqc_key_path.unwrap())?;
+        let canonical = serde_json::to_vec(&signed.credential)?;
+
+        // Split the hybrid signature into Ed25519 (64 bytes) + ML-DSA-65 (rest)
+        let ed_sig_bytes = signature.ed25519_component()
+            .with_context(|| "Could not extract Ed25519 component from hybrid signature")?;
+        let pqc_sig_bytes = signature.pqc_component()
+            .with_context(|| "Could not extract PQC component from hybrid signature")?;
+
+        let ed_sig = TaggedSignature::new(AlgorithmId::Ed25519, ed_sig_bytes.to_vec())
+            .map_err(|e| anyhow::anyhow!("Failed to build Ed25519 signature: {:?}", e))?;
+        let pqc_sig = TaggedSignature::new(AlgorithmId::MlDsa65, pqc_sig_bytes.to_vec())
+            .map_err(|e| anyhow::anyhow!("Failed to build ML-DSA-65 signature: {:?}", e))?;
+
+        let ed_result = verify_with_algorithm(&ed_pub, &canonical, &ed_sig, AlgorithmId::Ed25519);
+        let pqc_result = verify_with_algorithm(&pqc_pub, &canonical, &pqc_sig, AlgorithmId::MlDsa65);
+
+        match (ed_result, pqc_result) {
+            (Ok(true), Ok(true)) => println!("  Cryptographic verification: PASSED (both components)"),
+            (Ok(ed_ok), Ok(pqc_ok)) => {
+                println!("  Ed25519 component:  {}", if ed_ok { "PASSED" } else { "FAILED" });
+                println!("  ML-DSA-65 component: {}", if pqc_ok { "PASSED" } else { "FAILED" });
+                bail!("Hybrid signature verification failed");
+            }
+            (Err(e), _) => {
+                println!("  Ed25519 verification ERROR: {:?}", e);
+                bail!("Ed25519 component verification error: {:?}", e);
+            }
+            (_, Err(e)) => {
+                println!("  ML-DSA-65 verification ERROR: {:?}", e);
+                bail!("ML-DSA-65 component verification error: {:?}", e);
+            }
+        }
+    } else if has_dual_keys {
+        bail!("--ed25519-key and --pqc-key are only valid for hybrid signatures");
+    } else if let Some(issuer) = signed.credential.get("issuer") {
+        // Opportunistic: try embedded issuer public key if no key file given.
         if let Some(pk_str) = issuer.get("publicKeyMultibase").and_then(|v| v.as_str()) {
             match TaggedPublicKey::from_multibase(pk_str) {
                 Ok(pub_key) => {

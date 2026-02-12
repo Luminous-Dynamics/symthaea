@@ -79,7 +79,7 @@ export interface DidDocument {
 export interface DidDeactivation {
   did: string;
   reason: string;
-  deactivated_at: Timestamp;
+  deactivatedAt: Timestamp;
 }
 
 /**
