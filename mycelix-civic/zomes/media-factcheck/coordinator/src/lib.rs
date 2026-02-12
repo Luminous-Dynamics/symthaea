@@ -340,3 +340,164 @@ pub struct UpdateVerdictInput {
     pub requester_did: String,
     pub new_verdict: FactCheckVerdict,
 }
+
+// ============================================================================
+// Cross-domain: Verify disaster claims via emergency_incidents
+// ============================================================================
+
+/// Wire-compatible copy of emergency Disaster for deserialization.
+/// Must match emergency_incidents_integrity::Disaster field-for-field.
+#[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
+struct LocalDisaster {
+    pub id: String,
+    pub disaster_type: LocalDisasterType,
+    pub title: String,
+    pub description: String,
+    pub severity: LocalSeverityLevel,
+    pub declared_by: AgentPubKey,
+    pub declared_at: Timestamp,
+    pub affected_area: LocalAffectedArea,
+    pub status: LocalDisasterStatus,
+    pub estimated_affected: u32,
+    pub coordination_lead: Option<AgentPubKey>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum LocalDisasterType {
+    Hurricane, Earthquake, Wildfire, Flood, Tornado,
+    Pandemic, Industrial, MassCasualty, CyberAttack,
+    Infrastructure, Other(String),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum LocalSeverityLevel { Level1, Level2, Level3, Level4, Level5 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct LocalAffectedArea {
+    pub center_lat: f64,
+    pub center_lon: f64,
+    pub radius_km: f32,
+    pub boundary: Option<Vec<(f64, f64)>>,
+    pub zones: Vec<LocalOperationalZone>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct LocalOperationalZone {
+    pub id: String,
+    pub name: String,
+    pub boundary: Vec<(f64, f64)>,
+    pub priority: LocalZonePriority,
+    pub status: LocalZoneStatus,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum LocalZonePriority { Critical, High, Medium, Low }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum LocalZoneStatus { Unassessed, Active, Cleared, Hazardous, Evacuated }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+enum LocalDisasterStatus { Declared, Active, Recovery, Closed }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyDisasterClaimInput {
+    /// Disaster ID to look up, if known.
+    pub disaster_id: Option<String>,
+    /// Keyword to search in disaster titles/descriptions.
+    pub claim_keyword: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DisasterVerificationResult {
+    pub verified: bool,
+    pub disaster_id: Option<String>,
+    pub disaster_title: Option<String>,
+    pub severity: Option<String>,
+    pub active_disaster_count: u32,
+    pub error: Option<String>,
+}
+
+/// Verify a disaster claim by checking active disasters in emergency_incidents.
+///
+/// This is a concrete cross-domain call: media-factcheck queries
+/// emergency_incidents directly using `call(CallTargetCell::Local, ...)`.
+/// Before rating a disaster-related claim, verify the disaster actually exists.
+#[hdk_extern]
+pub fn verify_disaster_claim(input: VerifyDisasterClaimInput) -> ExternResult<DisasterVerificationResult> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("emergency_incidents"),
+        FunctionName::from("get_active_disasters"),
+        None,
+        (),
+    );
+
+    match &response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            let records: Vec<Record> = extern_io.decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+
+            let active_count = records.len() as u32;
+
+            // Search for matching disaster
+            for record in &records {
+                if let Some(disaster) = record
+                    .entry()
+                    .to_app_option::<LocalDisaster>()
+                    .ok()
+                    .flatten()
+                {
+                    let id_match = input.disaster_id.as_ref()
+                        .map(|id| disaster.id == *id)
+                        .unwrap_or(false);
+
+                    let keyword_match = disaster.title
+                        .to_lowercase()
+                        .contains(&input.claim_keyword.to_lowercase())
+                        || disaster.description
+                            .to_lowercase()
+                            .contains(&input.claim_keyword.to_lowercase());
+
+                    if id_match || keyword_match {
+                        return Ok(DisasterVerificationResult {
+                            verified: true,
+                            disaster_id: Some(disaster.id),
+                            disaster_title: Some(disaster.title),
+                            severity: Some(format!("{:?}", disaster.severity)),
+                            active_disaster_count: active_count,
+                            error: None,
+                        });
+                    }
+                }
+            }
+
+            Ok(DisasterVerificationResult {
+                verified: false,
+                disaster_id: None,
+                disaster_title: None,
+                severity: None,
+                active_disaster_count: active_count,
+                error: Some(format!(
+                    "No matching disaster found for '{}' among {} active disasters",
+                    input.claim_keyword, active_count
+                )),
+            })
+        }
+        Ok(ZomeCallResponse::NetworkError(err)) => Ok(DisasterVerificationResult {
+            verified: false,
+            disaster_id: None,
+            disaster_title: None,
+            severity: None,
+            active_disaster_count: 0,
+            error: Some(format!("Network error: {}", err)),
+        }),
+        _ => Ok(DisasterVerificationResult {
+            verified: false,
+            disaster_id: None,
+            disaster_title: None,
+            severity: None,
+            active_disaster_count: 0,
+            error: Some("Failed to query emergency incidents".into()),
+        }),
+    }
+}

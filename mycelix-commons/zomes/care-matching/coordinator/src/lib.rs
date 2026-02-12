@@ -414,6 +414,112 @@ fn calculate_match_factors(offer: &ServiceOffer, request: &ServiceRequest) -> Ma
     }
 }
 
+// ============================================================================
+// Cross-domain: Check mutual-aid resources for a care service
+// ============================================================================
+
+/// Wire-compatible copy of mutualaid ResourceType for serialization.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum MutualAidResourceType {
+    PowerTool, HandTool, GardenTool, CookingEquipment, CraftingSupplies,
+    Car, Truck, Bicycle, Trailer, Boat,
+    MeetingRoom, Workshop, Kitchen, GardenPlot, StorageSpace, ParkingSpot,
+    CampingGear, SportsEquipment, MusicInstrument, Photography, Projector,
+    Custom(String),
+}
+
+/// Wire-compatible copy of mutualaid SearchResourcesInput.
+#[derive(Serialize, Deserialize, Debug)]
+struct LocalSearchResourcesInput {
+    pub resource_type: Option<MutualAidResourceType>,
+    pub available_only: bool,
+    pub query: Option<String>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckResourcesInput {
+    pub category: ServiceCategory,
+    pub location_hint: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ResourceAvailabilityResult {
+    pub category: ServiceCategory,
+    pub resources_available: u32,
+    pub has_resources: bool,
+    pub error: Option<String>,
+}
+
+/// Check if mutual-aid physical resources are available to support a care service.
+///
+/// This is a concrete cross-domain call: care-matching queries
+/// mutualaid_resources directly using `call(CallTargetCell::Local, ...)`.
+/// For example, an eldercare match might need mobility aids or medical equipment.
+#[hdk_extern]
+pub fn check_resources_for_care_request(input: CheckResourcesInput) -> ExternResult<ResourceAvailabilityResult> {
+    let resource_type = map_care_to_resource_type(&input.category);
+
+    let search = LocalSearchResourcesInput {
+        resource_type,
+        available_only: true,
+        query: input.location_hint,
+        limit: Some(10),
+    };
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("mutualaid_resources"),
+        FunctionName::from("search_resources"),
+        None,
+        search,
+    );
+
+    match &response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            let records: Vec<Record> = extern_io.decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let count = records.len() as u32;
+            Ok(ResourceAvailabilityResult {
+                category: input.category,
+                resources_available: count,
+                has_resources: count > 0,
+                error: None,
+            })
+        }
+        Ok(ZomeCallResponse::NetworkError(err)) => Ok(ResourceAvailabilityResult {
+            category: input.category,
+            resources_available: 0,
+            has_resources: false,
+            error: Some(format!("Network error: {}", err)),
+        }),
+        _ => Ok(ResourceAvailabilityResult {
+            category: input.category,
+            resources_available: 0,
+            has_resources: false,
+            error: Some("Failed to query mutualaid resources".into()),
+        }),
+    }
+}
+
+/// Map a care service category to a mutualaid resource type for search.
+fn map_care_to_resource_type(category: &ServiceCategory) -> Option<MutualAidResourceType> {
+    match category {
+        ServiceCategory::Transportation => Some(MutualAidResourceType::Car),
+        ServiceCategory::Gardening => Some(MutualAidResourceType::GardenTool),
+        ServiceCategory::HomeRepair => Some(MutualAidResourceType::HandTool),
+        ServiceCategory::Cooking => Some(MutualAidResourceType::CookingEquipment),
+        ServiceCategory::ArtMusic => Some(MutualAidResourceType::MusicInstrument),
+        // For categories without a direct resource mapping, return None
+        // to search all available resources
+        _ => None,
+    }
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
 /// Compute overall match score from factors
 fn compute_overall_score(factors: &MatchFactors) -> f32 {
     // Weighted average: skill alignment is most important
