@@ -108,6 +108,98 @@ impl DaemonSnapshot {
     }
 }
 
+/// Daemon configuration — loadable from a JSON config file.
+///
+/// Default location: `$XDG_CONFIG_HOME/nix-mind/daemon.json`
+/// (overridable via `NIX_MIND_CONFIG` environment variable).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DaemonConfig {
+    /// How often to take a full system snapshot (seconds).
+    #[serde(default = "default_snapshot_interval")]
+    pub snapshot_interval: u64,
+    /// How often to check for high-frequency events like journal entries (seconds).
+    #[serde(default = "default_poll_interval")]
+    pub poll_interval: u64,
+    /// Prediction error threshold for episodic storage.
+    #[serde(default = "default_surprise_threshold")]
+    pub surprise_threshold: f64,
+    /// Maximum journal entries to process per poll cycle.
+    #[serde(default = "default_journal_batch_size")]
+    pub journal_batch_size: usize,
+    /// IPC snapshot write frequency (every N poll cycles).
+    #[serde(default = "default_ipc_write_interval")]
+    pub ipc_write_interval: u64,
+    /// Hebbian learning rate for causal graph.
+    #[serde(default = "default_learning_rate")]
+    pub learning_rate: f64,
+}
+
+fn default_snapshot_interval() -> u64 { 60 }
+fn default_poll_interval() -> u64 { 5 }
+fn default_surprise_threshold() -> f64 { 0.3 }
+fn default_journal_batch_size() -> usize { 50 }
+fn default_ipc_write_interval() -> u64 { 10 }
+fn default_learning_rate() -> f64 { 0.1 }
+
+impl Default for DaemonConfig {
+    fn default() -> Self {
+        Self {
+            snapshot_interval: default_snapshot_interval(),
+            poll_interval: default_poll_interval(),
+            surprise_threshold: default_surprise_threshold(),
+            journal_batch_size: default_journal_batch_size(),
+            ipc_write_interval: default_ipc_write_interval(),
+            learning_rate: default_learning_rate(),
+        }
+    }
+}
+
+impl DaemonConfig {
+    /// Load config from a JSON file. Returns default if file doesn't exist.
+    pub fn load(path: &Path) -> Self {
+        match std::fs::read_to_string(path) {
+            Ok(json) => match serde_json::from_str(&json) {
+                Ok(config) => config,
+                Err(e) => {
+                    eprintln!("nix-mind: failed to parse config {}: {}, using defaults", path.display(), e);
+                    Self::default()
+                }
+            },
+            Err(_) => Self::default(),
+        }
+    }
+
+    /// Load config from the default path, with environment override.
+    pub fn load_default() -> Self {
+        Self::load(&default_config_path())
+    }
+
+    /// Save config to a JSON file.
+    pub fn save(&self, path: &Path) -> Result<(), String> {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("create dir: {}", e))?;
+        }
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| format!("serialize: {}", e))?;
+        std::fs::write(path, json)
+            .map_err(|e| format!("write: {}", e))
+    }
+}
+
+/// Default path for the daemon config file.
+pub fn default_config_path() -> PathBuf {
+    if let Some(config_path) = std::env::var_os("NIX_MIND_CONFIG") {
+        PathBuf::from(config_path)
+    } else if let Some(config_dir) = std::env::var_os("XDG_CONFIG_HOME") {
+        PathBuf::from(config_dir).join("nix-mind").join("daemon.json")
+    } else if let Some(home) = std::env::var_os("HOME") {
+        PathBuf::from(home).join(".config/nix-mind/daemon.json")
+    } else {
+        PathBuf::from("/etc/nix-mind/daemon.json")
+    }
+}
+
 /// Default path for the daemon snapshot file.
 pub fn default_snapshot_path() -> PathBuf {
     if let Some(state_dir) = std::env::var_os("NIX_MIND_STATE_DIR") {
@@ -204,5 +296,80 @@ mod tests {
     fn test_default_snapshot_path() {
         let path = default_snapshot_path();
         assert!(path.to_string_lossy().contains("daemon_state.json"));
+    }
+
+    #[test]
+    fn test_config_default() {
+        let config = DaemonConfig::default();
+        assert_eq!(config.snapshot_interval, 60);
+        assert_eq!(config.poll_interval, 5);
+        assert!((config.surprise_threshold - 0.3).abs() < 1e-6);
+        assert_eq!(config.journal_batch_size, 50);
+        assert_eq!(config.ipc_write_interval, 10);
+        assert!((config.learning_rate - 0.1).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_config_serde_roundtrip() {
+        let config = DaemonConfig::default();
+        let json = serde_json::to_string_pretty(&config).unwrap();
+        let restored: DaemonConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.snapshot_interval, config.snapshot_interval);
+        assert_eq!(restored.poll_interval, config.poll_interval);
+    }
+
+    #[test]
+    fn test_config_partial_json() {
+        // Only override some fields — rest should use defaults
+        let json = r#"{"snapshot_interval": 120, "poll_interval": 10}"#;
+        let config: DaemonConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.snapshot_interval, 120);
+        assert_eq!(config.poll_interval, 10);
+        assert!((config.surprise_threshold - 0.3).abs() < 1e-6, "Should use default");
+        assert_eq!(config.journal_batch_size, 50, "Should use default");
+    }
+
+    #[test]
+    fn test_config_save_and_load() {
+        let dir = std::env::temp_dir().join("nix-mind-config-test");
+        let path = dir.join("daemon.json");
+
+        let mut config = DaemonConfig::default();
+        config.snapshot_interval = 30;
+        config.surprise_threshold = 0.5;
+
+        config.save(&path).unwrap();
+        let loaded = DaemonConfig::load(&path);
+        assert_eq!(loaded.snapshot_interval, 30);
+        assert!((loaded.surprise_threshold - 0.5).abs() < 1e-6);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_config_load_nonexistent() {
+        let config = DaemonConfig::load(Path::new("/tmp/nonexistent-nix-mind-config.json"));
+        // Should return defaults
+        assert_eq!(config.snapshot_interval, 60);
+    }
+
+    #[test]
+    fn test_config_load_invalid_json() {
+        let dir = std::env::temp_dir().join("nix-mind-config-invalid");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("daemon.json");
+        std::fs::write(&path, "not valid json!!!").unwrap();
+
+        let config = DaemonConfig::load(&path);
+        // Should return defaults on parse error
+        assert_eq!(config.snapshot_interval, 60);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_default_config_path() {
+        let path = default_config_path();
+        assert!(path.to_string_lossy().contains("daemon.json"));
     }
 }

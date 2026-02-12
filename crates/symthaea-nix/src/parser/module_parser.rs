@@ -117,7 +117,7 @@ impl ModuleParser {
         let has_config = config.module_args.iter().any(|a| a == "config");
         let has_pkgs = config.module_args.iter().any(|a| a == "pkgs");
         let has_lib = config.module_args.iter().any(|a| a == "lib");
-        (has_config || has_lib) && (has_pkgs || has_lib)
+        has_lib || (has_config && has_pkgs)
     }
 
     /// Check if a parsed option looks like an mkOption/mkEnableOption declaration.
@@ -205,8 +205,7 @@ impl ModuleParser {
         if let Some(pos) = raw.find("mkEnableOption") {
             let after = &raw[pos + "mkEnableOption".len()..].trim_start();
             // Look for a quoted string
-            if after.starts_with('"') {
-                let inner = &after[1..];
+            if let Some(inner) = after.strip_prefix('"') {
                 if let Some(end) = inner.find('"') {
                     return Some(inner[..end].to_string());
                 }

@@ -34,7 +34,7 @@ impl<'a> PackageEncoder<'a> {
     /// The name is split on `-` and `.` to capture sub-tokens:
     /// `python311Packages.numpy` → bundle(python311Packages, numpy)
     pub fn encode_name(&mut self, name: &str) -> ContinuousHV {
-        let tokens: Vec<&str> = name.split(|c: char| c == '.' || c == '-' || c == '_')
+        let tokens: Vec<&str> = name.split(['.', '-', '_'])
             .filter(|t| !t.is_empty())
             .collect();
 

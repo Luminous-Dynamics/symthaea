@@ -45,8 +45,7 @@ impl SystemdObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "systemctl list-units failed: {}",
                     String::from_utf8_lossy(&output.stderr)
@@ -70,8 +69,7 @@ impl SystemdObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "systemctl show {} failed: {}",
                     unit,
@@ -99,8 +97,7 @@ impl SystemdObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "systemctl list-units --state=failed failed: {}",
                     String::from_utf8_lossy(&output.stderr)

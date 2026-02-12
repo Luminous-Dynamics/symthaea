@@ -40,8 +40,7 @@ impl StoreObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "nix path-info --all -S failed: {}",
                     String::from_utf8_lossy(&output.stderr)
@@ -60,8 +59,7 @@ impl StoreObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "nix path-info -S failed for '{}': {}",
                     path,
@@ -86,8 +84,7 @@ impl StoreObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "nix-store --gc --print-roots failed: {}",
                     String::from_utf8_lossy(&output.stderr)

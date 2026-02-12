@@ -359,8 +359,8 @@ impl NixCausalGraph {
         let mut loaded = 0;
         for edge in snapshot.edges {
             let key = (edge.from.clone(), edge.to.clone());
-            if !self.causal_graph.contains_key(&key) {
-                self.causal_graph.insert(key, edge);
+            if let std::collections::hash_map::Entry::Vacant(e) = self.causal_graph.entry(key) {
+                e.insert(edge);
                 loaded += 1;
             }
         }
