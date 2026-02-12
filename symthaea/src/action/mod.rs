@@ -129,17 +129,31 @@ impl SandboxRoot {
             requested
                 .canonicalize()
                 .map_err(|e| PolicyViolation::SandboxEscape(e.to_string()))?
-        } else if let Some(parent) = requested.parent() {
-            parent
-                .canonicalize()
-                .map_err(|e| PolicyViolation::SandboxEscape(e.to_string()))?
-                .join(requested.file_name().unwrap_or_default())
         } else {
-            return Err(PolicyViolation::SandboxEscape(format!(
-                "cannot canonicalize {}",
-                requested.display()
-            )));
+            let mut ancestor = requested.parent();
+            let mut found = None;
+            while let Some(parent) = ancestor {
+                if parent.exists() {
+                    found = Some(parent);
+                    break;
+                }
+                ancestor = parent.parent();
+            }
+
+            let base = found.ok_or_else(|| {
+                PolicyViolation::SandboxEscape(format!(
+                    "cannot canonicalize {}",
+                    requested.display()
+                ))
+            })?;
+            let base_canon = base
+                .canonicalize()
+                .map_err(|e| PolicyViolation::SandboxEscape(e.to_string()))?;
+            let suffix = requested.strip_prefix(base).unwrap_or(requested);
+            base_canon.join(suffix)
         };
+
+        let canonical = normalize_path(&canonical);
 
         if !canonical.starts_with(&self.root) {
             return Err(PolicyViolation::SandboxEscape(format!(
@@ -393,6 +407,23 @@ fn ensure_pattern(
     }
 }
 
+fn normalize_path(path: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir => normalized.push(Path::new("/")),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                let _ = normalized.pop();
+            }
+            Component::Normal(part) => normalized.push(part),
+        }
+    }
+    normalized
+}
+
 /// Outcome of executing an action.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ActionOutcome {
@@ -523,36 +554,41 @@ impl SimpleExecutor {
 
         let outcome: ActionOutcome = match action {
             ActionIR::ReadFile { path, .. } => {
-                let data = std::fs::read(path)?;
+                let canonical = sandbox.validate(path).map_err(ExecutionError::Policy)?;
+                let data = std::fs::read(&canonical)?;
                 ActionOutcome::FileContent(data)
             }
             ActionIR::WriteFile { path, content, create_dirs } => {
+                let canonical = sandbox.validate(path).map_err(ExecutionError::Policy)?;
                 if *create_dirs {
-                    if let Some(parent) = path.parent() {
+                    if let Some(parent) = canonical.parent() {
                         std::fs::create_dir_all(parent)?;
                     }
                 }
-                std::fs::write(path, content)?;
+                std::fs::write(&canonical, content)?;
                 ActionOutcome::Success
             }
             ActionIR::DeleteFile { path } => {
-                if path.exists() {
-                    std::fs::remove_file(path)?;
+                let canonical = sandbox.validate(path).map_err(ExecutionError::Policy)?;
+                if canonical.exists() {
+                    std::fs::remove_file(&canonical)?;
                 }
                 ActionOutcome::Success
             }
             ActionIR::CreateDirectory { path, recursive } => {
+                let canonical = sandbox.validate(path).map_err(ExecutionError::Policy)?;
                 if *recursive {
-                    std::fs::create_dir_all(path)?;
+                    std::fs::create_dir_all(&canonical)?;
                 } else {
-                    std::fs::create_dir(path)?;
+                    std::fs::create_dir(&canonical)?;
                 }
                 ActionOutcome::Success
             }
             ActionIR::ListDirectory { path, recursive } => {
+                let canonical = sandbox.validate(path).map_err(ExecutionError::Policy)?;
                 let mut entries = Vec::new();
                 if *recursive {
-                    let mut stack = vec![path.clone()];
+                    let mut stack = vec![canonical.clone()];
                     while let Some(dir) = stack.pop() {
                         for entry in std::fs::read_dir(&dir)? {
                             let e = entry?;
@@ -564,7 +600,7 @@ impl SimpleExecutor {
                         }
                     }
                 } else {
-                    for entry in std::fs::read_dir(path)? {
+                    for entry in std::fs::read_dir(&canonical)? {
                         let e = entry?;
                         entries.push(e.path());
                     }
@@ -876,6 +912,30 @@ mod tests {
             working_dir: None,
         };
         assert!(blocked.validate(&policy, &sandbox).is_err());
+    }
+
+    #[test]
+    fn validate_allows_nested_paths_with_missing_parents() {
+        let policy = PolicyBundle::restrictive();
+        let sandbox = SandboxRoot::new("test_nested").unwrap();
+
+        let nested_path = sandbox.root().join("deep/nested/path.txt");
+        let action = ActionIR::WriteFile {
+            path: nested_path,
+            content: b"ok".to_vec(),
+            create_dirs: true,
+        };
+        assert!(action.validate(&policy, &sandbox).is_ok());
+    }
+
+    #[test]
+    fn validate_blocks_parent_traversal() {
+        let policy = PolicyBundle::restrictive();
+        let sandbox = SandboxRoot::new("test_traversal").unwrap();
+
+        let escaped = sandbox.root().join("dir/../../etc/passwd");
+        let action = ActionIR::ReadFile { path: escaped, encoding: None };
+        assert!(action.validate(&policy, &sandbox).is_err());
     }
 
     #[test]

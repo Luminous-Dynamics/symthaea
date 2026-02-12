@@ -207,7 +207,7 @@ impl MetricsCollector {
         if len < 2 {
             return 0.0;
         }
-        let start = if len > window { len - window } else { 0 };
+        let start = len.saturating_sub(window);
         let slice = &self.phi_history[start..];
         if slice.len() < 2 {
             return 0.0;
@@ -225,7 +225,7 @@ impl MetricsCollector {
         if len == 0 {
             return 0.0;
         }
-        let start = if len > window { len - window } else { 0 };
+        let start = len.saturating_sub(window);
         let slice = &self.phi_history[start..];
         slice.iter().map(|dp| dp.value).sum::<f64>() / slice.len() as f64
     }
