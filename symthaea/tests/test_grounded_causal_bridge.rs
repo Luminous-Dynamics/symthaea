@@ -78,8 +78,13 @@ fn test_causal_markers_so_therefore() {
     let text = "Memory was exhausted so the system crashed";
     let relations = markers.extract_causal_relations(text);
 
-    // May or may not extract depending on implementation
+    // The extraction should at least not crash and produce a valid result
     println!("Relations for 'so': {:?}", relations);
+    // If relations are extracted, they should have non-empty cause and effect
+    for rel in &relations {
+        assert!(!rel.cause.is_empty(), "Cause should not be empty");
+        assert!(!rel.effect.is_empty(), "Effect should not be empty");
+    }
 }
 
 #[test]
@@ -91,6 +96,11 @@ fn test_causal_markers_since() {
     let relations = markers.extract_causal_relations(text);
 
     println!("Relations for 'since': {:?}", relations);
+    // Validate any extracted relations have proper structure
+    for rel in &relations {
+        assert!(!rel.cause.is_empty(), "Cause should not be empty");
+        assert!(!rel.effect.is_empty(), "Effect should not be empty");
+    }
 }
 
 #[test]
@@ -143,8 +153,8 @@ fn test_causal_mind_multiple_sentences() {
     // Log what we learned
     println!("Total links: {}, concepts: {}", total_links, mind.concept_count());
 
-    // The implementation may extract some relations
-    // Don't assert on exact counts as extraction is heuristic
+    // After 4 causal sentences, the mind should have learned something
+    assert!(mind.concept_count() > 0, "Should have learned at least one concept");
 }
 
 #[test]
@@ -158,8 +168,12 @@ fn test_causal_mind_query_why() {
     // Query causal explanation
     let explanations = mind.query_why("crash");
 
-    // Should provide explanation (may or may not find depending on extraction)
+    // The query should return a valid (possibly empty) result without panicking
     println!("Explanations for 'crash': {:?}", explanations);
+    // If we found explanations, they should have non-empty explanation text
+    for explanation in &explanations {
+        assert!(!explanation.explanation.is_empty(), "Explanation text should not be empty");
+    }
 }
 
 #[test]
@@ -173,8 +187,12 @@ fn test_causal_mind_query_what_if() {
     // Query predictions
     let predictions = mind.query_what_if("rain");
 
-    // Should provide predictions (may or may not find depending on extraction)
+    // The query should return a valid (possibly empty) result without panicking
     println!("Predictions for 'rain': {:?}", predictions);
+    // If we found predictions, they should have non-empty prediction text
+    for prediction in &predictions {
+        assert!(!prediction.prediction.is_empty(), "Prediction text should not be empty");
+    }
 }
 
 #[test]
@@ -192,6 +210,8 @@ fn test_causal_mind_phi_increases() {
     // Phi should increase with more causal structure
     // (or at least not decrease significantly)
     println!("Initial Phi: {:.4}, Final Phi: {:.4}", initial_phi, final_phi);
+    assert!(final_phi >= initial_phi,
+        "Phi should not decrease after learning causal structure: {initial_phi:.4} -> {final_phi:.4}");
 }
 
 // ============================================================================
@@ -235,6 +255,9 @@ fn test_full_text_to_causal_pipeline() {
 
     println!("Why timeouts? {:?}", timeout_causes);
     println!("What if cache? {:?}", cache_effects);
+
+    // After processing 5 causal sentences, the mind should have some structure
+    assert!(concept_count > 0, "Should have learned concepts from paragraph");
 }
 
 #[test]

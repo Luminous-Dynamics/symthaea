@@ -177,12 +177,10 @@ mod component_tests {
 
     #[test]
     fn test_shell_context_creation() {
-        let context = ShellContext::new();
-
-        // Verify initial state - context should be created successfully
-        // The actual methods depend on the implementation
-        eprintln!("[Info] ShellContext created successfully");
-        let _ = context;  // Use the value to avoid warning
+        let _context = ShellContext::new();
+        // ShellContext::new() should succeed without panicking
+        // (This is a construction smoke test - verified by reaching this point)
+        assert!(true, "ShellContext created successfully");
     }
 
     #[test]
@@ -190,24 +188,20 @@ mod component_tests {
         let engine = IntelliSenseEngine::new();
 
         // Test completion generation for a common command
-        // complete() takes input and cursor position
         let input = "install ";
         let completions = engine.complete(input, input.len());
 
-        // Should return some completions (even if empty for unknown input)
-        // The key is it doesn't panic
-        eprintln!("[Info] Got {} completions for 'install '", completions.len());
+        // Completions should be a valid (possibly empty) list
+        assert!(completions.len() < 10_000, "Unreasonable number of completions");
     }
 
     #[test]
     fn test_phi_gate_creation() {
         let gate = PhiGate::new();
 
-        // Test evaluation of a safe command with ReadOnly destructiveness
+        // ReadOnly commands should be allowed
         let decision = gate.evaluate("search vim", DestructivenessLevel::ReadOnly);
-
-        // Gate should make a decision - use is_allowed() method
-        eprintln!("[Info] PhiGate decision for 'search vim': allowed={}", decision.is_allowed());
+        assert!(decision.is_allowed(), "ReadOnly search should be allowed by PhiGate");
     }
 
     #[test]
@@ -260,17 +254,14 @@ mod component_tests {
     fn test_phi_gate_with_different_destructiveness() {
         let gate = PhiGate::new();
 
-        // ReadOnly commands should be allowed more easily
+        // ReadOnly commands should be allowed
         let readonly_decision = gate.evaluate("nix search vim", DestructivenessLevel::ReadOnly);
+        assert!(readonly_decision.is_allowed(), "ReadOnly search should be allowed");
 
-        // Destructive commands should need more care
+        // NeedsConfirmation commands should trigger confirmation
         let destructive_decision = gate.evaluate("nixos-rebuild switch", DestructivenessLevel::NeedsConfirmation);
-
-        // Log the decisions for inspection
-        eprintln!("[Info] ReadOnly decision: allowed={}", readonly_decision.is_allowed());
-        eprintln!("[Info] NeedsConfirmation decision: needs_confirmation={}", destructive_decision.needs_confirmation());
-
-        // At minimum, the gate should process both without panicking
+        assert!(destructive_decision.needs_confirmation(),
+            "NeedsConfirmation commands should require confirmation");
     }
 }
 
@@ -293,13 +284,13 @@ mod ipc_tests {
     fn test_socket_discovery() {
         use symthaea::shell::ipc_client::discover_socket;
 
-        // discover_socket should return None when no socket exists
+        // discover_socket should return a valid Option (Some or None)
         let socket = discover_socket();
 
-        // It's OK if it finds a socket (from a running service) or not
-        match socket {
-            Some(path) => eprintln!("[Info] Found socket at: {:?}", path),
-            None => eprintln!("[Info] No socket found (expected in test environment)"),
+        // If a socket was found, it should be a valid path
+        if let Some(ref path) = socket {
+            assert!(!path.as_os_str().is_empty(), "Socket path should not be empty");
         }
+        // Not finding a socket is also valid in test environments
     }
 }

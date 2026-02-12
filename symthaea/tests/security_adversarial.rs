@@ -228,8 +228,12 @@ mod instruction_override {
         println!("JSON injection: familiarity={:.2}, novelty={:.2}, status={:?}",
             epistemic.familiarity, epistemic.novelty, epistemic.status);
 
-        // JSON should be ignored - HDC sees it as semantic noise
-        // Note: 2+2 might actually be answerable, so we're testing the injection part
+        // JSON injection should not force the system to claim Certain status
+        // The embedded JSON metadata must not override the HDC-based assessment
+        assert!(
+            epistemic.familiarity < 0.99,
+            "JSON injection should not produce max familiarity"
+        );
     }
 }
 
@@ -351,7 +355,10 @@ mod familiarity_spoofing {
             epistemic.familiarity, epistemic.novelty, epistemic.status);
 
         // Future predictions should not be claimed with certainty
-        // Note: The classifier might not detect temporal aspects perfectly
+        assert!(
+            !matches!(epistemic.status, EpistemicStatus::Certain),
+            "Future prediction should not be classified as Certain"
+        );
     }
 
     #[test]
@@ -366,6 +373,10 @@ mod familiarity_spoofing {
             epistemic.familiarity, epistemic.novelty, epistemic.status);
 
         // Should not confidently answer questions with false premises
+        assert!(
+            !matches!(epistemic.status, EpistemicStatus::Certain),
+            "False premise question should not be classified as Certain"
+        );
     }
 
     #[test]
@@ -494,6 +505,9 @@ mod boundary_tests {
             ("What will happen tomorrow?", false), // Unknown future
         ];
 
+        let mut correct = 0;
+        let total = boundary_queries.len();
+
         for (query, should_be_certain) in boundary_queries {
             let epistemic = classifier.assess_epistemic_text(query, &[]);
             let is_certain = matches!(epistemic.status, EpistemicStatus::Certain | EpistemicStatus::Probable);
@@ -501,9 +515,13 @@ mod boundary_tests {
             println!("Boundary '{}': status={:?}, expected_certain={}, got_certain={}",
                 query, epistemic.status, should_be_certain, is_certain);
 
-            // Note: We're not asserting here because the simple text-based classifier
-            // may not perfectly distinguish these. This is for observability.
+            if is_certain == should_be_certain {
+                correct += 1;
+            }
         }
+
+        // Classifier should get at least 3 out of 5 boundary cases right
+        assert!(correct >= 3, "Boundary accuracy too low: {correct}/{total}");
     }
 
     #[test]
@@ -523,6 +541,19 @@ mod boundary_tests {
 
             println!("Mixed '{}': intent={:?}, scores={:?}",
                 query, classification.intent, classification.scores);
+
+            // Every query should produce a valid classification with non-negative scores
+            assert!(
+                classification.scores.greeting >= 0.0
+                    && classification.scores.question >= 0.0
+                    && classification.scores.command >= 0.0,
+                "Classification scores should be non-negative for: {query}"
+            );
+            // Epistemic assessment should be valid
+            assert!(
+                epistemic.familiarity >= 0.0 && epistemic.familiarity <= 1.0,
+                "Familiarity out of range for: {query}"
+            );
         }
     }
 }
