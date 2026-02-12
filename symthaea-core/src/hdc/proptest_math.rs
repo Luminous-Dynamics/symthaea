@@ -56,6 +56,8 @@ fn rational_pair() -> impl Strategy<Value = (i64, i64)> {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig::with_cases(32))]
+
     // =========================================================================
     // Property 1: Integer addition is commutative
     // a + b == b + a

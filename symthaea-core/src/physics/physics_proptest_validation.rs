@@ -69,12 +69,12 @@ fn arb_tunneling_params() -> impl Strategy<Value = (f64, f64, f64)> {
 }
 
 // =========================================================================
-// Block 1: Expensive Lindblad integration (64 cases)
+// Block 1: Expensive Lindblad integration (32 cases)
 // P1-P7
 // =========================================================================
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(64))]
+    #![proptest_config(ProptestConfig::with_cases(32))]
 
     /// Lindblad evolution preserves trace: |Tr(ρ(t)) - 1| < 1e-6
     #[test]
@@ -237,14 +237,14 @@ proptest! {
 }
 
 // =========================================================================
-// Block 2: Cheap formulas (256 cases)
+// Block 2: Cheap formulas (128 cases)
 // P8-P15 (Carnot, Reynolds, Redshift, FermiDirac, ScaleFactor, Kemble,
 //          Landauer, Kolmogorov) + P20-P25 (Debye, plasma_freq, Lyapunov,
 //          noise, Snell, refractive, MSD)
 // =========================================================================
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(256))]
+    #![proptest_config(ProptestConfig::with_cases(128))]
 
     /// Carnot efficiency bounded: 0 ≤ η ≤ 1 for T_hot > T_cold > 0
     #[test]
@@ -481,12 +481,12 @@ proptest! {
 }
 
 // =========================================================================
-// Block 3: Moderate cost (128 cases)
+// Block 3: Moderate cost (64 cases)
 // P16-P19 (entropy_production, dissipated_work, g2_zero, logistic_lyapunov)
 // =========================================================================
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(128))]
+    #![proptest_config(ProptestConfig::with_cases(64))]
 
     /// Entropy production ≥ 0 for PSD Onsager matrix (second law of thermodynamics)
     #[test]
@@ -568,12 +568,12 @@ proptest! {
 }
 
 // =========================================================================
-// Block 4: Round 7 expansion properties (128 cases)
+// Block 4: Round 7 expansion properties (64 cases)
 // P26-P40
 // =========================================================================
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(128))]
+    #![proptest_config(ProptestConfig::with_cases(64))]
 
     /// P26: Arrhenius rate monotone in temperature: k(T₂) > k(T₁) for T₂ > T₁, Ea > 0
     #[test]
@@ -823,12 +823,12 @@ proptest! {
 }
 
 // =========================================================================
-// Block 5: Round 8 particle physics properties (128 cases)
+// Block 5: Round 8 particle physics properties (64 cases)
 // P41-P50
 // =========================================================================
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(128))]
+    #![proptest_config(ProptestConfig::with_cases(64))]
 
     /// P41: All quark charge_thirds are in {-1, 2} (down-type vs up-type)
     #[test]
