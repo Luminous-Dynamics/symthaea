@@ -63,13 +63,14 @@
 //!
 //! The database uses `Mutex<Connection>` for thread-safe access. While this
 //! serializes database operations, SQLite in WAL mode can handle concurrent
-//! reads efficiently.
+//! reads efficiently. Calls are wrapped in `spawn_blocking` to avoid stalling
+//! async runtimes.
 
 use super::{ConsciousnessDatabase, DbResult, DatabaseError, DatabaseStats, MemoryRecord, MemoryType, SearchResult};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use async_trait::async_trait;
 use rusqlite::{Connection, params};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::path::Path;
 use crate::infrastructure::lock_guard::ResilientMutex;
 
@@ -101,7 +102,7 @@ use crate::infrastructure::lock_guard::ResilientMutex;
 /// ```
 pub struct SqliteMemory {
     /// Database connection protected by mutex for thread-safe access.
-    conn: Mutex<Connection>,
+    conn: Arc<Mutex<Connection>>,
 
     /// Path to the database file (":memory:" for in-memory databases).
     path: String,
@@ -150,7 +151,7 @@ impl SqliteMemory {
         })?;
 
         let db = Self {
-            conn: Mutex::new(conn),
+            conn: Arc::new(Mutex::new(conn)),
             path: path_str,
         };
 
@@ -187,7 +188,7 @@ impl SqliteMemory {
         })?;
 
         let db = Self {
-            conn: Mutex::new(conn),
+            conn: Arc::new(Mutex::new(conn)),
             path: ":memory:".to_string(),
         };
 
@@ -223,6 +224,20 @@ impl SqliteMemory {
         })?;
 
         Ok(())
+    }
+
+    async fn with_connection<T, F>(&self, f: F) -> DbResult<T>
+    where
+        T: Send + 'static,
+        F: FnOnce(&Connection) -> DbResult<T> + Send + 'static,
+    {
+        let conn = Arc::clone(&self.conn);
+        tokio::task::spawn_blocking(move || {
+            let conn = conn.lock_resilient("sqlite");
+            f(&conn)
+        })
+        .await
+        .map_err(|e| DatabaseError::Other(format!("Blocking task failed: {}", e)))?
     }
 
     /// Serialize BinaryHV to bytes (2048 bytes = 16,384 bits).
@@ -270,290 +285,301 @@ impl SqliteMemory {
 #[async_trait]
 impl ConsciousnessDatabase for SqliteMemory {
     async fn store(&self, record: MemoryRecord) -> DbResult<()> {
-        let conn = self.conn.lock_resilient("sqlite");
+        self.with_connection(move |conn| {
+            let encoding_bytes = Self::hv_to_bytes(&record.encoding);
+            let memory_type_str = Self::memory_type_to_str(record.memory_type);
+            let topics_json = match serde_json::to_string(&record.topics) {
+                Ok(json) => json,
+                Err(e) => {
+                    tracing::warn!("Failed to serialize topics: {}. Using empty array.", e);
+                    "[]".to_string()
+                }
+            };
 
-        let encoding_bytes = Self::hv_to_bytes(&record.encoding);
-        let memory_type_str = Self::memory_type_to_str(record.memory_type);
-        let topics_json = match serde_json::to_string(&record.topics) {
-            Ok(json) => json,
-            Err(e) => {
-                tracing::warn!("Failed to serialize topics: {}. Using empty array.", e);
-                "[]".to_string()
-            }
-        };
+            conn.execute(
+                r#"INSERT OR REPLACE INTO memories
+                   (id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata)
+                   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#,
+                params![
+                    record.id,
+                    encoding_bytes,
+                    record.timestamp_ms as i64,
+                    memory_type_str,
+                    record.content,
+                    record.valence as f64,
+                    record.arousal as f64,
+                    { record.phi },
+                    topics_json,
+                    record.metadata,
+                ],
+            ).map_err(|e| DatabaseError::InsertFailed(format!("Insert failed: {}", e)))?;
 
-        conn.execute(
-            r#"INSERT OR REPLACE INTO memories
-               (id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#,
-            params![
-                record.id,
-                encoding_bytes,
-                record.timestamp_ms as i64,
-                memory_type_str,
-                record.content,
-                record.valence as f64,
-                record.arousal as f64,
-                { record.phi },
-                topics_json,
-                record.metadata,
-            ],
-        ).map_err(|e| DatabaseError::InsertFailed(format!("Insert failed: {}", e)))?;
-
-        Ok(())
+            Ok(())
+        })
+        .await
     }
 
     async fn search_similar(&self, query: &BinaryHV, top_k: usize) -> DbResult<Vec<SearchResult>> {
-        let conn = self.conn.lock_resilient("sqlite");
+        let query = *query;
+        self.with_connection(move |conn| {
+            let mut stmt = conn.prepare(
+                "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata
+                 FROM memories ORDER BY timestamp_ms DESC LIMIT 1000"
+            ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
 
-        let mut stmt = conn.prepare(
-            "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata
-             FROM memories ORDER BY timestamp_ms DESC LIMIT 1000"
-        ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
-
-        let rows = stmt.query_map([], |row| {
-            let encoding_bytes: Vec<u8> = row.get(1)?;
-            let topics_json: String = row.get(8)?;
-            let topics: Vec<String> = match serde_json::from_str(&topics_json) {
-                Ok(t) => t,
-                Err(e) => {
-                    tracing::warn!("Failed to deserialize topics: {}. Using empty array.", e);
-                    Vec::new()
-                }
-            };
-
-            Ok(MemoryRecord {
-                id: row.get(0)?,
-                encoding: Self::bytes_to_hv(&encoding_bytes),
-                timestamp_ms: {
-                    let ts = row.get::<_, i64>(2)?;
-                    if ts < 0 {
-                        tracing::warn!("Negative timestamp {} found, using 0", ts);
-                        0u64
-                    } else {
-                        ts as u64
+            let rows = stmt.query_map([], |row| {
+                let encoding_bytes: Vec<u8> = row.get(1)?;
+                let topics_json: String = row.get(8)?;
+                let topics: Vec<String> = match serde_json::from_str(&topics_json) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        tracing::warn!("Failed to deserialize topics: {}. Using empty array.", e);
+                        Vec::new()
                     }
-                },
-                memory_type: Self::str_to_memory_type(&row.get::<_, String>(3)?),
-                content: row.get(4)?,
-                valence: row.get::<_, f64>(5)? as f32,
-                arousal: row.get::<_, f64>(6)? as f32,
-                phi: row.get::<_, f64>(7)?,
-                topics,
-                metadata: row.get(9)?,
-            })
-        }).map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
+                };
 
-        // Compute similarities and sort
-        let mut results: Vec<SearchResult> = rows
-            .filter_map(|r| r.ok())
-            .map(|record| {
-                let similarity = query.similarity(&record.encoding);
-                SearchResult { record, similarity }
-            })
-            .collect();
+                Ok(MemoryRecord {
+                    id: row.get(0)?,
+                    encoding: Self::bytes_to_hv(&encoding_bytes),
+                    timestamp_ms: {
+                        let ts = row.get::<_, i64>(2)?;
+                        if ts < 0 {
+                            tracing::warn!("Negative timestamp {} found, using 0", ts);
+                            0u64
+                        } else {
+                            ts as u64
+                        }
+                    },
+                    memory_type: Self::str_to_memory_type(&row.get::<_, String>(3)?),
+                    content: row.get(4)?,
+                    valence: row.get::<_, f64>(5)? as f32,
+                    arousal: row.get::<_, f64>(6)? as f32,
+                    phi: row.get::<_, f64>(7)?,
+                    topics,
+                    metadata: row.get(9)?,
+                })
+            }).map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
 
-        // Sort by similarity descending
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
-        results.truncate(top_k);
+            // Compute similarities and sort
+            let mut results: Vec<SearchResult> = rows
+                .filter_map(|r| r.ok())
+                .map(|record| {
+                    let similarity = query.similarity(&record.encoding);
+                    SearchResult { record, similarity }
+                })
+                .collect();
 
-        Ok(results)
+            // Sort by similarity descending
+            results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+            results.truncate(top_k);
+
+            Ok(results)
+        })
+        .await
     }
 
     async fn get(&self, id: &str) -> DbResult<Option<MemoryRecord>> {
-        let conn = self.conn.lock_resilient("sqlite");
+        let id = id.to_string();
+        self.with_connection(move |conn| {
+            let mut stmt = conn.prepare(
+                "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata
+                 FROM memories WHERE id = ?1"
+            ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
 
-        let mut stmt = conn.prepare(
-            "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata
-             FROM memories WHERE id = ?1"
-        ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
-
-        let result = stmt.query_row([id], |row| {
-            let encoding_bytes: Vec<u8> = row.get(1)?;
-            let topics_json: String = row.get(8)?;
-            let topics: Vec<String> = match serde_json::from_str(&topics_json) {
-                Ok(t) => t,
-                Err(e) => {
-                    tracing::warn!("Failed to deserialize topics: {}. Using empty array.", e);
-                    Vec::new()
-                }
-            };
-
-            Ok(MemoryRecord {
-                id: row.get(0)?,
-                encoding: Self::bytes_to_hv(&encoding_bytes),
-                timestamp_ms: {
-                    let ts = row.get::<_, i64>(2)?;
-                    if ts < 0 {
-                        tracing::warn!("Negative timestamp {} found, using 0", ts);
-                        0u64
-                    } else {
-                        ts as u64
+            let result = stmt.query_row([id], |row| {
+                let encoding_bytes: Vec<u8> = row.get(1)?;
+                let topics_json: String = row.get(8)?;
+                let topics: Vec<String> = match serde_json::from_str(&topics_json) {
+                    Ok(t) => t,
+                    Err(e) => {
+                        tracing::warn!("Failed to deserialize topics: {}. Using empty array.", e);
+                        Vec::new()
                     }
-                },
-                memory_type: Self::str_to_memory_type(&row.get::<_, String>(3)?),
-                content: row.get(4)?,
-                valence: row.get::<_, f64>(5)? as f32,
-                arousal: row.get::<_, f64>(6)? as f32,
-                phi: row.get::<_, f64>(7)?,
-                topics,
-                metadata: row.get(9)?,
-            })
-        });
+                };
 
-        match result {
-            Ok(record) => Ok(Some(record)),
-            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(e) => Err(DatabaseError::QueryFailed(format!("Get failed: {}", e))),
-        }
+                Ok(MemoryRecord {
+                    id: row.get(0)?,
+                    encoding: Self::bytes_to_hv(&encoding_bytes),
+                    timestamp_ms: {
+                        let ts = row.get::<_, i64>(2)?;
+                        if ts < 0 {
+                            tracing::warn!("Negative timestamp {} found, using 0", ts);
+                            0u64
+                        } else {
+                            ts as u64
+                        }
+                    },
+                    memory_type: Self::str_to_memory_type(&row.get::<_, String>(3)?),
+                    content: row.get(4)?,
+                    valence: row.get::<_, f64>(5)? as f32,
+                    arousal: row.get::<_, f64>(6)? as f32,
+                    phi: row.get::<_, f64>(7)?,
+                    topics,
+                    metadata: row.get(9)?,
+                })
+            });
+
+            match result {
+                Ok(record) => Ok(Some(record)),
+                Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+                Err(e) => Err(DatabaseError::QueryFailed(format!("Get failed: {}", e))),
+            }
+        })
+        .await
     }
 
     async fn delete(&self, id: &str) -> DbResult<bool> {
-        let conn = self.conn.lock_resilient("sqlite");
+        let id = id.to_string();
+        self.with_connection(move |conn| {
+            let affected = conn.execute("DELETE FROM memories WHERE id = ?1", [id])
+                .map_err(|e| DatabaseError::QueryFailed(format!("Delete failed: {}", e)))?;
 
-        let affected = conn.execute("DELETE FROM memories WHERE id = ?1", [id])
-            .map_err(|e| DatabaseError::QueryFailed(format!("Delete failed: {}", e)))?;
-
-        Ok(affected > 0)
+            Ok(affected > 0)
+        })
+        .await
     }
 
     async fn count(&self) -> DbResult<usize> {
-        let conn = self.conn.lock_resilient("sqlite");
+        self.with_connection(|conn| {
+            let count: i64 = conn.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))
+                .map_err(|e| DatabaseError::QueryFailed(format!("Count failed: {}", e)))?;
 
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))
-            .map_err(|e| DatabaseError::QueryFailed(format!("Count failed: {}", e)))?;
-
-        Ok(count as usize)
+            Ok(count as usize)
+        })
+        .await
     }
 
     async fn health_check(&self) -> DbResult<bool> {
-        let conn = self.conn.lock_resilient("sqlite");
+        self.with_connection(|conn| {
+            conn.execute_batch("SELECT 1")
+                .map_err(|e| DatabaseError::QueryFailed(format!("Health check failed: {}", e)))?;
 
-        conn.execute_batch("SELECT 1")
-            .map_err(|e| DatabaseError::QueryFailed(format!("Health check failed: {}", e)))?;
-
-        Ok(true)
+            Ok(true)
+        })
+        .await
     }
 
     async fn stats(&self) -> DbResult<DatabaseStats> {
-        let conn = self.conn.lock_resilient("sqlite");
+        let path = self.path.clone();
+        self.with_connection(move |conn| {
+            // Get total record count
+            let total_records: i64 = conn.query_row(
+                "SELECT COUNT(*) FROM memories",
+                [],
+                |row| row.get(0)
+            ).map_err(|e| DatabaseError::QueryFailed(format!("Count query failed: {}", e)))?;
 
-        // Get total record count
-        let total_records: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM memories",
-            [],
-            |row| row.get(0)
-        ).map_err(|e| DatabaseError::QueryFailed(format!("Count query failed: {}", e)))?;
+            // Get SQLite pragma values for database metrics
+            let page_size: i64 = conn.query_row(
+                "PRAGMA page_size",
+                [],
+                |row| row.get(0)
+            ).unwrap_or(4096);
 
-        // Get SQLite pragma values for database metrics
-        let page_size: i64 = conn.query_row(
-            "PRAGMA page_size",
-            [],
-            |row| row.get(0)
-        ).unwrap_or(4096);
+            let page_count: i64 = conn.query_row(
+                "PRAGMA page_count",
+                [],
+                |row| row.get(0)
+            ).unwrap_or(0);
 
-        let page_count: i64 = conn.query_row(
-            "PRAGMA page_count",
-            [],
-            |row| row.get(0)
-        ).unwrap_or(0);
+            let freelist_count: i64 = conn.query_row(
+                "PRAGMA freelist_count",
+                [],
+                |row| row.get(0)
+            ).unwrap_or(0);
 
-        let freelist_count: i64 = conn.query_row(
-            "PRAGMA freelist_count",
-            [],
-            |row| row.get(0)
-        ).unwrap_or(0);
+            // Get cache statistics
+            let cache_hits: i64 = conn.query_row(
+                "SELECT cache_hit FROM pragma_database_list() LIMIT 1",
+                [],
+                |row| row.get(0)
+            ).unwrap_or(0);
 
-        // Get cache statistics
-        let cache_hits: i64 = conn.query_row(
-            "SELECT cache_hit FROM pragma_database_list() LIMIT 1",
-            [],
-            |row| row.get(0)
-        ).unwrap_or(0);
+            let cache_misses: i64 = conn.query_row(
+                "SELECT cache_miss FROM pragma_database_list() LIMIT 1",
+                [],
+                |row| row.get(0)
+            ).unwrap_or(0);
 
-        let cache_misses: i64 = conn.query_row(
-            "SELECT cache_miss FROM pragma_database_list() LIMIT 1",
-            [],
-            |row| row.get(0)
-        ).unwrap_or(0);
+            // Calculate cache hit ratio
+            let total_cache_ops = cache_hits + cache_misses;
+            let cache_hit_ratio = if total_cache_ops > 0 {
+                cache_hits as f64 / total_cache_ops as f64
+            } else {
+                0.0
+            };
 
-        // Calculate cache hit ratio
-        let total_cache_ops = cache_hits + cache_misses;
-        let cache_hit_ratio = if total_cache_ops > 0 {
-            cache_hits as f64 / total_cache_ops as f64
-        } else {
-            0.0
-        };
+            // Get memory type distribution
+            let mut type_counts_stmt = conn.prepare(
+                "SELECT memory_type, COUNT(*) as cnt FROM memories GROUP BY memory_type ORDER BY cnt DESC"
+            ).map_err(|e| DatabaseError::QueryFailed(format!("Type counts query failed: {}", e)))?;
 
-        // Get memory type distribution
-        let mut type_counts_stmt = conn.prepare(
-            "SELECT memory_type, COUNT(*) as cnt FROM memories GROUP BY memory_type ORDER BY cnt DESC"
-        ).map_err(|e| DatabaseError::QueryFailed(format!("Type counts query failed: {}", e)))?;
+            let memory_type_counts: Vec<(String, usize)> = type_counts_stmt
+                .query_map([], |row| {
+                    let mt: String = row.get(0)?;
+                    let cnt: i64 = row.get(1)?;
+                    Ok((mt, cnt as usize))
+                })
+                .map_err(|e| DatabaseError::QueryFailed(format!("Type counts failed: {}", e)))?
+                .filter_map(|r| r.ok())
+                .collect();
 
-        let memory_type_counts: Vec<(String, usize)> = type_counts_stmt
-            .query_map([], |row| {
-                let mt: String = row.get(0)?;
-                let cnt: i64 = row.get(1)?;
-                Ok((mt, cnt as usize))
+            // Get average phi
+            let avg_phi: f64 = conn.query_row(
+                "SELECT COALESCE(AVG(phi), 0.0) FROM memories",
+                [],
+                |row| row.get(0)
+            ).unwrap_or(0.0);
+
+            // Get timestamp range
+            let oldest_timestamp_ms: i64 = conn.query_row(
+                "SELECT COALESCE(MIN(timestamp_ms), 0) FROM memories",
+                [],
+                |row| row.get(0)
+            ).unwrap_or(0);
+
+            let newest_timestamp_ms: i64 = conn.query_row(
+                "SELECT COALESCE(MAX(timestamp_ms), 0) FROM memories",
+                [],
+                |row| row.get(0)
+            ).unwrap_or(0);
+
+            // Get journal mode for backend status
+            let journal_mode: String = conn.query_row(
+                "PRAGMA journal_mode",
+                [],
+                |row| row.get(0)
+            ).unwrap_or_else(|_| "unknown".to_string());
+
+            // Calculate database size
+            let database_size_bytes = (page_count as u64) * (page_size as u64);
+
+            // Determine backend status
+            let backend_status = if path == ":memory:" {
+                "in_memory".to_string()
+            } else {
+                format!("file:{}", journal_mode)
+            };
+
+            Ok(DatabaseStats {
+                total_records: total_records as usize,
+                database_size_bytes,
+                page_count: page_count as u64,
+                page_size: page_size as u64,
+                freelist_count: freelist_count as u64,
+                cache_hit_ratio,
+                cache_hits: cache_hits as u64,
+                cache_misses: cache_misses as u64,
+                avg_query_latency_us: 0, // Not tracked yet
+                total_queries: 0,        // Not tracked yet
+                memory_type_counts,
+                avg_phi,
+                oldest_timestamp_ms: oldest_timestamp_ms as u64,
+                newest_timestamp_ms: newest_timestamp_ms as u64,
+                backend_status,
             })
-            .map_err(|e| DatabaseError::QueryFailed(format!("Type counts failed: {}", e)))?
-            .filter_map(|r| r.ok())
-            .collect();
-
-        // Get average phi
-        let avg_phi: f64 = conn.query_row(
-            "SELECT COALESCE(AVG(phi), 0.0) FROM memories",
-            [],
-            |row| row.get(0)
-        ).unwrap_or(0.0);
-
-        // Get timestamp range
-        let oldest_timestamp_ms: i64 = conn.query_row(
-            "SELECT COALESCE(MIN(timestamp_ms), 0) FROM memories",
-            [],
-            |row| row.get(0)
-        ).unwrap_or(0);
-
-        let newest_timestamp_ms: i64 = conn.query_row(
-            "SELECT COALESCE(MAX(timestamp_ms), 0) FROM memories",
-            [],
-            |row| row.get(0)
-        ).unwrap_or(0);
-
-        // Get journal mode for backend status
-        let journal_mode: String = conn.query_row(
-            "PRAGMA journal_mode",
-            [],
-            |row| row.get(0)
-        ).unwrap_or_else(|_| "unknown".to_string());
-
-        // Calculate database size
-        let database_size_bytes = (page_count as u64) * (page_size as u64);
-
-        // Determine backend status
-        let backend_status = if self.path == ":memory:" {
-            "in_memory".to_string()
-        } else {
-            format!("file:{}", journal_mode)
-        };
-
-        Ok(DatabaseStats {
-            total_records: total_records as usize,
-            database_size_bytes,
-            page_count: page_count as u64,
-            page_size: page_size as u64,
-            freelist_count: freelist_count as u64,
-            cache_hit_ratio,
-            cache_hits: cache_hits as u64,
-            cache_misses: cache_misses as u64,
-            avg_query_latency_us: 0, // Not tracked yet
-            total_queries: 0,        // Not tracked yet
-            memory_type_counts,
-            avg_phi,
-            oldest_timestamp_ms: oldest_timestamp_ms as u64,
-            newest_timestamp_ms: newest_timestamp_ms as u64,
-            backend_status,
         })
+        .await
     }
 }
 
