@@ -611,6 +611,11 @@ impl StructuredThought {
             }
         }
 
+        // Primitive tier grounding
+        if !self.primitive_tiers.is_empty() {
+            prompt.push_str(&format!("PRIMITIVE_TIERS: {}\n", self.primitive_tiers.join(", ")));
+        }
+
         // Original input
         if let Some(ref input) = self.original_input {
             prompt.push_str(&format!("\nORIGINAL_INPUT: {}\n", input));

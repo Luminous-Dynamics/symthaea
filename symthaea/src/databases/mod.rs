@@ -37,6 +37,8 @@
 //!     phi: 0.65,      // Integrated information at encoding
 //!     topics: vec!["greeting".to_string(), "first-contact".to_string()],
 //!     metadata: "{}".to_string(),
+//!     consolidation_strength: 0.0,
+//!     retrieval_count: 0,
 //! };
 //! db.store(record).await?;
 //!
@@ -208,6 +210,8 @@ pub enum MemoryType {
 ///     phi: 0.85,      // Phi value at the moment
 ///     topics: vec!["milestone".to_string(), "phi".to_string()],
 ///     metadata: r#"{"session_id": "abc123"}"#.to_string(),
+///     consolidation_strength: 0.0,
+///     retrieval_count: 0,
 /// };
 /// ```
 #[derive(Debug, Clone)]
@@ -251,6 +255,17 @@ pub struct MemoryRecord {
 
     /// Additional metadata as a JSON string.
     pub metadata: String,
+
+    /// Consolidation strength from reconsolidation (0.0 = fragile, 1.0+ = strong).
+    ///
+    /// Increases each time the memory is retrieved and reconsolidated,
+    /// modelling the biological process of memory strengthening through recall.
+    pub consolidation_strength: f64,
+
+    /// Number of times this memory has been retrieved/replayed.
+    ///
+    /// Each retrieval triggers reconsolidation, strengthening the memory trace.
+    pub retrieval_count: u32,
 }
 
 /// Search result containing a memory record and its similarity score.

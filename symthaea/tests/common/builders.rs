@@ -119,6 +119,8 @@ impl MemoryRecordBuilder {
             phi: self.phi,
             topics: self.topics,
             metadata: self.metadata,
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
         }
     }
 }

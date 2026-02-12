@@ -139,6 +139,8 @@ async fn test_similarity_search_exact_match() {
         phi: 0.5,
         topics: vec!["test".to_string()],
         metadata: "{}".to_string(),
+        consolidation_strength: 0.0,
+        retrieval_count: 0,
     };
     db.store(record).await.expect("Should store memory");
 
@@ -178,6 +180,8 @@ async fn test_similarity_search_ordering() {
             phi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
         };
         db.store(record).await.expect("Should store memory");
     }
@@ -297,6 +301,8 @@ async fn test_encoding_roundtrip_integrity() {
         phi: 0.5,
         topics: vec![],
         metadata: "{}".to_string(),
+        consolidation_strength: 0.0,
+        retrieval_count: 0,
     };
 
     db.store(record).await.expect("Should store memory");
@@ -328,6 +334,8 @@ async fn test_emotional_values_roundtrip() {
         phi: 0.88,
         topics: vec!["emotion".to_string()],
         metadata: r#"{"intensity": "high"}"#.to_string(),
+        consolidation_strength: 0.0,
+        retrieval_count: 0,
     };
 
     db.store(record).await.expect("Should store memory");

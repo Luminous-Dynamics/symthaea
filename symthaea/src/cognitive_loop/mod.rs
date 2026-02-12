@@ -139,6 +139,8 @@ use crate::memory::memory_coordinator::{MemoryCoordinator, CoordinatorConfig};
 use crate::hdc_ltc_bridge::HdcLtcBridge;
 use crate::consciousness::stability_regime::{StabilityRegimeProcessor, RegimeTransition};
 use crate::consciousness::primitive_discovery::{PrimitiveDiscoveryService, DiscoveryServiceConfig};
+use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
+use crate::consciousness::primitive_consciousness::{PrimitiveConsciousnessState, ActivePrimitive, ActivationReason};
 use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 use crate::causal::{CausalLoopEnhancer, CausalEnhancerConfig, CausalGraph, DiscoveredRelationship};
 use crate::hdc::moral_algebra::{MoralAlgebra, MoralVerdict, DeontologicalVerdict};
@@ -616,6 +618,13 @@ pub struct CognitiveLoopService {
 
     /// Last moral evaluation result (for tracking and learning)
     last_moral_judgment: Option<MoralJudgmentSummary>,
+
+    /// Primitive-Belief Bridge: maps 9-tier primitives to active inference beliefs
+    /// Computes per-tier prediction errors and TD signals for learning
+    primitive_belief_bridge: PrimitiveBeliefBridge,
+
+    /// Previous cycle's primitive consciousness state for prediction error computation
+    prev_primitive_state: Option<PrimitiveConsciousnessState>,
 }
 
 impl CognitiveLoopService {
@@ -807,12 +816,16 @@ impl CognitiveLoopService {
             reasoning_engine: Some(crate::consciousness::reasoning_engine::ConsciousReasoningEngine::new()),
             // MFDI Bridge for identity verification and signed outputs
             #[cfg(feature = "identity")]
-            mfdi_bridge: crate::identity::MfdiBridge::new(crate::identity::MfdiConfig::default()),
+            mfdi_bridge: crate::identity::MfdiBridge::new(crate::identity::MfdiBridgeConfig::default()),
 
             // Moral Algebra for compositional ethical reasoning
             moral_algebra: MoralAlgebra::default_dim(),
             moral_parser: MoralParser::new(),
             last_moral_judgment: None,
+
+            // Primitive-Belief Bridge for tier-level prediction error learning
+            primitive_belief_bridge: PrimitiveBeliefBridge::new(),
+            prev_primitive_state: None,
         })
     }
 
@@ -929,7 +942,7 @@ impl CognitiveLoopService {
             training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             #[cfg(feature = "identity")]
-            signed_output: self.mfdi_bridge.sign_output(&output).ok(),
+            signed_output: self.mfdi_bridge.sign_output(output.clone()).ok(),
             #[cfg(feature = "identity")]
             assurance_level: self.mfdi_bridge.assurance_level(),
         })
@@ -1662,6 +1675,31 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // PRIMITIVE-BELIEF BRIDGE: Map detected primitives to active inference beliefs
+        // ═══════════════════════════════════════════════════════════════════════
+        // Converts detected primitives into tier-level belief vectors, computes
+        // prediction errors against the previous cycle, and generates a TD signal
+        // that modulates the FEP learning rate.
+        {
+            let prim_state = Self::build_primitive_state(
+                &encoding_result.detected_primitives,
+                self.coherence_bridge.smoothed_coherence() as f64,
+                self.stats.total_cycles as f64,
+            );
+
+            if let Some(ref prev_state) = self.prev_primitive_state {
+                let pred_error = self.primitive_belief_bridge.compute_prediction_error(prev_state, &prim_state);
+                let td_signal = self.primitive_belief_bridge.td_error_signal(&pred_error);
+
+                // Modulate FEP learning signal with primitive-level TD error
+                self.fep_learning_signal += td_signal as f32 * 0.2;
+                self.fep_learning_signal = self.fep_learning_signal.clamp(-1.0, 1.0);
+            }
+
+            self.prev_primitive_state = Some(prim_state);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // CLOSED LEARNING LOOP: Update with cycle results
         // ═══════════════════════════════════════════════════════════════════════
         // This closes the loop: learning from this cycle influences next cycle's strategy
@@ -1822,7 +1860,7 @@ impl CognitiveLoopService {
             training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             #[cfg(feature = "identity")]
-            signed_output: self.mfdi_bridge.sign_output(&output).ok(),
+            signed_output: self.mfdi_bridge.sign_output(output.clone()).ok(),
             #[cfg(feature = "identity")]
             assurance_level: self.mfdi_bridge.assurance_level(),
         }
@@ -1871,6 +1909,67 @@ impl CognitiveLoopService {
         }
 
         result
+    }
+
+    /// Build a lightweight [`PrimitiveConsciousnessState`] from detected primitive names.
+    ///
+    /// Maps primitive names to their most likely tier using keyword heuristics,
+    /// then constructs `ActivePrimitive` entries with activation = 1.0 for each.
+    fn build_primitive_state(
+        detected: &[String],
+        phi: f64,
+        timestamp: f64,
+    ) -> PrimitiveConsciousnessState {
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut state = PrimitiveConsciousnessState::new(timestamp);
+        state.phi = phi;
+
+        for name in detected {
+            let tier = Self::classify_primitive_tier(name);
+            let primitive = symthaea_core::hdc::primitive_system::Primitive {
+                name: name.clone(),
+                tier,
+                domain: "detected".into(),
+                encoding: BinaryHV::zero(),
+                definition: String::new(),
+                is_base: true,
+                derivation: None,
+            };
+            let active = ActivePrimitive {
+                primitive,
+                activation: 1.0,
+                activation_reason: ActivationReason::BottomUp { input_similarity: 1.0 },
+                duration: 1,
+            };
+            state.active_by_tier.entry(tier).or_default().push(active);
+        }
+
+        state
+    }
+
+    /// Classify a detected primitive name into its most likely tier.
+    fn classify_primitive_tier(name: &str) -> symthaea_core::hdc::primitive_system::PrimitiveTier {
+        use symthaea_core::hdc::primitive_system::PrimitiveTier;
+
+        let lower = name.to_lowercase();
+        match lower.as_str() {
+            "identity" | "bind" | "unbind" | "permute" | "bundle" | "protect" => PrimitiveTier::NSM,
+            "addition" | "multiplication" | "implication" | "greater_than" | "less_than"
+            | "equals" | "negation" => PrimitiveTier::Mathematical,
+            "cause" | "effect" | "action" | "force" | "energy" => PrimitiveTier::Physical,
+            "distance" | "angle" | "rotation" | "translation" | "manifold" => PrimitiveTier::Geometric,
+            "cooperate" | "compete" | "negotiate" | "trust" | "reciprocity" => PrimitiveTier::Strategic,
+            "reflect" | "metacognition" | "introspect" | "awareness" => PrimitiveTier::MetaCognitive,
+            "before" | "after" | "during" | "meets" | "overlaps" | "starts" | "finishes" => PrimitiveTier::Temporal,
+            "sequence" | "parallel" | "conditional" | "compose" | "recurse" => PrimitiveTier::Compositional,
+            _ => {
+                // Fallback: try prefix matching
+                if lower.starts_with("meta") { PrimitiveTier::MetaCognitive }
+                else if lower.starts_with("time") || lower.starts_with("temporal") { PrimitiveTier::Temporal }
+                else { PrimitiveTier::NSM } // Default to NSM for unknown primitives
+            }
+        }
     }
 
     /// Run a background consolidation cycle
@@ -3166,52 +3265,48 @@ impl MetricsProvider for CognitiveLoopService {
     fn total_cycles(&self) -> u64 {
         self.stats.total_cycles as u64
     }
+}
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MFDI Identity Integration
-    // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+// MFDI Identity Integration
+// ═══════════════════════════════════════════════════════════════════════════════
 
+#[cfg(feature = "identity")]
+impl CognitiveLoopService {
     /// Get current agent ID (if identity is set)
-    #[cfg(feature = "identity")]
     pub fn agent_id(&self) -> Option<&str> {
         self.mfdi_bridge.agent_id()
     }
 
     /// Get current assurance level
-    #[cfg(feature = "identity")]
     pub fn assurance_level(&self) -> crate::identity::AssuranceLevel {
         self.mfdi_bridge.assurance_level()
     }
 
     /// Set identity from external verification
-    #[cfg(feature = "identity")]
     pub fn set_identity(&mut self, identity: crate::identity::MfdiIdentity) {
         self.mfdi_bridge.set_identity(identity);
     }
 
     /// Check if a cognitive capability is allowed at current assurance level
-    #[cfg(feature = "identity")]
     pub fn check_capability(&self, capability: crate::identity::CognitiveCapability) -> Result<()> {
         self.mfdi_bridge.check_capability(capability)
             .map_err(|e| anyhow::anyhow!("MFDI capability denied: {:?}", e))
     }
 
     /// Sign a cycle output
-    #[cfg(feature = "identity")]
-    pub fn sign_output(&self, output: &[f32]) -> Result<crate::identity::SignedOutput> {
-        self.mfdi_bridge.sign_output(output)
+    pub fn sign_output(&mut self, output: &[f32]) -> Result<crate::identity::SignedOutput> {
+        self.mfdi_bridge.sign_output(output.to_vec())
             .map_err(|e| anyhow::anyhow!("MFDI signing failed: {:?}", e))
     }
 
     /// Verify a signed request
-    #[cfg(feature = "identity")]
     pub fn verify_request(&mut self, request: &crate::identity::SignedRequest) -> Result<()> {
         self.mfdi_bridge.verify_request(request)
             .map_err(|e| anyhow::anyhow!("MFDI verification failed: {:?}", e))
     }
 
     /// Get mutable access to MFDI bridge for advanced operations
-    #[cfg(feature = "identity")]
     pub fn mfdi_bridge_mut(&mut self) -> &mut crate::identity::MfdiBridge {
         &mut self.mfdi_bridge
     }
