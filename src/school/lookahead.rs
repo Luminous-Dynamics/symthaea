@@ -499,8 +499,8 @@ mod tests {
         // Verify that doubling the horizon doesn't significantly increase time
         // (allows for some variance due to system load and clone overhead)
         // The key O(1) property is that time doesn't scale with horizon
-        let max_time = *times.iter().max().unwrap();
-        let min_time = *times.iter().min().unwrap();
+        let max_time = times.iter().copied().max().expect("times should not be empty");
+        let min_time = times.iter().copied().min().expect("times should not be empty");
 
         // In an O(1) algorithm, max should be within 10x of min (accounting for noise)
         // This is a weaker check than exact timing due to clone overhead
