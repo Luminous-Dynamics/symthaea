@@ -85,7 +85,7 @@ impl PhonemeAccumulator {
     fn add(&mut self, phoneme: &str, hv: &HV16) {
         let acc = self.accumulators
             .entry(phoneme.to_string())
-            .or_insert_with(BundleAccumulator::new);
+            .or_default();
         acc.add(hv);
 
         *self.counts.entry(phoneme.to_string()).or_insert(0) += 1;

@@ -108,13 +108,12 @@ impl HardwareObserver {
         let mut core_count: usize = 0;
 
         for line in content.lines() {
-            if line.starts_with("model name") {
-                if model.is_empty() {
+            if line.starts_with("model name")
+                && model.is_empty() {
                     if let Some((_, value)) = line.split_once(':') {
                         model = value.trim().to_string();
                     }
                 }
-            }
             if line.starts_with("processor") {
                 core_count += 1;
             }

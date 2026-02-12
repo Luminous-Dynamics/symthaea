@@ -382,9 +382,9 @@ impl ArticulatoryMapper {
         self.features
             .iter()
             .filter(|(_, f)| {
-                voicing.map_or(true, |v| f.voicing == v)
-                    && manner.map_or(true, |m| f.manner == m)
-                    && place.map_or(true, |p| f.place == p)
+                voicing.is_none_or(|v| f.voicing == v)
+                    && manner.is_none_or(|m| f.manner == m)
+                    && place.is_none_or(|p| f.place == p)
             })
             .map(|(name, _)| name.clone())
             .collect()
@@ -693,7 +693,7 @@ impl ArticulatoryResonator {
         // Build attractors from valid phonemes
         let attractors: Vec<_> = hdc.phoneme_hvs
             .iter()
-            .map(|(name, hv)| (name.clone(), hv.clone()))
+            .map(|(name, hv)| (name.clone(), *hv))
             .collect();
 
         Self {
@@ -710,7 +710,7 @@ impl ArticulatoryResonator {
     /// projected onto the nearest attractor, with diminishing influence
     /// from distant attractors.
     pub fn resonate(&self, query: &HV16) -> (String, f32, usize) {
-        let mut state = query.clone();
+        let mut state = *query;
         let mut iterations = 0;
         let mut prev_best = String::new();
         let mut stable_count = 0;

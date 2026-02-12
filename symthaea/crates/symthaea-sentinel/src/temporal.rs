@@ -257,7 +257,7 @@ impl TemporalWindow {
             if i < self.valid_count {
                 result.extend_from_slice(&self.buffer[idx]);
             } else {
-                result.extend(std::iter::repeat(0.0).take(self.feature_dim));
+                result.extend(std::iter::repeat_n(0.0, self.feature_dim));
             }
         }
         result

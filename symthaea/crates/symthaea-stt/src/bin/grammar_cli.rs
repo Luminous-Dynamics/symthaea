@@ -336,21 +336,19 @@ fn load_phoneme_sequences(path: &PathBuf) -> Vec<Vec<String>> {
     let reader = BufReader::new(file);
     let mut sequences = Vec::new();
 
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            let line = line.trim();
-            if line.is_empty() || line.starts_with('#') {
-                continue;
-            }
+    for line in reader.lines().flatten() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
 
-            let phonemes: Vec<String> = line
-                .split_whitespace()
-                .map(|s| s.to_uppercase())
-                .collect();
+        let phonemes: Vec<String> = line
+            .split_whitespace()
+            .map(|s| s.to_uppercase())
+            .collect();
 
-            if phonemes.len() >= 2 {
-                sequences.push(phonemes);
-            }
+        if phonemes.len() >= 2 {
+            sequences.push(phonemes);
         }
     }
 

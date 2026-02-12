@@ -4,8 +4,6 @@
 //! cryptographic signing for cognitive loop outputs when the `identity`
 //! feature is enabled.
 
-use anyhow::Result;
-use super::CognitiveLoopService;
 
 #[cfg(feature = "identity")]
 impl CognitiveLoopService {

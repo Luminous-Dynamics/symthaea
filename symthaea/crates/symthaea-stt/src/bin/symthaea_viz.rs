@@ -773,8 +773,8 @@ fn similarity_color(sim: f32) -> String {
     let t = sim.clamp(0.0, 1.0);
 
     let r = ((1.0 - t) * 0.2) as u8 * 255;
-    let g = (t * 0.8 + 0.2) as f32 * 255.0;
-    let b = ((1.0 - t) * 0.8) as f32 * 255.0;
+    let g = ((t * 0.8 + 0.2)) * 255.0;
+    let b = ((1.0 - t) * 0.8) * 255.0;
 
-    format!("#{:02x}{:02x}{:02x}", r as u8, g as u8, b as u8)
+    format!("#{:02x}{:02x}{:02x}", { r }, g as u8, b as u8)
 }

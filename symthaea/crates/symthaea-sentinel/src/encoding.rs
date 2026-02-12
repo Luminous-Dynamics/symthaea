@@ -221,14 +221,12 @@ impl PremiumHdcEncoder {
         let rhythm = self.rff_rhythm.project_normalized(&rhythm_phase_space);
 
         // Step 7: Envelope vector
-        let envelope_features = vec![
-            (features.envelope_delta * 10.0).clamp(0.0, 1.0),
-            (features.envelope_variance * 100.0).clamp(0.0, 1.0),
-        ];
+        let envelope_features = [(features.envelope_delta * 10.0).clamp(0.0, 1.0),
+            (features.envelope_variance * 100.0).clamp(0.0, 1.0)];
         let mut envelope_values = vec![0.0f32; HDC_DIM];
         for i in 0..HDC_DIM {
             let idx = i % envelope_features.len();
-            let basis_sign = if (i / envelope_features.len()) % 2 == 0 { 1.0 } else { -1.0 };
+            let basis_sign = if (i / envelope_features.len()).is_multiple_of(2) { 1.0 } else { -1.0 };
             envelope_values[i] = basis_sign * (envelope_features[idx] * 2.0 - 1.0);
         }
         let envelope = HV { values: envelope_values }.normalize();

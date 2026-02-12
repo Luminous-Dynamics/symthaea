@@ -1156,7 +1156,7 @@ fn main() {
         }
         Commands::Download { data_dir, subset } => {
             download_librispeech(&data_dir, &subset, cli.quiet)
-                .map_err(|e| e.into())
+                .map_err(|e| e)
         }
         Commands::Info => {
             run_info();

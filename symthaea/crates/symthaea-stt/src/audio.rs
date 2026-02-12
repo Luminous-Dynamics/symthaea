@@ -697,7 +697,7 @@ impl AudioProjector {
             };
 
             // Spread rotations across full 2048-bit space for maximum discrimination
-            let rotation = (level as i32 - 3) * 256;  // Center around 0
+            let rotation = (level - 3) * 256;  // Center around 0
             let rotated = basis.rotate(rotation);
             for w in 0..16 {
                 hv.words[w] ^= rotated.words[w];

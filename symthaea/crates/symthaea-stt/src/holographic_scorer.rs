@@ -243,7 +243,7 @@ impl HolographicScorer {
             }
 
             // Add to grammar memory (bundle/superposition)
-            grammar_accumulator = bundle(&[grammar_accumulator.clone(), seq_state]);
+            grammar_accumulator = bundle(&[grammar_accumulator, seq_state]);
             count += 1;
         }
 
@@ -262,7 +262,7 @@ impl HolographicScorer {
 
                 self.trigram_constraints
                     .entry(key)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(next);
             }
         }
@@ -307,7 +307,7 @@ impl HolographicScorer {
 
     /// Get context state (for saving/restoring during beam search)
     pub fn get_state(&self) -> HV16 {
-        self.context_state.clone()
+        self.context_state
     }
 
     /// Set context state
