@@ -859,3 +859,70 @@ fn parse_degree_type(degree_name: &str) -> DegreeType {
         DegreeType::Diploma
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- parse_degree_type ---
+
+    #[test]
+    fn parse_bachelor_variants() {
+        assert_eq!(parse_degree_type("Bachelor of Science"), DegreeType::Bachelor);
+        assert_eq!(parse_degree_type("B.S. in Computer Science"), DegreeType::Bachelor);
+        assert_eq!(parse_degree_type("B.A. English Literature"), DegreeType::Bachelor);
+        assert_eq!(parse_degree_type("BACHELOR"), DegreeType::Bachelor);
+    }
+
+    #[test]
+    fn parse_master_variants() {
+        assert_eq!(parse_degree_type("Master of Arts"), DegreeType::Master);
+        assert_eq!(parse_degree_type("M.S. Physics"), DegreeType::Master);
+        assert_eq!(parse_degree_type("M.A. in History"), DegreeType::Master);
+    }
+
+    #[test]
+    fn parse_doctorate_variants() {
+        assert_eq!(parse_degree_type("Doctor of Philosophy"), DegreeType::Doctorate);
+        assert_eq!(parse_degree_type("Ph.D. in Mathematics"), DegreeType::Doctorate);
+        assert_eq!(parse_degree_type("PhD Computer Science"), DegreeType::Doctorate);
+    }
+
+    #[test]
+    fn parse_associate() {
+        assert_eq!(parse_degree_type("Associate of Science"), DegreeType::Associate);
+        assert_eq!(parse_degree_type("A.S. Nursing"), DegreeType::Associate);
+        assert_eq!(parse_degree_type("A.A. Liberal Arts"), DegreeType::Associate);
+    }
+
+    #[test]
+    fn parse_certificate() {
+        assert_eq!(parse_degree_type("Certificate in Data Analytics"), DegreeType::Certificate);
+    }
+
+    #[test]
+    fn parse_high_school() {
+        assert_eq!(parse_degree_type("High School Diploma"), DegreeType::HighSchool);
+        assert_eq!(parse_degree_type("Diploma from High School"), DegreeType::HighSchool);
+    }
+
+    #[test]
+    fn parse_professional() {
+        assert_eq!(parse_degree_type("J.D. Law"), DegreeType::Professional);
+        assert_eq!(parse_degree_type("M.D. Medicine"), DegreeType::Professional);
+        assert_eq!(parse_degree_type("Professional Degree"), DegreeType::Professional);
+    }
+
+    #[test]
+    fn parse_unknown_defaults_to_diploma() {
+        assert_eq!(parse_degree_type("Something Random"), DegreeType::Diploma);
+        assert_eq!(parse_degree_type(""), DegreeType::Diploma);
+    }
+
+    #[test]
+    fn parse_case_insensitive() {
+        assert_eq!(parse_degree_type("bachelor"), DegreeType::Bachelor);
+        assert_eq!(parse_degree_type("MASTER"), DegreeType::Master);
+        assert_eq!(parse_degree_type("doctorate"), DegreeType::Doctorate);
+    }
+}

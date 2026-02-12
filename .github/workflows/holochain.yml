@@ -571,6 +571,14 @@ jobs:
             done
           '
 
+      - name: WASM compilation gate (all identity zomes)
+        run: |
+          nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo build --release --target wasm32-unknown-unknown"
+
+      - name: Identity unit tests (190+ tests)
+        run: |
+          nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo test --lib -- --test-threads=1"
+
       - name: Run sweettest - Identity (4 tests)
         run: |
           nix develop ./mycelix-workspace --command bash -c "cd mycelix-workspace/tests/sweettest && cargo test --release identity -- --ignored --test-threads=1 --nocapture"

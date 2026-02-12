@@ -428,7 +428,7 @@ export interface IdentityConfig {
  * Default configuration values
  */
 export const DEFAULT_IDENTITY_CONFIG: Required<IdentityConfig> = {
-  roleName: 'mycelix_identity',
+  roleName: 'identity',
   debug: false,
   retry: {
     maxAttempts: 3,

@@ -1191,7 +1191,7 @@ export interface IdentityClientConfig {
  * Default identity client configuration
  */
 export const DEFAULT_IDENTITY_CLIENT_CONFIG: Required<IdentityClientConfig> = {
-  roleName: 'mycelix_identity',
+  roleName: 'identity',
   timeout: 30000,
   debug: false,
 };

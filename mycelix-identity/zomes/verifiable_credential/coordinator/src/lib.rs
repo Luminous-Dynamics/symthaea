@@ -1238,6 +1238,277 @@ fn multibase_decode(s: &str) -> Option<Vec<u8>> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- is_leap_year ---
+
+    #[test]
+    fn leap_year_divisible_by_4() {
+        assert!(is_leap_year(2024));
+        assert!(is_leap_year(2004));
+        assert!(is_leap_year(1996));
+    }
+
+    #[test]
+    fn leap_year_century_not_leap() {
+        assert!(!is_leap_year(1900));
+        assert!(!is_leap_year(2100));
+        assert!(!is_leap_year(2200));
+    }
+
+    #[test]
+    fn leap_year_400_is_leap() {
+        assert!(is_leap_year(2000));
+        assert!(is_leap_year(1600));
+        assert!(is_leap_year(2400));
+    }
+
+    #[test]
+    fn non_leap_years() {
+        assert!(!is_leap_year(2023));
+        assert!(!is_leap_year(2025));
+        assert!(!is_leap_year(1971));
+    }
+
+    // --- days_since_epoch ---
+
+    #[test]
+    fn epoch_is_zero() {
+        assert_eq!(days_since_epoch(1970, 1, 1), Some(0));
+    }
+
+    #[test]
+    fn known_date_2024_01_01() {
+        // 2024-01-01 = 54 years (including leap years)
+        // 1970-2023 = 54 years: 13 leap years (72,76,80,84,88,92,96,00,04,08,12,16,20) + 41 normal
+        // 13*366 + 41*365 = 4758 + 14965 = 19723
+        assert_eq!(days_since_epoch(2024, 1, 1), Some(19723));
+    }
+
+    #[test]
+    fn known_date_2000_03_01() {
+        // 2000-03-01 (right after Feb 29 leap day in Y2K)
+        let days = days_since_epoch(2000, 3, 1).unwrap();
+        // 1970-01-01 to 2000-03-01 = 11017 days
+        assert_eq!(days, 11017);
+    }
+
+    // --- parse_tz_offset ---
+
+    #[test]
+    fn tz_offset_utc_plus() {
+        assert_eq!(parse_tz_offset("+05:30"), Some(5 * 3600 + 30 * 60));
+        assert_eq!(parse_tz_offset("+00:00"), Some(0));
+        assert_eq!(parse_tz_offset("+08:00"), Some(8 * 3600));
+    }
+
+    #[test]
+    fn tz_offset_utc_minus() {
+        assert_eq!(parse_tz_offset("-08:00"), Some(-8 * 3600));
+        assert_eq!(parse_tz_offset("-05:00"), Some(-5 * 3600));
+    }
+
+    #[test]
+    fn tz_offset_compact_format() {
+        assert_eq!(parse_tz_offset("+0530"), Some(5 * 3600 + 30 * 60));
+        assert_eq!(parse_tz_offset("-0800"), Some(-8 * 3600));
+    }
+
+    #[test]
+    fn tz_offset_hours_only() {
+        assert_eq!(parse_tz_offset("+05"), Some(5 * 3600));
+        assert_eq!(parse_tz_offset("-08"), Some(-8 * 3600));
+    }
+
+    #[test]
+    fn tz_offset_invalid() {
+        assert_eq!(parse_tz_offset("+"), None);
+        assert_eq!(parse_tz_offset(""), None);
+    }
+
+    // --- parse_iso8601_to_micros ---
+
+    #[test]
+    fn iso8601_date_only() {
+        let micros = parse_iso8601_to_micros("2024-01-01").unwrap();
+        // Should be end of day (23:59:59)
+        let expected_days = days_since_epoch(2024, 1, 1).unwrap();
+        let expected_micros = (expected_days * 86400 + 86399) * 1_000_000;
+        assert_eq!(micros, expected_micros);
+    }
+
+    #[test]
+    fn iso8601_utc_z() {
+        let micros = parse_iso8601_to_micros("2024-01-01T00:00:00Z").unwrap();
+        let expected_days = days_since_epoch(2024, 1, 1).unwrap();
+        assert_eq!(micros, expected_days * 86400 * 1_000_000);
+    }
+
+    #[test]
+    fn iso8601_with_tz_offset() {
+        let utc_micros = parse_iso8601_to_micros("2024-01-01T00:00:00Z").unwrap();
+        let plus5_micros = parse_iso8601_to_micros("2024-01-01T05:00:00+05:00").unwrap();
+        // Both should resolve to same UTC time
+        assert_eq!(utc_micros, plus5_micros);
+    }
+
+    #[test]
+    fn iso8601_invalid_month() {
+        assert!(parse_iso8601_to_micros("2024-13-01").is_none());
+        assert!(parse_iso8601_to_micros("2024-00-01").is_none());
+    }
+
+    #[test]
+    fn iso8601_invalid_format() {
+        assert!(parse_iso8601_to_micros("not a date").is_none());
+        assert!(parse_iso8601_to_micros("").is_none());
+    }
+
+    // --- parse_iso8601_expired ---
+
+    #[test]
+    fn expired_past_date() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000); // ~2023-11-14
+        assert!(parse_iso8601_expired("2020-01-01T00:00:00Z", now));
+    }
+
+    #[test]
+    fn not_expired_future_date() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        assert!(!parse_iso8601_expired("2030-01-01T00:00:00Z", now));
+    }
+
+    #[test]
+    fn unparseable_defaults_not_expired() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        assert!(!parse_iso8601_expired("garbage", now));
+    }
+
+    // --- format_timestamp_iso8601 ---
+
+    #[test]
+    fn format_timestamp_epoch() {
+        let ts = Timestamp::from_micros(0);
+        assert_eq!(format_timestamp_iso8601(ts), "0Z");
+    }
+
+    #[test]
+    fn format_timestamp_known_value() {
+        let ts = Timestamp::from_micros(1_700_000_000_000_000);
+        let formatted = format_timestamp_iso8601(ts);
+        assert_eq!(formatted, "1700000000Z");
+    }
+
+    // --- base58_decode ---
+
+    #[test]
+    fn base58_decode_known_value() {
+        // "1" in base58 = 0x00
+        let result = base58_decode("1").unwrap();
+        assert_eq!(result, vec![0]);
+    }
+
+    #[test]
+    fn base58_decode_round_trip_simple() {
+        // "2" in base58 = 0x01
+        let result = base58_decode("2").unwrap();
+        assert_eq!(result, vec![1]);
+    }
+
+    #[test]
+    fn base58_decode_invalid_char() {
+        // '0', 'O', 'I', 'l' are not in base58 alphabet
+        assert!(base58_decode("0").is_none());
+        assert!(base58_decode("O").is_none());
+        assert!(base58_decode("I").is_none());
+        assert!(base58_decode("l").is_none());
+    }
+
+    // --- multibase_decode ---
+
+    #[test]
+    fn multibase_decode_z_prefix() {
+        let result = multibase_decode("z2");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn multibase_decode_wrong_prefix() {
+        assert!(multibase_decode("f01020304").is_none());
+        assert!(multibase_decode("m01020304").is_none());
+        assert!(multibase_decode("").is_none());
+    }
+
+    // --- compute_credential_hash ---
+
+    #[test]
+    fn credential_hash_deterministic() {
+        let vc = VerifiableCredential {
+            context: vec!["https://www.w3.org/ns/credentials/v2".into()],
+            id: "test-cred-1".into(),
+            credential_type: vec!["VerifiableCredential".into()],
+            issuer: CredentialIssuer::Did("did:mycelix:issuer1".into()),
+            valid_from: "2026-01-01T00:00:00Z".into(),
+            valid_until: None,
+            credential_subject: CredentialSubject {
+                id: "did:mycelix:holder1".into(),
+                claims: serde_json::json!({"degree": "BSc"}),
+            },
+            credential_schema: None,
+            credential_status: None,
+            proof: CredentialProof {
+                proof_type: "Ed25519Signature2020".into(),
+                created: "2026-01-01".into(),
+                verification_method: "did:mycelix:issuer1#key-1".into(),
+                proof_purpose: "assertionMethod".into(),
+                proof_value: "zSig".into(),
+                cryptosuite: None,
+                algorithm: None,
+            },
+            mycelix_schema_id: "mycelix:schema:test:v1".into(),
+            mycelix_created: Timestamp::from_micros(0),
+        };
+        let hash1 = compute_credential_hash(&vc);
+        let hash2 = compute_credential_hash(&vc);
+        assert_eq!(hash1, hash2, "Hash must be deterministic");
+        assert_eq!(hash1.len(), 32, "BLAKE2b-256 produces 32 bytes");
+    }
+
+    #[test]
+    fn credential_hash_differs_for_different_ids() {
+        let make_vc = |id: &str| VerifiableCredential {
+            context: vec!["https://www.w3.org/ns/credentials/v2".into()],
+            id: id.into(),
+            credential_type: vec!["VerifiableCredential".into()],
+            issuer: CredentialIssuer::Did("did:mycelix:issuer1".into()),
+            valid_from: "2026-01-01T00:00:00Z".into(),
+            valid_until: None,
+            credential_subject: CredentialSubject {
+                id: "did:mycelix:holder1".into(),
+                claims: serde_json::json!({}),
+            },
+            credential_schema: None,
+            credential_status: None,
+            proof: CredentialProof {
+                proof_type: "Ed25519Signature2020".into(),
+                created: "2026-01-01".into(),
+                verification_method: "did:mycelix:issuer1#key-1".into(),
+                proof_purpose: "assertionMethod".into(),
+                proof_value: "zSig".into(),
+                cryptosuite: None,
+                algorithm: None,
+            },
+            mycelix_schema_id: "mycelix:schema:test:v1".into(),
+            mycelix_created: Timestamp::from_micros(0),
+        };
+        let hash_a = compute_credential_hash(&make_vc("cred-A"));
+        let hash_b = compute_credential_hash(&make_vc("cred-B"));
+        assert_ne!(hash_a, hash_b);
+    }
+}
+
 /// Sign credential content using the agent's ed25519 key
 ///
 /// This uses Holochain's HDK sign_raw which performs ed25519 signing

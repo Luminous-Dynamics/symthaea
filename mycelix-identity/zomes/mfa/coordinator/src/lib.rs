@@ -2234,3 +2234,249 @@ fn calculate_assurance_output(state: &MfaState, now: Timestamp) -> AssuranceOutp
         stale_factors,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper to create an active factor with "just now" verification
+    fn fresh_factor(factor_type: FactorType, factor_id: &str, now: Timestamp) -> EnrolledFactor {
+        EnrolledFactor {
+            factor_type,
+            factor_id: factor_id.into(),
+            enrolled_at: now,
+            last_verified: now,
+            metadata: "{}".into(),
+            effective_strength: 1.0,
+            active: true,
+        }
+    }
+
+    /// Helper to create an inactive factor
+    fn inactive_factor(factor_type: FactorType, factor_id: &str, now: Timestamp) -> EnrolledFactor {
+        let mut f = fresh_factor(factor_type, factor_id, now);
+        f.active = false;
+        f
+    }
+
+    // --- calculate_assurance_internal ---
+
+    #[test]
+    fn empty_factors_is_anonymous() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        let (level, strength, cats) = calculate_assurance_internal(&[], now);
+        assert_eq!(level, AssuranceLevel::Anonymous);
+        assert_eq!(strength, 0.0);
+        assert_eq!(cats, 0);
+    }
+
+    #[test]
+    fn single_keypair_is_basic() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        let factors = vec![fresh_factor(FactorType::PrimaryKeyPair, "key1", now)];
+        let (level, strength, cats) = calculate_assurance_internal(&factors, now);
+        assert_eq!(level, AssuranceLevel::Basic);
+        // PrimaryKeyPair: current_strength=1.0 (fresh), base_weight=1.0 → 1.0
+        assert!((strength - 1.0).abs() < 0.01);
+        assert_eq!(cats, 1);
+    }
+
+    #[test]
+    fn inactive_factors_ignored() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        let factors = vec![
+            inactive_factor(FactorType::PrimaryKeyPair, "key1", now),
+            inactive_factor(FactorType::HardwareKey, "hw1", now),
+        ];
+        let (level, _, _) = calculate_assurance_internal(&factors, now);
+        assert_eq!(level, AssuranceLevel::Anonymous);
+    }
+
+    #[test]
+    fn two_categories_reaches_verified() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        let factors = vec![
+            // Cryptographic: PrimaryKeyPair (weight 1.0) + HardwareKey (weight 1.2) = 2.2
+            fresh_factor(FactorType::PrimaryKeyPair, "key1", now),
+            fresh_factor(FactorType::HardwareKey, "hw1", now),
+            // Biometric: weight 0.8
+            fresh_factor(FactorType::Biometric, "bio1", now),
+        ];
+        let (level, strength, cats) = calculate_assurance_internal(&factors, now);
+        // total = 1.0 + 1.2 + 0.8 = 3.0, categories = 2 (Cryptographic, Biometric)
+        assert_eq!(cats, 2);
+        assert!(strength >= 2.0);
+        assert_eq!(level, AssuranceLevel::Verified);
+    }
+
+    #[test]
+    fn three_categories_reaches_highly_assured() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        let factors = vec![
+            fresh_factor(FactorType::PrimaryKeyPair, "key1", now),   // Crypto: 1.0
+            fresh_factor(FactorType::HardwareKey, "hw1", now),       // Crypto: 1.2
+            fresh_factor(FactorType::Biometric, "bio1", now),        // Bio: 0.8
+            fresh_factor(FactorType::SocialRecovery, "soc1", now),   // Social: 0.9
+        ];
+        let (level, strength, cats) = calculate_assurance_internal(&factors, now);
+        // total = 1.0 + 1.2 + 0.8 + 0.9 = 3.9, categories = 3
+        assert_eq!(cats, 3);
+        assert!(strength >= 3.0);
+        assert_eq!(level, AssuranceLevel::HighlyAssured);
+    }
+
+    #[test]
+    fn four_categories_reaches_constitutionally_critical() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        let factors = vec![
+            fresh_factor(FactorType::PrimaryKeyPair, "key1", now),      // Crypto: 1.0
+            fresh_factor(FactorType::HardwareKey, "hw1", now),          // Crypto: 1.2
+            fresh_factor(FactorType::Biometric, "bio1", now),           // Bio: 0.8
+            fresh_factor(FactorType::SocialRecovery, "soc1", now),      // Social: 0.9
+            fresh_factor(FactorType::GitcoinPassport, "gp1", now),      // External: 0.8
+        ];
+        let (level, strength, cats) = calculate_assurance_internal(&factors, now);
+        // total = 1.0 + 1.2 + 0.8 + 0.9 + 0.8 = 4.7, categories = 4
+        assert_eq!(cats, 4);
+        assert!(strength >= 4.0);
+        assert_eq!(level, AssuranceLevel::ConstitutionallyCritical);
+    }
+
+    #[test]
+    fn decayed_factor_below_threshold_excluded() {
+        // Factor verified long ago — should have decayed below 0.3 threshold
+        let verified_at = Timestamp::from_micros(1_000_000_000_000_000); // ~2001
+        let now = Timestamp::from_micros(1_700_000_000_000_000);          // ~2023
+        let factors = vec![EnrolledFactor {
+            factor_type: FactorType::ReputationAttestation, // fast decay: 0.012/day
+            factor_id: "rep1".into(),
+            enrolled_at: verified_at,
+            last_verified: verified_at,
+            metadata: "{}".into(),
+            effective_strength: 1.0,
+            active: true,
+        }];
+        let (level, strength, cats) = calculate_assurance_internal(&factors, now);
+        // After ~22 years with 0.012/day decay, strength ≈ 0
+        assert_eq!(level, AssuranceLevel::Anonymous);
+        assert!(strength < 0.01);
+        assert_eq!(cats, 0);
+    }
+
+    #[test]
+    fn category_dedup_same_category_factors() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        // Two cryptographic factors = still 1 category
+        let factors = vec![
+            fresh_factor(FactorType::PrimaryKeyPair, "key1", now),
+            fresh_factor(FactorType::HardwareKey, "hw1", now),
+        ];
+        let (_, _, cats) = calculate_assurance_internal(&factors, now);
+        assert_eq!(cats, 1);
+    }
+
+    // --- AssuranceLevel::score ---
+
+    #[test]
+    fn assurance_level_scores() {
+        assert_eq!(AssuranceLevel::Anonymous.score(), 0.0);
+        assert_eq!(AssuranceLevel::Basic.score(), 0.25);
+        assert_eq!(AssuranceLevel::Verified.score(), 0.5);
+        assert_eq!(AssuranceLevel::HighlyAssured.score(), 0.75);
+        assert_eq!(AssuranceLevel::ConstitutionallyCritical.score(), 1.0);
+    }
+
+    // --- FactorType pure methods ---
+
+    #[test]
+    fn factor_type_categories() {
+        assert_eq!(FactorType::PrimaryKeyPair.category(), FactorCategory::Cryptographic);
+        assert_eq!(FactorType::HardwareKey.category(), FactorCategory::Cryptographic);
+        assert_eq!(FactorType::Biometric.category(), FactorCategory::Biometric);
+        assert_eq!(FactorType::SocialRecovery.category(), FactorCategory::SocialProof);
+        assert_eq!(FactorType::ReputationAttestation.category(), FactorCategory::SocialProof);
+        assert_eq!(FactorType::GitcoinPassport.category(), FactorCategory::ExternalVerification);
+        assert_eq!(FactorType::VerifiableCredential.category(), FactorCategory::ExternalVerification);
+        assert_eq!(FactorType::RecoveryPhrase.category(), FactorCategory::Knowledge);
+        assert_eq!(FactorType::SecurityQuestions.category(), FactorCategory::Knowledge);
+    }
+
+    #[test]
+    fn factor_type_base_weights() {
+        // All weights should be positive
+        let types = [
+            FactorType::PrimaryKeyPair, FactorType::HardwareKey,
+            FactorType::Biometric, FactorType::SocialRecovery,
+            FactorType::ReputationAttestation, FactorType::GitcoinPassport,
+            FactorType::VerifiableCredential, FactorType::RecoveryPhrase,
+            FactorType::SecurityQuestions,
+        ];
+        for ft in &types {
+            assert!(ft.base_weight() > 0.0, "{:?} has non-positive weight", ft);
+        }
+        // HardwareKey should have highest weight among factor types
+        assert!(FactorType::HardwareKey.base_weight() >= FactorType::PrimaryKeyPair.base_weight());
+    }
+
+    #[test]
+    fn factor_decay_configs_valid() {
+        let types = [
+            FactorType::PrimaryKeyPair, FactorType::HardwareKey,
+            FactorType::Biometric, FactorType::SocialRecovery,
+            FactorType::ReputationAttestation, FactorType::GitcoinPassport,
+            FactorType::VerifiableCredential, FactorType::RecoveryPhrase,
+            FactorType::SecurityQuestions,
+        ];
+        for ft in &types {
+            let (grace, decay_rate, reverify) = ft.decay_config();
+            assert!(grace > 0, "{:?} grace period is 0", ft);
+            assert!(decay_rate >= 0.0, "{:?} has negative decay", ft);
+            assert!(reverify > 0, "{:?} reverify period is 0", ft);
+            assert!(reverify >= grace, "{:?} reverify < grace", ft);
+        }
+    }
+
+    // --- EnrolledFactor::current_strength ---
+
+    #[test]
+    fn fresh_factor_full_strength() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        let f = fresh_factor(FactorType::PrimaryKeyPair, "k1", now);
+        assert_eq!(f.current_strength(now), 1.0);
+    }
+
+    #[test]
+    fn inactive_factor_zero_strength() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        let f = inactive_factor(FactorType::PrimaryKeyPair, "k1", now);
+        assert_eq!(f.current_strength(now), 0.0);
+    }
+
+    #[test]
+    fn within_grace_period_full_strength() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        // PrimaryKeyPair grace = 90 days
+        let one_day_later = Timestamp::from_micros(now.as_micros() + 86400 * 1_000_000);
+        let f = fresh_factor(FactorType::PrimaryKeyPair, "k1", now);
+        assert_eq!(f.current_strength(one_day_later), 1.0);
+    }
+
+    // --- EnrolledFactor::needs_reverification ---
+
+    #[test]
+    fn fresh_factor_no_reverification() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        let f = fresh_factor(FactorType::PrimaryKeyPair, "k1", now);
+        assert!(!f.needs_reverification(now));
+    }
+
+    // --- EnrolledFactor::weighted_strength ---
+
+    #[test]
+    fn weighted_strength_fresh() {
+        let now = Timestamp::from_micros(1_700_000_000_000_000);
+        let f = fresh_factor(FactorType::HardwareKey, "hw1", now);
+        // current_strength=1.0 * base_weight=1.2
+        assert!((f.weighted_strength(now) - 1.2).abs() < 0.01);
+    }
+}

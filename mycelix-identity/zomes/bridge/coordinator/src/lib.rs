@@ -1163,3 +1163,94 @@ pub struct EnhancedTrustResult {
     pub meets_threshold: bool,
     pub meets_mfa_requirement: bool,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- AssuranceLevel::to_score ---
+
+    #[test]
+    fn assurance_level_scores() {
+        assert_eq!(AssuranceLevel::Anonymous.to_score(), 0.0);
+        assert_eq!(AssuranceLevel::Basic.to_score(), 0.25);
+        assert_eq!(AssuranceLevel::Verified.to_score(), 0.5);
+        assert_eq!(AssuranceLevel::HighlyAssured.to_score(), 0.75);
+        assert_eq!(AssuranceLevel::ConstitutionallyCritical.to_score(), 1.0);
+    }
+
+    #[test]
+    fn assurance_scores_monotonically_increasing() {
+        let levels = [
+            AssuranceLevel::Anonymous,
+            AssuranceLevel::Basic,
+            AssuranceLevel::Verified,
+            AssuranceLevel::HighlyAssured,
+            AssuranceLevel::ConstitutionallyCritical,
+        ];
+        for i in 1..levels.len() {
+            assert!(
+                levels[i].to_score() > levels[i - 1].to_score(),
+                "{:?} score should be > {:?} score",
+                levels[i],
+                levels[i - 1]
+            );
+        }
+    }
+
+    // --- MFA / Reputation weight constants ---
+
+    #[test]
+    fn weights_sum_to_one() {
+        assert!((MFA_WEIGHT + REPUTATION_WEIGHT - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn mfa_weight_is_40_percent() {
+        assert_eq!(MFA_WEIGHT, 0.4);
+    }
+
+    // --- MfaSummary serde ---
+
+    #[test]
+    fn mfa_summary_json_round_trip() {
+        let summary = MfaSummary {
+            did: "did:mycelix:test".into(),
+            assurance_level: AssuranceLevel::Verified,
+            assurance_score: 0.5,
+            factor_count: 3,
+            category_count: 2,
+            has_external_verification: true,
+            fl_eligible: false,
+        };
+        let json = serde_json::to_string(&summary).unwrap();
+        let restored: MfaSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.did, "did:mycelix:test");
+        assert_eq!(restored.assurance_level, AssuranceLevel::Verified);
+        assert_eq!(restored.factor_count, 3);
+        assert!(restored.has_external_verification);
+        assert!(!restored.fl_eligible);
+    }
+
+    // --- EnhancedTrustResult serde ---
+
+    #[test]
+    fn enhanced_trust_result_serde() {
+        let result = EnhancedTrustResult {
+            did: "did:mycelix:test".into(),
+            is_trusted: true,
+            matl_score: 0.85,
+            reputation_score: 0.9,
+            mfa_score: 0.75,
+            mfa_level: Some(AssuranceLevel::HighlyAssured),
+            mfa_enrolled: true,
+            fl_eligible: true,
+            meets_threshold: true,
+            meets_mfa_requirement: true,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let restored: EnhancedTrustResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.matl_score, 0.85);
+        assert_eq!(restored.mfa_level, Some(AssuranceLevel::HighlyAssured));
+    }
+}
