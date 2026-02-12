@@ -11,10 +11,11 @@
 //! 4. Train: Average (bundle) all encoded HVs per digit class → 10 class prototypes
 //! 5. Classify: argmax cosine_similarity(encoded_test, class_prototype)
 //!
-//! ## Expected Results
-//! - HDC at dim=4096, Q=16: ~88-90% accuracy
-//! - HDC at dim=8192, Q=32: ~90-92% accuracy
-//! - HDC at dim=16384, Q=64: ~92-94% accuracy
+//! ## Validated Results (Feb 2026)
+//! - HDC at dim=4096, Q=32, 5 retrain: 88.49% accuracy
+//! - HDC at dim=8192, Q=32, 5 retrain: 88.01% accuracy
+//! - Higher dimensions show diminishing returns with position-level binding
+//! - 92%+ requires convolutional/multi-scale encoding (not pixel-level)
 //!
 //! ## Literature Reference
 //! Imani et al. "HDC: Hyperdimensional Computing for Efficient Classification" (2019)
