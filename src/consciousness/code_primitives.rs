@@ -37,7 +37,7 @@ use symthaea_core::hdc::{BinaryHV, Primitive, PrimitiveTier, ContinuousHV};
 
 #[cfg(feature = "code_understanding")]
 use crate::hdc::code_encoder::CodeHDEncoder;
-#[cfg(feature = "code_understanding")]
+#[cfg(feature = "code_generation")]
 use crate::language::code_intent::{CodeIntent, CodeIntentCategory};
 
 use super::primitive_reasoning::{TaskType, TierAwareConfig, PrimitiveExecution, TransformationType};
@@ -262,7 +262,7 @@ impl CodePrimitiveRouter {
     }
 
     /// Map a CodeIntent to a CodeOperation
-    #[cfg(feature = "code_understanding")]
+    #[cfg(feature = "code_generation")]
     pub fn intent_to_operation(intent: &CodeIntent) -> CodeOperation {
         match intent {
             CodeIntent::Create { .. } => CodeOperation::Generate,
@@ -275,7 +275,7 @@ impl CodePrimitiveRouter {
     }
 
     /// Map a CodeIntentCategory to a CodeOperation
-    #[cfg(feature = "code_understanding")]
+    #[cfg(feature = "code_generation")]
     pub fn category_to_operation(category: CodeIntentCategory) -> CodeOperation {
         match category {
             CodeIntentCategory::Create => CodeOperation::Generate,

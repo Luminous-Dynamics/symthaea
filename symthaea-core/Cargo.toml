@@ -7,25 +7,25 @@ description = "Core primitives for Symthaea: HDC, Phi Engine, and basic Consciou
 license = "MIT"
 
 [dependencies]
-ndarray = { version = "0.15", features = ["serde"] }
-rand = "0.8"
+ndarray = { workspace = true }
+rand = { workspace = true }
 rand_distr = "0.4"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-thiserror = "1.0"
-uuid = { version = "1.6", features = ["v4", "serde"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
 im = "15.1"  # Immutable data structures for functional state updates
-bincode = "1.3"  # Binary serialization (v1 API)
-rayon = "1.10"  # Parallel processing
-anyhow = "1.0"  # Error handling
-blake3 = "1.5"  # Fast hashing
+bincode = { workspace = true }
+rayon = { workspace = true }
+anyhow = { workspace = true }
+blake3 = { workspace = true }
 sha3 = "0.10"  # SHAKE-256 Keccak sponge for deterministic genesis
 ordered-float = "4.2"  # Orderable floats for heap-based top-k selection
-parking_lot = "0.12"  # Fast synchronization primitives
-once_cell = "1.19"  # Lazy initialization
-nalgebra = "0.32"  # Linear algebra
+parking_lot = { workspace = true }
+once_cell = { workspace = true }
+nalgebra = { workspace = true }
 bumpalo = "3.16"  # Arena allocation
-chrono = { version = "0.4", features = ["serde"] }  # DateTime
+chrono = { workspace = true }
 
 # Multi-Database Consciousness Architecture (optional dependencies)
 # Qdrant: Sensory Cortex - ultra-fast vector similarity for perception
@@ -50,6 +50,12 @@ tokio = { version = "1.35", features = ["rt-multi-thread", "macros"] }  # For as
 [[example]]
 name = "primitive_showcase"
 path = "examples/primitive_showcase.rs"
+
+# scaling_study_demo: module not yet wired into physics/mod.rs; exclude from default build
+[[example]]
+name = "scaling_study_demo"
+path = "examples/scaling_study_demo.rs"
+required-features = ["_scaling_study"]
 
 [[bench]]
 name = "hdc_ltc_learning"

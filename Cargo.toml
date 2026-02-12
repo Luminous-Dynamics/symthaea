@@ -7,21 +7,41 @@ members = [
     "crates/symthaea-stt",
     "crates/symthaea-sentinel",
     "crates/symthaea-dynamics",
+    "crates/symthaea-perception",
 ]
-# WIP crates: not yet workspace-ready (many missing deps, 279+ errors)
-# Add to members once they compile independently
+# WIP crate: cross-references main crate modules (circular dep), needs architectural rework
 exclude = [
     "crates/symthaea-consciousness",
-    "crates/symthaea-perception",
 ]
 
 [workspace.dependencies]
 ndarray = { version = "0.15", features = ["rayon", "serde"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "1.3"
 anyhow = "1.0"
+thiserror = "1.0"
 rand = "0.8"
 tokio = { version = "1.35", features = ["full"] }
 tracing = "0.1"
+blake3 = "1.5"
+uuid = { version = "1.6", features = ["serde", "v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+parking_lot = "0.12"
+once_cell = "1.19"
+nalgebra = "0.33"
+rustfft = "6.2"
+clap = { version = "4.4", features = ["derive"] }
+hound = "3.5"
+petgraph = { version = "0.6", features = ["serde-1"] }
+regex = "1.10"
+strsim = "0.11"
+tree-sitter = "0.24"
+tree-sitter-nix = "0.3"
+rusqlite = { version = "0.37", features = ["bundled"] }
+dashmap = "5.5"
+lru = "0.16"
+rayon = "1.10"
 
 [package]
 name = "symthaea"
@@ -56,10 +76,10 @@ symthaea-nix = { path = "crates/symthaea-nix", optional = true }
 # hypervector = "0.1"  # Using custom HDC implementation instead
 
 # Neural networks (for LTC implementation)
-ndarray = { version = "0.15", features = ["rayon"] }
+ndarray = { workspace = true }
 
 # Linear algebra (pure Rust, validated eigenvalue calculations)
-nalgebra = "0.33"
+nalgebra = { workspace = true }
 
 # Burn ML Framework (pure Rust) - for semantic encoding
 burn = { version = "0.20", features = ["ndarray"], optional = true }
@@ -67,7 +87,7 @@ burn-ndarray = { version = "0.20", optional = true }
 # ndarray-linalg = "0.16"  # Removed to avoid external BLAS dependency during tests
 
 # Graph structures (for autopoietic consciousness)
-petgraph = { version = "0.6", features = ["serde-1"] }
+petgraph = { workspace = true }
 
 # Phase 11: Semantic Ear - Now Active with Qwen3-Embedding
 tokenizers = { version = "0.21", optional = true }  # Tokenization for Qwen3/BGE
@@ -90,7 +110,7 @@ half = { version = "2.6", optional = true }  # f16 support for GPU inference (>=
 iroh = { version = "0.96", optional = true }
 
 # Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
-uuid = { version = "1.6", features = ["serde", "v4"] }  # Week 3: Enabled for Goal IDs
+uuid = { workspace = true }  # Week 3: Enabled for Goal IDs
 # mycelix-sdk: Path dependency removed for Nix sandbox compatibility
 # Re-enable when mycelix-workspace/sdk is available as a crates.io package or git dependency
 # mycelix-sdk = { path = "../../../mycelix-workspace/sdk", optional = true, default-features = false, features = ["standalone"] }
@@ -112,42 +132,42 @@ async-trait = "0.1"
 dirs = "5.0"
 
 # Phase 12: Resonator Networks (FFT for morphogenetic field)
-rustfft = "6.1"
+rustfft = { workspace = true }
 num-complex = "0.4"
 
 # Async runtime
-tokio = { version = "1.35", features = ["full"] }
-rayon = "1.8"
+tokio = { workspace = true }
+rayon = { workspace = true }
 
 # Serialization (for consciousness persistence)
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-bincode = "1.3"
+serde = { workspace = true }
+serde_json = { workspace = true }
+bincode = { workspace = true }
 
 # Observability
-tracing = "0.1"
+tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Week 0: Defer Prometheus metrics (needs OpenSSL via hyper)
 # metrics = "0.22"
 # metrics-exporter-prometheus = "0.13"
 
 # Utilities
-anyhow = "1.0"
-thiserror = "1.0"
-parking_lot = "0.12"  # High-performance synchronization primitives
-rusqlite = { version = "0.37", features = ["bundled"] }  # SQLite database (bundled to avoid system dependency)
-once_cell = "1.19"
-dashmap = "5.5"
-lru = "0.16"
-rand = "0.8"
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
+rusqlite = { workspace = true }
+once_cell = { workspace = true }
+dashmap = { workspace = true }
+lru = { workspace = true }
+rand = { workspace = true }
 rand_chacha = "0.3"  # Deterministic RNG for reproducible JL projections
-blake3 = "1.5"
+blake3 = { workspace = true }
 hex = "0.4"     # Hex encoding for node IDs in federated network
 ed25519-dalek = { version = "2.1", features = ["serde"] }  # MFDI identity signatures
 sha2 = "0.10"   # MFDI credential hashing
 md5 = "0.7"  # For experience module topic hashing
-chrono = { version = "0.4", features = ["serde"] }
-regex = "1.10"  # For Thalamus pattern matching
+chrono = { workspace = true }
+regex = { workspace = true }
 csv = "1.3"     # CSV parsing for benchmark data
 
 # Week 0: Memory Arena for HDC
@@ -155,12 +175,12 @@ bumpalo = "3.14"
 
 # Week 2: Cerebellum - Procedural Memory
 qp-trie = "0.8"      # Efficient prefix trie for skill lookup
-strsim = "0.11"      # Fuzzy string matching for typo tolerance
+strsim = { workspace = true }
 
 # Week 12: Perception & Tool Creation
 image = "0.24"       # Image loading and processing
 imageproc = "0.26"   # Computer vision algorithms
-tree-sitter = "0.24" # Incremental parsing for code understanding (updated for tree-sitter-nix 0.3.0)
+tree-sitter = { workspace = true }
 syn = { version = "2.0", features = ["full", "visit"] }  # Rust syntax parsing (self-analysis)
 ignore = "0.4"       # .gitignore-aware file walking
 
@@ -169,7 +189,7 @@ ignore = "0.4"       # .gitignore-aware file walking
 ort = { version = "2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # ONNX Runtime
 futures = { version = "0.3", optional = true }  # Async TTS streaming
 rodio = { version = "0.19", default-features = false, optional = true }  # Audio playback (no backends by default)
-hound = { version = "3.5", optional = true }        # WAV file I/O
+hound = { workspace = true, optional = true }
 hf-hub = { version = "0.4", optional = true }       # HuggingFace Hub for model download
 espeak-rs = { version = "0.1", optional = true }    # espeak-ng bindings for proper G2P
 
@@ -180,7 +200,7 @@ pyo3 = { version = "0.24", features = ["auto-initialize"], optional = true }  # 
 nix = "0.27"
 
 # CLI argument parsing (optional - for service binary)
-clap = { version = "4.4", features = ["derive"], optional = true }
+clap = { workspace = true, optional = true }
 ctrlc = { version = "3.4", optional = true }  # Ctrl+C signal handling
 
 # Shell Sidecar TUI dependencies (optional)
@@ -195,7 +215,7 @@ egui = { version = "0.33", optional = true }
 rmp-serde = "1.3"            # MessagePack binary protocol (A1)
 
 # Syntax Highlighting (B4)
-tree-sitter-nix = "0.3"      # Nix grammar for tree-sitter (updated for compatibility)
+tree-sitter-nix = { workspace = true }
 # syntect = "5.2"            # Alternative: regex-based highlighting
 
 # Code Understanding & Generation (Consciousness-Aware Code)

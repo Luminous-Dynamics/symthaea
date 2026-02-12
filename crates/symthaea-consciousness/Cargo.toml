@@ -9,7 +9,13 @@ symthaea-dynamics = { path = "../symthaea-dynamics" }
 # HDC Global Workspace (Improvement #23) - used by GlobalWorkspaceRouter
 symthaea-core = { path = "../../symthaea-core" }
 serde = { workspace = true }
+serde_json = { workspace = true }
 anyhow = { workspace = true }
 petgraph = { version = "0.6", features = ["serde-1"] }
 tracing = { workspace = true }
 rand = { workspace = true }
+blake3 = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+libm = "0.2"
+once_cell = "1.19"
