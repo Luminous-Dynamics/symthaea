@@ -108,6 +108,15 @@ pub struct Episode {
 
     /// Number of times this episode has been replayed
     pub replay_count: u32,
+
+    /// Consolidation strength (increases with each retrieval/reconsolidation).
+    /// Starts at 1.0 for new episodes; legacy deserialized episodes default to 0.0.
+    #[serde(default)]
+    pub consolidation_strength: f64,
+
+    /// Number of times this episode has been actively retrieved (distinct from replay)
+    #[serde(default)]
+    pub retrieval_count: u32,
 }
 
 impl Episode {
@@ -122,6 +131,8 @@ impl Episode {
             valence: None,
             coherence: None,
             replay_count: 0,
+            consolidation_strength: 1.0,
+            retrieval_count: 0,
         }
     }
 
@@ -144,6 +155,8 @@ impl Episode {
             valence: Some(valence),
             coherence: Some(coherence),
             replay_count: 0,
+            consolidation_strength: 1.0,
+            retrieval_count: 0,
         }
     }
 
@@ -170,8 +183,31 @@ impl Episode {
         // Emotional salience bonus
         let valence_bonus = self.valence.map(|v| v.abs() as f64 * 0.15).unwrap_or(0.0);
 
+        // Consolidation bonus: retrieved/reconsolidated memories are more valuable
+        let consolidation_bonus = self.consolidation_strength * 0.05;
+
         // Final score (Phi-dominant)
-        base_phi * 0.6 + error_bonus + valence_bonus + recency_bonus * 0.1 + replay_penalty * 0.15
+        base_phi * 0.6
+            + error_bonus
+            + valence_bonus
+            + recency_bonus * 0.1
+            + replay_penalty * 0.15
+            + consolidation_bonus
+    }
+
+    /// Reconsolidate this episode (called upon retrieval).
+    ///
+    /// Biological reconsolidation: each time a memory is retrieved, it becomes
+    /// labile and is re-stored with updated strength. This models that process
+    /// by boosting consolidation_strength logarithmically and incrementing
+    /// retrieval_count.
+    pub fn reconsolidate(&mut self, current_phi: f64) {
+        self.retrieval_count += 1;
+        // Logarithmic boost: diminishing returns on repeated retrieval
+        let boost = (self.retrieval_count as f64).ln_1p() * 0.1;
+        // Phi-weighted: reconsolidation is stronger during high-Phi states
+        let phi_weight = 0.5 + current_phi.clamp(0.0, 1.0) * 0.5;
+        self.consolidation_strength += boost * phi_weight;
     }
 
     /// Convert input to ndarray for CfC training
