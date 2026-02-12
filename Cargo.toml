@@ -6,6 +6,13 @@ members = [
     "crates/symthaea-nix",
     "crates/symthaea-stt",
     "crates/symthaea-sentinel",
+    "crates/symthaea-dynamics",
+]
+# WIP crates: not yet workspace-ready (many missing deps, 279+ errors)
+# Add to members once they compile independently
+exclude = [
+    "crates/symthaea-consciousness",
+    "crates/symthaea-perception",
 ]
 
 [workspace.dependencies]
@@ -34,7 +41,7 @@ categories = ["science", "algorithms", "data-structures"]
 symthaea-core = { path = "symthaea-core" }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
-mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core" }
+mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }
 
 # Symthaea STT - Speech-to-Text, Bioacoustics, EEG processing
 symthaea-stt = { path = "crates/symthaea-stt", optional = true }
@@ -198,6 +205,9 @@ tree-sitter-python = { version = "0.23", optional = true }  # Python grammar for
 # Desktop Notifications (E1)
 zbus = { version = "4.0", optional = true }  # D-Bus for notifications
 
+# Sandbox command timeouts
+wait-timeout = "0.2"
+
 # Systemd Integration (D1)
 libsystemd = { version = "0.7", optional = true }  # Systemd socket activation
 
@@ -243,7 +253,7 @@ desktop = ["notifications", "systemd"]
 # Mycelix integration
 # mycelix = ["mycelix-sdk", "sha3"]  # Full Mycelix SDK integration for governance
 # Disabled until mycelix-sdk is available as a proper crate
-mycelix = ["sha3"]  # Mycelix-ready (hashing only, SDK integration pending)
+mycelix = ["mycelix-fl-core", "sha3"]  # Mycelix FL algorithms + hashing
 
 # Identity: MFDI (Multi-Factor Delegated Identity) for cognitive agents
 identity = []  # Ed25519 signatures, capability gating, signed request/output
@@ -275,6 +285,12 @@ reasoning_engine = ["epistemic_conflict", "conscious_tool_gate", "temporal_plann
 code_understanding = ["tree-sitter-rust", "tree-sitter-python"]  # Multi-language code parsing via tree-sitter
 code_generation = ["code_understanding"]  # HDC-based code generation (requires parsers)
 consciousness_code = ["code_generation", "reasoning_engine", "epistemic_conflict"]  # Full consciousness-aware code pipeline
+
+# Sub-crate feature forwarding
+nix-cli = ["symthaea-nix", "symthaea-nix/cli"]        # CLI for Nix Mind
+nix-tui = ["symthaea-nix", "symthaea-nix/tui"]        # TUI for Nix Mind
+nix-daemon = ["symthaea-nix", "symthaea-nix/daemon"]   # Daemon mode for Nix Mind
+sentinel-live-audio = ["symthaea-sentinel", "symthaea-sentinel/live-audio"]  # Real-time audio capture
 
 nvml = []                      # NVIDIA Management Library for GPU monitoring
 network = []                   # Mycelix network client (real HTTP fetching)

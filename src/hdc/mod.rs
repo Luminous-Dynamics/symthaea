@@ -194,7 +194,8 @@ pub use symthaea_core::hdc::cincinnati_advanced;
 pub use symthaea_core::hdc::cincinnati_network;
 pub use symthaea_core::hdc::gwt_cincinnati_integration;
 pub use symthaea_core::hdc::universal_semantics;
-pub use symthaea_core::hdc::tiered_phi as core_tiered_phi;
+// tiered_phi is canonicalized in symthaea-core (single source of truth)
+pub use symthaea_core::hdc::tiered_phi;
 pub use symthaea_core::hdc::arithmetic_engine;
 pub use symthaea_core::hdc::consciousness_persistence as core_consciousness_persistence;
 pub use symthaea_core::hdc::conscious_learning as core_conscious_learning;
@@ -288,8 +289,7 @@ pub mod arithmetic;
 /// Consciousness-specific HDC computations.
 pub mod consciousness;
 
-/// Tiered phi computation with performance tiers.
-pub mod tiered_phi;
+// tiered_phi is re-exported from symthaea_core above
 
 /// Phi measurement utilities.
 pub mod phi;

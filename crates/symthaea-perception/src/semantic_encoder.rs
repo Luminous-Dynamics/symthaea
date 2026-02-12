@@ -8,7 +8,7 @@
 //! This ensures the system NEVER crashes due to missing model files.
 
 use anyhow::Result;
-use symthaea_math::RealHV;
+use symthaea_core::hdc::real_hv::RealHV;
 #[cfg(feature = "embeddings")]
 use ort::{GraphOptimizationLevel, Session};
 #[cfg(feature = "embeddings")]
