@@ -34,6 +34,8 @@
 //!     phi: 0.65,
 //!     topics: vec!["greeting".to_string()],
 //!     metadata: "{}".to_string(),
+//!     consolidation_strength: 0.0,
+//!     retrieval_count: 0,
 //! };
 //! db.store(record).await?;
 //!
@@ -213,7 +215,9 @@ impl SqliteMemory {
                 arousal REAL NOT NULL,
                 phi REAL NOT NULL,
                 topics TEXT NOT NULL,
-                metadata TEXT NOT NULL
+                metadata TEXT NOT NULL,
+                consolidation_strength REAL NOT NULL DEFAULT 0.0,
+                retrieval_count INTEGER NOT NULL DEFAULT 0
             );
 
             CREATE INDEX IF NOT EXISTS idx_memories_timestamp ON memories(timestamp_ms);
@@ -222,6 +226,12 @@ impl SqliteMemory {
         "#).map_err(|e| {
             DatabaseError::QueryFailed(format!("Schema creation failed: {}", e))
         })?;
+
+        // Migration: add reconsolidation columns to existing databases
+        let _ = conn.execute_batch(r#"
+            ALTER TABLE memories ADD COLUMN consolidation_strength REAL NOT NULL DEFAULT 0.0;
+            ALTER TABLE memories ADD COLUMN retrieval_count INTEGER NOT NULL DEFAULT 0;
+        "#);
 
         Ok(())
     }
@@ -298,8 +308,8 @@ impl ConsciousnessDatabase for SqliteMemory {
 
             conn.execute(
                 r#"INSERT OR REPLACE INTO memories
-                   (id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata)
-                   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#,
+                   (id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count)
+                   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"#,
                 params![
                     record.id,
                     encoding_bytes,
@@ -311,6 +321,8 @@ impl ConsciousnessDatabase for SqliteMemory {
                     { record.phi },
                     topics_json,
                     record.metadata,
+                    record.consolidation_strength,
+                    record.retrieval_count,
                 ],
             ).map_err(|e| DatabaseError::InsertFailed(format!("Insert failed: {}", e)))?;
 
@@ -323,7 +335,7 @@ impl ConsciousnessDatabase for SqliteMemory {
         let query = *query;
         self.with_connection(move |conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata
+                "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
                  FROM memories ORDER BY timestamp_ms DESC LIMIT 1000"
             ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
 
@@ -357,6 +369,8 @@ impl ConsciousnessDatabase for SqliteMemory {
                     phi: row.get::<_, f64>(7)?,
                     topics,
                     metadata: row.get(9)?,
+                    consolidation_strength: row.get::<_, f64>(10).unwrap_or(0.0),
+                    retrieval_count: row.get::<_, i64>(11).unwrap_or(0) as u32,
                 })
             }).map_err(|e| DatabaseError::QueryFailed(format!("Query failed: {}", e)))?;
 
@@ -382,7 +396,7 @@ impl ConsciousnessDatabase for SqliteMemory {
         let id = id.to_string();
         self.with_connection(move |conn| {
             let mut stmt = conn.prepare(
-                "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata
+                "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, topics, metadata, consolidation_strength, retrieval_count
                  FROM memories WHERE id = ?1"
             ).map_err(|e| DatabaseError::QueryFailed(format!("Prepare failed: {}", e)))?;
 
@@ -416,6 +430,8 @@ impl ConsciousnessDatabase for SqliteMemory {
                     phi: row.get::<_, f64>(7)?,
                     topics,
                     metadata: row.get(9)?,
+                    consolidation_strength: row.get::<_, f64>(10).unwrap_or(0.0),
+                    retrieval_count: row.get::<_, i64>(11).unwrap_or(0) as u32,
                 })
             });
 
@@ -603,6 +619,8 @@ mod tests {
             phi: 0.75,
             topics: vec!["greeting".to_string()],
             metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
         };
 
         db.store(record.clone()).await.unwrap();
@@ -646,6 +664,8 @@ mod tests {
                 phi: 0.6,
                 topics: vec!["test".to_string()],
                 metadata: "{}".to_string(),
+                consolidation_strength: 0.0,
+                retrieval_count: 0,
             };
             db.store(record).await.unwrap();
         }
@@ -684,6 +704,8 @@ mod tests {
                 phi: 0.5 + i as f64 * 0.1,
                 topics: vec!["test".to_string()],
                 metadata: "{}".to_string(),
+                consolidation_strength: 0.0,
+                retrieval_count: 0,
             };
             db.store(record).await.unwrap();
         }

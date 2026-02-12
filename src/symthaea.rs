@@ -424,6 +424,16 @@ impl Symthaea {
         // ====================================================================
         let phase2_start = Instant::now();
         self.mind.tick();
+
+        // Drain evicted working memory items for graduation tracking
+        let evicted = self.mind.take_evicted();
+        if !evicted.is_empty() {
+            tracing::trace!(
+                evicted_count = evicted.len(),
+                "Working memory items evicted during tick"
+            );
+        }
+
         let phase2_duration = phase2_start.elapsed();
 
         // ====================================================================

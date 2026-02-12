@@ -120,7 +120,8 @@ impl ContinuousMind {
             if self.working_memory.len() < self.config.working_memory_capacity {
                 self.working_memory.push(input.content.clone());
             } else {
-                self.working_memory.remove(0);
+                let evicted = self.working_memory.remove(0);
+                self.evicted_items.push(evicted);
                 self.working_memory.push(input.content.clone());
             }
 
