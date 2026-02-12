@@ -936,7 +936,7 @@ impl CognitiveLoopService {
         Ok(CycleResult {
             output: output.clone(),
             prediction_error,
-            attention_state: HashMap::new(), // No text-based attention for embedding input
+            attention_state: std::collections::HashMap::new(), // No text-based attention for embedding input
             detected_primitives: Vec::new(), // No text primitives for embedding input
             learning_occurred,
             training_loss,

@@ -185,7 +185,8 @@ impl NetworkService {
 
         // Create Iroh node
         let iroh = IrohNode::new(config.clone()).await?;
-        info!("NetworkService started with Iroh node: {}", &iroh.node_id()[..16.min(iroh.node_id().len())]);
+        let nid = iroh.node_id();
+        info!("NetworkService started with Iroh node: {}", &nid[..nid.len().min(16)]);
 
         Ok(Self {
             config: config.clone(),
