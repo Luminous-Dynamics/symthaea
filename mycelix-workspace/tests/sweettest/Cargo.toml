@@ -25,6 +25,9 @@ serde_json = "1.0"
 # Prevent nonce expiration from parallel test resource contention
 serial_test = "3"
 
+# PQC crypto for constructing test data off-chain
+mycelix-crypto = { path = "../../mycelix-identity/crates/mycelix-crypto", features = ["native"] }
+
 [[test]]
 name = "identity_workflow"
 path = "tests/identity_workflow.rs"
@@ -44,3 +47,7 @@ path = "tests/privacy_zk_attestation.rs"
 [[test]]
 name = "fl_bridge_e2e"
 path = "tests/fl_bridge_e2e.rs"
+
+[[test]]
+name = "identity_pqc_workflow"
+path = "tests/identity_pqc_workflow.rs"

@@ -38,6 +38,7 @@ coordinator:
       path: "../target/wasm32-unknown-unknown/release/did_registry.wasm"
       dependencies:
         - name: did_registry_integrity
+        - name: recovery_integrity
 
     - name: credential_schema
       path: "../target/wasm32-unknown-unknown/release/credential_schema.wasm"
@@ -54,12 +55,14 @@ coordinator:
       dependencies:
         - name: recovery_integrity
         - name: did_registry_integrity
+        - name: identity_bridge_integrity
 
     - name: identity_bridge
       path: "../target/wasm32-unknown-unknown/release/identity_bridge.wasm"
       dependencies:
         - name: identity_bridge_integrity
         - name: did_registry_integrity
+        - name: verifiable_credential_integrity
 
     - name: trust_credential
       path: "../target/wasm32-unknown-unknown/release/trust_credential_coordinator.wasm"

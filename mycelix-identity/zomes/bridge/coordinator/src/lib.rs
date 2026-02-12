@@ -433,46 +433,38 @@ fn verify_did_exists(did: &str) -> ExternResult<bool> {
     }
 }
 
-/// Count credentials for a DID (calls credential_schema zome)
-/// Note: Currently counts schemas authored by this DID as a proxy metric.
-/// In a complete system, this would query a credentials/issuance zome for actual issued credentials.
+/// Count credentials issued by a DID (calls verifiable_credential zome)
 fn count_credentials_for_did(did: &str) -> ExternResult<u32> {
-    // Call credential_schema zome to get schemas by author
-    // This counts schemas authored by the DID, which serves as a participation metric
     let response = call(
         CallTargetCell::Local,
-        ZomeName::new("credential_schema"),
-        FunctionName::new("get_schemas_by_author"),
+        ZomeName::new("verifiable_credential"),
+        FunctionName::new("get_credentials_issued_by"),
         None,
         did.to_string(),
     )?;
 
     match response {
         ZomeCallResponse::Ok(result) => {
-            let schemas: Vec<Record> = result.decode().map_err(|e| {
+            let credentials: Vec<Record> = result.decode().map_err(|e| {
                 wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode get_schemas_by_author response: {:?}",
+                    "Failed to decode get_credentials_issued_by response: {:?}",
                     e
                 )))
             })?;
-            Ok(schemas.len() as u32)
+            Ok(credentials.len() as u32)
         }
-        ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            // If unauthorized, return 0 rather than failing
-            // This allows queries to succeed even with limited permissions
+        ZomeCallResponse::Unauthorized(_, _, _, _)
+        | ZomeCallResponse::AuthenticationFailed(_, _) => {
+            // VC zome not accessible — return 0 rather than failing
             Ok(0)
         }
         ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Network error calling credential_schema: {}",
+            "Network error calling verifiable_credential: {}",
             err
         )))),
         ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
             format!("Countersigning error: {}", err)
         ))),
-        ZomeCallResponse::AuthenticationFailed(_, _) => {
-            // If authentication failed, return 0 rather than failing
-            Ok(0)
-        }
     }
 }
 
@@ -805,6 +797,250 @@ pub struct GetEventsInput {
     pub event_type: Option<BridgeEventType>,
     pub since: Option<u64>,
     pub limit: Option<u32>,
+}
+
+// ==================== BRIDGE NOTIFICATION ENDPOINTS ====================
+// Called by other zomes (did_registry, mfa) via cross-zome calls
+
+/// Notify bridge of DID deactivation
+#[hdk_extern]
+pub fn notify_did_deactivated(input: DidDeactivatedInput) -> ExternResult<Record> {
+    broadcast_event(BroadcastEventInput {
+        event_type: BridgeEventType::DidDeactivated,
+        subject: input.did.clone(),
+        payload: serde_json::json!({
+            "did": input.did,
+            "reason": input.reason,
+            "deactivated_at": input.deactivated_at,
+        })
+        .to_string(),
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DidDeactivatedInput {
+    pub did: String,
+    pub reason: String,
+    pub deactivated_at: String,
+}
+
+/// Notify bridge of MFA assurance level change
+#[hdk_extern]
+pub fn notify_mfa_assurance_changed(input: MfaAssuranceChangedInput) -> ExternResult<Record> {
+    broadcast_event(BroadcastEventInput {
+        event_type: BridgeEventType::MfaAssuranceChanged,
+        subject: input.did.clone(),
+        payload: serde_json::json!({
+            "did": input.did,
+            "old_level": input.old_level,
+            "new_level": input.new_level,
+            "new_score": input.new_score,
+        })
+        .to_string(),
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MfaAssuranceChangedInput {
+    pub did: String,
+    pub old_level: String,
+    pub new_level: String,
+    pub new_score: f64,
+}
+
+// ==================== CONVENIENCE FUNCTIONS ====================
+
+// ==================== SELECTIVE DISCLOSURE QUERIES ====================
+
+/// Query identity with selective disclosure — only returns fields the caller requests.
+/// This respects privacy by limiting data exposure to what the requesting hApp actually needs.
+#[hdk_extern]
+pub fn query_identity_selective(input: SelectiveQueryInput) -> ExternResult<SelectiveIdentityResult> {
+    let now = sys_time()?;
+
+    if input.did.is_empty() || !input.did.starts_with("did:mycelix:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID format — must start with did:mycelix:".into()
+        )));
+    }
+    if input.requested_fields.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Must request at least one field".into()
+        )));
+    }
+
+    // Create audit trail
+    let query = IdentityQuery {
+        id: format!("selective:{}:{}", input.did, now.as_micros()),
+        did: input.did.clone(),
+        source_happ: input.source_happ.clone(),
+        requested_fields: input.requested_fields.clone(),
+        queried_at: now,
+    };
+    let query_hash = create_entry(&EntryTypes::IdentityQuery(query))?;
+    create_link(
+        string_to_entry_hash(&input.did),
+        query_hash,
+        LinkTypes::DidToQueries,
+        (),
+    )?;
+
+    let fields = &input.requested_fields;
+
+    // Only resolve what's needed
+    let mut result = SelectiveIdentityResult {
+        did: input.did.clone(),
+        queried_at: now,
+        disclosed_fields: input.requested_fields.clone(),
+        is_valid: None,
+        is_deactivated: None,
+        matl_score: None,
+        reputation_score: None,
+        credential_count: None,
+        mfa_enrolled: None,
+        mfa_assurance_level: None,
+        mfa_assurance_score: None,
+        mfa_factor_count: None,
+        fl_eligible: None,
+        did_created: None,
+        services: None,
+        verification_methods: None,
+    };
+
+    // Resolve DID details if any DID-related field is requested
+    let needs_did = fields.iter().any(|f| matches!(f.as_str(),
+        "is_valid" | "is_deactivated" | "did_created" | "services" | "verification_methods"
+    ));
+    let did_details = if needs_did { get_did_details(&input.did)? } else { None };
+    let did_valid = did_details.is_some();
+
+    if fields.iter().any(|f| f == "is_valid") {
+        let deactivated = is_did_deactivated(&input.did)?;
+        result.is_valid = Some(did_valid && !deactivated);
+    }
+
+    if fields.iter().any(|f| f == "is_deactivated") {
+        result.is_deactivated = Some(is_did_deactivated(&input.did)?);
+    }
+
+    if fields.iter().any(|f| f == "did_created") {
+        result.did_created = did_details.as_ref().map(|doc| doc.created);
+    }
+
+    if fields.iter().any(|f| f == "services") {
+        result.services = did_details.as_ref().map(|doc| {
+            doc.service.iter().map(|s| ServiceInfo {
+                id: s.id.clone(),
+                type_: s.type_.clone(),
+                endpoint: s.service_endpoint.clone(),
+            }).collect()
+        });
+    }
+
+    if fields.iter().any(|f| f == "verification_methods") {
+        result.verification_methods = did_details.as_ref().map(|doc| {
+            doc.verification_method.iter().map(|vm| VerificationMethodInfo {
+                id: vm.id.clone(),
+                type_: vm.type_.clone(),
+            }).collect()
+        });
+    }
+
+    // MFA fields — only call MFA zome if any MFA field is requested
+    let needs_mfa = fields.iter().any(|f| matches!(f.as_str(),
+        "mfa_enrolled" | "mfa_assurance_level" | "mfa_assurance_score"
+        | "mfa_factor_count" | "fl_eligible" | "matl_score"
+    ));
+    let mfa_summary = if needs_mfa { get_mfa_summary_for_did(&input.did)? } else { None };
+
+    if fields.iter().any(|f| f == "mfa_enrolled") {
+        result.mfa_enrolled = Some(mfa_summary.is_some());
+    }
+    if fields.iter().any(|f| f == "mfa_assurance_level") {
+        result.mfa_assurance_level = mfa_summary.as_ref().map(|s| format!("{:?}", s.assurance_level));
+    }
+    if fields.iter().any(|f| f == "mfa_assurance_score") {
+        result.mfa_assurance_score = mfa_summary.as_ref().map(|s| s.assurance_score);
+    }
+    if fields.iter().any(|f| f == "mfa_factor_count") {
+        result.mfa_factor_count = mfa_summary.as_ref().map(|s| s.factor_count as u32);
+    }
+    if fields.iter().any(|f| f == "fl_eligible") {
+        result.fl_eligible = mfa_summary.as_ref().map(|s| s.fl_eligible);
+    }
+
+    // Reputation-based fields
+    let needs_reputation = fields.iter().any(|f| matches!(f.as_str(),
+        "reputation_score" | "matl_score"
+    ));
+    let reputation = if needs_reputation {
+        get_aggregated_reputation(&input.did)?
+    } else {
+        0.0
+    };
+
+    if fields.iter().any(|f| f == "reputation_score") {
+        result.reputation_score = Some(reputation);
+    }
+
+    if fields.iter().any(|f| f == "matl_score") {
+        let mfa_enrolled = mfa_summary.is_some();
+        let mfa_score = mfa_summary.as_ref().map(|s| s.assurance_score).unwrap_or(0.0);
+        let matl = if mfa_enrolled {
+            (reputation * REPUTATION_WEIGHT) + (mfa_score * MFA_WEIGHT)
+        } else {
+            reputation
+        };
+        result.matl_score = Some(matl);
+    }
+
+    if fields.iter().any(|f| f == "credential_count") {
+        result.credential_count = Some(count_credentials_for_did(&input.did)?);
+    }
+
+    Ok(result)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SelectiveQueryInput {
+    pub did: String,
+    pub source_happ: String,
+    pub requested_fields: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SelectiveIdentityResult {
+    pub did: String,
+    pub queried_at: Timestamp,
+    /// Which fields were disclosed in this response
+    pub disclosed_fields: Vec<String>,
+    // All fields are Option — None means not disclosed
+    pub is_valid: Option<bool>,
+    pub is_deactivated: Option<bool>,
+    pub matl_score: Option<f64>,
+    pub reputation_score: Option<f64>,
+    pub credential_count: Option<u32>,
+    pub mfa_enrolled: Option<bool>,
+    pub mfa_assurance_level: Option<String>,
+    pub mfa_assurance_score: Option<f64>,
+    pub mfa_factor_count: Option<u32>,
+    pub fl_eligible: Option<bool>,
+    pub did_created: Option<Timestamp>,
+    pub services: Option<Vec<ServiceInfo>>,
+    pub verification_methods: Option<Vec<VerificationMethodInfo>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ServiceInfo {
+    pub id: String,
+    pub type_: String,
+    pub endpoint: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct VerificationMethodInfo {
+    pub id: String,
+    pub type_: String,
 }
 
 // ==================== CONVENIENCE FUNCTIONS ====================

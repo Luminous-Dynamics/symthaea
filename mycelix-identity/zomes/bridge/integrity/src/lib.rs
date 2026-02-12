@@ -98,6 +98,10 @@ pub enum BridgeEventType {
     RecoveryCompleted,
     /// hApp registered with bridge
     HappRegistered,
+    /// MFA assurance level changed for a DID
+    MfaAssuranceChanged,
+    /// A DID was recovered via social recovery
+    DidRecovered,
     /// Custom event type
     Custom(String),
 }

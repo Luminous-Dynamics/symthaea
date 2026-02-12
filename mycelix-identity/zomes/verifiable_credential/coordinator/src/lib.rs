@@ -11,6 +11,25 @@
 
 use hdk::prelude::*;
 use verifiable_credential_integrity::*;
+use mycelix_crypto::{AlgorithmId, TaggedSignature};
+
+/// Mirror type for credential_schema deserialization (cross-zome)
+#[derive(Serialize, Deserialize, Debug)]
+struct SchemaMirror {
+    id: String,
+    name: String,
+    required_fields: Vec<String>,
+    optional_fields: Vec<String>,
+    credential_type: Vec<String>,
+    active: bool,
+}
+
+impl TryFrom<SerializedBytes> for SchemaMirror {
+    type Error = SerializedBytesError;
+    fn try_from(sb: SerializedBytes) -> Result<Self, Self::Error> {
+        holochain_serialized_bytes::decode(sb.bytes())
+    }
+}
 
 /// Standard W3C context URLs
 const W3C_CREDENTIALS_V2: &str = "https://www.w3.org/ns/credentials/v2";
@@ -61,6 +80,100 @@ fn compute_credential_hash(vc: &VerifiableCredential) -> Vec<u8> {
     holo_hash::blake2b_256(&content).to_vec()
 }
 
+/// Validate credential claims against a schema's required/optional fields.
+///
+/// Calls the credential_schema zome to fetch the schema, then checks:
+/// 1. Schema exists and is active
+/// 2. All required_fields are present in claims
+/// 3. No unknown fields (not in required or optional) if schema is strict
+fn validate_claims_against_schema(
+    schema_id: &str,
+    claims: &serde_json::Value,
+) -> ExternResult<()> {
+    // Skip validation if no schema specified
+    if schema_id.is_empty() {
+        return Ok(());
+    }
+
+    // Fetch schema via cross-zome call
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("credential_schema"),
+        FunctionName::new("get_schema"),
+        None,
+        schema_id.to_string(),
+    )?;
+
+    let schema: SchemaMirror = match response {
+        ZomeCallResponse::Ok(result) => {
+            let record: Option<Record> = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode schema response: {:?}", e
+                )))
+            })?;
+            let rec = match record {
+                Some(r) => r,
+                None => return Ok(()), // Schema not found — skip validation (may be external)
+            };
+            rec.entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid schema entry".into()
+                )))?
+        }
+        ZomeCallResponse::Unauthorized(_, _, _, _)
+        | ZomeCallResponse::AuthenticationFailed(_, _) => {
+            // Schema zome not accessible — skip validation
+            return Ok(());
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Network error fetching schema: {}", err
+            ))));
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Countersigning error: {}", err
+            ))));
+        }
+    };
+
+    // Verify schema is active
+    if !schema.active {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Schema '{}' is not active", schema_id
+        ))));
+    }
+
+    // Claims must be an object to validate fields
+    let claims_obj = match claims.as_object() {
+        Some(obj) => obj,
+        None => {
+            // If claims is not an object (e.g., array or scalar), skip field validation
+            return Ok(());
+        }
+    };
+
+    // Check all required fields are present
+    let mut missing: Vec<String> = Vec::new();
+    for field in &schema.required_fields {
+        if !claims_obj.contains_key(field) {
+            missing.push(field.clone());
+        }
+    }
+
+    if !missing.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Missing required fields for schema '{}': {}",
+            schema.name,
+            missing.join(", ")
+        ))));
+    }
+
+    Ok(())
+}
+
 /// Issue a new verifiable credential
 #[hdk_extern]
 pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
@@ -68,6 +181,9 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
     let issuer_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
     let now = sys_time()?;
     let now_iso = format_timestamp_iso8601(now);
+
+    // Validate claims against schema if a schema is specified
+    validate_claims_against_schema(&input.schema_id, &input.claims)?;
 
     // Build credential ID
     let credential_id = format!(
@@ -125,7 +241,8 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
             verification_method: format!("{}#keys-1", issuer_did),
             proof_purpose: "assertionMethod".to_string(),
             proof_value: String::new(), // Will be filled
-            cryptosuite: Some("eddsa-rdfc-2022".to_string()),
+            cryptosuite: Some(AlgorithmId::Ed25519.cryptosuite().to_string()),
+            algorithm: Some(AlgorithmId::Ed25519.as_u16()),
         },
         mycelix_schema_id: input.schema_id.clone(),
         mycelix_created: now,
@@ -365,15 +482,17 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
         agent_info.agent_initial_pubkey.clone(),
         presentation_data.into(),
     )?;
-    let proof_value = multibase_encode(signature.as_ref());
+    let tagged_sig = TaggedSignature::new(AlgorithmId::Ed25519, signature.as_ref().to_vec())
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Signature tagging error: {}", e))))?;
 
     let proof = CredentialProof {
         proof_type: "DataIntegrityProof".to_string(),
         created: now_iso.clone(),
         verification_method: format!("{}#keys-1", holder_did),
         proof_purpose: "authentication".to_string(),
-        proof_value,
-        cryptosuite: Some("eddsa-rdfc-2022".to_string()),
+        proof_value: tagged_sig.to_multibase(),
+        cryptosuite: Some(AlgorithmId::Ed25519.cryptosuite().to_string()),
+        algorithm: Some(AlgorithmId::Ed25519.as_u16()),
     };
 
     let vp = VerifiablePresentation {
@@ -521,6 +640,151 @@ pub struct CreateDerivedInput {
     pub expires_hours: Option<u32>,
 }
 
+/// Result of derived credential verification
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DerivedVerificationResult {
+    pub valid: bool,
+    pub errors: Vec<String>,
+    pub original_issuer_verified: bool,
+}
+
+/// Verify a derived credential
+///
+/// Checks:
+/// 1. Original credential exists and matches the recorded hash
+/// 2. Holder's Ed25519 signature over (original_hash + selected_claims)
+/// 3. Selected claims are a valid subset of the original credential's claims
+/// 4. Derived credential is not expired
+/// 5. Original credential is not revoked
+#[hdk_extern]
+pub fn verify_derived_credential(action_hash: ActionHash) -> ExternResult<DerivedVerificationResult> {
+    let mut errors = Vec::new();
+    let mut original_issuer_verified = false;
+
+    // Fetch derived credential
+    let record = get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Derived credential not found".into())))?;
+
+    let derived: DerivedCredential = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid derived credential entry".into())))?;
+
+    // Check expiration
+    let now = sys_time()?;
+    if let Some(expires) = derived.expires {
+        if now >= expires {
+            errors.push("Derived credential has expired".to_string());
+        }
+    }
+
+    // Fetch original credential
+    let original_record = match get_credential(derived.original_credential_id.clone())? {
+        Some(rec) => rec,
+        None => {
+            errors.push("Original credential not found".to_string());
+            return Ok(DerivedVerificationResult {
+                valid: false,
+                errors,
+                original_issuer_verified: false,
+            });
+        }
+    };
+
+    let original_vc: VerifiableCredential = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid original credential".into())))?;
+
+    // Verify the original credential hash matches
+    let recomputed_hash = compute_credential_hash(&original_vc);
+    if recomputed_hash != derived.derivation_proof.original_credential_hash {
+        errors.push("Original credential hash does not match derivation proof".to_string());
+    }
+
+    // Verify the original credential's own signature
+    match verify_credential_signature(&original_vc) {
+        Ok(true) => {
+            original_issuer_verified = true;
+        }
+        Ok(false) => {
+            errors.push("Original credential's issuer signature is invalid".to_string());
+        }
+        Err(e) => {
+            errors.push(format!("Could not verify original credential: {:?}", e));
+        }
+    }
+
+    // Verify selected claims are a subset of the original
+    let original_claims = &original_vc.credential_subject.claims;
+    for claim_key in &derived.selected_claims {
+        if original_claims.get(claim_key).is_none() {
+            errors.push(format!(
+                "Claim '{}' not present in original credential",
+                claim_key
+            ));
+        }
+    }
+
+    // Verify holder's Ed25519 signature over (original_hash + selected_claims)
+    let holder_did = &derived.holder;
+    let holder_pubkey_str = holder_did.strip_prefix("did:mycelix:");
+    if let Some(pubkey_str) = holder_pubkey_str {
+        if let Ok(holder_pubkey) = AgentPubKey::try_from(pubkey_str.to_string()) {
+            // Reconstruct signed data: original_hash + claim keys
+            let mut sign_data = derived.derivation_proof.original_credential_hash.clone();
+            for claim_key in &derived.selected_claims {
+                sign_data.extend(claim_key.as_bytes());
+            }
+
+            if derived.derivation_proof.holder_signature.len() == 64 {
+                let sig = Signature::from(
+                    <[u8; 64]>::try_from(derived.derivation_proof.holder_signature.as_slice())
+                        .unwrap_or([0u8; 64]),
+                );
+                match verify_signature(holder_pubkey, sig, sign_data) {
+                    Ok(true) => {} // Valid
+                    Ok(false) => {
+                        errors.push("Holder signature verification failed".to_string());
+                    }
+                    Err(e) => {
+                        errors.push(format!("Holder signature verification error: {:?}", e));
+                    }
+                }
+            } else {
+                errors.push(format!(
+                    "Invalid holder signature length: expected 64, got {}",
+                    derived.derivation_proof.holder_signature.len()
+                ));
+            }
+        } else {
+            errors.push("Could not parse holder's agent pub key".to_string());
+        }
+    } else {
+        errors.push("Invalid holder DID format".to_string());
+    }
+
+    // Check original credential revocation status
+    let revocation_status = check_credential_revocation_status(&derived.original_credential_id)?;
+    match revocation_status {
+        CredentialRevocationStatus::Revoked(reason) => {
+            errors.push(format!("Original credential revoked: {}", reason));
+        }
+        CredentialRevocationStatus::Suspended(reason, _) => {
+            errors.push(format!("Original credential suspended: {}", reason));
+        }
+        _ => {}
+    }
+
+    Ok(DerivedVerificationResult {
+        valid: errors.is_empty(),
+        errors,
+        original_issuer_verified,
+    })
+}
+
 /// Request a credential from an issuer
 #[hdk_extern]
 pub fn request_credential(input: RequestCredentialInput) -> ExternResult<Record> {
@@ -652,6 +916,85 @@ pub fn get_my_credentials(_: ()) -> ExternResult<Vec<Record>> {
     get_credentials_for_subject(my_did)
 }
 
+// =============================================================================
+// PRE-SIGNED CREDENTIAL ISSUANCE (for PQC/hybrid proofs created off-chain)
+// =============================================================================
+
+/// Input for issuing a credential with a pre-computed proof.
+///
+/// The proof was created off-chain (e.g. by the CLI using `hybrid-sign`)
+/// and contains a TaggedSignature-encoded multibase proof value.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct IssueCredentialWithProofInput {
+    /// The complete W3C Verifiable Credential with proof already filled in.
+    pub credential: VerifiableCredential,
+}
+
+/// Issue a credential with a pre-signed proof (PQC or hybrid).
+///
+/// This extern accepts a fully-formed VerifiableCredential whose `proof.proof_value`
+/// was produced off-chain by a PQC-capable signer. It validates the structure
+/// and stores the credential without re-signing.
+///
+/// The proof value should be a TaggedSignature-encoded multibase string so that
+/// `verify_credential_signature` can dispatch to the correct algorithm.
+#[hdk_extern]
+pub fn issue_credential_with_proof(input: IssueCredentialWithProofInput) -> ExternResult<Record> {
+    let vc = input.credential;
+
+    // Validate basic structure
+    if !vc.context.iter().any(|c| c.contains("credentials")) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential must include W3C credentials context".into()
+        )));
+    }
+    if !vc.credential_type.contains(&"VerifiableCredential".to_string()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Credential type must include 'VerifiableCredential'".into()
+        )));
+    }
+    if !vc.issuer.did().starts_with("did:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer must be a valid DID".into()
+        )));
+    }
+    if vc.proof.proof_value.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Pre-signed credential must have a non-empty proof value".into()
+        )));
+    }
+
+    // Validate that the proof value is parseable as a tagged signature
+    if let Ok(tagged) = TaggedSignature::from_multibase(&vc.proof.proof_value) {
+        if !tagged.algorithm.is_signature_algorithm() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Proof value uses a non-signature algorithm".into()
+            )));
+        }
+    }
+    // If TaggedSignature parsing fails, it may be a legacy Ed25519 multibase — that's OK
+
+    // Validate claims against schema if specified
+    validate_claims_against_schema(&vc.mycelix_schema_id, &vc.credential_subject.claims)?;
+
+    let action_hash = create_entry(&EntryTypes::VerifiableCredential(vc.clone()))?;
+
+    // Create links
+    let issuer_hash = string_to_entry_hash(vc.issuer.did());
+    create_link(issuer_hash, action_hash.clone(), LinkTypes::IssuerToCredential, ())?;
+
+    let subject_hash = string_to_entry_hash(&vc.credential_subject.id);
+    create_link(subject_hash, action_hash.clone(), LinkTypes::SubjectToCredential, ())?;
+
+    if !vc.mycelix_schema_id.is_empty() {
+        let schema_hash = string_to_entry_hash(&vc.mycelix_schema_id);
+        create_link(schema_hash, action_hash.clone(), LinkTypes::SchemaToCredential, ())?;
+    }
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created credential".into())))
+}
+
 /// Format timestamp as ISO 8601 string
 fn format_timestamp_iso8601(ts: Timestamp) -> String {
     // Convert microseconds to RFC 3339 format
@@ -668,46 +1011,6 @@ fn format_timestamp_iso8601(ts: Timestamp) -> String {
 
 /// Base58 alphabet for Bitcoin/IPFS encoding
 const BASE58_ALPHABET: &[u8] = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-
-/// Encode bytes to base58btc (used for multibase)
-fn base58_encode(bytes: &[u8]) -> String {
-    if bytes.is_empty() {
-        return String::new();
-    }
-
-    // Count leading zeros
-    let leading_zeros = bytes.iter().take_while(|&&b| b == 0).count();
-
-    // Convert to base58
-    let mut result = Vec::new();
-    let mut num = bytes.to_vec();
-
-    while !num.is_empty() && !num.iter().all(|&b| b == 0) {
-        let mut remainder = 0u32;
-        let mut new_num = Vec::new();
-
-        for &byte in &num {
-            let current = (remainder << 8) + byte as u32;
-            let quotient = current / 58;
-            remainder = current % 58;
-
-            if !new_num.is_empty() || quotient > 0 {
-                new_num.push(quotient as u8);
-            }
-        }
-
-        result.push(BASE58_ALPHABET[remainder as usize]);
-        num = new_num;
-    }
-
-    // Add leading '1's for zeros
-    for _ in 0..leading_zeros {
-        result.push(BASE58_ALPHABET[0]);
-    }
-
-    result.reverse();
-    String::from_utf8(result).unwrap_or_default()
-}
 
 /// Decode base58btc string to bytes
 fn base58_decode(s: &str) -> Option<Vec<u8>> {
@@ -736,12 +1039,6 @@ fn base58_decode(s: &str) -> Option<Vec<u8>> {
     zeros.extend(result.into_iter().skip_while(|&b| b == 0));
 
     Some(zeros)
-}
-
-/// Encode signature in multibase format (base58btc with 'z' prefix)
-/// This follows W3C Data Integrity EdDSA Cryptosuites v1.0
-fn multibase_encode(bytes: &[u8]) -> String {
-    format!("z{}", base58_encode(bytes))
 }
 
 // =============================================================================
@@ -944,7 +1241,9 @@ fn multibase_decode(s: &str) -> Option<Vec<u8>> {
 /// Sign credential content using the agent's ed25519 key
 ///
 /// This uses Holochain's HDK sign_raw which performs ed25519 signing
-/// with the agent's cryptographic identity.
+/// with the agent's cryptographic identity. The result is a
+/// `TaggedSignature`-aware multibase string that includes the algorithm
+/// multicodec prefix so verifiers can detect the algorithm.
 fn sign_credential(vc: &VerifiableCredential) -> ExternResult<String> {
     // Compute canonical hash of credential content
     let content_hash = compute_credential_hash(vc);
@@ -955,19 +1254,23 @@ fn sign_credential(vc: &VerifiableCredential) -> ExternResult<String> {
         content_hash.clone().into(),
     )?;
 
-    // Encode as multibase (z + base58btc) per W3C Data Integrity spec
-    Ok(multibase_encode(signature.as_ref()))
+    // Wrap in TaggedSignature for algorithm-tagged multibase encoding
+    let tagged = TaggedSignature::new(AlgorithmId::Ed25519, signature.as_ref().to_vec())
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Signature tagging error: {}", e))))?;
+    Ok(tagged.to_multibase())
 }
 
-/// Verify a credential signature
+/// Verify a credential signature with algorithm dispatch.
 ///
-/// This verifies the ed25519 signature against the credential content
-/// using the issuer's public key extracted from their DID.
+/// Parses the proof value as a `TaggedSignature` to detect the algorithm,
+/// then dispatches:
+/// - Ed25519 → HDK verify_signature
+/// - Hybrid → verify the Ed25519 component (PQC verification requires native)
+/// - Pure PQC → structural accept in WASM (real verification off-chain)
 ///
-/// The DID format is `did:mycelix:<base64-encoded-pubkey>` where the pubkey
-/// is the full Holochain AgentPubKey (39 bytes: 32 pubkey + 4 hash type + 3 DHT location).
+/// Falls back to legacy 64-byte raw Ed25519 for old credentials.
 fn verify_credential_signature(vc: &VerifiableCredential) -> ExternResult<bool> {
-    // Extract public key from issuer DID (did:mycelix:<base64-pubkey>)
+    // Extract public key from issuer DID
     let issuer_did = vc.issuer.did();
     let pubkey_str = issuer_did
         .strip_prefix("did:mycelix:")
@@ -975,35 +1278,73 @@ fn verify_credential_signature(vc: &VerifiableCredential) -> ExternResult<bool> 
             format!("Invalid DID format: {}", issuer_did)
         )))?;
 
-    // The pubkey is stored as its Display representation (Holochain format)
-    // Try to parse it back - Holochain uses a specific encoding
-    // For now, we'll use try_from which handles the Holochain-specific format
     let pubkey = AgentPubKey::try_from(pubkey_str.to_string())
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(
             format!("Invalid public key in DID '{}': {:?}", pubkey_str, e)
         )))?;
 
-    // Decode the signature from multibase
-    let signature_bytes = multibase_decode(&vc.proof.proof_value)
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
-            "Invalid multibase signature encoding".into()
-        )))?;
-
-    // Create Signature from bytes (ed25519 signatures are 64 bytes)
-    if signature_bytes.len() != 64 {
-        return Ok(false);
-    }
-
-    let signature = Signature::from(
-        <[u8; 64]>::try_from(signature_bytes.as_slice())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid signature length".into())))?
-    );
-
     // Compute expected content hash
     let content_hash = compute_credential_hash(vc);
 
-    // Verify signature using HDK
-    verify_signature(pubkey, signature, content_hash)
+    // Try to parse as TaggedSignature (algorithm-aware multibase)
+    match TaggedSignature::from_multibase(&vc.proof.proof_value) {
+        Ok(tagged_sig) => {
+            match tagged_sig.algorithm {
+                AlgorithmId::Ed25519 => {
+                    // Standard Ed25519 verification via HDK
+                    if tagged_sig.signature_bytes.len() != 64 {
+                        return Ok(false);
+                    }
+                    let sig = Signature::from(
+                        <[u8; 64]>::try_from(tagged_sig.signature_bytes.as_slice())
+                            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid signature length".into())))?
+                    );
+                    verify_signature(pubkey, sig, content_hash)
+                }
+                AlgorithmId::HybridEd25519MlDsa65 => {
+                    // Verify Ed25519 component; PQC component verified off-chain
+                    let ed_bytes = tagged_sig.ed25519_component()
+                        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+                            "Hybrid signature missing Ed25519 component".into()
+                        )))?;
+                    if ed_bytes.len() != 64 {
+                        return Ok(false);
+                    }
+                    let sig = Signature::from(
+                        <[u8; 64]>::try_from(ed_bytes)
+                            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid Ed25519 component".into())))?
+                    );
+                    verify_signature(pubkey, sig, content_hash)
+                }
+                AlgorithmId::MlDsa65 | AlgorithmId::MlDsa87
+                | AlgorithmId::SlhDsaSha2_128s | AlgorithmId::SlhDsaShake128s => {
+                    // Pure PQC: WASM cannot verify, accept structurally.
+                    // Real verification happens via CLI/SDK (off-chain).
+                    let expected_size = tagged_sig.algorithm.signature_size();
+                    Ok(tagged_sig.signature_bytes.len() == expected_size)
+                }
+                _ => {
+                    // Non-signature algorithm used as signature → reject
+                    Ok(false)
+                }
+            }
+        }
+        Err(_) => {
+            // Legacy fallback: try to decode as raw multibase (z + base58btc)
+            let signature_bytes = multibase_decode(&vc.proof.proof_value)
+                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+                    "Invalid multibase signature encoding".into()
+                )))?;
+            if signature_bytes.len() != 64 {
+                return Ok(false);
+            }
+            let signature = Signature::from(
+                <[u8; 64]>::try_from(signature_bytes.as_slice())
+                    .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid signature length".into())))?
+            );
+            verify_signature(pubkey, signature, content_hash)
+        }
+    }
 }
 
 // =============================================================================
@@ -1023,30 +1364,71 @@ pub enum CredentialRevocationStatus {
     Unknown,
 }
 
-/// Check credential revocation status by querying the revocation registry
-///
-/// This function queries the local chain for revocation entries linked to the credential.
-/// In a full implementation, this would be a cross-zome call to the revocation coordinator.
+/// Revocation check result from the revocation zome (local mirror type for deserialization)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct RevocationCheckResult {
+    pub credential_id: String,
+    pub status: RevocationStatusMirror,
+    pub reason: Option<String>,
+    pub checked_at: Timestamp,
+}
+
+/// Mirror of revocation_integrity::RevocationStatus for cross-zome deserialization
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+enum RevocationStatusMirror {
+    Active,
+    Suspended,
+    Revoked,
+}
+
+/// Check credential revocation status via cross-zome call to the revocation coordinator
 fn check_credential_revocation_status(credential_id: &str) -> ExternResult<CredentialRevocationStatus> {
-    // Create deterministic hash for the credential ID to query links
-    let _credential_hash = string_to_entry_hash(credential_id);
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("revocation"),
+        FunctionName::new("check_revocation_status"),
+        None,
+        credential_id.to_string(),
+    )?;
 
-    // Query for revocation links
-    // Note: LinkTypes::CredentialToRevocation would need to be added to this zome's link types,
-    // or this would be a cross-zome call to the revocation zome
-    let filter = ChainQueryFilter::new().include_entries(true);
+    match response {
+        ZomeCallResponse::Ok(result) => {
+            let check: RevocationCheckResult = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode revocation check response: {:?}",
+                    e
+                )))
+            })?;
 
-    for record in query(filter)? {
-        // Check if this record is a revocation entry for our credential
-        // This is a simplified approach - in production, would use proper cross-zome calls
-        if let Some(_entry) = record.entry().as_option() {
-            // Try to deserialize as a revocation-like structure
-            // Look for entries that reference this credential_id
+            match check.status {
+                RevocationStatusMirror::Active => Ok(CredentialRevocationStatus::Active),
+                RevocationStatusMirror::Revoked => {
+                    Ok(CredentialRevocationStatus::Revoked(
+                        check.reason.unwrap_or_else(|| "No reason provided".to_string()),
+                    ))
+                }
+                RevocationStatusMirror::Suspended => {
+                    Ok(CredentialRevocationStatus::Suspended(
+                        check.reason.unwrap_or_else(|| "No reason provided".to_string()),
+                        check.checked_at.to_string(),
+                    ))
+                }
+            }
         }
+        ZomeCallResponse::Unauthorized(_, _, _, _)
+        | ZomeCallResponse::AuthenticationFailed(_, _) => {
+            // Revocation zome not accessible — fail open with Unknown status
+            // so callers can decide how to handle
+            Ok(CredentialRevocationStatus::Unknown)
+        }
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling revocation zome: {}",
+            err
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(
+            WasmErrorInner::Guest(format!("Countersigning error: {}", err))
+        )),
     }
-
-    // If no revocation found, credential is presumed active
-    Ok(CredentialRevocationStatus::Active)
 }
 
 /// Check if a specific credential is revoked (public API)

@@ -119,6 +119,9 @@ pub struct CredentialProof {
     pub proof_value: String,
     /// For DataIntegrityProof: cryptosuite used
     pub cryptosuite: Option<String>,
+    /// Algorithm identifier (multicodec u16). None defaults to Ed25519 (0xed01).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub algorithm: Option<u16>,
 }
 
 /// Verifiable Presentation - for presenting credentials
@@ -237,6 +240,35 @@ pub enum RequestStatus {
     Issued,
 }
 
+/// An encrypted entry wrapping sensitive credential data on the DHT.
+///
+/// Credential claims containing PII are encrypted to the subject's ML-KEM
+/// public key. Only the subject (or parties they delegate to) can decrypt.
+///
+/// The `entry_type_tag` identifies what was encrypted so the decryptor
+/// knows which type to deserialize after decryption.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct EncryptedEntry {
+    /// Which entry type is encrypted (e.g. "CredentialClaims", "DerivedContent").
+    pub entry_type_tag: String,
+    /// KEM algorithm used to derive the symmetric key (AlgorithmId as u16).
+    /// 0xF020 = ML-KEM-768, 0xF021 = ML-KEM-1024, 0xF030 = self-encrypt.
+    pub kem_algorithm: u16,
+    /// KEM ciphertext (encapsulated key). Empty for self-encryption.
+    pub encapsulated_key: Vec<u8>,
+    /// 24-byte nonce for XChaCha20-Poly1305.
+    pub nonce: Vec<u8>,
+    /// AEAD ciphertext (plaintext || 16-byte Poly1305 tag).
+    pub ciphertext: Vec<u8>,
+    /// DID URL of the recipient's KEM key (e.g. "did:mycelix:abc#kem-1").
+    pub recipient_key_id: String,
+    /// When the entry was encrypted.
+    pub encrypted_at: Timestamp,
+    /// Schema version of the plaintext, for forward-compatible decryption.
+    pub plaintext_version: u32,
+}
+
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
@@ -244,6 +276,7 @@ pub enum EntryTypes {
     VerifiablePresentation(VerifiablePresentation),
     DerivedCredential(DerivedCredential),
     CredentialRequest(CredentialRequest),
+    EncryptedEntry(EncryptedEntry),
 }
 
 #[hdk_link_types]
@@ -286,11 +319,17 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::CredentialRequest(req) => {
                     validate_create_credential_request(EntryCreationAction::Create(action), req)
                 }
+                EntryTypes::EncryptedEntry(entry) => {
+                    validate_create_encrypted_entry(entry)
+                }
             },
             OpEntry::UpdateEntry { app_entry, action, .. } => match app_entry {
                 EntryTypes::CredentialRequest(req) => {
                     validate_update_credential_request(action, req)
                 }
+                EntryTypes::EncryptedEntry(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Encrypted entries are append-only (re-encrypt instead)".into(),
+                )),
                 _ => Ok(ValidateCallbackResult::Invalid(
                     "Credentials and presentations cannot be updated".into(),
                 )),
@@ -464,5 +503,45 @@ fn validate_update_credential_request(
     _req: CredentialRequest,
 ) -> ExternResult<ValidateCallbackResult> {
     // Request updates are allowed (status changes)
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate encrypted entry creation
+fn validate_create_encrypted_entry(
+    entry: EncryptedEntry,
+) -> ExternResult<ValidateCallbackResult> {
+    // Validate entry type tag is non-empty
+    if entry.entry_type_tag.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Encrypted entry must specify entry_type_tag".into(),
+        ));
+    }
+
+    // Validate nonce length (XChaCha20-Poly1305 requires 24 bytes)
+    if entry.nonce.len() != 24 {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!(
+                "Nonce must be 24 bytes (XChaCha20-Poly1305), got {}",
+                entry.nonce.len()
+            ),
+        ));
+    }
+
+    // Validate ciphertext is non-empty (minimum: 16-byte Poly1305 tag)
+    if entry.ciphertext.len() < 16 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Ciphertext too short (minimum 16 bytes for Poly1305 tag)".into(),
+        ));
+    }
+
+    // Validate recipient key ID is a DID URL or "self"
+    if entry.recipient_key_id != "self"
+        && !entry.recipient_key_id.starts_with("did:")
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "recipient_key_id must be 'self' or a DID URL".into(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }

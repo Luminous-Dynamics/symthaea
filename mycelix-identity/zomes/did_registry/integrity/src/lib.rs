@@ -17,6 +17,13 @@ pub struct DidDocument {
     pub verification_method: Vec<VerificationMethod>,
     /// Authentication methods
     pub authentication: Vec<String>,
+    /// Key agreement methods for encryption (W3C DID Core §5.3.3).
+    ///
+    /// Each entry is a DID URL fragment (e.g. "#kem-1") referencing a
+    /// `VerificationMethod` with an ML-KEM public key. Recipients use this
+    /// to look up the KEM key for encrypting data to this DID's owner.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub key_agreement: Vec<String>,
     /// Service endpoints
     pub service: Vec<ServiceEndpoint>,
     /// Creation timestamp
@@ -34,6 +41,9 @@ pub struct VerificationMethod {
     pub type_: String,
     pub controller: String,
     pub public_key_multibase: String,
+    /// Algorithm identifier (multicodec u16). None defaults to Ed25519 (0xed01).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub algorithm: Option<u16>,
 }
 
 /// Service endpoint for discovery

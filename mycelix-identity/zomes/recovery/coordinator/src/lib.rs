@@ -126,15 +126,45 @@ fn enroll_social_recovery_factor(did: &str, trustees: &[String]) -> ExternResult
     }
 }
 
-/// Notify MFA of successful recovery execution
-fn notify_mfa_of_recovery_execution(did: &str, new_agent: &AgentPubKey) -> ExternResult<()> {
-    // This would ideally transfer MFA state or create new MFA state for new agent
-    // For now, just log the event - full implementation would require additional MFA functions
-    debug!(
-        "Recovery executed for DID {} - MFA state should be transferred to new agent {:?}",
-        did, new_agent
-    );
-    Ok(())
+/// Notify bridge of successful recovery execution so other hApps are informed
+fn notify_bridge_of_recovery(did: &str, new_agent: &AgentPubKey) -> ExternResult<()> {
+    #[derive(Serialize, Deserialize, Debug)]
+    struct BroadcastEventInput {
+        event_type: String,
+        subject: String,
+        payload: String,
+        source_happ: String,
+    }
+
+    let payload = serde_json::json!({
+        "did": did,
+        "new_agent": format!("{}", new_agent),
+        "event": "recovery_completed",
+    })
+    .to_string();
+
+    let input = BroadcastEventInput {
+        event_type: "DidRecovered".to_string(),
+        subject: did.to_string(),
+        payload,
+        source_happ: "mycelix-identity".to_string(),
+    };
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("identity_bridge"),
+        FunctionName::new("broadcast_event"),
+        None,
+        input,
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(_) => Ok(()),
+        _ => {
+            debug!("Bridge notification failed for recovery of {} - non-critical", did);
+            Ok(())
+        }
+    }
 }
 
 /// Create a deterministic entry hash from a string identifier
@@ -721,14 +751,14 @@ pub fn execute_recovery(request_id: String) -> ExternResult<Record> {
         &EntryTypes::RecoveryRequest(completed_request),
     )?;
 
-    // Notify MFA zome of recovery execution
-    // This allows MFA state to be transferred or recreated for the new agent
-    if let Err(e) = notify_mfa_of_recovery_execution(&did_for_mfa, &new_agent_for_mfa) {
-        debug!("Failed to notify MFA of recovery execution: {:?}", e);
+    // Broadcast recovery event to bridge so other hApps are informed
+    if let Err(e) = notify_bridge_of_recovery(&did_for_mfa, &new_agent_for_mfa) {
+        debug!("Failed to notify bridge of recovery execution: {:?}", e);
     }
 
-    // Note: The actual DID update would be handled by the did_registry zome
-    // This would require a cross-zome call in a full implementation
+    // DID transfer completes when the new agent calls did_registry::claim_recovered_did().
+    // This two-step pattern is required by Holochain's agent-centric architecture:
+    // only the new agent can create entries on their own source chain.
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -828,6 +858,36 @@ pub fn cancel_recovery(request_id: String) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Could not find cancelled request".into()
         )))
+}
+
+/// Get a specific recovery request by ID
+#[hdk_extern]
+pub fn get_recovery_request(request_id: String) -> ExternResult<Option<Record>> {
+    if request_id.is_empty() || request_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Request ID must be 1-256 characters".into(),
+        )));
+    }
+
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::RecoveryRequest,
+        )?))
+        .include_entries(true);
+
+    for record in query(filter)? {
+        if let Some(req) = record
+            .entry()
+            .to_app_option::<RecoveryRequest>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            if req.id == request_id {
+                return Ok(Some(record));
+            }
+        }
+    }
+
+    Ok(None)
 }
 
 /// Get pending recovery requests for a trustee

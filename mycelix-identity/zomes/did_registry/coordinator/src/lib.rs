@@ -5,64 +5,41 @@
 
 use hdk::prelude::*;
 use did_registry_integrity::*;
-use bs58;
+use mycelix_crypto::{AlgorithmId, TaggedPublicKey, CryptoError};
 
-/// Validate a multibase-encoded Ed25519 public key.
+/// Validate a multibase-encoded public key and return its detected algorithm.
 ///
 /// Per the W3C DID specification and multibase encoding:
 /// - Must start with 'z' (base58btc prefix)
-/// - Remaining characters must be valid base58btc (no 0, O, I, l)
-/// - Decoded bytes must be exactly 34 bytes (2-byte multicodec prefix + 32-byte Ed25519 key)
-///   or 32 bytes (raw Ed25519 key without multicodec prefix)
-fn validate_multibase_ed25519_key(key: &str) -> Result<(), String> {
-    if key.is_empty() {
-        return Err("Public key multibase is empty".to_string());
-    }
+/// - Remaining characters must be valid base58btc
+/// - Decoded bytes must contain a recognized multicodec prefix + key bytes of
+///   the correct length, OR be a legacy raw 32-byte Ed25519 key.
+///
+/// Returns the detected `AlgorithmId` on success.
+fn validate_multibase_key(key: &str) -> Result<AlgorithmId, String> {
+    TaggedPublicKey::from_multibase(key)
+        .map(|tagged| tagged.algorithm)
+        .map_err(|e| match e {
+            CryptoError::InvalidKeyLength { algorithm, expected, actual } => {
+                format!("Invalid {} key length: expected {}, got {}", algorithm, expected, actual)
+            }
+            CryptoError::InvalidMultibase(msg) => format!("Invalid multibase key: {}", msg),
+            CryptoError::Base58Decode(msg) => format!("Invalid base58btc encoding: {}", msg),
+            other => format!("Key validation error: {}", other),
+        })
+}
 
-    // Check multibase prefix (z = base58btc)
-    if !key.starts_with('z') {
+/// Legacy Ed25519-only validator (delegates to the algorithm-agnostic version).
+#[cfg(test)]
+fn validate_multibase_ed25519_key(key: &str) -> Result<(), String> {
+    let alg = validate_multibase_key(key)?;
+    if alg != AlgorithmId::Ed25519 {
         return Err(format!(
-            "Invalid multibase prefix '{}': expected 'z' (base58btc)",
-            key.chars().next().unwrap_or('?')
+            "Expected Ed25519 key but detected {}",
+            alg.did_verification_method_type()
         ));
     }
-
-    let encoded = &key[1..]; // Strip 'z' prefix
-    if encoded.is_empty() {
-        return Err("Public key multibase has no data after prefix".to_string());
-    }
-
-    // Decode base58btc to verify character set and get actual key bytes
-    let decoded = bs58::decode(encoded)
-        .with_alphabet(bs58::Alphabet::BITCOIN)
-        .into_vec()
-        .map_err(|e| format!("Invalid base58btc encoding: {}", e))?;
-
-    // Accept either:
-    // - 34 bytes: multicodec prefix (0xed, 0x01 for Ed25519) + 32-byte key
-    // - 32 bytes: raw Ed25519 key (no multicodec prefix)
-    match decoded.len() {
-        34 => {
-            // Verify Ed25519 multicodec prefix (varint 0xed01)
-            if decoded[0] != 0xed || decoded[1] != 0x01 {
-                return Err(format!(
-                    "Invalid multicodec prefix: expected [0xed, 0x01] (Ed25519), got [{:#04x}, {:#04x}]",
-                    decoded[0], decoded[1]
-                ));
-            }
-            Ok(())
-        }
-        32 => {
-            // Raw Ed25519 key without multicodec prefix - acceptable
-            Ok(())
-        }
-        n => {
-            Err(format!(
-                "Invalid Ed25519 key length: decoded to {} bytes, expected 34 (with multicodec prefix) or 32 (raw)",
-                n
-            ))
-        }
-    }
+    Ok(())
 }
 
 // ==================== MFA INTEGRATION ====================
@@ -133,9 +110,10 @@ pub fn create_did() -> ExternResult<Record> {
     // Create default verification method
     let verification_method = VerificationMethod {
         id: format!("{}#keys-1", did_id),
-        type_: "Ed25519VerificationKey2020".to_string(),
+        type_: AlgorithmId::Ed25519.did_verification_method_type().to_string(),
         controller: did_id.clone(),
         public_key_multibase: format!("z{}", agent_pub_key),
+        algorithm: Some(AlgorithmId::Ed25519.as_u16()),
     };
 
     let now = sys_time()?;
@@ -144,6 +122,7 @@ pub fn create_did() -> ExternResult<Record> {
         controller: agent_pub_key.clone(),
         verification_method: vec![verification_method.clone()],
         authentication: vec![format!("{}#keys-1", did_id)],
+        key_agreement: vec![],
         service: vec![],
         created: now,
         updated: now,
@@ -239,13 +218,11 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
             if method.public_key_multibase.is_empty() || method.public_key_multibase.len() > 4096 {
                 return Err(wasm_error!(WasmErrorInner::Guest("Public key multibase must be 1-4096 characters".into())));
             }
-            // Validate multibase Ed25519 key format
-            if method.type_ == "Ed25519VerificationKey2020" || method.type_ == "Ed25519VerificationKey2018" {
-                if let Err(e) = validate_multibase_ed25519_key(&method.public_key_multibase) {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        format!("Invalid Ed25519 multibase key in update: {}", e)
-                    )));
-                }
+            // Validate multibase key format (algorithm-agnostic)
+            if let Err(e) = validate_multibase_key(&method.public_key_multibase) {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    format!("Invalid multibase key in update: {}", e)
+                )));
             }
         }
     }
@@ -291,6 +268,22 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
 
     let now = sys_time()?;
 
+    // Validate key_agreement references if provided
+    if let Some(ref ka) = input.key_agreement {
+        if ka.len() > 100 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Key agreement entries must not exceed 100".into()
+            )));
+        }
+        for entry in ka {
+            if entry.is_empty() || entry.len() > 256 {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Key agreement entry must be 1-256 characters".into()
+                )));
+            }
+        }
+    }
+
     // Build updated document
     let updated_did = DidDocument {
         id: current_did.id.clone(),
@@ -299,6 +292,7 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
             .verification_method
             .unwrap_or(current_did.verification_method),
         authentication: input.authentication.unwrap_or(current_did.authentication),
+        key_agreement: input.key_agreement.unwrap_or(current_did.key_agreement),
         service: input.service.unwrap_or(current_did.service),
         created: current_did.created,
         updated: now,
@@ -321,6 +315,8 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
 pub struct UpdateDidInput {
     pub verification_method: Option<Vec<VerificationMethod>>,
     pub authentication: Option<Vec<String>>,
+    /// Key agreement methods (DID URL fragments referencing KEM verification methods).
+    pub key_agreement: Option<Vec<String>>,
     pub service: Option<Vec<ServiceEndpoint>>,
 }
 
@@ -356,7 +352,7 @@ pub fn deactivate_did(reason: String) -> ExternResult<Record> {
 
     let deactivation = DidDeactivation {
         did: current_did.id.clone(),
-        reason,
+        reason: reason.clone(),
         deactivated_at: now,
     };
 
@@ -371,10 +367,56 @@ pub fn deactivate_did(reason: String) -> ExternResult<Record> {
         (),
     )?;
 
+    // Notify bridge of deactivation for ecosystem-wide awareness
+    if let Err(e) = notify_bridge_of_deactivation(&current_did.id, &reason, now) {
+        debug!("Failed to notify bridge of DID deactivation: {:?}", e);
+    }
+
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Could not find deactivation record".into()
         )))
+}
+
+/// Notify bridge of DID deactivation via cross-zome call
+fn notify_bridge_of_deactivation(did: &str, reason: &str, deactivated_at: Timestamp) -> ExternResult<()> {
+    #[derive(Serialize, Deserialize, Debug)]
+    struct DidDeactivatedNotification {
+        did: String,
+        reason: String,
+        deactivated_at: String,
+    }
+
+    let input = DidDeactivatedNotification {
+        did: did.to_string(),
+        reason: reason.to_string(),
+        deactivated_at: deactivated_at.as_micros().to_string(),
+    };
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("identity_bridge"),
+        FunctionName::new("notify_did_deactivated"),
+        None,
+        input,
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(_) => Ok(()),
+        ZomeCallResponse::Unauthorized(_, _, _, _)
+        | ZomeCallResponse::AuthenticationFailed(_, _) => {
+            debug!("Bridge zome not accessible for deactivation notification");
+            Ok(())
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            debug!("Network error notifying bridge of deactivation: {}", err);
+            Ok(())
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            debug!("Countersigning error notifying bridge: {}", err);
+            Ok(())
+        }
+    }
 }
 
 /// Check if a DID is active (not deactivated)
@@ -492,6 +534,7 @@ pub fn add_service_endpoint(service: ServiceEndpoint) -> ExternResult<Record> {
     update_did_document(UpdateDidInput {
         verification_method: None,
         authentication: None,
+        key_agreement: None,
         service: Some(services),
     })
 }
@@ -520,6 +563,7 @@ pub fn remove_service_endpoint(service_id: String) -> ExternResult<Record> {
     update_did_document(UpdateDidInput {
         verification_method: None,
         authentication: None,
+        key_agreement: None,
         service: Some(services),
     })
 }
@@ -541,13 +585,11 @@ pub fn add_verification_method(method: VerificationMethod) -> ExternResult<Recor
         return Err(wasm_error!(WasmErrorInner::Guest("Public key multibase must be 1-4096 characters".into())));
     }
 
-    // Validate multibase encoding format for Ed25519 keys
-    if method.type_ == "Ed25519VerificationKey2020" || method.type_ == "Ed25519VerificationKey2018" {
-        if let Err(e) = validate_multibase_ed25519_key(&method.public_key_multibase) {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Invalid Ed25519 multibase key: {}", e)
-            )));
-        }
+    // Validate multibase key format (algorithm-agnostic)
+    if let Err(e) = validate_multibase_key(&method.public_key_multibase) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Invalid multibase key: {}", e)
+        )));
     }
 
     let agent_info = agent_info()?;
@@ -568,6 +610,70 @@ pub fn add_verification_method(method: VerificationMethod) -> ExternResult<Recor
     update_did_document(UpdateDidInput {
         verification_method: Some(methods),
         authentication: None,
+        key_agreement: None,
+        service: None,
+    })
+}
+
+/// Add a KEM verification method and register it for key agreement.
+///
+/// This adds a post-quantum KEM public key (e.g. ML-KEM-768) to the DID
+/// document and records its DID URL fragment in the `keyAgreement` array.
+/// Other agents can then look up this key to encrypt data to this DID's owner.
+#[hdk_extern]
+pub fn add_key_agreement(method: VerificationMethod) -> ExternResult<Record> {
+    // Input validation
+    if method.id.is_empty() || method.id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Verification method ID must be 1-256 characters".into()
+        )));
+    }
+    if method.public_key_multibase.is_empty() || method.public_key_multibase.len() > 4096 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Public key multibase must be 1-4096 characters".into()
+        )));
+    }
+
+    // Validate the key is a KEM algorithm
+    let alg = validate_multibase_key(&method.public_key_multibase)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid KEM key: {}", e))))?;
+
+    match alg {
+        AlgorithmId::MlKem768 | AlgorithmId::MlKem1024 => {}
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Key agreement requires a KEM algorithm (ML-KEM-768 or ML-KEM-1024), got {}",
+                alg.did_verification_method_type()
+            ))));
+        }
+    }
+
+    let agent_info = agent_info()?;
+    let agent_pub_key = agent_info.agent_initial_pubkey;
+
+    let current_record = get_did_document(agent_pub_key.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("No DID found".into())))?;
+
+    let current_did: DidDocument = current_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
+
+    // Add the KEM key as a verification method
+    let mut methods = current_did.verification_method.clone();
+    methods.push(method.clone());
+
+    // Register the method ID in keyAgreement
+    let mut ka = current_did.key_agreement.clone();
+    if !ka.contains(&method.id) {
+        ka.push(method.id);
+    }
+
+    update_did_document(UpdateDidInput {
+        verification_method: Some(methods),
+        authentication: None,
+        key_agreement: Some(ka),
         service: None,
     })
 }
@@ -580,6 +686,188 @@ pub fn get_my_did(_: ()) -> ExternResult<Option<Record>> {
 }
 
 // =============================================================================
+// SOCIAL RECOVERY: DID TRANSFER
+// =============================================================================
+
+/// Mirror type for recovery request deserialization (cross-zome)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct RecoveryRequestMirror {
+    pub id: String,
+    pub did: String,
+    pub new_agent: AgentPubKey,
+    pub initiated_by: String,
+    pub reason: String,
+    pub status: RecoveryStatusMirror,
+    pub created: Timestamp,
+    pub time_lock_expires: Option<Timestamp>,
+}
+
+impl TryFrom<SerializedBytes> for RecoveryRequestMirror {
+    type Error = SerializedBytesError;
+    fn try_from(sb: SerializedBytes) -> Result<Self, Self::Error> {
+        holochain_serialized_bytes::decode(sb.bytes())
+    }
+}
+
+/// Mirror of recovery_integrity::RecoveryStatus for cross-zome deserialization
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+enum RecoveryStatusMirror {
+    Pending,
+    Approved,
+    ReadyToExecute,
+    Completed,
+    Rejected,
+    Cancelled,
+}
+
+/// Input for claiming a recovered DID
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ClaimRecoveredDidInput {
+    /// The completed recovery request ID
+    pub request_id: String,
+    /// The DID being recovered (did:mycelix:...)
+    pub did: String,
+}
+
+/// Claim a DID after social recovery has been completed.
+///
+/// This must be called by the NEW agent specified in the recovery request.
+/// It creates a new DID document controlled by the new agent, linked from
+/// the original agent's pubkey so that DID resolution picks up the transfer.
+#[hdk_extern]
+pub fn claim_recovered_did(input: ClaimRecoveredDidInput) -> ExternResult<Record> {
+    // Input validation
+    if input.request_id.is_empty() || input.request_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Request ID must be 1-256 characters".into()
+        )));
+    }
+    if !input.did.starts_with("did:mycelix:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID format".into()
+        )));
+    }
+
+    let my_agent_info = agent_info()?;
+    let new_agent = my_agent_info.agent_initial_pubkey;
+
+    // Verify recovery request is completed via cross-zome call to recovery zome
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("recovery"),
+        FunctionName::new("get_recovery_request"),
+        None,
+        input.request_id.clone(),
+    )?;
+
+    let request: RecoveryRequestMirror = match response {
+        ZomeCallResponse::Ok(result) => {
+            let record: Option<Record> = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode recovery request: {:?}", e
+                )))
+            })?;
+            let rec = record.ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Recovery request not found".into()
+            )))?;
+            rec.entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid recovery request entry".into()
+                )))?
+        }
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Failed to query recovery zome".into()
+            )));
+        }
+    };
+
+    // Verify request is completed
+    if request.status != RecoveryStatusMirror::Completed {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Recovery request is not completed".into()
+        )));
+    }
+
+    // Verify the caller is the designated new agent
+    if request.new_agent != new_agent {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the designated recovery agent can claim this DID".into()
+        )));
+    }
+
+    // Verify the DID matches
+    if request.did != input.did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "DID does not match recovery request".into()
+        )));
+    }
+
+    // Parse original agent pubkey from DID for linking
+    let original_agent_str = input.did.strip_prefix("did:mycelix:")
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid DID format".into())))?;
+    let original_agent = AgentPubKey::try_from(original_agent_str).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest("Invalid agent pub key in DID".into()))
+    })?;
+
+    let now = sys_time()?;
+
+    // Create new DID document controlled by the new agent
+    let verification_method = VerificationMethod {
+        id: format!("{}#recovery-key-1", input.did),
+        type_: AlgorithmId::Ed25519.did_verification_method_type().to_string(),
+        controller: input.did.clone(),
+        public_key_multibase: format!("z{}", new_agent),
+        algorithm: Some(AlgorithmId::Ed25519.as_u16()),
+    };
+
+    let did_doc = DidDocument {
+        id: input.did.clone(),
+        controller: new_agent.clone(),
+        verification_method: vec![verification_method.clone()],
+        authentication: vec![format!("{}#recovery-key-1", input.did)],
+        key_agreement: vec![],
+        service: vec![],
+        created: now,
+        updated: now,
+        version: 1, // Fresh document for new controller
+    };
+
+    let action_hash = create_entry(&EntryTypes::DidDocument(did_doc))?;
+
+    // Link from the ORIGINAL agent's pubkey to this new DID document.
+    // This ensures resolve_did() finds the recovered document, since it
+    // looks up links from the agent pubkey embedded in the DID string.
+    // The latest link (by timestamp) takes precedence.
+    create_link(
+        original_agent,
+        action_hash.clone(),
+        LinkTypes::AgentToDid,
+        (),
+    )?;
+
+    // Also link from the new agent for get_my_did() convenience
+    create_link(
+        new_agent.clone(),
+        action_hash.clone(),
+        LinkTypes::AgentToDid,
+        (),
+    )?;
+
+    // Auto-create MFA state for the new agent's control of this DID
+    if let Err(e) = auto_create_mfa_state(&input.did, &new_agent) {
+        debug!("Failed to auto-create MFA state for recovered DID: {:?}", e);
+    }
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find recovered DID document".into()
+        )))
+}
+
+// =============================================================================
 // UNIT TESTS
 // =============================================================================
 
@@ -589,32 +877,46 @@ mod tests {
 
     #[test]
     fn test_valid_multibase_ed25519_key_with_multicodec() {
-        // Ed25519 multicodec prefix (0xed, 0x01) + 32 bytes = 34 bytes total
         let mut key_bytes = vec![0xed, 0x01];
-        key_bytes.extend([0x42u8; 32]); // 32-byte dummy Ed25519 key
+        key_bytes.extend([0x42u8; 32]);
         let encoded = bs58::encode(&key_bytes)
             .with_alphabet(bs58::Alphabet::BITCOIN)
             .into_string();
         let multibase = format!("z{}", encoded);
 
-        assert!(validate_multibase_ed25519_key(&multibase).is_ok());
+        let alg = validate_multibase_key(&multibase).unwrap();
+        assert_eq!(alg, AlgorithmId::Ed25519);
     }
 
     #[test]
     fn test_valid_raw_32_byte_key() {
-        // Raw 32-byte Ed25519 key (no multicodec prefix)
         let key_bytes = [0x42u8; 32];
         let encoded = bs58::encode(&key_bytes)
             .with_alphabet(bs58::Alphabet::BITCOIN)
             .into_string();
         let multibase = format!("z{}", encoded);
 
-        assert!(validate_multibase_ed25519_key(&multibase).is_ok());
+        let alg = validate_multibase_key(&multibase).unwrap();
+        assert_eq!(alg, AlgorithmId::Ed25519);
+    }
+
+    #[test]
+    fn test_pqc_key_accepted() {
+        // ML-DSA-65 multicodec prefix [0xF0, 0x01] + 1952-byte key
+        let mut key_bytes = vec![0xF0, 0x01];
+        key_bytes.extend(vec![0x33u8; 1952]);
+        let encoded = bs58::encode(&key_bytes)
+            .with_alphabet(bs58::Alphabet::BITCOIN)
+            .into_string();
+        let multibase = format!("z{}", encoded);
+
+        let alg = validate_multibase_key(&multibase).unwrap();
+        assert_eq!(alg, AlgorithmId::MlDsa65);
     }
 
     #[test]
     fn test_empty_key_rejected() {
-        assert!(validate_multibase_ed25519_key("").is_err());
+        assert!(validate_multibase_key("").is_err());
     }
 
     #[test]
@@ -623,57 +925,67 @@ mod tests {
         let encoded = bs58::encode(&key_bytes)
             .with_alphabet(bs58::Alphabet::BITCOIN)
             .into_string();
-        // Missing 'z' prefix
-        assert!(validate_multibase_ed25519_key(&encoded).is_err());
+        assert!(validate_multibase_key(&encoded).is_err());
     }
 
     #[test]
     fn test_wrong_prefix_rejected() {
-        assert!(validate_multibase_ed25519_key("m" ).is_err());
-        assert!(validate_multibase_ed25519_key("u" ).is_err());
+        assert!(validate_multibase_key("m").is_err());
+        assert!(validate_multibase_key("u").is_err());
     }
 
     #[test]
     fn test_invalid_base58_characters_rejected() {
-        // '0', 'O', 'I', 'l' are not in base58btc alphabet
-        assert!(validate_multibase_ed25519_key("z0000000000000000000000000000000000000000000").is_err());
-        assert!(validate_multibase_ed25519_key("zOOOOOOOOOOOO").is_err());
+        assert!(validate_multibase_key("z0000000000000000000000000000000000000000000").is_err());
+        assert!(validate_multibase_key("zOOOOOOOOOOOO").is_err());
     }
 
     #[test]
     fn test_wrong_key_length_rejected() {
-        // 16 bytes - too short for Ed25519
+        // 16 bytes - too short for any algorithm
         let short_key = [0x42u8; 16];
         let encoded = bs58::encode(&short_key)
             .with_alphabet(bs58::Alphabet::BITCOIN)
             .into_string();
         let multibase = format!("z{}", encoded);
-        assert!(validate_multibase_ed25519_key(&multibase).is_err());
+        assert!(validate_multibase_key(&multibase).is_err());
 
-        // 64 bytes - too long for Ed25519
+        // 64 bytes - doesn't match any known algorithm
         let long_key = [0x42u8; 64];
         let encoded = bs58::encode(&long_key)
             .with_alphabet(bs58::Alphabet::BITCOIN)
             .into_string();
         let multibase = format!("z{}", encoded);
-        assert!(validate_multibase_ed25519_key(&multibase).is_err());
+        assert!(validate_multibase_key(&multibase).is_err());
     }
 
     #[test]
     fn test_wrong_multicodec_prefix_rejected() {
-        // Use P-256 multicodec prefix (0x80, 0x24) instead of Ed25519
+        // Use unrecognized prefix (0x80, 0x24) + 32 bytes
         let mut key_bytes = vec![0x80, 0x24];
-        key_bytes.extend([0x42u8; 32]); // 32-byte key body
+        key_bytes.extend([0x42u8; 32]);
+        let encoded = bs58::encode(&key_bytes)
+            .with_alphabet(bs58::Alphabet::BITCOIN)
+            .into_string();
+        let multibase = format!("z{}", encoded);
+
+        assert!(validate_multibase_key(&multibase).is_err());
+    }
+
+    #[test]
+    fn test_prefix_only_rejected() {
+        assert!(validate_multibase_key("z").is_err());
+    }
+
+    #[test]
+    fn test_legacy_ed25519_validator_rejects_pqc() {
+        let mut key_bytes = vec![0xF0, 0x01];
+        key_bytes.extend(vec![0x33u8; 1952]);
         let encoded = bs58::encode(&key_bytes)
             .with_alphabet(bs58::Alphabet::BITCOIN)
             .into_string();
         let multibase = format!("z{}", encoded);
 
         assert!(validate_multibase_ed25519_key(&multibase).is_err());
-    }
-
-    #[test]
-    fn test_prefix_only_rejected() {
-        assert!(validate_multibase_ed25519_key("z").is_err());
     }
 }
