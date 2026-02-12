@@ -244,7 +244,7 @@ impl GradientComputer {
     fn find_best_direction(&self, derivatives: &[(BinaryHV, f64)]) -> (BinaryHV, f64) {
         // Sort by derivative (descending)
         let mut sorted = derivatives.to_vec();
-        sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        sorted.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         // Take top-k directions
         let top_k = sorted.iter().take(self.config.top_k);
@@ -270,7 +270,7 @@ impl GradientComputer {
             .enumerate()
             .map(|(i, &g)| (i, g.abs()))
             .collect();
-        importance.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        importance.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         // Weight direction by component importance
         // (In practice, this is approximated by permuting more in important dimensions)
@@ -472,7 +472,7 @@ impl ConsciousnessLandscape {
 
         let (idx, &max_phi) = self.attractor_phis.iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())?;
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))?;
 
         Some((&self.attractors[idx], max_phi))
     }

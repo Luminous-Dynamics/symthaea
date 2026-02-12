@@ -46,7 +46,7 @@ mod bridge_deposits {
     use super::*;
 
     /// Test 1.1: Basic ETH deposit mints SAP
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_eth_deposit() {
         println!("Test 1.1: ETH Deposit -> SAP Minting");
@@ -62,7 +62,7 @@ mod bridge_deposits {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Deposit 1 ETH at rate 2000.0 SAP/ETH
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -102,7 +102,7 @@ mod bridge_deposits {
     }
 
     /// Test 1.2: USDC deposit mints SAP
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_usdc_deposit() {
         println!("Test 1.2: USDC Deposit -> SAP Minting");
@@ -128,7 +128,7 @@ mod bridge_deposits {
         }
 
         let input = DepositCollateralInput {
-            depositor_did: test_did("alice"),
+            depositor_did: format!("did:mycelix:{}", agents[0]),
             collateral_type: "USDC".to_string(),
             collateral_amount: 500_000_000, // 500 USDC in micro-units
             oracle_rate: 1.0, // 1:1 USDC:SAP
@@ -153,7 +153,7 @@ mod bridge_deposits {
     }
 
     /// Test 1.3: Invalid collateral type rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_invalid_collateral_type_rejected() {
         println!("Test 1.3: Invalid Collateral Type Rejected");
@@ -179,7 +179,7 @@ mod bridge_deposits {
         }
 
         let input = DepositCollateralInput {
-            depositor_did: test_did("alice"),
+            depositor_did: format!("did:mycelix:{}", agents[0]),
             collateral_type: "BTC".to_string(), // Invalid - only ETH and USDC
             collateral_amount: 1000,
             oracle_rate: 50000.0,
@@ -195,7 +195,7 @@ mod bridge_deposits {
     }
 
     /// Test 1.4: Invalid DID rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_invalid_did_rejected() {
         println!("Test 1.4: Invalid Depositor DID Rejected");
@@ -237,7 +237,7 @@ mod bridge_deposits {
     }
 
     /// Test 1.5: Zero amount rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_zero_amount_rejected() {
         println!("Test 1.5: Zero Amount Rejected");
@@ -263,7 +263,7 @@ mod bridge_deposits {
         }
 
         let input = DepositCollateralInput {
-            depositor_did: test_did("alice"),
+            depositor_did: format!("did:mycelix:{}", agents[0]),
             collateral_type: "ETH".to_string(),
             collateral_amount: 0, // Zero amount
             oracle_rate: 2000.0,
@@ -288,7 +288,7 @@ mod cross_happ_payments {
     use super::*;
 
     /// Test 2.1: Basic cross-hApp payment
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cross_happ_payment() {
         println!("Test 2.1: Cross-hApp Payment");
@@ -317,8 +317,8 @@ mod cross_happ_payments {
 
         let input = ProcessPaymentInput {
             source_happ: "mycelix-property".to_string(),
-            from_did: test_did("alice"),
-            to_did: test_did("bob"),
+            from_did: format!("did:mycelix:{}", agents[0]),
+            to_did: format!("did:mycelix:{}", agents[1]),
             amount: 500,
             currency: "SAP".to_string(),
             reference: "property:rent:2026-02".to_string(),
@@ -344,7 +344,7 @@ mod cross_happ_payments {
     }
 
     /// Test 2.2: Non-SAP currency rejected for cross-hApp payment
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_non_sap_cross_happ_rejected() {
         println!("Test 2.2: Non-SAP Cross-hApp Payment Rejected");
@@ -373,8 +373,8 @@ mod cross_happ_payments {
 
         let input = ProcessPaymentInput {
             source_happ: "mycelix-property".to_string(),
-            from_did: test_did("alice"),
-            to_did: test_did("bob"),
+            from_did: format!("did:mycelix:{}", agents[0]),
+            to_did: format!("did:mycelix:{}", agents[1]),
             amount: 100,
             currency: "TEND".to_string(), // Invalid for cross-hApp
             reference: "test".to_string(),
@@ -399,7 +399,7 @@ mod finance_events {
     use super::*;
 
     /// Test 3.1: Broadcast and retrieve finance events
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_broadcast_finance_event() {
         println!("Test 3.1: Broadcast Finance Event");
@@ -426,7 +426,7 @@ mod finance_events {
 
         let input = BroadcastFinanceEventInput {
             event_type: FinanceEventType::CommonsContributed,
-            subject_did: test_did("alice"),
+            subject_did: format!("did:mycelix:{}", agents[0]),
             amount: Some(1000),
             payload: serde_json::json!({"pool": "commons:local:1"}).to_string(),
         };
@@ -591,7 +591,7 @@ mod collateral_registration {
     use super::*;
 
     /// Test 4.1: Register a RealEstate collateral asset
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_register_collateral() {
         println!("Test 4.1: Register Collateral");
@@ -607,7 +607,7 @@ mod collateral_registration {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct RegisterCollateralInput {
@@ -652,7 +652,7 @@ mod collateral_registration {
     }
 
     /// Test 4.2: Invalid collateral registration with empty asset_id
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_invalid_collateral_registration() {
         println!("Test 4.2: Invalid Collateral Registration");
@@ -680,7 +680,7 @@ mod collateral_registration {
         }
 
         let input = RegisterCollateralInput {
-            owner_did: test_did("alice"),
+            owner_did: format!("did:mycelix:{}", agents[0]),
             source_happ: "mycelix-property".to_string(),
             asset_type: AssetType::RealEstate,
             asset_id: "".to_string(), // Empty asset_id - should fail validation
@@ -717,7 +717,7 @@ mod redemption_tests {
     use super::*;
 
     /// Test 5.1: Deposit ETH and redeem collateral
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_redeem_collateral() {
         println!("Test 5.1: Redeem Collateral");
@@ -733,7 +733,7 @@ mod redemption_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Deposit ETH collateral
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -787,7 +787,7 @@ mod redemption_tests {
     ///
     /// Makes an initial deposit (bootstraps vault), confirms it, makes a second
     /// deposit, then attempts a third that would exceed 5% of vault value in 24h.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_deposit_rate_limit_enforcement() {
         println!("Test 5.2: Deposit Rate Limit Enforcement");
@@ -803,7 +803,7 @@ mod redemption_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct DepositCollateralInput {
@@ -884,7 +884,7 @@ mod redemption_tests {
     ///
     /// Deposit -> Confirm -> Verify status transitions. Then try confirming
     /// again, which should fail because only Pending deposits can be confirmed.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_confirm_deposit_lifecycle() {
         println!("Test 5.3: Confirm Deposit Lifecycle");
@@ -900,7 +900,7 @@ mod redemption_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct DepositCollateralInput {
@@ -974,7 +974,7 @@ mod redemption_tests {
     ///
     /// Create a deposit (Pending status), attempt to redeem it.
     /// Should fail because only confirmed deposits can be redeemed.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_redeem_unconfirmed_deposit() {
         println!("Test 5.4: Redeem Unconfirmed Deposit");
@@ -990,7 +990,7 @@ mod redemption_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct DepositCollateralInput {
@@ -1045,7 +1045,7 @@ mod redemption_tests {
     }
 
     /// Test 5.5: Make 3 cross-hApp payments and query payment history
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_payment_history() {
         println!("Test 5.2: Payment History");
@@ -1061,8 +1061,8 @@ mod redemption_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct ProcessPaymentInput {

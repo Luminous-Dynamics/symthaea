@@ -128,14 +128,8 @@ tempfile = "3.10"
 
 [features]
 default = []
-# Enable FLAC support
-flac = []
-# Enable GPU acceleration (future)
-gpu = []
-# Enable whale/cetacean bioacoustics
-bioacoustics = []
-# Enable EEG/sleep processing
-eeg = []
+# Removed dead features: flac, gpu, bioacoustics, eeg (no cfg gates in source code)
+# Re-add when actual conditional compilation is implemented
 
 [[bench]]
 name = "core_benchmarks"

@@ -589,7 +589,7 @@ impl ConsciousnessFlowField {
         let dominant_attractor = critical_points.iter()
             .enumerate()
             .filter(|(_, p)| p.point_type == CriticalPointType::Attractor)
-            .max_by(|(_, a), (_, b)| a.strength.partial_cmp(&b.strength).unwrap())
+            .max_by(|(_, a), (_, b)| a.strength.total_cmp(&b.strength))
             .map(|(idx, _)| idx);
 
         // Compute average flow magnitude

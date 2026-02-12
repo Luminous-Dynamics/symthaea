@@ -279,7 +279,7 @@ impl CausalSpace {
         results.sort_by(|a, b| {
             let score_a = a.similarity as f64 * a.strength;
             let score_b = b.similarity as f64 * b.strength;
-            score_b.partial_cmp(&score_a).unwrap()
+            score_b.total_cmp(&score_a)
         });
 
         results.truncate(top_n);
@@ -325,7 +325,7 @@ impl CausalSpace {
         results.sort_by(|a, b| {
             let score_a = a.similarity as f64 * a.strength;
             let score_b = b.similarity as f64 * b.strength;
-            score_b.partial_cmp(&score_a).unwrap()
+            score_b.total_cmp(&score_a)
         });
 
         results.truncate(top_n);

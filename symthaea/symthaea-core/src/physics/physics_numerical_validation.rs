@@ -844,7 +844,7 @@ fn hermitian_eigenvalues_known_spectrum() {
     rho.set(2, 2, Complex64::from_real(0.1));
 
     let mut eigenvalues = rho.hermitian_eigenvalues();
-    eigenvalues.sort_by(|a, b| b.partial_cmp(a).unwrap()); // Descending
+    eigenvalues.sort_by(|a, b| b.total_cmp(a)); // Descending
 
     assert_relative_eq(eigenvalues[0], 0.6, 1e-10, "λ₁ of diag(0.6,0.3,0.1)");
     assert_relative_eq(eigenvalues[1], 0.3, 1e-10, "λ₂ of diag(0.6,0.3,0.1)");
@@ -869,7 +869,7 @@ fn hermitian_eigenvalues_off_diagonal() {
     rho.set(1, 1, Complex64::from_real(0.3));
 
     let mut eigenvalues = rho.hermitian_eigenvalues();
-    eigenvalues.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    eigenvalues.sort_by(|a, b| b.total_cmp(a));
 
     let disc = 0.05_f64.sqrt();
     let lambda1 = 0.5 + disc;

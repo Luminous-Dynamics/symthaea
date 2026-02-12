@@ -6,11 +6,13 @@ on:
     paths:
       - 'symthaea/**'
       - '.github/workflows/symthaea-ci.yml'
+      - '.github/workflows/symthaea-nightly.yml'
   pull_request:
     branches: [main]
     paths:
       - 'symthaea/**'
       - '.github/workflows/symthaea-ci.yml'
+      - '.github/workflows/symthaea-nightly.yml'
 
 env:
   CARGO_TERM_COLOR: always
@@ -102,12 +104,22 @@ jobs:
       fail-fast: false
       matrix:
         features:
+          # cfg-gated modules in lib.rs
           - identity
           - code_generation
           - nix-mind
-          - audio-sentinel
+          - integration_module
+          - observability_module
+          - web_research_module
+          # Major optional dependency features
           - voice-stt
           - embeddings
+          - neural-bridge
+          - mycelix
+          - swarm
+          # Consciousness stack features
+          - full_consciousness
+          - reasoning_engine
     defaults:
       run:
         working-directory: symthaea
@@ -126,3 +138,7 @@ jobs:
             ${{ runner.os }}-cargo-feat-${{ matrix.features }}-
       - name: Check feature (${{ matrix.features }})
         run: cargo check --lib --features ${{ matrix.features }}
+      - name: Test feature (${{ matrix.features }})
+        run: cargo test --lib --features ${{ matrix.features }}
+        env:
+          RUST_BACKTRACE: 1

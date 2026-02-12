@@ -993,6 +993,16 @@ mod three_currency_lifecycle {
         assert!(balance.can_provide, "Should be able to provide");
         assert!(balance.can_receive, "Should be able to receive");
 
+        // ---- Initialize SAP balances for both agents (required before SAP transfer) ----
+        let _: Record = conductor
+            .call(&cell1.zome("payments"), "initialize_sap_balance", did1.clone())
+            .await;
+
+        let cell2 = app2.cells()[0].clone();
+        let _: Record = conductor
+            .call(&cell2.zome("payments"), "initialize_sap_balance", did2.clone())
+            .await;
+
         // ---- Verify: payments only accept SAP or TEND ----
         let payment_input = SendPaymentInput {
             from_did: did1.clone(),

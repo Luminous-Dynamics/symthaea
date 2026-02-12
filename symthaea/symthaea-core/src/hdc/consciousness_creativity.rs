@@ -523,7 +523,7 @@ impl ConsciousnessCreativity {
 
         // Update best idea
         if let Some(best) = self.ideas.iter().max_by(|a, b| {
-            a.creativity_score.partial_cmp(&b.creativity_score).unwrap()
+            a.creativity_score.total_cmp(&b.creativity_score)
         }) {
             self.best_idea = Some(best.clone());
         }

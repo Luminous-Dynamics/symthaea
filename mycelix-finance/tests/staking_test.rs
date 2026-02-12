@@ -40,7 +40,7 @@ mod stake_lifecycle {
 
     /// Test 1.1: Create a stake with MYCEL weighting, verify weight = 1.0 + mycel_score
     /// MYCEL score is fetched from recognition zome (not caller-provided).
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_create_stake_with_mycel_weighting() {
         println!("Test 1.1: Create Stake with MYCEL Weighting");
@@ -56,7 +56,7 @@ mod stake_lifecycle {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Initialize member in recognition zome first (sets MYCEL via components)
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -114,7 +114,7 @@ mod stake_lifecycle {
     }
 
     /// Test 1.2: Full lifecycle — create stake, begin unbonding, then withdraw
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_unbonding_and_withdrawal() {
         println!("Test 1.2: Unbonding and Withdrawal Lifecycle");
@@ -130,7 +130,7 @@ mod stake_lifecycle {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Step 1: Create stake
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -192,7 +192,7 @@ mod stake_lifecycle {
     }
 
     /// Test 1.3: Cannot withdraw a stake that is still in unbonding period
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cannot_withdraw_during_unbonding() {
         println!("Test 1.3: Cannot Withdraw During Unbonding");
@@ -208,7 +208,7 @@ mod stake_lifecycle {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Create and unbond
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -264,7 +264,7 @@ mod stake_lifecycle {
 
     /// Test 1.4: Update MYCEL score on an active stake
     /// Score is re-fetched from recognition zome (not caller-provided).
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_update_mycel_score() {
         println!("Test 1.4: Update MYCEL Score (fetched from recognition)");
@@ -280,7 +280,7 @@ mod stake_lifecycle {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Initialize member in recognition zome
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -382,7 +382,7 @@ mod slashing_tests {
     }
 
     /// Test 2.1: Slash for double signing — 100% slash, jailed
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_slash_for_double_signing() {
         println!("Test 2.1: Slash for Double Signing (100%, Jailed)");
@@ -398,7 +398,7 @@ mod slashing_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Create a stake first
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -439,7 +439,7 @@ mod slashing_tests {
             reason: SlashingReason::DoubleSigning,
             evidence: test_evidence(
                 EvidenceType::DoubleSignEvidence,
-                vec![test_did("reporter_1"), test_did("reporter_2")],
+                vec![format!("did:mycelix:{}", agents[0]), format!("did:mycelix:{}", agents[0])],
             ),
             custom_slash_percentage: None, // Use default 100%
         };
@@ -469,7 +469,7 @@ mod slashing_tests {
     }
 
     /// Test 2.2: Slash for downtime — 5% slash, not jailed
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_slash_for_downtime() {
         println!("Test 2.2: Slash for Downtime (5%, Not Jailed)");
@@ -485,7 +485,7 @@ mod slashing_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Create a stake
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -525,7 +525,7 @@ mod slashing_tests {
             reason: SlashingReason::Downtime,
             evidence: test_evidence(
                 EvidenceType::DowntimeEvidence,
-                vec![test_did("monitor_node")],
+                vec![format!("did:mycelix:{}", agents[0])],
             ),
             custom_slash_percentage: None, // Use default 5%
         };
@@ -554,7 +554,7 @@ mod slashing_tests {
     }
 
     /// Test 2.3: Slash with custom percentage override
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_slash_with_custom_percentage() {
         println!("Test 2.3: Slash with Custom Percentage Override");
@@ -570,7 +570,7 @@ mod slashing_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Create a stake
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -610,7 +610,7 @@ mod slashing_tests {
             reason: SlashingReason::InvalidGradient,
             evidence: test_evidence(
                 EvidenceType::GradientAnalysis,
-                vec![test_did("fl_aggregator")],
+                vec![format!("did:mycelix:{}", agents[0])],
             ),
             custom_slash_percentage: Some(25), // Override default 10%
         };
@@ -647,7 +647,7 @@ mod escrow_tests {
     use super::*;
 
     /// Test 3.1: Hash-lock escrow — create, reveal preimage, release
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_hash_lock_escrow() {
         println!("Test 3.1: Hash-Lock Escrow Lifecycle");
@@ -663,8 +663,8 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Preimage and its hash (all hash types use Blake2b-256 internally)
         let preimage = b"secret_preimage_for_escrow_release".to_vec();
@@ -773,7 +773,7 @@ mod escrow_tests {
     }
 
     /// Test 3.2: Multi-sig escrow — create 2-of-3, add signatures, release
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_multisig_escrow() {
         println!("Test 3.2: Multi-Sig Escrow (2-of-3)");
@@ -789,12 +789,12 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
-        let signer_1 = test_did("signer_alpha");
-        let signer_2 = test_did("signer_beta");
-        let signer_3 = test_did("signer_gamma");
+        let signer_1 = format!("did:mycelix:{}", agents[0]);
+        let signer_2 = format!("did:mycelix:{}", agents[0]);
+        let signer_3 = format!("did:mycelix:{}", agents[0]);
 
         // Create 2-of-3 multi-sig escrow
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -916,7 +916,7 @@ mod escrow_tests {
     }
 
     /// Test 3.3: Unauthorized signer is rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_unauthorized_signer_rejected() {
         println!("Test 3.3: Unauthorized Signer Rejected");
@@ -932,12 +932,12 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
-        let signer_1 = test_did("authorized_1");
-        let signer_2 = test_did("authorized_2");
-        let unauthorized = test_did("evil_signer");
+        let signer_1 = format!("did:mycelix:{}", agents[0]);
+        let signer_2 = format!("did:mycelix:{}", agents[0]);
+        let unauthorized = format!("did:mycelix:{}", agents[0]);
 
         // Create escrow with specific authorized signers
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

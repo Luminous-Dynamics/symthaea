@@ -573,7 +573,7 @@ impl UnifiedTheory {
             .map(|(c, cv)| (*c, cv.weighted_value()))
             .collect();
 
-        contributions.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        contributions.sort_by(|a, b| a.1.total_cmp(&b.1));
 
         contributions.into_iter()
             .take(self.config.num_bottlenecks)

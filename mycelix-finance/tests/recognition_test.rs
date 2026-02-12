@@ -21,6 +21,65 @@ use std::time::Duration;
 use recognition_integrity::*;
 use mycelix_finance_types::FeeTier;
 
+// Mirror types for TEND zome types — avoids linking tend_integrity alongside
+// recognition_integrity (both HDI crates generate conflicting #[no_mangle] symbols).
+// These must match the serde layout of the originals exactly.
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ServiceCategory {
+    CareWork,
+    HomeServices,
+    FoodServices,
+    Transportation,
+    Education,
+    GeneralAssistance,
+    Administrative,
+    Creative,
+    TechSupport,
+    Wellness,
+    Gardening,
+    Custom(String),
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ExchangeStatus {
+    Proposed,
+    Confirmed,
+    Disputed,
+    Cancelled,
+    Resolved,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RecordExchangeInput {
+    pub receiver_did: String,
+    pub hours: f32,
+    pub service_description: String,
+    pub service_category: ServiceCategory,
+    pub cultural_alias: Option<String>,
+    pub dao_did: String,
+    pub service_date: Option<Timestamp>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ExchangeRecord {
+    pub id: String,
+    pub provider_did: String,
+    pub receiver_did: String,
+    pub hours: f32,
+    pub service_description: String,
+    pub service_category: ServiceCategory,
+    pub status: ExchangeStatus,
+    pub timestamp: Timestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RateExchangeInput {
+    pub exchange_id: String,
+    pub rating: u8,
+    pub comment: Option<String>,
+}
+
 mod test_helpers {
     pub const TEST_DID_PREFIX: &str = "did:mycelix:test:";
 
@@ -47,7 +106,7 @@ mod apprentice_lifecycle {
     use super::*;
 
     /// Test 1.1: Onboard apprentice with valid mentor
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_onboard_apprentice() {
         println!("Test 1.1: Onboard Apprentice");
@@ -117,7 +176,7 @@ mod apprentice_lifecycle {
     }
 
     /// Test 1.2: Cannot onboard without sufficient MYCEL
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_onboard_insufficient_mycel() {
         println!("Test 1.2: Cannot Onboard Without Sufficient MYCEL");
@@ -186,7 +245,7 @@ mod apprentice_lifecycle {
     }
 
     /// Test 1.3: Graduate apprentice when MYCEL reaches 0.3
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_graduate_apprentice() {
         println!("Test 1.3: Graduate Apprentice");
@@ -275,7 +334,7 @@ mod apprentice_lifecycle {
     }
 
     /// Test 1.4: Cannot graduate below 0.3 MYCEL
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cannot_graduate_early() {
         println!("Test 1.4: Cannot Graduate Below 0.3 MYCEL");
@@ -364,7 +423,7 @@ mod quality_rating_integration {
     /// 2. Bob confirms exchange
     /// 3. Bob rates Alice 5/5
     /// 4. Alice's MYCEL Validation component reflects the rating
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_quality_rating_flows_to_mycel() {
         println!("Test 2.1: Quality Rating -> MYCEL Validation Flow");
@@ -414,8 +473,7 @@ mod quality_rating_integration {
 
         // Step 1: Alice provides services and Bob rates them highly
         // We need 3 confirmed+rated exchanges for the validation score to be non-zero
-        use tend_integrity::ServiceCategory;
-        use tend::{RecordExchangeInput, ExchangeRecord, RateExchangeInput};
+        // Using mirror types from top-level (avoids HDI linker conflicts)
 
         for i in 0..3 {
             // Alice records exchange with Bob
@@ -493,7 +551,7 @@ mod quality_rating_integration {
     }
 
     /// Test 2.2: Low ratings reduce MYCEL Validation
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_low_ratings_reduce_validation() {
         println!("Test 2.2: Low Ratings Reduce MYCEL Validation");
@@ -537,8 +595,7 @@ mod quality_rating_integration {
 
         let dao_did = "did:mycelix:dao:test_community".to_string();
 
-        use tend_integrity::ServiceCategory;
-        use tend::{RecordExchangeInput, ExchangeRecord, RateExchangeInput};
+        // Using mirror types from top-level (avoids HDI linker conflicts)
 
         // 3 exchanges, all rated 1/5 (poor quality)
         for i in 0..3 {
@@ -812,7 +869,7 @@ mod recognition_query_tests {
     use super::*;
 
     /// Test 5.1: Recognize a member 3 times and query received recognitions
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_get_recognition_received() {
         println!("Test 5.1: Get Recognition Received");
@@ -921,7 +978,7 @@ mod lifecycle_advanced {
     use super::*;
 
     /// Test 6.1: Jubilee normalization integration
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_jubilee_normalize_integration() {
         println!("Test 6.1: Jubilee Normalize Integration");
@@ -995,7 +1052,7 @@ mod lifecycle_advanced {
     }
 
     /// Test 6.2: Dissolve MYCEL sets all scores to 0
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_dissolve_mycel() {
         println!("Test 6.2: Dissolve MYCEL");
@@ -1072,7 +1129,7 @@ mod lifecycle_advanced {
     }
 
     /// Test 6.3: Passive decay integration test
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_passive_decay_integration() {
         println!("Test 6.3: Passive Decay Integration");

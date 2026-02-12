@@ -70,7 +70,7 @@ mod payment_creation {
     /// - Alice sends 100 SAP to Bob
     /// - Verify payment is created with correct fields
     /// - Verify receipt is generated
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore] // Requires DNA bundle to be built
     async fn test_create_payment_success() {
         println!("Test 1.1: Basic Payment Creation");
@@ -89,8 +89,8 @@ mod payment_creation {
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create payment input
         let payment_input = SendPaymentInput {
@@ -135,7 +135,7 @@ mod payment_creation {
     }
 
     /// Test 1.2: Payment with different payment types
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_payment_types() {
         println!("Test 1.2: Payment Types");
@@ -152,8 +152,8 @@ mod payment_creation {
 
         let alice_cell = &apps[0].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Test each valid payment type (LoanPayment and EnergyInvestment removed)
         let payment_types = vec![
@@ -191,7 +191,7 @@ mod payment_creation {
     }
 
     /// Test 1.3: Recurring payment configuration
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_recurring_payment() {
         println!("Test 1.3: Recurring Payment Configuration");
@@ -208,8 +208,8 @@ mod payment_creation {
 
         let alice_cell = &apps[0].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create recurring payment config
         let recurring_config = RecurringConfig {
@@ -259,7 +259,7 @@ mod payment_validation {
     use super::*;
 
     /// Test 2.1: Invalid DID format rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_invalid_did_rejected() {
         println!("Test 2.1: Invalid DID Validation");
@@ -279,7 +279,7 @@ mod payment_validation {
         // Test with invalid sender DID (no "did:" prefix)
         let invalid_sender_input = SendPaymentInput {
             from_did: "invalid:alice".to_string(), // Invalid - no "did:" prefix
-            to_did: test_did("bob"),
+            to_did: format!("did:mycelix:{}", agents[1]),
             amount: 100_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
@@ -305,7 +305,7 @@ mod payment_validation {
 
         // Test with invalid receiver DID
         let invalid_receiver_input = SendPaymentInput {
-            from_did: test_did("alice"),
+            from_did: format!("did:mycelix:{}", agents[0]),
             to_did: "bob@example.com".to_string(), // Invalid - email format
             amount: 100_000_000,
             currency: TEST_CURRENCY.to_string(),
@@ -334,7 +334,7 @@ mod payment_validation {
     }
 
     /// Test 2.2: Zero or negative amounts rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_invalid_amount_rejected() {
         println!("Test 2.2: Invalid Amount Validation");
@@ -350,8 +350,8 @@ mod payment_validation {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Test zero amount
         let zero_amount_input = SendPaymentInput {
@@ -386,7 +386,7 @@ mod payment_validation {
     }
 
     /// Test 2.3: Self-payment rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_self_payment_rejected() {
         println!("Test 2.3: Self-Payment Validation");
@@ -402,7 +402,7 @@ mod payment_validation {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Attempt self-payment
         let self_payment_input = SendPaymentInput {
@@ -434,7 +434,7 @@ mod payment_validation {
     }
 
     /// Test 2.4: Invalid currency rejected (only SAP and TEND accepted)
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_invalid_currency_rejected() {
         println!("Test 2.4: Invalid Currency Validation");
@@ -450,8 +450,8 @@ mod payment_validation {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Test invalid currencies that are no longer accepted
         let invalid_currencies = vec!["MYC", "USD", "ENERGY", "BTC", "ETH"];
@@ -498,7 +498,7 @@ mod double_spend_prevention {
     /// Test 3.1: Payment ID uniqueness
     ///
     /// Verifies that each payment gets a unique ID to prevent replay attacks
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_payment_id_uniqueness() {
         println!("Test 3.1: Payment ID Uniqueness");
@@ -514,8 +514,8 @@ mod double_spend_prevention {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create multiple identical payments
         let mut payment_ids = Vec::new();
@@ -562,7 +562,7 @@ mod double_spend_prevention {
     ///
     /// Each payment generates a unique receipt that can be used to verify
     /// the payment has not been processed twice
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_receipt_prevents_replay() {
         println!("Test 3.2: Receipt Verification");
@@ -578,8 +578,8 @@ mod double_spend_prevention {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Send payment
         let input = SendPaymentInput {
@@ -622,7 +622,7 @@ mod double_spend_prevention {
     /// Test 3.3: Channel balance consistency
     ///
     /// Payment channels maintain consistent balances, preventing double-spend
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_channel_balance_consistency() {
         println!("Test 3.3: Channel Balance Consistency");
@@ -640,8 +640,8 @@ mod double_spend_prevention {
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open payment channel with initial deposits
         let channel_input = OpenChannelInput {
@@ -701,7 +701,7 @@ mod double_spend_prevention {
     }
 
     /// Test 3.4: Insufficient balance prevents double-spend in channels
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_channel_insufficient_balance() {
         println!("Test 3.4: Channel Insufficient Balance Check");
@@ -718,8 +718,8 @@ mod double_spend_prevention {
 
         let alice_cell = &apps[0].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open channel with limited balance
         let channel_input = OpenChannelInput {
@@ -778,7 +778,7 @@ mod transaction_confirmation {
     use super::*;
 
     /// Test 4.1: Payment completion status
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_payment_completion_status() {
         println!("Test 4.1: Payment Completion Status");
@@ -794,8 +794,8 @@ mod transaction_confirmation {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
@@ -833,7 +833,7 @@ mod transaction_confirmation {
     }
 
     /// Test 4.2: Payment history retrieval (both sent and received)
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_payment_history_retrieval() {
         println!("Test 4.2: Payment History Retrieval");
@@ -852,9 +852,9 @@ mod transaction_confirmation {
         let bob_cell = &apps[1].cells()[0];
         let charlie_cell = &apps[2].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
-        let charlie_did = test_did("charlie");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
+        let charlie_did = format!("did:mycelix:{}", agents[2]);
 
         // Alice sends to Bob
         let input1 = SendPaymentInput {
@@ -939,7 +939,7 @@ mod currency_tests {
     use super::*;
 
     /// Test 5.1: SAP currency payment
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_sap_payment() {
         println!("Test 5.1: SAP Currency Payment");
@@ -955,8 +955,8 @@ mod currency_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
@@ -985,7 +985,7 @@ mod currency_tests {
     }
 
     /// Test 5.2: TEND currency payment
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_tend_payment() {
         println!("Test 5.2: TEND Currency Payment");
@@ -1001,8 +1001,8 @@ mod currency_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
@@ -1030,7 +1030,7 @@ mod currency_tests {
     }
 
     /// Test 5.3: Only SAP and TEND currencies are valid
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_valid_currencies_only() {
         println!("Test 5.3: Valid Currencies Only (SAP/TEND)");
@@ -1046,8 +1046,8 @@ mod currency_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Valid: SAP
         let sap_input = SendPaymentInput {
@@ -1109,7 +1109,7 @@ mod failed_transaction_handling {
     use super::*;
 
     /// Test 6.1: Channel not found error
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_channel_not_found() {
         println!("Test 6.1: Channel Not Found Error");
@@ -1153,7 +1153,7 @@ mod failed_transaction_handling {
     }
 
     /// Test 6.2: Empty history handling
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_empty_payment_history() {
         println!("Test 6.2: Empty Payment History");
@@ -1171,7 +1171,7 @@ mod failed_transaction_handling {
         let alice_cell = &apps[0].cells()[0];
 
         // Query history for user with no payments
-        let new_user_did = test_did("new_user_with_no_payments");
+        let new_user_did = format!("did:mycelix:{}", agents[0]);
 
         let history: Vec<Record> = conductor
             .call(&alice_cell.zome("payments"), "get_payment_history", GetPaymentHistoryInput {
@@ -1189,7 +1189,7 @@ mod failed_transaction_handling {
     /// Test 6.3: Concurrent transfer race condition prevention
     ///
     /// Tests that rapid successive transfers are handled correctly
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_concurrent_channel_transfers() {
         println!("Test 6.3: Concurrent Channel Transfers");
@@ -1205,8 +1205,8 @@ mod failed_transaction_handling {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open channel with enough balance for multiple transfers
         let channel_input = OpenChannelInput {
@@ -1290,7 +1290,7 @@ mod payment_channels {
     use super::*;
 
     /// Test 7.1: Channel creation with valid inputs
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_channel_creation() {
         println!("Test 7.1: Payment Channel Creation");
@@ -1306,8 +1306,8 @@ mod payment_channels {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         let channel_input = OpenChannelInput {
             party_a: alice_did.clone(),
@@ -1343,7 +1343,7 @@ mod payment_channels {
     }
 
     /// Test 7.2: Bidirectional transfers in channel
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_bidirectional_transfers() {
         println!("Test 7.2: Bidirectional Channel Transfers");
@@ -1361,8 +1361,8 @@ mod payment_channels {
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open channel
         let channel_input = OpenChannelInput {
@@ -1436,7 +1436,7 @@ mod payment_channels {
     }
 
     /// Test 7.3: Channel validation - invalid DIDs
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_channel_invalid_parties() {
         println!("Test 7.3: Channel Invalid Parties Validation");
@@ -1456,7 +1456,7 @@ mod payment_channels {
         // Test invalid party_a
         let invalid_input = OpenChannelInput {
             party_a: "invalid_did".to_string(), // No "did:" prefix
-            party_b: test_did("bob"),
+            party_b: format!("did:mycelix:{}", agents[1]),
             currency: TEST_CURRENCY.to_string(),
             initial_deposit_a: 100_000_000,
             initial_deposit_b: 100_000_000,
@@ -1497,8 +1497,8 @@ mod unit_tests {
     #[test]
     fn test_did_validation_format() {
         // Valid DIDs
-        assert!(test_did("alice").starts_with("did:mycelix:test:"));
-        assert!(test_did("bob").starts_with("did:mycelix:test:"));
+        assert!(test_helpers::test_did("alice").starts_with("did:mycelix:test:"));
+        assert!(test_helpers::test_did("bob").starts_with("did:mycelix:test:"));
 
         // Generated DIDs are different
         let did1 = test_helpers::unique_test_did("user");
@@ -1595,7 +1595,7 @@ mod performance_benchmarks {
     use super::*;
 
     /// Benchmark: Multiple payment creation latency
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn benchmark_payment_creation_latency() {
         println!("Benchmark: Payment Creation Latency");
@@ -1611,8 +1611,8 @@ mod performance_benchmarks {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         let num_payments = 10;
         let mut latencies = Vec::new();
@@ -1662,7 +1662,7 @@ mod sap_balance_management {
     use super::*;
 
     /// Test 8.1: Initialize SAP balance and verify zero balance
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_initialize_sap_balance() {
         println!("Test 8.1: Initialize SAP Balance");
@@ -1704,7 +1704,7 @@ mod sap_balance_management {
     }
 
     /// Test 8.2: Credit and debit SAP, verify remaining balance
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_credit_and_debit_sap() {
         println!("Test 8.2: Credit and Debit SAP");
@@ -1776,7 +1776,7 @@ mod sap_balance_management {
     }
 
     /// Test 8.3: Debit exceeding balance should fail
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_debit_exceeds_balance_fails() {
         println!("Test 8.3: Debit Exceeds Balance");
@@ -1847,7 +1847,7 @@ mod sap_balance_management {
     }
 
     /// Test 8.4: Demurrage is applied on balance read
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_demurrage_applied_on_read() {
         println!("Test 8.4: Demurrage Applied on Read");
@@ -1915,7 +1915,7 @@ mod exit_protocol {
     use super::*;
 
     /// Test 9.1: Initiate exit with Commons succession preference
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_exit_with_commons_succession() {
         println!("Test 9.1: Exit with Commons Succession");
@@ -1968,7 +1968,7 @@ mod exit_protocol {
     }
 
     /// Test 9.2: Initiate exit with Designee succession preference
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_exit_with_designee() {
         println!("Test 9.2: Exit with Designee");
@@ -1994,7 +1994,7 @@ mod exit_protocol {
             pub sap_balance: u64,
         }
 
-        let designee_did = test_did("bob");
+        let designee_did = format!("did:mycelix:{}", agents[1]);
         let input = InitiateExitInput {
             member_did: alice_did.clone(),
             succession_preference: SuccessionPreference::Designee(designee_did.clone()),
@@ -2033,7 +2033,7 @@ mod escrow_tests {
     use super::*;
 
     /// Test 10.1: Create and release escrow
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_create_and_release_escrow() {
         println!("Test 10.1: Create and Release Escrow");
@@ -2049,8 +2049,8 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create escrow
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -2102,7 +2102,7 @@ mod escrow_tests {
     }
 
     /// Test 10.2: Refund a payment and verify Refunded status
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_refund_payment() {
         println!("Test 10.2: Refund Payment");
@@ -2118,8 +2118,8 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create payment
         let input = SendPaymentInput {
@@ -2160,7 +2160,7 @@ mod escrow_tests {
     }
 
     /// Test 10.3: Cannot double refund
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cannot_double_refund() {
         println!("Test 10.3: Cannot Double Refund");
@@ -2176,8 +2176,8 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create and refund a payment
         let input = SendPaymentInput {
@@ -2236,7 +2236,7 @@ mod channel_close_tests {
     use super::*;
 
     /// Test 11.1: Close an open payment channel
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_close_payment_channel() {
         println!("Test 11.1: Close Payment Channel");
@@ -2252,8 +2252,8 @@ mod channel_close_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open channel
         let channel_input = OpenChannelInput {
@@ -2295,7 +2295,7 @@ mod channel_close_tests {
     }
 
     /// Test 11.2: Cannot close an already closed channel
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cannot_close_already_closed() {
         println!("Test 11.2: Cannot Close Already Closed Channel");
@@ -2311,8 +2311,8 @@ mod channel_close_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open and close channel
         let channel_input = OpenChannelInput {
@@ -2453,7 +2453,7 @@ mod fee_tier_tests {
     /// NOTE: Testing different MYCEL scores requires the recognition zome to be
     /// initialized with specific scores for each agent. Since cross-zome setup
     /// is complex in integration tests, we verify the default (Newcomer) tier.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_sap_fee_tiers() {
         println!("Test 13.1: SAP Fee Tiers (Default Newcomer)");
@@ -2563,7 +2563,7 @@ mod fee_tier_tests {
     ///
     /// Send a TEND payment and verify no fee is deducted. TEND is fee-free
     /// because the payments coordinator only computes fees for SAP currency.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_tend_payment_no_fee() {
         println!("Test 13.2: TEND Payment No Fee");
@@ -2579,8 +2579,8 @@ mod fee_tier_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Send a TEND payment -- TEND bypasses SAP balance/fee logic entirely
         let input = SendPaymentInput {

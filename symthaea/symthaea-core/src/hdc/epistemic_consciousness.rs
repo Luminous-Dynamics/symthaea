@@ -627,7 +627,7 @@ impl EpistemicConsciousness {
 
         // Top contributing theories
         let mut sorted = assessments.to_vec();
-        sorted.sort_by(|a, b| b.independent_score.partial_cmp(&a.independent_score).unwrap());
+        sorted.sort_by(|a, b| b.independent_score.total_cmp(&a.independent_score));
 
         parts.push("Top theories:".to_string());
         for theory in sorted.iter().take(3) {

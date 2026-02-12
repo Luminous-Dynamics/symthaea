@@ -334,7 +334,7 @@ impl ConsciousnessEvaluation {
         // Top 5 dimensions
         report.push_str(&format!("║ TOP SCORING DIMENSIONS:{:<43} ║\n", ""));
         let mut sorted_scores: Vec<_> = self.dimension_scores.iter().collect();
-        sorted_scores.sort_by(|a, b| b.raw_score.partial_cmp(&a.raw_score).unwrap());
+        sorted_scores.sort_by(|a, b| b.raw_score.total_cmp(&a.raw_score));
         for score in sorted_scores.iter().take(5) {
             report.push_str(&format!("║   #{:02} {:?}: {:.1}%{:<30} ║\n",
                 score.dimension.improvement_number(),

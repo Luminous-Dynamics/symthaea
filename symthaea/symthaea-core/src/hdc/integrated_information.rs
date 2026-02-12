@@ -647,7 +647,7 @@ impl IntegratedInformation {
         }
 
         // Sort by similarity (descending)
-        similarities.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+        similarities.sort_by(|a, b| b.2.total_cmp(&a.2));
 
         // Greedy clustering: start with most similar pair
         let mut part_a = vec![similarities[0].0, similarities[0].1];

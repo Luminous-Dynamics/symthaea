@@ -916,7 +916,7 @@ mod tests {
     const HDC_DIM: usize = 16_384;
 
     fn random_vec(dim: usize, seed: u64) -> Vec<f32> {
-        let mut state = seed;
+        let mut state = seed ^ 0x9E3779B97F4A7C15; // avoid xorshift64 fixed-point at 0
         (0..dim).map(|_| {
             state ^= state << 13;
             state ^= state >> 7;

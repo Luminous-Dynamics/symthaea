@@ -259,7 +259,7 @@ impl PhiTransfer {
         features.push(max);
 
         // Percentiles (quartiles)
-        similarities.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        similarities.sort_by(|a, b| a.total_cmp(b));
         let q1 = similarities[similarities.len() / 4];
         let q2 = similarities[similarities.len() / 2];
         let q3 = similarities[3 * similarities.len() / 4];
@@ -900,7 +900,7 @@ impl CausalAnalysisResult {
         // Gini coefficient
         let n = self.causal_power.len();
         let mut sorted = self.causal_power.clone();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.total_cmp(b));
 
         let mut gini_sum = 0.0;
         for (i, &x) in sorted.iter().enumerate() {
@@ -1016,7 +1016,7 @@ impl PhiCausalAnalyzer {
         // Rank nodes by causal power
         let mut node_ranking: Vec<usize> = (0..n).collect();
         node_ranking.sort_by(|&a, &b| {
-            causal_power[b].partial_cmp(&causal_power[a]).unwrap()
+            causal_power[b].total_cmp(&causal_power[a])
         });
 
         // Identify critical and redundant nodes
@@ -1500,7 +1500,7 @@ impl NetworkModularityResult {
     pub fn highest_phi_module(&self) -> Option<&ConsciousnessModule> {
         self.modules
             .iter()
-            .max_by(|a, b| a.internal_phi.partial_cmp(&b.internal_phi).unwrap())
+            .max_by(|a, b| a.internal_phi.total_cmp(&b.internal_phi))
     }
 
     /// Get balance score (how evenly sized modules are)
@@ -1729,7 +1729,7 @@ impl PhiModularityAnalyzer {
         } else {
             // For k > 2, use quantiles
             let mut sorted: Vec<(usize, f64)> = fiedler.iter().copied().enumerate().collect();
-            sorted.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+            sorted.sort_by(|a, b| a.1.total_cmp(&b.1));
 
             let chunk_size = n.div_ceil(k);
             for (rank, (idx, _)) in sorted.iter().enumerate() {

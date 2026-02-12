@@ -22,8 +22,8 @@ use holochain::sweettest::*;
 use holochain::prelude::*;
 use std::time::Duration;
 
-// Import zome types
-use tend_integrity::*;
+// Import zome types (tend re-exports tend_integrity::* via pub use)
+use tend::*;
 
 mod test_helpers {
     pub const TEST_DID_PREFIX: &str = "did:mycelix:test:";
@@ -52,7 +52,7 @@ mod balance_limits {
     use super::*;
 
     /// Test 1.1: Balance limits are enforced (±40 TEND)
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_balance_limits() {
         println!("Test 1.1: Balance Limits (±40 TEND)");
@@ -68,7 +68,7 @@ mod balance_limits {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Get balance
         let balance_input = GetBalanceInput {
@@ -92,7 +92,7 @@ mod balance_limits {
     }
 
     /// Test 1.2: Exchange rejected when it would exceed positive limit
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_positive_limit_enforcement() {
         println!("Test 1.2: Positive Limit Enforcement");
@@ -108,7 +108,7 @@ mod balance_limits {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let bob_did = test_did("bob");
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Alice (caller/provider) tries to record 50 hours (exceeds +40 limit)
         let exchange_input = RecordExchangeInput {
@@ -144,7 +144,7 @@ mod balance_limits {
     }
 
     /// Test 1.3: Exchange rejected when it would exceed negative limit
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_negative_limit_enforcement() {
         println!("Test 1.3: Negative Limit Enforcement");
@@ -160,7 +160,7 @@ mod balance_limits {
             .expect("Failed to install app");
 
         let bob_cell = &apps[1].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Bob (caller/provider) records exchange where Alice receives
         // If Alice already has large negative balance, this should be rejected
@@ -206,7 +206,7 @@ mod exchange_recording {
     use super::*;
 
     /// Test 2.1: Basic time exchange recording
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_basic_exchange() {
         println!("Test 2.1: Basic Time Exchange");
@@ -222,7 +222,7 @@ mod exchange_recording {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let bob_did = test_did("bob");
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Alice (caller) provides 2 hours of service to Bob
         let exchange_input = RecordExchangeInput {
@@ -251,7 +251,7 @@ mod exchange_recording {
     }
 
     /// Test 2.2: Exchange confirmation updates balances (zero-sum)
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_exchange_confirmation_zero_sum() {
         println!("Test 2.2: Exchange Confirmation (Zero-Sum)");
@@ -268,8 +268,8 @@ mod exchange_recording {
 
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Get initial balances
         let alice_balance_before: BalanceInfo = conductor
@@ -338,7 +338,7 @@ mod exchange_recording {
     }
 
     /// Test 2.3: Self-exchange is rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_self_exchange_rejected() {
         println!("Test 2.3: Self-Exchange Rejection");
@@ -399,7 +399,7 @@ mod service_listings {
     use super::*;
 
     /// Test 3.1: Create service listing
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_create_listing() {
         println!("Test 3.1: Create Service Listing");
@@ -440,7 +440,7 @@ mod service_listings {
     }
 
     /// Test 3.2: Query all DAO listings
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_query_dao_listings() {
         println!("Test 3.2: Query DAO Listings");
@@ -507,7 +507,7 @@ mod dispute_tests {
     use super::*;
 
     /// Test 4.1: Dispute an exchange using dispute_exchange (simple exchange_id)
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_dispute_exchange() {
         println!("Test 4.1: Dispute Exchange");
@@ -524,7 +524,7 @@ mod dispute_tests {
 
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
-        let bob_did = test_did("bob");
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Alice records exchange
         let exchange: ExchangeRecord = conductor
@@ -551,7 +551,7 @@ mod dispute_tests {
     }
 
     /// Test 4.2: Full dispute lifecycle - open -> escalate -> resolve
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_dispute_lifecycle() {
         println!("Test 4.2: Dispute Lifecycle (Open -> Escalate -> Resolve)");
@@ -568,7 +568,7 @@ mod dispute_tests {
 
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
-        let bob_did = test_did("bob");
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Record an exchange
         let exchange: ExchangeRecord = conductor
@@ -670,7 +670,7 @@ mod quality_ratings {
     use super::*;
 
     /// Test 5.1: Rate a confirmed exchange
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_rate_confirmed_exchange() {
         println!("Test 5.1: Rate Confirmed Exchange");
@@ -687,7 +687,7 @@ mod quality_ratings {
 
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
-        let bob_did = test_did("bob");
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Alice records exchange, Bob confirms
         let exchange: ExchangeRecord = conductor
@@ -733,7 +733,7 @@ mod quality_ratings {
     }
 
     /// Test 5.2: Cannot rate an unconfirmed exchange
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cannot_rate_unconfirmed_exchange() {
         println!("Test 5.2: Cannot Rate Unconfirmed Exchange");
@@ -750,7 +750,7 @@ mod quality_ratings {
 
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
-        let bob_did = test_did("bob");
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Record exchange but do NOT confirm
         let exchange: ExchangeRecord = conductor
@@ -801,7 +801,7 @@ mod dynamic_limits {
     use super::*;
 
     /// Test 6.1: TendLimitTier returns correct limits
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_tend_limit_tiers() {
         println!("Test 6.1: Dynamic TEND Limit Tiers");
@@ -999,7 +999,7 @@ mod oracle_management {
     use super::*;
 
     /// Test 7.1: Update oracle state and verify TEND limit tier changes
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_update_oracle_state() {
         println!("Test 7.1: Update Oracle State");
@@ -1032,7 +1032,7 @@ mod oracle_management {
     }
 
     /// Test 7.2: Dynamic limit tiers from different vitality values
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_dynamic_limit_tiers() {
         println!("Test 7.2: Dynamic Limit Tiers");
@@ -1086,7 +1086,7 @@ mod exchange_cancellation {
     use super::*;
 
     /// Test 8.1: Cancel a proposed exchange
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cancel_proposed_exchange() {
         println!("Test 8.1: Cancel Proposed Exchange");
@@ -1102,7 +1102,7 @@ mod exchange_cancellation {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let bob_did = test_did("bob");
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Alice records exchange (Proposed status)
         let exchange: ExchangeRecord = conductor
@@ -1132,7 +1132,7 @@ mod exchange_cancellation {
     }
 
     /// Test 8.2: Cannot cancel a confirmed exchange
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cannot_cancel_confirmed() {
         println!("Test 8.2: Cannot Cancel Confirmed Exchange");
@@ -1149,7 +1149,7 @@ mod exchange_cancellation {
 
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
-        let bob_did = test_did("bob");
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Alice records, Bob confirms
         let exchange: ExchangeRecord = conductor
@@ -1200,7 +1200,7 @@ mod cross_dao_clearing {
     use super::*;
 
     /// Test 9.1: Record a cross-DAO exchange
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_record_cross_dao_exchange() {
         println!("Test 9.1: Record Cross-DAO Exchange");
@@ -1248,7 +1248,7 @@ mod cross_dao_clearing {
     }
 
     /// Test 9.2: Bilateral balance uses canonical alphabetical order
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_bilateral_balance_canonical_order() {
         println!("Test 9.2: Bilateral Balance Canonical Order");
@@ -1302,7 +1302,7 @@ mod cross_dao_clearing {
     /// Settlement now uses two-phase commit: a BilateralSettlement record is
     /// created before the treasury transfer. Without a treasury zome, the
     /// transfer fails and the bilateral balance is preserved (no debt lost).
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_settle_bilateral_balance() {
         println!("Test 9.3: Settle Bilateral Balance (Two-Phase Commit)");
@@ -1368,7 +1368,7 @@ mod cross_dao_clearing {
         // Attempt settlement (may fail without treasury zome -- that's correct)
         let settle_result: Result<Record, _> = conductor
             .call_fallible(
-                alice_cell.zome("tend"),
+                &alice_cell.zome("tend"),
                 "settle_bilateral_balance",
                 SettleBilateralInput {
                     dao_a_did: dao_a.clone(),
@@ -1438,7 +1438,7 @@ mod tend_forgiveness {
     use super::*;
 
     /// Test 10.1: Forgive balance on exit
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_forgive_balance_on_exit() {
         println!("Test 10.1: Forgive Balance on Exit");
@@ -1455,8 +1455,8 @@ mod tend_forgiveness {
 
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create a TEND balance by recording and confirming an exchange
         let exchange: ExchangeRecord = conductor
@@ -1549,7 +1549,7 @@ mod tend_boundary_tests {
     ///
     /// Record an exchange with exactly 8.0 hours (MAX_SERVICE_HOURS) -- should succeed.
     /// Record one with 8.1 hours -- should fail (integrity validation rejects > 8).
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_max_service_hours_boundary() {
         println!("Test 12.1: MAX_SERVICE_HOURS Boundary (8h)");
@@ -1565,7 +1565,7 @@ mod tend_boundary_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let bob_did = test_did("bob");
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Exactly 8.0 hours -- should succeed
         let input_ok = RecordExchangeInput {
@@ -1626,7 +1626,7 @@ mod tend_boundary_tests {
     ///
     /// Record an exchange with 0.25 hours (15 min = MIN_SERVICE_MINUTES) -- should succeed.
     /// Record with 0.24 hours (14.4 min, below 15 min) -- should fail.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_min_service_minutes_boundary() {
         println!("Test 12.2: MIN_SERVICE_MINUTES Boundary (15 min)");
@@ -1642,7 +1642,7 @@ mod tend_boundary_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let bob_did = test_did("bob");
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // 0.25 hours = 15 minutes (MIN_SERVICE_MINUTES) -- should succeed
         let input_ok = RecordExchangeInput {
@@ -1704,7 +1704,7 @@ mod tend_boundary_tests {
     /// Note: test_self_exchange_rejected already exists in exchange_recording (Test 2.3),
     /// but that test uses the agent pubkey format. This test uses test_did format to
     /// verify the coordinator also catches it via DID comparison.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_self_exchange_rejected() {
         println!("Test 12.3: Self-Exchange Rejected");
@@ -1768,7 +1768,7 @@ mod tend_lifecycle_edge_cases {
     ///
     /// Record an exchange, dispute it, then try to confirm -- should fail
     /// because confirm_exchange requires Proposed status.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_confirm_disputed_exchange_rejected() {
         println!("Test 13.1: Confirm Disputed Exchange Rejected");
@@ -1785,7 +1785,7 @@ mod tend_lifecycle_edge_cases {
 
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
-        let bob_did = test_did("bob");
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Alice records an exchange
         let exchange: ExchangeRecord = conductor
@@ -1874,7 +1874,7 @@ mod bilateral_settlement_two_phase {
     /// transfer_commons_sap will fail, resulting in a Failed settlement and
     /// the bilateral balance remaining unchanged. This is the CORRECT behavior
     /// of the two-phase commit pattern -- it protects against debt loss.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_bilateral_settlement_creates_record() {
         println!("Test 14.1: Bilateral Settlement Two-Phase Commit");
@@ -1946,7 +1946,7 @@ mod bilateral_settlement_two_phase {
         //   - The bilateral balance will remain UNCHANGED (two-phase commit protection)
         let settle_result: Result<Record, _> = conductor
             .call_fallible(
-                alice_cell.zome("tend"),
+                &alice_cell.zome("tend"),
                 "settle_bilateral_balance",
                 SettleBilateralInput {
                     dao_a_did: dao_a.clone(),

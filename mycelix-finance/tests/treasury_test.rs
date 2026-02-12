@@ -41,7 +41,7 @@ mod treasury_lifecycle {
     use super::*;
 
     /// Test 1.1: Create a treasury with two managers and verify reserve ratio
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_create_treasury() {
         println!("Test 1.1: Create Treasury with 2 managers");
@@ -58,8 +58,8 @@ mod treasury_lifecycle {
 
         let alice_cell = &apps[0].cells()[0];
 
-        let manager_a = test_did("manager_alice");
-        let manager_b = test_did("manager_bob");
+        let manager_a = format!("did:mycelix:{}", agents[0]);
+        let manager_b = format!("did:mycelix:{}", agents[0]);
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreateTreasuryInput {
@@ -104,7 +104,7 @@ mod treasury_lifecycle {
     }
 
     /// Test 1.2: Contribute SAP to treasury and verify balance update
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_contribute_increases_balance() {
         println!("Test 1.2: Contribute SAP increases treasury balance");
@@ -120,7 +120,7 @@ mod treasury_lifecycle {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let manager_did = test_did("manager_alice");
+        let manager_did = format!("did:mycelix:{}", agents[0]);
 
         // Step 1: Create treasury
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -165,7 +165,7 @@ mod treasury_lifecycle {
 
         let contribute_input = ContributeInput {
             treasury_id: treasury_id.clone(),
-            contributor_did: test_did("alice"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 500_000_000,
             currency: "SAP".to_string(),
             contribution_type: ContributionType::Deposit,
@@ -292,7 +292,7 @@ mod allocation_governance {
     }
 
     /// Test 2.1: Propose -> Approve by majority -> Execute
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_propose_and_approve() {
         println!("Test 2.1: Propose -> Approve (majority) -> Execute");
@@ -309,10 +309,10 @@ mod allocation_governance {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr_a = test_did("mgr_alice");
-        let mgr_b = test_did("mgr_bob");
-        let mgr_c = test_did("mgr_carol");
-        let recipient = test_did("recipient_dave");
+        let mgr_a = format!("did:mycelix:{}", agents[0]);
+        let mgr_b = format!("did:mycelix:{}", agents[0]);
+        let mgr_c = format!("did:mycelix:{}", agents[0]);
+        let recipient = format!("did:mycelix:{}", agents[0]);
 
         // Create treasury with 3 managers (majority = 2)
         let treasury_id = setup_treasury_with_managers(
@@ -334,7 +334,7 @@ mod allocation_governance {
 
         let fund_input = ContributeInput {
             treasury_id: treasury_id.clone(),
-            contributor_did: test_did("funder"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 1_000_000_000,
             currency: "SAP".to_string(),
             contribution_type: ContributionType::Grant,
@@ -434,7 +434,7 @@ mod allocation_governance {
     }
 
     /// Test 2.2: Propose -> Reject by manager
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_reject_allocation() {
         println!("Test 2.2: Propose -> Reject");
@@ -451,8 +451,8 @@ mod allocation_governance {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr = test_did("mgr_alice");
-        let recipient = test_did("recipient_eve");
+        let mgr = format!("did:mycelix:{}", agents[0]);
+        let recipient = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = setup_treasury_with_managers(&conductor, cell, vec![mgr.clone()]).await;
 
@@ -493,7 +493,7 @@ mod allocation_governance {
     }
 
     /// Test 2.3: Propose -> Cancel by manager
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cancel_allocation() {
         println!("Test 2.3: Propose -> Cancel");
@@ -510,8 +510,8 @@ mod allocation_governance {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr = test_did("mgr_cancel");
-        let recipient = test_did("recipient_cancel");
+        let mgr = format!("did:mycelix:{}", agents[0]);
+        let recipient = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = setup_treasury_with_managers(&conductor, cell, vec![mgr.clone()]).await;
 
@@ -552,7 +552,7 @@ mod allocation_governance {
     }
 
     /// Test 2.4: Non-manager cannot approve allocations
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_non_manager_cannot_approve() {
         println!("Test 2.4: Non-manager cannot approve allocations");
@@ -569,9 +569,9 @@ mod allocation_governance {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr = test_did("actual_manager");
-        let non_mgr = test_did("outsider");
-        let recipient = test_did("recipient");
+        let mgr = format!("did:mycelix:{}", agents[0]);
+        let non_mgr = format!("did:mycelix:{}", agents[0]);
+        let recipient = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = setup_treasury_with_managers(&conductor, cell, vec![mgr.clone()]).await;
 
@@ -643,7 +643,7 @@ mod commons_pool_tests {
     }
 
     /// Test 3.1: Create commons pool with correct defaults
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_create_commons_pool() {
         println!("Test 3.1: Create Commons Pool");
@@ -693,7 +693,7 @@ mod commons_pool_tests {
     }
 
     /// Test 3.2: Contribution splits 25% reserve / 75% available
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_contribute_splits_25_75() {
         println!("Test 3.2: Contribution splits 25/75");
@@ -723,7 +723,7 @@ mod commons_pool_tests {
 
         let input = ContributeToCommonsInput {
             commons_pool_id: pool_id.clone(),
-            contributor_did: test_did("contributor_alice"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 1000,
         };
 
@@ -750,7 +750,7 @@ mod commons_pool_tests {
     }
 
     /// Test 3.3: Inalienable reserve is untouchable -- allocate exact available OK, more fails
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_inalienable_reserve_untouchable() {
         println!("Test 3.3: Inalienable reserve is untouchable");
@@ -780,7 +780,7 @@ mod commons_pool_tests {
 
         let contrib_input = ContributeToCommonsInput {
             commons_pool_id: pool_id.clone(),
-            contributor_did: test_did("funder"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 1000,
         };
 
@@ -799,7 +799,7 @@ mod commons_pool_tests {
 
         let over_alloc = RequestCommonsAllocationInput {
             commons_pool_id: pool_id.clone(),
-            requester_did: test_did("requester"),
+            requester_did: format!("did:mycelix:{}", agents[0]),
             amount: 751,
             purpose: "Over-allocation attempt".to_string(),
         };
@@ -818,7 +818,7 @@ mod commons_pool_tests {
         // reserve ratio = 250 / (250+0) = 1.0 >= 0.25
         let exact_alloc = RequestCommonsAllocationInput {
             commons_pool_id: pool_id.clone(),
-            requester_did: test_did("requester"),
+            requester_did: format!("did:mycelix:{}", agents[0]),
             amount: 750,
             purpose: "Exact available allocation".to_string(),
         };
@@ -841,7 +841,7 @@ mod commons_pool_tests {
     }
 
     /// Test 3.4: Compost (demurrage redistribution) goes to available, not reserve
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_compost_goes_to_available() {
         println!("Test 3.4: Compost goes to available balance");
@@ -871,7 +871,7 @@ mod commons_pool_tests {
 
         let contrib_input = ContributeToCommonsInput {
             commons_pool_id: pool_id.clone(),
-            contributor_did: test_did("funder"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 400,
         };
 
@@ -890,7 +890,7 @@ mod commons_pool_tests {
         let compost_input = ReceiveCompostInput {
             commons_pool_id: pool_id.clone(),
             amount: 200,
-            source_member_did: test_did("demurrage_source"),
+            source_member_did: format!("did:mycelix:{}", agents[0]),
         };
 
         let result: Record = conductor
@@ -914,7 +914,7 @@ mod commons_pool_tests {
     }
 
     /// Test 3.5: Reserve ratio maintained at >= 25% after contribute + allocate
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_reserve_ratio_maintained() {
         println!("Test 3.5: Reserve ratio maintained >= 25%");
@@ -944,7 +944,7 @@ mod commons_pool_tests {
 
         let contrib_input = ContributeToCommonsInput {
             commons_pool_id: pool_id.clone(),
-            contributor_did: test_did("funder"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 1000,
         };
 
@@ -964,7 +964,7 @@ mod commons_pool_tests {
 
         let alloc_ok = RequestCommonsAllocationInput {
             commons_pool_id: pool_id.clone(),
-            requester_did: test_did("requester"),
+            requester_did: format!("did:mycelix:{}", agents[0]),
             amount: 400,
             purpose: "Community project".to_string(),
         };
@@ -1014,7 +1014,7 @@ mod commons_pool_tests {
         let compost_input = ReceiveCompostInput {
             commons_pool_id: pool_id.clone(),
             amount: 750,
-            source_member_did: test_did("compost_source"),
+            source_member_did: format!("did:mycelix:{}", agents[0]),
         };
 
         let _: Record = conductor
@@ -1063,7 +1063,7 @@ mod savings_pool_tests {
     use super::*;
 
     /// Test 4.1: Create savings pool and join
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_create_and_join_pool() {
         println!("Test 4.1: Create and Join Savings Pool");
@@ -1095,7 +1095,7 @@ mod savings_pool_tests {
             description: "Treasury for pool tests".to_string(),
             currency: "SAP".to_string(),
             reserve_ratio: 0.20,
-            managers: vec![test_did("pool_mgr")],
+            managers: vec![format!("did:mycelix:{}", agents[0])],
         };
 
         let treasury_result: Record = conductor
@@ -1121,7 +1121,7 @@ mod savings_pool_tests {
             pub yield_rate: f64,
         }
 
-        let alice = test_did("pool_alice");
+        let alice = format!("did:mycelix:{}", agents[0]);
         let pool_input = CreatePoolInput {
             treasury_id: treasury_id.clone(),
             name: "Community Savings".to_string(),
@@ -1158,7 +1158,7 @@ mod savings_pool_tests {
             pub member_did: String,
         }
 
-        let bob = test_did("pool_bob");
+        let bob = format!("did:mycelix:{}", agents[0]);
         let join_input = JoinPoolInput {
             pool_id: pool_id.clone(),
             member_did: bob.clone(),
@@ -1184,7 +1184,7 @@ mod savings_pool_tests {
     }
 
     /// Test 4.2: Contribute to savings pool
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_pool_contribution() {
         println!("Test 4.2: Contribute to Savings Pool");
@@ -1216,7 +1216,7 @@ mod savings_pool_tests {
             description: "For pool contribution test".to_string(),
             currency: "SAP".to_string(),
             reserve_ratio: 0.15,
-            managers: vec![test_did("mgr")],
+            managers: vec![format!("did:mycelix:{}", agents[0])],
         };
 
         let treasury_result: Record = conductor
@@ -1240,7 +1240,7 @@ mod savings_pool_tests {
             pub yield_rate: f64,
         }
 
-        let alice = test_did("saver_alice");
+        let alice = format!("did:mycelix:{}", agents[0]);
         let pool_input = CreatePoolInput {
             treasury_id: treasury.id.clone(),
             name: "Rainy Day Fund".to_string(),
@@ -1359,7 +1359,7 @@ mod manager_operations {
     }
 
     /// Test 5.1: Add a new manager
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_add_manager() {
         println!("Test 5.1: Add Manager");
@@ -1376,8 +1376,8 @@ mod manager_operations {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr_a = test_did("mgr_existing");
-        let mgr_new = test_did("mgr_new");
+        let mgr_a = format!("did:mycelix:{}", agents[0]);
+        let mgr_new = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = create_test_treasury(&conductor, cell, vec![mgr_a.clone()]).await;
 
@@ -1413,7 +1413,7 @@ mod manager_operations {
     }
 
     /// Test 5.2: Remove a manager
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_remove_manager() {
         println!("Test 5.2: Remove Manager");
@@ -1430,8 +1430,8 @@ mod manager_operations {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr_a = test_did("mgr_keeper");
-        let mgr_b = test_did("mgr_removed");
+        let mgr_a = format!("did:mycelix:{}", agents[0]);
+        let mgr_b = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = create_test_treasury(
             &conductor,
@@ -1472,7 +1472,7 @@ mod manager_operations {
     }
 
     /// Test 5.3: Cannot remove last manager
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cannot_remove_last_manager() {
         println!("Test 5.3: Cannot Remove Last Manager");
@@ -1489,7 +1489,7 @@ mod manager_operations {
 
         let cell = &apps[0].cells()[0];
 
-        let sole_mgr = test_did("sole_manager");
+        let sole_mgr = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = create_test_treasury(&conductor, cell, vec![sole_mgr.clone()]).await;
 

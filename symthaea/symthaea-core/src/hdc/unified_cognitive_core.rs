@@ -621,7 +621,7 @@ impl UnifiedCognitiveCore {
             .filter(|r| r.similarity > 0.1)
             .collect();
 
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap());
+        results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
         results.truncate(5);
         results
     }
@@ -650,7 +650,7 @@ impl UnifiedCognitiveCore {
             .filter(|r| r.similarity > 0.1)
             .collect();
 
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap());
+        results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
         results.truncate(5);
         results
     }
@@ -677,7 +677,7 @@ impl UnifiedCognitiveCore {
             .filter(|r| r.similarity > 0.1)
             .collect();
 
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap());
+        results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
         results.truncate(5);
         results
     }
@@ -698,7 +698,7 @@ impl UnifiedCognitiveCore {
             })
             .collect();
 
-        results.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap());
+        results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
         results.truncate(limit);
         results
     }

@@ -103,5 +103,4 @@ datalog = []                                 # Prefrontal Cortex: recursive reas
 lance = ["dep:tokio"]                         # Long-Term Memory: multimodal storage (lancedb dep pending upgrade)
 duck = ["dep:duckdb"]                        # Epistemic Auditor: analytics/Phi stats
 
-# Enable all databases (full consciousness infrastructure)
-full-databases = ["qdrant", "datalog", "lance", "duck"]
+# full-databases removed: aggregate never referenced (enable individual features: qdrant, datalog, lance, duck)
