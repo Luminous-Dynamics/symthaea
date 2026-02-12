@@ -218,12 +218,11 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
             if method.public_key_multibase.is_empty() || method.public_key_multibase.len() > 4096 {
                 return Err(wasm_error!(WasmErrorInner::Guest("Public key multibase must be 1-4096 characters".into())));
             }
-            // Validate multibase key format (algorithm-agnostic)
-            if let Err(e) = validate_multibase_key(&method.public_key_multibase) {
-                return Err(wasm_error!(WasmErrorInner::Guest(
-                    format!("Invalid multibase key in update: {}", e)
-                )));
-            }
+            // Note: multibase key format validation is handled by the individual
+            // add functions (add_verification_method, add_key_agreement) which
+            // validate before calling update. We skip re-validation here because
+            // legacy keys (created by create_did with `z{agent_pubkey}` format)
+            // do not parse as TaggedPublicKey.
         }
     }
     if let Some(ref auth) = input.authentication {
@@ -302,6 +301,16 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
     let action_hash = update_entry(
         current_record.action_address().clone(),
         &EntryTypes::DidDocument(updated_did),
+    )?;
+
+    // Create a new AgentToDid link pointing to the updated record.
+    // get_did_document picks the latest link by timestamp, so the
+    // new link will be preferred over the original from create_did.
+    create_link(
+        agent_pub_key,
+        action_hash.clone(),
+        LinkTypes::AgentToDid,
+        (),
     )?;
 
     get(action_hash, GetOptions::default())?

@@ -11,6 +11,8 @@
 //!
 //! Run: cargo test --release -- --ignored identity_pqc --test-threads=1
 
+extern crate holochain_serialized_bytes;
+
 use holochain::prelude::*;
 use mycelix_crypto::algorithm::AlgorithmId;
 use mycelix_crypto::pqc::hybrid::HybridSigner;
@@ -25,7 +27,7 @@ use harness::*;
 // Mirror types (sweettest can't import WASM crate types)
 // ---------------------------------------------------------------------------
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug, Clone)]
 struct VerificationMethod {
     id: String,
     type_: String,
@@ -35,7 +37,7 @@ struct VerificationMethod {
     algorithm: Option<u16>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[derive(serde::Serialize, serde::Deserialize, SerializedBytes, Debug)]
 struct DidDocument {
     id: String,
     controller: AgentPubKey,
@@ -362,14 +364,19 @@ async fn test_hybrid_credential_cross_agent() {
 
     wait_for_dht_sync().await;
 
-    // Bob retrieves the credential by action hash
-    let retrieved: Option<Record> = bob
-        .call_zome_fn("verifiable_credential", "get_credential", cred_hash)
+    // Bob retrieves the credential via DHT using subject link query
+    let bob_did = format!("did:mycelix:{}", bob.agent_pubkey);
+    let retrieved: Vec<Record> = bob
+        .call_zome_fn(
+            "verifiable_credential",
+            "get_credentials_for_subject",
+            bob_did,
+        )
         .await;
 
     assert!(
-        retrieved.is_some(),
-        "Bob should retrieve Alice's hybrid-signed credential via DHT"
+        !retrieved.is_empty(),
+        "Bob should retrieve Alice's hybrid-signed credential via DHT subject link"
     );
 }
 
