@@ -866,7 +866,7 @@ impl SemanticSpace {
             .collect();
 
         // Sort by similarity (descending)
-        similarities.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        similarities.sort_by(|a, b| b.0.total_cmp(&a.0));
 
         // Return top matches
         Ok(similarities
@@ -946,7 +946,7 @@ impl SemanticSpace {
             })
             .collect();
 
-        best_matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        best_matches.sort_by(|a, b| b.0.total_cmp(&a.0));
 
         // Take top 5 concepts
         let decoded: Vec<String> = best_matches

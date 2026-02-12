@@ -257,7 +257,7 @@ impl PhiPyramid {
         // Step 3: Find peak
         let (peak_scale, peak_phi) = phi_by_scale.iter()
             .enumerate()
-            .max_by(|(_, a): &(usize, &f64), (_, b): &(usize, &f64)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a): &(usize, &f64), (_, b): &(usize, &f64)| a.total_cmp(b))
             .map(|(i, &phi)| (i, phi))
             .unwrap_or((0, 0.0));
 
@@ -842,7 +842,7 @@ impl PhiEntropyAnalyzer {
     /// Compute median value
     fn compute_median(&self, values: &[f64]) -> f64 {
         let mut sorted = values.to_vec();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(|a, b| a.total_cmp(b));
 
         let n = sorted.len();
         if n.is_multiple_of(2) {

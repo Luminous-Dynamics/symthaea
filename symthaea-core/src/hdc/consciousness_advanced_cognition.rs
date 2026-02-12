@@ -486,12 +486,12 @@ impl TheoryOfMindEngine {
 
         // Find strongest intention
         let strongest_intention = model.intentions.iter()
-            .max_by(|a, b| a.commitment.partial_cmp(&b.commitment).unwrap())?;
+            .max_by(|a, b| a.commitment.total_cmp(&b.commitment))?;
 
         // Find most urgent unfulfilled desire
         let urgent_desire = model.desires.iter()
             .filter(|d| !d.fulfilled)
-            .max_by(|a, b| a.urgency.partial_cmp(&b.urgency).unwrap());
+            .max_by(|a, b| a.urgency.total_cmp(&b.urgency));
 
         // Combine intention with desire
         let predicted_action = if let Some(desire) = urgent_desire {
@@ -990,7 +990,7 @@ impl PredictiveProcessor {
     /// Get action to minimize distance to goal (active inference)
     pub fn get_active_inference_action(&self) -> Option<BinaryHV> {
         let goal = self.goals.iter().max_by(|a, b|
-            a.priority.partial_cmp(&b.priority).unwrap())?;
+            a.priority.total_cmp(&b.priority))?;
 
         // Action = difference between current belief and goal
         if let Some(top_layer) = self.layers.last() {
@@ -1335,7 +1335,7 @@ impl ProceduralMemory {
     pub fn check_habit(&self, trigger: &BinaryHV) -> Option<(BinaryHV, f64)> {
         self.habits.iter()
             .filter(|h| h.trigger.similarity(trigger) > 0.8)
-            .max_by(|a, b| a.strength.partial_cmp(&b.strength).unwrap())
+            .max_by(|a, b| a.strength.total_cmp(&b.strength))
             .map(|h| (h.response, h.strength))
     }
 
@@ -1418,7 +1418,7 @@ impl WorkingMemory {
             // Remove least activated item
             let min_idx = self.items.iter()
                 .enumerate()
-                .min_by(|a, b| a.1.activation.partial_cmp(&b.1.activation).unwrap())
+                .min_by(|a, b| a.1.activation.total_cmp(&b.1.activation))
                 .map(|(i, _)| i);
 
             if let Some(idx) = min_idx {

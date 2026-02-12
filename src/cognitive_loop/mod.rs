@@ -14,6 +14,10 @@
 //! 4. Prediction error computed (multi-scale)
 //! 5. Error → CfC analytical gradient + HDC attention update
 //! 6. Prediction sent to encoder for cycle t+1
+//! 7. Post-processing: parallel subsystem updates via rayon::join
+//!    Branch A: stability regime, semantic memory, causal enhancement
+//!    Branch B: episodic memory, primitive-belief bridge, closed learning loop
+//!    Sequential: episodic replay (needs CfC), memory coordinator
 //! ```
 //!
 //! ## Why CfC (vs LTC)
@@ -154,6 +158,7 @@ use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 use crate::causal::{CausalLoopEnhancer, CausalEnhancerConfig, CausalGraph, DiscoveredRelationship};
 use crate::hdc::moral_algebra::{MoralAlgebra, MoralVerdict, DeontologicalVerdict};
 use crate::hdc::moral_parser::MoralParser;
+use rayon::join as rayon_join;
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
 
@@ -1384,107 +1389,135 @@ impl CognitiveLoopService {
         self.stats.coherence_phi_contribution = self.coherence_bridge.phi_contribution();
 
         // ═══════════════════════════════════════════════════════════════════════
-        // EPISODIC MEMORY: Encode this cycle's experience
+        // PARALLEL POST-PROCESSING: Independent subsystem updates via rayon
         // ═══════════════════════════════════════════════════════════════════════
-        // Only encode if prediction error is significant (worth remembering)
+        // These subsystem updates use disjoint fields and run in parallel:
+        //   Branch A: Stability regime + Semantic memory + Causal enhancement
+        //   Branch B: Episodic memory + Primitive-belief bridge + Closed learning loop
+        // Sequential after join: Episodic replay + Memory coordinator (cross-dependencies)
 
-        if prediction_error > 0.1 || self.flow_state.in_flow {
-            let emotional_valence = self.emotion_contagion.prosody_valence();
-            let phi = self.unification_engine.phi as f32;
-            self.episodic_memory.encode(
-                input,
-                hdv_sample.clone(),
-                emotional_valence,
-                phi,
-                self.stats.total_cycles,
-            );
-        }
+        // Pre-compute read-only values needed by parallel branches
+        let pp_total_cycles = self.stats.total_cycles;
+        let pp_in_flow = self.flow_state.in_flow;
+        let pp_emotional_valence = self.emotion_contagion.prosody_valence();
+        let pp_phi = self.unification_engine.phi as f32;
+        let pp_smoothed_coh = self.coherence_bridge.smoothed_coherence() as f64;
+        let pp_learning_threshold = self.config.learning_threshold;
 
-        // Apply memory context boost to confidence
-        self.prediction_confidence = (self.prediction_confidence + memory_context_boost).clamp(0.0, 1.0);
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // STABILITY REGIME: Update primitive CfC dynamics
-        // ═══════════════════════════════════════════════════════════════════════
-        // Convert the HDC encoding to BinaryHV and run through stability regime processor.
-        // Frequently-used primitives crystallize, rarely-used stay fluid.
-        {
-            let hv16_input = real_hv_to_hv16(&encoding_result.hdv);
-            let timestamp = self.stats.total_cycles as f64 * delta_t as f64;
-            let (_regime_state, transitions) = self.stability_regime.process_input(&hv16_input, delta_t, timestamp);
-
-            // When primitives crystallize, seed the discovery system to explore neighbors
-            for transition in &transitions {
-                if let RegimeTransition::Crystallized { primitive_name, encoding } = transition {
-                    self.discovery_service.seed_neighbor_exploration(primitive_name, encoding);
-                }
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // PRIMITIVE-BELIEF BRIDGE: Map detected primitives to active inference beliefs
-        // ═══════════════════════════════════════════════════════════════════════
-        // Converts detected primitives into tier-level belief vectors, computes
-        // prediction errors against the previous cycle, and generates a TD signal
-        // that modulates the FEP learning rate.
-        {
-            let prim_state = Self::build_primitive_state(
-                &encoding_result.detected_primitives,
-                self.coherence_bridge.smoothed_coherence() as f64,
-                self.stats.total_cycles as f64,
-            );
-
-            if let Some(ref prev_state) = self.prev_primitive_state {
-                let pred_error = self.primitive_belief_bridge.compute_prediction_error(prev_state, &prim_state);
-                let td_signal = self.primitive_belief_bridge.td_error_signal(&pred_error);
-
-                // Modulate FEP learning signal with primitive-level TD error
-                self.fep_learning_signal += td_signal as f32 * 0.2;
-                self.fep_learning_signal = self.fep_learning_signal.clamp(-1.0, 1.0);
-            }
-
-            self.prev_primitive_state = Some(prim_state);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // CLOSED LEARNING LOOP: Update with cycle results
-        // ═══════════════════════════════════════════════════════════════════════
-        // This closes the loop: learning from this cycle influences next cycle's strategy
-
-        let cycle_reward = if prediction_error < self.config.learning_threshold {
-            // Good prediction → positive reward (scaled by confidence)
+        // Compute cycle reward before parallel section (reads prediction_confidence, flow_state)
+        let cycle_reward = if prediction_error < pp_learning_threshold {
             0.5 + 0.5 * self.prediction_confidence
         } else if prediction_error > 0.5 {
-            // Very poor prediction → negative reward
             -0.3 - 0.2 * (prediction_error - 0.5)
         } else {
-            // Moderate prediction → neutral to slightly negative
             0.2 - 0.5 * prediction_error
         };
 
         let cycle_learning_result = CycleLearningResult {
             reward: cycle_reward.clamp(-1.0, 1.0),
             strategy_used: selected_strategy,
-            successful: prediction_error < self.config.learning_threshold && self.flow_state.in_flow,
+            successful: prediction_error < pp_learning_threshold && pp_in_flow,
             prediction_error,
             coherence,
         };
 
-        self.closed_learning_loop.update(cycle_learning_result);
+        // Take disjoint mutable borrows for parallel processing.
+        // The block scope ensures all borrows are dropped before the sequential section.
+        {
+        let stability_regime = &mut self.stability_regime;
+        let discovery_service = &mut self.discovery_service;
+        let semantic_memory = &mut self.semantic_memory;
+        let causal_enhancer = &mut self.causal_enhancer;
+        let episodic_memory = &mut self.episodic_memory;
+        let primitive_belief_bridge = &mut self.primitive_belief_bridge;
+        let closed_learning_loop = &mut self.closed_learning_loop;
+        let fep_learning_signal = &mut self.fep_learning_signal;
+        let prev_primitive_state = &mut self.prev_primitive_state;
+        let prediction_confidence_ref = &mut self.prediction_confidence;
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // SEMANTIC MEMORY: Store this cycle's HDC vector + prediction error
-        // ═══════════════════════════════════════════════════════════════════════
-        // This enables future cycles to find semantically similar inputs and
-        // use their prediction errors to modulate learning rate.
-        self.semantic_memory.store_with_timestamp(
-            semantic_hdc,
-            prediction_error,
-            None, // Category could be derived from detected_primitives if desired
-            self.stats.total_cycles as u64,
+        rayon_join(
+            // ── Branch A: Stability Regime + Semantic Memory + Causal Enhancement ──
+            || {
+                // Stability regime: CfC dynamics for primitives
+                // Frequently-used primitives crystallize, rarely-used stay fluid
+                let hv16_input = real_hv_to_hv16(&encoding_result.hdv);
+                let timestamp = pp_total_cycles as f64 * delta_t as f64;
+                let (_regime_state, transitions) =
+                    stability_regime.process_input(&hv16_input, delta_t, timestamp);
+
+                for transition in &transitions {
+                    if let RegimeTransition::Crystallized { primitive_name, encoding } = transition {
+                        discovery_service.seed_neighbor_exploration(primitive_name, encoding);
+                    }
+                }
+
+                // Semantic memory: store HDC vector + prediction error for future similarity lookup
+                semantic_memory.store_with_timestamp(
+                    semantic_hdc,
+                    prediction_error,
+                    None,
+                    pp_total_cycles as u64,
+                );
+
+                // Causal enhancement: track (input, output) pairs and discover structure
+                if let Some(ref mut enhancer) = causal_enhancer {
+                    enhancer.record_cycle_from_f32(&compressed_state, &output);
+
+                    if enhancer.should_discover() {
+                        let causal_graph = enhancer.run_discovery();
+
+                        if !causal_graph.is_empty() {
+                            tracing::info!(
+                                edges = causal_graph.edges.len(),
+                                cycle = pp_total_cycles,
+                                "Causal structure discovered in cognitive loop"
+                            );
+                            enhancer.log_discoveries();
+                        }
+                    }
+                }
+            },
+            // ── Branch B: Episodic Memory + Primitive-Belief + Closed Learning ──
+            || {
+                // Episodic memory: encode significant experiences
+                if prediction_error > 0.1 || pp_in_flow {
+                    episodic_memory.encode(
+                        input,
+                        hdv_sample.clone(),
+                        pp_emotional_valence,
+                        pp_phi,
+                        pp_total_cycles,
+                    );
+                }
+
+                // Apply memory context boost to confidence
+                *prediction_confidence_ref =
+                    (*prediction_confidence_ref + memory_context_boost).clamp(0.0, 1.0);
+
+                // Primitive-Belief Bridge: map primitives to beliefs, compute TD signals
+                let prim_state = CognitiveLoopService::build_primitive_state(
+                    &encoding_result.detected_primitives,
+                    pp_smoothed_coh,
+                    pp_total_cycles as f64,
+                );
+
+                if let Some(ref prev_state) = prev_primitive_state {
+                    let pred_error =
+                        primitive_belief_bridge.compute_prediction_error(prev_state, &prim_state);
+                    let td_signal = primitive_belief_bridge.td_error_signal(&pred_error);
+                    *fep_learning_signal += td_signal as f32 * 0.2;
+                    *fep_learning_signal = fep_learning_signal.clamp(-1.0, 1.0);
+                }
+
+                *prev_primitive_state = Some(prim_state);
+
+                // Closed learning loop: update Q-values from cycle results
+                closed_learning_loop.update(cycle_learning_result);
+            },
         );
+        } // end parallel scope — disjoint borrows released
 
-        // Update semantic memory stats in loop stats
+        // Update semantic memory stats after parallel join completes
         self.stats.semantic_hits = self.semantic_memory.stats().semantic_hits;
         self.stats.semantic_misses = self.semantic_memory.stats().semantic_misses;
         self.stats.semantic_lr_factor = semantic_lr_factor;
@@ -1492,46 +1525,15 @@ impl CognitiveLoopService {
         self.stats.semantic_entries_stored = self.semantic_memory.stats().total_stored;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // CAUSAL ENHANCEMENT: Track (input, output) pairs and discover causal structure
+        // SEQUENTIAL: Episodic replay + Memory coordinator
         // ═══════════════════════════════════════════════════════════════════════
-        // When enabled, the causal enhancer:
-        // - Records each (compressed_state, output) pair
-        // - Periodically runs causal discovery to find structure
-        // - Logs discovered causal relationships
-        if let Some(ref mut enhancer) = self.causal_enhancer {
-            // Record this cycle's (input, output) pair
-            enhancer.record_cycle_from_f32(&compressed_state, &output);
-
-            // Check if it's time to run causal discovery
-            if enhancer.should_discover() {
-                let causal_graph = enhancer.run_discovery();
-
-                // Log discovered relationships
-                if !causal_graph.is_empty() {
-                    tracing::info!(
-                        edges = causal_graph.edges.len(),
-                        cycle = self.stats.total_cycles,
-                        "Causal structure discovered in cognitive loop"
-                    );
-                    enhancer.log_discoveries();
-                }
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // EPISODIC REPLAY: Store high-Phi moments and periodically replay
-        // ═══════════════════════════════════════════════════════════════════════
-        // When enabled, the episodic replay system:
-        // - Stores episodes that exceed the Phi threshold
-        // - Periodically replays high-Phi episodes to reinforce important patterns
-        // - Uses Phi-weighted sampling to prioritize most conscious moments
+        // These remain sequential because:
+        // - Episodic replay needs &mut temporal_network for CfC retraining
+        // - Memory coordinator needs &mut phi_episodic_replay after replay completes
         if let Some(ref mut replay) = self.phi_episodic_replay {
-            // Get coherence summary for Phi estimation and overall coherence
             let coherence_summary = self.coherence_bridge.summary();
-            // Use smoothed coherence as a proxy for Phi (both measure integration)
             let current_phi = coherence_summary.smoothed_coherence as f64;
 
-            // Create episode from this cycle
             let input_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(
                 compressed_state.clone()
             );
@@ -1549,7 +1551,6 @@ impl CognitiveLoopService {
                 coherence_summary.coherence,
             );
 
-            // Store if Phi exceeds threshold
             let stored = replay.store_if_significant(episode);
             if stored {
                 tracing::trace!(
@@ -1559,9 +1560,7 @@ impl CognitiveLoopService {
                 );
             }
 
-            // Check if we should run a replay session
             if replay.should_replay() {
-                // Get CfC network for training (only works with CfC backend)
                 if let TemporalNetwork::CfC(ref mut cfc) = self.temporal_network {
                     let learning_rate = self.config.cfc_config.learning_rate;
                     let result = replay.replay_session(cfc, learning_rate);
@@ -1578,15 +1577,12 @@ impl CognitiveLoopService {
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // MEMORY COORDINATOR: Broadcast consciousness signals across memory tiers
-        // ═══════════════════════════════════════════════════════════════════════
+        // Memory coordinator: broadcast signals and process graduations
         {
             let coord_phi = self.coherence_bridge.smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
             self.memory_coordinator.update_signals(coord_phi, coord_coherence);
 
-            // Process any queued graduations into episodic memory
             if let Some(ref mut replay) = self.phi_episodic_replay {
                 let graduated = self.memory_coordinator.process_graduations(replay);
                 if graduated > 0 {

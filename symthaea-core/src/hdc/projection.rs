@@ -542,7 +542,7 @@ impl RandomProjection {
         let scale = 1.0 / (output_dim as f32).sqrt();
         let mut matrix = Vec::with_capacity(output_dim * input_dim);
 
-        let mut state = seed;
+        let mut state = seed ^ 0x9E3779B97F4A7C15; // avoid xorshift64 fixed-point at 0
         for _ in 0..(output_dim * input_dim) {
             // Box-Muller for approximate Gaussian
             state ^= state << 13;

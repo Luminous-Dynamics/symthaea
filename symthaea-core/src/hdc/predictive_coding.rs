@@ -1,26 +1,63 @@
-// ==================================================================================
-// Revolutionary Improvement #3: Predictive Coding / Free Energy Principle
-// ==================================================================================
-//
-// **Scientific Foundation**: Karl Friston's Free Energy Principle
-//
-// **Key Papers**:
-// - Friston (2010) - The free-energy principle: a unified brain theory?
-// - Friston (2018) - Does predictive coding have a future?
-// - Rao & Ballard (1999) - Predictive coding in the visual cortex
-//
-// **Traditional Approach**:
-// - Requires differentiable probabilistic models
-// - Complex hierarchical message passing
-// - Continuous-valued prediction errors
-//
-// **Revolutionary HDC Approach**:
-// - Binary predictions and errors using BinaryHV
-// - Similarity as "confidence" / inverse surprise
-// - Hierarchical layers with bundling
-// - Active inference via causal encoder integration
-//
-// ==================================================================================
+//! # Predictive Coding / Free Energy Principle (FEP)
+//!
+//! This module implements the core FEP interface for Symthaea, providing two
+//! complementary systems:
+//!
+//! - [`PredictiveCoding`] — Hierarchical prediction error minimization
+//! - [`ActiveInference`] — Goal-directed action selection via expected free energy
+//!
+//! ## Scientific Foundation
+//!
+//! Based on Karl Friston's Free Energy Principle, which proposes that all adaptive
+//! systems minimize variational free energy (a bound on surprise). This drives both
+//! perception (updating internal models) and action (changing the world to match
+//! predictions).
+//!
+//! **Key Papers**:
+//! - Friston (2010) — "The free-energy principle: a unified brain theory?"
+//! - Friston (2018) — "Does predictive coding have a future?"
+//! - Rao & Ballard (1999) — "Predictive coding in the visual cortex"
+//!
+//! ## HDC Implementation
+//!
+//! Unlike traditional FEP implementations that require differentiable probabilistic
+//! models, Symthaea operates entirely in hyperdimensional computing (HDC) space:
+//!
+//! | Traditional FEP | Symthaea FEP |
+//! |----------------|--------------|
+//! | Continuous probability distributions | Binary hypervectors (BinaryHV) |
+//! | KL divergence for error | Hamming distance for surprise |
+//! | Gradient-based learning | XOR-based error + bundling |
+//! | O(n²) message passing | O(D) bitwise operations |
+//!
+//! ## Architecture
+//!
+//! ```text
+//! Layer N (abstract)  ──▶  Predictions (top-down)
+//!   ↑                          ↓
+//! Layer 1 (concrete)  ◀──  Errors (bottom-up)
+//!   ↑                          ↓
+//! Observation         ──▶  Free Energy = Σ precision_i × error_i
+//! ```
+//!
+//! ## Usage
+//!
+//! ```rust,ignore
+//! use symthaea_core::hdc::predictive_coding::{PredictiveCoding, ActiveInference};
+//! use symthaea_core::hdc::binary_hv::BinaryHV;
+//!
+//! // Perception: minimize prediction error
+//! let mut pc = PredictiveCoding::new(3);
+//! let obs = BinaryHV::random(42);
+//! let (prediction, free_energy) = pc.predict_and_update(&obs);
+//! assert!(free_energy >= 0.0); // free energy is always non-negative
+//!
+//! // Action: minimize expected free energy
+//! let mut agent = ActiveInference::new(3);
+//! agent.set_goal(&BinaryHV::random(99));
+//! agent.add_action(BinaryHV::random(1), BinaryHV::random(99)); // action → expected outcome
+//! let best_action = agent.select_action();
+//! ```
 
 use super::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};

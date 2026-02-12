@@ -844,12 +844,12 @@ impl PeriodicTable {
     /// 1. Different electron configuration
     /// 2. Charge marker (permuted by charge magnitude)
     pub fn ion(&self, atomic_number: u8, charge: i8, hadrons: &Hadrons) -> ContinuousHV {
-        let base = self.element(atomic_number);
-        if base.is_none() {
-            return ContinuousHV::zero(PHYSICS_DIM);
-        }
+        let base = match self.element(atomic_number) {
+            Some(el) => el,
+            None => return ContinuousHV::zero(PHYSICS_DIM),
+        };
 
-        let neutrons = base.unwrap().data.standard_neutrons;
+        let neutrons = base.data.standard_neutrons;
         let electrons = (atomic_number as i8 - charge) as u8;
 
         let z = atomic_number as f32;

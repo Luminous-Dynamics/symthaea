@@ -665,7 +665,7 @@ impl ResonatorNetwork {
                 .iter()
                 .enumerate()
                 .map(|(i, entry)| (i, cosine_similarity(&estimate, &entry.vector)))
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
                 .unwrap();
 
             (Some(self.codebook[idx].name.clone()), sim)

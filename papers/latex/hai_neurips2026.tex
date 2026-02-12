@@ -245,7 +245,17 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
 
 \textbf{Repository:} [Anonymous for review] \\
 \textbf{Language:} Rust (Edition 2021) \\
-\textbf{Test command:} \texttt{cargo test test\_fep\_active\_inference}
+\textbf{Test command:} \texttt{cargo test test\_fep\_active\_inference} \\
+\textbf{Traceability:} See \texttt{papers/PAPER\_CODE\_TRACEABILITY.md} for section--code mapping.
+
+Key implementation files:
+\begin{itemize}
+    \item \S3.1--3.2: \texttt{src/consciousness/fep\_active\_inference.rs} (free energy, precision binding)
+    \item \S3.3: \texttt{symthaea-core/src/hdc/predictive\_coding.rs} (belief updating)
+    \item \S3.4: \texttt{src/consciousness/fep\_active\_inference.rs:2278} (8 motor commands)
+    \item \S4: \texttt{src/benchmarks/fep\_temporal\_benchmark.rs} (T-Maze, Grid World)
+    \item HDC primitives: \texttt{symthaea-core/src/hdc/unified\_hv.rs}
+\end{itemize}
 
 \section{Full Mathematical Derivations}
 

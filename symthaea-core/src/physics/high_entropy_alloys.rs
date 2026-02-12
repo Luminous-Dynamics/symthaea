@@ -660,7 +660,7 @@ pub fn multi_seed_hea_search(
             let occurrence_count = results.len();
             let best_result = results.iter()
                 .max_by(|a, b| a.0.match_score.partial_cmp(&b.0.match_score).unwrap_or(std::cmp::Ordering::Equal))
-                .unwrap();
+                .expect("results vec is non-empty by construction (accumulated via push)");
 
             let total_match: f32 = results.iter().map(|(r, _)| r.match_score).sum();
             let avg_match_score = total_match / occurrence_count as f32;

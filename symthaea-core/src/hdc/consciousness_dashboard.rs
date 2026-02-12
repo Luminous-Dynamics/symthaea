@@ -386,7 +386,7 @@ impl ConsciousnessDashboard {
 
             // Get top 5 dimensions
             let mut scores: Vec<_> = eval.dimension_scores.iter().collect();
-            scores.sort_by(|a, b| b.raw_score.partial_cmp(&a.raw_score).unwrap());
+            scores.sort_by(|a, b| b.raw_score.total_cmp(&a.raw_score));
 
             for score in scores.iter().take(5) {
                 let bar = self.render_bar(score.raw_score, 20);
