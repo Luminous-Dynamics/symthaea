@@ -1284,8 +1284,10 @@ mod tests {
             integration.process();
         }
 
-        // Should have tracked some ignitions
-        // Ignition processing tracked (usize always >= 0)
+        // Should have tracked phi history from processing
+        let history = integration.phi_history();
+        assert!(!history.is_empty(),
+            "Phi history should be non-empty after 5 process() calls");
     }
 
     #[test]

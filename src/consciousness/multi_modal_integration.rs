@@ -588,13 +588,17 @@ mod tests {
 
         // Same input multiple times should increase coherence
         let features = BinaryHV::random(42);
+        let mut last_coherence = 0.0;
         for _ in 0..5 {
             let inputs = vec![
                 visual_input(features.clone(), 0.9),
             ];
             let result = integrator.integrate(&inputs);
-            println!("Coherence: {:.3}", result.binding_coherence);
+            last_coherence = result.binding_coherence;
         }
+        // Coherence should be in valid range after repeated input
+        assert!(last_coherence >= 0.0 && last_coherence <= 1.0,
+            "Binding coherence must be in [0,1]: {last_coherence}");
     }
 
     #[test]
@@ -603,8 +607,11 @@ mod tests {
         let system = PrimitiveSystem::new();
 
         let matches = integrator.route_to_primitives(&system);
-        // Should work even if no high matches
-        let _ = matches; // Just verify it runs without panic
+        // Routing should produce a valid (possibly empty) vec
+        let prim_count = system.all_primitives().count();
+        assert!(matches.len() <= prim_count,
+            "Route matches ({}) cannot exceed primitives count ({prim_count})",
+            matches.len());
     }
 
     #[test]

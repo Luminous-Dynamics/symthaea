@@ -1275,6 +1275,9 @@ mod tests {
         println!("Hierarchy detection (n=64):");
         println!("  Is hierarchical: {}", result.is_hierarchical);
         println!("  Φ gradient: {:?}", result.scale_gradient());
+
+        assert!(!result.phi_by_scale.is_empty(), "pyramid should produce at least one scale of phi values");
+        assert!(result.peak_phi >= 0.0, "peak phi should be non-negative, got {}", result.peak_phi);
     }
 
     #[test]
@@ -1347,8 +1350,13 @@ mod tests {
         println!("{:>6} | {:>10} | {:>8} | {:>12}", "Size", "Peak Scale", "Peak Φ", "Locality");
         println!("{:-<6}-+-{:-<10}-+-{:-<8}-+-{:-<12}", "", "", "", "");
 
-        for (n, peak_scale, peak_phi, locality) in results {
+        for (n, peak_scale, peak_phi, locality) in &results {
             println!("{:>6} | {:>10} | {:>8.4} | {:>12.4}", n, peak_scale, peak_phi, locality);
+        }
+
+        assert_eq!(results.len(), sizes.len(), "should have results for all system sizes");
+        for &(n, _, peak_phi, _) in &results {
+            assert!(peak_phi >= 0.0, "peak_phi should be non-negative for size {}, got {}", n, peak_phi);
         }
     }
 
@@ -2101,11 +2109,14 @@ mod tests {
             ("Chaotic", (0..50).map(|i| 0.5 + 0.3 * (i as f64 * 0.7).sin() * (i as f64 * 1.3).cos()).collect::<Vec<_>>(), AttractorType::LimitCycle),
         ];
 
-        for (name, trajectory, _expected) in cases {
-            let result = attractor.analyze(&trajectory);
-            println!("{} trajectory → {:?}", name, result.attractor_type);
+        for (name, trajectory, _expected) in &cases {
+            let result = attractor.analyze(trajectory);
+            println!("{} trajectory -> {:?}", name, result.attractor_type);
             println!("  Description: {}", result.attractor_type.description());
             println!("  Consciousness: {}", result.attractor_type.consciousness_interpretation());
+
+            assert!(result.attractor_phi.is_finite(), "attractor_phi should be finite for {} trajectory", name);
+            assert!(!result.attractor_type.description().is_empty(), "attractor type description should not be empty for {}", name);
         }
     }
 
@@ -2267,6 +2278,11 @@ mod tests {
         println!("  Type: {:?}", result.attractor_type);
         println!("  Converged: {}", result.converged);
         println!("  Lyapunov: {:.4}", result.lyapunov_exponent);
+
+        assert!(result.lyapunov_exponent.is_finite(), "Lyapunov exponent should be finite, got {}", result.lyapunov_exponent);
+        // With a tight convergence threshold and oscillating input, it should not report as converged to a fixed point
+        assert!(!result.converged || !matches!(result.attractor_type, AttractorType::FixedPoint),
+            "oscillating trajectory should not converge to a fixed point");
     }
 
     #[test]
@@ -2512,6 +2528,9 @@ mod tests {
         println!("  Node ranking: {:?}", result.node_ranking);
         println!("  Causal power: {:?}", result.causal_power);
         println!("  Most critical: {:?}", result.most_critical_node());
+
+        assert!(result.baseline_phi >= 0.0, "baseline phi should be non-negative, got {}", result.baseline_phi);
+        assert!(!result.node_ranking.is_empty(), "node ranking should not be empty for hub topology");
     }
 
     #[test]
@@ -2609,6 +2628,11 @@ mod tests {
         println!("  Random (robust):");
         println!("    Robustness: {:.4}", robust_result.robustness());
         println!("    Concentration: {:.4}", robust_result.concentration());
+
+        assert!(fragile_result.robustness() >= 0.0 && fragile_result.robustness() <= 1.0,
+            "fragile robustness should be in [0,1], got {}", fragile_result.robustness());
+        assert!(robust_result.robustness() >= 0.0 && robust_result.robustness() <= 1.0,
+            "robust robustness should be in [0,1], got {}", robust_result.robustness());
     }
 
     #[test]
@@ -2939,5 +2963,9 @@ mod tests {
         let hub_class = &result.node_classifications[0];
         println!("  Hub node role: {:?}", hub_class.role);
         println!("  Hub participation: {:.4}", hub_class.participation_coefficient);
+
+        assert!(result.total_phi >= 0.0, "total phi should be non-negative, got {}", result.total_phi);
+        assert!(result.num_modules() >= 1, "should detect at least 1 module, got {}", result.num_modules());
+        assert!(result.modularity_score.is_finite(), "modularity score should be finite, got {}", result.modularity_score);
     }
 }

@@ -2297,6 +2297,9 @@ mod tests {
         let agent = IntegratedConsciousAgent::new(AgentConfig::default());
         let intro = agent.introspect();
         println!("{}", intro);
+        assert!(intro.believed_phi >= 0.0, "initial phi should be non-negative, got {}", intro.believed_phi);
+        assert!(intro.self_awareness_level >= 0.0 && intro.self_awareness_level <= 1.0,
+            "self_awareness_level should be in [0,1], got {}", intro.self_awareness_level);
     }
 
     #[test]
@@ -2322,7 +2325,10 @@ mod tests {
             }
         }
 
-        println!("\n{}", agent.introspect());
+        let intro = agent.introspect();
+        println!("\n{}", intro);
+        assert!(intro.believed_phi >= 0.0, "phi should be non-negative after processing, got {}", intro.believed_phi);
+        assert!(intro.integration_quality >= 0.0, "integration_quality should be non-negative, got {}", intro.integration_quality);
     }
 
     #[test]
@@ -2365,7 +2371,9 @@ mod tests {
                     goal_match);
         }
 
-        println!("\n{}", agent.introspect());
+        let intro = agent.introspect();
+        println!("\n{}", intro);
+        assert!(intro.num_active_goals >= 1, "should have at least 1 active goal, got {}", intro.num_active_goals);
     }
 
     #[test]
@@ -2402,6 +2410,8 @@ mod tests {
         let health = agent.stream_health();
         println!("\nFinal stream health: coherence={:.3}, flowing={}",
                 health.coherence, health.is_flowing);
+        assert!(health.coherence >= 0.0, "stream coherence should be non-negative, got {}", health.coherence);
+        assert!(health.narrative_length > 0, "narrative should have accumulated entries, got {}", health.narrative_length);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -2661,6 +2671,9 @@ mod tests {
 
         // Full introspection
         println!("\n{}", agent.introspect());
+
+        assert!(wm.episodic_buffer.len() > 0, "working memory should contain items after processing");
+        assert!(es.arousal >= 0.0 && es.arousal <= 1.0, "arousal should be in [0,1], got {}", es.arousal);
     }
 
     #[test]
@@ -3345,11 +3358,11 @@ mod runtime_tests {
         let input = vec![0.5; TEST_DIM];
         let response = runtime.process(&input);
 
-        match response {
-            RuntimeResponse::ProcessingComplete { .. } => {
-                println!("Low coherence processing succeeded (reflex mode)");
-            }
-            _ => {}
+        let processed = matches!(response, RuntimeResponse::ProcessingComplete { .. });
+        assert!(processed, "low-coherence input should still produce ProcessingComplete (reflex mode)");
+        if let RuntimeResponse::ProcessingComplete { phi, .. } = response {
+            println!("Low coherence processing succeeded (reflex mode), phi={:.4}", phi);
+            assert!(phi >= 0.0, "phi should be non-negative, got {}", phi);
         }
     }
 
@@ -3367,6 +3380,7 @@ mod runtime_tests {
         // Export memories
         let exports = runtime.export_memories();
         println!("Exported {} memories", exports.len());
+        assert!(!exports.is_empty(), "should have exported at least one memory after 5 processing steps");
 
         // Simulate hippocampus processing and re-import
         let imports: Vec<MemoryImport> = exports.iter().take(2).map(|e| {
@@ -3377,8 +3391,10 @@ mod runtime_tests {
             }
         }).collect();
 
+        let import_count = imports.len();
         runtime.import_memories(imports);
-        println!("Re-imported 2 memories");
+        println!("Re-imported {} memories", import_count);
+        assert!(import_count > 0, "should have re-imported at least one memory");
     }
 
     #[test]
@@ -3504,5 +3520,8 @@ mod runtime_tests {
             final_snapshot.tick, final_snapshot.phi, final_snapshot.memory_load * 100.0);
 
         println!("\n=== Cycle Complete ===");
+
+        assert!(final_snapshot.tick > 0, "tick should have advanced, got {}", final_snapshot.tick);
+        assert!(final_snapshot.phi >= 0.0, "phi should be non-negative, got {}", final_snapshot.phi);
     }
 }

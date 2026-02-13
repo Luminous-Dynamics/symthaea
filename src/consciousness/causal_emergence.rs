@@ -542,10 +542,18 @@ mod tests {
         println!("  Micro EI: {:.3} bits", result.micro_ei);
         println!("  Macro EI: {:.3} bits", result.macro_ei);
         println!("  Emergence: {:.3} bits", result.emergence);
-        println!("  Micro determinism: {:.3}", result.micro_determinism);
-        println!("  Macro determinism: {:.3}", result.macro_determinism);
-        println!("  Consciousness emerges: {}", result.consciousness_emerges);
-        println!("  Interpretation: {}", result.interpretation);
+        // EI values should be finite and non-negative
+        assert!(result.micro_ei >= 0.0 && result.micro_ei.is_finite(),
+            "Micro EI must be finite non-negative: {}", result.micro_ei);
+        assert!(result.macro_ei >= 0.0 && result.macro_ei.is_finite(),
+            "Macro EI must be finite non-negative: {}", result.macro_ei);
+        // Determinism should be in [0, 1]
+        assert!((0.0..=1.0).contains(&result.micro_determinism),
+            "Micro determinism must be in [0,1]: {}", result.micro_determinism);
+        assert!((0.0..=1.0).contains(&result.macro_determinism),
+            "Macro determinism must be in [0,1]: {}", result.macro_determinism);
+        // Interpretation should not be empty
+        assert!(!result.interpretation.is_empty());
     }
 
     #[test]

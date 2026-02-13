@@ -649,9 +649,17 @@ mod tests {
         let chain = ReasoningChain::new(BinaryHV::random(3));
 
         let result = monitor.monitor_step(&execution, &chain);
-        // Result should be a valid monitoring result (any variant is acceptable)
-        // The actual result depends on threshold configuration and history
-        let _ = result; // Result is valid regardless of variant
+        // Phi drop should be detected (went from 0.01 to 0.001)
+        match &result {
+            MonitoringResult::Anomaly { diagnosis, .. } |
+            MonitoringResult::Critical { diagnosis, .. } => {
+                assert_eq!(diagnosis.problem_type, ProblemType::PhiDrop,
+                    "Expected PhiDrop detection");
+            }
+            MonitoringResult::Healthy => {
+                // Healthy is acceptable if threshold wasn't crossed
+            }
+        }
     }
 
     // Helper to create a test PrimitiveExecution with a given phi

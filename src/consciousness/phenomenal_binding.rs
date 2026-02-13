@@ -955,9 +955,15 @@ mod tests {
             analyzer.observe_all(&values);
         }
 
-        // May or may not detect fragmentation depending on coherence calculation
-        let _warning = analyzer.detect_fragmentation();
-        // Just verify it runs without panic
+        // Fragmentation detection should return a valid Option
+        let warning = analyzer.detect_fragmentation();
+        // With alternating desynchronized inputs, fragmentation is plausible
+        if let Some(ref w) = warning {
+            assert!(w.severity >= 0.0 && w.severity <= 1.0,
+                "Fragmentation severity must be in [0,1]: {}", w.severity);
+            assert!(!w.fragmented_pairs.is_empty(),
+                "Warning should have at least one fragmented pair");
+        }
     }
 
     #[test]
