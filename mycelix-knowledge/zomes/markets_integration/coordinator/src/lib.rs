@@ -568,6 +568,53 @@ pub fn on_verification_market_resolved(input: MarketResolvedInput) -> ExternResu
         );
     }
 
+    // Notify DKG consensus mechanism of market resolution
+    #[derive(Serialize, Deserialize, Debug)]
+    struct DkgMarketResolvedInput {
+        market_id: String,
+        claim_hash: ActionHash,
+        outcome: String,
+        confidence: f64,
+    }
+
+    // Try to parse claim_id as an ActionHash for DKG callback
+    // The DKG uses ActionHash internally; claim_id may be an encoded hash
+    if let Ok(claim_action_hash) = ActionHash::try_from(input.claim_id.as_bytes().to_vec()) {
+        let dkg_input = DkgMarketResolvedInput {
+            market_id: input.market_id.clone(),
+            claim_hash: claim_action_hash,
+            outcome: input.outcome.clone(),
+            confidence: input.matl_weighted_confidence,
+        };
+
+        match call(
+            CallTargetCell::Local,
+            ZomeName::from("dkg"),
+            FunctionName::from("on_market_resolved"),
+            None,
+            dkg_input,
+        ) {
+            Ok(ZomeCallResponse::Ok(_)) => {
+                debug!(
+                    "DKG consensus updated for claim {} via market {}",
+                    input.claim_id, input.market_id
+                );
+            }
+            Ok(other) => {
+                debug!(
+                    "DKG on_market_resolved returned non-Ok for claim {}: {:?}",
+                    input.claim_id, other
+                );
+            }
+            Err(e) => {
+                debug!(
+                    "DKG on_market_resolved call failed for claim {}: {:?}",
+                    input.claim_id, e
+                );
+            }
+        }
+    }
+
     Ok(evidence_hash)
 }
 

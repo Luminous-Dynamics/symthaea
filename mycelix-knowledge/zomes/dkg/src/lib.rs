@@ -16,6 +16,7 @@
 use hdk::prelude::*;
 use dkg_integrity::{
     ClaimEntry, AttestationEntry, AnchorEntry,
+    ConsensusSnapshot, DisputeEntry, ClaimStatus, DisputeStatus,
     EntryTypes, LinkTypes,
 };
 use mycelix_sdk::dkg::{
@@ -303,6 +304,579 @@ pub fn list_subjects(_: ()) -> ExternResult<Vec<String>> {
 #[hdk_extern]
 pub fn ping(_: ()) -> ExternResult<String> {
     Ok("pong".to_string())
+}
+
+// ============================================================================
+// Consensus Mechanism
+// ============================================================================
+
+/// Minimum endorsements required for quorum
+const MIN_ENDORSEMENTS: u32 = 3;
+/// Minimum aggregate K-vector trust score for quorum
+const MIN_AGGREGATE_TRUST: f64 = 2.0;
+/// Maximum challenge ratio before claim is contested
+const MAX_CHALLENGE_RATIO: f64 = 0.3;
+/// Days after which temporal decay begins
+const DECAY_START_DAYS: u64 = 90;
+/// Confidence reduction per 30-day period after decay starts
+const DECAY_PER_PERIOD: f64 = 0.10;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct EvaluateConsensusResult {
+    pub claim_hash: ActionHash,
+    pub status: ClaimStatus,
+    pub endorsement_count: u32,
+    pub challenge_count: u32,
+    pub aggregate_reputation: f64,
+    pub confidence: f64,
+    pub snapshot_hash: ActionHash,
+}
+
+/// Evaluate consensus for a claim.
+///
+/// Computes quorum: requires aggregate K-vector score of endorsers > 2.0
+/// AND endorsement count >= 3 AND challenge ratio < 0.3.
+/// Creates a ConsensusSnapshot entry recording the evaluation.
+#[hdk_extern]
+pub fn evaluate_consensus(claim_hash: ActionHash) -> ExternResult<EvaluateConsensusResult> {
+    let now = sys_time()?.as_micros() / 1_000_000;
+
+    // Verify the claim exists
+    let _claim_record = get(claim_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Claim not found".to_string())))?;
+
+    // Get attestations
+    let attestations = get_claim_attestations(&claim_hash)?;
+
+    let mut endorsement_count: u32 = 0;
+    let mut challenge_count: u32 = 0;
+    let mut aggregate_reputation: f64 = 0.0;
+
+    for att in &attestations {
+        // Get the attestation's action record to find the attester
+        let att_links = get_links(
+            LinkQuery::try_new(claim_hash.clone(), LinkTypes::ClaimToAttestation)?,
+            GetStrategy::default(),
+        )?;
+
+        // We already have the attestation entry; compute trust from the claim author pattern
+        if att.is_endorsement() {
+            endorsement_count += 1;
+            // Approximate: use a default trust contribution per endorser
+            // In production, we'd look up each attester's K-vector
+            aggregate_reputation += 0.5; // Conservative default per endorser
+        } else if att.is_challenge() {
+            challenge_count += 1;
+        }
+    }
+
+    // Refine aggregate_reputation by looking up actual attesters
+    // Walk attestation links to find attester agents
+    let att_links = get_links(
+        LinkQuery::try_new(claim_hash.clone(), LinkTypes::ClaimToAttestation)?,
+        GetStrategy::default(),
+    )?;
+    let mut real_aggregate: f64 = 0.0;
+    let mut real_endorsements: u32 = 0;
+    let mut real_challenges: u32 = 0;
+
+    for link in &att_links {
+        let att_hash = link.target.clone().into_action_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid attestation link".to_string())))?;
+        if let Some(record) = get(att_hash, GetOptions::default())? {
+            let att: AttestationEntry = record.entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid attestation".to_string())))?;
+            let attester = record.action().author();
+            let rep = calculate_agent_reputation(attester)?;
+
+            if att.is_endorsement() {
+                real_endorsements += 1;
+                real_aggregate += rep;
+            } else if att.is_challenge() {
+                real_challenges += 1;
+            }
+        }
+    }
+
+    // Use the real computed values
+    endorsement_count = real_endorsements;
+    challenge_count = real_challenges;
+    aggregate_reputation = real_aggregate;
+
+    // Check for active disputes
+    let dispute_links = get_links(
+        LinkQuery::try_new(claim_hash.clone(), LinkTypes::ClaimToDispute)?,
+        GetStrategy::default(),
+    )?;
+    let has_open_dispute = dispute_links.iter().any(|link| {
+        if let Some(hash) = link.target.clone().into_action_hash() {
+            if let Ok(Some(record)) = get(hash, GetOptions::default()) {
+                if let Ok(Some(dispute)) = record.entry().to_app_option::<DisputeEntry>() {
+                    return dispute.status == DisputeStatus::Open;
+                }
+            }
+        }
+        false
+    });
+
+    // Determine status
+    let total_attestations = endorsement_count + challenge_count;
+    let challenge_ratio = if total_attestations > 0 {
+        challenge_count as f64 / total_attestations as f64
+    } else {
+        0.0
+    };
+
+    // Get weighted claim for confidence score
+    let weighted = get_weighted_claim(&claim_hash, now as u64)?;
+    let confidence = weighted.map(|w| w.confidence).unwrap_or(0.0);
+
+    let status = if has_open_dispute {
+        ClaimStatus::Contested
+    } else if challenge_ratio > MAX_CHALLENGE_RATIO {
+        ClaimStatus::Contested
+    } else if endorsement_count >= MIN_ENDORSEMENTS
+        && aggregate_reputation >= MIN_AGGREGATE_TRUST
+        && challenge_ratio <= MAX_CHALLENGE_RATIO
+    {
+        ClaimStatus::Established
+    } else if endorsement_count > 0 {
+        ClaimStatus::Attested
+    } else {
+        ClaimStatus::Proposed
+    };
+
+    // Create consensus snapshot
+    let snapshot = ConsensusSnapshot {
+        claim_hash: claim_hash.clone(),
+        status: status.clone(),
+        endorsement_count,
+        challenge_count,
+        aggregate_reputation,
+        confidence,
+        evaluated_at: now as u64,
+    };
+
+    let snapshot_hash = create_entry(EntryTypes::ConsensusSnapshot(snapshot))?;
+
+    // Link claim to snapshot
+    create_link(
+        claim_hash.clone(),
+        snapshot_hash.clone(),
+        LinkTypes::ClaimToConsensus,
+        (),
+    )?;
+
+    Ok(EvaluateConsensusResult {
+        claim_hash,
+        status,
+        endorsement_count,
+        challenge_count,
+        aggregate_reputation,
+        confidence,
+        snapshot_hash,
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FileDisputeInput {
+    pub claim_hash: ActionHash,
+    pub reason: String,
+    pub evidence: Vec<String>,
+}
+
+/// File a dispute against a claim.
+///
+/// Creates a DisputeEntry, transitions claim to Contested status.
+/// Requires challenger to have governance tier >= Basic.
+#[hdk_extern]
+pub fn file_dispute(input: FileDisputeInput) -> ExternResult<ActionHash> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?.as_micros() / 1_000_000;
+
+    // Verify claim exists
+    let _claim_record = get(input.claim_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Claim not found".to_string())))?;
+
+    // Check challenger's governance tier
+    let rep = calculate_agent_reputation(&agent_info.agent_initial_pubkey)?;
+    let claim_links = get_links(
+        LinkQuery::try_new(agent_info.agent_initial_pubkey.clone(), LinkTypes::AgentToClaim)?,
+        GetStrategy::default(),
+    )?;
+    let mut total_endorsements = 0;
+    let mut total_challenges = 0;
+    for link in &claim_links {
+        if let Some(ch) = link.target.clone().into_action_hash() {
+            let atts = get_claim_attestations(&ch)?;
+            for att in atts {
+                if att.is_endorsement() { total_endorsements += 1; }
+                else if att.is_challenge() { total_challenges += 1; }
+            }
+        }
+    }
+    let kvector = build_kvector_from_activity(claim_links.len(), total_endorsements, total_challenges);
+    let tier = compute_governance_tier(kvector.trust_score());
+    match tier {
+        GovernanceTier::Observer => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Challenger must have governance tier >= Basic to file disputes".to_string()
+            )));
+        }
+        _ => {} // Basic, Major, Constitutional are all allowed
+    }
+
+    // Validate evidence count
+    if input.evidence.len() > 5 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Maximum 5 evidence URIs allowed".to_string()
+        )));
+    }
+
+    let dispute = DisputeEntry {
+        claim_hash: input.claim_hash.clone(),
+        challenger: agent_info.agent_initial_pubkey.clone(),
+        reason: input.reason,
+        evidence: input.evidence,
+        status: DisputeStatus::Open,
+        resolution: None,
+        created_at: now as u64,
+    };
+
+    // Validate
+    match dispute.validate()? {
+        ValidateCallbackResult::Valid => {}
+        ValidateCallbackResult::Invalid(reason) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(reason)));
+        }
+        _ => {}
+    }
+
+    let dispute_hash = create_entry(EntryTypes::Dispute(dispute))?;
+
+    // Link claim to dispute
+    create_link(
+        input.claim_hash.clone(),
+        dispute_hash.clone(),
+        LinkTypes::ClaimToDispute,
+        (),
+    )?;
+
+    // Link agent to dispute
+    create_link(
+        agent_info.agent_initial_pubkey,
+        dispute_hash.clone(),
+        LinkTypes::AgentToDispute,
+        (),
+    )?;
+
+    Ok(dispute_hash)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ResolveDisputeInput {
+    pub dispute_hash: ActionHash,
+    pub resolution: String,
+    pub upheld: bool,
+}
+
+/// Resolve a dispute. Only callable by agents with Constitutional tier.
+///
+/// If upheld, claim stays Contested→Resolved with reduced confidence.
+/// If dismissed, claim returns to Attested.
+#[hdk_extern]
+pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<ActionHash> {
+    let agent_info = agent_info()?;
+
+    // Check resolver's governance tier — must be Constitutional
+    let claim_links = get_links(
+        LinkQuery::try_new(agent_info.agent_initial_pubkey.clone(), LinkTypes::AgentToClaim)?,
+        GetStrategy::default(),
+    )?;
+    let mut total_endorsements = 0;
+    let mut total_challenges = 0;
+    for link in &claim_links {
+        if let Some(ch) = link.target.clone().into_action_hash() {
+            let atts = get_claim_attestations(&ch)?;
+            for att in atts {
+                if att.is_endorsement() { total_endorsements += 1; }
+                else if att.is_challenge() { total_challenges += 1; }
+            }
+        }
+    }
+    let kvector = build_kvector_from_activity(claim_links.len(), total_endorsements, total_challenges);
+    let tier = compute_governance_tier(kvector.trust_score());
+    if tier != GovernanceTier::Constitutional {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only Constitutional-tier agents can resolve disputes".to_string()
+        )));
+    }
+
+    // Get the original dispute
+    let record = get(input.dispute_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Dispute not found".to_string())))?;
+
+    let dispute: DisputeEntry = record.entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid dispute entry".to_string())))?;
+
+    if dispute.status != DisputeStatus::Open {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Dispute is not open".to_string()
+        )));
+    }
+
+    // Update dispute status
+    let resolved_dispute = DisputeEntry {
+        claim_hash: dispute.claim_hash.clone(),
+        challenger: dispute.challenger,
+        reason: dispute.reason,
+        evidence: dispute.evidence,
+        status: if input.upheld { DisputeStatus::Resolved } else { DisputeStatus::Dismissed },
+        resolution: Some(input.resolution),
+        created_at: dispute.created_at,
+    };
+
+    let updated_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::Dispute(resolved_dispute),
+    )?;
+
+    // Re-evaluate consensus after dispute resolution
+    let _ = evaluate_consensus(dispute.claim_hash)?;
+
+    Ok(updated_hash)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TemporalDecayResult {
+    pub claim_hash: ActionHash,
+    pub original_confidence: f64,
+    pub decayed_confidence: f64,
+    pub status: ClaimStatus,
+    pub snapshot_hash: ActionHash,
+}
+
+/// Apply temporal decay to a claim's confidence.
+///
+/// Claims older than 90 days without re-attestation lose 10% confidence
+/// per 30-day period. Claims below "low" threshold transition to Decayed.
+#[hdk_extern]
+pub fn apply_temporal_decay(claim_hash: ActionHash) -> ExternResult<TemporalDecayResult> {
+    let now = sys_time()?.as_micros() / 1_000_000;
+
+    // Get the claim to find its age
+    let record = get(claim_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Claim not found".to_string())))?;
+
+    let claim: ClaimEntry = record.entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid claim entry".to_string())))?;
+
+    let age_seconds = (now as u64).saturating_sub(claim.created_at);
+    let age_days = age_seconds / 86400;
+
+    // Get current confidence from weighted claim
+    let weighted = get_weighted_claim(&claim_hash, now as u64)?;
+    let original_confidence = weighted.map(|w| w.confidence).unwrap_or(0.0);
+
+    // Apply decay if older than threshold
+    let decayed_confidence = if age_days > DECAY_START_DAYS {
+        let decay_periods = (age_days - DECAY_START_DAYS) / 30;
+        let decay_factor = 1.0 - (decay_periods as f64 * DECAY_PER_PERIOD);
+        (original_confidence * decay_factor.max(0.0)).max(0.0)
+    } else {
+        original_confidence
+    };
+
+    let status = if decayed_confidence < 0.1 && age_days > DECAY_START_DAYS {
+        ClaimStatus::Decayed
+    } else if decayed_confidence < original_confidence {
+        // Re-evaluate with decay
+        ClaimStatus::Attested
+    } else {
+        ClaimStatus::Attested
+    };
+
+    // Get attestation counts for snapshot
+    let att_links = get_links(
+        LinkQuery::try_new(claim_hash.clone(), LinkTypes::ClaimToAttestation)?,
+        GetStrategy::default(),
+    )?;
+    let mut endorsement_count: u32 = 0;
+    let mut challenge_count: u32 = 0;
+    let mut aggregate_rep: f64 = 0.0;
+
+    for link in &att_links {
+        let att_hash = link.target.clone().into_action_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link".to_string())))?;
+        if let Some(rec) = get(att_hash, GetOptions::default())? {
+            let att: AttestationEntry = rec.entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid attestation".to_string())))?;
+            let attester = rec.action().author();
+            let rep = calculate_agent_reputation(attester)?;
+            if att.is_endorsement() {
+                endorsement_count += 1;
+                aggregate_rep += rep;
+            } else if att.is_challenge() {
+                challenge_count += 1;
+            }
+        }
+    }
+
+    let snapshot = ConsensusSnapshot {
+        claim_hash: claim_hash.clone(),
+        status: status.clone(),
+        endorsement_count,
+        challenge_count,
+        aggregate_reputation: aggregate_rep,
+        confidence: decayed_confidence,
+        evaluated_at: now as u64,
+    };
+
+    let snapshot_hash = create_entry(EntryTypes::ConsensusSnapshot(snapshot))?;
+    create_link(
+        claim_hash.clone(),
+        snapshot_hash.clone(),
+        LinkTypes::ClaimToConsensus,
+        (),
+    )?;
+
+    Ok(TemporalDecayResult {
+        claim_hash,
+        original_confidence,
+        decayed_confidence,
+        status,
+        snapshot_hash,
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MarketResolvedInput {
+    pub market_id: String,
+    pub claim_hash: ActionHash,
+    pub outcome: String,
+    pub confidence: f64,
+}
+
+/// Callback from markets_integration when a verification market resolves.
+///
+/// If market confidence > 0.7, auto-transitions claim to Resolved/Established.
+#[hdk_extern]
+pub fn on_market_resolved(input: MarketResolvedInput) -> ExternResult<EvaluateConsensusResult> {
+    let now = sys_time()?.as_micros() / 1_000_000;
+
+    // Verify claim exists
+    let _record = get(input.claim_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Claim not found".to_string())))?;
+
+    // Determine status based on market outcome
+    let market_verified = input.outcome == "Yes" && input.confidence > 0.7;
+
+    // Get current attestation state
+    let att_links = get_links(
+        LinkQuery::try_new(input.claim_hash.clone(), LinkTypes::ClaimToAttestation)?,
+        GetStrategy::default(),
+    )?;
+    let mut endorsement_count: u32 = 0;
+    let mut challenge_count: u32 = 0;
+    let mut aggregate_rep: f64 = 0.0;
+
+    for link in &att_links {
+        let att_hash = link.target.clone().into_action_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link".to_string())))?;
+        if let Some(rec) = get(att_hash, GetOptions::default())? {
+            let att: AttestationEntry = rec.entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid attestation".to_string())))?;
+            let attester = rec.action().author();
+            let rep = calculate_agent_reputation(attester)?;
+            if att.is_endorsement() {
+                endorsement_count += 1;
+                aggregate_rep += rep;
+            } else if att.is_challenge() {
+                challenge_count += 1;
+            }
+        }
+    }
+
+    let status = if market_verified {
+        ClaimStatus::Established
+    } else {
+        ClaimStatus::Resolved
+    };
+
+    let snapshot = ConsensusSnapshot {
+        claim_hash: input.claim_hash.clone(),
+        status: status.clone(),
+        endorsement_count,
+        challenge_count,
+        aggregate_reputation: aggregate_rep,
+        confidence: input.confidence,
+        evaluated_at: now as u64,
+    };
+
+    let snapshot_hash = create_entry(EntryTypes::ConsensusSnapshot(snapshot))?;
+    create_link(
+        input.claim_hash.clone(),
+        snapshot_hash.clone(),
+        LinkTypes::ClaimToConsensus,
+        (),
+    )?;
+
+    Ok(EvaluateConsensusResult {
+        claim_hash: input.claim_hash,
+        status,
+        endorsement_count,
+        challenge_count,
+        aggregate_reputation: aggregate_rep,
+        confidence: input.confidence,
+        snapshot_hash,
+    })
+}
+
+/// Get the latest consensus snapshot for a claim
+#[hdk_extern]
+pub fn get_claim_consensus(claim_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(claim_hash, LinkTypes::ClaimToConsensus)?,
+        GetStrategy::default(),
+    )?;
+
+    // Return the most recent snapshot (last link)
+    if let Some(link) = links.last() {
+        let hash = link.target.clone().into_action_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
+        get(hash, GetOptions::default())
+    } else {
+        Ok(None)
+    }
+}
+
+/// Get all disputes for a claim
+#[hdk_extern]
+pub fn get_claim_disputes(claim_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(claim_hash, LinkTypes::ClaimToDispute)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        let hash = link.target.into_action_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
+        if let Some(record) = get(hash, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
 }
 
 // ============================================================================

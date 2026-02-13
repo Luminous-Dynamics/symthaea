@@ -145,6 +145,124 @@ pub struct AnchorEntry {
 }
 
 // ============================================================================
+// Consensus Types
+// ============================================================================
+
+/// Maximum length for dispute reason
+pub const MAX_DISPUTE_REASON_LEN: usize = 2000;
+/// Maximum number of evidence URIs in a dispute
+pub const MAX_DISPUTE_EVIDENCE_COUNT: usize = 5;
+
+/// Lifecycle status of a claim in the consensus process
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum ClaimStatus {
+    /// Just submitted, below minimum attestation threshold
+    Proposed,
+    /// Has endorsements above low threshold
+    Attested,
+    /// Active dispute filed against this claim
+    Contested,
+    /// Dispute resolved or market-verified
+    Resolved,
+    /// High-confidence truth: quorum met
+    Established,
+    /// Temporal decay dropped confidence below threshold
+    Decayed,
+}
+
+/// Status of a dispute
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum DisputeStatus {
+    /// Dispute is open and awaiting resolution
+    Open,
+    /// Dispute was resolved (upheld or dismissed)
+    Resolved,
+    /// Dispute was dismissed
+    Dismissed,
+}
+
+/// Snapshot of consensus state at evaluation time
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ConsensusSnapshot {
+    /// Hash of the claim being evaluated
+    pub claim_hash: ActionHash,
+    /// Current status after evaluation
+    pub status: ClaimStatus,
+    /// Number of endorsements
+    pub endorsement_count: u32,
+    /// Number of challenges
+    pub challenge_count: u32,
+    /// Sum of endorser K-vector trust scores
+    pub aggregate_reputation: f64,
+    /// Computed confidence value (0.0-1.0)
+    pub confidence: f64,
+    /// Unix timestamp of evaluation (seconds)
+    pub evaluated_at: u64,
+}
+
+/// A formal dispute against a claim
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct DisputeEntry {
+    /// Hash of the claim being disputed
+    pub claim_hash: ActionHash,
+    /// Agent filing the dispute
+    pub challenger: AgentPubKey,
+    /// Reason for the dispute (max 2000 chars)
+    pub reason: String,
+    /// Supporting evidence URIs (max 5)
+    pub evidence: Vec<String>,
+    /// Current dispute status
+    pub status: DisputeStatus,
+    /// Resolution text (set when resolved)
+    pub resolution: Option<String>,
+    /// Unix timestamp of creation (seconds)
+    pub created_at: u64,
+}
+
+impl ConsensusSnapshot {
+    /// Validate consensus snapshot fields
+    pub fn validate(&self) -> ExternResult<ValidateCallbackResult> {
+        if self.confidence < 0.0 || self.confidence > 1.0 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Confidence must be between 0.0 and 1.0".to_string(),
+            ));
+        }
+        if self.aggregate_reputation < 0.0 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Aggregate reputation cannot be negative".to_string(),
+            ));
+        }
+        Ok(ValidateCallbackResult::Valid)
+    }
+}
+
+impl DisputeEntry {
+    /// Validate dispute fields
+    pub fn validate(&self) -> ExternResult<ValidateCallbackResult> {
+        if self.reason.is_empty() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Dispute reason cannot be empty".to_string(),
+            ));
+        }
+        if self.reason.len() > MAX_DISPUTE_REASON_LEN {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Dispute reason exceeds maximum length of {} bytes",
+                MAX_DISPUTE_REASON_LEN
+            )));
+        }
+        if self.evidence.len() > MAX_DISPUTE_EVIDENCE_COUNT {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Dispute evidence exceeds maximum of {} URIs",
+                MAX_DISPUTE_EVIDENCE_COUNT
+            )));
+        }
+        Ok(ValidateCallbackResult::Valid)
+    }
+}
+
+// ============================================================================
 // Entry Types Enum
 // ============================================================================
 
@@ -157,6 +275,10 @@ pub enum EntryTypes {
     Attestation(AttestationEntry),
     /// Anchor for indexing
     Anchor(AnchorEntry),
+    /// Consensus evaluation snapshot
+    ConsensusSnapshot(ConsensusSnapshot),
+    /// Formal dispute against a claim
+    Dispute(DisputeEntry),
 }
 
 // ============================================================================
@@ -175,6 +297,12 @@ pub enum LinkTypes {
     AgentToAttestation,
     /// Global anchor -> All subjects (for discovery)
     AllSubjects,
+    /// Claim -> Consensus snapshots
+    ClaimToConsensus,
+    /// Claim -> Disputes
+    ClaimToDispute,
+    /// Agent -> Disputes they filed
+    AgentToDispute,
 }
 
 // ============================================================================
@@ -190,11 +318,15 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Claim(claim) => claim.validate(),
                 EntryTypes::Attestation(att) => att.validate(),
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::ConsensusSnapshot(snap) => snap.validate(),
+                EntryTypes::Dispute(dispute) => dispute.validate(),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::Claim(claim) => claim.validate(),
                 EntryTypes::Attestation(att) => att.validate(),
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::ConsensusSnapshot(snap) => snap.validate(),
+                EntryTypes::Dispute(dispute) => dispute.validate(),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
