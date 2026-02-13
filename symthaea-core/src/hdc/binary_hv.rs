@@ -30,8 +30,8 @@ thread_local! {
 /// - Bit = 1 means +1, bit = 0 means -1 (bipolar encoding)
 ///
 /// # Examples
-/// ```ignore
-/// use symthaea::hdc::binary_hv::BinaryHV;
+/// ```
+/// # use symthaea_core::hdc::binary_hv::BinaryHV;
 ///
 /// let a = BinaryHV::random(42);  // Deterministic from seed
 /// let b = BinaryHV::random(43);
@@ -69,8 +69,8 @@ impl BinaryHV {
     /// Uses BLAKE3 hash for cryptographic randomness
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let v1 = BinaryHV::random(42);
     /// let v2 = BinaryHV::random(42);
     /// assert_eq!(v1, v2);  // Same seed = same vector
@@ -94,8 +94,8 @@ impl BinaryHV {
     /// Used in graph encoding to represent nodes uniquely.
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let node0 = BinaryHV::basis(0);
     /// let node1 = BinaryHV::basis(1);
     /// assert!(node0.similarity(&node1) < 0.6);  // Different nodes
@@ -147,8 +147,8 @@ impl BinaryHV {
     /// - 200x faster than circular convolution on Vec<f32>
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let cat = BinaryHV::random(1);
     /// let orange = BinaryHV::random(2);
     /// let orange_cat = cat.bind(&orange);
@@ -186,8 +186,8 @@ impl BinaryHV {
     /// - ~100ns for 10 vectors
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let cat1 = BinaryHV::random(1);
     /// let cat2 = BinaryHV::random(2);
     /// let cat3 = BinaryHV::random(3);
@@ -223,8 +223,8 @@ impl BinaryHV {
     /// - No stack overflow risk
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let vectors: Vec<BinaryHV> = (0..1000).map(|i| BinaryHV::random(i)).collect();
     /// let result = BinaryHV::bundle_safe(&vectors);  // Won't overflow stack
     /// ```
@@ -279,7 +279,7 @@ impl BinaryHV {
     /// - `weights`: Slice of weights (must be same length as `vectors`)
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(1);
     /// let b = BinaryHV::random(2);
@@ -337,7 +337,7 @@ impl BinaryHV {
     /// the 64KB stack allocation.
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let vectors: Vec<BinaryHV> = (0..100).map(|i| BinaryHV::random(i)).collect();
     /// let weights: Vec<f32> = (0..100).map(|i| i as f32).collect();
@@ -398,8 +398,8 @@ impl BinaryHV {
     /// - 1.0 = all ones (all +1 in bipolar)
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let random = BinaryHV::random(42);
     /// let density = random.density();
     /// assert!(density > 0.45 && density < 0.55);  // ~0.5 for random
@@ -429,8 +429,8 @@ impl BinaryHV {
     /// - Rebalanced vector if outside bounds
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let saturated = BinaryHV::ones();  // 100% density
     /// let balanced = saturated.ensure_density(0.4, 0.6);
     /// assert!(balanced.density() >= 0.4 && balanced.density() <= 0.6);
@@ -500,8 +500,8 @@ impl BinaryHV {
     /// - Gradual drift in long-running systems
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// // Even with biased inputs, result stays balanced
     /// let biased: Vec<BinaryHV> = (0..10).map(|_| BinaryHV::ones()).collect();
     /// let result = BinaryHV::bundle_normalized(&biased);
@@ -518,8 +518,8 @@ impl BinaryHV {
     /// "cat dog" ≠ "dog cat" in HDC space
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let cat = BinaryHV::random(1);
     /// let dog = BinaryHV::random(2);
     ///
@@ -628,7 +628,7 @@ impl BinaryHV {
     /// representations: ngram([a, b]) != ngram([b, a]).
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(1);
     /// let b = BinaryHV::random(2);
@@ -669,7 +669,7 @@ impl BinaryHV {
     /// selectively applies flips based on the exponent.
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let base = BinaryHV::random(1);
     /// let half = base.fractional_power(0.5, 99);
@@ -720,7 +720,7 @@ impl BinaryHV {
     /// - `k`: Number of top entries to return
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let sims = vec![(0, 0.9), (1, 0.3), (2, 0.7), (3, 0.5)];
     /// let top2 = BinaryHV::k_winners(&sims, 2);
@@ -761,8 +761,8 @@ impl BinaryHV {
     /// - 200x faster than cosine similarity on Vec<f32>
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(42);
     /// assert_eq!(a.similarity(&a), 1.0);
     ///
@@ -797,7 +797,7 @@ impl BinaryHV {
     /// This is the standard similarity metric used in many HDC papers.
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(42);
     /// assert_eq!(a.cosine_similarity(&a), 1.0);
@@ -820,13 +820,13 @@ impl BinaryHV {
     /// - ~10-20ns with SIMD (AVX2+POPCNT), ~160ns scalar
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(42);
-    /// let b = a.permute(1);  // Slightly different
+    /// let b = a.permute(1);  // Cyclic shift — roughly half the bits differ
     ///
     /// let dist = a.hamming_distance(&b);
-    /// assert!(dist > 0 && dist < 2048);
+    /// assert!(dist > 0 && dist < 16384);
     /// ```
     #[inline(always)]
     pub fn hamming_distance(&self, other: &Self) -> u32 {
@@ -850,8 +850,8 @@ impl BinaryHV {
     /// - ~5-10ns with SIMD (AVX2), ~80ns scalar
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(42);
     /// let inv = a.invert();
     ///
@@ -880,7 +880,7 @@ impl BinaryHV {
     /// For two random ~50% density vectors, the result has ~25% density.
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(1);
     /// let b = BinaryHV::random(2);
@@ -903,7 +903,7 @@ impl BinaryHV {
     /// - ~5-10ns with SIMD (AVX2), ~80ns scalar
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let a = BinaryHV::random(1);
     /// let b = BinaryHV::random(2);
@@ -990,8 +990,8 @@ impl BinaryHV {
     /// Useful for testing robustness
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::binary_hv::BinaryHV;
+    /// ```
+    /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let original = BinaryHV::random(42);
     /// let noisy = original.add_noise(0.1, 123);  // Flip 10% of bits
     ///
@@ -1029,7 +1029,7 @@ impl BinaryHV {
     /// - `seed`: Deterministic seed for reproducibility
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let dense = BinaryHV::random(42);
     /// let sparse = dense.thin(0.1, 99);
@@ -1071,7 +1071,7 @@ impl BinaryHV {
     /// Avoids allocating a new BinaryHV. Equivalent to `*self = self.bind(other)`.
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let mut a = BinaryHV::random(1);
     /// let b = BinaryHV::random(2);
@@ -1091,7 +1091,7 @@ impl BinaryHV {
     /// More cache-friendly than calling similarity() in a loop.
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let query = BinaryHV::random(0);
     /// let targets: Vec<BinaryHV> = (1..10).map(|i| BinaryHV::random(i)).collect();
@@ -1117,7 +1117,7 @@ impl BinaryHV {
     /// Returns (index, similarity) pairs for all targets meeting the threshold.
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let query = BinaryHV::random(0);
     /// let mut targets: Vec<BinaryHV> = (1..50).map(|i| BinaryHV::random(i)).collect();
@@ -1146,7 +1146,7 @@ impl BinaryHV {
     /// computes similarity inline and returns the top-K results.
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let query = BinaryHV::random(0);
     /// let targets: Vec<BinaryHV> = (1..100).map(|i| BinaryHV::random(i)).collect();
@@ -1177,7 +1177,7 @@ impl BinaryHV {
     /// Useful for encoding sequences or creating associations in bulk.
     ///
     /// # Example
-    /// ```ignore
+    /// ```
     /// # use symthaea_core::hdc::binary_hv::BinaryHV;
     /// let vectors: Vec<BinaryHV> = (0..10).map(|i| BinaryHV::random(i)).collect();
     /// let operand = BinaryHV::random(99);

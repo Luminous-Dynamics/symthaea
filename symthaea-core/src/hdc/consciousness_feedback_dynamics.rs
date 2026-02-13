@@ -1406,4 +1406,592 @@ mod tests {
         let report = engine.dynamics_report();
         assert!(report.contains("Feedback Dynamics Report"));
     }
+
+    // =========================================================================
+    // Helper to build DreamScenario with controlled parameters
+    // =========================================================================
+
+    fn make_dream(
+        emotional_valence: f64,
+        lucidity: f64,
+        bizarreness: f64,
+        themes: Vec<&str>,
+    ) -> DreamScenario {
+        use crate::hdc::sleep_and_altered_states::{DreamFragment, DreamFragmentSource};
+
+        // Build one fragment with the requested bizarreness so
+        // overall_bizarreness() returns that value.
+        let fragment = DreamFragment {
+            content_hv: BinaryHV::random(42),
+            description: "test fragment".to_string(),
+            valence: emotional_valence,
+            bizarreness,
+            source: DreamFragmentSource::RandomActivation,
+        };
+
+        DreamScenario {
+            fragments: vec![fragment],
+            emotional_valence,
+            narrative_coherence: 0.5,
+            lucidity,
+            themes: themes.into_iter().map(String::from).collect(),
+            subjective_duration: 10.0,
+        }
+    }
+
+    // =========================================================================
+    // 1. test_feedback_processor_process_dream
+    // =========================================================================
+
+    #[test]
+    fn test_feedback_processor_process_dream_emotional_resolution() {
+        let mut processor = FeedbackProcessor::new();
+        // High valence (>0.5), low bizarreness (<0.3) => EmotionalResolution
+        let dream = make_dream(0.8, 0.2, 0.1, vec!["peace", "harmony"]);
+        let insight = processor.process_dream(&dream);
+        assert!(insight.is_some());
+        let insight = insight.unwrap();
+        assert_eq!(insight.insight_type, InsightType::EmotionalResolution);
+        assert_eq!(insight.id, 1);
+    }
+
+    #[test]
+    fn test_feedback_processor_process_dream_causal_discovery() {
+        let mut processor = FeedbackProcessor::new();
+        // Theme containing "because" => CausalDiscovery
+        let dream = make_dream(0.3, 0.2, 0.2, vec!["something happened because of X"]);
+        let insight = processor.process_dream(&dream).unwrap();
+        assert_eq!(insight.insight_type, InsightType::CausalDiscovery);
+        // Should also have extracted causal discoveries from the theme
+        assert!(!insight.causal_discoveries.is_empty());
+    }
+
+    #[test]
+    fn test_feedback_processor_process_dream_creative_solution() {
+        let mut processor = FeedbackProcessor::new();
+        // High lucidity (>0.5) => CreativeSolution (when valence is not
+        // high-positive/low-bizarre and no causal theme)
+        let dream = make_dream(0.3, 0.8, 0.2, vec!["flying"]);
+        let insight = processor.process_dream(&dream).unwrap();
+        assert_eq!(insight.insight_type, InsightType::CreativeSolution);
+        // Creative solution should generate a "creativity" attention hint
+        assert!(insight.attention_hints.iter().any(|h| h.focus_area == "creativity"));
+    }
+
+    #[test]
+    fn test_feedback_processor_process_dream_warning() {
+        let mut processor = FeedbackProcessor::new();
+        // High bizarreness (>0.7) => Warning
+        let dream = make_dream(0.0, 0.2, 0.9, vec!["surreal"]);
+        let insight = processor.process_dream(&dream).unwrap();
+        assert_eq!(insight.insight_type, InsightType::Warning);
+        // Warning should generate a "safety" attention hint
+        assert!(insight.attention_hints.iter().any(|h| h.focus_area == "safety"));
+    }
+
+    #[test]
+    fn test_feedback_processor_process_dream_warning_from_nightmare() {
+        let mut processor = FeedbackProcessor::new();
+        // Negative valence (<-0.5) also triggers Warning
+        let dream = make_dream(-0.8, 0.2, 0.2, vec!["falling"]);
+        let insight = processor.process_dream(&dream).unwrap();
+        assert_eq!(insight.insight_type, InsightType::Warning);
+    }
+
+    #[test]
+    fn test_feedback_processor_process_dream_memory_integration() {
+        let mut processor = FeedbackProcessor::new();
+        // Moderate values with no special triggers => MemoryIntegration
+        let dream = make_dream(0.2, 0.3, 0.4, vec!["routine"]);
+        let insight = processor.process_dream(&dream).unwrap();
+        assert_eq!(insight.insight_type, InsightType::MemoryIntegration);
+    }
+
+    // =========================================================================
+    // 2. test_feedback_processor_insight_history
+    // =========================================================================
+
+    #[test]
+    fn test_feedback_processor_insight_history() {
+        let mut processor = FeedbackProcessor::new();
+
+        // Process 5 dreams and verify history grows
+        for i in 0..5 {
+            let dream = make_dream(0.1 * i as f64, 0.2, 0.2, vec!["theme"]);
+            let insight = processor.process_dream(&dream);
+            assert!(insight.is_some());
+        }
+        assert_eq!(processor.insights.len(), 5);
+
+        // Process up to 110 total to verify the max_insights cap (100)
+        for i in 5..110 {
+            let dream = make_dream(0.01 * (i % 50) as f64, 0.2, 0.2, vec!["theme"]);
+            processor.process_dream(&dream);
+        }
+        // Should be capped at max_insights (100)
+        assert_eq!(processor.insights.len(), 100);
+
+        // Verify the first insights were evicted (oldest removed)
+        // The first insight had id=1, so the oldest remaining should have id > 10
+        assert!(processor.insights.front().unwrap().id > 10);
+    }
+
+    #[test]
+    fn test_feedback_processor_insight_ids_monotonic() {
+        let mut processor = FeedbackProcessor::new();
+        let dream = make_dream(0.3, 0.2, 0.2, vec!["test"]);
+
+        let insight1 = processor.process_dream(&dream).unwrap();
+        let insight2 = processor.process_dream(&dream).unwrap();
+        let insight3 = processor.process_dream(&dream).unwrap();
+
+        assert_eq!(insight1.id, 1);
+        assert_eq!(insight2.id, 2);
+        assert_eq!(insight3.id, 3);
+    }
+
+    // =========================================================================
+    // 3. test_emotional_adjustment_accumulation
+    // =========================================================================
+
+    #[test]
+    fn test_emotional_adjustment_accumulation() {
+        let mut processor = FeedbackProcessor::new();
+        let mut emotional_depth = EmotionalDepthSystem::new();
+
+        // Process a dream with known positive emotional valence.
+        // A non-nightmare, non-lucid dream with valence 0.6 should have
+        // emotional_impact = 0.6 * 0.3 = 0.18, accumulated as 0.18 * 0.1 = 0.018
+        let dream = make_dream(0.6, 0.2, 0.2, vec!["happy"]);
+        processor.process_dream(&dream);
+
+        // Apply and verify non-zero adjustment
+        let adj = processor.apply_emotional_feedback(&mut emotional_depth);
+        assert!(adj.abs() > 0.001, "First adjustment should be non-zero, got {}", adj);
+
+        // After applying, the accumulator was reset to 0.0.
+        // A second call without processing more dreams should return ~0.0.
+        let adj2 = processor.apply_emotional_feedback(&mut emotional_depth);
+        assert!(adj2.abs() < 0.02, "Second adjustment should be near zero, got {}", adj2);
+    }
+
+    #[test]
+    fn test_emotional_adjustment_nightmare_cathartic() {
+        let mut processor = FeedbackProcessor::new();
+        let mut emotional_depth = EmotionalDepthSystem::new();
+
+        // Nightmare (valence < -0.5) should still produce a positive
+        // cathartic emotional_impact of 0.1
+        let dream = make_dream(-0.8, 0.2, 0.2, vec!["chased"]);
+        processor.process_dream(&dream);
+
+        let adj = processor.apply_emotional_feedback(&mut emotional_depth);
+        // 0.1 (cathartic) * 0.1 = 0.01
+        assert!(adj > 0.0, "Nightmare should have positive cathartic adjustment, got {}", adj);
+    }
+
+    // =========================================================================
+    // 4. test_attention_hints_for_warning
+    // =========================================================================
+
+    #[test]
+    fn test_attention_hints_for_warning() {
+        let mut processor = FeedbackProcessor::new();
+
+        // High bizarreness => Warning insight => safety attention hint
+        let dream = make_dream(0.0, 0.2, 0.9, vec!["distortion"]);
+        processor.process_dream(&dream);
+
+        let hints = processor.get_attention_adjustments();
+        assert!(!hints.is_empty(), "Warning insight should produce attention hints");
+        assert!(
+            hints.iter().any(|h| h.focus_area == "safety"),
+            "Warning should produce 'safety' focus area hint, got: {:?}",
+            hints.iter().map(|h| &h.focus_area).collect::<Vec<_>>()
+        );
+        assert!(hints[0].priority > 0.5, "Safety hint should have high priority");
+    }
+
+    #[test]
+    fn test_attention_hints_for_creative_solution() {
+        let mut processor = FeedbackProcessor::new();
+
+        // High lucidity => CreativeSolution => creativity attention hint
+        let dream = make_dream(0.3, 0.8, 0.2, vec!["innovation"]);
+        processor.process_dream(&dream);
+
+        let hints = processor.get_attention_adjustments();
+        assert!(!hints.is_empty(), "CreativeSolution should produce attention hints");
+        assert!(
+            hints.iter().any(|h| h.focus_area == "creativity"),
+            "CreativeSolution should produce 'creativity' focus area hint"
+        );
+    }
+
+    #[test]
+    fn test_attention_hints_empty_for_memory_integration() {
+        let mut processor = FeedbackProcessor::new();
+
+        // MemoryIntegration should produce no attention hints
+        let dream = make_dream(0.2, 0.3, 0.4, vec!["mundane"]);
+        processor.process_dream(&dream);
+
+        let hints = processor.get_attention_adjustments();
+        assert!(hints.is_empty(), "MemoryIntegration should produce no attention hints");
+    }
+
+    // =========================================================================
+    // 5. test_dream_scheduler_stress_levels
+    // =========================================================================
+
+    #[test]
+    fn test_dream_scheduler_low_stress() {
+        let mut scheduler = AdaptiveDreamScheduler::new();
+        scheduler.update_stress(0.1);
+        let recommended = scheduler.recommend_dream_type();
+        // Low stress: should NOT be Lucid (that is for high stress)
+        assert_ne!(recommended, DreamType::Lucid);
+        // Should be one of the regular types based on overdue intervals
+        assert!(matches!(
+            recommended,
+            DreamType::Regular
+                | DreamType::Consolidation
+                | DreamType::Counterfactual
+                | DreamType::CausalExploration
+                | DreamType::Nightmare
+        ));
+    }
+
+    #[test]
+    fn test_dream_scheduler_medium_stress() {
+        let mut scheduler = AdaptiveDreamScheduler::new();
+        scheduler.update_stress(0.5);
+        let recommended = scheduler.recommend_dream_type();
+        // Medium stress (0.5) is below the 0.6 threshold for Consolidation
+        // and below 0.8 for Lucid, so it falls through to overdue logic
+        assert_ne!(recommended, DreamType::Lucid);
+    }
+
+    #[test]
+    fn test_dream_scheduler_moderately_high_stress() {
+        let mut scheduler = AdaptiveDreamScheduler::new();
+        // 0.6 < stress <= 0.8 => Consolidation
+        scheduler.update_stress(0.7);
+        let recommended = scheduler.recommend_dream_type();
+        assert_eq!(recommended, DreamType::Consolidation);
+    }
+
+    #[test]
+    fn test_dream_scheduler_high_stress() {
+        let mut scheduler = AdaptiveDreamScheduler::new();
+        scheduler.update_stress(0.9);
+        let recommended = scheduler.recommend_dream_type();
+        assert_eq!(recommended, DreamType::Lucid);
+    }
+
+    #[test]
+    fn test_dream_scheduler_extreme_stress() {
+        let mut scheduler = AdaptiveDreamScheduler::new();
+        scheduler.update_stress(1.0);
+        let recommended = scheduler.recommend_dream_type();
+        assert_eq!(recommended, DreamType::Lucid);
+    }
+
+    #[test]
+    fn test_dream_scheduler_record_effectiveness() {
+        let mut scheduler = AdaptiveDreamScheduler::new();
+
+        let record = EffectivenessRecord {
+            dream_type: DreamType::Regular,
+            emotional_before: 0.3,
+            emotional_after: 0.6,
+            stress_before: 0.7,
+            stress_after: 0.4,
+            insight_generated: true,
+            timestamp: 1000,
+        };
+        scheduler.record_effectiveness(record);
+
+        // Verify it was recorded
+        assert_eq!(
+            scheduler.effectiveness_history.get(&DreamType::Regular).unwrap().len(),
+            1
+        );
+    }
+
+    #[test]
+    fn test_dream_scheduler_report_content() {
+        let scheduler = AdaptiveDreamScheduler::new();
+        let report = scheduler.scheduling_report();
+        assert!(report.contains("Dream Scheduling Report"));
+        assert!(report.contains("Current stress"));
+        assert!(report.contains("Recommended"));
+    }
+
+    // =========================================================================
+    // 6. test_causal_dream_integrator_queue
+    // =========================================================================
+
+    #[test]
+    fn test_causal_dream_integrator_queue_priority() {
+        let mut integrator = CausalDreamIntegrator::new();
+
+        // Queue hypotheses with different priorities
+        integrator.queue_hypothesis(CausalHypothesis {
+            cause: "low_priority".to_string(),
+            effect: "effect_a".to_string(),
+            prior: 0.5,
+            hv_encoding: None,
+            priority: 0.2,
+        });
+        integrator.queue_hypothesis(CausalHypothesis {
+            cause: "high_priority".to_string(),
+            effect: "effect_b".to_string(),
+            prior: 0.5,
+            hv_encoding: None,
+            priority: 0.9,
+        });
+        integrator.queue_hypothesis(CausalHypothesis {
+            cause: "medium_priority".to_string(),
+            effect: "effect_c".to_string(),
+            prior: 0.5,
+            hv_encoding: None,
+            priority: 0.5,
+        });
+
+        // next_hypothesis should return highest priority first
+        let first = integrator.next_hypothesis().unwrap();
+        assert_eq!(first.cause, "high_priority");
+        assert!((first.priority - 0.9).abs() < 1e-9);
+
+        let second = integrator.next_hypothesis().unwrap();
+        assert_eq!(second.cause, "medium_priority");
+
+        let third = integrator.next_hypothesis().unwrap();
+        assert_eq!(third.cause, "low_priority");
+
+        // Queue should now be empty
+        assert!(integrator.next_hypothesis().is_none());
+    }
+
+    #[test]
+    fn test_causal_dream_integrator_max_queue() {
+        let mut integrator = CausalDreamIntegrator::new();
+
+        // Queue more than max_queue (50) hypotheses
+        for i in 0..60 {
+            integrator.queue_hypothesis(CausalHypothesis {
+                cause: format!("cause_{}", i),
+                effect: format!("effect_{}", i),
+                prior: 0.5,
+                hv_encoding: None,
+                priority: 0.5,
+            });
+        }
+
+        // Should be capped at max_queue (50)
+        assert_eq!(integrator.hypotheses_queue.len(), 50);
+    }
+
+    #[test]
+    fn test_causal_dream_integrator_add_hypothesis_convenience() {
+        let mut integrator = CausalDreamIntegrator::new();
+
+        // add_hypothesis is a convenience method that sets priority = 1.0 - prior.abs()
+        integrator.add_hypothesis("stress", "insomnia", 0.3);
+
+        let h = integrator.next_hypothesis().unwrap();
+        assert_eq!(h.cause, "stress");
+        assert_eq!(h.effect, "insomnia");
+        assert!((h.prior - 0.3).abs() < 1e-9);
+        // Priority = 1.0 - 0.3 = 0.7
+        assert!((h.priority - 0.7).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_causal_dream_integrator_configure_dream_question() {
+        let integrator = CausalDreamIntegrator::new();
+
+        let hypothesis = CausalHypothesis {
+            cause: "rain".to_string(),
+            effect: "flooding".to_string(),
+            prior: 0.6,
+            hv_encoding: None,
+            priority: 0.5,
+        };
+
+        let mut engine = CounterfactualDreamEngine::new();
+        let question = integrator.configure_causal_dream(&mut engine, &hypothesis);
+        assert!(question.contains("rain"));
+        assert!(question.contains("flooding"));
+        assert!(question.contains("What if"));
+    }
+
+    // =========================================================================
+    // 7. test_dynamics_engine_report_content
+    // =========================================================================
+
+    #[test]
+    fn test_dynamics_engine_report_content() {
+        let engine = FeedbackDynamicsEngine::new();
+        let report = engine.dynamics_report();
+
+        // Verify expected sections are present
+        assert!(report.contains("Feedback Dynamics Report"), "Missing header");
+        assert!(report.contains("Recent Insights"), "Missing Recent Insights section");
+        assert!(report.contains("Prediction Accuracy"), "Missing Prediction Accuracy section");
+        assert!(report.contains("Causal Discoveries"), "Missing Causal Discoveries section");
+        assert!(report.contains("Collective Dream Hub"), "Missing Collective Dream Hub section");
+        assert!(report.contains("Dream Scheduling Report"), "Missing Dream Scheduling Report section");
+        assert!(report.contains("Current stress"), "Missing current stress info");
+        assert!(report.contains("Recommended"), "Missing recommendation");
+    }
+
+    #[test]
+    fn test_dynamics_engine_components_accessible() {
+        let mut engine = FeedbackDynamicsEngine::new();
+
+        // Verify all sub-components are accessible and functional
+        let dream = make_dream(0.5, 0.3, 0.2, vec!["test"]);
+        let insight = engine.feedback.process_dream(&dream);
+        assert!(insight.is_some());
+
+        // Predictor starts empty
+        let prediction = engine.predictor.predict();
+        assert!(prediction.is_none(), "Predictor should need at least 5 states");
+
+        // Scheduler defaults
+        engine.scheduler.update_stress(0.85);
+        assert_eq!(engine.scheduler.recommend_dream_type(), DreamType::Lucid);
+
+        // Collective hub
+        engine.collective.set_peer_count(3);
+        let collective_report = engine.collective.collective_report();
+        assert!(collective_report.contains("3 peers"));
+    }
+
+    // =========================================================================
+    // Additional edge case tests
+    // =========================================================================
+
+    #[test]
+    fn test_feedback_processor_consolidation_strength_bounds() {
+        let mut processor = FeedbackProcessor::new();
+
+        // Test that consolidation_strength is always within [0, 1]
+        // Low bizarreness, high valence
+        let dream1 = make_dream(0.9, 0.1, 0.05, vec!["calm"]);
+        let insight1 = processor.process_dream(&dream1).unwrap();
+        assert!(insight1.consolidation_strength >= 0.0 && insight1.consolidation_strength <= 1.0,
+            "consolidation_strength out of bounds: {}", insight1.consolidation_strength);
+
+        // High bizarreness, low valence
+        let dream2 = make_dream(0.0, 0.1, 0.95, vec!["chaos"]);
+        let insight2 = processor.process_dream(&dream2).unwrap();
+        assert!(insight2.consolidation_strength >= 0.0 && insight2.consolidation_strength <= 1.0,
+            "consolidation_strength out of bounds: {}", insight2.consolidation_strength);
+    }
+
+    #[test]
+    fn test_feedback_processor_dream_summary_format() {
+        let mut processor = FeedbackProcessor::new();
+
+        // Regular dream
+        let dream = make_dream(0.3, 0.2, 0.4, vec!["a", "b"]);
+        let insight = processor.process_dream(&dream).unwrap();
+        assert!(insight.dream_summary.contains("dream"));
+        assert!(insight.dream_summary.contains("2 themes"));
+
+        // Lucid dream
+        let lucid = make_dream(0.3, 0.8, 0.2, vec!["c"]);
+        let insight2 = processor.process_dream(&lucid).unwrap();
+        assert!(insight2.dream_summary.contains("lucid dream"));
+
+        // Nightmare
+        let nightmare = make_dream(-0.8, 0.2, 0.2, vec!["d"]);
+        let insight3 = processor.process_dream(&nightmare).unwrap();
+        assert!(insight3.dream_summary.contains("nightmare"));
+    }
+
+    #[test]
+    fn test_recent_insights_ordering() {
+        let mut processor = FeedbackProcessor::new();
+
+        for _ in 0..5 {
+            let dream = make_dream(0.3, 0.2, 0.2, vec!["test"]);
+            processor.process_dream(&dream);
+        }
+
+        let recent = processor.recent_insights(3);
+        assert_eq!(recent.len(), 3);
+        // recent_insights returns most recent first (rev().take())
+        assert!(recent[0].id > recent[1].id);
+        assert!(recent[1].id > recent[2].id);
+    }
+
+    #[test]
+    fn test_emotional_predictor_needs_minimum_history() {
+        let mut predictor = EmotionalPredictor::new();
+
+        // With fewer than 5 records, predict() should return None
+        for i in 0..4 {
+            predictor.record_state(0.5 + i as f64 * 0.01, 0.5);
+        }
+        assert!(predictor.predict().is_none());
+
+        // After adding the 5th, it should work
+        predictor.record_state(0.55, 0.5);
+        assert!(predictor.predict().is_some());
+    }
+
+    #[test]
+    fn test_emotional_predictor_prediction_values_clamped() {
+        let mut predictor = EmotionalPredictor::new();
+
+        // Record strongly trending states to push predictions to extremes
+        for i in 0..10 {
+            predictor.record_state(-1.0 + i as f64 * 0.01, 0.1);
+        }
+
+        let prediction = predictor.predict().unwrap();
+        assert!(prediction.predicted_valence >= -1.0 && prediction.predicted_valence <= 1.0);
+        assert!(prediction.predicted_arousal >= 0.0 && prediction.predicted_arousal <= 1.0);
+        assert!(prediction.confidence >= 0.1 && prediction.confidence <= 0.9);
+    }
+
+    #[test]
+    fn test_collective_dream_hub_resonance() {
+        let mut hub = CollectiveDreamHub::new();
+
+        // Share an insight with causal discoveries
+        let insight = DreamInsight {
+            id: 1,
+            insight_type: InsightType::CausalDiscovery,
+            emotional_impact: 0.3,
+            consolidation_strength: 0.5,
+            causal_discoveries: vec![CausalDiscovery {
+                cause: "shared_theme".to_string(),
+                effect: "outcome".to_string(),
+                strength: 0.7,
+                counterfactual_support: 0.5,
+            }],
+            attention_hints: vec![],
+            dream_summary: "test".to_string(),
+            timestamp: 0,
+        };
+
+        hub.share_insight(&insight);
+
+        // Check resonance with matching local themes
+        let resonance = hub.calculate_resonance(&["shared_theme".to_string()]);
+        assert!(resonance > 0.0, "Should have positive resonance with shared theme");
+
+        // Check resonance with non-matching themes
+        let no_resonance = hub.calculate_resonance(&["unrelated".to_string()]);
+        assert!((no_resonance - 0.0).abs() < 1e-9, "Should have zero resonance with unrelated theme");
+
+        // Get resonant themes
+        let themes = hub.get_resonant_themes(0.5);
+        assert!(themes.contains(&"shared_theme".to_string()));
+    }
 }
