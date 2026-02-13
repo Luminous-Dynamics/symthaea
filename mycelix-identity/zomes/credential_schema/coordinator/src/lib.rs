@@ -20,6 +20,15 @@ fn string_to_entry_hash(s: &str) -> EntryHash {
 /// Create a new credential schema
 #[hdk_extern]
 pub fn create_schema(schema: CredentialSchema) -> ExternResult<Record> {
+    // Capability guard: only the claimed author can create schemas
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if schema.author != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the claimed author can create schemas".into()
+        )));
+    }
+
     // Input validation
     if schema.id.is_empty() || schema.id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("Schema ID must be 1-256 characters".into())));
@@ -162,6 +171,15 @@ pub fn update_schema(input: UpdateSchemaInput) -> ExternResult<Record> {
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid schema entry".into())))?;
 
+    // Capability guard: only the schema author can update it
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if current_schema.author != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the schema author can update it".into()
+        )));
+    }
+
     let now = sys_time()?;
 
     let updated_schema = CredentialSchema {
@@ -209,6 +227,15 @@ pub struct UpdateSchemaInput {
 /// Endorse a schema
 #[hdk_extern]
 pub fn endorse_schema(input: EndorseSchemaInput) -> ExternResult<Record> {
+    // Capability guard: only the claimed endorser can create endorsements
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.endorser_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the claimed endorser can create endorsements".into()
+        )));
+    }
+
     // Input validation
     if input.schema_id.is_empty() || input.schema_id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("Schema ID must be 1-256 characters".into())));

@@ -863,6 +863,10 @@ pub fn get_pending_requests(issuer_did: String) -> ExternResult<Vec<Record>> {
 /// Update credential request status
 #[hdk_extern]
 pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<Record> {
+    // Capability guard: only the target issuer can approve/reject requests
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+
     // Find the request
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CredentialRequest)?))
@@ -871,6 +875,11 @@ pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<Re
     for record in query(filter)? {
         if let Some(req) = record.entry().to_app_option::<CredentialRequest>().ok().flatten() {
             if req.id == input.request_id {
+                if req.issuer_did != caller_did {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only the target issuer can update request status".into()
+                    )));
+                }
                 let now = sys_time()?;
                 let updated_req = CredentialRequest {
                     status: input.new_status,
@@ -939,6 +948,15 @@ pub struct IssueCredentialWithProofInput {
 #[hdk_extern]
 pub fn issue_credential_with_proof(input: IssueCredentialWithProofInput) -> ExternResult<Record> {
     let vc = input.credential;
+
+    // Capability guard: only the claimed issuer can submit pre-signed credentials
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if vc.issuer.did() != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the claimed issuer can submit pre-signed credentials".into()
+        )));
+    }
 
     // Validate basic structure
     if !vc.context.iter().any(|c| c.contains("credentials")) {
