@@ -71,6 +71,75 @@ export type {
 } from './civic/index.js';
 
 // ============================================================================
+// Food Sovereignty Integration
+// ============================================================================
+
+export { FoodClient, createFoodClient, FOOD_ZOMES } from './food/index.js';
+
+export type {
+  // Production types
+  PlotStatus,
+  Plot,
+  CropStatus,
+  Crop,
+  QualityGrade,
+  YieldRecord,
+  SeasonPlan,
+  // Distribution types
+  MarketType,
+  OrderStatus,
+  Market as FoodMarket,
+  Listing,
+  Order as FoodOrder,
+  // Preservation types
+  PreservationStatus,
+  StorageType,
+  SkillLevel,
+  PreservationBatch,
+  PreservationMethod,
+  StorageUnit,
+  // Knowledge types
+  PracticeCategory,
+  SeedVariety,
+  TraditionalPractice,
+  Recipe,
+} from './food/index.js';
+
+// ============================================================================
+// Transport/Mobility Integration
+// ============================================================================
+
+export { TransportClient, createTransportClient, TRANSPORT_ZOMES } from './transport/index.js';
+
+export type {
+  // Route types
+  VehicleType,
+  VehicleStatus,
+  Vehicle,
+  RouteMode,
+  Waypoint,
+  Route,
+  StopType,
+  Stop,
+  // Sharing types
+  RideOfferStatus,
+  RideRequestStatus,
+  RideMatchStatus,
+  RideOffer,
+  RideRequest,
+  RideMatch,
+  CargoOffer,
+  // Impact types
+  TripMode,
+  CreditSource,
+  TripLog,
+  CarbonCredit,
+  EmissionsCalcInput,
+  EmissionsCalcResult,
+  CommunityImpactSummary,
+} from './transport/index.js';
+
+// ============================================================================
 // Mail Integration
 // ============================================================================
 

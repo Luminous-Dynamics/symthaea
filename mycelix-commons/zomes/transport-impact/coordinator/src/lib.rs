@@ -215,3 +215,115 @@ pub fn get_community_impact_summary(_: ()) -> ExternResult<CommunityImpactSummar
         total_credits_earned: credits,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn emissions_factor_driving() {
+        assert!((emissions_factor(&TripMode::Driving) - 0.21).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn emissions_factor_cycling_is_zero() {
+        assert_eq!(emissions_factor(&TripMode::Cycling), 0.0);
+    }
+
+    #[test]
+    fn emissions_factor_walking_is_zero() {
+        assert_eq!(emissions_factor(&TripMode::Walking), 0.0);
+    }
+
+    #[test]
+    fn emissions_factor_ev_lower_than_driving() {
+        assert!(emissions_factor(&TripMode::ElectricVehicle) < emissions_factor(&TripMode::Driving));
+    }
+
+    #[test]
+    fn emissions_factor_carpool_lower_than_driving() {
+        assert!(emissions_factor(&TripMode::Carpool) < emissions_factor(&TripMode::Driving));
+    }
+
+    #[test]
+    fn calculate_trip_emissions_cycling() {
+        let trip = TripLog {
+            vehicle_hash: None,
+            route_hash: None,
+            distance_km: 20.0,
+            mode: TripMode::Cycling,
+            passengers: 1,
+            cargo_kg: 0.0,
+            emissions_kg_co2: 0.0,
+            logged_at: 0,
+        };
+        assert_eq!(calculate_trip_emissions(&trip), 0.0);
+    }
+
+    #[test]
+    fn calculate_trip_emissions_solo_driving() {
+        let trip = TripLog {
+            vehicle_hash: None,
+            route_hash: None,
+            distance_km: 100.0,
+            mode: TripMode::Driving,
+            passengers: 1,
+            cargo_kg: 0.0,
+            emissions_kg_co2: 0.0,
+            logged_at: 0,
+        };
+        let emissions = calculate_trip_emissions(&trip);
+        assert!((emissions - 21.0).abs() < 0.01); // 100km * 0.21
+    }
+
+    #[test]
+    fn calculate_trip_emissions_carpool_splits() {
+        let trip = TripLog {
+            vehicle_hash: None,
+            route_hash: None,
+            distance_km: 100.0,
+            mode: TripMode::Carpool,
+            passengers: 4,
+            cargo_kg: 0.0,
+            emissions_kg_co2: 0.0,
+            logged_at: 0,
+        };
+        let emissions = calculate_trip_emissions(&trip);
+        // 100km * 0.07 / 4 passengers = 1.75
+        assert!((emissions - 1.75).abs() < 0.01);
+    }
+
+    #[test]
+    fn calculate_trip_emissions_driving_multi_passenger_splits() {
+        let trip = TripLog {
+            vehicle_hash: None,
+            route_hash: None,
+            distance_km: 100.0,
+            mode: TripMode::Driving,
+            passengers: 2,
+            cargo_kg: 0.0,
+            emissions_kg_co2: 0.0,
+            logged_at: 0,
+        };
+        let emissions = calculate_trip_emissions(&trip);
+        // 100km * 0.21 / 2 = 10.5
+        assert!((emissions - 10.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn calculate_trip_emissions_transit_no_split() {
+        let trip = TripLog {
+            vehicle_hash: None,
+            route_hash: None,
+            distance_km: 50.0,
+            mode: TripMode::Transit,
+            passengers: 3,
+            cargo_kg: 0.0,
+            emissions_kg_co2: 0.0,
+            logged_at: 0,
+        };
+        let emissions = calculate_trip_emissions(&trip);
+        // Transit doesn't split by passengers: 50 * 0.089 = 4.45
+        assert!((emissions - 4.45).abs() < 0.01);
+    }
+}

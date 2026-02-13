@@ -40,13 +40,8 @@ use std::time::Instant;
 // Compile-time safety checks
 // =============================================================================
 
-// Ensure production builds have risc0 feature enabled
-#[cfg(all(not(feature = "risc0"), not(feature = "simulation")))]
-compile_error!(
-    "ZK proof security: Production builds require the 'risc0' feature. \
-     For testing only, use '--features simulation'. \
-     Never deploy without real ZK proofs!"
-);
+// NOTE: This module is only compiled when `simulation` or `risc0` feature is enabled
+// (gated by #[cfg] in zkproof/mod.rs). No compile_error! needed here.
 
 // =============================================================================
 // Simulation Proof Marker

@@ -111,3 +111,137 @@ fn validate_credit(c: CarbonCredit) -> ExternResult<ValidateCallbackResult> {
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+
+    #[test]
+    fn valid_trip_passes() {
+        let t = TripLog {
+            vehicle_hash: None,
+            route_hash: None,
+            distance_km: 15.0,
+            mode: TripMode::Cycling,
+            passengers: 1,
+            cargo_kg: 0.0,
+            emissions_kg_co2: 0.0,
+            logged_at: 1700000000,
+        };
+        assert_eq!(validate_trip(t).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn trip_zero_distance_rejected() {
+        let t = TripLog {
+            vehicle_hash: None,
+            route_hash: None,
+            distance_km: 0.0,
+            mode: TripMode::Walking,
+            passengers: 1,
+            cargo_kg: 0.0,
+            emissions_kg_co2: 0.0,
+            logged_at: 1700000000,
+        };
+        assert!(matches!(validate_trip(t).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn trip_negative_distance_rejected() {
+        let t = TripLog {
+            vehicle_hash: None,
+            route_hash: None,
+            distance_km: -5.0,
+            mode: TripMode::Driving,
+            passengers: 1,
+            cargo_kg: 0.0,
+            emissions_kg_co2: 0.0,
+            logged_at: 1700000000,
+        };
+        assert!(matches!(validate_trip(t).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn trip_negative_emissions_rejected() {
+        let t = TripLog {
+            vehicle_hash: None,
+            route_hash: None,
+            distance_km: 10.0,
+            mode: TripMode::Driving,
+            passengers: 1,
+            cargo_kg: 0.0,
+            emissions_kg_co2: -0.5,
+            logged_at: 1700000000,
+        };
+        assert!(matches!(validate_trip(t).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn all_trip_modes_valid() {
+        for mode in [TripMode::Driving, TripMode::Cycling, TripMode::Walking,
+                      TripMode::Transit, TripMode::Carpool, TripMode::ElectricVehicle] {
+            let t = TripLog {
+                vehicle_hash: None,
+                route_hash: None,
+                distance_km: 10.0,
+                mode,
+                passengers: 1,
+                cargo_kg: 0.0,
+                emissions_kg_co2: 0.0,
+                logged_at: 1700000000,
+            };
+            assert_eq!(validate_trip(t).unwrap(), ValidateCallbackResult::Valid);
+        }
+    }
+
+    #[test]
+    fn valid_credit_passes() {
+        let c = CarbonCredit {
+            holder: fake_agent(),
+            credits_kg_co2: 2.1,
+            earned_from: CreditSource::Cycling,
+            earned_at: 1700000000,
+        };
+        assert_eq!(validate_credit(c).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn credit_zero_rejected() {
+        let c = CarbonCredit {
+            holder: fake_agent(),
+            credits_kg_co2: 0.0,
+            earned_from: CreditSource::Transit,
+            earned_at: 1700000000,
+        };
+        assert!(matches!(validate_credit(c).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn credit_negative_rejected() {
+        let c = CarbonCredit {
+            holder: fake_agent(),
+            credits_kg_co2: -1.0,
+            earned_from: CreditSource::Carpool,
+            earned_at: 1700000000,
+        };
+        assert!(matches!(validate_credit(c).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn all_credit_sources_valid() {
+        for src in [CreditSource::Cycling, CreditSource::Transit, CreditSource::Carpool,
+                     CreditSource::ElectricVehicle, CreditSource::Walking] {
+            let c = CarbonCredit {
+                holder: fake_agent(),
+                credits_kg_co2: 1.0,
+                earned_from: src,
+                earned_at: 1700000000,
+            };
+            assert_eq!(validate_credit(c).unwrap(), ValidateCallbackResult::Valid);
+        }
+    }
+}

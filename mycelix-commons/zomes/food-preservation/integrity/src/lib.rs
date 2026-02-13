@@ -159,3 +159,159 @@ fn validate_storage(s: StorageUnit) -> ExternResult<ValidateCallbackResult> {
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+
+    #[test]
+    fn valid_batch_passes() {
+        let b = PreservationBatch {
+            id: "batch-1".into(),
+            source_crop_hash: None,
+            method: "Lacto-fermentation".into(),
+            quantity_kg: 5.0,
+            started_at: 1700000000,
+            expected_ready: 1701000000,
+            status: BatchStatus::InProgress,
+            notes: None,
+        };
+        assert_eq!(validate_batch(b).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn batch_empty_id_rejected() {
+        let b = PreservationBatch {
+            id: String::new(),
+            source_crop_hash: None,
+            method: "Drying".into(),
+            quantity_kg: 2.0,
+            started_at: 1700000000,
+            expected_ready: 1701000000,
+            status: BatchStatus::InProgress,
+            notes: None,
+        };
+        assert!(matches!(validate_batch(b).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn batch_empty_method_rejected() {
+        let b = PreservationBatch {
+            id: "batch-2".into(),
+            source_crop_hash: None,
+            method: String::new(),
+            quantity_kg: 2.0,
+            started_at: 1700000000,
+            expected_ready: 1701000000,
+            status: BatchStatus::InProgress,
+            notes: None,
+        };
+        assert!(matches!(validate_batch(b).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn batch_zero_quantity_rejected() {
+        let b = PreservationBatch {
+            id: "batch-3".into(),
+            source_crop_hash: None,
+            method: "Canning".into(),
+            quantity_kg: 0.0,
+            started_at: 1700000000,
+            expected_ready: 1701000000,
+            status: BatchStatus::InProgress,
+            notes: None,
+        };
+        assert!(matches!(validate_batch(b).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn valid_method_passes() {
+        let m = PreservationMethod {
+            name: "Water Bath Canning".into(),
+            description: "High-acid food preservation using boiling water".into(),
+            shelf_life_days: 365,
+            equipment_needed: vec!["Canning pot".into(), "Jars".into()],
+            skill_level: SkillLevel::Intermediate,
+        };
+        assert_eq!(validate_method(m).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn method_empty_name_rejected() {
+        let m = PreservationMethod {
+            name: String::new(),
+            description: "Some method".into(),
+            shelf_life_days: 30,
+            equipment_needed: vec![],
+            skill_level: SkillLevel::Beginner,
+        };
+        assert!(matches!(validate_method(m).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn method_empty_description_rejected() {
+        let m = PreservationMethod {
+            name: "Drying".into(),
+            description: String::new(),
+            shelf_life_days: 180,
+            equipment_needed: vec!["Dehydrator".into()],
+            skill_level: SkillLevel::Beginner,
+        };
+        assert!(matches!(validate_method(m).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn valid_storage_passes() {
+        let s = StorageUnit {
+            id: "store-1".into(),
+            name: "Community Root Cellar".into(),
+            capacity_kg: 500.0,
+            storage_type: StorageType::RootCellar,
+            steward: fake_agent(),
+        };
+        assert_eq!(validate_storage(s).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn storage_empty_id_rejected() {
+        let s = StorageUnit {
+            id: String::new(),
+            name: "Cellar".into(),
+            capacity_kg: 100.0,
+            storage_type: StorageType::Cellar,
+            steward: fake_agent(),
+        };
+        assert!(matches!(validate_storage(s).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn storage_zero_capacity_rejected() {
+        let s = StorageUnit {
+            id: "store-2".into(),
+            name: "Tiny Pantry".into(),
+            capacity_kg: 0.0,
+            storage_type: StorageType::Pantry,
+            steward: fake_agent(),
+        };
+        assert!(matches!(validate_storage(s).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn all_storage_types_valid() {
+        for st in [StorageType::RootCellar, StorageType::Cellar, StorageType::Freezer,
+                    StorageType::Dehydrator, StorageType::Fermenter, StorageType::Pantry] {
+            let s = StorageUnit {
+                id: "s".into(),
+                name: "Test".into(),
+                capacity_kg: 10.0,
+                storage_type: st,
+                steward: fake_agent(),
+            };
+            assert_eq!(validate_storage(s).unwrap(), ValidateCallbackResult::Valid);
+        }
+    }
+}

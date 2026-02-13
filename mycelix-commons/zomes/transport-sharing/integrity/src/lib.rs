@@ -177,3 +177,176 @@ fn validate_cargo_offer(c: CargoOffer) -> ExternResult<ValidateCallbackResult> {
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    #[test]
+    fn valid_ride_offer_passes() {
+        let o = RideOffer {
+            vehicle_hash: fake_action_hash(),
+            route_hash: None,
+            driver: fake_agent(),
+            departure_time: 1700000000,
+            seats_available: 3,
+            price_per_seat: 5.0,
+            status: OfferStatus::Open,
+        };
+        assert_eq!(validate_ride_offer(o).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn ride_offer_zero_seats_rejected() {
+        let o = RideOffer {
+            vehicle_hash: fake_action_hash(),
+            route_hash: None,
+            driver: fake_agent(),
+            departure_time: 1700000000,
+            seats_available: 0,
+            price_per_seat: 5.0,
+            status: OfferStatus::Open,
+        };
+        assert!(matches!(validate_ride_offer(o).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn ride_offer_negative_price_rejected() {
+        let o = RideOffer {
+            vehicle_hash: fake_action_hash(),
+            route_hash: None,
+            driver: fake_agent(),
+            departure_time: 1700000000,
+            seats_available: 2,
+            price_per_seat: -1.0,
+            status: OfferStatus::Open,
+        };
+        assert!(matches!(validate_ride_offer(o).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn ride_offer_free_valid() {
+        let o = RideOffer {
+            vehicle_hash: fake_action_hash(),
+            route_hash: Some(fake_action_hash()),
+            driver: fake_agent(),
+            departure_time: 1700000000,
+            seats_available: 4,
+            price_per_seat: 0.0,
+            status: OfferStatus::Open,
+        };
+        assert_eq!(validate_ride_offer(o).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn valid_ride_request_passes() {
+        let r = RideRequest {
+            requester: fake_agent(),
+            origin_lat: 32.95,
+            origin_lon: -96.73,
+            destination_lat: 32.78,
+            destination_lon: -96.80,
+            requested_time: 1700000000,
+            passengers: 2,
+            status: RequestStatus::Open,
+        };
+        assert_eq!(validate_ride_request(r).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn ride_request_zero_passengers_rejected() {
+        let r = RideRequest {
+            requester: fake_agent(),
+            origin_lat: 32.95,
+            origin_lon: -96.73,
+            destination_lat: 32.78,
+            destination_lon: -96.80,
+            requested_time: 1700000000,
+            passengers: 0,
+            status: RequestStatus::Open,
+        };
+        assert!(matches!(validate_ride_request(r).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn ride_request_invalid_origin_lat_rejected() {
+        let r = RideRequest {
+            requester: fake_agent(),
+            origin_lat: -91.0,
+            origin_lon: -96.73,
+            destination_lat: 32.78,
+            destination_lon: -96.80,
+            requested_time: 1700000000,
+            passengers: 1,
+            status: RequestStatus::Open,
+        };
+        assert!(matches!(validate_ride_request(r).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn ride_request_invalid_dest_lon_rejected() {
+        let r = RideRequest {
+            requester: fake_agent(),
+            origin_lat: 32.95,
+            origin_lon: -96.73,
+            destination_lat: 32.78,
+            destination_lon: -181.0,
+            requested_time: 1700000000,
+            passengers: 1,
+            status: RequestStatus::Open,
+        };
+        assert!(matches!(validate_ride_request(r).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn valid_cargo_offer_passes() {
+        let c = CargoOffer {
+            vehicle_hash: fake_action_hash(),
+            origin_lat: 32.95,
+            origin_lon: -96.73,
+            destination_lat: 33.45,
+            destination_lon: -96.50,
+            capacity_kg: 100.0,
+            price_per_kg: 0.50,
+            departure_time: 1700000000,
+        };
+        assert_eq!(validate_cargo_offer(c).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn cargo_zero_capacity_rejected() {
+        let c = CargoOffer {
+            vehicle_hash: fake_action_hash(),
+            origin_lat: 32.95,
+            origin_lon: -96.73,
+            destination_lat: 33.45,
+            destination_lon: -96.50,
+            capacity_kg: 0.0,
+            price_per_kg: 0.50,
+            departure_time: 1700000000,
+        };
+        assert!(matches!(validate_cargo_offer(c).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn cargo_negative_price_rejected() {
+        let c = CargoOffer {
+            vehicle_hash: fake_action_hash(),
+            origin_lat: 32.95,
+            origin_lon: -96.73,
+            destination_lat: 33.45,
+            destination_lon: -96.50,
+            capacity_kg: 50.0,
+            price_per_kg: -0.10,
+            departure_time: 1700000000,
+        };
+        assert!(matches!(validate_cargo_offer(c).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+}

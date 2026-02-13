@@ -27,6 +27,8 @@
 | media | ✅ | 8 | v0 | ✅ Scaffolded |
 | consensus | ⏳ | 1 | v0 | ✅ Scaffolded (native workspace) |
 | music | ⏳ | 8 | v0 | ✅ Scaffolded |
+| food | ⏳ | 4 | v0 | ✅ Scaffolded (Commons cluster) |
+| transport | ⏳ | 3 | v0 | ✅ Scaffolded (Commons cluster) |
 | core | N/A | 6 | - | REST API (not hApp) |
 | desci | N/A | - | - | REST API (not hApp) |
 
@@ -38,11 +40,11 @@ To build hApp bundles:
 ```bash
 cd mycelix-workspace
 nix develop
-./scripts/build-happs.sh           # Build all 8 ready hApps
+./scripts/build-happs.sh           # Build all 10 ready hApps
 ./scripts/build-happs.sh health    # Build specific hApp
 ```
 
-All 8 scaffolded hApps (health, energy, climate, mutualaid, property, media, consensus, music) have:
+All 10 scaffolded hApps (health, energy, climate, mutualaid, property, media, consensus, music, food, transport) have:
 - `happ.yaml` with manifest_version "0" (current Holochain 0.6 format)
 - `dna.yaml` with proper zome references
 - Build script support
@@ -101,6 +103,8 @@ All 8 scaffolded hApps (health, energy, climate, mutualaid, property, media, con
 | **Emergency** | New scaffold | Restored/created recently. |
 | **Water** | New scaffold | Restored/created recently. |
 | **Housing** | New scaffold | Restored/created recently. |
+| **Food** | New scaffold | 4 zomes (production, distribution, preservation, knowledge). Part of Commons cluster. |
+| **Transport** | New scaffold | 3 zomes (routes, sharing, impact). Part of Commons cluster. |
 
 ### Stub / Early Stage
 
@@ -157,11 +161,11 @@ academic, climate, consensus, desci, edunet, energy, epistemic-markets, fabricat
 2. ~~**TS SDK libsodium errors**~~: Fixed. All 6,316 tests pass.
 3. ~~**Core REST API**~~: Implemented 2026-02-04. 4 endpoints: /health, /status, /trust/{id}, /pogq/validate.
 4. ~~**Observatory mock-only**~~: Live conductor connection fully implemented, awaiting conductor.
-5. ~~**hApp scaffolding incomplete**~~: Fixed 2026-02-08. All 8 ready-to-build hApps have v0 manifest format.
-6. **Scope sprawl**: 22 hApps total, 12 with bundles, 8 scaffolded (ready to build), 2 REST APIs.
+5. ~~**hApp scaffolding incomplete**~~: Fixed 2026-02-08. All 10 ready-to-build hApps have v0 manifest format.
+6. **Scope sprawl**: 24 hApps total, 12 with bundles, 10 scaffolded (ready to build), 2 REST APIs.
 7. **SDK-TS bundle size**: 29 integration modules, unclear how many are functional.
 8. **Cross-hApp bridges**: Claimed in architecture docs, not tested in integration.
-9. **WASM builds pending**: 4 hApps (climate, mutualaid, consensus, music) need `nix develop` + WASM compilation.
+9. **WASM builds pending**: 6 hApps (climate, mutualaid, consensus, music, food, transport) need `nix develop` + WASM compilation.
 
 ---
 

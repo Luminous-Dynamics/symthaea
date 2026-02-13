@@ -210,3 +210,167 @@ fn validate_season_plan(sp: SeasonPlan) -> ExternResult<ValidateCallbackResult> 
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn valid_plot() -> Plot {
+        Plot {
+            id: "plot-1".into(),
+            name: "Community Garden".into(),
+            area_sqm: 100.0,
+            soil_type: SoilType::Loam,
+            location_lat: 32.95,
+            location_lon: -96.73,
+            steward: fake_agent(),
+            status: PlotStatus::Active,
+        }
+    }
+
+    #[test]
+    fn valid_plot_passes() {
+        assert_eq!(validate_plot(valid_plot()).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn plot_empty_id_rejected() {
+        let mut p = valid_plot();
+        p.id = String::new();
+        assert!(matches!(validate_plot(p).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn plot_empty_name_rejected() {
+        let mut p = valid_plot();
+        p.name = String::new();
+        assert!(matches!(validate_plot(p).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn plot_zero_area_rejected() {
+        let mut p = valid_plot();
+        p.area_sqm = 0.0;
+        assert!(matches!(validate_plot(p).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn plot_invalid_lat_rejected() {
+        let mut p = valid_plot();
+        p.location_lat = 91.0;
+        assert!(matches!(validate_plot(p).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn plot_invalid_lon_rejected() {
+        let mut p = valid_plot();
+        p.location_lon = -181.0;
+        assert!(matches!(validate_plot(p).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn valid_crop_passes() {
+        let c = Crop {
+            plot_hash: fake_action_hash(),
+            name: "Tomato".into(),
+            variety: "Cherokee Purple".into(),
+            planted_at: 1700000000,
+            expected_harvest: 1708000000,
+            status: CropStatus::Planted,
+        };
+        assert_eq!(validate_crop(c).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn crop_empty_name_rejected() {
+        let c = Crop {
+            plot_hash: fake_action_hash(),
+            name: String::new(),
+            variety: "Cherokee Purple".into(),
+            planted_at: 1700000000,
+            expected_harvest: 1708000000,
+            status: CropStatus::Planted,
+        };
+        assert!(matches!(validate_crop(c).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn crop_empty_variety_rejected() {
+        let c = Crop {
+            plot_hash: fake_action_hash(),
+            name: "Tomato".into(),
+            variety: String::new(),
+            planted_at: 1700000000,
+            expected_harvest: 1708000000,
+            status: CropStatus::Planted,
+        };
+        assert!(matches!(validate_crop(c).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn valid_yield_passes() {
+        let yr = YieldRecord {
+            crop_hash: fake_action_hash(),
+            quantity_kg: 25.5,
+            quality_grade: QualityGrade::Premium,
+            harvested_at: 1708000000,
+            notes: Some("Great harvest".into()),
+        };
+        assert_eq!(validate_yield(yr).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn yield_zero_quantity_rejected() {
+        let yr = YieldRecord {
+            crop_hash: fake_action_hash(),
+            quantity_kg: 0.0,
+            quality_grade: QualityGrade::Standard,
+            harvested_at: 1708000000,
+            notes: None,
+        };
+        assert!(matches!(validate_yield(yr).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn valid_season_plan_passes() {
+        let sp = SeasonPlan {
+            plot_hash: fake_action_hash(),
+            year: 2026,
+            season: "Spring".into(),
+            planned_crops: vec!["Tomato".into(), "Basil".into()],
+            rotation_notes: None,
+        };
+        assert_eq!(validate_season_plan(sp).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn season_plan_empty_season_rejected() {
+        let sp = SeasonPlan {
+            plot_hash: fake_action_hash(),
+            year: 2026,
+            season: String::new(),
+            planned_crops: vec!["Tomato".into()],
+            rotation_notes: None,
+        };
+        assert!(matches!(validate_season_plan(sp).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn season_plan_no_crops_rejected() {
+        let sp = SeasonPlan {
+            plot_hash: fake_action_hash(),
+            year: 2026,
+            season: "Spring".into(),
+            planned_crops: vec![],
+            rotation_notes: None,
+        };
+        assert!(matches!(validate_season_plan(sp).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+}

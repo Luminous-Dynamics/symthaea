@@ -44,11 +44,11 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Full roadmap**: @THE_SUBSTRATE_ROADMAP.md (load when needed)
 
 ### Mycelix Cluster Architecture
-8 domain hApps consolidated into 2 cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
+10 domain hApps consolidated into 2 cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
 
 | Cluster | Path | Domains | Zomes |
 |---------|------|---------|-------|
-| **mycelix-commons** | `mycelix-commons/` | property, housing, care, mutualaid, water | 29 (28 domain + 1 bridge) |
+| **mycelix-commons** | `mycelix-commons/` | property, housing, care, mutualaid, water, food, transport | 35 (34 domain + 1 bridge) |
 | **mycelix-civic** | `mycelix-civic/` | justice, emergency, media | 16 (15 domain + 1 bridge) |
 
 - **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster)

@@ -144,3 +144,185 @@ fn validate_recipe(r: Recipe) -> ExternResult<ValidateCallbackResult> {
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn valid_seed_passes() {
+        let s = SeedVariety {
+            name: "Cherokee Purple".into(),
+            species: "Solanum lycopersicum".into(),
+            origin: Some("Tennessee".into()),
+            days_to_maturity: 80,
+            companion_plants: vec!["Basil".into(), "Marigold".into()],
+            avoid_plants: vec!["Fennel".into()],
+            seed_saving_notes: Some("Open-pollinated, save from ripe fruit".into()),
+        };
+        assert_eq!(validate_seed(s).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn seed_empty_name_rejected() {
+        let s = SeedVariety {
+            name: String::new(),
+            species: "Solanum lycopersicum".into(),
+            origin: None,
+            days_to_maturity: 80,
+            companion_plants: vec![],
+            avoid_plants: vec![],
+            seed_saving_notes: None,
+        };
+        assert!(matches!(validate_seed(s).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn seed_empty_species_rejected() {
+        let s = SeedVariety {
+            name: "Tomato".into(),
+            species: String::new(),
+            origin: None,
+            days_to_maturity: 80,
+            companion_plants: vec![],
+            avoid_plants: vec![],
+            seed_saving_notes: None,
+        };
+        assert!(matches!(validate_seed(s).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn seed_zero_maturity_rejected() {
+        let s = SeedVariety {
+            name: "Tomato".into(),
+            species: "Solanum lycopersicum".into(),
+            origin: None,
+            days_to_maturity: 0,
+            companion_plants: vec![],
+            avoid_plants: vec![],
+            seed_saving_notes: None,
+        };
+        assert!(matches!(validate_seed(s).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn valid_practice_passes() {
+        let p = TraditionalPractice {
+            name: "Three Sisters Planting".into(),
+            description: "Corn, beans, and squash planted together".into(),
+            region: Some("Haudenosaunee territory".into()),
+            season: Some("Spring".into()),
+            category: PracticeCategory::Planting,
+        };
+        assert_eq!(validate_practice(p).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn practice_empty_name_rejected() {
+        let p = TraditionalPractice {
+            name: String::new(),
+            description: "A practice".into(),
+            region: None,
+            season: None,
+            category: PracticeCategory::Soil,
+        };
+        assert!(matches!(validate_practice(p).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn practice_empty_description_rejected() {
+        let p = TraditionalPractice {
+            name: "Mulching".into(),
+            description: String::new(),
+            region: None,
+            season: None,
+            category: PracticeCategory::Soil,
+        };
+        assert!(matches!(validate_practice(p).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn all_practice_categories_valid() {
+        for cat in [PracticeCategory::Planting, PracticeCategory::Harvest,
+                     PracticeCategory::Soil, PracticeCategory::Pest, PracticeCategory::Water] {
+            let p = TraditionalPractice {
+                name: "Test".into(),
+                description: "Test desc".into(),
+                region: None,
+                season: None,
+                category: cat,
+            };
+            assert_eq!(validate_practice(p).unwrap(), ValidateCallbackResult::Valid);
+        }
+    }
+
+    #[test]
+    fn valid_recipe_passes() {
+        let r = Recipe {
+            name: "Tomato Sauce".into(),
+            ingredients: vec!["Tomatoes".into(), "Garlic".into(), "Basil".into()],
+            instructions: "Blend tomatoes, simmer with garlic and basil for 30 min".into(),
+            servings: 4,
+            prep_time_min: 45,
+            tags: vec!["sauce".into(), "preserving".into()],
+            source_attribution: Some("Community cookbook".into()),
+        };
+        assert_eq!(validate_recipe(r).unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn recipe_empty_name_rejected() {
+        let r = Recipe {
+            name: String::new(),
+            ingredients: vec!["Flour".into()],
+            instructions: "Mix".into(),
+            servings: 1,
+            prep_time_min: 5,
+            tags: vec![],
+            source_attribution: None,
+        };
+        assert!(matches!(validate_recipe(r).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn recipe_no_ingredients_rejected() {
+        let r = Recipe {
+            name: "Empty Dish".into(),
+            ingredients: vec![],
+            instructions: "Do nothing".into(),
+            servings: 1,
+            prep_time_min: 0,
+            tags: vec![],
+            source_attribution: None,
+        };
+        assert!(matches!(validate_recipe(r).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn recipe_empty_instructions_rejected() {
+        let r = Recipe {
+            name: "Mystery".into(),
+            ingredients: vec!["Something".into()],
+            instructions: String::new(),
+            servings: 1,
+            prep_time_min: 0,
+            tags: vec![],
+            source_attribution: None,
+        };
+        assert!(matches!(validate_recipe(r).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn recipe_zero_servings_rejected() {
+        let r = Recipe {
+            name: "Zero Serve".into(),
+            ingredients: vec!["Flour".into()],
+            instructions: "Make something".into(),
+            servings: 0,
+            prep_time_min: 10,
+            tags: vec![],
+            source_attribution: None,
+        };
+        assert!(matches!(validate_recipe(r).unwrap(), ValidateCallbackResult::Invalid(_)));
+    }
+}

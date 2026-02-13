@@ -1,7 +1,7 @@
 ---
 # Mycelix Commons DNA
-# Universal Resource Coordination: property + housing + care + mutualaid + water
-# 34 domain zomes + 1 unified bridge = 35 zomes
+# Universal Resource Coordination: property + housing + care + mutualaid + water + food + transport
+# 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food + 3 transport = 34 domain + 1 bridge = 35 coordinator zomes
 
 manifest_version: "0"
 name: mycelix_commons

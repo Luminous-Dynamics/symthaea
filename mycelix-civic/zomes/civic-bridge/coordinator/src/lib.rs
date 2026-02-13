@@ -304,6 +304,17 @@ pub fn get_events_by_type(query: EventTypeQuery) -> ExternResult<Vec<Record>> {
     bridge::records_from_links(links)
 }
 
+/// Get all queries for a specific domain
+#[hdk_extern]
+pub fn get_domain_queries(domain: String) -> ExternResult<Vec<Record>> {
+    let domain_anchor = anchor_hash(&format!("domain_queries:{}", domain))?;
+    let links = get_links(
+        LinkQuery::try_new(domain_anchor, LinkTypes::DomainToQuery)?,
+        GetStrategy::default(),
+    )?;
+    bridge::records_from_links(links)
+}
+
 /// Get my queries
 #[hdk_extern]
 pub fn get_my_queries(_: ()) -> ExternResult<Vec<Record>> {
