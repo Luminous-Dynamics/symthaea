@@ -372,4 +372,51 @@ mod tests {
         assert_eq!(decoded.algorithm, AlgorithmId::MlDsa65);
         assert_eq!(decoded.key_bytes.len(), 1952);
     }
+
+    #[test]
+    fn encrypted_envelope_json_roundtrip() {
+        let envelope = EncryptedEnvelope {
+            kem_algorithm: AlgorithmId::MlKem768,
+            encapsulated_key: vec![0xAA; 1088],
+            nonce: vec![0xBB; 24],
+            ciphertext: vec![0xCC; 256],
+            recipient_key_id: "#kem-1".to_string(),
+        };
+
+        // Serialize to JSON
+        let json = serde_json::to_string(&envelope).unwrap();
+
+        // Verify field names are camelCase (serde default for snake_case fields)
+        assert!(json.contains("kem_algorithm"), "JSON should contain kem_algorithm field");
+        assert!(json.contains("encapsulated_key"), "JSON should contain encapsulated_key field");
+        assert!(json.contains("recipient_key_id"), "JSON should contain recipient_key_id field");
+
+        // Deserialize back
+        let decoded: EncryptedEnvelope = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.kem_algorithm, AlgorithmId::MlKem768);
+        assert_eq!(decoded.encapsulated_key.len(), 1088);
+        assert_eq!(decoded.nonce.len(), 24);
+        assert_eq!(decoded.ciphertext.len(), 256);
+        assert_eq!(decoded.recipient_key_id, "#kem-1");
+    }
+
+    #[test]
+    fn encrypted_envelope_field_stability() {
+        // Simulate receiving a JSON envelope from an external source
+        // This catches field name drift if serde attributes are added/changed
+        let external_json = r##"{
+            "kem_algorithm": "MlKem768",
+            "encapsulated_key": [170, 170, 170],
+            "nonce": [187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187, 187],
+            "ciphertext": [204, 204],
+            "recipient_key_id": "#kem-2"
+        }"##;
+
+        let decoded: EncryptedEnvelope = serde_json::from_str(external_json).unwrap();
+        assert_eq!(decoded.kem_algorithm, AlgorithmId::MlKem768);
+        assert_eq!(decoded.encapsulated_key, vec![0xAA; 3]);
+        assert_eq!(decoded.nonce.len(), 24);
+        assert_eq!(decoded.ciphertext, vec![0xCC; 2]);
+        assert_eq!(decoded.recipient_key_id, "#kem-2");
+    }
 }

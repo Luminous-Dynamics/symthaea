@@ -337,16 +337,34 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
-            LinkTypes::IssuerToCredential => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SubjectToCredential => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::HolderToPresentation => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::CredentialToDerived => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SchemaToCredential => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::IssuerToRequest => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::RequesterToRequest => Ok(ValidateCallbackResult::Valid),
-        },
-        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            if tag.0.len() > 1024 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Link tag exceeds maximum length of 1024 bytes".into(),
+                ));
+            }
+            match link_type {
+                LinkTypes::IssuerToCredential => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::SubjectToCredential => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::HolderToPresentation => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::CredentialToDerived => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::SchemaToCredential => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::IssuerToRequest => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::RequesterToRequest => Ok(ValidateCallbackResult::Valid),
+            }
+        }
+        FlatOp::RegisterDeleteLink {
+            original_action,
+            action,
+            ..
+        } => {
+            if action.author != original_action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the link creator can delete their links".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),

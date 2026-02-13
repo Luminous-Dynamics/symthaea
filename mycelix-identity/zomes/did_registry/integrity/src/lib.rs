@@ -119,7 +119,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             }
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => {
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            // Validate tag length to prevent spam/DoS
+            if tag.0.len() > 1024 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Link tag exceeds maximum length of 1024 bytes".into(),
+                ));
+            }
             match link_type {
                 LinkTypes::AgentToDid => Ok(ValidateCallbackResult::Valid),
                 LinkTypes::DidToVerificationMethod => Ok(ValidateCallbackResult::Valid),
@@ -128,8 +134,17 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 LinkTypes::DidToDeactivation => Ok(ValidateCallbackResult::Valid),
             }
         }
-        FlatOp::RegisterDeleteLink { .. } => {
-            // Links can be deleted
+        FlatOp::RegisterDeleteLink {
+            original_action,
+            action,
+            ..
+        } => {
+            // Only the original link creator can delete their links
+            if action.author != original_action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the link creator can delete their links".into(),
+                ));
+            }
             Ok(ValidateCallbackResult::Valid)
         }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),

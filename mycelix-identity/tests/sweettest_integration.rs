@@ -485,6 +485,122 @@ pub struct CredentialStatusResponse {
     pub checked_at: Timestamp,
 }
 
+/// Mirror of trust_credential coordinator::RevokeCredentialInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RevokeCredentialInput {
+    pub credential_id: String,
+    pub subject_did: String,
+    pub reason: String,
+}
+
+/// Mirror of trust_credential coordinator::CreatePresentationInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CreatePresentationInput {
+    pub credential_id: String,
+    pub subject_did: String,
+    pub disclosed_tier: TrustTier,
+    pub disclose_range: bool,
+    pub trust_range: TrustScoreRange,
+    pub presentation_proof: Vec<u8>,
+    pub verifier_did: Option<String>,
+    pub purpose: String,
+}
+
+/// Mirror of trust_credential coordinator::DeclineAttestationInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct DeclineAttestationInput {
+    pub request_id: String,
+    pub subject_did: String,
+}
+
+/// Mirror of trust_credential_integrity::TrustPresentation
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TrustPresentation {
+    pub id: String,
+    pub credential_id: String,
+    pub subject_did: String,
+    pub disclosed_tier: TrustTier,
+    pub disclosed_range: Option<TrustScoreRange>,
+    pub presentation_proof: Vec<u8>,
+    pub verifier_did: Option<String>,
+    pub purpose: String,
+    pub presented_at: Timestamp,
+    pub nonce: Vec<u8>,
+}
+
+/// Mirror of education coordinator::StartLegacyImportInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct StartLegacyImportInput {
+    pub institution_did: String,
+    pub source_system: String,
+    pub source_hash: Vec<u8>,
+    pub total_credentials: u32,
+}
+
+/// Mirror of education coordinator::ImportCredentialFromCsvInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ImportCredentialFromCsvInput {
+    pub batch_id: String,
+    pub row_number: u32,
+    pub student_id: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub degree_name: String,
+    pub major: String,
+    pub conferral_date: String,
+    pub gpa: Option<f32>,
+    pub honors: Option<Vec<String>>,
+}
+
+/// Mirror of education coordinator::ImportCredentialResult
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ImportCredentialResult {
+    pub row_number: u32,
+    pub success: bool,
+    pub credential_id: Option<String>,
+    pub action_hash: Option<ActionHash>,
+    pub error: Option<ImportError>,
+}
+
+/// Mirror of education_integrity::ImportError
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ImportError {
+    pub row: u32,
+    pub field: String,
+    pub message: String,
+    pub code: String,
+}
+
+/// Mirror of education_integrity::RevocationReason
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum RevocationReason {
+    AcademicFraud,
+    DegreeRescinded,
+    IssuedInError,
+    HolderRequest,
+    CourtOrder,
+    InstitutionChange,
+    Other,
+}
+
+/// Mirror of education coordinator::RequestRevocationInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RequestRevocationInput {
+    pub credential_id: String,
+    pub reason: RevocationReason,
+    pub explanation: String,
+    pub evidence: Option<Vec<String>>,
+}
+
+/// Mirror of education coordinator::VerifyCommitmentInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct VerifyCommitmentInput {
+    pub credential_id: String,
+    pub subject_id: String,
+    pub nonce: Vec<u8>,
+    pub expected_commitment: Vec<u8>,
+}
+
 // ============================================================================
 // Test Utilities
 // ============================================================================
@@ -2134,6 +2250,338 @@ mod trust_attestation_tests {
             "Fulfilled request should no longer be pending"
         );
     }
+
+    /// Issue a trust credential, then revoke it and verify revocation shows in verification
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_revoke_trust_credential() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-trust-revoke", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+        let agent_did = did_doc.id.clone();
+
+        // Issue trust credential
+        let issue_input = IssueTrustCredentialInput {
+            subject_did: agent_did.clone(),
+            issuer_did: agent_did.clone(),
+            kvector_commitment: vec![42u8; 32],
+            range_proof: vec![1, 2, 3],
+            trust_score_lower: 0.5,
+            trust_score_upper: 0.7,
+            expires_at: None,
+            supersedes: None,
+        };
+
+        let cred_record: Record = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "issue_trust_credential",
+                issue_input,
+            )
+            .await;
+
+        let cred: TrustCredential =
+            decode_entry(&cred_record).expect("decode trust credential");
+        assert!(!cred.revoked, "New credential should not be revoked");
+
+        // Revoke it
+        let revoke_input = RevokeCredentialInput {
+            credential_id: cred.id.clone(),
+            subject_did: agent_did.clone(),
+            reason: "Compromised attestation data".to_string(),
+        };
+
+        let revoked_record: Record = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "revoke_credential",
+                revoke_input,
+            )
+            .await;
+
+        let revoked_cred: TrustCredential =
+            decode_entry(&revoked_record).expect("decode revoked credential");
+        assert!(revoked_cred.revoked, "Credential should be revoked");
+        assert_eq!(
+            revoked_cred.revocation_reason.as_deref(),
+            Some("Compromised attestation data"),
+            "Revocation reason should match"
+        );
+
+        // Verify — should report not_revoked = false
+        let verify_result: TrustVerificationResult = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "verify_credential",
+                cred.id.clone(),
+            )
+            .await;
+
+        assert!(
+            !verify_result.not_revoked,
+            "Verification should report credential as revoked"
+        );
+    }
+
+    /// Issue credential → create selective disclosure presentation
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_create_trust_presentation() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("test-trust-presentation", &[dna])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+        let agent_did = did_doc.id.clone();
+
+        // Issue trust credential
+        let issue_input = IssueTrustCredentialInput {
+            subject_did: agent_did.clone(),
+            issuer_did: agent_did.clone(),
+            kvector_commitment: vec![42u8; 32],
+            range_proof: vec![1, 2, 3],
+            trust_score_lower: 0.6,
+            trust_score_upper: 0.8,
+            expires_at: None,
+            supersedes: None,
+        };
+
+        let cred_record: Record = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "issue_trust_credential",
+                issue_input,
+            )
+            .await;
+
+        let cred: TrustCredential =
+            decode_entry(&cred_record).expect("decode trust credential");
+
+        // Create presentation (disclose tier only, not range)
+        let present_input = CreatePresentationInput {
+            credential_id: cred.id.clone(),
+            subject_did: agent_did.clone(),
+            disclosed_tier: TrustTier::Elevated,
+            disclose_range: false,
+            trust_range: TrustScoreRange {
+                lower: 0.6,
+                upper: 0.8,
+            },
+            presentation_proof: vec![10, 20, 30],
+            verifier_did: Some("did:mycelix:verifier-123".to_string()),
+            purpose: "Access control check".to_string(),
+        };
+
+        let presentation_record: Record = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "create_presentation",
+                present_input,
+            )
+            .await;
+
+        let pres: TrustPresentation =
+            decode_entry(&presentation_record).expect("decode presentation");
+
+        assert_eq!(pres.credential_id, cred.id, "Presentation should reference credential");
+        assert_eq!(pres.disclosed_tier, TrustTier::Elevated, "Disclosed tier should match");
+        assert_eq!(
+            pres.verifier_did.as_deref(),
+            Some("did:mycelix:verifier-123"),
+            "Verifier DID should be set"
+        );
+        assert_eq!(pres.purpose, "Access control check");
+    }
+
+    /// Request attestation → decline it → verify status is Declined
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_decline_attestation_request() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("test-decline-attestation", &[dna])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+
+        let now = Timestamp::now();
+        let subject_did = format!("did:mycelix:decline-subject-{}", now.as_micros());
+        let one_hour = Timestamp::from_micros(now.as_micros() + 3_600_000_000);
+
+        // Request attestation
+        let request_input = RequestAttestationInput {
+            requester_did: did_doc.id.clone(),
+            subject_did: subject_did.clone(),
+            components: vec![KVectorComponent::Reputation],
+            min_trust_score: Some(0.3),
+            min_tier: None,
+            purpose: "Test decline".to_string(),
+            expires_at: one_hour,
+        };
+
+        let request_record: Record = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "request_attestation",
+                request_input,
+            )
+            .await;
+
+        let request: AttestationRequest =
+            decode_entry(&request_record).expect("decode request");
+        assert_eq!(request.status, AttestationStatus::Pending);
+
+        // Decline it
+        let decline_input = DeclineAttestationInput {
+            request_id: request.id.clone(),
+            subject_did: subject_did.clone(),
+        };
+
+        let declined_record: Record = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "decline_attestation",
+                decline_input,
+            )
+            .await;
+
+        let declined: AttestationRequest =
+            decode_entry(&declined_record).expect("decode declined request");
+
+        assert_eq!(
+            declined.status,
+            AttestationStatus::Declined,
+            "Request status should be Declined"
+        );
+    }
+
+    /// Issue multiple credentials and query by subject and by tier
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_query_credentials_by_subject_and_tier() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("test-trust-queries", &[dna])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+        let agent_did = did_doc.id.clone();
+
+        let now = Timestamp::now();
+        let subject_did = format!("did:mycelix:query-subject-{}", now.as_micros());
+
+        // Issue credential #1 (Elevated tier: 0.6-0.7)
+        let issue1 = IssueTrustCredentialInput {
+            subject_did: subject_did.clone(),
+            issuer_did: agent_did.clone(),
+            kvector_commitment: vec![1u8; 32],
+            range_proof: vec![1, 2, 3],
+            trust_score_lower: 0.6,
+            trust_score_upper: 0.7,
+            expires_at: None,
+            supersedes: None,
+        };
+
+        let _: Record = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "issue_trust_credential",
+                issue1,
+            )
+            .await;
+
+        // Issue credential #2 (Guardian tier: 0.8-0.9)
+        let issue2 = IssueTrustCredentialInput {
+            subject_did: subject_did.clone(),
+            issuer_did: agent_did.clone(),
+            kvector_commitment: vec![2u8; 32],
+            range_proof: vec![4, 5, 6],
+            trust_score_lower: 0.8,
+            trust_score_upper: 0.9,
+            expires_at: None,
+            supersedes: None,
+        };
+
+        let _: Record = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "issue_trust_credential",
+                issue2,
+            )
+            .await;
+
+        // Query by subject
+        let by_subject: Vec<Record> = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "get_subject_credentials",
+                subject_did.clone(),
+            )
+            .await;
+
+        assert!(
+            by_subject.len() >= 2,
+            "Should find at least 2 credentials for subject, got {}",
+            by_subject.len()
+        );
+
+        // Query by tier (Elevated)
+        let by_tier: Vec<Record> = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "get_credentials_by_tier",
+                TrustTier::Elevated,
+            )
+            .await;
+
+        assert!(
+            !by_tier.is_empty(),
+            "Should find at least one Elevated credential"
+        );
+
+        // Query by tier (Guardian)
+        let by_guardian: Vec<Record> = conductor
+            .call(
+                &cell.zome("trust_credential"),
+                "get_credentials_by_tier",
+                TrustTier::Guardian,
+            )
+            .await;
+
+        assert!(
+            !by_guardian.is_empty(),
+            "Should find at least one Guardian credential"
+        );
+    }
 }
 
 // ============================================================================
@@ -2486,6 +2934,78 @@ mod social_recovery_tests {
         assert!(
             missing.is_none(),
             "Non-existent request ID should return None"
+        );
+    }
+
+    /// Execute recovery on a Pending (non-approved) request should fail
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_execute_recovery_rejects_non_approved() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("test-recovery-reject", &[dna])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create owner DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+        let owner_did = did_doc.id.clone();
+
+        let now = Timestamp::now();
+        let trustee1 = format!("did:mycelix:trustee-reject-1-{}", now.as_micros());
+        let trustee2 = format!("did:mycelix:trustee-reject-2-{}", now.as_micros());
+        let trustee3 = format!("did:mycelix:trustee-reject-3-{}", now.as_micros());
+
+        // Setup recovery
+        let setup_input = SetupRecoveryInput {
+            did: owner_did.clone(),
+            trustees: vec![trustee1.clone(), trustee2.clone(), trustee3.clone()],
+            threshold: 2,
+            time_lock: Some(0), // No time lock for test simplicity
+        };
+
+        let _: Record = conductor
+            .call(&cell.zome("recovery"), "setup_recovery", setup_input)
+            .await;
+
+        // Initiate recovery (creates a Pending request)
+        let new_agent = app.agent().clone();
+        let initiate_input = InitiateRecoveryInput {
+            did: owner_did.clone(),
+            initiator_did: trustee1.clone(),
+            new_agent: new_agent.clone(),
+            reason: "Testing premature execution".to_string(),
+        };
+
+        let request_record: Record = conductor
+            .call(
+                &cell.zome("recovery"),
+                "initiate_recovery",
+                initiate_input,
+            )
+            .await;
+
+        let request: RecoveryRequest =
+            decode_entry(&request_record).expect("decode request");
+        assert_eq!(request.status, RecoveryStatus::Pending);
+
+        // Try to execute without sufficient votes — should fail
+        let result: Result<Record, _> = conductor
+            .call_fallible(
+                &cell.zome("recovery"),
+                "execute_recovery",
+                request.id.clone(),
+            )
+            .await;
+
+        assert!(
+            result.is_err(),
+            "execute_recovery should reject a Pending (non-approved) request"
         );
     }
 }
@@ -3674,4 +4194,411 @@ mod education_tests {
             "Should find at least one credential for subject"
         );
     }
+
+    /// Start a legacy import batch and import a CSV credential row
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_legacy_csv_import() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("test-csv-import", &[dna])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create DID for the institution
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+        let institution_did = did_doc.id.clone();
+
+        // Start legacy import batch
+        let start_input = StartLegacyImportInput {
+            institution_did: institution_did.clone(),
+            source_system: "legacy-sis-v3".to_string(),
+            source_hash: vec![0xAA; 32],
+            total_credentials: 3,
+        };
+
+        let batch_id: String = conductor
+            .call(&cell.zome("education"), "start_legacy_import", start_input)
+            .await;
+
+        assert!(
+            !batch_id.is_empty(),
+            "Batch ID should be non-empty"
+        );
+
+        // Import a single credential row
+        let csv_input = ImportCredentialFromCsvInput {
+            batch_id: batch_id.clone(),
+            row_number: 1,
+            student_id: "STU-CSV-001".to_string(),
+            first_name: "Alice".to_string(),
+            last_name: "Johnson".to_string(),
+            degree_name: "Bachelor of Science".to_string(),
+            major: "Computer Science".to_string(),
+            conferral_date: "2026-05-15".to_string(),
+            gpa: Some(3.85),
+            honors: Some(vec!["Magna Cum Laude".to_string()]),
+        };
+
+        let import_result: ImportCredentialResult = conductor
+            .call(
+                &cell.zome("education"),
+                "import_credential_from_csv",
+                csv_input,
+            )
+            .await;
+
+        assert_eq!(import_result.row_number, 1, "Row number should match");
+        assert!(import_result.success, "Import should succeed");
+        assert!(
+            import_result.credential_id.is_some(),
+            "Should have a credential ID"
+        );
+        assert!(
+            import_result.action_hash.is_some(),
+            "Should have an action hash"
+        );
+    }
+
+    /// Request revocation of an academic credential
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_request_academic_revocation() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("test-edu-revocation", &[dna])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create DID and issue academic credential
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+        let institution_did = did_doc.id.clone();
+
+        let now = Timestamp::now();
+        let student_did = format!("did:mycelix:revoke-student-{}", now.as_micros());
+
+        let input = CreateAcademicCredentialInput {
+            issuer: test_issuer(&institution_did),
+            subject: AcademicSubject {
+                id: student_did.clone(),
+                name: Some("Bob Revokee".to_string()),
+                name_hash: None,
+                birth_date: None,
+                student_id: Some("STU-REVOKE-001".to_string()),
+            },
+            achievement: AchievementMetadata {
+                degree_type: DegreeType::Bachelor,
+                degree_name: "Bachelor of Arts".to_string(),
+                field_of_study: "History".to_string(),
+                minors: None,
+                conferral_date: "2026-01-15".to_string(),
+                gpa: Some(2.8),
+                honors: None,
+                cip_code: None,
+                credits_earned: Some(120),
+            },
+            dns_did: test_dns_did(&institution_did),
+            revocation_registry_id: "rev-registry-revoke-001".to_string(),
+            valid_from: "2026-01-15T00:00:00Z".to_string(),
+            valid_until: None,
+            proof: test_proof(&institution_did),
+        };
+
+        let output: CreateAcademicCredentialOutput = conductor
+            .call(
+                &cell.zome("education"),
+                "create_academic_credential",
+                input,
+            )
+            .await;
+
+        // Request revocation
+        let revoke_input = RequestRevocationInput {
+            credential_id: output.credential_id.clone(),
+            reason: RevocationReason::AcademicFraud,
+            explanation: "Plagiarism discovered in thesis".to_string(),
+            evidence: Some(vec![
+                "Turnitin report #12345".to_string(),
+                "Faculty committee finding 2026-01-20".to_string(),
+            ]),
+        };
+
+        let revocation_hash: ActionHash = conductor
+            .call(
+                &cell.zome("education"),
+                "request_academic_revocation",
+                revoke_input,
+            )
+            .await;
+
+        // Verify we got a valid action hash back
+        assert!(
+            !revocation_hash.get_raw_39().is_empty(),
+            "Should return a valid action hash for the revocation request"
+        );
+    }
+
+    /// Verify ZK commitment for an academic credential
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_verify_zk_commitment() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("test-edu-zk", &[dna])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create DID and issue credential
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+        let institution_did = did_doc.id.clone();
+
+        let now = Timestamp::now();
+        let student_did = format!("did:mycelix:zk-student-{}", now.as_micros());
+
+        let input = CreateAcademicCredentialInput {
+            issuer: test_issuer(&institution_did),
+            subject: AcademicSubject {
+                id: student_did.clone(),
+                name: Some("Charlie ZK".to_string()),
+                name_hash: None,
+                birth_date: None,
+                student_id: Some("STU-ZK-001".to_string()),
+            },
+            achievement: AchievementMetadata {
+                degree_type: DegreeType::Master,
+                degree_name: "Master of Science".to_string(),
+                field_of_study: "Cryptography".to_string(),
+                minors: None,
+                conferral_date: "2026-05-01".to_string(),
+                gpa: Some(3.9),
+                honors: Some(vec!["With Honors".to_string()]),
+                cip_code: Some("11.0401".to_string()),
+                credits_earned: Some(36),
+            },
+            dns_did: test_dns_did(&institution_did),
+            revocation_registry_id: "rev-registry-zk-001".to_string(),
+            valid_from: "2026-05-01T00:00:00Z".to_string(),
+            valid_until: None,
+            proof: test_proof(&institution_did),
+        };
+
+        let output: CreateAcademicCredentialOutput = conductor
+            .call(
+                &cell.zome("education"),
+                "create_academic_credential",
+                input,
+            )
+            .await;
+
+        // Verify ZK commitment with a test nonce and expected commitment
+        let verify_input = VerifyCommitmentInput {
+            credential_id: output.credential_id.clone(),
+            subject_id: student_did.clone(),
+            nonce: vec![0xDE, 0xAD, 0xBE, 0xEF],
+            expected_commitment: vec![0u8; 32], // Intentionally wrong commitment
+        };
+
+        let result: bool = conductor
+            .call(
+                &cell.zome("education"),
+                "verify_zk_commitment",
+                verify_input,
+            )
+            .await;
+
+        // With a wrong expected_commitment, verification should return false
+        assert!(
+            !result,
+            "ZK commitment verification with wrong expected value should return false"
+        );
+    }
+
+    /// Record a DNS-DID verification result
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_record_dns_did_verification() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("test-edu-dns", &[dna])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+
+        // Mirror of the input type (using local DnssecStatus)
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct RecordDnsDidVerificationInput {
+            pub domain: String,
+            pub expected_did: String,
+            pub dnssec_status: DnssecStatus,
+            pub resolved_did: Option<String>,
+        }
+
+        #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+        struct VerifyDnsDidResult {
+            pub verified: bool,
+            pub dnssec_status: DnssecStatus,
+            pub resolved_did: Option<String>,
+            pub verification_record: DnsVerificationRecord,
+            pub error: Option<String>,
+        }
+
+        let input = RecordDnsDidVerificationInput {
+            domain: "mit.edu".to_string(),
+            expected_did: did_doc.id.clone(),
+            dnssec_status: DnssecStatus::Validated,
+            resolved_did: Some(did_doc.id.clone()),
+        };
+
+        let result: VerifyDnsDidResult = conductor
+            .call(
+                &cell.zome("education"),
+                "record_dns_did_verification",
+                input,
+            )
+            .await;
+
+        assert!(
+            result.verified,
+            "DNS-DID verification with matching DID should succeed"
+        );
+        assert_eq!(
+            result.dnssec_status,
+            DnssecStatus::Validated,
+            "DNSSEC status should be Validated"
+        );
+        assert_eq!(
+            result.resolved_did.as_deref(),
+            Some(did_doc.id.as_str()),
+            "Resolved DID should match expected"
+        );
+    }
+}
+
+// ============================================================================
+// Cross-Zome Error Propagation Tests
+// ============================================================================
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+async fn test_bridge_cross_zome_resolve_nonexistent_did() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor
+        .setup_app("test-bridge-error", &[dna])
+        .await
+        .unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Ask bridge to get identity summary for a DID that doesn't exist
+    // The bridge coordinator calls did_registry::resolve_did internally;
+    // when the DID doesn't exist, the bridge should return None gracefully.
+
+    /// Mirror of bridge coordinator::IdentitySummary
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    struct IdentitySummary {
+        pub did: String,
+        pub is_active: bool,
+        pub verification_method_count: u32,
+        pub service_count: u32,
+        pub credential_count: u32,
+        pub mfa_summary: Option<serde_json::Value>,
+    }
+
+    let result: Option<IdentitySummary> = conductor
+        .call(
+            &cell.zome("identity_bridge"),
+            "get_identity_summary",
+            "did:mycelix:nonexistent-did-12345".to_string(),
+        )
+        .await;
+
+    assert!(
+        result.is_none(),
+        "Bridge should return None for a non-existent DID rather than propagating an error"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+async fn test_bridge_did_deactivation_propagates_to_events() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna = load_dna().await;
+    let app = conductor
+        .setup_app("test-bridge-deactivation", &[dna])
+        .await
+        .unwrap();
+    let cell = app.cells()[0].clone();
+
+    // Create a DID and deactivate it
+    let did_record: Record = conductor
+        .call(&cell.zome("did_registry"), "create_did", ())
+        .await;
+    let did_doc: DidDocument = decode_entry(&did_record).expect("decode DID");
+
+    // Deactivate the DID
+    let _: Record = conductor
+        .call(
+            &cell.zome("did_registry"),
+            "deactivate_did",
+            "Testing cross-zome event propagation".to_string(),
+        )
+        .await;
+
+    // Notify bridge of the deactivation
+    let input = DidDeactivatedInput {
+        did: did_doc.id.clone(),
+        reason: "Testing cross-zome event propagation".to_string(),
+        deactivated_at: "2026-02-12T12:00:00Z".to_string(),
+    };
+
+    let _: Record = conductor
+        .call(&cell.zome("identity_bridge"), "notify_did_deactivated", input)
+        .await;
+
+    // Query events filtered by type
+    let query = GetEventsInput {
+        event_type: Some("did_deactivated".to_string()),
+        since: None,
+        limit: Some(10),
+    };
+
+    let events: Vec<Record> = conductor
+        .call(&cell.zome("identity_bridge"), "get_recent_events", query)
+        .await;
+
+    assert!(
+        !events.is_empty(),
+        "Should have at least one did_deactivated event"
+    );
+
+    let event: BridgeEvent =
+        decode_entry(&events[0]).expect("decode bridge event");
+
+    assert_eq!(event.subject, did_doc.id, "Event subject should be the deactivated DID");
+    assert!(
+        event.payload.contains("cross-zome event propagation"),
+        "Event payload should contain the deactivation reason"
+    );
 }
