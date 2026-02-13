@@ -122,6 +122,11 @@ jobs:
           # Consciousness stack features
           - full_consciousness
           - reasoning_engine
+          # Feature groups (test combinations)
+          - epistemic_conflict
+          - temporal_planning
+          - consciousness_code
+          - api_module
     defaults:
       run:
         working-directory: symthaea
@@ -144,3 +149,29 @@ jobs:
         run: cargo test --lib --features ${{ matrix.features }}
         env:
           RUST_BACKTRACE: 1
+
+  no-default-features:
+    name: Minimal Build (no default features)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-minimal-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-minimal-
+      - name: Check with no default features
+        run: cargo check --workspace --lib --no-default-features
+      - name: Check symthaea-core features individually
+        run: |
+          cargo check -p symthaea-core --no-default-features --features simd
+          cargo check -p symthaea-core --no-default-features --features duck

@@ -2529,8 +2529,11 @@ mod tests {
         let tower = CausalTower::new();
         let result = tower.discover(&x, &y);
 
-        println!("Direction: {:?}, p_forward: {:.3}, confidence: {:.3}",
-                 result.direction, result.p_forward, result.confidence);
+        // Confidence and p_forward should be in [0, 1]
+        assert!(result.confidence >= 0.0 && result.confidence <= 1.0,
+            "Confidence must be in [0,1]: {}", result.confidence);
+        assert!(result.p_forward >= 0.0 && result.p_forward <= 1.0,
+            "p_forward must be in [0,1]: {}", result.p_forward);
     }
 
     #[test]
@@ -2539,6 +2542,8 @@ mod tests {
         let y: Vec<f64> = x.iter().map(|&xi| 2.0 * xi + 1.0).collect();
 
         let features = MetaFeatures::extract(&x, &y);
-        println!("Linearity: {:.3}, Noise: {:.3}", features.linearity, features.noise_level);
+        // Linear data should have high linearity
+        assert!(features.linearity > 0.5, "Linear data should have high linearity: {}", features.linearity);
+        assert!(features.noise_level.is_finite(), "Noise level must be finite");
     }
 }

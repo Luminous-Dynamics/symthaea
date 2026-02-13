@@ -3014,9 +3014,12 @@ mod tests {
             .map(|(a, b)| a * b)
             .sum::<f32>();
 
-        // Expect phi-gated output to be more aligned with high-phi input
-        // (may not always hold due to network nonlinearity, but should trend that way)
-        println!("sim_to_high: {}, sim_to_low: {}", sim_to_high, sim_to_low);
+        // Phi-gated output should be finite (network produced valid output)
+        assert!(phi_output.iter().all(|x| x.is_finite()),
+            "Phi-gated output must be finite");
+        // Log comparison for diagnostic purposes
+        assert!(sim_to_high.is_finite() && sim_to_low.is_finite(),
+            "Similarity scores must be finite: high={sim_to_high}, low={sim_to_low}");
     }
 
     #[test]

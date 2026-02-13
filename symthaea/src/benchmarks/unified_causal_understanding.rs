@@ -990,8 +990,11 @@ mod tests {
         let reasoner = UnifiedCausalReasoning::new();
         let result = reasoner.discover(&x, &y);
 
-        // Should detect forward causation with some confidence
-        println!("Result: {:?}", result);
-        println!("Explanation:\n{}", reasoner.explain(&x, &y));
+        // Should produce a result with valid confidence
+        assert!(result.confidence >= 0.0 && result.confidence <= 1.0,
+            "Confidence must be in [0,1]: {}", result.confidence);
+        // Explanation should be non-empty
+        let explanation = reasoner.explain(&x, &y);
+        assert!(!explanation.is_empty(), "Explanation should not be empty");
     }
 }

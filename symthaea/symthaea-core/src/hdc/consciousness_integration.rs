@@ -4149,15 +4149,13 @@ mod tests {
 
         // Check if intervention is recommended
         let prediction = pipeline.current_prediction();
-        if let Some(pred) = prediction {
-            println!("✅ Emotional prediction after decline:");
-            println!("   - Predicted valence: {:.4}", pred.predicted_valence);
-            println!("   - Predicted arousal: {:.4}", pred.predicted_arousal);
-
-            if pred.intervention.is_some() {
-                println!("   - Intervention recommended: {:?}", pred.intervention);
-            }
-        }
+        assert!(prediction.is_some(), "prediction should exist after 10 emotional updates");
+        let pred = prediction.unwrap();
+        println!("✅ Emotional prediction after decline:");
+        println!("   - Predicted valence: {:.4}", pred.predicted_valence);
+        println!("   - Predicted arousal: {:.4}", pred.predicted_arousal);
+        // After a declining valence trajectory, predicted valence should be low
+        assert!(pred.predicted_valence < 0.5, "predicted valence should reflect decline, got {}", pred.predicted_valence);
     }
 
     #[test]
@@ -4179,6 +4177,9 @@ mod tests {
         } else {
             println!("   - No intervention needed at this time");
         }
+
+        // Pipeline should still have feedback dynamics enabled after intervention attempt
+        assert!(pipeline.has_feedback_dynamics(), "feedback dynamics should remain enabled after apply_intervention");
     }
 
     #[test]
@@ -4534,9 +4535,9 @@ mod tests {
             println!("   {}", rec);
         }
 
-        // With low embodiment, we should get some recommendations
-        // (may or may not have recommendations depending on state)
+        // With low embodiment (0.3), we should get at least one recommendation
         println!("   Total recommendations: {}", recommendations.len());
+        assert!(!recommendations.is_empty(), "low embodiment (0.3) should produce at least one optimization recommendation");
     }
 
     #[test]
@@ -4648,6 +4649,10 @@ mod tests {
         for rec in &recommendations {
             println!("   {}", rec);
         }
+
+        assert_eq!(recommendations.len(), 3, "should have exactly 3 recommendations");
+        assert_eq!(recommendations[0].system, "phi");
+        assert!(recommendations[0].suggested_action.is_some(), "high-priority recommendation should have a suggested action");
     }
 
     // ==========================================

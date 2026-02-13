@@ -14,7 +14,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 uuid = { workspace = true }
-im = "15.1"  # Immutable data structures for functional state updates
+# im removed: planned for immutable data structures but never imported
 bincode = { workspace = true }
 rayon = { workspace = true }
 anyhow = { workspace = true }

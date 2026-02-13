@@ -91,13 +91,13 @@ petgraph = { workspace = true }
 
 # Phase 11: Semantic Ear - Now Active with Qwen3-Embedding
 tokenizers = { version = "0.21", optional = true }  # Tokenization for Qwen3/BGE
-safetensors = { version = "0.4", optional = true }  # Safe tensor loading
+# safetensors removed: referenced in neural-bridge feature but never imported in source
 
 # Neural Bridge v2: BGE-M3 via Candle (pure Rust ML)
 candle-core = { version = "0.8", optional = true }
 candle-nn = { version = "0.8", optional = true }
 candle-transformers = { version = "0.8", optional = true }
-half = { version = "2.6", optional = true }  # f16 support for GPU inference (>=2.6 for burn+candle compat)
+# half removed: referenced in neural-bridge feature but never imported in source
 
 # Phase 11: Database Trinity (Deferred to Week 11+)
 # Blocked deps (link conflicts): lancedb (xz2), cozo (graph_builder rayon), qdrant (lzma)
@@ -119,7 +119,7 @@ sha3 = { version = "0.10", optional = true }  # For gradient hashing
 # Web Research & Epistemic Verification (Track 6)
 reqwest = { version = "0.13", features = ["json", "rustls"], default-features = false }
 scraper = "0.25"
-html2text = "0.6"
+# html2text removed: scraper is used for HTML parsing, html2text never imported
 
 # API server (optional)
 axum = { version = "0.7", optional = true }
@@ -133,7 +133,7 @@ dirs = "5.0"
 
 # Phase 12: Resonator Networks (FFT for morphogenetic field)
 rustfft = { workspace = true }
-num-complex = "0.4"
+# num-complex removed: codebase uses custom Complex struct in spectral_analysis.rs
 
 # Async runtime
 tokio = { workspace = true }
@@ -170,16 +170,15 @@ chrono = { workspace = true }
 regex = { workspace = true }
 csv = "1.3"     # CSV parsing for benchmark data
 
-# Week 0: Memory Arena for HDC
-bumpalo = "3.14"
+# bumpalo removed from main crate: only used in symthaea-core
 
 # Week 2: Cerebellum - Procedural Memory
-qp-trie = "0.8"      # Efficient prefix trie for skill lookup
+# qp-trie removed: planned for skill lookup but never imported
 strsim = { workspace = true }
 
 # Week 12: Perception & Tool Creation
 image = "0.24"       # Image loading and processing
-imageproc = "0.26"   # Computer vision algorithms
+# imageproc removed: only image crate is used, imageproc never imported
 tree-sitter = { workspace = true }
 syn = { version = "2.0", features = ["full", "visit"] }  # Rust syntax parsing (self-analysis)
 ignore = "0.4"       # .gitignore-aware file walking
@@ -187,7 +186,7 @@ ignore = "0.4"       # .gitignore-aware file walking
 # Week 12 Phase 2a: Voice Output (Larynx) - Kokoro TTS (optional)
 # Also used for Qwen3-Embedding and SigLIP vision models
 ort = { version = "2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # ONNX Runtime
-futures = { version = "0.3", optional = true }  # Async TTS streaming
+# futures removed: voice-tts-async feature never implemented in source
 rodio = { version = "0.19", default-features = false, optional = true }  # Audio playback (no backends by default)
 hound = { workspace = true, optional = true }
 hf-hub = { version = "0.4", optional = true }       # HuggingFace Hub for model download
@@ -196,8 +195,7 @@ espeak-rs = { version = "0.1", optional = true }    # espeak-ng bindings for pro
 # Enhancement #8 Week 4: PyPhi Integration (IIT 3.0 exact Φ calculation)
 # pyo3 removed: pyphi feature was never implemented (no cfg gates, no code using pyo3)
 
-# NixOS integration
-nix = "0.27"
+# nix (unix syscall crate) removed: no nix:: imports in source (NixOS integration uses CLI commands)
 
 # CLI argument parsing (optional - for service binary)
 clap = { workspace = true, optional = true }
@@ -240,7 +238,7 @@ full = ["service", "shell", "gui", "demo"]  # All binaries
 # Voice features
 voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
 voice-tts-cuda = ["voice-tts", "ort/cuda"]  # TTS with CUDA acceleration (requires CUDA toolkit)
-voice-tts-async = ["voice-tts", "futures"]  # Async/streaming TTS
+voice-tts-async = ["voice-tts"]  # Async/streaming TTS (futures dep deferred)
 voice-stt = ["symthaea-stt", "hound"]  # STT with symthaea-stt crate (HDC + LTC + CfC)
 # audio-sentinel removed: symthaea-sentinel is never imported in main crate (use sentinel sub-crate directly)
 nix-mind = ["symthaea-nix"]  # Conscious NixOS mind with HDC world model + active inference
@@ -255,7 +253,7 @@ vision = ["ort", "hf-hub"]  # SigLIP image embeddings via ONNX
 perception = ["embeddings", "vision"]  # Full multimodal perception stack
 webcam = []  # deferred (live webcam capture for video perception - gates cfg blocks in source)
 # Neural Bridge v2: BGE-M3 via Candle (LLM as Semantic Sensor)
-neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub", "safetensors", "half"]
+neural-bridge = ["candle-core", "candle-nn", "candle-transformers", "tokenizers", "hf-hub"]
 neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "candle-transformers/cuda"]
 # Database backends: DuckDB is active (unconditional dep). Others deferred:
 # - qdrant: blocked (lzma link conflict with burn-ndarray)

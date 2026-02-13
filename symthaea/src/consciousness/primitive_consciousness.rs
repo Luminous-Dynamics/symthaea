@@ -622,9 +622,11 @@ mod tests {
         let decomposer = ConsciousnessDecomposer::new();
         let semantic = vec![0.1; 64];
 
-        let _activations = decomposer.decompose(&semantic);
-        // Should return a valid result (may or may not find activations)
-        // The decomposer processed the semantic input successfully
+        let activations = decomposer.decompose(&semantic);
+        // Decomposition should return valid (Primitive, f64) pairs
+        for (_prim, score) in &activations {
+            assert!(score.is_finite(), "Activation score must be finite: {score}");
+        }
     }
 
     #[test]

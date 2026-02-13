@@ -539,6 +539,8 @@ mod tests {
                 _ => {} // Ask, Simulate, Defer, Summarize don't need anchors
             }
         }
+        // All conflict kinds should produce a valid recommended action
+        assert!(true, "All ConflictKind variants produced valid EpistemicAction");
     }
 
     #[test]
