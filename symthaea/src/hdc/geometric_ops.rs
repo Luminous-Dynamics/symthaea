@@ -1177,7 +1177,7 @@ mod tests {
         // Create points that vary only along one direction on the sphere.
         // Start from e_0 = (1, 0, 0, 0, 0) and perturb along e_1.
         let dim = 5;
-        let base = unit_vec(dim, 0);
+        let _base = unit_vec(dim, 0);
 
         let points: Vec<Vec<f64>> = (-5..=5)
             .map(|i| {

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Test Data Builders
 //!
 //! Factory functions and builder patterns for creating test data.

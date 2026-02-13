@@ -1047,7 +1047,6 @@ mod tests {
         ActionType, AffectiveSystemsState, Decision, EvaluationBreakdown, EvaluationContext,
         EvaluationResult, VetoReason,
     };
-    use std::collections::HashMap;
     use super::*;
 
     #[test]
@@ -1248,7 +1247,7 @@ mod tests {
         };
 
         // A potentially harmful action in healthcare context
-        let result = evaluator.evaluate(
+        let _result = evaluator.evaluate(
             "recommend treatment that might have side effects",
             healthcare_context,
         );

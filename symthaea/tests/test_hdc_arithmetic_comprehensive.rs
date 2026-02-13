@@ -410,7 +410,7 @@ fn test_reasoning_bridge_creation() {
 
     // Should have base primitives loaded
     let assertions = bridge.assertions();
-    assert!(assertions.len() >= 0, "Should have assertions available");
+    assert!(!assertions.is_empty(), "Should have assertions available");
 }
 
 #[test]

@@ -10,7 +10,7 @@
 //! ```
 
 use symthaea::language::{
-    AnthropicBackend, GenerationParams, LLMBackend, OllamaBackend, OpenAiBackend,
+    AnthropicBackend, GenerationParams, LLMBackend, OpenAiBackend,
     SimulatedBackend, create_backend_from_env,
 };
 

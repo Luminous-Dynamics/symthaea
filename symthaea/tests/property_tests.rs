@@ -5,6 +5,7 @@
 use proptest::prelude::*;
 
 // HDC vector generation strategy
+#[allow(dead_code)]
 fn hv16_strategy() -> impl Strategy<Value = Vec<u16>> {
     prop::collection::vec(any::<u16>(), 1024..2048)
 }

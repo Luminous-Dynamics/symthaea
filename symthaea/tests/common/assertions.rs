@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Custom Assertions
 //!
 //! Custom assertion macros and functions for common test patterns.
@@ -190,7 +191,7 @@ where
 }
 
 /// Assert an async operation completes within a time limit
-#[cfg(feature = "tokio")]
+#[allow(dead_code)]
 pub async fn assert_async_completes_within_ms<F, Fut, R>(f: F, max_ms: u128, msg: &str) -> R
 where
     F: FnOnce() -> Fut,
@@ -268,7 +269,6 @@ macro_rules! assert_in_range {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::builders::MemoryRecordBuilder;
 
     #[test]
     fn test_f32_eq() {

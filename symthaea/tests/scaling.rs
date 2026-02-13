@@ -12,7 +12,7 @@ use std::time::Instant;
 
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::RealPhiCalculator,
+    spectral_connectivity::ConnectivityCalculator,
     real_hv::RealHV,
     HDC_DIMENSION,
 };
@@ -28,7 +28,7 @@ use symthaea::perception::semantic_encoder::SemanticEncoder;
 fn test_parallel_phi_100_topologies() {
     use rayon::prelude::*;
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
     let topologies: Vec<_> = (0..100)
         .map(|i| ConsciousnessTopology::random(8, HDC_DIMENSION, i))
         .collect();
@@ -36,7 +36,7 @@ fn test_parallel_phi_100_topologies() {
     let start = Instant::now();
     let results: Vec<f64> = topologies
         .par_iter()
-        .map(|topo| calc.compute(&topo.node_representations))
+        .map(|topo| calc.algebraic_connectivity(&topo.node_representations))
         .collect();
     let elapsed = start.elapsed();
 
@@ -53,7 +53,7 @@ fn test_parallel_phi_100_topologies() {
 fn test_parallel_phi_scaling_10_50_200() {
     use rayon::prelude::*;
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     for count in [10, 50, 200] {
         let topologies: Vec<_> = (0..count)
@@ -63,7 +63,7 @@ fn test_parallel_phi_scaling_10_50_200() {
         let start = Instant::now();
         let results: Vec<f64> = topologies
             .par_iter()
-            .map(|topo| calc.compute(&topo.node_representations))
+            .map(|topo| calc.algebraic_connectivity(&topo.node_representations))
             .collect();
         let elapsed = start.elapsed();
 
@@ -557,13 +557,13 @@ fn test_mixed_concurrent_workload() {
     // Thread 5: Phi computation
     let phi_handle = thread::spawn(|| {
         use rayon::prelude::*;
-        let calc = RealPhiCalculator::new();
+        let calc = ConnectivityCalculator::new();
         let topologies: Vec<_> = (0..20)
             .map(|i| ConsciousnessTopology::ring(8, HDC_DIMENSION, i))
             .collect();
         let _results: Vec<f64> = topologies
             .par_iter()
-            .map(|topo| calc.compute(&topo.node_representations))
+            .map(|topo| calc.algebraic_connectivity(&topo.node_representations))
             .collect();
     });
 
@@ -597,8 +597,8 @@ fn test_memory_stability_concurrent_allocation() {
                     let topo =
                         ConsciousnessTopology::random(8, HDC_DIMENSION, (t * 50 + i) as u64);
                     // Do a computation so optimizer doesn't elide
-                    let calc = RealPhiCalculator::new();
-                    let result: f64 = calc.compute(&topo.node_representations);
+                    let calc = ConnectivityCalculator::new();
+                    let result: f64 = calc.algebraic_connectivity(&topo.node_representations);
                     assert!(result >= 0.0);
                     // topo is dropped here, releasing memory
                 }

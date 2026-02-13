@@ -1711,7 +1711,7 @@ mod tests {
         let result = integration.process();
 
         // After consistent processing, should be healthy
-        if let Some(healthy) = result.temporally_healthy {
+        if let Some(_healthy) = result.temporally_healthy {
             // System should be reasonably healthy with consistent behavior
             // (may be false initially if not enough history)
             assert!(result.temporally_healthy.is_some());

@@ -631,7 +631,7 @@ mod tests {
         for _ in 0..5 {
             dc.update(0.5, 0.3, 50.0, 0.5);
         }
-        let initial_bifurcations = dc.stats.total_bifurcations;
+        let _initial_bifurcations = dc.stats.total_bifurcations;
 
         // Sudden change - should trigger bifurcation
         dc.update(0.9, 0.8, 200.0, 0.9);
