@@ -2,10 +2,10 @@
 	path = 11-meta-consciousness/luminous-nix
 	url = https://github.com/Luminous-Dynamics/luminous-nix.git
 [submodule "Mycelix-Core"]
-	path = Mycelix-Core
+	path = mycelix-core
 	url = https://github.com/Luminous-Dynamics/Mycelix-Core.git
 [submodule "Mycelix-Mail"]
-	path = Mycelix-Mail
+	path = mycelix-mail
 	url = https://github.com/Luminous-Dynamics/Mycelix-Mail.git
 [submodule "mycelix-desci"]
 	path = mycelix-desci

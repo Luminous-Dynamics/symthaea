@@ -212,6 +212,7 @@ impl fmt::Display for EpistemicCube {
 /// This captures the semantic intent determined by cognitive processing,
 /// not what the LLM decides to say.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum SemanticIntent {
     /// Acknowledge the input ("I heard you")
     Acknowledge,
@@ -228,21 +229,19 @@ pub enum SemanticIntent {
     /// Encourage continuation of dialogue
     Continue,
     /// Intent could not be determined
+    #[default]
     Unknown,
 }
 
-impl Default for SemanticIntent {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
 
 /// The structural form of the response.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ResponseType {
     /// A greeting or social acknowledgment
     Greeting,
     /// A declarative statement
+    #[default]
     Statement,
     /// A question seeking information
     Question,
@@ -254,17 +253,13 @@ pub enum ResponseType {
     Empathic,
 }
 
-impl Default for ResponseType {
-    fn default() -> Self {
-        Self::Statement
-    }
-}
 
 /// How certain the mind is about its conclusion.
 ///
 /// This is derived from consciousness metrics (phi, meta-awareness, coherence)
 /// and determines how the translation should express confidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum EpistemicStatus {
     /// High confidence: p > 0.9
     Certain,
@@ -273,16 +268,12 @@ pub enum EpistemicStatus {
     /// Low confidence: p > 0.4
     Uncertain,
     /// Very low confidence: p < 0.4
+    #[default]
     Unknown,
     /// Topic is outside the system's domain of knowledge
     OutOfDomain,
 }
 
-impl Default for EpistemicStatus {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
 
 /// Emotional coloring of the response.
 ///
@@ -356,6 +347,7 @@ pub struct DomainContext {
 
 /// Structured data that may need to be incorporated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum StructuredData {
     /// A list of items
     List(Vec<String>),
@@ -366,14 +358,10 @@ pub enum StructuredData {
     /// Code or technical content
     Code { language: String, content: String },
     /// No structured data
+    #[default]
     None,
 }
 
-impl Default for StructuredData {
-    fn default() -> Self {
-        Self::None
-    }
-}
 
 /// The complete structured thought representation.
 ///
@@ -455,6 +443,14 @@ pub struct StructuredThought {
 
     /// Original user input (for reference in translation)
     pub original_input: Option<String>,
+
+    /// Active ontological primitive tiers for this thought.
+    ///
+    /// Populated from the 9-tier primitive system grounding step,
+    /// these indicate which fundamental cognitive primitives are
+    /// active (e.g. "Mathematical", "Strategic", "MetaCognitive").
+    #[serde(default)]
+    pub primitive_tiers: Vec<String>,
 }
 
 /// Context for code understanding and generation within StructuredThought.
@@ -615,6 +611,11 @@ impl StructuredThought {
             }
         }
 
+        // Primitive tier grounding
+        if !self.primitive_tiers.is_empty() {
+            prompt.push_str(&format!("PRIMITIVE_TIERS: {}\n", self.primitive_tiers.join(", ")));
+        }
+
         // Original input
         if let Some(ref input) = self.original_input {
             prompt.push_str(&format!("\nORIGINAL_INPUT: {}\n", input));
@@ -662,6 +663,7 @@ impl Default for StructuredThought {
             trust: 0.0,
             constraints: Vec::new(),
             original_input: None,
+            primitive_tiers: Vec::new(),
         }
     }
 }

@@ -51,7 +51,17 @@ impl DnaPaths {
     }
 
     pub fn federated_learning() -> PathBuf {
-        Self::workspace_root().join("../Mycelix-Core/zomes/federated_learning/workdir/dna/federated_learning.dna")
+        Self::workspace_root().join("../mycelix-core/zomes/federated_learning/workdir/dna/federated_learning.dna")
+    }
+
+    /// Commons cluster DNA (property + housing + care + mutualaid + water)
+    pub fn commons() -> PathBuf {
+        Self::workspace_root().join("../mycelix-commons/dna/mycelix_commons.dna")
+    }
+
+    /// Civic cluster DNA (justice + emergency + media)
+    pub fn civic() -> PathBuf {
+        Self::workspace_root().join("../mycelix-civic/dna/mycelix_civic.dna")
     }
 }
 

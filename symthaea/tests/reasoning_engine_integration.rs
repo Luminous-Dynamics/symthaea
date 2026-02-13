@@ -274,10 +274,12 @@ fn inv10_anchor_kind_required() {
         let action = kind.recommended_action();
         match action {
             EpistemicAction::Verify(anchor) => {
-                let _ = anchor.description(); // INV-10: anchor is present
+                assert!(!anchor.description().is_empty(),
+                    "INV-10: Verify anchor should have non-empty description for {:?}", kind);
             }
             EpistemicAction::Sense(anchor) => {
-                let _ = anchor.description(); // INV-10: anchor is present
+                assert!(!anchor.description().is_empty(),
+                    "INV-10: Sense anchor should have non-empty description for {:?}", kind);
             }
             _ => {} // Ask, Simulate, Defer, Summarize don't need anchors
         }
@@ -644,16 +646,22 @@ mod proptest_counterfactual {
             z_large.insert(3);
 
             // Note: This property doesn't always hold due to colliders
-            // We just verify it doesn't panic and returns valid booleans
+            // Verify calls complete and return consistent types
+            let mut calls = 0u32;
             for x in 0..6 {
                 for y in (x + 1)..6 {
                     if x != 2 && x != 3 && y != 2 && y != 3 {
-                        let _small = dag.is_d_separated(x, y, &z_small);
+                        let small = dag.is_d_separated(x, y, &z_small);
                         let _large = dag.is_d_separated(x, y, &z_large);
-                        // Both should be valid booleans - test doesn't panic
+                        // Reflexivity: identical calls should be deterministic
+                        let small2 = dag.is_d_separated(x, y, &z_small);
+                        prop_assert_eq!(small, small2,
+                            "d-separation should be deterministic for x={}, y={}", x, y);
+                        calls += 1;
                     }
                 }
             }
+            prop_assert!(calls > 0, "Should have tested at least one pair");
         }
 
         /// Property: Causal queries on valid DAGs don't panic
@@ -668,8 +676,22 @@ mod proptest_counterfactual {
                     outcome,
                     conditioning: vec![],
                 };
-                let _result = reasoner.query(&dag, &query);
-                // Should complete without panicking
+                let result = reasoner.query(&dag, &query);
+                // Result should be a valid variant (Identified, Unidentified, or AssumptionRequired)
+                match &result {
+                    symthaea::consciousness::counterfactual::identification::CausalQueryOutcome::Identified { confidence, .. } => {
+                        prop_assert!(*confidence >= 0.0 && *confidence <= 1.0,
+                            "Confidence should be in [0,1], got {}", confidence);
+                    }
+                    symthaea::consciousness::counterfactual::identification::CausalQueryOutcome::Unidentified { reason, .. } => {
+                        // Valid outcome - unidentified has a reason
+                        let reason_str = format!("{:?}", reason);
+                        prop_assert!(!reason_str.is_empty(), "Reason should be non-empty");
+                    }
+                    _ => {
+                        // AssumptionRequired or other valid variants
+                    }
+                }
             }
         }
     }
@@ -993,10 +1015,14 @@ mod mediation_tests {
 
         // With both direct and indirect paths, likely partial mediation
         if result.is_identified {
-            // At least one should be true (or neither if proportion is very small)
-            let _ = result.is_fully_mediated();
-            let _ = result.is_partially_mediated();
-            // Test completes without panic
+            let fully = result.is_fully_mediated();
+            let partially = result.is_partially_mediated();
+            // Cannot be both fully and partially mediated (mutually exclusive ranges)
+            assert!(!(fully && partially),
+                "Cannot be both fully (>80%) and partially (20-80%) mediated");
+            // Proportion should be in valid range
+            assert!(result.proportion_mediated >= 0.0 && result.proportion_mediated <= 1.0,
+                "Proportion mediated should be in [0,1], got {}", result.proportion_mediated);
         }
     }
 }
@@ -1190,8 +1216,11 @@ mod edge_case_tests {
         };
 
         let reasoner = CounterfactualReasoner::new();
-        let _result = reasoner.query(&dag, &query);
-        // Should handle gracefully (likely unidentified)
+        let result = reasoner.query(&dag, &query);
+        // Treatment == outcome should be unidentified or handled gracefully
+        assert!(!matches!(result,
+            symthaea::consciousness::counterfactual::identification::CausalQueryOutcome::Identified { .. }),
+            "Querying treatment==outcome should not produce Identified result");
     }
 
     #[test]

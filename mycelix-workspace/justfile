@@ -128,26 +128,48 @@ build-sdk-ts:
         echo "⚠️  sdk-ts not found"; \
     fi
 
-# Build all hApps (18 total)
-build-happs: build-core build-epistemic-markets build-fabrication build-mail build-marketplace build-edunet build-supplychain build-identity build-knowledge build-governance build-justice build-finance build-property build-energy build-media build-desci build-music
+# Build Commons cluster (property + housing + care + mutualaid + water — 28 zomes)
+build-commons:
+    @echo "🏘️ Building mycelix-commons cluster..."
+    @if [ -f "../mycelix-commons/Cargo.toml" ]; then \
+        cd ../mycelix-commons && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna && hc app pack .; \
+    else \
+        echo "⚠️  mycelix-commons not found"; \
+    fi
+
+# Build Civic cluster (justice + emergency + media — 16 zomes)
+build-civic:
+    @echo "⚖️ Building mycelix-civic cluster..."
+    @if [ -f "../mycelix-civic/Cargo.toml" ]; then \
+        cd ../mycelix-civic && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna && hc app pack .; \
+    else \
+        echo "⚠️  mycelix-civic not found"; \
+    fi
+
+# Build all hApps (clusters + standalone)
+build-happs: build-commons build-civic build-core build-epistemic-markets build-fabrication build-mail build-marketplace build-edunet build-supplychain build-identity build-knowledge build-governance build-finance build-energy build-desci build-music
     @echo "✅ All hApps built!"
 
 # Build production-ready hApps only
 build-production: build-core build-epistemic-markets build-fabrication build-edunet build-marketplace
     @echo "✅ Production hApps built!"
 
-# Build Mycelix-Core
+# Build mycelix-core
 build-core:
-    @echo "🧠 Building Mycelix-Core..."
+    @echo "🧠 Building mycelix-core..."
     @if [ -d "happs/core/dna" ]; then \
         cd happs/core && hc dna pack dna && hc app pack .; \
     else \
         echo "⚠️  happs/core not found, skipping"; \
     fi
 
-# Build Mycelix-Mail
+# Build mycelix-mail
 build-mail:
-    @echo "📧 Building Mycelix-Mail..."
+    @echo "📧 Building mycelix-mail..."
     @if [ -d "happs/mail/holochain/dna" ]; then \
         cd happs/mail/holochain && hc dna pack dna && hc app pack .; \
     else \
@@ -247,16 +269,8 @@ build-governance:
         echo "⚠️  happs/governance not ready, skipping"; \
     fi
 
-# Build Mycelix-Justice
-build-justice:
-    @echo "⚖️ Building Mycelix-Justice..."
-    @if [ -d "happs/justice" ] && [ -f "happs/justice/Cargo.toml" ]; then \
-        cd happs/justice && \
-        cargo build --release --target wasm32-unknown-unknown && \
-        hc dna pack . 2>/dev/null || true && hc app pack . 2>/dev/null || true; \
-    else \
-        echo "⚠️  happs/justice not ready, skipping"; \
-    fi
+# NOTE: justice, emergency, media are now in mycelix-civic cluster (use build-civic)
+# NOTE: property, housing, care, mutualaid, water are now in mycelix-commons cluster (use build-commons)
 
 # Build Mycelix-Finance
 build-finance:
@@ -269,16 +283,6 @@ build-finance:
         echo "⚠️  happs/finance not ready, skipping"; \
     fi
 
-# Build Mycelix-Property
-build-property:
-    @echo "🏠 Building Mycelix-Property..."
-    @if [ -d "happs/property/dna" ]; then \
-        cd happs/property && \
-        cargo build --release --target wasm32-unknown-unknown && \
-        hc dna pack dna && hc app pack .; \
-    else \
-        echo "⚠️  happs/property not ready, skipping"; \
-    fi
 
 # Build Mycelix-Energy
 build-energy:
@@ -291,16 +295,6 @@ build-energy:
         echo "⚠️  happs/energy not ready, skipping"; \
     fi
 
-# Build Mycelix-Media
-build-media:
-    @echo "📰 Building Mycelix-Media..."
-    @if [ -d "happs/media/dna" ]; then \
-        cd happs/media && \
-        cargo build --release --target wasm32-unknown-unknown && \
-        hc dna pack dna && hc app pack .; \
-    else \
-        echo "⚠️  happs/media not ready, skipping"; \
-    fi
 
 # Build Mycelix-DeSci
 build-desci:
@@ -327,16 +321,17 @@ build-wasm-all:
     errors=""
 
     declare -A HAPPS
-    HAPPS[core]="/srv/luminous-dynamics/Mycelix-Core"
+    # Cluster DNAs (replace property, housing, care, mutualaid, water, justice, emergency, media)
+    HAPPS[commons]="/srv/luminous-dynamics/mycelix-commons"
+    HAPPS[civic]="/srv/luminous-dynamics/mycelix-civic"
+    # Standalone hApps
+    HAPPS[core]="/srv/luminous-dynamics/mycelix-core"
     HAPPS[epistemic-markets]="/srv/luminous-dynamics/mycelix-workspace/happs/epistemic-markets"
     HAPPS[health]="/srv/luminous-dynamics/mycelix-health"
     HAPPS[energy]="/srv/luminous-dynamics/mycelix-energy"
     HAPPS[identity]="/srv/luminous-dynamics/mycelix-identity"
     HAPPS[governance]="/srv/luminous-dynamics/mycelix-governance"
     HAPPS[finance]="/srv/luminous-dynamics/mycelix-finance"
-    HAPPS[justice]="/srv/luminous-dynamics/mycelix-justice"
-    HAPPS[media]="/srv/luminous-dynamics/mycelix-media"
-    HAPPS[property]="/srv/luminous-dynamics/mycelix-property"
     HAPPS[climate]="/srv/luminous-dynamics/mycelix-climate"
     HAPPS[space]="/srv/luminous-dynamics/mycelix-space"
     HAPPS[consensus]="/srv/luminous-dynamics/mycelix-workspace/happs/consensus"
@@ -462,10 +457,10 @@ migrate:
 # Check all zomes compile
 check-zomes:
     @echo "Checking core zomes..."
-    cd ../Mycelix-Core/civitas_dna/zomes/civitas_reputation && cargo check
-    cd ../Mycelix-Core/civitas_dna/zomes/causal_contribution && cargo check
+    cd ../mycelix-core/civitas_dna/zomes/civitas_reputation && cargo check
+    cd ../mycelix-core/civitas_dna/zomes/causal_contribution && cargo check
     @echo "Checking Mail zomes..."
-    cd ../Mycelix-Mail/holochain && cargo check
+    cd ../mycelix-mail/holochain && cargo check
     @echo "All zomes check passed!"
 
 # Check SDK-TS
@@ -584,7 +579,25 @@ status:
         echo "  [--] TypeScript SDK (missing)"
     fi
     echo ""
-    echo "hApps (18 total):"
+    echo "Cluster DNAs:"
+    for cluster in commons civic; do
+        if [ -d "happs/$cluster" ]; then
+            if [ -L "happs/$cluster" ]; then
+                target=$(readlink "happs/$cluster")
+                if [ -d "happs/$cluster" ]; then
+                    echo "  [OK] $cluster -> $target"
+                else
+                    echo "  [!!] $cluster -> $target (broken)"
+                fi
+            else
+                echo "  [OK] $cluster (native)"
+            fi
+        else
+            echo "  [--] $cluster (missing)"
+        fi
+    done
+    echo ""
+    echo "Standalone hApps:"
     echo ""
     echo "  Production Ready:"
     for happ in core epistemic-markets fabrication edunet marketplace; do
@@ -619,7 +632,7 @@ status:
     done
     echo ""
     echo "  Early Stage:"
-    for happ in knowledge governance justice finance property energy media desci music desktop; do
+    for happ in knowledge governance finance energy desci music; do
         if [ -d "happs/$happ" ]; then
             if [ -L "happs/$happ" ]; then
                 target=$(readlink "happs/$happ")
@@ -1022,3 +1035,9 @@ test-sweettest-bridge:
 
 test-sweettest-privacy:
     cd tests/sweettest && cargo test --release privacy -- --ignored --nocapture
+
+test-sweettest-commons:
+    cd ../mycelix-commons && cargo test --release --test sweettest_integration -- --ignored --nocapture
+
+test-sweettest-civic:
+    cd ../mycelix-civic && cargo test --release --test sweettest_integration -- --ignored --nocapture

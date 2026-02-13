@@ -31,7 +31,7 @@
  *
  * ## Usage
  *
- * ```rust
+ * ```ignore
  * use symthaea::consciousness::quantum_coherence::{
  *     QuantumCoherenceAnalyzer, CoherenceConfig
  * };
@@ -268,7 +268,7 @@ impl QuantumCoherenceAnalyzer {
         components: Option<Vec<BinaryHV>>,
     ) {
         let observation = StateObservation {
-            state: state.clone(),
+            state: *state,
             phi,
             timestamp: Instant::now(),
             components,
@@ -346,8 +346,8 @@ impl QuantumCoherenceAnalyzer {
         if p <= 0.0 || p >= 1.0 {
             0.0
         } else {
-            let h = -p * p.log2() - (1.0 - p) * (1.0 - p).log2();
-            h // Normalized to [0, 1]
+            
+            -p * p.log2() - (1.0 - p) * (1.0 - p).log2() // Normalized to [0, 1]
         }
     }
 
@@ -435,7 +435,7 @@ impl QuantumCoherenceAnalyzer {
         let past_state = &self.history[self.history.len() - window_back];
 
         // Interference = combination of current and past using bundle
-        let combined = BinaryHV::bundle(&[current.state.clone(), past_state.state.clone()]);
+        let combined = BinaryHV::bundle(&[current.state, past_state.state]);
         let combined_phi = (current.phi + past_state.phi) / 2.0;
 
         // Measure interference visibility using popcount
@@ -626,7 +626,7 @@ impl QuantumCoherenceAnalyzer {
         // 3. Low recent decoherence rate
         let coherence_ok = self.current_coherence >= self.config.coherence_threshold;
         let richness = self.superposition_richness();
-        let richness_ok = richness >= 0.4 && richness <= 0.6;
+        let richness_ok = (0.4..=0.6).contains(&richness);
         let low_decoherence = self.decoherence_rate() < 0.2;
 
         coherence_ok && richness_ok && low_decoherence

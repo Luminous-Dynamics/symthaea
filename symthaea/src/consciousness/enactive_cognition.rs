@@ -1419,12 +1419,12 @@ impl EnactiveCognition {
         let action_enc = self
             .action_groundings
             .get(&action)
-            .map(|g| g.primitive_encoding.clone())
+            .map(|g| g.primitive_encoding)
             .unwrap_or_else(BinaryHV::zero);
         let meaning_enc = self
             .meaning_groundings
             .get(&category)
-            .map(|g| g.primitive_encoding.clone())
+            .map(|g| g.primitive_encoding)
             .unwrap_or_else(BinaryHV::zero);
 
         action_enc.bind(&meaning_enc)

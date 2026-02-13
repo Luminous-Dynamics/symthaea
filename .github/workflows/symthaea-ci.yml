@@ -5,34 +5,57 @@ on:
     branches: [main]
     paths:
       - 'symthaea/**'
-      - 'symthaea-core/**'
       - '.github/workflows/symthaea-ci.yml'
+      - '.github/workflows/symthaea-nightly.yml'
   pull_request:
     branches: [main]
     paths:
       - 'symthaea/**'
-      - 'symthaea-core/**'
       - '.github/workflows/symthaea-ci.yml'
+      - '.github/workflows/symthaea-nightly.yml'
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  check:
-    name: Check & Test
+  fmt:
+    name: Format
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: symthaea
-
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check formatting
+        run: cargo fmt --all --check
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+  deny:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: symthaea/Cargo.toml
+          command: check advisories licenses
+
+  clippy:
+    name: Clippy (workspace)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-
       - name: Cache cargo registry & build
         uses: actions/cache@v4
         with:
@@ -40,19 +63,82 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             symthaea/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('symthaea/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('symthaea/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-
+            ${{ runner.os }}-cargo-clippy-
+      - name: Clippy (all workspace crates)
+        run: cargo clippy --workspace --no-deps --lib -- -D warnings
 
-      - name: Check compilation (0 warnings enforced)
-        run: cargo check --lib
+  check:
+    name: Check & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+      - name: Check compilation
+        run: cargo check --workspace --lib
         env:
           RUSTFLAGS: -D warnings
-
-      - name: Run clippy (advisory, non-blocking)
-        run: cargo clippy -p symthaea --no-deps --lib -- -W clippy::all 2>&1 | tail -5 || true
-
       - name: Run lib tests
-        run: cargo test --lib
+        run: cargo test --workspace --lib
+        env:
+          RUST_BACKTRACE: 1
+
+  features:
+    name: Feature Matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          # cfg-gated modules in lib.rs
+          - identity
+          - code_generation
+          - nix-mind
+          - integration_module
+          - observability_module
+          - web_research_module
+          # Major optional dependency features
+          - voice-stt
+          - embeddings
+          - neural-bridge
+          - mycelix
+          - swarm
+          # Consciousness stack features
+          - full_consciousness
+          - reasoning_engine
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-feat-${{ matrix.features }}-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-feat-${{ matrix.features }}-
+      - name: Check feature (${{ matrix.features }})
+        run: cargo check --lib --features ${{ matrix.features }}
+      - name: Test feature (${{ matrix.features }})
+        run: cargo test --lib --features ${{ matrix.features }}
         env:
           RUST_BACKTRACE: 1

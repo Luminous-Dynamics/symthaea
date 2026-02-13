@@ -43,6 +43,9 @@ pub mod action;
 /// Layer 6: Integration with full Symthaea brain
 pub mod plugin;
 
+/// Daemon ↔ TUI inter-process communication
+pub mod ipc;
+
 /// Layer 7: Command-line interface
 #[cfg(feature = "cli")]
 pub mod cli;

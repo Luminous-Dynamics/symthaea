@@ -521,14 +521,14 @@ impl PhiValidationFramework {
         report.push_str(&format!("- **R² (variance explained)**: {:.3}\n", results.r_squared));
         report.push_str(&format!("- **95% Confidence Interval**: ({:.3}, {:.3})\n",
                                  results.confidence_interval.0, results.confidence_interval.1));
-        report.push_str("\n");
+        report.push('\n');
 
         // Classification Performance
         report.push_str("## Classification Performance\n\n");
         report.push_str(&format!("- **AUC (conscious vs unconscious)**: {:.3}\n", results.auc));
         report.push_str(&format!("- **Mean Absolute Error**: {:.3}\n", results.mae));
         report.push_str(&format!("- **RMSE**: {:.3}\n", results.rmse));
-        report.push_str("\n");
+        report.push('\n');
 
         // Per-State Analysis
         report.push_str("## Per-State Analysis\n\n");
@@ -546,7 +546,7 @@ impl PhiValidationFramework {
                 ));
             }
         }
-        report.push_str("\n");
+        report.push('\n');
 
         // Interpretation
         report.push_str("## Interpretation\n\n");
@@ -556,7 +556,7 @@ impl PhiValidationFramework {
         // Recommendation
         report.push_str("## Recommendation\n\n");
         report.push_str(&self.generate_recommendation(results));
-        report.push_str("\n");
+        report.push('\n');
 
         report
     }

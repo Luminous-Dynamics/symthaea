@@ -13,6 +13,7 @@ verifiable_credential_integrity = { path = "../integrity" }
 holochain_serialized_bytes = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+mycelix-crypto = { workspace = true }
 
 [features]
 default = []

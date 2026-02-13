@@ -201,7 +201,7 @@ impl WorkingMemory {
             // Find and remove lowest activation item
             if let Some(min_idx) = self.episodic_buffer.iter()
                 .enumerate()
-                .min_by(|a, b| a.1.activation.partial_cmp(&b.1.activation).unwrap())
+                .min_by(|a, b| a.1.activation.total_cmp(&b.1.activation))
                 .map(|(i, _)| i)
             {
                 self.episodic_buffer.remove(min_idx);
@@ -242,7 +242,7 @@ impl WorkingMemory {
     /// Get most activated item
     pub fn most_active(&self) -> Option<&WorkingMemoryItem> {
         self.episodic_buffer.iter().max_by(|a, b|
-            a.activation.partial_cmp(&b.activation).unwrap()
+            a.activation.total_cmp(&b.activation)
         )
     }
 
@@ -2254,7 +2254,7 @@ impl IntegratedConsciousAgent {
                 // Force high focus on highest priority goal
                 if let Some(goal) = self.goals.iter()
                     .filter(|g| g.active)
-                    .max_by(|a, b| a.priority.partial_cmp(&b.priority).unwrap())
+                    .max_by(|a, b| a.priority.total_cmp(&b.priority))
                 {
                     self.attention.add_target(goal.target.clone(), 1.0);
                 }

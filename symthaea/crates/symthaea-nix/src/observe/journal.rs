@@ -36,8 +36,7 @@ impl JournalObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "journalctl failed: {}",
                     String::from_utf8_lossy(&output.stderr)
@@ -64,8 +63,7 @@ impl JournalObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "journalctl -u {} failed: {}",
                     unit,
@@ -96,8 +94,7 @@ impl JournalObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "journalctl --since {} -p err failed: {}",
                     since,

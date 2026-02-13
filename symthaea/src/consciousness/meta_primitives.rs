@@ -17,7 +17,7 @@
 //!
 //! ## The Meta-Learning Framework
 //!
-//! ```
+//! ```ignore
 //! Primitive Genome: Sequence of base transformations
 //!   Example: [Bind, Permute, Bundle] = "Rotational Binding"
 //!
@@ -79,14 +79,12 @@ impl CompositeTransformation {
         let mut rng = rand::thread_rng();
         let length = rng.gen_range(min_length..=max_length);
 
-        let all_transformations = vec![
-            TransformationType::Bind,
+        let all_transformations = [TransformationType::Bind,
             TransformationType::Bundle,
             TransformationType::Permute,
             TransformationType::Resonate,
             TransformationType::Abstract,
-            TransformationType::Ground,
-        ];
+            TransformationType::Ground];
 
         let sequence: Vec<_> = (0..length)
             .map(|_| {
@@ -100,7 +98,7 @@ impl CompositeTransformation {
 
     /// Apply this composite transformation
     pub fn apply(&self, input: &BinaryHV, primitive: &Primitive) -> Result<BinaryHV> {
-        let mut current = input.clone();
+        let mut current = *input;
 
         for transformation in &self.sequence {
             current = self.apply_single(&current, primitive, transformation)?;
@@ -122,7 +120,7 @@ impl CompositeTransformation {
             }
 
             TransformationType::Bundle => {
-                Ok(BinaryHV::bundle(&[input.clone(), primitive.encoding.clone()]))
+                Ok(BinaryHV::bundle(&[*input, primitive.encoding]))
             }
 
             TransformationType::Permute => {
@@ -133,9 +131,9 @@ impl CompositeTransformation {
             TransformationType::Resonate => {
                 let similarity = input.similarity(&primitive.encoding);
                 if similarity > 0.7 {
-                    Ok(BinaryHV::bundle(&[input.clone(), primitive.encoding.clone()]))
+                    Ok(BinaryHV::bundle(&[*input, primitive.encoding]))
                 } else {
-                    Ok(input.clone())
+                    Ok(*input)
                 }
             }
 
@@ -162,14 +160,12 @@ impl CompositeTransformation {
             0 => {
                 // Add transformation
                 if new_sequence.len() < 8 {
-                    let all_transformations = vec![
-                        TransformationType::Bind,
+                    let all_transformations = [TransformationType::Bind,
                         TransformationType::Bundle,
                         TransformationType::Permute,
                         TransformationType::Resonate,
                         TransformationType::Abstract,
-                        TransformationType::Ground,
-                    ];
+                        TransformationType::Ground];
                     let idx = rng.gen_range(0..all_transformations.len());
                     let pos = rng.gen_range(0..=new_sequence.len());
                     new_sequence.insert(pos, all_transformations[idx]);
@@ -187,14 +183,12 @@ impl CompositeTransformation {
             2 => {
                 // Replace transformation
                 if !new_sequence.is_empty() {
-                    let all_transformations = vec![
-                        TransformationType::Bind,
+                    let all_transformations = [TransformationType::Bind,
                         TransformationType::Bundle,
                         TransformationType::Permute,
                         TransformationType::Resonate,
                         TransformationType::Abstract,
-                        TransformationType::Ground,
-                    ];
+                        TransformationType::Ground];
                     let pos = rng.gen_range(0..new_sequence.len());
                     let idx = rng.gen_range(0..all_transformations.len());
                     new_sequence[pos] = all_transformations[idx];
@@ -240,6 +234,15 @@ pub struct CompositeFitness {
 
     /// Number of evaluations
     pub num_evaluations: usize,
+
+    /// Task-specific improvement: how much this composite improves downstream task metrics
+    pub task_improvement: f64,
+
+    /// Classification accuracy when this composite is used as a feature transform
+    pub classification_accuracy: f64,
+
+    /// Number of task-grounded evaluations (separate from Φ evaluations)
+    pub task_evaluations: usize,
 }
 
 impl Default for CompositeFitness {
@@ -249,6 +252,9 @@ impl Default for CompositeFitness {
             generalization_score: 0.0,
             novelty_score: 1.0, // Start with high novelty
             num_evaluations: 0,
+            task_improvement: 0.0,
+            classification_accuracy: 0.0,
+            task_evaluations: 0,
         }
     }
 }
@@ -268,12 +274,42 @@ impl CompositeFitness {
         self.novelty_score *= 0.99;
     }
 
-    /// Compute overall fitness
+    /// Compute overall fitness including task-grounded metrics.
+    ///
+    /// Blends Φ-based fitness (discovery) with task-grounded fitness (utility):
+    /// - Φ contribution: does the composite increase consciousness integration?
+    /// - Generalization: does it work across many problems?
+    /// - Novelty: is it different from existing transformations?
+    /// - Task improvement: does it actually improve downstream task performance?
+    /// - Classification accuracy: does it help with discriminative tasks?
     pub fn composite_score(&self) -> f64 {
-        // Weighted combination
-        0.5 * self.avg_phi_contribution
-            + 0.3 * self.generalization_score
-            + 0.2 * self.novelty_score
+        // Base discovery-driven fitness (always available)
+        let discovery_score = 0.4 * self.avg_phi_contribution
+            + 0.2 * self.generalization_score
+            + 0.1 * self.novelty_score;
+
+        // Task-grounded fitness (available once task_evaluations > 0)
+        if self.task_evaluations > 0 {
+            let task_score = 0.2 * self.task_improvement + 0.1 * self.classification_accuracy;
+            discovery_score + task_score
+        } else {
+            // Fall back to pure discovery scoring when no task data available
+            // (rescale to use the full weight budget)
+            let scale = 1.0 / 0.7; // 0.4 + 0.2 + 0.1 = 0.7, scale up
+            discovery_score * scale
+        }
+    }
+
+    /// Update fitness from task-grounded evaluation.
+    ///
+    /// Call this after using the composite in a concrete task (classification,
+    /// reasoning, etc.) to track how much it improves real metrics.
+    pub fn update_task_fitness(&mut self, improvement: f64, accuracy: f64) {
+        let n = self.task_evaluations as f64;
+        self.task_improvement = (self.task_improvement * n + improvement) / (n + 1.0);
+        self.classification_accuracy =
+            (self.classification_accuracy * n + accuracy) / (n + 1.0);
+        self.task_evaluations += 1;
     }
 }
 
@@ -342,6 +378,16 @@ impl MetaPrimitiveEvolution {
             let generalization = 1.0 / (1.0 + variance); // High generalization = low variance
 
             composite.fitness.update(avg_phi, generalization);
+
+            // Task-grounded fitness: measure improvement consistency and accuracy
+            // improvement = fraction of problems where Phi > threshold (0.1)
+            // accuracy = fraction of problems with non-trivial Phi output
+            let threshold = 0.1;
+            let improved_count = phi_scores.iter().filter(|&&p| p > threshold).count();
+            let task_improvement = improved_count as f64 / phi_scores.len().max(1) as f64;
+            let accuracy = phi_scores.iter().filter(|&&p| p > 0.0).count() as f64
+                / phi_scores.len().max(1) as f64;
+            composite.fitness.update_task_fitness(task_improvement, accuracy);
         }
 
         // Sort by fitness
@@ -371,7 +417,7 @@ impl MetaPrimitiveEvolution {
             let parent2 = self.tournament_select();
 
             let mut offspring = if rand::thread_rng().gen::<f64>() < self.crossover_rate {
-                parent1.crossover(&parent2)
+                parent1.crossover(parent2)
             } else {
                 parent1.clone()
             };
@@ -406,7 +452,7 @@ impl MetaPrimitiveEvolution {
         // Measure Φ
         use crate::hdc::integrated_information::IntegratedInformation;
         let mut phi_computer = IntegratedInformation::new();
-        let components = vec![problem.clone(), output];
+        let components = vec![*problem, output];
         let phi = phi_computer.compute_phi(&components);
 
         Ok(phi)

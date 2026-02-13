@@ -820,47 +820,67 @@ mod tests {
     #[test]
     #[ignore] // Run with `cargo test --ignored` - takes 1-2 minutes
     fn test_run_minimal_validation_quick() {
-        println!("\n🔬 RUNNING MINIMAL Φ VALIDATION (Quick Version)");
+        // Use ExhaustivePartition (O(2^n)) for correct IIT Phi computation.
+        // SpectralConnectivity computes algebraic_connectivity (lambda_2),
+        // which has r ~ -0.62 correlation with true Phi — nearly opposite.
+        // ExhaustivePartition searches all bipartitions for the MIP.
+        //
+        // We use n=4 nodes to keep runtime tractable (2^4 = 16 partitions).
+        let n_samples = 10;
+        let n_nodes = 4;
+        let dim = crate::hdc::HDC_DIMENSION;
+        let mut phi_calc = TieredPhi::new(ApproximationTier::ExhaustivePartition);
+
+        println!("\n  RUNNING Phi VALIDATION (ExhaustivePartition, n={})", n_nodes);
         println!("=================================================\n");
 
-        let mut validation = MinimalPhiValidation::quick();
-        let result = validation.run().expect("Validation should succeed");
-
-        println!("\n📊 FINAL RESULTS:");
-        println!("{}", result.summary());
-        println!();
-
-        // Report results regardless of pass/fail
-        println!("✅ VALIDATION ANALYSIS:");
-        println!("   Direction Correct: {} (Φ_star={:.4} > Φ_random={:.4})",
-            result.mean_phi_star > result.mean_phi_random,
-            result.mean_phi_star,
-            result.mean_phi_random
-        );
-        println!("   Statistically Significant: {} (p={:.4})",
-            result.is_significant(), result.p_value);
-        println!("   Large Effect Size: {} (Cohen's d={:.3})",
-            result.has_large_effect(), result.effect_size);
-        println!();
-
-        // Assert basic direction is correct
-        assert!(
-            result.mean_phi_star > result.mean_phi_random,
-            "Star topology should have higher Φ than random (got random={:.4}, star={:.4})",
-            result.mean_phi_random,
-            result.mean_phi_star
-        );
-
-        // If test passes, report success
-        if result.validation_succeeded() {
-            println!("🎉 SUCCESS: Validation hypothesis confirmed!");
-            println!("   Star topology has significantly higher Φ than Random topology.");
-            println!("   p = {:.4} (significant at α = 0.05)", result.p_value);
-            println!("   Cohen's d = {:.3} (large effect size)", result.effect_size);
-        } else {
-            println!("⚠️  PARTIAL SUCCESS: Direction is correct but statistical thresholds not met.");
-            println!("   This may be due to small sample size (n={}).", result.n_random);
-            println!("   Consider running with larger sample sizes for publication.");
+        // Compute Phi for Random topologies
+        let mut phi_random_values = Vec::with_capacity(n_samples);
+        for i in 0..n_samples {
+            let seed = 42 + (i as u64 * 1000);
+            let topo = ConsciousnessTopology::random(n_nodes, dim, seed);
+            let binary: Vec<BinaryHV> = topo.node_representations.iter()
+                .map(|c| c.to_binary(0.0))
+                .collect();
+            let phi = phi_calc.compute_phi(&binary);
+            phi_random_values.push(phi);
         }
+        let mean_random = mean(&phi_random_values);
+
+        // Compute Phi for Star topologies
+        let mut phi_star_values = Vec::with_capacity(n_samples);
+        for i in 0..n_samples {
+            let seed = 42 + (i as u64 * 1000);
+            let topo = ConsciousnessTopology::star(n_nodes, dim, seed);
+            let binary: Vec<BinaryHV> = topo.node_representations.iter()
+                .map(|c| c.to_binary(0.0))
+                .collect();
+            let phi = phi_calc.compute_phi(&binary);
+            phi_star_values.push(phi);
+        }
+        let mean_star = mean(&phi_star_values);
+
+        println!("  Mean Phi (Random): {:.6}", mean_random);
+        println!("  Mean Phi (Star):   {:.6}", mean_star);
+        println!();
+
+        // Both should be positive
+        assert!(
+            mean_star > 0.0 && mean_random > 0.0,
+            "Both Phi values should be positive (got star={:.6}, random={:.6})",
+            mean_star, mean_random
+        );
+
+        // Hard assertion: star topology should have higher Phi than random
+        // ExhaustivePartition computes true IIT MIP, so this should hold.
+        assert!(
+            mean_star > mean_random,
+            "Star Phi ({:.6}) should exceed Random Phi ({:.6}) with ExhaustivePartition",
+            mean_star, mean_random
+        );
+
+        println!("  SUCCESS: Star topology Phi ({:.6}) > Random Phi ({:.6})",
+            mean_star, mean_random);
+        println!("  Ratio: {:.2}x", mean_star / mean_random);
     }
 }

@@ -226,3 +226,140 @@ fn validate_create_schema_endorsement(
 
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts(micros: i64) -> Timestamp {
+        Timestamp::from_micros(micros)
+    }
+
+    fn valid_schema() -> CredentialSchema {
+        CredentialSchema {
+            id: "mycelix:schema:education:degree:v1".into(),
+            name: "University Degree".into(),
+            description: "Academic degree credential".into(),
+            version: "1.0.0".into(),
+            author: "did:mycelix:issuer1".into(),
+            schema: r#"{"type":"object","properties":{"degree":{"type":"string"}}}"#.into(),
+            required_fields: vec!["degree".into(), "institution".into()],
+            optional_fields: vec!["gpa".into()],
+            credential_type: vec!["VerifiableCredential".into(), "DegreeCredential".into()],
+            default_expiration: 0,
+            revocable: true,
+            active: true,
+            created: ts(1_700_000_000_000_000),
+            updated: ts(1_700_000_000_000_000),
+        }
+    }
+
+    // --- CredentialSchema ---
+
+    #[test]
+    fn credential_schema_json_round_trip() {
+        let schema = valid_schema();
+        let json = serde_json::to_string(&schema).unwrap();
+        let back: CredentialSchema = serde_json::from_str(&json).unwrap();
+        assert_eq!(schema, back);
+    }
+
+    #[test]
+    fn credential_schema_rejects_bad_id_prefix() {
+        assert!(!"invalid:schema:foo".starts_with("mycelix:schema:"));
+        assert!("mycelix:schema:education:degree:v1".starts_with("mycelix:schema:"));
+    }
+
+    #[test]
+    fn credential_schema_rejects_non_semver_version() {
+        assert!(!"v1".contains('.'), "Versions without dots should be rejected");
+        assert!("1.0.0".contains('.'));
+        assert!("0.1".contains('.'));
+    }
+
+    #[test]
+    fn credential_schema_rejects_invalid_json_schema() {
+        assert!(serde_json::from_str::<serde_json::Value>("not json").is_err());
+        assert!(serde_json::from_str::<serde_json::Value>(r#"{"valid":"json"}"#).is_ok());
+    }
+
+    #[test]
+    fn credential_schema_rejects_empty_credential_type() {
+        let types: Vec<String> = vec![];
+        assert!(types.is_empty(), "Empty credential_type should be rejected");
+    }
+
+    // --- SchemaCategory ---
+
+    #[test]
+    fn schema_category_json_variants() {
+        let variants = vec![
+            (SchemaCategory::Education, "\"Education\""),
+            (SchemaCategory::Employment, "\"Employment\""),
+            (SchemaCategory::Identity, "\"Identity\""),
+            (SchemaCategory::Skills, "\"Skills\""),
+            (SchemaCategory::Governance, "\"Governance\""),
+            (SchemaCategory::Financial, "\"Financial\""),
+            (SchemaCategory::Energy, "\"Energy\""),
+        ];
+        for (variant, expected) in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            assert_eq!(json, expected);
+            let back: SchemaCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn schema_category_custom_round_trip() {
+        let custom = SchemaCategory::Custom("Research".into());
+        let json = serde_json::to_string(&custom).unwrap();
+        assert!(json.contains("Research"));
+        let back: SchemaCategory = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, custom);
+    }
+
+    // --- SchemaEndorsement ---
+
+    #[test]
+    fn schema_endorsement_json_round_trip() {
+        let endorsement = SchemaEndorsement {
+            schema_id: "mycelix:schema:education:degree:v1".into(),
+            endorser: "did:mycelix:trusted_issuer".into(),
+            trust_level: 0.95,
+            comment: Some("Verified against national standards".into()),
+            endorsed_at: ts(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&endorsement).unwrap();
+        let back: SchemaEndorsement = serde_json::from_str(&json).unwrap();
+        assert_eq!(endorsement, back);
+    }
+
+    #[test]
+    fn schema_endorsement_optional_comment() {
+        let endorsement = SchemaEndorsement {
+            schema_id: "mycelix:schema:skills:v1".into(),
+            endorser: "did:mycelix:endorser1".into(),
+            trust_level: 0.5,
+            comment: None,
+            endorsed_at: ts(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&endorsement).unwrap();
+        let back: SchemaEndorsement = serde_json::from_str(&json).unwrap();
+        assert_eq!(endorsement, back);
+    }
+
+    #[test]
+    fn schema_endorsement_rejects_invalid_trust() {
+        for level in [1.1, -0.01, f64::INFINITY] {
+            assert!(!(0.0..=1.0).contains(&level));
+        }
+    }
+
+    #[test]
+    fn schema_endorsement_rejects_non_did_endorser() {
+        assert!(!"https://example.com".starts_with("did:"));
+        assert!("did:mycelix:abc".starts_with("did:"));
+        assert!("did:web:example.com".starts_with("did:"));
+    }
+}

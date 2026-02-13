@@ -27,7 +27,7 @@
 //! cargo test --test payments_test -- --ignored
 //! ```
 
-use holochain::sweettest::{SweetConductor, SweetConductorBatch, SweetDnaFile, SweetAgents, SweetCell};
+use holochain::sweettest::*;
 use holochain::prelude::*;
 use holochain_types::prelude::*;
 use std::time::Duration;
@@ -70,7 +70,7 @@ mod payment_creation {
     /// - Alice sends 100 SAP to Bob
     /// - Verify payment is created with correct fields
     /// - Verify receipt is generated
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore] // Requires DNA bundle to be built
     async fn test_create_payment_success() {
         println!("Test 1.1: Basic Payment Creation");
@@ -89,8 +89,8 @@ mod payment_creation {
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create payment input
         let payment_input = SendPaymentInput {
@@ -105,12 +105,11 @@ mod payment_creation {
         // Send payment
         let payment_record: Record = conductor
             .call(
-                alice_cell.zome("payments"),
+                &alice_cell.zome("payments"),
                 "send_payment",
-                payment_input.clone(),
+                payment_input,
             )
-            .await
-            .expect("Failed to send payment");
+            .await;
 
         println!("  - Payment created successfully");
 
@@ -136,7 +135,7 @@ mod payment_creation {
     }
 
     /// Test 1.2: Payment with different payment types
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_payment_types() {
         println!("Test 1.2: Payment Types");
@@ -153,8 +152,8 @@ mod payment_creation {
 
         let alice_cell = &apps[0].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Test each valid payment type (LoanPayment and EnergyInvestment removed)
         let payment_types = vec![
@@ -176,8 +175,7 @@ mod payment_creation {
 
             let result: Record = conductor
                 .call(&alice_cell.zome("payments"), "send_payment", input)
-                .await
-                .expect(&format!("Failed to send {} payment", type_name));
+                .await;
 
             let payment: Payment = result
                 .entry()
@@ -193,7 +191,7 @@ mod payment_creation {
     }
 
     /// Test 1.3: Recurring payment configuration
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_recurring_payment() {
         println!("Test 1.3: Recurring Payment Configuration");
@@ -210,8 +208,8 @@ mod payment_creation {
 
         let alice_cell = &apps[0].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create recurring payment config
         let recurring_config = RecurringConfig {
@@ -231,8 +229,7 @@ mod payment_creation {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to create recurring payment");
+            .await;
 
         let payment: Payment = result
             .entry()
@@ -262,7 +259,7 @@ mod payment_validation {
     use super::*;
 
     /// Test 2.1: Invalid DID format rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_invalid_did_rejected() {
         println!("Test 2.1: Invalid DID Validation");
@@ -282,7 +279,7 @@ mod payment_validation {
         // Test with invalid sender DID (no "did:" prefix)
         let invalid_sender_input = SendPaymentInput {
             from_did: "invalid:alice".to_string(), // Invalid - no "did:" prefix
-            to_did: test_did("bob"),
+            to_did: format!("did:mycelix:{}", agents[1]),
             amount: 100_000_000,
             currency: TEST_CURRENCY.to_string(),
             payment_type: PaymentType::Direct,
@@ -308,7 +305,7 @@ mod payment_validation {
 
         // Test with invalid receiver DID
         let invalid_receiver_input = SendPaymentInput {
-            from_did: test_did("alice"),
+            from_did: format!("did:mycelix:{}", agents[0]),
             to_did: "bob@example.com".to_string(), // Invalid - email format
             amount: 100_000_000,
             currency: TEST_CURRENCY.to_string(),
@@ -337,7 +334,7 @@ mod payment_validation {
     }
 
     /// Test 2.2: Zero or negative amounts rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_invalid_amount_rejected() {
         println!("Test 2.2: Invalid Amount Validation");
@@ -353,8 +350,8 @@ mod payment_validation {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Test zero amount
         let zero_amount_input = SendPaymentInput {
@@ -389,7 +386,7 @@ mod payment_validation {
     }
 
     /// Test 2.3: Self-payment rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_self_payment_rejected() {
         println!("Test 2.3: Self-Payment Validation");
@@ -405,7 +402,7 @@ mod payment_validation {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Attempt self-payment
         let self_payment_input = SendPaymentInput {
@@ -437,7 +434,7 @@ mod payment_validation {
     }
 
     /// Test 2.4: Invalid currency rejected (only SAP and TEND accepted)
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_invalid_currency_rejected() {
         println!("Test 2.4: Invalid Currency Validation");
@@ -453,8 +450,8 @@ mod payment_validation {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Test invalid currencies that are no longer accepted
         let invalid_currencies = vec!["MYC", "USD", "ENERGY", "BTC", "ETH"];
@@ -501,7 +498,7 @@ mod double_spend_prevention {
     /// Test 3.1: Payment ID uniqueness
     ///
     /// Verifies that each payment gets a unique ID to prevent replay attacks
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_payment_id_uniqueness() {
         println!("Test 3.1: Payment ID Uniqueness");
@@ -517,8 +514,8 @@ mod double_spend_prevention {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create multiple identical payments
         let mut payment_ids = Vec::new();
@@ -534,8 +531,7 @@ mod double_spend_prevention {
 
             let result: Record = conductor
                 .call(&alice_cell.zome("payments"), "send_payment", input)
-                .await
-                .expect("Failed to send payment");
+                .await;
 
             let payment: Payment = result
                 .entry()
@@ -566,7 +562,7 @@ mod double_spend_prevention {
     ///
     /// Each payment generates a unique receipt that can be used to verify
     /// the payment has not been processed twice
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_receipt_prevents_replay() {
         println!("Test 3.2: Receipt Verification");
@@ -582,8 +578,8 @@ mod double_spend_prevention {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Send payment
         let input = SendPaymentInput {
@@ -597,8 +593,7 @@ mod double_spend_prevention {
 
         let payment_record: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send payment");
+            .await;
 
         let payment: Payment = payment_record
             .entry()
@@ -612,8 +607,7 @@ mod double_spend_prevention {
                 did: alice_did.clone(),
                 limit: None,
             })
-            .await
-            .expect("Failed to get payment history");
+            .await;
 
         assert!(!history.is_empty(), "Payment history should not be empty");
 
@@ -628,7 +622,7 @@ mod double_spend_prevention {
     /// Test 3.3: Channel balance consistency
     ///
     /// Payment channels maintain consistent balances, preventing double-spend
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_channel_balance_consistency() {
         println!("Test 3.3: Channel Balance Consistency");
@@ -646,8 +640,8 @@ mod double_spend_prevention {
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open payment channel with initial deposits
         let channel_input = OpenChannelInput {
@@ -660,8 +654,7 @@ mod double_spend_prevention {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -686,8 +679,7 @@ mod double_spend_prevention {
 
         let updated_channel: Record = conductor
             .call(&alice_cell.zome("payments"), "channel_transfer", transfer_input)
-            .await
-            .expect("Failed to transfer");
+            .await;
 
         let channel_after: PaymentChannel = updated_channel
             .entry()
@@ -709,7 +701,7 @@ mod double_spend_prevention {
     }
 
     /// Test 3.4: Insufficient balance prevents double-spend in channels
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_channel_insufficient_balance() {
         println!("Test 3.4: Channel Insufficient Balance Check");
@@ -726,8 +718,8 @@ mod double_spend_prevention {
 
         let alice_cell = &apps[0].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open channel with limited balance
         let channel_input = OpenChannelInput {
@@ -740,8 +732,7 @@ mod double_spend_prevention {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -787,7 +778,7 @@ mod transaction_confirmation {
     use super::*;
 
     /// Test 4.1: Payment completion status
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_payment_completion_status() {
         println!("Test 4.1: Payment Completion Status");
@@ -803,8 +794,8 @@ mod transaction_confirmation {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
@@ -817,8 +808,7 @@ mod transaction_confirmation {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send payment");
+            .await;
 
         let payment: Payment = result
             .entry()
@@ -843,7 +833,7 @@ mod transaction_confirmation {
     }
 
     /// Test 4.2: Payment history retrieval (both sent and received)
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_payment_history_retrieval() {
         println!("Test 4.2: Payment History Retrieval");
@@ -862,9 +852,9 @@ mod transaction_confirmation {
         let bob_cell = &apps[1].cells()[0];
         let charlie_cell = &apps[2].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
-        let charlie_did = test_did("charlie");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
+        let charlie_did = format!("did:mycelix:{}", agents[2]);
 
         // Alice sends to Bob
         let input1 = SendPaymentInput {
@@ -878,8 +868,7 @@ mod transaction_confirmation {
 
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input1)
-            .await
-            .expect("Failed payment 1");
+            .await;
         println!("  - Payment 1: Alice -> Bob (50)");
 
         // Charlie sends to Alice
@@ -894,8 +883,7 @@ mod transaction_confirmation {
 
         let _: Record = conductor
             .call(&charlie_cell.zome("payments"), "send_payment", input2)
-            .await
-            .expect("Failed payment 2");
+            .await;
         println!("  - Payment 2: Charlie -> Alice (30)");
 
         // Alice sends to Charlie
@@ -910,8 +898,7 @@ mod transaction_confirmation {
 
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input3)
-            .await
-            .expect("Failed payment 3");
+            .await;
         println!("  - Payment 3: Alice -> Charlie (20)");
 
         // Wait for DHT consistency
@@ -923,8 +910,7 @@ mod transaction_confirmation {
                 did: alice_did.clone(),
                 limit: None,
             })
-            .await
-            .expect("Failed to get Alice's history");
+            .await;
 
         println!("  - Alice's history: {} payments", alice_history.len());
         assert!(alice_history.len() >= 2, "Alice should have at least 2 payments");
@@ -935,8 +921,7 @@ mod transaction_confirmation {
                 did: bob_did.clone(),
                 limit: None,
             })
-            .await
-            .expect("Failed to get Bob's history");
+            .await;
 
         println!("  - Bob's history: {} payments", bob_history.len());
         assert!(!bob_history.is_empty(), "Bob should have at least 1 payment");
@@ -954,7 +939,7 @@ mod currency_tests {
     use super::*;
 
     /// Test 5.1: SAP currency payment
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_sap_payment() {
         println!("Test 5.1: SAP Currency Payment");
@@ -970,8 +955,8 @@ mod currency_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
@@ -984,8 +969,7 @@ mod currency_tests {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send SAP payment");
+            .await;
 
         let payment: Payment = result
             .entry()
@@ -1001,7 +985,7 @@ mod currency_tests {
     }
 
     /// Test 5.2: TEND currency payment
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_tend_payment() {
         println!("Test 5.2: TEND Currency Payment");
@@ -1017,8 +1001,8 @@ mod currency_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         let input = SendPaymentInput {
             from_did: alice_did.clone(),
@@ -1031,8 +1015,7 @@ mod currency_tests {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send TEND payment");
+            .await;
 
         let payment: Payment = result
             .entry()
@@ -1047,7 +1030,7 @@ mod currency_tests {
     }
 
     /// Test 5.3: Only SAP and TEND currencies are valid
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_valid_currencies_only() {
         println!("Test 5.3: Valid Currencies Only (SAP/TEND)");
@@ -1063,8 +1046,8 @@ mod currency_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Valid: SAP
         let sap_input = SendPaymentInput {
@@ -1078,8 +1061,7 @@ mod currency_tests {
 
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", sap_input)
-            .await
-            .expect("SAP payment should succeed");
+            .await;
         println!("  - SAP accepted: OK");
 
         // Valid: TEND
@@ -1094,8 +1076,7 @@ mod currency_tests {
 
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", tend_input)
-            .await
-            .expect("TEND payment should succeed");
+            .await;
         println!("  - TEND accepted: OK");
 
         // Invalid: MYC (old currency, no longer accepted)
@@ -1128,7 +1109,7 @@ mod failed_transaction_handling {
     use super::*;
 
     /// Test 6.1: Channel not found error
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_channel_not_found() {
         println!("Test 6.1: Channel Not Found Error");
@@ -1172,7 +1153,7 @@ mod failed_transaction_handling {
     }
 
     /// Test 6.2: Empty history handling
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_empty_payment_history() {
         println!("Test 6.2: Empty Payment History");
@@ -1190,15 +1171,14 @@ mod failed_transaction_handling {
         let alice_cell = &apps[0].cells()[0];
 
         // Query history for user with no payments
-        let new_user_did = test_did("new_user_with_no_payments");
+        let new_user_did = format!("did:mycelix:{}", agents[0]);
 
         let history: Vec<Record> = conductor
             .call(&alice_cell.zome("payments"), "get_payment_history", GetPaymentHistoryInput {
                 did: new_user_did,
                 limit: None,
             })
-            .await
-            .expect("Failed to get history");
+            .await;
 
         assert!(history.is_empty(), "New user should have empty history");
         println!("  - Empty history returned: OK");
@@ -1209,7 +1189,7 @@ mod failed_transaction_handling {
     /// Test 6.3: Concurrent transfer race condition prevention
     ///
     /// Tests that rapid successive transfers are handled correctly
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_concurrent_channel_transfers() {
         println!("Test 6.3: Concurrent Channel Transfers");
@@ -1225,8 +1205,8 @@ mod failed_transaction_handling {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open channel with enough balance for multiple transfers
         let channel_input = OpenChannelInput {
@@ -1239,8 +1219,7 @@ mod failed_transaction_handling {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -1267,8 +1246,7 @@ mod failed_transaction_handling {
 
             let result: Record = conductor
                 .call(&alice_cell.zome("payments"), "channel_transfer", transfer_input)
-                .await
-                .expect(&format!("Failed transfer {}", i));
+                .await;
 
             let updated_channel: PaymentChannel = result
                 .entry()
@@ -1312,7 +1290,7 @@ mod payment_channels {
     use super::*;
 
     /// Test 7.1: Channel creation with valid inputs
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_channel_creation() {
         println!("Test 7.1: Payment Channel Creation");
@@ -1328,8 +1306,8 @@ mod payment_channels {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         let channel_input = OpenChannelInput {
             party_a: alice_did.clone(),
@@ -1341,8 +1319,7 @@ mod payment_channels {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = result
             .entry()
@@ -1366,7 +1343,7 @@ mod payment_channels {
     }
 
     /// Test 7.2: Bidirectional transfers in channel
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_bidirectional_transfers() {
         println!("Test 7.2: Bidirectional Channel Transfers");
@@ -1384,8 +1361,8 @@ mod payment_channels {
         let alice_cell = &apps[0].cells()[0];
         let bob_cell = &apps[1].cells()[0];
 
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open channel
         let channel_input = OpenChannelInput {
@@ -1398,8 +1375,7 @@ mod payment_channels {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -1419,8 +1395,7 @@ mod payment_channels {
 
         let result1: Record = conductor
             .call(&alice_cell.zome("payments"), "channel_transfer", transfer1)
-            .await
-            .expect("Failed transfer A->B");
+            .await;
 
         let channel1: PaymentChannel = result1
             .entry()
@@ -1441,8 +1416,7 @@ mod payment_channels {
 
         let result2: Record = conductor
             .call(&bob_cell.zome("payments"), "channel_transfer", transfer2)
-            .await
-            .expect("Failed transfer B->A");
+            .await;
 
         let channel2: PaymentChannel = result2
             .entry()
@@ -1462,7 +1436,7 @@ mod payment_channels {
     }
 
     /// Test 7.3: Channel validation - invalid DIDs
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_channel_invalid_parties() {
         println!("Test 7.3: Channel Invalid Parties Validation");
@@ -1482,7 +1456,7 @@ mod payment_channels {
         // Test invalid party_a
         let invalid_input = OpenChannelInput {
             party_a: "invalid_did".to_string(), // No "did:" prefix
-            party_b: test_did("bob"),
+            party_b: format!("did:mycelix:{}", agents[1]),
             currency: TEST_CURRENCY.to_string(),
             initial_deposit_a: 100_000_000,
             initial_deposit_b: 100_000_000,
@@ -1523,8 +1497,8 @@ mod unit_tests {
     #[test]
     fn test_did_validation_format() {
         // Valid DIDs
-        assert!(test_did("alice").starts_with("did:mycelix:test:"));
-        assert!(test_did("bob").starts_with("did:mycelix:test:"));
+        assert!(test_helpers::test_did("alice").starts_with("did:mycelix:test:"));
+        assert!(test_helpers::test_did("bob").starts_with("did:mycelix:test:"));
 
         // Generated DIDs are different
         let did1 = test_helpers::unique_test_did("user");
@@ -1621,7 +1595,7 @@ mod performance_benchmarks {
     use super::*;
 
     /// Benchmark: Multiple payment creation latency
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn benchmark_payment_creation_latency() {
         println!("Benchmark: Payment Creation Latency");
@@ -1637,8 +1611,8 @@ mod performance_benchmarks {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         let num_payments = 10;
         let mut latencies = Vec::new();
@@ -1657,8 +1631,7 @@ mod performance_benchmarks {
 
             let _: Record = conductor
                 .call(&alice_cell.zome("payments"), "send_payment", input)
-                .await
-                .expect("Failed to send payment");
+                .await;
 
             let elapsed = start.elapsed();
             latencies.push(elapsed.as_millis());
@@ -1689,7 +1662,7 @@ mod sap_balance_management {
     use super::*;
 
     /// Test 8.1: Initialize SAP balance and verify zero balance
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_initialize_sap_balance() {
         println!("Test 8.1: Initialize SAP Balance");
@@ -1711,16 +1684,14 @@ mod sap_balance_management {
         // Initialize SAP balance
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to initialize SAP balance");
+            .await;
 
         println!("  - SAP balance initialized");
 
         // Get balance and verify zero
         let balance: SapBalanceResponse = conductor
             .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to get SAP balance");
+            .await;
 
         assert_eq!(balance.raw_balance, 0, "Initial raw balance should be 0");
         assert_eq!(balance.effective_balance, 0, "Initial effective balance should be 0");
@@ -1733,7 +1704,7 @@ mod sap_balance_management {
     }
 
     /// Test 8.2: Credit and debit SAP, verify remaining balance
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_credit_and_debit_sap() {
         println!("Test 8.2: Credit and Debit SAP");
@@ -1755,8 +1726,7 @@ mod sap_balance_management {
         // Initialize
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to initialize");
+            .await;
 
         // Credit 5000
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -1772,8 +1742,7 @@ mod sap_balance_management {
                 amount: 5000,
                 reason: "Test credit".to_string(),
             })
-            .await
-            .expect("Failed to credit SAP");
+            .await;
 
         println!("  - Credited 5000 SAP");
 
@@ -1791,16 +1760,14 @@ mod sap_balance_management {
                 amount: 2000,
                 reason: "Test debit".to_string(),
             })
-            .await
-            .expect("Failed to debit SAP");
+            .await;
 
         println!("  - Debited 2000 SAP");
 
         // Verify remaining balance is 3000
         let balance: SapBalanceResponse = conductor
             .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to get balance");
+            .await;
 
         assert_eq!(balance.raw_balance, 3000, "Balance should be 3000 after credit 5000 and debit 2000");
 
@@ -1809,7 +1776,7 @@ mod sap_balance_management {
     }
 
     /// Test 8.3: Debit exceeding balance should fail
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_debit_exceeds_balance_fails() {
         println!("Test 8.3: Debit Exceeds Balance");
@@ -1831,8 +1798,7 @@ mod sap_balance_management {
         // Initialize and credit 1000
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to initialize");
+            .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreditSapInput {
@@ -1847,8 +1813,7 @@ mod sap_balance_management {
                 amount: 1000,
                 reason: "Test credit".to_string(),
             })
-            .await
-            .expect("Failed to credit");
+            .await;
 
         // Try to debit 2000 (exceeds 1000 balance)
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -1882,7 +1847,7 @@ mod sap_balance_management {
     }
 
     /// Test 8.4: Demurrage is applied on balance read
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_demurrage_applied_on_read() {
         println!("Test 8.4: Demurrage Applied on Read");
@@ -1904,8 +1869,7 @@ mod sap_balance_management {
         // Initialize and credit a large balance (above exempt floor)
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to initialize");
+            .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreditSapInput {
@@ -1920,8 +1884,7 @@ mod sap_balance_management {
                 amount: 10_000_000_000, // 10B micro-SAP (well above exempt floor)
                 reason: "Test large credit".to_string(),
             })
-            .await
-            .expect("Failed to credit");
+            .await;
 
         // Wait to allow time to pass for demurrage calculation
         tokio::time::sleep(Duration::from_secs(2)).await;
@@ -1929,8 +1892,7 @@ mod sap_balance_management {
         // Read balance - pending_demurrage should be > 0 (time has elapsed)
         let balance: SapBalanceResponse = conductor
             .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to get balance");
+            .await;
 
         println!("  - Raw balance: {}", balance.raw_balance);
         println!("  - Effective balance: {}", balance.effective_balance);
@@ -1953,7 +1915,7 @@ mod exit_protocol {
     use super::*;
 
     /// Test 9.1: Initiate exit with Commons succession preference
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_exit_with_commons_succession() {
         println!("Test 9.1: Exit with Commons Succession");
@@ -1987,8 +1949,7 @@ mod exit_protocol {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "initiate_exit", input)
-            .await
-            .expect("Failed to initiate exit");
+            .await;
 
         let exit: ExitRecord = result
             .entry()
@@ -2007,7 +1968,7 @@ mod exit_protocol {
     }
 
     /// Test 9.2: Initiate exit with Designee succession preference
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_exit_with_designee() {
         println!("Test 9.2: Exit with Designee");
@@ -2033,7 +1994,7 @@ mod exit_protocol {
             pub sap_balance: u64,
         }
 
-        let designee_did = test_did("bob");
+        let designee_did = format!("did:mycelix:{}", agents[1]);
         let input = InitiateExitInput {
             member_did: alice_did.clone(),
             succession_preference: SuccessionPreference::Designee(designee_did.clone()),
@@ -2042,8 +2003,7 @@ mod exit_protocol {
 
         let result: Record = conductor
             .call(&alice_cell.zome("payments"), "initiate_exit", input)
-            .await
-            .expect("Failed to initiate exit");
+            .await;
 
         let exit: ExitRecord = result
             .entry()
@@ -2073,7 +2033,7 @@ mod escrow_tests {
     use super::*;
 
     /// Test 10.1: Create and release escrow
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_create_and_release_escrow() {
         println!("Test 10.1: Create and Release Escrow");
@@ -2089,8 +2049,8 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create escrow
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -2114,8 +2074,7 @@ mod escrow_tests {
 
         let escrow_record: Record = conductor
             .call(&alice_cell.zome("payments"), "create_escrow", escrow_input)
-            .await
-            .expect("Failed to create escrow");
+            .await;
 
         let escrow: Payment = escrow_record
             .entry()
@@ -2129,8 +2088,7 @@ mod escrow_tests {
         // Release escrow
         let released_record: Record = conductor
             .call(&alice_cell.zome("payments"), "release_escrow", escrow.id.clone())
-            .await
-            .expect("Failed to release escrow");
+            .await;
 
         let released: Payment = released_record
             .entry()
@@ -2144,7 +2102,7 @@ mod escrow_tests {
     }
 
     /// Test 10.2: Refund a payment and verify Refunded status
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_refund_payment() {
         println!("Test 10.2: Refund Payment");
@@ -2160,8 +2118,8 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create payment
         let input = SendPaymentInput {
@@ -2175,8 +2133,7 @@ mod escrow_tests {
 
         let payment_record: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send payment");
+            .await;
 
         let payment: Payment = payment_record
             .entry()
@@ -2189,8 +2146,7 @@ mod escrow_tests {
         // Refund
         let refunded_record: Record = conductor
             .call(&alice_cell.zome("payments"), "refund_payment", payment.id.clone())
-            .await
-            .expect("Failed to refund payment");
+            .await;
 
         let refunded: Payment = refunded_record
             .entry()
@@ -2204,7 +2160,7 @@ mod escrow_tests {
     }
 
     /// Test 10.3: Cannot double refund
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cannot_double_refund() {
         println!("Test 10.3: Cannot Double Refund");
@@ -2220,8 +2176,8 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Create and refund a payment
         let input = SendPaymentInput {
@@ -2235,8 +2191,7 @@ mod escrow_tests {
 
         let payment_record: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send payment");
+            .await;
 
         let payment: Payment = payment_record
             .entry()
@@ -2247,8 +2202,7 @@ mod escrow_tests {
         // First refund - should succeed
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "refund_payment", payment.id.clone())
-            .await
-            .expect("Failed to refund");
+            .await;
 
         println!("  - First refund succeeded");
 
@@ -2282,7 +2236,7 @@ mod channel_close_tests {
     use super::*;
 
     /// Test 11.1: Close an open payment channel
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_close_payment_channel() {
         println!("Test 11.1: Close Payment Channel");
@@ -2298,8 +2252,8 @@ mod channel_close_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open channel
         let channel_input = OpenChannelInput {
@@ -2312,8 +2266,7 @@ mod channel_close_tests {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -2328,8 +2281,7 @@ mod channel_close_tests {
         // Close channel
         let closed_record: Record = conductor
             .call(&alice_cell.zome("payments"), "close_payment_channel", channel_id.clone())
-            .await
-            .expect("Failed to close channel");
+            .await;
 
         let closed_channel: PaymentChannel = closed_record
             .entry()
@@ -2343,7 +2295,7 @@ mod channel_close_tests {
     }
 
     /// Test 11.2: Cannot close an already closed channel
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cannot_close_already_closed() {
         println!("Test 11.2: Cannot Close Already Closed Channel");
@@ -2359,8 +2311,8 @@ mod channel_close_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Open and close channel
         let channel_input = OpenChannelInput {
@@ -2373,8 +2325,7 @@ mod channel_close_tests {
 
         let channel_record: Record = conductor
             .call(&alice_cell.zome("payments"), "open_payment_channel", channel_input)
-            .await
-            .expect("Failed to open channel");
+            .await;
 
         let channel: PaymentChannel = channel_record
             .entry()
@@ -2387,8 +2338,7 @@ mod channel_close_tests {
         // First close
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "close_payment_channel", channel_id.clone())
-            .await
-            .expect("Failed to close channel");
+            .await;
 
         println!("  - First close succeeded");
 
@@ -2503,7 +2453,7 @@ mod fee_tier_tests {
     /// NOTE: Testing different MYCEL scores requires the recognition zome to be
     /// initialized with specific scores for each agent. Since cross-zome setup
     /// is complex in integration tests, we verify the default (Newcomer) tier.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_sap_fee_tiers() {
         println!("Test 13.1: SAP Fee Tiers (Default Newcomer)");
@@ -2528,8 +2478,7 @@ mod fee_tier_tests {
         // Initialize Alice's SAP balance and credit 10M micro-SAP
         let _: Record = conductor
             .call(&alice_cell.zome("payments"), "initialize_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to initialize Alice SAP balance");
+            .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreditSapInput {
@@ -2544,22 +2493,19 @@ mod fee_tier_tests {
                 amount: 10_000_000, // 10M micro-SAP
                 reason: "Test credit for fee test".to_string(),
             })
-            .await
-            .expect("Failed to credit Alice SAP");
+            .await;
 
         // Initialize Bob's SAP balance (so credit_sap on receive works)
         let _: Record = conductor
             .call(&bob_cell.zome("payments"), "initialize_sap_balance", bob_did.clone())
-            .await
-            .expect("Failed to initialize Bob SAP balance");
+            .await;
 
         println!("  - Alice funded with 10M micro-SAP");
 
         // Get Alice's balance before payment
         let balance_before: SapBalanceResponse = conductor
             .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to get Alice balance before");
+            .await;
 
         // Send 1.0 SAP (= 1_000_000 micro-SAP) from Alice to Bob
         let input = SendPaymentInput {
@@ -2573,8 +2519,7 @@ mod fee_tier_tests {
 
         let payment_record: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send SAP payment");
+            .await;
 
         let payment: Payment = payment_record
             .entry()
@@ -2588,8 +2533,7 @@ mod fee_tier_tests {
         // Check Alice's balance after -- should be reduced by amount + fee
         let balance_after: SapBalanceResponse = conductor
             .call(&alice_cell.zome("payments"), "get_sap_balance", alice_did.clone())
-            .await
-            .expect("Failed to get Alice balance after");
+            .await;
 
         // Total debit = amount (1M) + fee (Newcomer 0.001 * 1M = 1000) = 1_001_000
         // Note: demurrage may also apply, so we check the balance decrease is >= amount + fee
@@ -2606,8 +2550,7 @@ mod fee_tier_tests {
         // Verify Bob received the amount (without fee)
         let bob_balance: SapBalanceResponse = conductor
             .call(&bob_cell.zome("payments"), "get_sap_balance", bob_did.clone())
-            .await
-            .expect("Failed to get Bob balance");
+            .await;
 
         assert_eq!(bob_balance.raw_balance, micro_amount,
             "Bob should receive exactly the payment amount (no fee)");
@@ -2620,7 +2563,7 @@ mod fee_tier_tests {
     ///
     /// Send a TEND payment and verify no fee is deducted. TEND is fee-free
     /// because the payments coordinator only computes fees for SAP currency.
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_tend_payment_no_fee() {
         println!("Test 13.2: TEND Payment No Fee");
@@ -2636,8 +2579,8 @@ mod fee_tier_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Send a TEND payment -- TEND bypasses SAP balance/fee logic entirely
         let input = SendPaymentInput {
@@ -2651,8 +2594,7 @@ mod fee_tier_tests {
 
         let payment_record: Record = conductor
             .call(&alice_cell.zome("payments"), "send_payment", input)
-            .await
-            .expect("Failed to send TEND payment");
+            .await;
 
         let payment: Payment = payment_record
             .entry()

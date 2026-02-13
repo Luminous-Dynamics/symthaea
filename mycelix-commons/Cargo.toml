@@ -1,0 +1,118 @@
+[workspace]
+resolver = "2"
+members = [
+    # Shared crates
+    "crates/commons-types",
+    "crates/mutualaid-common",
+
+    # Property domain (4 zomes)
+    "zomes/property-registry/integrity",
+    "zomes/property-registry/coordinator",
+    "zomes/property-transfer/integrity",
+    "zomes/property-transfer/coordinator",
+    "zomes/property-disputes/integrity",
+    "zomes/property-disputes/coordinator",
+    "zomes/property-commons/integrity",
+    "zomes/property-commons/coordinator",
+
+    # Housing domain (6 zomes)
+    "zomes/housing-units/integrity",
+    "zomes/housing-units/coordinator",
+    "zomes/housing-membership/integrity",
+    "zomes/housing-membership/coordinator",
+    "zomes/housing-finances/integrity",
+    "zomes/housing-finances/coordinator",
+    "zomes/housing-maintenance/integrity",
+    "zomes/housing-maintenance/coordinator",
+    "zomes/housing-clt/integrity",
+    "zomes/housing-clt/coordinator",
+    "zomes/housing-governance/integrity",
+    "zomes/housing-governance/coordinator",
+
+    # Care domain (5 zomes)
+    "zomes/care-timebank/integrity",
+    "zomes/care-timebank/coordinator",
+    "zomes/care-circles/integrity",
+    "zomes/care-circles/coordinator",
+    "zomes/care-matching/integrity",
+    "zomes/care-matching/coordinator",
+    "zomes/care-plans/integrity",
+    "zomes/care-plans/coordinator",
+    "zomes/care-credentials/integrity",
+    "zomes/care-credentials/coordinator",
+
+    # Mutual Aid domain (7 zomes)
+    "zomes/mutualaid-needs/integrity",
+    "zomes/mutualaid-needs/coordinator",
+    "zomes/mutualaid-circles/integrity",
+    "zomes/mutualaid-circles/coordinator",
+    "zomes/mutualaid-governance/integrity",
+    "zomes/mutualaid-governance/coordinator",
+    "zomes/mutualaid-pools/integrity",
+    "zomes/mutualaid-pools/coordinator",
+    "zomes/mutualaid-requests/integrity",
+    "zomes/mutualaid-requests/coordinator",
+    "zomes/mutualaid-resources/integrity",
+    "zomes/mutualaid-resources/coordinator",
+    "zomes/mutualaid-timebank/integrity",
+    "zomes/mutualaid-timebank/coordinator",
+
+    # Water domain (5 zomes)
+    "zomes/water-flow/integrity",
+    "zomes/water-flow/coordinator",
+    "zomes/water-purity/integrity",
+    "zomes/water-purity/coordinator",
+    "zomes/water-capture/integrity",
+    "zomes/water-capture/coordinator",
+    "zomes/water-steward/integrity",
+    "zomes/water-steward/coordinator",
+    "zomes/water-wisdom/integrity",
+    "zomes/water-wisdom/coordinator",
+
+    # Unified bridge (1 zome)
+    "zomes/commons-bridge/integrity",
+    "zomes/commons-bridge/coordinator",
+]
+exclude = ["tests"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+# Holochain 0.6 compatible
+hdk = "0.6.0"
+hdi = "0.7.0"
+holochain_integrity_types = "0.6.0"
+holochain_serialized_bytes = "0.0.56"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Hashing
+holo_hash = { version = "0.6", features = ["hashing"] }
+
+# Utilities
+thiserror = "1.0"
+derive_more = "0.99"
+
+# WASM compatibility - getrandom 0.3 with custom backend
+getrandom_03 = { package = "getrandom", version = "0.3" }
+
+# Internal shared crates
+commons-types = { path = "crates/commons-types" }
+mutualaid-common = { path = "crates/mutualaid-common" }
+mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
+mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
+
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false

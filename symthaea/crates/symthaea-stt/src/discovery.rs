@@ -332,11 +332,10 @@ impl OnlineClusterer {
 
         for (id, unit) in &self.units {
             let sim = unit.similarity(&segment.hv);
-            if sim > self.config.similarity_threshold {
-                if best_match.as_ref().map(|(_, s)| sim > *s).unwrap_or(true) {
+            if sim > self.config.similarity_threshold
+                && best_match.as_ref().map(|(_, s)| sim > *s).unwrap_or(true) {
                     best_match = Some((id.clone(), sim));
                 }
-            }
         }
 
         let unit_id = if let Some((id, _)) = best_match {

@@ -3,6 +3,9 @@ resolver = "2"
 # Tests excluded from WASM workspace (use different deps)
 exclude = ["tests", "cli"]
 members = [
+    # Shared crypto-agile types (PQE abstraction layer)
+    "crates/mycelix-crypto",
+    # Zomes
     "zomes/did_registry/integrity",
     "zomes/did_registry/coordinator",
     "zomes/credential_schema/integrity",
@@ -42,6 +45,9 @@ subtle = { version = "2.5", default-features = false }
 
 # Base encoding
 bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
+
+# Crypto-agile abstraction layer
+mycelix-crypto = { path = "crates/mycelix-crypto", default-features = false, features = ["wasm"] }
 
 # Utilities
 thiserror = "1.0"

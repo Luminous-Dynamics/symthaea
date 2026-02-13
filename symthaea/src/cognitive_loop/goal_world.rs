@@ -256,6 +256,12 @@ pub struct CausalGoalAnalyzer {
     max_observations: usize,
 }
 
+impl Default for CausalGoalAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CausalGoalAnalyzer {
     pub fn new() -> Self {
         Self {

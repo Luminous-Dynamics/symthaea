@@ -73,7 +73,7 @@ impl ConsciousnessSubsystem for PhiOptimizationSubsystem {
         }
 
         // Only optimize every N cycles
-        if self.cycle_count % self.optimize_every != 0 {
+        if !self.cycle_count.is_multiple_of(self.optimize_every) {
             self.prev_phi = state.phi;
             return Ok(());
         }

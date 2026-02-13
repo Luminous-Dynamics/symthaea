@@ -31,6 +31,8 @@ fn create_memory(id: &str, seed: u64, memory_type: MemoryType, content: &str) ->
         phi: (seed % 100) as f64 / 100.0,              // 0.0 to 1.0
         topics: vec![format!("topic_{}", seed % 10)],
         metadata: format!(r#"{{"seed": {}}}"#, seed),
+        consolidation_strength: 0.0,
+        retrieval_count: 0,
     }
 }
 
@@ -86,6 +88,8 @@ mod roundtrip_tests {
             phi: 0.75,
             topics: vec![],
             metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
         };
 
         db.store(record).await.expect("Store failed");
@@ -204,6 +208,8 @@ mod roundtrip_tests {
             phi: 1.0,                // Max phi
             topics: vec![],          // Empty topics
             metadata: "{}".to_string(),
+            consolidation_strength: 0.0,
+            retrieval_count: 0,
         };
 
         db.store(record).await.expect("Store failed");

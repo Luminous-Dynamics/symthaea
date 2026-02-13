@@ -1,0 +1,85 @@
+[workspace]
+resolver = "2"
+members = [
+    # Shared crates
+    "crates/civic-types",
+
+    # Justice domain (5 zomes)
+    "zomes/justice-cases/integrity",
+    "zomes/justice-cases/coordinator",
+    "zomes/justice-evidence/integrity",
+    "zomes/justice-evidence/coordinator",
+    "zomes/justice-arbitration/integrity",
+    "zomes/justice-arbitration/coordinator",
+    "zomes/justice-restorative/integrity",
+    "zomes/justice-restorative/coordinator",
+    "zomes/justice-enforcement/integrity",
+    "zomes/justice-enforcement/coordinator",
+
+    # Emergency domain (6 zomes)
+    "zomes/emergency-incidents/integrity",
+    "zomes/emergency-incidents/coordinator",
+    "zomes/emergency-triage/integrity",
+    "zomes/emergency-triage/coordinator",
+    "zomes/emergency-resources/integrity",
+    "zomes/emergency-resources/coordinator",
+    "zomes/emergency-coordination/integrity",
+    "zomes/emergency-coordination/coordinator",
+    "zomes/emergency-shelters/integrity",
+    "zomes/emergency-shelters/coordinator",
+    "zomes/emergency-comms/integrity",
+    "zomes/emergency-comms/coordinator",
+
+    # Media domain (4 zomes)
+    "zomes/media-publication/integrity",
+    "zomes/media-publication/coordinator",
+    "zomes/media-attribution/integrity",
+    "zomes/media-attribution/coordinator",
+    "zomes/media-factcheck/integrity",
+    "zomes/media-factcheck/coordinator",
+    "zomes/media-curation/integrity",
+    "zomes/media-curation/coordinator",
+
+    # Unified bridge (1 zome)
+    "zomes/civic-bridge/integrity",
+    "zomes/civic-bridge/coordinator",
+]
+exclude = ["tests"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+# Holochain 0.6 compatible
+hdk = "0.6.0"
+hdi = "0.7.0"
+holochain_integrity_types = "0.6.0"
+holochain_serialized_bytes = "0.0.56"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Utilities
+thiserror = "1.0"
+derive_more = "0.99"
+
+# WASM compatibility
+getrandom_03 = { package = "getrandom", version = "0.3" }
+
+# Internal shared crates
+civic-types = { path = "crates/civic-types" }
+mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
+mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
+
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false

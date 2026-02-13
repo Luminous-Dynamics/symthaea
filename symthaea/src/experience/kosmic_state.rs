@@ -480,11 +480,13 @@ impl GisState {
 
 /// GIS type classification
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum GisType {
     /// I know that I know
     KnownKnown,
 
     /// I know that I don't know
+    #[default]
     KnownUnknown,
 
     /// Tacit knowledge I can't articulate
@@ -497,11 +499,6 @@ pub enum GisType {
     StrategicIgnorance,
 }
 
-impl Default for GisType {
-    fn default() -> Self {
-        GisType::KnownUnknown
-    }
-}
 
 impl std::fmt::Display for GisType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -530,7 +527,9 @@ pub struct DarkSpot {
 
 /// Dominant mode of the KosmicSong
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum KosmicMode {
+    #[default]
     Balanced,
     Contemplative, // Wisdom-dominant
     Nurturing,     // Flourishing-dominant
@@ -541,11 +540,6 @@ pub enum KosmicMode {
     Giving,        // Reciprocity-dominant
 }
 
-impl Default for KosmicMode {
-    fn default() -> Self {
-        KosmicMode::Balanced
-    }
-}
 
 #[cfg(test)]
 mod tests {

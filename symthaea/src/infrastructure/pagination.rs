@@ -288,11 +288,10 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         // If buffer is exhausted, fetch next page
-        if self.buffer_index >= self.buffer.len() {
-            if !self.fetch_next_page() {
+        if self.buffer_index >= self.buffer.len()
+            && !self.fetch_next_page() {
                 return None;
             }
-        }
 
         if self.buffer_index < self.buffer.len() {
             let item = self.buffer[self.buffer_index].clone();

@@ -36,6 +36,7 @@ use std::time::Instant;
 
 /// Kind of context the user is operating in
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ContextKind {
     /// Exploring or learning about the system
     Exploration,
@@ -68,6 +69,7 @@ pub enum ContextKind {
     /// Initial setup or onboarding
     Setup,
     /// Unknown context
+    #[default]
     Unknown,
 }
 
@@ -158,16 +160,13 @@ impl ContextKind {
     }
 }
 
-impl Default for ContextKind {
-    fn default() -> Self {
-        ContextKind::Unknown
-    }
-}
 
 /// User experience level
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ExperienceLevel {
     /// New to the system, needs guidance
+    #[default]
     Beginner,
     /// Has some experience, familiar with basics
     Intermediate,
@@ -175,11 +174,6 @@ pub enum ExperienceLevel {
     Expert,
 }
 
-impl Default for ExperienceLevel {
-    fn default() -> Self {
-        ExperienceLevel::Beginner
-    }
-}
 
 /// Inferred cognitive load
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

@@ -1,0 +1,16 @@
+[package]
+name = "water_steward"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "water_steward"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+water_steward_integrity = { path = "../integrity" }
+

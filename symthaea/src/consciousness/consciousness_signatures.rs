@@ -228,7 +228,7 @@ impl ConsciousnessSignature {
         // Mix attention state
         let attn_combined: u64 = dims.attention_state.iter()
             .enumerate()
-            .map(|(i, &v)| (v.to_bits() as u64).rotate_left((i * 9) as u32))
+            .map(|(i, &v)| v.to_bits().rotate_left((i * 9) as u32))
             .fold(0, |acc, x| acc ^ x);
 
         // Compute hash lanes
@@ -555,11 +555,10 @@ impl ConsciousnessSignatureAnalyzer {
 
         for (name, known_sig) in &self.known_entities {
             let similarity = sig.similarity(known_sig);
-            if similarity >= self.config.identity_threshold {
-                if best_match.as_ref().map(|(_, s)| similarity > *s).unwrap_or(true) {
+            if similarity >= self.config.identity_threshold
+                && best_match.as_ref().map(|(_, s)| similarity > *s).unwrap_or(true) {
                     best_match = Some((name.clone(), similarity));
                 }
-            }
         }
 
         best_match

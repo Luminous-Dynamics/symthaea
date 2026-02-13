@@ -631,6 +631,12 @@ pub struct DirectionalPhi {
     bandwidth: f64,
 }
 
+impl Default for DirectionalPhi {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DirectionalPhi {
     pub fn new() -> Self {
         Self { bandwidth: 0.5 }

@@ -25,18 +25,13 @@ pub struct SystemStateSnapshot {
 }
 
 /// State of a systemd service.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ServiceState {
     Running,
     Stopped,
     Failed,
+    #[default]
     Inactive,
-}
-
-impl Default for ServiceState {
-    fn default() -> Self {
-        Self::Inactive
-    }
 }
 
 /// Encodes system state snapshots into HDC vectors.

@@ -1,0 +1,17 @@
+[package]
+name = "civic_bridge"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "civic_bridge"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+civic_bridge_integrity = { path = "../integrity" }
+civic-types = { workspace = true }
+mycelix-bridge-common = { workspace = true }

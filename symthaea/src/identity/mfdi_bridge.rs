@@ -346,7 +346,7 @@ impl MfdiBridge {
     pub fn generate_key() -> SigningKey {
         use rand::RngCore;
         let mut seed = [0u8; 32];
-        rand::rng().fill_bytes(&mut seed);
+        rand::thread_rng().fill_bytes(&mut seed);
         SigningKey::from_bytes(&seed)
     }
 

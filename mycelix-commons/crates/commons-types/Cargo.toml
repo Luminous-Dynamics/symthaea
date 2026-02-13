@@ -1,0 +1,14 @@
+[package]
+name = "commons-types"
+version.workspace = true
+edition.workspace = true
+description = "Shared types and utilities for all Mycelix Commons zomes"
+
+[dependencies]
+hdk = { workspace = true }
+hdi = { workspace = true }
+holo_hash = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+mycelix-bridge-entry-types = { workspace = true }
+mycelix-bridge-common = { workspace = true }

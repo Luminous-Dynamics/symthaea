@@ -39,8 +39,10 @@ use serde::{Deserialize, Serialize};
 
 /// Types of actions that require different Φ thresholds
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ActionType {
     /// Basic queries, information retrieval (Φ ≥ 0.2)
+    #[default]
     BasicQuery,
     /// Commands that modify state (Φ ≥ 0.3)
     StateModifying,
@@ -50,11 +52,6 @@ pub enum ActionType {
     Irreversible,
 }
 
-impl Default for ActionType {
-    fn default() -> Self {
-        Self::BasicQuery
-    }
-}
 
 /// Consciousness thresholds for different action types
 ///

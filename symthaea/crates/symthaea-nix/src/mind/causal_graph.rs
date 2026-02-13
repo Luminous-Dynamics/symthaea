@@ -359,8 +359,8 @@ impl NixCausalGraph {
         let mut loaded = 0;
         for edge in snapshot.edges {
             let key = (edge.from.clone(), edge.to.clone());
-            if !self.causal_graph.contains_key(&key) {
-                self.causal_graph.insert(key, edge);
+            if let std::collections::hash_map::Entry::Vacant(e) = self.causal_graph.entry(key) {
+                e.insert(edge);
                 loaded += 1;
             }
         }
@@ -895,5 +895,108 @@ mod tests {
         let loaded = graph2.load(&path).unwrap();
         assert_eq!(loaded, 0); // a→b already exists, so 0 new edges
         assert_eq!(graph2.edge_count(), 2); // a→b + c→d
+    }
+
+    #[test]
+    fn test_root_cause_analysis_chain() {
+        let mut graph = NixCausalGraph::new(42);
+        // Build chain: A → B → C → D (symptom)
+        graph.add_structural_edge("A", "B", 0.8);
+        graph.add_structural_edge("B", "C", 0.7);
+        graph.add_structural_edge("C", "D", 0.9);
+
+        let analysis = graph.analyze_root_causes("D");
+        assert_eq!(analysis.symptom, "D");
+        assert!(!analysis.causal_chain.is_empty(), "Should find causal chain to D");
+        assert!(!analysis.root_causes.is_empty(), "Should identify root causes");
+
+        // A should be a root cause (no incoming edges)
+        assert!(
+            analysis.root_causes.iter().any(|rc| rc.variable == "A"),
+            "A should be root cause. Got: {:?}", analysis.root_causes.iter().map(|rc| &rc.variable).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_root_cause_no_causes() {
+        let graph = NixCausalGraph::new(42);
+        let analysis = graph.analyze_root_causes("unknown");
+        assert!(analysis.root_causes.is_empty());
+        assert!(analysis.causal_chain.is_empty());
+    }
+
+    #[test]
+    fn test_side_effect_transitive() {
+        let mut graph = NixCausalGraph::new(42);
+        graph.add_structural_edge("A", "B", 0.8);
+        graph.add_structural_edge("B", "C", 0.6);
+
+        let effects = graph.predict_side_effects("A");
+        let affected: Vec<&str> = effects.iter().map(|e| e.affected_variable.as_str()).collect();
+        assert!(affected.contains(&"B"), "Should predict B as affected");
+        assert!(affected.contains(&"C"), "Should predict C transitively");
+    }
+
+    #[test]
+    fn test_recommend_fixes_high_confidence() {
+        let mut graph = NixCausalGraph::new(42);
+        graph.add_structural_edge("misconfigured-firewall", "service-unreachable", 0.8);
+
+        let fixes = graph.recommend_fixes("service-unreachable");
+        assert!(
+            fixes.iter().any(|f| f.contains("misconfigured-firewall")),
+            "Should recommend adjusting the firewall. Got: {:?}", fixes
+        );
+    }
+
+    #[test]
+    fn test_recommend_fixes_insufficient_evidence() {
+        let mut graph = NixCausalGraph::new(42);
+        // Low confidence edge shouldn't generate a recommendation
+        graph.add_structural_edge("maybe-cause", "symptom", 0.3);
+
+        let fixes = graph.recommend_fixes("symptom");
+        assert!(
+            fixes.iter().any(|f| f.contains("Insufficient")),
+            "Low-confidence edges shouldn't produce recommendations. Got: {:?}", fixes
+        );
+    }
+
+    #[test]
+    fn test_observe_and_batch() {
+        let mut graph = NixCausalGraph::new(42);
+        graph.observe("cpu_load", 0.5);
+        graph.observe("cpu_load", 0.7);
+        graph.observe_batch("memory", &[0.3, 0.4, 0.5]);
+
+        assert_eq!(graph.observations["cpu_load"].len(), 2);
+        assert_eq!(graph.observations["memory"].len(), 3);
+    }
+
+    #[test]
+    fn test_learning_rate_setter() {
+        let graph = NixCausalGraph::new(42).with_learning_rate(0.5);
+        assert!((graph.learning_rate - 0.5).abs() < 1e-6);
+
+        // Should clamp to valid range
+        let graph = NixCausalGraph::new(42).with_learning_rate(5.0);
+        assert!((graph.learning_rate - 1.0).abs() < 1e-6);
+
+        let graph = NixCausalGraph::new(42).with_learning_rate(0.0);
+        assert!((graph.learning_rate - 0.001).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_hebbian_repeated_strengthening_bounded() {
+        let mut graph = NixCausalGraph::new(42);
+        graph.add_structural_edge("A", "B", 0.5);
+
+        // Strengthen many times — confidence should approach but never exceed 1.0
+        for _ in 0..100 {
+            graph.observe_outcome("A", &["B"], &["B"]);
+        }
+        let edge = &graph.causal_graph[&("A".to_string(), "B".to_string())];
+        assert!(edge.confidence <= 1.0, "Confidence should be bounded: {}", edge.confidence);
+        assert!(edge.confidence > 0.95, "Should be very high after many observations: {}", edge.confidence);
     }
 }

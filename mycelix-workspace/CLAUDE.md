@@ -24,9 +24,10 @@ just status          # Check status
 |-------|-------|-------|
 | Production | 3 | core (62 tests), mail (12 zomes), desci (141 tests, REST not hApp) |
 | Beta | 9 | marketplace, supplychain, observatory, epistemic-markets, fabrication, edunet, consensus, civic-happ, lucid |
-| Scaffold | 14 | identity, knowledge, governance, justice, finance, property, energy, media, health, space, care, emergency, water, housing |
+| **Cluster** | **2** | **commons** (property+housing+care+mutualaid+water, 28 zomes), **civic** (justice+emergency+media, 16 zomes) |
+| Scaffold | 6 | identity, knowledge, governance, finance, energy, health, space |
 | Stub/Other | 3 | bots (Python), music (early), symthaea-bridge |
-| Dormant | 2 | climate, mutualaid (restored from archive) |
+| Dormant | 1 | climate |
 
 Full breakdown: [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md)
 
@@ -36,7 +37,10 @@ Full breakdown: [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md)
 
 ```
 mycelix-workspace/
-├── happs/           # 18 hApps (mostly symlinks to mycelix-*)
+├── happs/           # hApps (symlinks to mycelix-* dirs)
+│   ├── commons/     # → mycelix-commons (28 zomes: property+housing+care+mutualaid+water)
+│   ├── civic/       # → mycelix-civic (16 zomes: justice+emergency+media)
+│   └── ...          # identity, governance, finance, etc.
 ├── sdk/             # Rust SDK (MATL, epistemic, bridge, etc.)
 ├── sdk-ts/          # TypeScript SDK
 ├── observatory/     # SvelteKit dashboard

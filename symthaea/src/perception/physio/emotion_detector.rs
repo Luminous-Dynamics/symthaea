@@ -744,10 +744,13 @@ impl EmotionSimulator {
         // Theta (4-8 Hz): approach motivation
 
         // Alpha power modulated by arousal (inverse relationship)
-        let alpha_power = 1.0 - arousal.abs() * 0.5;
+        // High arousal suppresses alpha; low arousal (relaxation) increases it
+        let alpha_power = (1.0 - arousal * 0.4).max(0.2);
 
         // Beta power correlates with arousal
-        let beta_power = 0.5 + arousal * 0.3;
+        // Base of 1.2 produces beta/alpha ratios in the 0.5-3.0 range
+        // that match real EEG literature (Koelstra et al., 2012)
+        let beta_power = (1.2 + arousal * 0.6).max(0.1);
 
         // Asymmetry for frontal channels based on valence
         let asymmetry_factor = if channel.is_frontal() {
@@ -779,7 +782,7 @@ impl EmotionSimulator {
             let alpha = alpha_power * asymmetry_factor * (2.0 * PI * 10.0 * t).sin();
 
             // Beta component (20 Hz)
-            let beta = beta_power * 0.5 * (2.0 * PI * 20.0 * t).sin();
+            let beta = beta_power * (2.0 * PI * 20.0 * t).sin();
 
             // Gamma component (40 Hz)
             let gamma = 0.2 * (2.0 * PI * 40.0 * t).sin();

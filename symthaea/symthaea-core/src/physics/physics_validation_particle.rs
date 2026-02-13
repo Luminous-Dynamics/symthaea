@@ -8,6 +8,7 @@ use super::hadrons::{Baryon, Meson};
 use super::nuclear::EnergyScale;
 use super::antimatter::{Antimatter, BaryogenesisConcepts};
 use super::qft::{QEDEncoder, QCDEncoder, ElectroweakEncoder, DivergenceType};
+use super::constants::ALPHA;
 use crate::genesis::GenesisSeed;
 
 // =========================================================================
@@ -334,8 +335,7 @@ fn qed_bhabha_amplitude_alpha() {
     let (genesis, model, _, _, _, _) = particle_physics_setup();
     let qed = QEDEncoder::from_genesis(&genesis, &model);
     let bhabha = qed.bhabha_scattering();
-    let alpha = 1.0 / 137.036;
-    assert_relative_eq(bhabha.amplitude_estimate, alpha, 1e-6, "Bhabha amplitude ≈ α");
+    assert_relative_eq(bhabha.amplitude_estimate, ALPHA, 1e-6, "Bhabha amplitude ≈ α");
 }
 
 #[test]

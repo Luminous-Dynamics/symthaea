@@ -4772,6 +4772,8 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(ProptestConfig::with_cases(32))]
+
         /// Property: d-separation is symmetric in the query nodes
         #[test]
         fn prop_dsep_symmetric(

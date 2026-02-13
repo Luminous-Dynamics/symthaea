@@ -47,6 +47,7 @@ htmlcov/
 # === Rust ===
 target/
 Cargo.lock
+!symthaea/Cargo.lock
 **/*.rs.bk
 
 # === OS Files ===

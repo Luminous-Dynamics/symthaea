@@ -15,7 +15,7 @@
 //! cargo test --test treasury_test -- --ignored     # Full integration tests
 //! ```
 
-use holochain::sweettest::{SweetConductor, SweetDnaFile, SweetAgents};
+use holochain::sweettest::*;
 use holochain::prelude::*;
 use std::time::Duration;
 
@@ -41,7 +41,7 @@ mod treasury_lifecycle {
     use super::*;
 
     /// Test 1.1: Create a treasury with two managers and verify reserve ratio
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_create_treasury() {
         println!("Test 1.1: Create Treasury with 2 managers");
@@ -58,8 +58,8 @@ mod treasury_lifecycle {
 
         let alice_cell = &apps[0].cells()[0];
 
-        let manager_a = test_did("manager_alice");
-        let manager_b = test_did("manager_bob");
+        let manager_a = format!("did:mycelix:{}", agents[0]);
+        let manager_b = format!("did:mycelix:{}", agents[0]);
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreateTreasuryInput {
@@ -80,8 +80,7 @@ mod treasury_lifecycle {
 
         let result: Record = conductor
             .call(&alice_cell.zome("treasury"), "create_treasury", input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = result
             .entry()
@@ -105,7 +104,7 @@ mod treasury_lifecycle {
     }
 
     /// Test 1.2: Contribute SAP to treasury and verify balance update
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_contribute_increases_balance() {
         println!("Test 1.2: Contribute SAP increases treasury balance");
@@ -121,7 +120,7 @@ mod treasury_lifecycle {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let manager_did = test_did("manager_alice");
+        let manager_did = format!("did:mycelix:{}", agents[0]);
 
         // Step 1: Create treasury
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -143,8 +142,7 @@ mod treasury_lifecycle {
 
         let create_result: Record = conductor
             .call(&alice_cell.zome("treasury"), "create_treasury", create_input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = create_result
             .entry()
@@ -167,7 +165,7 @@ mod treasury_lifecycle {
 
         let contribute_input = ContributeInput {
             treasury_id: treasury_id.clone(),
-            contributor_did: test_did("alice"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 500_000_000,
             currency: "SAP".to_string(),
             contribution_type: ContributionType::Deposit,
@@ -175,8 +173,7 @@ mod treasury_lifecycle {
 
         let contrib_result: Record = conductor
             .call(&alice_cell.zome("treasury"), "contribute", contribute_input)
-            .await
-            .expect("Failed to contribute");
+            .await;
 
         let contribution: Contribution = contrib_result
             .entry()
@@ -191,8 +188,7 @@ mod treasury_lifecycle {
         // Step 3: Verify treasury balance updated
         let updated_treasury: Option<Record> = conductor
             .call(&alice_cell.zome("treasury"), "get_treasury", treasury_id.clone())
-            .await
-            .expect("Failed to get treasury");
+            .await;
 
         let updated: Treasury = updated_treasury
             .expect("Treasury should exist")
@@ -242,8 +238,7 @@ mod allocation_governance {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "create_treasury", input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = result
             .entry()
@@ -284,8 +279,7 @@ mod allocation_governance {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "propose_allocation", input)
-            .await
-            .expect("Failed to propose allocation");
+            .await;
 
         let allocation: Allocation = result
             .entry()
@@ -298,7 +292,7 @@ mod allocation_governance {
     }
 
     /// Test 2.1: Propose -> Approve by majority -> Execute
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_propose_and_approve() {
         println!("Test 2.1: Propose -> Approve (majority) -> Execute");
@@ -315,10 +309,10 @@ mod allocation_governance {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr_a = test_did("mgr_alice");
-        let mgr_b = test_did("mgr_bob");
-        let mgr_c = test_did("mgr_carol");
-        let recipient = test_did("recipient_dave");
+        let mgr_a = format!("did:mycelix:{}", agents[0]);
+        let mgr_b = format!("did:mycelix:{}", agents[0]);
+        let mgr_c = format!("did:mycelix:{}", agents[0]);
+        let recipient = format!("did:mycelix:{}", agents[0]);
 
         // Create treasury with 3 managers (majority = 2)
         let treasury_id = setup_treasury_with_managers(
@@ -340,7 +334,7 @@ mod allocation_governance {
 
         let fund_input = ContributeInput {
             treasury_id: treasury_id.clone(),
-            contributor_did: test_did("funder"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 1_000_000_000,
             currency: "SAP".to_string(),
             contribution_type: ContributionType::Grant,
@@ -348,8 +342,7 @@ mod allocation_governance {
 
         let _: Record = conductor
             .call(&cell.zome("treasury"), "contribute", fund_input)
-            .await
-            .expect("Failed to fund treasury");
+            .await;
 
         // Propose allocation of 200 SAP
         let alloc_id = propose_allocation_helper(
@@ -376,8 +369,7 @@ mod allocation_governance {
 
         let approve_result_1: Record = conductor
             .call(&cell.zome("treasury"), "approve_allocation", approve_1)
-            .await
-            .expect("First approval failed");
+            .await;
 
         let after_first: Allocation = approve_result_1
             .entry()
@@ -398,8 +390,7 @@ mod allocation_governance {
 
         let approve_result_2: Record = conductor
             .call(&cell.zome("treasury"), "approve_allocation", approve_2)
-            .await
-            .expect("Second approval failed");
+            .await;
 
         let after_second: Allocation = approve_result_2
             .entry()
@@ -414,8 +405,7 @@ mod allocation_governance {
         // Execute the approved allocation
         let exec_result: Record = conductor
             .call(&cell.zome("treasury"), "execute_allocation", alloc_id.clone())
-            .await
-            .expect("Execute allocation failed");
+            .await;
 
         let executed: Allocation = exec_result
             .entry()
@@ -429,8 +419,7 @@ mod allocation_governance {
         // Verify treasury balance decreased
         let updated_treasury: Option<Record> = conductor
             .call(&cell.zome("treasury"), "get_treasury", treasury_id.clone())
-            .await
-            .expect("Failed to get treasury");
+            .await;
 
         let treasury_data: Treasury = updated_treasury
             .expect("Treasury should exist")
@@ -445,7 +434,7 @@ mod allocation_governance {
     }
 
     /// Test 2.2: Propose -> Reject by manager
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_reject_allocation() {
         println!("Test 2.2: Propose -> Reject");
@@ -462,8 +451,8 @@ mod allocation_governance {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr = test_did("mgr_alice");
-        let recipient = test_did("recipient_eve");
+        let mgr = format!("did:mycelix:{}", agents[0]);
+        let recipient = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = setup_treasury_with_managers(&conductor, cell, vec![mgr.clone()]).await;
 
@@ -490,8 +479,7 @@ mod allocation_governance {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "reject_allocation", reject_input)
-            .await
-            .expect("Reject allocation failed");
+            .await;
 
         let rejected: Allocation = result
             .entry()
@@ -505,7 +493,7 @@ mod allocation_governance {
     }
 
     /// Test 2.3: Propose -> Cancel by manager
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cancel_allocation() {
         println!("Test 2.3: Propose -> Cancel");
@@ -522,8 +510,8 @@ mod allocation_governance {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr = test_did("mgr_cancel");
-        let recipient = test_did("recipient_cancel");
+        let mgr = format!("did:mycelix:{}", agents[0]);
+        let recipient = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = setup_treasury_with_managers(&conductor, cell, vec![mgr.clone()]).await;
 
@@ -550,8 +538,7 @@ mod allocation_governance {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "cancel_allocation", cancel_input)
-            .await
-            .expect("Cancel allocation failed");
+            .await;
 
         let cancelled: Allocation = result
             .entry()
@@ -565,7 +552,7 @@ mod allocation_governance {
     }
 
     /// Test 2.4: Non-manager cannot approve allocations
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_non_manager_cannot_approve() {
         println!("Test 2.4: Non-manager cannot approve allocations");
@@ -582,9 +569,9 @@ mod allocation_governance {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr = test_did("actual_manager");
-        let non_mgr = test_did("outsider");
-        let recipient = test_did("recipient");
+        let mgr = format!("did:mycelix:{}", agents[0]);
+        let non_mgr = format!("did:mycelix:{}", agents[0]);
+        let recipient = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = setup_treasury_with_managers(&conductor, cell, vec![mgr.clone()]).await;
 
@@ -610,7 +597,7 @@ mod allocation_governance {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(cell.zome("treasury"), "approve_allocation", approve_input)
+            .call_fallible(&cell.zome("treasury"), "approve_allocation", approve_input)
             .await;
 
         assert!(result.is_err(), "Non-manager approval should be rejected");
@@ -644,8 +631,7 @@ mod commons_pool_tests {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "create_commons_pool", input)
-            .await
-            .expect("Failed to create commons pool");
+            .await;
 
         let pool: CommonsPool = result
             .entry()
@@ -657,7 +643,7 @@ mod commons_pool_tests {
     }
 
     /// Test 3.1: Create commons pool with correct defaults
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_create_commons_pool() {
         println!("Test 3.1: Create Commons Pool");
@@ -686,8 +672,7 @@ mod commons_pool_tests {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "create_commons_pool", input)
-            .await
-            .expect("Failed to create commons pool");
+            .await;
 
         let pool: CommonsPool = result
             .entry()
@@ -708,7 +693,7 @@ mod commons_pool_tests {
     }
 
     /// Test 3.2: Contribution splits 25% reserve / 75% available
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_contribute_splits_25_75() {
         println!("Test 3.2: Contribution splits 25/75");
@@ -738,14 +723,13 @@ mod commons_pool_tests {
 
         let input = ContributeToCommonsInput {
             commons_pool_id: pool_id.clone(),
-            contributor_did: test_did("contributor_alice"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 1000,
         };
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_commons", input)
-            .await
-            .expect("Failed to contribute to commons");
+            .await;
 
         let pool: CommonsPool = result
             .entry()
@@ -766,7 +750,7 @@ mod commons_pool_tests {
     }
 
     /// Test 3.3: Inalienable reserve is untouchable -- allocate exact available OK, more fails
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_inalienable_reserve_untouchable() {
         println!("Test 3.3: Inalienable reserve is untouchable");
@@ -796,14 +780,13 @@ mod commons_pool_tests {
 
         let contrib_input = ContributeToCommonsInput {
             commons_pool_id: pool_id.clone(),
-            contributor_did: test_did("funder"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 1000,
         };
 
         let _: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_commons", contrib_input)
-            .await
-            .expect("Failed to contribute");
+            .await;
 
         // Attempt to allocate MORE than available (751 > 750)
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -816,13 +799,13 @@ mod commons_pool_tests {
 
         let over_alloc = RequestCommonsAllocationInput {
             commons_pool_id: pool_id.clone(),
-            requester_did: test_did("requester"),
+            requester_did: format!("did:mycelix:{}", agents[0]),
             amount: 751,
             purpose: "Over-allocation attempt".to_string(),
         };
 
         let over_result: Result<Record, _> = conductor
-            .call_fallible(cell.zome("treasury"), "request_allocation", over_alloc)
+            .call_fallible(&cell.zome("treasury"), "request_allocation", over_alloc)
             .await;
 
         assert!(over_result.is_err(), "Allocating more than available should fail");
@@ -835,15 +818,14 @@ mod commons_pool_tests {
         // reserve ratio = 250 / (250+0) = 1.0 >= 0.25
         let exact_alloc = RequestCommonsAllocationInput {
             commons_pool_id: pool_id.clone(),
-            requester_did: test_did("requester"),
+            requester_did: format!("did:mycelix:{}", agents[0]),
             amount: 750,
             purpose: "Exact available allocation".to_string(),
         };
 
         let exact_result: Record = conductor
             .call(&cell.zome("treasury"), "request_allocation", exact_alloc)
-            .await
-            .expect("Allocating exact available should succeed");
+            .await;
 
         let pool_after: CommonsPool = exact_result
             .entry()
@@ -859,7 +841,7 @@ mod commons_pool_tests {
     }
 
     /// Test 3.4: Compost (demurrage redistribution) goes to available, not reserve
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_compost_goes_to_available() {
         println!("Test 3.4: Compost goes to available balance");
@@ -889,14 +871,13 @@ mod commons_pool_tests {
 
         let contrib_input = ContributeToCommonsInput {
             commons_pool_id: pool_id.clone(),
-            contributor_did: test_did("funder"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 400,
         };
 
         let _: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_commons", contrib_input)
-            .await
-            .expect("Failed to contribute");
+            .await;
 
         // Now receive compost (demurrage redistribution) of 200
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -909,13 +890,12 @@ mod commons_pool_tests {
         let compost_input = ReceiveCompostInput {
             commons_pool_id: pool_id.clone(),
             amount: 200,
-            source_member_did: test_did("demurrage_source"),
+            source_member_did: format!("did:mycelix:{}", agents[0]),
         };
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "receive_compost", compost_input)
-            .await
-            .expect("Failed to receive compost");
+            .await;
 
         let pool: CommonsPool = result
             .entry()
@@ -934,7 +914,7 @@ mod commons_pool_tests {
     }
 
     /// Test 3.5: Reserve ratio maintained at >= 25% after contribute + allocate
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_reserve_ratio_maintained() {
         println!("Test 3.5: Reserve ratio maintained >= 25%");
@@ -964,14 +944,13 @@ mod commons_pool_tests {
 
         let contrib_input = ContributeToCommonsInput {
             commons_pool_id: pool_id.clone(),
-            contributor_did: test_did("funder"),
+            contributor_did: format!("did:mycelix:{}", agents[0]),
             amount: 1000,
         };
 
         let _: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_commons", contrib_input)
-            .await
-            .expect("Failed to contribute");
+            .await;
 
         // Allocate 400 from available -- should succeed
         // After: reserve=250, available=350, total=600, ratio=250/600=0.4167 >= 0.25
@@ -985,15 +964,14 @@ mod commons_pool_tests {
 
         let alloc_ok = RequestCommonsAllocationInput {
             commons_pool_id: pool_id.clone(),
-            requester_did: test_did("requester"),
+            requester_did: format!("did:mycelix:{}", agents[0]),
             amount: 400,
             purpose: "Community project".to_string(),
         };
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "request_allocation", alloc_ok)
-            .await
-            .expect("Allocation of 400 should succeed");
+            .await;
 
         let pool_after: CommonsPool = result
             .entry()
@@ -1036,13 +1014,12 @@ mod commons_pool_tests {
         let compost_input = ReceiveCompostInput {
             commons_pool_id: pool_id.clone(),
             amount: 750,
-            source_member_did: test_did("compost_source"),
+            source_member_did: format!("did:mycelix:{}", agents[0]),
         };
 
         let _: Record = conductor
             .call(&cell.zome("treasury"), "receive_compost", compost_input)
-            .await
-            .expect("Failed to receive compost");
+            .await;
 
         // Now: reserve=250, available=350+750=1100, total=1350
         // Try allocating 1100 -> new_available=0, new_total=250, ratio=1.0 (passes)
@@ -1058,8 +1035,7 @@ mod commons_pool_tests {
         // Verify current state after compost
         let pool_state: Option<Record> = conductor
             .call(&cell.zome("treasury"), "get_commons_pool", pool_id.clone())
-            .await
-            .expect("Failed to get pool");
+            .await;
 
         let current: CommonsPool = pool_state
             .expect("Pool should exist")
@@ -1087,7 +1063,7 @@ mod savings_pool_tests {
     use super::*;
 
     /// Test 4.1: Create savings pool and join
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_create_and_join_pool() {
         println!("Test 4.1: Create and Join Savings Pool");
@@ -1119,13 +1095,12 @@ mod savings_pool_tests {
             description: "Treasury for pool tests".to_string(),
             currency: "SAP".to_string(),
             reserve_ratio: 0.20,
-            managers: vec![test_did("pool_mgr")],
+            managers: vec![format!("did:mycelix:{}", agents[0])],
         };
 
         let treasury_result: Record = conductor
             .call(&cell.zome("treasury"), "create_treasury", treasury_input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = treasury_result
             .entry()
@@ -1146,7 +1121,7 @@ mod savings_pool_tests {
             pub yield_rate: f64,
         }
 
-        let alice = test_did("pool_alice");
+        let alice = format!("did:mycelix:{}", agents[0]);
         let pool_input = CreatePoolInput {
             treasury_id: treasury_id.clone(),
             name: "Community Savings".to_string(),
@@ -1158,8 +1133,7 @@ mod savings_pool_tests {
 
         let pool_result: Record = conductor
             .call(&cell.zome("treasury"), "create_savings_pool", pool_input)
-            .await
-            .expect("Failed to create savings pool");
+            .await;
 
         let pool: SavingsPool = pool_result
             .entry()
@@ -1184,7 +1158,7 @@ mod savings_pool_tests {
             pub member_did: String,
         }
 
-        let bob = test_did("pool_bob");
+        let bob = format!("did:mycelix:{}", agents[0]);
         let join_input = JoinPoolInput {
             pool_id: pool_id.clone(),
             member_did: bob.clone(),
@@ -1192,8 +1166,7 @@ mod savings_pool_tests {
 
         let join_result: Record = conductor
             .call(&cell.zome("treasury"), "join_savings_pool", join_input)
-            .await
-            .expect("Failed to join pool");
+            .await;
 
         let updated_pool: SavingsPool = join_result
             .entry()
@@ -1211,7 +1184,7 @@ mod savings_pool_tests {
     }
 
     /// Test 4.2: Contribute to savings pool
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_pool_contribution() {
         println!("Test 4.2: Contribute to Savings Pool");
@@ -1243,13 +1216,12 @@ mod savings_pool_tests {
             description: "For pool contribution test".to_string(),
             currency: "SAP".to_string(),
             reserve_ratio: 0.15,
-            managers: vec![test_did("mgr")],
+            managers: vec![format!("did:mycelix:{}", agents[0])],
         };
 
         let treasury_result: Record = conductor
             .call(&cell.zome("treasury"), "create_treasury", treasury_input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = treasury_result
             .entry()
@@ -1268,7 +1240,7 @@ mod savings_pool_tests {
             pub yield_rate: f64,
         }
 
-        let alice = test_did("saver_alice");
+        let alice = format!("did:mycelix:{}", agents[0]);
         let pool_input = CreatePoolInput {
             treasury_id: treasury.id.clone(),
             name: "Rainy Day Fund".to_string(),
@@ -1280,8 +1252,7 @@ mod savings_pool_tests {
 
         let pool_result: Record = conductor
             .call(&cell.zome("treasury"), "create_savings_pool", pool_input)
-            .await
-            .expect("Failed to create pool");
+            .await;
 
         let pool: SavingsPool = pool_result
             .entry()
@@ -1308,8 +1279,7 @@ mod savings_pool_tests {
 
         let contrib_result: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_pool", contrib_input)
-            .await
-            .expect("Failed to contribute to pool");
+            .await;
 
         let updated: SavingsPool = contrib_result
             .entry()
@@ -1328,8 +1298,7 @@ mod savings_pool_tests {
 
         let contrib_result_2: Record = conductor
             .call(&cell.zome("treasury"), "contribute_to_pool", contrib_2)
-            .await
-            .expect("Failed to contribute again");
+            .await;
 
         let final_pool: SavingsPool = contrib_result_2
             .entry()
@@ -1378,8 +1347,7 @@ mod manager_operations {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "create_treasury", input)
-            .await
-            .expect("Failed to create treasury");
+            .await;
 
         let treasury: Treasury = result
             .entry()
@@ -1391,7 +1359,7 @@ mod manager_operations {
     }
 
     /// Test 5.1: Add a new manager
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_add_manager() {
         println!("Test 5.1: Add Manager");
@@ -1408,8 +1376,8 @@ mod manager_operations {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr_a = test_did("mgr_existing");
-        let mgr_new = test_did("mgr_new");
+        let mgr_a = format!("did:mycelix:{}", agents[0]);
+        let mgr_new = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = create_test_treasury(&conductor, cell, vec![mgr_a.clone()]).await;
 
@@ -1428,8 +1396,7 @@ mod manager_operations {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "add_manager", add_input)
-            .await
-            .expect("Failed to add manager");
+            .await;
 
         let updated: Treasury = result
             .entry()
@@ -1446,7 +1413,7 @@ mod manager_operations {
     }
 
     /// Test 5.2: Remove a manager
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_remove_manager() {
         println!("Test 5.2: Remove Manager");
@@ -1463,8 +1430,8 @@ mod manager_operations {
 
         let cell = &apps[0].cells()[0];
 
-        let mgr_a = test_did("mgr_keeper");
-        let mgr_b = test_did("mgr_removed");
+        let mgr_a = format!("did:mycelix:{}", agents[0]);
+        let mgr_b = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = create_test_treasury(
             &conductor,
@@ -1488,8 +1455,7 @@ mod manager_operations {
 
         let result: Record = conductor
             .call(&cell.zome("treasury"), "remove_manager", remove_input)
-            .await
-            .expect("Failed to remove manager");
+            .await;
 
         let updated: Treasury = result
             .entry()
@@ -1506,7 +1472,7 @@ mod manager_operations {
     }
 
     /// Test 5.3: Cannot remove last manager
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cannot_remove_last_manager() {
         println!("Test 5.3: Cannot Remove Last Manager");
@@ -1523,7 +1489,7 @@ mod manager_operations {
 
         let cell = &apps[0].cells()[0];
 
-        let sole_mgr = test_did("sole_manager");
+        let sole_mgr = format!("did:mycelix:{}", agents[0]);
 
         let treasury_id = create_test_treasury(&conductor, cell, vec![sole_mgr.clone()]).await;
 
@@ -1541,7 +1507,7 @@ mod manager_operations {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(cell.zome("treasury"), "remove_manager", remove_input)
+            .call_fallible(&cell.zome("treasury"), "remove_manager", remove_input)
             .await;
 
         assert!(result.is_err(), "Removing last manager should fail");

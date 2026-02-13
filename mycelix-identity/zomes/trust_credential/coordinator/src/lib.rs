@@ -247,7 +247,7 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
         credential_id: input.credential_id.clone(),
         subject_did: input.subject_did.clone(),
         disclosed_tier: input.disclosed_tier,
-        disclosed_range: input.disclose_range.then(|| input.trust_range),
+        disclosed_range: input.disclose_range.then_some(input.trust_range),
         presentation_proof: input.presentation_proof,
         verifier_did: input.verifier_did,
         purpose: input.purpose,
@@ -301,7 +301,7 @@ pub fn request_attestation(input: RequestAttestationInput) -> ExternResult<Recor
         return Err(wasm_error!(WasmErrorInner::Guest("At least one component is required".into())));
     }
     if let Some(score) = input.min_trust_score {
-        if score < 0.0 || score > 1.0 {
+        if !(0.0..=1.0).contains(&score) {
             return Err(wasm_error!(WasmErrorInner::Guest("Min trust score must be between 0.0 and 1.0".into())));
         }
     }
@@ -348,6 +348,246 @@ pub struct RequestAttestationInput {
     pub min_tier: Option<TrustTier>,
     pub purpose: String,
     pub expires_at: Timestamp,
+}
+
+/// Fulfill an attestation request
+///
+/// The subject responds to an attestation request by providing a K-Vector
+/// commitment and range proof that meets the request's requirements.
+/// This issues a trust credential and marks the request as Fulfilled.
+#[hdk_extern]
+pub fn fulfill_attestation(input: FulfillAttestationInput) -> ExternResult<FulfillAttestationResult> {
+    if input.request_id.is_empty() || input.request_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Request ID must be 1-256 characters".into())));
+    }
+    if input.subject_did.is_empty() || input.subject_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Subject DID must be 1-256 characters".into())));
+    }
+    if input.trust_score_lower < 0.0 || input.trust_score_upper > 1.0 || input.trust_score_lower > input.trust_score_upper {
+        return Err(wasm_error!(WasmErrorInner::Guest("Trust scores must be in [0.0, 1.0] with lower <= upper".into())));
+    }
+
+    let now = sys_time()?;
+
+    // Find the attestation request
+    let subject_hash = anchor_hash(&format!("requests:{}", input.subject_did))?;
+    let links = get_links(
+        LinkQuery::try_new(subject_hash, LinkTypes::SubjectToRequest)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut request_hash: Option<ActionHash> = None;
+    let mut request: Option<AttestationRequest> = None;
+
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah.clone(), GetOptions::default())? {
+            if let Some(req) = record.entry().to_app_option::<AttestationRequest>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if req.id == input.request_id {
+                    request_hash = Some(ah);
+                    request = Some(req);
+                    break;
+                }
+            }
+        }
+    }
+
+    let (original_hash, req) = match (request_hash, request) {
+        (Some(ah), Some(r)) => (ah, r),
+        _ => return Err(wasm_error!(WasmErrorInner::Guest(
+            "Attestation request not found".into()
+        ))),
+    };
+
+    // Verify request is still pending
+    if req.status != AttestationStatus::Pending {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Request is not pending (status: {:?})", req.status)
+        )));
+    }
+
+    // Verify the fulfiller matches the subject
+    if req.subject_did != input.subject_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the attestation subject can fulfill the request".into()
+        )));
+    }
+
+    // Check request hasn't expired
+    if now > req.expires_at {
+        // Update request to expired
+        let mut expired_req = req.clone();
+        expired_req.status = AttestationStatus::Expired;
+        update_entry(original_hash, &EntryTypes::AttestationRequest(expired_req))?;
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Attestation request has expired".into()
+        )));
+    }
+
+    // Verify the provided proof meets request requirements
+    let mid_score = (input.trust_score_lower + input.trust_score_upper) / 2.0;
+    let trust_tier = TrustTier::from_score(mid_score);
+
+    if let Some(min_score) = req.min_trust_score {
+        if input.trust_score_lower < min_score {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                format!("Trust score lower bound ({}) is below the requested minimum ({})",
+                    input.trust_score_lower, min_score)
+            )));
+        }
+    }
+
+    if let Some(ref min_tier) = req.min_tier {
+        if (mid_score) < min_tier.min_score() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                format!("Trust tier {:?} does not meet the requested minimum {:?}",
+                    trust_tier, min_tier)
+            )));
+        }
+    }
+
+    // Issue the trust credential (subject self-attests in response to request)
+    let credential_record = issue_trust_credential(IssueTrustCredentialInput {
+        subject_did: input.subject_did.clone(),
+        issuer_did: input.subject_did.clone(), // Self-attestation
+        kvector_commitment: input.kvector_commitment,
+        range_proof: input.range_proof,
+        trust_score_lower: input.trust_score_lower,
+        trust_score_upper: input.trust_score_upper,
+        expires_at: input.expires_at,
+        supersedes: None,
+    })?;
+
+    // Update request status to Fulfilled
+    let mut fulfilled_req = req;
+    fulfilled_req.status = AttestationStatus::Fulfilled;
+    update_entry(original_hash, &EntryTypes::AttestationRequest(fulfilled_req))?;
+
+    Ok(FulfillAttestationResult {
+        credential_record,
+        request_id: input.request_id,
+    })
+}
+
+/// Input for fulfilling an attestation request
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FulfillAttestationInput {
+    pub request_id: String,
+    pub subject_did: String,
+    pub kvector_commitment: Vec<u8>,
+    pub range_proof: Vec<u8>,
+    pub trust_score_lower: f32,
+    pub trust_score_upper: f32,
+    pub expires_at: Option<Timestamp>,
+}
+
+/// Result of fulfilling an attestation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FulfillAttestationResult {
+    pub credential_record: Record,
+    pub request_id: String,
+}
+
+/// Decline an attestation request
+#[hdk_extern]
+pub fn decline_attestation(input: DeclineAttestationInput) -> ExternResult<Record> {
+    if input.request_id.is_empty() || input.request_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Request ID must be 1-256 characters".into())));
+    }
+    if input.subject_did.is_empty() || input.subject_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Subject DID must be 1-256 characters".into())));
+    }
+
+    // Find the request
+    let subject_hash = anchor_hash(&format!("requests:{}", input.subject_did))?;
+    let links = get_links(
+        LinkQuery::try_new(subject_hash, LinkTypes::SubjectToRequest)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut request_hash: Option<ActionHash> = None;
+    let mut request: Option<AttestationRequest> = None;
+
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah.clone(), GetOptions::default())? {
+            if let Some(req) = record.entry().to_app_option::<AttestationRequest>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if req.id == input.request_id && req.status == AttestationStatus::Pending {
+                    request_hash = Some(ah);
+                    request = Some(req);
+                    break;
+                }
+            }
+        }
+    }
+
+    let (original_hash, req) = match (request_hash, request) {
+        (Some(ah), Some(r)) => (ah, r),
+        _ => return Err(wasm_error!(WasmErrorInner::Guest(
+            "Pending attestation request not found".into()
+        ))),
+    };
+
+    // Verify the decliner is the subject
+    if req.subject_did != input.subject_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the attestation subject can decline the request".into()
+        )));
+    }
+
+    // Update status to Declined
+    let mut declined_req = req;
+    declined_req.status = AttestationStatus::Declined;
+    let action_hash = update_entry(original_hash, &EntryTypes::AttestationRequest(declined_req))?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find updated request".into()
+        )))
+}
+
+/// Input for declining an attestation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DeclineAttestationInput {
+    pub request_id: String,
+    pub subject_did: String,
+}
+
+/// Get pending attestation requests for a subject
+#[hdk_extern]
+pub fn get_pending_requests(subject_did: String) -> ExternResult<Vec<Record>> {
+    if subject_did.is_empty() || subject_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Subject DID must be 1-256 characters".into())));
+    }
+    let now = sys_time()?;
+    let subject_hash = anchor_hash(&format!("requests:{}", subject_did))?;
+    let links = get_links(
+        LinkQuery::try_new(subject_hash, LinkTypes::SubjectToRequest)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut pending = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            if let Some(req) = record.entry().to_app_option::<AttestationRequest>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if req.status == AttestationStatus::Pending && now < req.expires_at {
+                    pending.push(record);
+                }
+            }
+        }
+    }
+
+    Ok(pending)
 }
 
 /// Get credentials for a subject

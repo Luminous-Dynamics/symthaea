@@ -44,12 +44,14 @@ use anyhow::Result;
 
 /// Emotional valence attached to memories
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum EmotionalValence {
     /// Highly positive experience
     VeryPositive,
     /// Positive experience
     Positive,
     /// Neutral experience
+    #[default]
     Neutral,
     /// Negative experience
     Negative,
@@ -85,11 +87,6 @@ impl EmotionalValence {
     }
 }
 
-impl Default for EmotionalValence {
-    fn default() -> Self {
-        EmotionalValence::Neutral
-    }
-}
 
 /// A memory trace in the hippocampus
 #[derive(Debug, Clone, Serialize, Deserialize)]

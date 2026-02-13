@@ -219,7 +219,7 @@ impl AllenRelationPrimitiveGrounding {
         // Bundle the primitive encodings
         let encodings: Vec<BinaryHV> = nsm_primitives
             .iter()
-            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding.clone()))
+            .filter_map(|name| primitive_system.get(name).map(|p| p.encoding))
             .collect();
 
         let primitive_encoding = if encodings.is_empty() {
@@ -838,7 +838,7 @@ impl TemporalReasoner {
 
     /// Get HDC encoding for an Allen relation
     pub fn encode_relation(&self, relation: AllenRelation) -> BinaryHV {
-        self.relation_encodings[&relation].clone()
+        self.relation_encodings[&relation]
     }
 
     /// Encode a temporal statement "A relation B" as an BinaryHV
@@ -1314,7 +1314,7 @@ impl TemporalPrimitiveSystem {
 
         for (i, relation) in AllenRelation::all().iter().enumerate() {
             let local_encoding = BinaryHV::random(6001 + i as u64);
-            let encoding = BinaryHV::bundle(&[domain_rotation.clone(), local_encoding]);
+            let encoding = BinaryHV::bundle(&[domain_rotation, local_encoding]);
 
             relation_primitives.insert(
                 *relation,
@@ -1392,8 +1392,8 @@ impl TemporalPrimitiveSystem {
         for (relation, grounding) in &all_groundings {
             // Combine domain rotation with NSM-grounded encoding
             let encoding = BinaryHV::bundle(&[
-                domain_rotation.clone(),
-                grounding.primitive_encoding.clone(),
+                domain_rotation,
+                grounding.primitive_encoding,
             ]);
 
             relation_primitives.insert(
@@ -1461,19 +1461,19 @@ impl TemporalPrimitiveSystem {
                 name: "Containment".to_string(),
                 relations: vec![AllenRelation::Contains],
                 meaning: "One event fully contains another".to_string(),
-                encoding: contains.primitive_encoding.clone(),
+                encoding: contains.primitive_encoding,
             },
             TemporalPattern {
                 name: "Simultaneity".to_string(),
                 relations: vec![AllenRelation::Equals],
                 meaning: "Events occur at same time".to_string(),
-                encoding: equals.primitive_encoding.clone(),
+                encoding: equals.primitive_encoding,
             },
             TemporalPattern {
                 name: "Causal_Immediacy".to_string(),
                 relations: vec![AllenRelation::Meets],
                 meaning: "Effect immediately follows cause".to_string(),
-                encoding: meets.primitive_encoding.clone(),
+                encoding: meets.primitive_encoding,
             },
             TemporalPattern {
                 name: "Binding_Window".to_string(),
@@ -1484,9 +1484,9 @@ impl TemporalPrimitiveSystem {
                 ],
                 meaning: "Events within 25ms binding window".to_string(),
                 encoding: BinaryHV::bundle(&[
-                    overlaps.primitive_encoding.clone(),
-                    starts.primitive_encoding.clone(),
-                    during.primitive_encoding.clone(),
+                    overlaps.primitive_encoding,
+                    starts.primitive_encoding,
+                    during.primitive_encoding,
                 ]),
             },
         ]
@@ -1538,7 +1538,7 @@ impl TemporalPrimitiveSystem {
 
     /// Encode a temporal relation
     pub fn encode(&self, relation: AllenRelation) -> BinaryHV {
-        self.relation_primitives[&relation].encoding.clone()
+        self.relation_primitives[&relation].encoding
     }
 
     /// Encode a sequence of relations (temporal pattern)

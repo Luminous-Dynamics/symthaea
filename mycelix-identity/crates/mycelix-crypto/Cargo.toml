@@ -1,0 +1,46 @@
+[package]
+name = "mycelix-crypto"
+version = "0.1.0"
+edition = "2021"
+description = "Crypto-agile types for Mycelix Identity (Ed25519, ML-DSA, hybrid, ML-KEM)"
+
+[features]
+default = []
+# WASM zomes: types + validation only, no crypto operations
+wasm = []
+# Native CLI/tests: adds trait impls with real PQC libraries
+native = [
+    "dep:ed25519-dalek",
+    "dep:pqcrypto-dilithium",
+    "dep:pqcrypto-sphincsplus",
+    "dep:pqcrypto-kyber",
+    "dep:chacha20poly1305",
+    "dep:rand",
+    "dep:pqcrypto-traits",
+    "dep:zeroize",
+]
+
+[dependencies]
+serde = { workspace = true }
+bs58 = { workspace = true }
+thiserror = { workspace = true }
+
+# Native-only PQC dependencies
+ed25519-dalek = { version = "2", optional = true, features = ["rand_core"] }
+pqcrypto-dilithium = { version = "0.5", optional = true }
+pqcrypto-sphincsplus = { version = "0.7", optional = true }
+pqcrypto-kyber = { version = "0.8", optional = true }
+pqcrypto-traits = { version = "0.3", optional = true }
+chacha20poly1305 = { version = "0.10", optional = true }
+rand = { version = "0.8", optional = true }
+zeroize = { version = "1", optional = true, features = ["derive"] }
+
+[dev-dependencies]
+proptest = "1"
+serde_json = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "pqc_bench"
+harness = false
+required-features = ["native"]

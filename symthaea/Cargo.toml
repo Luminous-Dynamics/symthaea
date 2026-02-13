@@ -6,15 +6,42 @@ members = [
     "crates/symthaea-nix",
     "crates/symthaea-stt",
     "crates/symthaea-sentinel",
+    "crates/symthaea-dynamics",
+    "crates/symthaea-perception",
+]
+# WIP crate: cross-references main crate modules (circular dep), needs architectural rework
+exclude = [
+    "crates/symthaea-consciousness",
 ]
 
 [workspace.dependencies]
-ndarray = { version = "0.15", features = ["rayon", "serde"] }
+ndarray = { version = "0.16", features = ["rayon", "serde"] }
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "1.3"
 anyhow = "1.0"
+thiserror = "1.0"
 rand = "0.8"
 tokio = { version = "1.35", features = ["full"] }
 tracing = "0.1"
+blake3 = "1.5"
+uuid = { version = "1.6", features = ["serde", "v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+parking_lot = "0.12"
+once_cell = "1.19"
+nalgebra = "0.34"
+rustfft = "6.2"
+clap = { version = "4.4", features = ["derive"] }
+hound = "3.5"
+petgraph = { version = "0.6", features = ["serde-1"] }
+regex = "1.10"
+strsim = "0.11"
+tree-sitter = "0.24"
+tree-sitter-nix = "0.3"
+rusqlite = { version = "0.37", features = ["bundled"] }
+dashmap = "5.5"
+lru = "0.16"
+rayon = "1.10"
 
 [package]
 name = "symthaea"
@@ -34,7 +61,7 @@ categories = ["science", "algorithms", "data-structures"]
 symthaea-core = { path = "symthaea-core" }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
-mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core" }
+mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }
 
 # Symthaea STT - Speech-to-Text, Bioacoustics, EEG processing
 symthaea-stt = { path = "crates/symthaea-stt", optional = true }
@@ -49,10 +76,10 @@ symthaea-nix = { path = "crates/symthaea-nix", optional = true }
 # hypervector = "0.1"  # Using custom HDC implementation instead
 
 # Neural networks (for LTC implementation)
-ndarray = { version = "0.15", features = ["rayon"] }
+ndarray = { workspace = true }
 
 # Linear algebra (pure Rust, validated eigenvalue calculations)
-nalgebra = "0.33"
+nalgebra = { workspace = true }
 
 # Burn ML Framework (pure Rust) - for semantic encoding
 burn = { version = "0.20", features = ["ndarray"], optional = true }
@@ -60,7 +87,7 @@ burn-ndarray = { version = "0.20", optional = true }
 # ndarray-linalg = "0.16"  # Removed to avoid external BLAS dependency during tests
 
 # Graph structures (for autopoietic consciousness)
-petgraph = { version = "0.6", features = ["serde-1"] }
+petgraph = { workspace = true }
 
 # Phase 11: Semantic Ear - Now Active with Qwen3-Embedding
 tokenizers = { version = "0.21", optional = true }  # Tokenization for Qwen3/BGE
@@ -83,7 +110,7 @@ half = { version = "2.6", optional = true }  # f16 support for GPU inference (>=
 iroh = { version = "0.96", optional = true }
 
 # Phase 11+: Mycelix Protocol Integration (Deferred to Week 9+)
-uuid = { version = "1.6", features = ["serde", "v4"] }  # Week 3: Enabled for Goal IDs
+uuid = { workspace = true }  # Week 3: Enabled for Goal IDs
 # mycelix-sdk: Path dependency removed for Nix sandbox compatibility
 # Re-enable when mycelix-workspace/sdk is available as a crates.io package or git dependency
 # mycelix-sdk = { path = "../../../mycelix-workspace/sdk", optional = true, default-features = false, features = ["standalone"] }
@@ -105,42 +132,42 @@ async-trait = "0.1"
 dirs = "5.0"
 
 # Phase 12: Resonator Networks (FFT for morphogenetic field)
-rustfft = "6.1"
+rustfft = { workspace = true }
 num-complex = "0.4"
 
 # Async runtime
-tokio = { version = "1.35", features = ["full"] }
-rayon = "1.8"
+tokio = { workspace = true }
+rayon = { workspace = true }
 
 # Serialization (for consciousness persistence)
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-bincode = "1.3"
+serde = { workspace = true }
+serde_json = { workspace = true }
+bincode = { workspace = true }
 
 # Observability
-tracing = "0.1"
+tracing = { workspace = true }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Week 0: Defer Prometheus metrics (needs OpenSSL via hyper)
 # metrics = "0.22"
 # metrics-exporter-prometheus = "0.13"
 
 # Utilities
-anyhow = "1.0"
-thiserror = "1.0"
-parking_lot = "0.12"  # High-performance synchronization primitives
-rusqlite = { version = "0.37", features = ["bundled"] }  # SQLite database (bundled to avoid system dependency)
-once_cell = "1.19"
-dashmap = "5.5"
-lru = "0.16"
-rand = "0.8"
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
+rusqlite = { workspace = true }
+once_cell = { workspace = true }
+dashmap = { workspace = true }
+lru = { workspace = true }
+rand = { workspace = true }
 rand_chacha = "0.3"  # Deterministic RNG for reproducible JL projections
-blake3 = "1.5"
+blake3 = { workspace = true }
 hex = "0.4"     # Hex encoding for node IDs in federated network
 ed25519-dalek = { version = "2.1", features = ["serde"] }  # MFDI identity signatures
 sha2 = "0.10"   # MFDI credential hashing
 md5 = "0.7"  # For experience module topic hashing
-chrono = { version = "0.4", features = ["serde"] }
-regex = "1.10"  # For Thalamus pattern matching
+chrono = { workspace = true }
+regex = { workspace = true }
 csv = "1.3"     # CSV parsing for benchmark data
 
 # Week 0: Memory Arena for HDC
@@ -148,12 +175,12 @@ bumpalo = "3.14"
 
 # Week 2: Cerebellum - Procedural Memory
 qp-trie = "0.8"      # Efficient prefix trie for skill lookup
-strsim = "0.11"      # Fuzzy string matching for typo tolerance
+strsim = { workspace = true }
 
 # Week 12: Perception & Tool Creation
 image = "0.24"       # Image loading and processing
 imageproc = "0.26"   # Computer vision algorithms
-tree-sitter = "0.24" # Incremental parsing for code understanding (updated for tree-sitter-nix 0.3.0)
+tree-sitter = { workspace = true }
 syn = { version = "2.0", features = ["full", "visit"] }  # Rust syntax parsing (self-analysis)
 ignore = "0.4"       # .gitignore-aware file walking
 
@@ -162,18 +189,18 @@ ignore = "0.4"       # .gitignore-aware file walking
 ort = { version = "2.0.0-rc.10", features = ["half", "load-dynamic", "ndarray"], optional = true }  # ONNX Runtime
 futures = { version = "0.3", optional = true }  # Async TTS streaming
 rodio = { version = "0.19", default-features = false, optional = true }  # Audio playback (no backends by default)
-hound = { version = "3.5", optional = true }        # WAV file I/O
+hound = { workspace = true, optional = true }
 hf-hub = { version = "0.4", optional = true }       # HuggingFace Hub for model download
 espeak-rs = { version = "0.1", optional = true }    # espeak-ng bindings for proper G2P
 
 # Enhancement #8 Week 4: PyPhi Integration (IIT 3.0 exact Φ calculation)
-pyo3 = { version = "0.24", features = ["auto-initialize"], optional = true }  # Rust-Python bridge for PyPhi
+# pyo3 removed: pyphi feature was never implemented (no cfg gates, no code using pyo3)
 
 # NixOS integration
 nix = "0.27"
 
 # CLI argument parsing (optional - for service binary)
-clap = { version = "4.4", features = ["derive"], optional = true }
+clap = { workspace = true, optional = true }
 ctrlc = { version = "3.4", optional = true }  # Ctrl+C signal handling
 
 # Shell Sidecar TUI dependencies (optional)
@@ -188,7 +215,7 @@ egui = { version = "0.33", optional = true }
 rmp-serde = "1.3"            # MessagePack binary protocol (A1)
 
 # Syntax Highlighting (B4)
-tree-sitter-nix = "0.3"      # Nix grammar for tree-sitter (updated for compatibility)
+tree-sitter-nix = { workspace = true }
 # syntect = "5.2"            # Alternative: regex-based highlighting
 
 # Code Understanding & Generation (Consciousness-Aware Code)
@@ -198,8 +225,10 @@ tree-sitter-python = { version = "0.23", optional = true }  # Python grammar for
 # Desktop Notifications (E1)
 zbus = { version = "4.0", optional = true }  # D-Bus for notifications
 
-# Systemd Integration (D1)
-libsystemd = { version = "0.7", optional = true }  # Systemd socket activation
+# Sandbox command timeouts
+wait-timeout = "0.2"
+
+# libsystemd removed: systemd feature was never implemented (no cfg gates, no code using libsystemd)
 
 [features]
 default = []
@@ -213,11 +242,11 @@ voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + 
 voice-tts-cuda = ["voice-tts", "ort/cuda"]  # TTS with CUDA acceleration (requires CUDA toolkit)
 voice-tts-async = ["voice-tts", "futures"]  # Async/streaming TTS
 voice-stt = ["symthaea-stt", "hound"]  # STT with symthaea-stt crate (HDC + LTC + CfC)
-audio-sentinel = ["symthaea-sentinel"]  # Zero-shot temporal audio pattern recognition (HDC + LTC + CfC)
+# audio-sentinel removed: symthaea-sentinel is never imported in main crate (use sentinel sub-crate directly)
 nix-mind = ["symthaea-nix"]  # Conscious NixOS mind with HDC world model + active inference
 audio = ["voice-tts", "rodio"]  # Full audio including playback
-audio-cuda = ["voice-tts-cuda", "rodio"]  # Full audio with GPU acceleration
-pyphi = ["pyo3"]  # Enhancement #8 Week 4: Enable PyPhi integration for exact IIT Φ validation
+# audio-cuda removed: aggregated dead voice-tts-cuda + rodio with no cfg gate or required-features
+# pyphi removed: pyo3 never used in source code (feature was planned but never implemented)
 # Semantic encoding with Burn ML framework
 semantic-burn = ["burn", "burn-ndarray"]  # Pure Rust semantic encoder
 # Perception & Embeddings (Phase 1 Activation)
@@ -238,12 +267,12 @@ swarm = ["iroh"]  # Real-time P2P tensor streaming via Iroh 0.95+
 holochain = []    # gate only (real integration in symthaea-mycelix-bridge; rmp-serde conflict prevents in-tree dep)
 # Desktop integration features
 notifications = ["zbus"]  # E1: D-Bus desktop notifications
-systemd = ["libsystemd"]  # D1: Systemd socket activation
-desktop = ["notifications", "systemd"]
+# systemd removed: libsystemd never used in source code (feature was planned but never implemented)
+# desktop removed: aggregated notifications + dead systemd (use "notifications" directly)
 # Mycelix integration
 # mycelix = ["mycelix-sdk", "sha3"]  # Full Mycelix SDK integration for governance
 # Disabled until mycelix-sdk is available as a proper crate
-mycelix = ["sha3"]  # Mycelix-ready (hashing only, SDK integration pending)
+mycelix = ["mycelix-fl-core", "sha3"]  # Mycelix FL algorithms + hashing
 
 # Identity: MFDI (Multi-Factor Delegated Identity) for cognitive agents
 identity = []  # Ed25519 signatures, capability gating, signed request/output
@@ -252,7 +281,8 @@ identity = []  # Ed25519 signatures, capability gating, signed request/output
 gpu = ["burn", "burn-ndarray"]  # GPU acceleration via Burn/WGPU for CfC networks
 cuda = ["gpu"]  # CUDA backend (requires CUDA toolkit)
 
-# Module compilation gates (only flags actually referenced in cfg attributes)
+# Module compilation gates (integration_module and observability_module are cfg-gated in lib.rs;
+# the rest are example build gates used in required-features on [[example]] entries)
 integration_module = []        # Integration module in lib.rs
 observability_module = []      # Observability module in lib.rs
 api_module = ["axum", "tower-http"]  # HTTP API binary + module
@@ -275,6 +305,12 @@ reasoning_engine = ["epistemic_conflict", "conscious_tool_gate", "temporal_plann
 code_understanding = ["tree-sitter-rust", "tree-sitter-python"]  # Multi-language code parsing via tree-sitter
 code_generation = ["code_understanding"]  # HDC-based code generation (requires parsers)
 consciousness_code = ["code_generation", "reasoning_engine", "epistemic_conflict"]  # Full consciousness-aware code pipeline
+
+# Sub-crate feature forwarding
+nix-cli = ["symthaea-nix", "symthaea-nix/cli"]        # CLI for Nix Mind
+nix-tui = ["symthaea-nix", "symthaea-nix/tui"]        # TUI for Nix Mind
+nix-daemon = ["symthaea-nix", "symthaea-nix/daemon"]   # Daemon mode for Nix Mind
+# sentinel-live-audio removed: symthaea-sentinel never imported in main crate (use sentinel sub-crate directly)
 
 nvml = []                      # NVIDIA Management Library for GPU monitoring
 network = []                   # Mycelix network client (real HTTP fetching)
@@ -546,6 +582,145 @@ name = "full_pipeline"
 # Neuroscience validation examples (no required features)
 [[example]]
 name = "meditation_phi_analysis"
+
+# Neural-bridge examples (require candle/BGE-M3 layer extraction)
+[[example]]
+name = "bert_layer_extraction"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "bert_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "binding_associative_memory"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "binding_betti_analysis"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "binding_compositionality"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "binding_layer_sweep"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "binding_layer21_integration"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "causal_ablation_lobotomy"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "cross_architecture_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "cross_model_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "gpt2_layer_topology"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "gpt2_layerwise_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "l22_mechanistic_analysis"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer21_analysis"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer21_causal_intervention"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer_specific_probes"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer_topology_analysis"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer_topology_expanded"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "layer_topology_full_corpus"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "oil_water_investigation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "phi_extraction_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "phenomenal_corridor_finegrained"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "phenomenality_index_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "robustness_validation"
+required-features = ["neural-bridge"]
+
+[[example]]
+name = "train_probe"
+required-features = ["neural-bridge"]
+
+# Perception examples (require embeddings/ONNX models)
+[[example]]
+name = "check_model_inputs"
+required-features = ["embeddings"]
+
+[[example]]
+name = "embedding_verification"
+required-features = ["embeddings"]
+
+[[example]]
+name = "phenomenal_detector_cli"
+required-features = ["embeddings"]
+
+[[example]]
+name = "robustness_adversarial"
+required-features = ["embeddings"]
+
+# Voice examples (require voice-tts feature)
+[[example]]
+name = "hdc_coarticulation_benchmark"
+required-features = ["voice-tts"]
+
+[[example]]
+name = "synesthesia_live"
+required-features = ["voice-tts"]
+
+[[example]]
+name = "test_tts_pipeline"
+required-features = ["voice-tts"]
+
+[[example]]
+name = "voice_demo"
+required-features = ["voice-tts"]
+
+[[example]]
+name = "voice_diagnostic"
+required-features = ["voice-tts"]
 
 # Benchmarks
 # Quick suite for CI (~5 min)

@@ -787,9 +787,7 @@ pub fn spectrum_to_mel_bands(spectrum: &[f32], n_mels: usize, sample_rate: f32) 
             for j in start..end {
                 let weight = if j <= center {
                     if center > start { (j - start) as f32 / (center - start) as f32 } else { 1.0 }
-                } else {
-                    if end > center { (end - j) as f32 / (end - center) as f32 } else { 1.0 }
-                };
+                } else if end > center { (end - j) as f32 / (end - center) as f32 } else { 1.0 };
                 *band += spectrum[j] * weight;
             }
         }

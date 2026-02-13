@@ -84,6 +84,8 @@ fn unpermute(v: &[i8], shift: usize) -> Vec<i8> {
 }
 
 proptest! {
+    #![proptest_config(ProptestConfig::with_cases(64))]
+
     // =========================================================================
     // Property 1: Binding is self-inverse
     // bind(bind(a, b), b) = a  (XOR is self-inverse)

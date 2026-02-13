@@ -167,6 +167,7 @@ impl std::fmt::Display for PhiUncertainty {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
 
     #[test]
     fn test_phi_result_display() {
@@ -226,5 +227,103 @@ mod tests {
         };
 
         assert!(high.is_significantly_different(&low));
+    }
+
+    // =====================================================================
+    // Property-based tests
+    // =====================================================================
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(64))]
+
+        #[test]
+        fn prop_phi_classification_consistent(phi in 0.0f64..=1.0) {
+            let result = PhiResult::new(phi, "test", 8);
+            // highly_integrated implies indicates_consciousness
+            if result.is_highly_integrated() {
+                prop_assert!(result.indicates_consciousness(),
+                    "Highly integrated (phi={}) should also indicate consciousness", phi);
+            }
+        }
+
+        #[test]
+        fn prop_phi_percent_bounded(phi in 0.0f64..=1.0) {
+            let result = PhiResult::new(phi, "test", 8);
+            let pct = result.percent_of_maximum();
+            prop_assert!(pct >= 0.0, "Percent should be non-negative, got {} for phi={}", pct, phi);
+            prop_assert!(pct <= 200.0, "Percent should be ≤200%, got {} for phi={}", pct, phi);
+        }
+
+        #[test]
+        fn prop_uncertainty_stddev_nonneg(
+            s1 in -1.0f64..1.0,
+            s2 in -1.0f64..1.0,
+            s3 in -1.0f64..1.0,
+            s4 in -1.0f64..1.0,
+        ) {
+            let samples = vec![s1, s2, s3, s4];
+            let u = PhiUncertainty::from_samples(&samples);
+            prop_assert!(u.std_dev >= 0.0,
+                "Standard deviation must be non-negative, got {}", u.std_dev);
+            prop_assert!(!u.std_dev.is_nan(),
+                "Standard deviation must not be NaN");
+        }
+
+        #[test]
+        fn prop_uncertainty_ci_ordered(
+            s1 in 0.0f64..1.0,
+            s2 in 0.0f64..1.0,
+            s3 in 0.0f64..1.0,
+        ) {
+            let samples = vec![s1, s2, s3];
+            let u = PhiUncertainty::from_samples(&samples);
+            prop_assert!(u.confidence_interval_95.0 <= u.confidence_interval_95.1,
+                "CI lower {} should be ≤ upper {}", u.confidence_interval_95.0, u.confidence_interval_95.1);
+        }
+
+        #[test]
+        fn prop_uncertainty_symmetric(
+            s1 in 0.0f64..1.0,
+            s2 in 0.0f64..1.0,
+            s3 in 0.0f64..1.0,
+        ) {
+            let a_samples = vec![s1, s2, s3];
+            let b_samples = vec![s1 + 2.0, s2 + 2.0, s3 + 2.0];
+            let a = PhiUncertainty::from_samples(&a_samples);
+            let b = PhiUncertainty::from_samples(&b_samples);
+            // is_significantly_different should be symmetric
+            prop_assert_eq!(
+                a.is_significantly_different(&b),
+                b.is_significantly_different(&a),
+                "Significance test should be symmetric"
+            );
+        }
+
+        #[test]
+        fn prop_single_sample_zero_stddev(phi in 0.0f64..1.0) {
+            let u = PhiUncertainty::from_samples(&[phi]);
+            prop_assert_eq!(u.std_dev, 0.0, "Single sample should have zero std_dev");
+            prop_assert_eq!(u.n_samples, 1);
+        }
+
+        #[test]
+        fn prop_identical_samples_zero_stddev(phi in 0.0f64..1.0) {
+            let u = PhiUncertainty::from_samples(&[phi, phi, phi, phi]);
+            prop_assert!(u.std_dev < 1e-10,
+                "Identical samples should have near-zero std_dev, got {}", u.std_dev);
+        }
+
+        #[test]
+        fn prop_cv_nonneg(
+            s1 in 0.1f64..1.0,
+            s2 in 0.1f64..1.0,
+            s3 in 0.1f64..1.0,
+        ) {
+            let samples = vec![s1, s2, s3];
+            let mean = (s1 + s2 + s3) / 3.0;
+            let u = PhiUncertainty::from_samples(&samples);
+            let cv = u.coefficient_of_variation(mean);
+            prop_assert!(cv >= 0.0, "CV should be non-negative, got {}", cv);
+        }
     }
 }

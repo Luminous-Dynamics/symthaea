@@ -14,7 +14,7 @@
 //! cargo test --test staking_test -- --ignored      # Full integration tests
 //! ```
 
-use holochain::sweettest::{SweetConductor, SweetDnaFile, SweetAgents};
+use holochain::sweettest::*;
 use holochain::prelude::*;
 use std::time::Duration;
 
@@ -40,7 +40,7 @@ mod stake_lifecycle {
 
     /// Test 1.1: Create a stake with MYCEL weighting, verify weight = 1.0 + mycel_score
     /// MYCEL score is fetched from recognition zome (not caller-provided).
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_create_stake_with_mycel_weighting() {
         println!("Test 1.1: Create Stake with MYCEL Weighting");
@@ -56,7 +56,7 @@ mod stake_lifecycle {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Initialize member in recognition zome first (sets MYCEL via components)
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -72,8 +72,7 @@ mod stake_lifecycle {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init member");
+            .await;
 
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
         struct CreateStakeInput {
@@ -88,8 +87,7 @@ mod stake_lifecycle {
 
         let result: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = result
             .entry()
@@ -116,7 +114,7 @@ mod stake_lifecycle {
     }
 
     /// Test 1.2: Full lifecycle — create stake, begin unbonding, then withdraw
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_unbonding_and_withdrawal() {
         println!("Test 1.2: Unbonding and Withdrawal Lifecycle");
@@ -132,7 +130,7 @@ mod stake_lifecycle {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Step 1: Create stake
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -148,8 +146,7 @@ mod stake_lifecycle {
 
         let result: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = result
             .entry()
@@ -164,8 +161,7 @@ mod stake_lifecycle {
         // Step 2: Begin unbonding
         let unbonding_result: Record = conductor
             .call(&alice_cell.zome("staking"), "begin_unbonding", stake_id.clone())
-            .await
-            .expect("Failed to begin unbonding");
+            .await;
 
         let unbonding_stake: CollateralStake = unbonding_result
             .entry()
@@ -182,7 +178,7 @@ mod stake_lifecycle {
         // The 21-day unbonding period means we cannot withdraw immediately in a real
         // test. We verify the mechanism is in place by trying and expecting failure.
         let withdraw_result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("staking"), "withdraw_stake", stake_id.clone())
+            .call_fallible(&alice_cell.zome("staking"), "withdraw_stake", stake_id.clone())
             .await;
 
         // Withdrawal should fail because unbonding period is not complete
@@ -196,7 +192,7 @@ mod stake_lifecycle {
     }
 
     /// Test 1.3: Cannot withdraw a stake that is still in unbonding period
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_cannot_withdraw_during_unbonding() {
         println!("Test 1.3: Cannot Withdraw During Unbonding");
@@ -212,7 +208,7 @@ mod stake_lifecycle {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Create and unbond
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -228,8 +224,7 @@ mod stake_lifecycle {
 
         let result: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = result
             .entry()
@@ -242,12 +237,11 @@ mod stake_lifecycle {
         // Begin unbonding
         let _: Record = conductor
             .call(&alice_cell.zome("staking"), "begin_unbonding", stake_id.clone())
-            .await
-            .expect("Failed to begin unbonding");
+            .await;
 
         // Try to withdraw immediately (within 21-day window)
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("staking"), "withdraw_stake", stake_id.clone())
+            .call_fallible(&alice_cell.zome("staking"), "withdraw_stake", stake_id.clone())
             .await;
 
         match result {
@@ -270,7 +264,7 @@ mod stake_lifecycle {
 
     /// Test 1.4: Update MYCEL score on an active stake
     /// Score is re-fetched from recognition zome (not caller-provided).
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_update_mycel_score() {
         println!("Test 1.4: Update MYCEL Score (fetched from recognition)");
@@ -286,7 +280,7 @@ mod stake_lifecycle {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Initialize member in recognition zome
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -302,8 +296,7 @@ mod stake_lifecycle {
                 is_apprentice: false,
                 mentor_did: None,
             })
-            .await
-            .expect("Failed to init member");
+            .await;
 
         // Create stake — MYCEL fetched from recognition
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -319,8 +312,7 @@ mod stake_lifecycle {
 
         let result: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = result
             .entry()
@@ -343,8 +335,7 @@ mod stake_lifecycle {
 
         let updated_result: Record = conductor
             .call(&alice_cell.zome("staking"), "update_stake_mycel", update_input)
-            .await
-            .expect("Failed to update MYCEL score");
+            .await;
 
         let updated_stake: CollateralStake = updated_result
             .entry()
@@ -391,7 +382,7 @@ mod slashing_tests {
     }
 
     /// Test 2.1: Slash for double signing — 100% slash, jailed
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_slash_for_double_signing() {
         println!("Test 2.1: Slash for Double Signing (100%, Jailed)");
@@ -407,7 +398,7 @@ mod slashing_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Create a stake first
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -423,8 +414,7 @@ mod slashing_tests {
 
         let stake_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", create_input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = stake_record
             .entry()
@@ -449,15 +439,14 @@ mod slashing_tests {
             reason: SlashingReason::DoubleSigning,
             evidence: test_evidence(
                 EvidenceType::DoubleSignEvidence,
-                vec![test_did("reporter_1"), test_did("reporter_2")],
+                vec![format!("did:mycelix:{}", agents[0]), format!("did:mycelix:{}", agents[0])],
             ),
             custom_slash_percentage: None, // Use default 100%
         };
 
         let slash_result: Record = conductor
             .call(&alice_cell.zome("staking"), "slash_stake", slash_input)
-            .await
-            .expect("Failed to slash stake");
+            .await;
 
         let slashing_event: SlashingEvent = slash_result
             .entry()
@@ -480,7 +469,7 @@ mod slashing_tests {
     }
 
     /// Test 2.2: Slash for downtime — 5% slash, not jailed
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_slash_for_downtime() {
         println!("Test 2.2: Slash for Downtime (5%, Not Jailed)");
@@ -496,7 +485,7 @@ mod slashing_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Create a stake
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -512,8 +501,7 @@ mod slashing_tests {
 
         let stake_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", create_input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = stake_record
             .entry()
@@ -537,15 +525,14 @@ mod slashing_tests {
             reason: SlashingReason::Downtime,
             evidence: test_evidence(
                 EvidenceType::DowntimeEvidence,
-                vec![test_did("monitor_node")],
+                vec![format!("did:mycelix:{}", agents[0])],
             ),
             custom_slash_percentage: None, // Use default 5%
         };
 
         let slash_result: Record = conductor
             .call(&alice_cell.zome("staking"), "slash_stake", slash_input)
-            .await
-            .expect("Failed to slash stake");
+            .await;
 
         let slashing_event: SlashingEvent = slash_result
             .entry()
@@ -567,7 +554,7 @@ mod slashing_tests {
     }
 
     /// Test 2.3: Slash with custom percentage override
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_slash_with_custom_percentage() {
         println!("Test 2.3: Slash with Custom Percentage Override");
@@ -583,7 +570,7 @@ mod slashing_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
 
         // Create a stake
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -599,8 +586,7 @@ mod slashing_tests {
 
         let stake_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_stake", create_input)
-            .await
-            .expect("Failed to create stake");
+            .await;
 
         let stake: CollateralStake = stake_record
             .entry()
@@ -624,15 +610,14 @@ mod slashing_tests {
             reason: SlashingReason::InvalidGradient,
             evidence: test_evidence(
                 EvidenceType::GradientAnalysis,
-                vec![test_did("fl_aggregator")],
+                vec![format!("did:mycelix:{}", agents[0])],
             ),
             custom_slash_percentage: Some(25), // Override default 10%
         };
 
         let slash_result: Record = conductor
             .call(&alice_cell.zome("staking"), "slash_stake", slash_input)
-            .await
-            .expect("Failed to slash stake");
+            .await;
 
         let slashing_event: SlashingEvent = slash_result
             .entry()
@@ -662,7 +647,7 @@ mod escrow_tests {
     use super::*;
 
     /// Test 3.1: Hash-lock escrow — create, reveal preimage, release
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_hash_lock_escrow() {
         println!("Test 3.1: Hash-Lock Escrow Lifecycle");
@@ -678,8 +663,8 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
         // Preimage and its hash (all hash types use Blake2b-256 internally)
         let preimage = b"secret_preimage_for_escrow_release".to_vec();
@@ -722,8 +707,7 @@ mod escrow_tests {
 
         let escrow_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_escrow", escrow_input)
-            .await
-            .expect("Failed to create escrow");
+            .await;
 
         let escrow: CryptoEscrow = escrow_record
             .entry()
@@ -755,8 +739,7 @@ mod escrow_tests {
 
         let reveal_result: Record = conductor
             .call(&alice_cell.zome("staking"), "reveal_hash_preimage", reveal_input)
-            .await
-            .expect("Failed to reveal preimage");
+            .await;
 
         let revealed_escrow: CryptoEscrow = reveal_result
             .entry()
@@ -774,8 +757,7 @@ mod escrow_tests {
         // Release escrow
         let release_result: Record = conductor
             .call(&alice_cell.zome("staking"), "release_escrow", escrow_id.clone())
-            .await
-            .expect("Failed to release escrow");
+            .await;
 
         let released_escrow: CryptoEscrow = release_result
             .entry()
@@ -791,7 +773,7 @@ mod escrow_tests {
     }
 
     /// Test 3.2: Multi-sig escrow — create 2-of-3, add signatures, release
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_multisig_escrow() {
         println!("Test 3.2: Multi-Sig Escrow (2-of-3)");
@@ -807,12 +789,12 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
-        let signer_1 = test_did("signer_alpha");
-        let signer_2 = test_did("signer_beta");
-        let signer_3 = test_did("signer_gamma");
+        let signer_1 = format!("did:mycelix:{}", agents[0]);
+        let signer_2 = format!("did:mycelix:{}", agents[0]);
+        let signer_3 = format!("did:mycelix:{}", agents[0]);
 
         // Create 2-of-3 multi-sig escrow
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -847,8 +829,7 @@ mod escrow_tests {
 
         let escrow_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_escrow", escrow_input)
-            .await
-            .expect("Failed to create escrow");
+            .await;
 
         let escrow: CryptoEscrow = escrow_record
             .entry()
@@ -876,8 +857,7 @@ mod escrow_tests {
 
         let sig_1_result: Record = conductor
             .call(&alice_cell.zome("staking"), "add_escrow_signature", sig_1_input)
-            .await
-            .expect("Failed to add first signature");
+            .await;
 
         let after_sig_1: CryptoEscrow = sig_1_result
             .entry()
@@ -902,8 +882,7 @@ mod escrow_tests {
 
         let sig_2_result: Record = conductor
             .call(&alice_cell.zome("staking"), "add_escrow_signature", sig_2_input)
-            .await
-            .expect("Failed to add second signature");
+            .await;
 
         let after_sig_2: CryptoEscrow = sig_2_result
             .entry()
@@ -921,8 +900,7 @@ mod escrow_tests {
         // Release escrow
         let release_result: Record = conductor
             .call(&alice_cell.zome("staking"), "release_escrow", escrow_id.clone())
-            .await
-            .expect("Failed to release escrow");
+            .await;
 
         let released: CryptoEscrow = release_result
             .entry()
@@ -938,7 +916,7 @@ mod escrow_tests {
     }
 
     /// Test 3.3: Unauthorized signer is rejected
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     #[ignore]
     async fn test_unauthorized_signer_rejected() {
         println!("Test 3.3: Unauthorized Signer Rejected");
@@ -954,12 +932,12 @@ mod escrow_tests {
             .expect("Failed to install app");
 
         let alice_cell = &apps[0].cells()[0];
-        let alice_did = test_did("alice");
-        let bob_did = test_did("bob");
+        let alice_did = format!("did:mycelix:{}", agents[0]);
+        let bob_did = format!("did:mycelix:{}", agents[1]);
 
-        let signer_1 = test_did("authorized_1");
-        let signer_2 = test_did("authorized_2");
-        let unauthorized = test_did("evil_signer");
+        let signer_1 = format!("did:mycelix:{}", agents[0]);
+        let signer_2 = format!("did:mycelix:{}", agents[0]);
+        let unauthorized = format!("did:mycelix:{}", agents[0]);
 
         // Create escrow with specific authorized signers
         #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -994,8 +972,7 @@ mod escrow_tests {
 
         let escrow_record: Record = conductor
             .call(&alice_cell.zome("staking"), "create_escrow", escrow_input)
-            .await
-            .expect("Failed to create escrow");
+            .await;
 
         let escrow: CryptoEscrow = escrow_record
             .entry()
@@ -1020,7 +997,7 @@ mod escrow_tests {
         };
 
         let result: Result<Record, _> = conductor
-            .call_fallible(alice_cell.zome("staking"), "add_escrow_signature", bad_sig)
+            .call_fallible(&alice_cell.zome("staking"), "add_escrow_signature", bad_sig)
             .await;
 
         match result {

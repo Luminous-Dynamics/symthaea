@@ -288,7 +288,7 @@ impl PhysicsConsciousnessObserver {
     /// 3. Binding with a position-marker HV to preserve partition identity.
     fn encode_state(&self, state: &[f64]) -> Vec<BinaryHV> {
         let n = self.num_partitions;
-        let chunk_size = (state.len() + n - 1) / n; // ceil division
+        let chunk_size = state.len().div_ceil(n); // ceil division
 
         (0..n)
             .map(|i| {

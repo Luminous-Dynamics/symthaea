@@ -163,11 +163,10 @@ fn decode_sequence(
                 .map(|(_, c)| c)
                 .sum::<f32>() / run_len as f32;
 
-            if avg_conf >= min_confidence {
-                if result.last().map_or(true, |last| last != current) {
+            if avg_conf >= min_confidence
+                && result.last() != Some(current) {
                     result.push(current.clone());
                 }
-            }
         }
 
         run_start = run_end;
@@ -279,7 +278,7 @@ fn build_bigram_lm(alignments_path: &Path, phonemes: &[String]) -> Result<Bigram
         .collect();
 
     // Detect if phonemes are stress-collapsed (no digits in any phoneme name)
-    let is_collapsed = phonemes.iter().all(|p| !p.bytes().last().map_or(false, |b| b.is_ascii_digit()));
+    let is_collapsed = phonemes.iter().all(|p| !p.bytes().last().is_some_and(|b| b.is_ascii_digit()));
 
     // Count bigrams and unigrams
     let mut bigram_counts = vec![vec![0u64; n_states]; n_states];
@@ -287,7 +286,7 @@ fn build_bigram_lm(alignments_path: &Path, phonemes: &[String]) -> Result<Bigram
     let mut total_bigrams = 0u64;
     let mut total_unigrams = 0u64;
 
-    for (_id, alignment) in &alignments {
+    for alignment in alignments.values() {
         let phone_indices: Vec<usize> = alignment.phonemes.iter()
             .filter_map(|seg| {
                 let key = if is_collapsed { strip_stress(&seg.phoneme) } else { seg.phoneme.clone() };

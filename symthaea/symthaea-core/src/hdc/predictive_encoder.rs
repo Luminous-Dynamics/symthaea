@@ -123,7 +123,7 @@ pub struct PredictiveHdcEncoder {
     config: PredictiveEncoderConfig,
 
     /// Base primitive system for semantic encoding
-    primitive_system: PrimitiveSystem,
+    primitive_system: &'static PrimitiveSystem,
 
     /// Text encoder for input processing
     text_encoder: TextEncoder,
@@ -147,7 +147,7 @@ pub struct PredictiveHdcEncoder {
 impl PredictiveHdcEncoder {
     /// Create a new predictive encoder
     pub fn new(config: PredictiveEncoderConfig) -> Self {
-        let primitive_system = PrimitiveSystem::new();
+        let primitive_system = PrimitiveSystem::global();
         let text_encoder = TextEncoder::new(TextEncoderConfig {
             dimension: config.dimension,
             ..Default::default()
@@ -192,7 +192,7 @@ impl PredictiveHdcEncoder {
         self.stats.total_cycles += 1;
 
         // 1. Get base encoding via text encoder (uses primitives internally)
-        let base_encoding = match self.text_encoder.encode_with_primitives(input, &self.primitive_system) {
+        let base_encoding = match self.text_encoder.encode_with_primitives(input, self.primitive_system) {
             Ok(enc) => enc,
             Err(_) => {
                 // Fallback to sentence encoding if primitive encoding fails

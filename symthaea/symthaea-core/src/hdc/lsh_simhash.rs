@@ -448,7 +448,7 @@ mod tests {
             .enumerate()
             .map(|(i, v)| (i, query.similarity(v)))
             .collect();
-        ground_truth.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        ground_truth.sort_by(|a, b| b.1.total_cmp(&a.1));
         ground_truth.truncate(10);
 
         println!("Ground truth top-10:");

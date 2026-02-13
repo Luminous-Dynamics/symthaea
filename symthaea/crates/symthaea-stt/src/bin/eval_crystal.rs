@@ -100,7 +100,7 @@ fn viterbi_decode(
     let n_states = phonemes.len();
     let n_frames = logits.len();
     let uniform_log = -(n_states as f32).ln();
-    let total_unigrams: f32 = unigram_counts.iter().sum::<usize>() as f32;
+    let _total_unigrams: f32 = unigram_counts.iter().sum::<usize>() as f32;
 
     // Viterbi DP
     let mut dp = vec![vec![f32::NEG_INFINITY; n_states]; n_frames];
@@ -403,7 +403,7 @@ fn main() {
     println!("{}", style("═══════════════════════════════════════════════════════════").magenta());
 
     if evaluated > 0 {
-        let avg_per = total_per / evaluated as f32;
+        let _avg_per = total_per / evaluated as f32;
         let overall_per = (total_insertions + total_deletions + total_substitutions) as f32
             / total_ref_len as f32
             * 100.0;

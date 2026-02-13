@@ -138,11 +138,13 @@ fn test_cosine_similarity_range() {
 #[test]
 fn test_hv16_bundle_empty() {
     let empty: Vec<BinaryHV> = vec![];
-    // BinaryHV::bundle requires non-empty input; verify it doesn't panic
-    // or returns a zero vector
+    // BinaryHV::bundle requires non-empty input; verify it handles gracefully
     let result = BinaryHV::bundle(&empty);
-    // Should return zero or some default, not crash
-    let _ = result;
+    // Result should be a valid BinaryHV (zero vector or default)
+    // Verify it has the expected dimensionality by checking similarity with itself
+    let self_sim = result.similarity(&result);
+    assert!(self_sim >= 0.0 && self_sim <= 1.0,
+        "Empty bundle result should have valid self-similarity");
 }
 
 #[test]

@@ -14,8 +14,9 @@
 # Default batch_dir: import_batch/
 #
 # File naming convention (set by celestrak-demo tool):
-#   register_object_*.json  -> orbital_objects_coordinator::register_object
-#   submit_tle_*.json       -> orbital_objects_coordinator::submit_tle
+#   register_object_*.json       -> orbital_objects_coordinator::register_object
+#   submit_tle_*.json            -> orbital_objects_coordinator::submit_tle
+#   submit_observation_*.json    -> observations_coordinator::submit_observation
 #
 # Generate batch files:
 #   cargo run -p celestrak-demo -- ingest --source stations
@@ -120,8 +121,10 @@ fi
 # --- Counters ---
 OBJECT_FILES=0
 TLE_FILES=0
+OBS_FILES=0
 OBJECT_OK=0
 TLE_OK=0
+OBS_OK=0
 SKIPPED=0
 ERRORS=0
 
@@ -252,10 +255,52 @@ done
 
 echo ""
 
+# --- Phase 3: Submit observations ---
+echo "--- Phase 3: Submitting observations ---"
+OBS_ZOME="observations_coordinator"
+for f in "$BATCH_DIR"/submit_observation_*.json; do
+    [ -f "$f" ] || { echo "  No submit_observation files found."; break; }
+    OBS_FILES=$((OBS_FILES + 1))
+    basename_f="$(basename "$f")"
+
+    if is_already_imported "$basename_f"; then
+        SKIPPED=$((SKIPPED + 1))
+        [ "$VERBOSE" = true ] && echo "  SKIP $basename_f (already imported)"
+        continue
+    fi
+
+    echo -n "  $basename_f ... "
+
+    if ! validate_json "$f" "sensor_id measurement"; then
+        ERRORS=$((ERRORS + 1))
+        continue
+    fi
+
+    if [ "$DRY_RUN" = true ]; then
+        echo "OK (dry-run)"
+        OBS_OK=$((OBS_OK + 1))
+        mark_imported "$basename_f"
+    else
+        payload="$(cat "$f")"
+        # shellcheck disable=SC2086
+        if hc sandbox call $SANDBOX_ARGS "$ROLE" "$OBS_ZOME" "submit_observation" "$payload" 2>/dev/null; then
+            echo "OK"
+            OBS_OK=$((OBS_OK + 1))
+            mark_imported "$basename_f"
+        else
+            echo "FAILED"
+            ERRORS=$((ERRORS + 1))
+        fi
+    fi
+done
+
+echo ""
+
 # --- Summary ---
 echo "=== Import Summary ==="
-echo "  Objects: $OBJECT_OK / $OBJECT_FILES registered"
-echo "  TLEs:    $TLE_OK / $TLE_FILES submitted"
+echo "  Objects:      $OBJECT_OK / $OBJECT_FILES registered"
+echo "  TLEs:         $TLE_OK / $TLE_FILES submitted"
+echo "  Observations: $OBS_OK / $OBS_FILES submitted"
 [ "$SKIPPED" -gt 0 ] && echo "  Skipped: $SKIPPED (already imported)"
 echo "  Errors:  $ERRORS"
 echo ""
@@ -265,7 +310,7 @@ if [ "$ERRORS" -gt 0 ]; then
     echo "Use --continue to skip previously successful imports."
     exit 1
 elif [ "$DRY_RUN" = true ]; then
-    echo "Dry run complete. All $((OBJECT_FILES + TLE_FILES)) files are valid."
+    echo "Dry run complete. All $((OBJECT_FILES + TLE_FILES + OBS_FILES)) files are valid."
     echo "Remove --dry-run to import into Holochain."
 else
     echo "All imports successful."

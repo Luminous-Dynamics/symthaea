@@ -7,12 +7,12 @@ on:
   push:
     branches: [main]
     paths:
-      - 'Mycelix-Core/contracts/**'
+      - 'mycelix-core/contracts/**'
       - '.github/workflows/contracts.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'Mycelix-Core/contracts/**'
+      - 'mycelix-core/contracts/**'
       - '.github/workflows/contracts.yml'
 
 concurrency:
@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: Mycelix-Core/contracts
+        working-directory: mycelix-core/contracts
 
     steps:
       - uses: actions/checkout@v4
@@ -48,9 +48,9 @@ jobs:
         with:
           path: |
             ~/.foundry/cache
-            Mycelix-Core/contracts/cache
-            Mycelix-Core/contracts/out
-          key: ${{ runner.os }}-foundry-${{ hashFiles('Mycelix-Core/contracts/foundry.toml') }}
+            mycelix-core/contracts/cache
+            mycelix-core/contracts/out
+          key: ${{ runner.os }}-foundry-${{ hashFiles('mycelix-core/contracts/foundry.toml') }}
           restore-keys: |
             ${{ runner.os }}-foundry-
 
@@ -72,7 +72,7 @@ jobs:
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:
-          files: Mycelix-Core/contracts/lcov.info
+          files: mycelix-core/contracts/lcov.info
           flags: solidity
           fail_ci_if_error: false
 
@@ -85,7 +85,7 @@ jobs:
     needs: build
     defaults:
       run:
-        working-directory: Mycelix-Core/contracts
+        working-directory: mycelix-core/contracts
 
     steps:
       - uses: actions/checkout@v4
@@ -107,7 +107,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gas-report
-          path: Mycelix-Core/contracts/gas-report.txt
+          path: mycelix-core/contracts/gas-report.txt
 
       - name: Post gas report to PR
         if: github.event_name == 'pull_request'
@@ -115,7 +115,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const gasReport = fs.readFileSync('Mycelix-Core/contracts/gas-report.txt', 'utf8');
+            const gasReport = fs.readFileSync('mycelix-core/contracts/gas-report.txt', 'utf8');
 
             // Truncate if too long
             const maxLength = 60000;
@@ -171,7 +171,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     defaults:
       run:
-        working-directory: Mycelix-Core/contracts
+        working-directory: mycelix-core/contracts
 
     steps:
       - uses: actions/checkout@v4
@@ -202,7 +202,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     defaults:
       run:
-        working-directory: Mycelix-Core/contracts
+        working-directory: mycelix-core/contracts
 
     steps:
       - uses: actions/checkout@v4
@@ -230,7 +230,7 @@ jobs:
     needs: build
     defaults:
       run:
-        working-directory: Mycelix-Core/contracts
+        working-directory: mycelix-core/contracts
 
     steps:
       - uses: actions/checkout@v4
@@ -272,7 +272,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
-          sarif_file: Mycelix-Core/contracts/slither-results.sarif
+          sarif_file: mycelix-core/contracts/slither-results.sarif
         continue-on-error: true
 
       - name: Run Slither (text report)
@@ -288,7 +288,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: slither-report
-          path: Mycelix-Core/contracts/slither-report.txt
+          path: mycelix-core/contracts/slither-report.txt
 
   # ============================================================================
   # Contract Size Check
@@ -299,7 +299,7 @@ jobs:
     needs: build
     defaults:
       run:
-        working-directory: Mycelix-Core/contracts
+        working-directory: mycelix-core/contracts
 
     steps:
       - uses: actions/checkout@v4
@@ -342,7 +342,7 @@ jobs:
     needs: build
     defaults:
       run:
-        working-directory: Mycelix-Core/contracts
+        working-directory: mycelix-core/contracts
 
     steps:
       - uses: actions/checkout@v4
@@ -364,7 +364,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gas-snapshot
-          path: Mycelix-Core/contracts/.gas-snapshot
+          path: mycelix-core/contracts/.gas-snapshot
 
       - name: Compare snapshots (on PR)
         if: github.event_name == 'pull_request'

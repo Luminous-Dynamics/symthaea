@@ -10,8 +10,7 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
-use arrow::array::{Array, ArrayRef, AsArray, Float64Array, ListArray, StringArray, StructArray};
-use arrow::datatypes::DataType;
+use arrow::array::{Array, ArrayRef, AsArray, StructArray};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 
 /// A single phoneme segment with timing information
@@ -97,7 +96,7 @@ pub fn load_alignments<P: AsRef<Path>>(path: P) -> Result<HashMap<String, Uttera
             let mut phonemes = Vec::new();
 
             // Try to extract phonemes from nested structure
-            if let Some(ref col) = phonemes_col {
+            if let Some(col) = phonemes_col {
                 if let Some(list_array) = col.as_list_opt::<i32>() {
                     // It's a list column - extract the nested phonemes
                     if !list_array.is_null(row_idx) {

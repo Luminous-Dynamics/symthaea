@@ -18,6 +18,7 @@ mod csv_parser;
 mod credential;
 mod dns_did;
 mod import;
+mod pqc_commands;
 
 use import::ImportConfig;
 
@@ -134,6 +135,74 @@ enum Commands {
         #[arg(short = 'i', long)]
         did: String,
     },
+
+    /// Generate a PQC keypair (Ed25519, ML-DSA-65/87, SPHINCS+, or hybrid)
+    Keygen {
+        /// Algorithm: ed25519, ml-dsa-65, ml-dsa-87, slh-dsa-sha2-128s, hybrid-ed25519-ml-dsa-65
+        #[arg(short, long)]
+        algorithm: String,
+
+        /// Output key file path (JSON)
+        #[arg(short, long, default_value = "key.json")]
+        output: PathBuf,
+    },
+
+    /// Sign a credential with a PQC key
+    Sign {
+        /// Key file (from keygen)
+        #[arg(short, long)]
+        key: PathBuf,
+
+        /// Credential JSON file
+        #[arg(short, long)]
+        credential: PathBuf,
+
+        /// Output signed credential path
+        #[arg(short, long, default_value = "signed.json")]
+        output: PathBuf,
+    },
+
+    /// Dual-sign a credential with Ed25519 + ML-DSA-65 (hybrid)
+    HybridSign {
+        /// Ed25519 key file
+        #[arg(long)]
+        ed25519_key: PathBuf,
+
+        /// ML-DSA-65 key file
+        #[arg(long)]
+        pqc_key: PathBuf,
+
+        /// Credential JSON file
+        #[arg(short, long)]
+        credential: PathBuf,
+
+        /// Output signed credential path
+        #[arg(short, long, default_value = "signed.json")]
+        output: PathBuf,
+    },
+
+    /// Verify a PQC/hybrid signature on a credential
+    PqcVerify {
+        /// Signed credential JSON file
+        #[arg(short, long)]
+        credential: PathBuf,
+
+        /// Key file for full cryptographic verification (from keygen)
+        #[arg(short, long)]
+        key: Option<PathBuf>,
+
+        /// Ed25519 key file (for dual-key hybrid verification with hybrid-sign output)
+        #[arg(long)]
+        ed25519_key: Option<PathBuf>,
+
+        /// ML-DSA-65 key file (for dual-key hybrid verification with hybrid-sign output)
+        #[arg(long)]
+        pqc_key: Option<PathBuf>,
+
+        /// Show full verification details
+        #[arg(long)]
+        verbose: bool,
+    },
 }
 
 #[tokio::main]
@@ -196,6 +265,43 @@ async fn main() -> Result<()> {
 
         Commands::SetupDns { domain, did } => {
             dns_did::print_setup_instructions(&domain, &did);
+        }
+
+        Commands::Keygen { algorithm, output } => {
+            pqc_commands::keygen(&algorithm, &output)?;
+        }
+
+        Commands::Sign {
+            key,
+            credential,
+            output,
+        } => {
+            pqc_commands::sign(&key, &credential, &output)?;
+        }
+
+        Commands::HybridSign {
+            ed25519_key,
+            pqc_key,
+            credential,
+            output,
+        } => {
+            pqc_commands::hybrid_sign(&ed25519_key, &pqc_key, &credential, &output)?;
+        }
+
+        Commands::PqcVerify {
+            credential,
+            key,
+            ed25519_key,
+            pqc_key,
+            verbose,
+        } => {
+            pqc_commands::pqc_verify(
+                &credential,
+                key.as_deref(),
+                ed25519_key.as_deref(),
+                pqc_key.as_deref(),
+                verbose,
+            )?;
         }
     }
 

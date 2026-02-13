@@ -519,7 +519,7 @@ mod recognition_tests {
     async fn test_initialize_member() {
         let mut conductor = SweetConductor::from_standard_config().await;
         let dna = load_dna().await;
-        let app = conductor.setup_app("test-app", &[dna]).await.unwrap();
+        let app = conductor.setup_app("test-app", &[dna.clone()]).await.unwrap();
         let cell = app.cells()[0].clone();
         let agent = app.agent().clone();
 
@@ -992,6 +992,16 @@ mod three_currency_lifecycle {
         assert_eq!(balance.balance, 0, "TEND balance should be 0 (exchange not yet confirmed)");
         assert!(balance.can_provide, "Should be able to provide");
         assert!(balance.can_receive, "Should be able to receive");
+
+        // ---- Initialize SAP balances for both agents (required before SAP transfer) ----
+        let _: Record = conductor
+            .call(&cell1.zome("payments"), "initialize_sap_balance", did1.clone())
+            .await;
+
+        let cell2 = app2.cells()[0].clone();
+        let _: Record = conductor
+            .call(&cell2.zome("payments"), "initialize_sap_balance", did2.clone())
+            .await;
 
         // ---- Verify: payments only accept SAP or TEND ----
         let payment_input = SendPaymentInput {

@@ -276,7 +276,7 @@ impl ConsciousnessSentinel {
         let emg_state = self.emg_ltc.forward(&emg_features, self.frame_duration);
 
         // 6. Project to HDC space (using sign-based LSH like acoustic)
-        let hv = Self::state_to_hv_static(&eeg_state, &eog_state, &emg_state);
+        let hv = Self::state_to_hv_static(eeg_state, eog_state, emg_state);
         self.recent_hvs.push(hv);
         if self.recent_hvs.len() > 100 {
             self.recent_hvs.remove(0);
@@ -398,15 +398,15 @@ impl ConsciousnessSentinel {
             let freq = i as f32 * freq_resolution;
             let power = c.norm_sqr() / fft_size as f32;
 
-            if freq >= 0.5 && freq < 4.0 {
+            if (0.5..4.0).contains(&freq) {
                 bands.delta += power;
-            } else if freq >= 4.0 && freq < 8.0 {
+            } else if (4.0..8.0).contains(&freq) {
                 bands.theta += power;
-            } else if freq >= 8.0 && freq < 12.0 {
+            } else if (8.0..12.0).contains(&freq) {
                 bands.alpha += power;
-            } else if freq >= 12.0 && freq < 15.0 {
+            } else if (12.0..15.0).contains(&freq) {
                 bands.sigma += power;
-            } else if freq >= 12.0 && freq < 30.0 {
+            } else if (12.0..30.0).contains(&freq) {
                 bands.beta += power;
             }
         }

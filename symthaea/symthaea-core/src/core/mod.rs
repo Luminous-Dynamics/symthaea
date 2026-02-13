@@ -160,10 +160,10 @@ pub use crate::hdc::consciousness_phi_optimization::{
 pub use crate::hdc::consciousness_integration::PipelineCheckpoint;
 pub use crate::hdc::consciousness_integration::ConsciousnessPipelineBuilder;
 pub use crate::hdc::consciousness_integration::SubsystemCycleReport;
-pub use crate::hdc::consciousness_integration::{
-    PhiMetrics, TemporalState, SelfModelState, EmotionalState,
-    PredictiveState, IntegrationMetrics,
-};
+// State view types are available from their home modules:
+//   TemporalState -> consciousness_metacognition
+//   EmotionalState -> consciousness_continuity
+//   IntegrationMetrics -> physics::design_integration
 
 // Consciousness API traits
 pub mod traits;

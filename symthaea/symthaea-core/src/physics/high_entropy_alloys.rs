@@ -28,6 +28,7 @@ use crate::hdc::unified_hv::ContinuousHV;
 use super::standard_model::PHYSICS_DIM;
 use super::phonon_dynamics::CrystalStructure;
 use super::radiation_damage::{RadiationDamageSystem, RadiationDamage, HealingAnalysis, FusionReaction};
+use super::constants::R_GAS;
 use std::collections::HashMap;
 
 /// An element contribution to an HEA
@@ -320,8 +321,7 @@ impl HEADesigner {
         let lattice_distortion = radius_variance.sqrt();
 
         // Configurational entropy: S = -R * Σ(x_i * ln(x_i))
-        let r_gas = 8.314; // J/mol·K
-        let entropy: f64 = -r_gas * composition.iter()
+        let entropy: f64 = -R_GAS * composition.iter()
             .map(|(_, x)| {
                 if *x > 0.0 {
                     x * x.ln()
@@ -332,7 +332,7 @@ impl HEADesigner {
             .sum::<f64>();
 
         // Sluggish diffusion factor (higher entropy + distortion = slower)
-        let sluggish_factor = (entropy / r_gas) * (1.0 + lattice_distortion * 10.0);
+        let sluggish_factor = (entropy / R_GAS) * (1.0 + lattice_distortion * 10.0);
 
         // Estimate Debye temperature (rule of mixtures)
         let debye_temp_k = match structure {
@@ -660,7 +660,7 @@ pub fn multi_seed_hea_search(
             let occurrence_count = results.len();
             let best_result = results.iter()
                 .max_by(|a, b| a.0.match_score.partial_cmp(&b.0.match_score).unwrap_or(std::cmp::Ordering::Equal))
-                .unwrap();
+                .expect("results vec is non-empty by construction (accumulated via push)");
 
             let total_match: f32 = results.iter().map(|(r, _)| r.match_score).sum();
             let avg_match_score = total_match / occurrence_count as f32;

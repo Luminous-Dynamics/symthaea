@@ -33,6 +33,9 @@ ed25519-dalek = { version = "2.1", features = ["rand_core"] }
 rand = "0.8"
 base64 = "0.21"
 
+# PQC crypto (keygen, sign, verify for all algorithms)
+mycelix-crypto = { path = "../crates/mycelix-crypto", features = ["native"] }
+
 # DNS resolution with DNSSEC
 trust-dns-resolver = { version = "0.23", features = ["dnssec-ring"] }
 
@@ -41,6 +44,9 @@ chrono = { version = "0.4", features = ["serde"] }
 
 # UUID generation
 uuid = { version = "1.6", features = ["v4"] }
+
+# Secret key zeroization
+zeroize = { version = "1", features = ["derive"] }
 
 # Error handling
 anyhow = "1.0"

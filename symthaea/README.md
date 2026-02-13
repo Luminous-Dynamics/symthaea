@@ -40,7 +40,7 @@ cd symthaea-hlb
 # Build
 cargo build --release
 
-# Run tests (3,388 tests)
+# Run tests (~4,300 tests)
 cargo test
 
 # Run example
@@ -87,10 +87,13 @@ cargo build --features "voice-tts audio"
 # Perception (requires ONNX models)
 cargo build --features "embeddings vision perception"
 
+# Neural bridge (candle-based layer extraction, BGE-M3)
+cargo build --features "neural-bridge"
+
 # Full consciousness reasoning
 cargo build --features "reasoning_engine"
 
-# Everything
+# All binaries
 cargo build --features full
 ```
 

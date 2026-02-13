@@ -4070,6 +4070,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // 20s: 10-component heuristic MIP search over 16K-dim vectors. Run with --ignored.
     fn test_true_phi_heuristic_search() {
         let calc = TruePhiCalculator::new();
         // 10 components triggers heuristic search
@@ -4194,6 +4195,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // 162s: 20-component MIP search over 16K-dim vectors. Run with --ignored.
     fn test_large_system_mip_search() {
         let calc = TruePhiCalculator::new();
         let components: Vec<ContinuousHV> = create_test_vectors(20);

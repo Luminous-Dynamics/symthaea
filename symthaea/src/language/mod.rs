@@ -694,6 +694,11 @@ pub struct ConsciousUnderstandingResult {
     pub clarifying_questions: Vec<ClarifyingQuestion>,
     /// HDC-based semantic intent classification (if available)
     pub intent_classification: Option<IntentClassification>,
+
+    /// Primitive tiers likely active for this input (grounding step).
+    /// Maps the semantic intent to ontological primitive tiers, providing
+    /// a bridge between language understanding and primitive-based reasoning.
+    pub primitive_tiers: Vec<String>,
 }
 
 impl Default for ConsciousUnderstandingResult {
@@ -716,6 +721,7 @@ impl Default for ConsciousUnderstandingResult {
             recommended_strategy: strategy,
             clarifying_questions: Vec::new(),
             intent_classification: None,
+            primitive_tiers: Vec::new(),
         }
     }
 }
@@ -910,6 +916,11 @@ impl ConsciousnessLanguageCore {
             Vec::new()
         };
 
+        // Primitive grounding: identify which ontological primitive tiers
+        // are likely active for this input based on the semantic classification.
+        // This bridges language understanding with the 9-tier primitive system.
+        let primitive_tiers = Self::ground_to_primitive_tiers(&intent_classification);
+
         ConsciousUnderstandingResult {
             nixos: nix_understanding.clone(),
             nix_understanding,
@@ -926,7 +937,55 @@ impl ConsciousnessLanguageCore {
             recommended_strategy: strategy,
             clarifying_questions,
             intent_classification: Some(intent_classification),
+            primitive_tiers,
         }
+    }
+
+    /// Map a semantic intent classification to likely active primitive tiers.
+    ///
+    /// This is the "grounding step" that connects language understanding to
+    /// the 9-tier ontological primitive system. Each intent category activates
+    /// a characteristic set of primitive tiers.
+    fn ground_to_primitive_tiers(classification: &IntentClassification) -> Vec<String> {
+        let mut tiers = Vec::new();
+
+        // Every input activates NSM (Natural Semantic Metalanguage) primitives
+        tiers.push("NSM".to_string());
+
+        match classification.category {
+            IntentCategory::NixOS => {
+                tiers.push("Strategic".to_string());      // Planning, goal-directed action
+                tiers.push("Compositional".to_string());  // System composition
+                tiers.push("Temporal".to_string());        // Sequencing (build steps)
+            }
+            IntentCategory::Programming => {
+                tiers.push("Strategic".to_string());      // Problem decomposition
+                tiers.push("Compositional".to_string());  // Code composition
+                tiers.push("Mathematical".to_string());   // Logic, algorithms
+                tiers.push("MetaCognitive".to_string());  // Debugging, reflection
+            }
+            IntentCategory::Math => {
+                tiers.push("Mathematical".to_string());   // Core math primitives
+                tiers.push("Physical".to_string());       // Quantities, units
+                tiers.push("Geometric".to_string());      // Spatial reasoning
+            }
+            IntentCategory::SystemAdmin => {
+                tiers.push("Strategic".to_string());      // System management
+                tiers.push("Temporal".to_string());        // Process sequencing
+                tiers.push("Physical".to_string());       // Hardware, resources
+            }
+            IntentCategory::General => {
+                tiers.push("MetaCognitive".to_string());  // General reasoning
+                tiers.push("Consciousness".to_string());  // Awareness, understanding
+            }
+        }
+
+        // High-confidence classifications also activate consciousness tier
+        if classification.confidence > 0.7 && !tiers.contains(&"Consciousness".to_string()) {
+            tiers.push("Consciousness".to_string());
+        }
+
+        tiers
     }
 
     /// Determine consciousness quadrant and execution strategy based on Φ and confidence

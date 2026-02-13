@@ -120,7 +120,8 @@ impl ContinuousMind {
             if self.working_memory.len() < self.config.working_memory_capacity {
                 self.working_memory.push(input.content.clone());
             } else {
-                self.working_memory.remove(0);
+                let evicted = self.working_memory.remove(0);
+                self.evicted_items.push(evicted);
                 self.working_memory.push(input.content.clone());
             }
 
@@ -223,7 +224,7 @@ impl ContinuousMind {
         }
 
         // Step 2: Aggregate every 10 ticks if we have enough contributions
-        if self.state.tick % 10 == 0 && federated.pending_contributions() >= 2 {
+        if self.state.tick.is_multiple_of(10) && federated.pending_contributions() >= 2 {
             if let Some(aggregated) = federated.aggregate() {
                 let lr = 0.01f32;
                 federated.apply_gradient(&aggregated, lr);
@@ -237,7 +238,7 @@ impl ContinuousMind {
         }
 
         // Step 3: Export local gradient every 5 ticks
-        if self.state.tick % 5 == 0 {
+        if self.state.tick.is_multiple_of(5) {
             let msg = federated.export_local_gradient(0.0);
             self.federated_outbox.push(msg);
         }

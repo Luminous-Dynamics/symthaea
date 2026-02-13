@@ -52,6 +52,10 @@ pub struct ContinuousMind {
     pub(crate) federated_inbox: Vec<crate::swarm::GradientMessage>,
     /// Outgoing gradient messages to broadcast to peers.
     pub(crate) federated_outbox: Vec<crate::swarm::GradientMessage>,
+    /// Buffer of items evicted from working memory when capacity is exceeded.
+    /// Consuming code can drain this via `take_evicted()` and route items
+    /// to episodic memory or the MemoryCoordinator for graduation.
+    evicted_items: Vec<ContinuousHV>,
 }
 
 impl ContinuousMind {
@@ -76,6 +80,7 @@ impl ContinuousMind {
             federated: None,
             federated_inbox: Vec::new(),
             federated_outbox: Vec::new(),
+            evicted_items: Vec::new(),
         }
     }
 
@@ -161,6 +166,15 @@ impl ContinuousMind {
     /// Get working memory contents
     pub fn working_memory(&self) -> &[ContinuousHV] {
         &self.working_memory
+    }
+
+    /// Drain items evicted from working memory since the last call.
+    ///
+    /// Returns the evicted hypervectors. Each was the oldest item removed
+    /// when working memory reached capacity. These can be routed to the
+    /// MemoryCoordinator for graduation into episodic storage.
+    pub fn take_evicted(&mut self) -> Vec<ContinuousHV> {
+        std::mem::take(&mut self.evicted_items)
     }
 
     /// Get active goals
@@ -397,6 +411,7 @@ impl ContinuousMind {
             code_context: None,
             constraints: Vec::new(),
             original_input: None,
+            primitive_tiers: Vec::new(), // Populated by Symthaea facade from language grounding
         }
     }
 

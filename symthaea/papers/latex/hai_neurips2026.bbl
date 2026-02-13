@@ -20,12 +20,12 @@ Karl Friston, Thomas FitzGerald, Francesco Rigoli, Philipp Schwartenbeck, and
 
 \bibitem[Garcez and Lamb(2020)]{garcez2020neurosymbolic}
 Artur Garcez and Luis~C Lamb.
-\newblock Neurosymbolic ai: The 3rd wave.
+\newblock Neurosymbolic {AI}: The 3rd wave.
 \newblock \emph{arXiv preprint arXiv:2012.05876}, 2020.
 
 \bibitem[Heins et~al.(2022)Heins, Millidge, Da~Costa, et~al.]{heins2022pymdp}
 Conor Heins, Beren Millidge, Lancelot Da~Costa, et~al.
-\newblock pymdp: A python library for active inference in discrete state
+\newblock pymdp: A {Python} library for active inference in discrete state
   spaces.
 \newblock \emph{Journal of Open Source Software}, 7\penalty0 (73):\penalty0
   4098, 2022.

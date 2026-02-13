@@ -846,7 +846,7 @@ impl ScaleAwareComparison {
 
             // Find closest LCF data point
             if let Some(&(_, cost_usd, lcoe)) = lcf_points.iter()
-                .min_by(|a, b| (a.0 - power_w).abs().partial_cmp(&(b.0 - power_w).abs()).unwrap())
+                .min_by(|a, b| (a.0 - power_w).abs().total_cmp(&(b.0 - power_w).abs()))
             {
                 technologies.push(ScaleCostPoint {
                     technology: "LCF Reactor".to_string(),

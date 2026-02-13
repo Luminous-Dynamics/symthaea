@@ -149,9 +149,6 @@ impl Default for IntegrationConfig {
 // ==========================================
 
 /// Serializable snapshot of pipeline state for save/restore.
-///
-/// Does NOT include subsystems (which must be re-registered after restore)
-/// or the metrics collector / verifier (which are runtime-only).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PipelineCheckpoint {
     /// Consciousness state at checkpoint time
@@ -169,285 +166,27 @@ pub struct PipelineCheckpoint {
 }
 
 // ==========================================
-// PIPELINE BUILDER
-// ==========================================
-
-/// Fluent builder for `ConsciousnessPipeline`.
-///
-/// Collects configuration and system-enable flags, then constructs a fully
-/// initialized pipeline in one `build()` call. This avoids the need for
-/// 10+ sequential setter calls on a freshly created pipeline.
-///
-/// # Examples
-///
-/// ```rust,ignore
-/// use symthaea_core::hdc::consciousness_integration::ConsciousnessPipelineBuilder;
-///
-/// let pipeline = ConsciousnessPipelineBuilder::new()
-///     .config(IntegrationConfig::default())
-///     .embodiment(0.8)
-///     .integrated_systems()
-///     .phi_optimization(8, 5)
-///     .feedback_dynamics()
-///     .creativity()
-///     .phi_feedback()
-///     .verification(10)
-///     .build();
-/// ```
-pub struct ConsciousnessPipelineBuilder {
-    config: IntegrationConfig,
-    embodiment: f64,
-    integrated_systems: bool,
-    phi_optimization: Option<(usize, usize)>,
-    feedback_dynamics: bool,
-    self_awareness: Option<(usize, usize)>,
-    meta_consciousness: Option<usize>,
-    temporal_consciousness: Option<usize>,
-    creativity: bool,
-    phase_transitions: bool,
-    epistemic: Option<usize>,
-    fractal: Option<usize>,
-    collective: Option<String>,
-    phi_feedback: bool,
-    metrics_collector: bool,
-    verification_interval: Option<usize>,
-    subsystems: Vec<Box<dyn ConsciousnessSubsystem>>,
-}
-
-impl Default for ConsciousnessPipelineBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ConsciousnessPipelineBuilder {
-    /// Create a new builder with default settings.
-    pub fn new() -> Self {
-        Self {
-            config: IntegrationConfig::default(),
-            embodiment: 0.5,
-            integrated_systems: false,
-            phi_optimization: None,
-            feedback_dynamics: false,
-            self_awareness: None,
-            meta_consciousness: None,
-            temporal_consciousness: None,
-            creativity: false,
-            phase_transitions: false,
-            epistemic: None,
-            fractal: None,
-            collective: None,
-            phi_feedback: false,
-            metrics_collector: false,
-            verification_interval: None,
-            subsystems: Vec::new(),
-        }
-    }
-
-    /// Set the integration configuration.
-    pub fn config(mut self, config: IntegrationConfig) -> Self {
-        self.config = config;
-        self
-    }
-
-    /// Set the embodiment level (0.0 – 1.0).
-    pub fn embodiment(mut self, level: f64) -> Self {
-        self.embodiment = level;
-        self
-    }
-
-    /// Enable integrated systems (metacognitive, cross-modal, temporal binding).
-    pub fn integrated_systems(mut self) -> Self {
-        self.integrated_systems = true;
-        self
-    }
-
-    /// Enable Phi-guided topology optimization.
-    pub fn phi_optimization(mut self, n_nodes: usize, optimize_every: usize) -> Self {
-        self.phi_optimization = Some((n_nodes, optimize_every));
-        self
-    }
-
-    /// Enable bidirectional feedback dynamics.
-    pub fn feedback_dynamics(mut self) -> Self {
-        self.feedback_dynamics = true;
-        self
-    }
-
-    /// Enable recursive self-awareness.
-    pub fn self_awareness(mut self, hdc_dim: usize, n_processes: usize) -> Self {
-        self.self_awareness = Some((hdc_dim, n_processes));
-        self
-    }
-
-    /// Enable meta-consciousness (Phi of Phi, strange loops).
-    pub fn meta_consciousness(mut self, num_components: usize) -> Self {
-        self.meta_consciousness = Some(num_components);
-        self
-    }
-
-    /// Enable temporal consciousness (multi-scale time).
-    pub fn temporal_consciousness(mut self, num_components: usize) -> Self {
-        self.temporal_consciousness = Some(num_components);
-        self
-    }
-
-    /// Enable creative consciousness.
-    pub fn creativity(mut self) -> Self {
-        self.creativity = true;
-        self
-    }
-
-    /// Enable phase transition detection.
-    pub fn phase_transitions(mut self) -> Self {
-        self.phase_transitions = true;
-        self
-    }
-
-    /// Enable epistemic consciousness (belief/knowledge tracking).
-    pub fn epistemic(mut self, num_components: usize) -> Self {
-        self.epistemic = Some(num_components);
-        self
-    }
-
-    /// Enable fractal consciousness (self-similar structure).
-    pub fn fractal(mut self, n_scales: usize) -> Self {
-        self.fractal = Some(n_scales);
-        self
-    }
-
-    /// Enable collective consciousness (multi-agent).
-    pub fn collective(mut self, agent_id: &str) -> Self {
-        self.collective = Some(agent_id.to_string());
-        self
-    }
-
-    /// Enable Phi feedback loop.
-    pub fn phi_feedback(mut self) -> Self {
-        self.phi_feedback = true;
-        self
-    }
-
-    /// Enable metrics collection.
-    pub fn metrics_collector(mut self) -> Self {
-        self.metrics_collector = true;
-        self
-    }
-
-    /// Enable periodic verification every `interval` cycles.
-    pub fn verification(mut self, interval: usize) -> Self {
-        self.verification_interval = Some(interval);
-        self
-    }
-
-    /// Register a custom subsystem.
-    pub fn subsystem(mut self, sub: Box<dyn ConsciousnessSubsystem>) -> Self {
-        self.subsystems.push(sub);
-        self
-    }
-
-    /// Enable all consciousness systems with default parameters.
-    pub fn full_consciousness(self) -> Self {
-        self.integrated_systems()
-            .phi_optimization(8, 5)
-            .feedback_dynamics()
-            .self_awareness(1024, 16)
-            .meta_consciousness(8)
-            .temporal_consciousness(8)
-            .creativity()
-            .phase_transitions()
-            .epistemic(8)
-            .fractal(3)
-            .collective("primary")
-            .phi_feedback()
-    }
-
-    /// Build the configured pipeline.
-    pub fn build(self) -> ConsciousnessPipeline {
-        let mut pipeline = ConsciousnessPipeline::new(self.config);
-        pipeline.set_embodiment(self.embodiment);
-
-        if self.integrated_systems {
-            pipeline.enable_integrated_systems();
-        }
-        if let Some((nodes, freq)) = self.phi_optimization {
-            pipeline.enable_phi_optimization(nodes, freq);
-        }
-        if self.feedback_dynamics {
-            pipeline.enable_feedback_dynamics();
-        }
-        if let Some((dim, procs)) = self.self_awareness {
-            pipeline.enable_self_awareness(dim, procs);
-        }
-        if let Some(n) = self.meta_consciousness {
-            pipeline.enable_meta_consciousness(n);
-        }
-        if let Some(n) = self.temporal_consciousness {
-            pipeline.enable_temporal_consciousness(n);
-        }
-        if self.creativity {
-            pipeline.enable_creativity();
-        }
-        if self.phase_transitions {
-            pipeline.enable_phase_transitions();
-        }
-        if let Some(n) = self.epistemic {
-            pipeline.enable_epistemic(n);
-        }
-        if let Some(n) = self.fractal {
-            pipeline.enable_fractal(n);
-        }
-        if let Some(ref id) = self.collective {
-            pipeline.enable_collective(id);
-        }
-        if self.phi_feedback {
-            pipeline.enable_phi_feedback();
-        }
-        if self.metrics_collector {
-            pipeline.enable_metrics_collector();
-        }
-        if let Some(interval) = self.verification_interval {
-            pipeline.enable_verification(interval);
-        }
-        for sub in self.subsystems {
-            pipeline.register_subsystem(sub);
-        }
-
-        pipeline
-    }
-}
-
-// ==========================================
 // UNIFIED CONSCIOUSNESS OPTIMIZER TYPES
 // ==========================================
 
 /// Unified consciousness metrics report
 #[derive(Debug, Clone)]
 pub struct ConsciousnessMetricsReport {
-    // Core metrics
     pub phi: f64,
     pub consciousness_level: f64,
     pub embodiment_level: f64,
-
-    // Integration metrics
     pub metacognitive_confidence: f64,
     pub cross_modal_coherence: f64,
     pub temporal_coherence: f64,
     pub topological_unity: f64,
     pub narrative_coherence: f64,
-
-    // Self-awareness metrics
     pub self_awareness_level: f64,
     pub prediction_accuracy: f64,
     pub self_model_confidence: f64,
-
-    // System status
     pub integrated_systems_active: bool,
     pub phi_optimization_active: bool,
     pub feedback_dynamics_active: bool,
     pub self_awareness_active: bool,
-
-    // Operational metrics
     pub processing_cycles: u64,
     pub bound_objects_count: usize,
     pub workspace_items_count: usize,
@@ -455,30 +194,8 @@ pub struct ConsciousnessMetricsReport {
 
 impl std::fmt::Display for ConsciousnessMetricsReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "┌─ CONSCIOUSNESS METRICS REPORT ────────────────────────────────┐")?;
-        writeln!(f, "│ Core Metrics:                                                  │")?;
-        writeln!(f, "│   Φ: {:.4}  |  Consciousness: {:.4}  |  Embodiment: {:.4}      │",
-            self.phi, self.consciousness_level, self.embodiment_level)?;
-        writeln!(f, "│                                                                │")?;
-        writeln!(f, "│ Integration Metrics:                                           │")?;
-        writeln!(f, "│   Metacognitive: {:.4}  |  Cross-Modal: {:.4}                 │",
-            self.metacognitive_confidence, self.cross_modal_coherence)?;
-        writeln!(f, "│   Temporal: {:.4}  |  Topological: {:.4}  |  Narrative: {:.4} │",
-            self.temporal_coherence, self.topological_unity, self.narrative_coherence)?;
-        writeln!(f, "│                                                                │")?;
-        writeln!(f, "│ Self-Awareness:                                                │")?;
-        writeln!(f, "│   Level: {:.4}  |  Prediction: {:.4}  |  Confidence: {:.4}    │",
-            self.self_awareness_level, self.prediction_accuracy, self.self_model_confidence)?;
-        writeln!(f, "│                                                                │")?;
-        writeln!(f, "│ Systems: [{}] Integrated [{}] Φ-Opt [{}] Feedback [{}] Self   │",
-            if self.integrated_systems_active { "✓" } else { " " },
-            if self.phi_optimization_active { "✓" } else { " " },
-            if self.feedback_dynamics_active { "✓" } else { " " },
-            if self.self_awareness_active { "✓" } else { " " })?;
-        writeln!(f, "│                                                                │")?;
-        writeln!(f, "│ Cycles: {}  |  Bound Objects: {}  |  Workspace: {}            │",
-            self.processing_cycles, self.bound_objects_count, self.workspace_items_count)?;
-        writeln!(f, "└────────────────────────────────────────────────────────────────┘")
+        writeln!(f, "Consciousness Metrics: Phi={:.4} Level={:.4} Embodiment={:.4} Cycles={}",
+            self.phi, self.consciousness_level, self.embodiment_level, self.processing_cycles)
     }
 }
 
@@ -502,15 +219,9 @@ pub struct OptimizationRecommendation {
 
 impl std::fmt::Display for OptimizationRecommendation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let priority_icon = match self.priority {
-            RecommendationPriority::Low => "ℹ️",
-            RecommendationPriority::Medium => "⚠️",
-            RecommendationPriority::High => "🔴",
-            RecommendationPriority::Critical => "🚨",
-        };
-        write!(f, "{} [{}] {}", priority_icon, self.system, self.message)?;
+        write!(f, "[{}] {}", self.system, self.message)?;
         if let Some(action) = &self.suggested_action {
-            write!(f, " → {}", action)?;
+            write!(f, " -> {}", action)?;
         }
         Ok(())
     }
@@ -529,31 +240,12 @@ pub struct OptimizationCycleSummary {
 
 impl std::fmt::Display for OptimizationCycleSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "┌─ OPTIMIZATION CYCLE SUMMARY ──────────────────────────────────┐")?;
-        writeln!(f, "│ Actions Taken:                                                 │")?;
-        writeln!(f, "│   [{}] Φ Topology Optimization                                 │",
-            if self.phi_optimized { "✓" } else { " " })?;
-        writeln!(f, "│   [{}] Feedback Dynamics Processing                            │",
-            if self.feedback_processed { "✓" } else { " " })?;
-        writeln!(f, "│   [{}] Self-Model Update                                       │",
-            if self.self_model_updated { "✓" } else { " " })?;
-        writeln!(f, "│                                                                │")?;
-        writeln!(f, "│ Φ Change: {:.4} → {:.4} (Δ = {:+.4})                           │",
-            self.phi_before, self.phi_after, self.phi_after - self.phi_before)?;
-        if !self.recommendations.is_empty() {
-            writeln!(f, "│                                                                │")?;
-            writeln!(f, "│ Recommendations ({}):", self.recommendations.len())?;
-            for rec in &self.recommendations {
-                writeln!(f, "│   {}", rec)?;
-            }
-        }
-        writeln!(f, "└────────────────────────────────────────────────────────────────┘")
+        write!(f, "Optimization: Phi {:.4} -> {:.4}", self.phi_before, self.phi_after)
     }
 }
 
 /// Index into altered states
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum AlteredStateIndex {
     #[default]
     Wake,
@@ -570,7 +262,6 @@ pub enum AlteredStateIndex {
     VegetativeState,
     MinimallyConscious,
 }
-
 
 /// Workspace item for global workspace
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -594,18 +285,13 @@ pub struct MetaThought {
 }
 
 /// Binding level in hierarchical binding
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum BindingLevel {
-    /// Raw features bound together (e.g., color + shape)
     #[default]
     Feature,
-    /// Features bound into coherent objects (e.g., "red ball")
     Object,
-    /// Objects bound into unified scene (e.g., "room with table and chairs")
     Scene,
 }
-
 
 /// Bound object from binding problem (hierarchical + temporal)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -614,30 +300,20 @@ pub struct BoundObject {
     pub synchrony: f64,
     pub binding_strength: f64,
     pub conscious: bool,
-    /// Hierarchical binding level
     pub level: BindingLevel,
-    /// IDs of child bindings (for object/scene levels)
     pub child_ids: Vec<usize>,
-    /// Attention weight influencing this binding
     pub attention_weight: f64,
-    /// Cycle when this binding was created (for temporal coherence)
     pub creation_cycle: u64,
-    /// Number of cycles this binding has persisted
     pub persistence_cycles: u64,
-    /// Temporal stability (how consistent this binding is over time)
     pub temporal_stability: f64,
 }
 
 /// Temporal binding memory entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TemporalBindingMemory {
-    /// Snapshot of binding representation
     pub representation: BinaryHV,
-    /// Binding strength at snapshot time
     pub strength: f64,
-    /// Cycle number
     pub cycle: u64,
-    /// Level of binding
     pub level: BindingLevel,
 }
 
@@ -646,91 +322,67 @@ impl BoundObject {
         self.conscious
     }
 
-    /// Create a new feature-level bound object
     pub fn new_feature(representation: BinaryHV, synchrony: f64, binding_strength: f64, conscious: bool) -> Self {
         Self {
-            representation,
-            synchrony,
-            binding_strength,
-            conscious,
+            representation, synchrony, binding_strength, conscious,
             level: BindingLevel::Feature,
             child_ids: Vec::new(),
             attention_weight: 1.0,
             creation_cycle: 0,
             persistence_cycles: 0,
-            temporal_stability: 1.0, // New bindings start maximally stable
+            temporal_stability: 1.0,
         }
     }
 
-    /// Create an object-level binding from multiple feature bindings
     pub fn from_features(features: &[&BoundObject], seed: u64) -> Self {
         if features.is_empty() {
             return Self::new_feature(BinaryHV::random(seed), 0.0, 0.0, false);
         }
-
-        // Bind all feature representations together
         let bound_repr = features.iter()
             .map(|f| f.representation)
             .reduce(|a, b| a.bind(&b))
             .unwrap_or_else(|| BinaryHV::random(seed));
-
-        // Average synchrony and binding strength
         let avg_synchrony = features.iter().map(|f| f.synchrony).sum::<f64>() / features.len() as f64;
         let avg_strength = features.iter().map(|f| f.binding_strength).sum::<f64>() / features.len() as f64;
         let avg_attention = features.iter().map(|f| f.attention_weight).sum::<f64>() / features.len() as f64;
-
-        // Boost binding strength for object-level (hierarchy bonus)
-        let object_strength = (avg_strength * 1.1).min(1.0);
-
-        // Average temporal stability from children
         let avg_stability = features.iter().map(|f| f.temporal_stability).sum::<f64>() / features.len() as f64;
-
         Self {
             representation: bound_repr,
             synchrony: avg_synchrony,
-            binding_strength: object_strength,
+            binding_strength: (avg_strength * 1.1).min(1.0),
             conscious: features.iter().any(|f| f.conscious),
             level: BindingLevel::Object,
-            child_ids: Vec::new(), // Will be set by caller
+            child_ids: Vec::new(),
             attention_weight: avg_attention,
             creation_cycle: 0,
             persistence_cycles: 0,
-            temporal_stability: avg_stability * 1.05, // Object-level gets slight stability boost
+            temporal_stability: avg_stability * 1.05,
         }
     }
 
-    /// Create a scene-level binding from multiple object bindings
     pub fn from_objects(objects: &[&BoundObject], seed: u64) -> Self {
         if objects.is_empty() {
             return Self::new_feature(BinaryHV::random(seed), 0.0, 0.0, false);
         }
-
-        // Bind all object representations together
         let bound_repr = objects.iter()
             .map(|o| o.representation)
             .reduce(|a, b| a.bind(&b))
             .unwrap_or_else(|| BinaryHV::random(seed));
-
-        // Average with scene-level coherence weighting
         let avg_synchrony = objects.iter().map(|o| o.synchrony).sum::<f64>() / objects.len() as f64;
         let avg_strength = objects.iter().map(|o| o.binding_strength).sum::<f64>() / objects.len() as f64;
         let avg_attention = objects.iter().map(|o| o.attention_weight).sum::<f64>() / objects.len() as f64;
         let avg_stability = objects.iter().map(|o| o.temporal_stability).sum::<f64>() / objects.len() as f64;
-
-        // Scene-level bindings are strongest (full integration bonus)
-        let scene_strength = (avg_strength * 1.2).min(1.0);
-
         Self {
             representation: bound_repr,
-            synchrony: (avg_synchrony * 1.05).min(1.0), // Slight synchrony boost for scene coherence
-            binding_strength: scene_strength,
-            conscious: objects.iter().all(|o| o.conscious), // Scene conscious only if all objects are
+            synchrony: (avg_synchrony * 1.05).min(1.0),
+            binding_strength: (avg_strength * 1.2).min(1.0),
+            conscious: objects.iter().all(|o| o.conscious),
             level: BindingLevel::Scene,
-            child_ids: Vec::new(), // Will be set by caller
+            child_ids: Vec::new(),
             attention_weight: avg_attention,
             creation_cycle: 0,
             persistence_cycles: 0,
-            temporal_stability: (avg_stability * 1.1).min(1.0), // Scene-level gets larger stability boost
+            temporal_stability: (avg_stability * 1.1).min(1.0),
         }
     }
 }
@@ -738,233 +390,101 @@ impl BoundObject {
 /// Consciousness state - the complete state of a conscious system
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsciousnessState {
-    /// Integrated information Φ
     pub phi: f64,
-    /// Free energy (prediction error)
     pub free_energy: f64,
-    /// Temporal coherence
     pub temporal_coherence: f64,
-    /// Overall consciousness level [0, 1]
     pub consciousness_level: f64,
-    /// Items in global workspace
     pub conscious_contents: Vec<WorkspaceItem>,
-    /// Bound objects from binding
     pub bound_objects: Vec<BoundObject>,
-    /// Meta-awareness (HOT)
     pub meta_awareness: Vec<MetaThought>,
-    /// Current altered state
     pub altered_state: AlteredStateIndex,
-    /// Attention focus
     pub attention_focus: Option<BinaryHV>,
-    /// Prediction accuracy
     pub prediction_accuracy: f64,
-    /// Flow stability
     pub flow_stability: f64,
-    /// Embodiment level
     pub embodiment: f64,
-    /// Semantic depth
     pub semantic_depth: f64,
-    /// Topological unity
     pub topological_unity: f64,
-
-    // === INTEGRATED CONSCIOUSNESS SYSTEMS ===
-
-    /// Metacognitive confidence (self-awareness of processing quality)
     pub metacognitive_confidence: f64,
-    /// Metacognitive coherence (integration quality assessment)
     pub metacognitive_coherence: f64,
-    /// Predicted next Φ level (from metacognitive trends)
     pub predicted_phi: Option<f64>,
-    /// Phi trend: positive = improving, negative = declining
     pub phi_trend: f64,
-
-    /// Predictive precision (attention gain from active inference)
     pub predictive_precision: f64,
-    /// Current surprise/prediction error level
     pub surprise_level: f64,
-    /// Active inference mode
     pub inference_mode: PredictiveMode,
-
-    /// Cross-modal integration strength
     pub cross_modal_coherence: f64,
-    /// Active modalities in current binding
     pub active_modalities: Vec<Modality>,
-
-    /// Theta phase for temporal binding (0.0 - 2π)
     pub theta_phase: f64,
-    /// Narrative coherence (episodic continuity)
     pub narrative_coherence: f64,
-    /// Specious present window length
     pub present_window_length: usize,
-
-    /// Self-model confidence
     pub self_model_confidence: f64,
-    /// Self-model accuracy (prediction vs actual)
     pub self_model_accuracy: f64,
-    /// Current cognitive mode (from self-model optimization)
     pub cognitive_mode: CognitiveMode,
-    /// Mode appropriateness score
     pub mode_appropriateness: f64,
-
-    // === EMOTIONAL STATE FOR FEEDBACK DYNAMICS ===
-
-    /// Current emotional valence (-1.0 to 1.0)
     pub emotional_valence: f64,
-    /// Current emotional arousal (0.0 to 1.0)
     pub emotional_arousal: Option<f64>,
-    /// Current uncertainty level (0.0 to 1.0)
     pub uncertainty: f64,
-    /// Integration score from feedback dynamics
     pub integration_score: f64,
 }
 
-// ==========================================
-// SUBSYSTEM CYCLE REPORT
-// ==========================================
-
-/// Per-subsystem report from a single `process()` cycle.
-#[derive(Debug, Clone)]
-pub struct SubsystemCycleReport {
-    /// Name of the subsystem.
-    pub name: String,
-    /// Whether the subsystem was enabled and actually ran.
-    pub ran: bool,
-    /// Wall-clock duration in microseconds (0 if skipped).
-    pub duration_us: u64,
-    /// Change in Phi caused by this subsystem (phi_after - phi_before).
-    pub phi_delta: f64,
-    /// Error from this subsystem, if any.
-    pub error: Option<super::consciousness_subsystem::SubsystemError>,
+/// Predictive processing mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum PredictiveMode {
+    Exploring,
+    Exploiting,
+    #[default]
+    Balanced,
 }
 
-// ==========================================
-// STATE GROUP VIEWS
-// ==========================================
-
-/// Grouped view of Phi-related metrics from [`ConsciousnessState`].
-#[derive(Debug, Clone, Copy)]
+/// State view types for structured access to ConsciousnessState fields
 pub struct PhiMetrics {
-    pub phi: f64,
-    pub free_energy: f64,
-    pub topological_unity: f64,
-    pub predicted_phi: Option<f64>,
-    pub phi_trend: f64,
+    pub phi: f64, pub free_energy: f64, pub topological_unity: f64,
+    pub phi_trend: f64, pub predicted_phi: Option<f64>,
 }
-
-/// Grouped view of temporal binding state from [`ConsciousnessState`].
-#[derive(Debug, Clone, Copy)]
-pub struct TemporalState {
-    pub temporal_coherence: f64,
-    pub theta_phase: f64,
-    pub narrative_coherence: f64,
-    pub present_window_length: usize,
+pub struct TemporalStateView {
+    pub temporal_coherence: f64, pub theta_phase: f64,
+    pub narrative_coherence: f64, pub present_window_length: usize,
 }
-
-/// Grouped view of self-model state from [`ConsciousnessState`].
-#[derive(Debug, Clone, Copy)]
-pub struct SelfModelState {
-    pub confidence: f64,
-    pub accuracy: f64,
-    pub cognitive_mode: CognitiveMode,
-    pub mode_appropriateness: f64,
+pub struct SelfModelStateView { pub confidence: f64, pub accuracy: f64 }
+pub struct EmotionalStateView {
+    pub valence: f64, pub arousal: Option<f64>, pub uncertainty: f64,
 }
-
-/// Grouped view of emotional state from [`ConsciousnessState`].
-#[derive(Debug, Clone, Copy)]
-pub struct EmotionalState {
-    pub valence: f64,
-    pub arousal: Option<f64>,
-    pub uncertainty: f64,
+pub struct PredictiveStateView { pub precision: f64, pub surprise: f64 }
+pub struct IntegrationMetricsView {
+    pub metacognitive_confidence: f64, pub cross_modal_coherence: f64,
     pub integration_score: f64,
-}
-
-/// Grouped view of predictive processing state from [`ConsciousnessState`].
-#[derive(Debug, Clone, Copy)]
-pub struct PredictiveState {
-    pub precision: f64,
-    pub surprise_level: f64,
-    pub inference_mode: PredictiveMode,
-}
-
-/// Grouped view of integration quality metrics from [`ConsciousnessState`].
-#[derive(Debug, Clone, Copy)]
-pub struct IntegrationMetrics {
-    pub metacognitive_confidence: f64,
-    pub metacognitive_coherence: f64,
-    pub cross_modal_coherence: f64,
 }
 
 impl ConsciousnessState {
-    /// Phi-related metrics as a grouped view.
     pub fn phi_metrics(&self) -> PhiMetrics {
         PhiMetrics {
-            phi: self.phi,
-            free_energy: self.free_energy,
+            phi: self.phi, free_energy: self.free_energy,
             topological_unity: self.topological_unity,
-            predicted_phi: self.predicted_phi,
-            phi_trend: self.phi_trend,
+            phi_trend: self.phi_trend, predicted_phi: self.predicted_phi,
         }
     }
-
-    /// Temporal binding state as a grouped view.
-    pub fn temporal_state(&self) -> TemporalState {
-        TemporalState {
-            temporal_coherence: self.temporal_coherence,
-            theta_phase: self.theta_phase,
+    pub fn temporal_state(&self) -> TemporalStateView {
+        TemporalStateView {
+            temporal_coherence: self.temporal_coherence, theta_phase: self.theta_phase,
             narrative_coherence: self.narrative_coherence,
             present_window_length: self.present_window_length,
         }
     }
-
-    /// Self-model state as a grouped view.
-    pub fn self_model_state(&self) -> SelfModelState {
-        SelfModelState {
-            confidence: self.self_model_confidence,
-            accuracy: self.self_model_accuracy,
-            cognitive_mode: self.cognitive_mode,
-            mode_appropriateness: self.mode_appropriateness,
-        }
+    pub fn self_model_state(&self) -> SelfModelStateView {
+        SelfModelStateView { confidence: self.self_model_confidence, accuracy: self.self_model_accuracy }
     }
-
-    /// Emotional state as a grouped view.
-    pub fn emotional_state(&self) -> EmotionalState {
-        EmotionalState {
-            valence: self.emotional_valence,
-            arousal: self.emotional_arousal,
-            uncertainty: self.uncertainty,
+    pub fn emotional_state(&self) -> EmotionalStateView {
+        EmotionalStateView { valence: self.emotional_valence, arousal: self.emotional_arousal, uncertainty: self.uncertainty }
+    }
+    pub fn predictive_state(&self) -> PredictiveStateView {
+        PredictiveStateView { precision: self.predictive_precision, surprise: self.surprise_level }
+    }
+    pub fn integration_metrics(&self) -> IntegrationMetricsView {
+        IntegrationMetricsView {
+            metacognitive_confidence: self.metacognitive_confidence,
+            cross_modal_coherence: self.cross_modal_coherence,
             integration_score: self.integration_score,
         }
     }
-
-    /// Predictive processing state as a grouped view.
-    pub fn predictive_state(&self) -> PredictiveState {
-        PredictiveState {
-            precision: self.predictive_precision,
-            surprise_level: self.surprise_level,
-            inference_mode: self.inference_mode,
-        }
-    }
-
-    /// Integration quality metrics as a grouped view.
-    pub fn integration_metrics(&self) -> IntegrationMetrics {
-        IntegrationMetrics {
-            metacognitive_confidence: self.metacognitive_confidence,
-            metacognitive_coherence: self.metacognitive_coherence,
-            cross_modal_coherence: self.cross_modal_coherence,
-        }
-    }
-}
-
-/// Predictive processing mode (from active inference)
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum PredictiveMode {
-    /// Exploring: gathering information, high surprise tolerance
-    Exploring,
-    /// Exploiting: using predictions, low surprise tolerance
-    Exploiting,
-    /// Balanced: moderate prediction/exploration
-    #[default]
-    Balanced,
 }
 
 impl Default for ConsciousnessState {
@@ -984,40 +504,26 @@ impl Default for ConsciousnessState {
             embodiment: 0.5,
             semantic_depth: 0.0,
             topological_unity: 0.5,
-
-            // === INTEGRATED CONSCIOUSNESS SYSTEMS DEFAULTS ===
-
-            // Metacognitive monitoring defaults
-            metacognitive_confidence: 0.5,  // Neutral confidence
-            metacognitive_coherence: 0.5,   // Neutral coherence
-            predicted_phi: None,             // No prediction yet
-            phi_trend: 0.0,                  // No trend (stable)
-
-            // Predictive consciousness defaults
-            predictive_precision: 1.0,       // Full precision (no attention suppression)
-            surprise_level: 0.5,             // Moderate surprise (neutral)
+            metacognitive_confidence: 0.5,
+            metacognitive_coherence: 0.5,
+            predicted_phi: None,
+            phi_trend: 0.0,
+            predictive_precision: 1.0,
+            surprise_level: 0.5,
             inference_mode: PredictiveMode::Balanced,
-
-            // Cross-modal binding defaults
-            cross_modal_coherence: 0.0,      // No cross-modal integration yet
-            active_modalities: Vec::new(),   // No active modalities
-
-            // Temporal binding defaults
-            theta_phase: 0.0,                // Start of theta cycle
-            narrative_coherence: 0.5,        // Neutral narrative continuity
-            present_window_length: 0,        // No specious present window yet
-
-            // Self-model defaults
-            self_model_confidence: 0.5,      // Neutral self-model
-            self_model_accuracy: 0.5,        // Neutral accuracy
+            cross_modal_coherence: 0.0,
+            active_modalities: Vec::new(),
+            theta_phase: 0.0,
+            narrative_coherence: 0.5,
+            present_window_length: 0,
+            self_model_confidence: 0.5,
+            self_model_accuracy: 0.5,
             cognitive_mode: CognitiveMode::default(),
-            mode_appropriateness: 0.5,       // Neutral appropriateness
-
-            // Emotional state for feedback dynamics
-            emotional_valence: 0.0,          // Neutral valence
-            emotional_arousal: Some(0.5),    // Moderate arousal
-            uncertainty: 0.5,                // Moderate uncertainty
-            integration_score: 0.5,          // Neutral integration
+            mode_appropriateness: 0.5,
+            emotional_valence: 0.0,
+            emotional_arousal: Some(0.5),
+            uncertainty: 0.5,
+            integration_score: 0.5,
         }
     }
 }
@@ -1025,15 +531,10 @@ impl Default for ConsciousnessState {
 /// Assessment result from integration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IntegrationAssessment {
-    /// Is the system conscious?
     pub is_conscious: bool,
-    /// Overall score [0, 1]
     pub consciousness_score: f64,
-    /// Component scores
     pub component_scores: HashMap<String, f64>,
-    /// Bottlenecks identified
     pub bottlenecks: Vec<String>,
-    /// Explanation
     pub explanation: String,
 }
 
@@ -1046,6 +547,189 @@ impl Default for IntegrationAssessment {
             bottlenecks: Vec::new(),
             explanation: String::new(),
         }
+    }
+}
+
+// ==========================================
+// SUBSYSTEM CYCLE REPORT
+// ==========================================
+
+/// Report from a single subsystem's processing cycle
+#[derive(Debug, Clone)]
+pub struct SubsystemCycleReport {
+    pub name: String,
+    pub ran: bool,
+    pub duration_us: u64,
+    pub phi_delta: f64,
+    pub error: Option<super::consciousness_subsystem::SubsystemError>,
+}
+
+// ==========================================
+// PIPELINE BUILDER
+// ==========================================
+
+/// Builder for constructing a ConsciousnessPipeline with desired configuration
+pub struct ConsciousnessPipelineBuilder {
+    config: IntegrationConfig,
+    embodiment_level: f64,
+    integrated_systems: bool,
+    phi_feedback: bool,
+    creativity: bool,
+    fractal: bool,
+    meta_consciousness: bool,
+    temporal_consciousness: bool,
+    phase_transitions: bool,
+    epistemic: bool,
+    collective: bool,
+    subsystems: Vec<Box<dyn ConsciousnessSubsystem>>,
+    verification_interval: Option<usize>,
+}
+
+impl ConsciousnessPipelineBuilder {
+    pub fn new() -> Self {
+        Self {
+            config: IntegrationConfig::default(),
+            embodiment_level: 0.5,
+            integrated_systems: false,
+            phi_feedback: false,
+            creativity: false,
+            fractal: false,
+            meta_consciousness: false,
+            temporal_consciousness: false,
+            phase_transitions: false,
+            epistemic: false,
+            collective: false,
+            subsystems: Vec::new(),
+            verification_interval: None,
+        }
+    }
+
+    pub fn config(mut self, config: IntegrationConfig) -> Self {
+        self.config = config;
+        self
+    }
+
+    pub fn embodiment(mut self, level: f64) -> Self {
+        self.embodiment_level = level;
+        self
+    }
+
+    pub fn integrated_systems(mut self) -> Self {
+        self.integrated_systems = true;
+        self
+    }
+
+    pub fn phi_feedback(mut self) -> Self {
+        self.phi_feedback = true;
+        self
+    }
+
+    pub fn creativity(mut self) -> Self {
+        self.creativity = true;
+        self
+    }
+
+    pub fn fractal(mut self) -> Self {
+        self.fractal = true;
+        self
+    }
+
+    pub fn meta_consciousness(mut self) -> Self {
+        self.meta_consciousness = true;
+        self
+    }
+
+    pub fn temporal_consciousness(mut self) -> Self {
+        self.temporal_consciousness = true;
+        self
+    }
+
+    pub fn phase_transitions(mut self) -> Self {
+        self.phase_transitions = true;
+        self
+    }
+
+    pub fn epistemic(mut self) -> Self {
+        self.epistemic = true;
+        self
+    }
+
+    pub fn collective(mut self) -> Self {
+        self.collective = true;
+        self
+    }
+
+    pub fn subsystem(mut self, sub: Box<dyn ConsciousnessSubsystem>) -> Self {
+        self.subsystems.push(sub);
+        self
+    }
+
+    pub fn verification(mut self, interval: usize) -> Self {
+        self.verification_interval = Some(interval);
+        self
+    }
+
+    /// Enable all consciousness systems (delegates to enable_full_consciousness)
+    pub fn full_consciousness(self) -> Self {
+        // Mark as full; build() will use enable_full_consciousness()
+        Self { integrated_systems: true, phi_feedback: true, creativity: true,
+               fractal: true, meta_consciousness: true, temporal_consciousness: true,
+               phase_transitions: true, epistemic: true, collective: true, ..self }
+    }
+
+    pub fn build(self) -> ConsciousnessPipeline {
+        let mut pipeline = ConsciousnessPipeline::new(self.config);
+        pipeline.embodiment_level = self.embodiment_level;
+
+        // If all systems requested, use the pipeline's full setup (includes phi_optimization etc.)
+        let is_full = self.integrated_systems && self.phi_feedback && self.creativity
+            && self.fractal && self.meta_consciousness && self.temporal_consciousness
+            && self.phase_transitions && self.epistemic && self.collective;
+
+        if is_full {
+            pipeline.enable_full_consciousness();
+        } else {
+            if self.integrated_systems {
+                pipeline.enable_integrated_systems();
+            }
+            if self.phi_feedback {
+                pipeline.enable_phi_feedback();
+            }
+            if self.creativity {
+                pipeline.enable_creativity();
+            }
+            if self.fractal {
+                pipeline.enable_fractal(3);
+            }
+            if self.meta_consciousness {
+                pipeline.enable_meta_consciousness(8);
+            }
+            if self.temporal_consciousness {
+                pipeline.enable_temporal_consciousness(8);
+            }
+            if self.phase_transitions {
+                pipeline.enable_phase_transitions();
+            }
+            if self.epistemic {
+                pipeline.enable_epistemic(8);
+            }
+            if self.collective {
+                pipeline.enable_collective("primary");
+            }
+        }
+        for sub in self.subsystems {
+            pipeline.register_subsystem(sub);
+        }
+        if let Some(interval) = self.verification_interval {
+            pipeline.enable_verification(interval);
+        }
+        pipeline
+    }
+}
+
+impl Default for ConsciousnessPipelineBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -3083,7 +2767,7 @@ impl ConsciousnessPipeline {
         }
 
         // === PERIODIC VERIFICATION ===
-        if self.verification_interval > 0 && self.current_cycle % self.verification_interval as u64 == 0 {
+        if self.verification_interval > 0 && self.current_cycle.is_multiple_of(self.verification_interval as u64) {
             if let Some(ref verifier) = self.verifier {
                 self.latest_verification = Some(verifier.verify_from_state(&self.state));
             }
@@ -5558,7 +5242,6 @@ mod tests {
         // "slow" should have ran
         let slow_report = reports.iter().find(|r| r.name == "slow").unwrap();
         assert!(slow_report.ran);
-        assert!(slow_report.duration_us >= 0);
         assert!(slow_report.phi_delta > 0.0, "slow sub increases phi");
         assert!(slow_report.error.is_none());
 

@@ -14,6 +14,10 @@
 //! 4. Prediction error computed (multi-scale)
 //! 5. Error → CfC analytical gradient + HDC attention update
 //! 6. Prediction sent to encoder for cycle t+1
+//! 7. Post-processing: parallel subsystem updates via rayon::join
+//!    Branch A: stability regime, semantic memory, causal enhancement
+//!    Branch B: episodic memory, primitive-belief bridge, closed learning loop
+//!    Sequential: episodic replay (needs CfC), memory coordinator
 //! ```
 //!
 //! ## Why CfC (vs LTC)
@@ -112,11 +116,20 @@ pub use builder::*;
 pub mod executor;
 pub use executor::*;
 
+mod training;
+use training::{AsyncTrainerHandle, TrainingSample};
+
+mod temporal_network;
+use temporal_network::TemporalNetwork;
+
+mod metrics_provider;
+
+mod identity_integration;
+
 // ── Imports ──────────────────────────────────────────────────────────────────
 use anyhow::Result;
 use rand::Rng;
 use std::collections::VecDeque;
-use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use ndarray::Array1;
 use symthaea_core::hdc::predictive_encoder::PredictiveHdcEncoder;
@@ -135,13 +148,17 @@ use crate::consciousness::fep_active_inference::{
 };
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
 use crate::memory::semantic_memory::SemanticMemory;
+use crate::memory::memory_coordinator::{MemoryCoordinator, CoordinatorConfig};
 use crate::hdc_ltc_bridge::HdcLtcBridge;
 use crate::consciousness::stability_regime::{StabilityRegimeProcessor, RegimeTransition};
 use crate::consciousness::primitive_discovery::{PrimitiveDiscoveryService, DiscoveryServiceConfig};
+use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
+use crate::consciousness::primitive_consciousness::{PrimitiveConsciousnessState, ActivePrimitive, ActivationReason};
 use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 use crate::causal::{CausalLoopEnhancer, CausalEnhancerConfig, CausalGraph, DiscoveredRelationship};
 use crate::hdc::moral_algebra::{MoralAlgebra, MoralVerdict, DeontologicalVerdict};
 use crate::hdc::moral_parser::MoralParser;
+use rayon::join as rayon_join;
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
 
@@ -165,271 +182,9 @@ struct Experience {
 // ASYNC TRAINING — Background thread for BPTT/SPSA so inference never blocks
 // ═══════════════════════════════════════════════════════════════════════════════
 
-/// A single training sample sent from the inference thread to the trainer.
-struct TrainingSample {
-    input: Array1<f32>,
-    target: Array1<f32>,
-    dt: f32,
-    learning_rate: f32,
-    method: TrainingMethod,
-    avg_loss: f32,
-}
+// TrainingSample and AsyncTrainerHandle are in training.rs
 
-/// Handle held by `CognitiveLoopService` to communicate with the background
-/// training thread.  Dropping it causes the background thread to exit.
-///
-/// The `Mutex<Receiver>` makes this struct `Sync` so that `CognitiveLoopService`
-/// can implement `MetricsProvider: Send + Sync`.  In practice the mutex is
-/// uncontended because `cycle()` is the only reader.
-struct AsyncTrainerHandle {
-    sample_tx: mpsc::SyncSender<TrainingSample>,
-    weights_rx: std::sync::Mutex<mpsc::Receiver<Vec<f32>>>,
-    updates_applied: u64,
-}
-
-impl AsyncTrainerHandle {
-    fn spawn(mut network: CfCNetwork) -> Self {
-        let (sample_tx, sample_rx) = mpsc::sync_channel::<TrainingSample>(4);
-        let (weights_tx, weights_rx) = mpsc::channel::<Vec<f32>>();
-
-        std::thread::Builder::new()
-            .name("symthaea-trainer".into())
-            .spawn(move || {
-                let mut steps_since_publish: u32 = 0;
-                while let Ok(sample) = sample_rx.recv() {
-                    let result = match sample.method {
-                        TrainingMethod::Spsa => {
-                            network.train_step_spsa(&sample.input, &sample.target, sample.dt, sample.learning_rate)
-                        }
-                        TrainingMethod::Bptt => {
-                            network.train_step_bptt(&[sample.input], &[sample.target], &[sample.dt], sample.learning_rate)
-                        }
-                        TrainingMethod::BpttWithSpsaFallback => {
-                            let bptt = network.train_step_bptt(
-                                &[sample.input.clone()], &[sample.target.clone()],
-                                &[sample.dt], sample.learning_rate,
-                            );
-                            match bptt {
-                                Ok(loss) if loss.is_finite() && (sample.avg_loss <= 0.0 || loss < sample.avg_loss * 2.0) => Ok(loss),
-                                _ => network.train_step_spsa(&sample.input, &sample.target, sample.dt, sample.learning_rate),
-                            }
-                        }
-                    };
-                    steps_since_publish += 1;
-                    if steps_since_publish >= 4 && result.is_ok() {
-                        let _ = weights_tx.send(network.get_weights());
-                        steps_since_publish = 0;
-                    }
-                }
-            })
-            .expect("failed to spawn trainer thread");
-
-        Self { sample_tx, weights_rx: std::sync::Mutex::new(weights_rx), updates_applied: 0 }
-    }
-
-    fn apply_latest_weights(&mut self, network: &mut CfCNetwork) -> bool {
-        let mut latest: Option<Vec<f32>> = None;
-        let rx = self.weights_rx.get_mut().expect("weights_rx mutex poisoned");
-        while let Ok(w) = rx.try_recv() {
-            latest = Some(w);
-        }
-        if let Some(w) = latest {
-            network.set_weights(&w);
-            self.updates_applied += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn send(&self, sample: TrainingSample) {
-        let _ = self.sample_tx.try_send(sample);
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TEMPORAL NETWORK WRAPPER
-// ═══════════════════════════════════════════════════════════════════════════════
-
-/// Wrapper enum for temporal network backends
-///
-/// This allows the CognitiveLoopService to use either CfC or HdcLtcUnified
-/// as the temporal prediction backend, selected at runtime.
-#[allow(dead_code)]  // Some methods are provided for API completeness
-enum TemporalNetwork {
-    /// CfC (Closed-form Continuous-time) network
-    CfC(CfCNetwork),
-    /// HdcLtcUnified network via bridge
-    HdcLtc(HdcLtcBridge),
-}
-
-#[allow(dead_code)]  // Methods provided for API completeness and future use
-impl TemporalNetwork {
-    /// Step the network forward
-    fn step(&mut self, input: &Array1<f32>, dt: f32) -> Result<()> {
-        match self {
-            Self::CfC(cfc) => cfc.step(input, dt),
-            Self::HdcLtc(bridge) => bridge.step(input, dt),
-        }
-    }
-
-    /// Read the current state
-    fn read_state(&self) -> Result<Array1<f32>> {
-        match self {
-            Self::CfC(cfc) => cfc.read_state(),
-            Self::HdcLtc(bridge) => bridge.read_state(),
-        }
-    }
-
-    /// Forward pass and return output
-    fn forward(&mut self, input: &Array1<f32>, dt: f32) -> Array1<f32> {
-        match self {
-            Self::CfC(cfc) => cfc.forward(input, dt),
-            Self::HdcLtc(bridge) => bridge.forward(input, dt),
-        }
-    }
-
-    /// Train step (delegates to BPTT by default for CfC)
-    fn train_step(
-        &mut self,
-        input: &Array1<f32>,
-        target: &Array1<f32>,
-        dt: f32,
-        learning_rate: f32,
-    ) -> Result<f32> {
-        match self {
-            Self::CfC(cfc) => cfc.train_step(input, target, dt, learning_rate),
-            Self::HdcLtc(bridge) => bridge.train_step(input, target, dt, learning_rate),
-        }
-    }
-
-    /// Train step using BPTT (analytical gradients).
-    /// For HdcLtc this falls through to the default train_step.
-    fn train_step_bptt(
-        &mut self,
-        input: &Array1<f32>,
-        target: &Array1<f32>,
-        dt: f32,
-        learning_rate: f32,
-    ) -> Result<f32> {
-        match self {
-            Self::CfC(cfc) => cfc.train_step_bptt(
-                &[input.clone()], &[target.clone()], &[dt], learning_rate,
-            ),
-            Self::HdcLtc(bridge) => bridge.train_step(input, target, dt, learning_rate),
-        }
-    }
-
-    /// Train step using SPSA (perturbation-based gradients).
-    /// For HdcLtc this falls through to the default train_step.
-    fn train_step_spsa(
-        &mut self,
-        input: &Array1<f32>,
-        target: &Array1<f32>,
-        dt: f32,
-        learning_rate: f32,
-    ) -> Result<f32> {
-        match self {
-            Self::CfC(cfc) => cfc.train_step_spsa(input, target, dt, learning_rate),
-            Self::HdcLtc(bridge) => bridge.train_step(input, target, dt, learning_rate),
-        }
-    }
-
-    /// Predict forward at a specific time horizon
-    fn predict_forward(&mut self, input: &Array1<f32>, horizon: f32) -> Result<Array1<f32>> {
-        match self {
-            Self::CfC(cfc) => cfc.predict_forward(input, horizon),
-            Self::HdcLtc(bridge) => bridge.predict_forward(input, horizon),
-        }
-    }
-
-    /// Inject state
-    fn inject(&mut self, state: &Array1<f32>) -> Result<()> {
-        match self {
-            Self::CfC(cfc) => cfc.inject(state),
-            Self::HdcLtc(bridge) => bridge.inject(state),
-        }
-    }
-
-    /// Reset the network
-    fn reset(&mut self) {
-        match self {
-            Self::CfC(cfc) => cfc.reset(),
-            Self::HdcLtc(bridge) => bridge.reset(),
-        }
-    }
-
-    /// Get state diversity metric
-    fn state_diversity(&self) -> f32 {
-        match self {
-            Self::CfC(cfc) => cfc.state_diversity(),
-            Self::HdcLtc(bridge) => bridge.state_diversity(),
-        }
-    }
-
-    /// Get all tau values for coherence tracking
-    fn all_tau(&self) -> Vec<&Array1<f32>> {
-        match self {
-            Self::CfC(cfc) => cfc.all_tau(),
-            Self::HdcLtc(_) => vec![], // HdcLtc returns owned, handled separately
-        }
-    }
-
-    /// Get all tau values (owned version for HdcLtc compatibility)
-    fn all_tau_owned(&self) -> Vec<Array1<f32>> {
-        match self {
-            Self::CfC(cfc) => cfc.all_tau().into_iter().cloned().collect(),
-            Self::HdcLtc(bridge) => bridge.all_tau(),
-        }
-    }
-
-    /// Get flattened tau values
-    fn flattened_tau(&self) -> Vec<f32> {
-        match self {
-            Self::CfC(cfc) => cfc.flattened_tau(),
-            Self::HdcLtc(bridge) => bridge.flattened_tau(),
-        }
-    }
-
-    /// Adaptively resize HDC dimension based on prediction error (HdcLtc only)
-    fn maybe_resize(&mut self, current_error: f32) {
-        if let Self::HdcLtc(bridge) = self {
-            bridge.maybe_resize(current_error);
-        }
-    }
-
-    /// Check if using HdcLtc backend
-    fn is_hdc_ltc(&self) -> bool {
-        matches!(self, Self::HdcLtc(_))
-    }
-
-    /// Get backend type
-    fn backend_type(&self) -> TemporalBackend {
-        match self {
-            Self::CfC(_) => TemporalBackend::CfC,
-            Self::HdcLtc(_) => TemporalBackend::HdcLtcUnified,
-        }
-    }
-
-    /// Project input directly to HDC space, bypassing CfC temporal dynamics.
-    ///
-    /// Returns `None` for CfC backend (no HDC projection available).
-    /// Returns `Some(Vec<f32>)` for HdcLtc backend with the raw HDC vector.
-    fn project_to_hdc_vec(&self, input: &[f32]) -> Option<Vec<f32>> {
-        match self {
-            Self::CfC(_) => None,
-            Self::HdcLtc(bridge) => Some(bridge.project_to_hdc_vec(input)),
-        }
-    }
-
-    /// Get HDC dimension (returns None for CfC backend)
-    fn hdc_dim(&self) -> Option<usize> {
-        match self {
-            Self::CfC(_) => None,
-            Self::HdcLtc(bridge) => Some(bridge.hdc_dim()),
-        }
-    }
-}
+// TemporalNetwork is in temporal_network.rs
 
 /// The Cognitive Loop Service
 ///
@@ -560,6 +315,11 @@ pub struct CognitiveLoopService {
     /// to modulate learning rate - high error on similar inputs → boost learning
     semantic_memory: SemanticMemory,
 
+    /// Memory Coordinator: cross-tier signal broadcaster
+    /// Bridges episodic and semantic memory with shared consciousness signals,
+    /// handles graduation from working memory to episodic storage.
+    memory_coordinator: MemoryCoordinator,
+
     /// Neural bridge for projecting pre-computed embeddings (e.g. BGE-M3)
     /// directly into HDC space via a trained linear probe.
     /// Only available when the `neural-bridge` feature is enabled and
@@ -610,6 +370,13 @@ pub struct CognitiveLoopService {
 
     /// Last moral evaluation result (for tracking and learning)
     last_moral_judgment: Option<MoralJudgmentSummary>,
+
+    /// Primitive-Belief Bridge: maps 9-tier primitives to active inference beliefs
+    /// Computes per-tier prediction errors and TD signals for learning
+    primitive_belief_bridge: PrimitiveBeliefBridge,
+
+    /// Previous cycle's primitive consciousness state for prediction error computation
+    prev_primitive_state: Option<PrimitiveConsciousnessState>,
 }
 
 impl CognitiveLoopService {
@@ -769,6 +536,8 @@ impl CognitiveLoopService {
             // Semantic memory: HDC-based similarity lookup for CfC context
             // 1000 entries, 0.3 similarity threshold
             semantic_memory: SemanticMemory::with_threshold(1000, 0.3),
+            // Memory coordinator: cross-tier signal broadcaster
+            memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             #[cfg(feature = "neural-bridge")]
             neural_bridge: {
                 let probe_path = std::path::Path::new("models/neural_bridge/probe_weights.npy");
@@ -799,12 +568,16 @@ impl CognitiveLoopService {
             reasoning_engine: Some(crate::consciousness::reasoning_engine::ConsciousReasoningEngine::new()),
             // MFDI Bridge for identity verification and signed outputs
             #[cfg(feature = "identity")]
-            mfdi_bridge: crate::identity::MfdiBridge::new(crate::identity::MfdiConfig::default()),
+            mfdi_bridge: crate::identity::MfdiBridge::new(crate::identity::MfdiBridgeConfig::default()),
 
             // Moral Algebra for compositional ethical reasoning
             moral_algebra: MoralAlgebra::default_dim(),
             moral_parser: MoralParser::new(),
             last_moral_judgment: None,
+
+            // Primitive-Belief Bridge for tier-level prediction error learning
+            primitive_belief_bridge: PrimitiveBeliefBridge::new(),
+            prev_primitive_state: None,
         })
     }
 
@@ -915,13 +688,13 @@ impl CognitiveLoopService {
         Ok(CycleResult {
             output: output.clone(),
             prediction_error,
-            attention_state: HashMap::new(), // No text-based attention for embedding input
+            attention_state: std::collections::HashMap::new(), // No text-based attention for embedding input
             detected_primitives: Vec::new(), // No text primitives for embedding input
             learning_occurred,
             training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             #[cfg(feature = "identity")]
-            signed_output: self.mfdi_bridge.sign_output(&output).ok(),
+            signed_output: self.mfdi_bridge.sign_output(output.clone()).ok(),
             #[cfg(feature = "identity")]
             assurance_level: self.mfdi_bridge.assurance_level(),
         })
@@ -1182,7 +955,15 @@ impl CognitiveLoopService {
 
         let semantic_hdc = self.temporal_network.project_to_hdc_vec(&compressed_state)
             .unwrap_or_else(|| compressed_state.clone());
-        let semantic_lr_factor = self.semantic_memory.compute_lr_factor(&semantic_hdc, 3);
+        // Phi-weighted learning rate: consciousness level modulates how aggressively
+        // we adjust to prediction errors on similar past inputs.
+        let current_phi_for_lr = self.coherence_bridge.smoothed_coherence() as f64;
+        let semantic_lr_factor = self.semantic_memory.compute_lr_factor_phi_weighted(
+            &semantic_hdc,
+            3,
+            current_phi_for_lr,
+            self.stats.total_cycles as u64,
+        );
 
         // 3. Convert to ndarray for CfC
         let input_array = Array1::from_vec(compressed_state.clone());
@@ -1608,82 +1389,135 @@ impl CognitiveLoopService {
         self.stats.coherence_phi_contribution = self.coherence_bridge.phi_contribution();
 
         // ═══════════════════════════════════════════════════════════════════════
-        // EPISODIC MEMORY: Encode this cycle's experience
+        // PARALLEL POST-PROCESSING: Independent subsystem updates via rayon
         // ═══════════════════════════════════════════════════════════════════════
-        // Only encode if prediction error is significant (worth remembering)
+        // These subsystem updates use disjoint fields and run in parallel:
+        //   Branch A: Stability regime + Semantic memory + Causal enhancement
+        //   Branch B: Episodic memory + Primitive-belief bridge + Closed learning loop
+        // Sequential after join: Episodic replay + Memory coordinator (cross-dependencies)
 
-        if prediction_error > 0.1 || self.flow_state.in_flow {
-            let emotional_valence = self.emotion_contagion.prosody_valence();
-            let phi = self.unification_engine.phi as f32;
-            self.episodic_memory.encode(
-                input,
-                hdv_sample.clone(),
-                emotional_valence,
-                phi,
-                self.stats.total_cycles,
-            );
-        }
+        // Pre-compute read-only values needed by parallel branches
+        let pp_total_cycles = self.stats.total_cycles;
+        let pp_in_flow = self.flow_state.in_flow;
+        let pp_emotional_valence = self.emotion_contagion.prosody_valence();
+        let pp_phi = self.unification_engine.phi as f32;
+        let pp_smoothed_coh = self.coherence_bridge.smoothed_coherence() as f64;
+        let pp_learning_threshold = self.config.learning_threshold;
 
-        // Apply memory context boost to confidence
-        self.prediction_confidence = (self.prediction_confidence + memory_context_boost).clamp(0.0, 1.0);
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // STABILITY REGIME: Update primitive CfC dynamics
-        // ═══════════════════════════════════════════════════════════════════════
-        // Convert the HDC encoding to BinaryHV and run through stability regime processor.
-        // Frequently-used primitives crystallize, rarely-used stay fluid.
-        {
-            let hv16_input = real_hv_to_hv16(&encoding_result.hdv);
-            let timestamp = self.stats.total_cycles as f64 * delta_t as f64;
-            let (_regime_state, transitions) = self.stability_regime.process_input(&hv16_input, delta_t, timestamp);
-
-            // When primitives crystallize, seed the discovery system to explore neighbors
-            for transition in &transitions {
-                if let RegimeTransition::Crystallized { primitive_name, encoding } = transition {
-                    self.discovery_service.seed_neighbor_exploration(primitive_name, encoding);
-                }
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // CLOSED LEARNING LOOP: Update with cycle results
-        // ═══════════════════════════════════════════════════════════════════════
-        // This closes the loop: learning from this cycle influences next cycle's strategy
-
-        let cycle_reward = if prediction_error < self.config.learning_threshold {
-            // Good prediction → positive reward (scaled by confidence)
+        // Compute cycle reward before parallel section (reads prediction_confidence, flow_state)
+        let cycle_reward = if prediction_error < pp_learning_threshold {
             0.5 + 0.5 * self.prediction_confidence
         } else if prediction_error > 0.5 {
-            // Very poor prediction → negative reward
             -0.3 - 0.2 * (prediction_error - 0.5)
         } else {
-            // Moderate prediction → neutral to slightly negative
             0.2 - 0.5 * prediction_error
         };
 
         let cycle_learning_result = CycleLearningResult {
             reward: cycle_reward.clamp(-1.0, 1.0),
             strategy_used: selected_strategy,
-            successful: prediction_error < self.config.learning_threshold && self.flow_state.in_flow,
+            successful: prediction_error < pp_learning_threshold && pp_in_flow,
             prediction_error,
             coherence,
         };
 
-        self.closed_learning_loop.update(cycle_learning_result);
+        // Take disjoint mutable borrows for parallel processing.
+        // The block scope ensures all borrows are dropped before the sequential section.
+        {
+        let stability_regime = &mut self.stability_regime;
+        let discovery_service = &mut self.discovery_service;
+        let semantic_memory = &mut self.semantic_memory;
+        let causal_enhancer = &mut self.causal_enhancer;
+        let episodic_memory = &mut self.episodic_memory;
+        let primitive_belief_bridge = &mut self.primitive_belief_bridge;
+        let closed_learning_loop = &mut self.closed_learning_loop;
+        let fep_learning_signal = &mut self.fep_learning_signal;
+        let prev_primitive_state = &mut self.prev_primitive_state;
+        let prediction_confidence_ref = &mut self.prediction_confidence;
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // SEMANTIC MEMORY: Store this cycle's HDC vector + prediction error
-        // ═══════════════════════════════════════════════════════════════════════
-        // This enables future cycles to find semantically similar inputs and
-        // use their prediction errors to modulate learning rate.
-        self.semantic_memory.store_with_timestamp(
-            semantic_hdc,
-            prediction_error,
-            None, // Category could be derived from detected_primitives if desired
-            self.stats.total_cycles as u64,
+        rayon_join(
+            // ── Branch A: Stability Regime + Semantic Memory + Causal Enhancement ──
+            || {
+                // Stability regime: CfC dynamics for primitives
+                // Frequently-used primitives crystallize, rarely-used stay fluid
+                let hv16_input = real_hv_to_hv16(&encoding_result.hdv);
+                let timestamp = pp_total_cycles as f64 * delta_t as f64;
+                let (_regime_state, transitions) =
+                    stability_regime.process_input(&hv16_input, delta_t, timestamp);
+
+                for transition in &transitions {
+                    if let RegimeTransition::Crystallized { primitive_name, encoding } = transition {
+                        discovery_service.seed_neighbor_exploration(primitive_name, encoding);
+                    }
+                }
+
+                // Semantic memory: store HDC vector + prediction error for future similarity lookup
+                semantic_memory.store_with_timestamp(
+                    semantic_hdc,
+                    prediction_error,
+                    None,
+                    pp_total_cycles as u64,
+                );
+
+                // Causal enhancement: track (input, output) pairs and discover structure
+                if let Some(ref mut enhancer) = causal_enhancer {
+                    enhancer.record_cycle_from_f32(&compressed_state, &output);
+
+                    if enhancer.should_discover() {
+                        let causal_graph = enhancer.run_discovery();
+
+                        if !causal_graph.is_empty() {
+                            tracing::info!(
+                                edges = causal_graph.edges.len(),
+                                cycle = pp_total_cycles,
+                                "Causal structure discovered in cognitive loop"
+                            );
+                            enhancer.log_discoveries();
+                        }
+                    }
+                }
+            },
+            // ── Branch B: Episodic Memory + Primitive-Belief + Closed Learning ──
+            || {
+                // Episodic memory: encode significant experiences
+                if prediction_error > 0.1 || pp_in_flow {
+                    episodic_memory.encode(
+                        input,
+                        hdv_sample.clone(),
+                        pp_emotional_valence,
+                        pp_phi,
+                        pp_total_cycles,
+                    );
+                }
+
+                // Apply memory context boost to confidence
+                *prediction_confidence_ref =
+                    (*prediction_confidence_ref + memory_context_boost).clamp(0.0, 1.0);
+
+                // Primitive-Belief Bridge: map primitives to beliefs, compute TD signals
+                let prim_state = CognitiveLoopService::build_primitive_state(
+                    &encoding_result.detected_primitives,
+                    pp_smoothed_coh,
+                    pp_total_cycles as f64,
+                );
+
+                if let Some(ref prev_state) = prev_primitive_state {
+                    let pred_error =
+                        primitive_belief_bridge.compute_prediction_error(prev_state, &prim_state);
+                    let td_signal = primitive_belief_bridge.td_error_signal(&pred_error);
+                    *fep_learning_signal += td_signal as f32 * 0.2;
+                    *fep_learning_signal = fep_learning_signal.clamp(-1.0, 1.0);
+                }
+
+                *prev_primitive_state = Some(prim_state);
+
+                // Closed learning loop: update Q-values from cycle results
+                closed_learning_loop.update(cycle_learning_result);
+            },
         );
+        } // end parallel scope — disjoint borrows released
 
-        // Update semantic memory stats in loop stats
+        // Update semantic memory stats after parallel join completes
         self.stats.semantic_hits = self.semantic_memory.stats().semantic_hits;
         self.stats.semantic_misses = self.semantic_memory.stats().semantic_misses;
         self.stats.semantic_lr_factor = semantic_lr_factor;
@@ -1691,46 +1525,15 @@ impl CognitiveLoopService {
         self.stats.semantic_entries_stored = self.semantic_memory.stats().total_stored;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // CAUSAL ENHANCEMENT: Track (input, output) pairs and discover causal structure
+        // SEQUENTIAL: Episodic replay + Memory coordinator
         // ═══════════════════════════════════════════════════════════════════════
-        // When enabled, the causal enhancer:
-        // - Records each (compressed_state, output) pair
-        // - Periodically runs causal discovery to find structure
-        // - Logs discovered causal relationships
-        if let Some(ref mut enhancer) = self.causal_enhancer {
-            // Record this cycle's (input, output) pair
-            enhancer.record_cycle_from_f32(&compressed_state, &output);
-
-            // Check if it's time to run causal discovery
-            if enhancer.should_discover() {
-                let causal_graph = enhancer.run_discovery();
-
-                // Log discovered relationships
-                if !causal_graph.is_empty() {
-                    tracing::info!(
-                        edges = causal_graph.edges.len(),
-                        cycle = self.stats.total_cycles,
-                        "Causal structure discovered in cognitive loop"
-                    );
-                    enhancer.log_discoveries();
-                }
-            }
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // EPISODIC REPLAY: Store high-Phi moments and periodically replay
-        // ═══════════════════════════════════════════════════════════════════════
-        // When enabled, the episodic replay system:
-        // - Stores episodes that exceed the Phi threshold
-        // - Periodically replays high-Phi episodes to reinforce important patterns
-        // - Uses Phi-weighted sampling to prioritize most conscious moments
+        // These remain sequential because:
+        // - Episodic replay needs &mut temporal_network for CfC retraining
+        // - Memory coordinator needs &mut phi_episodic_replay after replay completes
         if let Some(ref mut replay) = self.phi_episodic_replay {
-            // Get coherence summary for Phi estimation and overall coherence
             let coherence_summary = self.coherence_bridge.summary();
-            // Use smoothed coherence as a proxy for Phi (both measure integration)
             let current_phi = coherence_summary.smoothed_coherence as f64;
 
-            // Create episode from this cycle
             let input_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(
                 compressed_state.clone()
             );
@@ -1748,7 +1551,6 @@ impl CognitiveLoopService {
                 coherence_summary.coherence,
             );
 
-            // Store if Phi exceeds threshold
             let stored = replay.store_if_significant(episode);
             if stored {
                 tracing::trace!(
@@ -1758,9 +1560,7 @@ impl CognitiveLoopService {
                 );
             }
 
-            // Check if we should run a replay session
             if replay.should_replay() {
-                // Get CfC network for training (only works with CfC backend)
                 if let TemporalNetwork::CfC(ref mut cfc) = self.temporal_network {
                     let learning_rate = self.config.cfc_config.learning_rate;
                     let result = replay.replay_session(cfc, learning_rate);
@@ -1777,6 +1577,23 @@ impl CognitiveLoopService {
             }
         }
 
+        // Memory coordinator: broadcast signals and process graduations
+        {
+            let coord_phi = self.coherence_bridge.smoothed_coherence() as f64;
+            let coord_coherence = coherence as f64;
+            self.memory_coordinator.update_signals(coord_phi, coord_coherence);
+
+            if let Some(ref mut replay) = self.phi_episodic_replay {
+                let graduated = self.memory_coordinator.process_graduations(replay);
+                if graduated > 0 {
+                    tracing::debug!(
+                        graduated,
+                        "Memory coordinator graduated items to episodic storage"
+                    );
+                }
+            }
+        }
+
         CycleResult {
             output: output.clone(),
             prediction_error,
@@ -1786,7 +1603,7 @@ impl CognitiveLoopService {
             training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
             #[cfg(feature = "identity")]
-            signed_output: self.mfdi_bridge.sign_output(&output).ok(),
+            signed_output: self.mfdi_bridge.sign_output(output.clone()).ok(),
             #[cfg(feature = "identity")]
             assurance_level: self.mfdi_bridge.assurance_level(),
         }
@@ -1835,6 +1652,67 @@ impl CognitiveLoopService {
         }
 
         result
+    }
+
+    /// Build a lightweight [`PrimitiveConsciousnessState`] from detected primitive names.
+    ///
+    /// Maps primitive names to their most likely tier using keyword heuristics,
+    /// then constructs `ActivePrimitive` entries with activation = 1.0 for each.
+    fn build_primitive_state(
+        detected: &[String],
+        phi: f64,
+        timestamp: f64,
+    ) -> PrimitiveConsciousnessState {
+        use symthaea_core::hdc::BinaryHV;
+
+        let mut state = PrimitiveConsciousnessState::new(timestamp);
+        state.phi = phi;
+
+        for name in detected {
+            let tier = Self::classify_primitive_tier(name);
+            let primitive = symthaea_core::hdc::primitive_system::Primitive {
+                name: name.clone(),
+                tier,
+                domain: "detected".into(),
+                encoding: BinaryHV::zero(),
+                definition: String::new(),
+                is_base: true,
+                derivation: None,
+            };
+            let active = ActivePrimitive {
+                primitive,
+                activation: 1.0,
+                activation_reason: ActivationReason::BottomUp { input_similarity: 1.0 },
+                duration: 1,
+            };
+            state.active_by_tier.entry(tier).or_default().push(active);
+        }
+
+        state
+    }
+
+    /// Classify a detected primitive name into its most likely tier.
+    fn classify_primitive_tier(name: &str) -> symthaea_core::hdc::primitive_system::PrimitiveTier {
+        use symthaea_core::hdc::primitive_system::PrimitiveTier;
+
+        let lower = name.to_lowercase();
+        match lower.as_str() {
+            "identity" | "bind" | "unbind" | "permute" | "bundle" | "protect" => PrimitiveTier::NSM,
+            "addition" | "multiplication" | "implication" | "greater_than" | "less_than"
+            | "equals" | "negation" => PrimitiveTier::Mathematical,
+            "cause" | "effect" | "action" | "force" | "energy" => PrimitiveTier::Physical,
+            "distance" | "angle" | "rotation" | "translation" | "manifold" => PrimitiveTier::Geometric,
+            "cooperate" | "compete" | "negotiate" | "trust" | "reciprocity" => PrimitiveTier::Strategic,
+            "reflect" | "metacognition" | "introspect" | "awareness" => PrimitiveTier::MetaCognitive,
+            "before" | "after" | "during" | "meets" | "overlaps" | "starts" | "finishes" => PrimitiveTier::Temporal,
+            "sequence" | "parallel" | "conditional" | "compose" | "recurse" => PrimitiveTier::Compositional,
+            _ => {
+                // Fallback: try prefix matching
+                if lower.starts_with("meta") { PrimitiveTier::MetaCognitive }
+                else if lower.starts_with("time") || lower.starts_with("temporal") { PrimitiveTier::Temporal }
+                else { PrimitiveTier::NSM } // Default to NSM for unknown primitives
+            }
+        }
     }
 
     /// Run a background consolidation cycle
@@ -3067,119 +2945,8 @@ impl CognitiveLoopService {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// IPC INTEGRATION: MetricsProvider Implementation
-// ═══════════════════════════════════════════════════════════════════════════════
-
-use crate::shell::ipc_server::MetricsProvider;
-use crate::shell::ipc_client::MetricsSnapshot;
-
-impl MetricsProvider for CognitiveLoopService {
-    fn get_metrics(&self) -> MetricsSnapshot {
-        let phi = self.unification_engine.phi;
-        let coherence = self.coherence_bridge.smoothed_coherence() as f64;
-        MetricsSnapshot {
-            phi,
-            coherence,
-            is_conscious: phi > 0.3,
-            cognitive_depth: format!("{:?}", self.cognitive_depth),
-            strategy: format!("{:?}", self.closed_learning_loop.current_strategy),
-            in_flow: self.flow_state.in_flow,
-            prediction_error: self.stats.avg_prediction_error,
-            emotional_valence: self.emotion_contagion.prosody_valence(),
-            emotional_arousal: self.emotion_contagion.prosody_arousal(),
-            timestamp_ms: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() as u64,
-            uptime_secs: self.start_time.elapsed().as_secs(),
-            total_cycles: self.stats.total_cycles as u64,
-            consciousness_level: (phi + coherence) / 2.0,
-            latency_ms: 0, // Updated by IPC layer
-        }
-    }
-
-    fn phi(&self) -> f64 {
-        self.unification_engine.phi
-    }
-
-    fn coherence(&self) -> f64 {
-        self.coherence_bridge.smoothed_coherence() as f64
-    }
-
-    fn is_conscious(&self) -> bool {
-        self.unification_engine.phi > 0.3
-    }
-
-    fn cognitive_depth(&self) -> String {
-        format!("{:?}", self.cognitive_depth)
-    }
-
-    fn current_strategy(&self) -> String {
-        format!("{:?}", self.closed_learning_loop.current_strategy)
-    }
-
-    fn in_flow(&self) -> bool {
-        self.flow_state.in_flow
-    }
-
-    fn uptime_secs(&self) -> u64 {
-        self.start_time.elapsed().as_secs()
-    }
-
-    fn total_cycles(&self) -> u64 {
-        self.stats.total_cycles as u64
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MFDI Identity Integration
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Get current agent ID (if identity is set)
-    #[cfg(feature = "identity")]
-    pub fn agent_id(&self) -> Option<&str> {
-        self.mfdi_bridge.agent_id()
-    }
-
-    /// Get current assurance level
-    #[cfg(feature = "identity")]
-    pub fn assurance_level(&self) -> crate::identity::AssuranceLevel {
-        self.mfdi_bridge.assurance_level()
-    }
-
-    /// Set identity from external verification
-    #[cfg(feature = "identity")]
-    pub fn set_identity(&mut self, identity: crate::identity::MfdiIdentity) {
-        self.mfdi_bridge.set_identity(identity);
-    }
-
-    /// Check if a cognitive capability is allowed at current assurance level
-    #[cfg(feature = "identity")]
-    pub fn check_capability(&self, capability: crate::identity::CognitiveCapability) -> Result<()> {
-        self.mfdi_bridge.check_capability(capability)
-            .map_err(|e| anyhow::anyhow!("MFDI capability denied: {:?}", e))
-    }
-
-    /// Sign a cycle output
-    #[cfg(feature = "identity")]
-    pub fn sign_output(&self, output: &[f32]) -> Result<crate::identity::SignedOutput> {
-        self.mfdi_bridge.sign_output(output)
-            .map_err(|e| anyhow::anyhow!("MFDI signing failed: {:?}", e))
-    }
-
-    /// Verify a signed request
-    #[cfg(feature = "identity")]
-    pub fn verify_request(&mut self, request: &crate::identity::SignedRequest) -> Result<()> {
-        self.mfdi_bridge.verify_request(request)
-            .map_err(|e| anyhow::anyhow!("MFDI verification failed: {:?}", e))
-    }
-
-    /// Get mutable access to MFDI bridge for advanced operations
-    #[cfg(feature = "identity")]
-    pub fn mfdi_bridge_mut(&mut self) -> &mut crate::identity::MfdiBridge {
-        &mut self.mfdi_bridge
-    }
-}
+// MetricsProvider impl is in metrics_provider.rs
+// MFDI identity impl is in identity_integration.rs
 
 
 #[cfg(test)]

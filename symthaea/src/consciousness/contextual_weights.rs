@@ -38,8 +38,10 @@ use std::collections::HashMap;
 ///
 /// Canonical action type enum, re-exported by `unified_value_evaluator::types`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default)]
 pub enum ActionType {
     /// Basic action (default threshold)
+    #[default]
     Basic,
     /// Governance proposal (higher threshold)
     Governance,
@@ -49,16 +51,13 @@ pub enum ActionType {
     Constitutional,
 }
 
-impl Default for ActionType {
-    fn default() -> Self {
-        ActionType::Basic
-    }
-}
 
 /// Domain classification for actions
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default)]
 pub enum ActionDomain {
     /// General/unclassified action
+    #[default]
     General,
     /// Financial transactions, resource allocation
     Financial,
@@ -76,11 +75,6 @@ pub enum ActionDomain {
     Environmental,
 }
 
-impl Default for ActionDomain {
-    fn default() -> Self {
-        ActionDomain::General
-    }
-}
 
 /// Weight profile for harmonies in a specific context
 #[derive(Debug, Clone)]

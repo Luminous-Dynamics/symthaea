@@ -22,12 +22,14 @@ pub mod predictive_hierarchy;
 pub mod working_memory;
 pub mod episodic_memory;
 pub mod goal_inference;
+pub mod journal_anomaly;
 
 pub use world_model::{NixWorldModel, ActionCategory};
 pub use hdc_world_model::{HdcWorldModel, DriftReport, StateProjection};
 pub use active_inference::{NixActiveInference, ActionPlan, ScoredAction};
 pub use goal_inference::{GoalInference, InferredGoal};
 pub use predictive_hierarchy::{PredictiveHierarchy, PredictionLevel};
-pub use working_memory::{WorkingMemory, MemoryItem, MemorySource};
+pub use working_memory::{WorkingMemory, MemoryItem, MemorySource, SavedWorkingMemory};
 pub use episodic_memory::{NixEpisodicMemory, SystemEpisode, EpisodeOutcome};
 pub use causal_graph::{NixCausalGraph, CausalEdge, RootCauseAnalysis, SideEffectPrediction};
+pub use journal_anomaly::JournalAnomalyDetector;

@@ -25,7 +25,7 @@ hdi = "0.7.0"
 holochain_integrity_types = "0.6.0"
 
 # Mycelix Core Types for collective sensing integration
-mycelix-core-types = { path = "../Mycelix-Core/libs/mycelix-core-types", features = ["serde"] }
+mycelix-core-types = { path = "../mycelix-core/libs/mycelix-core-types", features = ["serde"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

@@ -449,12 +449,14 @@ impl Default for ActorSystem {
 
 /// Priority levels for actor message processing
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default)]
 pub enum ActorPriority {
     /// Background priority - lowest, for non-time-critical tasks
     Background,
     /// Low priority background tasks
     Low,
     /// Normal priority
+    #[default]
     Normal,
     /// High priority
     High,
@@ -462,11 +464,6 @@ pub enum ActorPriority {
     Critical,
 }
 
-impl Default for ActorPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
 
 /// Generic organ message for cross-actor communication (struct version)
 #[derive(Debug, Clone)]

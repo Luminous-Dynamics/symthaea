@@ -70,6 +70,7 @@ async fn test_uncertain_thought_produces_hedged_translation() {
         domain_context: None,
         constraints: vec![],
         original_input: Some("What is the capital of Atlantis?".to_string()),
+        primitive_tiers: vec![],
     };
 
     // The thought SHOULD require hedging
@@ -118,6 +119,7 @@ async fn test_unknown_epistemic_status_forces_admission() {
         domain_context: None,
         constraints: vec![],
         original_input: Some("Explain quantum gravity to me".to_string()),
+        primitive_tiers: vec![],
     };
 
     assert!(thought.should_hedge());
@@ -166,6 +168,7 @@ async fn test_out_of_domain_marked_correctly() {
         domain_context: None,
         constraints: vec![],
         original_input: Some("What's the best recipe for chocolate cake?".to_string()),
+        primitive_tiers: vec![],
     };
 
     assert!(thought.should_hedge());
@@ -226,6 +229,7 @@ async fn test_certain_thought_can_be_confident() {
         domain_context: None,
         constraints: vec![],
         original_input: Some("Hello!".to_string()),
+        primitive_tiers: vec![],
     };
 
     // This should NOT require hedging
@@ -267,6 +271,7 @@ async fn test_must_include_constraint_verified() {
             },
         ],
         original_input: Some("What is your name?".to_string()),
+        primitive_tiers: vec![],
     };
 
     // Test fidelity check with a response that INCLUDES the required word
@@ -304,6 +309,7 @@ async fn test_must_exclude_constraint_verified() {
             },
         ],
         original_input: Some("Are you sure?".to_string()),
+        primitive_tiers: vec![],
     };
 
     // Response WITHOUT forbidden word should pass
@@ -341,6 +347,7 @@ async fn test_hedging_detection_comprehensive() {
         domain_context: None,
         constraints: vec![],
         original_input: None,
+        primitive_tiers: vec![],
     };
 
     // These should all PASS (contain hedging)
@@ -458,6 +465,7 @@ fn test_translation_prompt_includes_epistemic_markers() {
         domain_context: None,
         constraints: vec![],
         original_input: Some("What happens after death?".to_string()),
+        primitive_tiers: vec![],
     };
 
     let prompt = thought.to_translation_prompt();

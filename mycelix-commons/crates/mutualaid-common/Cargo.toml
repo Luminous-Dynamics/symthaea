@@ -1,0 +1,13 @@
+[package]
+name = "mutualaid-common"
+version.workspace = true
+edition.workspace = true
+description = "Shared types for Mycelix Mutual Aid domain zomes"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+hdi = { workspace = true }
+holochain_integrity_types = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+getrandom_03 = { workspace = true }

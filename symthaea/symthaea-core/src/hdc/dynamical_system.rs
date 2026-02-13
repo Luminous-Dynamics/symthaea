@@ -401,7 +401,7 @@ pub struct VerletIntegrator;
 impl Integrator for VerletIntegrator {
     fn step(&self, system: &dyn DynamicalSystem, state: &[f64], t: f64, dt: f64) -> Vec<f64> {
         let dim = state.len();
-        assert!(dim % 2 == 0, "Verlet requires even-dimensional state [q, p]");
+        assert!(dim.is_multiple_of(2), "Verlet requires even-dimensional state [q, p]");
         let half = dim / 2;
 
         // state = [q_0 .. q_{n-1}, v_0 .. v_{n-1}]

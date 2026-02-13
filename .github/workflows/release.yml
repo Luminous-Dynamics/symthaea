@@ -298,7 +298,7 @@ jobs:
 
             # Build WASM
             WASM_BUILD_FAILED=0
-            for zome_dir in Mycelix-Core/dna/*/; do
+            for zome_dir in mycelix-core/dna/*/; do
               if [ -f "${zome_dir}Cargo.toml" ]; then
                 echo "Building $(basename $zome_dir)..."
                 cd "$zome_dir"
@@ -311,10 +311,10 @@ jobs:
             done
 
             # Copy WASM files (empty result is OK if no WASMs built)
-            find Mycelix-Core -name "*.wasm" -path "*wasm32-unknown-unknown/release/*" -exec cp {} dist/wasm/ \; 2>/dev/null || true
+            find mycelix-core -name "*.wasm" -path "*wasm32-unknown-unknown/release/*" -exec cp {} dist/wasm/ \; 2>/dev/null || true
 
             # Package DNAs
-            for dna_dir in Mycelix-Core/dna/*/; do
+            for dna_dir in mycelix-core/dna/*/; do
               if [ -f "${dna_dir}dna.yaml" ]; then
                 if ! hc dna pack "$dna_dir" -o "dist/dna/$(basename $dna_dir).dna"; then
                   echo "::warning::DNA pack failed for $(basename $dna_dir)"
@@ -363,14 +363,14 @@ jobs:
 
       - name: Build contracts
         run: |
-          cd Mycelix-Core/contracts
+          cd mycelix-core/contracts
           forge install
           forge build
 
       - name: Package ABIs
         run: |
           mkdir -p dist/abi
-          find Mycelix-Core/contracts/out -name "*.json" -exec cp {} dist/abi/ \; 2>/dev/null || true
+          find mycelix-core/contracts/out -name "*.json" -exec cp {} dist/abi/ \; 2>/dev/null || true
 
           # Create combined ABI package
           VERSION="${{ needs.release-info.outputs.version }}"

@@ -108,6 +108,7 @@ async fn test_real_llm_respects_unknown_epistemic_status() {
             },
         ],
         original_input: Some("What is the capital of Atlantis?".to_string()),
+        primitive_tiers: vec![],
     };
 
     println!("   📋 Constraint Injection:");
@@ -263,6 +264,7 @@ async fn test_real_llm_allows_certainty_when_appropriate() {
         domain_context: None,
         constraints: vec![],
         original_input: Some("Hello!".to_string()),
+        primitive_tiers: vec![],
     };
 
     println!("   📋 Thought Configuration:");
@@ -342,6 +344,7 @@ async fn test_real_llm_respects_must_exclude_constraint() {
             },
         ],
         original_input: Some("What is a good language to learn?".to_string()),
+        primitive_tiers: vec![],
     };
 
     println!("   📋 Constraints:");

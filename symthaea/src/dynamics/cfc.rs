@@ -1722,7 +1722,7 @@ impl CfCNetwork {
                     let _attenuation = one_minus_decay.mean().unwrap_or(0.5);
                     // For stacked cells, the input gradient is not trivially dh;
                     // we'd need the full Jacobian. Use the same dh attenuated.
-                    dh = dh * _attenuation;
+                    dh *= _attenuation;
                     // Resize if dimensions differ between cells
                     if dh.len() != self.cells[cell_idx - 1].config.hidden_dim {
                         let prev_dim = self.cells[cell_idx - 1].config.hidden_dim;
@@ -1865,7 +1865,7 @@ impl CfCNetwork {
                     // Floor attenuation at 0.3 to prevent complete gradient vanishing
                     // through stacked layers (small dt/tau → tiny one_minus_decay)
                     let attenuation = one_minus_decay.mean().unwrap_or(0.5).max(0.3);
-                    dh = dh * attenuation;
+                    dh *= attenuation;
 
                     // Resize if dimensions differ between cells
                     if dh.len() != self.cells[cell_idx - 1].config.hidden_dim {

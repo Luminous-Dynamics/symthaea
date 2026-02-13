@@ -1230,6 +1230,7 @@ pub type LlmRequest = LLMQuery;
 
 /// Provider types for LLM backends
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum LlmProvider {
     /// Local Ollama instance
     Ollama,
@@ -1238,14 +1239,10 @@ pub enum LlmProvider {
     /// Anthropic Claude
     Anthropic,
     /// Custom/local model
+    #[default]
     Local,
 }
 
-impl Default for LlmProvider {
-    fn default() -> Self {
-        LlmProvider::Local
-    }
-}
 
 /// Consciousness-aware LLM wrapper
 ///

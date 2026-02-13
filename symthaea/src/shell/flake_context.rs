@@ -271,8 +271,8 @@ impl FlakeContext {
         // Suggest enabling known services
         if input_lower.contains("enable") || input_lower.starts_with("service") {
             for service in &self.known_services {
-                if !self.enabled_services.contains(service) {
-                    if service.to_lowercase().contains(&input_lower) {
+                if !self.enabled_services.contains(service)
+                    && service.to_lowercase().contains(&input_lower) {
                         suggestions.push(ContextualSuggestion {
                             text: format!("enable {}", service),
                             description: format!("Enable {} service", service),
@@ -280,7 +280,6 @@ impl FlakeContext {
                             confidence: 0.8,
                         });
                     }
-                }
             }
         }
 

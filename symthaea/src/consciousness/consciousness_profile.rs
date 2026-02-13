@@ -133,10 +133,10 @@ impl ConsciousnessProfile {
         }
 
         // Shannon entropy: H = -p*log(p) - (1-p)*log(1-p)
-        let entropy = -(p * p.log2() + (1.0 - p) * (1.0 - p).log2());
+        
 
         // Normalize to [0, 1]
-        entropy  // Already in [0, 1] range
+        -(p * p.log2() + (1.0 - p) * (1.0 - p).log2())  // Already in [0, 1] range
     }
 
     /// Compute complexity - structural sophistication

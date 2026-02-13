@@ -101,7 +101,9 @@ impl ContinuousHV {
     /// Uses simple but fast PRNG for reproducibility.
     pub fn random(dim: usize, seed: u64) -> Self {
         let mut values = Vec::with_capacity(dim);
-        let mut state = seed;
+        // Avoid xorshift64 fixed point: seed=0 produces all zeros.
+        // Mixing with a constant ensures every seed yields a non-degenerate sequence.
+        let mut state = seed ^ 0x9E3779B97F4A7C15; // golden-ratio constant
 
         for _ in 0..dim {
             // Simple xorshift64 for speed and reproducibility
@@ -544,7 +546,7 @@ impl ContinuousHV {
     /// Preserves heterogeneity better than threshold.
     pub fn to_binary_probabilistic(&self, seed: u64) -> BinaryHV {
         let mut bytes = [0u8; 2048];
-        let mut state = seed;
+        let mut state = seed ^ 0x9E3779B97F4A7C15; // avoid xorshift64 fixed-point at 0
         let len = self.values.len().min(16_384);
 
         for i in 0..len {

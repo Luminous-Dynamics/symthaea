@@ -619,7 +619,7 @@ impl AdaptivePrototypeSet {
         let mut prototypes = HashMap::new();
         let mut counts = HashMap::new();
 
-        for (_, adaptive) in &self.prototypes {
+        for adaptive in self.prototypes.values() {
             for (variant_label, hv, count) in adaptive.as_variant_pairs() {
                 if count >= config.min_instances {
                     prototypes.insert(variant_label.clone(), hv);
@@ -643,7 +643,7 @@ impl AdaptivePrototypeSet {
         let mut total_instances = 0;
         let mut max_variants_seen = 0;
 
-        for (_, proto) in &self.prototypes {
+        for proto in self.prototypes.values() {
             total_phonemes += 1;
             total_variants += proto.num_variants();
             total_instances += proto.total_count();
@@ -697,7 +697,7 @@ impl PrototypeAccumulator {
     fn add(&mut self, phoneme: &str, hv: &HV16) {
         self.accumulators
             .entry(phoneme.to_string())
-            .or_insert_with(BundleAccumulator::new)
+            .or_default()
             .add(hv);
 
         *self.counts.entry(phoneme.to_string()).or_insert(0) += 1;

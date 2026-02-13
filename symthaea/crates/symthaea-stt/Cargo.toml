@@ -92,32 +92,32 @@ path = "src/bin/train_rls.rs"
 
 [dependencies]
 # Core hashing
-blake3 = "1.5"
+blake3 = { workspace = true }
 
 # CLI
-clap = { version = "4.4", features = ["derive"] }
+clap = { workspace = true }
 
 # Progress bars
 indicatif = "0.17"
 console = "0.15"
 
 # Audio processing
-hound = "3.5"           # WAV reading
-rustfft = "6.2"         # Fast FFT for spectrograms
+hound = { workspace = true }
+rustfft = { workspace = true }
 claxon = "0.4"          # FLAC reading
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+serde = { workspace = true }
+serde_json = { workspace = true }
 toml = "0.8"
-bincode = "1.3"
+bincode = { workspace = true }
 
 # Parquet for loading alignment data
 parquet = "54.0"
 arrow = { version = "54.0", features = ["prettyprint"] }
 
 # Random number generation (for HDC)
-rand = "0.8"
+rand = { workspace = true }
 
 # Cache-tiled matrix multiply (AVX2 dgemm for batch accumulator)
 matrixmultiply = "0.3"
@@ -128,14 +128,8 @@ tempfile = "3.10"
 
 [features]
 default = []
-# Enable FLAC support
-flac = []
-# Enable GPU acceleration (future)
-gpu = []
-# Enable whale/cetacean bioacoustics
-bioacoustics = []
-# Enable EEG/sleep processing
-eeg = []
+# Removed dead features: flac, gpu, bioacoustics, eeg (no cfg gates in source code)
+# Re-add when actual conditional compilation is implemented
 
 [[bench]]
 name = "core_benchmarks"

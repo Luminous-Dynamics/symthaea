@@ -1,0 +1,16 @@
+[package]
+name = "emergency_shelters"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "emergency_shelters"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+emergency_shelters_integrity = { path = "../integrity" }
+

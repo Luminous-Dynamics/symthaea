@@ -21,6 +21,8 @@ fn create_test_memory(id: &str, seed: u64, memory_type: MemoryType) -> MemoryRec
         phi: 0.65,
         topics: vec!["integration_test".to_string()],
         metadata: "{}".to_string(),
+        consolidation_strength: 0.0,
+        retrieval_count: 0,
     }
 }
 

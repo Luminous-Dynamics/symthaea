@@ -555,7 +555,7 @@ impl StabilityAnalyzer {
         }
 
         let mut lyap_sums = vec![0.0_f64; n];
-        let reorth_interval = 10.max(1); // Re-orthogonalize every 10 steps
+        let reorth_interval = 10; // Re-orthogonalize every 10 steps
         let mut count = 0u64;
 
         for step in 0..total_steps {
@@ -766,10 +766,7 @@ impl StabilityAnalyzer {
 
             // Solve J * delta = -f(x) for delta
             let neg_fx: Vec<f64> = fx.iter().map(|v| -v).collect();
-            let delta = match self.solve_linear_system(&jac_matrix, &neg_fx) {
-                Some(d) => d,
-                None => return None, // Singular Jacobian
-            };
+            let delta = self.solve_linear_system(&jac_matrix, &neg_fx)?;
 
             // Update with damping to improve convergence
             let step_size = 1.0_f64;

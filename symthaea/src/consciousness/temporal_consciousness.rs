@@ -345,7 +345,7 @@ impl ConsciousnessContinuity {
         }
 
         // Update state history
-        self.recent_states.push_back(state.clone());
+        self.recent_states.push_back(*state);
         if self.recent_states.len() > self.capacity {
             self.recent_states.pop_front();
         }
@@ -439,14 +439,14 @@ impl TemporalIdentityCoherence {
         _predictive: &PredictiveSelfModel,
     ) {
         // Get past self from narrative
-        self.past_self = Some(narrative.unified_self().clone());
+        self.past_self = Some(*narrative.unified_self());
 
         // Present is given
-        self.present_self = Some(present_state.clone());
+        self.present_self = Some(*present_state);
 
         // Get future self from predictions (if available)
         // Use the predictor's last observed state as proxy for future trajectory
-        self.future_self = Some(present_state.clone()); // Simplified for now
+        self.future_self = Some(*present_state); // Simplified for now
 
         self.compute_coherence();
     }
@@ -458,9 +458,9 @@ impl TemporalIdentityCoherence {
         present: &BinaryHV,
         future: &BinaryHV,
     ) {
-        self.past_self = Some(past.clone());
-        self.present_self = Some(present.clone());
-        self.future_self = Some(future.clone());
+        self.past_self = Some(*past);
+        self.present_self = Some(*present);
+        self.future_self = Some(*future);
         self.compute_coherence();
     }
 
@@ -634,6 +634,12 @@ pub struct TemporalBinding {
     pub strength: f64,
 }
 
+impl Default for TemporalBindingAnalysis {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TemporalBindingAnalysis {
     pub fn new() -> Self {
         Self {
@@ -768,7 +774,7 @@ impl TemporalConsciousnessAnalyzer {
 
         // Update Husserlian analysis
         if self.config.enable_husserlian_analysis {
-            self.husserlian.update_primal(state.clone(), phi);
+            self.husserlian.update_primal(*state, phi);
         }
 
         // Update identity coherence if we have all components

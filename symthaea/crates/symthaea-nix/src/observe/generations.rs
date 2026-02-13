@@ -53,8 +53,7 @@ impl GenerationObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "nix-env --list-generations failed: {}",
                     String::from_utf8_lossy(&output.stderr)
@@ -92,8 +91,7 @@ impl GenerationObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 format!(
                     "nix store diff-closures failed: {}",
                     String::from_utf8_lossy(&output.stderr)

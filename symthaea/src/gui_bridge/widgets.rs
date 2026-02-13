@@ -1011,19 +1011,17 @@ impl ServiceDashboard {
                 }
 
                 // Name filter
-                if !self.name_filter.is_empty() {
-                    if !u.name.to_lowercase().contains(&self.name_filter.to_lowercase())
+                if !self.name_filter.is_empty()
+                    && !u.name.to_lowercase().contains(&self.name_filter.to_lowercase())
                         && !u.description.to_lowercase().contains(&self.name_filter.to_lowercase()) {
                         return false;
                     }
-                }
 
                 // NixOS filter (check if unit file is in /nix/store)
-                if self.nixos_only {
-                    if !u.unit_file.starts_with("/nix/store") {
+                if self.nixos_only
+                    && !u.unit_file.starts_with("/nix/store") {
                         return false;
                     }
-                }
 
                 true
             })

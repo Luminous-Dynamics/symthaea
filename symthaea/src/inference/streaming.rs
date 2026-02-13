@@ -562,13 +562,12 @@ impl StreamingInference {
 
         // Handle backpressure
         let mut queue = self.output_queue.lock();
-        if queue.len() >= self.config.max_output_queue {
-            if self.config.drop_on_backpressure {
+        if queue.len() >= self.config.max_output_queue
+            && self.config.drop_on_backpressure {
                 queue.pop_front();
                 self.stats.write().outputs_dropped += 1;
             }
             // If not dropping, we still add (may exceed max temporarily)
-        }
         queue.push_back(streaming_output.clone());
 
         // Notify async subscribers
@@ -586,7 +585,7 @@ impl StreamingInference {
         // Checkpoint if enabled
         if self.config.enable_checkpoints {
             let total = self.total_samples.load(Ordering::Relaxed);
-            if total % self.config.checkpoint_interval as u64 == 0 {
+            if total.is_multiple_of(self.config.checkpoint_interval as u64) {
                 self.create_checkpoint(seq);
             }
         }

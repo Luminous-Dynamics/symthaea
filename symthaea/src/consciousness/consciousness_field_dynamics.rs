@@ -295,6 +295,12 @@ pub struct EnergyTracker {
     pub violations: usize,
 }
 
+impl Default for EnergyTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EnergyTracker {
     pub fn new() -> Self {
         Self {

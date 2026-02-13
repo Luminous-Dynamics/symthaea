@@ -175,7 +175,7 @@ impl EnrolledFactor {
         let decay_days = decay_time as f32 / 86400.0;
         let decay_factor = (-decay_rate * decay_days).exp();
 
-        decay_factor.max(0.0).min(1.0)
+        decay_factor.clamp(0.0, 1.0)
     }
 
     /// Check if factor needs re-verification
@@ -309,6 +309,41 @@ pub struct FactorVerification {
 }
 
 // =============================================================================
+// ENCRYPTED ENTRY (for PQE-protected sensitive data)
+// =============================================================================
+
+/// An encrypted entry wrapping sensitive MFA data on the DHT.
+///
+/// Sensitive fields (factor metadata, recovery trustee lists) are encrypted
+/// to the owner's ML-KEM public key using XChaCha20-Poly1305 AEAD.
+/// The plaintext is only recoverable by decapsulating the KEM ciphertext
+/// with the owner's private key.
+///
+/// The `entry_type_tag` identifies what was encrypted so the decryptor
+/// knows which type to deserialize after decryption.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct EncryptedEntry {
+    /// Which entry type is encrypted (e.g. "MfaState", "FactorEnrollment").
+    pub entry_type_tag: String,
+    /// KEM algorithm used to derive the symmetric key (AlgorithmId as u16).
+    /// 0xF020 = ML-KEM-768, 0xF021 = ML-KEM-1024, 0xF030 = self-encrypt.
+    pub kem_algorithm: u16,
+    /// KEM ciphertext (encapsulated key). Empty for self-encryption.
+    pub encapsulated_key: Vec<u8>,
+    /// 24-byte nonce for XChaCha20-Poly1305.
+    pub nonce: Vec<u8>,
+    /// AEAD ciphertext (plaintext || 16-byte Poly1305 tag).
+    pub ciphertext: Vec<u8>,
+    /// DID URL fragment of the recipient's KEM key (e.g. "did:mycelix:abc#kem-1").
+    pub recipient_key_id: String,
+    /// When the entry was encrypted.
+    pub encrypted_at: Timestamp,
+    /// Schema version of the plaintext, for forward-compatible decryption.
+    pub plaintext_version: u32,
+}
+
+// =============================================================================
 // ENTRY AND LINK TYPES
 // =============================================================================
 
@@ -318,6 +353,7 @@ pub enum EntryTypes {
     MfaState(MfaState),
     FactorEnrollment(FactorEnrollment),
     FactorVerification(FactorVerification),
+    EncryptedEntry(EncryptedEntry),
 }
 
 #[hdk_link_types]
@@ -362,6 +398,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         verification,
                     )
                 }
+                EntryTypes::EncryptedEntry(entry) => {
+                    validate_create_encrypted_entry(entry)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -372,6 +411,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 )),
                 EntryTypes::FactorVerification(_) => Ok(ValidateCallbackResult::Invalid(
                     "Factor verifications are append-only".into(),
+                )),
+                EntryTypes::EncryptedEntry(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Encrypted entries are append-only (re-encrypt instead)".into(),
                 )),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -511,6 +553,46 @@ fn validate_create_factor_verification(
     if verification.new_strength < 0.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Strength/counter must be non-negative".into(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate encrypted entry creation
+fn validate_create_encrypted_entry(
+    entry: EncryptedEntry,
+) -> ExternResult<ValidateCallbackResult> {
+    // Validate entry type tag is non-empty
+    if entry.entry_type_tag.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Encrypted entry must specify entry_type_tag".into(),
+        ));
+    }
+
+    // Validate nonce length (XChaCha20-Poly1305 requires 24 bytes)
+    if entry.nonce.len() != 24 {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!(
+                "Nonce must be 24 bytes (XChaCha20-Poly1305), got {}",
+                entry.nonce.len()
+            ),
+        ));
+    }
+
+    // Validate ciphertext is non-empty (minimum: 16-byte Poly1305 tag)
+    if entry.ciphertext.len() < 16 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Ciphertext too short (minimum 16 bytes for Poly1305 tag)".into(),
+        ));
+    }
+
+    // Validate recipient key ID is a DID URL or "self"
+    if entry.recipient_key_id != "self"
+        && !entry.recipient_key_id.starts_with("did:")
+    {
+        return Ok(ValidateCallbackResult::Invalid(
+            "recipient_key_id must be 'self' or a DID URL".into(),
         ));
     }
 

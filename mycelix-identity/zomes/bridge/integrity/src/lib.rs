@@ -98,6 +98,10 @@ pub enum BridgeEventType {
     RecoveryCompleted,
     /// hApp registered with bridge
     HappRegistered,
+    /// MFA assurance level changed for a DID
+    MfaAssuranceChanged,
+    /// A DID was recovered via social recovery
+    DidRecovered,
     /// Custom event type
     Custom(String),
 }
@@ -358,4 +362,179 @@ fn validate_update_identity_reputation(
     }
 
     Ok(ValidateCallbackResult::Valid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts(micros: i64) -> Timestamp {
+        Timestamp::from_micros(micros)
+    }
+
+    // --- HappRegistration ---
+
+    #[test]
+    fn happ_registration_json_round_trip() {
+        let reg = HappRegistration {
+            happ_id: "mycelix-core".into(),
+            happ_name: "Mycelix Core".into(),
+            capabilities: vec!["identity".into(), "governance".into()],
+            matl_score: 0.85,
+            registered_at: ts(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&reg).unwrap();
+        let back: HappRegistration = serde_json::from_str(&json).unwrap();
+        assert_eq!(reg, back);
+    }
+
+    #[test]
+    fn happ_registration_rejects_empty_id() {
+        let reg = HappRegistration {
+            happ_id: "".into(),
+            happ_name: "Test".into(),
+            capabilities: vec![],
+            matl_score: 0.5,
+            registered_at: ts(0),
+        };
+        assert!(reg.happ_id.is_empty(), "Empty ID should be rejected by validator");
+    }
+
+    #[test]
+    fn happ_registration_rejects_invalid_matl() {
+        for score in [1.1, -0.1, f64::NAN, f64::INFINITY] {
+            assert!(
+                !(0.0..=1.0).contains(&score),
+                "Score {} should be rejected",
+                score
+            );
+        }
+        for score in [0.0, 0.5, 1.0] {
+            assert!(
+                (0.0..=1.0).contains(&score),
+                "Score {} should be accepted",
+                score
+            );
+        }
+    }
+
+    // --- IdentityQuery ---
+
+    #[test]
+    fn identity_query_json_round_trip() {
+        let query = IdentityQuery {
+            id: "q-001".into(),
+            did: "did:mycelix:abc123".into(),
+            source_happ: "mycelix-finance".into(),
+            requested_fields: vec!["name".into(), "email".into()],
+            queried_at: ts(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&query).unwrap();
+        let back: IdentityQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(query, back);
+    }
+
+    #[test]
+    fn identity_query_rejects_wrong_did_prefix() {
+        assert!(!"did:web:example.com".starts_with("did:mycelix:"));
+        assert!("did:mycelix:abc123".starts_with("did:mycelix:"));
+    }
+
+    // --- BridgeEventType ---
+
+    #[test]
+    fn bridge_event_type_json_variants() {
+        let variants = vec![
+            (BridgeEventType::DidCreated, "\"DidCreated\""),
+            (BridgeEventType::DidUpdated, "\"DidUpdated\""),
+            (BridgeEventType::DidDeactivated, "\"DidDeactivated\""),
+            (BridgeEventType::CredentialIssued, "\"CredentialIssued\""),
+            (BridgeEventType::CredentialRevoked, "\"CredentialRevoked\""),
+            (BridgeEventType::RecoveryInitiated, "\"RecoveryInitiated\""),
+            (BridgeEventType::RecoveryCompleted, "\"RecoveryCompleted\""),
+            (BridgeEventType::HappRegistered, "\"HappRegistered\""),
+            (BridgeEventType::MfaAssuranceChanged, "\"MfaAssuranceChanged\""),
+            (BridgeEventType::DidRecovered, "\"DidRecovered\""),
+        ];
+        for (variant, expected) in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            assert_eq!(json, expected);
+            let back: BridgeEventType = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn bridge_event_type_custom_round_trip() {
+        let custom = BridgeEventType::Custom("CustomEvent".into());
+        let json = serde_json::to_string(&custom).unwrap();
+        assert!(json.contains("CustomEvent"));
+        let back: BridgeEventType = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, custom);
+    }
+
+    // --- BridgeEvent ---
+
+    #[test]
+    fn bridge_event_json_round_trip() {
+        let event = BridgeEvent {
+            id: "evt-001".into(),
+            event_type: BridgeEventType::CredentialIssued,
+            subject: "did:mycelix:holder1".into(),
+            payload: r#"{"credential_id":"c-123"}"#.into(),
+            source_happ: "mycelix-identity".into(),
+            timestamp: ts(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let back: BridgeEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(event, back);
+    }
+
+    #[test]
+    fn bridge_event_rejects_empty_subject() {
+        assert!("".is_empty(), "Empty subject should be rejected by validator");
+        assert!(!"did:mycelix:abc".is_empty());
+    }
+
+    // --- IdentityVerification ---
+
+    #[test]
+    fn identity_verification_json_round_trip() {
+        let v = IdentityVerification {
+            id: "v-001".into(),
+            did: "did:mycelix:abc".into(),
+            is_valid: true,
+            is_deactivated: false,
+            matl_score: 0.92,
+            credential_count: 5,
+            did_created: Some(ts(1_600_000_000_000_000)),
+            verified_at: ts(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&v).unwrap();
+        let back: IdentityVerification = serde_json::from_str(&json).unwrap();
+        assert_eq!(v, back);
+    }
+
+    // --- IdentityReputation ---
+
+    #[test]
+    fn identity_reputation_json_round_trip() {
+        let rep = IdentityReputation {
+            did: "did:mycelix:abc".into(),
+            source_happ: "mycelix-finance".into(),
+            score: 0.75,
+            interactions: 42,
+            last_updated: ts(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&rep).unwrap();
+        let back: IdentityReputation = serde_json::from_str(&json).unwrap();
+        assert_eq!(rep, back);
+    }
+
+    #[test]
+    fn identity_reputation_rejects_invalid_score() {
+        for score in [1.5, -0.01] {
+            assert!(!(0.0..=1.0).contains(&score));
+        }
+    }
 }

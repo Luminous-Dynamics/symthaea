@@ -430,33 +430,27 @@ impl UserEpistemicMirror {
 
 /// Explanation depth preference
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum ExplanationDepth {
     Brief,
+    #[default]
     Moderate,
     Detailed,
     Expert,
 }
 
-impl Default for ExplanationDepth {
-    fn default() -> Self {
-        ExplanationDepth::Moderate
-    }
-}
 
 /// Communication style preference
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default)]
 pub enum CommunicationStyle {
     Technical,
+    #[default]
     Balanced,
     Casual,
     Formal,
 }
 
-impl Default for CommunicationStyle {
-    fn default() -> Self {
-        CommunicationStyle::Balanced
-    }
-}
 
 /// Harmonic resonance - which harmonies resonate with a user
 #[derive(Debug, Clone, Serialize, Deserialize)]

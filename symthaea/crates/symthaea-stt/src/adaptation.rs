@@ -67,7 +67,7 @@ impl SpeakerProfile {
     pub fn observe_phoneme(&mut self, phoneme: &str, acoustic_hv: &HV16) {
         self.accumulators
             .entry(phoneme.to_string())
-            .or_insert_with(BundleAccumulator::new)
+            .or_default()
             .add(acoustic_hv);
 
         *self.counts.entry(phoneme.to_string()).or_insert(0) += 1;
@@ -369,11 +369,10 @@ impl SpeakerDiarizer {
 
         for (i, cluster) in self.clusters.iter().enumerate() {
             let sim = segment_hv.similarity(&cluster.centroid);
-            if sim > self.threshold {
-                if best_match.as_ref().map(|(_, s)| sim > *s).unwrap_or(true) {
+            if sim > self.threshold
+                && best_match.as_ref().map(|(_, s)| sim > *s).unwrap_or(true) {
                     best_match = Some((i, sim));
                 }
-            }
         }
 
         if let Some((idx, _)) = best_match {

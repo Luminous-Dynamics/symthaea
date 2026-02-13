@@ -25,7 +25,7 @@ use std::time::{Duration, Instant};
 use tokio::net::UnixStream;
 use tokio::net::unix::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::sync::watch;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter};
 use anyhow::{Result, Context};
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -34,8 +34,10 @@ use anyhow::{Result, Context};
 
 /// Connection state for visual indicators
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum ConnectionState {
     /// Not connected to service
+    #[default]
     Disconnected,
     /// Attempting to connect
     Connecting,
@@ -47,11 +49,6 @@ pub enum ConnectionState {
     Reconnecting,
 }
 
-impl Default for ConnectionState {
-    fn default() -> Self {
-        Self::Disconnected
-    }
-}
 
 impl ConnectionState {
     /// Get visual indicator for this state
@@ -812,32 +809,206 @@ impl ShellIpcClient {
         request: Request,
         id: Option<String>,
     ) -> Result<ResponseEnvelope> {
-        let writer = self.writer.as_mut()
-            .context("Not connected to service")?;
-        let reader = self.reader.as_mut()
-            .context("Not connected to service")?;
+        let (ipc_request, accept_metrics) = match &request {
+            Request::Ping => (IpcRequest::Ping, false),
+            Request::GetStatus => (IpcRequest::GetMetrics, true),
+            Request::Execute { command, phi_required, dry_run } => {
+                if *dry_run {
+                    (IpcRequest::Validate { command: command.clone() }, false)
+                } else {
+                    (IpcRequest::Execute { command: command.clone(), require_phi: Some(*phi_required) }, false)
+                }
+            }
+            Request::GetIntelliSense { input, cursor_pos, .. } => {
+                (IpcRequest::GetCompletions { input: input.clone(), cursor_pos: *cursor_pos }, false)
+            }
+            Request::Validate { command, .. } => (IpcRequest::Validate { command: command.clone() }, false),
+            Request::SubscribeMetrics => (IpcRequest::SubscribeMetrics, false),
+            Request::UnsubscribeMetrics => (IpcRequest::UnsubscribeMetrics, false),
+        };
 
-        let envelope = RequestEnvelope { id: id.clone(), request };
+        let ipc_response = self.send_ipc_request(ipc_request, accept_metrics).await?;
+        let response = self.map_ipc_response(&request, ipc_response);
 
-        // Serialize to JSON with newline (for line-based protocol in tests)
-        let json = serde_json::to_string(&envelope)? + "\n";
+        Ok(ResponseEnvelope {
+            id,
+            latency_ms: None,
+            response,
+        })
+    }
 
-        // Write request
-        writer.write_all(json.as_bytes()).await
-            .context("Failed to write request")?;
-        writer.flush().await
-            .context("Failed to flush request")?;
+    async fn send_ipc_request(
+        &mut self,
+        request: IpcRequest,
+        accept_metrics: bool,
+    ) -> Result<IpcResponse> {
+        const MAX_FRAME_BYTES: usize = 2 * 1024 * 1024;
 
-        // Read response (line-based JSON)
-        let mut line = String::new();
-        reader.read_line(&mut line).await
-            .context("Failed to read response")?;
+        // Write phase: borrow writer, send request, then drop the borrow
+        {
+            let writer = self.writer.as_mut()
+                .context("Not connected to service")?;
 
-        // Parse response
-        let response_envelope: ResponseEnvelope = serde_json::from_str(&line)
-            .context("Failed to parse response")?;
+            let data = rmp_serde::to_vec(&request)?;
+            let len = (data.len() as u32).to_le_bytes();
 
-        Ok(response_envelope)
+            writer.write_all(&len).await
+                .context("Failed to write request length")?;
+            writer.write_all(&data).await
+                .context("Failed to write request payload")?;
+            writer.flush().await
+                .context("Failed to flush request")?;
+        }
+
+        // Read phase: re-borrow reader each iteration to avoid overlap with update_metrics
+        loop {
+            let reader = self.reader.as_mut()
+                .context("Not connected to service")?;
+            let response = Self::read_ipc_response(reader, MAX_FRAME_BYTES).await?;
+            match response {
+                IpcResponse::Metrics(metrics) => {
+                    self.update_metrics(metrics.clone());
+                    if accept_metrics {
+                        return Ok(IpcResponse::Metrics(metrics));
+                    }
+                }
+                other => return Ok(other),
+            }
+        }
+    }
+
+    async fn read_ipc_response(
+        reader: &mut BufReader<OwnedReadHalf>,
+        max_size: usize,
+    ) -> Result<IpcResponse> {
+        let mut len_buf = [0u8; 4];
+        reader.read_exact(&mut len_buf).await
+            .context("Failed to read response length")?;
+        let len = u32::from_le_bytes(len_buf) as usize;
+        if len == 0 || len > max_size {
+            anyhow::bail!("Invalid IPC frame size: {}", len);
+        }
+
+        let mut buf = vec![0u8; len];
+        reader.read_exact(&mut buf).await
+            .context("Failed to read response payload")?;
+        let response = rmp_serde::from_slice::<IpcResponse>(&buf)
+            .context("Failed to decode response")?;
+        Ok(response)
+    }
+
+    fn map_ipc_response(&self, request: &Request, response: IpcResponse) -> Response {
+        match (request, response) {
+            (Request::Ping, IpcResponse::Pong) => Response::Pong {
+                timestamp_ms: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64,
+            },
+            (Request::GetStatus, IpcResponse::Metrics(metrics)) => Response::Status {
+                phi: metrics.phi,
+                coherence: metrics.coherence,
+                consciousness_level: metrics.consciousness_level,
+                is_conscious: metrics.is_conscious,
+                uptime_secs: metrics.uptime_secs,
+            },
+            (Request::GetIntelliSense { .. }, IpcResponse::Completions(items)) => {
+                let confidence = items.iter()
+                    .map(|c| c.similarity)
+                    .fold(0.0_f32, |a, b| a.max(b));
+                Response::IntelliSenseResult {
+                    completions: items,
+                    command_preview: None,
+                    phi: self.last_metrics.phi,
+                    confidence,
+                }
+            }
+            (Request::Validate { .. }, IpcResponse::ValidationResult { valid, safety_level, warnings, .. }) => {
+                Response::ValidationResult {
+                    valid,
+                    safety_level: Self::safety_level_from_string(&safety_level),
+                    phi_required: 0.0,
+                    warnings,
+                }
+            }
+            (Request::Execute { dry_run: true, .. }, IpcResponse::ValidationResult { valid, safety_level: _, preview, warnings }) => {
+                let output = preview.unwrap_or_else(|| warnings.join("\n"));
+                let gate_reason = if valid { Some("dry-run".to_string()) } else { Some("dry-run failed".to_string()) };
+                Response::ExecutionResult {
+                    executed: false,
+                    output,
+                    phi_at_execution: 0.0,
+                    gate_reason,
+                }
+            }
+            (Request::Execute { .. }, IpcResponse::ExecutionResult { success, output, phi_at_execution, vetoed, veto_reason }) => {
+                let gate_reason = if vetoed { veto_reason.or(Some("vetoed".to_string())) } else { veto_reason };
+                Response::ExecutionResult {
+                    executed: success && !vetoed,
+                    output,
+                    phi_at_execution,
+                    gate_reason,
+                }
+            }
+            (Request::SubscribeMetrics, IpcResponse::Subscribed)
+            | (Request::UnsubscribeMetrics, IpcResponse::Subscribed) => Response::Subscribed,
+            (_, IpcResponse::Metrics(metrics)) => {
+                Response::Status {
+                    phi: metrics.phi,
+                    coherence: metrics.coherence,
+                    consciousness_level: metrics.consciousness_level,
+                    is_conscious: metrics.is_conscious,
+                    uptime_secs: metrics.uptime_secs,
+                }
+            }
+            (_, IpcResponse::ValidationResult { valid, safety_level, warnings, .. }) => {
+                Response::ValidationResult {
+                    valid,
+                    safety_level: Self::safety_level_from_string(&safety_level),
+                    phi_required: 0.0,
+                    warnings,
+                }
+            }
+            (_, IpcResponse::Completions(items)) => Response::IntelliSenseResult {
+                completions: items,
+                command_preview: None,
+                phi: self.last_metrics.phi,
+                confidence: 0.0,
+            },
+            (_, IpcResponse::Error(message)) => Response::Error { code: 1, message },
+            (_, IpcResponse::Pong) => Response::Pong {
+                timestamp_ms: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64,
+            },
+            (_, IpcResponse::Subscribed) => Response::Subscribed,
+            (_, IpcResponse::ExecutionResult { success, output, phi_at_execution, vetoed, veto_reason }) => {
+                let gate_reason = if vetoed { veto_reason.or(Some("vetoed".to_string())) } else { veto_reason };
+                Response::ExecutionResult {
+                    executed: success && !vetoed,
+                    output,
+                    phi_at_execution,
+                    gate_reason,
+                }
+            }
+        }
+    }
+
+    fn safety_level_from_string(level: &str) -> SafetyLevelData {
+        let lower = level.to_lowercase();
+        let color = if lower.contains("destructive") || lower.contains("critical") || lower.contains("red") {
+            "red"
+        } else if lower.contains("confirm") || lower.contains("yellow") || lower.contains("warn") {
+            "yellow"
+        } else {
+            "green"
+        };
+        SafetyLevelData {
+            level: level.to_string(),
+            color: color.to_string(),
+            description: level.to_string(),
+        }
     }
 
     /// Get IntelliSense completions for the given input

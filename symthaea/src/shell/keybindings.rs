@@ -7,10 +7,12 @@ use std::collections::HashMap;
 
 /// Editing mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default)]
 pub enum EditingMode {
     /// Normal (command) mode
     Normal,
     /// Insert mode
+    #[default]
     Insert,
     /// Visual (selection) mode
     Visual,
@@ -18,16 +20,13 @@ pub enum EditingMode {
     Command,
 }
 
-impl Default for EditingMode {
-    fn default() -> Self {
-        EditingMode::Insert
-    }
-}
 
 /// Keybinding scheme
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default)]
 pub enum KeybindingScheme {
     /// Emacs-style (default readline)
+    #[default]
     Emacs,
     /// Vim-style modal editing
     Vim,
@@ -35,11 +34,6 @@ pub enum KeybindingScheme {
     Minimal,
 }
 
-impl Default for KeybindingScheme {
-    fn default() -> Self {
-        KeybindingScheme::Emacs
-    }
-}
 
 /// A key event
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

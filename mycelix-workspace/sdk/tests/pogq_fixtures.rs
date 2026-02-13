@@ -20,7 +20,7 @@ fn pogq_fixtures_match_rust_implementation() {
     // Resolve fixture path relative to the sdk crate
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     let fixture_path =
-        manifest_dir.join("../../Mycelix-Core/tests/shared-fixtures/pogq/simple_cases.json");
+        manifest_dir.join("../../mycelix-core/tests/shared-fixtures/pogq/simple_cases.json");
 
     // Skip test if fixture file doesn't exist (e.g., in CI without submodules)
     if !fixture_path.exists() {

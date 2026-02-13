@@ -1290,9 +1290,9 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
         .iter()
         .map(|name| {
             if let Some(p) = system.get(name) {
-                p.encoding.clone()
+                p.encoding
             } else if let Some(p) = system.get(&name.to_lowercase()) {
-                p.encoding.clone()
+                p.encoding
             } else {
                 let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
                 BinaryHV::random(seed)
@@ -1304,7 +1304,7 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
         return BinaryHV::random(0);
     }
 
-    let mut result = vectors[0].clone();
+    let mut result = vectors[0];
     for (i, v) in vectors.iter().enumerate().skip(1) {
         let position_hv = BinaryHV::random(i as u64 * 1000);
         let positioned = v.bind(&position_hv);

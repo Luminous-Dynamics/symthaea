@@ -134,7 +134,7 @@ impl CodePerceptionCortex {
                         if let Some(ext) = path.extension().and_then(|e: &std::ffi::OsStr| e.to_str()) {
                             files_by_type
                                 .entry(ext.to_string())
-                                .or_insert_with(Vec::new)
+                                .or_default()
                                 .push(path);
                         }
 

@@ -1576,20 +1576,22 @@ mod tests {
     fn test_moral_judgment() {
         let algebra = MoralAlgebra::default_dim();
 
-        // Good action with good intent and consent
+        // Good action — compose using bind() to match prototype composition
         let good_action = {
+            let agent = algebra.encode_agent("I");
             let action = algebra.encode_action("help");
+            let patient = algebra.encode_patient("person");
             let intent = algebra.encode_intent(MoralIntent::Good);
-            let consent = algebra.encode_consent(ConsentState::Given);
-            ContinuousHV::bundle_owned(&[action, intent, consent])
+            agent.bind(&action).bind(&patient).bind(&intent)
         };
 
-        // Bad action with bad intent and no consent
+        // Bad action — compose using bind() to match prototype composition
         let bad_action = {
+            let agent = algebra.encode_agent("I");
             let action = algebra.encode_action("harm");
+            let patient = algebra.encode_patient("victim");
             let intent = algebra.encode_intent(MoralIntent::Bad);
-            let consent = algebra.encode_consent(ConsentState::Denied);
-            ContinuousHV::bundle_owned(&[action, intent, consent])
+            agent.bind(&action).bind(&patient).bind(&intent)
         };
 
         let good_judgment = algebra.judge_action(&good_action);

@@ -529,9 +529,9 @@ impl LiquidNetwork {
             .sum::<f32>() / self.num_neurons as f32;
 
         // Combine: conscious if active AND diverse
-        let consciousness = (active_fraction * variance.sqrt()).min(1.0);
+        
 
-        consciousness
+        (active_fraction * variance.sqrt()).min(1.0)
     }
 
     /// Read current state as hypervector

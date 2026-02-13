@@ -1,0 +1,23 @@
+---
+# Mycelix Commons hApp Bundle
+# Universal Resource Coordination: property + housing + care + mutualaid + water
+
+manifest_version: "0"
+name: mycelix-commons
+description: |
+  Universal resource coordination for the Mycelix ecosystem.
+  Consolidates property registries, cooperative housing, community care,
+  mutual aid networks, and water stewardship into a single DNA for
+  cross-domain integration.
+
+roles:
+  - name: commons
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_commons.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

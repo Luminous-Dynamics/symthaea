@@ -558,6 +558,12 @@ impl Default for ImprovedPhiFlow {
 /// Based on the principle that P(cause) and P(effect|cause) are independent
 pub struct IgciDiscovery;
 
+impl Default for IgciDiscovery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IgciDiscovery {
     pub fn new() -> Self {
         Self
@@ -615,6 +621,12 @@ impl IgciDiscovery {
 /// Linear Non-Gaussian Acyclic Model (LiNGaM)
 /// Exploits non-Gaussianity for causal discovery
 pub struct LingamDiscovery;
+
+impl Default for LingamDiscovery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl LingamDiscovery {
     pub fn new() -> Self {
@@ -689,6 +701,12 @@ impl LingamDiscovery {
 
 /// Regression Error-based Causal Inference (RECI)
 pub struct ReciDiscovery;
+
+impl Default for ReciDiscovery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl ReciDiscovery {
     pub fn new() -> Self {
@@ -892,6 +910,12 @@ impl Default for EnhancedReci {
 
 /// Causal Additive Model (CAM) - simplified version
 pub struct CamDiscovery;
+
+impl Default for CamDiscovery {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl CamDiscovery {
     pub fn new() -> Self {

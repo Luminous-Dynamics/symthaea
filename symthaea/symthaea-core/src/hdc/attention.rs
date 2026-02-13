@@ -435,7 +435,7 @@ impl AttentionResult {
     pub fn argmax(&self) -> Option<usize> {
         self.weights.iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .map(|(i, _)| i)
     }
 
@@ -446,7 +446,7 @@ impl AttentionResult {
             .enumerate()
             .collect();
 
-        indexed.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap());
+        indexed.sort_by(|(_, a), (_, b)| b.total_cmp(a));
         indexed.truncate(k);
         indexed
     }

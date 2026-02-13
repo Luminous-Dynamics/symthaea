@@ -485,6 +485,20 @@ impl FusionReaction {
 
         (escape_prob * geometric_factor).clamp(0.001, 1.0)
     }
+
+    /// Total fuel mass in g/mol (sum of reactant atomic masses)
+    #[allow(dead_code)]
+    pub fn fuel_mass_g_mol(&self) -> f64 {
+        let d = 2.01410;  // Deuterium
+        let t = 3.01605;  // Tritium
+        let he3 = 3.01603; // Helium-3
+        match self {
+            FusionReaction::DD => 2.0 * d,
+            FusionReaction::DT => d + t,
+            FusionReaction::DdProton => 2.0 * d,
+            FusionReaction::DHe3 => d + he3,
+        }
+    }
 }
 
 #[cfg(test)]

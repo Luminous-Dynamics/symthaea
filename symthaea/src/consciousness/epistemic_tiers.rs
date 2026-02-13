@@ -581,13 +581,13 @@ impl EpistemicNSMGrounding {
     /// Get combined encoding for an epistemic coordinate
     pub fn encode_coordinate(&self, coord: &EpistemicCoordinate) -> BinaryHV {
         let e_enc = self.empirical_tiers.get(&coord.empirical)
-            .map(|g| g.primitive_encoding.clone())
+            .map(|g| g.primitive_encoding)
             .unwrap_or_else(|| BinaryHV::random(0));
         let n_enc = self.normative_tiers.get(&coord.normative)
-            .map(|g| g.primitive_encoding.clone())
+            .map(|g| g.primitive_encoding)
             .unwrap_or_else(|| BinaryHV::random(1));
         let m_enc = self.materiality_tiers.get(&coord.materiality)
-            .map(|g| g.primitive_encoding.clone())
+            .map(|g| g.primitive_encoding)
             .unwrap_or_else(|| BinaryHV::random(2));
 
         // Bind the three axes together
@@ -655,9 +655,9 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
         .iter()
         .map(|name| {
             if let Some(p) = system.get(name) {
-                p.encoding.clone()
+                p.encoding
             } else if let Some(p) = system.get(&name.to_lowercase()) {
-                p.encoding.clone()
+                p.encoding
             } else {
                 // Fallback: deterministic random for unknown primitives
                 let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
@@ -671,7 +671,7 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
     }
 
     // Bind sequentially with position encoding for order preservation
-    let mut result = vectors[0].clone();
+    let mut result = vectors[0];
     for (i, v) in vectors.iter().enumerate().skip(1) {
         let position_hv = BinaryHV::random(i as u64 * 1000);
         let positioned = v.bind(&position_hv);

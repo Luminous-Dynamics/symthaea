@@ -140,10 +140,8 @@ impl<'a> FlakeGraphEncoder<'a> {
         for (from, to, edge_hv) in &graph.edge_vectors {
             if from == updated_input {
                 let sim = updated_hv.similarity(edge_hv).abs();
-                if sim > threshold {
-                    if !affected.iter().any(|(name, _)| name == to) {
-                        affected.push((to.clone(), sim));
-                    }
+                if sim > threshold && !affected.iter().any(|(name, _)| name == to) {
+                    affected.push((to.clone(), sim));
                 }
             }
         }

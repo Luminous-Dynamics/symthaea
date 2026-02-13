@@ -463,7 +463,7 @@ impl MetaCognitiveReasoner {
         let adjust_strategy = !weights_effective && !alternative_weights.is_empty();
 
         Ok(StrategyReflection {
-            current_weights: result.weights.clone(),
+            current_weights: result.weights,
             weights_effective,
             alternative_weights,
             strategy_reasoning,
@@ -484,7 +484,7 @@ impl MetaCognitiveReasoner {
 
         // Check dominant objective
         let dominant = result.weights.dominant_objective();
-        let dominant_score = match &*dominant {
+        let dominant_score = match dominant {
             "phi" => result.tradeoff_point.phi,
             "harmonic" => result.tradeoff_point.harmonic,
             "epistemic" => result.tradeoff_point.epistemic,
@@ -551,7 +551,7 @@ impl MetaCognitiveReasoner {
             .iter()
             .rev()
             .take(10)
-            .filter(|d| d.outcome.as_ref().map_or(false, |o| o.success > 0.7))
+            .filter(|d| d.outcome.as_ref().is_some_and(|o| o.success > 0.7))
             .count();
 
         let decision_conf = recent_successes as f64 / 10.0;
@@ -678,7 +678,7 @@ impl StrategyAdapter {
         // Use best alternative weights if available
         if let Some((best_weights, _)) = reflection.alternative_weights.first() {
             let mut adjusted_result = original_result.clone();
-            adjusted_result.weights = best_weights.clone();
+            adjusted_result.weights = *best_weights;
 
             // Recompute primitive ranking with new weights
             let mut best_fitness = f64::NEG_INFINITY;
@@ -694,7 +694,7 @@ impl StrategyAdapter {
 
             let (best_point, best_prim) = &original_result.frontier.frontier_points[best_idx];
             adjusted_result.primitive = best_prim.clone();
-            adjusted_result.tradeoff_point = best_point.clone();
+            adjusted_result.tradeoff_point = *best_point;
 
             return Ok(adjusted_result);
         }

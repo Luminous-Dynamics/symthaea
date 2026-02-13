@@ -1,0 +1,22 @@
+---
+# Mycelix Civic hApp Bundle
+# Civic Operations Platform: justice + emergency + media
+
+manifest_version: "0"
+name: mycelix-civic
+description: |
+  Civic operations platform for the Mycelix ecosystem.
+  Consolidates dispute resolution, emergency response coordination,
+  and media attribution into a single DNA for cross-domain integration.
+
+roles:
+  - name: civic
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_civic.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

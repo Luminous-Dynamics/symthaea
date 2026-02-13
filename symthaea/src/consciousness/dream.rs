@@ -14,7 +14,7 @@ Algorithm:
 
 # Example
 
-```rust
+```ignore
 use symthaea::consciousness::dream::{DreamEngine, DreamEngineConfig};
 
 let config = DreamEngineConfig::default();

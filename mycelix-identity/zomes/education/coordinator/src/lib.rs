@@ -271,7 +271,7 @@ pub fn import_credential_from_csv(
         validate_field(&input.degree_name, "degree_name", 512),
     ];
 
-    for validation in validations.into_iter().flatten() {
+    if let Some(validation) = validations.into_iter().flatten().next() {
         return Ok(ImportCredentialResult {
             row_number: input.row_number,
             success: false,
@@ -372,6 +372,7 @@ pub fn import_credential_from_csv(
             cryptosuite: None,
             domain: None,
             challenge: None,
+            algorithm: None,
         },
     };
 
@@ -553,7 +554,7 @@ fn generate_credential_id(issuer_did: &str, subject_did: &str) -> ExternResult<S
     use sha2::Digest;
     hasher.update(issuer_did.as_bytes());
     hasher.update(subject_did.as_bytes());
-    hasher.update(&timestamp.to_le_bytes());
+    hasher.update(timestamp.to_le_bytes());
     hasher.update(agent.get_raw_39());
     let hash = hasher.finalize();
 
@@ -577,7 +578,7 @@ fn generate_nonce() -> ExternResult<Vec<u8>> {
     let mut hasher = sha2::Sha256::new();
     use sha2::Digest;
     hasher.update(b"nonce:");
-    hasher.update(&timestamp.to_le_bytes());
+    hasher.update(timestamp.to_le_bytes());
     hasher.update(agent.get_raw_39());
 
     Ok(hasher.finalize().to_vec())
@@ -591,7 +592,7 @@ fn generate_batch_id() -> ExternResult<String> {
     let mut hasher = sha2::Sha256::new();
     use sha2::Digest;
     hasher.update(b"batch:");
-    hasher.update(&timestamp.to_le_bytes());
+    hasher.update(timestamp.to_le_bytes());
     hasher.update(agent.get_raw_39());
     let hash = hasher.finalize();
 
@@ -857,5 +858,72 @@ fn parse_degree_type(degree_name: &str) -> DegreeType {
         DegreeType::Professional
     } else {
         DegreeType::Diploma
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- parse_degree_type ---
+
+    #[test]
+    fn parse_bachelor_variants() {
+        assert_eq!(parse_degree_type("Bachelor of Science"), DegreeType::Bachelor);
+        assert_eq!(parse_degree_type("B.S. in Computer Science"), DegreeType::Bachelor);
+        assert_eq!(parse_degree_type("B.A. English Literature"), DegreeType::Bachelor);
+        assert_eq!(parse_degree_type("BACHELOR"), DegreeType::Bachelor);
+    }
+
+    #[test]
+    fn parse_master_variants() {
+        assert_eq!(parse_degree_type("Master of Arts"), DegreeType::Master);
+        assert_eq!(parse_degree_type("M.S. Physics"), DegreeType::Master);
+        assert_eq!(parse_degree_type("M.A. in History"), DegreeType::Master);
+    }
+
+    #[test]
+    fn parse_doctorate_variants() {
+        assert_eq!(parse_degree_type("Doctor of Philosophy"), DegreeType::Doctorate);
+        assert_eq!(parse_degree_type("Ph.D. in Mathematics"), DegreeType::Doctorate);
+        assert_eq!(parse_degree_type("PhD Computer Science"), DegreeType::Doctorate);
+    }
+
+    #[test]
+    fn parse_associate() {
+        assert_eq!(parse_degree_type("Associate of Science"), DegreeType::Associate);
+        assert_eq!(parse_degree_type("A.S. Nursing"), DegreeType::Associate);
+        assert_eq!(parse_degree_type("A.A. Liberal Arts"), DegreeType::Associate);
+    }
+
+    #[test]
+    fn parse_certificate() {
+        assert_eq!(parse_degree_type("Certificate in Data Analytics"), DegreeType::Certificate);
+    }
+
+    #[test]
+    fn parse_high_school() {
+        assert_eq!(parse_degree_type("High School Diploma"), DegreeType::HighSchool);
+        assert_eq!(parse_degree_type("Diploma from High School"), DegreeType::HighSchool);
+    }
+
+    #[test]
+    fn parse_professional() {
+        assert_eq!(parse_degree_type("J.D. Law"), DegreeType::Professional);
+        assert_eq!(parse_degree_type("M.D. Medicine"), DegreeType::Professional);
+        assert_eq!(parse_degree_type("Professional Degree"), DegreeType::Professional);
+    }
+
+    #[test]
+    fn parse_unknown_defaults_to_diploma() {
+        assert_eq!(parse_degree_type("Something Random"), DegreeType::Diploma);
+        assert_eq!(parse_degree_type(""), DegreeType::Diploma);
+    }
+
+    #[test]
+    fn parse_case_insensitive() {
+        assert_eq!(parse_degree_type("bachelor"), DegreeType::Bachelor);
+        assert_eq!(parse_degree_type("MASTER"), DegreeType::Master);
+        assert_eq!(parse_degree_type("doctorate"), DegreeType::Doctorate);
     }
 }

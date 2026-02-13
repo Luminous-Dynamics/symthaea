@@ -63,7 +63,7 @@ impl Default for NgramLM {
 impl NgramLM {
     /// Create a new N-gram language model
     pub fn new(order: usize) -> Self {
-        assert!(order >= 1 && order <= 3, "Order must be 1, 2, or 3");
+        assert!((1..=3).contains(&order), "Order must be 1, 2, or 3");
 
         Self {
             order,
@@ -121,7 +121,7 @@ impl NgramLM {
 
         // Unigrams: P(w) = (count(w) + k) / (N + k*V)
         for (word, count) in &unigram_counts {
-            let prob = ((count.clone() as f32 + k) / (total_f + k * vocab_f)).ln();
+            let prob = ((*count as f32 + k) / (total_f + k * vocab_f)).ln();
             self.unigrams.insert(word.clone(), prob);
         }
 
@@ -129,7 +129,7 @@ impl NgramLM {
         if self.order >= 2 {
             for ((w1, w2), count) in &bigram_counts {
                 let w1_count = *unigram_counts.get(w1).unwrap_or(&1) as f32;
-                let prob = ((count.clone() as f32 + k) / (w1_count + k * vocab_f)).ln();
+                let prob = ((*count as f32 + k) / (w1_count + k * vocab_f)).ln();
                 self.bigrams.insert((w1.clone(), w2.clone()), prob);
             }
 
@@ -143,7 +143,7 @@ impl NgramLM {
         if self.order >= 3 {
             for ((w1, w2, w3), count) in &trigram_counts {
                 let bigram_count = *bigram_counts.get(&(w1.clone(), w2.clone())).unwrap_or(&1) as f32;
-                let prob = ((count.clone() as f32 + k) / (bigram_count + k * vocab_f)).ln();
+                let prob = ((*count as f32 + k) / (bigram_count + k * vocab_f)).ln();
                 self.trigrams.insert((w1.clone(), w2.clone(), w3.clone()), prob);
             }
 
