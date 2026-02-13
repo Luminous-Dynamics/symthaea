@@ -332,3 +332,111 @@ pub fn get_my_disputes(_: ()) -> ExternResult<Vec<Record>> {
     )?;
     records_from_links(links)
 }
+
+// ============================================================================
+// Cross-domain: Verify property before registering water right
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckPropertyForWaterRightInput {
+    /// Property ID to verify in the property registry.
+    pub property_id: String,
+    /// Expected owner DID — if provided, verifies the property owner matches.
+    pub expected_owner_did: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PropertyCheckResult {
+    pub property_exists: bool,
+    pub has_clear_title: bool,
+    pub owner_matches: bool,
+    pub error: Option<String>,
+}
+
+/// Verify a property exists in the registry before registering a water right.
+///
+/// Cross-domain call: water-steward queries property_registry via
+/// `call(CallTargetCell::Local, ...)` to confirm the property exists
+/// and has clear title. This prevents registering water rights for
+/// non-existent or encumbered properties.
+#[hdk_extern]
+pub fn check_property_for_water_right(input: CheckPropertyForWaterRightInput) -> ExternResult<PropertyCheckResult> {
+    // 1. Check if property exists
+    let get_response = call(
+        CallTargetCell::Local,
+        ZomeName::from("property_registry"),
+        FunctionName::from("get_property"),
+        None,
+        input.property_id.clone(),
+    );
+
+    let property_exists = match &get_response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            let record: Option<Record> = extern_io.decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            record.is_some()
+        }
+        _ => false,
+    };
+
+    if !property_exists {
+        return Ok(PropertyCheckResult {
+            property_exists: false,
+            has_clear_title: false,
+            owner_matches: false,
+            error: Some(format!("Property '{}' not found in registry", input.property_id)),
+        });
+    }
+
+    // 2. Check clear title
+    let title_response = call(
+        CallTargetCell::Local,
+        ZomeName::from("property_registry"),
+        FunctionName::from("has_clear_title"),
+        None,
+        input.property_id.clone(),
+    );
+
+    let has_clear_title = match &title_response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            extern_io.decode::<bool>().unwrap_or(false)
+        }
+        _ => false,
+    };
+
+    // 3. Optionally verify ownership
+    let owner_matches = if let Some(ref expected) = input.expected_owner_did {
+        let verify_response = call(
+            CallTargetCell::Local,
+            ZomeName::from("property_registry"),
+            FunctionName::from("verify_ownership"),
+            None,
+            serde_json::json!({
+                "property_id": input.property_id,
+                "expected_owner": expected,
+            }).to_string(),
+        );
+
+        match &verify_response {
+            Ok(ZomeCallResponse::Ok(extern_io)) => {
+                extern_io.decode::<bool>().unwrap_or(false)
+            }
+            _ => false,
+        }
+    } else {
+        true // No ownership check requested
+    };
+
+    Ok(PropertyCheckResult {
+        property_exists,
+        has_clear_title,
+        owner_matches,
+        error: if !has_clear_title {
+            Some("Property has encumbrances — clear title needed for water right".to_string())
+        } else if !owner_matches {
+            Some("Property ownership does not match expected holder".to_string())
+        } else {
+            None
+        },
+    })
+}

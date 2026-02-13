@@ -317,3 +317,106 @@ pub fn get_building_maintenance_history(building_hash: ActionHash) -> ExternResu
 
     Ok(requests)
 }
+
+// ============================================================================
+// Cross-domain: Search community tool library for maintenance resources
+// ============================================================================
+
+/// Wire-compatible copy of mutualaid ResourceType for deserialization.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum MutualAidResourceType {
+    PowerTool, HandTool, GardenTool, CookingEquipment, CraftingSupplies,
+    Car, Truck, Bicycle, Trailer, Boat,
+    MeetingRoom, Workshop, Kitchen, GardenPlot, StorageSpace, ParkingSpot,
+    CampingGear, SportsEquipment, MusicInstrument, Photography, Projector,
+    Custom(String),
+}
+
+/// Wire-compatible copy of mutualaid SearchResourcesInput.
+#[derive(Serialize, Deserialize, Debug)]
+struct LocalSearchResourcesInput {
+    pub resource_type: Option<MutualAidResourceType>,
+    pub available_only: bool,
+    pub query: Option<String>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FindCommunityResourcesInput {
+    /// The maintenance category to search for (maps to resource types).
+    pub maintenance_category: String,
+    /// Optional text query for resource names/descriptions.
+    pub query: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CommunityResourcesResult {
+    pub resources_found: u32,
+    pub has_resources: bool,
+    pub resource_type_searched: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Search the community mutual-aid tool library for resources matching
+/// a maintenance request.
+///
+/// Cross-domain call: housing-maintenance queries mutualaid_resources
+/// via `call(CallTargetCell::Local, ...)` to find community-owned tools
+/// and equipment that could be used for housing repairs.
+#[hdk_extern]
+pub fn find_community_resources_for_repair(input: FindCommunityResourcesInput) -> ExternResult<CommunityResourcesResult> {
+    let resource_type = map_maintenance_to_resource_type(&input.maintenance_category);
+    let type_label = resource_type.as_ref().map(|t| format!("{:?}", t));
+
+    let search = LocalSearchResourcesInput {
+        resource_type,
+        available_only: true,
+        query: input.query,
+        limit: Some(10),
+    };
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::from("mutualaid_resources"),
+        FunctionName::from("search_resources"),
+        None,
+        search,
+    );
+
+    match &response {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            let records: Vec<Record> = extern_io.decode()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Decode error: {:?}", e))))?;
+            let count = records.len() as u32;
+            Ok(CommunityResourcesResult {
+                resources_found: count,
+                has_resources: count > 0,
+                resource_type_searched: type_label,
+                error: None,
+            })
+        }
+        Ok(ZomeCallResponse::NetworkError(err)) => Ok(CommunityResourcesResult {
+            resources_found: 0,
+            has_resources: false,
+            resource_type_searched: type_label,
+            error: Some(format!("Network error: {}", err)),
+        }),
+        _ => Ok(CommunityResourcesResult {
+            resources_found: 0,
+            has_resources: false,
+            resource_type_searched: type_label,
+            error: Some("Failed to query mutualaid resources".into()),
+        }),
+    }
+}
+
+/// Map maintenance category strings to mutualaid resource types.
+fn map_maintenance_to_resource_type(category: &str) -> Option<MutualAidResourceType> {
+    match category.to_lowercase().as_str() {
+        "plumbing" | "electrical" | "structural" => Some(MutualAidResourceType::PowerTool),
+        "painting" | "carpentry" | "general" => Some(MutualAidResourceType::HandTool),
+        "landscaping" | "grounds" => Some(MutualAidResourceType::GardenTool),
+        "workshop" | "fabrication" => Some(MutualAidResourceType::CraftingSupplies),
+        _ => None,
+    }
+}
