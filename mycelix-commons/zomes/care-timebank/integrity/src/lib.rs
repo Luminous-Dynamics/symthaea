@@ -389,14 +389,14 @@ fn validate_create_exchange(
         ));
     }
     if let Some(rating) = exchange.rating_provider {
-        if rating < 1 || rating > 5 {
+        if !(1..=5).contains(&rating) {
             return Ok(ValidateCallbackResult::Invalid(
                 "Provider rating must be 1-5".into(),
             ));
         }
     }
     if let Some(rating) = exchange.rating_recipient {
-        if rating < 1 || rating > 5 {
+        if !(1..=5).contains(&rating) {
             return Ok(ValidateCallbackResult::Invalid(
                 "Recipient rating must be 1-5".into(),
             ));
@@ -447,14 +447,14 @@ fn validate_update_request(request: ServiceRequest) -> ExternResult<ValidateCall
 
 fn validate_update_exchange(exchange: TimeExchange) -> ExternResult<ValidateCallbackResult> {
     if let Some(rating) = exchange.rating_provider {
-        if rating < 1 || rating > 5 {
+        if !(1..=5).contains(&rating) {
             return Ok(ValidateCallbackResult::Invalid(
                 "Provider rating must be 1-5".into(),
             ));
         }
     }
     if let Some(rating) = exchange.rating_recipient {
-        if rating < 1 || rating > 5 {
+        if !(1..=5).contains(&rating) {
             return Ok(ValidateCallbackResult::Invalid(
                 "Recipient rating must be 1-5".into(),
             ));

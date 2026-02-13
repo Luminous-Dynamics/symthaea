@@ -50,14 +50,12 @@ pub fn genesis_self_check(_data: GenesisSelfCheckData) -> ExternResult<ValidateC
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(store_entry) => match store_entry {
-            OpEntry::CreateEntry { app_entry, action: _ } => match app_entry {
-                EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-                EntryTypes::Query(query) => validate_query(&query),
-                EntryTypes::Event(event) => validate_event(&event),
-            },
-            _ => Ok(ValidateCallbackResult::Valid),
+        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, action: _ }) => match app_entry {
+            EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            EntryTypes::Query(query) => validate_query(&query),
+            EntryTypes::Event(event) => validate_event(&event),
         },
+        FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
         _ => Ok(ValidateCallbackResult::Valid),
     }
 }

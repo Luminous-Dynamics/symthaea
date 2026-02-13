@@ -342,11 +342,7 @@ pub fn accept_transfer(input: AcceptTransferInput) -> ExternResult<Record> {
                     return Err(wasm_error!(WasmErrorInner::Guest("Transfer not in acceptable state".into())));
                 }
 
-                let new_status = if transfer.conditions.is_empty() {
-                    TransferStatus::ConditionsPending
-                } else {
-                    TransferStatus::ConditionsPending
-                };
+                let new_status = TransferStatus::ConditionsPending;
 
                 let accepted = Transfer {
                     status: new_status,

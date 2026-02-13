@@ -280,7 +280,7 @@ pub fn get_team_sitreps(team_hash: ActionHash) -> ExternResult<Vec<Record>> {
         }
     }
 
-    sitreps.sort_by(|a, b| a.action().timestamp().cmp(&b.action().timestamp()));
+    sitreps.sort_by_key(|a| a.action().timestamp());
     Ok(sitreps)
 }
 

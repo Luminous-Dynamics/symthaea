@@ -351,11 +351,7 @@ pub fn get_financial_summary(input: FinancialSummaryInput) -> ExternResult<Finan
         }
     }
 
-    let outstanding_cents = if total_charges_cents > total_payments_cents {
-        total_charges_cents - total_payments_cents
-    } else {
-        0
-    };
+    let outstanding_cents = total_charges_cents.saturating_sub(total_payments_cents);
 
     Ok(FinancialSummary {
         total_charges_cents,

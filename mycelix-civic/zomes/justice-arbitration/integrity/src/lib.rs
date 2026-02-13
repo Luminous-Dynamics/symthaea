@@ -858,7 +858,7 @@ fn validate_mediation(mediation: &Mediation) -> ExternResult<ValidateCallbackRes
 
 fn validate_arbitration(arb: &Arbitration) -> ExternResult<ValidateCallbackResult> {
     // Must have odd number of arbitrators for voting
-    if arb.arbitrators.len() % 2 == 0 {
+    if arb.arbitrators.len().is_multiple_of(2) {
         return Ok(ValidateCallbackResult::Invalid(
             "Arbitration panel must have odd number of arbitrators".into(),
         ));

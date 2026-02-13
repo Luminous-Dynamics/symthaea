@@ -498,7 +498,7 @@ pub fn get_ownership_history(property_id: String) -> ExternResult<Vec<OwnershipR
     }
 
     // Sort by issue date (oldest first)
-    history.sort_by_key(|r| r.issued.as_micros() as i64);
+    history.sort_by_key(|r| r.issued.as_micros());
 
     Ok(history)
 }

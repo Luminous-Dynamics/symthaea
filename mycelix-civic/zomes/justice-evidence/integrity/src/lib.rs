@@ -57,11 +57,8 @@ pub enum LinkTypes { ComplaintToEvidence, SubmitterToEvidence, EvidenceToVerific
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
     match op.flattened::<EntryTypes, LinkTypes>()? {
-        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. }) => match app_entry {
-            EntryTypes::Evidence(evidence) => validate_evidence(&evidence),
-            _ => Ok(ValidateCallbackResult::Valid),
-        },
-        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
+        FlatOp::StoreEntry(OpEntry::CreateEntry { app_entry, .. })
+        | FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
             EntryTypes::Evidence(evidence) => validate_evidence(&evidence),
             _ => Ok(ValidateCallbackResult::Valid),
         },

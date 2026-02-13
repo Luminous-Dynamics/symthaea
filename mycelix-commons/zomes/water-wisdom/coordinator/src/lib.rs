@@ -247,7 +247,7 @@ pub fn get_regional_patterns(region: String) -> ExternResult<Vec<Record>> {
         GetStrategy::default(),
     )?;
     let mut records = records_from_links(links)?;
-    records.sort_by(|a, b| a.action().timestamp().cmp(&b.action().timestamp()));
+    records.sort_by_key(|a| a.action().timestamp());
     Ok(records)
 }
 

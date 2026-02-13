@@ -236,7 +236,7 @@ fn validate_create_reading(
 
     // pH must be in [0, 14] if provided
     if let Some(ph) = reading.ph {
-        if ph < 0.0 || ph > 14.0 {
+        if !(0.0..=14.0).contains(&ph) {
             return Ok(ValidateCallbackResult::Invalid(
                 "pH must be between 0 and 14".into(),
             ));
@@ -245,7 +245,7 @@ fn validate_create_reading(
 
     // Temperature sanity check
     if let Some(temp) = reading.temperature_celsius {
-        if temp < -50.0 || temp > 100.0 {
+        if !(-50.0..=100.0).contains(&temp) {
             return Ok(ValidateCallbackResult::Invalid(
                 "Temperature must be between -50 and 100 Celsius".into(),
             ));

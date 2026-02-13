@@ -182,7 +182,7 @@ fn validate_credit_line(line: CreditLine) -> ExternResult<ValidateCallbackResult
     }
 
     // Balance cannot exceed credit limit (too negative)
-    if line.balance < -(line.credit_limit as i64) {
+    if line.balance < -line.credit_limit {
         return Ok(ValidateCallbackResult::Invalid(
             "Balance exceeds credit limit".to_string(),
         ));

@@ -68,7 +68,7 @@ pub fn get_source_readings(source_hash: ActionHash) -> ExternResult<Vec<Record>>
         GetStrategy::default(),
     )?;
     let mut records = records_from_links(links)?;
-    records.sort_by(|a, b| a.action().timestamp().cmp(&b.action().timestamp()));
+    records.sort_by_key(|a| a.action().timestamp());
     Ok(records)
 }
 
@@ -89,7 +89,7 @@ pub fn check_potability(source_hash: ActionHash) -> ExternResult<PotabilityResul
         let mut warnings = Vec::new();
 
         if let Some(ph) = reading.ph {
-            if ph < 6.5 || ph > 8.5 {
+            if !(6.5..=8.5).contains(&ph) {
                 warnings.push(format!("pH out of range: {:.1}", ph));
             }
         }

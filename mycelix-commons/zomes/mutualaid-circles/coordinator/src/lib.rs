@@ -478,9 +478,9 @@ pub fn get_circle_balances(circle_hash: ActionHash) -> ExternResult<Vec<Balance>
                 .flatten()
             {
                 let credit_available = if line.balance < 0 {
-                    line.credit_limit as i64 + line.balance
+                    line.credit_limit + line.balance
                 } else {
-                    line.credit_limit as i64
+                    line.credit_limit
                 };
 
                 balances.push(Balance {
