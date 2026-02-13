@@ -587,7 +587,7 @@ jobs:
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity/crates/mycelix-crypto && cargo check --target wasm32-unknown-unknown --features wasm"
 
-      - name: Identity unit tests (261 tests)
+      - name: Identity unit tests (267 tests)
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity && cargo test --lib -- --test-threads=1"
 
@@ -598,6 +598,10 @@ jobs:
       - name: Run sweettest - MFA Identity (7 tests)
         run: |
           nix develop ./mycelix-identity --command bash -c "cd mycelix-identity/tests && cargo test --release mfa -- --ignored --test-threads=1 --nocapture"
+
+      - name: Run sweettest - Identity Integration (30 tests)
+        run: |
+          nix develop ./mycelix-identity --command bash -c "cd mycelix-identity/tests && cargo test --release sweettest_integration -- --ignored --test-threads=1 --nocapture"
 
       - name: Run MFA Unit Tests
         run: |
@@ -1020,7 +1024,7 @@ jobs:
           echo "| Lint Zomes | $(format_status '${{ needs.lint-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Integration Tests | $(format_status '${{ needs.integration-test.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| SDK Conductor Tests | $(format_status '${{ needs.sdk-conductor-tests.result }}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| **Sweettest Integration (85 tests)** | $(format_status '${{ needs.sweettest.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Sweettest Integration (115 tests)** | $(format_status '${{ needs.sweettest.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Package DNAs | $(format_status '${{ needs.package-dna.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Package hApps | $(format_status '${{ needs.package-happs.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -1029,9 +1033,10 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Suite | Tests | Description |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|-------------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Identity unit tests | 261 | DID registry, VC lifecycle, revocation, MFA, bridge, education, trust, crypto types |" >> $GITHUB_STEP_SUMMARY
+          echo "| Identity unit tests | 267 | DID registry, VC lifecycle, revocation, MFA, bridge, education, trust, crypto types |" >> $GITHUB_STEP_SUMMARY
           echo "| Sweettest Identity | 4 | DID registration, profile updates, trust attestations |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest Identity PQC** | 6 | Hybrid signatures, ML-KEM key agreement, PQC verification methods |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Sweettest Identity Integration** | 30 | DID lifecycle, VC lifecycle, trust attestation, security edge cases, bridge events, social recovery, key rotation |" >> $GITHUB_STEP_SUMMARY
           echo "| **Sweettest MFA Identity** | 7 | MFA state, factor enrollment, assurance levels, FL eligibility |" >> $GITHUB_STEP_SUMMARY
           echo "| mycelix-crypto native | 58 | Ed25519, ML-DSA-65/87, SPHINCS+, hybrid, ML-KEM, XChaCha20, fuzz |" >> $GITHUB_STEP_SUMMARY
           echo "| MFA Unit Tests | 16 | Decay calculations, factor strength, assurance scores |" >> $GITHUB_STEP_SUMMARY

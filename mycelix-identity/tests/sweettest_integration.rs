@@ -298,6 +298,106 @@ pub struct TrustVerificationResult {
     pub message: String,
 }
 
+/// Mirror of recovery_integrity::RecoveryConfig
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RecoveryConfig {
+    pub did: String,
+    pub owner: AgentPubKey,
+    pub trustees: Vec<String>,
+    pub threshold: u32,
+    pub time_lock: u64,
+    pub active: bool,
+    pub created: Timestamp,
+    pub updated: Timestamp,
+}
+
+/// Mirror of recovery_integrity::RecoveryRequest
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RecoveryRequest {
+    pub id: String,
+    pub did: String,
+    pub new_agent: AgentPubKey,
+    pub initiated_by: String,
+    pub reason: String,
+    pub status: RecoveryStatus,
+    pub created: Timestamp,
+    pub time_lock_expires: Option<Timestamp>,
+}
+
+/// Mirror of recovery_integrity::RecoveryVote
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RecoveryVote {
+    pub request_id: String,
+    pub trustee: String,
+    pub vote: VoteDecision,
+    pub comment: Option<String>,
+    pub voted_at: Timestamp,
+}
+
+/// Mirror of recovery_integrity::RecoveryStatus
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum RecoveryStatus {
+    Pending,
+    Approved,
+    ReadyToExecute,
+    Completed,
+    Rejected,
+    Cancelled,
+}
+
+/// Mirror of recovery_integrity::VoteDecision
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum VoteDecision {
+    Approve,
+    Reject,
+    Abstain,
+}
+
+/// Mirror of recovery coordinator::SetupRecoveryInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SetupRecoveryInput {
+    pub did: String,
+    pub trustees: Vec<String>,
+    pub threshold: u32,
+    pub time_lock: Option<u64>,
+}
+
+/// Mirror of recovery coordinator::InitiateRecoveryInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct InitiateRecoveryInput {
+    pub did: String,
+    pub initiator_did: String,
+    pub new_agent: AgentPubKey,
+    pub reason: String,
+}
+
+/// Mirror of recovery coordinator::VoteOnRecoveryInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct VoteOnRecoveryInput {
+    pub request_id: String,
+    pub trustee_did: String,
+    pub vote: VoteDecision,
+    pub comment: Option<String>,
+}
+
+/// Mirror of did_registry coordinator::RotateKeyInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RotateKeyInput {
+    pub old_key_id: String,
+    pub new_method: VerificationMethod,
+}
+
+/// Mirror of did_registry coordinator::UpdateDidInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct UpdateDidInput {
+    #[serde(rename = "verificationMethod", alias = "verification_method")]
+    pub verification_method: Option<Vec<VerificationMethod>>,
+    pub authentication: Option<Vec<String>>,
+    #[serde(rename = "keyAgreement", alias = "key_agreement")]
+    pub key_agreement: Option<Vec<String>>,
+    pub service: Option<Vec<ServiceEndpoint>>,
+}
+
 // ============================================================================
 // Test Utilities
 // ============================================================================
@@ -1312,14 +1412,6 @@ mod mfa_tests {
 // Security edge case tests (SEC-005, SEC-017, FIND-001, FIND-003)
 // ============================================================================
 
-/// Mirror of UpdateDidInput for security tests
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct UpdateDidInput {
-    pub verification_method: Option<Vec<VerificationMethod>>,
-    pub authentication: Option<Vec<String>>,
-    pub service: Option<Vec<ServiceEndpoint>>,
-}
-
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
 async fn test_reject_malformed_multibase_key_no_prefix() {
@@ -1342,6 +1434,7 @@ async fn test_reject_malformed_multibase_key_no_prefix() {
             public_key_multibase: "ABCDEF1234567890ABCDEF1234567890ABCDEF12".to_string(),
         }]),
         authentication: None,
+        key_agreement: None,
         service: None,
     };
 
@@ -1373,6 +1466,7 @@ async fn test_reject_multibase_key_with_invalid_base58_chars() {
             public_key_multibase: "z0OIlInvalidBase58Characters!!".to_string(),
         }]),
         authentication: None,
+        key_agreement: None,
         service: None,
     };
 
@@ -1404,6 +1498,7 @@ async fn test_reject_multibase_key_too_short() {
             public_key_multibase: "zABC".to_string(),
         }]),
         authentication: None,
+        key_agreement: None,
         service: None,
     };
 
@@ -1435,6 +1530,7 @@ async fn test_accept_valid_non_ed25519_key_type() {
             public_key_multibase: "zSomeOpaqueKeyMaterial12345678901234567890".to_string(),
         }]),
         authentication: None,
+        key_agreement: None,
         service: None,
     };
 
@@ -1950,5 +2046,347 @@ mod trust_attestation_tests {
             still_pending.is_empty(),
             "Fulfilled request should no longer be pending"
         );
+    }
+}
+
+// ============================================================================
+// Social Recovery E2E Tests
+// ============================================================================
+
+#[cfg(test)]
+mod social_recovery_tests {
+    use super::*;
+
+    /// Full recovery lifecycle: setup → initiate → vote (reach threshold) → execute
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_recovery_setup_initiate_vote_execute() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-recovery", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // 1. Create owner DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
+        let owner_did = did_doc.id.clone();
+
+        // 2. Setup recovery with 3 trustees, threshold 2
+        let trustee1 = "did:mycelix:trustee-alice".to_string();
+        let trustee2 = "did:mycelix:trustee-bob".to_string();
+        let trustee3 = "did:mycelix:trustee-carol".to_string();
+
+        let setup_input = SetupRecoveryInput {
+            did: owner_did.clone(),
+            trustees: vec![trustee1.clone(), trustee2.clone(), trustee3.clone()],
+            threshold: 2,
+            time_lock: Some(86400), // 1 day (minimum)
+        };
+
+        let config_record: Record = conductor
+            .call(&cell.zome("recovery"), "setup_recovery", setup_input)
+            .await;
+
+        let config: RecoveryConfig =
+            decode_entry(&config_record).expect("Failed to decode RecoveryConfig");
+
+        assert_eq!(config.did, owner_did, "Config DID should match");
+        assert_eq!(config.trustees.len(), 3, "Should have 3 trustees");
+        assert_eq!(config.threshold, 2, "Threshold should be 2");
+        assert!(config.active, "Config should be active");
+
+        // 3. Verify config retrieval
+        let retrieved: Option<Record> = conductor
+            .call(&cell.zome("recovery"), "get_recovery_config", owner_did.clone())
+            .await;
+        assert!(retrieved.is_some(), "Recovery config should be retrievable");
+
+        // 4. Initiate recovery (trustee1 starts it)
+        let new_agent = app.agent().clone(); // reuse agent for test simplicity
+        let initiate_input = InitiateRecoveryInput {
+            did: owner_did.clone(),
+            initiator_did: trustee1.clone(),
+            new_agent: new_agent.clone(),
+            reason: "Owner lost access to device".to_string(),
+        };
+
+        let request_record: Record = conductor
+            .call(&cell.zome("recovery"), "initiate_recovery", initiate_input)
+            .await;
+
+        let request: RecoveryRequest =
+            decode_entry(&request_record).expect("Failed to decode RecoveryRequest");
+
+        assert_eq!(request.did, owner_did, "Request DID should match");
+        assert_eq!(request.initiated_by, trustee1, "Initiator should match");
+        assert!(
+            request.status == RecoveryStatus::Pending || request.status == RecoveryStatus::Approved,
+            "Status should be Pending or Approved (initiator auto-votes), got: {:?}",
+            request.status
+        );
+
+        // 5. Second trustee votes to approve (should reach threshold of 2)
+        let vote_input = VoteOnRecoveryInput {
+            request_id: request.id.clone(),
+            trustee_did: trustee2.clone(),
+            vote: VoteDecision::Approve,
+            comment: Some("I confirm identity via phone call".to_string()),
+        };
+
+        let _vote_record: Record = conductor
+            .call(&cell.zome("recovery"), "vote_on_recovery", vote_input)
+            .await;
+
+        // 6. Check votes
+        let votes: Vec<Record> = conductor
+            .call(
+                &cell.zome("recovery"),
+                "get_recovery_votes",
+                request.id.clone(),
+            )
+            .await;
+
+        assert!(
+            votes.len() >= 2,
+            "Should have at least 2 votes (initiator auto-vote + trustee2), got {}",
+            votes.len()
+        );
+
+        // 7. Get updated request - should be Approved (threshold reached)
+        let updated_request: Option<Record> = conductor
+            .call(
+                &cell.zome("recovery"),
+                "get_recovery_request",
+                request.id.clone(),
+            )
+            .await;
+
+        if let Some(req_record) = updated_request {
+            let req: RecoveryRequest =
+                decode_entry(&req_record).expect("Failed to decode updated request");
+            assert!(
+                req.status == RecoveryStatus::Approved
+                    || req.status == RecoveryStatus::ReadyToExecute
+                    || req.status == RecoveryStatus::Completed,
+                "Request should be at least Approved after threshold, got: {:?}",
+                req.status
+            );
+        }
+    }
+
+    /// Setup recovery and verify trustee responsibilities query
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_trustee_responsibilities_query() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-trustee-query", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
+
+        let trustee_did = "did:mycelix:trustee-dan".to_string();
+
+        // Setup recovery with the trustee
+        let setup_input = SetupRecoveryInput {
+            did: did_doc.id.clone(),
+            trustees: vec![
+                trustee_did.clone(),
+                "did:mycelix:trustee-eve".to_string(),
+                "did:mycelix:trustee-frank".to_string(),
+            ],
+            threshold: 2,
+            time_lock: Some(86400),
+        };
+
+        let _: Record = conductor
+            .call(&cell.zome("recovery"), "setup_recovery", setup_input)
+            .await;
+
+        // Query trustee responsibilities
+        let responsibilities: Vec<Record> = conductor
+            .call(
+                &cell.zome("recovery"),
+                "get_trustee_responsibilities",
+                trustee_did.clone(),
+            )
+            .await;
+
+        assert!(
+            !responsibilities.is_empty(),
+            "Trustee should have at least one responsibility"
+        );
+    }
+}
+
+// ============================================================================
+// Key Rotation E2E Tests
+// ============================================================================
+
+#[cfg(test)]
+mod key_rotation_tests {
+    use super::*;
+
+    /// Create DID → update verification method → resolve → verify new state
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_did_key_rotation_via_update() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-key-rotation", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // 1. Create DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
+        let did_id = did_doc.id.clone();
+
+        assert_eq!(did_doc.version, 1, "Initial version should be 1");
+        let initial_vm_count = did_doc.verification_method.len();
+        assert!(initial_vm_count > 0, "Should have initial verification method");
+
+        let initial_key = did_doc.verification_method[0].public_key_multibase.clone();
+        let initial_auth = did_doc.authentication.clone();
+
+        // 2. Update DID with a new verification method (simulate key rotation via update_did_document)
+        let new_method = VerificationMethod {
+            id: "#keys-2".to_string(),
+            type_: "Multikey".to_string(),
+            controller: did_id.clone(),
+            public_key_multibase: "z6Mktest123rotatedkey456".to_string(),
+        };
+
+        let mut updated_methods = did_doc.verification_method.clone();
+        // Deprecate old key
+        updated_methods[0].id = format!("{}-deprecated-v1", updated_methods[0].id);
+        updated_methods.push(new_method.clone());
+
+        let update_input = UpdateDidInput {
+            verification_method: Some(updated_methods.clone()),
+            authentication: Some(vec!["#keys-2".to_string()]),
+            key_agreement: None,
+            service: None,
+        };
+
+        let updated_record: Record = conductor
+            .call(&cell.zome("did_registry"), "update_did_document", update_input)
+            .await;
+
+        let updated_doc: DidDocument =
+            decode_entry(&updated_record).expect("Failed to decode updated DID");
+
+        // 3. Verify the updated DID
+        assert_eq!(updated_doc.version, 2, "Version should increment to 2");
+        assert_eq!(
+            updated_doc.verification_method.len(),
+            initial_vm_count + 1,
+            "Should have old (deprecated) + new method"
+        );
+        assert!(
+            updated_doc.authentication.contains(&"#keys-2".to_string()),
+            "Authentication should reference new key"
+        );
+        assert!(
+            !updated_doc.authentication.contains(&initial_auth[0]),
+            "Authentication should no longer reference old key"
+        );
+
+        // 4. Resolve the DID and verify it returns the updated state
+        let resolved: Option<Record> = conductor
+            .call(&cell.zome("did_registry"), "resolve_did", did_id.clone())
+            .await;
+
+        let resolved_doc: DidDocument =
+            decode_entry(&resolved.expect("DID resolution should succeed"))
+                .expect("Failed to decode resolved DID");
+
+        assert_eq!(resolved_doc.version, 2, "Resolved version should be 2");
+
+        // Verify deprecated key is still present (for old signature verification)
+        let deprecated_keys: Vec<_> = resolved_doc
+            .verification_method
+            .iter()
+            .filter(|m| m.id.contains("deprecated"))
+            .collect();
+        assert_eq!(deprecated_keys.len(), 1, "Should have exactly one deprecated key");
+        assert_eq!(
+            deprecated_keys[0].public_key_multibase, initial_key,
+            "Deprecated key should retain original public key material"
+        );
+
+        // New key should be present
+        let new_keys: Vec<_> = resolved_doc
+            .verification_method
+            .iter()
+            .filter(|m| m.id == "#keys-2")
+            .collect();
+        assert_eq!(new_keys.len(), 1, "Should have new key");
+    }
+
+    /// Add a service endpoint, then update DID to remove it
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires holochain conductor - run with: cargo test --release -- --ignored"]
+    async fn test_did_service_update_lifecycle() {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("test-service-update", &[dna]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create DID
+        let did_record: Record = conductor
+            .call(&cell.zome("did_registry"), "create_did", ())
+            .await;
+        let _did_doc: DidDocument = decode_entry(&did_record).expect("Failed to decode DID");
+
+        // Add service endpoint via update
+        let svc = ServiceEndpoint {
+            id: "#messaging".to_string(),
+            type_: "MessagingService".to_string(),
+            service_endpoint: "https://example.com/msg".to_string(),
+        };
+
+        let update_input = UpdateDidInput {
+            verification_method: None, // preserve
+            authentication: None,       // preserve
+            key_agreement: None,        // preserve
+            service: Some(vec![svc.clone()]),
+        };
+
+        let updated: Record = conductor
+            .call(&cell.zome("did_registry"), "update_did_document", update_input)
+            .await;
+
+        let updated_doc: DidDocument =
+            decode_entry(&updated).expect("Failed to decode updated DID");
+
+        assert_eq!(updated_doc.service.len(), 1, "Should have one service");
+        assert_eq!(updated_doc.service[0].id, "#messaging");
+        assert_eq!(updated_doc.version, 2);
+
+        // Remove the service by updating with empty array
+        let remove_input = UpdateDidInput {
+            verification_method: None,
+            authentication: None,
+            key_agreement: None,
+            service: Some(vec![]),
+        };
+
+        let removed: Record = conductor
+            .call(&cell.zome("did_registry"), "update_did_document", remove_input)
+            .await;
+
+        let removed_doc: DidDocument =
+            decode_entry(&removed).expect("Failed to decode removed service DID");
+
+        assert!(removed_doc.service.is_empty(), "Service list should be empty after removal");
+        assert_eq!(removed_doc.version, 3, "Version should be 3 after two updates");
     }
 }

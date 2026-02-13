@@ -155,6 +155,60 @@ fn key_file_deterministic_fields() {
 }
 
 #[test]
+fn slh_dsa_key_roundtrip() {
+    ensure_built();
+    keygen_sign_verify("slh-dsa-sha2-128s", "slhdsa");
+}
+
+#[test]
+fn hybrid_dual_key_verify() {
+    ensure_built();
+    let dir = tempfile::tempdir().unwrap();
+    let ed_key = dir.path().join("ed-key.json");
+    let pqc_key = dir.path().join("pqc-key.json");
+    let cred_path = dir.path().join("credential.json");
+    let signed_path = dir.path().join("hybrid-signed.json");
+
+    std::fs::write(&cred_path, r#"{"type":"DualKeyTest","value":99}"#).unwrap();
+
+    // Generate separate Ed25519 and ML-DSA-65 keys
+    let output = run_cli(&["keygen", "--algorithm", "ed25519", "--output", ed_key.to_str().unwrap()]);
+    assert!(output.status.success(), "Ed25519 keygen failed: {}", String::from_utf8_lossy(&output.stderr));
+
+    let output = run_cli(&["keygen", "--algorithm", "ml-dsa-65", "--output", pqc_key.to_str().unwrap()]);
+    assert!(output.status.success(), "ML-DSA-65 keygen failed: {}", String::from_utf8_lossy(&output.stderr));
+
+    // Sign with hybrid-sign using both keys
+    let output = run_cli(&[
+        "hybrid-sign",
+        "--ed25519-key", ed_key.to_str().unwrap(),
+        "--pqc-key", pqc_key.to_str().unwrap(),
+        "--credential", cred_path.to_str().unwrap(),
+        "--output", signed_path.to_str().unwrap(),
+    ]);
+    assert!(output.status.success(), "hybrid-sign failed: {}", String::from_utf8_lossy(&output.stderr));
+
+    // Verify with dual-key path (--ed25519-key + --pqc-key)
+    let output = run_cli(&[
+        "pqc-verify",
+        "--credential", signed_path.to_str().unwrap(),
+        "--ed25519-key", ed_key.to_str().unwrap(),
+        "--pqc-key", pqc_key.to_str().unwrap(),
+        "--verbose",
+    ]);
+    assert!(output.status.success(), "Dual-key verify failed: {}", String::from_utf8_lossy(&output.stderr));
+
+    // Also verify with single --key using the Ed25519 key (should detect hybrid and handle)
+    let output = run_cli(&[
+        "pqc-verify",
+        "--credential", signed_path.to_str().unwrap(),
+        "--verbose",
+    ]);
+    assert!(output.status.success(), "Structure-only verify of hybrid-signed failed: {}",
+        String::from_utf8_lossy(&output.stderr));
+}
+
+#[test]
 fn tampered_signature_rejected() {
     ensure_built();
     let dir = tempfile::tempdir().unwrap();
