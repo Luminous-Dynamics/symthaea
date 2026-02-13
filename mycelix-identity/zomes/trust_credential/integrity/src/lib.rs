@@ -257,9 +257,20 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 /// Validate trust credential creation
 fn validate_create_credential(
-    _action: Create,
+    action: Create,
     cred: TrustCredential,
 ) -> ExternResult<ValidateCallbackResult> {
+    // Issuer must be the action author (prevent impersonation)
+    let expected_issuer = format!("did:mycelix:{}", action.author);
+    if cred.issuer_did != expected_issuer {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!(
+                "Issuer DID must match action author. Expected '{}', got '{}'",
+                expected_issuer, cred.issuer_did
+            ),
+        ));
+    }
+
     // Subject must be a valid DID
     if !cred.subject_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid(

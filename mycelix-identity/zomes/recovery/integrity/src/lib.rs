@@ -4,6 +4,7 @@
 //! Updated to use HDI 0.7 patterns with FlatOp validation
 
 use hdi::prelude::*;
+use std::collections::HashSet;
 
 /// Recovery configuration for a DID
 #[hdk_entry_helper]
@@ -207,6 +208,14 @@ fn validate_create_recovery_config(
         ));
     }
 
+    // Validate all trustees are unique (prevent Sybil attacks)
+    let unique_trustees: HashSet<&String> = config.trustees.iter().collect();
+    if unique_trustees.len() != config.trustees.len() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Duplicate trustees are not allowed".into(),
+        ));
+    }
+
     // Validate all trustees are valid DIDs
     for trustee in &config.trustees {
         if !trustee.starts_with("did:") {
@@ -229,6 +238,14 @@ fn validate_update_recovery_config(
     if config.trustees.len() < 3 || config.trustees.len() > 7 {
         return Ok(ValidateCallbackResult::Invalid(
             "Must have 3-7 trustees".into(),
+        ));
+    }
+
+    // Validate all trustees are unique (prevent Sybil attacks)
+    let unique_trustees: HashSet<&String> = config.trustees.iter().collect();
+    if unique_trustees.len() != config.trustees.len() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Duplicate trustees are not allowed".into(),
         ));
     }
 
@@ -280,7 +297,7 @@ fn validate_create_recovery_request(
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Validate recovery request update
+/// Validate recovery request update (status transitions)
 fn validate_update_recovery_request(
     _action: Update,
     request: RecoveryRequest,
@@ -289,6 +306,21 @@ fn validate_update_recovery_request(
     if !request.did.starts_with("did:mycelix:") {
         return Ok(ValidateCallbackResult::Invalid(
             "DID must start with 'did:mycelix:'".into(),
+        ));
+    }
+
+    // Validate status transitions:
+    // Completed status requires time_lock_expires to be set (timelock was applied)
+    if request.status == RecoveryStatus::Completed && request.time_lock_expires.is_none() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot complete recovery without timelock (time_lock_expires must be set)".into(),
+        ));
+    }
+
+    // Approved status must have time_lock_expires set
+    if request.status == RecoveryStatus::Approved && request.time_lock_expires.is_none() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Approved recovery must have time_lock_expires set".into(),
         ));
     }
 

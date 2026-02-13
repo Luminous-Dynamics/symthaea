@@ -48,22 +48,30 @@ fn verify_mfa_assurance_for_recovery(did: &str) -> ExternResult<bool> {
             Ok(score >= 0.25)
         }
         ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            // MFA zome not available - allow recovery without MFA check
-            // This maintains backwards compatibility
-            debug!("MFA zome unauthorized - proceeding without MFA verification");
-            Ok(true)
+            // MFA zome not installed — this is a configuration issue, not a security bypass.
+            // Fail safe: deny rather than silently allow.
+            warn!("MFA zome unauthorized — denying recovery operation (MFA zome must be installed)");
+            Err(wasm_error!(WasmErrorInner::Guest(
+                "MFA verification unavailable (zome unauthorized). Recovery denied for safety.".into()
+            )))
         }
         ZomeCallResponse::NetworkError(err) => {
-            debug!("MFA zome network error: {} - proceeding without MFA verification", err);
-            Ok(true)
+            warn!("MFA zome network error: {} — denying recovery operation", err);
+            Err(wasm_error!(WasmErrorInner::Guest(
+                format!("MFA verification failed (network error: {}). Retry later.", err)
+            )))
         }
         ZomeCallResponse::CountersigningSession(err) => {
-            debug!("MFA countersigning error: {} - proceeding without MFA verification", err);
-            Ok(true)
+            warn!("MFA countersigning error: {} — denying recovery operation", err);
+            Err(wasm_error!(WasmErrorInner::Guest(
+                format!("MFA verification failed (countersigning: {}). Retry later.", err)
+            )))
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
-            debug!("MFA authentication failed - proceeding without MFA verification");
-            Ok(true)
+            warn!("MFA authentication failed — denying recovery operation");
+            Err(wasm_error!(WasmErrorInner::Guest(
+                "MFA verification failed (authentication). Recovery denied for safety.".into()
+            )))
         }
     }
 }
@@ -399,6 +407,22 @@ pub fn vote_on_recovery(input: VoteOnRecoveryInput) -> ExternResult<Record> {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Voter does not meet MFA requirements (minimum Basic level required)".into()
         )));
+    }
+
+    // Prevent duplicate votes: check if this trustee already voted on this request
+    let existing_votes = get_recovery_votes(input.request_id.clone())?;
+    for record in &existing_votes {
+        if let Some(existing_vote) = record
+            .entry()
+            .to_app_option::<RecoveryVote>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            if existing_vote.trustee == input.trustee_did {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    format!("Trustee {} has already voted on this recovery request", input.trustee_did)
+                )));
+            }
+        }
     }
 
     let now = sys_time()?;

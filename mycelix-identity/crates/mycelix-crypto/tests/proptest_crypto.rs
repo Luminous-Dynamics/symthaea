@@ -79,7 +79,7 @@ proptest! {
     }
 }
 
-// ML-DSA-87: sign→verify succeeds
+// ML-DSA-87: sign→verify succeeds + tamper detection
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(4))]
 
@@ -91,10 +91,25 @@ proptest! {
         let ok = MlDsa87Verifier.verify(&pk, &msg, &sig).unwrap();
         prop_assert!(ok, "ML-DSA-87 verify failed for msg len {}", msg.len());
     }
+
+    #[test]
+    fn mldsa87_wrong_message_rejected(
+        msg in prop::collection::vec(any::<u8>(), 1..512),
+        flip_idx in 0usize..512,
+    ) {
+        let signer = MlDsa87Signer::generate();
+        let pk = signer.public_key();
+        let sig = signer.sign(&msg).unwrap();
+        let mut wrong_msg = msg.clone();
+        let idx = flip_idx % wrong_msg.len();
+        wrong_msg[idx] ^= 0xFF;
+        let ok = MlDsa87Verifier.verify(&pk, &wrong_msg, &sig).unwrap();
+        prop_assert!(!ok, "ML-DSA-87 should reject tampered message");
+    }
 }
 
-// SLH-DSA-SHA2-128s: sign→verify succeeds
-// Very slow (~1s/sign) so only 2 cases
+// SLH-DSA-SHA2-128s: sign→verify succeeds + tamper detection
+// Very slow (~1s/sign) so only 2 cases each
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(2))]
 
@@ -105,6 +120,21 @@ proptest! {
         let sig = signer.sign(&msg).unwrap();
         let ok = SlhDsaSha2128sVerifier.verify(&pk, &msg, &sig).unwrap();
         prop_assert!(ok, "SLH-DSA verify failed for msg len {}", msg.len());
+    }
+
+    #[test]
+    fn slhdsa_wrong_message_rejected(
+        msg in prop::collection::vec(any::<u8>(), 1..256),
+        flip_idx in 0usize..256,
+    ) {
+        let signer = SlhDsaSha2128sSigner::generate();
+        let pk = signer.public_key();
+        let sig = signer.sign(&msg).unwrap();
+        let mut wrong_msg = msg.clone();
+        let idx = flip_idx % wrong_msg.len();
+        wrong_msg[idx] ^= 0xFF;
+        let ok = SlhDsaSha2128sVerifier.verify(&pk, &wrong_msg, &sig).unwrap();
+        prop_assert!(!ok, "SLH-DSA should reject tampered message");
     }
 }
 
